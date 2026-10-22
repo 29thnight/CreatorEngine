@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "title": "간접 명령 그룹·패킷 레코드 재사용",
+  "report": "../index.html",
+  "datasets": [
+    {
+      "id": "on-a-baseline",
+      "variant": "on-a",
+      "mode": "baseline",
+      "begin": 0,
+      "end": 15539.4943,
+      "events": 1482692,
+      "measurements": 740,
+      "cpu": "on-a-baseline.json",
+      "gpu": "on-a-baseline-gpu.json",
+      "label": "재사용 ON · A · 기록 ON"
+    },
+    {
+      "id": "on-a-etw",
+      "variant": "on-a",
+      "mode": "etw",
+      "begin": 0,
+      "end": 42355.617,
+      "events": 1379658,
+      "measurements": 676,
+      "cpu": "on-a-etw.json",
+      "gpu": "on-a-etw-gpu.json",
+      "label": "재사용 ON · A · ETW"
+    },
+    {
+      "id": "off-a-baseline",
+      "variant": "off-a",
+      "mode": "baseline",
+      "begin": 0,
+      "end": 15559.8914,
+      "events": 1348908,
+      "measurements": 658,
+      "cpu": "off-a-baseline.json",
+      "gpu": "off-a-baseline-gpu.json",
+      "label": "재사용 OFF · A · 기록 ON"
+    },
+    {
+      "id": "off-a-etw",
+      "variant": "off-a",
+      "mode": "etw",
+      "begin": 0,
+      "end": 42413.325,
+      "events": 1362588,
+      "measurements": 664,
+      "cpu": "off-a-etw.json",
+      "gpu": "off-a-etw-gpu.json",
+      "label": "재사용 OFF · A · ETW"
+    },
+    {
+      "id": "off-b-baseline",
+      "variant": "off-b",
+      "mode": "baseline",
+      "begin": 0,
+      "end": 15566.2422,
+      "events": 1382036,
+      "measurements": 678,
+      "cpu": "off-b-baseline.json",
+      "gpu": "off-b-baseline-gpu.json",
+      "label": "재사용 OFF · B · 기록 ON"
+    },
+    {
+      "id": "on-b-baseline",
+      "variant": "on-b",
+      "mode": "baseline",
+      "begin": 0,
+      "end": 15575.391,
+      "events": 1389589,
+      "measurements": 683,
+      "cpu": "on-b-baseline.json",
+      "gpu": "on-b-baseline-gpu.json",
+      "label": "재사용 ON · B · 기록 ON"
+    }
+  ]
+}

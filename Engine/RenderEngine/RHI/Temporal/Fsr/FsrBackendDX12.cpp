@@ -1,3 +1,4 @@
+#include "../../../../Utility_Framework/Ownership.h"
 #include "FsrBackendDX12.h"
 #if CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_DX12_SDK
 #include "../../DX12/DX12DeviceResources.h"
@@ -32,11 +33,14 @@ class FsrUpscalerDX12 final : public ITemporalUpscaler
 {
 public:
     explicit FsrUpscalerDX12(DX12DeviceResources& resources)
-        : m_resources(resources), m_upscaler(std::make_unique<FsrUpscaler>()) {}
+        : m_resources(resources), m_upscaler(own::make_unique<FsrUpscaler>()) {}
     ~FsrUpscalerDX12() override
     {
         // A failed drain must preserve the SDK callback owner and GPU resources.
-        if (!Shutdown().IsSuccess()) m_upscaler.release();
+        if (!Shutdown().IsSuccess())
+        {
+            (void)new decltype(m_upscaler)(std::move(m_upscaler));
+        }
     }
     TemporalResult Initialize(const FsrContextDescription& description, FsrGpuSynchronization synchronization)
     {
@@ -82,7 +86,7 @@ public:
 
 private:
     DX12DeviceResources& m_resources;
-    std::unique_ptr<FsrUpscaler> m_upscaler;
+    own::unique_owner<FsrUpscaler> m_upscaler;
 };
 }
 
@@ -94,10 +98,10 @@ FsrBackendDevice MakeFsrBackendDeviceDX12(ID3D12Device* device)
 }
 
 TemporalResult CreateFsrUpscalerDX12(DX12DeviceResources& resources, const FsrContextDescription& description,
-    FsrGpuSynchronization synchronization, std::unique_ptr<ITemporalUpscaler>& output)
+    FsrGpuSynchronization synchronization, own::unique_owner<ITemporalUpscaler>& output)
 {
     if (output) return { TemporalStatus::AlreadyInitialized, 0 };
-    auto candidate = std::make_unique<FsrUpscalerDX12>(resources);
+    auto candidate = own::make_unique<FsrUpscalerDX12>(resources);
     const auto result = candidate->Initialize(description, synchronization);
     if (result.IsSuccess()) output = std::move(candidate);
     return result;
@@ -107,9 +111,9 @@ FsrFrameGeneratorDX12::~FsrFrameGeneratorDX12()
 {
     if (!Shutdown().IsSuccess())
     {
-        m_generator.release();
+        (void)new decltype(m_generator)(std::move(m_generator));
         m_swapchain.Detach();
-        m_lifetime.release();
+        (void)new decltype(m_lifetime)(std::move(m_lifetime));
     }
 }
 
@@ -201,7 +205,7 @@ TemporalResult FsrFrameGeneratorDX12::Prepare(const TemporalFrameGenerationInput
     if (inputs.uiColor.IsValid() && (!ui.resource || ui.description.width != inputs.frame.displayExtent.width ||
         ui.description.height != inputs.frame.displayExtent.height || ui.resource == resources.hudlessColor.resource ||
         ui.resource == resources.depth.resource || ui.resource == resources.motionVectors.resource)) return Invalid();
-    m_lifetime = std::make_unique<FramePins>();
+    m_lifetime = own::make_unique<FramePins>();
     m_lifetime->lifetimeToken = inputs.lifetimeToken;
     m_lifetime->resources[0] = static_cast<ID3D12Resource*>(resources.depth.resource);
     m_lifetime->resources[1] = static_cast<ID3D12Resource*>(resources.motionVectors.resource);
@@ -306,10 +310,10 @@ TemporalResult FsrFrameGeneratorDX12::Shutdown()
 
 TemporalResult CreateFsrFrameGeneratorDX12(DX12DeviceResources& resources, const FsrContextDescription& description,
     const TemporalFrameGenerationConfig& configuration, const FsrPlayerSwapchainDescriptionDX12& native,
-    FsrGpuSynchronization synchronization, std::unique_ptr<FsrFrameGeneratorDX12>& output)
+    FsrGpuSynchronization synchronization, own::unique_owner<FsrFrameGeneratorDX12>& output)
 {
     if (output) return { TemporalStatus::AlreadyInitialized, 0 };
-    auto candidate = std::make_unique<FsrFrameGeneratorDX12>();
+    auto candidate = own::make_unique<FsrFrameGeneratorDX12>();
     const auto result = candidate->Initialize(resources, description, configuration, native, synchronization);
     if (result.IsSuccess()) output = std::move(candidate);
     return result;

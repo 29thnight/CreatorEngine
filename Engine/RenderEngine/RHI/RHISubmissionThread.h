@@ -1,4 +1,6 @@
 #pragma once
+#include "../../Utility_Framework/LifetimeToken.h"
+#include "../../Utility_Framework/Ownership.h"
 #include "RHICommandFailure.h"
 #include "RHIResourceTypes.h"
 
@@ -145,7 +147,7 @@ public:
 private:
     friend class RHISubmissionThread;
     struct State;
-    std::shared_ptr<State> m_state;
+    own::shared_owner<State> m_state;
 };
 
 /// 네이티브 제출과 수명 작업을 하나의 bounded FIFO·전용 스레드로 모은다.
@@ -176,7 +178,7 @@ public:
         RHISubmissionTicket& outTicket, std::string& outError,
         RHICompletionPoint retirementPoint = {},
         CompletionQuery completionQuery = {},
-        std::shared_ptr<const void> lifetimeToken = {});
+        ce::lifetime_token lifetimeToken = {});
 
     bool ExecuteAndWait(const void* owner, const char* label, Work work,
         std::string& outError);
@@ -217,7 +219,7 @@ public:
                               RHISubmissionTicket& outTicket, std::string& outError, uint64_t commandRecordingId = 0);
 
     bool EnqueueSoftwareBatch(const void* owner, IRHIDeviceResources& completionSource,
-        std::shared_ptr<IRHIParallelCommandPool> pool, std::shared_ptr<IRHICommandTranslator> translator,
+        own::shared_owner<IRHIParallelCommandPool> pool, own::shared_owner<IRHICommandTranslator> translator,
         RHISoftwareBatch&& batch, RHISubmissionTicket& outTicket, std::string& outError);
 
     bool EnqueueTranslatedBatch(const void* owner,
@@ -228,14 +230,13 @@ private:
     enum class EntryKind : uint8_t;
     bool EnqueueInternal(const void* owner, const char* label, Work work, RHISubmissionTicket& outTicket,
                          std::string& outError, RHICompletionPoint retirementPoint, CompletionQuery completionQuery,
-                         std::shared_ptr<const void> lifetimeToken, EntryKind kind, bool allowTransition,
-                         uint64_t expectedGeneration = 0, std::shared_ptr<RHIRecordedBatch> recordedBatch = {},
+                         ce::lifetime_token lifetimeToken, EntryKind kind, bool allowTransition,
+                         uint64_t expectedGeneration = 0, own::shared_owner<RHIRecordedBatch> recordedBatch = {},
                          RHISubmissionIdentity identity = {}, uint64_t softwareBytes = 0,
                          uint64_t commandRecordingId = 0);
 
     struct Impl;
-    std::unique_ptr<Impl> m_impl;
+    own::unique_owner<Impl> m_impl;
 };
 
 RHISubmissionThread& GetRHISubmissionThread();
-

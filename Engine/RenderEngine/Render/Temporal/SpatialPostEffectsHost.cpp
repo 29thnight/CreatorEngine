@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "SpatialPostEffectsHost.h"
 #include "TemporalRuntimeControl.h"
 #include "../Graph/EnhancedRenderPass.h"
@@ -27,7 +28,7 @@ namespace
 struct SpatialPostEffectsHost::State
 {
     DX12DeviceResources* resources{ nullptr };
-    std::shared_ptr<DlssTemporalAdapter> session;
+    own::shared_owner<DlssTemporalAdapter> session;
     SpatialPostSettings settings;
     SpatialPostSnapshot snapshot;
     uint64_t generation{ UINT64_MAX };
@@ -37,14 +38,14 @@ struct SpatialPostEffectsHost::State
     bool nisFailed{ false }, deepDvcFailed{ false }, sdkResources{ false };
 };
 
-SpatialPostEffectsHost::SpatialPostEffectsHost() : m_state(std::make_unique<State>()) {}
+SpatialPostEffectsHost::SpatialPostEffectsHost() : m_state(own::make_unique<State>()) {}
 SpatialPostEffectsHost::~SpatialPostEffectsHost()
 {
     if (!Shutdown().IsSuccess())
     {
         // Preserve the native session and handles rather than unload live SDK
         // code or free resources after an unproven GPU retirement.
-        (void)m_state.release();
+        (void)new decltype(m_state)(std::move(m_state));
     }
 }
 
@@ -157,7 +158,7 @@ TemporalResult SpatialPostEffectsHost::Configure(IRHIDeviceResources& resources,
         render.width = std::max(1u, static_cast<uint32_t>(std::ceil(display.width * settings.spatialPost.nisRenderScale)));
         render.height = std::max(1u, static_cast<uint32_t>(std::ceil(display.height * settings.spatialPost.nisRenderScale)));
     }
-    const bool changed = retryFaulted || state.resources != dx || state.session != session || state.render != render || state.display != display ||
+    const bool changed = retryFaulted || state.resources != dx || state.session.operator->() != session.operator->() || state.render != render || state.display != display ||
         state.snapshot.selectedNisMode != observed.selectedNisMode || state.snapshot.deepDvcSelected != observed.deepDvcSelected;
     if (changed)
     {

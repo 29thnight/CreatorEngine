@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #pragma once
 #include "../Utility_Framework/Core.Minimal.h"
 #include <mathematics/matrix4x4.hpp>
@@ -39,7 +40,7 @@ public:
 	// Profiler requests expire when the live page stops drawing. The UI never
 	// reads Animator or task containers directly across the scene thread.
 	void RequestHudCapture(std::uint64_t animatorId = 0) noexcept;
-	[[nodiscard]] std::shared_ptr<const AnimationHudSnapshot> GetHudSnapshot() const;
+	[[nodiscard]] own::shared_owner<const AnimationHudSnapshot> GetHudSnapshot() const;
 	void Finalize();
 private:
 	SceneManager& m_owner;
@@ -77,7 +78,7 @@ private:
 	std::atomic<std::uint64_t> m_hudTargetAnimatorId{};
 	std::uint64_t m_updateSequence{};
 	mutable std::mutex m_hudMutex;
-	std::shared_ptr<const AnimationHudSnapshot> m_hudPublished;
+	own::shared_owner<const AnimationHudSnapshot> m_hudPublished;
 	struct Scratch;
 	std::unique_ptr<Scratch> m_scratch;
 };

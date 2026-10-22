@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "MaterialGraphRasterSurface.h"
 
 #include "../Utility_Framework/StandardLibrary.h"
@@ -354,16 +355,16 @@ bool RasterSurfaceCollector::Initialize(IRenderDeviceServices& device, IRenderRo
 }
 
 bool RasterSurfaceCollector::Prepare(IRenderDeviceServices& device, const RasterSurfaceRequest& request,
-                                     std::span<const std::shared_ptr<const MeshSurfaceBatch>> meshes,
-                                     std::shared_ptr<const RasterSurfaceBatch>& result, std::string& error)
+                                     std::span<const own::shared_owner<const MeshSurfaceBatch>> meshes,
+                                     own::shared_owner<const RasterSurfaceBatch>& result, std::string& error)
 {
     return PrepareImpl(device, request, meshes, {}, result, error);
 }
 
 bool RasterSurfaceCollector::PrepareSharedDepth(IRenderDeviceServices& device, const RasterSurfaceRequest& request,
-                                                std::span<const std::shared_ptr<const MeshSurfaceBatch>> meshes,
-                                                std::shared_ptr<const RasterSurfaceBatch> depthSource,
-                                                std::shared_ptr<const RasterSurfaceBatch>& result, std::string& error)
+                                                std::span<const own::shared_owner<const MeshSurfaceBatch>> meshes,
+                                                own::shared_owner<const RasterSurfaceBatch> depthSource,
+                                                own::shared_owner<const RasterSurfaceBatch>& result, std::string& error)
 {
     if (!depthSource)
     {
@@ -373,9 +374,9 @@ bool RasterSurfaceCollector::PrepareSharedDepth(IRenderDeviceServices& device, c
 }
 
 bool RasterSurfaceCollector::PrepareImpl(IRenderDeviceServices& device, const RasterSurfaceRequest& request,
-                                         std::span<const std::shared_ptr<const MeshSurfaceBatch>> meshes,
-                                         std::shared_ptr<const RasterSurfaceBatch> depthSource,
-                                         std::shared_ptr<const RasterSurfaceBatch>& result, std::string& error)
+                                         std::span<const own::shared_owner<const MeshSurfaceBatch>> meshes,
+                                         own::shared_owner<const RasterSurfaceBatch> depthSource,
+                                         own::shared_owner<const RasterSurfaceBatch>& result, std::string& error)
 {
     float ignored;
     auto footprint = request.texture;
@@ -412,13 +413,13 @@ bool RasterSurfaceCollector::PrepareImpl(IRenderDeviceServices& device, const Ra
          std::memcmp(&request.viewProjection, &depthSource->Request().viewProjection, sizeof(request.viewProjection)) !=
              0 ||
          !SameView(meshes[0]->View(), depthSource->View()) || !std::ranges::all_of(meshes, [&](const auto& mesh) {
-             return std::ranges::find(depthSource->meshes_, mesh) != depthSource->meshes_.end();
+             return std::ranges::find(depthSource->meshes_, mesh.operator->(), [](const auto& value) { return value.operator->(); }) != depthSource->meshes_.end();
          })))
     {
         return Fail(error,
                     "Shared depth requires the same camera/view, current recording and exact opaque mesh owners.");
     }
-    auto candidate = std::shared_ptr<RasterSurfaceBatch>(new RasterSurfaceBatch);
+    auto candidate = own::make_shared<RasterSurfaceBatch>(RasterSurfaceBatch::ConstructionKey{});
     candidate->device_ = &device;
     candidate->request_ = request;
     candidate->meshes_.assign(meshes.begin(), meshes.end());
@@ -491,7 +492,7 @@ bool RasterSurfaceCollector::PrepareImpl(IRenderDeviceServices& device, const Ra
     for (const auto& mesh : meshes)
     {
         auto drawConstants = constants;
-        const auto index = candidate->depthSource_ ? std::ranges::find(candidate->depthSource_->meshes_, mesh) -
+        const auto index = candidate->depthSource_ ? std::ranges::find(candidate->depthSource_->meshes_, mesh.operator->(), [](const auto& value) { return value.operator->(); }) -
                                                          candidate->depthSource_->meshes_.begin()
                                                    : candidate->drawConstants_.size();
         // Exact draw identity resolves coplanar ties according to prepass order.

@@ -1,0 +1,2115 @@
+{
+  "events": 109590,
+  "exactProvenanceMatches": 109590,
+  "duplicatesRemoved": 0,
+  "zeroDurationSpans": 3649,
+  "sourceSha256": "2612b94ab95453997f59bceb0af80d5705cef5ac104be7f8f2a2b4bfb3064da7",
+  "sourceLosses": {
+    "droppedFrames": 0,
+    "droppedEvents": 0,
+    "droppedCounters": 0,
+    "sourceDroppedCounters": 0,
+    "sourceDroppedEvents": 0,
+    "sourceDroppedFrameBoundaries": 0,
+    "lateCpuEvents": 0,
+    "lateGpuSpans": 0
+  },
+  "alignedTo": "existing CPU QPC anchor; GPU begin/end already calibrated by backend",
+  "window": {
+    "begin": 324.313,
+    "end": 15511.568
+  },
+  "queues": {
+    "0": "[GPU Graphics]"
+  },
+  "views": {
+    "1": {
+      "submissions": 384,
+      "spanMs": {
+        "count": 384,
+        "mean": 5.766004947916729,
+        "p50": 5.8009500000002845,
+        "p95": 6.918100000000777
+      },
+      "unionMs": {
+        "count": 384,
+        "mean": 5.729589062499976,
+        "p50": 5.769299999999021,
+        "p95": 6.855800000003001
+      }
+    },
+    "2": {
+      "submissions": 383,
+      "spanMs": {
+        "count": 383,
+        "mean": 5.810871018276778,
+        "p50": 5.806000000000495,
+        "p95": 6.850500000000466
+      },
+      "unionMs": {
+        "count": 383,
+        "mean": 5.780156919059974,
+        "p50": 5.773699999999735,
+        "p95": 6.824000000000524
+      }
+    }
+  },
+  "passMs": [
+    {
+      "view": 1,
+      "name": "Geometry.Occlusion.Build",
+      "count": 768,
+      "mean": 0.04507578125,
+      "p50": 0.0379,
+      "p95": 0.043
+    },
+    {
+      "view": 1,
+      "name": "GizmoIcon",
+      "count": 384,
+      "mean": 0.0020203125,
+      "p50": 0.002,
+      "p95": 0.003
+    },
+    {
+      "view": 1,
+      "name": "GizmoLine",
+      "count": 384,
+      "mean": 1.3541666666666668e-05,
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    {
+      "view": 1,
+      "name": "Grid",
+      "count": 384,
+      "mean": 0.011609375,
+      "p50": 0.0113,
+      "p95": 0.0143
+    },
+    {
+      "view": 1,
+      "name": "METEOR.CameraMeshlet.Recovery.Cull",
+      "count": 384,
+      "mean": 0.4851703125,
+      "p50": 0.48895,
+      "p95": 0.6134
+    },
+    {
+      "view": 1,
+      "name": "METEOR.CameraMeshlet.Recovery.Finalize",
+      "count": 384,
+      "mean": 0.0026260416666666667,
+      "p50": 0.003,
+      "p95": 0.0031
+    },
+    {
+      "view": 1,
+      "name": "METEOR.CameraMeshlet.Recovery.Reset",
+      "count": 384,
+      "mean": 0.008051302083333333,
+      "p50": 0.0082,
+      "p95": 0.0092
+    },
+    {
+      "view": 1,
+      "name": "METEOR.ClusterGeometryReady",
+      "count": 384,
+      "mean": 2.6041666666666666e-06,
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    {
+      "view": 1,
+      "name": "METEOR.ClusterPoseUpload",
+      "count": 384,
+      "mean": 0.002436197916666667,
+      "p50": 0.0021,
+      "p95": 0.0031
+    },
+    {
+      "view": 1,
+      "name": "METEOR.MeshWorldReuse",
+      "count": 384,
+      "mean": 5.208333333333333e-06,
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Color",
+      "count": 384,
+      "mean": 0.2597,
+      "p50": 0.26365,
+      "p95": 0.3032
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Depth.Arguments",
+      "count": 384,
+      "mean": 0.0030661458333333335,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Depth.Count",
+      "count": 384,
+      "mean": 0.0027182291666666665,
+      "p50": 0.003,
+      "p95": 0.0031
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Depth.Reset",
+      "count": 384,
+      "mean": 0.0032096354166666666,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Depth.Scan",
+      "count": 384,
+      "mean": 0.003860416666666667,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Depth.Scatter",
+      "count": 384,
+      "mean": 0.00625234375,
+      "p50": 0.0051,
+      "p95": 0.0062
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.Final.0.Arguments",
+      "count": 384,
+      "mean": 0.0034893229166666666,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.Final.0.Count",
+      "count": 384,
+      "mean": 0.002749739583333333,
+      "p50": 0.003,
+      "p95": 0.0031
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.Final.0.Reset",
+      "count": 384,
+      "mean": 0.005497916666666667,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.Final.0.Scan",
+      "count": 384,
+      "mean": 0.0038583333333333334,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.Final.0.Scatter",
+      "count": 384,
+      "mean": 0.004159375,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.Final.1.Arguments",
+      "count": 384,
+      "mean": 0.0034888020833333333,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.Final.1.Count",
+      "count": 384,
+      "mean": 0.00279453125,
+      "p50": 0.0031,
+      "p95": 0.0031
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.Final.1.Reset",
+      "count": 384,
+      "mean": 0.00689296875,
+      "p50": 0.0041,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.Final.1.Scan",
+      "count": 384,
+      "mean": 0.0038453125,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.Final.1.Scatter",
+      "count": 384,
+      "mean": 0.004035416666666667,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.Final.2.Arguments",
+      "count": 384,
+      "mean": 0.003393229166666667,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.Final.2.Count",
+      "count": 384,
+      "mean": 0.004610416666666667,
+      "p50": 0.0051,
+      "p95": 0.0052
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.Final.2.Reset",
+      "count": 384,
+      "mean": 0.003655729166666667,
+      "p50": 0.0041,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.Final.2.Scan",
+      "count": 384,
+      "mean": 0.0038505208333333334,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.Final.2.Scatter",
+      "count": 384,
+      "mean": 0.00401484375,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.First.0.Arguments",
+      "count": 384,
+      "mean": 0.00303125,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.First.0.Count",
+      "count": 384,
+      "mean": 0.0026197916666666665,
+      "p50": 0.003,
+      "p95": 0.0031
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.First.0.Reset",
+      "count": 384,
+      "mean": 0.00295390625,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.First.0.Scan",
+      "count": 384,
+      "mean": 0.0037317708333333335,
+      "p50": 0.0041,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.First.0.Scatter",
+      "count": 384,
+      "mean": 0.004019010416666667,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.First.1.Arguments",
+      "count": 384,
+      "mean": 0.0039947916666666665,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.First.1.Count",
+      "count": 384,
+      "mean": 0.0027338541666666666,
+      "p50": 0.003,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.First.1.Reset",
+      "count": 384,
+      "mean": 0.0041796875,
+      "p50": 0.0031,
+      "p95": 0.0051
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.First.1.Scan",
+      "count": 384,
+      "mean": 0.00372421875,
+      "p50": 0.0041,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.First.1.Scatter",
+      "count": 384,
+      "mean": 0.0041929687500000005,
+      "p50": 0.0041,
+      "p95": 0.0052
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.First.2.Arguments",
+      "count": 384,
+      "mean": 0.0033427083333333334,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.First.2.Count",
+      "count": 384,
+      "mean": 0.0029684895833333334,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.First.2.Reset",
+      "count": 384,
+      "mean": 0.0037851562500000003,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.First.2.Scan",
+      "count": 384,
+      "mean": 0.004843229166666667,
+      "p50": 0.0041,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Shadow.First.2.Scatter",
+      "count": 384,
+      "mean": 0.005140104166666667,
+      "p50": 0.0051,
+      "p95": 0.0061
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Surface.Arguments",
+      "count": 384,
+      "mean": 0.0034742187500000003,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Surface.Count",
+      "count": 384,
+      "mean": 0.0029184895833333333,
+      "p50": 0.0031,
+      "p95": 0.0031
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Surface.Reset",
+      "count": 384,
+      "mean": 0.0045164062500000005,
+      "p50": 0.0041,
+      "p95": 0.0052
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Surface.Scan",
+      "count": 384,
+      "mean": 0.0037187500000000003,
+      "p50": 0.0041,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Commands.Surface.Scatter",
+      "count": 384,
+      "mean": 0.004815885416666667,
+      "p50": 0.0051,
+      "p95": 0.0061
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.HdrClear",
+      "count": 384,
+      "mean": 0.0036989583333333336,
+      "p50": 0.0041,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.LookupReady",
+      "count": 384,
+      "mean": 2.6041666666666666e-06,
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Material.Arguments",
+      "count": 384,
+      "mean": 0.0034750000000000002,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Material.Count",
+      "count": 384,
+      "mean": 0.03523333333333333,
+      "p50": 0.0328,
+      "p95": 0.0389
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Material.Reset",
+      "count": 384,
+      "mean": 0.006777083333333334,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Material.Resolve",
+      "count": 384,
+      "mean": 0.17984661458333334,
+      "p50": 0.1812,
+      "p95": 0.2089
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Material.Scan",
+      "count": 384,
+      "mean": 0.00463984375,
+      "p50": 0.0041,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Material.Scatter",
+      "count": 384,
+      "mean": 0.03403020833333333,
+      "p50": 0.0337,
+      "p95": 0.0399
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Occluder.Classify",
+      "count": 384,
+      "mean": 0.016859114583333334,
+      "p50": 0.0174,
+      "p95": 0.0195
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Occluder.HW",
+      "count": 384,
+      "mean": 0.03501927083333333,
+      "p50": 0.0348,
+      "p95": 0.0409
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Occluder.Initialize",
+      "count": 384,
+      "mean": 0.011286458333333332,
+      "p50": 0.0113,
+      "p95": 0.0133
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Occluder.PrepareClassify",
+      "count": 384,
+      "mean": 0.0038861979166666667,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Occluder.PrepareSoftware",
+      "count": 384,
+      "mean": 0.0034510416666666665,
+      "p50": 0.0031,
+      "p95": 0.0031
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Occluder.Resolve",
+      "count": 384,
+      "mean": 0.02292265625,
+      "p50": 0.0225,
+      "p95": 0.0256
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Occluder.SW",
+      "count": 384,
+      "mean": 0.03971692708333333,
+      "p50": 0.0379,
+      "p95": 0.0461
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.RuntimeLookupMetadata",
+      "count": 384,
+      "mean": 0.0027216145833333333,
+      "p50": 0.003,
+      "p95": 0.0031
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Shadow.C0",
+      "count": 384,
+      "mean": 0.101809375,
+      "p50": 0.1024,
+      "p95": 0.1158
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Shadow.C0.StaticMerge",
+      "count": 384,
+      "mean": 0.08961484374999999,
+      "p50": 0.0902,
+      "p95": 0.1086
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Shadow.C1",
+      "count": 384,
+      "mean": 0.08155546875,
+      "p50": 0.0829,
+      "p95": 0.0962
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Shadow.C1.StaticMerge",
+      "count": 384,
+      "mean": 0.09381145833333333,
+      "p50": 0.0922,
+      "p95": 0.1106
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Shadow.C2",
+      "count": 384,
+      "mean": 0.08097239583333334,
+      "p50": 0.0809,
+      "p95": 0.0953
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Shadow.C2.StaticMerge",
+      "count": 384,
+      "mean": 0.09131145833333333,
+      "p50": 0.0922,
+      "p95": 0.1106
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.SurfaceResolve.Clear",
+      "count": 384,
+      "mean": 0.009364583333333334,
+      "p50": 0.0082,
+      "p95": 0.0102
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Temporal.Resolve",
+      "count": 384,
+      "mean": 0.08529817708333333,
+      "p50": 0.08395,
+      "p95": 0.1055
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Visibility.Classify",
+      "count": 384,
+      "mean": 0.02645859375,
+      "p50": 0.0266,
+      "p95": 0.0287
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Visibility.HW",
+      "count": 384,
+      "mean": 0.03702734375,
+      "p50": 0.0359,
+      "p95": 0.041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Visibility.Initialize",
+      "count": 384,
+      "mean": 0.012386979166666666,
+      "p50": 0.0113,
+      "p95": 0.0133
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Visibility.PrepareClassify",
+      "count": 384,
+      "mean": 0.00411015625,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Visibility.PrepareSoftware",
+      "count": 384,
+      "mean": 0.004332552083333333,
+      "p50": 0.0041,
+      "p95": 0.0052
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Visibility.Resolve",
+      "count": 384,
+      "mean": 0.041105989583333336,
+      "p50": 0.0419,
+      "p95": 0.0492
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Scene.Visibility.SW",
+      "count": 384,
+      "mean": 0.04379713541666667,
+      "p50": 0.0389,
+      "p95": 0.0461
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shadow.History.C0.Build",
+      "count": 384,
+      "mean": 0.05343984375,
+      "p50": 0.0542,
+      "p95": 0.0604
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shadow.History.C0.Copy",
+      "count": 384,
+      "mean": 0.04619296875,
+      "p50": 0.046,
+      "p95": 0.0532
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shadow.History.C1.Build",
+      "count": 384,
+      "mean": 0.0586046875,
+      "p50": 0.0584,
+      "p95": 0.0645
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shadow.History.C1.Copy",
+      "count": 384,
+      "mean": 0.04374817708333333,
+      "p50": 0.044,
+      "p95": 0.0512
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shadow.History.C2.Build",
+      "count": 384,
+      "mean": 0.05835546875,
+      "p50": 0.0584,
+      "p95": 0.0645
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shadow.History.C2.Copy",
+      "count": 384,
+      "mean": 0.04455885416666667,
+      "p50": 0.045,
+      "p95": 0.0522
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shadow.Occluder.C0.Raster",
+      "count": 384,
+      "mean": 0.09710989583333333,
+      "p50": 0.0983,
+      "p95": 0.1106
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shadow.Occluder.C0.StaticCopy",
+      "count": 384,
+      "mean": 0.048563802083333336,
+      "p50": 0.04915,
+      "p95": 0.0553
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shadow.Occluder.C1.Raster",
+      "count": 384,
+      "mean": 0.08037395833333333,
+      "p50": 0.0814,
+      "p95": 0.0952
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shadow.Occluder.C1.StaticCopy",
+      "count": 384,
+      "mean": 0.04957213541666667,
+      "p50": 0.0491,
+      "p95": 0.0553
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shadow.Occluder.C2.Raster",
+      "count": 384,
+      "mean": 0.08035807291666666,
+      "p50": 0.08085,
+      "p95": 0.0942
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shadow.Occluder.C2.StaticCopy",
+      "count": 384,
+      "mean": 0.057439843750000004,
+      "p50": 0.0522,
+      "p95": 0.0574
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shadow.Occlusion.C0.Build",
+      "count": 384,
+      "mean": 0.12509505208333332,
+      "p50": 0.1239,
+      "p95": 0.127
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shadow.Occlusion.C1.Build",
+      "count": 384,
+      "mean": 0.13406666666666667,
+      "p50": 0.1321,
+      "p95": 0.1393
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shadow.Occlusion.C2.Build",
+      "count": 384,
+      "mean": 0.1128953125,
+      "p50": 0.1116,
+      "p95": 0.1187
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shared.First.Cull",
+      "count": 384,
+      "mean": 0.9811723958333334,
+      "p50": 0.97125,
+      "p95": 1.2134
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shared.First.Finalize",
+      "count": 384,
+      "mean": 0.003011197916666667,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shared.First.Reset",
+      "count": 384,
+      "mean": 0.013768489583333333,
+      "p50": 0.0143,
+      "p95": 0.0154
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shared.First.StreamingFeedback",
+      "count": 1536,
+      "mean": 0.0011742838541666666,
+      "p50": 0.001,
+      "p95": 0.0031
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shared.ShadowRecovery.Cull",
+      "count": 384,
+      "mean": 0.9834692708333334,
+      "p50": 0.98455,
+      "p95": 1.152
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shared.ShadowRecovery.Finalize",
+      "count": 384,
+      "mean": 0.0028804687499999998,
+      "p50": 0.0031,
+      "p95": 0.0031
+    },
+    {
+      "view": 1,
+      "name": "METEOR.Shared.ShadowRecovery.Reset",
+      "count": 384,
+      "mean": 0.009905208333333334,
+      "p50": 0.0102,
+      "p95": 0.0113
+    },
+    {
+      "view": 1,
+      "name": "PostChain.BloomDown",
+      "count": 1920,
+      "mean": 0.0050155729166666664,
+      "p50": 0.0041,
+      "p95": 0.0103
+    },
+    {
+      "view": 1,
+      "name": "PostChain.BloomThreshold",
+      "count": 384,
+      "mean": 0.014023697916666666,
+      "p50": 0.0112,
+      "p95": 0.0133
+    },
+    {
+      "view": 1,
+      "name": "PostChain.BloomUp",
+      "count": 1920,
+      "mean": 0.005375052083333333,
+      "p50": 0.0041,
+      "p95": 0.0082
+    },
+    {
+      "view": 1,
+      "name": "PostChain.FXAA",
+      "count": 384,
+      "mean": 0.014358333333333334,
+      "p50": 0.0143,
+      "p95": 0.0164
+    },
+    {
+      "view": 1,
+      "name": "PostChain.Uber",
+      "count": 384,
+      "mean": 0.017229427083333332,
+      "p50": 0.0164,
+      "p95": 0.0194
+    },
+    {
+      "view": 1,
+      "name": "SSAO.Compute",
+      "count": 384,
+      "mean": 0.03662161458333333,
+      "p50": 0.0307,
+      "p95": 0.0359
+    },
+    {
+      "view": 1,
+      "name": "SSAO.Filter",
+      "count": 384,
+      "mean": 0.007369010416666667,
+      "p50": 0.0072,
+      "p95": 0.0092
+    },
+    {
+      "view": 1,
+      "name": "SSGI.Composite",
+      "count": 384,
+      "mean": 0.026759635416666667,
+      "p50": 0.0236,
+      "p95": 0.0266
+    },
+    {
+      "view": 1,
+      "name": "SSGI.Filter",
+      "count": 384,
+      "mean": 0.009065885416666667,
+      "p50": 0.0082,
+      "p95": 0.0102
+    },
+    {
+      "view": 1,
+      "name": "SSGI.HiZ.0",
+      "count": 384,
+      "mean": 0.010975,
+      "p50": 0.0072,
+      "p95": 0.0082
+    },
+    {
+      "view": 1,
+      "name": "SSGI.HiZ.1",
+      "count": 384,
+      "mean": 0.0058263020833333335,
+      "p50": 0.0051,
+      "p95": 0.0052
+    },
+    {
+      "view": 1,
+      "name": "SSGI.HiZ.2",
+      "count": 384,
+      "mean": 0.0043734375,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "SSGI.HiZ.3",
+      "count": 384,
+      "mean": 0.00305703125,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "SSGI.HiZ.4",
+      "count": 384,
+      "mean": 0.0030010416666666666,
+      "p50": 0.0031,
+      "p95": 0.0031
+    },
+    {
+      "view": 1,
+      "name": "SSGI.HiZ.5",
+      "count": 384,
+      "mean": 0.0037369791666666667,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "SSGI.HiZ.6",
+      "count": 384,
+      "mean": 0.0032265625,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "SSGI.HiZ.7",
+      "count": 384,
+      "mean": 0.00450234375,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 1,
+      "name": "SSGI.Resolve",
+      "count": 384,
+      "mean": 0.0107390625,
+      "p50": 0.0102,
+      "p95": 0.0113
+    },
+    {
+      "view": 1,
+      "name": "SSGI.StoreHistory",
+      "count": 384,
+      "mean": 0.0110890625,
+      "p50": 0.0072,
+      "p95": 0.0082
+    },
+    {
+      "view": 1,
+      "name": "SSGI.Trace",
+      "count": 384,
+      "mean": 0.056213802083333334,
+      "p50": 0.05375,
+      "p95": 0.0717
+    },
+    {
+      "view": 1,
+      "name": "Shadow.Clear",
+      "count": 384,
+      "mean": 0.03144036458333333,
+      "p50": 0.0317,
+      "p95": 0.0379
+    },
+    {
+      "view": 1,
+      "name": "SkyBox",
+      "count": 384,
+      "mean": 0.036973958333333334,
+      "p50": 0.0194,
+      "p95": 0.0225
+    },
+    {
+      "view": 1,
+      "name": "Temporal.CameraMotion",
+      "count": 384,
+      "mean": 0.019582552083333333,
+      "p50": 0.0185,
+      "p95": 0.0215
+    },
+    {
+      "view": 1,
+      "name": "Temporal.DepthCopy",
+      "count": 384,
+      "mean": 0.01443203125,
+      "p50": 0.0144,
+      "p95": 0.0163
+    },
+    {
+      "view": 1,
+      "name": "UI.Draw",
+      "count": 384,
+      "mean": 0.0037994791666666667,
+      "p50": 0.003,
+      "p95": 0.0031
+    },
+    {
+      "view": 1,
+      "name": "live_present",
+      "count": 384,
+      "mean": 0.017502604166666668,
+      "p50": 0.0133,
+      "p95": 0.0144
+    },
+    {
+      "view": 2,
+      "name": "Geometry.Occlusion.Build",
+      "count": 766,
+      "mean": 0.044002741514360316,
+      "p50": 0.0379,
+      "p95": 0.043
+    },
+    {
+      "view": 2,
+      "name": "METEOR.CameraMeshlet.Recovery.Cull",
+      "count": 383,
+      "mean": 0.48086187989556134,
+      "p50": 0.4905,
+      "p95": 0.5795
+    },
+    {
+      "view": 2,
+      "name": "METEOR.CameraMeshlet.Recovery.Finalize",
+      "count": 383,
+      "mean": 0.002633942558746736,
+      "p50": 0.003,
+      "p95": 0.0031
+    },
+    {
+      "view": 2,
+      "name": "METEOR.CameraMeshlet.Recovery.Reset",
+      "count": 383,
+      "mean": 0.00871070496083551,
+      "p50": 0.0082,
+      "p95": 0.0092
+    },
+    {
+      "view": 2,
+      "name": "METEOR.ClusterGeometryReady",
+      "count": 383,
+      "mean": 7.83289817232376e-06,
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    {
+      "view": 2,
+      "name": "METEOR.ClusterPoseUpload",
+      "count": 383,
+      "mean": 0.002451958224543081,
+      "p50": 0.0021,
+      "p95": 0.0031
+    },
+    {
+      "view": 2,
+      "name": "METEOR.MeshWorldReuse",
+      "count": 383,
+      "mean": 5.221932114882507e-06,
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Color",
+      "count": 383,
+      "mean": 0.33801697127937336,
+      "p50": 0.3287,
+      "p95": 0.4485
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Depth.Arguments",
+      "count": 383,
+      "mean": 0.0036258485639686683,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Depth.Count",
+      "count": 383,
+      "mean": 0.004273890339425588,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Depth.Reset",
+      "count": 383,
+      "mean": 0.0032091383812010445,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Depth.Scan",
+      "count": 383,
+      "mean": 0.0037819843342036556,
+      "p50": 0.0041,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Depth.Scatter",
+      "count": 383,
+      "mean": 0.004066057441253264,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.Final.0.Arguments",
+      "count": 383,
+      "mean": 0.003574412532637076,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.Final.0.Count",
+      "count": 383,
+      "mean": 0.0028013054830287208,
+      "p50": 0.0031,
+      "p95": 0.0031
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.Final.0.Reset",
+      "count": 383,
+      "mean": 0.00414046997389034,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.Final.0.Scan",
+      "count": 383,
+      "mean": 0.0037986945169712796,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.Final.0.Scatter",
+      "count": 383,
+      "mean": 0.004155352480417755,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.Final.1.Arguments",
+      "count": 383,
+      "mean": 0.0035825065274151437,
+      "p50": 0.004,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.Final.1.Count",
+      "count": 383,
+      "mean": 0.0027780678851174936,
+      "p50": 0.0031,
+      "p95": 0.0031
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.Final.1.Reset",
+      "count": 383,
+      "mean": 0.003706005221932115,
+      "p50": 0.0041,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.Final.1.Scan",
+      "count": 383,
+      "mean": 0.003783289817232376,
+      "p50": 0.0041,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.Final.1.Scatter",
+      "count": 383,
+      "mean": 0.00405065274151436,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.Final.2.Arguments",
+      "count": 383,
+      "mean": 0.003496083550913838,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.Final.2.Count",
+      "count": 383,
+      "mean": 0.002737859007832898,
+      "p50": 0.003,
+      "p95": 0.0031
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.Final.2.Reset",
+      "count": 383,
+      "mean": 0.004574151436031332,
+      "p50": 0.0041,
+      "p95": 0.0052
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.Final.2.Scan",
+      "count": 383,
+      "mean": 0.0038122715404699742,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.Final.2.Scatter",
+      "count": 383,
+      "mean": 0.0040483028720626636,
+      "p50": 0.0041,
+      "p95": 0.0052
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.First.0.Arguments",
+      "count": 383,
+      "mean": 0.00298798955613577,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.First.0.Count",
+      "count": 383,
+      "mean": 0.0026535248041775457,
+      "p50": 0.003,
+      "p95": 0.0031
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.First.0.Reset",
+      "count": 383,
+      "mean": 0.0029571801566579633,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.First.0.Scan",
+      "count": 383,
+      "mean": 0.003726370757180157,
+      "p50": 0.0041,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.First.0.Scatter",
+      "count": 383,
+      "mean": 0.0040187989556135775,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.First.1.Arguments",
+      "count": 383,
+      "mean": 0.0031898172323759793,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.First.1.Count",
+      "count": 383,
+      "mean": 0.002810704960835509,
+      "p50": 0.003,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.First.1.Reset",
+      "count": 383,
+      "mean": 0.0033302872062663186,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.First.1.Scan",
+      "count": 383,
+      "mean": 0.004490861618798956,
+      "p50": 0.0041,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.First.1.Scatter",
+      "count": 383,
+      "mean": 0.004140992167101828,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.First.2.Arguments",
+      "count": 383,
+      "mean": 0.003409660574412533,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.First.2.Count",
+      "count": 383,
+      "mean": 0.002960574412532637,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.First.2.Reset",
+      "count": 383,
+      "mean": 0.0038216710182767625,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.First.2.Scan",
+      "count": 383,
+      "mean": 0.003697650130548303,
+      "p50": 0.0041,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Shadow.First.2.Scatter",
+      "count": 383,
+      "mean": 0.004837075718015666,
+      "p50": 0.0051,
+      "p95": 0.0061
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Surface.Arguments",
+      "count": 383,
+      "mean": 0.003399477806788512,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Surface.Count",
+      "count": 383,
+      "mean": 0.004264751958224543,
+      "p50": 0.0031,
+      "p95": 0.0031
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Surface.Reset",
+      "count": 383,
+      "mean": 0.004412271540469974,
+      "p50": 0.0041,
+      "p95": 0.0052
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Surface.Scan",
+      "count": 383,
+      "mean": 0.0037334203655352482,
+      "p50": 0.0041,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Commands.Surface.Scatter",
+      "count": 383,
+      "mean": 0.004784856396866841,
+      "p50": 0.0051,
+      "p95": 0.0061
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.HdrClear",
+      "count": 383,
+      "mean": 0.003774934725848564,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.LookupReady",
+      "count": 383,
+      "mean": 2.6109660574412534e-06,
+      "p50": 0.0,
+      "p95": 0.0
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Material.Arguments",
+      "count": 383,
+      "mean": 0.0034091383812010446,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Material.Count",
+      "count": 383,
+      "mean": 0.035820626631853786,
+      "p50": 0.0328,
+      "p95": 0.039
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Material.Reset",
+      "count": 383,
+      "mean": 0.00458355091383812,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Material.Resolve",
+      "count": 383,
+      "mean": 0.1893906005221932,
+      "p50": 0.1915,
+      "p95": 0.2181
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Material.Scan",
+      "count": 383,
+      "mean": 0.0036997389033942563,
+      "p50": 0.0041,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Material.Scatter",
+      "count": 383,
+      "mean": 0.034929503916449084,
+      "p50": 0.0328,
+      "p95": 0.0399
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Occluder.Classify",
+      "count": 383,
+      "mean": 0.017069451697127938,
+      "p50": 0.0174,
+      "p95": 0.0205
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Occluder.HW",
+      "count": 383,
+      "mean": 0.036495300261096604,
+      "p50": 0.0369,
+      "p95": 0.0431
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Occluder.Initialize",
+      "count": 383,
+      "mean": 0.011225587467362925,
+      "p50": 0.0113,
+      "p95": 0.0133
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Occluder.PrepareClassify",
+      "count": 383,
+      "mean": 0.004809660574412533,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Occluder.PrepareSoftware",
+      "count": 383,
+      "mean": 0.0043582245430809395,
+      "p50": 0.003,
+      "p95": 0.0031
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Occluder.Resolve",
+      "count": 383,
+      "mean": 0.021897127937336815,
+      "p50": 0.0225,
+      "p95": 0.0256
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Occluder.SW",
+      "count": 383,
+      "mean": 0.038755352480417754,
+      "p50": 0.0358,
+      "p95": 0.043
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.RuntimeLookupMetadata",
+      "count": 383,
+      "mean": 0.0027488250652741514,
+      "p50": 0.003,
+      "p95": 0.0031
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Shadow.C0",
+      "count": 383,
+      "mean": 0.10193420365535248,
+      "p50": 0.1024,
+      "p95": 0.1167
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Shadow.C0.StaticMerge",
+      "count": 383,
+      "mean": 0.08961357702349869,
+      "p50": 0.0902,
+      "p95": 0.1086
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Shadow.C1",
+      "count": 383,
+      "mean": 0.081422454308094,
+      "p50": 0.082,
+      "p95": 0.0963
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Shadow.C1.StaticMerge",
+      "count": 383,
+      "mean": 0.09129921671018276,
+      "p50": 0.0922,
+      "p95": 0.1106
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Shadow.C2",
+      "count": 383,
+      "mean": 0.0807018276762402,
+      "p50": 0.0809,
+      "p95": 0.0962
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Shadow.C2.StaticMerge",
+      "count": 383,
+      "mean": 0.09133002610966058,
+      "p50": 0.0922,
+      "p95": 0.1106
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.SurfaceResolve.Clear",
+      "count": 383,
+      "mean": 0.007929503916449086,
+      "p50": 0.0082,
+      "p95": 0.0093
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Temporal.Resolve",
+      "count": 383,
+      "mean": 0.08124934725848564,
+      "p50": 0.0819,
+      "p95": 0.0983
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Visibility.Classify",
+      "count": 383,
+      "mean": 0.026802872062663186,
+      "p50": 0.0266,
+      "p95": 0.0287
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Visibility.HW",
+      "count": 383,
+      "mean": 0.03851488250652742,
+      "p50": 0.0379,
+      "p95": 0.043
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Visibility.Initialize",
+      "count": 383,
+      "mean": 0.01125953002610966,
+      "p50": 0.0113,
+      "p95": 0.0133
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Visibility.PrepareClassify",
+      "count": 383,
+      "mean": 0.003989033942558747,
+      "p50": 0.0041,
+      "p95": 0.0051
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Visibility.PrepareSoftware",
+      "count": 383,
+      "mean": 0.003917232375979112,
+      "p50": 0.0031,
+      "p95": 0.0031
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Visibility.Resolve",
+      "count": 383,
+      "mean": 0.04097415143603133,
+      "p50": 0.041,
+      "p95": 0.0491
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Scene.Visibility.SW",
+      "count": 383,
+      "mean": 0.038597127937336814,
+      "p50": 0.0358,
+      "p95": 0.043
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shadow.History.C0.Build",
+      "count": 383,
+      "mean": 0.05279843342036553,
+      "p50": 0.0533,
+      "p95": 0.0604
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shadow.History.C0.Copy",
+      "count": 383,
+      "mean": 0.045283289817232376,
+      "p50": 0.0461,
+      "p95": 0.0532
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shadow.History.C1.Build",
+      "count": 383,
+      "mean": 0.05810548302872063,
+      "p50": 0.0583,
+      "p95": 0.0645
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shadow.History.C1.Copy",
+      "count": 383,
+      "mean": 0.04386631853785901,
+      "p50": 0.0441,
+      "p95": 0.0512
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shadow.History.C2.Build",
+      "count": 383,
+      "mean": 0.059283812010443866,
+      "p50": 0.0584,
+      "p95": 0.0645
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shadow.History.C2.Copy",
+      "count": 383,
+      "mean": 0.045020626631853786,
+      "p50": 0.0451,
+      "p95": 0.0522
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shadow.Occluder.C0.Raster",
+      "count": 383,
+      "mean": 0.09690261096605744,
+      "p50": 0.0983,
+      "p95": 0.1106
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shadow.Occluder.C0.StaticCopy",
+      "count": 383,
+      "mean": 0.04889086161879896,
+      "p50": 0.0501,
+      "p95": 0.0553
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shadow.Occluder.C1.Raster",
+      "count": 383,
+      "mean": 0.08039660574412533,
+      "p50": 0.0809,
+      "p95": 0.0952
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shadow.Occluder.C1.StaticCopy",
+      "count": 383,
+      "mean": 0.049478067885117494,
+      "p50": 0.0482,
+      "p95": 0.0553
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shadow.Occluder.C2.Raster",
+      "count": 383,
+      "mean": 0.07938825065274152,
+      "p50": 0.0799,
+      "p95": 0.0932
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shadow.Occluder.C2.StaticCopy",
+      "count": 383,
+      "mean": 0.054371018276762405,
+      "p50": 0.0512,
+      "p95": 0.0573
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shadow.Occlusion.C0.Build",
+      "count": 383,
+      "mean": 0.13167493472584857,
+      "p50": 0.1249,
+      "p95": 0.1301
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shadow.Occlusion.C1.Build",
+      "count": 383,
+      "mean": 0.1320874673629243,
+      "p50": 0.1301,
+      "p95": 0.1372
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shadow.Occlusion.C2.Build",
+      "count": 383,
+      "mean": 0.1111467362924282,
+      "p50": 0.1106,
+      "p95": 0.1167
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shared.First.Cull",
+      "count": 383,
+      "mean": 0.9711433420365535,
+      "p50": 0.9708,
+      "p95": 1.1673
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shared.First.Finalize",
+      "count": 383,
+      "mean": 0.002931070496083551,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shared.First.Reset",
+      "count": 383,
+      "mean": 0.013705221932114882,
+      "p50": 0.0134,
+      "p95": 0.0154
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shared.First.StreamingFeedback",
+      "count": 1532,
+      "mean": 0.0010841383812010444,
+      "p50": 0.001,
+      "p95": 0.0031
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shared.ShadowRecovery.Cull",
+      "count": 383,
+      "mean": 0.996742819843342,
+      "p50": 1.0014,
+      "p95": 1.1755
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shared.ShadowRecovery.Finalize",
+      "count": 383,
+      "mean": 0.002856396866840731,
+      "p50": 0.0031,
+      "p95": 0.0031
+    },
+    {
+      "view": 2,
+      "name": "METEOR.Shared.ShadowRecovery.Reset",
+      "count": 383,
+      "mean": 0.009996605744125326,
+      "p50": 0.0102,
+      "p95": 0.0113
+    },
+    {
+      "view": 2,
+      "name": "PostChain.BloomDown",
+      "count": 1915,
+      "mean": 0.00509509138381201,
+      "p50": 0.0041,
+      "p95": 0.0103
+    },
+    {
+      "view": 2,
+      "name": "PostChain.BloomThreshold",
+      "count": 383,
+      "mean": 0.012617232375979113,
+      "p50": 0.0112,
+      "p95": 0.0133
+    },
+    {
+      "view": 2,
+      "name": "PostChain.BloomUp",
+      "count": 1915,
+      "mean": 0.0048792689295039165,
+      "p50": 0.0041,
+      "p95": 0.0082
+    },
+    {
+      "view": 2,
+      "name": "PostChain.FXAA",
+      "count": 383,
+      "mean": 0.015711227154047,
+      "p50": 0.0143,
+      "p95": 0.0164
+    },
+    {
+      "view": 2,
+      "name": "PostChain.Uber",
+      "count": 383,
+      "mean": 0.017052219321148827,
+      "p50": 0.0164,
+      "p95": 0.0185
+    },
+    {
+      "view": 2,
+      "name": "SSAO.Compute",
+      "count": 383,
+      "mean": 0.03494177545691906,
+      "p50": 0.0318,
+      "p95": 0.0379
+    },
+    {
+      "view": 2,
+      "name": "SSAO.Filter",
+      "count": 383,
+      "mean": 0.008413577023498695,
+      "p50": 0.0072,
+      "p95": 0.0092
+    },
+    {
+      "view": 2,
+      "name": "SSGI.Composite",
+      "count": 383,
+      "mean": 0.02413237597911227,
+      "p50": 0.0226,
+      "p95": 0.0256
+    },
+    {
+      "view": 2,
+      "name": "SSGI.Filter",
+      "count": 383,
+      "mean": 0.008693472584856397,
+      "p50": 0.0092,
+      "p95": 0.0103
+    },
+    {
+      "view": 2,
+      "name": "SSGI.HiZ.0",
+      "count": 383,
+      "mean": 0.01166579634464752,
+      "p50": 0.0072,
+      "p95": 0.0082
+    },
+    {
+      "view": 2,
+      "name": "SSGI.HiZ.1",
+      "count": 383,
+      "mean": 0.005983812010443864,
+      "p50": 0.0051,
+      "p95": 0.0061
+    },
+    {
+      "view": 2,
+      "name": "SSGI.HiZ.2",
+      "count": 383,
+      "mean": 0.0033616187989556137,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "SSGI.HiZ.3",
+      "count": 383,
+      "mean": 0.0041472584856396865,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "SSGI.HiZ.4",
+      "count": 383,
+      "mean": 0.003002088772845953,
+      "p50": 0.0031,
+      "p95": 0.0031
+    },
+    {
+      "view": 2,
+      "name": "SSGI.HiZ.5",
+      "count": 383,
+      "mean": 0.003043864229765013,
+      "p50": 0.0031,
+      "p95": 0.004
+    },
+    {
+      "view": 2,
+      "name": "SSGI.HiZ.6",
+      "count": 383,
+      "mean": 0.0032078328981723237,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "SSGI.HiZ.7",
+      "count": 383,
+      "mean": 0.003478590078328982,
+      "p50": 0.0031,
+      "p95": 0.0041
+    },
+    {
+      "view": 2,
+      "name": "SSGI.Resolve",
+      "count": 383,
+      "mean": 0.01211644908616188,
+      "p50": 0.0102,
+      "p95": 0.0123
+    },
+    {
+      "view": 2,
+      "name": "SSGI.StoreHistory",
+      "count": 383,
+      "mean": 0.009260313315926893,
+      "p50": 0.0072,
+      "p95": 0.0082
+    },
+    {
+      "view": 2,
+      "name": "SSGI.Trace",
+      "count": 383,
+      "mean": 0.07036788511749348,
+      "p50": 0.0614,
+      "p95": 0.0768
+    },
+    {
+      "view": 2,
+      "name": "Shadow.Clear",
+      "count": 383,
+      "mean": 0.03129451697127937,
+      "p50": 0.0317,
+      "p95": 0.0369
+    },
+    {
+      "view": 2,
+      "name": "SkyBox",
+      "count": 383,
+      "mean": 0.03691488250652741,
+      "p50": 0.0185,
+      "p95": 0.0226
+    },
+    {
+      "view": 2,
+      "name": "Temporal.CameraMotion",
+      "count": 383,
+      "mean": 0.019732637075718016,
+      "p50": 0.0185,
+      "p95": 0.0215
+    },
+    {
+      "view": 2,
+      "name": "Temporal.DepthCopy",
+      "count": 383,
+      "mean": 0.014186161879895562,
+      "p50": 0.0143,
+      "p95": 0.0154
+    },
+    {
+      "view": 2,
+      "name": "UI.Draw",
+      "count": 383,
+      "mean": 0.002621148825065274,
+      "p50": 0.003,
+      "p95": 0.0031
+    },
+    {
+      "view": 2,
+      "name": "live_present",
+      "count": 383,
+      "mean": 0.013108355091383812,
+      "p50": 0.0133,
+      "p95": 0.0144
+    }
+  ]
+}

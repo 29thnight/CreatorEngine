@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 
 #include "LXMaterialRuntime.h"
 #include "RHI/RHIGraphicsPipelineRequest.h"
@@ -133,7 +134,7 @@ public:
         { error = "LX compute generation requires a complete stage and dependency identity."; return false; }
         if (!desc.csBytecode || !desc.csSize || !desc.layout.IsValid())
         { error = "LX compute generation requires owned bytecode and a pipeline layout."; return false; }
-        auto candidate = std::make_shared<ComputeGeneration>();
+        auto candidate = own::make_shared<ComputeGeneration>();
         candidate->shader = std::move(shader);
         candidate->desc_ = desc;
         const auto* bytes = static_cast<const std::uint8_t*>(desc.csBytecode);
@@ -163,7 +164,7 @@ public:
     }
     bool IsValid() const { return generation_ && generation_->IsValid(); }
     RHIPipelineHandle GetHandle() const { return generation_ ? generation_->GetHandle() : RHIPipelineHandle{}; }
-    std::shared_ptr<const ComputeGeneration> GetGeneration() const { return generation_; }
+    own::shared_owner<const ComputeGeneration> GetGeneration() const { return generation_; }
     const RHIComputePipelineDesc& GetDesc() const
     {
         static const RHIComputePipelineDesc empty;
@@ -171,7 +172,7 @@ public:
     }
 
 private:
-    std::shared_ptr<ComputeGeneration> generation_;
+    own::shared_owner<ComputeGeneration> generation_;
 };
 
 // Full compile identity is separate from the material keyword selection key.
@@ -310,8 +311,8 @@ struct GraphicsGeneration
     RHIGraphicsPipelineRequest pipeline;
 };
 
-inline std::shared_ptr<const GraphicsGeneration> ResolveGraphicsGeneration(
-    std::span<const std::shared_ptr<const GraphicsGeneration>> generations,
+inline own::shared_owner<const GraphicsGeneration> ResolveGraphicsGeneration(
+    std::span<const own::shared_owner<const GraphicsGeneration>> generations,
     ShaderMetaHandle handle, RHIShaderPermutationKey materialKey, const ShaderMetaBindingLayout& layout,
     std::uint32_t vertexMask, bool reference)
 {
@@ -340,7 +341,7 @@ public:
     {
         if (generation_) { error = "Cannot prepare an existing LX graphics generation."; return false; }
         if (!Validate(shader, error)) return false;
-        auto candidate = std::make_shared<GraphicsGeneration>();
+        auto candidate = own::make_shared<GraphicsGeneration>();
         candidate->shader = std::move(shader);
         if (!candidate->pipeline.Prepare(desc, error)) return false;
         generation_ = std::move(candidate);
@@ -356,7 +357,7 @@ public:
     {
         if (generation_) { error = "LX graphics generation was already prepared or published."; return false; }
         if (!Validate(shader, error)) return false;
-        auto candidate = std::make_shared<GraphicsGeneration>();
+        auto candidate = own::make_shared<GraphicsGeneration>();
         candidate->shader = std::move(shader);
         if (!candidate->pipeline.Create(cache, desc, error)) return false;
         generation_ = std::move(candidate);
@@ -399,7 +400,7 @@ public:
         static const RHIGraphicsPipelineDesc empty;
         return generation_ ? generation_->pipeline.GetDesc() : empty;
     }
-    std::shared_ptr<const GraphicsGeneration> GetGeneration() const
+    own::shared_owner<const GraphicsGeneration> GetGeneration() const
     { return IsValid() ? generation_ : nullptr; }
 
 private:
@@ -414,6 +415,6 @@ private:
         error.clear();
         return true;
     }
-    std::shared_ptr<GraphicsGeneration> generation_;
+    own::shared_owner<GraphicsGeneration> generation_;
 };
 } // namespace LX::Runtime

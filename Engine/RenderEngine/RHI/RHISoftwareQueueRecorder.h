@@ -1,4 +1,6 @@
 #pragma once
+#include "../../Utility_Framework/LifetimeToken.h"
+#include "../../Utility_Framework/Ownership.h"
 #include "IRHICommandTranslator.h"
 #include "RHIQueueRecorder.h"
 #include "RHISoftwareRecorder.h"
@@ -21,7 +23,7 @@ struct RHISoftwareQueueState;
 class RHIQueueCommandTranslator final : public IRHICommandTranslator
 {
   public:
-    RHIQueueCommandTranslator(IRHIQueueRecorder& recorder, std::shared_ptr<IRHICommandQueue> queue)
+    RHIQueueCommandTranslator(IRHIQueueRecorder& recorder, own::shared_owner<IRHICommandQueue> queue)
         : m_recorder(recorder), m_queue(std::move(queue))
     {
     }
@@ -30,7 +32,7 @@ class RHIQueueCommandTranslator final : public IRHICommandTranslator
 
   private:
     IRHIQueueRecorder& m_recorder;
-    std::shared_ptr<IRHICommandQueue> m_queue;
+    own::shared_owner<IRHICommandQueue> m_queue;
 };
 
 // Wrapping does not create another GPU queue or timeline. Every public operation
@@ -42,7 +44,7 @@ class RHISoftwareCommandQueue final : public IRHICommandQueue
     RHIQueueIdentity GetIdentity() const override;
     bool Signal(uint64_t value, RHITimelinePoint& issuedPoint, std::string& error) override;
     bool Wait(const RHITimelinePoint& point, std::string& error) override;
-    bool Submit(const std::shared_ptr<IRHIQueueCommandBatch>& batch, uint64_t value, RHITimelinePoint& point,
+    bool Submit(const ce::pooled_owner<IRHIQueueCommandBatch>& batch, uint64_t value, RHITimelinePoint& point,
                 std::string& error) override;
     size_t CollectCompleted() override;
     size_t GetPendingBatchCount() const override;
@@ -50,10 +52,19 @@ class RHISoftwareCommandQueue final : public IRHICommandQueue
   private:
     friend class RHISoftwareQueueRecorder;
     friend struct RHISoftwareQueueState;
-    RHISoftwareCommandQueue(std::shared_ptr<RHISoftwareQueueState> state,
-                            std::shared_ptr<IRHICommandQueue> nativeQueue);
-    std::shared_ptr<RHISoftwareQueueState> m_state;
-    std::shared_ptr<IRHICommandQueue> m_native;
+
+  public:
+    class ConstructionKey
+    {
+        friend class RHISoftwareQueueRecorder;
+        ConstructionKey() = default;
+    };
+    RHISoftwareCommandQueue(ConstructionKey, own::shared_owner<RHISoftwareQueueState> state,
+                            own::shared_owner<IRHICommandQueue> nativeQueue);
+
+  private:
+    own::shared_owner<RHISoftwareQueueState> m_state;
+    own::shared_owner<IRHICommandQueue> m_native;
 };
 
 class RHISoftwareQueueRecorder final : public IRHIQueueRecorder
@@ -62,25 +73,24 @@ class RHISoftwareQueueRecorder final : public IRHIQueueRecorder
     // These shared owners retain the recorder and validator through outstanding
     // CPU recordings. Their referenced device services keep the backend's usual
     // drain-before-destruction lifetime; native batches retain GPU owners alone.
-    RHISoftwareQueueRecorder(std::shared_ptr<IRHIQueueRecorder> nativeRecorder,
-                             std::shared_ptr<const IRHISoftwareCommandValidator> validator,
+    RHISoftwareQueueRecorder(own::shared_owner<IRHIQueueRecorder> nativeRecorder,
+                             own::shared_owner<const IRHISoftwareCommandValidator> validator,
                              RHISoftwareQueueOptions options = {}, job_scheduler& scheduler = ce::get_job_scheduler());
     ~RHISoftwareQueueRecorder() override;
     IRenderDeviceServices& DeviceServices() const override;
     uint32_t GetWorkerCount() const override;
     void SetFrameDesc(const RHISoftwareBatchDesc& desc);
-    bool WrapQueue(const std::shared_ptr<IRHICommandQueue>& nativeQueue, std::shared_ptr<IRHICommandQueue>& queue,
+    bool WrapQueue(const own::shared_owner<IRHICommandQueue>& nativeQueue, own::shared_owner<IRHICommandQueue>& queue,
                    std::string& error);
-    bool Record(const std::shared_ptr<IRHICommandQueue>& queue, const std::function<void(RHIEncoder&)>& commands,
-                std::shared_ptr<const void> token, std::shared_ptr<IRHIQueueCommandBatch>& batch,
-                std::string& error) override;
-    bool BeginRecording(const std::shared_ptr<IRHICommandQueue>& queue, uint32_t targetCount,
-                        std::shared_ptr<const void> token, std::shared_ptr<IRHIQueueRecording>& recording,
+    bool Record(const own::shared_owner<IRHICommandQueue>& queue, const std::function<void(RHIEncoder&)>& commands,
+                ce::lifetime_token token, ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error) override;
+    bool BeginRecording(const own::shared_owner<IRHICommandQueue>& queue, uint32_t targetCount,
+                        ce::lifetime_token token, ce::pooled_owner<IRHIQueueRecording>& recording,
                         std::string& error) override;
     bool ExecuteSubmission(const std::function<bool(std::string&)>& submit, std::string& error) override;
 
   private:
-    std::shared_ptr<RHISoftwareQueueState> m_state;
+    own::shared_owner<RHISoftwareQueueState> m_state;
 };
 
 // The factory and recorder are referenced only while creating a wrapper. Created
@@ -93,7 +103,7 @@ class RHISoftwareQueueFactory final : public IRHICommandQueueFactory
     {
     }
     RHIQueueCapabilities QueryQueueCapabilities() const override;
-    bool CreateQueue(RHIQueueKind kind, std::shared_ptr<IRHICommandQueue>& queue, std::string& error) override;
+    bool CreateQueue(RHIQueueKind kind, own::shared_owner<IRHICommandQueue>& queue, std::string& error) override;
 
   private:
     IRHICommandQueueFactory& m_native;

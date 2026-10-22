@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #pragma once
 #include "ClassProperty.h"
 #include "../RenderEngine/LocalPose.h"
@@ -117,7 +118,7 @@ struct AnimInstance final
     struct ControllerSlot final
     {
         std::uint64_t id{};
-        std::weak_ptr<AnimationController> owner{};
+        own::weak_owner<AnimationController> owner{};
         ControllerPlayback playback{};
     };
 
@@ -204,7 +205,7 @@ struct AnimInstance final
     std::unordered_map<std::uint64_t, std::size_t> controllerSlotById{};
 
     [[nodiscard]] ControllerPlayback& GetControllerPlayback(
-        std::uint64_t id, std::weak_ptr<AnimationController> owner)
+        std::uint64_t id, own::weak_owner<AnimationController> owner)
     {
         if (const auto found = controllerSlotById.find(id); found != controllerSlotById.end())
             return controllerSlots[found->second]->playback;

@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/Ownership.h"
 #pragma once
 
 #include "PlaybackService.h"
@@ -24,7 +25,7 @@ namespace wave
         [[nodiscard]] bool LoadEditorAssets(const std::filesystem::path& assetsRoot,
             const std::filesystem::path& cacheRoot, std::string& error);
         [[nodiscard]] bool LoadCookedAssets(const experiment::cooked::CookedAssetCatalog& catalog,
-            std::shared_ptr<const experiment::cooked::ArtifactByteSource> bytes, std::string& error);
+            own::shared_owner<const experiment::cooked::ArtifactByteSource> bytes, std::string& error);
         [[nodiscard]] std::string ResolveLegacyClip(std::string_view name, std::string& error) const;
         void Clear();
 
@@ -33,7 +34,7 @@ namespace wave
         PlaybackService& m_playback;
         std::unordered_map<ClipKey, std::string> m_clipStamps;
         std::unordered_set<ClipKey> m_assets;
-        std::unordered_map<ClipKey, std::shared_ptr<const SoundGraphProgram>> m_editorGraphs;
+        std::unordered_map<ClipKey, own::shared_owner<const SoundGraphProgram>> m_editorGraphs;
         std::unordered_map<std::string, std::string> m_legacyAliases;
     };
 }

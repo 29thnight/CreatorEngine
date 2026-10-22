@@ -1,0 +1,42 @@
+{
+  "passed": true,
+  "cases": [
+    {
+      "variant": "on-a",
+      "passed": true,
+      "referenceChecks": [],
+      "events": {
+        "Interrupt": 49417,
+        "DPC": 118941,
+        "CSwitch": 1493467,
+        "ReadyThread": 849876,
+        "DPCTmr": 6402,
+        "T-Start": 463,
+        "T-End": 518
+      },
+      "unknownSwitchStates": {
+        "Running": 293
+      },
+      "threads": 32
+    },
+    {
+      "variant": "off-a",
+      "passed": true,
+      "referenceChecks": [],
+      "events": {
+        "CSwitch": 1465044,
+        "Interrupt": 46660,
+        "DPC": 112786,
+        "ReadyThread": 836263,
+        "DPCTmr": 6311,
+        "T-Start": 513,
+        "T-End": 521
+      },
+      "unknownSwitchStates": {
+        "Running": 262
+      },
+      "threads": 33
+    }
+  ],
+  "toleranceMs": 0.005
+}

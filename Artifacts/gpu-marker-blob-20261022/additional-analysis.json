@@ -1,0 +1,1295 @@
+{
+  "scope": "CreatorRobot Debug, exact archived binaries, unchanged borrowed-query renderer; nested scopes are not summed.",
+  "pairs": {
+    "A": {
+      "offMs": 30.2924408,
+      "onMs": 31.956105361930295,
+      "deltaMs": 1.6636645619302932,
+      "changePercent": 5.492012257824719
+    },
+    "B": {
+      "offMs": 30.114500261780105,
+      "onMs": 29.946960301507538,
+      "deltaMs": -0.1675399602725669,
+      "changePercent": -0.5563431530198781
+    },
+    "ETW": {
+      "offMs": 34.35663601190476,
+      "onMs": 33.73438267045454,
+      "deltaMs": -0.622253341450218,
+      "changePercent": -1.8111591054333798
+    }
+  },
+  "scopes": {
+    "RenderThreadFrame": {
+      "pairedMsPerTwoViewLoop": {
+        "A": {
+          "beforeMsPerLoop": 30.301001866666667,
+          "afterMsPerLoop": 31.963203217158195,
+          "deltaMsPerLoop": 1.6622013504915287
+        },
+        "B": {
+          "beforeMsPerLoop": 30.1182738219895,
+          "afterMsPerLoop": 29.9495555276382,
+          "deltaMsPerLoop": -0.1687182943513008
+        },
+        "ETW": {
+          "beforeMsPerLoop": 34.381026785714276,
+          "afterMsPerLoop": 33.74817784090911,
+          "deltaMsPerLoop": -0.6328489448051684
+        }
+      },
+      "allThreadCallsEtw": {
+        "on-a": {
+          "wall": {
+            "count": 363,
+            "mean": 32.725505785123964,
+            "p50": 32.7516,
+            "p95": 38.771,
+            "p99": 43.2988,
+            "max": 46.1638
+          },
+          "meanStateMs": {
+            "Running": 26.461818732782415,
+            "Ready": 0.4114355371903391,
+            "Waiting": 5.851901652892713,
+            "Unknown": 0.00034986225895178503
+          }
+        },
+        "off-a": {
+          "wall": {
+            "count": 358,
+            "mean": 32.26822625698324,
+            "p50": 33.30325,
+            "p95": 39.7865,
+            "p99": 41.7495,
+            "max": 45.9251
+          },
+          "meanStateMs": {
+            "Running": 26.05436508379908,
+            "Ready": 0.3654645251398945,
+            "Waiting": 5.848231843575546,
+            "Unknown": 0.00016480446927175126
+          }
+        }
+      }
+    },
+    "RenderGraphDeclare": {
+      "pairedMsPerTwoViewLoop": {
+        "A": {
+          "beforeMsPerLoop": 7.99261093333334,
+          "afterMsPerLoop": 8.557896514745309,
+          "deltaMsPerLoop": 0.5652855814119686
+        },
+        "B": {
+          "beforeMsPerLoop": 7.939761256544509,
+          "afterMsPerLoop": 7.97195025125628,
+          "deltaMsPerLoop": 0.03218899471177128
+        },
+        "ETW": {
+          "beforeMsPerLoop": 8.75550178571429,
+          "afterMsPerLoop": 8.78701392045455,
+          "deltaMsPerLoop": 0.03151213474025916
+        }
+      },
+      "allThreadCallsEtw": {
+        "on-a": {
+          "wall": {
+            "count": 705,
+            "mean": 4.387275035460993,
+            "p50": 4.1868,
+            "p95": 5.822,
+            "p99": 6.487,
+            "max": 7.272
+          },
+          "meanStateMs": {
+            "Running": 4.375890638297889,
+            "Ready": 0.006265248226966362,
+            "Waiting": 0.00511914893617591,
+            "Unknown": 0.0
+          }
+        },
+        "off-a": {
+          "wall": {
+            "count": 674,
+            "mean": 4.364760534124629,
+            "p50": 4.16675,
+            "p95": 5.705,
+            "p99": 6.4446,
+            "max": 7.5574
+          },
+          "meanStateMs": {
+            "Running": 4.352948961424409,
+            "Ready": 0.006918397626104004,
+            "Waiting": 0.004893175074196461,
+            "Unknown": 0.0
+          }
+        }
+      }
+    },
+    "RenderGraphDeclareNodeBody": {
+      "pairedMsPerTwoViewLoop": {
+        "A": {
+          "beforeMsPerLoop": 7.5037154666667885,
+          "afterMsPerLoop": 8.019371581769533,
+          "deltaMsPerLoop": 0.515656115102745
+        },
+        "B": {
+          "beforeMsPerLoop": 7.439966753926784,
+          "afterMsPerLoop": 7.470722864321651,
+          "deltaMsPerLoop": 0.03075611039486681
+        },
+        "ETW": {
+          "beforeMsPerLoop": 8.21089494047626,
+          "afterMsPerLoop": 8.248302840909119,
+          "deltaMsPerLoop": 0.03740790043285891
+        }
+      },
+      "allThreadCallsEtw": {
+        "on-a": {
+          "wall": {
+            "count": 26120,
+            "mean": 0.11115630168453293,
+            "p50": 0.0298,
+            "p95": 0.3942,
+            "p99": 0.5737,
+            "max": 1.263
+          },
+          "meanStateMs": {
+            "Running": 0.11084970903521743,
+            "Ready": 0.0001684379785608978,
+            "Waiting": 0.00013815467075050563,
+            "Unknown": 0.0
+          }
+        },
+        "off-a": {
+          "wall": {
+            "count": 24938,
+            "mean": 0.11062878739273398,
+            "p50": 0.0293,
+            "p95": 0.3965,
+            "p99": 0.5718,
+            "max": 1.4723
+          },
+          "meanStateMs": {
+            "Running": 0.11031573903279622,
+            "Ready": 0.00018341887881915495,
+            "Waiting": 0.00012962948111356273,
+            "Unknown": 0.0
+          }
+        }
+      }
+    },
+    "RenderGraphDeclareAddPass": {
+      "pairedMsPerTwoViewLoop": {
+        "A": {
+          "beforeMsPerLoop": 0.9364125333333025,
+          "afterMsPerLoop": 0.9942453083108842,
+          "deltaMsPerLoop": 0.05783277497758166
+        },
+        "B": {
+          "beforeMsPerLoop": 0.9338109947643519,
+          "afterMsPerLoop": 0.930499748743633,
+          "deltaMsPerLoop": -0.003311246020718972
+        },
+        "ETW": {
+          "beforeMsPerLoop": 1.0156086309523489,
+          "afterMsPerLoop": 1.018323863636284,
+          "deltaMsPerLoop": 0.0027152326839350316
+        }
+      },
+      "allThreadCallsEtw": {
+        "on-a": {
+          "wall": {
+            "count": 94938,
+            "mean": 0.003775621984874339,
+            "p50": 0.0031,
+            "p95": 0.0055,
+            "p99": 0.0123,
+            "max": 0.2345
+          },
+          "meanStateMs": {
+            "Running": 0.0037735195601211273,
+            "Ready": 1.9444268891137544e-06,
+            "Waiting": 1.579978511464531e-07,
+            "Unknown": 0.0
+          }
+        },
+        "off-a": {
+          "wall": {
+            "count": 90653,
+            "mean": 0.0037642935148312798,
+            "p50": 0.0031,
+            "p95": 0.0055,
+            "p99": 0.0126,
+            "max": 0.2396
+          },
+          "meanStateMs": {
+            "Running": 0.0037609974297515437,
+            "Ready": 2.3507219838127374e-06,
+            "Waiting": 9.453630878745354e-07,
+            "Unknown": 0.0
+          }
+        }
+      }
+    },
+    "RenderGraphDeclareAdvanceVersion": {
+      "pairedMsPerTwoViewLoop": {
+        "A": {
+          "beforeMsPerLoop": 0.5453359999995434,
+          "afterMsPerLoop": 0.589847184986242,
+          "deltaMsPerLoop": 0.04451118498669859
+        },
+        "B": {
+          "beforeMsPerLoop": 0.541939790575482,
+          "afterMsPerLoop": 0.5520092964821257,
+          "deltaMsPerLoop": 0.010069505906643683
+        },
+        "ETW": {
+          "beforeMsPerLoop": 0.5842249999995774,
+          "afterMsPerLoop": 0.5890874999996609,
+          "deltaMsPerLoop": 0.004862500000083481
+        }
+      },
+      "allThreadCallsEtw": {
+        "on-a": {
+          "wall": {
+            "count": 213165,
+            "mean": 0.0009727619449722046,
+            "p50": 0.0009,
+            "p95": 0.0014,
+            "p99": 0.0017,
+            "max": 0.2709
+          },
+          "meanStateMs": {
+            "Running": 0.0009723683530210713,
+            "Ready": 3.8796237656883565e-07,
+            "Waiting": 5.629441975883849e-09,
+            "Unknown": 0.0
+          }
+        },
+        "off-a": {
+          "wall": {
+            "count": 203548,
+            "mean": 0.0009643897262562147,
+            "p50": 0.0008,
+            "p95": 0.0014,
+            "p99": 0.0016,
+            "max": 0.3198
+          },
+          "meanStateMs": {
+            "Running": 0.0009638011671211565,
+            "Ready": 5.099534261813496e-07,
+            "Waiting": 7.860553774487181e-08,
+            "Unknown": 0.0
+          }
+        }
+      }
+    },
+    "RenderGpuCollect": {
+      "pairedMsPerTwoViewLoop": {
+        "A": {
+          "beforeMsPerLoop": 6.069057333333347,
+          "afterMsPerLoop": 3.458834584450408,
+          "deltaMsPerLoop": -2.6102227488829386
+        },
+        "B": {
+          "beforeMsPerLoop": 5.977941884816769,
+          "afterMsPerLoop": 3.3139276381909575,
+          "deltaMsPerLoop": -2.664014246625811
+        },
+        "ETW": {
+          "beforeMsPerLoop": 6.576426190476181,
+          "afterMsPerLoop": 3.621761079545451,
+          "deltaMsPerLoop": -2.9546651109307303
+        }
+      },
+      "allThreadCallsEtw": {
+        "on-a": {
+          "wall": {
+            "count": 1434,
+            "mean": 0.889023640167364,
+            "p50": 0.3764,
+            "p95": 2.4883,
+            "p99": 2.8557,
+            "max": 3.4621
+          },
+          "meanStateMs": {
+            "Running": 0.8745691073919228,
+            "Ready": 0.007418200836819287,
+            "Waiting": 0.007030055788011837,
+            "Unknown": 6.27615062778377e-06
+          }
+        },
+        "off-a": {
+          "wall": {
+            "count": 1385,
+            "mean": 1.5954362454873645,
+            "p50": 0.2404,
+            "p95": 4.2138,
+            "p99": 4.718,
+            "max": 8.1703
+          },
+          "meanStateMs": {
+            "Running": 1.553145559566812,
+            "Ready": 0.01671783393506759,
+            "Waiting": 0.02554974729245069,
+            "Unknown": 2.3104693140740376e-05
+          }
+        }
+      }
+    },
+    "RenderSubmit": {
+      "pairedMsPerTwoViewLoop": {
+        "A": {
+          "beforeMsPerLoop": 3.077600266666667,
+          "afterMsPerLoop": 3.247206434316353,
+          "deltaMsPerLoop": 0.16960616764968606
+        },
+        "B": {
+          "beforeMsPerLoop": 3.067340837696333,
+          "afterMsPerLoop": 3.021522864321605,
+          "deltaMsPerLoop": -0.04581797337472793
+        },
+        "ETW": {
+          "beforeMsPerLoop": 3.3889095238095215,
+          "afterMsPerLoop": 3.1923573863636365,
+          "deltaMsPerLoop": -0.19655213744588496
+        }
+      },
+      "allThreadCallsEtw": {
+        "on-a": {
+          "wall": {
+            "count": 706,
+            "mean": 1.591656940509915,
+            "p50": 1.4959,
+            "p95": 2.1557,
+            "p99": 2.3437,
+            "max": 2.6428
+          },
+          "meanStateMs": {
+            "Running": 0.4548198300283027,
+            "Ready": 0.01646317280462411,
+            "Waiting": 1.1203739376770392,
+            "Unknown": 0.0
+          }
+        },
+        "off-a": {
+          "wall": {
+            "count": 674,
+            "mean": 1.689426706231454,
+            "p50": 1.60775,
+            "p95": 2.1971,
+            "p99": 2.3874,
+            "max": 2.7132
+          },
+          "meanStateMs": {
+            "Running": 0.4538080118694481,
+            "Ready": 0.01750103857571372,
+            "Waiting": 1.218117655786341,
+            "Unknown": 0.0
+          }
+        }
+      }
+    },
+    "RHITicketWait": {
+      "pairedMsPerTwoViewLoop": {
+        "A": {
+          "beforeMsPerLoop": 2.34444373333333,
+          "afterMsPerLoop": 2.4528042895442317,
+          "deltaMsPerLoop": 0.10836055621090157
+        },
+        "B": {
+          "beforeMsPerLoop": 2.3363876963350667,
+          "afterMsPerLoop": 2.298809296482416,
+          "deltaMsPerLoop": -0.03757839985265088
+        },
+        "ETW": {
+          "beforeMsPerLoop": 2.538729761904757,
+          "afterMsPerLoop": 2.3401911931818167,
+          "deltaMsPerLoop": -0.1985385687229404
+        }
+      },
+      "allThreadCallsEtw": {
+        "on-a": {
+          "wall": {
+            "count": 5175,
+            "mean": 0.19941742995169082,
+            "p50": 0.0023,
+            "p95": 1.106,
+            "p99": 1.5099,
+            "max": 1.9535
+          },
+          "meanStateMs": {
+            "Running": 0.01429495652173843,
+            "Ready": 0.005099594202924298,
+            "Waiting": 0.18002287922704907,
+            "Unknown": 0.0
+          }
+        },
+        "off-a": {
+          "wall": {
+            "count": 4996,
+            "mean": 0.212119935948759,
+            "p50": 0.0022,
+            "p95": 1.211,
+            "p99": 1.6005,
+            "max": 2.2186
+          },
+          "meanStateMs": {
+            "Running": 0.015497117694150516,
+            "Ready": 0.0056344275420462265,
+            "Waiting": 0.19098839071256452,
+            "Unknown": 0.0
+          }
+        }
+      }
+    },
+    "MaterialGraphScenePrepare": {
+      "pairedMsPerTwoViewLoop": {
+        "A": {
+          "beforeMsPerLoop": 5.8030778666666665,
+          "afterMsPerLoop": 6.159178284182307,
+          "deltaMsPerLoop": 0.35610041751564037
+        },
+        "B": {
+          "beforeMsPerLoop": 5.8269557591623,
+          "afterMsPerLoop": 5.759986180904525,
+          "deltaMsPerLoop": -0.06696957825777528
+        },
+        "ETW": {
+          "beforeMsPerLoop": 7.023038690476193,
+          "afterMsPerLoop": 6.947541193181809,
+          "deltaMsPerLoop": -0.07549749729438382
+        }
+      },
+      "allThreadCallsEtw": {
+        "on-a": {
+          "wall": {
+            "count": 706,
+            "mean": 3.4639298866855524,
+            "p50": 3.51415,
+            "p95": 4.4275,
+            "p99": 4.857,
+            "max": 5.6182
+          },
+          "meanStateMs": {
+            "Running": 3.1390372521246905,
+            "Ready": 0.11285864022663382,
+            "Waiting": 0.2119858356941132,
+            "Unknown": 4.815864022645627e-05
+          }
+        },
+        "off-a": {
+          "wall": {
+            "count": 674,
+            "mean": 3.5010994065281897,
+            "p50": 3.4566999999999997,
+            "p95": 4.5271,
+            "p99": 5.1758,
+            "max": 6.7231
+          },
+          "meanStateMs": {
+            "Running": 3.1611229970326646,
+            "Ready": 0.1092451038576218,
+            "Waiting": 0.2307164688427299,
+            "Unknown": 1.4836795251874676e-05
+          }
+        }
+      }
+    },
+    "MaterialSceneDrawBindingsTask": {
+      "pairedMsPerTwoViewLoop": {},
+      "allThreadCallsEtw": {
+        "on-a": {
+          "wall": {
+            "count": 706,
+            "mean": 0.5540376770538243,
+            "p50": 0.5395,
+            "p95": 0.8386,
+            "p99": 1.0412,
+            "max": 1.2593
+          },
+          "meanStateMs": {
+            "Running": 0.5461218130311755,
+            "Ready": 0.003414447592049212,
+            "Waiting": 0.004501416430601177,
+            "Unknown": 0.0
+          }
+        },
+        "off-a": {
+          "wall": {
+            "count": 674,
+            "mean": 0.5481755192878338,
+            "p50": 0.5172,
+            "p95": 0.8192,
+            "p99": 1.0518,
+            "max": 1.2514
+          },
+          "meanStateMs": {
+            "Running": 0.5371013353115592,
+            "Ready": 0.0032002967359056086,
+            "Waiting": 0.007866468842733544,
+            "Unknown": 7.4183976249252885e-06
+          }
+        }
+      }
+    },
+    "MaterialBindingsPrepare": {
+      "pairedMsPerTwoViewLoop": {},
+      "allThreadCallsEtw": {
+        "on-a": {
+          "wall": {
+            "count": 2824,
+            "mean": 0.10407581444759206,
+            "p50": 0.09115000000000001,
+            "p95": 0.1906,
+            "p99": 0.291,
+            "max": 0.5684
+          },
+          "meanStateMs": {
+            "Running": 0.10260563031162004,
+            "Ready": 0.0005905807365421178,
+            "Waiting": 0.0008796033994353331,
+            "Unknown": 0.0
+          }
+        },
+        "off-a": {
+          "wall": {
+            "count": 2696,
+            "mean": 0.10266461424332345,
+            "p50": 0.0901,
+            "p95": 0.1875,
+            "p99": 0.2938,
+            "max": 0.7608
+          },
+          "meanStateMs": {
+            "Running": 0.10067303412464547,
+            "Ready": 0.0005741468842735974,
+            "Waiting": 0.0014155786350148953,
+            "Unknown": 1.8545994062313221e-06
+          }
+        }
+      }
+    },
+    "BindingPrepareOwner": {
+      "pairedMsPerTwoViewLoop": {},
+      "allThreadCallsEtw": {
+        "on-a": {
+          "wall": {
+            "count": 2824,
+            "mean": 0.011765651558073655,
+            "p50": 0.0106,
+            "p95": 0.0176,
+            "p99": 0.0529,
+            "max": 0.1866
+          },
+          "meanStateMs": {
+            "Running": 0.011496281869670357,
+            "Ready": 8.484419263339196e-05,
+            "Waiting": 0.00018452549575100657,
+            "Unknown": 0.0
+          }
+        },
+        "off-a": {
+          "wall": {
+            "count": 2696,
+            "mean": 0.011737129080118694,
+            "p50": 0.0102,
+            "p95": 0.0183,
+            "p99": 0.0401,
+            "max": 0.4133
+          },
+          "meanStateMs": {
+            "Running": 0.01126617210681308,
+            "Ready": 0.00012047477744819104,
+            "Waiting": 0.00035048219584635774,
+            "Unknown": 0.0
+          }
+        }
+      }
+    }
+  },
+  "processWideSampleLeaves": {
+    "on-a": {
+      "scope": "All CreatorEditor process threads, sampled CPU weight in native-ON ETW window; not RenderThread-only or an atomic contention measurement.",
+      "totalWeightUs": 41292162,
+      "categoryWeightUs": {
+        "other": 35763907,
+        "heap": 357181,
+        "vector": 1822287,
+        "ownership": 569357,
+        "functionWrapper": 98896,
+        "string": 1003145,
+        "debugIteratorLock": 1629457,
+        "lifetimeToken": 47932
+      },
+      "top": [
+        {
+          "weightUs": 2067838,
+          "symbol": "ntdll.dll!RtlpEnterCriticalSectionContended",
+          "category": "other"
+        },
+        {
+          "weightUs": 1716974,
+          "symbol": "ntdll.dll!RtlEnterCriticalSection",
+          "category": "other"
+        },
+        {
+          "weightUs": 1565419,
+          "symbol": "nvwgf2umx.dll!\"Unknown\"",
+          "category": "other"
+        },
+        {
+          "weightUs": 1542047,
+          "symbol": "ntdll.dll!RtlLeaveCriticalSection",
+          "category": "other"
+        },
+        {
+          "weightUs": 1230912,
+          "symbol": "ntoskrnl.exe!RtlpLookupFunctionEntryForStackWalks",
+          "category": "other"
+        },
+        {
+          "weightUs": 1089106,
+          "symbol": "ntoskrnl.exe!RtlpUnwindPrologue",
+          "category": "other"
+        },
+        {
+          "weightUs": 1062134,
+          "symbol": "CreatorEditor.runtime.dll!_RTC_CheckStackVars",
+          "category": "other"
+        },
+        {
+          "weightUs": 989219,
+          "symbol": "ucrtbased.dll!\"Unknown\"",
+          "category": "other"
+        },
+        {
+          "weightUs": 749232,
+          "symbol": "MSVCP140D.dll!\"Unknown\"",
+          "category": "other"
+        },
+        {
+          "weightUs": 525773,
+          "symbol": "VCRUNTIME140D.dll!\"Unknown\"",
+          "category": "other"
+        },
+        {
+          "weightUs": 500836,
+          "symbol": "CreatorEditor.runtime.dll!std::_Atomic_storage<unsigned __int64,8>::load",
+          "category": "other"
+        },
+        {
+          "weightUs": 420559,
+          "symbol": "ntoskrnl.exe!RtlpxVirtualUnwind",
+          "category": "other"
+        },
+        {
+          "weightUs": 363447,
+          "symbol": "ntdll.dll!RtlpLowFragHeapAllocFromContext",
+          "category": "other"
+        },
+        {
+          "weightUs": 280123,
+          "symbol": "ntoskrnl.exe!RtlpWalkFrameChain",
+          "category": "other"
+        },
+        {
+          "weightUs": 228481,
+          "symbol": "nvlddmkm.sys!\"Unknown\"",
+          "category": "other"
+        },
+        {
+          "weightUs": 228063,
+          "symbol": "CreatorEditor.runtime.dll!std::_Check_load_memory_order",
+          "category": "other"
+        },
+        {
+          "weightUs": 211640,
+          "symbol": "CreatorEditor.runtime.dll!std::_Iterator_base12::_Orphan_me_locked_v3",
+          "category": "debugIteratorLock"
+        },
+        {
+          "weightUs": 204960,
+          "symbol": "CreatorEditor.runtime.dll!wave::`anonymous namespace'::RoomReverb::Process",
+          "category": "other"
+        },
+        {
+          "weightUs": 200831,
+          "symbol": "ntdll.dll!RtlFreeHeap",
+          "category": "heap"
+        },
+        {
+          "weightUs": 199408,
+          "symbol": "ntdll.dll!RtlpAcquireSRWLockExclusiveContended",
+          "category": "other"
+        },
+        {
+          "weightUs": 175790,
+          "symbol": "enkiTS.dll!std::_Atomic_storage<unsigned int,4>::load",
+          "category": "other"
+        },
+        {
+          "weightUs": 165981,
+          "symbol": "ntdll.dll!RtlSleepConditionVariableSRW",
+          "category": "other"
+        },
+        {
+          "weightUs": 165007,
+          "symbol": "CreatorEditor.runtime.dll!ce::detail::recording_file_impl::update_crc",
+          "category": "other"
+        },
+        {
+          "weightUs": 152309,
+          "symbol": "CreatorEditor.runtime.dll!std::vector<enum std::byte,std::allocator<enum std::byte> >::_Resize<std::_Value_init_tag>",
+          "category": "vector"
+        },
+        {
+          "weightUs": 147200,
+          "symbol": "enkiTS.dll!enki::TaskScheduler::TryRunTask",
+          "category": "other"
+        },
+        {
+          "weightUs": 145411,
+          "symbol": "CreatorEditor.runtime.dll!std::_Iterator_base12::_Getcont",
+          "category": "debugIteratorLock"
+        },
+        {
+          "weightUs": 143625,
+          "symbol": "CreatorEditor.runtime.dll!std::_Atomic_integral<unsigned __int64,8>::fetch_add",
+          "category": "other"
+        },
+        {
+          "weightUs": 142612,
+          "symbol": "CreatorEditor.runtime.dll!std::_Iterator_base12::_Assign_locked",
+          "category": "debugIteratorLock"
+        },
+        {
+          "weightUs": 142411,
+          "symbol": "CreatorEditor.runtime.dll!__security_check_cookie",
+          "category": "other"
+        },
+        {
+          "weightUs": 132653,
+          "symbol": "ntoskrnl.exe!SwapContext",
+          "category": "other"
+        },
+        {
+          "weightUs": 124290,
+          "symbol": "CreatorEditor.runtime.dll!std::_Uninitialized_value_construct_n<std::allocator<enum std::byte> >",
+          "category": "other"
+        },
+        {
+          "weightUs": 121323,
+          "symbol": "ntdll.dll!RtlQueryPerformanceCounter",
+          "category": "other"
+        },
+        {
+          "weightUs": 120306,
+          "symbol": "CreatorEditor.runtime.dll!std::vector<enum std::byte,std::allocator<enum std::byte> >::_Orphan_range_locked",
+          "category": "debugIteratorLock"
+        },
+        {
+          "weightUs": 118449,
+          "symbol": "dxgmms2.sys!\"Unknown\"",
+          "category": "other"
+        },
+        {
+          "weightUs": 117140,
+          "symbol": "CreatorEditor.runtime.dll!shadow_math::bounds_detail::Compose",
+          "category": "other"
+        },
+        {
+          "weightUs": 117008,
+          "symbol": "CreatorEditor.runtime.dll!std::_Iterator_base12::_Adopt_unlocked",
+          "category": "debugIteratorLock"
+        },
+        {
+          "weightUs": 115511,
+          "symbol": "ntoskrnl.exe!KiApcInterrupt",
+          "category": "other"
+        },
+        {
+          "weightUs": 112104,
+          "symbol": "CreatorEditor.runtime.dll!std::_Atomic_address_as<__int64,std::_Atomic_padded<unsigned __int64> >",
+          "category": "other"
+        },
+        {
+          "weightUs": 108608,
+          "symbol": "CreatorEditor.runtime.dll!ce::thread_stream::honor_seal_request",
+          "category": "other"
+        },
+        {
+          "weightUs": 108194,
+          "symbol": "CreatorEditor.runtime.dll!std::_Iterator_base12::_Iterator_base12",
+          "category": "debugIteratorLock"
+        },
+        {
+          "weightUs": 105397,
+          "symbol": "CreatorEditor.runtime.dll!std::is_constant_evaluated",
+          "category": "other"
+        },
+        {
+          "weightUs": 104972,
+          "symbol": "CreatorEditor.runtime.dll!std::vector<DX12GpuProfiler::PassRecord,std::allocator<DX12GpuProfiler::PassRecord> >::operator[]",
+          "category": "vector"
+        },
+        {
+          "weightUs": 102672,
+          "symbol": "enkiTS.dll!enki::LockLessMultiReadPipe<8,enki::SubTaskSet>::ReaderTryReadBack",
+          "category": "other"
+        },
+        {
+          "weightUs": 97416,
+          "symbol": "CreatorEditor.runtime.dll!ce::profiler_service::now",
+          "category": "other"
+        },
+        {
+          "weightUs": 97191,
+          "symbol": "CreatorEditor.runtime.dll!std::array<unsigned int,256>::operator[]",
+          "category": "other"
+        },
+        {
+          "weightUs": 96598,
+          "symbol": "CreatorEditor.runtime.dll!std::vector<ce::frame_record,std::allocator<ce::frame_record> >::operator[]",
+          "category": "vector"
+        },
+        {
+          "weightUs": 94342,
+          "symbol": "CreatorEditor.runtime.dll!std::_String_val<std::_Simple_types<char> >::_Large_mode_engaged",
+          "category": "string"
+        },
+        {
+          "weightUs": 91828,
+          "symbol": "ntoskrnl.exe!RtlpLookupUserFunctionTableInverted",
+          "category": "other"
+        },
+        {
+          "weightUs": 91701,
+          "symbol": "ntoskrnl.exe!KiSystemServiceUser",
+          "category": "other"
+        },
+        {
+          "weightUs": 85236,
+          "symbol": "CreatorEditor.runtime.dll!std::reverse_iterator<std::_Vector_iterator<std::_Vector_val<std::_Simple_types<ce::frame_record> > > >::operator->",
+          "category": "other"
+        },
+        {
+          "weightUs": 82356,
+          "symbol": "ntoskrnl.exe!HalpInterruptSendIpi",
+          "category": "other"
+        },
+        {
+          "weightUs": 81264,
+          "symbol": "D3D12.dll!CUseCountedObject<NOutermost::CDeviceChild>::Release",
+          "category": "other"
+        },
+        {
+          "weightUs": 81257,
+          "symbol": "ntoskrnl.exe!EtwpLogKernelEvent",
+          "category": "other"
+        },
+        {
+          "weightUs": 79981,
+          "symbol": "CreatorEditor.runtime.dll!std::array<std::array<double,4>,4>::operator[]",
+          "category": "other"
+        },
+        {
+          "weightUs": 79510,
+          "symbol": "CreatorEditor.runtime.dll!DX12DeviceResources::CreateBindings",
+          "category": "other"
+        },
+        {
+          "weightUs": 79163,
+          "symbol": "CreatorEditor.runtime.dll!std::_Iterator_base12::_Orphan_me_unlocked_v3",
+          "category": "debugIteratorLock"
+        },
+        {
+          "weightUs": 78993,
+          "symbol": "CreatorEditor.runtime.dll!operator new",
+          "category": "heap"
+        },
+        {
+          "weightUs": 76971,
+          "symbol": "CreatorEditor.runtime.dll!std::_Vector_iterator<std::_Vector_val<std::_Simple_types<ce::frame_record> > >::__autoclassinit2",
+          "category": "other"
+        },
+        {
+          "weightUs": 76349,
+          "symbol": "ntdll.dll!RtlWaitOnAddress",
+          "category": "other"
+        },
+        {
+          "weightUs": 74617,
+          "symbol": "CreatorEditor.runtime.dll!std::_Check_store_memory_order",
+          "category": "other"
+        }
+      ]
+    },
+    "off-a": {
+      "scope": "All CreatorEditor process threads, sampled CPU weight in native-ON ETW window; not RenderThread-only or an atomic contention measurement.",
+      "totalWeightUs": 40967466,
+      "categoryWeightUs": {
+        "other": 35508012,
+        "heap": 347495,
+        "string": 1088225,
+        "vector": 1699968,
+        "debugIteratorLock": 1573037,
+        "ownership": 620128,
+        "functionWrapper": 77447,
+        "lifetimeToken": 53154
+      },
+      "top": [
+        {
+          "weightUs": 2112663,
+          "symbol": "ntdll.dll!RtlpEnterCriticalSectionContended",
+          "category": "other"
+        },
+        {
+          "weightUs": 1848509,
+          "symbol": "ntdll.dll!RtlEnterCriticalSection",
+          "category": "other"
+        },
+        {
+          "weightUs": 1657794,
+          "symbol": "ntdll.dll!RtlLeaveCriticalSection",
+          "category": "other"
+        },
+        {
+          "weightUs": 1513531,
+          "symbol": "nvwgf2umx.dll!\"Unknown\"",
+          "category": "other"
+        },
+        {
+          "weightUs": 1200987,
+          "symbol": "ntoskrnl.exe!RtlpLookupFunctionEntryForStackWalks",
+          "category": "other"
+        },
+        {
+          "weightUs": 1119733,
+          "symbol": "ucrtbased.dll!\"Unknown\"",
+          "category": "other"
+        },
+        {
+          "weightUs": 1096662,
+          "symbol": "CreatorEditor.runtime.dll!_RTC_CheckStackVars",
+          "category": "other"
+        },
+        {
+          "weightUs": 1069499,
+          "symbol": "ntoskrnl.exe!RtlpUnwindPrologue",
+          "category": "other"
+        },
+        {
+          "weightUs": 655063,
+          "symbol": "MSVCP140D.dll!\"Unknown\"",
+          "category": "other"
+        },
+        {
+          "weightUs": 477715,
+          "symbol": "VCRUNTIME140D.dll!\"Unknown\"",
+          "category": "other"
+        },
+        {
+          "weightUs": 444890,
+          "symbol": "CreatorEditor.runtime.dll!std::_Atomic_storage<unsigned __int64,8>::load",
+          "category": "other"
+        },
+        {
+          "weightUs": 388534,
+          "symbol": "ntoskrnl.exe!RtlpxVirtualUnwind",
+          "category": "other"
+        },
+        {
+          "weightUs": 360833,
+          "symbol": "ntdll.dll!RtlpLowFragHeapAllocFromContext",
+          "category": "other"
+        },
+        {
+          "weightUs": 310246,
+          "symbol": "ntoskrnl.exe!RtlpWalkFrameChain",
+          "category": "other"
+        },
+        {
+          "weightUs": 212888,
+          "symbol": "nvlddmkm.sys!\"Unknown\"",
+          "category": "other"
+        },
+        {
+          "weightUs": 206384,
+          "symbol": "CreatorEditor.runtime.dll!std::_Check_load_memory_order",
+          "category": "other"
+        },
+        {
+          "weightUs": 200281,
+          "symbol": "CreatorEditor.runtime.dll!std::_Iterator_base12::_Orphan_me_locked_v3",
+          "category": "debugIteratorLock"
+        },
+        {
+          "weightUs": 199588,
+          "symbol": "ntdll.dll!RtlpAcquireSRWLockExclusiveContended",
+          "category": "other"
+        },
+        {
+          "weightUs": 197081,
+          "symbol": "CreatorEditor.runtime.dll!wave::`anonymous namespace'::RoomReverb::Process",
+          "category": "other"
+        },
+        {
+          "weightUs": 181886,
+          "symbol": "ntdll.dll!RtlFreeHeap",
+          "category": "heap"
+        },
+        {
+          "weightUs": 155287,
+          "symbol": "CreatorEditor.runtime.dll!std::_Iterator_base12::_Getcont",
+          "category": "debugIteratorLock"
+        },
+        {
+          "weightUs": 153017,
+          "symbol": "CreatorEditor.runtime.dll!ce::detail::recording_file_impl::update_crc",
+          "category": "other"
+        },
+        {
+          "weightUs": 149551,
+          "symbol": "CreatorEditor.runtime.dll!std::_Atomic_integral<unsigned __int64,8>::fetch_add",
+          "category": "other"
+        },
+        {
+          "weightUs": 149264,
+          "symbol": "enkiTS.dll!std::_Atomic_storage<unsigned int,4>::load",
+          "category": "other"
+        },
+        {
+          "weightUs": 146035,
+          "symbol": "ntdll.dll!RtlSleepConditionVariableSRW",
+          "category": "other"
+        },
+        {
+          "weightUs": 143584,
+          "symbol": "CreatorEditor.runtime.dll!std::_Atomic_address_as<__int64,std::_Atomic_padded<unsigned __int64> >",
+          "category": "other"
+        },
+        {
+          "weightUs": 142838,
+          "symbol": "enkiTS.dll!enki::TaskScheduler::TryRunTask",
+          "category": "other"
+        },
+        {
+          "weightUs": 141516,
+          "symbol": "ntoskrnl.exe!SwapContext",
+          "category": "other"
+        },
+        {
+          "weightUs": 127337,
+          "symbol": "CreatorEditor.runtime.dll!std::_Iterator_base12::_Assign_locked",
+          "category": "debugIteratorLock"
+        },
+        {
+          "weightUs": 123433,
+          "symbol": "CreatorEditor.runtime.dll!std::is_constant_evaluated",
+          "category": "other"
+        },
+        {
+          "weightUs": 118849,
+          "symbol": "ntdll.dll!RtlQueryPerformanceCounter",
+          "category": "other"
+        },
+        {
+          "weightUs": 116264,
+          "symbol": "CreatorEditor.runtime.dll!std::vector<enum std::byte,std::allocator<enum std::byte> >::_Resize<std::_Value_init_tag>",
+          "category": "vector"
+        },
+        {
+          "weightUs": 113448,
+          "symbol": "ntoskrnl.exe!KiApcInterrupt",
+          "category": "other"
+        },
+        {
+          "weightUs": 109050,
+          "symbol": "CreatorEditor.runtime.dll!std::_Iterator_base12::_Iterator_base12",
+          "category": "debugIteratorLock"
+        },
+        {
+          "weightUs": 107569,
+          "symbol": "CreatorEditor.runtime.dll!ce::thread_stream::honor_seal_request",
+          "category": "other"
+        },
+        {
+          "weightUs": 107174,
+          "symbol": "CreatorEditor.runtime.dll!__security_check_cookie",
+          "category": "other"
+        },
+        {
+          "weightUs": 104046,
+          "symbol": "CreatorEditor.runtime.dll!shadow_math::bounds_detail::Compose",
+          "category": "other"
+        },
+        {
+          "weightUs": 103162,
+          "symbol": "CreatorEditor.runtime.dll!ce::profiler_service::now",
+          "category": "other"
+        },
+        {
+          "weightUs": 103111,
+          "symbol": "CreatorEditor.runtime.dll!std::_Iterator_base12::_Adopt_unlocked",
+          "category": "debugIteratorLock"
+        },
+        {
+          "weightUs": 102640,
+          "symbol": "dxgmms2.sys!\"Unknown\"",
+          "category": "other"
+        },
+        {
+          "weightUs": 102415,
+          "symbol": "CreatorEditor.runtime.dll!std::_Uninitialized_value_construct_n<std::allocator<enum std::byte> >",
+          "category": "other"
+        },
+        {
+          "weightUs": 99510,
+          "symbol": "ntdll.dll!RtlWaitOnAddress",
+          "category": "other"
+        },
+        {
+          "weightUs": 96600,
+          "symbol": "ntoskrnl.exe!KiSystemServiceUser",
+          "category": "other"
+        },
+        {
+          "weightUs": 95273,
+          "symbol": "D3D12.dll!CUseCountedObject<NOutermost::CDeviceChild>::Release",
+          "category": "other"
+        },
+        {
+          "weightUs": 92949,
+          "symbol": "CreatorEditor.runtime.dll!std::reverse_iterator<std::_Vector_iterator<std::_Vector_val<std::_Simple_types<ce::frame_record> > > >::operator->",
+          "category": "other"
+        },
+        {
+          "weightUs": 89222,
+          "symbol": "enkiTS.dll!enki::LockLessMultiReadPipe<8,enki::SubTaskSet>::ReaderTryReadBack",
+          "category": "other"
+        },
+        {
+          "weightUs": 87108,
+          "symbol": "CreatorEditor.runtime.dll!std::_Iterator_base12::_Orphan_me_unlocked_v3",
+          "category": "debugIteratorLock"
+        },
+        {
+          "weightUs": 85519,
+          "symbol": "ntoskrnl.exe!HalpInterruptSendIpi",
+          "category": "other"
+        },
+        {
+          "weightUs": 84651,
+          "symbol": "CreatorEditor.runtime.dll!std::vector<DX12GpuProfiler::PassRecord,std::allocator<DX12GpuProfiler::PassRecord> >::operator[]",
+          "category": "vector"
+        },
+        {
+          "weightUs": 84469,
+          "symbol": "CreatorEditor.runtime.dll!std::vector<ce::frame_record,std::allocator<ce::frame_record> >::operator[]",
+          "category": "vector"
+        },
+        {
+          "weightUs": 83382,
+          "symbol": "CreatorEditor.runtime.dll!std::vector<enum std::byte,std::allocator<enum std::byte> >::_Orphan_range_locked",
+          "category": "debugIteratorLock"
+        },
+        {
+          "weightUs": 83329,
+          "symbol": "CreatorEditor.runtime.dll!operator new",
+          "category": "heap"
+        },
+        {
+          "weightUs": 81724,
+          "symbol": "ntoskrnl.exe!RtlpLookupUserFunctionTableInverted",
+          "category": "other"
+        },
+        {
+          "weightUs": 79101,
+          "symbol": "CreatorEditor.runtime.dll!Microsoft::WRL::ComPtr<ID3D12Resource>::InternalRelease",
+          "category": "other"
+        },
+        {
+          "weightUs": 77305,
+          "symbol": "CreatorEditor.runtime.dll!std::array<double,4>::operator[]",
+          "category": "other"
+        },
+        {
+          "weightUs": 76163,
+          "symbol": "CreatorEditor.runtime.dll!std::_String_val<std::_Simple_types<char> >::_Large_mode_engaged",
+          "category": "string"
+        },
+        {
+          "weightUs": 76061,
+          "symbol": "CreatorEditor.runtime.dll!std::array<unsigned int,256>::operator[]",
+          "category": "other"
+        },
+        {
+          "weightUs": 74669,
+          "symbol": "CreatorEditor.runtime.dll!ce::thread_stream::write",
+          "category": "other"
+        },
+        {
+          "weightUs": 74505,
+          "symbol": "enkiTS.dll!_RTC_CheckStackVars",
+          "category": "other"
+        },
+        {
+          "weightUs": 74292,
+          "symbol": "CreatorEditor.runtime.dll!std::_Check_store_memory_order",
+          "category": "other"
+        }
+      ]
+    }
+  },
+  "sourceFindings": {
+    "scope": "Actual current implementation and remaining initial blob snapshot; measured effects are separate.",
+    "findings": [
+      {
+        "path": "Engine/EngineDiagnostics/ProfileMarker.cpp",
+        "lines": [
+          89
+        ],
+        "behavior": "Bounded 4096-entry TLS cache, at most 16 probes. Hits compare immutable registered names and return IDs without global lock or key-string allocation. Misses retain original registry semantics."
+      },
+      {
+        "path": "Engine/RenderEngine/Assets/ModelAssetGeneration.h",
+        "lines": [
+          68
+        ],
+        "behavior": "Draw and RHI handle copies retain immutable blob metadata instead of copying three strings. Blob() returns a borrowed const reference under the owning handle."
+      },
+      {
+        "path": "Engine/RenderEngine/Assets/ModelAssetGeneration.cpp",
+        "lines": [
+          30
+        ],
+        "behavior": "Initial handle construction still snapshots the descriptor blob; subsequent copies share it. No descriptor/frame-arena pointer is retained."
+      },
+      {
+        "path": "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp",
+        "lines": [
+          7898,
+          7899
+        ],
+        "behavior": "Collection output storage persists on the render thread and is reused; existing pending/fence gates still control collection and submission."
+      },
+      {
+        "path": "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp",
+        "lines": [
+          8007
+        ],
+        "behavior": "GPU scope suffix uses a stack buffer; marker spelling and ordinal are preserved."
+      },
+      {
+        "path": "Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp",
+        "lines": [
+          1490
+        ],
+        "behavior": "Retains timing strings and copies only changed names; slice names use the same content check."
+      }
+    ]
+  }
+}

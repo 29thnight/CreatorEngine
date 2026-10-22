@@ -1,4 +1,5 @@
 #pragma once
+#include "Ownership.h"
 #include "StandardLibrary.h"
 #include "JobGraph.h"
 
@@ -45,7 +46,7 @@ class thread_pool
                   std::function<void(std::exception_ptr)> complete);
     void dispatch_graph(std::span<const job_graph_node> nodes, std::function<void(std::size_t)> execute,
                         std::function<void(std::exception_ptr)> complete,
-                        std::shared_ptr<job_graph_diagnostics> diagnostics);
+                        own::shared_owner<job_graph_diagnostics> diagnostics);
     std::shared_ptr<state> snapshot() const;
     mutable std::mutex mutex_;
     std::shared_ptr<state> state_;

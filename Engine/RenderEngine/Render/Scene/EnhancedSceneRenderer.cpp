@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "../../RHI/RHISoftwareBatch.h"
 #include "../../../Utility_Framework/DynamicBitset.h"
 #include <stdint.h>
@@ -89,7 +90,7 @@
 // 명칭 체계가 흐려진다(실제로 그렇게 만들었다가 물렸다).
 namespace EnhancedSceneRenderer
 {
-    using LiveGraphSnapshot = std::shared_ptr<const EnhancedRenderGraph::DiagnosticSnapshot>;
+    using LiveGraphSnapshot = own::shared_owner<const EnhancedRenderGraph::DiagnosticSnapshot>;
 
     struct TemporalFixtureExchange
     {
@@ -216,7 +217,7 @@ namespace EnhancedSceneRenderer
         uint32_t width, uint32_t height, const TemporalMeasurementProvenance& temporalProvenance)
     {
         const auto started = std::chrono::steady_clock::now();
-        auto snapshot = std::make_shared<EnhancedRenderGraph::DiagnosticSnapshot>();
+        auto snapshot = own::make_shared<EnhancedRenderGraph::DiagnosticSnapshot>();
         if (!graph.CaptureDiagnosticSnapshot(*snapshot))
         {
             return {};
@@ -786,7 +787,7 @@ namespace
             // 이 슬롯 프레임의 그래프. 규칙(dx12.compare 크래시의 교훈):
             // 그래프의 수명은 그 커맨드를 GPU가 끝낼 때까지다 — transient를
             // 그래프가 들고 있다. 승격(펜스 완료) 때 놓으면 풀로 반납된다.
-            std::shared_ptr<EnhancedRenderGraph> graph;
+            own::shared_owner<EnhancedRenderGraph> graph;
             bool graphCompleted{false};
             bool graphReusable{false};
         };
@@ -814,7 +815,7 @@ namespace
             DisplaySlot      slots[kSlotsPerView];
             // History slots and completed/fresh geometry yield several exact CPU
             // shapes. These bounded templates retain no native resources.
-            std::array<std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule>,
+            std::array<own::shared_owner<const EnhancedRenderGraph::StructuralSchedule>,
                 EnhancedRenderGraph::MaxStructuralSchedules> structuralSchedules;
             int              displaySlot{ -1 };   // DX11이 표시 중인 슬롯(-1 = 아직 없음)
             std::vector<int> pendingQueue;        // 제출 순서의 인플라이트 슬롯들
@@ -953,7 +954,7 @@ namespace
         uint64_t frameCounter{ 0 };
 
         VulkanDeviceResources resources;
-        std::shared_ptr<VulkanCaptureGpuProfiler> retainedCaptureProfiler;
+        own::shared_owner<VulkanCaptureGpuProfiler> retainedCaptureProfiler;
         VulkanPipelineCache pipelines;
         VulkanMeshCache meshCache;
         VulkanTextureCache textureCache;
@@ -1044,7 +1045,7 @@ namespace
         {
             bool previewComplete{false};
             RHIReadback readback{};
-            std::shared_ptr<EnhancedRenderGraph> graph;
+            own::shared_owner<EnhancedRenderGraph> graph;
             uint64_t fenceValue{ 0 };
             uint32_t viewIndex{ 0 };
             EnhancedLiveViewKey key{};
@@ -1298,7 +1299,7 @@ namespace
         }
 
         void PromoteCompleted(
-            const std::shared_ptr<IDisplayPresentationSink>& presentationSink,
+            const own::shared_owner<IDisplayPresentationSink>& presentationSink,
             uint64_t& outPromoted, std::string& outValidation)
         {
             const uint64_t completed = resources.GetCompletedFenceValue();
@@ -1434,7 +1435,7 @@ namespace
                 const bool& committed;
                 EnhancedPbrCapture* capture;
                 std::string& error;
-                std::shared_ptr<VulkanCaptureGpuProfiler>& profiler;
+                own::shared_owner<VulkanCaptureGpuProfiler>& profiler;
                 ~FrameGuard()
                 {
                     if (!committed) resources.AbortFrame();
@@ -1518,7 +1519,7 @@ namespace
                 }
             }
 
-            slot->graph = std::make_shared<EnhancedRenderGraph>(
+            slot->graph = own::make_shared<EnhancedRenderGraph>(
                 static_cast<IRenderDeviceServices&>(resources),
                 kLiveGraphScheduling, RGOrderPolicy::DependencyOrder);
             EnhancedRenderGraph& graph = *slot->graph;
@@ -1568,7 +1569,7 @@ namespace
             // A stack destructor must not free queries still referenced by the GPU.
             if (capture)
             {
-                retainedCaptureProfiler = std::make_shared<VulkanCaptureGpuProfiler>(resources);
+                retainedCaptureProfiler = own::make_shared<VulkanCaptureGpuProfiler>(resources);
             }
             // Graph slots persist across frames; never retain this stack-owned
             // diagnostic profiler when the slot returns to ordinary rendering.
@@ -1581,7 +1582,7 @@ namespace
             if (capture)
             {
                 if (!retainedCaptureProfiler->Initialize(outError)) return false;
-                graph.SetProfiler(retainedCaptureProfiler.get());
+                graph.SetProfiler(retainedCaptureProfiler.operator->());
             }
             RHIRecordedBatchDesc batchDesc{};
             batchDesc.frameId = sourceFrameId;
@@ -1634,7 +1635,7 @@ namespace
                 RenderThreadPhaseScope submit(RenderPhase::submit);
                 if (softwareRecording)
                 {
-                    std::shared_ptr<VulkanCommandBufferPool> frozen;
+                    own::shared_owner<VulkanCommandBufferPool> frozen;
                     if (!commandPool.CreateTranslationPool(frozen, outError))
                     {
                         return false;
@@ -2177,7 +2178,7 @@ namespace
             }
         }
 
-        std::unique_ptr<EnhancedPbrCapture> pbrCapture;
+        own::unique_owner<EnhancedPbrCapture> pbrCapture;
 
         EnhancedPbrCapture* BeginPbrCapture(const EnhancedLiveFramePacket& frame,
             const EnhancedLiveViewPacket& view)
@@ -2253,7 +2254,7 @@ namespace
                 pbrCapture->RecordTemporalInputs(activeTemporal->frame, activeTemporal->submittedFrame,
                     activeTemporal->reconstructionSettings.quality);
             }
-            return pbrCapture.get();
+            return pbrCapture.operator->();
         }
 
         std::atomic_bool enabled{ false };
@@ -2263,26 +2264,26 @@ namespace
 
         // SceneRenderer(DX11)에서 이관한 메인 런타임 소유권. 에디터 카메라는
         // 여기 없다(E4-5) — Editor 세션이 소유하고 뷰 요청으로 넘어온다.
-        std::shared_ptr<RenderScene> renderScene;
+        own::shared_owner<RenderScene> renderScene;
 
         // Editor Host가 주입하는 presentation 입력. GT가 packet마다 shared_ptr을
         // snapshot하고 packet이 RT까지 수명을 운반한다.
         mutable std::mutex gizmoIconMutex;
-        std::shared_ptr<const EnhancedGizmoIconTextures> gizmoIconTextures;
+        own::shared_owner<const EnhancedGizmoIconTextures> gizmoIconTextures;
 
         // Host가 주입하는 파이프라인 기여자(E4-2). 조립은 RenderThread에서
         // 일어나므로 설치·해제와 mutex로 격리한다. 기여 노드는 기여자가 아니라
         // 자기 패스 묶음을 붙들므로, 해제 뒤에도 살아 있는 파이프라인은 안전하다.
         mutable std::mutex featureContributorMutex;
-        std::shared_ptr<IRenderFeatureContributor> featureContributor;
+        own::shared_owner<IRenderFeatureContributor> featureContributor;
 
         // Host가 주입하는 표시 sink(E4-6a). RT의 CPU 프레임 push와 CE의
         // 표시 ID 해석이 소비하므로 mutex 아래 shared_ptr 복사로 격리한다.
         // 미설치면 표시 ID는 0이다 — Core는 ImGui 셸을 모른다.
         mutable std::mutex presentationSinkMutex;
-        std::shared_ptr<IDisplayPresentationSink> presentationSink;
+        own::shared_owner<IDisplayPresentationSink> presentationSink;
 
-        std::shared_ptr<IDisplayPresentationSink> CopyPresentationSink() const
+        own::shared_owner<IDisplayPresentationSink> CopyPresentationSink() const
         {
             std::lock_guard<std::mutex> lock(presentationSinkMutex);
             return presentationSink;
@@ -2567,8 +2568,8 @@ namespace
 
         // 렌더 backend가 소유하는 카메라별 뷰. CE/UI는 이 파이프라인을 직접
         // 순회하지 않고 아래 display snapshot의 Editor/Game 대상만 소비한다.
-        std::shared_ptr<LivePipeline> pipeline;
-        std::unique_ptr<VulkanLivePipeline> vulkanPipeline;
+        own::shared_owner<LivePipeline> pipeline;
+        own::unique_owner<VulkanLivePipeline> vulkanPipeline;
 
         // RenderThread는 완료된 슬롯을 아래 값 스냅샷으로 승격하고, CE는 그
         // 스냅샷과 불투명 presentation key만 읽는다. resize 해체와 DX12 공유
@@ -2751,7 +2752,7 @@ namespace
             EnhancedDrawItem     item{};
             // drawPool이 view 선별과 graph 기록까지 Mesh raw 주소를 운반하므로
             // 프록시 snapshot을 놓은 뒤에도 같은 generation을 명시적으로 붙든다.
-            std::shared_ptr<Mesh> meshSource{};
+            own::shared_owner<Mesh> meshSource{};
             // Borrowed mesh bytes are covered by the frame's single model pin
             // table. Copies of this draw carry only the stable table index.
             std::size_t modelPinIndex{ (std::numeric_limits<std::size_t>::max)() };
@@ -2937,7 +2938,7 @@ namespace
         uint32_t nativeRecordOwnerJoins{0};
         uint32_t nativeRecordDispatcherHandoffs{0};
         bool nativeRecordBatched{false};
-        std::shared_ptr<const RHIRecordingDiagnostics> nativeRecordDiagnostics;
+        own::shared_owner<const RHIRecordingDiagnostics> nativeRecordDiagnostics;
         uint32_t nativeRecordTargets{0}, nativeRecordUnits{0}, nativeRecordDeclaredCost{0};
         uint64_t nativeRecordEstimatedWork{0};
         bool nativeRecordParallelDeclined{false};
@@ -3240,7 +3241,7 @@ namespace
             {
                 std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
                 InvalidateDisplayResultsLocked();
-                pipeline = std::make_shared<LivePipeline>();
+                pipeline = own::make_shared<LivePipeline>();
                 pipeline->resizeGeneration = displaySnapshot.resizeGeneration;
             }
             LivePipeline& p = *pipeline;
@@ -3472,7 +3473,7 @@ namespace
                 std::lock_guard<std::mutex> displayLock(displayLifetimeMutex);
                 InvalidateDisplayResultsLocked();
             }
-            vulkanPipeline = std::make_unique<VulkanLivePipeline>();
+            vulkanPipeline = own::make_unique<VulkanLivePipeline>();
             if (!BuildPipelineDesc(*vulkanPipeline, true, outError))
             {
                 vulkanPipeline.reset();
@@ -3502,7 +3503,7 @@ namespace
             }
             InvalidateDisplayResultsLocked();
             std::string error;
-            if (!vulkanPipeline->Shutdown(error, pbrCapture.get()))
+            if (!vulkanPipeline->Shutdown(error, pbrCapture.operator->()))
             {
                 lastError = error;
                 enabled = false;
@@ -3714,7 +3715,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Geometry";
-                node.parallelDeclare = true;
                 node.writes = {LiveSlots::kMeteorGeometry};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
@@ -3726,7 +3726,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Cull.First";
-                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry};
                 node.writes = {LiveSlots::kMeteorFirstList};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3740,7 +3739,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Occluder";
-                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kMeteorFirstList};
                 node.writes = {LiveSlots::kMeteorOccluderDepth};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3754,7 +3752,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Cull.Final";
-                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kMeteorOccluderDepth};
                 node.writes = {LiveSlots::kMeteorFinalList, LiveSlots::kMeteorBlendedList};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3772,7 +3769,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.LayerWork";
-                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorBlendedList};
                 node.writes = {LiveSlots::kMeteorLayerCommands, LiveSlots::kMeteorBlendedCommands};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3790,7 +3786,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Shadow.StaticCache";
-                node.parallelDeclare = true;
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.shadow; };
                 node.initialize = [](const EnhancedFrameContext&, std::string&, uint32_t) { return true; };
                 node.prepare = [&p](const EnhancedFrameContext& ctx, std::string& error, uint32_t)
@@ -3810,7 +3805,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Shadow.Cull.First";
-                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kMeteorOccluderDepth};
                 node.writes = {LiveSlots::kShadowFirstLists};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph, const EnhancedFrameContext&,
@@ -3826,7 +3820,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Shadow.Occluder";
-                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kShadowStaticDepths, LiveSlots::kShadowFirstLists};
                 node.writes = {LiveSlots::kShadowOccluderDepths};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3842,7 +3835,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Shadow.Cull.Final";
-                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kShadowOccluderDepths};
                 node.writes = {LiveSlots::kShadowFinalLists};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3857,7 +3849,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Shadow.Raster";
-                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kShadowStaticDepths, LiveSlots::kShadowFinalLists};
                 node.writes = {LiveSlots::kShadowMap};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3873,7 +3864,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Shadow.History";
-                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kShadowMap};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&)
@@ -3888,7 +3878,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Visibility";
-                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorFinalList};
                 node.writes = {LiveSlots::kGBufferDepth, LiveSlots::kVisibility};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3905,7 +3894,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.MaterialWork";
-                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kVisibility};
                 node.writes = {LiveSlots::kMeteorMaterialTiles, LiveSlots::kMeteorMaterialArguments};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -3921,7 +3909,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.SurfaceResolve";
-                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kMeteorGeometry, LiveSlots::kGBufferDepth, LiveSlots::kVisibility,
                     LiveSlots::kMeteorMaterialTiles, LiveSlots::kMeteorMaterialArguments};
                 node.writes = {LiveSlots::kGBufferDiffuse, LiveSlots::kGBufferMetalRough,
@@ -3944,7 +3931,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Decal";
-                node.parallelDeclare = true;
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.decal; };
                 node.prepare = [this, &p](const EnhancedFrameContext& ctx, std::string& err, uint32_t) -> bool
                 {
@@ -3979,7 +3965,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.History";
-                node.parallelDeclare = true;
                 node.reads = {LiveSlots::kGBufferDepth};
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext&, const LiveFrameBinding&) {
@@ -4018,7 +4003,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "SSAO";
-                node.parallelDeclare = true;
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.ssao; };
                 node.reads = { LiveSlots::kGBufferDepth, LiveSlots::kGBufferNormal };
                 node.writes = { LiveSlots::kAmbientOcclusion };
@@ -4043,7 +4027,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Color";
-                node.parallelDeclare = true;
                 node.reads = {
                     LiveSlots::kMeteorGeometry, LiveSlots::kVisibility,
                     LiveSlots::kMeteorLayerCommands,
@@ -4217,7 +4200,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Volume";
-                node.parallelDeclare = true;
                 node.reads = { LiveSlots::kGBufferDepth, LiveSlots::kShadowMap };
                 node.modifies = { LiveSlots::kLitColor };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -4237,7 +4219,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.LightTiles";
-                node.parallelDeclare = true;
                 node.instance = [&p](uint32_t) -> EnhancedRenderPass* { return &p.lightTiles; };
                 node.reads = { LiveSlots::kGBufferDepth };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -4251,8 +4232,6 @@ namespace
             {
                 LivePassNode node;
                 node.name = "METEOR.Scene.Blended";
-                node.setupDependencies = {"METEOR.Scene.LightTiles"};
-                node.parallelDeclare = true;
                 node.reads = { LiveSlots::kGBufferDepth, LiveSlots::kShadowMap, LiveSlots::kMeteorLayerCommands, LiveSlots::kMeteorBlendedCommands };
                 node.modifies = { LiveSlots::kLitColor };
                 node.declare = [&p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
@@ -4579,7 +4558,7 @@ namespace
             // (InitializeAll 등)를 타고, 패스 수명은 노드 람다가 붙드는 묶음이
             // 소유한다 — desc가 노드를 놓을 때 묶음도 함께 사라진다.
             {
-                std::shared_ptr<IRenderFeatureContributor> contributor;
+                own::shared_owner<IRenderFeatureContributor> contributor;
                 {
                     std::lock_guard<std::mutex> lock(featureContributorMutex);
                     contributor = featureContributor;
@@ -5613,7 +5592,7 @@ namespace
             uiProxyPointers.reserve(uiProxySnapshot.size());
             for (const auto& proxy : uiProxySnapshot)
             {
-                if (proxy) uiProxyPointers.push_back(proxy.get());
+                if (proxy) uiProxyPointers.push_back(proxy.operator->());
             }
             buildGuard.published = true;
         }
@@ -7018,7 +6997,7 @@ namespace
                 !dx12.CreateTemporalDisplayTextures(slot.interopToken,view.temporal.frame.renderExtent,
                     view.temporal.frame.displayExtent,slot.temporalResources,outError)) return false;
             const bool reuseStructuralSchedule = ReadLivePostFlag("CREATOR_RENDERGRAPH_SCHEDULE_CACHE", true);
-            std::shared_ptr<EnhancedRenderGraph> nextGraph;
+            own::shared_owner<EnhancedRenderGraph> nextGraph;
             if (reuseStructuralSchedule && slot.graph && slot.graphCompleted && slot.graph.use_count() == 1)
             {
                 if (!slot.graphReusable)
@@ -7030,7 +7009,7 @@ namespace
             }
             else
             {
-                nextGraph = std::make_shared<EnhancedRenderGraph>(dx12.Resources(),
+                nextGraph = own::make_shared<EnhancedRenderGraph>(dx12.Resources(),
                     kLiveGraphScheduling, RGOrderPolicy::DependencyOrder);
                 ce::profile_instant(ce::marker<"RenderGraphStorageBuild">());
             }
@@ -7149,10 +7128,10 @@ namespace
                     const auto schedule = graph.SnapshotStructuralSchedule();
                     // Pose upload, completed geometry reuse and their mixtures
                     // have distinct valid DAGs. Keep bounded exact templates.
-                    if (schedule != view.structuralSchedules[0])
+                    if (schedule.operator->() != view.structuralSchedules[0].operator->())
                     {
-                        const auto found = std::find(view.structuralSchedules.begin(),
-                            view.structuralSchedules.end(), schedule);
+                        const auto found = std::find_if(view.structuralSchedules.begin(),
+                            view.structuralSchedules.end(), [&](const auto& candidate) { return candidate.operator->() == schedule.operator->(); });
                         const size_t position = found == view.structuralSchedules.end()
                             ? view.structuralSchedules.size() - 1
                             : static_cast<size_t>(found - view.structuralSchedules.begin());
@@ -7916,8 +7895,8 @@ namespace
                         }
                         ++state.gpuCollects;
 
-                        std::vector<EnhancedLiveGpuSlice> slices;
-                        std::vector<EnhancedLivePassTiming> timings;
+                        thread_local std::vector<EnhancedLiveGpuSlice> slices;
+                        thread_local std::vector<EnhancedLivePassTiming> timings;
                         EnhancedLiveGpuSpan span{};
                         std::string collectError;
                         GpuCaptureCompletion captureCompletion{ view.slots[slotIndex].profilerToken };
@@ -7929,7 +7908,7 @@ namespace
                             // 패스별 시간은 예전에는 여기서 버려졌다 — 합계만 남기면
                             // "느려졌다"까지만 알 수 있고 어느 패스인지는 알 수 없다.
                             // 렌더 디버그 창이 읽도록 마지막 성공분을 보관한다.
-                            state.lastPassTimings = std::move(timings);
+                            state.lastPassTimings.swap(timings);
                             state.gpuTemporalProvenance = view.slots[slotIndex].temporalProvenance;
                             state.lastGpuFrameId = view.slots[slotIndex].profilerToken.engineFrameId;
                             state.lastGpuSubmissionId = view.slots[slotIndex].profilerToken.submissionId;
@@ -8016,14 +7995,17 @@ namespace
                                     // ordinal. Distinct zero-cost scopes can share name and
                                     // timestamp ticks; give each collected scope a unique marker
                                     // within this submission, without inventing elapsed time.
-                                    std::string scopeName;
+                                    thread_local std::string scopeName;
                                     scopeName.reserve(128);
                                     uint32_t scopeOrdinal = 0;
                                     for (const EnhancedLiveGpuSlice& slice : slices)
                                     {
                                         scopeName.assign(slice.name);
                                         scopeName += " [gpu scope ";
-                                        scopeName += std::to_string(++scopeOrdinal);
+                                        char ordinal[16]{};
+                                        const auto converted =
+                                            std::to_chars(ordinal, ordinal + sizeof(ordinal), ++scopeOrdinal);
+                                        scopeName.append(ordinal, converted.ptr);
                                         scopeName += ']';
                                         origin.queueId = slice.queueId;
                                         origin.rhi = slice.rhi;
@@ -8907,7 +8889,7 @@ bool EnhancedSceneRenderer::InitializeRuntime(EnhancedLiveBackend backend,
         material_graph::SetAuthoringSceneBackend(backend == EnhancedLiveBackend::Vulkan
             ? RHIShaderBinary::SpirV : RHIShaderBinary::Dxil);
         state.ResetDisplaySnapshot();
-        state.renderScene = std::make_shared<RenderScene>();
+        state.renderScene = own::make_shared<RenderScene>();
 
         // 에디터 카메라는 여기서 만들지 않는다(E4-5) — Editor 세션이 소유하고
         // Host가 뷰 요청에 실어 넘긴다. Core는 씬 오버레이 뷰 판정도 하지 않는다.
@@ -8965,7 +8947,7 @@ bool EnhancedSceneRenderer::InitializeRuntime(EnhancedLiveBackend backend,
 
 RenderScene* EnhancedSceneRenderer::GetRenderScene()
 {
-    return GetLiveState().renderScene.get();
+    return GetLiveState().renderScene.operator->();
 }
 
 void EnhancedSceneRenderer::SetActiveScene(Scene* scene)
@@ -8983,7 +8965,7 @@ void EnhancedSceneRenderer::SetActiveScene(Scene* scene)
 }
 
 void EnhancedSceneRenderer::SetGizmoIconTextures(
-    std::shared_ptr<const EnhancedGizmoIconTextures> textures)
+    own::shared_owner<const EnhancedGizmoIconTextures> textures)
 {
     LiveState& state = GetLiveState();
     std::lock_guard<std::mutex> lock(state.gizmoIconMutex);
@@ -8991,7 +8973,7 @@ void EnhancedSceneRenderer::SetGizmoIconTextures(
 }
 
 void EnhancedSceneRenderer::SetRenderFeatureContributor(
-    std::shared_ptr<IRenderFeatureContributor> contributor)
+    own::shared_owner<IRenderFeatureContributor> contributor)
 {
     LiveState& state = GetLiveState();
     std::lock_guard<std::mutex> lock(state.featureContributorMutex);
@@ -8999,7 +8981,7 @@ void EnhancedSceneRenderer::SetRenderFeatureContributor(
 }
 
 void EnhancedSceneRenderer::SetDisplayPresentationSink(
-    std::shared_ptr<IDisplayPresentationSink> sink)
+    own::shared_owner<IDisplayPresentationSink> sink)
 {
     LiveState& state = GetLiveState();
     std::lock_guard<std::mutex> lock(state.presentationSinkMutex);
@@ -9121,7 +9103,7 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
     EnhancedLiveFramePacket frame{};
     frame.temporalFixture = SnapshotTemporalFixtureStep();
     frame.sourceCaptureNanoseconds = capture_steady_nanoseconds();
-    std::shared_ptr<const EnhancedGizmoIconTextures> gizmoIconTextures;
+    own::shared_owner<const EnhancedGizmoIconTextures> gizmoIconTextures;
     {
         std::lock_guard<std::mutex> lock(state.gizmoIconMutex);
         gizmoIconTextures = state.gizmoIconTextures;
@@ -9172,7 +9154,7 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
         {
             continue;
         }
-        auto gizmos = std::make_shared<EnhancedGizmoSceneData>();
+        auto gizmos = own::make_shared<EnhancedGizmoSceneData>();
         CaptureEnhancedGizmoSceneData(view.camera, collectColliders,
             gizmoIconTextures, *gizmos);
         view.gizmos = std::move(gizmos);
@@ -9370,7 +9352,7 @@ bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
     const auto path = std::filesystem::u8path(directory);
     if (!path.is_absolute() || !std::filesystem::create_directories(path, error) || error)
     { outError = "capture requires a new absolute directory: " + directory; return false; }
-    state.pbrCapture = std::make_unique<EnhancedPbrCapture>(!observeTemporal && historyOrdinal == 0 && !expectedFixture.sdkQuality);
+    state.pbrCapture = own::make_unique<EnhancedPbrCapture>(!observeTemporal && historyOrdinal == 0 && !expectedFixture.sdkQuality);
     state.pbrCapture->historyOrdinal = historyOrdinal;
     state.pbrCapture->observeTemporal = observeTemporal;
     state.pbrCapture->historyFixedSdkClock = historyFixedSdkClock;
@@ -10425,7 +10407,7 @@ EnhancedLiveDisplayTexture EnhancedSceneRenderer::GetLiveDisplayTexture(
     };
     // Host가 설치한 표시 sink가 ID를 해석한다(E4-6a). Core는 표시 수명 락만
     // 소유하고 ImGui 셸을 모른다 — 미설치·비활성이면 표시할 수단이 없다.
-    const std::shared_ptr<IDisplayPresentationSink> sink =
+    const own::shared_owner<IDisplayPresentationSink> sink =
         state.CopyPresentationSink();
     if (!sink || !sink->IsActive())
     {
@@ -10678,7 +10660,7 @@ EnhancedSceneRenderer::GetLiveSealDiagnostics()
 
     if (EnhancedLiveBackend::Vulkan == state.backend)
     {
-        if (const VulkanLivePipeline* pipeline = state.vulkanPipeline.get())
+        if (const VulkanLivePipeline* pipeline = state.vulkanPipeline.operator->())
             out.textureUploadFailures = pipeline->textureCache.GetUploadFailureCount();
     }
     else if (state.pipeline)
@@ -10723,7 +10705,7 @@ std::string EnhancedSceneRenderer::GetLiveStatus()
     if (EnhancedLiveBackend::Vulkan == state.backend)
     {
         char line[512]{};
-        const VulkanLivePipeline* pipeline = state.vulkanPipeline.get();
+        const VulkanLivePipeline* pipeline = state.vulkanPipeline.operator->();
         const VulkanMeshCache::Stats meshStats = pipeline
             ? pipeline->meshCache.GetStats() : VulkanMeshCache::Stats{};
         const VulkanTextureCache::Stats textureStats = pipeline
@@ -11166,7 +11148,7 @@ EnhancedLiveDebugSnapshot EnhancedSceneRenderer::GetLiveDebugSnapshot()
     return state.debugSnapshot;
 }
 
-std::shared_ptr<const EnhancedRenderGraph::DiagnosticSnapshot>
+own::shared_owner<const EnhancedRenderGraph::DiagnosticSnapshot>
 EnhancedSceneRenderer::GetLiveGraphSnapshot(EnhancedLiveDisplayTarget target)
 {
     LiveState& state = GetLiveState();

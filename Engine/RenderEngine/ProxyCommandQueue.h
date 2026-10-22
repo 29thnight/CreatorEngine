@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 #include "Core.Minimal.h"
 #include "AnimationPaletteArena.h"
 #include "ProxyCommand.h"
@@ -71,11 +72,11 @@ public:
 					m_primaryArena = arena;
 					m_paletteCount = checked_size(*arena);
 				}
-				else if (m_primaryArena != arena)
+				else if (m_primaryArena.operator->() != arena.operator->())
 				{
 					bool found = false;
 					for (const auto& segment : m_extraArenas)
-						if (segment.arena == arena) { base = segment.base; found = true; break; }
+						if (segment.arena.operator->() == arena.operator->()) { base = segment.base; found = true; break; }
 					if (!found)
 					{
 						base = m_paletteCount;
@@ -121,15 +122,15 @@ public:
 			m_paletteCount += source.m_paletteCount;
 		}
 
-		[[nodiscard]] std::pair<std::shared_ptr<const ce::animation_palette_arena>,
+		[[nodiscard]] std::pair<own::shared_owner<const ce::animation_palette_arena>,
 			std::uint32_t> resolve(const ProxyCommand& command) const
 		{
 			const auto [offset, count] = command.GetPaletteSlice();
 			if (!count) return {};
 			auto check = [offset, count](
-				const std::shared_ptr<const ce::animation_palette_arena>& arena,
+				const own::shared_owner<const ce::animation_palette_arena>& arena,
 				std::uint32_t base, std::uint32_t limit)
-				-> std::pair<std::shared_ptr<const ce::animation_palette_arena>, std::uint32_t>
+				-> std::pair<own::shared_owner<const ce::animation_palette_arena>, std::uint32_t>
 			{
 				if (!arena || offset < base || offset - base >= limit) return {};
 				const auto local = offset - base;
@@ -155,7 +156,7 @@ public:
 		struct PaletteSegment final
 		{
 			std::uint32_t base{};
-			std::shared_ptr<const ce::animation_palette_arena> arena{};
+			own::shared_owner<const ce::animation_palette_arena> arena{};
 		};
 		static std::uint32_t checked_size(const ce::animation_palette_arena& arena)
 		{
@@ -169,13 +170,13 @@ public:
 				throw std::length_error("merged palette address space overflow");
 		}
 		std::vector<ProxyCommand> m_commands{};
-		std::shared_ptr<const ce::animation_palette_arena> m_primaryArena{};
+		own::shared_owner<const ce::animation_palette_arena> m_primaryArena{};
 		std::vector<PaletteSegment> m_extraArenas{};
 		std::uint32_t m_paletteCount{};
 	};
 	struct PaletteCapture
 	{
-		std::shared_ptr<const ce::animation_palette_arena> arena{};
+		own::shared_owner<const ce::animation_palette_arena> arena{};
 		std::uint32_t offset{};
 		std::uint32_t count{};
 		bool copied{};
@@ -198,7 +199,7 @@ public:
 			}
 			if (!m_paletteArena)
 			{
-				m_paletteArena = std::make_shared<ce::animation_palette_arena>();
+				m_paletteArena = own::make_shared<ce::animation_palette_arena>();
 				m_paletteArenas.push_back(m_paletteArena);
 				created = true;
 			}
@@ -335,12 +336,12 @@ private:
 	struct DeferredCommand final
 	{
 		ProxyCommand command{};
-		std::shared_ptr<const ce::animation_palette_arena> arena{};
+		own::shared_owner<const ce::animation_palette_arena> arena{};
 		std::uint32_t localOffset{};
 	};
 	void Consume(ProxyCommand command, RenderScene& renderScene,
 		uint64_t sceneEpoch,
-		std::shared_ptr<const ce::animation_palette_arena> arena,
+		own::shared_owner<const ce::animation_palette_arena> arena,
 		std::uint32_t localOffset)
 	{
 		// 아직 소비할 frame packet보다 새 씬의 명령이면 버리지 않고 보류한다.
@@ -382,8 +383,8 @@ private:
 private:
 	ImplProxyCommandQueue m_proxyCommands;
 	std::mutex m_paletteMutex;
-	std::shared_ptr<ce::animation_palette_arena> m_paletteArena;
-	std::vector<std::shared_ptr<ce::animation_palette_arena>> m_paletteArenas;
+	own::shared_owner<ce::animation_palette_arena> m_paletteArena;
+	std::vector<own::shared_owner<ce::animation_palette_arena>> m_paletteArenas;
 	// 렌더 소비 스레드만 접근한다.
 	std::deque<DeferredCommand> m_deferredCommands;
 	std::atomic_ullong m_enqueued{};

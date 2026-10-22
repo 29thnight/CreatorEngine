@@ -1,0 +1,30 @@
+{
+  "policy": "Delete only after full JSON hashes and byte round-trip plus RT stack analysis pass; source ETL and JSON retained.",
+  "bytes": 13242243560.0,
+  "files": [
+    {
+      "bytes": 5812203516,
+      "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\gpu-marker-blob-20261022\\timeline\\on-a-all-events.csv"
+    },
+    {
+      "bytes": 5799493196,
+      "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\gpu-marker-blob-20261022\\timeline\\off-a-all-events.csv"
+    },
+    {
+      "bytes": 609036721,
+      "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\gpu-marker-blob-20261022\\timeline\\on-a-kernel.csv"
+    },
+    {
+      "bytes": 600656924,
+      "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\gpu-marker-blob-20261022\\timeline\\off-a-kernel.csv"
+    },
+    {
+      "bytes": 207431995,
+      "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\gpu-marker-blob-20261022\\on-a\\profile-stacks.csv"
+    },
+    {
+      "bytes": 213421208,
+      "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\gpu-marker-blob-20261022\\off-a\\profile-stacks.csv"
+    }
+  ]
+}

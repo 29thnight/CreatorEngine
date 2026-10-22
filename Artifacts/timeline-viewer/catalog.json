@@ -1,0 +1,41 @@
+{
+  "schema": 1,
+  "measurements": [
+    {
+      "label": "노드 선언 병렬화 · 이전 측정",
+      "manifest": "/Artifacts/node-declare-parallel-20261021/timeline/viewer.json"
+    },
+    {
+      "label": "이전 합산 측정 · 2026-10-21",
+      "manifest": "/Artifacts/container-reuse-20261021/timeline/viewer.json"
+    },
+    {
+      "label": "컨테이너 재사용만 · ON/OFF",
+      "manifest": "/Artifacts/container-reuse-isolated-20261021/timeline/viewer.json"
+    },
+    {
+      "label": "그룹·패킷 재사용 · ON/OFF",
+      "manifest": "/Artifacts/packet-group-reuse-20261021/timeline/viewer.json"
+    },
+    {
+      "label": "그룹·패킷 재사용 · ON/OFF",
+      "manifest": "/Artifacts/packet-group-reuse-final-20261021/timeline/viewer.json"
+    },
+    {
+      "label": "장면 준비·ownership_cpp · 전후",
+      "manifest": "/Artifacts/scene-preparation-ownership-20261021/timeline/viewer.json"
+    },
+    {
+      "label": "소유권 차용 · 전후",
+      "manifest": "/Artifacts/owner-borrow-20261022/timeline/viewer.json"
+    },
+    {
+      "label": "ownership_cpp e1ccf48 · 전후",
+      "manifest": "/Artifacts/ownership-update-20261022/timeline/viewer.json"
+    },
+    {
+      "label": "GPU 마커·blob 복사 · 전후",
+      "manifest": "/Artifacts/gpu-marker-blob-20261022/timeline/viewer.json"
+    }
+  ]
+}

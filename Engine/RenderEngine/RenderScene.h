@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 #include "PrimitiveRenderProxy.h"
 #include "LightRenderProxy.h"
 #include "UIRenderProxy.h"
@@ -25,14 +26,14 @@ class RenderScene
 {
 public:
 	using ProxyContainer		= std::vector<PrimitiveRenderProxy*>;
-	using ProxyMap				= std::unordered_map<size_t, std::shared_ptr<PrimitiveRenderProxy>>;
-	using ProxySnapshot			= std::vector<std::shared_ptr<PrimitiveRenderProxy>>;
+	using ProxyMap				= std::unordered_map<size_t, own::shared_owner<PrimitiveRenderProxy>>;
+	using ProxySnapshot			= std::vector<own::shared_owner<PrimitiveRenderProxy>>;
 	// 광원은 프리미티브와 저장소를 나눈다. 소비자가 겹치지 않고(패스는 둘 중
 	// 하나만 본다), 나눠 두면 순회에서 타입 태그로 거를 일이 없다.
-	using LightProxyMap			= std::unordered_map<size_t, std::shared_ptr<LightRenderProxy>>;
-	using LightProxySnapshot	= std::vector<std::shared_ptr<LightRenderProxy>>;
-	using UIProxyMap			= std::unordered_map<size_t, std::shared_ptr<UIRenderProxy>>;
-	using UIProxySnapshot		= std::vector<std::shared_ptr<UIRenderProxy>>;
+	using LightProxyMap			= std::unordered_map<size_t, own::shared_owner<LightRenderProxy>>;
+	using LightProxySnapshot	= std::vector<own::shared_owner<LightRenderProxy>>;
+	using UIProxyMap			= std::unordered_map<size_t, own::shared_owner<UIRenderProxy>>;
+	using UIProxySnapshot		= std::vector<own::shared_owner<UIRenderProxy>>;
 
     struct UIDrawState
     {

@@ -1,3 +1,4 @@
+#include "../../../Engine/RenderEngine/RenderAllocator.h"
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 
 #include "RHI/ModelVertexInputLayout.h"
@@ -274,7 +275,7 @@ namespace RenderTest
                 const auto draw = fixture.Draw(meshIndex, math::matrix4x4::identity());
                 material_graph::MeshSurfacePlanBudget chunkBudget;
                 chunkBudget.maxChunkPoints = 64;
-                std::shared_ptr<const material_graph::MeshSurfacePlan> plan;
+                own::shared_owner<const material_graph::MeshSurfacePlan> plan;
                 check.Check(material_graph::MeshSurfacePlan::BuildForScene(draw, {{0, 0, -5}, 1, 1, 1}, chunkBudget,
                     plan, error), "METEOR cooked cluster-aligned chunk partition");
                 if (plan)

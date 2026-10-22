@@ -1,4 +1,6 @@
 #pragma once
+#include "../../Utility_Framework/LifetimeToken.h"
+#include "../../Utility_Framework/Ownership.h"
 #include "RHIQueueContract.h"
 #include "RHICommandProvenance.h"
 #include "RHICommandRecordingJobs.h"
@@ -21,7 +23,7 @@ public:
     // Unknown for legacy native adapters. Software recordings publish the same
     // value identity before callbacks that their eventual sealed batch carries.
     virtual RHICommandProvenance GetCommandProvenance(uint32_t) const { return {}; }
-    virtual bool Finish(std::shared_ptr<IRHIQueueCommandBatch>& batch, std::string& error) = 0;
+    virtual bool Finish(ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error) = 0;
 };
 
 // Each recording exclusively leases allocator storage until batch retirement.
@@ -33,14 +35,14 @@ public:
         : m_scheduler(scheduler) {}
     virtual ~IRHIQueueRecorder() = default;
     virtual IRenderDeviceServices& DeviceServices() const = 0;
-    virtual bool Record(const std::shared_ptr<IRHICommandQueue>& queue,
-        const std::function<void(RHIEncoder&)>& commands, std::shared_ptr<const void> token,
-        std::shared_ptr<IRHIQueueCommandBatch>& batch, std::string& error) = 0;
+    virtual bool Record(const own::shared_owner<IRHICommandQueue>& queue,
+        const std::function<void(RHIEncoder&)>& commands, ce::lifetime_token token,
+        ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error) = 0;
     // Zero keeps compatibility with serial recording adapters. A positive count
     // opts into owned targets, including the one-target small-workload path.
     virtual uint32_t GetWorkerCount() const { return 0; }
-    virtual bool BeginRecording(const std::shared_ptr<IRHICommandQueue>&,
-        uint32_t, std::shared_ptr<const void>, std::shared_ptr<IRHIQueueRecording>&,
+    virtual bool BeginRecording(const own::shared_owner<IRHICommandQueue>&,
+        uint32_t, ce::lifetime_token, ce::pooled_owner<IRHIQueueRecording>&,
         std::string& error)
     {
         error = "Queue recorder does not support independent command targets.";

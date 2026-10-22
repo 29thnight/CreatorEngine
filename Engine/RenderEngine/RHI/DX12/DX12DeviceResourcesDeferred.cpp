@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "DX12DeviceResources.h"
 #include "DX12Encoder.h"
 #include "../RHIBackendExecution.h"
@@ -102,13 +103,13 @@ struct DX12DeviceResources::DeferredImmediate
     explicit DeferredImmediate(DX12DeviceResources& resources) : validator(resources), recorder(validator) {}
     DX12SoftwareCommandValidator validator;
     RHISoftwareRecorder recorder;
-    std::shared_ptr<DeferredNativeFrame> frame;
+    own::shared_owner<DeferredNativeFrame> frame;
     struct Bindings
     {
-        std::shared_ptr<const DX12RecordingResources> resources;
+        own::shared_owner<const DX12RecordingResources> resources;
         bool needed{};
     };
-    std::shared_ptr<Bindings> bindings;
+    own::shared_owner<Bindings> bindings;
     bool recording{};
 };
 
@@ -125,16 +126,16 @@ void DX12DeviceResources::BeginDeferredImmediate()
 {
     if (!m_deferred)
     {
-        m_deferred = std::make_shared<DeferredImmediate>(*this);
+        m_deferred = own::make_shared<DeferredImmediate>(*this);
     }
     if (!m_pendingViews)
     {
-        m_pendingViews = std::make_shared<PendingViews>();
+        m_pendingViews = own::make_shared<PendingViews>();
     }
     auto& frame = m_deferredFrames[m_frameIndex];
     if (!frame)
     {
-        frame = std::make_shared<DeferredNativeFrame>();
+        frame = own::make_shared<DeferredNativeFrame>();
         frame->allocator = m_allocators[m_frameIndex];
     }
     // BeginFrame has joined the slot's CPU ticket and GPU fence. Only its RHI
@@ -147,8 +148,8 @@ void DX12DeviceResources::BeginDeferredImmediate()
 
 void DX12DeviceResources::BeginPendingImmediate()
 {
-    m_pendingCommands = std::make_shared<DX12PendingCommands>(m_pendingCommandPool);
-    m_deferred->bindings = std::make_shared<DeferredImmediate::Bindings>();
+    m_pendingCommands = own::make_shared<DX12PendingCommands>(m_pendingCommandPool);
+    m_deferred->bindings = own::make_shared<DeferredImmediate::Bindings>();
 }
 
 RHIEncoder& DX12DeviceResources::GetDeferredImmediateEncoder()
@@ -159,7 +160,7 @@ RHIEncoder& DX12DeviceResources::GetDeferredImmediateEncoder()
     }
     if (!m_deferred->recording)
     {
-        std::shared_ptr<IRHICommandQueue> queue;
+        own::shared_owner<IRHICommandQueue> queue;
         std::string error;
         if (!GetPrimaryGraphicsQueue(queue, error) ||
             !m_deferred->recorder.BeginRecording({queue->GetIdentity(), 1, 64ull << 20, 64ull << 20}, error))
@@ -177,7 +178,7 @@ bool DX12DeviceResources::SealImmediateSoftware(std::string& error)
     {
         return true;
     }
-    std::shared_ptr<IRHICommandQueue> queue;
+    own::shared_owner<IRHICommandQueue> queue;
     if (!GetPrimaryGraphicsQueue(queue, error))
     {
         return false;
@@ -229,11 +230,11 @@ bool DX12DeviceResources::SubmitPendingImmediate(bool preserveRecording, bool en
     const auto bindings = m_deferred->bindings;
     struct Lifetime
     {
-        std::shared_ptr<DX12PendingCommands> commands;
-        std::shared_ptr<DeferredNativeFrame> frame;
-        std::shared_ptr<DeferredImmediate::Bindings> bindings;
+        own::shared_owner<DX12PendingCommands> commands;
+        own::shared_owner<DeferredNativeFrame> frame;
+        own::shared_owner<DeferredImmediate::Bindings> bindings;
     };
-    auto lifetime = std::make_shared<Lifetime>(commands, frame, bindings);
+    auto lifetime = own::make_shared<Lifetime>(commands, frame, bindings);
     RHIRecordingAdmissionGuard admission(
         [this, recording, completion, preserveRecording]
         {

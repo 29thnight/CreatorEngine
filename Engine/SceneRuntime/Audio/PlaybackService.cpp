@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/Ownership.h"
 #include "PlaybackService.h"
 
 #include "../../Utility_Framework/StandardLibrary.h"
@@ -515,7 +516,7 @@ namespace wave
         return instance == nullptr ? 0u : instance->children.size();
     }
 
-    bool PlaybackService::RegisterGraph(const ClipKey& id, std::shared_ptr<const SoundGraphProgram> graph)
+    bool PlaybackService::RegisterGraph(const ClipKey& id, own::shared_owner<const SoundGraphProgram> graph)
     {
         if (!id.IsGuid() || !graph)
         {

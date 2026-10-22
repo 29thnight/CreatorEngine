@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Ownership.h"
 
 #include "ModelData.h"
 
@@ -13,7 +14,7 @@ namespace experiment
 	class Model final
 	{
 	public:
-		using Shared = std::shared_ptr<const Model>;
+		using Shared = own::shared_owner<const Model>;
 
 		// pass-key: 생성은 ModelLoader만 가능하지만 생성자 자체는 public이므로
 		// make_shared가 컨트롤 블록과 객체를 단일 할당으로 잡을 수 있다.

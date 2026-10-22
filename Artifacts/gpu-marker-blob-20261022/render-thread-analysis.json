@@ -1,0 +1,599 @@
+{
+  "on-a": {
+    "scope": "RenderThread-only sampled CPU stacks in native-ON ETW window. Inclusive flags overlap and are not summed. Counts are samples, not exact elapsed time.",
+    "tids": [
+      30820
+    ],
+    "totalSamples": 10794,
+    "inclusiveCategories": {
+      "ownershipLeaf": 318,
+      "debugIteratorManagement": 843,
+      "gpuTimingValuePath": 9,
+      "runtimeMarkerPath": 101,
+      "criticalSectionPath": 617,
+      "rtcStackCheckLeaf": 376,
+      "assetBlobRecordValuePath": 64,
+      "lifetimeTokenPath": 70
+    },
+    "scopes": {
+      "RenderGraphDeclare": {
+        "totalSamples": 3062,
+        "ownershipLeaf": 41,
+        "debugIteratorManagement": 103,
+        "rtcStackCheckLeaf": 77,
+        "lifetimeTokenPath": 12,
+        "criticalSectionPath": 64
+      },
+      "MaterialGraphScenePrepare": {
+        "totalSamples": 2135,
+        "ownershipLeaf": 118,
+        "criticalSectionPath": 167,
+        "rtcStackCheckLeaf": 73,
+        "debugIteratorManagement": 188,
+        "lifetimeTokenPath": 7
+      },
+      "RenderGpuCollect": {
+        "totalSamples": 1220,
+        "gpuTimingValuePath": 3,
+        "runtimeMarkerPath": 101,
+        "debugIteratorManagement": 157,
+        "criticalSectionPath": 124,
+        "rtcStackCheckLeaf": 37,
+        "ownershipLeaf": 20,
+        "assetBlobRecordValuePath": 4,
+        "lifetimeTokenPath": 3
+      },
+      "RenderSubmit": {
+        "totalSamples": 318,
+        "debugIteratorManagement": 38,
+        "lifetimeTokenPath": 23,
+        "ownershipLeaf": 16,
+        "rtcStackCheckLeaf": 16,
+        "criticalSectionPath": 14
+      }
+    },
+    "topLeaves": [
+      [
+        "CreatorEditor.runtime.dll!_RTC_CheckStackVars",
+        375
+      ],
+      [
+        "ntdll.dll!RtlpEnterCriticalSectionContended",
+        317
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::_Atomic_storage<unsigned __int64;8>::load",
+        312
+      ],
+      [
+        "ntdll.dll!RtlLeaveCriticalSection",
+        248
+      ],
+      [
+        "ntdll.dll!RtlEnterCriticalSection",
+        244
+      ],
+      [
+        "ntoskrnl.exe!RtlpLookupFunctionEntryForStackWalks",
+        156
+      ],
+      [
+        "ntdll.dll!RtlpLowFragHeapAllocFromContext",
+        129
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::_Check_load_memory_order",
+        123
+      ],
+      [
+        "CreatorEditor.runtime.dll!shadow_math::bounds_detail::Compose",
+        112
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::vector<DX12GpuProfiler::PassRecord;std::allocator<DX12GpuProfiler::PassRecord> >::operator[]",
+        95
+      ],
+      [
+        "ntdll.dll!RtlFreeHeap",
+        84
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::array<std::array<double;4>;4>::operator[]",
+        80
+      ],
+      [
+        "ntoskrnl.exe!RtlpUnwindPrologue",
+        79
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::operator<=><unsigned __int64;unsigned __int64;unsigned __int64;unsigned __int64>",
+        73
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::_Atomic_integral<unsigned __int64;8>::fetch_add",
+        71
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::array<double;4>::operator[]",
+        69
+      ],
+      [
+        "CreatorEditor.runtime.dll!ce::profiler_service::now",
+        63
+      ],
+      [
+        "ntdll.dll!RtlQueryPerformanceCounter",
+        62
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::_Atomic_address_as<__int64;std::_Atomic_padded<unsigned __int64> >",
+        60
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::_String_val<std::_Simple_types<char> >::_Large_mode_engaged",
+        56
+      ],
+      [
+        "ntoskrnl.exe!RtlpxVirtualUnwind",
+        54
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::_Check_store_memory_order",
+        51
+      ],
+      [
+        "CreatorEditor.runtime.dll!shadow_math::bounds_detail::Transform",
+        49
+      ],
+      [
+        "CreatorEditor.runtime.dll!ce::thread_stream::end_scope",
+        46
+      ],
+      [
+        "CreatorEditor.runtime.dll!ce::thread_stream::honor_seal_request",
+        46
+      ],
+      [
+        "CreatorEditor.runtime.dll!__security_check_cookie",
+        45
+      ],
+      [
+        "CreatorEditor.runtime.dll!ce::thread_stream::recording_depth",
+        37
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::is_constant_evaluated",
+        37
+      ],
+      [
+        "VCRUNTIME140D.dll!0x00007fff1b5129a3",
+        35
+      ],
+      [
+        "CreatorEditor.runtime.dll!DX12GpuProfiler::BeginFrame",
+        34
+      ]
+    ],
+    "lockIteratorCallerPaths": [
+      [
+        "CreatorEditor.runtime.dll!EnhancedRenderGraph::ClearPassMetadata",
+        47
+      ],
+      [
+        "CreatorEditor.runtime.dll!TextureFramePins::Retain",
+        34
+      ],
+      [
+        "CreatorEditor.runtime.dll!EnhancedRenderGraph::PhaseBarrierPlans::clear",
+        29
+      ],
+      [
+        "CreatorEditor.runtime.dll!material_graph::SceneHybridVisibility::Prepare",
+        27
+      ],
+      [
+        "CreatorEditor.runtime.dll!`anonymous namespace'::LiveState::AdmitImagePayloads",
+        24
+      ],
+      [
+        "CreatorEditor.runtime.dll!SelectRHIAssetEvictionCandidates",
+        22
+      ],
+      [
+        "CreatorEditor.runtime.dll!material_graph::TransientBufferPool::Return",
+        22
+      ],
+      [
+        "CreatorEditor.runtime.dll!DX12TextureCache::GetOrUpload",
+        21
+      ],
+      [
+        "CreatorEditor.runtime.dll!LiveBlackboard::Get",
+        20
+      ],
+      [
+        "CreatorEditor.runtime.dll!GpuGeometryVisibility::Frame::ConsumeStreamingFeedback",
+        19
+      ],
+      [
+        "CreatorEditor.runtime.dll!DX12DeviceResources::AllocateUpload",
+        19
+      ],
+      [
+        "CreatorEditor.runtime.dll!`material_graph::MeshSurfacePlan::BuildSceneZeroLod'::`2'::<lambda_2>::operator()",
+        19
+      ],
+      [
+        "CreatorEditor.runtime.dll!DX12TextureCache::IsResident",
+        18
+      ],
+      [
+        "CreatorEditor.runtime.dll!RHISubmissionThread::CollectCompletedLifetimes",
+        17
+      ],
+      [
+        "CreatorEditor.runtime.dll!assets::cluster::Stream::Prepare",
+        15
+      ],
+      [
+        "CreatorEditor.runtime.dll!LiveBlackboard::WritableSlot",
+        14
+      ],
+      [
+        "CreatorEditor.runtime.dll!material_graph::MeshSurfacePlan::BuildSceneZeroLod",
+        14
+      ],
+      [
+        "CreatorEditor.runtime.dll!`anonymous namespace'::LiveState::PruneImageDemands",
+        14
+      ],
+      [
+        "CreatorEditor.runtime.dll!EnhancedRenderGraph::ReleaseResources",
+        14
+      ],
+      [
+        "CreatorEditor.runtime.dll!EnhancedRenderGraph::CreateTransients",
+        14
+      ],
+      [
+        "CreatorEditor.runtime.dll!material_graph::SceneHost::Prepare",
+        14
+      ],
+      [
+        "CreatorEditor.runtime.dll!material_graph::MeshSurfaceInput::~MeshSurfaceInput",
+        13
+      ],
+      [
+        "CreatorEditor.runtime.dll!material_graph::MeshSurfaceStaticCache::Acquire",
+        13
+      ],
+      [
+        "CreatorEditor.runtime.dll!ce::intern_runtime_marker",
+        12
+      ],
+      [
+        "CreatorEditor.runtime.dll!EnhancedSSGIPass::Declare",
+        11
+      ],
+      [
+        "CreatorEditor.runtime.dll!GpuGeometryVisibility::Frame::~Frame",
+        11
+      ],
+      [
+        "CreatorEditor.runtime.dll!material_graph::MeshSurfaceInput::MeshSurfaceInput",
+        11
+      ],
+      [
+        "CreatorEditor.runtime.dll!``anonymous namespace'::LiveState::AdmitImagePayloads'::`2'::<lambda_1>::operator()",
+        11
+      ],
+      [
+        "CreatorEditor.runtime.dll!RHISubmissionThread::ConsumeFailure",
+        9
+      ],
+      [
+        "CreatorEditor.runtime.dll!EnhancedSceneRenderer::TickLive",
+        9
+      ]
+    ]
+  },
+  "off-a": {
+    "scope": "RenderThread-only sampled CPU stacks in native-ON ETW window. Inclusive flags overlap and are not summed. Counts are samples, not exact elapsed time.",
+    "tids": [
+      24336
+    ],
+    "totalSamples": 11438,
+    "inclusiveCategories": {
+      "debugIteratorManagement": 1133,
+      "ownershipLeaf": 345,
+      "rtcStackCheckLeaf": 410,
+      "assetBlobRecordValuePath": 242,
+      "runtimeMarkerPath": 414,
+      "gpuTimingValuePath": 249,
+      "criticalSectionPath": 836,
+      "lifetimeTokenPath": 73
+    },
+    "scopes": {
+      "MaterialGraphScenePrepare": {
+        "totalSamples": 2094,
+        "rtcStackCheckLeaf": 87,
+        "ownershipLeaf": 105,
+        "lifetimeTokenPath": 8,
+        "criticalSectionPath": 148,
+        "debugIteratorManagement": 171,
+        "assetBlobRecordValuePath": 5
+      },
+      "RenderGraphDeclare": {
+        "totalSamples": 2907,
+        "debugIteratorManagement": 118,
+        "ownershipLeaf": 40,
+        "rtcStackCheckLeaf": 94,
+        "criticalSectionPath": 61,
+        "lifetimeTokenPath": 6
+      },
+      "RenderGpuCollect": {
+        "totalSamples": 2145,
+        "runtimeMarkerPath": 414,
+        "debugIteratorManagement": 441,
+        "gpuTimingValuePath": 243,
+        "criticalSectionPath": 345,
+        "rtcStackCheckLeaf": 55,
+        "ownershipLeaf": 17,
+        "assetBlobRecordValuePath": 4,
+        "lifetimeTokenPath": 3
+      },
+      "RenderSubmit": {
+        "rtcStackCheckLeaf": 22,
+        "totalSamples": 287,
+        "lifetimeTokenPath": 21,
+        "debugIteratorManagement": 28,
+        "ownershipLeaf": 18,
+        "criticalSectionPath": 15
+      }
+    },
+    "topLeaves": [
+      [
+        "ntdll.dll!RtlpEnterCriticalSectionContended",
+        435
+      ],
+      [
+        "CreatorEditor.runtime.dll!_RTC_CheckStackVars",
+        407
+      ],
+      [
+        "ntdll.dll!RtlEnterCriticalSection",
+        342
+      ],
+      [
+        "ntdll.dll!RtlLeaveCriticalSection",
+        322
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::_Atomic_storage<unsigned __int64;8>::load",
+        260
+      ],
+      [
+        "ntdll.dll!RtlpLowFragHeapAllocFromContext",
+        153
+      ],
+      [
+        "ntoskrnl.exe!RtlpLookupFunctionEntryForStackWalks",
+        141
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::_Check_load_memory_order",
+        118
+      ],
+      [
+        "CreatorEditor.runtime.dll!shadow_math::bounds_detail::Compose",
+        104
+      ],
+      [
+        "ntdll.dll!RtlFreeHeap",
+        101
+      ],
+      [
+        "ntoskrnl.exe!RtlpUnwindPrologue",
+        88
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::_Atomic_address_as<__int64;std::_Atomic_padded<unsigned __int64> >",
+        85
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::array<double;4>::operator[]",
+        76
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::vector<DX12GpuProfiler::PassRecord;std::allocator<DX12GpuProfiler::PassRecord> >::operator[]",
+        73
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::array<std::array<double;4>;4>::operator[]",
+        69
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::operator<=><unsigned __int64;unsigned __int64;unsigned __int64;unsigned __int64>",
+        66
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::_Atomic_integral<unsigned __int64;8>::fetch_add",
+        60
+      ],
+      [
+        "ntdll.dll!RtlQueryPerformanceCounter",
+        58
+      ],
+      [
+        "ntoskrnl.exe!RtlpxVirtualUnwind",
+        56
+      ],
+      [
+        "CreatorEditor.runtime.dll!ce::profiler_service::now",
+        56
+      ],
+      [
+        "CreatorEditor.runtime.dll!ce::thread_stream::honor_seal_request",
+        53
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::_Fnv1a_append_bytes",
+        52
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::_String_val<std::_Simple_types<char> >::_Large_mode_engaged",
+        49
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::_Check_store_memory_order",
+        49
+      ],
+      [
+        "CreatorEditor.runtime.dll!ce::thread_stream::write",
+        48
+      ],
+      [
+        "CreatorEditor.runtime.dll!__security_check_cookie",
+        45
+      ],
+      [
+        "CreatorEditor.runtime.dll!shadow_math::bounds_detail::Transform",
+        38
+      ],
+      [
+        "CreatorEditor.runtime.dll!ce::thread_stream::recording_depth",
+        38
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::exchange<std::_Iterator_base12 *;std::nullptr_t>",
+        36
+      ],
+      [
+        "CreatorEditor.runtime.dll!std::is_constant_evaluated",
+        34
+      ]
+    ],
+    "lockIteratorCallerPaths": [
+      [
+        "CreatorEditor.runtime.dll!ce::intern_runtime_marker",
+        163
+      ],
+      [
+        "CreatorEditor.runtime.dll!`anonymous namespace'::LiveState::CollectCompletedDisplays",
+        61
+      ],
+      [
+        "CreatorEditor.runtime.dll!experiment::cooked::AssetBlobRecord::~AssetBlobRecord",
+        49
+      ],
+      [
+        "CreatorEditor.runtime.dll!EnhancedRenderGraph::ClearPassMetadata",
+        42
+      ],
+      [
+        "CreatorEditor.runtime.dll!EnhancedLivePassTiming::~EnhancedLivePassTiming",
+        41
+      ],
+      [
+        "CreatorEditor.runtime.dll!experiment::cooked::AssetBlobRecord::AssetBlobRecord",
+        39
+      ],
+      [
+        "CreatorEditor.runtime.dll!EnhancedLivePassTiming::EnhancedLivePassTiming",
+        38
+      ],
+      [
+        "CreatorEditor.runtime.dll!LiveBlackboard::Get",
+        29
+      ],
+      [
+        "CreatorEditor.runtime.dll!EnhancedLiveGpuSlice::EnhancedLiveGpuSlice",
+        28
+      ],
+      [
+        "CreatorEditor.runtime.dll!TextureFramePins::Retain",
+        28
+      ],
+      [
+        "CreatorEditor.runtime.dll!EnhancedLiveGpuSlice::~EnhancedLiveGpuSlice",
+        27
+      ],
+      [
+        "CreatorEditor.runtime.dll!DX12DeviceResources::AllocateUpload",
+        24
+      ],
+      [
+        "CreatorEditor.runtime.dll!EnhancedSceneRendererLiveDX12Adapter::CollectProfiler",
+        22
+      ],
+      [
+        "CreatorEditor.runtime.dll!material_graph::SceneHybridVisibility::Prepare",
+        21
+      ],
+      [
+        "CreatorEditor.runtime.dll!`anonymous namespace'::CollectQueueProfiler",
+        19
+      ],
+      [
+        "CreatorEditor.runtime.dll!material_graph::TransientBufferPool::Return",
+        19
+      ],
+      [
+        "CreatorEditor.runtime.dll!DX12TextureCache::GetOrUpload",
+        17
+      ],
+      [
+        "CreatorEditor.runtime.dll!``anonymous namespace'::LiveState::AdmitImagePayloads'::`2'::<lambda_1>::operator()",
+        17
+      ],
+      [
+        "CreatorEditor.runtime.dll!material_graph::SceneHost::Prepare",
+        17
+      ],
+      [
+        "CreatorEditor.runtime.dll!EnhancedRenderGraph::PhaseBarrierPlans::clear",
+        16
+      ],
+      [
+        "CreatorEditor.runtime.dll!`material_graph::MeshSurfacePlan::BuildSceneZeroLod'::`2'::<lambda_2>::operator()",
+        16
+      ],
+      [
+        "CreatorEditor.runtime.dll!EnhancedRenderGraph::CreateTransients",
+        15
+      ],
+      [
+        "CreatorEditor.runtime.dll!EnhancedRenderGraph::PlanBarriers",
+        15
+      ],
+      [
+        "CreatorEditor.runtime.dll!LivePipelineDesc::HasConsumer",
+        13
+      ],
+      [
+        "CreatorEditor.runtime.dll!material_graph::MeshSurfaceInput::~MeshSurfaceInput",
+        13
+      ],
+      [
+        "CreatorEditor.runtime.dll!`anonymous namespace'::LiveState::AdmitImagePayloads",
+        13
+      ],
+      [
+        "CreatorEditor.runtime.dll!DX12TextureCache::IsResident",
+        12
+      ],
+      [
+        "CreatorEditor.runtime.dll!EnhancedRenderGraph::ReleaseResources",
+        12
+      ],
+      [
+        "CreatorEditor.runtime.dll!SelectRHIAssetEvictionCandidates",
+        12
+      ],
+      [
+        "CreatorEditor.runtime.dll!material_graph::MeshSurfaceInput::MeshSurfaceInput",
+        12
+      ]
+    ]
+  }
+}

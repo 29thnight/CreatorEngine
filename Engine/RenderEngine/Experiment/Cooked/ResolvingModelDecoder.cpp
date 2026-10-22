@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "ResolvingModelDecoder.h"
 
 #include "../../../Utility_Framework/StandardLibrary.h"
@@ -23,8 +24,8 @@ namespace experiment::cooked
     }
 
     ResolvingModelDecoder::ResolvingModelDecoder(
-        std::unique_ptr<IModelDecoder> cookedDecoder,
-        std::unique_ptr<IModelDecoder> sourceDecoder) noexcept
+        own::unique_owner<IModelDecoder> cookedDecoder,
+        own::unique_owner<IModelDecoder> sourceDecoder) noexcept
         : cooked_(std::move(cookedDecoder))
         , source_(std::move(sourceDecoder))
     {

@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "../../Assets/PreparedClusterPages.h"
 #include "../../../Utility_Framework/DynamicBitset.h"
 #include "CookedModelSubAssetCodec.h"
@@ -635,7 +636,7 @@ std::span<const std::byte> GeometrySection(WireReader& wire)
     return result;
 }
 
-std::shared_ptr<const assets::cluster::Archive> GeometryClusterArchive(const Mesh& mesh)
+own::shared_owner<const assets::cluster::Archive> GeometryClusterArchive(const Mesh& mesh)
 {
     auto topology = mesh.meshlets;
     for (const auto& level : mesh.coarseLods.levels)

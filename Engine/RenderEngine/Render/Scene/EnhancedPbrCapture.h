@@ -146,16 +146,17 @@ struct EnhancedPbrCapture
         item["meshDomain"] << (handle.domain == assets::ModelMeshDomain::Granular ? "granular" : "aggregate");
         if (handle.domain == assets::ModelMeshDomain::Granular)
         {
+            const auto& blob = handle.Blob();
             item["assetId"] << FileGuid(handle.asset.key.assetId.value).ToString();
             item["subassetId"] << FileGuid(handle.asset.key.subassetId.value).ToString();
             item["resolverRevision"] << handle.resolverRevision;
-            item["representation"] << handle.blob.representation;
-            item["artifactSchema"] << handle.blob.schemaVersion;
-            item["artifactBytes"] << handle.blob.byteSize;
-            item["targetPlatform"] << handle.blob.targetPlatform;
-            item["targetAbi"] << handle.blob.targetAbi;
+            item["representation"] << blob.representation;
+            item["artifactSchema"] << blob.schemaVersion;
+            item["artifactBytes"] << blob.byteSize;
+            item["targetPlatform"] << blob.targetPlatform;
+            item["targetAbi"] << blob.targetAbi;
             item["contentSha256"] |= ryml::SEQ;
-            for (const auto byte : handle.blob.contentSha256)
+            for (const auto byte : blob.contentSha256)
             {
                 item["contentSha256"].append_child() << static_cast<uint32_t>(byte);
             }

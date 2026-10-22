@@ -1,7 +1,6 @@
 // Volume coefficients, composite and forward medium bindings.
-RGHandle SceneHost::VolumeStage::Declare(const own::shared_owner<const FrameInput>& prepared,
-                                         EnhancedRenderGraph& graph, RGHandle shaded, RGHandle lighting, RGHandle depth,
-                                         RGHandle shadowMap) const
+RGHandle SceneHost::VolumeStage::Declare(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph,
+                                         RGHandle shaded, RGHandle lighting, RGHandle depth, RGHandle shadowMap) const
 {
     const auto input = prepared;
     if (!input || !this->frame || this->output.IsValid())

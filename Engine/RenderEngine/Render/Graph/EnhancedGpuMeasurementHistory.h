@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 
 #include "EnhancedRenderGraph.h"
 #include "../../../Utility_Framework/StandardLibrary.h"
@@ -10,7 +11,7 @@ class EnhancedGpuMeasurementHistory
 public:
     struct Sample
     {
-        std::shared_ptr<const std::string> graphSignature;
+        own::shared_owner<const std::string> graphSignature;
         std::vector<std::optional<uint64_t>> nanoseconds;
         GpuFrameToken token;
     };
@@ -31,12 +32,12 @@ public:
     }
 
     const Sample* FindFresh(RGMeasurementDomain domain, const GpuFrameToken& current,
-        uint64_t cpuTicksPerSecond, const std::shared_ptr<const std::string>& signature = {}) const
+        uint64_t cpuTicksPerSecond, const own::shared_owner<const std::string>& signature = {}) const
     {
         const auto fresh = [&](const Sample* sample)
         {
             return current.IsValid() && sample && sample->graphSignature && cpuTicksPerSecond != 0 &&
-            (!signature || sample->graphSignature == signature || *sample->graphSignature == *signature) &&
+            (!signature || sample->graphSignature.operator->() == signature.operator->() || *sample->graphSignature == *signature) &&
             !(
             sample->token.submissionId >= current.submissionId ||
             sample->token.engineFrameId > current.engineFrameId ||
@@ -87,7 +88,7 @@ public:
         if (entry.latest.graphSignature)
         {
             const auto equal = [](const auto& a, const auto& b)
-            { return a == b || (a && b && *a == *b); };
+            { return a.operator->() == b.operator->() || (a && b && *a == *b); };
             std::erase_if(entry.variants, [&](const Sample& old)
             { return equal(old.graphSignature, sample.graphSignature); });
             if (!equal(entry.latest.graphSignature, sample.graphSignature))

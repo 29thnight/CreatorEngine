@@ -1,0 +1,105 @@
+{
+  "submitCandidates": [
+    "RenderSubmit",
+    "RHINativeSubmit",
+    "DX12PresentWait",
+    "DXGIPresent",
+    "MaterialLookupUnsubmittedDiscard",
+    "Physics.TaskSubmit",
+    "Physics.SimulateSubmit",
+    "EditorCameraPresentationSample",
+    "PresentationQueueIdle",
+    "PresentationMessages",
+    "PresentationResize",
+    "PresentationViewportExtent",
+    "PresentationTestDelay",
+    "PresentFrame",
+    "PresentationComplete",
+    "PresentationDisplayLost",
+    "PresentationSceneLockWait",
+    "PresentationUI",
+    "ImGuiRenderPresent",
+    "RenderPostSubmitDiagnostics",
+    "RenderDeclare.live_present",
+    "live_present [gpu scope 137]",
+    "live_present [gpu scope 138]",
+    "live_present [gpu scope 140]",
+    "live_present [gpu scope 139]",
+    "live_present [gpu scope 135]",
+    "live_present [gpu scope 142]",
+    "live_present [gpu scope 136]",
+    "live_present [gpu scope 133]",
+    "live_present [gpu scope 134]",
+    "live_present [gpu scope 141]"
+  ],
+  "threads": {
+    "0": {
+      "name": "[Worker 1]",
+      "tid": 31616
+    },
+    "1": {
+      "name": "[Worker 3]",
+      "tid": 41288
+    },
+    "2": {
+      "name": "[Worker 5]",
+      "tid": 37856
+    },
+    "3": {
+      "name": "[Worker 2]",
+      "tid": 6396
+    },
+    "4": {
+      "name": "[Worker 6]",
+      "tid": 34832
+    },
+    "5": {
+      "name": "[Worker 4]",
+      "tid": 7200
+    },
+    "6": {
+      "name": "[Worker 8]",
+      "tid": 36464
+    },
+    "7": {
+      "name": "[Worker 7]",
+      "tid": 23880
+    },
+    "8": {
+      "name": "[GameThread]",
+      "tid": 39988
+    },
+    "9": {
+      "name": "[RenderThread]",
+      "tid": 38072
+    },
+    "10": {
+      "name": "[RHIThread]",
+      "tid": 20812
+    },
+    "11": {
+      "name": "[PresentationThread]",
+      "tid": 33976
+    },
+    "12": {
+      "name": "[Physics 1 Worker 0]",
+      "tid": 22916
+    },
+    "13": {
+      "name": "[Physics 1 Worker 2]",
+      "tid": 41916
+    },
+    "14": {
+      "name": "[Physics 1 Worker 1]",
+      "tid": 25548
+    },
+    "15": {
+      "name": "[Physics 1 Worker 3]",
+      "tid": 4856
+    },
+    "16": {
+      "name": "[GPU Graphics]",
+      "tid": 0
+    }
+  }
+}

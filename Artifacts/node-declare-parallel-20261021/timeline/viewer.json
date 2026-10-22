@@ -1,0 +1,55 @@
+{
+  "schema": 1,
+  "title": "노드 선언 병렬화 · 이전 측정",
+  "report": "../index.html",
+  "datasets": [
+    {
+      "id": "before-baseline",
+      "variant": "before",
+      "mode": "baseline",
+      "begin": 0,
+      "end": 15514.7123,
+      "events": 1444221,
+      "measurements": 725,
+      "cpu": "before-baseline.json",
+      "gpu": "before-baseline-gpu.json",
+      "label": "변경 전 · baseline"
+    },
+    {
+      "id": "before-etw",
+      "variant": "before",
+      "mode": "etw",
+      "begin": 0,
+      "end": 42021.646,
+      "events": 1349786,
+      "measurements": 662,
+      "cpu": "before-etw.json",
+      "gpu": "before-etw-gpu.json",
+      "label": "변경 전 · etw"
+    },
+    {
+      "id": "after-baseline",
+      "variant": "after",
+      "mode": "baseline",
+      "begin": 0,
+      "end": 15493.3304,
+      "events": 1629951,
+      "measurements": 516,
+      "cpu": "after-baseline.json",
+      "gpu": "after-baseline-gpu.json",
+      "label": "변경 후 · baseline"
+    },
+    {
+      "id": "after-etw",
+      "variant": "after",
+      "mode": "etw",
+      "begin": 0,
+      "end": 41895.422,
+      "events": 1529448,
+      "measurements": 480,
+      "cpu": "after-etw.json",
+      "gpu": "after-etw-gpu.json",
+      "label": "변경 후 · etw"
+    }
+  ]
+}

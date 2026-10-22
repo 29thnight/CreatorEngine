@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/Ownership.h"
 #pragma once
 
 #include "AudioService.h"
@@ -110,7 +111,7 @@ namespace wave
         [[nodiscard]] bool IsAlive(PlaybackHandle playback) const noexcept;
         [[nodiscard]] std::size_t AliveCount() const noexcept;
         [[nodiscard]] std::size_t ChildVoiceCount(PlaybackHandle playback) const noexcept;
-        [[nodiscard]] bool RegisterGraph(const ClipKey& id, std::shared_ptr<const SoundGraphProgram> graph);
+        [[nodiscard]] bool RegisterGraph(const ClipKey& id, own::shared_owner<const SoundGraphProgram> graph);
         [[nodiscard]] bool RegisterPreset(const ClipKey& id, const SoundPreset& preset);
         void UnregisterAsset(const ClipKey& id);
         [[nodiscard]] bool HasSource(const SoundSource& source) const;
@@ -140,7 +141,7 @@ namespace wave
         {
             PlaybackScope scope;
             PlaybackRequest request;
-            std::shared_ptr<const SoundGraphProgram> graph;
+            own::shared_owner<const SoundGraphProgram> graph;
             ParameterMap parameters;
             std::vector<Child> children;
             std::uint64_t randomState{};
@@ -156,7 +157,7 @@ namespace wave
         AudioService& m_audio;
         std::vector<ScopeRecord> m_scopes;
         std::vector<Instance> m_instances;
-        std::unordered_map<ClipKey, std::shared_ptr<const SoundGraphProgram>> m_graphs;
+        std::unordered_map<ClipKey, own::shared_owner<const SoundGraphProgram>> m_graphs;
         std::unordered_map<ClipKey, SoundPreset> m_presets;
         std::vector<PlaybackCompletion> m_completions;
         std::vector<PlaybackStarted> m_started;

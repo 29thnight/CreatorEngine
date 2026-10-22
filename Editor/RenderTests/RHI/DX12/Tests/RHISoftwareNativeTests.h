@@ -1,4 +1,5 @@
-﻿#pragma once
+#include "../../../../../Engine/RenderEngine/RenderAllocator.h"
+#pragma once
 #include "RHI/DX12/DX12CommandTranslator.h"
 #include "RHI/RHISoftwareRecorder.h"
 #include "RHI/RHISoftwareQueueRecorder.h"
@@ -27,7 +28,7 @@ namespace
         DX12DeviceResources resources;
         DX12CommandListPool pool;
         RHISubmissionTicket ticket;
-        auto releaseTranslation = std::make_shared<std::promise<void>>();
+        auto releaseTranslation = own::make_shared<std::promise<void>>();
         bool translationBlocked = false;
         try
         {
@@ -122,8 +123,8 @@ namespace
             }
             {
                 EnhancedRenderGraph graph(resources);
-                auto owner = std::make_shared<int>(41);
-                std::weak_ptr<int> weak = owner;
+                auto owner = own::make_shared<int>(41);
+                own::weak_owner<int> weak = owner;
                 size_t calls{};
                 auto callback = graph.StoreExecute(
                     [owner, &calls](const auto&)
@@ -144,7 +145,7 @@ namespace
                 callback = {};
                 graph.Reset();
                 require(weak.expired(), "Graph reset retained declaration callback owners.");
-                auto last = std::make_shared<int>(53);
+                auto last = own::make_shared<int>(53);
                 weak = last;
                 graph.StoreExecute([last](const auto&) {});
                 last.reset();
@@ -154,7 +155,7 @@ namespace
             }
 
             require(pool.Initialize(resources, 1, 3, error), error);
-            std::shared_ptr<IRHICommandQueue> primary;
+            own::shared_owner<IRHICommandQueue> primary;
             require(resources.GetPrimaryGraphicsQueue(primary, error), error);
             require(resources.BeginFrame(error), error);
             pool.BeginFrame(0);
@@ -341,9 +342,9 @@ namespace
                     drawInputs.assign(4096, 0x12345678);
                 }
             };
-            auto arenaFrame = std::make_shared<ArenaFrame>(frameArenas.Acquire());
-            std::weak_ptr<ArenaFrame> pendingFrame = arenaFrame;
-            auto* pendingArena = arenaFrame->storage.get();
+            auto arenaFrame = own::make_shared<ArenaFrame>(frameArenas.Acquire());
+            own::weak_owner<ArenaFrame> pendingFrame = arenaFrame;
+            auto* pendingArena = arenaFrame->storage.operator->();
             batchDesc.lifetimeToken = arenaFrame;
             const std::array<uint32_t, 1> order{0};
             DX12CommandTranslator translator(pool, resources, primary->GetIdentity());
@@ -376,9 +377,9 @@ namespace
             const auto upload = resources.AllocateUpload(RHIUploadRequest{256, RHIUploadUsage::ConstantBuffer, 1});
             require(upload.IsValid() && upload.cpuAddress, "Upload lifetime probe allocation failed.");
             std::memset(upload.cpuAddress, 0x5a, 256);
-            std::shared_ptr<DX12CommandListPool> frozen;
+            own::shared_owner<DX12CommandListPool> frozen;
             require(pool.CreateTranslationPool(frozen, error), error);
-            auto asyncTranslator = std::make_shared<DX12CommandTranslator>(*frozen, resources, primary->GetIdentity());
+            auto asyncTranslator = own::make_shared<DX12CommandTranslator>(*frozen, resources, primary->GetIdentity());
             auto gate = releaseTranslation->get_future().share();
             RHISubmissionTicket gateTicket;
             require(GetRHISubmissionThread().Enqueue(
@@ -409,7 +410,7 @@ namespace
             staleDesc.lifetimeToken.reset();
             arenaFrame.reset();
             auto overlappingArena = frameArenas.Acquire();
-            require(!pendingFrame.expired() && overlappingArena.get() != pendingArena,
+            require(!pendingFrame.expired() && overlappingArena.operator->() != pendingArena,
                     "Pending RHI frame arena was reset or reused before translation.");
             require(pendingFrame.lock()->drawInputs.back() == 0x12345678,
                     "Pending frame arena contents changed while RHI was gated.");
@@ -441,19 +442,19 @@ namespace
             }
             std::string validation;
             require(resources.HasDebugMessageQueue() && resources.DrainDebugMessages(validation) == 0, validation);
-            std::shared_ptr<DX12CommandListPool> heldFork;
+            own::shared_owner<DX12CommandListPool> heldFork;
             require(pool.CreateTranslationPool(heldFork, error), error);
-            require(heldFork.get() != frozen.get(),
+            require(heldFork.operator->() != frozen.operator->(),
                     "Translation pool cache reused a fork with external lifetime owners.");
             frozen.reset();
             asyncTranslator.reset();
             GetRHISubmissionThread().CollectCompletedLifetimes(&resources);
             require(pendingFrame.expired(), "Completed GPU retirement still owns the arena frame.");
             auto recycledArena = frameArenas.Acquire();
-            require(recycledArena.get() == pendingArena && recycledArena->Resource(0).stats().resets > 0 &&
+            require(recycledArena.operator->() == pendingArena && recycledArena->Resource(0).stats().resets > 0 &&
                         recycledArena->Resource(0).stats().usedBytes == 0,
                     "GPU-retired arena was not bulk reset and reused.");
-            auto* cachedPool = heldFork.get();
+            auto* cachedPool = heldFork.operator->();
             heldFork.reset();
             // Snapshot capture seals one producer recording. Reuse is tested
             // on the next recording, as in the product frame path.
@@ -462,9 +463,9 @@ namespace
             pool.BeginFrame(0);
             require(resources.CreateRenderTargets(std::span<const RHITextureHandle>{targets}, nullptr).IsValid(),
                     "Reuse frame target creation failed.");
-            std::shared_ptr<DX12CommandListPool> reusedFork;
+            own::shared_owner<DX12CommandListPool> reusedFork;
             require(pool.CreateTranslationPool(reusedFork, error), error);
-            require(reusedFork.get() == cachedPool, "Exclusive retired translation fork was not reused.");
+            require(reusedFork.operator->() == cachedPool, "Exclusive retired translation fork was not reused.");
             uint64_t reusedUpload{};
             uint64_t reusedDescriptors{};
             require(reusedFork->GetTranslationRecording(reusedUpload, reusedDescriptors) &&
@@ -487,7 +488,7 @@ namespace
             batchDesc.backendGeneration = GetRHISubmissionThread().GetOwnerGeneration(&resources);
             batchDesc.uploadRecordingId = resources.GetCurrentUploadRecordingId();
             batchDesc.descriptorVersion = resources.GetDescriptorVersionToken();
-            batchDesc.lifetimeToken = std::make_shared<int>(2);
+            batchDesc.lifetimeToken = own::make_shared<int>(2);
             require(recorder.BeginRecording(recordingDesc, error), error);
             auto& first = recorder.AcquireEncoder(1);
             first.BindRenderTargets(parallelBinding);
@@ -518,7 +519,7 @@ namespace
             require(translated.GetTranslationStats().translationJobCount == 2 &&
                         translated.GetTranslationStats().commandCount == 7,
                     "Parallel translation did not run both targets exactly once.");
-            releaseTranslation = std::make_shared<std::promise<void>>();
+            releaseTranslation = own::make_shared<std::promise<void>>();
             auto notificationGate = releaseTranslation->get_future().share();
             require(GetRHISubmissionThread().Enqueue(
                         &resources, "parallel submission gate",
@@ -559,17 +560,17 @@ namespace
             frozen.reset();
             pool.Shutdown();
             {
-                auto nativeRecorder = std::make_shared<DX12QueueRecorder>(resources, 2);
-                auto ownedValidator = std::make_shared<SoftwareNativeProbeValidator>();
+                auto nativeRecorder = own::make_shared<DX12QueueRecorder>(resources, 2);
+                auto ownedValidator = own::make_shared<SoftwareNativeProbeValidator>();
                 RHISoftwareQueueOptions ownedOptions;
                 ownedOptions.translation = {RHICommandTranslationMode::Parallel, 2, 0};
                 RHISoftwareQueueRecorder ownedRecorder(nativeRecorder, ownedValidator, ownedOptions);
-                std::shared_ptr<IRHICommandQueue> ownedGraphics;
+                own::shared_owner<IRHICommandQueue> ownedGraphics;
                 require(ownedRecorder.WrapQueue(primary, ownedGraphics, error) &&
                             ownedGraphics->GetIdentity() == primary->GetIdentity(),
                         "Software owned queue changed the native queue identity.");
                 RHISoftwareQueueFactory ownedFactory(resources, ownedRecorder);
-                std::shared_ptr<IRHICommandQueue> ownedCompute;
+                own::shared_owner<IRHICommandQueue> ownedCompute;
                 require(ownedFactory.CreateQueue(RHIQueueKind::Compute, ownedCompute, error), error);
                 std::array<RHITextureHandle, 2> ownedTextures;
                 for (uint32_t index = 0; index < ownedTextures.size(); ++index)
@@ -594,9 +595,9 @@ namespace
                     const auto ownedBinding =
                         resources.CreateRenderTargets(std::span<const RHITextureHandle>{ownedTargets}, nullptr);
                     require(ownedBinding.IsValid(), "Owned software target creation failed.");
-                    auto ownedLifetime = std::make_shared<int>(3 + iteration);
-                    std::weak_ptr<int> pendingOwned = ownedLifetime;
-                    std::shared_ptr<IRHIQueueRecording> ownedRecording;
+                    auto ownedLifetime = own::make_shared<int>(3 + iteration);
+                    own::weak_owner<int> pendingOwned = ownedLifetime;
+                    ce::pooled_owner<IRHIQueueRecording> ownedRecording;
                     require(ownedRecorder.BeginRecording(ownedGraphics, 2, ownedLifetime, ownedRecording, error),
                             error);
                     auto& clear = ownedRecording->AcquireEncoder(0);
@@ -614,7 +615,7 @@ namespace
                     barriers.textureTransitions = ownedToCopySource;
                     copy.ResourceBarriers(barriers);
                     copy.CopyToReadback(readback, ownedTexture, 0, 0);
-                    std::shared_ptr<IRHIQueueCommandBatch> ownedBatch;
+                    ce::pooled_owner<IRHIQueueCommandBatch> ownedBatch;
                     require(ownedRecording->Finish(ownedBatch, error), error);
                     ownedRecording.reset();
                     ownedLifetime.reset();
@@ -676,7 +677,7 @@ namespace
             }
             {
                 ce::RenderArenaPool pendingPool;
-                std::weak_ptr<int> weak;
+                own::weak_owner<int> weak;
                 int executions = 0;
                 const void* address = nullptr;
                 {
@@ -684,7 +685,7 @@ namespace
                     std::array<uint32_t, 3> input{7, 11, 19};
                     const auto copy = pending.Copy<uint32_t>(input);
                     address = copy.data();
-                    auto owner = std::make_shared<int>(41);
+                    auto owner = own::make_shared<int>(41);
                     weak = owner;
                     pending.Add([owner, copy, &executions](ID3D12GraphicsCommandList*)
                     {

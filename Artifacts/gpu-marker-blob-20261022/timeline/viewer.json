@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "title": "GPU 마커·blob 복사 최적화",
+  "report": "../index.html",
+  "datasets": [
+    {
+      "id": "on-a-baseline",
+      "variant": "on-a",
+      "mode": "baseline",
+      "begin": 0,
+      "end": 15484.5182,
+      "events": 1513649,
+      "measurements": 758,
+      "cpu": "on-a-baseline.json",
+      "gpu": "on-a-baseline-gpu.json",
+      "label": "변경 후 · A · 기록 ON"
+    },
+    {
+      "id": "on-a-etw",
+      "variant": "on-a",
+      "mode": "etw",
+      "begin": 0,
+      "end": 42020.633,
+      "events": 1466431,
+      "measurements": 727,
+      "cpu": "on-a-etw.json",
+      "gpu": "on-a-etw-gpu.json",
+      "label": "변경 후 · A · ETW"
+    },
+    {
+      "id": "off-a-baseline",
+      "variant": "off-a",
+      "mode": "baseline",
+      "begin": 0,
+      "end": 15496.4609,
+      "events": 1522978,
+      "measurements": 764,
+      "cpu": "off-a-baseline.json",
+      "gpu": "off-a-baseline-gpu.json",
+      "label": "변경 전 · A · 기록 ON"
+    },
+    {
+      "id": "off-a-etw",
+      "variant": "off-a",
+      "mode": "etw",
+      "begin": 0,
+      "end": 41623.662,
+      "events": 1406711,
+      "measurements": 691,
+      "cpu": "off-a-etw.json",
+      "gpu": "off-a-etw-gpu.json",
+      "label": "변경 전 · A · ETW"
+    },
+    {
+      "id": "off-b-baseline",
+      "variant": "off-b",
+      "mode": "baseline",
+      "begin": 0,
+      "end": 15530.2419,
+      "events": 1549962,
+      "measurements": 780,
+      "cpu": "off-b-baseline.json",
+      "gpu": "off-b-baseline-gpu.json",
+      "label": "변경 전 · B · 기록 ON"
+    },
+    {
+      "id": "on-b-baseline",
+      "variant": "on-b",
+      "mode": "baseline",
+      "begin": 0,
+      "end": 15513.4085,
+      "events": 1603151,
+      "measurements": 810,
+      "cpu": "on-b-baseline.json",
+      "gpu": "on-b-baseline-gpu.json",
+      "label": "변경 후 · B · 기록 ON"
+    }
+  ]
+}

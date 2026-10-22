@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "XeSSUpscaler.h"
 
 #include <stdint.h>
@@ -210,14 +211,17 @@ XeSSUpscalerDX12::~XeSSUpscalerDX12()
     // A failed SDK destroy may still own live GPU objects. Keep the module and
     // context alive rather than unload code referenced by them. Explicit Shutdown
     // lets the host resolve the error and retry before destruction.
-    if (!Shutdown().IsSuccess()) (void)m_state.release();
+    if (!Shutdown().IsSuccess())
+    {
+        (void)new decltype(m_state)(std::move(m_state));
+    }
 }
 
 TemporalResult XeSSUpscalerDX12::QuerySupport(ID3D12Device* device, const wchar_t* runtimeDirectory)
 {
 #if defined(_WIN32) && CREATOR_ENABLE_XESS_SDK
     XeSSUpscalerDX12 probe;
-    probe.m_state = std::make_unique<XeSSUpscalerDX12State>();
+    probe.m_state = own::make_unique<XeSSUpscalerDX12State>();
     const auto result = probe.m_state->Load(device, runtimeDirectory);
     const auto destroyed = probe.Shutdown();
     return result.IsSuccess() && !destroyed.IsSuccess() ? destroyed : result;
@@ -231,7 +235,7 @@ TemporalResult XeSSUpscalerDX12::Initialize(ID3D12Device* device, const wchar_t*
 {
 #if defined(_WIN32) && CREATOR_ENABLE_XESS_SDK
     if (m_state) return { TemporalStatus::AlreadyInitialized };
-    m_state = std::make_unique<XeSSUpscalerDX12State>();
+    m_state = own::make_unique<XeSSUpscalerDX12State>();
     auto result = m_state->m_core.ValidateConfig(config);
     if (result.IsSuccess()) result = m_state->Load(device, runtimeDirectory);
     if (result.IsSuccess())
@@ -368,10 +372,13 @@ public:
     XeSSUpscalerBridgeDX12(DX12DeviceResources& resources, const XeSSUpscalerConfig& config,
         std::function<TemporalResult()> drain)
         : m_resources(resources), m_config(config), m_drain(std::move(drain)),
-          m_adapter(std::make_unique<XeSSUpscalerDX12>()) {}
+          m_adapter(own::make_unique<XeSSUpscalerDX12>()) {}
     ~XeSSUpscalerBridgeDX12() override
     {
-        if (!Shutdown().IsSuccess()) (void)m_adapter.release();
+        if (!Shutdown().IsSuccess())
+        {
+            (void)new decltype(m_adapter)(std::move(m_adapter));
+        }
     }
     XeSSUpscalerDX12& GetAdapter() { return *m_adapter; }
     TemporalResult QueryRenderExtent(TemporalQuality, TemporalExtent, TemporalExtent& extent) const override
@@ -441,19 +448,19 @@ private:
     DX12DeviceResources& m_resources;
     XeSSUpscalerConfig m_config;
     std::function<TemporalResult()> m_drain;
-    std::unique_ptr<XeSSUpscalerDX12> m_adapter;
+    own::unique_owner<XeSSUpscalerDX12> m_adapter;
 };
 }
 #endif
 
 TemporalResult CreateXeSSUpscalerDX12(DX12DeviceResources& resources, const wchar_t* runtimeDirectory,
     const XeSSUpscalerConfig& config, std::function<TemporalResult()> drain,
-    std::unique_ptr<ITemporalUpscaler>& upscaler)
+    own::unique_owner<ITemporalUpscaler>& upscaler)
 {
     if (upscaler) return { TemporalStatus::AlreadyInitialized };
     if (!drain) return { TemporalStatus::InvalidInput };
 #if defined(_WIN32) && CREATOR_ENABLE_XESS_SDK
-    auto bridge = std::make_unique<XeSSUpscalerBridgeDX12>(resources, config, std::move(drain));
+    auto bridge = own::make_unique<XeSSUpscalerBridgeDX12>(resources, config, std::move(drain));
     const auto result = bridge->GetAdapter().Initialize(resources.GetDevice(), runtimeDirectory, config);
     if (!result.IsSuccess()) return result;
     upscaler = std::move(bridge);
@@ -480,14 +487,17 @@ struct XeSSUpscalerVulkanState
 XeSSUpscalerVulkan::XeSSUpscalerVulkan() = default;
 XeSSUpscalerVulkan::~XeSSUpscalerVulkan()
 {
-    if (!Shutdown().IsSuccess()) (void)m_state.release();
+    if (!Shutdown().IsSuccess())
+    {
+        (void)new decltype(m_state)(std::move(m_state));
+    }
 }
 
 TemporalResult XeSSUpscalerVulkan::Load(const wchar_t* runtimeDirectory)
 {
 #if defined(_WIN32)
     if (m_state) return { TemporalStatus::AlreadyInitialized };
-    auto state = std::make_unique<XeSSUpscalerVulkanState>();
+    auto state = own::make_unique<XeSSUpscalerVulkanState>();
     auto result = state->m_core.Load(runtimeDirectory);
     if (!result.IsSuccess()) return result;
     auto& module = state->m_core.m_module;
@@ -681,11 +691,14 @@ class XeSSUpscalerBridgeVulkan final : public ITemporalUpscaler
 {
 public:
     XeSSUpscalerBridgeVulkan(VulkanDeviceResources& resources, const XeSSUpscalerConfig& config,
-        std::function<TemporalResult()> drain, std::unique_ptr<XeSSUpscalerVulkan> adapter)
+        std::function<TemporalResult()> drain, own::unique_owner<XeSSUpscalerVulkan> adapter)
         : m_resources(resources), m_config(config), m_drain(std::move(drain)), m_adapter(std::move(adapter)) {}
     ~XeSSUpscalerBridgeVulkan() override
     {
-        if (!Shutdown().IsSuccess()) (void)m_adapter.release();
+        if (!Shutdown().IsSuccess())
+        {
+            (void)new decltype(m_adapter)(std::move(m_adapter));
+        }
     }
     TemporalResult QueryRenderExtent(TemporalQuality, TemporalExtent, TemporalExtent& extent) const override
     {
@@ -766,14 +779,14 @@ private:
     VulkanDeviceResources& m_resources;
     XeSSUpscalerConfig m_config;
     std::function<TemporalResult()> m_drain;
-    std::unique_ptr<XeSSUpscalerVulkan> m_adapter;
+    own::unique_owner<XeSSUpscalerVulkan> m_adapter;
 };
 }
 #endif
 
 TemporalResult CreateXeSSUpscalerVulkan(VulkanDeviceResources& resources,
-    std::unique_ptr<XeSSUpscalerVulkan>& preparedRuntime, const XeSSUpscalerConfig& config,
-    std::function<TemporalResult()> drain, std::unique_ptr<ITemporalUpscaler>& upscaler)
+    own::unique_owner<XeSSUpscalerVulkan>& preparedRuntime, const XeSSUpscalerConfig& config,
+    std::function<TemporalResult()> drain, own::unique_owner<ITemporalUpscaler>& upscaler)
 {
     if (upscaler) return { TemporalStatus::AlreadyInitialized };
     if (!drain || !preparedRuntime) return { TemporalStatus::InvalidInput };
@@ -781,7 +794,7 @@ TemporalResult CreateXeSSUpscalerVulkan(VulkanDeviceResources& resources,
     const auto result = preparedRuntime->Initialize(resources.GetInstance(), resources.GetPhysicalDevice(),
         resources.GetDevice(), config);
     if (!result.IsSuccess()) return result;
-    upscaler = std::make_unique<XeSSUpscalerBridgeVulkan>(resources, config, std::move(drain), std::move(preparedRuntime));
+    upscaler = own::make_unique<XeSSUpscalerBridgeVulkan>(resources, config, std::move(drain), std::move(preparedRuntime));
     return result;
 #else
     return { TemporalStatus::BackendUnsupported };

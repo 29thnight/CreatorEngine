@@ -1,0 +1,258 @@
+[
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\container-reuse-20261021\\timeline\\after-all-events.csv",
+    "bytes": 6050940174,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\container-reuse-20261021\\after\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\container-reuse-20261021\\timeline\\after-kernel.csv",
+    "bytes": 620530338,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\container-reuse-20261021\\after\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\container-reuse-20261021\\timeline\\before-all-events.csv",
+    "bytes": 7038417676,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\container-reuse-20261021\\before\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\container-reuse-20261021\\timeline\\before-kernel.csv",
+    "bytes": 716430652,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\container-reuse-20261021\\before\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\container-reuse-isolated-20261021\\timeline\\off-a-all-events.csv",
+    "bytes": 7058842127,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\container-reuse-isolated-20261021\\off-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\container-reuse-isolated-20261021\\timeline\\off-a-kernel.csv",
+    "bytes": 704680691,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\container-reuse-isolated-20261021\\off-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\container-reuse-isolated-20261021\\timeline\\on-a-all-events.csv",
+    "bytes": 7571408486,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\container-reuse-isolated-20261021\\on-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\container-reuse-isolated-20261021\\timeline\\on-a-kernel.csv",
+    "bytes": 717844323,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\container-reuse-isolated-20261021\\on-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\node-declare-parallel-20261021\\timeline\\after-all-events.csv",
+    "bytes": 6787167771,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\node-declare-parallel-20261021\\after\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\node-declare-parallel-20261021\\timeline\\after-kernel.csv",
+    "bytes": 703925167,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\node-declare-parallel-20261021\\after\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\node-declare-parallel-20261021\\timeline\\before-all-events.csv",
+    "bytes": 6468471922,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\node-declare-parallel-20261021\\before\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\node-declare-parallel-20261021\\timeline\\before-kernel.csv",
+    "bytes": 633373278,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\node-declare-parallel-20261021\\before\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\owner-borrow-20261022\\timeline\\off-a-all-events.csv",
+    "bytes": 5599825429,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\owner-borrow-20261022\\off-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\owner-borrow-20261022\\timeline\\off-a-kernel.csv",
+    "bytes": 582373816,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\owner-borrow-20261022\\off-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\owner-borrow-20261022\\timeline\\on-a-all-events.csv",
+    "bytes": 11782835952,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\owner-borrow-20261022\\on-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\owner-borrow-20261022\\timeline\\on-a-kernel.csv",
+    "bytes": 996565874,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\owner-borrow-20261022\\on-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\ownership-update-20261022\\timeline\\off-a-all-events.csv",
+    "bytes": 5828309710,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\ownership-update-20261022\\off-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\ownership-update-20261022\\timeline\\off-a-kernel.csv",
+    "bytes": 610938925,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\ownership-update-20261022\\off-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\ownership-update-20261022\\timeline\\on-a-all-events.csv",
+    "bytes": 6070885100,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\ownership-update-20261022\\on-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\ownership-update-20261022\\timeline\\on-a-kernel.csv",
+    "bytes": 628961696,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\ownership-update-20261022\\on-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\packet-group-reuse-20261021\\timeline\\off-a-all-events.csv",
+    "bytes": 6400390409,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\packet-group-reuse-20261021\\off-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\packet-group-reuse-20261021\\timeline\\off-a-kernel.csv",
+    "bytes": 647986393,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\packet-group-reuse-20261021\\off-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\packet-group-reuse-20261021\\timeline\\on-a-all-events.csv",
+    "bytes": 6050338173,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\packet-group-reuse-20261021\\on-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\packet-group-reuse-20261021\\timeline\\on-a-kernel.csv",
+    "bytes": 631882171,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\packet-group-reuse-20261021\\on-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\packet-group-reuse-final-20261021\\timeline\\off-a-all-events.csv",
+    "bytes": 7873516709,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\packet-group-reuse-final-20261021\\off-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\packet-group-reuse-final-20261021\\timeline\\off-a-kernel.csv",
+    "bytes": 740179717,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\packet-group-reuse-final-20261021\\off-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\packet-group-reuse-final-20261021\\timeline\\on-a-all-events.csv",
+    "bytes": 8212218312,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\packet-group-reuse-final-20261021\\on-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\packet-group-reuse-final-20261021\\timeline\\on-a-kernel.csv",
+    "bytes": 761294211,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\packet-group-reuse-final-20261021\\on-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\scene-preparation-ownership-20261021\\timeline\\off-a-all-events.csv",
+    "bytes": 6557615288,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\scene-preparation-ownership-20261021\\off-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\scene-preparation-ownership-20261021\\timeline\\off-a-kernel.csv",
+    "bytes": 667908435,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\scene-preparation-ownership-20261021\\off-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\scene-preparation-ownership-20261021\\timeline\\on-a-all-events.csv",
+    "bytes": 7646803162,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\scene-preparation-ownership-20261021\\on-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  },
+  {
+    "path": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\scene-preparation-ownership-20261021\\timeline\\on-a-kernel.csv",
+    "bytes": 808741679,
+    "preservedEtls": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\scene-preparation-ownership-20261021\\on-a\\creator-robot.etl"
+    ],
+    "reason": "Regenerable ETW text dump; source ETL retained"
+  }
+]

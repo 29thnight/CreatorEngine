@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Ownership.h"
 #include "RHISoftwareCommandTypes.h"
 #include "../RenderArena.h"
 #include <string_view>
@@ -57,7 +58,7 @@ class RHISoftwareCommandList final
 {
   public:
     explicit RHISoftwareCommandList(uint64_t maxCommandBytes, uint64_t maxPayloadBytes,
-                                    std::shared_ptr<RHISoftwareRecordingBudget> budget = {});
+                                    own::shared_owner<RHISoftwareRecordingBudget> budget = {});
     ~RHISoftwareCommandList();
     RHISoftwareCommandList(const RHISoftwareCommandList&) = delete;
     RHISoftwareCommandList& operator=(const RHISoftwareCommandList&) = delete;
@@ -77,7 +78,7 @@ class RHISoftwareCommandList final
     friend class RHISoftwareEncoder;
     friend struct RHISoftwareRecordingStorage;
     friend class RHISoftwareRecorder;
-    void Reset(uint64_t commandBytes, uint64_t payloadBytes, const std::shared_ptr<RHISoftwareRecordingBudget>& budget);
+    void Reset(uint64_t commandBytes, uint64_t payloadBytes, const own::shared_owner<RHISoftwareRecordingBudget>& budget);
 
     struct Command
     {
@@ -269,7 +270,7 @@ class RHISoftwareCommandList final
     void MoveFrom(RHISoftwareCommandList&& other) noexcept;
 
     RHISoftwareCommandArena m_arena;
-    std::shared_ptr<RHISoftwareRecordingBudget> m_budget;
+    own::shared_owner<RHISoftwareRecordingBudget> m_budget;
     Command* m_head{};
     Command* m_tail{};
     uint64_t m_maxCommandBytes{};

@@ -43,7 +43,7 @@ struct AssetBundleLoadResult
     std::vector<assets::ModelAssetGeneration::Shared> models;
     std::vector<own::shared_owner<const Material>> materials;
     std::vector<own::shared_owner<const Texture>> textures;
-    std::vector<std::shared_ptr<FontAsset>> fonts;
+    std::vector<own::shared_owner<FontAsset>> fonts;
     own::shared_owner<TextureFramePins> textureImages;
     std::vector<PreparedTextureImageRequest> imageRequests;
     // Nonblocking, including for direct LoadAssetBundle result owners.
@@ -95,7 +95,7 @@ struct RuntimeTexturePublication final
     experiment::cooked::AssetSetManifest manifest{};
     std::vector<std::byte> manifestBytes{};
     own::shared_owner<const experiment::cooked::ArtifactByteSource> byteSource{};
-    std::shared_ptr<std::atomic<std::uint64_t>> latestRevision{};
+    own::shared_owner<std::atomic<std::uint64_t>> latestRevision{};
     std::uint64_t revision{};
     std::atomic<State> state{ State::Queued };
     // Written before Loading (release), then read through Snapshot (acquire).
@@ -502,8 +502,8 @@ public:
     // CPU SDF fonts use catalog GUID + normalized resolved path identity, never
     // the basename. Accepts a catalog GUID or a source path; an empty path
     // selects the bundled engine default.
-    std::shared_ptr<FontAsset> LoadFontShared(std::string_view path, std::string& error);
-    std::vector<std::pair<std::string, std::shared_ptr<FontAsset>>> SnapshotFonts() const;
+    own::shared_owner<FontAsset> LoadFontShared(std::string_view path, std::string& error);
+    std::vector<std::pair<std::string, own::shared_owner<FontAsset>>> SnapshotFonts() const;
     std::size_t SnapshotFontCount() const;
     std::uint64_t GetFontCacheRevision() const noexcept
     {
@@ -700,9 +700,9 @@ private:
 
 private:
     static constexpr std::size_t kMaxCachedFonts = 32u;
-    std::unordered_map<std::string, std::shared_ptr<FontAsset>> m_fonts;
+    std::unordered_map<std::string, own::shared_owner<FontAsset>> m_fonts;
     std::atomic<std::uint64_t> m_fontCacheRevision{ 1 };
-    std::shared_ptr<FontAsset> LoadFontFile(const file::path& path, std::string& error) const;
+    own::shared_owner<FontAsset> LoadFontFile(const file::path& path, std::string& error) const;
     bool ReloadCachedFont(const file::path& path, FileGuid guid, std::string& error);
     [[nodiscard]] own::shared_owner<const Texture> TryAcquireTexture(
         AssetDepot::AssetLink<Texture> link, const AssetDepot::TextureAssetVariant& variant);
@@ -924,7 +924,7 @@ private:
     {
         assets::ModelAssetGenerationCache::RetiredEntries models;
         material_graph::GenerationStore::RetiredEntries graphs;
-        std::unordered_map<std::string, std::shared_ptr<FontAsset>> fonts;
+        std::unordered_map<std::string, own::shared_owner<FontAsset>> fonts;
         DataContainer<Material> materials;
         std::unordered_map<FileGuid, asset_cache_detail::Entry<experiment::Material>> authoredMaterials;
         DataContainer<Texture> textures;
@@ -946,4 +946,3 @@ private:
 };
 
 static auto DataSystems = DataSystem::GetInstance();
-

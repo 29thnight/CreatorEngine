@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 
 #include "MaterialGraphSceneLookup.h"
 
@@ -65,18 +66,18 @@ class SceneRuntimeEffectsFrame
   private:
     friend class SceneRuntimeEffectsResources;
     IRenderDeviceServices* device_{};
-    std::shared_ptr<SceneRuntimeEffectPool> pool_;
-    std::shared_ptr<SceneRuntimeEffectBundle> bundle_;
+    own::shared_owner<SceneRuntimeEffectPool> pool_;
+    own::shared_owner<SceneRuntimeEffectBundle> bundle_;
     std::uint64_t recording_{}, descriptors_{}, lease_{};
     bool transmission_{};
     std::vector<SceneRuntimeEffectTile> tiles_;
-    std::shared_ptr<const LX::Runtime::GraphicsGeneration> depthCopy_;
+    own::shared_owner<const LX::Runtime::GraphicsGeneration> depthCopy_;
     RHIBindingTable inputs_, background_;
     RHIRenderTargetBinding depthTarget_;
     std::array<RHIRenderTargetBinding, 2> captureTargets_{};
     mutable std::mutex depthBindingMutex_;
     mutable std::map<std::uint64_t, RHIBindingTable> depthBindings_;
-    std::weak_ptr<const SceneRuntimeEffectsFrame> self_;
+    own::weak_owner<const SceneRuntimeEffectsFrame> self_;
     mutable const EnhancedRenderGraph* graph_{};
     mutable std::uint64_t graphEpoch_{};
     mutable std::array<RGHandle, 14> graphInputs_{};
@@ -88,7 +89,7 @@ class SceneRuntimeEffectsResources : private IRHIUploadTransactionListener
   public:
     bool Prepare(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection, bool transmission,
                  bool backgroundHasMedium, std::uint64_t effectBudget, std::uint64_t refractionBudget,
-                 std::shared_ptr<const SceneRuntimeEffectsFrame>& result, std::string& error);
+                 own::shared_owner<const SceneRuntimeEffectsFrame>& result, std::string& error);
     bool PreparationDeferred() const { return preparationDeferred_; }
     void ResetPreparationStatus() { preparationDeferred_ = false; }
     // An owner unwound without ShutdownAfterIdle must not leave a dangling
@@ -99,7 +100,7 @@ class SceneRuntimeEffectsResources : private IRHIUploadTransactionListener
   private:
     IRenderDeviceServices* device_{};
     LX::Runtime::GraphicsPipeline depthCopy_;
-    std::shared_ptr<SceneRuntimeEffectPool> pool_;
+    own::shared_owner<SceneRuntimeEffectPool> pool_;
     bool preparationDeferred_{};
     bool Initialize(const EnhancedFrameContext& context, std::string& error);
     void OnUploadSubmitted(std::uint64_t recording, RHICompletionPoint completion) override;

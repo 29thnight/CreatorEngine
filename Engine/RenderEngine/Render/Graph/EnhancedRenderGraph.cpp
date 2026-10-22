@@ -1,8 +1,8 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "../../RHI/RHISoftwareRecorder.h"
 #include "../../RHI/RHIProfilingContext.h"
 #include "../../../Utility_Framework/DynamicBitset.h"
 #include "EnhancedRenderGraph.h"
-#include "RGSetupTaskGraph.h"
 #include "../../../Utility_Framework/JobScheduler.h"
 #include "../../../Utility_Framework/WorkPartition.h"
 #include "../../RenderArena.h"
@@ -23,8 +23,8 @@ namespace
 
 namespace
 {
-    void AuditStructuralMiss(const std::string& current, const std::shared_ptr<const std::string>& previous,
-        const std::shared_ptr<const std::string>& alternate)
+    void AuditStructuralMiss(const std::string& current, const own::shared_owner<const std::string>& previous,
+        const own::shared_owner<const std::string>& alternate)
     {
         static const std::string prefix = []
         {
@@ -278,10 +278,7 @@ namespace
 RHITextureHandle EnhancedRenderGraph::ExecuteContext::ResolveHandle(RGHandle handle) const
 {
     if (nullptr == graph || !handle.IsValid()) return {};
-    if (graph->m_branch && graph->m_branch->merged)
-    {
-        return ExecuteContext{graph->m_branch->parent, encoder}.ResolveHandle(graph->MapBranchHandle(handle));
-    }
+
     handle = graph->LocalDeclarationHandle(handle);
     if (handle.index >= graph->m_resources.size()) return {};
     if (graph->m_scheduling == RGSchedulingMode::ExplicitVersioned && !graph->ValidVersionHandle(handle)) return {};
@@ -732,15 +729,11 @@ void EnhancedRenderGraph::Reset()
 {
     ce::profile_scope profile{ce::marker<"RenderGraphReset">()};
     RequireQueueIdle();
-    if (m_setupTasks)
-    {
-        m_setupTasks->RecycleForOwner();
-    }
+
     CancelDeclarationPackets();
-    if (!m_branch)
-    {
-        ReleaseResources();
-    }
+
+    ReleaseResources();
+
     m_packetArena.reset();
     m_declarationWork->nextPacket = 0;
     m_declarationPackets.clear();
@@ -772,21 +765,7 @@ void EnhancedRenderGraph::Reset()
     }
     m_passes = {};
     m_declarationData.reset();
-    m_declarationBranches.clear();
-    for (const auto& branch : m_declarationBranchPool)
-    {
-        branch->Reset();
-    }
-    m_nextDeclarationBranch = 0;
-    if (m_branch)
-    {
-        m_branch->merged = false;
-        m_branch->mapping.clear();
-        m_branch->parentResources.clear();
-        m_branch->baseVersions.clear();
-        m_branch->knownWriters.clear();
-        m_branch->baseResources = 0;
-    }
+
     m_finalStateRequirements.clear();
     m_executeOrder.clear();
     m_timingSignature.reset();
@@ -804,10 +783,7 @@ void EnhancedRenderGraph::Reset()
 
 RHIBufferHandle EnhancedRenderGraph::ResolveBufferHandle(RGHandle handle) const
 {
-    if (m_branch && m_branch->merged)
-    {
-        return m_branch->parent->ResolveBufferHandle(MapBranchHandle(handle));
-    }
+
     handle = LocalDeclarationHandle(handle);
     if (m_scheduling == RGSchedulingMode::ExplicitVersioned && !ValidVersionHandle(handle)) return {};
     return handle.IsValid() && handle.index < m_resources.size() ? m_resources[handle.index].buffer : RHIBufferHandle{};
@@ -833,16 +809,7 @@ RGHandle EnhancedRenderGraph::FindImportedBuffer(RHIBufferHandle buffer) const
     {
         return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(index, 0) : RGHandle{index};
     }
-    if (m_branch && !m_branch->merged)
-    {
-        auto& parent = *m_branch->parent;
-        std::lock_guard lock{parent.m_branchMutex};
-        const auto imported = parent.FindImportedBuffer(buffer);
-        if (imported.IsValid())
-        {
-            return LocalDeclarationHandle(imported);
-        }
-    }
+
     return {};
 }
 
@@ -866,16 +833,7 @@ RGHandle EnhancedRenderGraph::FindImportedTexture(RHITextureHandle texture) cons
     {
         return m_scheduling == RGSchedulingMode::ExplicitVersioned ? VersionHandle(index, 0) : RGHandle{index};
     }
-    if (m_branch && !m_branch->merged)
-    {
-        auto& parent = *m_branch->parent;
-        std::lock_guard lock{parent.m_branchMutex};
-        const auto imported = parent.FindImportedTexture(texture);
-        if (imported.IsValid())
-        {
-            return LocalDeclarationHandle(imported);
-        }
-    }
+
     return {};
 }
 
@@ -1109,7 +1067,7 @@ RGTransientPool::AliasHeapMemory EnhancedRenderGraph::GetAliasHeapMemory() const
     return result;
 }
 
-void RGTransientPool::AliasedGroup::TrackHeap(const std::shared_ptr<AliasHeapAccounting>& accounting)
+void RGTransientPool::AliasedGroup::TrackHeap(const own::shared_owner<AliasHeapAccounting>& accounting)
 {
     if (!heap || !accounting || m_accounting)
     {
@@ -1218,16 +1176,7 @@ bool EnhancedRenderGraph::HasDeclaredWriter(RGHandle resource, std::string_view 
 {
     resource = LocalDeclarationHandle(resource);
     if (!ValidVersionHandle(resource)) return false;
-    if (m_branch)
-    {
-        for (const auto& writer : m_branch->knownWriters)
-        {
-            if (writer.resource == resource.index && writer.name == producer)
-            {
-                return true;
-            }
-        }
-    }
+
     for (size_t index = 0; index < m_passes.size(); ++index)
     {
         const auto& pass = m_passes[index];
@@ -2441,7 +2390,7 @@ bool EnhancedRenderGraph::CreateAliasedTransients(std::string& outError)
             }
             descriptions.push_back(TransientDescription(m_resources[index]));
         }
-        std::shared_ptr<RGTransientPool::AliasedGroup> lease;
+        own::shared_owner<RGTransientPool::AliasedGroup> lease;
         if (m_transientPool)
         {
             auto& free = m_transientPool->freeAliasedGroups;
@@ -2465,7 +2414,7 @@ bool EnhancedRenderGraph::CreateAliasedTransients(std::string& outError)
         }
         if (!lease)
         {
-            lease = std::make_shared<RGTransientPool::AliasedGroup>();
+            lease = own::make_shared<RGTransientPool::AliasedGroup>();
             lease->owner = m_deviceServices;
             lease->allocation = group.allocation;
             lease->descriptions = std::move(descriptions);
@@ -2478,7 +2427,7 @@ bool EnhancedRenderGraph::CreateAliasedTransients(std::string& outError)
             auto& accounting = m_transientPool ? m_transientPool->aliasHeapAccounting : m_aliasHeapAccounting;
             if (!accounting)
             {
-                accounting = std::make_shared<RGTransientPool::AliasHeapAccounting>();
+                accounting = own::make_shared<RGTransientPool::AliasHeapAccounting>();
             }
             lease->TrackHeap(accounting);
             for (size_t member = 0; member < group.members.size(); ++member)
@@ -2662,49 +2611,32 @@ bool EnhancedRenderGraph::CreateTransients(std::string& outError)
 
 EnhancedRenderGraph::EnhancedRenderGraph(IRenderDeviceServices& services, RGSchedulingMode scheduling,
                                          RGOrderPolicy orderPolicy)
-    : EnhancedRenderGraph(services, scheduling, orderPolicy, false)
-{
-}
-
-EnhancedRenderGraph::EnhancedRenderGraph(IRenderDeviceServices& services, RGSchedulingMode scheduling,
-                                         RGOrderPolicy orderPolicy, bool declarationBranch)
     : m_deviceServices(&services), m_scheduling(scheduling), m_orderPolicy(orderPolicy)
 {
-    if (declarationBranch)
-    {
-        m_branch = std::make_unique<DeclarationBranchState>();
-    }
     // A live scene declares dozens of passes/resources per recording. Pass owns
     // several vectors; growing the outer array repeatedly also rebuilds their
     // checked-iterator proxies in Debug. These are initial capacities, not limits.
     // The METEOR scene graph alone records ~190 passes; 128 forced one full
     // relocation of every Pass per frame.
-    m_declarationWork = std::make_unique<DeclarationWork>();
+    m_declarationWork = own::make_unique<DeclarationWork>();
     m_resourceDeclarations.resize(512);
     m_passDeclarations.resize(512);
     m_declarationPackets.reserve(64);
-    m_resourceStorage.reserve(declarationBranch ? 64 : 512);
-    m_passStorage.reserve(declarationBranch ? 16 : 512);
+    m_resourceStorage.reserve(512);
+    m_passStorage.reserve(512);
     m_executeOrder.reserve(512);
     m_resourceEpoch = NextResourceEpoch();
-    if (!m_branch)
-    {
-        services.RegisterUploadTransactionListener(this);
-    }
+
+    services.RegisterUploadTransactionListener(this);
 }
 
 EnhancedRenderGraph::~EnhancedRenderGraph()
 {
-    if (m_setupTasks)
-    {
-        m_setupTasks->Drain();
-    }
+
     CancelDeclarationPackets();
-    if (!m_branch)
-    {
-        m_deviceServices->UnregisterUploadTransactionListener(this);
-        ReleaseResources();
-    }
+
+    m_deviceServices->UnregisterUploadTransactionListener(this);
+    ReleaseResources();
 }
 
 void EnhancedRenderGraph::OnUploadAccepted(uint64_t recording, RHICompletionPoint)
@@ -3819,20 +3751,20 @@ void EnhancedRenderGraph::CaptureStructuralDeclarations(StructuralSchedule& sche
 
 void EnhancedRenderGraph::InheritStructuralSchedule(const EnhancedRenderGraph& previous)
 {
-    std::array<std::shared_ptr<const StructuralSchedule>, MaxStructuralSchedules> schedules;
+    std::array<own::shared_owner<const StructuralSchedule>, MaxStructuralSchedules> schedules;
     schedules[0] = previous.m_structuralSchedule;
     schedules[1] = previous.m_alternateSchedule;
     std::copy(previous.m_additionalSchedules.begin(), previous.m_additionalSchedules.end(), schedules.begin() + 2);
     InheritStructuralSchedule(schedules);
 }
 
-void EnhancedRenderGraph::InheritStructuralSchedule(const std::shared_ptr<const StructuralSchedule>& previous)
+void EnhancedRenderGraph::InheritStructuralSchedule(const own::shared_owner<const StructuralSchedule>& previous)
 {
     InheritStructuralSchedule(previous, {});
 }
 
-void EnhancedRenderGraph::InheritStructuralSchedule(const std::shared_ptr<const StructuralSchedule>& previous,
-    const std::shared_ptr<const StructuralSchedule>& alternate)
+void EnhancedRenderGraph::InheritStructuralSchedule(const own::shared_owner<const StructuralSchedule>& previous,
+    const own::shared_owner<const StructuralSchedule>& alternate)
 {
     RequireQueueIdle();
     if (previous)
@@ -3845,7 +3777,7 @@ void EnhancedRenderGraph::InheritStructuralSchedule(const std::shared_ptr<const 
 }
 
 void EnhancedRenderGraph::InheritStructuralSchedule(
-    std::span<const std::shared_ptr<const StructuralSchedule>> schedules)
+    std::span<const own::shared_owner<const StructuralSchedule>> schedules)
 {
     InheritStructuralSchedule(schedules.empty() ? nullptr : schedules[0],
         schedules.size() < 2 ? nullptr : schedules[1]);
@@ -3855,18 +3787,14 @@ void EnhancedRenderGraph::InheritStructuralSchedule(
     }
 }
 
-std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule> EnhancedRenderGraph::SnapshotStructuralSchedule() const
+own::shared_owner<const EnhancedRenderGraph::StructuralSchedule> EnhancedRenderGraph::SnapshotStructuralSchedule() const
 {
     return m_structuralSchedule && m_structuralSchedule->key ? m_structuralSchedule : nullptr;
 }
 
 bool EnhancedRenderGraph::Compile(std::string& outError)
 {
-    if (m_branch)
-    {
-        outError = "A declaration branch must be merged before compilation";
-        return false;
-    }
+
     if (m_collectingDeclarationPackets || m_cancelledDeclarationPackets)
     {
         outError = "Declaration packets require successful FinishDeclarationPackets before Compile";
@@ -3878,19 +3806,7 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
         return false;
     }
     ce::profile_scope profile{ce::marker<"RenderGraphCompile">()};
-    if (m_setupTasks)
-    {
-        try
-        {
-            ce::profile_scope join{ce::marker<"RenderGraphSetupCompileJoin">()};
-            m_setupTasks->Join(RGSetupWaitPoint::Compile);
-        }
-        catch (const std::exception& failure)
-        {
-            outError = failure.what();
-            return false;
-        }
-    }
+
     // ★ 디바이스를 인자로 받지 않는다 (G-1). 생성자에서 받은 중립 service를
     //   그대로 쓰므로 호출부가 같은 값을 도로 넘기지 않는다.
     if (nullptr == m_deviceServices)
@@ -3973,34 +3889,13 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
             {
                 pass.culled = false;
             }
-            if (RGParallelSetupEnabled() && m_passes.size() >= 64 && ce::get_job_scheduler().is_running() &&
-                ce::get_job_scheduler().worker_count() > 1)
-            {
-                std::array<std::string, 2> errors;
-                std::array<bool, 2> valid{};
-                RGSetupTaskGraph validation{ce::get_job_scheduler()};
-                validation.AddTask(ce::marker<"RenderGraphCompileFinalStates">(), {}, RGSetupWaitPoint::Compile,
-                                   [&] { valid[0] = ValidateFinalStates(errors[0]); });
-                validation.AddTask(ce::marker<"RenderGraphCompileRepeated">(), {}, RGSetupWaitPoint::Compile,
-                                   [&] { valid[1] = ValidateRepeatedPasses(errors[1]); });
-                // Signature construction only reads sealed declarations. It does
-                // not allocate native resources or change pass reachability.
-                BuildTimingSignature();
-                validation.Join(RGSetupWaitPoint::Compile);
-                if (!valid[0] || !valid[1])
-                {
-                    outError = !valid[0] ? errors[0] : errors[1];
-                    return false;
-                }
-            }
-            else
-            {
+
                 if (!ValidateFinalStates(outError) || !ValidateRepeatedPasses(outError))
                 {
                     return false;
                 }
                 BuildTimingSignature();
-            }
+
             const auto structuralKey = m_timingSignature;
             AuditStructuralMiss(*structuralKey, m_structuralSchedule ? m_structuralSchedule->key : nullptr,
                 m_alternateSchedule ? m_alternateSchedule->key : nullptr);
@@ -4018,7 +3913,7 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
             if (structuralKey->size() <= 1024 * 1024 && m_passes.size() <= 4096)
             {
                 UpdateResourceUses();
-                auto schedule = std::make_shared<StructuralSchedule>();
+                auto schedule = own::make_shared<StructuralSchedule>();
                 CaptureStructuralDeclarations(*schedule);
                 schedule->key = structuralKey;
                 schedule->timingSignature = m_timingSignature;
@@ -4197,7 +4092,7 @@ void EnhancedRenderGraph::BuildTimingSignature()
         numbers({requirement.handle.index, requirement.handle.version,
             static_cast<uint64_t>(requirement.handle.kind), static_cast<uint64_t>(requirement.state)});
     }
-    m_timingSignature = std::make_shared<const std::string>(std::move(signature));
+    m_timingSignature = own::make_shared<const std::string>(std::move(signature));
 }
 
 // Compilation changes only reachability, so rewrite those fields in a copy
@@ -4217,7 +4112,7 @@ void EnhancedRenderGraph::PatchTimingSignatureReachability()
         const uint64_t culled = m_passes[i].culled;
         std::memcpy(signature.data() + m_signatureCulledOffsets[i], &culled, sizeof(culled));
     }
-    m_timingSignature = std::make_shared<const std::string>(std::move(signature));
+    m_timingSignature = own::make_shared<const std::string>(std::move(signature));
 }
 
 std::vector<EnhancedRenderGraph::QueueHint> EnhancedRenderGraph::MeasuredQueueHints(
@@ -4817,19 +4712,6 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
 
 bool EnhancedRenderGraph::Execute(std::string& outError)
 {
-    if (m_setupTasks)
-    {
-        try
-        {
-            ce::profile_scope join{ce::marker<"RenderGraphSetupExecuteJoin">()};
-            m_setupTasks->Join(RGSetupWaitPoint::Execute);
-        }
-        catch (const std::exception& failure)
-        {
-            outError = failure.what();
-            return false;
-        }
-    }
 
     const auto& executeOrder = GetExecuteOrder();
     if (!m_queueLease.expired() || m_queueExecutionAttempted)
@@ -5063,19 +4945,6 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
     const RHIRecordedBatchDesc& batchDesc, RHIRecordedBatch& outBatch, std::string& outError,
     RHISoftwareRecorder* software, RHISoftwareBatchDesc* softwareDesc, RHISoftwareBatch* softwareBatch)
 {
-    if (m_setupTasks)
-    {
-        try
-        {
-            ce::profile_scope join{ce::marker<"RenderGraphSetupExecuteJoin">()};
-            m_setupTasks->Join(RGSetupWaitPoint::Execute);
-        }
-        catch (const std::exception& failure)
-        {
-            outError = failure.what();
-            return false;
-        }
-    }
 
     const auto finalize = [&](std::span<const uint32_t> order)
     {
@@ -5273,7 +5142,7 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
     };
     struct CachedRecordingPlan
     {
-        std::shared_ptr<const StructuralSchedule> schedule;
+        own::shared_owner<const StructuralSchedule> schedule;
         uint32_t workers{0}, waveCount{1};
         bool balanced{false};
         std::vector<RecordingShape> shapes;
@@ -5302,7 +5171,7 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
     {
         for (const auto& entry : cachedPlans)
         {
-            if (!entry || entry->schedule != m_activeStructuralSchedule || entry->workers != workers ||
+            if (!entry || entry->schedule.operator->() != m_activeStructuralSchedule.operator->() || entry->workers != workers ||
                 entry->shapes.size() != unitCount)
             {
                 continue;
@@ -5454,7 +5323,7 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
                 const auto criticalWork =
                     [&](const std::vector<uint32_t>& targets, const std::vector<uint32_t>& waves, uint32_t count)
                 {
-                    RHIRecordingTaskGraph graph;
+                    auto& graph = m_recordingTrialGraph;
                     if (kDependencyRecordingEnabled &&
                         RHIBuildRecordingTaskGraph(targets, waves, unitPasses, costs, recordingPasses, workers,
                                                    graph) &&
@@ -5601,11 +5470,11 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
     const auto& recordingPolicy = RHIRecordingPolicy::Get();
     const bool dependencyRecording = kDependencyRecordingEnabled &&
         selectedPlan->taskGraph.ReplacesWaveJoins() && !recordingSideEffects;
-    std::shared_ptr<RHIRecordingDiagnostics> recordingDiagnostics;
+    own::shared_owner<RHIRecordingDiagnostics> recordingDiagnostics;
     if (recordingPolicy.timingEnabled)
     {
         ce::profile_scope profile{ce::marker<"RenderCommandRecord.Diagnostics">()};
-        recordingDiagnostics = std::make_shared<RHIRecordingDiagnostics>();
+        recordingDiagnostics = own::make_shared<RHIRecordingDiagnostics>();
         recordingDiagnostics->frameId = batchDesc.frameId;
         recordingDiagnostics->timingEnabled = true;
         recordingDiagnostics->dependencyGraph = dependencyRecording;
@@ -5640,7 +5509,7 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
             {
                 if (!recordingDiagnostics->jobTimingsTruncated)
                 {
-                    recordingDiagnostics->jobs = std::make_shared<job_graph_diagnostics>();
+                    recordingDiagnostics->jobs = own::make_shared<job_graph_diagnostics>();
                 }
                 auto& topology = recordingDiagnostics->topology;
                 topology.truncated = recordingDiagnostics->unitTimingsTruncated ||
@@ -5674,7 +5543,7 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
                     {
                         unitPasses.push_back(executeOrder[unit.order]);
                     }
-                    RHIRecordingTaskGraph diagnosticGraph;
+                    auto& diagnosticGraph = m_recordingDiagnosticGraph;
                     const bool matches = RHIBuildRecordingTaskGraph(unitWorker, unitWave, unitPasses, {},
                         recordingPasses, workers, diagnosticGraph, &topology) &&
                         std::ranges::equal(nodes, diagnosticGraph.nodes, [](const auto& left, const auto& right)
@@ -6033,7 +5902,7 @@ uint32_t EnhancedRenderGraph::GetPassBarrierCount(RGPassId pass) const
         planned.bufferTransitions.size() + planned.uavBarriers.size() +
         planned.uavBufferBarriers.size() + planned.finalTransitions.size() + planned.finalBufferTransitions.size() +
         planned.aliasTextures.size() + planned.aliasBuffers.size() + planned.poisonBuffers.size();
-    const auto phaseCount = [](const std::vector<PhaseBarrierPlan>& plans)
+    const auto phaseCount = [](const PhaseBarrierPlans& plans)
     {
         uint64_t total = 0;
         for (const auto& phase : plans)

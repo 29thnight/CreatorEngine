@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "TemporalDeviceDX12.h"
 #include "../../Render/Temporal/TemporalRuntimeControl.h"
 #include "../../../Utility_Framework/StandardLibrary.h"
@@ -5,7 +6,7 @@
 namespace
 {
     std::mutex g_mutex;
-    std::weak_ptr<TemporalDeviceDX12> g_device;
+    own::weak_owner<TemporalDeviceDX12> g_device;
 }
 TemporalDeviceDX12::~TemporalDeviceDX12()
 {
@@ -38,7 +39,7 @@ bool HasTemporalDeviceDX12()
     std::lock_guard lock(g_mutex);
     return !g_device.expired();
 }
-std::shared_ptr<TemporalDeviceDX12> AcquireTemporalDeviceDX12(uint32_t flags,
+own::shared_owner<TemporalDeviceDX12> AcquireTemporalDeviceDX12(uint32_t flags,
     LUID adapterLuid, TemporalResult& result)
 {
     std::lock_guard lock(g_mutex);
@@ -63,7 +64,7 @@ std::shared_ptr<TemporalDeviceDX12> AcquireTemporalDeviceDX12(uint32_t flags,
         (settings.requestedUpscaler == TemporalProvider::None &&
             settings.requestedFrameGenerator == TemporalProvider::None)))
     { result = { TemporalStatus::NotQueried }; return {}; }
-    auto owner = std::make_shared<TemporalDeviceDX12>();
+    auto owner = own::make_shared<TemporalDeviceDX12>();
     const bool useDlss = editorDlss || requestReflex || requestSpatial || (settings.enabled &&
         (settings.requestedUpscaler == TemporalProvider::Dlss ||
             (control.playerLatencyHostRegistered && settings.requestedFrameGenerator == TemporalProvider::Dlss)));
@@ -84,7 +85,7 @@ std::shared_ptr<TemporalDeviceDX12> AcquireTemporalDeviceDX12(uint32_t flags,
         g_device = owner;
         return owner;
     }
-    owner->session = std::make_shared<DlssTemporalAdapter>();
+    owner->session = own::make_shared<DlssTemporalAdapter>();
     DlssInitialization init;
     init.pluginDirectory = settings.runtimeDirectory;
     init.projectId = settings.dlssProjectId;

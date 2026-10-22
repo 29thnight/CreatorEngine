@@ -1,0 +1,48 @@
+{
+  "scope": "Actual current implementation and remaining initial blob snapshot; measured effects are separate.",
+  "findings": [
+    {
+      "path": "Engine/EngineDiagnostics/ProfileMarker.cpp",
+      "lines": [
+        89
+      ],
+      "behavior": "Bounded 4096-entry TLS cache, at most 16 probes. Hits compare immutable registered names and return IDs without global lock or key-string allocation. Misses retain original registry semantics."
+    },
+    {
+      "path": "Engine/RenderEngine/Assets/ModelAssetGeneration.h",
+      "lines": [
+        68
+      ],
+      "behavior": "Draw and RHI handle copies retain immutable blob metadata instead of copying three strings. Blob() returns a borrowed const reference under the owning handle."
+    },
+    {
+      "path": "Engine/RenderEngine/Assets/ModelAssetGeneration.cpp",
+      "lines": [
+        30
+      ],
+      "behavior": "Initial handle construction still snapshots the descriptor blob; subsequent copies share it. No descriptor/frame-arena pointer is retained."
+    },
+    {
+      "path": "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp",
+      "lines": [
+        7898,
+        7899
+      ],
+      "behavior": "Collection output storage persists on the render thread and is reused; existing pending/fence gates still control collection and submission."
+    },
+    {
+      "path": "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp",
+      "lines": [
+        8007
+      ],
+      "behavior": "GPU scope suffix uses a stack buffer; marker spelling and ordinal are preserved."
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp",
+      "lines": [
+        1490
+      ],
+      "behavior": "Retains timing strings and copies only changed names; slice names use the same content check."
+    }
+  ]
+}

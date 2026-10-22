@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "MaterialGraphSceneRuntimeEffects.h"
 
 #include "RHI/RHIShaderCompiler.h"
@@ -77,7 +78,7 @@ struct SceneRuntimeEffectPool
         bool accepted{}, nativeConfirmed{};
     };
 
-    std::shared_ptr<SceneRuntimeEffectBundle> Acquire(std::uint32_t width, std::uint32_t height, bool transmission,
+    own::shared_owner<SceneRuntimeEffectBundle> Acquire(std::uint32_t width, std::uint32_t height, bool transmission,
                                                       std::uint64_t recording, std::uint64_t effectBudget,
                                                       std::uint64_t snapshotBudget, std::uint64_t scratch)
     {
@@ -91,7 +92,7 @@ struct SceneRuntimeEffectPool
                    (!transmission || (bundle->width == width && bundle->height == height));
         };
         auto found = std::find_if(bundles.begin(), bundles.end(), matches);
-        const auto reusable = found == bundles.end() ? std::shared_ptr<SceneRuntimeEffectBundle>{} : *found;
+        const auto reusable = found == bundles.end() ? own::shared_owner<SceneRuntimeEffectBundle>{} : *found;
         const auto extraEffects = scratch + (reusable ? 0 : requiredEffects);
         const auto extraSnapshots = reusable ? 0 : requiredSnapshots;
         const auto fits = [&] {
@@ -102,7 +103,7 @@ struct SceneRuntimeEffectPool
         for (auto it = bundles.begin(); it != bundles.end();)
         {
             const auto& bundle = *it;
-            if (!bundle->busy && bundle != reusable && (!fits() || !matches(bundle)))
+            if (!bundle->busy && bundle.operator->() != reusable.operator->() && (!fits() || !matches(bundle)))
             {
                 // GPU 완료가 확인된 lease만 무효화한다. 이전 표시 프레임의
                 // HDR에는 손대지 않고 효과 scratch의 중복 소유만 끝낸다.
@@ -124,7 +125,7 @@ struct SceneRuntimeEffectPool
         auto bundle = reusable;
         if (!bundle)
         {
-            bundle = std::make_shared<SceneRuntimeEffectBundle>(device);
+            bundle = own::make_shared<SceneRuntimeEffectBundle>(device);
             bundle->width = width;
             bundle->height = height;
             bundle->transmission = transmission;
@@ -146,7 +147,7 @@ struct SceneRuntimeEffectPool
         return bundle;
     }
 
-    void Abandon(const std::shared_ptr<SceneRuntimeEffectBundle>& bundle, std::uint64_t lease)
+    void Abandon(const own::shared_owner<SceneRuntimeEffectBundle>& bundle, std::uint64_t lease)
     {
         std::lock_guard lock(mutex);
         if (bundle->lease.load() != lease || bundle->completion)
@@ -164,7 +165,7 @@ struct SceneRuntimeEffectPool
         bundle->Release();
         effectBytes -= bundle->effectBytes;
         snapshotBytes -= bundle->snapshotBytes;
-        std::erase(bundles, bundle);
+        std::erase_if(bundles, [&](const auto& value) { return value.operator->() == bundle.operator->(); });
     }
 
     void Submitted(std::uint64_t recording, RHICompletionPoint completion)
@@ -184,7 +185,7 @@ struct SceneRuntimeEffectPool
         }
     }
 
-    void Publish(const std::shared_ptr<SceneRuntimeEffectBundle>& bundle, std::uint64_t lease,
+    void Publish(const own::shared_owner<SceneRuntimeEffectBundle>& bundle, std::uint64_t lease,
                  RHICompletionPoint completion)
     {
         std::lock_guard lock(mutex);
@@ -218,7 +219,7 @@ struct SceneRuntimeEffectPool
         RetireUploads();
     }
 
-    void Confirm(const std::shared_ptr<SceneRuntimeEffectBundle>& bundle, std::uint64_t lease,
+    void Confirm(const own::shared_owner<SceneRuntimeEffectBundle>& bundle, std::uint64_t lease,
                  RHICompletionPoint completion)
     {
         std::lock_guard lock(mutex);
@@ -309,7 +310,7 @@ struct SceneRuntimeEffectPool
 
     IRenderDeviceServices& device;
     std::mutex mutex;
-    std::vector<std::shared_ptr<SceneRuntimeEffectBundle>> bundles;
+    std::vector<own::shared_owner<SceneRuntimeEffectBundle>> bundles;
     std::map<std::uint64_t, UploadReservation> uploads;
     std::uint64_t effectBytes{}, snapshotBytes{}, uploadBytes{}, completed{};
 };
@@ -359,7 +360,7 @@ bool SceneRuntimeEffectsResources::Initialize(const EnhancedFrameContext& contex
         return false;
     }
     device_ = context.resources;
-    pool_ = std::make_shared<SceneRuntimeEffectPool>(*device_);
+    pool_ = own::make_shared<SceneRuntimeEffectPool>(*device_);
     device_->RegisterUploadTransactionListener(this);
     return true;
 }
@@ -367,7 +368,7 @@ bool SceneRuntimeEffectsResources::Initialize(const EnhancedFrameContext& contex
 bool SceneRuntimeEffectsResources::Prepare(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection,
                                            bool transmission, bool backgroundHasMedium, std::uint64_t effectBudget,
                                            std::uint64_t refractionBudget,
-                                           std::shared_ptr<const SceneRuntimeEffectsFrame>& result, std::string& error)
+                                           own::shared_owner<const SceneRuntimeEffectsFrame>& result, std::string& error)
 {
     ResetPreparationStatus();
     const auto count = std::uint64_t(context.width) * context.height;
@@ -387,7 +388,7 @@ bool SceneRuntimeEffectsResources::Prepare(const EnhancedFrameContext& context, 
     {
         return false;
     }
-    auto candidate = std::make_shared<SceneRuntimeEffectsFrame>();
+    auto candidate = own::make_shared<SceneRuntimeEffectsFrame>();
     candidate->device_ = device_;
     candidate->recording_ = device_->GetCurrentUploadRecordingId();
     candidate->descriptors_ = device_->GetDescriptorVersionToken();

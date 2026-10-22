@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 
 #include "FrameCameraSnapshot.h"
 #include "MaterialGraphInstancePins.h"
@@ -62,8 +63,8 @@ struct SceneDrawInput
     EnhancedMaterialCoverage coverage;
     SceneCoverage queue{};
     float viewDepth{};
-    std::shared_ptr<const MeshSurfacePlan> geometry;
-    std::shared_ptr<const MeshSurfacePlan> previousGeometry;
+    own::shared_owner<const MeshSurfacePlan> geometry;
+    own::shared_owner<const MeshSurfacePlan> previousGeometry;
 };
 
 // One selected Scene view. No proxy, Material, Camera, mutable mesh bytes or
@@ -103,6 +104,11 @@ class SceneViewInput
     own::shared_owner<const Instance> MaterialOwner(const SceneDrawInput& draw) const
     {
         return materialPins_->Owner(draw.materialPinIndex);
+    }
+    // Immediate preparation borrows the immutable instance; this input pins the table.
+    own::local_view<const Instance> MaterialBorrow(const SceneDrawInput& draw) const
+    {
+        return materialPins_->Borrow(draw.materialPinIndex);
     }
     const own::shared_owner<InstanceFramePins>& MaterialPins() const { return materialPins_; }
 

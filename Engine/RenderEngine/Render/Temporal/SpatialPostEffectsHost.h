@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 #include "SpatialPostEffects.h"
 #include "../Graph/EnhancedRenderGraph.h"
 #include "../../../Utility_Framework/StandardLibrary.h"
@@ -28,5 +29,5 @@ public:
 
 private:
     struct State;
-    std::unique_ptr<State> m_state;
+    own::unique_owner<State> m_state;
 };

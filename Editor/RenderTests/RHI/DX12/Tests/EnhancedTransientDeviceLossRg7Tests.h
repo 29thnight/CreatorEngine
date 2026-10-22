@@ -1,3 +1,4 @@
+#include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
 
 namespace
@@ -38,8 +39,8 @@ namespace
         Rg7FailureServices resources;
         RGTransientPool cache;
         Rg7DeviceLossPool pool;
-        std::shared_ptr<EnhancedRenderGraph> graph;
-        std::weak_ptr<EnhancedRenderGraph> retained;
+        own::shared_owner<EnhancedRenderGraph> graph;
+        own::weak_owner<EnhancedRenderGraph> retained;
         Microsoft::WRL::ComPtr<ID3D12Fence> gate;
         std::string error;
         const auto cleanup = [&]
@@ -92,7 +93,7 @@ namespace
                 throw std::runtime_error(error);
             }
             pool.BeginFrame(0);
-            graph = std::make_shared<EnhancedRenderGraph>(resources, RGSchedulingMode::ExplicitVersioned);
+            graph = own::make_shared<EnhancedRenderGraph>(resources, RGSchedulingMode::ExplicitVersioned);
             graph->SetTransientPool(&cache);
             graph->SetTransientAliasing(true);
             graph->SetParallelRecordCostThreshold(0);

@@ -229,7 +229,7 @@ namespace
         }
 
         uint64_t OpenSharedTexture(void* sharedHandle,
-            std::shared_ptr<RHIDisplayConsumerLease> consumerLease) override
+            own::shared_owner<RHIDisplayConsumerLease> consumerLease) override
         {
             return m_renderer
                 ? m_renderer->OpenSharedTexture(sharedHandle, std::move(consumerLease)) : 0;

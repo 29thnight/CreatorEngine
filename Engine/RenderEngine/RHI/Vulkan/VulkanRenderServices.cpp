@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "VulkanDeviceResources.h"
 #include "VulkanFormat.h"
 #include "VulkanResourceState.h"
@@ -309,7 +310,7 @@ struct VulkanTextureCache::Impl
     }
 };
 
-VulkanTextureCache::VulkanTextureCache() : m_impl(std::make_unique<Impl>()) {}
+VulkanTextureCache::VulkanTextureCache() : m_impl(own::make_unique<Impl>()) {}
 VulkanTextureCache::~VulkanTextureCache() { Shutdown(); }
 
 bool VulkanTextureCache::Initialize(VulkanDeviceResources* resources, std::string& outError)
@@ -761,7 +762,7 @@ struct VulkanMeshCache::Impl
     }
 };
 
-VulkanMeshCache::VulkanMeshCache() : m_impl(std::make_unique<Impl>()) {}
+VulkanMeshCache::VulkanMeshCache() : m_impl(own::make_unique<Impl>()) {}
 VulkanMeshCache::~VulkanMeshCache() { Shutdown(); }
 
 bool VulkanMeshCache::Initialize(VulkanDeviceResources* resources,
@@ -2109,7 +2110,7 @@ RHIEncoder& VulkanDeviceResources::GetImmediateEncoder()
     AccumulateEncoderDiagnostics();
     if (!m_encoder)
     {
-        m_encoder = std::make_unique<VulkanEncoder>(VK_NULL_HANDLE, nullptr);
+        m_encoder = own::make_unique<VulkanEncoder>(VK_NULL_HANDLE, nullptr);
     }
     m_encoder->Rebind(
         current, m_pipelineCache, &m_resourceTable, &m_renderTargetTables[m_frameIndex],

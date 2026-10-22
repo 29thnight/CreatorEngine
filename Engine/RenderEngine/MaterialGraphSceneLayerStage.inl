@@ -1,11 +1,12 @@
+#include "../Utility_Framework/Ownership.h"
 // Ordered layer resources, command production and capture raster.
-void SceneHost::LayerStage::DeclareForwardGBuffer(const own::shared_owner<const FrameInput>& prepared,
+void SceneHost::LayerStage::DeclareForwardGBuffer(const own::shared_owner<const Frame>& prepared,
                                                   EnhancedRenderGraph& graph,
                                                   const SceneSurfaceTargets::Outputs& opaque,
                                                   const SceneShadingInputs& commands, std::size_t index) const
 {
 
-    const auto frame = prepared;
+    const auto& frame = prepared;
     if (!this->forwardGbuffer.depth.IsValid())
     {
         RGTextureDesc desc;
@@ -32,7 +33,8 @@ void SceneHost::LayerStage::DeclareForwardGBuffer(const own::shared_owner<const 
     graph.AddPass("METEOR.Blended.DepthCopy",
                   {{opaque.depth, RHIResourceState::CopySource, RGAccessMode::Read},
                    {copiedDepth, RHIResourceState::CopyDest, RGAccessMode::Write}},
-                  [this, frame, opaque, copiedDepth](const auto& execution) {
+                  [this, frame = frame, opaque, copiedDepth](const auto& execution)
+                  {
                       frame->CheckCurrent(execution.graph);
                       execution.encoder->CopyResource(execution.ResolveHandle(copiedDepth),
                                                       execution.ResolveHandle(opaque.depth));
@@ -66,60 +68,63 @@ void SceneHost::LayerStage::DeclareForwardGBuffer(const own::shared_owner<const 
         graph, uses, [&](const auto& draw) { return draw.inputIndex == index && draw.program->hasSurface; },
         commands.layers.layer);
     NormalizeSceneReads(graph, uses);
-    graph.AddPass("METEOR.Blended.Surface", uses, [this, frame, inputs, index](const auto& execution) {
-        frame->CheckCurrent(execution.graph);
-        std::array<RHITextureHandle, 5> colors;
-        const auto handles = Colors(inputs);
-        for (unsigned i = 0; i < colors.size(); ++i)
+    graph.AddPass(
+        "METEOR.Blended.Surface", uses,
+        [this, frame = frame, inputs, index](const auto& execution)
         {
-            colors[i] = execution.ResolveHandle(handles[i]);
-        }
-        RHIRenderTargetBinding targets;
-        {
-            std::lock_guard lock(this->forwardTargetMutex);
-            if (!this->forwardTargets.IsValid())
+            frame->CheckCurrent(execution.graph);
+            std::array<RHITextureHandle, 5> colors;
+            const auto handles = Colors(inputs);
+            for (unsigned i = 0; i < colors.size(); ++i)
             {
-                const auto depth =
-                    RHIDepthTargetDesc::Depth(execution.ResolveHandle(inputs.depth), RHIFormat::D32Float);
-                this->forwardTargets = frame->device->CreateRenderTargets(colors, &depth);
+                colors[i] = execution.ResolveHandle(handles[i]);
             }
-            targets = this->forwardTargets;
-        }
-        if (!targets.IsValid())
-        {
-            throw std::runtime_error("METEOR Scene transmission GBuffer binding failed.");
-        }
-        auto& encoder = *execution.encoder;
-        encoder.BindRenderTargets(targets);
-        const float clear[]{0, 0, 0, 0};
-        encoder.ClearRenderTargets(targets, clear);
-        encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
-        encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-        for (const auto& draw : frame->RasterDrawsFor())
-        {
-            if (draw.inputIndex != index || !draw.program->hasSurface)
+            RHIRenderTargetBinding targets;
             {
-                continue;
+                std::lock_guard lock(this->forwardTargetMutex);
+                if (!this->forwardTargets.IsValid())
+                {
+                    const auto depth =
+                        RHIDepthTargetDesc::Depth(execution.ResolveHandle(inputs.depth), RHIFormat::D32Float);
+                    this->forwardTargets = frame->device->CreateRenderTargets(colors, &depth);
+                }
+                targets = this->forwardTargets;
             }
-            encoder.SetPipeline(RHIBindPoint::Graphics,
-                                frame->RasterPipeline(draw, draw.program->gbuffer[draw.doubleSided].GetHandle()));
-            std::string error;
-            if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
+            if (!targets.IsValid())
             {
-                throw std::runtime_error(error);
+                throw std::runtime_error("METEOR Scene transmission GBuffer binding failed.");
             }
-            encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
-            frame->BindLayerGeometry(encoder, draw);
-            frame->DrawLayerGeometry(encoder, draw);
-        }
-    });
+            auto& encoder = *execution.encoder;
+            encoder.BindRenderTargets(targets);
+            const float clear[]{0, 0, 0, 0};
+            encoder.ClearRenderTargets(targets, clear);
+            encoder.SetViewportAndScissor(frame->input->View().width, frame->input->View().height);
+            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+            for (const auto& draw : frame->RasterDrawsFor())
+            {
+                if (draw.inputIndex != index || !draw.program->hasSurface)
+                {
+                    continue;
+                }
+                encoder.SetPipeline(RHIBindPoint::Graphics,
+                                    frame->RasterPipeline(draw, draw.program->gbuffer[draw.doubleSided].GetHandle()));
+                std::string error;
+                if (!RenderBindingCache::Bind(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings, error))
+                {
+                    throw std::runtime_error(error);
+                }
+                encoder.SetConstantBuffer(RHIBindPoint::Graphics, 0, draw.constants);
+                frame->BindLayerGeometry(encoder, draw);
+                frame->DrawLayerGeometry(encoder, draw);
+            }
+        });
 }
 
 bool SceneHost::LayerStage::PrepareBlended(const FrameInput& frame,
-                                           const std::shared_ptr<const SceneLookupFrame>& alphaLookup,
+                                           const own::shared_owner<const SceneLookupFrame>& alphaLookup,
                                            bool hasRuntimeEffects,
-                                           const std::shared_ptr<const LX::Runtime::ComputeGeneration>& generation,
-                                           std::string& error)
+                                           const own::shared_owner<const LX::Runtime::ComputeGeneration>& generation,
+                                           IndirectMaterialBatchPool& batches, std::string& error)
 {
     // Prepared from the sealed input while the owner prepared native resources.
     // Capture/transmission boundaries below still split adjacent sorted runs.
@@ -157,7 +162,7 @@ bool SceneHost::LayerStage::PrepareBlended(const FrameInput& frame,
              0x0800u) != 0;
         for (unsigned reference = 0; reference != 2; ++reference)
         {
-            auto blendedCommands = std::make_shared<IndirectMaterialBatch>();
+            auto blendedCommands = batches.Acquire();
             blendedCommands->name = "METEOR.Scene.Commands.Blended." + std::to_string(range.inputs.front()) +
                                     (reference ? ".Reference" : ".Color");
             blendedCommands->device = frame.device;
@@ -180,9 +185,8 @@ bool SceneHost::LayerStage::PrepareBlended(const FrameInput& frame,
                     const auto current = draw.program->blendedColor[draw.doubleSided].GetHandle();
                     if (blendedCommands->buckets.empty())
                     {
-                        IndirectMaterialBatch::Bucket bucket;
+                        auto& bucket = blendedCommands->AppendBucket();
                         bucket.representative = &draw - frame.draws.data();
-                        blendedCommands->buckets.push_back(std::move(bucket));
                         pipeline = current;
                     }
                     if (pipeline != current)
@@ -231,8 +235,8 @@ bool SceneHost::LayerStage::PrepareBlended(const FrameInput& frame,
     return true;
 }
 
-SceneLayerWork SceneHost::LayerStage::Declare(const own::shared_owner<const FrameInput>& frame,
-                                              EnhancedRenderGraph& graph, RGHandle list) const
+SceneLayerWork SceneHost::LayerStage::Declare(const own::shared_owner<const Frame>& frame, EnhancedRenderGraph& graph,
+                                              RGHandle list) const
 {
     if (!frame || frame->draws.empty())
     {

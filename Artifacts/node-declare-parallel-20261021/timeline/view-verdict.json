@@ -1,0 +1,119 @@
+{
+  "passed": true,
+  "datasets": [
+    {
+      "id": "before-baseline",
+      "events": 1444221,
+      "loops": 385,
+      "phases": 1008571,
+      "stages": {
+        "RenderBeginFrame": 727,
+        "MaterialGraphScenePrepare": 727,
+        "RenderGraphDeclare": 727,
+        "RenderGraphCompile": 727,
+        "RenderCommandRecord": 727,
+        "RenderSubmit": 727,
+        "RenderComplete": 386,
+        "DXGIPresent": 1048,
+        "DX12PresentWait": 1048
+      },
+      "unassociated": 12
+    },
+    {
+      "id": "before-etw",
+      "events": 1349786,
+      "loops": 374,
+      "phases": 926767,
+      "stages": {
+        "RenderBeginFrame": 668,
+        "MaterialGraphScenePrepare": 668,
+        "RenderGraphDeclare": 668,
+        "RenderGraphCompile": 668,
+        "RenderCommandRecord": 668,
+        "RenderSubmit": 668,
+        "RenderComplete": 375,
+        "DXGIPresent": 964,
+        "DX12PresentWait": 965
+      },
+      "unassociated": 30
+    },
+    {
+      "id": "after-baseline",
+      "events": 1629951,
+      "loops": 368,
+      "phases": 1226084,
+      "stages": {
+        "RenderBeginFrame": 520,
+        "MaterialGraphScenePrepare": 520,
+        "RenderGraphDeclare": 520,
+        "RenderGraphCompile": 520,
+        "RenderCommandRecord": 520,
+        "RenderSubmit": 520,
+        "RenderComplete": 369,
+        "DXGIPresent": 825,
+        "DX12PresentWait": 825
+      },
+      "unassociated": 20
+    },
+    {
+      "id": "after-etw",
+      "events": 1529448,
+      "loops": 339,
+      "phases": 1141046,
+      "stages": {
+        "RenderBeginFrame": 484,
+        "MaterialGraphScenePrepare": 484,
+        "RenderGraphDeclare": 484,
+        "RenderGraphCompile": 484,
+        "RenderCommandRecord": 484,
+        "RenderSubmit": 484,
+        "RenderComplete": 340,
+        "DXGIPresent": 773,
+        "DX12PresentWait": 773
+      },
+      "unassociated": 20
+    }
+  ],
+  "alignment": {
+    "passed": true,
+    "cases": [
+      {
+        "variant": "before",
+        "passed": true,
+        "referenceChecks": [],
+        "events": {
+          "DPC": 120396,
+          "Interrupt": 49873,
+          "ReadyThread": 882352,
+          "CSwitch": 1536002,
+          "DPCTmr": 6294,
+          "T-Start": 782,
+          "T-End": 641
+        },
+        "unknownSwitchStates": {
+          "Running": 235
+        },
+        "threads": 144
+      },
+      {
+        "variant": "after",
+        "passed": true,
+        "referenceChecks": [],
+        "events": {
+          "ReadyThread": 1002138,
+          "CSwitch": 1739917,
+          "Interrupt": 46326,
+          "DPC": 111835,
+          "DPCTmr": 6217,
+          "T-End": 664,
+          "T-Start": 641
+        },
+        "unknownSwitchStates": {
+          "Running": 256
+        },
+        "threads": 135
+      }
+    ],
+    "toleranceMs": 0.005
+  }
+}

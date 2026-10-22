@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #pragma once
 #include "LightProperty.h"
 #include "SceneGC.h"
@@ -518,10 +519,10 @@ private:
     // 제출 중인 batch는 콜백과 공동 소유하고, 완료 batch는 게임 스레드만 보관한다.
     // 느린 결과를 보관하는 동안 새 제출을 막아 미소비 batch는 하나로 제한한다.
     [[reflgen::ignore]]
-    std::shared_ptr<AIUpdateBatch> m_aiUpdateBatch;
+    own::shared_owner<AIUpdateBatch> m_aiUpdateBatch;
 
     [[reflgen::ignore]]
-    std::vector<std::shared_ptr<AIUpdateBatch>> m_completedAIUpdates;
+    std::vector<own::shared_owner<AIUpdateBatch>> m_completedAIUpdates;
 
     [[reflgen::ignore]]
     bool m_aiTickBoundaryReached = false;

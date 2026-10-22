@@ -1,3 +1,4 @@
+#include "../../../../Utility_Framework/Ownership.h"
 #include "FsrBackend.h"
 
 namespace
@@ -234,7 +235,7 @@ TemporalResult FsrUpscaler::Initialize(const FsrBackendDevice& device, const Fsr
     if (result.IsSuccess()) result = m_effectBackend.Initialize(device);
     if (result.IsSuccess())
     {
-        m_context = std::make_unique<FfxFsr3UpscalerContext>();
+        m_context = own::make_unique<FfxFsr3UpscalerContext>();
         FfxFsr3UpscalerContextDescription create{};
         create.maxRenderSize = { description.maxRenderExtent.width, description.maxRenderExtent.height };
         create.maxUpscaleSize = { description.displayExtent.width, description.displayExtent.height };
@@ -246,12 +247,12 @@ TemporalResult FsrUpscaler::Initialize(const FsrBackendDevice& device, const Fsr
         if (description.autoExposure) create.flags |= FFX_FSR3UPSCALER_ENABLE_AUTO_EXPOSURE;
         if (description.motionVectorsAtDisplayResolution)
             create.flags |= FFX_FSR3UPSCALER_ENABLE_DISPLAY_RESOLUTION_MOTION_VECTORS;
-        result = FsrResult(ffxFsr3UpscalerContextCreate(m_context.get(), &create));
+        result = FsrResult(ffxFsr3UpscalerContextCreate(m_context.operator->(), &create));
     }
     if (result.IsSuccess())
     {
         FfxFsr3UpscalerSharedResourceDescriptions descriptions{};
-        result = FsrResult(ffxFsr3UpscalerGetSharedResourceDescriptions(m_context.get(), &descriptions));
+        result = FsrResult(ffxFsr3UpscalerGetSharedResourceDescriptions(m_context.operator->(), &descriptions));
         FfxCreateResourceDescription resources[] = { descriptions.dilatedDepth, descriptions.dilatedMotionVectors,
             descriptions.reconstructedPrevNearestDepth };
         auto& interface = m_sharedBackend.GetInterface();
@@ -315,7 +316,7 @@ TemporalResult FsrUpscaler::Dispatch(const TemporalFrame& frame, const FsrUpscal
     dispatch.cameraFar = CameraFar(frame);
     dispatch.cameraFovAngleVertical = frame.cameraVerticalFov;
     dispatch.viewSpaceToMetersFactor = frame.viewSpaceToMeters;
-    result = FsrResult(ffxFsr3UpscalerContextDispatch(m_context.get(), &dispatch));
+    result = FsrResult(ffxFsr3UpscalerContextDispatch(m_context.operator->(), &dispatch));
     if (result.IsSuccess())
     {
         m_lastFrame = frame;
@@ -339,7 +340,7 @@ TemporalResult FsrUpscaler::Shutdown()
     // a failure before allocation; never destroy an unrelated default ID zero.
     if (m_context && m_effectBackend.HasContext())
     {
-        result = FsrResult(ffxFsr3UpscalerContextDestroy(m_context.get()));
+        result = FsrResult(ffxFsr3UpscalerContextDestroy(m_context.operator->()));
         if (!result.IsSuccess()) return result;
         if (m_effectBackend.HasContext()) return FsrResult(FFX_ERROR_BACKEND_API_ERROR);
     }
@@ -404,15 +405,15 @@ TemporalResult FsrFrameGenerator::Initialize(const FsrBackendDevice& device, con
     if (result.IsSuccess()) result = m_interpolationBackend.Initialize(device);
     if (result.IsSuccess())
     {
-        m_opticalFlow = std::make_unique<FfxOpticalflowContext>();
+        m_opticalFlow = own::make_unique<FfxOpticalflowContext>();
         FfxOpticalflowContextDescription create{};
         create.backendInterface = m_opticalFlowBackend.GetInterface();
         create.resolution = { description.displayExtent.width, description.displayExtent.height };
-        result = FsrResult(ffxOpticalflowContextCreate(m_opticalFlow.get(), &create));
+        result = FsrResult(ffxOpticalflowContextCreate(m_opticalFlow.operator->(), &create));
     }
     if (result.IsSuccess())
     {
-        m_interpolation = std::make_unique<FfxFrameInterpolationContext>();
+        m_interpolation = own::make_unique<FfxFrameInterpolationContext>();
         FfxFrameInterpolationContextDescription create{};
         create.backendInterface = m_interpolationBackend.GetInterface();
         create.maxRenderSize = { description.maxRenderExtent.width, description.maxRenderExtent.height };
@@ -426,15 +427,15 @@ TemporalResult FsrFrameGenerator::Initialize(const FsrBackendDevice& device, con
             create.flags |= FFX_FRAMEINTERPOLATION_ENABLE_DISPLAY_RESOLUTION_MOTION_VECTORS;
         // Baseline deliberately serial. Async enabling requires additional
         // prepared resource sets, queue ownership and completion tracking.
-        result = FsrResult(ffxFrameInterpolationContextCreate(m_interpolation.get(), &create));
+        result = FsrResult(ffxFrameInterpolationContextCreate(m_interpolation.operator->(), &create));
     }
     if (result.IsSuccess())
     {
         FfxFrameInterpolationSharedResourceDescriptions frameResources{};
         FfxOpticalflowSharedResourceDescriptions opticalResources{};
-        result = FsrResult(ffxFrameInterpolationGetSharedResourceDescriptions(m_interpolation.get(), &frameResources));
+        result = FsrResult(ffxFrameInterpolationGetSharedResourceDescriptions(m_interpolation.operator->(), &frameResources));
         if (result.IsSuccess())
-            result = FsrResult(ffxOpticalflowGetSharedResourceDescriptions(m_opticalFlow.get(), &opticalResources));
+            result = FsrResult(ffxOpticalflowGetSharedResourceDescriptions(m_opticalFlow.operator->(), &opticalResources));
         FfxCreateResourceDescription resources[] = { frameResources.dilatedDepth, frameResources.dilatedMotionVectors,
             frameResources.reconstructedPrevNearestDepth, opticalResources.opticalFlowVector, opticalResources.opticalFlowSCD };
         auto& interface = m_sharedBackend.GetInterface();
@@ -498,7 +499,7 @@ TemporalResult FsrFrameGenerator::Prepare(const TemporalFrame& frame, const FsrF
     prepare.dilatedDepth = Resource(m_sharedBackend, m_shared[0]);
     prepare.dilatedMotionVectors = Resource(m_sharedBackend, m_shared[1]);
     prepare.reconstructedPrevDepth = Resource(m_sharedBackend, m_shared[2]);
-    result = FsrResult(ffxFrameInterpolationPrepare(m_interpolation.get(), &prepare));
+    result = FsrResult(ffxFrameInterpolationPrepare(m_interpolation.operator->(), &prepare));
     if (result.IsSuccess())
     {
         m_preparedFrame = frame;
@@ -571,7 +572,7 @@ FfxErrorCode FsrFrameGenerator::DispatchGeneratedFrame(const FfxFrameGenerationD
     opticalFlow.minMaxLuminance = { m_configuration.minLuminance, m_configuration.maxLuminance };
     opticalFlow.opticalFlowVector = Resource(m_sharedBackend, m_shared[3]);
     opticalFlow.opticalFlowSCD = Resource(m_sharedBackend, m_shared[4]);
-    auto error = ffxOpticalflowContextDispatch(m_opticalFlow.get(), &opticalFlow);
+    auto error = ffxOpticalflowContextDispatch(m_opticalFlow.operator->(), &opticalFlow);
     if (error != FFX_OK) return error;
     FfxFrameInterpolationDispatchDescription dispatch{};
     dispatch.commandList = description.commandList;
@@ -600,7 +601,7 @@ FfxErrorCode FsrFrameGenerator::DispatchGeneratedFrame(const FfxFrameGenerationD
     dispatch.dilatedDepth = Resource(m_sharedBackend, m_shared[0]);
     dispatch.dilatedMotionVectors = Resource(m_sharedBackend, m_shared[1]);
     dispatch.reconstructedPrevDepth = Resource(m_sharedBackend, m_shared[2]);
-    error = ffxFrameInterpolationDispatch(m_interpolation.get(), &dispatch);
+    error = ffxFrameInterpolationDispatch(m_interpolation.operator->(), &dispatch);
 #if CE_DEVELOPMENT && !CE_SHIPPING
     if (error == FFX_OK && m_developmentEvaluationFailure && m_developmentEvaluationFailure())
     {
@@ -685,14 +686,14 @@ TemporalResult FsrFrameGenerator::Shutdown()
     if (!result.IsSuccess()) return result;
     if (m_interpolation && m_interpolationBackend.HasContext())
     {
-        result = FsrResult(ffxFrameInterpolationContextDestroy(m_interpolation.get()));
+        result = FsrResult(ffxFrameInterpolationContextDestroy(m_interpolation.operator->()));
         if (!result.IsSuccess()) return result;
         if (m_interpolationBackend.HasContext()) return FsrResult(FFX_ERROR_BACKEND_API_ERROR);
     }
     m_interpolation.reset();
     if (m_opticalFlow && m_opticalFlowBackend.HasContext())
     {
-        result = FsrResult(ffxOpticalflowContextDestroy(m_opticalFlow.get()));
+        result = FsrResult(ffxOpticalflowContextDestroy(m_opticalFlow.operator->()));
         if (!result.IsSuccess()) return result;
         if (m_opticalFlowBackend.HasContext()) return FsrResult(FFX_ERROR_BACKEND_API_ERROR);
     }
@@ -711,8 +712,8 @@ TemporalCapabilities QueryFsrCapabilities(const FsrBackendDevice& device, const 
     auto result = QueryFsrBuildAvailability(device.backend);
     if (result.upscaling.status != TemporalStatus::NotQueried) return result;
     const FsrGpuSynchronization synchronization{ NoSubmittedWork, nullptr };
-    auto upscaler = std::make_unique<FsrUpscaler>();
-    auto generator = std::make_unique<FsrFrameGenerator>();
+    auto upscaler = own::make_unique<FsrUpscaler>();
+    auto generator = own::make_unique<FsrFrameGenerator>();
     result.upscaling = upscaler->Initialize(device, description, synchronization);
     result.frameGeneration = generator->Initialize(device, description, configuration, format, synchronization);
     if (result.upscaling.IsSuccess()) result.upscalerImplementation = "AMD FSR 3.1.4 source";
@@ -723,8 +724,16 @@ TemporalCapabilities QueryFsrCapabilities(const FsrBackendDevice& device, const 
     }
     const auto upscaleCleanup = upscaler->Shutdown();
     const auto generationCleanup = generator->Shutdown();
-    if (!upscaleCleanup.IsSuccess()) { result.upscaling = upscaleCleanup; upscaler.release(); }
-    if (!generationCleanup.IsSuccess()) { result.frameGeneration = generationCleanup; generator.release(); }
+    if (!upscaleCleanup.IsSuccess())
+    {
+        result.upscaling = upscaleCleanup;
+        (void)new decltype(upscaler)(std::move(upscaler));
+    }
+    if (!generationCleanup.IsSuccess())
+    {
+        result.frameGeneration = generationCleanup;
+        (void)new decltype(generator)(std::move(generator));
+    }
     return result;
 }
 #endif

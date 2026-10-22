@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "AnimationScheduler.h"
 #include "ProfileScope.h"
 #include "AnimationDiagnostics.h"
@@ -469,7 +470,7 @@ void AnimationScheduler::RequestHudCapture(std::uint64_t animatorId) noexcept
     m_hudRequestedAtNs.store(now, std::memory_order_release);
 }
 
-std::shared_ptr<const AnimationHudSnapshot> AnimationScheduler::GetHudSnapshot() const
+own::shared_owner<const AnimationHudSnapshot> AnimationScheduler::GetHudSnapshot() const
 {
     std::lock_guard<std::mutex> lock(m_hudMutex);
     return m_hudPublished;
@@ -534,7 +535,7 @@ void AnimationScheduler::Update(float deltaTime)
 #endif
         const bool hasExpiredController = std::any_of(animator->m_animationControllers.begin(),
             animator->m_animationControllers.end(),
-            [](const std::shared_ptr<AnimationController>& controller) { return !controller; });
+            [](const own::shared_owner<AnimationController>& controller) { return !controller; });
         if (hasExpiredController) continue;
         auto binding = animator->CaptureAnimationBinding();
         auto& instance = animator->GetInstance();
@@ -589,7 +590,7 @@ void AnimationScheduler::Update(float deltaTime)
             const bool transitioning = instance.control.isBlending
                 || std::any_of(animator->m_animationControllers.begin(),
                     animator->m_animationControllers.end(),
-                    [](const std::shared_ptr<AnimationController>& controller)
+                    [](const own::shared_owner<AnimationController>& controller)
                     { return controller && controller->useController && controller->IsBlending(); });
             if (transitioning)
                 selected = static_cast<animation::quality_stage>(
@@ -615,7 +616,7 @@ void AnimationScheduler::Update(float deltaTime)
         item.transitioning = instance.control.isBlending
             || std::any_of(animator->m_animationControllers.begin(),
                 animator->m_animationControllers.end(),
-                [](const std::shared_ptr<AnimationController>& controller)
+                [](const own::shared_owner<AnimationController>& controller)
                 { return controller && controller->useController && controller->IsBlending(); });
         item.forcedQuality = forcedQuality;
         item.requiredQuality = hasRequiredIK || hasRequiredBoneTransform;
@@ -894,7 +895,7 @@ void AnimationScheduler::Update(float deltaTime)
     }
     if (captureHud)
     {
-        auto hud = std::make_shared<AnimationHudSnapshot>();
+        auto hud = own::make_shared<AnimationHudSnapshot>();
         hud->frame = m_updateSequence;
         hud->registered = currentAnimators.size();
         hud->budgetUs = settings.cpuBudgetMs * 1000.;
@@ -1556,7 +1557,7 @@ namespace
         layerMasks.resize(animator.m_animationControllers.size());
         for (std::size_t slot = 0; slot < layerTracks.size(); ++slot)
         {
-            AnimationController* controller = animator.m_animationControllers[slot].get();
+            AnimationController* controller = animator.m_animationControllers[slot].operator->();
             layerTracks[slot] = source.TracksAt(controller && controller->useController
                 ? controller->GetAnimationIndex() : -1);
             if (controller && controller->useController && !layerTracks[slot].empty())
@@ -1573,7 +1574,7 @@ namespace
         auto& instance = animator.GetInstance();
         if (slot >= animator.m_animationControllers.size())
             throw std::logic_error("invalid animation layer slot");
-        AnimationController* controller = animator.m_animationControllers[slot].get();
+        AnimationController* controller = animator.m_animationControllers[slot].operator->();
         if (!controller || !controller->useController
             || !(controller->IsBlending() || controller->IsUseLayer())) return;
         const auto tracks = instance.layerTrackTables[slot];
@@ -1644,7 +1645,7 @@ namespace
         auto& instance = animator.GetInstance();
         if (slot >= animator.m_animationControllers.size())
             throw std::logic_error("invalid additive animation layer slot");
-        AnimationController* controller = animator.m_animationControllers[slot].get();
+        AnimationController* controller = animator.m_animationControllers[slot].operator->();
         if (!controller || !controller->useController || !controller->m_additive
             || !(controller->IsBlending() || controller->IsUseLayer())) return;
         const auto tracks = instance.layerTrackTables[slot];
@@ -1815,7 +1816,7 @@ namespace
         else
         {
             AnimationController* controller = item.next_clip_index < 0
-                ? nullptr : animator.m_animationControllers[item.next_clip_index].get();
+                ? nullptr : animator.m_animationControllers[item.next_clip_index].operator->();
             MaterializePose(animator, source, controller, item.clip_index, true, ik.start);
         }
     }
@@ -1858,7 +1859,7 @@ namespace
         else
         {
             AnimationController* controller = item.next_clip_index < 0
-                ? nullptr : animator.m_animationControllers[item.next_clip_index].get();
+                ? nullptr : animator.m_animationControllers[item.next_clip_index].operator->();
             MaterializePose(animator, source, controller, item.clip_index,
                 true, correction.bone);
         }
@@ -1972,7 +1973,7 @@ namespace
         for (std::size_t slot = 0; slot < animator.m_animationControllers.size(); ++slot)
         {
             const auto& sharedController = animator.m_animationControllers[slot];
-            AnimationController* controller = sharedController.get();
+            AnimationController* controller = sharedController.operator->();
             if (!controller || !controller->useController) continue;
             const int clipIndex = controller->GetAnimationIndex();
             const auto* clip = source.ClipAt(clipIndex);
@@ -2119,7 +2120,7 @@ namespace
             case animation::task_kind::materialize:
             {
                 AnimationController* controller = item.output_slot == animation::invalid_task
-                    ? nullptr : animator.m_animationControllers[item.output_slot].get();
+                    ? nullptr : animator.m_animationControllers[item.output_slot].operator->();
                 auto& cursors = instance.samplingCursors[
                     item.output_slot == animation::invalid_task ? 0 : item.output_slot];
                 if (item.next_clip_index < 0) cursors[1].Clear();
@@ -2284,7 +2285,7 @@ void AnimationScheduler::FinalizeBindingQuality(Animator& animator,
         const bool transitioning = instance.control.isBlending
             || std::any_of(animator.m_animationControllers.begin(),
                 animator.m_animationControllers.end(),
-                [](const std::shared_ptr<AnimationController>& controller)
+                [](const own::shared_owner<AnimationController>& controller)
                 { return controller && controller->useController && controller->IsBlending(); });
         if (transitioning)
             instance.l4SnappedBlend = instance.taskList.snap_single_blend(

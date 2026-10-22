@@ -1,0 +1,24 @@
+{
+  "passed": true,
+  "baseMaster": "b8b84e9cea8a6a34153b06ff670dcd097e6f685b",
+  "optimizationCommit": "f9065f2fa97d4f556914925d9d29f87bd5454f29",
+  "conflictFiles": [
+    "Engine/RenderEngine/DataSystem.cpp",
+    "Engine/RenderEngine/MaterialGraphSceneHost.cpp",
+    "Engine/RenderEngine/RHI/DX12/DX12PSOManager.cpp",
+    "Engine/RenderEngine/RHI/DX12/DX12PSOManager.h",
+    "Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.cpp",
+    "Editor/EngineEntry/EditorModelPlacement.cpp"
+  ],
+  "checks": {
+    "debugBuild": true,
+    "markerBlobRegression": true,
+    "nativeGpu": true,
+    "pendingNative": true,
+    "measurementJsonTreeIdentical": true,
+    "sharedViewerTreeIdentical": true,
+    "otherLocalEditsPreserved": true
+  },
+  "resolution": "Preserve upstream preview preparation and preview shadow exclusion, reuse cached caster plans, use typed own PendingCompile allocation and owner identity comparison.",
+  "reportPolicy": "Per-measurement report HTML stays local; shared viewer HTML is versioned."
+}

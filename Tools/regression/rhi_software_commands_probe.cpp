@@ -111,20 +111,20 @@ int main()
             size_t destroyed{};
             struct Capture
             {
-                std::shared_ptr<int> owner;
+                own::shared_owner<int> owner;
                 int id;
                 std::array<int, 4>* order;
                 size_t* count;
                 ~Capture() { (*order)[(*count)++] = id; }
             };
-            auto owner = std::make_shared<int>(17);
-            std::weak_ptr<int> weak = owner;
+            auto owner = own::make_shared<int>(17);
+            own::weak_owner<int> weak = owner;
             auto* first = objects.emplace<Capture>(owner, 1, &destruction, &destroyed);
             const auto address = reinterpret_cast<uintptr_t>(first);
             Require(address % alignof(Capture) == 0, "Declaration capture alignment failed.");
             objects.emplace<Capture>(owner, 2, &destruction, &destroyed);
             std::array owners{owner, owner};
-            const auto copied = objects.copy(std::span<const std::shared_ptr<int>>{owners});
+            const auto copied = objects.copy(std::span<const own::shared_owner<int>>{owners});
             Require(copied.size() == 2 && *copied[1] == 17, "Declaration owner array copy failed.");
             owners.fill({});
             owner.reset();
@@ -141,7 +141,7 @@ int main()
                     "Declaration captures were not destroyed in reverse order.");
             Require(objects.stats().retainedBytes == retained && objects.stats().usedBytes == 0,
                     "Declaration reset failed to retain raw blocks.");
-            auto* recycled = objects.emplace<Capture>(std::shared_ptr<int>{}, 3, &destruction, &destroyed);
+            auto* recycled = objects.emplace<Capture>(own::shared_owner<int>{}, 3, &destruction, &destroyed);
             Require(reinterpret_cast<uintptr_t>(recycled) == address,
                     "Declaration reset failed to reuse an aligned object address.");
             objects.reset();
@@ -199,10 +199,33 @@ int main()
         {
             uint64_t values[32]{};
         };
+        struct Left
+        {
+            virtual ~Left() = default;
+        };
+        struct Right
+        {
+            virtual ~Right() = default;
+        };
+        struct Multiple final : Left, Right
+        {
+            uint32_t value{123};
+        };
+        {
+            auto root = ce::make_render_shared<Multiple>();
+            ce::pooled_owner<Left> left = root;
+            const auto right = ce::dynamic_pooled_cast<Right>(left);
+            const auto restored = ce::dynamic_pooled_cast<Multiple>(right);
+            Require(right && restored && restored->value == 123 && root.use_count() == 4,
+                    "Polymorphic RHI lease lost its concrete ownership or adjusted pointer.");
+            ce::weak_pooled_owner<Left> observed = left;
+            root.reset();
+            Require(!observed.expired(), "RHI weak lease expired before outstanding aliases.");
+        }
         auto aligned = ce::make_render_unique<AlignedStorage>();
-        Require(reinterpret_cast<uintptr_t>(aligned.get()) % alignof(AlignedStorage) == 0,
+        Require(reinterpret_cast<uintptr_t>(aligned.operator->()) % alignof(AlignedStorage) == 0,
                 "Render allocator alignment failed.");
-        Require(mi_check_owned(aligned.get()), "Render object bypassed mimalloc.");
+        Require(mi_check_owned(aligned.operator->()), "Render object bypassed mimalloc.");
         aligned->values[31] = 87;
         ce::render_vector<uint64_t> allocatedValues(4096, 123);
         Require(mi_check_owned(allocatedValues.data()), "Render vector bypassed mimalloc.");
@@ -325,7 +348,7 @@ int main()
         }
         ce::RenderArenaPool arenaPool;
         auto arenaLease = arenaPool.Acquire();
-        auto* originalSet = arenaLease.get();
+        auto* originalSet = arenaLease.operator->();
         auto& arenaResource = arenaLease->Resource(0);
         void* firstBlock{};
         {
@@ -342,13 +365,13 @@ int main()
         auto gpuOwner = arenaLease;
         arenaLease.reset();
         auto overlap = arenaPool.Acquire();
-        Require(overlap.get() != originalSet && arenaResource.stats().usedBytes != 0,
+        Require(overlap.operator->() != originalSet && arenaResource.stats().usedBytes != 0,
                 "Live frame arena was reset while asynchronous owners remained.");
         rhiOwner.reset();
         Require(arenaResource.stats().usedBytes != 0, "CPU completion reset a GPU-owned arena.");
         gpuOwner.reset();
         auto recycled = arenaPool.Acquire();
-        Require(recycled.get() == originalSet && recycled->Resource(0).stats().resets == 1 &&
+        Require(recycled.operator->() == originalSet && recycled->Resource(0).stats().resets == 1 &&
                     recycled->Resource(0).stats().usedBytes == 0 &&
                     recycled->Resource(0).stats().retainedBytes == retained.retainedBytes,
                 "Last owner did not reset and retain arena blocks.");
@@ -401,16 +424,16 @@ int main()
             try
             {
                 auto lease = exceptionPool.Acquire();
-                failedSet = lease.get();
-                ce::render_arena_vector<std::shared_ptr<uint32_t>> values{&lease->Resource(0)};
-                values.push_back(std::make_shared<uint32_t>(19));
+                failedSet = lease.operator->();
+                ce::render_arena_vector<own::shared_owner<uint32_t>> values{&lease->Resource(0)};
+                values.push_back(own::make_shared<uint32_t>(19));
                 throw std::runtime_error("expected arena early exit");
             }
             catch (const std::runtime_error&)
             {
             }
             auto next = exceptionPool.Acquire();
-            Require(next.get() == failedSet && next->Resource(0).stats().usedBytes == 0,
+            Require(next.operator->() == failedSet && next->Resource(0).stats().usedBytes == 0,
                     "Early exit did not destroy containers before resetting arena storage.");
         }
         ProbeValidator validator;
@@ -542,8 +565,8 @@ int main()
         recorder.AcquireEncoder(0).Draw(1, 1, 0, 0);
         recorder.AcquireEncoder(0).Draw(2, 1, 0, 0);
         recorder.AcquireEncoder(1).Draw(3, 1, 0, 0);
-        auto owner = std::make_shared<uint32_t>(42);
-        std::weak_ptr<uint32_t> weakOwner = owner;
+        auto owner = own::make_shared<uint32_t>(42);
+        own::weak_owner<uint32_t> weakOwner = owner;
         RHISoftwareBatchDesc batchDesc;
         batchDesc.queue = recordingDesc.queue;
         batchDesc.backendGeneration = 1;
@@ -583,7 +606,7 @@ int main()
                     restartedRecordingId != firstRecordingId,
                 "A new session reused a cancelled recording identity.");
         recorder.AcquireEncoder(0).ClearRenderTargets({}, nullptr);
-        batchDesc.lifetimeToken = std::make_shared<uint32_t>(1);
+        batchDesc.lifetimeToken = own::make_shared<uint32_t>(1);
         Require(!recorder.FinishRecording(omitted, batchDesc, batch, error), "Null color accepted.");
         bool sealRejected = false;
         try

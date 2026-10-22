@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Ownership.h"
 #include "RHISoftwareBatch.h"
 #include "RHICommandProvenance.h"
 
@@ -49,7 +50,7 @@ class RHITranslatedBatch final
     friend class RHISoftwareCommandQueue;
     friend class RHISubmissionThread;
     RHIRecordedBatch m_native;
-    std::shared_ptr<IRHIQueueCommandBatch> m_owned;
+    ce::pooled_owner<IRHIQueueCommandBatch> m_owned;
     RHICommandTranslationStats m_stats;
     RHICommandProvenance m_provenance;
 };

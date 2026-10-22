@@ -1,3 +1,5 @@
+#include "../../../../Utility_Framework/LifetimeToken.h"
+#include "../../../../Utility_Framework/Ownership.h"
 #include "FsrBackendVulkan.h"
 #if CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_VULKAN_SDK
 #include "../../Vulkan/VulkanDeviceResources.h"
@@ -38,7 +40,7 @@ class FsrUpscalerVulkan final : public ITemporalUpscaler
 {
 public:
     explicit FsrUpscalerVulkan(VulkanDeviceResources& resources)
-        : m_resources(resources), m_upscaler(std::make_unique<FsrUpscaler>())
+        : m_resources(resources), m_upscaler(own::make_unique<FsrUpscaler>())
     {
         *m_deviceContext = { resources.GetDevice(), resources.GetPhysicalDevice(), VulkanApi::vkGetDeviceProcAddr };
     }
@@ -46,8 +48,8 @@ public:
     {
         if (!Shutdown().IsSuccess())
         {
-            m_upscaler.release();
-            m_deviceContext.release();
+            (void)new decltype(m_upscaler)(std::move(m_upscaler));
+            (void)new decltype(m_deviceContext)(std::move(m_deviceContext));
         }
     }
     TemporalResult Initialize(const FsrContextDescription& description, FsrGpuSynchronization synchronization)
@@ -92,8 +94,8 @@ public:
     TemporalResult Shutdown() override { return m_upscaler->Shutdown(); }
 private:
     VulkanDeviceResources& m_resources;
-    std::unique_ptr<VkDeviceContext> m_deviceContext{ std::make_unique<VkDeviceContext>() };
-    std::unique_ptr<FsrUpscaler> m_upscaler;
+    own::unique_owner<VkDeviceContext> m_deviceContext{ own::make_unique<VkDeviceContext>() };
+    own::unique_owner<FsrUpscaler> m_upscaler;
 };
 }
 
@@ -108,10 +110,10 @@ FsrBackendDevice MakeFsrBackendDeviceVulkan(VkDeviceContext& deviceContext)
 }
 
 TemporalResult CreateFsrUpscalerVulkan(VulkanDeviceResources& resources, const FsrContextDescription& description,
-    FsrGpuSynchronization synchronization, std::unique_ptr<ITemporalUpscaler>& output)
+    FsrGpuSynchronization synchronization, own::unique_owner<ITemporalUpscaler>& output)
 {
     if (output) return { TemporalStatus::AlreadyInitialized, 0 };
-    auto candidate = std::make_unique<FsrUpscalerVulkan>(resources);
+    auto candidate = own::make_unique<FsrUpscalerVulkan>(resources);
     const auto result = candidate->Initialize(description, synchronization);
     if (result.IsSuccess()) output = std::move(candidate);
     return result;
@@ -122,9 +124,9 @@ FsrFrameGeneratorVulkan::~FsrFrameGeneratorVulkan()
     if (!Shutdown().IsSuccess())
     {
         // Keep SDK callback owner, resources, proxy and caller lease alive.
-        m_generator.release();
-        m_deviceContext.release();
-        m_lifetime.release();
+        (void)new decltype(m_generator)(std::move(m_generator));
+        (void)new decltype(m_deviceContext)(std::move(m_deviceContext));
+        (void)new decltype(m_lifetime)(std::move(m_lifetime));
         m_swapchain = nullptr;
     }
 }
@@ -215,7 +217,7 @@ TemporalResult FsrFrameGeneratorVulkan::Prepare(const TemporalFrameGenerationInp
     if (inputs.uiColor.IsValid() && (!ui.resource || ui.description.width != inputs.frame.displayExtent.width ||
         ui.description.height != inputs.frame.displayExtent.height || ui.resource == resources.hudlessColor.resource ||
         ui.resource == resources.depth.resource || ui.resource == resources.motionVectors.resource)) return Invalid();
-    m_lifetime = std::make_unique<std::shared_ptr<const void>>(inputs.lifetimeToken);
+    m_lifetime = own::make_unique<ce::lifetime_token>(inputs.lifetimeToken);
     m_pending = true;
     m_canPresent = false;
     native->EndRenderTargets();
@@ -263,10 +265,10 @@ TemporalResult FsrFrameGeneratorVulkan::Shutdown()
 
 TemporalResult CreateFsrFrameGeneratorVulkan(VulkanDeviceResources& resources, const FsrContextDescription& description,
     const TemporalFrameGenerationConfig& configuration, const FsrPlayerSwapchainDescriptionVulkan& native,
-    FsrGpuSynchronization synchronization, std::unique_ptr<FsrFrameGeneratorVulkan>& output)
+    FsrGpuSynchronization synchronization, own::unique_owner<FsrFrameGeneratorVulkan>& output)
 {
     if (output) return { TemporalStatus::AlreadyInitialized, 0 };
-    auto candidate = std::make_unique<FsrFrameGeneratorVulkan>();
+    auto candidate = own::make_unique<FsrFrameGeneratorVulkan>();
     const auto result = candidate->Initialize(resources, description, configuration, native, synchronization);
     if (result.IsSuccess()) output = std::move(candidate);
     return result;

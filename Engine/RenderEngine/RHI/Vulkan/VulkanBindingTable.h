@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 #include "VulkanLoader.h"
 #include "../RHIResourceTypes.h"
 #include "../RHIPipelineLayout.h"
@@ -35,7 +36,7 @@ public:
         const std::lock_guard lock(m_mutex);
         if (m_activeRequests == m_requests.size())
         {
-            m_requests.push_back(std::make_unique<Request>());
+            m_requests.push_back(own::make_unique<Request>());
         }
         m_requests[m_activeRequests]->descs.assign(descs.begin(), descs.end());
         ++m_activeRequests;
@@ -75,7 +76,7 @@ private:
 
     // Request를 따로 할당해 Add의 vector 재할당 중에도 Resolve가 돌려준 descs
     // 주소가 안정적으로 유지되게 한다. Reset은 worker join 뒤에만 호출된다.
-    std::vector<std::unique_ptr<Request>> m_requests;
+    std::vector<own::unique_owner<Request>> m_requests;
     mutable std::mutex m_mutex;
     uint64_t m_epoch{ 1 };
 };
@@ -219,4 +220,3 @@ private:
 
     std::vector<Request> m_requests;
 };
-

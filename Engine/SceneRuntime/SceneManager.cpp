@@ -1,4 +1,5 @@
-﻿#include "ProjectLayerSettings.h"
+#include "../Utility_Framework/Ownership.h"
+#include "ProjectLayerSettings.h"
 #include "SceneManager.h"
 #include "../Utility_Framework/StandardLibrary.h"
 #include "RenderScene.h"
@@ -1017,7 +1018,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
             ClrHost::Get().NotifySceneUnload();
 
             SetActiveScene(nullptr);
-            
+
             std::erase_if(m_scenes,
                 [&](const auto& scene) { return scene == swapScene; });
 
@@ -2102,7 +2103,7 @@ void SceneManager::SetSimulationPhase(ScenePhase phase)
     }
 }
 
-bool SceneManager::BindProjectLayerSettings(const std::shared_ptr<ProjectLayerSettings>& settings)
+bool SceneManager::BindProjectLayerSettings(const own::shared_owner<ProjectLayerSettings>& settings)
 {
     if (!settings || m_isGameStart || m_isSimulationSessionActive || !m_scenes.empty()) return false;
 

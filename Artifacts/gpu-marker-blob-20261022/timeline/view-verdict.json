@@ -1,0 +1,27 @@
+{
+  "passed": true,
+  "checks": {
+    "markerBlobRegression": true,
+    "softwareLifetimeRegression": true,
+    "ownershipRegression": true,
+    "build": true,
+    "groupRegression": true,
+    "nativeGpu": true,
+    "source": true,
+    "expectedRuntimePerVariant": true,
+    "captures": true,
+    "policyAndSerialNodes": true,
+    "pixels": true,
+    "noEtwLoss": true,
+    "ownershipAudit": true
+  },
+  "datasets": [
+    "on-a-baseline",
+    "on-a-etw",
+    "off-a-baseline",
+    "off-a-etw",
+    "off-b-baseline",
+    "on-b-baseline"
+  ],
+  "sourcePolicy": "CPU and GPU JSON share exact native SHA256; ETW uses the recorded UTC/QPC anchor."
+}

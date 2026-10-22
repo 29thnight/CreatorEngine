@@ -145,11 +145,11 @@ public:
 	// The retained proxy keeps its captured batch arena alive. Offsets resolve
 	// only after the game-thread batch is sealed, so render draws never observe
 	// a vector reallocation or a mutable Animator.
-	std::shared_ptr<const ce::animation_palette_arena> m_paletteArena{};
+	own::shared_owner<const ce::animation_palette_arena> m_paletteArena{};
 	std::uint32_t m_paletteOffset{ 0 };
 	std::uint32_t m_boneCount{ 0 };
 	static_assert(std::is_same_v<decltype(m_paletteArena),
-		std::shared_ptr<const ce::animation_palette_arena>>);
+		own::shared_owner<const ce::animation_palette_arena>>);
 	LightMapping					m_LightMapping;
 	uint32							m_bitflag{ 0 };
 
@@ -185,8 +185,8 @@ public:
 	explicit TerrainRenderProxy(TerrainComponent* component);
 
 public:
-	std::shared_ptr<TerrainMesh>		m_terrainMesh{ nullptr };
-	std::shared_ptr<TerrainMaterial>	m_terrainMaterial{ nullptr };
+	own::shared_owner<TerrainMesh>		m_terrainMesh{ nullptr };
+	own::shared_owner<TerrainMaterial>	m_terrainMaterial{ nullptr };
 };
 
 // ── 폴리지 ──
@@ -250,7 +250,7 @@ public:
 	explicit SpriteRenderProxy(SpriteRenderer* component);
 
 public:
-	std::shared_ptr<Mesh>           m_quadMesh{ nullptr };
+	own::shared_owner<Mesh>           m_quadMesh{ nullptr };
 	own::shared_owner<const Texture>		m_spriteTexture{ nullptr };
 	BillboardType                   m_billboardType{ BillboardType::None };
 	math::vector3                   m_billboardAxis{ 0.f, 1.f, 0.f };

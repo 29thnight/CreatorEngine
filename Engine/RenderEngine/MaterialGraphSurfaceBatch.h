@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 
 #include "LXMaterialPipeline.h"
 
@@ -56,8 +57,9 @@ namespace material_graph
     // binding layout. Runtime consumes the verified/cooked artifact, not Slang.
     std::string BuildSurfaceSource(const LX::LXMaterialProgram& program);
     bool VerifySurfaceProduct(const LX::LXMaterialProgram& program, const std::filesystem::path& file,
-                              std::span<const CompileTarget> targets, RHIShaderCompileOptions options, const Budget& budget,
-                              VerifiedProduct& result, std::vector<LX::LXMaterialDiagnostic>& diagnostics);
+                              std::span<const CompileTarget> targets, RHIShaderCompileOptions options,
+                              const Budget& budget, VerifiedProduct& result,
+                              std::vector<LX::LXMaterialDiagnostic>& diagnostics);
 
     class SurfaceBatch
     {
@@ -74,10 +76,7 @@ namespace material_graph
         {
             return bindings_->instancePins->Owner(bindings_->instancePinIndex);
         }
-        const own::shared_owner<InstanceFramePins>& MaterialPins() const
-        {
-            return bindings_->instancePins;
-        }
+        const own::shared_owner<InstanceFramePins>& MaterialPins() const { return bindings_->instancePins; }
         std::uint64_t RecordingId() const { return recordingId_; }
         bool IsValidated() const { return validated_; }
         bool IsReadyForBake() const { return recordedStages_.load() == 3 && (!mesh_ || mesh_->IsReadyForEvaluation()); }
@@ -101,22 +100,32 @@ namespace material_graph
 
       private:
         friend class SurfaceEvaluator;
-        SurfaceBatch() = default;
+
+      public:
+        class ConstructionKey
+        {
+            friend class SurfaceBatch;
+            friend class SurfaceEvaluator;
+            ConstructionKey() = default;
+        };
+        explicit SurfaceBatch(ConstructionKey) {}
+
+      private:
         bool RecordCommands(RHIEncoder& encoder, std::string& error,
                             const RenderBindingCache::PreparedPass* prepared = nullptr) const;
         IRenderDeviceServices* device_{};
         RHIBufferHandle buffer_;
         SurfaceView view_;
         std::vector<SurfacePoint> points_;
-        std::shared_ptr<const SurfaceGeometrySource> mesh_;
+        own::shared_owner<const SurfaceGeometrySource> mesh_;
         std::uint32_t count_{};
         own::shared_owner<const RenderBindings> bindings_;
         std::uint64_t recordingId_{};
         std::uint64_t descriptorVersion_{};
-        std::shared_ptr<const LX::Runtime::ComputeGeneration> pipeline_;
+        own::shared_owner<const LX::Runtime::ComputeGeneration> pipeline_;
         RHIBufferSlice inputs_, uniform_;
         RHIBindingTable output_;
-        std::weak_ptr<const SurfaceBatch> self_;
+        own::weak_owner<const SurfaceBatch> self_;
         mutable std::atomic<unsigned> recordedStages_{};
         mutable std::atomic<bool> declared_{};
         mutable const EnhancedRenderGraph* graph_{};
@@ -130,37 +139,39 @@ namespace material_graph
       public:
         // Candidate-first PSO/layout initialization; failure preserves the accepted
         // evaluator. A new graph generation requires its own matching evaluator.
-        bool Initialize(IRenderDeviceServices& device, IRenderRootSignatureCache& roots, IRenderPipelineCache& pipelines,
-                        const VerifiedProduct& product, RHIShaderBinary backend, const Budget& budget, std::string& error);
+        bool Initialize(IRenderDeviceServices& device, IRenderRootSignatureCache& roots,
+                        IRenderPipelineCache& pipelines, const VerifiedProduct& product, RHIShaderBinary backend,
+                        const Budget& budget, std::string& error);
         const PassLayout& Layout() const { return layout_; }
 
         // Immediate recording only, after material textures are ShaderResource.
         // 평가 입력·출력과 머티리얼 테이블의 준비 검증은 첫 자원 참조 전에 끝낸다.
         // 반환된 owner는 제출 완료/취소까지 보유하고 device shutdown 전에 해제한다.
-        bool Record(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings, const SurfaceView& view,
-                    std::span<const SurfacePoint> points, std::shared_ptr<const SurfaceBatch>& result, std::string& error);
+        bool Record(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
+                    const SurfaceView& view, std::span<const SurfacePoint> points,
+                    own::shared_owner<const SurfaceBatch>& result, std::string& error);
         // GPU skin/world frame -> graph -> IBL, without a CPU readback between stages.
         // Across recordings the source must have passed completed readback validation.
         bool RecordGpu(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
-                       std::shared_ptr<const SurfaceGeometrySource> mesh, std::shared_ptr<const SurfaceBatch>& result,
-                       std::string& error);
+                       own::shared_owner<const SurfaceGeometrySource> mesh,
+                       own::shared_owner<const SurfaceBatch>& result, std::string& error);
         // Allocate without recording, including an unrecorded prepared raster
         // source. PrepareParallel must precede this when using worker recording.
         bool PrepareGpu(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
-                        std::shared_ptr<const SurfaceGeometrySource> source, std::shared_ptr<const SurfaceBatch>& result,
-                        std::string& error);
+                        own::shared_owner<const SurfaceGeometrySource> source,
+                        own::shared_owner<const SurfaceBatch>& result, std::string& error);
 
       private:
         bool RecordInputs(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
                           const SurfaceView& view, std::span<const SurfacePoint> points,
-                          std::shared_ptr<const SurfaceGeometrySource> mesh, std::shared_ptr<const SurfaceBatch>& result,
-                          std::string& error);
+                          own::shared_owner<const SurfaceGeometrySource> mesh,
+                          own::shared_owner<const SurfaceBatch>& result, std::string& error);
         bool PrepareInputs(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
                            const SurfaceView& view, std::span<const SurfacePoint> points,
-                           std::shared_ptr<const SurfaceGeometrySource> source, std::shared_ptr<const SurfaceBatch>& result,
-                           std::string& error);
+                           own::shared_owner<const SurfaceGeometrySource> source,
+                           own::shared_owner<const SurfaceBatch>& result, std::string& error);
         IRenderDeviceServices* device_{};
-        std::shared_ptr<const LX::Runtime::ComputeGeneration> pipeline_;
+        own::shared_owner<const LX::Runtime::ComputeGeneration> pipeline_;
         PassLayout layout_;
         std::string semanticKey_;
         bool principledGgx_{};

@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #pragma once
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector4.hpp>
@@ -52,7 +53,7 @@ public:
 	void OnDeserialized();
 	void OnPropertyChanged(std::string_view propertyName, Meta::PropertyChangeSource source) override;
 	void PrepareTextLayout();
-	const std::shared_ptr<const TextLayout>& GetTextLayout() const { return m_textLayout; }
+	const own::shared_owner<const TextLayout>& GetTextLayout() const { return m_textLayout; }
 
 	const std::string& GetFontPath() const { return fontPath; }
 
@@ -112,9 +113,9 @@ private:
     bool isStretchY{ false };
 
     [[reflgen::ignore]]
-    std::shared_ptr<FontAsset> m_font;
+    own::shared_owner<FontAsset> m_font;
     [[reflgen::ignore]]
-    std::shared_ptr<const TextLayout> m_textLayout;
+    own::shared_owner<const TextLayout> m_textLayout;
     [[reflgen::ignore]]
     std::string m_loadedFontPath;
     [[reflgen::ignore]]
@@ -143,4 +144,3 @@ public:
 	[[reflgen::ignore]]
 	math::vector2 m_textMeasureSize{ 0.f };
 };
-

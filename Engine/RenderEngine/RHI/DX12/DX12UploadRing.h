@@ -1,4 +1,6 @@
 #pragma once
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 #include <d3d12.h>
@@ -43,7 +45,7 @@ class DX12UploadSegmentAllocator
     bool ReserveBatch(uint64_t recordingId, std::span<const RHIUploadRequest> requests,
                       std::span<RHIBufferSlice> outSlices, std::string& outError);
     // Recording owner calls after all allocation writers join.
-    std::shared_ptr<const void> PinRecording(uint64_t recordingId);
+    ce::lifetime_token PinRecording(uint64_t recordingId);
     void OnSubmitted(uint64_t recordingId, RHICompletionPoint completion);
     void RejectSubmission(uint64_t recordingId, RHICompletionPoint completion);
     void AbortRecording(uint64_t recordingId);
@@ -74,7 +76,7 @@ class DX12UploadSegmentAllocator
         uint64_t completionValue{0};
         uint64_t lastCollectedEpoch{0};
         bool large{false};
-        std::weak_ptr<const void> translationLease;
+        ce::weak_lifetime_token translationLease;
         RHIUploadSegmentState state{RHIUploadSegmentState::Available};
     };
 
@@ -92,7 +94,7 @@ class DX12UploadSegmentAllocator
 
     ID3D12Device* m_device{nullptr};
     DX12ResourceTable* m_table{nullptr};
-    std::vector<std::unique_ptr<Segment>> m_segments;
+    std::vector<own::unique_owner<Segment>> m_segments;
     uint64_t m_regularSegmentBytes{0};
     uint64_t m_largeThreshold{0};
     uint32_t m_standbyRegularSegments{0};

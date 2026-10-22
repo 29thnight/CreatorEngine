@@ -285,7 +285,7 @@ if (ImGui::IsWindowAppearing())
 	ClickNodeIndex = -1;
 	targetNodeIndex = -1;
 	selectedTransitionIndex = -1;
-	preInspectorIndex = -1; //인스펙터에뛰운 인덱스번호 
+	preInspectorIndex = -1; //인스펙터에뛰운 인덱스번호
 	animator_editing::select_avatar_controller(-1);
 	close_window(EditorWindowName::kAvatarMask);
 }
@@ -335,7 +335,7 @@ if (showControllerTabs)
 					ClickNodeIndex = -1;
 					targetNodeIndex = -1;
 					selectedTransitionIndex = -1;
-					preInspectorIndex = -1; //인스펙터에뛰운 인덱스번호 
+					preInspectorIndex = -1; //인스펙터에뛰운 인덱스번호
 					animator_editing::select_avatar_controller(-1);
 					close_window(EditorWindowName::kAvatarMask);
 				}
@@ -361,7 +361,7 @@ if (showControllerTabs)
 				{
 					controller->name = buffer;
 					std::string filename = controller->name + ".json";
-					GetControllerNodeEditor(controller.get())->ReNameJson(filename);
+					GetControllerNodeEditor(controller.operator->())->ReNameJson(filename);
 				}
 				ImGui::Checkbox("Additive (clip start reference)", &controller->m_additive);
 
@@ -491,7 +491,7 @@ ImGui::SameLine();
 ImGui::BeginChild("Controller Info", ImVec2(900, 500), false);
 if (selectedControllerIndex >= 0
     && selectedControllerIndex < static_cast<int>(animator->m_animationControllers.size()))
-	controller = animator->m_animationControllers[selectedControllerIndex].get();
+	controller = animator->m_animationControllers[selectedControllerIndex].operator->();
 std::string controllerName;
 if (controller)
 {
@@ -505,7 +505,7 @@ ImGui::TextUnformatted(controllerName.c_str());
 ImGui::Separator();
 if (selectedControllerIndex >= 0 && selectedControllerIndex < animator->m_animationControllers.size())
 {
-	controller = animator->m_animationControllers[selectedControllerIndex].get();
+	controller = animator->m_animationControllers[selectedControllerIndex].operator->();
 	nodeEdtior;
 	static bool isOpenPopUp;
 	static bool isOpenNodePopUp;
@@ -826,7 +826,7 @@ else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selecte
 	ImGui::SameLine();
 	if (state->m_isAny == false)
 	{
-		
+
 
 		if (ImGui::InputText("##stateName", buffer, sizeof(buffer)))
 		{
@@ -875,7 +875,7 @@ else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selecte
 		}
 		ImGui::Text("MultiplierAnimation Speed");
 		ImGui::SameLine();
-		
+
 		if (ImGui::Button(state->animationSpeedParameterName.c_str(), ImVec2(140, 0)))
 		{
 			if (state->useMultipler)
@@ -907,7 +907,7 @@ else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selecte
 			ImGui::EndPopup();
 		}
 
-		
+
 	}
 	else
 	{
@@ -1077,10 +1077,10 @@ else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selecte
 	{
 		stateName = state->behaviour->m_name;
 	}
-	
+
 	if (ImGui::Button(stateName.c_str(), ImVec2(buttonWidth, 0)))
 	{
-		if(nullptr != state->behaviour)	
+		if(nullptr != state->behaviour)
 		{
 			FileGuid fileGuid = DataSystems->GetStemToGuid(state->behaviour->m_name);
 			file::path scriptFullPath = DataSystems->GetFilePath(fileGuid);
@@ -1095,7 +1095,7 @@ else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selecte
 			}
 		}
 	}
-	
+
 	ImGui::SameLine();
 	if (ImGui::Button("Delete behavior"))
 	{
@@ -1107,7 +1107,7 @@ else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selecte
 
 	if (ImGui::Button("Add Behaviour", ImVec2(buttonWidth, 0)))
 	{
-		selectedState = state.get();
+		selectedState = state.operator->();
 		isOpenAniBehaviorPopup = true;
 	}
 

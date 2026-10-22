@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include "MaterialGraphRenderBindings.h"
 #include "MaterialGraphBindingDiagnostics.h"
@@ -240,11 +241,29 @@ namespace material_graph
     }
 
     bool RenderBindingCache::Prepare(IRenderDeviceServices& device, IRenderTextureCache& textures,
-                                     own::shared_owner<const Instance> instance, const PassLayout& layout,
+                                     const own::shared_owner<const Instance>& instance, const PassLayout& layout,
                                      own::shared_owner<const RenderBindings>& result, std::string& error,
-                                     own::shared_owner<InstanceFramePins> instancePins,
+                                     const own::shared_owner<InstanceFramePins>& instancePins,
                                      const TextureFramePins* imagePins,
-                                     std::shared_ptr<const PassLayout> layoutSnapshot)
+                                     const own::shared_owner<const PassLayout>& layoutSnapshot)
+    {
+        if (!instancePins)
+        {
+            auto pins = own::make_shared<InstanceFramePins>();
+            pins->Retain(instance);
+            return PrepareBorrowed(device, textures, instance.borrow(), layout, result, error, pins, imagePins,
+                                   layoutSnapshot);
+        }
+        return PrepareBorrowed(device, textures, instance.borrow(), layout, result, error, instancePins, imagePins,
+                               layoutSnapshot);
+    }
+
+    bool RenderBindingCache::PrepareBorrowed(IRenderDeviceServices& device, IRenderTextureCache& textures,
+                                             own::local_view<const Instance> instance, const PassLayout& layout,
+                                             own::shared_owner<const RenderBindings>& result, std::string& error,
+                                             const own::shared_owner<InstanceFramePins>& instancePins,
+                                             const TextureFramePins* imagePins,
+                                             const own::shared_owner<const PassLayout>& layoutSnapshot)
     {
         ce::profile_scope profile{ce::marker<"MaterialBindingsPrepare">()};
         std::optional<ce::profile_scope> detailProfile;
@@ -256,8 +275,8 @@ namespace material_graph
 
         nextDetail(ce::marker<"BindingPrepareValidate">());
         error.clear();
-        if ((device_ && device_ != &device) || !layout.handle.IsValid() || !instance || !instance->generation ||
-            layout.material != instance->generation->cooked.product.layout)
+        if ((device_ && device_ != &device) || !layout.handle.IsValid() || !instance || !instancePins ||
+            !instance->generation || layout.material != instance->generation->cooked.product.layout)
         {
             return Fail(error, "Material render binding requires the matching device, instance and pass layout.");
         }
@@ -265,7 +284,7 @@ namespace material_graph
         {
             return Fail(error, "Material pass layout omits or adds a reflected binding slot.");
         }
-        if (layoutSnapshot && layoutSnapshot.get() != &layout && *layoutSnapshot != layout)
+        if (layoutSnapshot && layoutSnapshot.operator->() != &layout && *layoutSnapshot != layout)
         {
             return Fail(error, "Material layout snapshot differs from the requested reflected layout.");
         }
@@ -288,12 +307,24 @@ namespace material_graph
         {
             {
                 BindingDetailScope clearProfile{ce::marker<"BindingFrameClear">()};
-                prepared_.clear();
+                // Retain per-identity nodes and nested vector capacity across recordings.
+                // Bound stale material identities; no frame packet is retained here.
+                if (prepared_.size() > 4096)
+                {
+                    prepared_.clear();
+                }
+                else
+                {
+                    for (auto& [key, packets] : prepared_)
+                    {
+                        packets.clear();
+                    }
+                }
             }
             preparedRecording_ = recording;
             preparedDescriptorVersion_ = descriptorVersion;
             BindingDetailScope createProfile{ce::marker<"BindingFrameCreate">()};
-            bindless_ = std::make_shared<BindlessMaterialFrame>();
+            bindless_ = own::make_shared<BindlessMaterialFrame>();
         }
         const auto identity = InstanceFramePins::Identity(*instance);
         {
@@ -304,10 +335,11 @@ namespace material_graph
             {
                 for (const auto& cached : std::span(found->second))
                 {
-                    if (auto packet = cached.lock(); packet && packet->layout &&
-                                                     (packet->layout.get() == &layout || *packet->layout == layout) &&
-                                                     std::addressof(*packet->instance) == std::addressof(*instance) &&
-                                                     Validate(device, *packet, error))
+                    if (auto packet = cached.lock();
+                        packet && packet->layout &&
+                        (packet->layout.operator->() == &layout || *packet->layout == layout) &&
+                        std::addressof(*packet->instance) == std::addressof(*instance) && packet->device == &device &&
+                        packet->recordingId == recording && packet->descriptorVersion == descriptorVersion)
                     {
                         result = std::move(packet);
                         return true;
@@ -318,20 +350,14 @@ namespace material_graph
         }
         nextDetail(ce::marker<"BindingPrepareOwner">());
         auto candidate = own::make_shared<RenderBindings>();
-        if (!instancePins)
-        {
-            auto pins = own::make_shared<InstanceFramePins>();
-            pins->Retain(instance);
-            instancePins = std::move(pins);
-        }
         candidate->instancePinIndex = instancePins->Find(*instance);
         candidate->instance = instancePins->Borrow(candidate->instancePinIndex);
         if (!candidate->instance || std::addressof(*candidate->instance) != std::addressof(*instance))
         {
             return Fail(error, "Material bindings require the exact instance in the frame pin table.");
         }
-        candidate->instancePins = std::move(instancePins);
-        candidate->layout = layoutSnapshot ? std::move(layoutSnapshot) : std::make_shared<const PassLayout>(layout);
+        candidate->instancePins = instancePins;
+        candidate->layout = layoutSnapshot ? layoutSnapshot : own::make_shared<const PassLayout>(layout);
         candidate->device = &device;
         candidate->recordingId = recording;
         if (candidate->instance->textures.size() > candidate->textureValues.size())
@@ -378,10 +404,9 @@ namespace material_graph
         CpuDescription* description{};
         if (const auto found = descriptions_.find(identity); found != descriptions_.end())
         {
-            // A representation ID alone is not authority. Both exact instances
-            // must be alive during comparison, including for copied/forged IDs.
-            const auto owner = found->second.instance.lock();
-            if (owner && std::addressof(*owner) == std::addressof(*instance) &&
+            // The live frame table pins the exact instance. A weak identity check
+            // rejects recycled addresses without acquiring a temporary strong owner.
+            if (instancePins->Matches(candidate->instancePinIndex, found->second.instance) &&
                 std::ranges::equal(std::span(found->second.textureShapes), std::span(uploaded), SameTextureShape))
             {
                 description = &found->second;
@@ -392,7 +417,7 @@ namespace material_graph
         if (!description)
         {
             ce::profile_scope descriptionProfile{ce::marker<"MaterialBindingsCpuDescription">()};
-            auto resources = std::make_shared<ResourcePacket>();
+            auto resources = own::make_shared<ResourcePacket>();
             std::vector<TextureBinding> bindings;
             bindings.reserve(uploaded.size());
             for (std::size_t i = 0; i < uploaded.size(); ++i)
@@ -540,7 +565,7 @@ namespace material_graph
         if (!description)
         {
             CpuDescription cached;
-            cached.instance = instance;
+            cached.instance = instancePins->Observe(candidate->instancePinIndex);
             cached.resources = candidate->resourceOwner;
             cached.textureShapes.assign(uploaded.begin(), uploaded.end());
             cached.descriptorIndices = descriptorIndices;
@@ -653,8 +678,8 @@ namespace material_graph
                 table = frame.publishedTable.load(std::memory_order_relaxed);
                 if (!table)
                 {
-                    frame.publishedTables.push_back(std::make_unique<const RHIBindingTable>(frame.textures));
-                    table = frame.publishedTables.back().get();
+                    frame.publishedTables.push_back(own::make_unique<const RHIBindingTable>(frame.textures));
+                    table = frame.publishedTables.back().operator->();
                     frame.publishedTable.store(table, std::memory_order_release);
                 }
             }

@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "DlssTemporalAdapter.h"
 
 #ifndef CREATOR_ENABLE_DLSS_STREAMLINE
@@ -224,7 +226,7 @@ struct DlssTemporalAdapter::Implementation
     TemporalFrameGenerationConfig presentation;
     TemporalExtent dynamicResolutionTarget;
     TemporalExtent lastFrameGenerationExtent;
-    std::shared_ptr<const void> pendingFrameGenerationOwner;
+    ce::lifetime_token pendingFrameGenerationOwner;
     uint64_t pendingPresentedFrames{ 0 };
     DlssPacingOwner pacingOwner{ DlssPacingOwner::Unspecified };
     std::unordered_map<uint64_t, Frame> frames;
@@ -427,7 +429,7 @@ struct DlssTemporalAdapter::Implementation
     }
 };
 
-DlssTemporalAdapter::DlssTemporalAdapter() : m_implementation(std::make_unique<Implementation>()) {}
+DlssTemporalAdapter::DlssTemporalAdapter() : m_implementation(own::make_unique<Implementation>()) {}
 
 DlssTemporalAdapter::~DlssTemporalAdapter()
 {
@@ -439,7 +441,10 @@ DlssTemporalAdapter::~DlssTemporalAdapter()
                 (!m_implementation->module && "Explicit DLSS shutdown and proxy release are required"));
         },
         "!m_implementation->module && \"Explicit DLSS shutdown and proxy release are required\"");
-    if (m_implementation->module) (void)m_implementation.release();
+    if (m_implementation->module)
+    {
+        (void)new decltype(m_implementation)(std::move(m_implementation));
+    }
 }
 
 TemporalResult DlssTemporalAdapter::Initialize(const DlssInitialization& initialization)
@@ -1592,14 +1597,17 @@ namespace
     class DlssDX12Upscaler final : public ITemporalUpscaler
     {
     public:
-        DlssDX12Upscaler(DX12DeviceResources& resources, std::shared_ptr<DlssTemporalAdapter> session,
+        DlssDX12Upscaler(DX12DeviceResources& resources, own::shared_owner<DlssTemporalAdapter> session,
             uint32_t viewportId, TemporalQuality quality, DlssFinalConsumptionDrain drain)
-            : m_resources(resources), m_session(std::make_unique<std::shared_ptr<DlssTemporalAdapter>>(std::move(session))),
+            : m_resources(resources), m_session(own::make_unique<own::shared_owner<DlssTemporalAdapter>>(std::move(session))),
               m_viewportId(viewportId), m_quality(quality), m_drain(std::move(drain)) {}
 
         ~DlssDX12Upscaler() override
         {
-            if (!Shutdown().IsSuccess()) (void)m_session.release();
+            if (!Shutdown().IsSuccess())
+            {
+                (void)new decltype(m_session)(std::move(m_session));
+            }
         }
 
         TemporalResult QueryRenderExtent(TemporalQuality quality, TemporalExtent display, TemporalExtent& extent) const override
@@ -1662,7 +1670,7 @@ namespace
 
     private:
         DX12DeviceResources& m_resources;
-        std::unique_ptr<std::shared_ptr<DlssTemporalAdapter>> m_session;
+        own::unique_owner<own::shared_owner<DlssTemporalAdapter>> m_session;
         uint32_t m_viewportId;
         TemporalQuality m_quality;
         DlssFinalConsumptionDrain m_drain;
@@ -1672,14 +1680,17 @@ namespace
     class DlssDX12FrameGenerator final : public ITemporalFrameGenerator
     {
     public:
-        DlssDX12FrameGenerator(DX12DeviceResources& resources, std::shared_ptr<DlssTemporalAdapter> session,
+        DlssDX12FrameGenerator(DX12DeviceResources& resources, own::shared_owner<DlssTemporalAdapter> session,
             const TemporalFrameGenerationConfig& configuration, DlssFinalConsumptionDrain drain)
-            : m_resources(resources), m_session(std::make_unique<std::shared_ptr<DlssTemporalAdapter>>(std::move(session))),
+            : m_resources(resources), m_session(own::make_unique<own::shared_owner<DlssTemporalAdapter>>(std::move(session))),
               m_configuration(configuration), m_drain(std::move(drain)) {}
 
         ~DlssDX12FrameGenerator() override
         {
-            if (!Shutdown().IsSuccess()) (void)m_session.release();
+            if (!Shutdown().IsSuccess())
+            {
+                (void)new decltype(m_session)(std::move(m_session));
+            }
         }
 
         TemporalCapabilities GetCapabilities() const override { return (*m_session)->QueryCapabilities(); }
@@ -1738,7 +1749,7 @@ namespace
 
     private:
         DX12DeviceResources& m_resources;
-        std::unique_ptr<std::shared_ptr<DlssTemporalAdapter>> m_session;
+        own::unique_owner<own::shared_owner<DlssTemporalAdapter>> m_session;
         TemporalFrameGenerationConfig m_configuration;
         DlssFinalConsumptionDrain m_drain;
         bool m_shutdown{ false };
@@ -1747,8 +1758,8 @@ namespace
 }
 
 TemporalResult CreateDlssDX12Upscaler(DX12DeviceResources& resources,
-    std::shared_ptr<DlssTemporalAdapter> session, uint32_t viewportId, TemporalQuality quality,
-    DlssFinalConsumptionDrain drain, std::unique_ptr<ITemporalUpscaler>& upscaler)
+    own::shared_owner<DlssTemporalAdapter> session, uint32_t viewportId, TemporalQuality quality,
+    DlssFinalConsumptionDrain drain, own::unique_owner<ITemporalUpscaler>& upscaler)
 {
     if (upscaler) return { TemporalStatus::AlreadyInitialized };
     if (!session || !drain || viewportId == UINT32_MAX || ToMode(quality) == sl::DLSSMode::eOff)
@@ -1756,13 +1767,13 @@ TemporalResult CreateDlssDX12Upscaler(DX12DeviceResources& resources,
     const auto capability = session->QueryCapabilities().upscaling;
     if (!capability.IsSuccess()) return capability;
     if (!session->IsBoundToDX12Device(resources.GetDevice())) return { TemporalStatus::InvalidInput };
-    upscaler = std::make_unique<DlssDX12Upscaler>(resources, std::move(session), viewportId, quality, std::move(drain));
+    upscaler = own::make_unique<DlssDX12Upscaler>(resources, std::move(session), viewportId, quality, std::move(drain));
     return { TemporalStatus::Success };
 }
 
 TemporalResult CreateDlssDX12FrameGenerator(DX12DeviceResources& resources,
-    std::shared_ptr<DlssTemporalAdapter> session, const TemporalFrameGenerationConfig& configuration,
-    DlssFinalConsumptionDrain drain, std::unique_ptr<ITemporalFrameGenerator>& frameGenerator)
+    own::shared_owner<DlssTemporalAdapter> session, const TemporalFrameGenerationConfig& configuration,
+    DlssFinalConsumptionDrain drain, own::unique_owner<ITemporalFrameGenerator>& frameGenerator)
 {
     if (frameGenerator) return { TemporalStatus::AlreadyInitialized };
     if (!session || !drain) return { TemporalStatus::InvalidInput };
@@ -1775,7 +1786,7 @@ TemporalResult CreateDlssDX12FrameGenerator(DX12DeviceResources& resources,
     if (!binding.IsSuccess()) return binding;
     // Enabling remains the shell's explicit presenting-thread operation, after
     // a real proxy swapchain has been bound and pacing ownership has been chosen.
-    frameGenerator = std::make_unique<DlssDX12FrameGenerator>(resources, std::move(session), configuration, std::move(drain));
+    frameGenerator = own::make_unique<DlssDX12FrameGenerator>(resources, std::move(session), configuration, std::move(drain));
     return { TemporalStatus::Success };
 }
 
@@ -1786,7 +1797,7 @@ struct DlssTemporalAdapter::Implementation
     TemporalBackend backend{ TemporalBackend::DX12 };
 };
 
-DlssTemporalAdapter::DlssTemporalAdapter() : m_implementation(std::make_unique<Implementation>()) {}
+DlssTemporalAdapter::DlssTemporalAdapter() : m_implementation(own::make_unique<Implementation>()) {}
 DlssTemporalAdapter::~DlssTemporalAdapter() = default;
 TemporalResult DlssTemporalAdapter::Initialize(const DlssInitialization& initialization)
 {
@@ -1873,12 +1884,12 @@ TemporalResult DlssTemporalAdapter::ReleaseFrameGenerationInputsAfterGpuIdle() {
 TemporalResult DlssTemporalAdapter::ShutdownAfterGpuIdle() { return { TemporalStatus::SdkNotBuilt }; }
 TemporalResult DlssTemporalAdapter::UnloadAfterNativeObjectsDestroyed() { return { TemporalStatus::SdkNotBuilt }; }
 TemporalResult CreateDlssDX12Upscaler(DX12DeviceResources&,
-    std::shared_ptr<DlssTemporalAdapter>, uint32_t, TemporalQuality, DlssFinalConsumptionDrain,
-    std::unique_ptr<ITemporalUpscaler>& upscaler)
+    own::shared_owner<DlssTemporalAdapter>, uint32_t, TemporalQuality, DlssFinalConsumptionDrain,
+    own::unique_owner<ITemporalUpscaler>& upscaler)
 { return { upscaler ? TemporalStatus::AlreadyInitialized : TemporalStatus::SdkNotBuilt }; }
 TemporalResult CreateDlssDX12FrameGenerator(DX12DeviceResources&,
-    std::shared_ptr<DlssTemporalAdapter>, const TemporalFrameGenerationConfig& configuration,
-    DlssFinalConsumptionDrain, std::unique_ptr<ITemporalFrameGenerator>& frameGenerator)
+    own::shared_owner<DlssTemporalAdapter>, const TemporalFrameGenerationConfig& configuration,
+    DlssFinalConsumptionDrain, own::unique_owner<ITemporalFrameGenerator>& frameGenerator)
 {
     if (frameGenerator) return { TemporalStatus::AlreadyInitialized };
     const auto validation = ValidateTemporalFrameGenerationConfig(configuration);

@@ -1,4 +1,5 @@
-﻿#pragma once
+#pragma once
+#include "../../../Utility_Framework/Ownership.h"
 #include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 #include <d3d12.h> // 5a — 인터페이스가 더는 이것을 물지 않는다(비유니티가 잡았다)
@@ -19,9 +20,9 @@ class DX12Encoder final : public RHIEncoder
         ResetState(commandList);
     }
 
-    void SetRecordingResources(const std::shared_ptr<const DX12RecordingResources>& recording)
+    void SetRecordingResources(const own::shared_owner<const DX12RecordingResources>& recording)
     {
-        if (m_recordingResources != recording)
+        if (m_recordingResources.operator->() != recording.operator->())
         {
             m_recordingResources = recording;
             m_heapsBound = false;
@@ -190,7 +191,7 @@ class DX12Encoder final : public RHIEncoder
     /// [0] = Graphics, [1] = Compute. 둘은 DX12에서 완전히 별개 상태다.
     ID3D12RootSignature* m_boundRootSignature[2]{nullptr, nullptr};
 
-    std::shared_ptr<const DX12RecordingResources> m_recordingResources;
+    own::shared_owner<const DX12RecordingResources> m_recordingResources;
     bool m_heapsBound{false};
 
     uint32_t m_dropped{0};

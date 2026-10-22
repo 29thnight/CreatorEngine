@@ -1,0 +1,91 @@
+{
+  "passed": true,
+  "releasedBytes": 39689777041,
+  "releasedGiB": 36.96398533973843,
+  "duplicatePdbFilesRemoved": 71,
+  "uniquePdbFilesPreserved": 14,
+  "stackCsvFilesRemoved": 2,
+  "legacyHtmlRedirects": 4,
+  "legacyHtmlSourcesRemoved": 4,
+  "sharedViewer": "/Artifacts/timeline-viewer/index.html",
+  "catalog": "Artifacts/timeline-viewer/catalog.json",
+  "dataPolicy": "Original ETL, CEPROF, analysis JSON, reports and distinct PDB data retained. Only byte-identical PDB copies and regenerable intermediates removed.",
+  "symbolResolution": {
+    "passed": true,
+    "runtimeSymbolRows": 314
+  },
+  "viewerVerification": {
+    "passed": true,
+    "newest": {
+      "id": "on-a-etw",
+      "identities": 128863,
+      "collections": 9,
+      "overflow": false
+    },
+    "legacy": {
+      "id": "after-etw",
+      "status": "after-etw · 1,529,448 CPU 스코프 · 뷰 구간 480개 · 135 TID · ETW 상태 있음 · t=0 CEPROF 첫 프레임 · CPU·GPU QPC 시간축 ms · GPU 67,440 spans"
+    },
+    "redirect": "http://127.0.0.1:8765/Artifacts/timeline-viewer/index.html?manifest=%2FArtifacts%2Fgpu-marker-blob-20261022%2Ftimeline%2Fviewer.json&dataset=on-b-baseline",
+    "errors": []
+  },
+  "catalogVerification": {
+    "passed": true,
+    "measurements": [
+      {
+        "manifest": "/Artifacts/node-declare-parallel-20261021/timeline/viewer.json",
+        "datasets": 4,
+        "dataFiles": 8,
+        "reportExists": true
+      },
+      {
+        "manifest": "/Artifacts/container-reuse-20261021/timeline/viewer.json",
+        "datasets": 4,
+        "dataFiles": 8,
+        "reportExists": true
+      },
+      {
+        "manifest": "/Artifacts/container-reuse-isolated-20261021/timeline/viewer.json",
+        "datasets": 6,
+        "dataFiles": 12,
+        "reportExists": true
+      },
+      {
+        "manifest": "/Artifacts/packet-group-reuse-20261021/timeline/viewer.json",
+        "datasets": 6,
+        "dataFiles": 12,
+        "reportExists": true
+      },
+      {
+        "manifest": "/Artifacts/packet-group-reuse-final-20261021/timeline/viewer.json",
+        "datasets": 6,
+        "dataFiles": 12,
+        "reportExists": true
+      },
+      {
+        "manifest": "/Artifacts/scene-preparation-ownership-20261021/timeline/viewer.json",
+        "datasets": 6,
+        "dataFiles": 12,
+        "reportExists": true
+      },
+      {
+        "manifest": "/Artifacts/owner-borrow-20261022/timeline/viewer.json",
+        "datasets": 6,
+        "dataFiles": 12,
+        "reportExists": true
+      },
+      {
+        "manifest": "/Artifacts/ownership-update-20261022/timeline/viewer.json",
+        "datasets": 6,
+        "dataFiles": 12,
+        "reportExists": true
+      },
+      {
+        "manifest": "/Artifacts/gpu-marker-blob-20261022/timeline/viewer.json",
+        "datasets": 6,
+        "dataFiles": 12,
+        "reportExists": true
+      }
+    ]
+  }
+}

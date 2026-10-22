@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "AnimationController.h"
 #include "AnimationState.h"
 #include "AniBehavior.h"
@@ -93,7 +94,7 @@ void AnimationController::SetCurState(std::string stateName)
 	}
 }
 
-std::shared_ptr<AniTransition> AnimationController::CheckTransition()
+own::shared_owner<AniTransition> AnimationController::CheckTransition()
 {
 	auto& playback = GetPlayback();
 	if (!playback.currentState)
@@ -102,7 +103,7 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 		for (const auto& state : StateVec)
 		{
 			if (!state || state->m_isAny || state->AnimationIndex < 0) continue;
-			playback.currentState = state.get();
+			playback.currentState = state.operator->();
 			m_curState = playback.currentState;
 			playback.animationIndex = state->AnimationIndex;
 			if (m_owner) m_owner->SetSelectedClipIndex(playback.animationIndex);
@@ -111,7 +112,7 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 	}
 	if (!playback.currentState) return nullptr;
 
-	AnimationState* aniState = GetAniState().get();
+	AnimationState* aniState = GetAniState().operator->();
 	if (aniState)
 	{
 		if (!aniState->Transitions.empty())
@@ -142,7 +143,7 @@ std::shared_ptr<AniTransition> AnimationController::CheckTransition()
 	}
 	if (!transState || transState->Transitions.empty()) return nullptr;
 
-	
+
 	for (auto& trans : transState->Transitions)
 	{
 		if (playback.isBlending)
@@ -177,7 +178,7 @@ void AnimationController::UpdateState()
 	{
 		auto& playback = GetPlayback();
 		auto& ownerControl = m_owner->GetPlaybackControl();
-		
+
 		playback.endAnimation = false;
 		if (playback.needBlend == true)
 		{
@@ -220,7 +221,7 @@ void AnimationController::UpdateState()
 		ownerControl.nextClipIndex = playback.nextState->AnimationIndex;
 		playback.nextAnimationIndex = playback.nextState->AnimationIndex;
 
-		playback.currentTransition = trans.get();
+		playback.currentTransition = trans.operator->();
 		playback.needBlend = true;
 		ownerControl.isBlending = true;
 		playback.isBlending = true;
@@ -273,7 +274,7 @@ int AnimationController::GetAnimatonIndexformState(std::string stateName)
 	}
 }
 
-std::shared_ptr<AnimationState> AnimationController::GetAniState()
+own::shared_owner<AnimationState> AnimationController::GetAniState()
 {
 	for (auto& state : StateVec)
 	{
@@ -291,7 +292,7 @@ AnimationState* AnimationController::CreateState(const std::string& stateName, i
 		return it;
 	}
 
-	auto state = std::make_shared<AnimationState>(this, stateName);
+	auto state = own::make_shared<AnimationState>(this, stateName);
 	if (isAny == true)
 	{
 		state->m_isAny = true;
@@ -304,12 +305,12 @@ AnimationState* AnimationController::CreateState(const std::string& stateName, i
 	StateVec.back()->index = StateVec.size() - 1;
 	StateNameSet.insert(stateName);
 	m_nameToState[stateName] = state;
-	return state.get();
+	return state.operator->();
 }
 
-std::shared_ptr<AnimationState> AnimationController::CreateState_UI()
+own::shared_owner<AnimationState> AnimationController::CreateState_UI()
 {
-	std::string uniqueName = "NewState"; 
+	std::string uniqueName = "NewState";
 	std::string baseName = "NewState";
 	int count = 0;
 	while(StateNameSet.find(uniqueName) !=  StateNameSet.end())
@@ -317,7 +318,7 @@ std::shared_ptr<AnimationState> AnimationController::CreateState_UI()
 		uniqueName = baseName + " " + std::to_string(count++);
 	}
 
-	auto state = std::make_shared<AnimationState>(this, uniqueName);
+	auto state = own::make_shared<AnimationState>(this, uniqueName);
 	StateNameSet.insert(uniqueName);
 	StateVec.push_back(state);
 	StateVec.back()->index = StateVec.size() - 1;
@@ -328,19 +329,19 @@ std::shared_ptr<AnimationState> AnimationController::CreateState_UI()
 void AnimationController::DeleteState(std::string stateName)
 {
 	auto it = std::find_if(StateVec.begin(), StateVec.end(),
-		[&](const std::shared_ptr<AnimationState>& state)
+		[&](const own::shared_owner<AnimationState>& state)
 		{
 			return state->m_name == stateName;
 		});
 
 	if (it == StateVec.end()) return;
 	auto& playback = GetPlayback();
-	if (it->get() == playback.currentState)
+	if (it->operator->() == playback.currentState)
 	{
 		playback.currentState = nullptr;
 		m_curState = nullptr;
 	}
-	if (it->get() == playback.nextState)
+	if (it->operator->() == playback.nextState)
 	{
 		playback.nextState = nullptr;
 		playback.currentTransition = nullptr;
@@ -351,8 +352,8 @@ void AnimationController::DeleteState(std::string stateName)
 		m_owner->GetPlaybackControl().isBlending = false;
 	}
 	else if (playback.currentTransition
-		&& (playback.currentTransition->curState == it->get()
-			|| playback.currentTransition->nextState == it->get()))
+		&& (playback.currentTransition->curState == it->operator->()
+			|| playback.currentTransition->nextState == it->operator->()))
 	{
 		playback.currentTransition = nullptr;
 		playback.nextState = nullptr;
@@ -367,9 +368,9 @@ void AnimationController::DeleteState(std::string stateName)
 	{
 		auto& transitions = state->Transitions;
 
-		std::erase_if(transitions, [&](const std::shared_ptr<AniTransition>& t)
+		std::erase_if(transitions, [&](const own::shared_owner<AniTransition>& t)
 		{
-			return t->GetCurState() == stateName 
+			return t->GetCurState() == stateName
 				|| t->GetNextState() == stateName;
 		});
 	}
@@ -385,12 +386,12 @@ void AnimationController::DeleteTransiton(const std::string& fromStateName, cons
 
 	auto& transitions = state->Transitions;
 	auto& playback = GetPlayback();
-	
-	std::erase_if(transitions, [&](const std::shared_ptr<AniTransition>& t)
+
+	std::erase_if(transitions, [&](const own::shared_owner<AniTransition>& t)
 	{
 		const bool remove = t->GetCurState() == fromStateName
 			&& t->GetNextState() == toStateName;
-		if (remove && playback.currentTransition == t.get())
+		if (remove && playback.currentTransition == t.operator->())
 		{
 			playback.currentTransition = nullptr;
 			playback.nextState = nullptr;
@@ -410,7 +411,7 @@ AnimationState* AnimationController::FindState(std::string stateName)
 	{
 		if (state->m_name == stateName)
 		{
-			return state.get();
+			return state.operator->();
 		}
 	}
 
@@ -424,18 +425,18 @@ AniTransition* AnimationController::CreateTransition(const std::string& curState
 	for (auto& trans : curstate->Transitions)
 	{
 		if (trans->GetCurState() == curStateName && trans->GetNextState() == nextStateName)
-			return trans.get();
+			return trans.operator->();
 	}
-	
+
 	auto nextstate = FindState(nextStateName);
 	if (!nextstate) return nullptr;
-	auto transition = std::make_shared<AniTransition>();
+	auto transition = own::make_shared<AniTransition>();
 	transition->SetCurState(curstate);
 	transition->SetNextState(nextstate);
 	transition->m_ownerController = this;
 	transition->m_name = curStateName + " to " + nextStateName;
 	curstate->Transitions.push_back(transition);
-	return transition.get();
+	return transition.operator->();
 }
 
 

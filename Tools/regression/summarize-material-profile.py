@@ -177,11 +177,15 @@ def snapshot(data):
         markers.append(dict(name=r.string(), file=r.string(), line=line, kind=kind))
     r.end()
     threads = {}
+    thread_ids = {}
+    thread_metadata = {}
     r = chunks[3][1]
     for _ in range(r.count(17)):
         slot, osid, kind, order = r.get('IIBI')
         require(slot not in threads, 'Duplicate thread slot')
         threads[slot] = r.string()
+        thread_ids[slot] = osid
+        thread_metadata[slot] = dict(osid=osid, kind=kind, order=order)
     r.end()
     descriptors = {}
     if 6 in chunks:
@@ -217,7 +221,7 @@ def snapshot(data):
             frame['measurements'] = [measurement(r, version >= 6, version == 8) for _ in range(r.count(100))]
         r.end()
     return dict(version=version, hz=hz, complete=bool(complete), unacked=unacked, frames=frames,
-                markers=markers, threads=threads, descriptors=descriptors, droppedCounters=dropped_counters,
+                markers=markers, threads=threads, threadIds=thread_ids, threadMetadata=thread_metadata, descriptors=descriptors, droppedCounters=dropped_counters,
                 finalized=True, losses={})
 
 

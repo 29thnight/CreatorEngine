@@ -1,9 +1,9 @@
 // Stage implementation included by MaterialGraphSceneHost.cpp inside material_graph.
-SceneFirstCullOutputs SceneHost::FirstCullStage::DeclareFirstCull(const own::shared_owner<const FrameInput>& prepared,
+SceneFirstCullOutputs SceneHost::FirstCullStage::DeclareFirstCull(const own::shared_owner<const Frame>& prepared,
                                                                   EnhancedRenderGraph& graph, RGHandle geometry) const
 {
     ce::profile_scope profile{ce::marker<"MaterialDeclareFirstCull">()};
-    const auto frame = prepared;
+    const auto& frame = prepared;
     if (!frame || frame->draws.empty())
     {
         RequireStage(geometry, {}, "METEOR.Scene.Cull.First received geometry for an empty frame.");

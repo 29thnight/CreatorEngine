@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 
 #include "../ModelLoader.h"
 
@@ -35,14 +36,14 @@ namespace experiment::cooked
         // 둘 중 하나는 null 이어도 된다. 없는 쪽을 요구하는 preference 는
         // 실패로 보고한다 — 조용히 다른 쪽으로 넘어가지 않는다. preference 를
         // 무시하는 것은 호출자가 고른 정책을 뒤집는 일이다.
-        ResolvingModelDecoder(std::unique_ptr<IModelDecoder> cookedDecoder,
-            std::unique_ptr<IModelDecoder> sourceDecoder) noexcept;
+        ResolvingModelDecoder(own::unique_owner<IModelDecoder> cookedDecoder,
+            own::unique_owner<IModelDecoder> sourceDecoder) noexcept;
 
         [[nodiscard]] ModelDecodeResult Decode(
             const ModelLoadRequest& request) override;
 
     private:
-        std::unique_ptr<IModelDecoder> cooked_{};
-        std::unique_ptr<IModelDecoder> source_{};
+        own::unique_owner<IModelDecoder> cooked_{};
+        own::unique_owner<IModelDecoder> source_{};
     };
 }

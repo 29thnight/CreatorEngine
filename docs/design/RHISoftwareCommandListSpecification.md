@@ -448,72 +448,16 @@ UE 기준 루트: `C:/Program Files/Epic Games/UE_5.6/Engine`, 버전 5.6.1 CL44
 
 UE의 명령 분리 원칙을 현재 RHI 경계에 적용한다. UE의 allocator 구현, linked-list 저장 형식, task thread 배치, 모든 RDG 기능을 동일하게 복제하는 계약은 아니다. UE식 명령 목록 도입과 고정 프레임 지연 설정은 별도다.
 
-## 15. RDG setup·선언·compile 작업 계층 — 2026-10-21 추가 계약
+## 15. 노드 선언 직렬화와 CPU 저장소 재사용 — 2026-10-21 수정
 
-이 절의 수용까지 전체 RDG 전환의 완료 조건에 포함한다. RHI 기록·번역 완료를 RDG setup/compile 완료로 대신하지 않는다. GPU 자원 의존성과 CPU 작업 의존성은 별개다. UE의 AddSetupTask/Compile·Execute wait point 원칙을 적용하며 모든 AddPass 호출을 동시에 실행하는 계약은 아니다.
+제품 `LivePipelineDesc::DeclareAll`은 활성 노드를 등록 순서대로 한 번씩 선언한다. 노드별 분기 그래프, 입력 스냅샷, `Wait → Merge → Publish` 경로와 `RGSetupTaskGraph`를 제거했다. `parallelDeclare`, `setupDependencies`, `CreateDeclarationBranch`, `MergeDeclarationBranch`는 제공하지 않는다. 노드 선언 병렬화를 구현 완료로 표시하지 않는다. 소프트웨어 명령 목록의 기존 병렬 기록과 비동기 RHI 번역·제출은 유지한다.
 
-### 15.1 API와 실행 경계
-
-- `RGSetupTaskHandle`: 그래프 소유자·세대·작업 번호를 가진 불투명 핸들. 다른 그래프·Reset 전 세대·아직 등록되지 않은 작업 참조를 거절한다.
-- `RGSetupWaitPoint::{Compile, Execute}`: compile에 필요한 CPU 결과와 기록 직전까지 준비하면 되는 CPU 결과를 구분한다.
-- `RGSetupTaskGraph::AddTask(marker, prerequisites, waitPoint, callback)`: 기존 공용 scheduler에 제출한다. callback은 작업 소유 결과만 쓴다. 선행 실패는 후손 실행을 막고 독립 가지는 합류한다.
-- `Wait(handle)`와 `Join(waitPoint)`는 owner가 남은 허용 작업을 보조 실행하며 기다린다. owner 밖의 임의 graph mutation과 thread-affine 서비스 호출을 허용하지 않는다.
-- `Drain/Reset`: 모든 accepted callback과 캡처 해제 뒤 세대를 바꾸고 저장소 용량을 재사용한다. 실패·취소·shutdown에서도 writer가 남은 저장소를 파괴하지 않는다.
-- `LivePassNode`의 CPU 준비와 graph 게시를 분리한다. CPU 준비 작업 의존성은 별도로 선언한다. 기존 reads/writes/modifies의 GPU 슬롯 연결을 CPU 공유 상태의 배타성 증명으로 사용하지 않는다.
-- 노드별 불변 준비 결과와 독립 writer 저장소를 사용한다. 공용 blackboard·pass/resource 배열·버전 계보의 게시와 핸들 발급은 owner가 결정적 순서로 수행한다. worker 완료 순서로 RGHandle/RGPassId를 바꾸지 않는다.
-
-### 15.2 병렬화와 수명
-
-- 독립 CPU 준비는 fork한다. consumer 노드의 게시 전에 해당 결과만 join한다. Compile/Execute wait point는 남은 등록 작업을 합류한다.
-- 비동기 pass-resource setup은 등록된 핸들의 변경 없는 저장소만 처리한다. producer의 재할당과 Reset을 작업 수명 밖으로 둔다. 기존 선언 packet job과 중복 처리하지 않는다.
-- compile은 실제 데이터 의존성을 따라 자원·배리어·기록 계획 작업을 나눈다. 자원 할당과 descriptor·upload 서비스의 owner-thread 제약을 유지한다. GPU 상태 계획을 병렬 CPU 완료 순서로 확정하지 않는다.
-- callback, 입력 snapshot, arena, prepared result, node instance의 수명은 최종 writer 합류까지 유지한다. GPU 참조는 기존 retirement까지 별도로 유지한다.
-- 조건부 노드, per-view 상태, afterDeclare 관측, 재진입, 예외·취소·resize/reload가 결정적 게시와 호환돼야 한다. 부분 setup 실패 프레임을 제출하거나 자동 재실행하지 않는다.
-
-### 15.3 제출 중첩·식별자·수용
-
-- RT→RHI 간 대기 지점을 구체적인 소비자와 함께 기록한다. CPU admission/translation/native-submit/GPU completion을 혼용하지 않는다. temporal/interop 등 필요한 소비자만 정확한 완료를 기다린다.
-- publication의 실제 sourceEngineFrame과 view identity를 frame input→graph→software batch→translation→submit에 전달한다. 없는 값은 unavailable이며 추측하지 않는다.
-- `CREATOR_RDG_PARALLEL_SETUP=0/1`의 같은 코드·같은 계측 A/B를 제공한다. 병렬 모드에서도 작은 작업의 inline 실행과 정확한 동일 결과를 유지한다.
-- 실제 제품 노드의 fork 실행, consumer join, Compile/Execute join, callback 소유자 소멸, 실패한 선행/독립 가지, stale handle·잘못된 dependency를 회귀 검사한다. 작업을 제출한 횟수를 병렬 실행 증거로 사용하지 않는다.
-- Debug CreatorRobot의 픽셀·깊이·readback, 플레이·reload·정상 종료를 검사한다. 동일 장면/해상도/worker/전경/예열/길이에서 기록 ON/OFF와 ETW를 전후 수집한다. CPU Running/Ready/Waiting, GPU timestamp, RHI identity, 할당·in-flight를 JSON과 로컬 HTML에 보존한다.
-
-### 15.4 구현 순서와 완료 기록
-
-1. setup 작업 API·소유권·오류·회귀.
-2. 노드 CPU 준비/게시 분리와 제품 소비자 연결·개별 join.
-3. 비동기 resource setup 및 compile 작업 분할·단계 join.
-4. source frame/view 전달과 RT/RHI 소비자 대기 확인.
-5. 실제 Debug 빌드·정확성 검사·동일 조건 전후 측정·데이터/HTML.
-
-각 단계의 구현·빌드·실행 결과는 `Artifacts/rdg-setup-forkjoin-20261021`에 기록한다. 이 절은 현재 작업의 요구사항이며, 절을 추가한 것만으로 구현·수용 완료를 뜻하지 않는다.
-### 15.5 현재 구현 경계와 제품 연결
-
-- `EnhancedRenderGraph::SetupTasks()`가 setup 작업 저장소를 소유한다. Compile은 Compile 작업을, 직접 실행·software/parallel 기록·owned queue 제출은 Execute 작업을 합류한다. Reset과 소멸은 accepted writer를 먼저 종료한다.
-- `LivePassNode::parallelDeclare`는 공유 CPU 상태를 조사한 뒤에만 켠다. `setupDependencies`는 앞선 노드 이름을 명시한다. GPU 슬롯 의존성은 준비된 입력의 가용성을 판단하며 CPU 배타성 opt-in을 대체하지 않는다.
-- `LiveBlackboard::CopySnapshotFrom`은 reads/modifies의 값을 작업별로 복사하고 저장 키·목록 용량을 재사용한다. `CreateDeclarationBranch(inputs)`는 필요한 자원만 로컬 핸들로 보관한다. `MergeDeclarationBranch`와 `Publish`는 원래 노드 순서로 최종 자원·버전을 게시한다. 기록 callback은 원래 branch 핸들을 최종 native 자원으로 복원한다. branch 저장소는 그래프 Reset 후 재사용한다.
-- 제품 opt-in은 현재 `SSAO`, `METEOR.Scene.LightTiles` 두 노드다. SceneHost의 기하·컬링·그림자·표면 선언은 공용 frame/stage 상태와 graph identity에 묶여 있어 직렬이다. 해당 상태의 분리와 추가 제품 노드 연결은 남은 단계이며, 두 노드 연결을 전체 노드 병렬화 완료로 계산하지 않는다.
-- 캐시 미스의 final-state/repeated-pass 검증은 독립 작업으로 실행하고 owner의 signature 생성과 합류한다. 위상 순서·컬링·버전 계보·배리어 상태 변경과 native transient 생성은 owner가 수행한다. 이 구현을 UE의 모든 compile 작업과 동일하다고 표시하지 않는다.
-- `CREATOR_RDG_PARALLEL_SETUP` 기본값은 0이다. 0은 원래 직렬 경로를 실행하며 준비 계획·snapshot을 생성하지 않는다. 1은 새 제품 경로를 명시적으로 실행한다. 실패 시 직렬 자동 재시도는 없다. 기본값 전환은 제품 정확성과 전체 프레임 성능 수용 뒤 결정한다.
-- sourceEngineFrame/view는 현재 software batch와 profiler에 전달되는 실제 publication 값을 유지한다. 입력에서 제공되지 않은 식별자는 새 setup 계층에서 생성하거나 추정하지 않는다.
-
-회귀는 `verify-rdg-setup-task-graph.ps1`의 선행 순서·실제 중첩·실패 후손 차단·독립 가지 합류·캡처 해제·stale 핸들 검사를 포함한다. `dx12.rendergraph`는 branch의 로컬 ID 충돌 분리·버전 게시·native buffer 복원·Reset 후 alias 무효화를 추가 검사한다. 제품 측정과 정확성의 결과는 실행이 끝난 뒤 별도 JSON에 확정한다.
-
-### 15.6 준비 저장소 재사용
-
-- 노드별 의존 인덱스는 AddNode 때 한 번 구성한다. 매 프레임 작업 계획·입력 핸들 목록·blackboard 컨테이너를 새로 만들지 않고 보유 용량을 재사용한다.
-- 선언 branch 객체와 자원·버전 메타데이터 저장소는 그래프별 풀에 남긴다. 합류 후 게시되는 usage와 반복 phase view는 기존 declaration/packet RenderArena에 저장한다. 일반·분할·반복 패스 게시용 임시 vector는 만들지 않는다.
-- root Reset은 accepted setup writer를 먼저 합류하고 기존 GPU retirement 경계를 통과한 다음 callback·메타데이터를 비우고 아레나를 reset한다. 비동기 RHI가 읽는 중인 그래프의 아레나를 조기 reset하지 않는다.
-- Compile join 후 Compile 작업 추가, Execute join 후 모든 작업 추가는 거부한다. 작업 의존 핸들 변환용 scratch 목록은 작업 그래프 내부 용량을 재사용한다.
-
-### 15.7 2026-10-21 재사용 변경 검증
-
-- Debug 빌드, worker 1·4·8 작업 그래프 회귀, DX12 GPU 검증을 통과했다. branch 일반·반복·분할 패스 게시, stale alias 거부, 비활성 modifier 통과, 결정적 게시와 실제 노드 중첩을 검사했다.
-- CreatorRobot Debug Play에서 초기 병렬판과 재사용판의 출력 비교, 최신 직렬/병렬 출력 비교, 장면 재로드와 정상 종료를 통과했다. 기록 ON/OFF·ETW 조건과 해상도·worker 8개·전경 상태를 맞췄다. 비교에 사용한 네 최신 CEPROF 기록과 초기 병렬 기록은 손실 0이다. 손실 1건이 있던 초기 직렬 baseline은 제외했다.
-- 초기 병렬판 → 재사용판의 ETW ON 평균: 선언 6.292→5.347ms, 입력 snapshot 0.238→0.056ms, 렌더 스레드 프레임 32.606→32.067ms. 저장소 재사용 묶음 변경의 비교이며, 아레나 하나만 분리한 실험은 아니다.
-- 같은 최신 바이너리의 직렬 대조군은 선언 4.967ms·렌더 스레드 프레임 31.809ms다. 재사용판도 이 대조군보다 느리며 8.333ms 목표에 미달한다. 병렬 setup 기본값 0을 유지한다.
-- 근거: `Artifacts/rdg-setup-forkjoin-final-20261021/measurement.json`, `arena-reuse-comparison.json`, `json/{before,after}/manifest.json`. 로컬 HTML은 같은 폴더의 `index.html`과 `timeline-gpu.html`이다. xperf 전체 provider 변환의 Invalid Event 진단도 JSON에 보존하며 원본 ETL을 유지한다.
-
+- 반복 패스 장벽 계획은 물리 원소를 유지하고 활성 개수만 초기화한다. 각 원소의 전환·UAV 배열 용량을 보존한다. graph `Reset`은 기존 queue/GPU 완료 계약을 따른다.
+- `IndirectMaterialBatchPool`은 준비 소유 스레드가 회수한다. 풀 외부의 공유 소유자가 하나라도 남으면 해당 묶음을 재사용하지 않는다. 작업자에게 전달하기 전에 객체를 확보한다. 기존 프레임·명령 callback 및 RHI/GPU 완료 수명은 유지한다.
+- 회수 시 이전 GPU 버퍼는 기존 `ReleaseSceneBuffer`와 지연 풀 경로로 반납한다. 버킷의 roots, 패킷의 scan/slice 배열과 객체 자체는 유지한다. 패킷 모드는 저장소 존재 여부와 별도로 초기화한다.
+- 기록 작업 그래프는 후보 노드, target/wave 묶음, 이전 target, 단위 역매핑, frontier, required 및 critical-path 배열을 재사용한다. 잘못된 입력은 기존 실행 그래프를 변경하지 않는다.
+- 검증과 측정 근거는 `Artifacts/container-reuse-20261021`에 기록했다. Debug 빌드, 기록 작업 그래프 24,550개 검사와 mutation 검사, GPU validation, CreatorRobot 전후·재로드 출력 비교가 통과했다. 출력 7개 attachment의 최대 차이는 0이다.
+- 동일 조건의 두 뷰 `RenderThreadFrame` 평균은 기록 ON·ETW 없음 48.008 → 31.186ms, ETW 포함 52.947 → 36.558ms다. 컨테이너 재사용과 노드 분기 제거의 합산 효과이며, Debug 120Hz의 8.333ms 예산에는 미달한다. 노드 선언은 RT TID 43792에서만 기록됐고 노드별 join·snapshot·publish 이벤트는 0개다.
 
 ## 16. 제품 RT/RHI 실행 경계 — 2026-10-21
 
