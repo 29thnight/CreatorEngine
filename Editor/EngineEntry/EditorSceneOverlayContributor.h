@@ -12,6 +12,6 @@
 class EditorSceneOverlayContributor final : public IRenderFeatureContributor
 {
 public:
-    void Contribute(LivePipelineDesc& pipeline,
-        const RenderFeatureContext& context) override;
+  std::string_view GetName() const noexcept override { return "Editor.SceneOverlay"; }
+  void Contribute(LivePipelineDesc& pipeline, const RenderFeatureContext& context) override;
 };

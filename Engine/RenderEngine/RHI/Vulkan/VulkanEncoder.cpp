@@ -647,41 +647,9 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
             }
             if (!entry.IsValid()) return;
 
-            VkImageView view = entry.view;
-            if (RHIBindingDesc::Dim::TextureCube == desc.dim)
-            {
-                view = m_recordingResources
-                           ? m_recordingResources->ResolveCubeView(desc.resource, desc.format, desc.mostDetailedMip,
-                                                                   desc.mipLevels, desc.firstSlice)
-                           : m_resources->GetOrCreateCubeView(m_device, desc.resource, desc.format,
-                                                              desc.mostDetailedMip, desc.mipLevels, desc.firstSlice);
-            }
-            else if (RHIBindingDesc::Dim::Default != desc.dim)
-            {
-                // 기본 2D/배열/3D 전체 뷰는 리소스 엔트리의 view와 같다.
-                // 부분 밉·부분 배열 뷰는 다음 소비자가 청구할 때 캐시를 넓힌다.
-                const RHIFormat format = (RHIFormat::Unknown == desc.format)
-                    ? entry.format : desc.format;
-                // DX12는 D32 자원을 R32_FLOAT SRV로 보는 어휘를 쓴다. 공용
-                // RHIBindingDesc도 그 포맷을 그대로 전달하지만 Vulkan에서는
-                // depth image의 기존 D32 view로 샘플하는 것이 같은 뜻이다.
-                // R32 color view를 새로 만들려 하면 mutable-format 이미지가
-                // 필요하고, 무엇보다 depth aspect를 잃는다.
-                const bool depthSrvAlias = RHIFormat::D32Float == entry.format &&
-                    RHIFormat::R32Float == format &&
-                    RHIBindingDesc::Kind::ShaderResource == desc.kind;
-                const bool wholeMip = 0 == desc.mostDetailedMip &&
-                    desc.mipLevels == entry.mipLevels;
-                const bool wholeSlice =
-                    (RHIBindingDesc::Dim::Texture2D == desc.dim) ||
-                    (RHIBindingDesc::Dim::Texture3D == desc.dim) ||
-                    (0 == desc.firstSlice && desc.sliceCount == entry.depthOrArraySize);
-                if ((!depthSrvAlias && format != entry.format) || !wholeMip || !wholeSlice)
-                {
-                    NoteUnimplemented("SetBindings(부분 이미지 뷰 미지원)");
-                    return;
-                }
-            }
+            const VkImageView view = m_recordingResources
+                ? ResolveVulkanImageView(entry, desc)
+                : m_resources->GetOrCreateImageView(m_device, desc);
 
             if (VK_NULL_HANDLE == view)
             {
@@ -700,21 +668,15 @@ void VulkanEncoder::SetBindings(RHIBindPoint bindPoint, uint32_t slot,
             // 따라 layout이 달라진다. 반대로 SRV/UAV 종류만 보면 깊이를 읽기
             // 전용 DSV와 동시에 샘플하는 DepthReadShaderResource를 구별하지
             // 못한다. 로컬 barrier 결과가 두 경우를 모두 정확히 보존한다.
-            const auto recorded = m_recordedImageLayouts.find(desc.resource.id);
-            if (recorded != m_recordedImageLayouts.end())
+            VulkanImageViewEntry bindingView;
+            if (!DescribeVulkanImageView(entry, desc, bindingView))
             {
-                pending.image.imageLayout = recorded->second;
+                NoteUnimplemented("SetBindings(invalid image subresource range)");
+                return;
             }
-            else if (VK_DESCRIPTOR_TYPE_STORAGE_IMAGE == target.type)
-            {
-                pending.image.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-            }
-            else
-            {
-                // 전이가 필요 없던 첫 바인딩의 안전한 기본값. 읽기 전용 깊이
-                // 동시 바인딩은 위 로컬 전이에 잡힌다.
-                pending.image.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-            }
+            pending.image.imageLayout = GetRecordedImageLayout(desc.resource, bindingView.range,
+                VK_DESCRIPTOR_TYPE_STORAGE_IMAGE == target.type ? VK_IMAGE_LAYOUT_GENERAL
+                                                                 : VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
         }
         resolved.push_back(pending);
     }
@@ -858,6 +820,65 @@ void VulkanEncoder::ClearRenderTargetRect(const RHIRenderTargetBinding&,
     NoteUnimplemented("ClearRenderTargetRect");  // 〃
 }
 
+VkImageLayout VulkanEncoder::GetRecordedImageLayout(RHITextureHandle texture,
+    const RHITextureSubresourceRange& range, VkImageLayout fallback) const
+{
+    const auto overlaps = [](const RHITextureSubresourceRange& left, const RHITextureSubresourceRange& right)
+    {
+        return (static_cast<uint8_t>(left.aspect) & static_cast<uint8_t>(right.aspect)) != 0 &&
+               left.firstMip < right.firstMip + right.mipCount && right.firstMip < left.firstMip + left.mipCount &&
+               left.firstLayer < right.firstLayer + right.layerCount &&
+               right.firstLayer < left.firstLayer + left.layerCount;
+    };
+    for (auto entry = m_recordedImageLayouts.rbegin(); entry != m_recordedImageLayouts.rend(); ++entry)
+    {
+        if (entry->texture != texture || !overlaps(entry->range, range))
+        {
+            continue;
+        }
+        if (entry->range.firstMip <= range.firstMip &&
+            entry->range.firstMip + entry->range.mipCount >= range.firstMip + range.mipCount &&
+            entry->range.firstLayer <= range.firstLayer &&
+            entry->range.firstLayer + entry->range.layerCount >= range.firstLayer + range.layerCount &&
+            (static_cast<uint8_t>(entry->range.aspect) & static_cast<uint8_t>(range.aspect)) ==
+                static_cast<uint8_t>(range.aspect))
+        {
+            return entry->layout;
+        }
+        break;
+    }
+    std::optional<VkImageLayout> selected;
+    for (uint8_t aspect = 1; aspect <= static_cast<uint8_t>(RHITextureAspect::Stencil); aspect <<= 1)
+    {
+        if ((static_cast<uint8_t>(range.aspect) & aspect) == 0)
+        {
+            continue;
+        }
+        for (uint32_t layer = range.firstLayer; layer < range.firstLayer + range.layerCount; ++layer)
+        {
+            for (uint32_t mip = range.firstMip; mip < range.firstMip + range.mipCount; ++mip)
+            {
+                VkImageLayout layout = fallback;
+                const RHITextureSubresourceRange cell{mip, 1, layer, 1, static_cast<RHITextureAspect>(aspect)};
+                for (auto entry = m_recordedImageLayouts.rbegin(); entry != m_recordedImageLayouts.rend(); ++entry)
+                {
+                    if (entry->texture == texture && overlaps(entry->range, cell))
+                    {
+                        layout = entry->layout;
+                        break;
+                    }
+                }
+                if (selected && *selected != layout)
+                {
+                    throw std::invalid_argument("Vulkan image view spans incompatible subresource layouts");
+                }
+                selected = layout;
+            }
+        }
+    }
+    return selected.value_or(fallback);
+}
+
 void VulkanEncoder::ResourceBarriers(const RHIBarrierBatch& batch)
 {
     if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources || batch.IsEmpty())
@@ -888,11 +909,14 @@ void VulkanEncoder::ResourceBarriers(const RHIBarrierBatch& batch)
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.image = entry.image;
-        barrier.subresourceRange.aspectMask = AspectOf(entry.format);
-        barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
-        barrier.subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;
+        barrier.subresourceRange = ToVulkanSubresourceRange(transition.range, entry.mipLevels,
+            entry.is3D ? 1u : entry.depthOrArraySize, entry.format, m_resources->SupportsSeparateDepthStencilLayouts());
+        ApplyVulkanExternalImageOwnership(transition, entry.externalShared, entry.queueFamily, barrier);
         imageBarriers.push_back(barrier);
-        m_recordedImageLayouts[transition.texture.id] = after.layout;
+        RHITextureSubresourceRange resolved;
+        ResolveRHITextureSubresourceRange(transition.range, entry.mipLevels,
+            entry.is3D ? 1u : entry.depthOrArraySize, RHITextureAspects(entry.format), resolved);
+        m_recordedImageLayouts.push_back({transition.texture, resolved, after.layout});
     }
 
     for (const RHIBufferTransition& transition : batch.bufferTransitions)
@@ -910,8 +934,13 @@ void VulkanEncoder::ResourceBarriers(const RHIBarrierBatch& batch)
         barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
         barrier.buffer = entry.buffer;
-        barrier.offset = 0;
-        barrier.size = VK_WHOLE_SIZE;
+        RHIBufferSubresourceRange resolved;
+        if (!ResolveRHIBufferSubresourceRange(transition.range, entry.bytes, resolved))
+        {
+            throw std::invalid_argument("Vulkan buffer transition has an invalid range");
+        }
+        barrier.offset = resolved.offset;
+        barrier.size = resolved.size;
         bufferBarriers.push_back(barrier);
     }
 
@@ -1017,9 +1046,54 @@ void VulkanEncoder::CopyResource(RHITextureHandle destination, RHITextureHandle 
         static_cast<uint32_t>(regions.size()), regions.data());
 }
 
-void VulkanEncoder::CopyTexture(RHITextureHandle, RHITextureHandle, uint32_t, uint32_t)
+void VulkanEncoder::CopyTexture(RHITextureHandle destination, RHITextureHandle source,
+    uint32_t destinationSubresource, uint32_t sourceSubresource)
 {
-    NoteUnimplemented("CopyTexture");            // 〃
+    if (VK_NULL_HANDLE == m_commandBuffer || nullptr == m_resources) return;
+    const VulkanImageEntry src = ResolveResource(source);
+    const VulkanImageEntry dst = ResolveResource(destination);
+    if (!src.IsValid() || !dst.IsValid() || src.format != dst.format || src.is3D != dst.is3D ||
+        (src.image == dst.image && sourceSubresource == destinationSubresource))
+    {
+        throw std::invalid_argument("CopyTexture requires compatible live image handles");
+    }
+    const auto decode = [](const VulkanImageEntry& image, uint32_t subresource,
+        VkImageSubresourceLayers& layers, VkExtent3D& extent)
+    {
+        const uint32_t arrayLayers = image.is3D ? 1u : image.depthOrArraySize;
+        const VkImageAspectFlags aspects = AspectOf(image.format);
+        const bool stencil = (aspects & VK_IMAGE_ASPECT_STENCIL_BIT) != 0;
+        const uint64_t planeSize = uint64_t{image.mipLevels} * arrayLayers;
+        if (!planeSize || uint64_t{subresource} >= planeSize * (stencil ? 2u : 1u)) return false;
+        const uint32_t plane = static_cast<uint32_t>(subresource / planeSize);
+        const uint32_t inPlane = static_cast<uint32_t>(subresource % planeSize);
+        layers.mipLevel = inPlane % image.mipLevels;
+        layers.baseArrayLayer = inPlane / image.mipLevels;
+        layers.layerCount = 1;
+        layers.aspectMask = plane ? VK_IMAGE_ASPECT_STENCIL_BIT
+            : (aspects & VK_IMAGE_ASPECT_DEPTH_BIT) ? VK_IMAGE_ASPECT_DEPTH_BIT : VK_IMAGE_ASPECT_COLOR_BIT;
+        const auto mipExtent = [mip = layers.mipLevel](uint32_t value)
+        {
+            return mip < 32 ? (std::max)(1u, value >> mip) : 1u;
+        };
+        extent = {mipExtent(image.width), mipExtent(image.height), image.is3D ? mipExtent(image.depthOrArraySize) : 1u};
+        return true;
+    };
+    VkImageCopy copy{};
+    VkExtent3D destinationExtent{};
+    if (!decode(src, sourceSubresource, copy.srcSubresource, copy.extent) ||
+        !decode(dst, destinationSubresource, copy.dstSubresource, destinationExtent) ||
+        copy.srcSubresource.aspectMask != copy.dstSubresource.aspectMask ||
+        copy.extent.width > destinationExtent.width || copy.extent.height > destinationExtent.height ||
+        copy.extent.depth > destinationExtent.depth ||
+        (dst.externalShared && (copy.extent.width != destinationExtent.width ||
+            copy.extent.height != destinationExtent.height || copy.extent.depth != destinationExtent.depth)))
+    {
+        throw std::invalid_argument("CopyTexture subresources or extents are incompatible");
+    }
+    EndRenderTargets();
+    vkCmdCopyImage(m_commandBuffer, src.image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+        dst.image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &copy);
 }
 
 void VulkanEncoder::ClearUnorderedAccess(const RHIBindingDesc& desc, const float values[4])

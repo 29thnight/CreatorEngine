@@ -325,6 +325,9 @@ public:
     }
 
     virtual RHIAtomicCapabilities GetAtomicCapabilities() const { return {}; }
+    virtual RHISubresourceCapabilities GetSubresourceCapabilities() const { return {}; }
+    virtual bool SupportsConcurrentTextureShaderReads() const { return false; }
+    virtual RHIBufferInfo DescribeBuffer(RHIBufferHandle) const { return {}; }
     // Validate imported storage, including stale handles, UAV flags and 8-byte extent.
     virtual bool IsAtomicMin64Buffer(RHIBufferHandle) const { return false; }
 

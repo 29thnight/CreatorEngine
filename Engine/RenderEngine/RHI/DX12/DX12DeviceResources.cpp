@@ -5,6 +5,7 @@
 #include "DX12DeviceResources.h"
 #include "../RHIBackendExecution.h"
 #include "DX12Format.h"
+#include "DX12SubresourceRange.h"
 #include "../Temporal/TemporalDeviceDX12.h"
 #include "../../Render/Temporal/TemporalRuntimeControl.h"
 #include "../RHIRecordedBatch.h"
@@ -1342,13 +1343,18 @@ void DX12DeviceResources::DrainAbortedQueueFrame()
 
 bool DX12DeviceResources::WaitForLastFrameSubmission(std::string& outError)
 {
-    const auto& ticket = m_frameSubmissionTickets[(m_frameIndex + kFrameCount - 1) % kFrameCount];
+    const auto ticket = GetLastFrameSubmissionTicket();
     if (!ticket.IsValid())
     {
         outError = "No accepted frame submission is available.";
         return false;
     }
     return GetRHISubmissionThread().Wait(ticket, outError);
+}
+
+RHISubmissionTicket DX12DeviceResources::GetLastFrameSubmissionTicket() const
+{
+    return m_frameSubmissionTickets[(m_frameIndex + kFrameCount - 1) % kFrameCount];
 }
 
 bool DX12DeviceResources::ShutdownQueueService(std::string& outError)
@@ -2397,6 +2403,7 @@ D3D12_RESOURCE_STATES DX12DeviceResources::ToD3D12(RHIResourceState state)
     case RHIResourceState::DepthRead:
         return D3D12_RESOURCE_STATE_DEPTH_READ;
     case RHIResourceState::ShaderResource:
+    case RHIResourceState::SharedShaderResource:
         return D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
     case RHIResourceState::PixelShaderResource:
         return D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
@@ -2415,6 +2422,7 @@ D3D12_RESOURCE_STATES DX12DeviceResources::ToD3D12(RHIResourceState state)
     case RHIResourceState::VertexAndShaderResource:
         return D3D12_RESOURCE_STATE_VERTEX_AND_CONSTANT_BUFFER | D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
     case RHIResourceState::Common:
+    case RHIResourceState::ExternalShared:
     default:
         return D3D12_RESOURCE_STATE_COMMON;
     }
@@ -2435,7 +2443,8 @@ void DX12DeviceResources::TransitionResources(std::span<const RHITransition> tra
     }
 
     // 한 번에 모아 넣는다 — 배리어를 흩뿌리면 GPU가 그때마다 파이프라인을 비운다.
-    std::vector<D3D12_RESOURCE_BARRIER> barriers;
+    static thread_local std::vector<D3D12_RESOURCE_BARRIER> barriers;
+    barriers.clear();
     barriers.reserve(transitions.size());
 
     for (const RHITransition& transition : transitions)
@@ -2448,18 +2457,7 @@ void DX12DeviceResources::TransitionResources(std::span<const RHITransition> tra
 
         const D3D12_RESOURCE_STATES before = ToD3D12(transition.before);
         const D3D12_RESOURCE_STATES after = ToD3D12(transition.after);
-        if (before == after)
-        {
-            continue; // 같은 상태로의 전이는 검증 레이어가 거절한다
-        }
-
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = resource;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        barrier.Transition.StateBefore = before;
-        barrier.Transition.StateAfter = after;
-        barriers.push_back(barrier);
+        AppendDX12TextureTransitions(*resource, before, after, transition.range, barriers);
     }
 
     if (barriers.empty())
@@ -2483,7 +2481,8 @@ void DX12DeviceResources::TransitionBuffers(std::span<const RHIBufferTransition>
         return;
     }
 
-    std::vector<D3D12_RESOURCE_BARRIER> barriers;
+    static thread_local std::vector<D3D12_RESOURCE_BARRIER> barriers;
+    barriers.clear();
     barriers.reserve(transitions.size());
     for (const RHIBufferTransition& transition : transitions)
     {
@@ -2492,6 +2491,7 @@ void DX12DeviceResources::TransitionBuffers(std::span<const RHIBufferTransition>
         {
             continue;
         }
+        ValidateDX12BufferTransitionRange(*resource, transition.range);
 
         const D3D12_RESOURCE_STATES before = ToD3D12(transition.before);
         const D3D12_RESOURCE_STATES after = ToD3D12(transition.after);
@@ -3680,6 +3680,20 @@ RHITextureInfo DX12DeviceResources::DescribeTexture(RHITextureHandle handle) con
     info.depthOrArraySize = desc.DepthOrArraySize;
     info.mipLevels = desc.MipLevels;
     info.format = FromDXGI(desc.Format);
+    if ((desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL) != 0)
+    {
+        // Depth resources are often typeless so their SRV can reinterpret the
+        // same allocation. Graph range validation needs their actual aspects.
+        switch (desc.Format)
+        {
+        case DXGI_FORMAT_R16_TYPELESS: info.format = RHIFormat::D16Unorm; break;
+        case DXGI_FORMAT_R32_TYPELESS: info.format = RHIFormat::D32Float; break;
+        case DXGI_FORMAT_R24G8_TYPELESS: info.format = RHIFormat::D24UnormS8Uint; break;
+        case DXGI_FORMAT_R32G8X24_TYPELESS: info.format = RHIFormat::D32FloatS8Uint; break;
+        default: break;
+        }
+    }
+    info.is3D = desc.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D;
     info.retainsExplicitStateOnGraphicsQueue = desc.Dimension != D3D12_RESOURCE_DIMENSION_BUFFER &&
                                                (desc.Flags & D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS) == 0;
     return info;

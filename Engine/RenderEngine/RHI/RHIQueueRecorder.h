@@ -52,6 +52,14 @@ public:
     {
         RHIRunCommandRecordingJobs(m_scheduler, job, targetCount);
     }
+    // Finish all CPU translation before entering the native submission owner.
+    // This may allocate/record native targets but must not submit, wait, or signal
+    // GPU queues. A graph prepares every batch before its first queue operation.
+    virtual bool PrepareSubmissionBatch(const own::shared_owner<IRHICommandQueue>&,
+        const ce::pooled_owner<IRHIQueueCommandBatch>&, std::string&)
+    {
+        return true;
+    }
     // Backend may marshal the entire transaction to its submission owner once.
     // Return after CPU admission, never wait for GPU completion here.
     virtual bool ExecuteSubmission(const std::function<bool(std::string&)>& submit,

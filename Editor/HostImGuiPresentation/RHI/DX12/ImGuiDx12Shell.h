@@ -96,6 +96,7 @@ public:
     /// 라이브 러너의 공유 텍스처(NT 핸들)를 열어 ImTextureID로. 핸들별 캐시.
     uint64_t OpenSharedTexture(void* sharedHandle,
         own::shared_owner<RHIDisplayConsumerLease> consumerLease);
+    RHIGpuPresentationCapabilities QueryGpuPresentationCapabilities() const;
 
     /// 완성된 RGBA8 프레임을 셸 디바이스로 넘기는 CPU 전달 경로.
     ///

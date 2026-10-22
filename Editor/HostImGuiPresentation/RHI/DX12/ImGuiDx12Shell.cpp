@@ -26,6 +26,7 @@ struct ImGuiDx12Shell::Impl
     template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     bool active{ false };
+    std::atomic<bool> sharedGpuImages{false};
     bool frameOpen{ false };
     bool deviceLost{ false };
     uint64_t frameIndex{ 0 };
@@ -532,6 +533,8 @@ bool ImGuiDx12Shell::Initialize(void* windowHandle, uint32_t width, uint32_t hei
 
     impl.width = width;
     impl.height = height;
+    impl.sharedGpuImages.store((ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) == 0,
+        std::memory_order_release);
     impl.active = true;
     return true;
 }
@@ -545,6 +548,8 @@ void ImGuiDx12Shell::NewFrame()
 {
     Impl& impl = *m_impl;
     if (!impl.active || impl.frameOpen) return;
+    impl.sharedGpuImages.store((ImGui::GetIO().ConfigFlags & ImGuiConfigFlags_ViewportsEnable) == 0,
+        std::memory_order_release);
     if (impl.deviceLost)
     {
         ImGui_ImplDX12_NewFrame();
@@ -714,6 +719,21 @@ bool ImGuiDx12Shell::IsTextureReady(const Texture* texture) const
         static_cast<uint64_t>(texture->m_assetId.m_ID_Data));
     return found != impl.textureSlots.end() && found->second.uploaded
         && impl.textureCache.IsResident(texture);
+}
+
+RHIGpuPresentationCapabilities ImGuiDx12Shell::QueryGpuPresentationCapabilities() const
+{
+    RHIGpuPresentationCapabilities capabilities;
+    if (m_impl->active && m_impl->sharedGpuImages.load(std::memory_order_acquire) &&
+        m_impl->resources.GetDevice())
+    {
+        const LUID adapter = m_impl->resources.GetDevice()->GetAdapterLuid();
+        static_assert(sizeof(adapter) == sizeof(capabilities.adapter.luid));
+        std::memcpy(capabilities.adapter.luid.data(), &adapter, sizeof(adapter));
+        capabilities.adapter.valid = true;
+        capabilities.sharedD3D12Resource = true;
+    }
+    return capabilities;
 }
 
 uint64_t ImGuiDx12Shell::OpenSharedTexture(void* sharedHandleValue,
@@ -1029,5 +1049,6 @@ void ImGuiDx12Shell::Shutdown()
     impl.resources.Shutdown();
     impl.frameIndex = 0;
     impl.frameError.clear();
+    impl.sharedGpuImages.store(false, std::memory_order_release);
     impl.active = false;
 }

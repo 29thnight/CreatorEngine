@@ -28,87 +28,373 @@ namespace
 
 void LivePipelineDesc::AddNode(LivePassNode node)
 {
+    if (!m_currentContributor.empty())
+    {
+        node.m_contributorName = m_currentContributor;
+        node.m_contributorStage = m_currentContributionStage;
+    }
 #if !CE_SHIPPING
     node.declarationMarker = ce::intern_runtime_marker("RenderDeclare." + node.name, ce::marker_kind::cpu_scope);
 #endif
     m_nodes.push_back(std::move(node));
+    ++m_revision;
+    m_compiledRevision = 0;
+}
+
+bool LiveResources::IsBuiltin(std::string_view slot) noexcept
+{
+    static constexpr auto names = std::to_array<std::string_view>({
+        LiveSlots::kGBufferDiffuse,
+        LiveSlots::kGBufferMetalRough,
+        LiveSlots::kGBufferNormal,
+        LiveSlots::kGBufferEmissive,
+        LiveSlots::kGBufferBitmask,
+        LiveSlots::kGBufferDepth,
+        LiveSlots::kDecalBaseDiffuse,
+        LiveSlots::kDecalBaseOrm,
+        LiveSlots::kDecalBaseNormal,
+        LiveSlots::kVisibility,
+        LiveSlots::kShadowStaticDepths,
+        LiveSlots::kShadowFirstLists,
+        LiveSlots::kShadowOccluderDepths,
+        LiveSlots::kShadowFinalLists,
+        LiveSlots::kMeteorGeometry,
+        LiveSlots::kMeteorFirstList,
+        LiveSlots::kMeteorOccluderDepth,
+        LiveSlots::kMeteorLayerCommands,
+        LiveSlots::kMeteorMaterialTiles,
+        LiveSlots::kMeteorMaterialArguments,
+        LiveSlots::kMeteorBlendedCommands,
+        LiveSlots::kMeteorBlendedList,
+        LiveSlots::kMeteorFinalList,
+        LiveSlots::kTemporalMotion,
+        LiveSlots::kTemporalReactive,
+        LiveSlots::kTemporalTransparency,
+        LiveSlots::kTemporalResponsive,
+        LiveSlots::kTemporalDepth,
+        LiveSlots::kHudlessLdr,
+        LiveSlots::kUiLayer,
+        LiveSlots::kShadowMap,
+        LiveSlots::kAmbientOcclusion,
+        LiveSlots::kLitColor,
+        LiveSlots::kDisplayLdr,
+    });
+    return std::find(names.begin(), names.end(), slot) != names.end();
+}
+
+void RenderFeatureContributors::Contribute(RenderFeatureStage stage, LivePipelineDesc& pipeline,
+                                           const RenderFeatureContext& context) const
+{
+    if (!pipeline.m_currentContributor.empty())
+    {
+        throw std::logic_error("Nested render feature contribution is not supported.");
+    }
+    for (const Entry& entry : m_entries)
+    {
+        if (entry.stage != stage)
+        {
+            continue;
+        }
+        pipeline.m_currentContributor = entry.name;
+        pipeline.m_currentContributionStage = stage;
+        try
+        {
+            entry.contributor->Contribute(pipeline, context);
+        }
+        catch (...)
+        {
+            pipeline.m_currentContributor = {};
+            throw;
+        }
+        pipeline.m_currentContributor = {};
+    }
+}
+
+bool LiveResourceContract::Accepts(const LiveResourceContract& producer) const noexcept
+{
+    const bool compatibleExtent =
+        extent == LiveResourceExtent::Independent || extent == producer.extent ||
+        (extent == LiveResourceExtent::RenderOrDisplay &&
+         (producer.extent == LiveResourceExtent::Render || producer.extent == LiveResourceExtent::Display));
+    return kind == producer.kind && cardinality == producer.cardinality &&
+           (semantic == LiveResourceSemantic::Generic || semantic == producer.semantic) &&
+           (format == RHIFormat::Unknown || format == producer.format) && compatibleExtent &&
+           (optional || !producer.optional) && (!listSize || listSize == producer.listSize);
 }
 
 bool LivePipelineDesc::Validate(std::string& outError) const
 {
-    // 발행된 슬롯의 집합. 노드 순서대로 걸으며 자란다 — 순서가 곧 계약이므로
-    // 앞에서 발행되지 않은 것을 뒤가 읽으면 그것이 곧 순서 실수다.
-    std::unordered_set<std::string> published;
+    outError.clear();
+    return m_compiledRevision == m_revision || CompileFeaturePlan(outError);
+}
 
-    // 슬롯을 처음 발행한 노드. 중복 발행을 잡을 때 '누구와 부딪혔는지'를
-    // 말해 주기 위해 든다 — 이름 하나만으로는 어디를 고쳐야 할지 모른다.
-    std::unordered_map<std::string, std::string> publisher;
-
-    for (const LivePassNode& node : m_nodes)
+bool LivePipelineDesc::CompileFeaturePlan(std::string& outError) const
+{
+    // Assembly-only allocations. The resulting indices/dependencies and owned
+    // contracts are immutable throughout frame execution and reused by every view.
+    struct PublishedSlot
     {
+        uint32_t slot{}, writer{};
+        std::string publisher;
+        LiveResourceContract contract;
+        bool typed{};
+        std::vector<uint32_t> readers;
+    };
+    std::unordered_map<std::string, PublishedSlot> published;
+    std::unordered_map<std::string, uint32_t> nodeNames;
+    m_planNodes.clear();
+    m_planResources.clear();
+    m_planConsumers.clear();
+    m_planNodes.reserve(m_nodes.size());
+    m_compiledRevision = 0;
+    outError.clear();
+
+    for (uint32_t nodeIndex = 0; nodeIndex < m_nodes.size(); ++nodeIndex)
+    {
+        const LivePassNode& node = m_nodes[nodeIndex];
         if (node.name.empty())
         {
             outError = "이름 없는 노드가 있다";
             return false;
         }
-
-        const bool canBeInactive = static_cast<bool>(node.active);
-
-        if (canBeInactive && !node.writes.empty())
+        if (!nodeNames.emplace(node.name, nodeIndex).second)
         {
-            outError = "노드 '" + node.name + "'은 꺼질 수 있는데 슬롯 '"
-                + node.writes.front() + "'을(를) 발행한다 — 꺼진 프레임에"
-                " 소비자가 무효 핸들을 받는다. modifies로 적어야 한다";
+            outError = "Duplicate feature node '" + node.name + "'.";
             return false;
         }
-
-        for (const std::string& slot : node.reads)
-        {
-            if (published.end() == published.find(slot))
-            {
-                outError = "노드 '" + node.name + "'이 아직 발행되지 않은 슬롯 '"
-                    + slot + "'을(를) 읽는다";
-                return false;
-            }
-        }
-
-        for (const std::string& slot : node.modifies)
-        {
-            if (published.end() == published.find(slot))
-            {
-                outError = "노드 '" + node.name + "'이 아직 발행되지 않은 슬롯 '"
-                    + slot + "'을(를) 수정한다";
-                return false;
-            }
-        }
-
-        for (const std::string& slot : node.writes)
-        {
-            const auto found = publisher.find(slot);
-            if (publisher.end() != found)
-            {
-                outError = "슬롯 '" + slot + "'을(를) 노드 '" + found->second
-                    + "'와(과) '" + node.name + "'이 둘 다 발행한다 —"
-                    " 뒤엣것은 수정이므로 modifies로 적어야 한다";
-                return false;
-            }
-            published.insert(slot);
-            publisher.emplace(slot, node.name);
-        }
-
         if (!node.declare)
         {
             outError = "노드 '" + node.name + "'에 declare가 없다";
             return false;
         }
+        if (!node.m_contributorName.empty())
+        {
+            const std::string prefix = "Contributor '" + node.m_contributorName + "' at " +
+                                       RenderFeatureStageName(node.m_contributorStage) + " node '" + node.name + "'";
+            const std::string_view writable = node.m_contributorStage == RenderFeatureStage::BeforePresent
+                                                  ? LiveSlots::kDisplayLdr
+                                                  : LiveSlots::kLitColor;
+            const auto validateWrites = [&](const std::vector<std::string>& slots)
+            {
+                for (const std::string& slot : slots)
+                {
+                    if (LiveResources::IsBuiltin(slot) && slot != writable)
+                    {
+                        outError = prefix + " cannot replace read-only built-in slot '" + slot + "'.";
+                        return false;
+                    }
+                }
+                return true;
+            };
+            if (!validateWrites(node.writes) || !validateWrites(node.modifies))
+            {
+                return false;
+            }
+            if ((!node.reads.empty() && node.inputContracts.empty()) ||
+                (!node.writes.empty() && node.outputContracts.empty()) ||
+                (!node.modifies.empty() && node.updateContracts.empty()))
+            {
+                outError = prefix + " requires typed Inputs, Outputs and Updates contracts.";
+                return false;
+            }
+        }
+        m_planNodes.emplace_back();
+        CompiledNode& compiled = m_planNodes.back();
+        compiled.node = nodeIndex;
+        const auto addDependency = [&](uint32_t predecessor)
+        {
+            if (predecessor != nodeIndex && std::find(compiled.dependencies.begin(), compiled.dependencies.end(),
+                                                      predecessor) == compiled.dependencies.end())
+            {
+                compiled.dependencies.push_back(predecessor);
+            }
+        };
+        for (const std::string& dependency : node.dependsOn)
+        {
+            const auto found = nodeNames.find(dependency);
+            if (found == nodeNames.end() || found->second >= nodeIndex)
+            {
+                outError = "Feature '" + node.name + "' requires an earlier CPU dependency '" + dependency + "'.";
+                return false;
+            }
+            addDependency(found->second);
+        }
+        const auto validateContractList =
+            [&](const std::vector<std::string>& names, const std::vector<LiveResourceBinding>& contracts)
+        {
+            if (contracts.empty())
+            {
+                return true;
+            }
+            if (names.size() != contracts.size())
+            {
+                outError = "Feature '" + node.name + "' has incomplete typed resource contracts.";
+                return false;
+            }
+            for (size_t index = 0; index < names.size(); ++index)
+            {
+                if (names[index] != contracts[index].name || names[index].empty())
+                {
+                    outError = "Feature '" + node.name + "' has inconsistent typed slot names.";
+                    return false;
+                }
+                const LiveResourceContract& contract = contracts[index].contract;
+                if ((contract.kind == RGResourceKind::Buffer &&
+                     (contract.format != RHIFormat::Unknown || contract.extent != LiveResourceExtent::Independent)) ||
+                    (contract.cardinality == LiveResourceCardinality::Single && contract.listSize))
+                {
+                    outError = "Feature '" + node.name + "' has an invalid contract for '" + names[index] + "'.";
+                    return false;
+                }
+            }
+            return true;
+        };
+        if (!validateContractList(node.reads, node.inputContracts) ||
+            !validateContractList(node.writes, node.outputContracts) ||
+            !validateContractList(node.modifies, node.updateContracts))
+        {
+            return false;
+        }
+        const auto consume = [&](const std::vector<std::string>& names,
+                                 const std::vector<LiveResourceBinding>& contracts,
+                                 std::vector<CompiledResourceUse>& uses, bool modifies)
+        {
+            for (size_t index = 0; index < names.size(); ++index)
+            {
+                const std::string& name = names[index];
+                const auto found = published.find(name);
+                if (found == published.end())
+                {
+                    outError = "노드 '" + node.name + "'이 아직 발행되지 않은 슬롯 '" + name +
+                               (modifies ? "'을(를) 수정한다" : "'을(를) 읽는다");
+                    return false;
+                }
+                PublishedSlot& source = found->second;
+                const bool typed = !contracts.empty();
+                const LiveResourceContract contract = typed ? contracts[index].contract : source.contract;
+                if (typed && (!source.typed || !contract.Accepts(source.contract)))
+                {
+                    outError = "Feature '" + node.name + "' has an incompatible resource contract for '" + name +
+                               "' from '" + source.publisher + "' (kind/cardinality/semantic/format/extent/optional).";
+                    return false;
+                }
+                if (std::any_of(uses.begin(), uses.end(),
+                                [&](const CompiledResourceUse& use) { return use.slot == source.slot; }))
+                {
+                    outError = "Feature '" + node.name + "' repeats resource '" + name + "'.";
+                    return false;
+                }
+                uses.push_back({source.slot, contract, typed});
+                addDependency(source.writer);
+                if (modifies)
+                {
+                    for (uint32_t reader : source.readers)
+                    {
+                        addDependency(reader);
+                    }
+                    source.readers.clear();
+                    source.writer = nodeIndex;
+                    source.contract = contract;
+                    source.typed = typed || source.typed;
+                }
+                else
+                {
+                    source.readers.push_back(nodeIndex);
+                    m_planConsumers[source.slot].push_back({nodeIndex, false});
+                }
+            }
+            return true;
+        };
+        if (!consume(node.reads, node.inputContracts, compiled.inputs, false) ||
+            !consume(node.modifies, node.updateContracts, compiled.updates, true))
+        {
+            return false;
+        }
+        for (size_t index = 0; index < node.writes.size(); ++index)
+        {
+            const std::string& name = node.writes[index];
+            const auto existing = published.find(name);
+            if (existing != published.end())
+            {
+                outError = "슬롯 '" + name + "'을(를) 노드 '" + existing->second.publisher + "'와(과) '" + node.name +
+                           "'이 둘 다 발행한다 — 뒤엣것은 수정이므로 modifies로 적어야 한다";
+                return false;
+            }
+            const bool typed = !node.outputContracts.empty();
+            const LiveResourceContract contract = typed ? node.outputContracts[index].contract : LiveResourceContract{};
+            const auto fallback =
+                std::find_if(node.disabledPassthroughs.begin(), node.disabledPassthroughs.end(),
+                             [&](const LivePassNode::DisabledPassthrough& value) { return value.output.name == name; });
+            if ((node.active || node.requiredViewFlags) && fallback == node.disabledPassthroughs.end() &&
+                !(typed && contract.optional))
+            {
+                outError = "노드 '" + node.name + "'은 꺼질 수 있는데 슬롯 '" + name +
+                           "'을(를) 발행한다 — modifies 또는 명시적 disabled passthrough가 필요하다";
+                return false;
+            }
+            const uint32_t slotIndex = static_cast<uint32_t>(m_planResources.size());
+            m_planResources.emplace_back(name, contract);
+            m_planConsumers.emplace_back();
+            compiled.outputs.push_back({slotIndex, contract, typed});
+            published.emplace(name, PublishedSlot{slotIndex, nodeIndex, node.name, contract, typed, {}});
+        }
+        for (const LivePassNode::DisabledPassthrough& fallback : node.disabledPassthroughs)
+        {
+            const auto output = published.find(fallback.output.name);
+            const auto input = published.find(fallback.input.name);
+            if (output == published.end() || output->second.writer != nodeIndex ||
+                std::find(node.writes.begin(), node.writes.end(), fallback.output.name) == node.writes.end() ||
+                input == published.end() || input->second.writer >= nodeIndex || !output->second.typed ||
+                !input->second.typed || !fallback.output.contract.Accepts(output->second.contract) ||
+                !output->second.contract.Accepts(fallback.output.contract) ||
+                !fallback.input.contract.Accepts(input->second.contract) ||
+                !output->second.contract.Accepts(input->second.contract) ||
+                std::any_of(compiled.disabledPassthroughs.begin(), compiled.disabledPassthroughs.end(),
+                            [&](const CompiledPassthrough& value) { return value.output == output->second.slot; }))
+            {
+                outError = "Feature '" + node.name + "' has an incompatible disabled passthrough '" +
+                           fallback.input.name + "' -> '" + fallback.output.name + "'.";
+                return false;
+            }
+            compiled.disabledPassthroughs.push_back({output->second.slot, input->second.slot});
+            addDependency(input->second.writer);
+            input->second.readers.push_back(nodeIndex);
+            m_planConsumers[input->second.slot].push_back({nodeIndex, true});
+        }
+        std::sort(compiled.dependencies.begin(), compiled.dependencies.end());
     }
-
+    // A description can be replaced at the same address with the same authored
+    // node count/revision. A unique binding ID prevents an existing blackboard
+    // from reusing the slot order of that earlier description.
+    static std::atomic<uint64_t> nextBindingId{1};
+    m_planBindingId = nextBindingId.fetch_add(1, std::memory_order_relaxed);
+    m_compiledRevision = m_revision;
     return true;
+}
+
+LivePipelineDesc::CompiledPlanStats LivePipelineDesc::GetCompiledPlanStats() const
+{
+    CompiledPlanStats result{m_compiledRevision, m_planNodes.size(), m_planResources.size(), 0};
+    for (const CompiledNode& node : m_planNodes)
+    {
+        result.dependencies += node.dependencies.size();
+    }
+    return result;
+}
+
+std::span<const uint32_t> LivePipelineDesc::GetNodeDependencies(size_t index) const
+{
+    return index < m_planNodes.size() ? std::span<const uint32_t>{m_planNodes[index].dependencies}
+                                      : std::span<const uint32_t>{};
 }
 
 bool LivePipelineDesc::InitializeAll(const EnhancedFrameContext& context,
     uint32_t viewCount, std::string& outError) const
 {
+    if (!Validate(outError))
+    {
+        return false;
+    }
     for (const LivePassNode& node : m_nodes)
     {
         const uint32_t rounds = node.perView ? viewCount : 1u;
@@ -160,6 +446,10 @@ bool LivePipelineDesc::PrepareAll(const EnhancedFrameContext& context,
 {
     for (const LivePassNode& node : m_nodes)
     {
+        if ((context.viewFlags & node.requiredViewFlags) != node.requiredViewFlags)
+        {
+            continue;
+        }
         if (node.prepare)
         {
             if (!node.prepare(context, outError, viewIndex))
@@ -208,6 +498,105 @@ void LivePipelineDesc::ShutdownAll(uint32_t viewCount) const
     }
 }
 
+void LivePipelineDesc::ValidatePublishedResources(const CompiledNode& node, const LiveBlackboard& blackboard,
+                                                  const EnhancedRenderGraph& graph,
+                                                  const EnhancedFrameContext& context) const
+{
+    const auto validate = [&](const CompiledResourceUse& use)
+    {
+        if (!use.typed)
+        {
+            return;
+        }
+        const LiveResourceContract& contract = use.contract;
+        const std::span<const RGHandle> handles = blackboard.BoundHandles(use.slot);
+        const auto fail = [&](std::string_view reason)
+        {
+            throw std::runtime_error("Feature '" + m_nodes[node.node].name + "' published invalid slot '" +
+                                     m_planResources[use.slot].name + "': " + std::string{reason});
+        };
+        if (handles.empty())
+        {
+            if (!contract.optional)
+            {
+                fail("required resource is absent");
+            }
+            return;
+        }
+        if ((contract.cardinality == LiveResourceCardinality::Single && handles.size() != 1) ||
+            (contract.listSize && handles.size() != contract.listSize))
+        {
+            fail("resource cardinality differs from its contract");
+        }
+        for (const RGHandle handle : handles)
+        {
+            if (!handle.IsValid())
+            {
+                if (!contract.optional)
+                {
+                    fail("required handle is invalid");
+                }
+                continue;
+            }
+            RGResourceDescription description{};
+            if (!graph.DescribeResource(handle, description) || description.kind != contract.kind)
+            {
+                fail("handle kind, epoch or version is invalid");
+            }
+            if (contract.kind == RGResourceKind::Buffer)
+            {
+                continue;
+            }
+            if (contract.format != RHIFormat::Unknown && description.format != contract.format)
+            {
+                fail("texture format differs from its contract");
+            }
+            const uint32_t displayWidth = context.displayWidth ? context.displayWidth : context.width;
+            const uint32_t displayHeight = context.displayHeight ? context.displayHeight : context.height;
+            const bool renderExtent = description.width == context.width && description.height == context.height;
+            const bool displayExtent = description.width == displayWidth && description.height == displayHeight;
+            switch (contract.extent)
+            {
+            case LiveResourceExtent::Render:
+                if (!renderExtent)
+                {
+                    fail("render extent differs from its contract");
+                }
+                break;
+            case LiveResourceExtent::HalfRender:
+                if (description.width != context.width / 2 + context.width % 2 ||
+                    description.height != context.height / 2 + context.height % 2)
+                {
+                    fail("half-render extent differs from its contract");
+                }
+                break;
+            case LiveResourceExtent::Display:
+                if (!displayExtent)
+                {
+                    fail("display extent differs from its contract");
+                }
+                break;
+            case LiveResourceExtent::RenderOrDisplay:
+                if (!renderExtent && !displayExtent)
+                {
+                    fail("texture is neither render nor display extent");
+                }
+                break;
+            case LiveResourceExtent::Independent:
+                break;
+            }
+        }
+    };
+    for (const CompiledResourceUse& output : node.outputs)
+    {
+        validate(output);
+    }
+    for (const CompiledResourceUse& update : node.updates)
+    {
+        validate(update);
+    }
+}
+
 void LivePipelineDesc::DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGraph& graph,
     const EnhancedFrameContext& context, const LiveFrameBinding& binding,
     const std::function<void(const LivePassNode&, const LiveBlackboard&)>& afterDeclare) const
@@ -215,44 +604,107 @@ void LivePipelineDesc::DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGrap
     ce::profile_scope declarationProfile{ce::marker<"RenderGraphDeclare">()};
     ce::profile_instant(RenderContainerReuseEnabled() ? ce::marker<"RenderContainerReuse.On">()
                                                       : ce::marker<"RenderContainerReuse.Off">());
-    graph.BeginDeclarationPackets();
+    if (m_compiledRevision != m_revision)
+    {
+        std::string error;
+        if (!CompileFeaturePlan(error))
+        {
+            throw std::runtime_error(error);
+        }
+    }
+    blackboard.BindPlan(this, m_planBindingId, m_planResources);
+    const bool declarationPackets = !graph.IsProgramBindingOpen();
+    if (declarationPackets)
+    {
+        graph.BeginDeclarationPackets();
+    }
     try
     {
-        for (const auto& node : m_nodes)
+        for (const CompiledNode& compiled : m_planNodes)
         {
-            if (!node.IsActive())
+            const LivePassNode& node = m_nodes[compiled.node];
+            if (!node.IsActive(binding))
             {
+                for (const CompiledPassthrough& fallback : compiled.disabledPassthroughs)
+                {
+                    blackboard.CopyBoundSlot(fallback.output, fallback.input);
+                }
+                ValidatePublishedResources(compiled, blackboard, graph, context);
                 continue;
             }
-            graph.NextDeclarationPacket();
+            if (declarationPackets)
+            {
+                graph.NextDeclarationPacket();
+            }
             ce::profile_scope profile{node.declarationMarker};
+            if (!node.m_contributorName.empty())
+            {
+                blackboard.BeginFeatureWrites(node.name);
+                for (const CompiledResourceUse& output : compiled.outputs)
+                {
+                    blackboard.AllowFeatureWrite(output.slot);
+                }
+                for (const CompiledResourceUse& update : compiled.updates)
+                {
+                    blackboard.AllowFeatureWrite(update.slot);
+                }
+            }
             {
                 ce::profile_scope body{ce::marker<"RenderGraphDeclareNodeBody">()};
                 node.declare(blackboard, graph, context, binding);
             }
+            blackboard.EndFeatureWrites();
+            ValidatePublishedResources(compiled, blackboard, graph, context);
             if (afterDeclare)
             {
                 ce::profile_scope callback{ce::marker<"RenderGraphDeclareAfterNode">()};
                 afterDeclare(node, blackboard);
             }
         }
-        graph.FinishDeclarationPackets();
+        if (declarationPackets)
+        {
+            graph.FinishDeclarationPackets();
+        }
     }
     catch (...)
     {
-        graph.CancelDeclarationPackets();
+        blackboard.EndFeatureWrites();
+        if (declarationPackets)
+        {
+            graph.CancelDeclarationPackets();
+        }
         throw;
     }
 }
 
-bool LivePipelineDesc::HasConsumer(const std::string& slot, const EnhancedFrameContext& context,
-    const LiveFrameBinding& binding) const
+bool LivePipelineDesc::HasConsumer(std::string_view slot, const EnhancedFrameContext& context,
+                                   const LiveFrameBinding& binding) const
 {
-    for (const LivePassNode& node : m_nodes)
+    if (m_compiledRevision != m_revision)
     {
-        if (!node.IsActive()) continue;
-        if (std::find(node.reads.begin(), node.reads.end(), slot) == node.reads.end()) continue;
-        if (!node.consumes || node.consumes(slot, context, binding)) return true;
+        std::string error;
+        if (!CompileFeaturePlan(error))
+        {
+            throw std::runtime_error(error);
+        }
+    }
+    for (size_t index = 0; index < m_planResources.size(); ++index)
+    {
+        const LiveResourceBinding& resource = m_planResources[index];
+        if (resource.name != slot)
+        {
+            continue;
+        }
+        for (const CompiledConsumer& consumer : m_planConsumers[index])
+        {
+            const LivePassNode& node = m_nodes[consumer.node];
+            if (node.IsActive(binding) != consumer.whenDisabled &&
+                (consumer.whenDisabled || !node.consumes || node.consumes(resource.name, context, binding)))
+            {
+                return true;
+            }
+        }
+        break;
     }
     return false;
 }

@@ -1,5 +1,6 @@
 ﻿#include "DX12Encoder.h"
 #include "DX12DeviceResources.h"
+#include "DX12SubresourceRange.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -695,6 +696,8 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
             {
             case RHIResourceState::ShaderResource:
                 return D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
+            case RHIResourceState::SharedShaderResource:
+                return D3D12_RESOURCE_STATE_ALL_SHADER_RESOURCE;
             case RHIResourceState::Common:
             case RHIResourceState::UnorderedAccess:
             case RHIResourceState::CopySource:
@@ -730,6 +733,12 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
 
     for (const RHITransition& transition : batch.textureTransitions)
     {
+        if (computeQueue && transition.before != transition.after &&
+            (transition.before == RHIResourceState::SharedShaderResource ||
+             transition.after == RHIResourceState::SharedShaderResource))
+        {
+            throw std::runtime_error("Stable shared shader state must be established/restored on graphics");
+        }
         ID3D12Resource* const resource = ResolveRecorded(transition.texture);
         if (nullptr == resource)
         {
@@ -738,27 +747,22 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
 
         const D3D12_RESOURCE_STATES before = stateForQueue(transition.before);
         const D3D12_RESOURCE_STATES after = stateForQueue(transition.after);
-        if (before == after)
-        {
-            continue;
-        }
-
-        D3D12_RESOURCE_BARRIER barrier{};
-        barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = resource;
-        barrier.Transition.StateBefore = before;
-        barrier.Transition.StateAfter = after;
-        barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
-        barriers.push_back(barrier);
+        AppendDX12TextureTransitions(*resource, before, after, transition.range, barriers);
     }
 
     for (const RHIBufferTransition& transition : batch.bufferTransitions)
     {
+        if (transition.before == RHIResourceState::SharedShaderResource ||
+            transition.after == RHIResourceState::SharedShaderResource)
+        {
+            throw std::runtime_error("Concurrent shared shader state requires a non-decaying texture");
+        }
         ID3D12Resource* const resource = ResolveRecorded(transition.buffer);
         if (nullptr == resource)
         {
             continue;
         }
+        ValidateDX12BufferTransitionRange(*resource, transition.range);
 
         const D3D12_RESOURCE_STATES before = stateForQueue(transition.before);
         const D3D12_RESOURCE_STATES after = stateForQueue(transition.after);
@@ -1068,7 +1072,7 @@ ID3D12Resource* DX12Encoder::ResolveRecorded(RHIBufferHandle handle) const
 DX12BufferEntry DX12Encoder::DescribeRecordedBuffer(RHIBufferHandle handle) const
 {
     return m_recordingResources && m_recordingResources->resourceTable
-        ? m_recordingResources->resourceTable->DescribeBuffer(handle) : m_resources->DescribeBuffer(handle);
+        ? m_recordingResources->resourceTable->DescribeBuffer(handle) : m_resources->DescribeNativeBuffer(handle);
 }
 uint64_t DX12Encoder::ResolveRecordedGpuAddress(RHIBufferHandle handle) const
 {

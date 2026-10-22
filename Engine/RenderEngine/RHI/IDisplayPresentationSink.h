@@ -20,6 +20,15 @@ struct IDisplayPresentationSink
     /// 진단 문자열용 백엔드 이름. 살아 있지 않으면 "none" 류를 돌려준다.
     virtual const char* GetName() const = 0;
 
+    virtual RHIGpuPresentationCapabilities QueryGpuPresentationCapabilities() const { return {}; }
+
+    virtual RHIDisplayTexture OpenGpuFrame(const RHIGpuDisplayImage& image)
+    {
+        if (!image.IsCompatible(QueryGpuPresentationCapabilities())) return {};
+        const uint64_t texture = OpenSharedTexture(image.sharedHandle, image.consumerLease);
+        return texture ? RHIDisplayTexture{texture, image.width, image.height, image.metadata} : RHIDisplayTexture{};
+    }
+
     /// 공유 핸들 텍스처(DX12 표시 슬롯)를 열어 presentation 텍스처 ID를
     /// 돌려준다. 호출자는 표시 수명 락 아래에서 부른다 — 핸들 retire와
     /// 직렬화되는 것은 Core의 몫이다. 성공한 구현은 consumerLease를 이번
