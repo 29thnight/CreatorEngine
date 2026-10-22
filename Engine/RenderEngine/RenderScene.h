@@ -105,7 +105,8 @@ public:
 	// 광원도 같은 규약이다 — 맵 순회는 락 안에서 shared_ptr 복사까지만 하고,
 	// 값 읽기는 락 밖에서 한다.
 	LightProxySnapshot GetLightProxySnapshot();
-	UIProxySnapshot GetUIProxySnapshot();
+    void CopyLightProxySnapshot(LightProxySnapshot& snapshot);
+    UIProxySnapshot GetUIProxySnapshot();
     // 진단은 GT에서 실행될 수 있으므로 live proxy 대신 락 안에서 복사한
     // 값만 반환한다. RT의 ProxyCommand::Apply와 같은 락을 사용한다.
     UIDrawSnapshot GetUIDrawSnapshot();

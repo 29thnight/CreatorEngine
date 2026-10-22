@@ -569,10 +569,19 @@ public:
 
     // Declaration scratch belongs to this graph's single writer arena. AddPass
     // copies the range before returning; Reset rewinds and reuses its blocks.
+    // Values are trivially destructible and remain valid through graph execution,
+    // including queued execution, until the guarded Reset releases the frame.
+    template<class T>
+    ce::render_arena_buffer<T> CreateDeclarationBuffer(size_t capacity = 0)
+    {
+        RequireQueueIdle();
+        ce::render_arena_buffer<T> result{m_packetArena};
+        result.reserve(capacity);
+        return result;
+    }
     ce::render_arena_buffer<RGPassUsage> CreateDeclarationUsages(std::initializer_list<RGPassUsage> initial = {})
     {
-        ce::render_arena_buffer<RGPassUsage> result{m_packetArena};
-        result.reserve(initial.size());
+        auto result = CreateDeclarationBuffer<RGPassUsage>(initial.size());
         for (const auto& usage : initial)
         {
             result.push_back(usage);
@@ -714,6 +723,20 @@ public:
         // CPU planning subtotals; these are not GPU costs or calibrated predictions.
         uint32_t placementTrials{0};
         double dependencyMilliseconds{0}, simulationMilliseconds{0};
+
+        // A frame's values never survive planning, but its caller-owned capacity
+        // can. Avoid constructing temporary vector proxies in Debug builds too.
+        void Reset()
+        {
+            entries.clear();
+            waits.clear();
+            compileGeneration = predictedSerialNanoseconds = predictedNanoseconds = 0;
+            usesCompute = predictionComplete = predictionCalibrated = false;
+            fallbackReason = RGQueueFallbackReason::None;
+            eligibleComputePasses = rejectedStatePasses = measuredPasses = missingMeasurementPasses = placementTrials =
+                0;
+            dependencyMilliseconds = simulationMilliseconds = 0;
+        }
     };
     struct QueueCostModel
     {
@@ -1048,7 +1071,26 @@ private:
         std::vector<RHIBufferTransition> bufferTransitions;
         std::vector<RHITextureHandle> uavBarriers;
         std::vector<RHIBufferHandle> uavBufferBarriers;
+
+        void clear()
+        {
+            transitions.clear();
+            bufferTransitions.clear();
+            uavBarriers.clear();
+            uavBufferBarriers.clear();
+        }
     };
+
+    struct QueueSubmissionScratch
+    {
+        ce::render_arena_resource arena;
+        QueueSchedule schedule;
+        PhaseBarrierPlan prologue, epilogue;
+        ce::dynamic_bitset incoming, outgoing, batchEnds, retainedGraphicsTextures, sharedReadTextures;
+    };
+    own::unique_owner<QueueSubmissionScratch> m_queueSubmissionScratch;
+    std::vector<std::vector<uint16_t>> m_queueBatchPassScratch;
+    void ResetQueueDiagnostics();
 
     struct PhaseBarrierPlans
     {
@@ -1192,10 +1234,20 @@ private:
         uint16_t atomicVersion{RGHandle::kInvalid};
     };
     std::vector<ResourceRangeSchema> m_rangeSchemas;
+    struct SubresourceScratch
+    {
+        std::vector<std::vector<SubresourceCell>> accessCells, stateCells;
+        std::vector<uint64_t> offsets;
+        std::vector<uint32_t> mips, layers;
+        std::vector<RHIResourceState> finalStates;
+        ce::dynamic_bitset externalResources;
+    };
+    own::unique_owner<SubresourceScratch> m_subresourceScratch;
     bool m_hasSubresourceUsages{false};
     bool ValidateSubresources(std::string& outError);
     bool BuildSubresourceDependencies(std::string& outError);
-    std::vector<SubresourceCell> BuildSubresourceCells(uint16_t resource, bool states) const;
+    void BuildSubresourceCells(uint16_t resource, bool states, std::vector<SubresourceCell>& cells,
+                               SubresourceScratch& scratch) const;
     bool CoversSubresource(uint16_t resource, const RGPassUsage& usage, const SubresourceCell& cell, bool states) const;
     void PlanSubresourceBarriers(const ce::dynamic_bitset* batchEnds, PhaseBarrierPlan* prologue,
                                  PhaseBarrierPlan* epilogue);
@@ -1204,7 +1256,13 @@ private:
     /// 막고 있던 것은 desc 어휘였다(깊이 타깃 · 클리어 힌트).
     bool CreateTransients(std::string& outError);
     bool CreateAliasedTransients(std::string& outError);
-    bool ResourcesHappenBefore(uint16_t before, uint16_t after) const;
+    struct AliasingScratch;
+    bool ResourcesHappenBefore(uint16_t before, uint16_t after, AliasingScratch& scratch) const;
+    // Compile and queue specialization have one producer. These local arrays
+    // never escape either call; the next call rewinds only after all destructors
+    // ran. Native resources/callbacks/in-flight leases retain their own storage.
+    ce::render_arena_resource m_compileScratchArena;
+    ce::dynamic_bitset m_barrierPreviousWrite;
     bool CanShareTextureReads(uint16_t resource) const;
     RHITransientResourceDesc TransientDescription(const Resource& resource) const;
     // Queue execution specializes the same planner at submission boundaries.

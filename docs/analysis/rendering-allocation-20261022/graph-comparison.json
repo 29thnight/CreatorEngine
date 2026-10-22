@@ -1,0 +1,2302 @@
+{
+  "status": "passed",
+  "sanitized": false,
+  "baseline_ref": "7b5e03da9802c903eaeacc48278d23585b36cfb6",
+  "compiler": "g++ (Ubuntu 13.3.0-6ubuntu2~24.04) 13.3.0",
+  "repetitions": 9,
+  "iterations_per_repetition": 1024,
+  "timing_order": "both binaries compiled before alternating current/baseline process runs",
+  "source_changed_after_snapshot": [],
+  "scope": "production CPU graph; successful C++ new and mimalloc requests; one producer; native mock allocations excluded from SubmitQueues",
+  "limits": "not native rendering, GPU frame time, real parallel jobs, Windows Debug STL, libc-internal allocations, or allocator retained capacity",
+  "versions": {
+    "current": {
+      "source": {
+        "frozen_files": 1037,
+        "frozen_inputs_sha256": "52a063627dd63f98d0d38a7fbfecd5b0e2c0a3cc6fe1af6fc5bd8a57102ff952",
+        "graph_and_fixture_sha256": {
+          "Engine/RenderEngine/Render/Graph/EnhancedDrawIdentity.h": "ea824931d36db9b143a66928254efa3f5586333741c258531d46eef9d9e9ad40",
+          "Engine/RenderEngine/Render/Graph/EnhancedDrawSealLedger.h": "714ecb427eddc591691ab4969d9c3b73d5a396a0aa28eea754812c598ed1cda2",
+          "Engine/RenderEngine/Render/Graph/EnhancedForwardLighting.h": "859f1a6a8fe1fa87bf17f544314999c036a53ebb5164ff697cb400f8d9c76045",
+          "Engine/RenderEngine/Render/Graph/EnhancedGpuMeasurementHistory.h": "815d98a338993585c94381dea3b68509bcfedf455d4c63aec2dfe72c5bdc14c7",
+          "Engine/RenderEngine/Render/Graph/EnhancedMaterialSealHash.h": "5a3603337f5639c3014bf297e03ed595549ed7a868677171c02f9e9bb74fa6d3",
+          "Engine/RenderEngine/Render/Graph/EnhancedMaterialSealIdentity.h": "44594234b1cbae90f7b8c8f58680ccb3a62be03c941f2d8810f3742ae52a7292",
+          "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp": "66beefc1a70b67ded3a9e945da261ab397db532a84e4244fb1d55380df56639c",
+          "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h": "0fa6638de3c1ab297e5190fdce944dfd45d02ee383afd8c3f85e63f9f137d692",
+          "Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp": "67d34fee0dba968ce51b52f871b19ca5fe4315c8f56c613508303e83b95e15ef",
+          "Engine/RenderEngine/Render/Graph/EnhancedRenderGraphSubresources.cpp": "ba979d1a625779164c1dd8b78c0900848e5900d9bc5eb9e7dcb6c698ec43f9dd",
+          "Engine/RenderEngine/Render/Graph/EnhancedRenderPass.h": "c290d9118775da1fa2dd1671fa541d49d8efd091c2b608974fc018be810d8152",
+          "Engine/RenderEngine/Render/Graph/PackedBoneMatrix.h": "25d5f4f0624e4ebe35df439b6dc30f97f7a7d3300c8c54bb1cba73cfad78e02a",
+          "Engine/RenderEngine/Render/Graph/RenderGraphDeclarationTask.h": "02a3d8507ce717fbfbe0d0c77a393fb072a19f1d99dbe00aa8fb5fc4a300780f",
+          "Engine/RenderEngine/Render/Graph/ShadowCasterBounds.h": "a687cdd6601602e09fe3c4f4718b13aea68e38c3d9b79ef68d60b25d38edc100",
+          "Engine/RenderEngine/Render/Graph/ShadowMath.h": "c746746f35b62eb030925ec9103fbb3828102ad969309ec3575c73691b058e94",
+          "Tools/regression/fixtures/light-packing-portable-proxy-base.h": "ef1ebaaec3b6dfde39ed28aa0d909e1f552da21ce04bb22b0503683018af12dd",
+          "Tools/regression/fixtures/live-pipeline-portable-pass.h": "e646a31c34994b3230fe972bc365a2bdd0ee7d62db764efe428bec3e9da6d775",
+          "Tools/regression/fixtures/pbr-alpha-mask/make_alpha_mask.py": "0136b6b8caa20389095da7fee8c35f10bdbf6ff70c9a33f11eba5885744e78cc",
+          "Tools/regression/fixtures/pbr-lighting/make_lighting.py": "cd78773a591b15a49e8cc1cf6a5e73208d8de01e66f5e00db8dbdeaf6c96a215",
+          "Tools/regression/fixtures/pbr-normal-pair/make_normal_pair.py": "007f16adaf0bb22d5e9398553345d06d1c22fa1d8d97387c90a062e3b4a00dbd",
+          "Tools/regression/fixtures/pbr-sampler/make_sampler.py": "673df904441f94fa8db8a37b23069d7f0b3ba96d38de8082b9772348a57d59f2",
+          "Tools/regression/fixtures/pbr-shared-material/make_shared_material.py": "548f9b9da4650c9422edfc13609b35333db3f9f74409246a32563d8513dcbc33",
+          "Tools/regression/fixtures/render-graph-allocation-counters.h": "aeef5e3a24d991e72ef4eb828ce52804ae0e1d48446f7e1cbea4f7948cb74c00",
+          "Tools/regression/fixtures/render-graph-portable-platform.cpp": "497a41e1dcd8837f3b1c51dff9d4a415201d0c421d5f88ac3be07dd1735f69c0",
+          "Tools/regression/fixtures/render-graph-portable-queues.h": "63b6d5ac8a1e8cc96e9e1ae7923f5a0a81e408bee35f58fe555b1fd8da583894",
+          "Tools/regression/fixtures/render-graph-portable-services.h": "7a1bdc10355de97eefb72a6000a9402105ea1b8968f80ac6bdcf3ef93fde7fea",
+          "Tools/regression/fixtures/rhi-d3d12-interop-boundary.h": "364f85f0c2d062841891b6c2d059259970e34de168c3e1255b07e6ae3253dd40",
+          "Tools/regression/render_graph_allocation_probe.cpp": "120e1a7a3cde6d34d33e5547a904da5b683fc51a91c0c323e3a08e86ad9e105a"
+        }
+      },
+      "runs": [
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4835834
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2287731
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4974033
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 12753592
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4759967
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 9048077
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4087666
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 136039930
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3155997
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 15004695
+            }
+          ]
+        },
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3201465
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 1500391
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3005945
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 7958091
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2819359
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 7271897
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2754736
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 100145567
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2558271
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 10690351
+            }
+          ]
+        },
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3173053
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 1605341
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3396669
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 8562446
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3889612
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 7699120
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3038907
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 103840853
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2244765
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 10006526
+            }
+          ]
+        },
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3145694
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 1459938
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3164296
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 7394601
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3146450
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 7613525
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3075569
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 103589907
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2887246
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 10444584
+            }
+          ]
+        },
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3006791
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 1491070
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3343510
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 9351488
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3009172
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 7492891
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2985564
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 99952265
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2485342
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 11292106
+            }
+          ]
+        },
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2906446
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 1527475
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3456072
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 7463011
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4405714
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 7800036
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3241424
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 107092246
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2377099
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 10482928
+            }
+          ]
+        },
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3551133
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 1897853
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3370101
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 8144936
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2801586
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 7125875
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2797593
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 93807553
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2446411
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 10164722
+            }
+          ]
+        },
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2988792
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 1490756
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3398732
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 7847454
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3184545
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 7438572
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3037170
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 100913359
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2255557
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 10136345
+            }
+          ]
+        },
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3625885
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 1699598
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4320403
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 11291326
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3557131
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 7501935
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3017670
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 115797624
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2248731
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 57344,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 10869376
+            }
+          ]
+        }
+      ],
+      "executable_sha256": "62c5c136527502d177ec39fa8e5866e78b576b2db9b84dc5e8b05aacd9c5b811",
+      "summary": [
+        {
+          "name": "plain_stream_declare",
+          "per_iteration": {
+            "standard_calls": 0.0,
+            "standard_bytes": 0.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 3098.6845703125,
+          "cpu_nanoseconds_per_iteration_min": 2838.326171875,
+          "cpu_nanoseconds_per_iteration_max": 4722.494140625,
+          "timing_samples": [
+            4722.494140625,
+            3126.4306640625,
+            3098.6845703125,
+            3071.966796875,
+            2936.3193359375,
+            2838.326171875,
+            3467.9033203125,
+            2918.7421875,
+            3540.9033203125
+          ]
+        },
+        {
+          "name": "plain_compile",
+          "per_iteration": {
+            "standard_calls": 0.0,
+            "standard_bytes": 0.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 1491.6748046875,
+          "cpu_nanoseconds_per_iteration_min": 1425.720703125,
+          "cpu_nanoseconds_per_iteration_max": 2234.1123046875,
+          "timing_samples": [
+            2234.1123046875,
+            1465.2255859375,
+            1567.7158203125,
+            1425.720703125,
+            1456.123046875,
+            1491.6748046875,
+            1853.3720703125,
+            1455.81640625,
+            1659.763671875
+          ]
+        },
+        {
+          "name": "range_stream_declare",
+          "per_iteration": {
+            "standard_calls": 0.0,
+            "standard_bytes": 0.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 3317.0595703125,
+          "cpu_nanoseconds_per_iteration_min": 2935.4931640625,
+          "cpu_nanoseconds_per_iteration_max": 4857.4541015625,
+          "timing_samples": [
+            4857.4541015625,
+            2935.4931640625,
+            3317.0595703125,
+            3090.1328125,
+            3265.146484375,
+            3375.0703125,
+            3291.1142578125,
+            3319.07421875,
+            4219.1435546875
+          ]
+        },
+        {
+          "name": "range_compile",
+          "per_iteration": {
+            "standard_calls": 0.0,
+            "standard_bytes": 0.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 7954.0390625,
+          "cpu_nanoseconds_per_iteration_min": 7221.2900390625,
+          "cpu_nanoseconds_per_iteration_max": 12454.6796875,
+          "timing_samples": [
+            12454.6796875,
+            7771.5732421875,
+            8361.763671875,
+            7221.2900390625,
+            9132.3125,
+            7288.0966796875,
+            7954.0390625,
+            7663.529296875,
+            11026.685546875
+          ]
+        },
+        {
+          "name": "alias_stream_declare",
+          "per_iteration": {
+            "standard_calls": 0.0,
+            "standard_bytes": 0.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 3109.9072265625,
+          "cpu_nanoseconds_per_iteration_min": 2735.923828125,
+          "cpu_nanoseconds_per_iteration_max": 4648.4052734375,
+          "timing_samples": [
+            4648.4052734375,
+            2753.2802734375,
+            3798.44921875,
+            3072.705078125,
+            2938.64453125,
+            4302.455078125,
+            2735.923828125,
+            3109.9072265625,
+            3473.7607421875
+          ]
+        },
+        {
+          "name": "alias_compile",
+          "per_iteration": {
+            "standard_calls": 0.0,
+            "standard_bytes": 0.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 7326.1083984375,
+          "cpu_nanoseconds_per_iteration_min": 6958.8623046875,
+          "cpu_nanoseconds_per_iteration_max": 8836.0126953125,
+          "timing_samples": [
+            8836.0126953125,
+            7101.4619140625,
+            7518.671875,
+            7435.0830078125,
+            7317.2763671875,
+            7617.22265625,
+            6958.8623046875,
+            7264.23046875,
+            7326.1083984375
+          ]
+        },
+        {
+          "name": "queue_threshold",
+          "per_iteration": {
+            "standard_calls": 0.0,
+            "standard_bytes": 0.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 2965.986328125,
+          "cpu_nanoseconds_per_iteration_min": 2690.171875,
+          "cpu_nanoseconds_per_iteration_max": 3991.861328125,
+          "timing_samples": [
+            3991.861328125,
+            2690.171875,
+            2967.6826171875,
+            3003.4853515625,
+            2915.58984375,
+            3165.453125,
+            2732.0244140625,
+            2965.986328125,
+            2946.943359375
+          ]
+        },
+        {
+          "name": "queue_overlap",
+          "per_iteration": {
+            "standard_calls": 0.0,
+            "standard_bytes": 0.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 101162.0185546875,
+          "cpu_nanoseconds_per_iteration_min": 91608.9384765625,
+          "cpu_nanoseconds_per_iteration_max": 132851.494140625,
+          "timing_samples": [
+            132851.494140625,
+            97798.4052734375,
+            101407.0830078125,
+            101162.0185546875,
+            97609.6337890625,
+            104582.271484375,
+            91608.9384765625,
+            98548.2021484375,
+            113083.6171875
+          ]
+        },
+        {
+          "name": "queue_submit_graphics_excluding_native_mock",
+          "per_iteration": {
+            "standard_calls": 1.0,
+            "standard_bytes": 56.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 2389.0732421875,
+          "cpu_nanoseconds_per_iteration_min": 2192.1533203125,
+          "cpu_nanoseconds_per_iteration_max": 3082.0283203125,
+          "timing_samples": [
+            3082.0283203125,
+            2498.3115234375,
+            2192.1533203125,
+            2819.576171875,
+            2427.091796875,
+            2321.3857421875,
+            2389.0732421875,
+            2202.6923828125,
+            2196.0263671875
+          ]
+        },
+        {
+          "name": "queue_submit_compute_excluding_native_mock",
+          "per_iteration": {
+            "standard_calls": 1.0,
+            "standard_bytes": 56.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 10237.234375,
+          "cpu_nanoseconds_per_iteration_min": 9771.998046875,
+          "cpu_nanoseconds_per_iteration_max": 14653.0224609375,
+          "timing_samples": [
+            14653.0224609375,
+            10439.7958984375,
+            9771.998046875,
+            10199.7890625,
+            11027.447265625,
+            10237.234375,
+            9926.486328125,
+            9898.7744140625,
+            10614.625
+          ]
+        }
+      ]
+    },
+    "baseline": {
+      "source": {
+        "frozen_files": 1037,
+        "frozen_inputs_sha256": "ff3c5af988a2b9d3046114fc87f1e8f2bcdfe53a050a46776dd6467c6ab32838",
+        "graph_and_fixture_sha256": {
+          "Engine/RenderEngine/Render/Graph/EnhancedDrawIdentity.h": "ea824931d36db9b143a66928254efa3f5586333741c258531d46eef9d9e9ad40",
+          "Engine/RenderEngine/Render/Graph/EnhancedDrawSealLedger.h": "714ecb427eddc591691ab4969d9c3b73d5a396a0aa28eea754812c598ed1cda2",
+          "Engine/RenderEngine/Render/Graph/EnhancedForwardLighting.h": "859f1a6a8fe1fa87bf17f544314999c036a53ebb5164ff697cb400f8d9c76045",
+          "Engine/RenderEngine/Render/Graph/EnhancedGpuMeasurementHistory.h": "815d98a338993585c94381dea3b68509bcfedf455d4c63aec2dfe72c5bdc14c7",
+          "Engine/RenderEngine/Render/Graph/EnhancedMaterialSealHash.h": "5a3603337f5639c3014bf297e03ed595549ed7a868677171c02f9e9bb74fa6d3",
+          "Engine/RenderEngine/Render/Graph/EnhancedMaterialSealIdentity.h": "44594234b1cbae90f7b8c8f58680ccb3a62be03c941f2d8810f3742ae52a7292",
+          "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp": "07a689ae55f47c4ed4e38a078a248e6befd3dbfbcbe6c7298ce9b7a309065ff4",
+          "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h": "eaa46342e7ba37f8527aab35df079d0220895a7c030fb3ee84b2bfde156e4d34",
+          "Engine/RenderEngine/Render/Graph/EnhancedRenderGraphQueues.cpp": "72b7c047912073de9aca0d6463c27a016becad076cf47076811929644e53dce3",
+          "Engine/RenderEngine/Render/Graph/EnhancedRenderGraphSubresources.cpp": "b6c21d096c0966987197c5f209c1d898cdd8987063d11132a1ec58de7d42371f",
+          "Engine/RenderEngine/Render/Graph/EnhancedRenderPass.h": "c290d9118775da1fa2dd1671fa541d49d8efd091c2b608974fc018be810d8152",
+          "Engine/RenderEngine/Render/Graph/PackedBoneMatrix.h": "25d5f4f0624e4ebe35df439b6dc30f97f7a7d3300c8c54bb1cba73cfad78e02a",
+          "Engine/RenderEngine/Render/Graph/RenderGraphDeclarationTask.h": "02a3d8507ce717fbfbe0d0c77a393fb072a19f1d99dbe00aa8fb5fc4a300780f",
+          "Engine/RenderEngine/Render/Graph/ShadowCasterBounds.h": "a687cdd6601602e09fe3c4f4718b13aea68e38c3d9b79ef68d60b25d38edc100",
+          "Engine/RenderEngine/Render/Graph/ShadowMath.h": "c746746f35b62eb030925ec9103fbb3828102ad969309ec3575c73691b058e94",
+          "Tools/regression/fixtures/light-packing-portable-proxy-base.h": "ef1ebaaec3b6dfde39ed28aa0d909e1f552da21ce04bb22b0503683018af12dd",
+          "Tools/regression/fixtures/live-pipeline-portable-pass.h": "e646a31c34994b3230fe972bc365a2bdd0ee7d62db764efe428bec3e9da6d775",
+          "Tools/regression/fixtures/pbr-alpha-mask/make_alpha_mask.py": "0136b6b8caa20389095da7fee8c35f10bdbf6ff70c9a33f11eba5885744e78cc",
+          "Tools/regression/fixtures/pbr-lighting/make_lighting.py": "cd78773a591b15a49e8cc1cf6a5e73208d8de01e66f5e00db8dbdeaf6c96a215",
+          "Tools/regression/fixtures/pbr-normal-pair/make_normal_pair.py": "007f16adaf0bb22d5e9398553345d06d1c22fa1d8d97387c90a062e3b4a00dbd",
+          "Tools/regression/fixtures/pbr-sampler/make_sampler.py": "673df904441f94fa8db8a37b23069d7f0b3ba96d38de8082b9772348a57d59f2",
+          "Tools/regression/fixtures/pbr-shared-material/make_shared_material.py": "548f9b9da4650c9422edfc13609b35333db3f9f74409246a32563d8513dcbc33",
+          "Tools/regression/fixtures/render-graph-allocation-counters.h": "aeef5e3a24d991e72ef4eb828ce52804ae0e1d48446f7e1cbea4f7948cb74c00",
+          "Tools/regression/fixtures/render-graph-portable-platform.cpp": "497a41e1dcd8837f3b1c51dff9d4a415201d0c421d5f88ac3be07dd1735f69c0",
+          "Tools/regression/fixtures/render-graph-portable-queues.h": "63b6d5ac8a1e8cc96e9e1ae7923f5a0a81e408bee35f58fe555b1fd8da583894",
+          "Tools/regression/fixtures/render-graph-portable-services.h": "7a1bdc10355de97eefb72a6000a9402105ea1b8968f80ac6bdcf3ef93fde7fea",
+          "Tools/regression/fixtures/rhi-d3d12-interop-boundary.h": "364f85f0c2d062841891b6c2d059259970e34de168c3e1255b07e6ae3253dd40",
+          "Tools/regression/render_graph_allocation_probe.cpp": "120e1a7a3cde6d34d33e5547a904da5b683fc51a91c0c323e3a08e86ad9e105a"
+        }
+      },
+      "runs": [
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 5045157
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 8192,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 2153299
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4693970
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 465920,
+              "standard_bytes": 14884864,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 28960073
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4702933
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 697344,
+              "standard_bytes": 17520640,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 30725965
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 6144,
+              "standard_bytes": 258048,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4258029
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 7168,
+              "standard_bytes": 323584,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 128923495
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 21504,
+              "standard_bytes": 2846720,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2630485
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 92160,
+              "standard_bytes": 8052736,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 12483953
+            }
+          ]
+        },
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3435720
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 8192,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 1683134
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3163184
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 465920,
+              "standard_bytes": 14884864,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 19098081
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3063313
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 697344,
+              "standard_bytes": 17520640,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 19633709
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 6144,
+              "standard_bytes": 258048,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3073844
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 7168,
+              "standard_bytes": 323584,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 102398966
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 21504,
+              "standard_bytes": 2846720,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2582647
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 92160,
+              "standard_bytes": 8052736,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 13129696
+            }
+          ]
+        },
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3585435
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 8192,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 1648531
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3049857
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 465920,
+              "standard_bytes": 14884864,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 18555116
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3028712
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 697344,
+              "standard_bytes": 17520640,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 20570708
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 6144,
+              "standard_bytes": 258048,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2983651
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 7168,
+              "standard_bytes": 323584,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 114987881
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 21504,
+              "standard_bytes": 2846720,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2476665
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 92160,
+              "standard_bytes": 8052736,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 12820675
+            }
+          ]
+        },
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3353122
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 8192,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 1624981
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4723125
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 465920,
+              "standard_bytes": 14884864,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 27495256
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4829824
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 697344,
+              "standard_bytes": 17520640,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 30236500
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 6144,
+              "standard_bytes": 258048,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4138609
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 7168,
+              "standard_bytes": 323584,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 137745393
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 21504,
+              "standard_bytes": 2846720,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2900831
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 92160,
+              "standard_bytes": 8052736,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 13100015
+            }
+          ]
+        },
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3494604
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 8192,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 1726500
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3876582
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 465920,
+              "standard_bytes": 14884864,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 28347230
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4636407
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 697344,
+              "standard_bytes": 17520640,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 30534945
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 6144,
+              "standard_bytes": 258048,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4236486
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 7168,
+              "standard_bytes": 323584,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 139046431
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 21504,
+              "standard_bytes": 2846720,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4159958
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 92160,
+              "standard_bytes": 8052736,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 18118635
+            }
+          ]
+        },
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3414327
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 8192,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 1673382
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3654114
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 465920,
+              "standard_bytes": 14884864,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 21235850
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3583773
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 697344,
+              "standard_bytes": 17520640,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 22850190
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 6144,
+              "standard_bytes": 258048,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3343923
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 7168,
+              "standard_bytes": 323584,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 154614422
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 21504,
+              "standard_bytes": 2846720,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4112906
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 92160,
+              "standard_bytes": 8052736,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 19451406
+            }
+          ]
+        },
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 4204995
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 8192,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 2848881
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3447880
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 465920,
+              "standard_bytes": 14884864,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 18453823
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2886385
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 697344,
+              "standard_bytes": 17520640,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 19329370
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 6144,
+              "standard_bytes": 258048,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2762012
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 7168,
+              "standard_bytes": 323584,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 103081711
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 21504,
+              "standard_bytes": 2846720,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2753404
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 92160,
+              "standard_bytes": 8052736,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 14670216
+            }
+          ]
+        },
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3462524
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 8192,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 1671100
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3578339
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 465920,
+              "standard_bytes": 14884864,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 20257475
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3255110
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 697344,
+              "standard_bytes": 17520640,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 23022634
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 6144,
+              "standard_bytes": 258048,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2834792
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 7168,
+              "standard_bytes": 323584,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 105187515
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 21504,
+              "standard_bytes": 2846720,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2631936
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 92160,
+              "standard_bytes": 8052736,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 19152466
+            }
+          ]
+        },
+        {
+          "warmups": 8,
+          "resources_per_frame": 24,
+          "scope": "production CPU graph, one producer, native services mocked; timing is descriptive",
+          "measurements": [
+            {
+              "name": "plain_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3198953
+            },
+            {
+              "name": "plain_compile",
+              "iterations": 1024,
+              "standard_calls": 1024,
+              "standard_bytes": 8192,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 1950678
+            },
+            {
+              "name": "range_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3394843
+            },
+            {
+              "name": "range_compile",
+              "iterations": 1024,
+              "standard_calls": 465920,
+              "standard_bytes": 14884864,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 18585204
+            },
+            {
+              "name": "alias_stream_declare",
+              "iterations": 1024,
+              "standard_calls": 0,
+              "standard_bytes": 0,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 3060338
+            },
+            {
+              "name": "alias_compile",
+              "iterations": 1024,
+              "standard_calls": 697344,
+              "standard_bytes": 17520640,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 19497796
+            },
+            {
+              "name": "queue_threshold",
+              "iterations": 1024,
+              "standard_calls": 6144,
+              "standard_bytes": 258048,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2971431
+            },
+            {
+              "name": "queue_overlap",
+              "iterations": 1024,
+              "standard_calls": 7168,
+              "standard_bytes": 323584,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 104077419
+            },
+            {
+              "name": "queue_submit_graphics_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 21504,
+              "standard_bytes": 2846720,
+              "mimalloc_calls": 0,
+              "mimalloc_bytes": 0,
+              "cpu_nanoseconds": 2461594
+            },
+            {
+              "name": "queue_submit_compute_excluding_native_mock",
+              "iterations": 1024,
+              "standard_calls": 92160,
+              "standard_bytes": 8052736,
+              "mimalloc_calls": 1024,
+              "mimalloc_bytes": 81920,
+              "cpu_nanoseconds": 12278001
+            }
+          ]
+        }
+      ],
+      "executable_sha256": "7218181e776baf90753ceabb4c38c2b1a50a1a3b7d1a7eab58d488072f227590",
+      "summary": [
+        {
+          "name": "plain_stream_declare",
+          "per_iteration": {
+            "standard_calls": 0.0,
+            "standard_bytes": 0.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 3381.37109375,
+          "cpu_nanoseconds_per_iteration_min": 3123.9775390625,
+          "cpu_nanoseconds_per_iteration_max": 4926.9111328125,
+          "timing_samples": [
+            4926.9111328125,
+            3355.1953125,
+            3501.4013671875,
+            3274.533203125,
+            3412.69921875,
+            3334.3037109375,
+            4106.4404296875,
+            3381.37109375,
+            3123.9775390625
+          ]
+        },
+        {
+          "name": "plain_compile",
+          "per_iteration": {
+            "standard_calls": 1.0,
+            "standard_bytes": 8.0,
+            "mimalloc_calls": 1.0,
+            "mimalloc_bytes": 80.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 1643.685546875,
+          "cpu_nanoseconds_per_iteration_min": 1586.8955078125,
+          "cpu_nanoseconds_per_iteration_max": 2782.1103515625,
+          "timing_samples": [
+            2102.8310546875,
+            1643.685546875,
+            1609.8935546875,
+            1586.8955078125,
+            1686.03515625,
+            1634.162109375,
+            2782.1103515625,
+            1631.93359375,
+            1904.958984375
+          ]
+        },
+        {
+          "name": "range_stream_declare",
+          "per_iteration": {
+            "standard_calls": 0.0,
+            "standard_bytes": 0.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 3494.4716796875,
+          "cpu_nanoseconds_per_iteration_min": 2978.3759765625,
+          "cpu_nanoseconds_per_iteration_max": 4612.4267578125,
+          "timing_samples": [
+            4583.955078125,
+            3089.046875,
+            2978.3759765625,
+            4612.4267578125,
+            3785.724609375,
+            3568.470703125,
+            3367.0703125,
+            3494.4716796875,
+            3315.2763671875
+          ]
+        },
+        {
+          "name": "range_compile",
+          "per_iteration": {
+            "standard_calls": 455.0,
+            "standard_bytes": 14536.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 19782.6904296875,
+          "cpu_nanoseconds_per_iteration_min": 18021.3115234375,
+          "cpu_nanoseconds_per_iteration_max": 28281.3212890625,
+          "timing_samples": [
+            28281.3212890625,
+            18650.4697265625,
+            18120.23046875,
+            26850.8359375,
+            27682.841796875,
+            20738.134765625,
+            18021.3115234375,
+            19782.6904296875,
+            18149.61328125
+          ]
+        },
+        {
+          "name": "alias_stream_declare",
+          "per_iteration": {
+            "standard_calls": 0.0,
+            "standard_bytes": 0.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 3178.818359375,
+          "cpu_nanoseconds_per_iteration_min": 2818.7353515625,
+          "cpu_nanoseconds_per_iteration_max": 4716.625,
+          "timing_samples": [
+            4592.7080078125,
+            2991.5166015625,
+            2957.7265625,
+            4716.625,
+            4527.7412109375,
+            3499.7783203125,
+            2818.7353515625,
+            3178.818359375,
+            2988.611328125
+          ]
+        },
+        {
+          "name": "alias_compile",
+          "per_iteration": {
+            "standard_calls": 681.0,
+            "standard_bytes": 17110.0,
+            "mimalloc_calls": 1.0,
+            "mimalloc_bytes": 80.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 22314.638671875,
+          "cpu_nanoseconds_per_iteration_min": 18876.337890625,
+          "cpu_nanoseconds_per_iteration_max": 30005.8251953125,
+          "timing_samples": [
+            30005.8251953125,
+            19173.5439453125,
+            20088.58203125,
+            29527.83203125,
+            29819.2822265625,
+            22314.638671875,
+            18876.337890625,
+            22483.041015625,
+            19040.81640625
+          ]
+        },
+        {
+          "name": "queue_threshold",
+          "per_iteration": {
+            "standard_calls": 6.0,
+            "standard_bytes": 252.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 3001.80078125,
+          "cpu_nanoseconds_per_iteration_min": 2697.27734375,
+          "cpu_nanoseconds_per_iteration_max": 4158.2314453125,
+          "timing_samples": [
+            4158.2314453125,
+            3001.80078125,
+            2913.7216796875,
+            4041.6103515625,
+            4137.193359375,
+            3265.5498046875,
+            2697.27734375,
+            2768.3515625,
+            2901.7880859375
+          ]
+        },
+        {
+          "name": "queue_overlap",
+          "per_iteration": {
+            "standard_calls": 7.0,
+            "standard_bytes": 316.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 112292.8525390625,
+          "cpu_nanoseconds_per_iteration_min": 99998.990234375,
+          "cpu_nanoseconds_per_iteration_max": 150990.646484375,
+          "timing_samples": [
+            125901.8505859375,
+            99998.990234375,
+            112292.8525390625,
+            134516.9853515625,
+            135787.5302734375,
+            150990.646484375,
+            100665.7333984375,
+            102722.1826171875,
+            101638.1044921875
+          ]
+        },
+        {
+          "name": "queue_submit_graphics_excluding_native_mock",
+          "per_iteration": {
+            "standard_calls": 21.0,
+            "standard_bytes": 2780.0,
+            "mimalloc_calls": 0.0,
+            "mimalloc_bytes": 0.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 2570.25,
+          "cpu_nanoseconds_per_iteration_min": 2403.900390625,
+          "cpu_nanoseconds_per_iteration_max": 4062.458984375,
+          "timing_samples": [
+            2568.8330078125,
+            2522.1162109375,
+            2418.6181640625,
+            2832.8427734375,
+            4062.458984375,
+            4016.509765625,
+            2688.87109375,
+            2570.25,
+            2403.900390625
+          ]
+        },
+        {
+          "name": "queue_submit_compute_excluding_native_mock",
+          "per_iteration": {
+            "standard_calls": 90.0,
+            "standard_bytes": 7864.0,
+            "mimalloc_calls": 1.0,
+            "mimalloc_bytes": 80.0
+          },
+          "cpu_nanoseconds_per_iteration_median": 12821.96875,
+          "cpu_nanoseconds_per_iteration_min": 11990.2353515625,
+          "cpu_nanoseconds_per_iteration_max": 18995.513671875,
+          "timing_samples": [
+            12191.3603515625,
+            12821.96875,
+            12520.1904296875,
+            12792.9833984375,
+            17693.9794921875,
+            18995.513671875,
+            14326.3828125,
+            18703.580078125,
+            11990.2353515625
+          ]
+        }
+      ]
+    }
+  }
+}

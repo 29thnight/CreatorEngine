@@ -1,0 +1,6 @@
+{
+  "status": "passed",
+  "sanitized": false,
+  "scope": "production CPU graph compiler and bindings; mocked native services",
+  "result": "program bindings, ownership, partial-range hazards/barriers, shared reads and happens-before async aliasing passed"
+}

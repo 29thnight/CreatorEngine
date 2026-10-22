@@ -113,14 +113,20 @@ RGHandle SceneHost::EffectStage::DeclareBlended(const own::shared_owner<const Fr
         throw std::runtime_error("Graph Blend needs its exact prepared frame and light-tile resources.");
     }
     frame->CheckCurrent(&graph);
-    std::set<std::size_t> selected;
+    commands.CheckCurrent(graph);
+    auto selected = graph.CreateDeclarationBuffer<std::size_t>(indices.size());
     for (const auto input : indices)
     {
-        if (!selected.insert(input).second || input >= frame->input->Draws().size() ||
-            this->layers.blendedOutputs.contains(input))
+        if (input >= frame->input->Draws().size() || this->layers.blendedOutputs.contains(input))
         {
             throw std::runtime_error("Graph Blend draw declared twice.");
         }
+        selected.push_back(input);
+    }
+    std::sort(selected.begin(), selected.end());
+    if (std::adjacent_find(selected.begin(), selected.end()) != selected.end())
+    {
+        throw std::runtime_error("Graph Blend draw declared twice.");
     }
     if (!this->lookup.layered->InputsDeclared(graph))
     {
@@ -160,6 +166,11 @@ RGHandle SceneHost::EffectStage::DeclareBlendedStream(const own::shared_owner<co
                                                       const SceneLayerWork& commands, RGHandle lighting,
                                                       RGHandle shadowMap, const EnhancedForwardLighting& tiles) const
 {
+    if (prepared)
+    {
+        prepared->CheckCurrent(&graph);
+    }
+    commands.CheckCurrent(graph);
     if (prepared && !prepared->draws.empty())
     {
         if (prepared->raster->layerCommands)
@@ -186,8 +197,15 @@ RGHandle SceneHost::EffectStage::DeclareBlendedStream(const own::shared_owner<co
             throw std::runtime_error("METEOR blended commands have extra inputs.");
         }
     }
-    const auto draws = BlendedDraws(prepared);
-    if (draws.empty())
+    const bool hasDraws =
+        prepared && std::ranges::any_of(prepared->input->Draws(),
+                                        [](const auto& draw)
+                                        {
+                                            const auto& program = draw.material->generation->cooked.product.program;
+                                            return program.surface && (draw.queue == SceneCoverage::Blended ||
+                                                                       (program.features & 0x0800u) != 0);
+                                        });
+    if (!hasDraws)
     {
         return lighting;
     }
@@ -296,13 +314,17 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                                                 const SceneShadingInputs& commands, RGHandle lighting,
                                                 RGHandle ambientOcclusion, RGHandle shadowMap, bool transmissionStage,
                                                 std::optional<std::size_t> blended, EnhancedForwardLighting forward,
-                                                std::vector<std::size_t> blendedGroup) const
+                                                std::span<const std::size_t> blendedGroup) const
 {
 
     const auto& frame = prepared;
     const bool reconstruct = !blended && !transmissionStage;
     const auto lookup = blended ? this->lookup.layered : this->lookup.opaque;
-    const auto selected = [blended, blendedGroup](const Frame::Draw& draw)
+    // Public DeclareBlended callers may supply temporary vectors. The graph
+    // owns one ordered copy until its guarded Reset, so every callback captures
+    // only the stable span instead of allocating another vector copy.
+    const auto ownedBlendedGroup = graph.CopyDeclaration(blendedGroup);
+    const auto selected = [blended, blendedGroup = ownedBlendedGroup](const Frame::Draw& draw)
     {
         return blended ? draw.blended && (blendedGroup.empty()
                                               ? draw.inputIndex == *blended

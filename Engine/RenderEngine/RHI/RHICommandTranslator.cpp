@@ -212,7 +212,9 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
         if (jobs > 1)
         {
             ce::profile_rhi_scope join{ce::marker<"RHICommandTranslateJoin">()};
-            m_pool.RunParallel(replayTargets, jobs);
+            // RunParallel joins every callback before returning. Passing its
+            // reference avoids heap-copying this multi-reference replay closure.
+            m_pool.RunParallel(std::cref(replayTargets), jobs);
         }
         else
         {

@@ -10,6 +10,7 @@
 #include "RHIProfilingContext.h"
 #include "RHIBackendExecution.h"
 
+#include <cassert>
 #include <stdio.h>
 #include "../../Utility_Framework/StandardLibrary.h"
 
@@ -55,15 +56,42 @@ struct RHISubmissionTicket::State
     static_assert(std::atomic<bool>::is_always_lock_free,
         "RHI ticket ready polling requires a lock-free bool atomic");
 
+    struct Preparation
+    {
+        RHISubmissionThread::Work work;
+        RHICommandFailure failure;
+        bool started{false};
+        bool complete{false};
+        bool success{false};
+    } preparation;
+
     mutable std::mutex mutex;
     std::condition_variable wake;
     uint64_t sequence{ 0 };
     std::atomic<bool> ready{ false };
     bool success{ false };
+    std::string label;
     std::string error;
     RHICommandFailure commandFailure;
     own::shared_owner<RHIRecordedBatch> recordedBatch;
     RHISubmissionIdentity identity;
+
+    // Only the retained cache's sole owner may reset this storage. Completed
+    // tickets held by any caller remain immutable and keep their own result.
+    void Reset()
+    {
+        sequence = 0;
+        ready.store(false, std::memory_order_relaxed);
+        success = false;
+        label.clear();
+        error.clear();
+        commandFailure.Reset();
+        assert(!recordedBatch);
+        identity = {};
+        preparation.work = {};
+        preparation.failure.Reset();
+        preparation.started = preparation.complete = preparation.success = false;
+    }
 
     void PublishCompletion(bool completedSuccessfully, std::string completionError)
     {
@@ -111,22 +139,12 @@ struct RHISubmissionThread::Impl
         uint64_t lastCompletedSequence{0};
     };
 
-    struct Preparation
-    {
-        Work work;
-        RHICommandFailure failure;
-        bool started{false};
-        bool complete{false};
-        bool success{false};
-    };
-
     struct Entry
     {
         uint64_t sequence{ 0 };
         uint64_t generation{ 0 };
         const void* owner{ nullptr };
         EntryKind kind{ EntryKind::Submission };
-        std::string label;
         Work work;
         own::shared_owner<RHISubmissionTicket::State> ticket;
         RHICompletionPoint retirementPoint{};
@@ -134,7 +152,7 @@ struct RHISubmissionThread::Impl
         ce::lifetime_token lifetimeToken;
         uint64_t softwareBytes{};
         ce::profile_rhi_context rhiContext;
-        own::shared_owner<Preparation> preparation;
+        RHISubmissionTicket::State::Preparation* preparation{nullptr};
     };
 
     struct Retirement
@@ -156,7 +174,11 @@ struct RHISubmissionThread::Impl
     std::condition_variable preparationWake;
     std::condition_variable spaceWake;
     std::condition_variable drainWake;
-    std::deque<Entry> queue;
+    // Admission is bounded to three entries. Retain its backing capacity rather
+    // than allocating a deque block for each large Entry on every enqueue.
+    std::vector<Entry> queue;
+    static constexpr size_t kRetainedTickets = 64;
+    std::array<own::shared_owner<RHISubmissionTicket::State>, kRetainedTickets> ticketStorage;
     std::vector<Retirement> retirements;
     std::deque<std::pair<const void*, RHICommandFailure>> failures;
     std::unordered_map<const void*, OwnerState> owners;
@@ -173,6 +195,46 @@ struct RHISubmissionThread::Impl
     bool abandonRetirements{ false };
     RHISubmissionThreadStats stats{};
     uint64_t softwareByteCapacity{RHISubmissionThread::kSoftwareByteCapacity};
+
+    Impl() { queue.reserve(RHISubmissionThread::kQueueCapacity); }
+
+    own::shared_owner<RHISubmissionTicket::State> AcquireTicketLocked(bool cacheable)
+    {
+        // Native batch tickets expose an owning payload to callers. Let their
+        // last external/worker reference release that payload outside this
+        // mutex instead of retaining it in the result cache past device drain.
+        if (!cacheable)
+        {
+            return own::make_shared<RHISubmissionTicket::State>();
+        }
+        own::shared_owner<RHISubmissionTicket::State>* empty{};
+        for (auto& state : ticketStorage)
+        {
+            if (!state)
+            {
+                if (!empty)
+                {
+                    empty = &state;
+                }
+                continue;
+            }
+            if (state.use_count() == 1)
+            {
+                // use_count is a relaxed load in own::shared_owner. Acquire
+                // the last released reader before reusing its result storage.
+                // State has no exposed weak handles that could acquire it now.
+                std::atomic_thread_fence(std::memory_order_acquire);
+                state->Reset();
+                return state;
+            }
+        }
+        auto state = own::make_shared<RHISubmissionTicket::State>();
+        if (empty)
+        {
+            *empty = state;
+        }
+        return state;
+    }
 
     size_t ExecutableEntryLocked() const
     {
@@ -206,7 +268,8 @@ struct RHISubmissionThread::Impl
         ce::profiler().register_thread("[RHITranslation]", ce::track_kind::command_thread, 2);
         for (;;)
         {
-            own::shared_owner<Preparation> preparation;
+            own::shared_owner<RHISubmissionTicket::State> preparingTicket;
+            RHISubmissionTicket::State::Preparation* preparation{};
             ce::profile_rhi_context context;
             {
                 std::unique_lock lock(mutex);
@@ -221,6 +284,7 @@ struct RHISubmissionThread::Impl
                     }
                     continue;
                 }
+                preparingTicket = found->ticket;
                 preparation = found->preparation;
                 preparation->started = true;
                 preparingOwner = found->owner;
@@ -259,7 +323,7 @@ struct RHISubmissionThread::Impl
                 stats.failedTranslations += preparation->success ? 0u : 1u;
                 for (Entry& entry : queue)
                 {
-                    if (entry.preparation.operator->() == preparation.operator->())
+                    if (entry.preparation == preparation)
                     {
                         stats.pendingSoftwareBytes -= entry.softwareBytes;
                         entry.softwareBytes = 0;
@@ -454,7 +518,7 @@ struct RHISubmissionThread::Impl
             }
             if (!success && error.empty())
             {
-                error = entry.label + " 실패";
+                error = entry.ticket->label + " 실패";
             }
             if (!success)
             {
@@ -772,13 +836,6 @@ bool RHISubmissionThread::EnqueueInternal(const void* owner, const char* label, 
         outError = "Software command arenas exceed the RHI admission byte capacity.";
         return false;
     }
-    auto state = own::make_shared<RHISubmissionTicket::State>();
-    own::shared_owner<Impl::Preparation> prepared;
-    if (preparation)
-    {
-        prepared = own::make_shared<Impl::Preparation>();
-        prepared->work = std::move(preparation);
-    }
     std::unique_lock lock(impl.mutex);
     const auto foundOwner = impl.owners.find(owner);
     if (foundOwner == impl.owners.end() || !foundOwner->second.registered)
@@ -843,6 +900,13 @@ bool RHISubmissionThread::EnqueueInternal(const void* owner, const char* label, 
         return false;
     }
 
+    auto state = impl.AcquireTicketLocked(!recordedBatch);
+    state->label = label ? label : "RHI submission";
+    auto* prepared = preparation ? &state->preparation : nullptr;
+    if (prepared)
+    {
+        prepared->work = std::move(preparation);
+    }
     const uint64_t sequence = impl.nextSequence;
     state->sequence = sequence;
     // worker가 즉시 완료해도 release 게시 뒤 ticket의 결과 포인터를 바꾸지 않는다.
@@ -859,10 +923,9 @@ bool RHISubmissionThread::EnqueueInternal(const void* owner, const char* label, 
         prepared->failure = state->commandFailure;
         prepared->failure.stage = RHICommandFailureStage::Translation;
     }
-    impl.queue.push_back(Impl::Entry{sequence, ownerState.generation, owner, kind, label ? label : "RHI submission",
-                                     std::move(work), state, retirementPoint, std::move(completionQuery),
-                                     std::move(lifetimeToken), softwareBytes, ce::current_rhi_context,
-                                     std::move(prepared)});
+    impl.queue.push_back(Impl::Entry{sequence, ownerState.generation, owner, kind, std::move(work), state,
+                                     retirementPoint, std::move(completionQuery), std::move(lifetimeToken),
+                                     softwareBytes, ce::current_rhi_context, prepared});
     impl.stats.pendingSoftwareBytes += softwareBytes;
     impl.stats.peakSoftwareBytes = (std::max)(impl.stats.peakSoftwareBytes, impl.stats.pendingSoftwareBytes);
     ++impl.nextSequence;
@@ -1234,6 +1297,7 @@ bool RHISubmissionThread::AbandonForDeviceError(const void* owner,
     }
     for (const auto& ticketState : cancelled)
     {
+        ticketState->preparation.work = {};
         if (ticketState->recordedBatch)
         {
             ticketState->recordedBatch->m_state = RHIRecordedBatchState::SubmissionFailed;
@@ -1404,38 +1468,57 @@ bool RHISubmissionThread::EnqueueSoftwareBatch(const void* owner, IRHIDeviceReso
         return false;
     }
     const RHISubmissionIdentity identity{batch.GetDesc().frameId, recordingId, completion};
-    struct Lifetime
+    struct SoftwareSubmission
     {
         own::shared_owner<IRHIParallelCommandPool> pool;
         own::shared_owner<IRHICommandTranslator> translator;
         ce::lifetime_token resources;
+        RHISoftwareBatch software;
+        RHITranslatedBatch translated;
+        RHISubmissionIdentity identity;
+        ce::cpu_span_context cpuContext{};
     };
-    auto lifetime = own::make_shared<Lifetime>(Lifetime{pool, translator, batch.GetDesc().lifetimeToken});
-    auto software = own::make_shared<RHISoftwareBatch>(std::move(batch));
-    auto translated = own::make_shared<RHITranslatedBatch>();
-    ce::cpu_span_context cpuContext{};
+    // The queue owns this aggregate through preparation, native submit and the
+    // proven GPU retirement. Separate shared wrappers and owning std::function
+    // captures would allocate several control blocks for the same lifetime.
+    auto lifetime = own::make_shared<SoftwareSubmission>();
+    lifetime->pool = pool;
+    lifetime->translator = translator;
+    lifetime->resources = batch.GetDesc().lifetimeToken;
+    lifetime->software = std::move(batch);
+    lifetime->identity = identity;
 #if !CE_SHIPPING
-    cpuContext = ce::current_cpu_context;
+    lifetime->cpuContext = ce::current_cpu_context;
 #endif
-    Work preparation = [pool, translator, software, translated, cpuContext](std::string& error)
+    auto* const submitted = lifetime.operator->();
+    Work preparation = [submitted](std::string& error)
     {
-        RHICommandFailureScope::SetIdentity(software->GetRecordingId(), software->GetDesc().backendGeneration);
+        auto& software = submitted->software;
+        // A custom translator may throw before consuming the input. Arena
+        // credits must still follow CPU storage, not this GPU lifetime owner.
+        struct ReleaseSoftware
+        {
+            RHISoftwareBatch& batch;
+            ~ReleaseSoftware() { batch = {}; }
+        } release{software};
+        RHICommandFailureScope::SetIdentity(software.GetRecordingId(), software.GetDesc().backendGeneration);
         RHICommandFailureScope::SetStage(RHICommandFailureStage::Translation);
 #if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
-        const ce::dx_capture::submission_context_scope context(software->GetDesc().captureContext);
+        const ce::dx_capture::submission_context_scope context(software.GetDesc().captureContext);
 #endif
-        const ce::profile_context_scope recordingContext(cpuContext);
+        const ce::profile_context_scope recordingContext(submitted->cpuContext);
         RHICommandFailure failure;
         {
             ce::profile_rhi_scope translate{ce::marker<"RHISoftwareTranslate">()};
             RHICommandTranslationOptions options;
-            if (pool->SupportsParallelTranslation())
+            if (submitted->pool->SupportsParallelTranslation())
             {
                 options.mode = RHICommandTranslationMode::Parallel;
-                options.maxTranslationJobs = (std::min)(IRHIParallelCommandPool::kMaxWorkers, pool->GetWorkerCount());
+                options.maxTranslationJobs =
+                    (std::min)(IRHIParallelCommandPool::kMaxWorkers, submitted->pool->GetWorkerCount());
                 options.minCommandsPerJob = 256;
             }
-            if (!translator->Translate(std::move(*software), options, *translated, failure))
+            if (!submitted->translator->Translate(std::move(software), options, submitted->translated, failure))
             {
                 RHICommandFailureScope::Report(failure);
                 error = failure.message;
@@ -1446,18 +1529,18 @@ bool RHISubmissionThread::EnqueueSoftwareBatch(const void* owner, IRHIDeviceReso
     };
     if (!EnqueueInternal(
             owner, "software batch submit",
-            [pool, translated, identity](std::string& error)
+            [submitted](std::string& error)
             {
-                auto& native = translated->m_native;
-                native.m_recordingId = identity.recordingId;
-                native.m_completion = identity.completion;
+                auto& native = submitted->translated.m_native;
+                native.m_recordingId = submitted->identity.recordingId;
+                native.m_completion = submitted->identity.completion;
                 native.m_admitted = true;
 #if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
                 const ce::dx_capture::submission_context_scope context(native.GetCaptureContext());
 #endif
                 RHICommandFailureScope::SetStage(RHICommandFailureStage::Submission);
                 ce::profile_rhi_scope nativeSubmit{ce::marker<"RHINativeSubmit">()};
-                return pool->SubmitRecordedBatch(native, error);
+                return submitted->pool->SubmitRecordedBatch(native, error);
             },
             outTicket, outError, completion, [&completionSource] { return completionSource.GetCompletedFenceValue(); },
             std::move(lifetime), EntryKind::RecordedBatch, false, generation, {}, identity, softwareBytes,

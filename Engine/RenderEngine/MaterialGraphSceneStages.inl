@@ -257,7 +257,7 @@ struct SceneHost::EffectStage
                             const SceneSurfaceTargets::Outputs& inputs, const SceneShadingInputs& commands,
                             RGHandle lighting, RGHandle ambientOcclusion, RGHandle shadowMap, bool transmissionStage,
                             std::optional<std::size_t> blended = {}, EnhancedForwardLighting forward = {},
-                            std::vector<std::size_t> blendedGroup = {}) const;
+                            std::span<const std::size_t> blendedGroup = {}) const;
     RGHandle DeclareRuntimeEffects(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph,
                                    const SceneSurfaceTargets::Outputs& inputs, const SceneShadingInputs& commands,
                                    RGHandle lighting, RGHandle ambientOcclusion, RGHandle shadowMap,

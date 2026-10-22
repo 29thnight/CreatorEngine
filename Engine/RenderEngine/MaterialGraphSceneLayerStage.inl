@@ -247,17 +247,21 @@ SceneLayerWork SceneHost::LayerStage::Declare(const own::shared_owner<const Fram
     RequireStage(list, frame->raster->layers ? frame->raster->layers->GraphVisibleIds(graph) : RGHandle{},
                  "METEOR layer work requires the ordered layer list.");
     SceneLayerWork work;
+    work.declarationGraph = graph.DeclarationGraph();
+    work.declarationEpoch = graph.DeclarationEpoch();
     if (indexedCommands)
     {
         indexedCommands->Declare(graph, indexedCommands);
         work.layer = indexedCommands->GraphOutput(graph);
     }
+    auto blended = graph.CreateDeclarationBuffer<RGHandle>();
     for (const auto& range : blendedRanges)
         for (const auto& batch : range.commands)
             if (batch)
             {
                 batch->Declare(graph, batch);
-                work.blended.push_back(batch->GraphOutput(graph));
+                blended.push_back(batch->GraphOutput(graph));
             }
+    work.blended = blended;
     return work;
 }

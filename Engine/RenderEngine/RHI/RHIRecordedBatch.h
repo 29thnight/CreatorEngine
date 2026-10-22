@@ -13,9 +13,9 @@ class RHISubmissionThread;
 /// completion은 admission 전에 예약하며 실제 GPU 완료와 구분한다.
 struct RHIRecordedBatchDesc
 {
-    uint64_t frameId{ 0 };
-    uint64_t backendGeneration{ 0 };
-    uint64_t displayToken{ 0 };
+    uint64_t frameId{0};
+    uint64_t backendGeneration{0};
+    uint64_t displayToken{0};
 
 #if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
     // Frozen at recording time; never infer query identity on the RHI thread.
@@ -43,19 +43,16 @@ enum class RHIRecordedBatchState : uint8_t
 /// 만들 수 없게 하기 위해서다. 이동은 3-15B bounded queue handoff에 사용한다.
 class RHIRecordedBatch final
 {
-public:
-    static constexpr uint32_t kInvalidFrameSlot =
-        (std::numeric_limits<uint32_t>::max)();
+  public:
+    static constexpr uint32_t kMaxCommandTargets = 8;
+    static constexpr uint32_t kInvalidFrameSlot = (std::numeric_limits<uint32_t>::max)();
 
     RHIRecordedBatch() = default;
     ~RHIRecordedBatch() = default;
     RHIRecordedBatch(const RHIRecordedBatch&) = delete;
     RHIRecordedBatch& operator=(const RHIRecordedBatch&) = delete;
 
-    RHIRecordedBatch(RHIRecordedBatch&& other) noexcept
-    {
-        MoveFrom(std::move(other));
-    }
+    RHIRecordedBatch(RHIRecordedBatch&& other) noexcept { MoveFrom(std::move(other)); }
 
     RHIRecordedBatch& operator=(RHIRecordedBatch&& other) noexcept
     {
@@ -79,24 +76,21 @@ public:
     ce::dx_capture::submission_context GetCaptureContext() const { return m_captureContext; }
 #endif
     uint32_t GetFrameSlot() const { return m_frameSlot; }
-    uint32_t GetCommandCount() const
-    {
-        return static_cast<uint32_t>(m_commandOrder.size());
-    }
+    uint32_t GetCommandCount() const { return m_commandCount; }
     RHICompletionPoint GetCompletionPoint() const { return m_completion; }
     uint64_t GetRecordingId() const { return m_recordingId; }
     bool IsAdmitted() const { return m_admitted; }
     bool HasLifetimeToken() const { return nullptr != m_lifetimeToken; }
     ce::lifetime_token GetLifetimeToken() const { return m_lifetimeToken; }
 
-private:
+  private:
     friend class IRHIParallelCommandPool;
     friend class RHISubmissionThread;
 
     void Reset()
     {
         m_pool = nullptr;
-        m_commandOrder.clear();
+        m_commandCount = 0;
         m_frameId = 0;
         m_backendGeneration = 0;
         m_displayToken = 0;
@@ -114,7 +108,8 @@ private:
     void MoveFrom(RHIRecordedBatch&& other)
     {
         m_pool = other.m_pool;
-        m_commandOrder = std::move(other.m_commandOrder);
+        m_commandOrder = other.m_commandOrder;
+        m_commandCount = other.m_commandCount;
         m_frameId = other.m_frameId;
         m_backendGeneration = other.m_backendGeneration;
         m_displayToken = other.m_displayToken;
@@ -130,18 +125,21 @@ private:
         other.Reset();
     }
 
-    IRHIParallelCommandPool* m_pool{ nullptr };
-    std::vector<uint32_t> m_commandOrder;
-    uint64_t m_frameId{ 0 };
-    uint64_t m_backendGeneration{ 0 };
-    uint64_t m_displayToken{ 0 };
+    IRHIParallelCommandPool* m_pool{nullptr};
+    // Parallel recording already admits at most eight distinct targets. Keep
+    // their order in the batch instead of allocating a vector per translation.
+    std::array<uint32_t, kMaxCommandTargets> m_commandOrder{};
+    uint32_t m_commandCount{0};
+    uint64_t m_frameId{0};
+    uint64_t m_backendGeneration{0};
+    uint64_t m_displayToken{0};
 #if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
     ce::dx_capture::submission_context m_captureContext{};
 #endif
-    uint32_t m_frameSlot{ kInvalidFrameSlot };
+    uint32_t m_frameSlot{kInvalidFrameSlot};
     RHICompletionPoint m_completion{};
-    uint64_t m_recordingId{ 0 };
-    bool m_admitted{ false };
+    uint64_t m_recordingId{0};
+    bool m_admitted{false};
     ce::lifetime_token m_lifetimeToken;
-    RHIRecordedBatchState m_state{ RHIRecordedBatchState::Empty };
+    RHIRecordedBatchState m_state{RHIRecordedBatchState::Empty};
 };

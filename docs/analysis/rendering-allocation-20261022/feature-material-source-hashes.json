@@ -1,0 +1,21 @@
+{
+  "files": {
+    "Engine/RenderEngine/Render/Core/EnhancedLightPacking.h": "675c6802217051bd0f7eb94a8091430a0218d31e08e610bf77dcae0c9945f450",
+    "Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h": "b1faf96c5620c4bef6822299e721208fb12bf14e7c583da4e0a6546a9baaab51",
+    "Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.cpp": "89af2517151de79f22781fc294d58602aa5a8f0546ed2f51ac6dab224be2e206",
+    "Engine/RenderEngine/MaterialGraphSceneHost.h": "1574057eeb94cae3802b3900d1516f6525b44d0ed3b826cf68318fa7f39138f6",
+    "Engine/RenderEngine/MaterialGraphSceneHost.cpp": "1e08d838dbd672296503386d1beb094ae2c027aad0969b6f2e7c5188a17792f2",
+    "Engine/RenderEngine/MaterialGraphSceneStages.inl": "6ec31b795c3cee88025ab55a3e76cefca810fbce55129bca2ed4a73ed852a4eb",
+    "Engine/RenderEngine/MaterialGraphSceneEffectStage.inl": "b7c28bef4c1e70534e47f26abe13b0afb2fa1d60970858c5670c3c544d67a1e3",
+    "Engine/RenderEngine/MaterialGraphSceneLayerStage.inl": "e06f7c8fb32c53bc9d093df9c51010ed34e069b588d6e861e20f1b113bdbffba",
+    "Tools/regression/live_pipeline_contract_probe.cpp": "a28f1185af923f37ff8cec0499a59dde191e428e26eae10755d77d501eed19c5",
+    "Tools/regression/verify-live-pipeline-contracts.py": "9637fddd48ffcb282696d1ebc05247b010fcb43cb5c2c2373bffbe12237b20e6",
+    "Tools/regression/material_forward_blend_tests.inl": "2c1b1ec27ec90dbbf3a1e5679aa6bb54d8a0a5292e3d8d85d4713a96fea1e7ad",
+    "Tools/regression/fixtures/live-pipeline-portable-pass.h": "e646a31c34994b3230fe972bc365a2bdd0ee7d62db764efe428bec3e9da6d775",
+    "Tools/regression/fixtures/light-packing-portable-proxy-base.h": "ef1ebaaec3b6dfde39ed28aa0d909e1f552da21ce04bb22b0503683018af12dd"
+  },
+  "core_current_hashes_match_sanitized": true,
+  "compiler": "GCC 13.3.0",
+  "formatter": "clang-format 19.1.7; actual repo paths and repo .clang-format",
+  "native_material_blend_fixture": "not executed; Windows/native backend required"
+}

@@ -1,8 +1,11 @@
 // Runs production LivePipelineDesc against the production graph. Only native
 // services and the platform-heavy frame-context payload are fixture boundaries.
 #include "Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h"
+#include "Engine/RenderEngine/Render/Core/EnhancedLightPacking.h"
 #include "Engine/RenderEngine/Render/Core/RenderFeatureContributor.h"
+#include "fixtures/render-graph-allocation-counters.h"
 #include "fixtures/render-graph-portable-services.h"
+#include <mathematics/transform.hpp>
 #include <iostream>
 
 namespace
@@ -604,6 +607,304 @@ namespace
         }
     }
 
+    bool AllowWarmAllocations()
+    {
+        const char* value = std::getenv("CE_LIVE_CONTRACT_ALLOW_ALLOCATIONS");
+        return value && std::string_view{value} == "1";
+    }
+
+    void ReportAllocations(std::string_view phase, const ce::regression::AllocationCounts& counts, uint32_t frames,
+                           uint32_t items)
+    {
+        std::cout << "{\"measurement\":\"" << phase << "\",\"frames\":" << frames << ",\"items\":" << items
+                  << ",\"standardCalls\":" << counts.standardCalls << ",\"standardBytes\":" << counts.standardBytes
+                  << ",\"mimallocCalls\":" << counts.mimallocCalls << ",\"mimallocBytes\":" << counts.mimallocBytes
+                  << ",\"native_or_gpu\":false}\n";
+        Require(AllowWarmAllocations() || (!counts.standardCalls && !counts.mimallocCalls),
+                "warmed feature dispatch or light selection allocated temporary storage");
+    }
+
+    void WarmDeclarationAllocations()
+    {
+        ce::regression::PortableRenderServices services;
+        EnhancedRenderGraph graph{services, RGSchedulingMode::ExplicitVersioned};
+        LiveBlackboard board;
+        EnhancedFrameContext context;
+        context.width = 32;
+        context.height = 16;
+        LivePipelineDesc pipeline;
+        RGHandle input;
+        std::array<RGHandle, 3> depths{};
+        auto source = Node("Warm.Source");
+        source.Outputs({kInput, kDepths});
+        source.declare =
+            [&](LiveBlackboard& values, EnhancedRenderGraph&, const EnhancedFrameContext&, const LiveFrameBinding&)
+        {
+            values.Set(kInput, input);
+            values.SetList(kDepths, depths);
+        };
+        pipeline.AddNode(std::move(source));
+        bool enabled{};
+        for (uint32_t index = 0; index < 32; ++index)
+        {
+            auto update = Node("Warm.Update." + std::to_string(index));
+            update.Inputs({kDepths});
+            update.Updates({kInput});
+            update.active = [&] { return enabled; };
+            update.declare =
+                [](LiveBlackboard& values, EnhancedRenderGraph&, const EnhancedFrameContext&, const LiveFrameBinding&)
+            {
+                values.Set(kInput, values.Get(kInput));
+                (void)values.GetListView(kDepths);
+            };
+            pipeline.AddNode(std::move(update));
+        }
+        auto passthrough = Node("Warm.Disabled");
+        passthrough.Outputs({kOutput});
+        passthrough.active = [] { return false; };
+        passthrough.disabledPassthroughs.push_back({kOutput, kInput});
+        pipeline.AddNode(std::move(passthrough));
+        std::string error;
+        Require(pipeline.Validate(error), error);
+        uint64_t a{}, b{}, c{}, d{}, e{}, f{};
+        // Six references exceed std::function's small-buffer storage. This is
+        // the same owning conversion the live diagnostic observer used to make.
+        const auto observer = [&a, &b, &c, &d, &e, &f](const LivePassNode&, const LiveBlackboard&)
+        {
+            ++a;
+            ++b;
+            ++c;
+            ++d;
+            ++e;
+            ++f;
+        };
+        constexpr uint32_t warmup = 4, measuredFrames = 128;
+        for (const bool observe : {false, true})
+        {
+            ce::regression::AllocationCounts counts;
+            for (uint32_t frame = 0; frame < warmup + measuredFrames; ++frame)
+            {
+                enabled = (frame & 1) != 0;
+                graph.Reset();
+                board.Reset();
+                graph.BeginProgramBinding();
+                input = graph.Write(Texture(graph, context.width, context.height));
+                for (auto& depth : depths)
+                {
+                    depth = graph.Write(Texture(graph, context.width, context.height, RHIFormat::D32Float));
+                }
+                graph.AddPass(
+                    "Warm.Output",
+                    {{input, RHIResourceState::RenderTarget, RGAccessMode::Write},
+                     {depths[0], RHIResourceState::DepthWrite, RGAccessMode::Write},
+                     {depths[1], RHIResourceState::DepthWrite, RGAccessMode::Write},
+                     {depths[2], RHIResourceState::DepthWrite, RGAccessMode::Write}},
+                    [](const auto&) {}, true);
+                const auto declare = [&]
+                {
+                    pipeline.PrepareAll(context, 0, error);
+                    (void)pipeline.HasConsumer(kInput.name, context, {});
+                    if (observe)
+                    {
+                        pipeline.DeclareAll(board, graph, context, {}, observer);
+                    }
+                    else
+                    {
+                        pipeline.DeclareAll(board, graph, context, {});
+                    }
+                };
+                if (frame < warmup)
+                {
+                    declare();
+                }
+                else
+                {
+                    // Graph resource creation/compilation is measured by its
+                    // own probe. This scope isolates actual feature dispatch,
+                    // validation, blackboard reuse and observer conversion.
+                    const ce::regression::ScopedAllocationMeasurement measurement{counts};
+                    declare();
+                }
+                Require(SameHandle(board.Get(kOutput), input) && board.GetListView(kDepths).size() == 3,
+                        "warm feature dispatch lost its disabled passthrough or list slots");
+                Require(graph.FinishProgramBinding(error) && graph.Compile(error) && graph.Execute(error), error);
+                if (frame)
+                {
+                    Require(graph.GetStats().programBindingReused,
+                            "repeated feature measurements must retain the actual graph program");
+                }
+            }
+            ReportAllocations(observe ? "warm_feature_dispatch_observer" : "warm_feature_dispatch", counts,
+                              measuredFrames, static_cast<uint32_t>(pipeline.NodeCount()));
+        }
+        Require(a != 0 && a == b && b == c && c == d && d == e && e == f,
+                "borrowed observer lost one of its captured references");
+    }
+
+    void WarmLightSelectionAllocations()
+    {
+        std::vector<own::shared_owner<LightRenderProxy>> proxies;
+        for (uint32_t index = 0; index < 256; ++index)
+        {
+            auto light = own::make_shared<LightRenderProxy>();
+            light->m_lightType = index % 11 == 0 ? LightType::DirectionalLight : LightType::PointLight;
+            light->m_worldPosition = {float(index % 32), 0.f, float(index / 32)};
+            light->m_intensity = float(index % 7 + 1);
+            proxies.push_back(std::move(light));
+        }
+        FrameCameraSnapshot camera;
+        camera.isOrthographic = true;
+        ViewLightSelection selected;
+#if !defined(CE_FEATURE_ALLOCATION_LEGACY_LIGHT_API)
+        ViewLightSelectionScratch scratch;
+#endif
+        constexpr uint32_t warmup = 4, measuredFrames = 128;
+        ce::regression::AllocationCounts counts;
+        for (uint32_t frame = 0; frame < warmup + measuredFrames; ++frame)
+        {
+            const auto select = [&]
+            {
+#if defined(CE_FEATURE_ALLOCATION_LEGACY_LIGHT_API)
+                selected = SelectLightsForView(proxies, camera);
+#else
+                SelectLightsForView(proxies, camera, selected, scratch);
+#endif
+            };
+            if (frame < warmup)
+            {
+                select();
+            }
+            else
+            {
+                const ce::regression::ScopedAllocationMeasurement measurement{counts};
+                select();
+            }
+            Require(selected.sceneLights == proxies.size() && selected.lights.size() == proxies.size() &&
+                        selected.culledByFrustum == 0,
+                    "warm light selection lost enabled lights");
+        }
+        ReportAllocations("warm_light_selection", counts, measuredFrames, static_cast<uint32_t>(proxies.size()));
+    }
+
+#if !defined(CE_FEATURE_ALLOCATION_LEGACY_LIGHT_API)
+    void LightSelectionBehavior()
+    {
+        std::vector<own::shared_owner<LightRenderProxy>> proxies;
+        for (uint32_t index = 0; index < 8; ++index)
+        {
+            auto light = own::make_shared<LightRenderProxy>();
+            light->m_lightType = LightType::PointLight;
+            light->m_worldPosition = {float(index), 0.f, 5.f};
+            light->m_range = 100.f;
+            light->m_intensity = 4.f;
+            light->m_color = {.2f, .3f, .4f, .5f};
+            proxies.push_back(std::move(light));
+        }
+        proxies[1]->m_lightType = LightType::DirectionalLight;
+        proxies[1]->m_intensity = 2.f;
+        proxies[3]->m_lightType = LightType::DirectionalLight;
+        proxies[3]->m_intensity = 5.f;
+        proxies[4]->m_intensity = 7.f;
+        proxies[5]->m_lightType = LightType::SpotLight;
+        proxies[6]->m_range = 0.f;
+        proxies[7]->m_lightStatus = LightStatus::Disabled;
+        proxies.push_back({});
+        FrameCameraSnapshot camera;
+        camera.isOrthographic = true;
+        ViewLightSelection selected;
+        ViewLightSelectionScratch scratch;
+        SelectLightsForView(proxies, camera, selected, scratch);
+        Require(selected.sceneLights == 7 && selected.culledByFrustum == 1 && selected.lights.size() == 6,
+                "light selection must preserve disabled/null/range culling counts");
+        constexpr std::array<uint32_t, 6> expected{3, 1, 4, 0, 2, 5};
+        for (size_t index = 0; index < expected.size(); ++index)
+        {
+            const auto& light = selected.lights[index];
+            const auto& source = *proxies[expected[index]];
+            Require(light.position.x == float(expected[index]) && light.color.r == source.m_color.r &&
+                        light.color.g == source.m_color.g && light.color.b == source.m_color.b &&
+                        light.color.a == source.m_intensity,
+                    "sorted shader lights must preserve finite equal-score order and unmultiplied RGB/intensity");
+        }
+        const auto oneShot = SelectLightsForView(proxies, camera);
+        Require(oneShot.lights.size() == selected.lights.size() && oneShot.sceneLights == selected.sceneLights &&
+                    oneShot.culledByFrustum == selected.culledByFrustum,
+                "one-shot light selection must preserve its public returning API");
+
+        // Non-finite authored intensity is legal input to the proxy. A total
+        // tie break keeps sort's comparator strict even when scores are NaN.
+        proxies[0]->m_intensity = std::numeric_limits<float>::quiet_NaN();
+        proxies[1]->m_intensity = std::numeric_limits<float>::quiet_NaN();
+        proxies[2]->m_intensity = std::numeric_limits<float>::infinity();
+        proxies[3]->m_intensity = -std::numeric_limits<float>::infinity();
+        proxies[4]->m_intensity = 0.f;
+        proxies[5]->m_intensity = -0.f;
+        SelectLightsForView(proxies, camera, selected, scratch);
+        constexpr std::array<uint32_t, 6> nonFiniteOrder{3, 1, 2, 4, 5, 0};
+        for (size_t index = 0; index < nonFiniteOrder.size(); ++index)
+        {
+            Require(selected.lights[index].position.x == float(nonFiniteOrder[index]),
+                    "NaN/infinity/signed-zero scores must retain deterministic strict ordering");
+        }
+
+        camera.isOrthographic = false;
+        camera.projection = math::perspective_fov_lh(1.f, 1.f, .1f, 100.f);
+        camera.inverseView = math::matrix4x4::identity();
+        proxies[0]->m_intensity = 1.f;
+        proxies[0]->m_range = .5f;
+        proxies[0]->m_worldPosition = {0.f, 0.f, 5.f};
+        proxies[2]->m_range = .5f;
+        proxies[2]->m_worldPosition = {1000.f, 0.f, 5.f};
+        SelectLightsForView(std::span{proxies}.first(3), camera, selected, scratch);
+        Require(selected.sceneLights == 3 && selected.culledByFrustum == 1 && selected.lights.size() == 2 &&
+                    selected.lights[0].position.w == float(LightType::DirectionalLight) &&
+                    selected.lights[1].position.z == 5.f,
+                "perspective frustum selection must keep infinite lights and cull local lights outside the view");
+        const auto outputCapacity = selected.lights.capacity();
+        const auto scratchCapacity = scratch.scored.capacity();
+        ce::regression::AllocationCounts counts;
+        {
+            const ce::regression::ScopedAllocationMeasurement measurement{counts};
+            SelectLightsForView({}, camera, selected, scratch);
+        }
+        Require(selected.lights.empty() && !selected.sceneLights && !selected.culledByFrustum &&
+                    selected.lights.capacity() == outputCapacity && scratch.scored.capacity() == scratchCapacity &&
+                    !counts.standardCalls && !counts.mimallocCalls,
+                "empty/smaller views must reset results while retaining both output and scoring capacity");
+    }
+
+    void ObserverCompatibility()
+    {
+        ce::regression::PortableRenderServices services;
+        EnhancedRenderGraph graph{services, RGSchedulingMode::ExplicitVersioned};
+        LiveBlackboard board;
+        LivePipelineDesc pipeline;
+        pipeline.AddNode(Node("Observer.Source"));
+        const auto invoke = [&](auto&& callback)
+        {
+            graph.Reset();
+            board.Reset();
+            graph.BeginProgramBinding();
+            pipeline.DeclareAll(board, graph, {}, {}, std::forward<decltype(callback)>(callback));
+        };
+        uint32_t calls{};
+        std::function<void(const LivePassNode&, const LiveBlackboard&)> owned = [&](const auto&, const auto&)
+        { ++calls; };
+        invoke(owned);
+        invoke(std::as_const(owned));
+        invoke(std::function<void(const LivePassNode&, const LiveBlackboard&)>{});
+        using CallbackPointer = void (*)(const LivePassNode&, const LiveBlackboard&);
+        invoke(CallbackPointer{});
+        Require(calls == 2, "owning std::function and empty/null callback compatibility must remain unchanged");
+        auto mutableCallback = [count = 0u, &calls](const auto&, const auto&) mutable { calls += ++count; };
+        invoke(mutableCallback);
+        invoke(mutableCallback);
+        Require(calls == 5, "borrowed mutable lvalue callback must retain its own current state");
+        invoke([owner = std::make_unique<uint32_t>(7), &calls](const auto&, const auto&) { calls += *owner; });
+        Require(calls == 12, "move-only temporary callback must remain alive through synchronous declaration");
+    }
+#endif
+
     void ContributorComposition()
     {
         std::vector<std::string> calls;
@@ -657,6 +958,12 @@ int main()
         ContributorComposition();
         StageWriteContracts();
         ProgramBindingIntegration();
+        WarmDeclarationAllocations();
+        WarmLightSelectionAllocations();
+#if !defined(CE_FEATURE_ALLOCATION_LEGACY_LIGHT_API)
+        LightSelectionBehavior();
+        ObserverCompatibility();
+#endif
         std::cout << "LIVE_PIPELINE_CONTRACTS_OK checks=" << checks << '\n';
         return 0;
     }

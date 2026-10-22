@@ -318,7 +318,7 @@ struct EnhancedRenderGraph::QueuePlanningScratch
     ce::dynamic_bitset sharedReadTextures;
     std::vector<const QueueHint*> byPass;
     std::vector<uint64_t> costs;
-    std::vector<uint16_t> candidates, order, component, members, stack;
+    std::vector<uint16_t> candidates, order, candidateOrder, component, members, stack;
     ce::dynamic_bitset candidatePasses;
     std::vector<std::vector<uint16_t>> predecessors, successors, trialPredecessors, trialSuccessors;
     std::vector<RHIQueueKind> serial, queues, trial;
@@ -588,7 +588,9 @@ void EnhancedRenderGraph::BeginDeclarationPackets()
     {
         throw std::logic_error("Declaration packet collection requires a finished or Reset graph");
     }
-    m_packetArena.reset();
+    // Earlier declarations (and frame-local payload buffers) may already borrow
+    // this arena. Only Reset ends their lifetime; opening another packet batch
+    // must append without overwriting those live values.
     m_declarationWork->nextPacket = 0;
     m_declarationPackets.clear();
     m_declarationPacketJobs = 0;
@@ -800,7 +802,7 @@ void EnhancedRenderGraph::Reset()
     m_recordedRecording = 0;
     m_statesCommitted = false;
     m_queueExecutionAttempted = false;
-    m_queueDiagnostics = {};
+    ResetQueueDiagnostics();
     m_measurementDomain = RGMeasurementDomain::Normal;
     m_queueExecutionMode = 0;
     // 현재 native 자원을 해제한 뒤 활성 상태만 비우고 이름·버전 저장 공간은
@@ -2374,40 +2376,35 @@ RHITransientResourceDesc EnhancedRenderGraph::TransientDescription(const Resourc
     return result;
 }
 
-bool EnhancedRenderGraph::ResourcesHappenBefore(uint16_t before, uint16_t after) const
+struct EnhancedRenderGraph::AliasingScratch
+{
+    ce::render_arena_vector<ce::render_arena_vector<uint16_t>> uses, successors;
+    ce::render_arena_vector<uint8_t> reached;
+    ce::render_arena_vector<uint16_t> pending;
+
+    AliasingScratch(ce::render_arena_resource* arena, size_t resourceCount, size_t passCount)
+        : uses(resourceCount, arena), successors(passCount, arena), reached(passCount, 0, arena), pending(arena)
+    {
+    }
+};
+
+bool EnhancedRenderGraph::ResourcesHappenBefore(uint16_t before, uint16_t after, AliasingScratch& scratch) const
 {
     // Allocation is legal only if the dependency DAG already orders EVERY use
     // of the previous occupant before EVERY use of its successor. A linear
     // topological position alone says nothing about overlap on another queue.
-    std::vector<uint16_t> previousUses, nextUses;
-    for (const auto pass : GetExecuteOrder())
-    {
-        for (const auto& usage : m_passes[pass].usages)
-        {
-            if (usage.handle.index == before)
-            {
-                previousUses.push_back(pass);
-            }
-            if (usage.handle.index == after)
-            {
-                nextUses.push_back(pass);
-            }
-        }
-    }
+    const auto& previousUses = scratch.uses[before];
+    const auto& nextUses = scratch.uses[after];
     if (previousUses.empty() || nextUses.empty())
     {
         return false;
     }
-    std::vector<std::vector<uint16_t>> successors(m_passes.size());
-    for (const auto& edge : VersionEdges())
-    {
-        successors[edge.producer].push_back(static_cast<uint16_t>(edge.consumer));
-    }
-    ce::dynamic_bitset reached(m_passes.size(), false);
-    std::vector<uint16_t> pending;
+    const auto& successors = scratch.successors;
+    auto& reached = scratch.reached;
+    auto& pending = scratch.pending;
     for (const auto previous : previousUses)
     {
-        reached.assign(m_passes.size(), false);
+        std::fill(reached.begin(), reached.end(), uint8_t{0});
         pending.assign(1, previous);
         while (!pending.empty())
         {
@@ -2415,16 +2412,16 @@ bool EnhancedRenderGraph::ResourcesHappenBefore(uint16_t before, uint16_t after)
             pending.pop_back();
             for (const auto next : successors[pass])
             {
-                if (!reached.test(next))
+                if (!reached[next])
                 {
-                    reached.set(next, true);
+                    reached[next] = 1;
                     pending.push_back(next);
                 }
             }
         }
         for (const auto next : nextUses)
         {
-            if (!reached.test(next))
+            if (!reached[next])
             {
                 return false;
             }
@@ -2459,14 +2456,40 @@ bool EnhancedRenderGraph::CreateAliasedTransients(std::string& outError)
         }
         m_transientPool->aliasOwner = m_deviceServices;
     }
+    m_compileScratchArena.reset();
+    auto* arena = &m_compileScratchArena;
+    AliasingScratch scratch{arena, m_resources.size(), m_passes.size()};
+    // The same immutable dependency DAG proves every candidate pair. Build its
+    // adjacency and physical-resource uses once, not again for every pair.
+    for (const auto pass : executeOrder)
+    {
+        for (const auto& usage : m_passes[pass].usages)
+        {
+            auto& uses = scratch.uses[usage.handle.index];
+            if (uses.empty() || uses.back() != pass)
+            {
+                uses.push_back(pass);
+            }
+        }
+    }
+    for (const auto& edge : VersionEdges())
+    {
+        scratch.successors[edge.producer].push_back(static_cast<uint16_t>(edge.consumer));
+    }
     struct Group
     {
         RHITransientAllocationInfo allocation;
         uint32_t lastUse;
-        std::vector<uint16_t> members;
+        ce::render_arena_vector<uint16_t> members;
+
+        Group(RHITransientAllocationInfo info, uint32_t last, uint16_t member, ce::render_arena_resource* arena)
+            : allocation(info), lastUse(last), members(arena)
+        {
+            members.push_back(member);
+        }
     };
-    std::vector<Group> groups;
-    std::vector<uint16_t> candidates;
+    ce::render_arena_vector<Group> groups{arena};
+    ce::render_arena_vector<uint16_t> candidates{arena};
     for (uint16_t index = 0; index < m_resources.size(); ++index)
     {
         const auto& resource = m_resources[index];
@@ -2475,10 +2498,13 @@ bool EnhancedRenderGraph::CreateAliasedTransients(std::string& outError)
             candidates.push_back(index);
         }
     }
-    std::stable_sort(candidates.begin(), candidates.end(), [this](auto left, auto right)
-    {
-        return m_resources[left].firstUse < m_resources[right].firstUse;
-    });
+    std::sort(candidates.begin(), candidates.end(),
+              [this](auto left, auto right)
+              {
+                  // Candidates were collected in resource order. The explicit tie break
+                  // preserves stable_sort's result without its temporary heap buffer.
+                  return std::pair{m_resources[left].firstUse, left} < std::pair{m_resources[right].firstUse, right};
+              });
     for (auto index : candidates)
     {
         auto& resource = m_resources[index];
@@ -2540,11 +2566,11 @@ bool EnhancedRenderGraph::CreateAliasedTransients(std::string& outError)
                                           {
                                               return existing.allocation.heapClass == allocation.heapClass &&
                                                      existing.lastUse < resource.firstUse &&
-                                                     ResourcesHappenBefore(existing.members.back(), index);
+                                                     ResourcesHappenBefore(existing.members.back(), index, scratch);
                                           });
         if (group == groups.end())
         {
-            groups.push_back({allocation, allocationLastUse, {index}});
+            groups.emplace_back(allocation, allocationLastUse, index, arena);
         }
         else
         {
@@ -2560,7 +2586,7 @@ bool EnhancedRenderGraph::CreateAliasedTransients(std::string& outError)
         {
             continue;
         }
-        std::vector<RHITransientResourceDesc> descriptions;
+        ce::render_arena_vector<RHITransientResourceDesc> descriptions{arena};
         descriptions.reserve(group.members.size());
         for (auto index : group.members)
         {
@@ -2608,7 +2634,9 @@ bool EnhancedRenderGraph::CreateAliasedTransients(std::string& outError)
             lease = own::make_shared<RGTransientPool::AliasedGroup>();
             lease->owner = m_deviceServices;
             lease->allocation = group.allocation;
-            lease->descriptions = std::move(descriptions);
+            // The lease can outlive this compile/arena. Only the cold native
+            // allocation path copies descriptors into owning retained storage.
+            lease->descriptions.assign(descriptions.begin(), descriptions.end());
             lease->entries.reserve(group.members.size());
             if (!m_deviceServices->CreateTransientHeap(group.allocation, lease->heap, outError))
             {
@@ -3171,14 +3199,15 @@ void EnhancedRenderGraph::PlanBarriers(const ce::dynamic_bitset* batchEnds, Phas
         PlanSubresourceBarriers(batchEnds, prologue, epilogue);
         return;
     }
-    auto temporaryStorage = AcquireRdgScratch();
-    auto* arena = &temporaryStorage->Resource(0);
+    m_compileScratchArena.reset();
+    auto* arena = &m_compileScratchArena;
     const auto& executeOrder = GetExecuteOrder();
     ce::profile_scope profile{ce::marker<"RenderGraphPlanBarriers">()};
     const bool queuePlan = batchEnds != nullptr;
     m_stats.barriersEmitted = 0;
     m_stats.barrierBatches = 0;
-    ce::dynamic_bitset previousWrite(m_resources.size(), true);
+    auto& previousWrite = m_barrierPreviousWrite;
+    previousWrite.assign(m_resources.size(), true);
     ce::render_arena_vector<uint16_t> previousAtomicVersion(m_resources.size(), RGHandle::kInvalid, arena);
     ce::render_arena_vector<RHIResourceState> finalStates{arena};
     ce::render_arena_vector<uint16_t> activeAliases(m_transientHeaps.size(), RGHandle::kInvalid, arena);
@@ -4995,12 +5024,15 @@ uint64_t EnhancedRenderGraph::SimulateQueues(const std::vector<RHIQueueKind>& qu
     QueuePlanningScratch::Timer timer{scratch.simulationMilliseconds};
     const auto baseline = SimulateQueueOrder(queues, costs, predecessors, successors, reorder, order, scratch, false);
     if (!reorder) return baseline;
-    std::vector<uint16_t> candidateOrder;
+    auto& candidateOrder = scratch.candidateOrder;
     const auto candidate = SimulateQueueOrder(queues, costs, predecessors, successors, true,
         order ? &candidateOrder : nullptr, scratch, true);
     if (candidate < baseline)
     {
-        if (order) *order = std::move(candidateOrder);
+        if (order)
+        {
+            order->swap(candidateOrder);
+        }
         return candidate;
     }
     return baseline;
@@ -5178,7 +5210,7 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
     auto& scratch = *m_queuePlanningScratch;
     scratch.dependencyMilliseconds = scratch.simulationMilliseconds = 0;
     const auto& executeOrder = GetExecuteOrder();
-    output = {};
+    output.Reset();
     outError.clear();
     if (!m_compiled || !capabilities.graphics)
     {
@@ -5201,7 +5233,7 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         }
         byPass[hint.pass.index] = &hint;
     }
-    QueueSchedule plan;
+    auto& plan = output;
     plan.compileGeneration = m_compileGeneration;
     // Placed allocations have already proved all-use happens-before on the
     // dependency DAG. Every queue placement preserves those edges.
@@ -5266,7 +5298,6 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         {
             plan.entries.push_back({pass, RHIQueueKind::Graphics});
         }
-        output = std::move(plan);
         return true;
     }
     auto& predecessors = scratch.predecessors;
@@ -5383,7 +5414,6 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
     }
     if (!plan.usesCompute)
     {
-        output = std::move(plan);
         return true;
     }
     for (const auto pass : std::span{executeOrder})
@@ -5416,7 +5446,6 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
             }
         }
     }
-    output = std::move(plan);
     return true;
 }
 

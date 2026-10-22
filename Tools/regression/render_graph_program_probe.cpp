@@ -60,6 +60,148 @@ namespace
         return output;
     }
 
+    void CheckDeclarationBufferLifetime()
+    {
+        ce::regression::PortableRenderServices services;
+        Graph graph{services, RGSchedulingMode::ExplicitVersioned};
+        std::string error;
+        for (int frame = 0; frame < 3; ++frame)
+        {
+            graph.Reset();
+            auto values = graph.CreateDeclarationBuffer<RGHandle>(2);
+            values.push_back(graph.Write(graph.CreateBuffer({64, true, false, "Payload"})));
+            const auto payload = std::span<const RGHandle>{values.data(), values.size()};
+            graph.AddPass("Producer", {{payload[0], RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
+                          [](const auto&) {});
+            // Packet batches may append after existing declarations. Opening a
+            // batch must not rewind buffers or usages that still belong to it.
+            graph.BeginDeclarationPackets();
+            bool observed = false;
+            graph.AddPass(
+                "Packet consumer with an owned non-SSO diagnostic name",
+                {{payload[0], RHIResourceState::ShaderResource, RGAccessMode::Read}},
+                [&, payload](const auto& context)
+                {
+                    Require(payload[0].epoch == graph.ResourceEpoch() &&
+                                context.graph->ResolveBufferHandle(payload[0]).IsValid(),
+                            "Declaration buffers remain valid through execution");
+                    observed = true;
+                },
+                true);
+            graph.FinishDeclarationPackets();
+            Require(graph.Compile(error) && graph.Execute(error) && observed, error);
+        }
+    }
+
+    void CheckQueuePlanReset()
+    {
+        ce::regression::PortableRenderServices services;
+        Graph graph{services, RGSchedulingMode::ExplicitVersioned};
+        const auto pass = graph.AddPass("Live", {}, [](const auto&) {}, true);
+        std::string error;
+        Require(graph.Compile(error), error);
+        Graph::QueueSchedule schedule;
+        Require(graph.BuildQueueSchedule({true, false, false, false}, {}, 0, schedule, error), error);
+        Require(schedule.entries.size() == 1 && schedule.compileGeneration != 0,
+                "A valid plan populates its reusable output");
+        const auto capacity = schedule.entries.capacity();
+        Require(!graph.BuildQueueSchedule({true, false, false, false}, {{pass}, {pass}}, 0, schedule, error),
+                "Duplicate queue hints remain invalid");
+        Require(schedule.entries.empty() && schedule.waits.empty() && schedule.compileGeneration == 0 &&
+                    schedule.predictedSerialNanoseconds == 0 && !schedule.predictionComplete &&
+                    schedule.entries.capacity() == capacity,
+                "A rejected plan clears old values and preserves only caller-owned capacity");
+    }
+
+    void CheckOwnedSubmissionScratch()
+    {
+        using namespace ce::regression;
+        // Exercise owned-target construction and arena-backed recording arrays.
+        // A declared CPU side effect keeps callbacks on this fixture's producer;
+        // this checks storage lifetime, not real parallel worker scheduling.
+        class Recorder final : public IRHIQueueRecorder
+        {
+          public:
+            struct Batch final : IRHIQueueCommandBatch
+            {
+                RHIQueueIdentity identity;
+                ce::lifetime_token owner;
+                std::vector<PortableRenderEncoder> encoders;
+                RHIQueueIdentity GetQueueIdentity() const override { return identity; }
+                uint64_t GetRecordingId() const override { return 1; }
+            };
+            struct Targets final : IRHIQueueRecording
+            {
+                own::shared_owner<Batch> batch;
+                RHIEncoder& AcquireEncoder(uint32_t target) override { return batch->encoders.at(target); }
+                bool Finish(ce::pooled_owner<IRHIQueueCommandBatch>& output, std::string&) override
+                {
+                    output = std::move(batch);
+                    return true;
+                }
+            };
+            PortableRenderServices& services;
+            explicit Recorder(PortableRenderServices& device) : services(device) {}
+            IRenderDeviceServices& DeviceServices() const override { return services; }
+            uint32_t GetWorkerCount() const override { return 4; }
+            bool Record(const own::shared_owner<IRHICommandQueue>&, const std::function<void(RHIEncoder&)>&,
+                        ce::lifetime_token, ce::pooled_owner<IRHIQueueCommandBatch>&, std::string&) override
+            {
+                throw std::logic_error("Owned fixture must use independent recording targets");
+            }
+            bool BeginRecording(const own::shared_owner<IRHICommandQueue>& queue, uint32_t count,
+                                ce::lifetime_token owner, ce::pooled_owner<IRHIQueueRecording>& output,
+                                std::string&) override
+            {
+                auto targets = own::make_shared<Targets>();
+                targets->batch = own::make_shared<Batch>();
+                targets->batch->identity = queue->GetIdentity();
+                targets->batch->owner = std::move(owner);
+                targets->batch->encoders.resize(count);
+                output = std::move(targets);
+                return true;
+            }
+        };
+        PortableRenderServices services;
+        auto graph = own::make_shared<Graph>(services, RGSchedulingMode::ExplicitVersioned);
+        auto queue = own::make_shared<PortableQueue>(RHIQueueIdentity{58, 1, RHIQueueKind::Graphics});
+        Graph::QueueEndpoint endpoint{queue};
+        Recorder recorder{services};
+        std::string error;
+        for (const uint32_t passCount : {32u, 3u, 48u, 32u})
+        {
+            graph->Reset();
+            uint32_t calls = 0;
+            for (uint32_t index = 0; index < passCount; ++index)
+            {
+                const auto pass = graph->AddPass(
+                    "Owned scratch", {},
+                    [&](const auto& context)
+                    {
+                        ++calls;
+                        context.encoder->Dispatch(1, 1, 1);
+                    },
+                    true);
+                if (index == 0)
+                {
+                    graph->DeclareRecordingSideEffect(pass);
+                }
+            }
+            Require(graph->Compile(error), error);
+            Graph::QueueExecution execution;
+            Require(graph->SubmitQueues(graph, recorder, endpoint, nullptr, {}, 0, own::make_shared<int>(1), execution,
+                                        error),
+                    error);
+            Require(calls == passCount && graph->GetQueueDiagnostics().batches.size() == 3 &&
+                        graph->GetQueueDiagnostics().batches[1].passes.size() == passCount,
+                    "Owned recording and retained diagnostics adapt across graph shape changes");
+            Require(queue->GetPendingBatchCount() == 3 && !execution.retirement.IsComplete(),
+                    "Native batches retain their independent owners after submission scratch is destroyed");
+            queue->Complete();
+            Require(execution.retirement.IsComplete(), "Collected native batches release the graph lease");
+        }
+    }
+
     void CheckSubresources(ce::regression::PortableRenderServices& services)
     {
         services.subresourceCapabilities = {true, true, true};
@@ -282,6 +424,16 @@ namespace
             resetRejected = true;
         }
         Require(resetRejected, "Submitted graph cannot release resources before queue collection");
+        bool declarationBufferRejected = false;
+        try
+        {
+            graph->CreateDeclarationBuffer<RGHandle>(1);
+        }
+        catch (const std::logic_error&)
+        {
+            declarationBufferRejected = true;
+        }
+        Require(declarationBufferRejected, "In-flight graph cannot mutate declaration arena storage");
         graphics->Complete();
         Require(!execution.retirement.IsComplete(), "Graphics completion alone does not retire independent compute");
         compute->Complete();
@@ -616,6 +768,9 @@ int main()
         Require(!imported.GetStats().programBindingReused &&
                     imported.SnapshotProgram().operator->() != importedProgram.operator->(),
                 "Streamed binding recompiles changed native resource schema in the same frame");
+        CheckDeclarationBufferLifetime();
+        CheckQueuePlanReset();
+        CheckOwnedSubmissionScratch();
         CheckSubresources(services);
         CheckQueues();
         CheckPartialSubmission();

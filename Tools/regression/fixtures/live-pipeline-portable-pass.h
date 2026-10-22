@@ -5,6 +5,19 @@
 // EnhancedRenderPass.h in its temporary snapshot with these lifecycle signatures
 // and the actual scalar fields consumed by EnhancedLivePipelineDesc.cpp.
 #include "../../../Utility_Framework/StandardLibrary.h"
+#include <mathematics/color.hpp>
+#include <mathematics/vector4.hpp>
+
+// Same shader payload as EnhancedRenderPass.h; light selection and packing use
+// the actual production LightRenderProxy and EnhancedLightPacking definitions.
+struct EnhancedLight
+{
+    math::vector4 position{};
+    math::vector4 direction{};
+    math::color color{};
+    math::vector4 attenuation{};
+};
+static_assert(sizeof(EnhancedLight) == 64);
 
 class EnhancedRenderGraph;
 struct EnhancedFrameContext

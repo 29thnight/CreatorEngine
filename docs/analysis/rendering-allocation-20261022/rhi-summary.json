@@ -1,0 +1,221 @@
+{
+  "schema": "creator.rhi_async_allocation_review.v1",
+  "status": "PASS",
+  "baseline_ref": "7b5e03da9802c903eaeacc48278d23585b36cfb6",
+  "scope": "EnqueueSoftwareBatch+Translate+Submit+finite completion retirement; recording excluded; all-thread actual std new and mimalloc API requests",
+  "warmup": 16,
+  "samples": 33,
+  "cases": [
+    {
+      "targets": 1,
+      "segments_per_target": 3,
+      "commands": 1554,
+      "before": {
+        "standard": {
+          "min": 10,
+          "median": 10,
+          "max": 10,
+          "total": 330
+        },
+        "mimalloc": {
+          "min": 0,
+          "median": 0,
+          "max": 0,
+          "total": 0
+        }
+      },
+      "after": {
+        "standard": {
+          "min": 1,
+          "median": 1,
+          "max": 1,
+          "total": 33
+        },
+        "mimalloc": {
+          "min": 0,
+          "median": 0,
+          "max": 0,
+          "total": 0
+        }
+      },
+      "paired_cpu_microseconds": {
+        "before": {
+          "min": 1151.649,
+          "p50": 1167.552,
+          "p95": 1252.66,
+          "max": 1444.406
+        },
+        "after": {
+          "min": 1131.148,
+          "p50": 1151.078,
+          "p95": 1430.234,
+          "max": 1998.126
+        }
+      }
+    },
+    {
+      "targets": 8,
+      "segments_per_target": 3,
+      "commands": 12432,
+      "before": {
+        "standard": {
+          "min": 15,
+          "median": 15,
+          "max": 15,
+          "total": 495
+        },
+        "mimalloc": {
+          "min": 0,
+          "median": 0,
+          "max": 0,
+          "total": 0
+        }
+      },
+      "after": {
+        "standard": {
+          "min": 5,
+          "median": 5,
+          "max": 5,
+          "total": 165
+        },
+        "mimalloc": {
+          "min": 0,
+          "median": 0,
+          "max": 0,
+          "total": 0
+        }
+      },
+      "paired_cpu_microseconds": {
+        "before": {
+          "min": 1372.863,
+          "p50": 1491.992,
+          "p95": 1712.535,
+          "max": 3162.284
+        },
+        "after": {
+          "min": 1384.209,
+          "p50": 1493.364,
+          "p95": 1712.235,
+          "max": 1994.015
+        }
+      }
+    }
+  ],
+  "final_source_counts": {
+    "scope": "EnqueueSoftwareBatch+Translate+Submit+finite completion retirement; recording excluded; all-thread actual std new and mimalloc API requests",
+    "warmup": 16,
+    "samples": 33,
+    "cases": [
+      {
+        "targets": 1,
+        "commands": 1554,
+        "standard": {
+          "min": 1,
+          "median": 1,
+          "max": 1,
+          "total": 33
+        },
+        "mimalloc": {
+          "min": 0,
+          "median": 0,
+          "max": 0,
+          "total": 0
+        },
+        "cpu_microseconds": {
+          "min": 1116.726,
+          "p50": 1208.45,
+          "p95": 3385.721,
+          "max": 3805.169
+        }
+      },
+      {
+        "targets": 8,
+        "commands": 12432,
+        "standard": {
+          "min": 5,
+          "median": 5,
+          "max": 5,
+          "total": 165
+        },
+        "mimalloc": {
+          "min": 0,
+          "median": 0,
+          "max": 0,
+          "total": 0
+        },
+        "cpu_microseconds": {
+          "min": 1384.335,
+          "p50": 1684.252,
+          "p95": 2569.608,
+          "max": 3751.653
+        }
+      }
+    ]
+  },
+  "remaining_allocation_sources": {
+    "gpu_retirement_aggregate_per_submission": 1,
+    "parallel_indexed_scheduler_per_batch": 4,
+    "parallel_sources": [
+      "job_detail::completion_state",
+      "completion callback std::function",
+      "thread_pool::state::work",
+      "thread_pool::state::handoff"
+    ],
+    "recording_scope_unchanged": {
+      "scope": "BeginRecording+AcquireEncoder+FinishRecording; actual std new and mimalloc API requests",
+      "stable8": {
+        "standard": 0,
+        "mimalloc": 9
+      },
+      "scale8_1_8": {
+        "standard": 0,
+        "mimalloc": 9
+      },
+      "allocated_arena_bytes": 524408,
+      "commands": 312
+    }
+  },
+  "validation": {
+    "primary_normal_checks": 34399,
+    "primary_asan_ubsan_checks": 34399,
+    "primary_scenarios": 1759,
+    "queue_asan_ubsan_checks": 5474,
+    "vulkan_mock_asan_ubsan_checks": 524,
+    "existing_commands_probe_status": "PASS",
+    "normal_and_sanitized_source_unchanged": true
+  },
+  "limitations": [
+    "CPU-only native boundary; no Windows Editor, native driver, GPU timing, pixel or full-frame benchmark.",
+    "Timing includes thread scheduling and 1ms finite-retirement polling; observed distributions do not establish a frame/runtime speedup.",
+    "Final source verification ran concurrently with other compilers; use paired run for its recorded timing comparison, not the final revalidation timing as a benchmark.",
+    "Recording allocations are a separate pre-existing scope; unchanged standard0/mimalloc9 at eight targets.",
+    "Older DX12 CollectProfiler local compute-pass, compute-slice, interval and lane vectors remain outside this measured regression scope.",
+    "Queue sanitizer receipt precedes whitespace-only header formatting; the separate equivalence receipt preserves exact before/after hashes and confirms unchanged non-whitespace bytes/directive lines."
+  ],
+  "evidence": {
+    "paired_before_after": {
+      "path": "/workspace/scratch/b74b0a3b6389/rhi-allocation-final-comparison.json",
+      "sha256": "4bb8bf0b43033f66ab62165e6a02e61dfaf5f38e5bc55fa8a0d27e681a6f6c36"
+    },
+    "final_normal": {
+      "path": "/workspace/scratch/b74b0a3b6389/rhi-allocation-formatted-normal.json",
+      "sha256": "bee572bd0c6b62ad462fd8efdffb59ebeee15db210399c8a7c24f299ee19d056"
+    },
+    "final_asan_ubsan": {
+      "path": "/workspace/scratch/b74b0a3b6389/rhi-allocation-formatted-sanitized.json",
+      "sha256": "5bed37bb37e9b883244ef359870cb3cb0d60e39c82ce95c7ffd84b74eec71324"
+    },
+    "queue_asan_ubsan": {
+      "path": "/workspace/scratch/b74b0a3b6389/rhi-allocation-queue-sanitized.json",
+      "sha256": "c9fbceb5f606539cf89c1c940f86dadb9dc860627226531c9701f846ed088768"
+    },
+    "vulkan_asan_ubsan": {
+      "path": "/workspace/scratch/b74b0a3b6389/rhi-allocation-vulkan-final-sanitized.json",
+      "sha256": "6c6cb6f4431759f0ed86d25466106a1372ebde116f9047ce4de3dcc853029912"
+    },
+    "header_format_equivalence": {
+      "path": "/workspace/scratch/b74b0a3b6389/rhi-allocation-format-equivalence.json",
+      "sha256": "2792c0d7a1de9a0f1deeb0b4e2bd258b23a753919124829a46c149fd0eb958b5"
+    }
+  }
+}
