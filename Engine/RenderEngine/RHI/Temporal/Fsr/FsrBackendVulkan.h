@@ -1,4 +1,6 @@
 #pragma once
+#include "../../../../Utility_Framework/LifetimeToken.h"
+#include "../../../../Utility_Framework/Ownership.h"
 #include "FsrBackend.h"
 #if CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_VULKAN_SDK
 #include "../../Vulkan/VulkanLoader.h"
@@ -11,7 +13,7 @@ class VulkanDeviceResources;
 // deviceContext storage must outlive all contexts made with this descriptor.
 FsrBackendDevice MakeFsrBackendDeviceVulkan(VkDeviceContext& deviceContext);
 TemporalResult CreateFsrUpscalerVulkan(VulkanDeviceResources&, const FsrContextDescription&,
-    FsrGpuSynchronization, std::unique_ptr<ITemporalUpscaler>& output);
+    FsrGpuSynchronization, own::unique_owner<ITemporalUpscaler>& output);
 
 struct FsrPlayerSwapchainDescriptionVulkan
 {
@@ -39,13 +41,13 @@ public:
 
 private:
     VulkanDeviceResources* m_resources{ nullptr };
-    std::unique_ptr<VkDeviceContext> m_deviceContext{ std::make_unique<VkDeviceContext>() };
-    std::unique_ptr<FsrFrameGenerator> m_generator{ std::make_unique<FsrFrameGenerator>() };
+    own::unique_owner<VkDeviceContext> m_deviceContext{ own::make_unique<VkDeviceContext>() };
+    own::unique_owner<FsrFrameGenerator> m_generator{ own::make_unique<FsrFrameGenerator>() };
     FfxSwapchain m_swapchain{ nullptr };
     FfxSwapchainReplacementFunctions m_functions{};
     VkQueue m_gameQueue{ VK_NULL_HANDLE };
     const VkAllocationCallbacks* m_allocator{ nullptr };
-    std::unique_ptr<std::shared_ptr<const void>> m_lifetime;
+    own::unique_owner<ce::lifetime_token> m_lifetime;
     bool m_pending{ false };
     bool m_canPresent{ false };
     uint32_t m_uiFlags{ 0 };
@@ -53,5 +55,5 @@ private:
 
 TemporalResult CreateFsrFrameGeneratorVulkan(VulkanDeviceResources&, const FsrContextDescription&,
     const TemporalFrameGenerationConfig&, const FsrPlayerSwapchainDescriptionVulkan&, FsrGpuSynchronization,
-    std::unique_ptr<FsrFrameGeneratorVulkan>& output);
+    own::unique_owner<FsrFrameGeneratorVulkan>& output);
 #endif

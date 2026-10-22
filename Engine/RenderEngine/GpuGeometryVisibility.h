@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 
 #include "LXMaterialPipeline.h"
 #include "GpuGeometryOcclusion.h"
@@ -98,7 +99,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
 
         void Declare(EnhancedRenderGraph& graph) const;
         static void DeclareMeshletBatch(EnhancedRenderGraph& graph,
-                                        std::span<const std::shared_ptr<const Frame>> frames,
+                                        std::span<const own::shared_owner<const Frame>> frames,
                                         const char* passPrefix = "METEOR.ShadowMeshlet");
         // Optional second geometry stage: the pyramid is already declared from an
         // earlier same-view standard-Z depth (clear 1, Less/LessEqual) that this
@@ -106,17 +107,17 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         // bounds/projection without custom pixel depth or depth bias. The caller
         // owns and declares the pyramid. Call before AddReadUsages/Declare.
         void DeclareWithOcclusion(EnhancedRenderGraph& graph,
-                                  std::shared_ptr<const GpuGeometryOcclusion::Pyramid> pyramid,
+                                  own::shared_owner<const GpuGeometryOcclusion::Pyramid> pyramid,
                                   const char* passPrefix = nullptr) const;
         static void DeclareFirstStageBatch(EnhancedRenderGraph& graph,
-                                           std::span<const std::shared_ptr<const Frame>> frames,
+                                           std::span<const own::shared_owner<const Frame>> frames,
                                            const char* passPrefix);
         static void DeclareOcclusionBatch(
-            EnhancedRenderGraph& graph, std::span<const std::shared_ptr<const Frame>> frames,
-            std::span<const std::shared_ptr<const GpuGeometryOcclusion::Pyramid>> pyramids, const char* passPrefix);
+            EnhancedRenderGraph& graph, std::span<const own::shared_owner<const Frame>> frames,
+            std::span<const own::shared_owner<const GpuGeometryOcclusion::Pyramid>> pyramids, const char* passPrefix);
         static void DeclareCameraPredictionBatch(EnhancedRenderGraph& graph,
-                                                 std::span<const std::shared_ptr<const Frame>> frames,
-                                                 std::shared_ptr<const GpuGeometryOcclusion::Pyramid> pyramid,
+                                                 std::span<const own::shared_owner<const Frame>> frames,
+                                                 own::shared_owner<const GpuGeometryOcclusion::Pyramid> pyramid,
                                                  const char* passPrefix);
         void DeclareFirstStage(EnhancedRenderGraph& graph, const char* passPrefix = "METEOR.CameraMeshlet.First") const;
         void AddReadUsages(EnhancedRenderGraph& graph, auto& usages) const
@@ -183,7 +184,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         std::uint32_t WorkQueueViewCount() const;
         std::uint32_t WorkQueueNonemptyPartitions(std::uint32_t width) const;
 
-        const std::shared_ptr<const material_graph::MeshSurfaceBatch>& MeshletGeometry(std::uint32_t bin) const
+        const own::shared_owner<const material_graph::MeshSurfaceBatch>& MeshletGeometry(std::uint32_t bin) const
         {
             return m_meshletGeometries.at(bin);
         }
@@ -193,18 +194,26 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
 
       private:
         friend class GpuGeometryVisibility;
-        Frame() = default;
+          public:
+    class ConstructionKey
+    {
+        friend class Frame;
+        friend class GpuGeometryVisibility;
+        ConstructionKey() = default;
+    };
+    explicit Frame(ConstructionKey) {}
+  private:
         void CheckCurrent(const EnhancedRenderGraph* graph = nullptr) const;
-        static std::shared_ptr<SharedBatch> BuildShared(std::span<const std::shared_ptr<const Frame>> frames);
+        static own::shared_owner<SharedBatch> BuildShared(std::span<const own::shared_owner<const Frame>> frames);
         void UploadMeshletInputs() const;
         void Dispatch(RHIEncoder& encoder, bool reset, RHIBindingTable depth = {}) const;
         void DispatchMeshletStage(RHIEncoder& encoder, MeshletStage stage, RHIBindingTable depth = {}) const;
-        static void ConsumeStreamingFeedback(std::span<const std::shared_ptr<const Frame>> frames);
+        static void ConsumeStreamingFeedback(std::span<const own::shared_owner<const Frame>> frames);
 
-        std::vector<std::shared_ptr<const material_graph::MeshSurfaceBatch>> m_meshletGeometries;
+        std::vector<own::shared_owner<const material_graph::MeshSurfaceBatch>> m_meshletGeometries;
         std::vector<std::uint32_t> m_meshletOffsets;
         mutable RHIBindingTable m_meshletVertices, m_meshletTopologies;
-        std::shared_ptr<MeshletInputs> m_meshletInputs;
+        own::shared_owner<MeshletInputs> m_meshletInputs;
         std::uint32_t m_meshletGroups{}, m_meshletJobs{};
         PreparedStats m_preparedStats{};
         IRenderDeviceServices* m_device{};
@@ -212,7 +221,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         std::uint32_t m_candidateCount{}, m_binCount{}, m_outputCount{};
         std::uint32_t m_width{}, m_height{}, m_occlusionLevelCount{};
         RHIBufferHandle m_visibleIds, m_arguments;
-        std::shared_ptr<BufferPool> m_bufferPool;
+        own::shared_owner<BufferPool> m_bufferPool;
         std::uint64_t m_visibleBytes{}, m_argumentBytes{};
         std::vector<RHIReadback> m_streamingFeedback;
         mutable std::atomic<bool> m_feedbackRecorded{};
@@ -220,23 +229,23 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         mutable RHIBufferSlice m_candidates, m_bins, m_constants;
         mutable RHIBindingTable m_outputs;
         mutable RHIBufferSlice m_historyProjection;
-        std::shared_ptr<const Frame> m_firstStage;
-        std::shared_ptr<const GpuGeometryOcclusion::Pyramid> m_historyPyramid;
+        own::shared_owner<const Frame> m_firstStage;
+        own::shared_owner<const GpuGeometryOcclusion::Pyramid> m_historyPyramid;
         bool m_ordered{};
         mutable RHIBufferSlice m_meshletWorlds;
-        std::shared_ptr<const LX::Runtime::ComputeGeneration> m_reset, m_cull, m_meshletCount,
+        own::shared_owner<const LX::Runtime::ComputeGeneration> m_reset, m_cull, m_meshletCount,
             m_meshletFinalize, m_meshletScatter;
-        std::shared_ptr<const LX::Runtime::ComputeGeneration> m_occlusionCull;
+        own::shared_owner<const LX::Runtime::ComputeGeneration> m_occlusionCull;
         GpuGeometryOcclusion::ViewKey m_occlusionView;
         std::optional<GpuGeometryOcclusion::ViewKey> m_cameraPredictionView;
 
-        mutable std::shared_ptr<const GpuGeometryOcclusion::Pyramid> m_pyramid;
-        std::weak_ptr<const Frame> m_self;
+        mutable own::shared_owner<const GpuGeometryOcclusion::Pyramid> m_pyramid;
+        own::weak_owner<const Frame> m_self;
         mutable const EnhancedRenderGraph* m_graph{};
         mutable std::uint64_t m_graphEpoch{};
         mutable RGHandle m_graphVisibleIds, m_graphArguments;
-        mutable std::shared_ptr<SharedBatch> m_sharedBatch;
-        std::shared_ptr<const LX::Runtime::ComputeGeneration> m_sharedReset, m_sharedCull,
+        mutable own::shared_owner<SharedBatch> m_sharedBatch;
+        own::shared_owner<const LX::Runtime::ComputeGeneration> m_sharedReset, m_sharedCull,
             m_sharedOcclusion, m_sharedCount, m_sharedFinalize, m_sharedScatter;
     };
 
@@ -261,7 +270,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
     bool PrepareMeshletPipelines(const EnhancedFrameContext& context, std::string& error);
 
     bool Prepare(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection,
-                 std::span<const Candidate> candidates, std::span<const Bin> bins, std::shared_ptr<const Frame>& result,
+                 std::span<const Candidate> candidates, std::span<const Bin> bins, own::shared_owner<const Frame>& result,
                  std::string& error, bool currentFrameOcclusion = false);
     // Optional-pipeline preflight before choosing any prepass/main geometry route.
     // False may disable the whole view's HZB without allocating candidate buffers.
@@ -270,10 +279,10 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
     // Posed world-space vertices and exact camera/light projection. GPU writes
     // an aligned {survivorCount, meshletIDs...} list and bounded 2D arguments.
     bool PrepareMeshlets(const EnhancedFrameContext& context, const math::matrix4x4& projection,
-                         std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries,
-                         std::shared_ptr<const Frame>& result, std::string& error, bool currentFrameOcclusion = false,
-                         std::shared_ptr<const GpuGeometryOcclusion::Pyramid> history = {},
-                         std::shared_ptr<const Frame> firstStage = {}, bool ordered = false, float maxPixelError = 1.f,
+                         std::span<const own::shared_owner<const material_graph::MeshSurfaceBatch>> geometries,
+                         own::shared_owner<const Frame>& result, std::string& error, bool currentFrameOcclusion = false,
+                         own::shared_owner<const GpuGeometryOcclusion::Pyramid> history = {},
+                         own::shared_owner<const Frame> firstStage = {}, bool ordered = false, float maxPixelError = 1.f,
                          uint32_t lodWidth = 0, uint32_t lodHeight = 0,
                          const GpuGeometryOcclusion::ViewKey* cameraPredictionView = nullptr);
 
@@ -284,16 +293,16 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
   private:
     struct Recording
     {
-        std::vector<std::shared_ptr<const Frame>> owners;
+        std::vector<own::shared_owner<const Frame>> owners;
         std::uint64_t completion{};
         bool submitted{}, quarantined{};
     };
 
     bool PrepareInternal(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection,
                          std::span<const Candidate> candidates, std::span<const Bin> bins,
-                         std::shared_ptr<const Frame>& result, std::string& error, bool currentFrameOcclusion,
-                         std::span<const std::shared_ptr<const material_graph::MeshSurfaceBatch>> geometries = {},
-                         std::shared_ptr<MeshletInputs> preparedInputs = {});
+                         own::shared_owner<const Frame>& result, std::string& error, bool currentFrameOcclusion,
+                         std::span<const own::shared_owner<const material_graph::MeshSurfaceBatch>> geometries = {},
+                         own::shared_owner<MeshletInputs> preparedInputs = {});
 
     bool Initialize(const EnhancedFrameContext& context, std::string& error);
     bool InitializeSharedMeshlets(const EnhancedFrameContext& context, std::string& error);
@@ -306,7 +315,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
     void OnUploadSubmissionRejected(std::uint64_t recording, RHICompletionPoint completion) override;
 
     IRenderDeviceServices* m_device{};
-    std::shared_ptr<BufferPool> m_bufferPool;
+    own::shared_owner<BufferPool> m_bufferPool;
     LX::Runtime::ComputePipeline m_reset, m_cull, m_meshletReset, m_meshletCull,
         m_meshletCount, m_meshletFinalize, m_meshletScatter;
     LX::Runtime::ComputePipeline m_meshletOcclusionCull;

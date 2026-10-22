@@ -1,10 +1,11 @@
+#include "../Utility_Framework/Ownership.h"
 // Stage implementation included by MaterialGraphSceneHost.cpp inside material_graph.
 SceneFinalCullOutputs SceneHost::FinalCullStage::DeclareFinalCull(
-    const own::shared_owner<const FrameInput>& prepared, EnhancedRenderGraph& graph, RGHandle geometry,
-    RGHandle occluderDepth, const std::shared_ptr<const SceneHybridVisibility>& occluder) const
+    const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph, RGHandle geometry,
+    RGHandle occluderDepth, const own::shared_owner<const SceneHybridVisibility>& occluder) const
 {
     ce::profile_scope profile{ce::marker<"MaterialDeclareFinalCull">()};
-    const auto frame = prepared;
+    const auto& frame = prepared;
     if (!frame || frame->draws.empty())
     {
         RequireStage(occluderDepth, {}, "METEOR.Scene.Cull.Final received depth for an empty frame.");

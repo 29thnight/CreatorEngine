@@ -1,3 +1,4 @@
+#include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
 
 namespace
@@ -10,7 +11,7 @@ namespace
         uint32_t heaps{0}, placements{0};
         std::vector<RHITextureHandle> textures;
         std::vector<RHIBufferHandle> buffers;
-        std::vector<std::weak_ptr<RHITransientHeap>> heapOwners;
+        std::vector<own::weak_owner<RHITransientHeap>> heapOwners;
 
         bool DescribeTransientAllocation(const RHITransientResourceDesc& desc,
             RHITransientAllocationInfo& info, std::string& error) const override
@@ -24,7 +25,7 @@ namespace
             return DX12DeviceResources::DescribeTransientAllocation(desc, info, error);
         }
         bool CreateTransientHeap(const RHITransientAllocationInfo& info,
-            std::shared_ptr<RHITransientHeap>& heap, std::string& error) override
+            own::shared_owner<RHITransientHeap>& heap, std::string& error) override
         {
             if (++heaps == failHeap)
             {

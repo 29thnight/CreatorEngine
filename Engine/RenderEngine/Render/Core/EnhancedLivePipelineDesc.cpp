@@ -1,5 +1,4 @@
 #include "EnhancedLivePipelineDesc.h"
-#include "../Graph/RGSetupTaskGraph.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
 
 #include <stdio.h>
@@ -32,53 +31,11 @@ void LivePipelineDesc::AddNode(LivePassNode node)
 #if !CE_SHIPPING
     node.declarationMarker = ce::intern_runtime_marker("RenderDeclare." + node.name, ce::marker_kind::cpu_scope);
 #endif
-    DeclarationWork work;
-    const auto depend = [&](const auto& slots)
-    {
-        for (const auto& slot : slots)
-        {
-            for (size_t index = m_nodes.size(); index > 0; --index)
-            {
-                const auto& producer = m_nodes[index - 1];
-                const auto contains = [&](const auto& names)
-                { return std::find(names.begin(), names.end(), slot) != names.end(); };
-                if (contains(producer.writes) || contains(producer.modifies))
-                {
-                    work.dependencies.push_back(index - 1);
-                    break;
-                }
-            }
-        }
-    };
-    depend(node.reads);
-    depend(node.modifies);
-    depend(node.writes);
-    for (const auto& prerequisite : node.setupDependencies)
-    {
-        const auto found = std::find_if(m_nodes.begin(), m_nodes.end(),
-                                        [&](const auto& producer) { return producer.name == prerequisite; });
-        if (found == m_nodes.end())
-        {
-            m_setupDependencyError = "RDG CPU setup dependency must precede its consumer: " + prerequisite;
-        }
-        else
-        {
-            work.dependencies.push_back(static_cast<size_t>(found - m_nodes.begin()));
-        }
-    }
-    std::sort(work.dependencies.begin(), work.dependencies.end());
-    work.dependencies.erase(std::unique(work.dependencies.begin(), work.dependencies.end()), work.dependencies.end());
     m_nodes.push_back(std::move(node));
-    m_setupWork.push_back(std::move(work));
 }
 
 bool LivePipelineDesc::Validate(std::string& outError) const
 {
-    if (!m_setupDependencyError.empty())
-    {
-        outError = m_setupDependencyError;
-        return false;
-    }
     // 발행된 슬롯의 집합. 노드 순서대로 걸으며 자란다 — 순서가 곧 계약이므로
     // 앞에서 발행되지 않은 것을 뒤가 읽으면 그것이 곧 순서 실수다.
     std::unordered_set<std::string> published;
@@ -256,151 +213,34 @@ void LivePipelineDesc::DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGrap
     const std::function<void(const LivePassNode&, const LiveBlackboard&)>& afterDeclare) const
 {
     ce::profile_scope declarationProfile{ce::marker<"RenderGraphDeclare">()};
-    if (!RGParallelSetupEnabled() || graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned)
-    {
-        // The A/B control retains the original path, including its allocation
-        // behavior. It does not construct unused setup plans or snapshots.
-        graph.BeginDeclarationPackets();
-        try
-        {
-            for (const auto& node : m_nodes)
-            {
-                if (!node.IsActive())
-                {
-                    continue;
-                }
-                graph.NextDeclarationPacket();
-                ce::profile_scope profile{node.declarationMarker};
-                {
-                    ce::profile_scope body{ce::marker<"RenderGraphDeclareNodeBody">()};
-                    node.declare(blackboard, graph, context, binding);
-                }
-                if (afterDeclare)
-                {
-                    ce::profile_scope callback{ce::marker<"RenderGraphDeclareAfterNode">()};
-                    afterDeclare(node, blackboard);
-                }
-            }
-            graph.FinishDeclarationPackets();
-        }
-        catch (...)
-        {
-            graph.CancelDeclarationPackets();
-            throw;
-        }
-        return;
-    }
-    if (!m_setupDependencyError.empty())
-    {
-        throw std::invalid_argument(m_setupDependencyError);
-    }
-    auto& work = m_setupWork;
-    auto& tasks = graph.SetupTasks();
-    for (size_t index = 0; index < m_nodes.size(); ++index)
-    {
-        auto& item = work[index];
-        item.active = m_nodes[index].IsActive();
-        item.launched = false;
-        item.published = false;
-        item.branch.reset();
-        item.task = {};
-        item.inputs.clear();
-    }
-    // Result storage precedes tasks in lifetime order. Tasks always drain before
-    // snapshots, context references or branch callbacks can be destroyed.
+    ce::profile_instant(RenderContainerReuseEnabled() ? ce::marker<"RenderContainerReuse.On">()
+                                                      : ce::marker<"RenderContainerReuse.Off">());
+    graph.BeginDeclarationPackets();
     try
     {
-        const auto launchReady = [&]
+        for (const auto& node : m_nodes)
         {
-            for (size_t index = 0; index < m_nodes.size(); ++index)
+            if (!node.IsActive())
             {
-                auto& item = work[index];
-                const auto& node = m_nodes[index];
-                if (item.launched || item.published || (item.active && !node.parallelDeclare))
-                {
-                    continue;
-                }
-                if (!std::all_of(item.dependencies.begin(), item.dependencies.end(),
-                                 [&](size_t dependency) { return work[dependency].published; }))
-                {
-                    continue;
-                }
-                if (!item.active)
-                {
-                    item.published = true;
-                    continue;
-                }
-                item.input.CopySnapshotFrom(blackboard, node.reads, node.modifies);
-                const auto gather = [&](const auto& slots)
-                {
-                    for (const auto& name : slots)
-                    {
-                        item.input.AppendHandles(name, item.inputs);
-                    }
-                };
-                gather(node.reads);
-                gather(node.modifies);
-                item.branch = graph.CreateDeclarationBranch(item.inputs);
-                item.task = tasks.AddTask(node.declarationMarker, {}, RGSetupWaitPoint::Compile,
-                                          [&, index]
-                                          {
-                                              auto& result = work[index];
-                                              ce::profile_scope body{ce::marker<"RenderGraphDeclareNodeBody">()};
-                                              m_nodes[index].declare(result.input, *result.branch, context, binding);
-                                          });
-                item.launched = true;
-            }
-        };
-        launchReady();
-        for (size_t index = 0; index < m_nodes.size(); ++index)
-        {
-            const auto& node = m_nodes[index];
-            auto& item = work[index];
-            if (!item.active)
-            {
-                item.published = true;
-                launchReady();
                 continue;
             }
-            if (item.launched)
+            graph.NextDeclarationPacket();
+            ce::profile_scope profile{node.declarationMarker};
             {
-                {
-                    ce::profile_scope join{ce::marker<"RenderGraphDeclareNodeJoin">()};
-                    tasks.Wait(item.task);
-                }
-                graph.MergeDeclarationBranch(item.branch);
-                blackboard.Publish(item.input, node.writes, graph);
-                blackboard.Publish(item.input, node.modifies, graph);
+                ce::profile_scope body{ce::marker<"RenderGraphDeclareNodeBody">()};
+                node.declare(blackboard, graph, context, binding);
             }
-            else
-            {
-                item.input.CopySnapshotFrom(blackboard, node.reads, node.modifies);
-                item.branch = graph.CreateDeclarationBranch({});
-                {
-                    ce::profile_scope profile{node.declarationMarker};
-                    ce::profile_scope body{ce::marker<"RenderGraphDeclareNodeBody">()};
-                    node.declare(item.input, *item.branch, context, binding);
-                }
-                graph.MergeDeclarationBranch(item.branch);
-                blackboard.Publish(item.input, node.writes, graph);
-                blackboard.Publish(item.input, node.modifies, graph);
-            }
-            item.published = true;
             if (afterDeclare)
             {
                 ce::profile_scope callback{ce::marker<"RenderGraphDeclareAfterNode">()};
-                graph.PublishDeclaration([&] { afterDeclare(node, blackboard); });
+                afterDeclare(node, blackboard);
             }
-            launchReady();
         }
-        {
-            ce::profile_scope join{ce::marker<"RenderGraphSetupCompileJoin">()};
-            tasks.Join(RGSetupWaitPoint::Compile);
-        }
+        graph.FinishDeclarationPackets();
     }
     catch (...)
     {
-        tasks.Drain();
+        graph.CancelDeclarationPackets();
         throw;
     }
 }
@@ -697,4 +537,3 @@ bool LivePipelineDesc::RunSelfTest(std::string& outLog)
         + std::to_string(total) + (complete ? " 통과\n" : " 실패\n");
     return complete;
 }
-

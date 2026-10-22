@@ -1,3 +1,4 @@
+#include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12QueueBatchAdapter.h"
@@ -20,7 +21,7 @@ bool DX12Test::RunQueueOwnershipTest(std::string& outLog)
         std::string error;
         require(device.Initialize(32, 32, error), error);
         DX12QueueService service(device.GetDevice());
-        std::shared_ptr<IRHICommandQueue> producer, consumer, unrelated;
+        own::shared_owner<IRHICommandQueue> producer, consumer, unrelated;
         require(service.CreateQueue(RHIQueueKind::Graphics, producer, error) &&
             service.CreateQueue(RHIQueueKind::Copy, consumer, error) &&
             service.CreateQueue(RHIQueueKind::Compute, unrelated, error), error);
@@ -63,10 +64,10 @@ bool DX12Test::RunQueueOwnershipTest(std::string& outLog)
             ~GateRelease() { fence->Signal(1); }
         } release{gate.Get()}; // Opens on exceptions before service teardown.
         require(service.EnqueueTestGate(producer, gate.Get(), 1, error), error);
-        auto producerOwner = std::make_shared<int>(1);
-        auto consumerOwner = std::make_shared<int>(2);
-        std::weak_ptr<int> producerWeak = producerOwner, consumerWeak = consumerOwner;
-        std::shared_ptr<IRHIQueueCommandBatch> produced, consumed;
+        auto producerOwner = own::make_shared<int>(1);
+        auto consumerOwner = own::make_shared<int>(2);
+        own::weak_owner<int> producerWeak = producerOwner, consumerWeak = consumerOwner;
+        ce::pooled_owner<IRHIQueueCommandBatch> produced, consumed;
         require(service.RecordBufferCopy(producer, upload.Get(), shared.Get(), bytes,
             produced, error, producerOwner) &&
             service.RecordBufferCopy(consumer, shared.Get(), readback.Get(), bytes,
@@ -75,8 +76,8 @@ bool DX12Test::RunQueueOwnershipTest(std::string& outLog)
             consumed->GetQueueIdentity() == consumer->GetIdentity() &&
             produced->GetRecordingId() != consumed->GetRecordingId(), "Recording identity collision.");
         RHITimelinePoint ready, done, rejected, otherDone;
-        std::shared_ptr<IRHICommandQueue> foreignQueue;
-        std::shared_ptr<IRHIQueueCommandBatch> foreignBatch;
+        own::shared_owner<IRHICommandQueue> foreignQueue;
+        ce::pooled_owner<IRHIQueueCommandBatch> foreignBatch;
         require(device.CreateQueue(RHIQueueKind::Copy, foreignQueue, error) &&
             DX12QueueService::RecordBufferCopy(foreignQueue, upload.Get(), readback.Get(), bytes,
                 foreignBatch, error) && !consumer->Submit(foreignBatch, 1, rejected, error) &&
@@ -86,15 +87,15 @@ bool DX12Test::RunQueueOwnershipTest(std::string& outLog)
             Microsoft::WRL::ComPtr<ID3D12CommandAllocator> allocator;
             Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> list;
         };
-        auto pin = std::make_shared<PinnedRecording>();
-        std::weak_ptr<PinnedRecording> pinWeak = pin;
+        auto pin = own::make_shared<PinnedRecording>();
+        own::weak_owner<PinnedRecording> pinWeak = pin;
         require(SUCCEEDED(device.GetDevice()->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_COPY,
             IID_PPV_ARGS(&pin->allocator))) &&
             SUCCEEDED(device.GetDevice()->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_COPY,
                 pin->allocator.Get(), nullptr, IID_PPV_ARGS(&pin->list))) &&
             SUCCEEDED(pin->list->Close()), "Existing encoder recording fixture failed.");
         ID3D12CommandList* nativeLists[]{pin->list.Get()};
-        std::shared_ptr<IRHIQueueCommandBatch> sealed;
+        ce::pooled_owner<IRHIQueueCommandBatch> sealed;
         require(!DX12SealQueueRecording(foreignQueue, nativeLists, {}, sealed, error) && !sealed &&
             !DX12SealQueueRecording(unrelated, nativeLists, pin, sealed, error) && !sealed,
             "Missing storage pin or incompatible native queue kind was accepted.");
@@ -158,10 +159,10 @@ bool DX12Test::RunQueueOwnershipTest(std::string& outLog)
 
         auto failedUpload = buffer(D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ);
         auto failedReadback = buffer(D3D12_HEAP_TYPE_READBACK, D3D12_RESOURCE_STATE_COPY_DEST);
-        auto failedOwner = std::make_shared<int>(3);
-        std::weak_ptr<int> failedWeak = failedOwner;
-        std::shared_ptr<IRHIQueueCommandBatch> failed;
-        std::shared_ptr<IRHIQueueCommandBatch> retired;
+        auto failedOwner = own::make_shared<int>(3);
+        own::weak_owner<int> failedWeak = failedOwner;
+        ce::pooled_owner<IRHIQueueCommandBatch> failed;
+        ce::pooled_owner<IRHIQueueCommandBatch> retired;
         require(service.RecordBufferCopy(consumer, failedUpload.Get(), failedReadback.Get(), bytes,
             retired, error), error);
         require(service.RecordBufferCopy(producer, failedUpload.Get(), failedReadback.Get(), bytes,
@@ -193,13 +194,13 @@ bool DX12Test::RunQueueOwnershipTest(std::string& outLog)
             SUCCEEDED(D3D12CreateDevice(warp.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&warpDevice))) &&
             SUCCEEDED(warpDevice.As(&removable)), "WARP ownership fixture creation failed.");
         DX12QueueService lost(warpDevice.Get());
-        std::shared_ptr<IRHICommandQueue> lostQueue;
+        own::shared_owner<IRHICommandQueue> lostQueue;
         auto lostUpload = buffer(D3D12_HEAP_TYPE_UPLOAD, D3D12_RESOURCE_STATE_GENERIC_READ, warpDevice.Get());
         auto lostReadback = buffer(D3D12_HEAP_TYPE_READBACK, D3D12_RESOURCE_STATE_COPY_DEST, warpDevice.Get());
         Microsoft::WRL::ComPtr<ID3D12Fence> lostGate;
-        auto lostOwner = std::make_shared<int>(4);
-        std::weak_ptr<int> lostWeak = lostOwner;
-        std::shared_ptr<IRHIQueueCommandBatch> lostBatch;
+        auto lostOwner = own::make_shared<int>(4);
+        own::weak_owner<int> lostWeak = lostOwner;
+        ce::pooled_owner<IRHIQueueCommandBatch> lostBatch;
         RHITimelinePoint lostPoint;
         require(SUCCEEDED(warpDevice->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&lostGate))),
             "WARP gate creation failed.");

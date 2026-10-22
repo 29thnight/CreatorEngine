@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #pragma once
 #include "Core.Minimal.h"
 #include "IAIComponent.h"
@@ -61,7 +62,7 @@ public:
 	void UnRegisterAIComponent(Entity* gameObject, IAIComponent* aiComponent);
 
     // Capture/Apply는 게임 스레드 전용이고 Cull만 공용 워커에서 실행한다.
-    std::shared_ptr<AIUpdateBatch> CaptureAIUpdate(Scene& scene, float deltaSeconds,
+    own::shared_owner<AIUpdateBatch> CaptureAIUpdate(Scene& scene, float deltaSeconds,
         const std::optional<math::bounding_frustum>& cameraFrustum);
     static void CullAIUpdate(const AIUpdateSnapshot& snapshot, std::vector<size_t>& visibleIndices);
     void ApplyAIUpdate(Scene& scene, const AIUpdateBatch& batch);
@@ -80,7 +81,7 @@ public:
 	// 寃곌낵媛 ?щ씪??"硫붾돱?먮뒗 ?덈뒗??遺숈씠硫????꾨뒗 ?몃뱶"媛 ?쒕떎.
 	// ?몄쭛湲곕뒗 ClrHost::GetBTNodeTypeNames / HasBTNodeType??吏곸젒 ?대떎.
 
-	std::shared_ptr<BTBuildGraph> GetBTBuildGraphCache(const FileGuid& fileGuid)
+	own::shared_owner<BTBuildGraph> GetBTBuildGraphCache(const FileGuid& fileGuid)
 	{
 		auto it = m_btBuildGraphCache.find(fileGuid);
 		if (it != m_btBuildGraphCache.end())
@@ -90,7 +91,7 @@ public:
 		return nullptr;
 	}
 
-	void SetBTBuildGraphCache(const FileGuid& fileGuid, std::shared_ptr<BTBuildGraph> graph)
+	void SetBTBuildGraphCache(const FileGuid& fileGuid, own::shared_owner<BTBuildGraph> graph)
 	{
 		m_btBuildGraphCache[fileGuid] = graph;
 	}
@@ -115,8 +116,7 @@ private:
     // 등록·해지·Capture·Apply는 게임 스레드가 직렬화한다. 이 잠금은 레지스트리
     // 조회만 보호하며 컴포넌트 수명을 워커까지 연장하는 수단이 아니다.
     mutable std::mutex m_aiComponentMutex;
-	std::unordered_map<FileGuid, std::shared_ptr<BTBuildGraph>> m_btBuildGraphCache; // BT 빌드 그래프 캐시
+	std::unordered_map<FileGuid, own::shared_owner<BTBuildGraph>> m_btBuildGraphCache; // BT 빌드 그래프 캐시
 };
 
 static auto AIManagers = AIManager::GetInstance();
-

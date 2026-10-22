@@ -145,7 +145,9 @@ namespace RenderTest
             check.Check(revised != firstKey && HashModelMeshHandle(revised) != HashModelMeshHandle(firstKey),
                 "GPU identity includes resolver revision independently of authoring generation");
             revised = firstKey;
-            revised.blob.targetAbi += "-other";
+            auto revisedBlob = firstKey.Blob();
+            revisedBlob.targetAbi += "-other";
+            revised.blob = own::make_shared<const experiment::cooked::AssetBlobRecord>(std::move(revisedBlob));
             check.Check(revised != firstKey && HashModelMeshHandle(revised) != HashModelMeshHandle(firstKey),
                 "GPU identity includes full artifact ABI");
             assets::ModelAssetGenerationPins frame;

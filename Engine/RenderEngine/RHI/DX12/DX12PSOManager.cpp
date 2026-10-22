@@ -1,4 +1,5 @@
-﻿#include "DX12PipelineLayoutTranslate.h"
+#include "../../../Utility_Framework/Ownership.h"
+#include "DX12PipelineLayoutTranslate.h"
 #include "DX12PSOManager.h"
 #include "DX12DeviceResources.h"
 #include "PathFinder.h"
@@ -770,7 +771,7 @@ RHIPipelineRequestState DX12PSOManager::RequestMesh(const RHIMeshPipelineDesc& d
         return result.IsValid() ? RHIPipelineRequestState::Ready : RHIPipelineRequestState::Failed;
     }
     try {
-        auto compile=std::make_shared<PendingCompile>();
+        auto compile = own::make_shared<PendingCompile>();
         compile->m_meshBytes.resize(desc.msSize);
         std::memcpy(compile->m_meshBytes.data(),desc.msBytecode,desc.msSize);
         compile->m_pixelBytes.resize(desc.psSize);
@@ -1014,7 +1015,7 @@ DX12PSOManager::RequestState DX12PSOManager::Request(const RHIGraphicsPipelineDe
     // Insert before submission: no allocation failure may orphan an accepted job.
     try
     {
-        auto compile = std::make_shared<PendingCompile>();
+        auto compile = own::make_shared<PendingCompile>();
         std::string ignored;
         if (!compile->m_input.Prepare(desc, ignored))
         {
@@ -1115,4 +1116,3 @@ DX12PSOManager::Stats DX12PSOManager::GetStats() const
     std::lock_guard<std::mutex> guard(m_mutex);
     return m_stats;
 }
-

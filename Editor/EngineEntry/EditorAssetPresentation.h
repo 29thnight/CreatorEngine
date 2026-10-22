@@ -1,3 +1,4 @@
+#include "../../Engine/Utility_Framework/Ownership.h"
 #pragma once
 
 #include "Core.Minimal.h"
@@ -90,7 +91,7 @@ private:
 	int m_selectedTextureKind{};
 
 	std::unordered_map<std::string, FileType> m_extensionTypes;
-	std::shared_ptr<const EnhancedGizmoIconTextures> m_gizmoIconTextures;
+	own::shared_owner<const EnhancedGizmoIconTextures> m_gizmoIconTextures;
     std::array<own::shared_owner<const Texture>, 2> m_directoryIcons;
     own::shared_owner<const Texture> m_engineIcon;
     std::array<own::shared_owner<const Texture>, editor::EntityIconPresets.size()> m_entityIcons;

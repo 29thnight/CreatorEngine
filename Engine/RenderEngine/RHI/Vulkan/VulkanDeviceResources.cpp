@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "../Temporal/XeSSUpscaler.h"
 #include "../../Render/Temporal/TemporalRuntimeControl.h"
 #include <stdint.h>
@@ -317,7 +318,7 @@ bool VulkanDeviceResources::CreateInstance(bool enableValidation, std::string& o
     const auto temporalSettings = TemporalRuntimeControl::Get().Snapshot().settings;
     if (temporalSettings.enabled && temporalSettings.requestedUpscaler == TemporalProvider::XeSS)
     {
-        auto bootstrap = std::make_unique<XeSSUpscalerVulkan>();
+        auto bootstrap = own::make_unique<XeSSUpscalerVulkan>();
         auto status = bootstrap->Load(temporalSettings.runtimeDirectory.c_str());
         uint32_t count = 0, minimumVersion = 0;
         const char* const* names = nullptr;

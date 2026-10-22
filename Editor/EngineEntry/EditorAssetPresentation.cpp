@@ -1,3 +1,4 @@
+#include "../../Engine/Utility_Framework/Ownership.h"
 #include "EditorAssetPresentation.h"
 #include "EditorWindowRegistry.h"
 #include "Windows/EditorStandardWindows.h"
@@ -276,7 +277,7 @@ void EditorAssetPresentation::LoadPresentationResources()
 		{ ".ttf", FileType::Font }, { ".otf", FileType::Font },
 	};
 
-	auto gizmoIcons = std::make_shared<EnhancedGizmoIconTextures>();
+	auto gizmoIcons = own::make_shared<EnhancedGizmoIconTextures>();
 	gizmoIcons->camera = loadIcon(L"CameraGizmo.png");
 	gizmoIcons->mainLight = loadIcon(L"MainLightGizmo.png");
 	gizmoIcons->directionalLight = loadIcon(L"DirectionalLightGizmo.png");

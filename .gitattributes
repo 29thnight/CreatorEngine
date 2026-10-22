@@ -130,3 +130,6 @@ Tools/regression/fixtures/imgui-ini/*.ini -text
 ThirdParty/GCCE/include/** text eol=lf
 ThirdParty/GCCE/src/** text eol=lf
 ThirdParty/GCCE/CMakeLists.txt text eol=lf
+
+# Preserve profiling JSON bytes and recorded hashes on every platform.
+Artifacts/**/*.json -text whitespace=cr-at-eol

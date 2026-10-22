@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "Ownership.h"
 #include "../Utility_Framework/StandardLibrary.h"
 
@@ -39,7 +39,7 @@ struct EnhancedGizmoSceneData
 {
     std::vector<EnhancedGizmoIcon> icons;
     std::vector<EnhancedGizmoLineVertex> lineVertices;
-    std::shared_ptr<const EnhancedGizmoIconTextures> iconTextures;
+    own::shared_owner<const EnhancedGizmoIconTextures> iconTextures;
 
     uint32_t cameraIcons{ 0 };
     uint32_t lightIcons{ 0 };
@@ -63,7 +63,7 @@ struct EnhancedGizmoSceneData
 /// 활성 씬이 없으면 false.
 bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     bool collectColliders,
-    std::shared_ptr<const EnhancedGizmoIconTextures> iconTextures,
+    own::shared_owner<const EnhancedGizmoIconTextures> iconTextures,
     EnhancedGizmoLineCollector& lineCollector,
     EnhancedGizmoSceneData& out);
 
@@ -71,11 +71,10 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
 /// vertices so the consumer never has to revisit Scene/Entity state.
 bool CaptureEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     bool collectColliders,
-    std::shared_ptr<const EnhancedGizmoIconTextures> iconTextures,
+    own::shared_owner<const EnhancedGizmoIconTextures> iconTextures,
     EnhancedGizmoSceneData& out);
 
 /// Presentation thread에서 디버그 콜라이더 수집을 켜고 끈다. Game thread의
 /// packet capture는 아래 atomic 판정만 읽어 에디터 설정 계층에 의존하지 않는다.
 void SetCollectGizmoColliders(bool enabled) noexcept;
 bool ShouldCollectGizmoColliders() noexcept;
-

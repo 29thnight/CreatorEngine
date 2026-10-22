@@ -1,9 +1,9 @@
 // Stage implementation included by MaterialGraphSceneHost.cpp inside material_graph.
-RGHandle SceneHost::GeometryStage::DeclareGeometry(const own::shared_owner<const FrameInput>& prepared,
+RGHandle SceneHost::GeometryStage::DeclareGeometry(const own::shared_owner<const Frame>& prepared,
                                                    EnhancedRenderGraph& graph) const
 {
     ce::profile_scope profile{ce::marker<"MaterialDeclareGeometry">()};
-    const auto frame = prepared;
+    const auto& frame = prepared;
     if (!frame || frame->draws.empty())
     {
         return {};
@@ -41,10 +41,10 @@ RGHandle SceneHost::GeometryStage::DeclareGeometry(const own::shared_owner<const
     };
     for (const auto& draw : std::span{frame->draws})
     {
-        addGeometry(draw.geometry.get());
+        addGeometry(draw.geometry.operator->());
         if (draw.previousGeometry)
         {
-            addGeometry(draw.previousGeometry.get());
+            addGeometry(draw.previousGeometry.operator->());
         }
         for (const auto& texture : std::span{draw.bindings->resources.textures})
         {
@@ -58,7 +58,7 @@ RGHandle SceneHost::GeometryStage::DeclareGeometry(const own::shared_owner<const
     }
     for (const auto& draw : std::span{frame->shadowDraws})
     {
-        addGeometry(draw.geometry.get());
+        addGeometry(draw.geometry.operator->());
     }
     std::string error;
     if (!MeshSurfaceBatch::DeclareBatch(graph, geometry, error))

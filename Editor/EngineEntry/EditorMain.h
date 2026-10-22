@@ -1,4 +1,5 @@
-﻿#pragma once
+#include "../../Engine/Utility_Framework/Ownership.h"
+#pragma once
 class ProjectLayerSettings;
 namespace wave
 {
@@ -73,7 +74,7 @@ namespace Editor
 		void InvokeResizeFlag();
 
 	private:
-        std::shared_ptr<ProjectLayerSettings> m_projectLayers;
+        own::shared_owner<ProjectLayerSettings> m_projectLayers;
         std::unique_ptr<wave::AudioHost> m_audioHost;
         std::array<std::uint64_t, 1025u> m_audioUpdateHistogram{};
         std::uint64_t m_audioUpdateSamples{};
@@ -107,7 +108,7 @@ namespace Editor
 		// 밀어 넣던 자리였다.
 		std::wstring                               m_appliedWindowTitle;
 
-		std::shared_ptr<GizmoRenderer>             m_gizmoRenderer;
+		own::shared_owner<GizmoRenderer>             m_gizmoRenderer;
 		std::unique_ptr<EditorRenderer>            m_editorRenderer;
 
 		// 에디터 창들.

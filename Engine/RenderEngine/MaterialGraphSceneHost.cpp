@@ -1,4 +1,5 @@
-﻿#include "MaterialGraphSceneHost.h"
+#include "../Utility_Framework/Ownership.h"
+#include "MaterialGraphSceneHost.h"
 #include "MaterialGraphGeometryContract.h"
 #include "MaterialGraphNativeAdmission.h"
 #include "Render/Graph/ShadowMath.h"
@@ -294,10 +295,11 @@ namespace material_graph
                         auto& result = m_chunks[index];
                         const auto& draw = input->Draws()[result.input];
                         const auto& current = draw.geometry->Chunks()[result.chunk].input;
-                        const auto& previous = draw.previousGeometry && draw.previousGeometry != draw.geometry &&
-                                                       result.chunk < draw.previousGeometry->Chunks().size()
-                                                   ? draw.previousGeometry->Chunks()[result.chunk].input
-                                                   : current;
+                        const auto& previous =
+                            draw.previousGeometry && draw.previousGeometry.operator->() != draw.geometry.operator->() &&
+                                    result.chunk < draw.previousGeometry->Chunks().size()
+                                ? draw.previousGeometry->Chunks()[result.chunk].input
+                                : current;
                         result.owner = 0x80000001u + static_cast<std::uint32_t>(result.input);
                         result.identity = {draw.geometryKey,
                                            draw.temporalObjectId,
@@ -458,27 +460,6 @@ namespace material_graph
         }
     } // namespace
 
-    struct SceneHost::PreparationScratch
-    {
-        ce::RenderArenaPool m_pool;
-        // camera 2개와 shadow 최대 9개의 writer가 각자 한 vector를 재사용한다.
-        // packet 입력은 UploadPackets 안에서 복사되고 이 저장소를 frame에 게시하지 않는다.
-        std::array<ce::render_vector<IndirectMaterialBatch::PacketDraw>, 11> m_packetRecords;
-        struct Work
-        {
-            // The lease precedes all containers: destruction destroys their
-            // objects/proxies before the last lease resets retained raw blocks.
-            ce::RenderArenaLease m_storage;
-            ce::render_arena_vector<SceneCpuPreparation::Chunk> m_chunks;
-            ce::render_arena_vector<std::shared_ptr<const MeshSurfaceBatch>> m_cameraGeometry, m_blendedGeometry;
-            explicit Work(const ce::RenderArenaPool& pool)
-                : m_storage(pool.Acquire()), m_chunks(&m_storage->Resource(0)),
-                  m_cameraGeometry(&m_storage->Resource(1)), m_blendedGeometry(&m_storage->Resource(1))
-            {
-            }
-        };
-    };
-
     struct SceneHost::Program
     {
         struct PacketRoots
@@ -488,7 +469,7 @@ namespace material_graph
         own::shared_owner<const Generation> generation;
         RHIShaderBinary backend{};
         PassLayout layout;
-        std::shared_ptr<const PassLayout> layoutSnapshot;
+        own::shared_owner<const PassLayout> layoutSnapshot;
         PassLayout shadowLayout;
         LX::Runtime::GraphicsPipeline shadow;
         std::array<LX::Runtime::GraphicsPipeline, 2> gbuffer, visibilitySurface, color, blendedColor, temporal;
@@ -497,7 +478,7 @@ namespace material_graph
         std::array<LX::Runtime::GraphicsPipeline, 2> refraction;
         std::array<std::array<LX::Runtime::GraphicsPipeline, 2>, 2> runtimeEffects;
         PassLayout volumeLayout;
-        std::shared_ptr<const PassLayout> volumeLayoutSnapshot;
+        own::shared_owner<const PassLayout> volumeLayoutSnapshot;
         LX::Runtime::ComputePipeline volume;
         RHIShaderBlob meshShader, visibilityMeshShader, reconstructShader, shadowMeshShader;
         RHIShaderBlob m_cachedSurfaceShader, m_cachedTemporalShader;
@@ -517,16 +498,128 @@ namespace material_graph
 
     // Immutable depth allocation. Only accepted/completed recordings publish it.
     // In-flight readers/writers retain this owner independently of the lookup map.
+    struct SceneHost::PreparationScratch
+    {
+        ce::RenderArenaPool m_pool;
+        IndirectMaterialBatchPool m_batches;
+        // camera 2개와 shadow 최대 9개의 writer가 각자 한 vector를 재사용한다.
+        // packet 입력은 UploadPackets 안에서 복사되고 이 저장소를 frame에 게시하지 않는다.
+        struct CasterPlan
+        {
+            struct Key
+            {
+                own::weak_owner<const MeshSurfaceInput> m_topology;
+                own::weak_owner<const Program> m_program;
+                size_t m_chunks{};
+                uint32_t m_flags{};
+                SceneCoverage m_queue{};
+                bool m_shadows{};
+            };
+            struct Entry
+            {
+                size_t m_input{}, m_chunk{}, m_output{};
+                bool m_blended{}, m_doubleSided{}, m_shadowEnabled{};
+            };
+            std::vector<Key> m_keys;
+            std::vector<Entry> m_entries;
+            bool m_valid{};
+            bool Prepare(const SceneViewInput& input, std::span<const own::shared_owner<const Program>> programs,
+                         bool shadows)
+            {
+                const auto draws = input.Draws();
+                bool matches = m_valid && m_keys.size() == draws.size();
+                for (size_t i = 0; matches && i < draws.size(); ++i)
+                {
+                    const auto topology = draws[i].geometry->SceneTopologyIdentity();
+
+                    matches = own::identity(topology) != own::object_id{} &&
+                              own::identity(m_keys[i].m_topology) == own::identity(topology) &&
+                              own::identity(m_keys[i].m_program) == own::identity(programs[i]) &&
+                              m_keys[i].m_chunks == draws[i].geometry->Chunks().size() &&
+                              m_keys[i].m_flags == draws[i].coverage.flags && m_keys[i].m_queue == draws[i].queue &&
+                              m_keys[i].m_shadows == shadows;
+                }
+                if (matches)
+                {
+                    return true;
+                }
+                m_valid = false;
+                m_keys.resize(draws.size());
+                m_entries.clear();
+                for (size_t i = 0; i < draws.size(); ++i)
+                {
+                    const auto& draw = draws[i];
+                    const auto& program = programs[i];
+                    const auto count = draw.geometry->Chunks().size();
+                    m_keys[i] = {draw.geometry->SceneTopologyIdentity(),
+                                 program,
+                                 count,
+                                 draw.coverage.flags,
+                                 draw.queue,
+                                 shadows};
+                    for (size_t j = 0; j < count; ++j)
+                    {
+                        m_entries.push_back(
+                            {i, j, m_entries.size(),
+                             program->hasSurface && (draw.queue == SceneCoverage::Blended || program->hasTransmission),
+                             (draw.coverage.flags & EnhancedMaterialCoverage::DoubleSided) != 0,
+                             program->hasSurface && !program->editorPreview && shadows && draw.queue != SceneCoverage::Blended});
+                    }
+                }
+                m_valid = true;
+                return false;
+            }
+        };
+        struct PacketView
+        {
+            uint64_t m_view{}, m_epoch{};
+            CasterPlan m_casters;
+            std::array<ScenePacketGroups, 3> m_groups;
+            std::array<ScenePacketRecords, 11> m_records;
+            std::vector<ScenePacketGroups::Input> m_inputs;
+        };
+        std::array<PacketView, 4> m_packetViews;
+        size_t m_nextPacketView{};
+        PacketView& Packets(uint64_t view, uint64_t epoch)
+        {
+            for (auto& entry : m_packetViews)
+            {
+                if (entry.m_view == view && entry.m_epoch == epoch)
+                {
+                    return entry;
+                }
+            }
+            auto& entry = m_packetViews[m_nextPacketView++ % m_packetViews.size()];
+            entry = {};
+            entry.m_view = view;
+            entry.m_epoch = epoch;
+            return entry;
+        }
+        struct Work
+        {
+            // The lease precedes all containers: destruction destroys their
+            // objects/proxies before the last lease resets retained raw blocks.
+            ce::RenderArenaLease m_storage;
+            ce::render_arena_vector<SceneCpuPreparation::Chunk> m_chunks;
+            ce::render_arena_vector<own::shared_owner<const MeshSurfaceBatch>> m_cameraGeometry, m_blendedGeometry;
+            explicit Work(const ce::RenderArenaPool& pool)
+                : m_storage(pool.Acquire()), m_chunks(&m_storage->Resource(0)),
+                  m_cameraGeometry(&m_storage->Resource(1)), m_blendedGeometry(&m_storage->Resource(1))
+            {
+            }
+        };
+    };
+
     struct SceneHost::ShadowCache
     {
         IRenderDeviceServices* device{};
         std::array<RHITextureHandle, 3> depths{};
         std::vector<std::byte> key;
-        std::vector<std::weak_ptr<const MeshSurfaceInput>> geometryIdentities;
+        std::vector<own::weak_owner<const MeshSurfaceInput>> geometryIdentities;
         std::uint64_t frameId{}, completion{}, bytes{};
         std::uint32_t extent{};
         std::atomic<unsigned> recordedMask{};
-        bool MatchesGeometry(std::span<const std::weak_ptr<const MeshSurfaceInput>> identities) const
+        bool MatchesGeometry(std::span<const own::weak_owner<const MeshSurfaceInput>> identities) const
         {
             if (geometryIdentities.size() != identities.size())
             {
@@ -536,8 +629,7 @@ namespace material_graph
             {
                 const auto previous = geometryIdentities[index].lock();
                 const auto current = identities[index].lock();
-                if (!previous || previous != current || previous.owner_before(current) ||
-                    current.owner_before(previous))
+                if (!previous || previous.operator->() != current.operator->())
                 {
                     return false;
                 }
@@ -563,10 +655,10 @@ namespace material_graph
 
     struct SceneHost::RasterResources
     {
-        std::shared_ptr<const SceneFrameGeometry> geometry;
-        std::shared_ptr<const GpuGeometryVisibility::Frame> first, opaque, layers;
-        std::shared_ptr<const IndirectMaterialBatch> layerCommands;
-        std::shared_ptr<const SceneMaterialWork> material;
+        own::shared_owner<const SceneFrameGeometry> geometry;
+        own::shared_owner<const GpuGeometryVisibility::Frame> first, opaque, layers;
+        own::shared_owner<const IndirectMaterialBatch> layerCommands;
+        own::shared_owner<const SceneMaterialWork> material;
     };
 
     // Sealed draw/device inputs and immutable GPU binding references.
@@ -585,7 +677,7 @@ namespace material_graph
             own::shared_owner<const Program> program;
             own::shared_owner<const RenderBindings> bindings;
             bool shadowEnabled{};
-            std::shared_ptr<const MeshSurfaceBatch> geometry, previousGeometry;
+            own::shared_owner<const MeshSurfaceBatch> geometry, previousGeometry;
             RHIBufferSlice constants, referenceConstants;
             RHIPipelineHandle m_cachedSurfacePipeline, m_cachedTemporalPipeline;
             RHIBufferSlice visibleOwner;
@@ -596,15 +688,15 @@ namespace material_graph
             bool bucketRepresentative{true};
 
             std::array<RHIBufferSlice, 3> shadowConstants;
-            std::array<std::shared_ptr<const GpuGeometryVisibility::Frame>, 3> shadowMeshlets;
+            std::array<own::shared_owner<const GpuGeometryVisibility::Frame>, 3> shadowMeshlets;
             std::uint32_t shadowMeshletBin{UINT32_MAX};
 
             bool doubleSided{}, blended{}, staticShadow{};
             std::size_t inputIndex{};
         };
-        std::shared_ptr<const RasterResources> raster;
-        std::shared_ptr<const SceneGpuData> sceneData;
-        std::shared_ptr<const ScenePrimitiveCacheFrame> m_primitiveCache;
+        own::shared_owner<const RasterResources> raster;
+        own::shared_owner<const SceneGpuData> sceneData;
+        own::shared_owner<const ScenePrimitiveCacheFrame> m_primitiveCache;
         std::map<const IndirectMaterialBatch*, RHIBindingTable> packetBindings;
         RHIBindingTable materialPacketBindings, legacyPacketBindings;
         IRenderDeviceServices* device{};
@@ -617,9 +709,9 @@ namespace material_graph
         // cascades. CheckCurrent rejects reuse with another graph or epoch.
         mutable std::array<ce::render_arena_buffer<EnhancedRenderGraph::RGPassUsage>, 2> m_shadowReadSets;
         mutable std::array<bool, 2> m_shadowReadSetsReady{};
-        std::shared_ptr<const PassReadPlan> m_passReadPlan;
-        void AddPassReadPlan(EnhancedRenderGraph& graph, auto& uses,
-                             PassReadPlan::Pass pass, RHIResourceState geometryState) const
+        own::shared_owner<const PassReadPlan> m_passReadPlan;
+        void AddPassReadPlan(EnhancedRenderGraph& graph, auto& uses, PassReadPlan::Pass pass,
+                             RHIResourceState geometryState) const
         {
             ce::profile_scope profile{ce::marker<"MaterialPassReadPlanResolve">()};
             const auto& inputs = pass == PassReadPlan::Pass::Surface ? draws : shadowDraws;
@@ -627,9 +719,10 @@ namespace material_graph
             {
                 for (const auto& draw : inputs)
                 {
-                    const bool selected = pass == PassReadPlan::Pass::Surface ?
-                        draw.program->hasSurface && !draw.program->hasTransmission && !draw.blended :
-                        draw.shadowEnabled && draw.staticShadow == (pass == PassReadPlan::Pass::StaticShadow);
+                    const bool selected =
+                        pass == PassReadPlan::Pass::Surface
+                            ? draw.program->hasSurface && !draw.program->hasTransmission && !draw.blended
+                            : draw.shadowEnabled && draw.staticShadow == (pass == PassReadPlan::Pass::StaticShadow);
                     if (!selected)
                     {
                         continue;
@@ -749,8 +842,7 @@ namespace material_graph
         // Geometry replay is exclusively for ordered layers. Opaque work is
         // restored from visibility/material tiles; its HW commands stay in Visibility.
         template<class Predicate>
-        void AddLayerReads(EnhancedRenderGraph& graph, auto& uses,
-                           const Predicate& selected, RGHandle commands) const
+        void AddLayerReads(EnhancedRenderGraph& graph, auto& uses, const Predicate& selected, RGHandle commands) const
         {
             bool any = false;
             for (const auto& draw : draws)
@@ -772,9 +864,8 @@ namespace material_graph
             }
         }
 
-        void AddReconstructionReads(EnhancedRenderGraph& graph, auto& uses,
-                                    RGHandle visibilityTarget, const std::array<RGHandle, 2>& materialInputs,
-                                    bool primitiveCache = false) const
+        void AddReconstructionReads(EnhancedRenderGraph& graph, auto& uses, RGHandle visibilityTarget,
+                                    const std::array<RGHandle, 2>& materialInputs, bool primitiveCache = false) const
         {
             uses.push_back({visibilityTarget, RHIResourceState::PixelShaderResource, RGAccessMode::Read});
             uses.push_back(
@@ -1488,10 +1579,10 @@ namespace material_graph
                         }
                     }
 
-                    candidate->layoutSnapshot = std::make_shared<const PassLayout>(candidate->layout);
+                    candidate->layoutSnapshot = own::make_shared<const PassLayout>(candidate->layout);
                     if (candidate->hasVolume)
                     {
-                        candidate->volumeLayoutSnapshot = std::make_shared<const PassLayout>(candidate->volumeLayout);
+                        candidate->volumeLayoutSnapshot = own::make_shared<const PassLayout>(candidate->volumeLayout);
                     }
                     preparation->program = std::move(candidate);
                     return true;
@@ -1976,7 +2067,7 @@ namespace material_graph
             }
             device_ = context.resources;
             device_->RegisterUploadTransactionListener(this);
-            bufferPool_ = std::make_shared<TransientBufferPool>(*device_);
+            bufferPool_ = own::make_shared<TransientBufferPool>(*device_);
         }
         if (!sceneResidentBuffers_.Initialize(*device_, bufferPool_, error))
         {
@@ -1984,7 +2075,7 @@ namespace material_graph
         }
         if (!m_preparationScratch)
         {
-            m_preparationScratch = std::make_unique<PreparationScratch>();
+            m_preparationScratch = own::make_unique<PreparationScratch>();
         }
         PreparationScratch::Work scratch(m_preparationScratch->m_pool);
         auto candidate = own::make_shared<Frame>();
@@ -2107,10 +2198,10 @@ namespace material_graph
             return false;
         }
         nextPreparationPhase(ce::marker<"MaterialSceneGeometryTableSetup">());
-        auto geometryTable = std::make_shared<SceneFrameGeometry>();
+        auto geometryTable = own::make_shared<SceneFrameGeometry>();
         geometryTable->device = device_;
         geometryTable->pool = bufferPool_;
-        auto sceneData = std::make_shared<SceneGpuData>();
+        auto sceneData = own::make_shared<SceneGpuData>();
         candidate->sceneData = sceneData;
 
         if (!device_->GetMeshShaderCapabilities().meshIndirect)
@@ -2135,11 +2226,16 @@ namespace material_graph
         sceneData->recordPages.resize(1 + preparedChunks, UINT32_MAX);
         // One producer per exact sealed geometry/pose input within this frame.
         // The owners remain pinned by the input and output arrays during lookup.
-        std::map<const MeshSurfaceInput*, std::shared_ptr<const MeshSurfaceBatch>> preparedGeometry;
-        const auto prepareGeometry =
-            [&](const std::shared_ptr<const MeshSurfaceInput>& source, std::shared_ptr<const MeshSurfaceBatch>& output)
+        ce::render_arena_vector<std::pair<const MeshSurfaceInput*, own::shared_owner<const MeshSurfaceBatch>>>
+            preparedGeometry{&scratch.m_storage->Resource(0)};
+        preparedGeometry.reserve(preparedChunks * 2);
+        const auto prepareGeometry = [&](const own::shared_owner<const MeshSurfaceInput>& source,
+                                         own::shared_owner<const MeshSurfaceBatch>& output)
         {
-            if (const auto found = preparedGeometry.find(source.get()); found != preparedGeometry.end())
+            if (const auto found = std::ranges::find(
+                    preparedGeometry, source.operator->(),
+                    &std::pair<const MeshSurfaceInput*, own::shared_owner<const MeshSurfaceBatch>>::first);
+                found != preparedGeometry.end())
             {
                 output = found->second;
                 return true;
@@ -2152,7 +2248,7 @@ namespace material_graph
             {
                 return false;
             }
-            preparedGeometry.emplace(source.get(), output);
+            preparedGeometry.emplace_back(source.operator->(), output);
             return true;
         };
 
@@ -2257,13 +2353,13 @@ namespace material_graph
                         };
                         nextDrawPhase(ce::marker<"MaterialSceneDrawProgramBindings">());
                         const auto inputIndex = static_cast<std::size_t>(&draw - candidate->input->Draws().data());
-                        const auto program = drawPrograms[inputIndex];
+                        const auto& program = drawPrograms[inputIndex];
                         own::shared_owner<const RenderBindings> bindings;
-                        if (!bindings_.Prepare(*device_, *context.textureCache, candidate->input->MaterialOwner(draw),
-                                               *program->layoutSnapshot, bindings, error,
-                                               candidate->input->MaterialPins(),
-                                               context.textureFramePins ? &*context.textureFramePins : nullptr,
-                                               program->layoutSnapshot))
+                        if (!bindings_.PrepareBorrowed(*device_, *context.textureCache,
+                                                       candidate->input->MaterialBorrow(draw), *program->layoutSnapshot,
+                                                       bindings, error, candidate->input->MaterialPins(),
+                                                       context.textureFramePins ? &*context.textureFramePins : nullptr,
+                                                       program->layoutSnapshot))
                         {
                             return false;
                         }
@@ -2272,12 +2368,12 @@ namespace material_graph
                         {
                             SceneVolumeBinding volume;
                             volume.pipeline = program->volume.GetGeneration();
-                            if (!bindings_.Prepare(*device_, *context.textureCache,
-                                                   candidate->input->MaterialOwner(draw),
-                                                   *program->volumeLayoutSnapshot, volume.material, error,
-                                                   candidate->input->MaterialPins(),
-                                                   context.textureFramePins ? &*context.textureFramePins : nullptr,
-                                                   program->volumeLayoutSnapshot))
+                            if (!bindings_.PrepareBorrowed(
+                                    *device_, *context.textureCache, candidate->input->MaterialBorrow(draw),
+                                    *program->volumeLayoutSnapshot, volume.material, error,
+                                    candidate->input->MaterialPins(),
+                                    context.textureFramePins ? &*context.textureFramePins : nullptr,
+                                    program->volumeLayoutSnapshot))
                             {
                                 return false;
                             }
@@ -2329,47 +2425,55 @@ namespace material_graph
             return false;
         }
         ce::render_arena_vector<std::uint32_t> shadowChunkIndices(preparedChunks, &scratch.m_storage->Resource(3));
-        ce::render_arena_vector<std::shared_ptr<const MeshSurfaceBatch>> shadowMeshletGeometry{
+        ce::render_arena_vector<own::shared_owner<const MeshSurfaceBatch>> shadowMeshletGeometry{
             &scratch.m_storage->Resource(3)};
-        for (const auto& draw : candidate->input->Draws())
+        auto& casterPlan =
+            m_preparationScratch->Packets(candidate->input->View().viewId, candidate->input->View().sceneEpoch)
+                .m_casters;
+        const bool casterReused =
+            casterPlan.Prepare(*candidate->input, std::span(drawPrograms.data(), drawPrograms.size()), shadow.enabled);
+        ce::profile_instant(casterReused ? ce::marker<"MaterialSceneCasterPlanReuse">()
+                                         : ce::marker<"MaterialSceneCasterPlanBuild">());
+        if (casterPlan.m_entries.size() != preparedChunks)
         {
-            const auto inputIndex = static_cast<std::size_t>(&draw - candidate->input->Draws().data());
-            const auto& program = drawPrograms[inputIndex];
-            for (const auto& chunk : draw.geometry->Chunks())
+            return Fail(error, "METEOR caster plan differs from the sealed chunk layout.");
+        }
+        for (const auto& entry : casterPlan.m_entries)
+        {
+            const auto inputIndex = entry.m_input;
+            const auto chunkIndex = entry.m_chunk;
+            const auto outputIndex = entry.m_output;
+            const auto& draw = candidate->input->Draws()[inputIndex];
+            const auto& chunk = draw.geometry->Chunks()[chunkIndex];
+            auto& item = candidate->draws[outputIndex];
+            item.program = drawPrograms[inputIndex];
+            item.blended = entry.m_blended;
+            item.inputIndex = inputIndex;
+            item.geometryRecord = static_cast<uint32_t>(1 + outputIndex);
+            item.doubleSided = entry.m_doubleSided;
+            item.shadowEnabled = entry.m_shadowEnabled;
+            if (!prepareGeometry(chunk.input, item.geometry))
             {
-                const auto chunkIndex = static_cast<std::size_t>(&chunk - draw.geometry->Chunks().data());
-                const auto outputIndex = candidate->inputRanges[inputIndex].first + chunkIndex;
-                auto& item = candidate->draws[outputIndex];
-                item.program = program;
-                item.blended =
-                    program->hasSurface && (draw.queue == SceneCoverage::Blended || program->hasTransmission);
-                item.inputIndex = inputIndex;
-                item.geometryRecord = static_cast<std::uint32_t>(1 + outputIndex);
-                item.doubleSided = (draw.coverage.flags & EnhancedMaterialCoverage::DoubleSided) != 0;
-                item.shadowEnabled = program->hasSurface && !program->editorPreview && shadow.enabled && draw.queue != SceneCoverage::Blended;
-                if (!prepareGeometry(chunk.input, item.geometry))
+                return false;
+            }
+            if (draw.previousGeometry && draw.previousGeometry.operator->() != draw.geometry.operator->() &&
+                chunkIndex < draw.previousGeometry->Chunks().size())
+            {
+                if (!prepareGeometry(draw.previousGeometry->Chunks()[chunkIndex].input, item.previousGeometry))
                 {
                     return false;
                 }
-                if (draw.previousGeometry && draw.previousGeometry != draw.geometry &&
-                    chunkIndex < draw.previousGeometry->Chunks().size())
-                {
-                    if (!prepareGeometry(draw.previousGeometry->Chunks()[chunkIndex].input, item.previousGeometry))
-                    {
-                        return false;
-                    }
-                }
-                else
-                {
-                    item.previousGeometry = item.geometry;
-                }
-                shadowChunkIndices[outputIndex] = static_cast<std::uint32_t>(chunkIndex);
-                if (item.shadowEnabled)
-                {
-                    // A separate value snapshot: the worker never reads Draw records
-                    // while their material bindings and scene records are being filled.
-                    candidate->shadowDraws.push_back(item);
-                }
+            }
+            else
+            {
+                item.previousGeometry = item.geometry;
+            }
+            shadowChunkIndices[outputIndex] = static_cast<std::uint32_t>(chunkIndex);
+            if (item.shadowEnabled)
+            {
+                // A separate value snapshot: the worker never reads Draw records
+                // while their material bindings and scene records are being filled.
+                candidate->shadowDraws.push_back(item);
             }
         }
 
@@ -2470,7 +2574,7 @@ namespace material_graph
                         // 현재 view/world/residency는 값으로 비교하고, 봉인된 partition은 약한 소유 신원으로 비교한다.
                         // 원본 geometry 바이트를 매 프레임 복사하지 않으며 hash-only hit도 허용하지 않는다.
                         std::vector<std::byte> key;
-                        std::vector<std::weak_ptr<const MeshSurfaceInput>> geometryIdentities;
+                        std::vector<own::weak_owner<const MeshSurfaceInput>> geometryIdentities;
                         geometryIdentities.reserve(candidate->input->Draws().size());
                         constexpr std::uint64_t maxKeyBytes = 64ull << 20;
                         std::uint64_t keyBytes{};
@@ -2551,7 +2655,7 @@ namespace material_graph
                             }
                             // root source는 generation/LOD/layout/chunk budget까지 확정된 불변 partition의 신원이다.
                             // weak token은 CPU/GPU payload를 보유하지 않고 만료/재봉인 시 기존 depth를 재사용하지 않는다.
-                            if (!accountBytes(sizeof(std::weak_ptr<const MeshSurfaceInput>)))
+                            if (!accountBytes(sizeof(own::weak_owner<const MeshSurfaceInput>)))
                             {
                                 return Fail(error, "Shadow static-cache identity exceeds its 64 MiB bound.");
                             }
@@ -2639,7 +2743,7 @@ namespace material_graph
                                     error,
                                     "Shadow static-cache allocations exceed the retained/in-flight byte budget.");
                             }
-                            auto cache = std::make_shared<ShadowCache>();
+                            auto cache = own::make_shared<ShadowCache>();
                             cache->device = device_;
                             cache->extent = candidate->shadowExtent;
                             cache->bytes = bytes;
@@ -2682,7 +2786,7 @@ namespace material_graph
                         for (unsigned cascade = 0; cascade < 3; ++cascade)
                         {
                             ce::profile_scope cascadeProfile{ce::marker<"MaterialSceneShadowCascadePrepare">()};
-                            std::shared_ptr<const GpuGeometryOcclusion::Pyramid> previous;
+                            own::shared_owner<const GpuGeometryOcclusion::Pyramid> previous;
                             for (const auto& history : histories)
                             {
                                 const auto& old = history.cascades[cascade];
@@ -2772,7 +2876,7 @@ namespace material_graph
                 list.push_back(draw.geometry);
             }
         }
-        std::shared_ptr<const GpuGeometryOcclusion::Pyramid> previousCameraHistory;
+        own::shared_owner<const GpuGeometryOcclusion::Pyramid> previousCameraHistory;
         if (!cameraGeometry.empty())
         {
             const auto& view = candidate->input->View();
@@ -2974,7 +3078,8 @@ namespace material_graph
                                       constants.coverage};
                 gpuRecord.surface = {std::bit_cast<uint32_t>(constants.cutoff), item.geometryRecord,
                                      static_cast<uint32_t>(chunkIndex), record.meshletCount};
-                gpuRecord.history = {constants.temporalHistoryValid, item.geometry != item.previousGeometry ? 1u : 0u,
+                gpuRecord.history = {constants.temporalHistoryValid,
+                                     item.geometry.operator->() != item.previousGeometry.operator->() ? 1u : 0u,
                                      UINT32_MAX, 0u};
                 // CPU seals geometry/material command ranges; compute selects
                 // cooked replacement groups and compacts meshlets. Ordered lists
@@ -3026,7 +3131,7 @@ namespace material_graph
                                               candidate->firstCullStage.cameraDepthMeshlets, hybridPipelines_, error) ||
             !candidate->visibilityStage.Prepare(*candidate, context, candidate->geometryStage.geometryTable,
                                                 candidate->finalCullStage.cameraMeshlets, hybridPipelines_, error,
-                                                candidate->occluderStage.occluderVisibility.get()))
+                                                candidate->occluderStage.occluderVisibility.operator->()))
         {
             return false;
         }
@@ -3080,46 +3185,35 @@ namespace material_graph
             // The exact cooked program, raster state and descriptor page form a
             // bucket. A hash, material pointer or equal GBuffer bytecode alone is
             // insufficient to merge programs with different pass semantics.
-            using BucketKey = std::tuple<std::string_view, bool, uint32_t>;
-            using PacketGroups = std::span<const std::span<const std::size_t>>;
-            ce::render_arena_map<BucketKey, ce::render_arena_vector<std::size_t>> groups{
-                &scratch.m_storage->Resource(2)};
-            const auto snapshotGroups = [&]() -> PacketGroups
+            using PacketGroups = const ScenePacketGroups*;
+            auto& packetCache =
+                m_preparationScratch->Packets(candidate->input->View().viewId, candidate->input->View().sceneEpoch);
+            const bool reusePackets = ScenePacketReuseEnabled();
+            const auto prepareGroups = [&](unsigned slot, const auto& draws, auto eligible) -> PacketGroups
             {
-                std::size_t count{};
-                for (const auto& entry : groups)
+                ce::profile_scope groupProfile{ce::marker<"MaterialScenePacketGroupsPrepare">()};
+                auto& inputs = packetCache.m_inputs;
+                inputs.clear();
+                for (size_t index = 0; index < draws.size(); ++index)
                 {
-                    count += entry.second.size();
+                    const auto& draw = draws[index];
+                    if (eligible(draw))
+                    {
+                        inputs.push_back({draw.program->generation->cooked.product.program.semanticKey,
+                                          draw.doubleSided, sceneData->recordPages[draw.geometryRecord], index,
+                                          draw.geometryRecord, draw.geometry->MeshletCount()});
+                    }
                 }
-                auto& arena = scratch.m_storage->Resource(2);
-                auto* indices =
-                    static_cast<std::size_t*>(arena.allocate(count * sizeof(std::size_t), alignof(std::size_t)));
-                using Group = std::span<const std::size_t>;
-                auto* selected = static_cast<Group*>(arena.allocate(groups.size() * sizeof(Group), alignof(Group)));
-                std::size_t offset{}, index{};
-                for (const auto& entry : groups)
-                {
-                    std::uninitialized_copy(entry.second.begin(), entry.second.end(), indices + offset);
-                    std::construct_at(selected + index++, indices + offset, entry.second.size());
-                    offset += entry.second.size();
-                }
-                // owner만 arena를 늘리고 worker는 게시된 불변 span만 읽는다.
-                // 모든 packet 작업이 끝난 뒤 scratch lease가 block을 되감는다.
-                return {selected, groups.size()};
+                auto& plan = packetCache.m_groups[slot];
+                const bool reused = plan.Update(inputs, reusePackets);
+                ce::profile_instant(reused ? ce::marker<"MaterialScenePacketGroups.Reuse">()
+                                           : ce::marker<"MaterialScenePacketGroups.Rebuild">());
+                inputs.clear();
+                return &plan;
             };
-            const auto bucketKey = [&](const Frame::Draw& draw)
-            {
-                return BucketKey{draw.program->generation->cooked.product.program.semanticKey, draw.doubleSided,
-                                 sceneData->recordPages[draw.geometryRecord]};
-            };
-            for (std::size_t index = 0; index < candidate->draws.size(); ++index)
-            {
-                const auto& draw = candidate->draws[index];
-                if (candidate->UsesMeshlets(draw) && !draw.blended)
-                {
-                    groups[bucketKey(draw)].push_back(index);
-                }
-            }
+            const auto cameraGroups = prepareGroups(0, candidate->draws, [&](const auto& draw)
+                                                    { return candidate->UsesMeshlets(draw) && !draw.blended; });
+            const auto groups = cameraGroups->Groups();
             const auto preparePacketPipelines = [&]()
             {
                 constexpr const char* entries[]{"LXResetPacketBuckets",   "LXCountPacketBuckets",
@@ -3159,19 +3253,30 @@ namespace material_graph
             {
                 return false;
             }
-            const auto prepare = [&](const PacketGroups& packetGroups,
-                                     ce::render_vector<IndirectMaterialBatch::PacketDraw>& records, bool depth,
-                                     std::shared_ptr<const IndirectMaterialBatch>& result, std::string& taskError,
+            const auto prepare = [&](own::shared_owner<IndirectMaterialBatch> batch, const PacketGroups& packetGroups,
+                                     ScenePacketRecords& recordCache, bool depth,
+                                     own::shared_owner<const IndirectMaterialBatch>& result, std::string& taskError,
                                      std::optional<unsigned> cascade = {},
-                                     std::shared_ptr<const GpuGeometryVisibility::Frame> shadowList = {},
+                                     own::shared_owner<const GpuGeometryVisibility::Frame> shadowList = {},
                                      const char* shadowPhase = "Final")
             {
                 ce::profile_scope packetProfile{ce::marker<"MaterialScenePacketPrepare">()};
-                auto batch = std::make_shared<IndirectMaterialBatch>();
-                batch->name = cascade ? "METEOR.Scene.Commands.Shadow." + std::string(shadowPhase) + "." +
-                                            std::to_string(*cascade)
-                              : depth ? "METEOR.Scene.Commands.Depth"
-                                      : "METEOR.Scene.Commands.Surface";
+                static constexpr std::array<std::array<std::string_view, 3>, 3> shadowNames{
+                    {{"METEOR.Scene.Commands.Shadow.Static.0", "METEOR.Scene.Commands.Shadow.Static.1",
+                      "METEOR.Scene.Commands.Shadow.Static.2"},
+                     {"METEOR.Scene.Commands.Shadow.First.0", "METEOR.Scene.Commands.Shadow.First.1",
+                      "METEOR.Scene.Commands.Shadow.First.2"},
+                     {"METEOR.Scene.Commands.Shadow.Final.0", "METEOR.Scene.Commands.Shadow.Final.1",
+                      "METEOR.Scene.Commands.Shadow.Final.2"}}};
+                const auto label = cascade ? shadowNames[std::string_view(shadowPhase) == "Static"  ? 0
+                                                         : std::string_view(shadowPhase) == "First" ? 1
+                                                                                                    : 2][*cascade]
+                                   : depth ? std::string_view("METEOR.Scene.Commands.Depth")
+                                           : std::string_view("METEOR.Scene.Commands.Surface");
+                if (batch->name != label)
+                {
+                    batch->name.assign(label);
+                }
                 batch->device = device_;
                 batch->pool = bufferPool_;
                 for (unsigned stage = 0; stage < packetPipelines_.size(); ++stage)
@@ -3182,37 +3287,32 @@ namespace material_graph
                 batch->visibility = cascade ? shadowList
                                     : depth ? candidate->firstCullStage.cameraDepthMeshlets
                                             : candidate->finalCullStage.cameraMeshlets;
-                size_t count{};
-                for (const auto& indices : std::span(packetGroups))
-                {
-                    count += indices.size();
-                }
-                records.resize(count);
-                batch->buckets.reserve(packetGroups.size());
+                const bool reused = recordCache.Prepare(*packetGroups);
+                ce::profile_instant(reused ? ce::marker<"MaterialScenePacketRecords.Reuse">()
+                                           : ce::marker<"MaterialScenePacketRecords.Rebuild">());
+                auto& records = recordCache.m_records;
+                const auto selectedGroups = packetGroups->Spans();
+                batch->ReserveBuckets(selectedGroups.size());
                 size_t output{};
-                for (const auto& indices : std::span(packetGroups))
+                for (const auto& indices : selectedGroups)
                 {
                     const auto bucketId = static_cast<uint32_t>(batch->buckets.size());
-                    IndirectMaterialBatch::Bucket bucket;
+                    auto& bucket = batch->AppendBucket();
                     bucket.representative = indices.front();
                     bucket.count = static_cast<uint32_t>(indices.size());
-                    for (const auto index : std::span(indices))
+                    for (const auto index : indices)
                     {
                         auto& draw = draws[index];
-                        // Publish the canonical opaque representatives once. Shadow
-                        // lists retain their own representatives without mutating it.
                         if (!cascade && !depth)
                         {
                             draw.materialBucket = bucketId;
                             draw.bucketRepresentative = index == indices.front();
                         }
                         const auto bin = cascade ? draw.shadowMeshletBin : draw.cameraMeshletBin;
-                        records[output++] = {draw.geometryRecord, batch->visibility->MeshletOutputOffset(bin), bucketId,
-                                             draw.geometry->MeshletCount()};
+                        records[output++].visibleOffset = batch->visibility->MeshletOutputOffset(bin);
                     }
-                    batch->buckets.push_back(std::move(bucket));
                 }
-                if (!batch->UploadPackets(records, taskError))
+                if (!batch->UploadPackets(records, taskError, packetGroups))
                 {
                     return false;
                 }
@@ -3223,15 +3323,16 @@ namespace material_graph
             {
                 PacketGroups m_groups;
                 bool m_depth{};
-                std::shared_ptr<const IndirectMaterialBatch>* m_output{};
+                own::shared_owner<const IndirectMaterialBatch>* m_output{};
                 std::optional<unsigned> m_cascade;
-                std::shared_ptr<const GpuGeometryVisibility::Frame> m_visibility;
+                own::shared_owner<const GpuGeometryVisibility::Frame> m_visibility;
                 const char* m_phase{"Final"};
                 std::size_t m_storageIndex{};
                 std::string m_error;
                 std::exception_ptr m_failure;
                 bool m_succeeded{};
-                ce::render_vector<IndirectMaterialBatch::PacketDraw>* m_records{};
+                ScenePacketRecords* m_records{};
+                own::shared_owner<IndirectMaterialBatch> m_batch;
             };
             std::array<PacketTask, 2> cameraTasks;
             std::array<PacketTask, 9> shadowTasks;
@@ -3275,7 +3376,8 @@ namespace material_graph
             {
                 for (auto& task : tasks)
                 {
-                    task.m_records = &m_preparationScratch->m_packetRecords[task.m_storageIndex];
+                    task.m_records = &packetCache.m_records[task.m_storageIndex];
+                    task.m_batch = m_preparationScratch->m_batches.Acquire();
                 }
                 const auto workers = parallelPreparation
                                          ? std::min(tasks.size(), std::max(std::size_t{1}, scheduler_.worker_count()))
@@ -3295,8 +3397,8 @@ namespace material_graph
                             try
                             {
                                 task.m_succeeded =
-                                    prepare(task.m_groups, *task.m_records, task.m_depth, *task.m_output, task.m_error,
-                                            task.m_cascade, task.m_visibility, task.m_phase);
+                                    prepare(task.m_batch, task.m_groups, *task.m_records, task.m_depth, *task.m_output,
+                                            task.m_error, task.m_cascade, task.m_visibility, task.m_phase);
                             }
                             catch (...)
                             {
@@ -3315,7 +3417,6 @@ namespace material_graph
             };
             if (!groups.empty())
             {
-                const auto cameraGroups = snapshotGroups();
                 cameraTasks[cameraTaskCount++] = {
                     cameraGroups, false, &candidate->visibilityStage.materialCommands, {}, {}, "Final", 0};
                 cameraTasks[cameraTaskCount++] = {cameraGroups, true, &candidate->occluderStage.depthCommands, {}, {},
@@ -3336,7 +3437,7 @@ namespace material_graph
                 constexpr const char* entries[]{"ResetMaterialWork",   "CountMaterialTiles",
                                                 "ScanMaterialRanges",  "AddMaterialRangeOffsets",
                                                 "BuildMaterialRanges", "ScatterMaterialTiles"};
-                auto work = std::make_shared<SceneMaterialWork>();
+                auto work = own::make_shared<SceneMaterialWork>();
                 work->device = device_;
                 work->pool = bufferPool_;
                 work->width = context.width;
@@ -3423,20 +3524,13 @@ namespace material_graph
             }
             for (const bool staticCasters : {true, false})
             {
-                groups.clear();
-                for (std::size_t index = 0; index < candidate->shadowDraws.size(); ++index)
-                {
-                    const auto& draw = candidate->shadowDraws[index];
-                    if (draw.shadowEnabled && draw.staticShadow == staticCasters)
-                    {
-                        groups[bucketKey(draw)].push_back(index);
-                    }
-                }
-                if (groups.empty())
+                const auto shadowGroups =
+                    prepareGroups(staticCasters ? 1u : 2u, candidate->shadowDraws, [&](const auto& draw)
+                                  { return draw.shadowEnabled && draw.staticShadow == staticCasters; });
+                if (shadowGroups->Groups().empty())
                 {
                     continue;
                 }
-                const auto shadowGroups = snapshotGroups();
                 for (unsigned cascade = 0; cascade < 3; ++cascade)
                 {
                     if (staticCasters)
@@ -3477,7 +3571,7 @@ namespace material_graph
             }
             // Only transmitting/blended surfaces replay geometry. Opaque Temporal
             // consumes final visibility and the existing GPU material tile packets.
-            auto replay = std::make_shared<IndirectMaterialBatch>();
+            auto replay = m_preparationScratch->m_batches.Acquire();
             replay->name = "METEOR.Scene.Commands.Temporal.Layers";
             replay->visibility = candidate->finalCullStage.blendedMeshlets;
             replay->device = device_;
@@ -3503,10 +3597,9 @@ namespace material_graph
                 const auto pipeline = draw.program->temporal[draw.doubleSided].GetHandle();
                 if (replay->buckets.empty() || pipeline != previousPipeline)
                 {
-                    IndirectMaterialBatch::Bucket bucket;
+                    auto& bucket = replay->AppendBucket();
                     bucket.representative = index;
                     bucket.offset = replayBytes;
-                    replay->buckets.push_back(std::move(bucket));
                     previousPipeline = pipeline;
                 }
                 auto& bucket = replay->buckets.back();
@@ -3582,7 +3675,7 @@ namespace material_graph
         // Captures and tiled effects preserve each sorted layer boundary. Within
         // a layer, every geometry chunk shares material/scene constants and PSO;
         // only geometry, owner and its ordered meshlet list vary per mesh dispatch.
-        auto indexed = std::make_shared<IndirectMaterialBatch>();
+        auto indexed = m_preparationScratch->m_batches.Acquire();
         indexed->name = "METEOR.Scene.Commands.Layer";
         indexed->device = device_;
         indexed->pool = bufferPool_;
@@ -3608,12 +3701,11 @@ namespace material_graph
                     if (bucketIndex == UINT32_MAX)
                     {
                         bucketIndex = static_cast<uint32_t>(indexed->buckets.size());
-                        IndirectMaterialBatch::Bucket bucket;
+                        auto& bucket = indexed->AppendBucket();
                         bucket.representative = index;
                         bucket.offset = indexedOutputBytes;
                         bucket.roots = {1u, draw.program->visibleOwnerRoot, draw.program->meshletRoot,
                                         draw.program->temporalPreviousRoot + 1};
-                        indexed->buckets.push_back(std::move(bucket));
                     }
                     auto& bucket = indexed->buckets[bucketIndex];
                     const auto first = static_cast<uint32_t>(indexedWords.size() * 4);
@@ -3702,7 +3794,7 @@ namespace material_graph
         {
             return false;
         }
-        const auto preparePacketBindings = [&](const std::shared_ptr<const IndirectMaterialBatch>& batch)
+        const auto preparePacketBindings = [&](const own::shared_owner<const IndirectMaterialBatch>& batch)
         {
             if (!batch)
             {
@@ -3715,7 +3807,7 @@ namespace material_graph
             {
                 return false;
             }
-            candidate->packetBindings.emplace(batch.get(), table);
+            candidate->packetBindings.emplace(batch.operator->(), table);
             return true;
         };
         if (!preparePacketBindings(candidate->visibilityStage.materialCommands) ||
@@ -3738,9 +3830,9 @@ namespace material_graph
             {
                 if (!m_primitiveCacheResources)
                 {
-                    m_primitiveCacheResources = std::make_shared<ScenePrimitiveCacheResources>();
+                    m_primitiveCacheResources = own::make_shared<ScenePrimitiveCacheResources>();
                 }
-                auto cache = std::make_shared<ScenePrimitiveCacheFrame>();
+                auto cache = own::make_shared<ScenePrimitiveCacheFrame>();
                 if (!cache->Prepare(context, bufferPool_, m_primitiveCacheResources, sceneData, work,
                                     candidate->input->ViewProjection(), error))
                 {
@@ -3777,15 +3869,15 @@ namespace material_graph
         {
             return false;
         }
-        candidate->raster = std::make_shared<const RasterResources>(
+        candidate->raster = own::make_shared<const RasterResources>(
             RasterResources{candidate->geometryStage.geometryTable, candidate->firstCullStage.cameraDepthMeshlets,
                             candidate->finalCullStage.cameraMeshlets, candidate->finalCullStage.blendedMeshlets,
                             candidate->effectStage.layers.indexedCommands, candidate->materialWorkStage.materialWork});
         try
         {
-            if (!candidate->effectStage.layers.PrepareBlended(*candidate, candidate->effectStage.lookup.layered,
-                                                              bool(candidate->effectStage.runtime.frame),
-                                                              indirectCommands_.GetGeneration(), error))
+            if (!candidate->effectStage.layers.PrepareBlended(
+                    *candidate, candidate->effectStage.lookup.layered, bool(candidate->effectStage.runtime.frame),
+                    indirectCommands_.GetGeneration(), m_preparationScratch->m_batches, error))
             {
                 return false;
             }
@@ -3810,7 +3902,7 @@ namespace material_graph
             if (!candidate->m_passReadPlan)
             {
                 ce::profile_scope build{ce::marker<"MaterialPassReadPlanBuild">()};
-                auto plan = std::make_shared<const PassReadPlan>(candidate->draws, candidate->shadowDraws);
+                auto plan = own::make_shared<const PassReadPlan>(candidate->draws, candidate->shadowDraws);
                 if (plan->StorageBytes() <= 128 * 1024)
                 {
                     m_passReadPlans[m_nextPassReadPlan] = plan;
@@ -3870,7 +3962,7 @@ namespace material_graph
         }
         frame_->CheckCurrent(&graph);
         RequireStage(geometry, frame_->raster->geometry->GraphTable(graph), "Shared first culling requires Geometry.");
-        std::array<std::shared_ptr<const GpuGeometryVisibility::Frame>, 4> ready;
+        std::array<own::shared_owner<const GpuGeometryVisibility::Frame>, 4> ready;
         std::size_t readyCount{};
         if (frame_->firstCullStage.cameraDepthMeshlets)
         {
@@ -3923,11 +4015,10 @@ namespace material_graph
                                       frame_ ? frame_->occluderStage.occluderVisibility : nullptr);
     }
 
-    void SceneHost::DeclareHardwareVisibility(EnhancedRenderGraph& graph,
-                                              const own::shared_owner<const FrameInput>& frame,
-                                              const std::shared_ptr<const SceneHybridVisibility>& hybrid,
-                                              const std::shared_ptr<const GpuGeometryVisibility::Frame>& list,
-                                              const std::shared_ptr<const IndirectMaterialBatch>& commands,
+    void SceneHost::DeclareHardwareVisibility(EnhancedRenderGraph& graph, const own::shared_owner<const Frame>& frame,
+                                              const own::shared_owner<const SceneHybridVisibility>& hybrid,
+                                              const own::shared_owner<const GpuGeometryVisibility::Frame>& list,
+                                              const own::shared_owner<const IndirectMaterialBatch>& commands,
                                               bool occluder, RGHandle commandInput)
     {
         if (!hybrid || !list || !commands)
@@ -3947,7 +4038,8 @@ namespace material_graph
         const auto bucketCount = static_cast<uint32_t>(commands->buckets.size());
         const auto pass = graph.AddSplitPass(
             hybrid->name + ".HW", std::move(uses),
-            [frame, hybrid, list, commands, occluder](const auto& execution, uint32_t slice, uint32_t sliceCount)
+            [frame = frame, hybrid, list, commands, occluder](const auto& execution, uint32_t slice,
+                                                              uint32_t sliceCount)
             {
                 frame->CheckCurrent(execution.graph);
                 const bool audit = !occluder && frame->geometryRouteAuditEnabled;
@@ -3984,7 +4076,7 @@ namespace material_graph
                     {
                         throw std::runtime_error(error);
                     }
-                    frame->BindPacketResources(encoder, draw, frame->packetBindings.at(commands.get()),
+                    frame->BindPacketResources(encoder, draw, frame->packetBindings.at(commands.operator->()),
                                                draw.program->packetRoots);
                     encoder.SetRootBuffer(RHIBindPoint::Graphics, draw.program->rasterRouteRoot, hybrid->RouteSlice());
                     if (!encoder.SetRootUnorderedBuffer(RHIBindPoint::Graphics, draw.program->visibilityKeyRoot,
@@ -4016,31 +4108,31 @@ namespace material_graph
         graph.DeclareRecordingIndependent(pass);
     }
 
-    std::shared_ptr<const GpuGeometryVisibility::Frame> SceneHost::CameraMeshletWork() const
+    own::shared_owner<const GpuGeometryVisibility::Frame> SceneHost::CameraMeshletWork() const
     {
         return frame_ ? frame_->finalCullStage.cameraMeshlets : nullptr;
     }
 
-    std::shared_ptr<const GpuGeometryVisibility::Frame> SceneHost::CameraDepthMeshletWork() const
+    own::shared_owner<const GpuGeometryVisibility::Frame> SceneHost::CameraDepthMeshletWork() const
     {
         return frame_ ? frame_->firstCullStage.cameraDepthMeshlets : nullptr;
     }
 
-    std::shared_ptr<const SceneMaterialWork> SceneHost::MaterialWork() const
+    own::shared_owner<const SceneMaterialWork> SceneHost::MaterialWork() const
     {
         return frame_ ? frame_->materialWorkStage.materialWork : nullptr;
     }
 
-    std::shared_ptr<const SceneFrameGeometry> SceneHost::FrameGeometry() const
+    own::shared_owner<const SceneFrameGeometry> SceneHost::FrameGeometry() const
     {
         return frame_ ? frame_->geometryStage.geometryTable : nullptr;
     }
 
-    std::shared_ptr<const SceneHybridVisibility> SceneHost::HybridVisibility() const
+    own::shared_owner<const SceneHybridVisibility> SceneHost::HybridVisibility() const
     {
         return frame_ ? frame_->visibilityStage.hybridVisibility : nullptr;
     }
-    std::shared_ptr<const SceneHybridVisibility> SceneHost::OccluderVisibility() const
+    own::shared_owner<const SceneHybridVisibility> SceneHost::OccluderVisibility() const
     {
         return frame_ ? frame_->occluderStage.occluderVisibility : nullptr;
     }
@@ -4250,7 +4342,7 @@ namespace material_graph
         return stats;
     }
 
-    std::shared_ptr<const GpuGeometryVisibility::Frame> SceneHost::ShadowFirstMeshletWork(unsigned cascade) const
+    own::shared_owner<const GpuGeometryVisibility::Frame> SceneHost::ShadowFirstMeshletWork(unsigned cascade) const
     {
         return frame_ && cascade < 3 ? frame_->shadowFirstCullStage.meshlets[cascade] : nullptr;
     }
@@ -4549,7 +4641,7 @@ namespace material_graph
         for (const auto& draw : frame_->draws)
         {
             draw.geometry->MarkSubmitted(completion);
-            if (draw.previousGeometry && draw.previousGeometry != draw.geometry)
+            if (draw.previousGeometry && draw.previousGeometry.operator->() != draw.geometry.operator->())
             {
                 draw.previousGeometry->MarkSubmitted(completion);
             }
@@ -4634,7 +4726,8 @@ namespace material_graph
             auto history = frame->historyStage.nextCameraHistory->HistoryOwner();
             history->completion = completion.value;
             auto& histories = cameraHistories_[{view.sceneEpoch, view.viewId}];
-            if (std::ranges::none_of(histories, [&](const auto& item) { return item.pyramid == history; }))
+            if (std::ranges::none_of(histories, [&](const auto& item)
+                                     { return item.pyramid.operator->() == history.operator->(); }))
             {
                 auto historyCamera = view.camera;
                 if (view.temporalFrame.camera.valid)
@@ -4652,7 +4745,7 @@ namespace material_graph
             cache->completion = completion.value;
             const auto key = std::pair{view.sceneEpoch, view.viewId};
             auto& cached = shadowCaches_[key];
-            if (std::ranges::none_of(cached, [&](const auto& item) { return item == cache; }))
+            if (std::ranges::none_of(cached, [&](const auto& item) { return item.operator->() == cache.operator->(); }))
             {
                 cached.push_back(std::move(cache));
             }
@@ -4811,12 +4904,12 @@ namespace material_graph
         return HasDraws() ? frame_->effectStage.lookup.opaque->GraphStatistics(graph) : RGHandle{};
     }
 
-    std::shared_ptr<const SceneLookupFrame> SceneHost::LookupFrame() const
+    own::shared_owner<const SceneLookupFrame> SceneHost::LookupFrame() const
     {
         return HasDraws() ? frame_->effectStage.lookup.opaque : nullptr;
     }
 
-    std::shared_ptr<const SceneLookupFrame> SceneHost::ForwardLookupFrame() const
+    own::shared_owner<const SceneLookupFrame> SceneHost::ForwardLookupFrame() const
     {
         return HasDraws() ? frame_->effectStage.lookup.layered : nullptr;
     }
@@ -4826,17 +4919,17 @@ namespace material_graph
         return HasDraws() ? frame_->effectStage.layers.forwardGbuffer : SceneSurfaceTargets::Outputs{};
     }
 
-    std::shared_ptr<const SceneSubsurfaceFrame> SceneHost::SubsurfaceFrame() const
+    own::shared_owner<const SceneSubsurfaceFrame> SceneHost::SubsurfaceFrame() const
     {
         return HasDraws() ? frame_->effectStage.subsurface : nullptr;
     }
 
-    std::shared_ptr<const SceneRefractionFrame> SceneHost::RefractionFrame() const
+    own::shared_owner<const SceneRefractionFrame> SceneHost::RefractionFrame() const
     {
         return HasDraws() ? frame_->effectStage.refraction : nullptr;
     }
 
-    std::shared_ptr<const SceneVolumeFrame> SceneHost::VolumeFrame() const
+    own::shared_owner<const SceneVolumeFrame> SceneHost::VolumeFrame() const
     {
         return HasDraws() ? frame_->effectStage.volume.frame : nullptr;
     }
@@ -4875,6 +4968,10 @@ namespace material_graph
         materialWorkPipelines_ = {};
         m_primitiveCacheResources.reset();
         geometry_ = {};
+        if (m_preparationScratch)
+        {
+            m_preparationScratch->m_batches.ClearAfterIdle();
+        }
         sceneResidentBuffers_.ShutdownAfterIdle();
         if (bufferPool_)
         {

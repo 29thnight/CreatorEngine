@@ -3,6 +3,7 @@
 #include "ClrHost.h"
 #include "DataSystem.h"
 #include "ProfileService.h"
+#include "ProfileScope.h"
 #include "Texture.h"
 
 #include "../../Engine/Utility_Framework/StandardLibrary.h"

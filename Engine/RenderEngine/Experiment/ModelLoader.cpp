@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/Ownership.h"
 #include "ModelLoader.h"
 
 #include "../../Utility_Framework/StandardLibrary.h"
@@ -243,7 +244,7 @@ namespace experiment
 		}
 	}
 
-	ModelLoader::ModelLoader(std::unique_ptr<IModelDecoder> decoder) noexcept
+	ModelLoader::ModelLoader(own::unique_owner<IModelDecoder> decoder) noexcept
 		: decoder_(std::move(decoder))
 	{
 	}
@@ -325,7 +326,7 @@ namespace experiment
 
 		// 검증 전에는 Model generation이 존재하지 않는다. 성공한 draft만 한 번에
 		// move하여 partial model publication을 구조적으로 막는다.
-		result.model = std::make_shared<const Model>(
+		result.model = own::make_shared<const Model>(
 			std::move(*decoded.draft), Model::ConstructKey{});
 		return result;
 	}

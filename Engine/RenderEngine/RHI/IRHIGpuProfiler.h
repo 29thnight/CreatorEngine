@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Ownership.h"
 #include <stdint.h>
 #include "../../Utility_Framework/StandardLibrary.h"
 
@@ -9,14 +10,14 @@ class RHIEncoder;
 // 이름 구분자/해시 충돌을 피하고, 공유 소유권으로 지연 수집까지 원문을 보존한다.
 struct GpuPassTimingIdentity
 {
-    std::shared_ptr<const std::string> graphSignature;
+    own::shared_owner<const std::string> graphSignature;
     uint32_t passIndex{UINT32_MAX};
 
     bool IsValid() const { return graphSignature && passIndex != UINT32_MAX; }
     bool operator==(const GpuPassTimingIdentity& other) const
     {
         return passIndex == other.passIndex &&
-            (graphSignature == other.graphSignature ||
+            (graphSignature.operator->() == other.graphSignature.operator->() ||
                 (graphSignature && other.graphSignature && *graphSignature == *other.graphSignature));
     }
 };
@@ -73,4 +74,3 @@ public:
         const GpuPassTimingIdentity& identity = {}) = 0;
     virtual void EndPass(RHIEncoder& encoder, uint32_t slot) = 0;
 };
-

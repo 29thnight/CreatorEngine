@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "TemporalRuntimeControl.h"
 #include "../../../Utility_Framework/StandardLibrary.h"
 
@@ -9,11 +10,21 @@ namespace
         char* value = nullptr;
         std::size_t size = 0;
         const auto result = _dupenv_s(&value, &size, key);
-        const std::unique_ptr<char, decltype(&std::free)> owned(value, &std::free);
-        if (result != 0 || !owned) { return std::nullopt; }
-        return std::string(owned.get());
+        struct environment_release
+        {
+            char* value_;
+            ~environment_release() { std::free(value_); }
+        } owned{value};
+        if (result != 0 || !owned.value_)
+        {
+            return std::nullopt;
+        }
+        return std::string(owned.value_);
 #else
-        if (const auto* value = std::getenv(key)) { return std::string(value); }
+        if (const auto* value = std::getenv(key))
+        {
+            return std::string(value);
+        }
         return std::nullopt;
 #endif
     }
@@ -24,17 +35,33 @@ namespace
         wchar_t* value = nullptr;
         std::size_t size = 0;
         const auto result = _wdupenv_s(&value, &size, key);
-        const std::unique_ptr<wchar_t, decltype(&std::free)> owned(value, &std::free);
-        if (result != 0 || !owned) { return std::nullopt; }
-        return std::wstring(owned.get());
+        struct environment_release
+        {
+            wchar_t* value_;
+            ~environment_release() { std::free(value_); }
+        } owned{value};
+        if (result != 0 || !owned.value_)
+        {
+            return std::nullopt;
+        }
+        return std::wstring(owned.value_);
     }
 #endif
 
     TemporalProvider ProductProvider(std::string_view value)
     {
-        if (value == "fsr") { return TemporalProvider::Fsr; }
-        if (value == "dlss") { return TemporalProvider::Dlss; }
-        if (value == "xess") { return TemporalProvider::XeSS; }
+        if (value == "fsr")
+        {
+            return TemporalProvider::Fsr;
+        }
+        if (value == "dlss")
+        {
+            return TemporalProvider::Dlss;
+        }
+        if (value == "xess")
+        {
+            return TemporalProvider::XeSS;
+        }
         return TemporalProvider::None;
     }
 
@@ -42,10 +69,14 @@ namespace
     {
         switch (provider)
         {
-        case TemporalProvider::Fsr: return "fsr";
-        case TemporalProvider::Dlss: return "dlss";
-        case TemporalProvider::XeSS: return "xess";
-        default: return "none";
+        case TemporalProvider::Fsr:
+            return "fsr";
+        case TemporalProvider::Dlss:
+            return "dlss";
+        case TemporalProvider::XeSS:
+            return "xess";
+        default:
+            return "none";
         }
     }
 
@@ -78,7 +109,7 @@ namespace
         {
             if (const auto overrideValue = ReadEnvironment(key))
             {
-                const std::string_view source{ *overrideValue };
+                const std::string_view source{*overrideValue};
                 const auto parsed = std::from_chars(source.data(), source.data() + source.size(), value);
                 if (source.empty() || parsed.ec != std::errc{} || parsed.ptr != source.data() + source.size())
                 {
@@ -92,8 +123,8 @@ namespace
         number("CREATOR_DEEPDVC_INTENSITY", product.vibranceIntensity);
         number("CREATOR_DEEPDVC_SATURATION_BOOST", product.saturationBoost);
         // Invalid overrides fail to native defaults, never guessed SDK support.
-        settings = valid && ValidateTemporalProductSettings(product)
-            ? TemporalRuntimeSettingsFromProduct(product) : TemporalRuntimeSettings{};
+        settings = valid && ValidateTemporalProductSettings(product) ? TemporalRuntimeSettingsFromProduct(product)
+                                                                     : TemporalRuntimeSettings{};
 #ifdef _WIN32
         if (const auto directory = ReadEnvironment(L"CREATOR_TEMPORAL_RUNTIME_DIRECTORY"))
 #else
@@ -118,7 +149,7 @@ namespace
             settings.dlssProjectId = *project;
         }
     }
-}
+} // namespace
 
 TemporalRuntimeSettings TemporalRuntimeSettingsFromProduct(const TemporalProductSettings& settings)
 {
@@ -131,14 +162,28 @@ TemporalRuntimeSettings TemporalRuntimeSettingsFromProduct(const TemporalProduct
     result.requestedUpscaler = ProductProvider(settings.upscaler);
     result.requestedFrameGenerator = ProductProvider(settings.frameGenerator);
     result.interpolatedFrameCount = settings.interpolatedFrameCount;
-    if (settings.quality == "native-aa") { result.quality = TemporalQuality::NativeAA; }
-    else if (settings.quality == "balanced") { result.quality = TemporalQuality::Balanced; }
-    else if (settings.quality == "performance") { result.quality = TemporalQuality::Performance; }
-    else if (settings.quality == "ultra-performance") { result.quality = TemporalQuality::UltraPerformance; }
-    result.reflexMode = settings.latencyMode == "on-boost" ? TemporalLatencyMode::OnPlusBoost :
-        settings.latencyMode == "on" ? TemporalLatencyMode::On : TemporalLatencyMode::Off;
-    result.spatialPost.nisMode = settings.spatialMode == "scale" ? SpatialScalingMode::NisScale :
-        settings.spatialMode == "sharpen" ? SpatialScalingMode::NisSharpen : SpatialScalingMode::Off;
+    if (settings.quality == "native-aa")
+    {
+        result.quality = TemporalQuality::NativeAA;
+    }
+    else if (settings.quality == "balanced")
+    {
+        result.quality = TemporalQuality::Balanced;
+    }
+    else if (settings.quality == "performance")
+    {
+        result.quality = TemporalQuality::Performance;
+    }
+    else if (settings.quality == "ultra-performance")
+    {
+        result.quality = TemporalQuality::UltraPerformance;
+    }
+    result.reflexMode = settings.latencyMode == "on-boost" ? TemporalLatencyMode::OnPlusBoost
+                        : settings.latencyMode == "on"     ? TemporalLatencyMode::On
+                                                           : TemporalLatencyMode::Off;
+    result.spatialPost.nisMode = settings.spatialMode == "scale"     ? SpatialScalingMode::NisScale
+                                 : settings.spatialMode == "sharpen" ? SpatialScalingMode::NisSharpen
+                                                                     : SpatialScalingMode::Off;
     result.spatialPost.nisRenderScale = settings.spatialRenderScale;
     result.spatialPost.nisSharpness = settings.spatialSharpness;
     result.spatialPost.deepDvcEnabled = settings.digitalVibrance;
@@ -156,14 +201,25 @@ TemporalProductSettings TemporalProductSettingsFromRuntime(const TemporalRuntime
     result.interpolatedFrameCount = settings.interpolatedFrameCount;
     switch (settings.quality)
     {
-    case TemporalQuality::NativeAA: result.quality = "native-aa"; break;
-    case TemporalQuality::Balanced: result.quality = "balanced"; break;
-    case TemporalQuality::Performance: result.quality = "performance"; break;
-    case TemporalQuality::UltraPerformance: result.quality = "ultra-performance"; break;
-    default: result.quality = "quality"; break;
+    case TemporalQuality::NativeAA:
+        result.quality = "native-aa";
+        break;
+    case TemporalQuality::Balanced:
+        result.quality = "balanced";
+        break;
+    case TemporalQuality::Performance:
+        result.quality = "performance";
+        break;
+    case TemporalQuality::UltraPerformance:
+        result.quality = "ultra-performance";
+        break;
+    default:
+        result.quality = "quality";
+        break;
     }
-    result.latencyMode = settings.reflexMode == TemporalLatencyMode::OnPlusBoost ? "on-boost" :
-        settings.reflexMode == TemporalLatencyMode::On ? "on" : "off";
+    result.latencyMode = settings.reflexMode == TemporalLatencyMode::OnPlusBoost ? "on-boost"
+                         : settings.reflexMode == TemporalLatencyMode::On        ? "on"
+                                                                                 : "off";
     result.fallbackAa = fallbackAa;
     result.spatialMode = SpatialScalingModeName(settings.spatialPost.nisMode);
     result.spatialRenderScale = settings.spatialPost.nisRenderScale;
@@ -175,7 +231,7 @@ TemporalProductSettings TemporalProductSettingsFromRuntime(const TemporalRuntime
 }
 
 uint32_t TemporalSupportedInterpolatedFrameCount(TemporalProvider provider, TemporalBackend backend,
-    const std::vector<TemporalCapabilities>& capabilities)
+                                                 const std::vector<TemporalCapabilities>& capabilities)
 {
     uint32_t maximum = 0;
     bool observed = false;
@@ -233,13 +289,19 @@ void TemporalRuntimeControl::RegisterPlayerLatencyHost()
 }
 
 void TemporalRuntimeControl::RegisterEditorUpscalingHost(const std::wstring& deployedDirectory,
-    const std::string& projectId)
+                                                         const std::string& projectId)
 {
     std::lock_guard lock(m_mutex);
     // Environment/runtime overrides remain authoritative. Installing the SDK
     // does not change the user's requested AA or enable Player-only features.
-    if (m_snapshot.settings.runtimeDirectory.empty()) m_snapshot.settings.runtimeDirectory = deployedDirectory;
-    if (m_snapshot.settings.dlssProjectId.empty()) m_snapshot.settings.dlssProjectId = projectId;
+    if (m_snapshot.settings.runtimeDirectory.empty())
+    {
+        m_snapshot.settings.runtimeDirectory = deployedDirectory;
+    }
+    if (m_snapshot.settings.dlssProjectId.empty())
+    {
+        m_snapshot.settings.dlssProjectId = projectId;
+    }
     m_snapshot.editorUpscalingHostRegistered = true;
     ++m_snapshot.requestedGeneration;
 }
@@ -271,7 +333,8 @@ uint64_t TemporalRuntimeControl::Request(const TemporalRuntimeSettings& settings
     return ++m_snapshot.requestedGeneration;
 }
 
-uint64_t TemporalRuntimeControl::RequestTestFault(TemporalTestFaultMode mode, TemporalProvider provider, uint64_t viewId)
+uint64_t TemporalRuntimeControl::RequestTestFault(TemporalTestFaultMode mode, TemporalProvider provider,
+                                                  uint64_t viewId)
 {
 #if CE_DEVELOPMENT && !CE_SHIPPING
     if (mode > TemporalTestFaultMode::FrameGenerationFinalConsumption || provider > TemporalProvider::XeSS ||
@@ -297,16 +360,18 @@ uint64_t TemporalRuntimeControl::RequestTestFault(TemporalTestFaultMode mode, Te
 #endif
 }
 
-bool TemporalRuntimeControl::ConsumeTestFault(const TemporalTestFaultSettings& fault,
-    TemporalTestFaultMode mode, TemporalProvider provider, uint64_t realFrameId, uint64_t viewId, uint64_t sceneEpoch)
+bool TemporalRuntimeControl::ConsumeTestFault(const TemporalTestFaultSettings& fault, TemporalTestFaultMode mode,
+                                              TemporalProvider provider, uint64_t realFrameId, uint64_t viewId,
+                                              uint64_t sceneEpoch)
 {
 #if CE_DEVELOPMENT && !CE_SHIPPING
     // Off is the normal render hot path; no mutex or global lookup is needed.
-    if (fault.revision == 0 || fault.mode != mode || mode == TemporalTestFaultMode::None || fault.provider != provider ||
-        fault.viewId != viewId || viewId == 0 || sceneEpoch == 0 ||
+    if (fault.revision == 0 || fault.mode != mode || mode == TemporalTestFaultMode::None ||
+        fault.provider != provider || fault.viewId != viewId || viewId == 0 || sceneEpoch == 0 ||
         mode > TemporalTestFaultMode::FrameGenerationFinalConsumption ||
         (mode == TemporalTestFaultMode::FrameGenerationEvaluate && provider != TemporalProvider::Fsr) ||
-        ((mode == TemporalTestFaultMode::Dispatch || mode >= TemporalTestFaultMode::FrameGenerationPrepare) && realFrameId == 0))
+        ((mode == TemporalTestFaultMode::Dispatch || mode >= TemporalTestFaultMode::FrameGenerationPrepare) &&
+         realFrameId == 0))
     {
         return false;
     }
@@ -317,7 +382,7 @@ bool TemporalRuntimeControl::ConsumeTestFault(const TemporalTestFaultSettings& f
     }
     m_snapshot.testFaultConsumedRevision = fault.revision;
     m_snapshot.testFaultConsumedMode = mode;
-    m_snapshot.testFaultResult = { TemporalStatus::SdkFailure, TemporalTestFaultNativeCode(mode) };
+    m_snapshot.testFaultResult = {TemporalStatus::SdkFailure, TemporalTestFaultNativeCode(mode)};
     ++m_snapshot.testFaultConsumedCount;
     // Capability/configure rejection occurs before a real frame exists. Zero explicitly
     // means no frame identity for that configuration-time observation.

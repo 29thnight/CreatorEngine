@@ -1,4 +1,5 @@
-﻿#pragma once
+#pragma once
+#include "../../../Utility_Framework/Ownership.h"
 #include "../RHICompletionRetireQueue.h"
 #include "../RHIPipelineState.h"
 #include "../IRenderPipelineCache.h"
@@ -172,7 +173,7 @@ private:
     void RetireCacheEntryLocked(CacheEntry& entry, RHICompletionPoint retireAfter);
 
     struct PendingCompile;
-    using PendingCompiles = std::unordered_map<uint64_t, std::shared_ptr<PendingCompile>>;
+    using PendingCompiles = std::unordered_map<uint64_t, own::shared_owner<PendingCompile>>;
     void WaitForPendingCompiles(const PendingCompiles& pending);
 
     job_scheduler& m_scheduler; // Engine-owned executor outlives this cache.
@@ -185,4 +186,3 @@ private:
     ComPtr<ID3D12PipelineState> m_fallback;
     Stats m_stats;
 };
-

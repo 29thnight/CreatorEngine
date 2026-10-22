@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 #include "ITemporalUpscaler.h"
 #include "TemporalRuntimeControl.h"
 #include "../../../Utility_Framework/StandardLibrary.h"
@@ -46,5 +47,5 @@ public:
     TemporalResult Shutdown();
 private:
     struct State;
-    std::unique_ptr<State> m_state;
+    own::unique_owner<State> m_state;
 };

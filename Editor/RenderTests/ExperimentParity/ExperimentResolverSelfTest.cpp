@@ -1,3 +1,4 @@
+#include "../../../Engine/RenderEngine/RenderAllocator.h"
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 
 #include "Experiment/Cooked/ResolvingModelDecoder.h"
@@ -101,10 +102,10 @@ namespace RenderTest
 
         // ── 1. cooked 성공 → source 를 부르지 않는다 ────────────────────
         {
-            auto cooked = std::make_unique<StubDecoder>(true, "cooked");
-            auto source = std::make_unique<StubDecoder>(true, "source");
-            StubDecoder* cookedRaw = cooked.get();
-            StubDecoder* sourceRaw = source.get();
+            auto cooked = own::make_unique<StubDecoder>(true, "cooked");
+            auto source = own::make_unique<StubDecoder>(true, "source");
+            StubDecoder* cookedRaw = cooked.operator->();
+            StubDecoder* sourceRaw = source.operator->();
             ck::ResolvingModelDecoder resolver(std::move(cooked), std::move(source));
 
             const ex::ModelDecodeResult result =
@@ -124,10 +125,10 @@ namespace RenderTest
 
         // ── 2. cooked 거부 → source 폴백, 그리고 관측 가능 ──────────────
         {
-            auto cooked = std::make_unique<StubDecoder>(false, "cooked");
-            auto source = std::make_unique<StubDecoder>(true, "source");
-            StubDecoder* cookedRaw = cooked.get();
-            StubDecoder* sourceRaw = source.get();
+            auto cooked = own::make_unique<StubDecoder>(false, "cooked");
+            auto source = own::make_unique<StubDecoder>(true, "source");
+            StubDecoder* cookedRaw = cooked.operator->();
+            StubDecoder* sourceRaw = source.operator->();
             ck::ResolvingModelDecoder resolver(std::move(cooked), std::move(source));
 
             const ex::ModelDecodeResult result =
@@ -151,10 +152,10 @@ namespace RenderTest
 
         // ── 3. SourceOnly — cooked 를 아예 부르지 않는다 ────────────────
         {
-            auto cooked = std::make_unique<StubDecoder>(true, "cooked");
-            auto source = std::make_unique<StubDecoder>(true, "source");
-            StubDecoder* cookedRaw = cooked.get();
-            StubDecoder* sourceRaw = source.get();
+            auto cooked = own::make_unique<StubDecoder>(true, "cooked");
+            auto source = own::make_unique<StubDecoder>(true, "source");
+            StubDecoder* cookedRaw = cooked.operator->();
+            StubDecoder* sourceRaw = source.operator->();
             ck::ResolvingModelDecoder resolver(std::move(cooked), std::move(source));
 
             const ex::ModelDecodeResult result =
@@ -171,9 +172,9 @@ namespace RenderTest
 
         // ── 4. CookedOnly 성공 / 실패 ──────────────────────────────────
         {
-            auto cooked = std::make_unique<StubDecoder>(true, "cooked");
-            auto source = std::make_unique<StubDecoder>(true, "source");
-            StubDecoder* sourceRaw = source.get();
+            auto cooked = own::make_unique<StubDecoder>(true, "cooked");
+            auto source = own::make_unique<StubDecoder>(true, "source");
+            StubDecoder* sourceRaw = source.operator->();
             ck::ResolvingModelDecoder resolver(std::move(cooked), std::move(source));
 
             const ex::ModelDecodeResult result =
@@ -184,9 +185,9 @@ namespace RenderTest
                 "CookedOnly 성공 — source 를 부르지 않는다");
         }
         {
-            auto cooked = std::make_unique<StubDecoder>(false, "cooked");
-            auto source = std::make_unique<StubDecoder>(true, "source");
-            StubDecoder* sourceRaw = source.get();
+            auto cooked = own::make_unique<StubDecoder>(false, "cooked");
+            auto source = own::make_unique<StubDecoder>(true, "source");
+            StubDecoder* sourceRaw = source.operator->();
             ck::ResolvingModelDecoder resolver(std::move(cooked), std::move(source));
 
             const ex::ModelDecodeResult result =
@@ -205,9 +206,9 @@ namespace RenderTest
 
         // ── 5. cooked 경로가 비면 시도하지 않고 넘어간다 ────────────────
         {
-            auto cooked = std::make_unique<StubDecoder>(true, "cooked");
-            auto source = std::make_unique<StubDecoder>(true, "source");
-            StubDecoder* cookedRaw = cooked.get();
+            auto cooked = own::make_unique<StubDecoder>(true, "cooked");
+            auto source = own::make_unique<StubDecoder>(true, "source");
+            StubDecoder* cookedRaw = cooked.operator->();
             ck::ResolvingModelDecoder resolver(std::move(cooked), std::move(source));
 
             const ex::ModelDecodeResult result = resolver.Decode(
@@ -223,8 +224,8 @@ namespace RenderTest
 
         // ── 6. decoder 부재는 조용히 넘어가지 않는다 ────────────────────
         {
-            auto source = std::make_unique<StubDecoder>(true, "source");
-            StubDecoder* sourceRaw = source.get();
+            auto source = own::make_unique<StubDecoder>(true, "source");
+            StubDecoder* sourceRaw = source.operator->();
             ck::ResolvingModelDecoder resolver(nullptr, std::move(source));
 
             const ex::ModelDecodeResult result =
@@ -238,7 +239,7 @@ namespace RenderTest
                 "cooked decoder 없음 — 설정 결함을 남긴다");
         }
         {
-            auto cooked = std::make_unique<StubDecoder>(false, "cooked");
+            auto cooked = own::make_unique<StubDecoder>(false, "cooked");
             ck::ResolvingModelDecoder resolver(std::move(cooked), nullptr);
 
             const ex::ModelDecodeResult result =
@@ -250,7 +251,7 @@ namespace RenderTest
                 "source decoder 없음 — 설정 결함을 남긴다");
         }
         {
-            ck::ResolvingModelDecoder resolver(nullptr, std::make_unique<StubDecoder>(true, "source"));
+            ck::ResolvingModelDecoder resolver(nullptr, own::make_unique<StubDecoder>(true, "source"));
             const ex::ModelDecodeResult result =
                 resolver.Decode(MakeRequest(Preference::CookedOnly));
             check.Check(!result.draft.has_value(),
@@ -266,9 +267,9 @@ namespace RenderTest
 
         // ── 7. source 경로가 비면 폴백할 곳이 없다 ─────────────────────
         {
-            auto cooked = std::make_unique<StubDecoder>(false, "cooked");
-            auto source = std::make_unique<StubDecoder>(true, "source");
-            StubDecoder* sourceRaw = source.get();
+            auto cooked = own::make_unique<StubDecoder>(false, "cooked");
+            auto source = own::make_unique<StubDecoder>(true, "source");
+            StubDecoder* sourceRaw = source.operator->();
             ck::ResolvingModelDecoder resolver(std::move(cooked), std::move(source));
 
             const ex::ModelDecodeResult result = resolver.Decode(

@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #pragma once
 #include "Component.h"
 #include "AniTransition.h"
@@ -11,7 +12,7 @@
 class AniTransition;
 class AvatarMask;
 class Animator;
-class [[reflgen::reflect]] AnimationController : public std::enable_shared_from_this<AnimationController>
+class [[reflgen::reflect]] AnimationController : public own::enable_owner_from_this<AnimationController>
 {
    public:
 public:
@@ -28,15 +29,15 @@ public:
 	[[reflgen::ignore]]
 	Animator* m_owner{};
 
-	std::vector<std::shared_ptr<AnimationState>> StateVec;
+	std::vector<own::shared_owner<AnimationState>> StateVec;
 
 	[[reflgen::ignore]]
-	std::unordered_map<std::string, std::weak_ptr<AnimationState>> m_nameToState;
+	std::unordered_map<std::string, own::weak_owner<AnimationState>> m_nameToState;
 
 	[[reflgen::ignore]]
 	std::set<std::string> StateNameSet;
 
-	std::shared_ptr<AnimationState> m_anyState;
+	own::shared_owner<AnimationState> m_anyState;
 	AvatarMask* m_avatarMask{};
 private:
 	[[reflgen::ignore]]
@@ -65,29 +66,28 @@ public:
 	Animator* GetOwner() { return m_owner; };
 	void SetCurState(std::string stateName);
 	void SetNextState(std::string stateName);
-	std::shared_ptr<AniTransition> CheckTransition();
+	own::shared_owner<AniTransition> CheckTransition();
 	void UpdateState();
 	void Update(float tick);
 	int GetAnimatonIndexformState(std::string stateName);
 	int GetAnimationIndex() const { return GetPlayback().animationIndex; }
 	int GetNextAnimationIndex() const { return GetPlayback().nextAnimationIndex; }
-	std::shared_ptr<AnimationState> GetAniState();
+	own::shared_owner<AnimationState> GetAniState();
 	AnimationState* CreateState(const std::string& stateName, int animationIndex,bool isAny = false);
-	std::shared_ptr<AnimationState> CreateState_UI();
+	own::shared_owner<AnimationState> CreateState_UI();
 
 	void DeleteState(std::string stateName);
 	void DeleteTransiton(const std::string& fromStateName, const std::string& toStateName);
 
 	AnimationState* FindState(std::string stateName);
 	AniTransition* CreateTransition(const std::string& curStateName, const std::string& nextStateName);
-	
+
 	AvatarMask* GetAvatarMask() { return m_avatarMask; }
 	void CreateMask();
 	void ReCreateMask(AvatarMask* mask);//팩토리에서 옮길때 쓸용
-	void DeleteAvatarMask(); 
+	void DeleteAvatarMask();
 
 
 	void SetUseLayer(bool _useLayer);
 	bool IsUseLayer() { return m_useLayer;}
 };
-

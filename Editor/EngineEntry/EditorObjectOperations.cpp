@@ -1,3 +1,4 @@
+#include "../../Engine/Utility_Framework/Ownership.h"
 #include "EditorObjectOperations.h"
 #include "ConsoleCommandSystem.h"
 #include "EditorEntityIcons.h"
@@ -919,7 +920,7 @@ namespace EditorObjectOperations
             {
                 auto* owner = m_owner.Resolve();
                 const auto project = m_project.lock();
-                if (!owner || !project || project != SceneManagers->ProjectLayers() || SceneManagers->IsGameStart() || IsEditLocked(owner, true))
+                if (!owner || !project || project.operator->() != SceneManagers->ProjectLayers().operator->() || SceneManagers->IsGameStart() || IsEditLocked(owner, true))
                     throw std::runtime_error("Physics shape edit owner is stale, locked or in Play");
 
                 auto* body = dynamic_cast<PhysicsBodyComponent*>(FindComponent(owner, m_component));
@@ -938,7 +939,7 @@ namespace EditorObjectOperations
             }
             Meta::EntityReference m_owner;
             std::string m_component;
-            std::weak_ptr<ProjectLayerSettings> m_project;
+            own::weak_owner<ProjectLayerSettings> m_project;
             std::vector<PhysicsShapeDefinition> m_before, m_after;
             Authoring::WriteDocument m_beforeDocument, m_afterDocument;
             int m_slot;

@@ -1,3 +1,4 @@
+#include "../../../../../../Engine/RenderEngine/RenderAllocator.h"
 #include "Render/Passes/Editor/EnhancedGridPass.h"
 #include "Render/Passes/Editor/EnhancedGizmoLinePass.h"
 #include "Render/Passes/Editor/EnhancedGizmoIconPass.h"
@@ -146,7 +147,7 @@ bool DX12Test::RunGizmoSceneTest(std::string& outLog)
     // (실전 조립에서는 ShouldCollectGizmoColliders()가 판정한다).
     line.ResetLines();
 	const file::path iconPath = PathFinder::IconPath();
-	auto gizmoIcons = std::make_shared<EnhancedGizmoIconTextures>();
+	auto gizmoIcons = own::make_shared<EnhancedGizmoIconTextures>();
 	gizmoIcons->camera = Texture::LoadSharedFromPath(iconPath / L"CameraGizmo.png");
 	gizmoIcons->mainLight = Texture::LoadSharedFromPath(iconPath / L"MainLightGizmo.png");
 	gizmoIcons->directionalLight = Texture::LoadSharedFromPath(

@@ -34,8 +34,8 @@ def stats(values):
                 p50=statistics.median(values), p95=values[min(len(values)-1, int(len(values)*.95))])
 
 
-def extract(reader, capture_path, cpu_data):
-    capture = reader.read_capture(capture_path)
+def extract(reader, capture_path, cpu_data, capture=None):
+    capture = capture if capture is not None else reader.read_capture(capture_path)
     if not capture['complete'] or capture['unacked'] or any(capture['losses'].values()):
         raise ValueError(f'Capture is incomplete or lossy: {capture_path}')
     if capture['sha256'] != cpu_data['nativeSha256'] or capture['hz'] != cpu_data['hz']:
@@ -128,6 +128,7 @@ def extract(reader, capture_path, cpu_data):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--root', required=True, type=Path)
+    parser.add_argument('--data-only', action='store_true', help='Write JSON only; reuse the common viewer')
     args = parser.parse_args()
     root = args.root.resolve()
     repo = Path(__file__).resolve().parents[2]
@@ -140,11 +141,16 @@ def main():
         data = json.loads((root/'timeline'/(item['id']+'.json')).read_text('utf-8-sig'))
         gpu, summary = extract(reader, root/item['variant']/(item['mode']+'.ceprof'), data)
         (root/'timeline'/(item['id']+'-gpu.json')).write_text(json.dumps(gpu, separators=(',',':')), 'utf-8')
+        if args.data_only:
+            summaries[item['id']] = summary
+            continue
         payload = base64.b64encode(gzip.compress(json.dumps(gpu, separators=(',',':')).encode(), mtime=0)).decode()
         tags.append(f'<script type="application/gzip" id="gpu-blob-{item["id"]}">{payload}</script>')
         summaries[item['id']] = summary
         print(item['id'], summary['events'], 'exact GPU spans', flush=True)
     (root/'gpu-metrics.json').write_text(json.dumps(summaries, indent=2), 'utf-8')
+    if args.data_only:
+        return
     source = root/'timeline.src.html'
     html = source.read_text('utf-8')
     if 'id="gpuTimeline"' in html:

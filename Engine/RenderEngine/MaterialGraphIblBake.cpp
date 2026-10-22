@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "Texture.h"
 #include "MaterialGraphIblBake.h"
 #include "MaterialGraphSurfaceBatch.h"
@@ -65,7 +66,7 @@ bool IblBakeResult::MatchesGpu(const IRenderDeviceServices& device, const IblEnv
 {
     const auto& a = environment_.cube;
     const auto& b = environment.cube;
-    return device_ == &device && gpuPoints_.get() == &points && environment_.generation == environment.generation &&
+    return device_ == &device && gpuPoints_.operator->() == &points && environment_.generation == environment.generation &&
            environment_.owner && environment.owner &&
            environment_.owner->m_assetId == environment.owner->m_assetId && a.handle == b.handle && a.format == b.format &&
            a.width == b.width && a.height == b.height && a.mipLevels == b.mipLevels && a.arraySize == b.arraySize &&
@@ -105,14 +106,14 @@ bool IblBaker::Initialize(IRenderDeviceServices& device, IRenderRootSignatureCac
 }
 
 bool IblBaker::Record(IRenderDeviceServices& device, const IblEnvironment& environment,
-                      std::span<const IblBakePoint> points, std::shared_ptr<const IblBakeResult>& result,
+                      std::span<const IblBakePoint> points, own::shared_owner<const IblBakeResult>& result,
                       std::string& error)
 {
     return RecordInputs(device, environment, points, {}, result, error);
 }
 
 bool IblBaker::RecordGpu(IRenderDeviceServices& device, const IblEnvironment& environment,
-                         std::shared_ptr<const SurfaceBatch> points, std::shared_ptr<const IblBakeResult>& result,
+                         own::shared_owner<const SurfaceBatch> points, own::shared_owner<const IblBakeResult>& result,
                          std::string& error)
 {
     if (!points)
@@ -124,15 +125,15 @@ bool IblBaker::RecordGpu(IRenderDeviceServices& device, const IblEnvironment& en
 }
 
 bool IblBaker::RecordInputs(IRenderDeviceServices& device, const IblEnvironment& environment,
-                            std::span<const IblBakePoint> cpuPoints, std::shared_ptr<const SurfaceBatch> gpuPoints,
-                            std::shared_ptr<const IblBakeResult>& result, std::string& error)
+                            std::span<const IblBakePoint> cpuPoints, own::shared_owner<const SurfaceBatch> gpuPoints,
+                            own::shared_owner<const IblBakeResult>& result, std::string& error)
 {
     if (gpuPoints && !gpuPoints->IsReadyForBake())
     {
         error = "GPU IBL recording needs a recorded surface producer.";
         return false;
     }
-    std::shared_ptr<const IblBakeResult> candidate;
+    own::shared_owner<const IblBakeResult> candidate;
     if (!PrepareInputs(device, environment, cpuPoints, std::move(gpuPoints), candidate, error))
     {
         return false;
@@ -153,7 +154,7 @@ bool IblBaker::RecordInputs(IRenderDeviceServices& device, const IblEnvironment&
 }
 
 bool IblBaker::PrepareGpu(IRenderDeviceServices& device, const IblEnvironment& environment,
-                          std::shared_ptr<const SurfaceBatch> points, std::shared_ptr<const IblBakeResult>& result,
+                          own::shared_owner<const SurfaceBatch> points, own::shared_owner<const IblBakeResult>& result,
                           std::string& error)
 {
     if (!points || (!points->IsPreparedForGraph() && !points->IsValidated()))
@@ -165,8 +166,8 @@ bool IblBaker::PrepareGpu(IRenderDeviceServices& device, const IblEnvironment& e
 }
 
 bool IblBaker::PrepareInputs(IRenderDeviceServices& device, const IblEnvironment& environment,
-                             std::span<const IblBakePoint> cpuPoints, std::shared_ptr<const SurfaceBatch> gpuPoints,
-                             std::shared_ptr<const IblBakeResult>& result, std::string& error)
+                             std::span<const IblBakePoint> cpuPoints, own::shared_owner<const SurfaceBatch> gpuPoints,
+                             own::shared_owner<const IblBakeResult>& result, std::string& error)
 {
     const auto recordingId = device.GetCurrentUploadRecordingId();
     const auto descriptorVersion = device.GetDescriptorVersionToken();
@@ -183,7 +184,7 @@ bool IblBaker::PrepareInputs(IRenderDeviceServices& device, const IblEnvironment
         error = "IBL bake needs finite Core/Layered points and an owning linear HDR cube generation in a recording.";
         return false;
     }
-    auto candidate = std::shared_ptr<IblBakeResult>(new IblBakeResult);
+    auto candidate = own::make_shared<IblBakeResult>(IblBakeResult::ConstructionKey{});
     candidate->device_ = &device;
     candidate->environment_ = environment;
     candidate->points_.assign(cpuPoints.begin(), cpuPoints.end());

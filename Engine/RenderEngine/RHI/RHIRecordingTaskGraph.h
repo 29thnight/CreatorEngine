@@ -1,4 +1,5 @@
 #pragma once
+#include "../RenderContainerReusePolicy.h"
 #include "../../Utility_Framework/StandardLibrary.h"
 
 struct RHIRecordingPassDependencies
@@ -45,6 +46,17 @@ struct RHIRecordingTaskTopology
 
 struct RHIRecordingTaskGraph
 {
+    struct Scratch
+    {
+        std::vector<std::pair<uint32_t, uint32_t>> groups;
+        std::vector<uint32_t> previous, unitNodes, required;
+        std::vector<std::vector<uint32_t>> frontiers;
+        std::vector<RHIRecordingTaskNode> stagedNodes;
+        RHIRecordingTaskTopology details;
+        std::vector<std::pair<std::pair<uint32_t, uint32_t>, uint8_t>> dependencyReasons;
+    };
+    Scratch scratch;
+    mutable std::vector<uint64_t> completion;
     std::vector<RHIRecordingTaskNode> nodes;
 
     bool ReplacesWaveJoins() const
@@ -69,17 +81,23 @@ struct RHIRecordingTaskGraph
 
     uint64_t CriticalWork() const
     {
-        std::vector<uint64_t> completion(nodes.size(), 0);
+        std::optional<std::vector<uint64_t>> freshCompletion;
+        if (!RenderContainerReuseEnabled())
+        {
+            freshCompletion.emplace();
+        }
+        auto& completedWork = freshCompletion ? *freshCompletion : completion;
+        completedWork.assign(nodes.size(), 0);
         uint64_t longest = 0;
         for (size_t node = 0; node < nodes.size(); ++node)
         {
             uint64_t ready = 0;
             for (const auto dependency : nodes[node].dependencies)
             {
-                ready = (std::max)(ready, completion[dependency]);
+                ready = (std::max)(ready, completedWork[dependency]);
             }
-            completion[node] = ready + nodes[node].work;
-            longest = (std::max)(longest, completion[node]);
+            completedWork[node] = ready + nodes[node].work;
+            longest = (std::max)(longest, completedWork[node]);
         }
         return longest;
     }
@@ -100,15 +118,26 @@ inline bool RHIBuildRecordingTaskGraph(std::span<const uint32_t> unitTargets, st
     {
         return false;
     }
-    RHIRecordingTaskTopology details;
+    auto& graph = result;
+    const bool reuse = RenderContainerReuseEnabled();
+    if (!reuse)
+    {
+        graph.scratch = RHIRecordingTaskGraph::Scratch{};
+    }
+    auto& nodes = graph.scratch.stagedNodes;
+    auto& details = graph.scratch.details;
+    details.available = false;
+    details.truncated = false;
+    details.unitNodes.clear();
+    for (auto& node : details.nodes)
+    {
+        node.dependencies.clear();
+        node.units.clear();
+    }
     bool captureTopology = topology && unitTargets.size() <= RHIRecordingTaskTopology::kMaximumEntries;
     details.truncated = topology && !captureTopology;
-    // 일부 STL은 빈 map도 sentinel을 할당하므로 trace 없는 빌더에서는 생성하지 않는다.
-    std::optional<std::map<std::pair<uint32_t, uint32_t>, uint8_t>> dependencyReasons;
-    if (captureTopology)
-    {
-        dependencyReasons.emplace();
-    }
+    auto& dependencyReasons = graph.scratch.dependencyReasons;
+    dependencyReasons.clear();
     const auto recordDependency = [&](uint32_t node, uint32_t dependency, RHIRecordingDependencyReason reason)
     {
         if (!captureTopology)
@@ -116,39 +145,45 @@ inline bool RHIBuildRecordingTaskGraph(std::span<const uint32_t> unitTargets, st
             return;
         }
         const auto key = std::pair{node, dependency};
-        auto& recorded = *dependencyReasons;
-        const auto found = recorded.find(key);
-        if (found == recorded.end())
+        auto& recorded = dependencyReasons;
+        const auto found = std::ranges::lower_bound(recorded, key, {}, [](const auto& value) { return value.first; });
+        if (found == recorded.end() || found->first != key)
         {
             if (recorded.size() >= RHIRecordingTaskTopology::kMaximumDependencies)
             {
                 captureTopology = false;
                 details.truncated = true;
-                dependencyReasons.reset();
+                dependencyReasons.clear();
                 return;
             }
-            recorded.emplace(key, static_cast<uint8_t>(reason));
+            recorded.insert(found, {key, static_cast<uint8_t>(reason)});
         }
         else
         {
             found->second |= static_cast<uint8_t>(reason);
         }
     };
-    RHIRecordingTaskGraph graph;
-    std::map<std::pair<uint32_t, uint32_t>, uint32_t> groups;
+    auto& groups = graph.scratch.groups;
+    groups.clear();
     for (size_t unit = 0; unit < unitTargets.size(); ++unit)
     {
         if (unitTargets[unit] >= targetCount || unitPasses[unit] >= passes.size())
         {
             return false;
         }
-        groups.try_emplace({unitWaves[unit], unitTargets[unit]}, 0);
+        groups.emplace_back(unitWaves[unit], unitTargets[unit]);
     }
-    std::vector<uint32_t> previous(targetCount, UINT32_MAX);
-    for (auto& [key, index] : groups)
+    std::ranges::sort(groups);
+    groups.erase(std::unique(groups.begin(), groups.end()), groups.end());
+    auto& previous = graph.scratch.previous;
+    previous.assign(targetCount, UINT32_MAX);
+    nodes.resize(groups.size());
+    for (uint32_t index = 0; index < groups.size(); ++index)
     {
-        index = static_cast<uint32_t>(graph.nodes.size());
-        RHIRecordingTaskNode node;
+        const auto& key = groups[index];
+        auto& node = nodes[index];
+        node.dependencies.clear();
+        node.work = 0;
         node.wave = key.first;
         node.target = key.second;
         if (previous[node.target] != UINT32_MAX)
@@ -157,21 +192,31 @@ inline bool RHIBuildRecordingTaskGraph(std::span<const uint32_t> unitTargets, st
             recordDependency(index, previous[node.target], RHIRecordingDependencyReason::SameTarget);
         }
         previous[node.target] = index;
-        graph.nodes.push_back(std::move(node));
     }
-    std::vector<uint32_t> unitNodes(unitTargets.size());
+    auto& unitNodes = graph.scratch.unitNodes;
+    unitNodes.resize(unitTargets.size());
     for (size_t unit = 0; unit < unitTargets.size(); ++unit)
     {
-        const auto node = groups.at({unitWaves[unit], unitTargets[unit]});
+        const auto node = static_cast<uint32_t>(
+            std::ranges::lower_bound(groups, std::pair{unitWaves[unit], unitTargets[unit]}) - groups.begin());
         unitNodes[unit] = node;
-        graph.nodes[node].work += unitWork.empty() ? 1 : unitWork[unit];
+        nodes[node].work += unitWork.empty() ? 1 : unitWork[unit];
     }
     const auto unique = [](std::vector<uint32_t>& values)
     {
         std::ranges::sort(values);
         values.erase(std::unique(values.begin(), values.end()), values.end());
     };
-    std::vector<std::vector<uint32_t>> frontiers(passes.size());
+    auto& frontiers = graph.scratch.frontiers;
+    if (frontiers.size() < passes.size())
+    {
+        frontiers.resize(passes.size());
+    }
+    for (auto& frontier : frontiers)
+    {
+        frontier.clear();
+    }
+    auto& required = graph.scratch.required;
     for (size_t begin = 0; begin < unitTargets.size();)
     {
         const auto pass = unitPasses[begin];
@@ -180,7 +225,7 @@ inline bool RHIBuildRecordingTaskGraph(std::span<const uint32_t> unitTargets, st
         {
             ++end;
         }
-        std::vector<uint32_t> required;
+        required.clear();
         for (const auto producer : passes[pass].producers)
         {
             if (producer >= passes.size())
@@ -192,7 +237,14 @@ inline bool RHIBuildRecordingTaskGraph(std::span<const uint32_t> unitTargets, st
         unique(required);
         auto& frontier = frontiers[pass];
         // 독립 콜백은 선행 CPU 작업 없이 실행해도 뒤의 비독립 소비자에 그 선행 조건을 전한다.
-        frontier = passes[pass].independent ? required : std::vector<uint32_t>{};
+        if (passes[pass].independent)
+        {
+            frontier.assign(required.begin(), required.end());
+        }
+        else
+        {
+            frontier.clear();
+        }
         for (size_t unit = begin; unit < end; ++unit)
         {
             const auto node = unitNodes[unit];
@@ -208,7 +260,7 @@ inline bool RHIBuildRecordingTaskGraph(std::span<const uint32_t> unitTargets, st
                     {
                         return false;
                     }
-                    graph.nodes[node].dependencies.push_back(dependency);
+                    nodes[node].dependencies.push_back(dependency);
                     recordDependency(node, dependency, RHIRecordingDependencyReason::CpuProducer);
                 }
             }
@@ -217,15 +269,15 @@ inline bool RHIBuildRecordingTaskGraph(std::span<const uint32_t> unitTargets, st
         unique(frontier);
         begin = end;
     }
-    for (auto& node : graph.nodes)
+    for (auto& node : nodes)
     {
         unique(node.dependencies);
     }
     if (captureTopology)
     {
         details.available = true;
-        details.nodes.resize(graph.nodes.size());
-        for (const auto& [key, reasons] : *dependencyReasons)
+        details.nodes.resize(nodes.size());
+        for (const auto& [key, reasons] : dependencyReasons)
         {
             details.nodes[key.first].dependencies.push_back({key.second, reasons});
         }
@@ -233,12 +285,33 @@ inline bool RHIBuildRecordingTaskGraph(std::span<const uint32_t> unitTargets, st
         {
             details.nodes[unitNodes[unit]].units.push_back(static_cast<uint32_t>(unit));
         }
-        details.unitNodes = std::move(unitNodes);
+        details.unitNodes.assign(unitNodes.begin(), unitNodes.end());
     }
     if (topology)
     {
-        *topology = std::move(details);
+        if (captureTopology)
+        {
+            *topology = details;
+        }
+        else
+        {
+            topology->truncated = details.truncated;
+        }
     }
-    result = std::move(graph);
+    if (!reuse)
+    {
+        // Commit only after validation. Failed inputs preserve the accepted DAG.
+        result.nodes = std::vector<RHIRecordingTaskNode>{};
+    }
+    result.nodes.resize(nodes.size());
+    for (size_t index = 0; index < nodes.size(); ++index)
+    {
+        auto& destination = result.nodes[index];
+        const auto& source = nodes[index];
+        destination.target = source.target;
+        destination.wave = source.wave;
+        destination.work = source.work;
+        destination.dependencies.assign(source.dependencies.begin(), source.dependencies.end());
+    }
     return true;
 }

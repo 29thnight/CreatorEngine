@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Ownership.h"
 #include "QuantizedGeometry.h"
 #include "../Experiment/MeshletData.h"
 #include "../../Utility_Framework/StandardLibrary.h"
@@ -237,10 +238,10 @@ inline bool Decode(std::span<const std::byte> packet, std::vector<std::byte>& ou
         return false;
     }
 }
-inline std::shared_ptr<const Archive> Build(uint32_t mask, uint32_t count, std::span<const std::byte> raw,
+inline own::shared_owner<const Archive> Build(uint32_t mask, uint32_t count, std::span<const std::byte> raw,
                                             const experiment::MeshletPayload& meshlets, const Policy& policy = {})
 {
-    auto result = std::make_shared<Archive>();
+    auto result = own::make_shared<Archive>();
     result->mask = mask;
     result->sourceVertices = count;
     result->grid = MakeGrid(mask, count, raw, policy);

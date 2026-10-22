@@ -1,3 +1,4 @@
+#include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #include "../VulkanSelfTest.h"
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/Vulkan/VulkanPipelineCache.h"
@@ -342,7 +343,7 @@ namespace
 
     bool UiRhiTextRects(std::string& outError)
     {
-        auto layout = std::make_shared<TextLayout>();
+        auto layout = own::make_shared<TextLayout>();
         layout->width = 100.f;
         layout->height = 40.f;
         TextGlyph glyph{};

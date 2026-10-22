@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/Ownership.h"
 #include "RHISoftwareCommandList.h"
 
 RHISoftwareCommandArena::~RHISoftwareCommandArena() = default;
@@ -69,7 +70,7 @@ void* RHISoftwareCommandArena::Allocate(size_t bytes, size_t alignment, RHIComma
 }
 
 RHISoftwareCommandList::RHISoftwareCommandList(uint64_t maxCommandBytes, uint64_t maxPayloadBytes,
-                                               std::shared_ptr<RHISoftwareRecordingBudget> budget)
+                                               own::shared_owner<RHISoftwareRecordingBudget> budget)
     : m_budget(std::move(budget)), m_maxCommandBytes(maxCommandBytes), m_maxPayloadBytes(maxPayloadBytes)
 {
     if (!maxCommandBytes || !maxPayloadBytes)
@@ -126,7 +127,7 @@ void RHISoftwareCommandList::Clear() noexcept
 }
 
 void RHISoftwareCommandList::Reset(uint64_t commandBytes, uint64_t payloadBytes,
-                                   const std::shared_ptr<RHISoftwareRecordingBudget>& budget)
+                                   const own::shared_owner<RHISoftwareRecordingBudget>& budget)
 {
     Clear();
     m_budget = budget;

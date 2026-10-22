@@ -73,40 +73,73 @@ namespace ce
 		}
 	}
 
-	marker_id intern_runtime_marker(std::string_view name, marker_kind kind)
-	{
-		using namespace ce::detail::marker_registry_impl;
+    marker_id intern_runtime_marker(std::string_view name, marker_kind kind)
+    {
+        using namespace ce::detail::marker_registry_impl;
+        struct cache_entry
+        {
+            const char* name_{};
+            std::size_t size_{};
+            marker_id id_{};
+            marker_kind kind_{};
+        };
+        // Registry names are immutable and live until process teardown. Cache
+        // contents never refer to the caller's temporary string or frame arena.
+        static constexpr std::size_t capacity = 4096;
+        thread_local std::array<cache_entry, capacity> cache{};
+        std::uint64_t hash = 14695981039346656037ull;
+        for (const unsigned char byte : name)
+        {
+            hash = (hash ^ byte) * 1099511628211ull;
+        }
+        hash ^= static_cast<std::uint8_t>(kind);
+        cache_entry* empty{};
+        for (std::size_t probe = 0; probe < 16; ++probe)
+        {
+            auto& entry = cache[(hash + probe) & (capacity - 1)];
+            if (!entry.name_)
+            {
+                empty = &entry;
+                break;
+            }
+            if (entry.kind_ == kind && std::string_view(entry.name_, entry.size_) == name)
+            {
+                return entry.id_;
+            }
+        }
+        registry& reg = get();
+        std::lock_guard<std::mutex> guard(reg.lock);
+        ensure_sentinel(reg);
+        std::string key(name);
+        key.push_back('#');
+        key.push_back(static_cast<char>('0' + static_cast<int>(kind)));
+        marker_id id{};
+        if (const auto found = reg.by_name.find(key); found != reg.by_name.end())
+        {
+            id = found->second;
+        }
+        else
+        {
+            reg.owned_names.emplace_back(name);
+            const char* stable = reg.owned_names.back().c_str();
+            id = static_cast<marker_id>(reg.descs.size());
+            reg.descs.push_back(marker_desc{stable, nullptr, 0, kind});
+            reg.by_name.emplace(std::move(key), id);
+        }
+        if (empty)
+        {
+            const auto& desc = reg.descs[id];
+            *empty = {desc.name, name.size(), id, kind};
+        }
+        return id;
+    }
 
-		registry& reg = get();
-		std::lock_guard<std::mutex> guard(reg.lock);
-		ensure_sentinel(reg);
+    const marker_desc& marker_info(marker_id id)
+    {
+        using namespace ce::detail::marker_registry_impl;
 
-		std::string key(name);
-		key.push_back('#');
-		key.push_back(static_cast<char>('0' + static_cast<int>(kind)));
-
-		const auto found = reg.by_name.find(key);
-		if (found != reg.by_name.end())
-		{
-			return found->second;
-		}
-
-		// 표가 이름을 소유한다. 이 주소는 프로세스가 끝날 때까지 산다.
-		reg.owned_names.emplace_back(name);
-		const char* stable = reg.owned_names.back().c_str();
-
-		const marker_id id = static_cast<marker_id>(reg.descs.size());
-		reg.descs.push_back(marker_desc{ stable, nullptr, 0, kind });
-		reg.by_name.emplace(std::move(key), id);
-		return id;
-	}
-
-	const marker_desc& marker_info(marker_id id)
-	{
-		using namespace ce::detail::marker_registry_impl;
-
-		registry& reg = get();
-		std::lock_guard<std::mutex> guard(reg.lock);
+        registry& reg = get();
+        std::lock_guard<std::mutex> guard(reg.lock);
 		ensure_sentinel(reg);
 
 		if (id >= reg.descs.size())
@@ -114,11 +147,11 @@ namespace ce
 			return reg.descs[invalid_marker];
 		}
 		return reg.descs[id];
-	}
+    }
 
-	std::span<const marker_desc> registered_markers()
-	{
-		using namespace ce::detail::marker_registry_impl;
+    std::span<const marker_desc> registered_markers()
+    {
+        using namespace ce::detail::marker_registry_impl;
 
 		// 표가 자라기만 하고 원소를 옮기는 것은 vector 재할당뿐이다. reader 가
 		// 등록과 겹치면 옛 저장소를 볼 수 있으므로, 호출자는 등록이 멈춘 뒤에만
@@ -127,9 +160,9 @@ namespace ce
 		std::lock_guard<std::mutex> guard(reg.lock);
 		ensure_sentinel(reg);
 		return std::span<const marker_desc>(reg.descs.data(), reg.descs.size());
-	}
+    }
 
-	std::vector<capture_marker> snapshot_markers()
+    std::vector<capture_marker> snapshot_markers()
 	{
 		using namespace ce::detail::marker_registry_impl;
 

@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Ownership.h"
 #include "RHISoftwareBatch.h"
 
 struct RHISoftwareRecordingDesc
@@ -27,7 +28,7 @@ class RHISoftwareRecorder final
 
   private:
     const IRHISoftwareCommandValidator& m_validator;
-    std::shared_ptr<RHISoftwareRecordingStorage> m_storage;
+    ce::pooled_owner<RHISoftwareRecordingStorage> m_storage;
     RHISoftwareRecordingDesc m_desc;
     uint64_t m_recordingId{};
     bool m_active{};

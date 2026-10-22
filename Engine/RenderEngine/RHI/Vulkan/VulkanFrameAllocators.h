@@ -1,4 +1,6 @@
 #pragma once
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "VulkanLoader.h"
 #include "VulkanResourceTable.h"
 #include "VulkanDescriptorLayout.h"
@@ -51,7 +53,7 @@ public:
         std::span<const RHIUploadRequest> requests,
         std::span<RHIBufferSlice> outSlices,
         std::string& outError);
-    bool PinRecording(uint64_t recordingId, std::vector<std::shared_ptr<const void>>& leases, std::string& outError);
+    bool PinRecording(uint64_t recordingId, std::vector<ce::lifetime_token>& leases, std::string& outError);
     void OnSubmitted(uint64_t recordingId, RHICompletionPoint completion);
     void RejectSubmission(uint64_t recordingId, RHICompletionPoint completion);
     void AbortRecording(uint64_t recordingId);
@@ -82,7 +84,7 @@ private:
         uint64_t lastCollectedEpoch{ 0 };
         bool large{ false };
         RHIUploadSegmentState state{ RHIUploadSegmentState::Available };
-        std::shared_ptr<const void> m_lease{std::make_shared<uint8_t>()};
+        ce::lifetime_token m_lease{own::make_shared<uint8_t>()};
     };
 
     uint64_t RequiredAlignment(const RHIUploadRequest& request) const;
@@ -102,7 +104,7 @@ private:
     VkDevice m_device{ VK_NULL_HANDLE };
     VulkanResourceTable* m_table{ nullptr };
     VkPhysicalDeviceMemoryProperties m_memoryProperties{};
-    std::vector<std::unique_ptr<Segment>> m_segments;
+    std::vector<own::unique_owner<Segment>> m_segments;
     uint64_t m_regularSegmentBytes{ 0 };
     uint64_t m_largeThreshold{ 0 };
     uint32_t m_standbyRegularSegments{ 0 };
@@ -178,7 +180,7 @@ class VulkanDescriptorPoolRecycler
 {
   public:
     bool Initialize(VkDevice device, uint32_t initialVersions, std::string& outError,
-                    uint32_t maxIndexingPoolDescriptors = 0, std::shared_ptr<VulkanDescriptorPoolBudget> budget = {});
+                    uint32_t maxIndexingPoolDescriptors = 0, own::shared_owner<VulkanDescriptorPoolBudget> budget = {});
     void Shutdown(VkDevice device);
 
     void Collect(RHICompletionPoint completed);
@@ -200,7 +202,7 @@ class VulkanDescriptorPoolRecycler
     ///   중립 계층이 이 축을 물어볼 수 없었다 — 캡처 manifest 의
     ///   `descriptorVersion` 이 writer 0 인 죽은 칸으로 남아 있던 이유다.
     uint64_t GetCurrentVersionToken() const { return m_activeVersion.ToToken(); }
-    const std::shared_ptr<VulkanDescriptorPoolBudget>& GetPoolBudget() const { return m_poolBudget; }
+    const own::shared_owner<VulkanDescriptorPoolBudget>& GetPoolBudget() const { return m_poolBudget; }
 
   private:
     bool EnsurePool(VkDevice device, uint32_t slot, size_t page, std::string& outError,
@@ -215,7 +217,7 @@ class VulkanDescriptorPoolRecycler
     std::vector<std::vector<PoolPage>> m_pools;
     uint64_t m_allocatedPoolDescriptors{};
     uint32_t m_maxIndexingPoolDescriptors{};
-    std::shared_ptr<VulkanDescriptorPoolBudget> m_poolBudget;
+    own::shared_owner<VulkanDescriptorPoolBudget> m_poolBudget;
     RHIDescriptorVersionPolicy m_versions;
     RHIDescriptorVersionHandle m_activeVersion{};
     VkDescriptorPool m_activePool{VK_NULL_HANDLE};

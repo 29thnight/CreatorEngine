@@ -1,3 +1,4 @@
+#include "../Engine/Utility_Framework/Ownership.h"
 #include "ProjectLayerSettingsIO.h"
 #include "../Engine/Utility_Framework/WindowsApartment.h"
 #include "PlayerMain.h"
@@ -147,7 +148,7 @@ void Player::PlayerMain::Initialize()
 
 	TagManagers->Initialize();
     const auto layers = ProjectLayerSettingsIO::Read(PathFinder::ProjectSettingPath(ProjectLayerSettingsIO::filename));
-    m_projectLayers = std::make_shared<ProjectLayerSettings>();
+    m_projectLayers = own::make_shared<ProjectLayerSettings>();
     if (!layers || !m_projectLayers->Restore(*layers) || !SceneManagers->BindProjectLayerSettings(m_projectLayers))
         throw std::runtime_error("Player requires valid CLYR project layers before scene startup");
 
@@ -259,7 +260,7 @@ void Player::PlayerMain::Initialize()
     if (const auto catalog = DataSystems->GetCookedCatalog())
     {
         std::string error;
-        auto bytes = std::make_shared<experiment::cooked::LooseArtifactByteSource>(catalog->DerivedRoot());
+        auto bytes = own::make_shared<experiment::cooked::LooseArtifactByteSource>(catalog->DerivedRoot());
         if (!m_audioCatalog->LoadCookedAssets(*catalog, std::move(bytes), error))
         {
             throw std::runtime_error("Cooked audio catalog failed: " + error);

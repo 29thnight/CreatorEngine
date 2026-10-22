@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "../RHISoftwareEncoder.h"
 #include "DX12GpuProfiler.h"
 #include "DX12Encoder.h"
@@ -51,10 +52,10 @@ bool DX12GpuProfiler::Initialize(ID3D12Device* device, ID3D12CommandQueue* queue
 
     // 슬롯마다 사용 수와 표를 따로 둔다. 이것이 없어서 수집이 "지금 기록
     // 중인 슬롯" 을 읽었다(§0.5.10).
-    m_slotUsedPasses = std::make_unique<std::atomic<uint32_t>[]>(frameCount);
+    m_slotUsedPasses = own::make_unique<PassSlots>(frameCount);
     for (uint32_t i = 0; i < frameCount; ++i)
     {
-        m_slotUsedPasses[i].store(0, std::memory_order_relaxed);
+        m_slotUsedPasses->m_values[i].store(0, std::memory_order_relaxed);
     }
     m_slotTokens.assign(frameCount, GpuFrameToken{});
 
@@ -231,7 +232,7 @@ GpuFrameToken DX12GpuProfiler::BeginFrame(uint64_t engineFrameId, uint64_t submi
     token.cpuSubmitTick = static_cast<uint64_t>(submitTick.QuadPart);
 
     m_recordingSlot = token.ringSlot;
-    m_slotUsedPasses[token.ringSlot].store(0, std::memory_order_relaxed);
+    m_slotUsedPasses->m_values[token.ringSlot].store(0, std::memory_order_relaxed);
     m_slotTokens[token.ringSlot] = token;
 
     // 지우지 않고 표시만 되돌린다. clear/push_back은 재할당을 일으켜
@@ -342,7 +343,7 @@ uint32_t DX12GpuProfiler::ReservePass(const std::string& name, const GpuPassTimi
         return kInvalidSlot;
     }
     // 슬롯을 원자적으로 예약한다. 병렬 기록에서는 여러 워커가 동시에 들어온다.
-    const uint32_t slot = m_slotUsedPasses[m_recordingSlot].fetch_add(1, std::memory_order_relaxed);
+    const uint32_t slot = m_slotUsedPasses->m_values[m_recordingSlot].fetch_add(1, std::memory_order_relaxed);
     if (slot >= m_maxPassesPerFrame)
     {
         // 넘친 만큼 되돌리지 않는다. 되돌리면 다른 워커가 그 사이에 받은
@@ -386,7 +387,7 @@ void DX12GpuProfiler::ResolveFrame(ID3D12GraphicsCommandList* commandList, const
     }
 
     const uint32_t used =
-        (std::min)(m_slotUsedPasses[token.ringSlot].load(std::memory_order_relaxed), m_maxPassesPerFrame);
+        (std::min)(m_slotUsedPasses->m_values[token.ringSlot].load(std::memory_order_relaxed), m_maxPassesPerFrame);
     if (!m_queryHeap || nullptr == commandList || 0 == used)
     {
         return;
@@ -446,7 +447,7 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token, FrameTimings& outTimin
     outTimings.queueBeginTicks = 0;
     outTimings.queueEndTicks = 0;
     outTimings.busyTicks = 0;
-    const uint32_t reservedPasses = m_slotUsedPasses[token.ringSlot].load(std::memory_order_relaxed);
+    const uint32_t reservedPasses = m_slotUsedPasses->m_values[token.ringSlot].load(std::memory_order_relaxed);
     outTimings.overflowedPasses = reservedPasses > m_maxPassesPerFrame ? reservedPasses - m_maxPassesPerFrame : 0;
     outTimings.droppedSlices = 0;
     outTimings.droppedSliceName.clear();

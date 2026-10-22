@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 // Included after BufferPool in GpuGeometryVisibility.cpp.
 namespace
 {
@@ -26,7 +27,7 @@ struct GpuGeometryVisibility::SharedBatch
         std::uint32_t mode{}, bins{}, outputWords{}, reserved{};
     };
     static_assert(sizeof(ViewData) == 160);
-    std::shared_ptr<BufferPool> pool;
+    own::shared_owner<BufferPool> pool;
     IRenderDeviceServices* device{};
     RHIBufferHandle queue;
     RGHandle graphQueue;
@@ -34,11 +35,11 @@ struct GpuGeometryVisibility::SharedBatch
     bool ordered{};
     // Sealed inputs have no back-reference to Frame. Keep diagnostic counts
     // through these owners instead of copying them or retaining upload scratch.
-    std::array<std::shared_ptr<const MeshletInputs>, kSharedViewCapacity> inputs;
+    std::array<own::shared_owner<const MeshletInputs>, kSharedViewCapacity> inputs;
     RHIBufferSlice constants, candidates, binData, worlds, viewData;
     RHIBindingTable outputs, vertices, topologies, ids, arguments, first;
-    std::array<std::shared_ptr<const GpuGeometryOcclusion::Pyramid>, kSharedViewCapacity> pyramids;
-    std::shared_ptr<const LX::Runtime::ComputeGeneration> reset, cull, count, finalize, scatter;
+    std::array<own::shared_owner<const GpuGeometryOcclusion::Pyramid>, kSharedViewCapacity> pyramids;
+    own::shared_owner<const LX::Runtime::ComputeGeneration> reset, cull, count, finalize, scatter;
     static constexpr std::uint64_t kQueueBytes = (kWorkRingHeaderWords + kWorkRingSlots) * sizeof(std::uint32_t);
     ~SharedBatch()
     {
@@ -236,8 +237,8 @@ void GpuGeometryVisibility::Frame::UploadMeshletInputs() const
     m_constants = uploads[0]; // Publish readiness only after the complete upload.
 }
 
-std::shared_ptr<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame::BuildShared(
-    std::span<const std::shared_ptr<const Frame>> frames)
+own::shared_owner<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Frame::BuildShared(
+    std::span<const own::shared_owner<const Frame>> frames)
 {
     ce::profile_scope profile{ce::marker<"GpuVisibility.SharedBuild">()};
     if (frames.empty() || frames.size() > kSharedViewCapacity)

@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #pragma once
 #include "Component.h"
 #include "../Utility_Framework/StandardLibrary.h"
@@ -96,7 +97,7 @@ namespace Lifecycle
             // K2 불변식: 컴포넌트가 enable_shared_from_this를 상속하면 여기서
             // 컴파일이 막힌다 — Animator가 shared_from_this()로 AnimationJob에
             // 소유권을 흘려 unique_ptr 전환을 막았던 사건의 재발 방지.
-            static_assert(!std::is_base_of_v<std::enable_shared_from_this<T>, T>,
+            static_assert(!std::is_base_of_v<own::enable_owner_from_this<T>, T>,
                 "컴포넌트는 enable_shared_from_this를 상속하지 마라 — 소유권은 GameObject가 갖고, "
                 "다른 시스템은 raw 포인터로 관찰만 해야 한다(Animator/AnimationJob 사건 참조).");
 

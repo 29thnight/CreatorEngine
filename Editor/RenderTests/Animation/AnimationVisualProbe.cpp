@@ -1,3 +1,4 @@
+#include "../../../Engine/RenderEngine/RenderAllocator.h"
 #include "Animation/AnimationVisualProbe.h"
 #include "AnimationScheduler.h"
 #include "Animator.h"
@@ -112,7 +113,7 @@ namespace RenderTest
             // Every capture samples the same Walk time. Only the camera-selected
             // quality stage and retained IK fade state change between frames.
             animator->ClearControllersAndParams();
-            auto controller = std::make_shared<AnimationController>();
+            auto controller = own::make_shared<AnimationController>();
             controller->m_owner = animator;
             controller->name = "IKBase";
             controller->CreateState("Current", walkIndex);
@@ -154,7 +155,7 @@ namespace RenderTest
                 && !unobserved && !blend && !layer)
             { error = "Unknown visual pose"; return false; }
             animator->ClearControllersAndParams();
-            auto first = std::make_shared<AnimationController>();
+            auto first = own::make_shared<AnimationController>();
             first->m_owner = animator;
             first->name = "Base";
             const int clipIndex = action == "next" ? runIndex : walkIndex;
@@ -179,7 +180,7 @@ namespace RenderTest
             }
             if (layer)
             {
-                auto second = std::make_shared<AnimationController>();
+                auto second = own::make_shared<AnimationController>();
                 second->m_owner = animator;
                 second->name = "Overlay";
                 second->CreateState("Overlay", runIndex);

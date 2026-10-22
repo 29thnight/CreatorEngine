@@ -1,3 +1,5 @@
+#include "../../Utility_Framework/LifetimeToken.h"
+#include "../../Utility_Framework/Ownership.h"
 #include "RHISoftwareQueueRecorder.h"
 #include "IRenderDeviceServices.h"
 #include "RHITranslationWorkQueue.h"
@@ -83,9 +85,9 @@ bool RHIQueueCommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, cons
         const auto budget = options.minCommandsPerJob
                                 ? input.GetRecordingStats().commandCount / options.minCommandsPerJob
                                 : order.size();
-        jobs = static_cast<uint32_t>((std::max)(
-            uint64_t{1},
-            (std::min)({uint64_t(options.maxTranslationJobs), uint64_t(workers), uint64_t(order.size()), budget})));
+        jobs = static_cast<uint32_t>(
+            (std::max)(uint64_t{1}, (std::min)({uint64_t(options.maxTranslationJobs), uint64_t(workers),
+                                                uint64_t(order.size()), budget})));
     }
     std::array<uint64_t, kMaximumTargets> costs{};
     if (jobs > 1)
@@ -103,7 +105,7 @@ bool RHIQueueCommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, cons
     RHITranslatedBatch translated;
     translated.m_provenance = MakeRHICommandProvenance(rhiContext);
     translated.m_stats.translationJobCount = jobs;
-    std::shared_ptr<IRHIQueueRecording> native;
+    ce::pooled_owner<IRHIQueueRecording> native;
     std::string error;
     const auto replayTarget = [&](size_t index, RHIEncoder* serialEncoder)
     {
@@ -288,7 +290,7 @@ class RHISoftwareQueueCommandBatch final : public IRHIQueueRecording, public IRH
         }
         return m_recorder.AcquireEncoder(target);
     }
-    bool Finish(std::shared_ptr<IRHIQueueCommandBatch>& batch, std::string& error) override;
+    bool Finish(ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error) override;
     bool Begin(RHISoftwareQueueState* domain, IRenderDeviceServices& services, const RHIQueueIdentity& identity,
                uint32_t targets, RHISoftwareBatchDesc desc, const RHISoftwareQueueOptions& options, std::string& error);
     void ReleaseCpuStorage() noexcept;
@@ -310,7 +312,7 @@ class RHISoftwareQueueCommandBatch final : public IRHIQueueRecording, public IRH
   private:
     friend class RHISoftwareCommandQueue;
     friend struct RHISoftwareQueueState;
-    std::weak_ptr<RHISoftwareQueueCommandBatch> m_lease;
+    ce::weak_pooled_owner<RHISoftwareQueueCommandBatch> m_lease;
     RHISoftwareRecorder m_recorder;
     RHISoftwareBatch m_batch;
     RHISoftwareBatchDesc m_desc;
@@ -324,17 +326,24 @@ class RHISoftwareQueueCommandBatch final : public IRHIQueueRecording, public IRH
     std::atomic<State> m_state{State::Empty};
 };
 
-struct RHISoftwareQueueState : std::enable_shared_from_this<RHISoftwareQueueState>
+struct RHISoftwareQueueState : own::enable_owner_from_this<RHISoftwareQueueState>
 {
     static constexpr size_t kRetainedRecordings = 64;
-    std::shared_ptr<IRHIQueueRecorder> m_nativeRecorder;
-    std::shared_ptr<const IRHISoftwareCommandValidator> m_validator;
+    own::shared_owner<IRHIQueueRecorder> m_nativeRecorder;
+    own::shared_owner<const IRHISoftwareCommandValidator> m_validator;
     RHISoftwareQueueOptions m_options;
     RHISoftwareBatchDesc m_frameDesc;
     uint64_t m_pendingArenaBytes{};
     std::mutex m_recordingMutex;
     std::recursive_mutex m_submissionMutex;
-    std::array<ce::render_unique_ptr<RHISoftwareQueueCommandBatch>, kRetainedRecordings> m_idle;
+    std::array<RHISoftwareQueueCommandBatch*, kRetainedRecordings> m_idle{};
+    ~RHISoftwareQueueState()
+    {
+        for (auto* batch : m_idle)
+        {
+            ce::render_delete<RHISoftwareQueueCommandBatch>{}(batch);
+        }
+    }
 
     bool ReserveArenaBytes(uint64_t bytes)
     {
@@ -376,9 +385,9 @@ struct RHISoftwareQueueState : std::enable_shared_from_this<RHISoftwareQueueStat
         return m_nativeRecorder->ExecuteSubmission([&dispatch](std::string& failure) { return dispatch(failure); },
                                                    error);
     }
-    std::shared_ptr<RHISoftwareQueueCommandBatch> Acquire(RHISoftwareBatchDesc& desc)
+    ce::pooled_owner<RHISoftwareQueueCommandBatch> Acquire(RHISoftwareBatchDesc& desc)
     {
-        ce::render_unique_ptr<RHISoftwareQueueCommandBatch> value;
+        RHISoftwareQueueCommandBatch* value{};
         {
             std::lock_guard lock(m_recordingMutex);
             desc = m_frameDesc;
@@ -386,32 +395,42 @@ struct RHISoftwareQueueState : std::enable_shared_from_this<RHISoftwareQueueStat
             {
                 if (slot)
                 {
-                    value = std::move(slot);
+                    value = std::exchange(slot, nullptr);
                     break;
                 }
             }
         }
         if (!value)
         {
-            value = ce::make_render_unique<RHISoftwareQueueCommandBatch>(*m_validator);
+            auto* memory = ce::render_allocator<RHISoftwareQueueCommandBatch>{}.allocate(1);
+            try
+            {
+                value = std::construct_at(memory, *m_validator);
+            }
+            catch (...)
+            {
+                ce::render_allocator<RHISoftwareQueueCommandBatch>{}.deallocate(memory, 1);
+                throw;
+            }
         }
-        auto lease = std::shared_ptr<RHISoftwareQueueCommandBatch>(
-            value.release(),
+        auto lease = ce::pooled_owner<RHISoftwareQueueCommandBatch>(
+            value,
             [state = shared_from_this()](RHISoftwareQueueCommandBatch* batch)
             {
                 // Last CPU alias releases the graph/packet owners even when the
                 // recording was cancelled or never submitted. Idle storage is empty.
                 batch->Reset();
-                ce::render_unique_ptr<RHISoftwareQueueCommandBatch> returned(batch);
+                RHISoftwareQueueCommandBatch* returned = batch;
                 std::lock_guard lock(state->m_recordingMutex);
                 for (auto& slot : state->m_idle)
                 {
                     if (!slot)
                     {
-                        slot = std::move(returned);
+                        slot = std::exchange(returned, nullptr);
                         break;
                     }
                 }
+                ce::render_delete<RHISoftwareQueueCommandBatch>{}(returned);
             },
             ce::render_allocator<std::byte>{});
         lease->m_lease = lease;
@@ -460,7 +479,7 @@ bool RHISoftwareQueueCommandBatch::Begin(RHISoftwareQueueState* domain, IRenderD
     return true;
 }
 
-bool RHISoftwareQueueCommandBatch::Finish(std::shared_ptr<IRHIQueueCommandBatch>& batch, std::string& error)
+bool RHISoftwareQueueCommandBatch::Finish(ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error)
 {
     batch.reset();
     error.clear();
@@ -500,8 +519,8 @@ bool RHISoftwareQueueCommandBatch::Finish(std::shared_ptr<IRHIQueueCommandBatch>
     return true;
 }
 
-RHISoftwareCommandQueue::RHISoftwareCommandQueue(std::shared_ptr<RHISoftwareQueueState> state,
-                                                 std::shared_ptr<IRHICommandQueue> nativeQueue)
+RHISoftwareCommandQueue::RHISoftwareCommandQueue(ConstructionKey, own::shared_owner<RHISoftwareQueueState> state,
+                                                 own::shared_owner<IRHICommandQueue> nativeQueue)
     : m_state(std::move(state)), m_native(std::move(nativeQueue))
 {
 }
@@ -540,18 +559,18 @@ bool RHISoftwareCommandQueue::Wait(const RHITimelinePoint& point, std::string& e
     return m_state->Execute([&](std::string& failure) { return m_native->Wait(point, failure); }, error);
 }
 
-bool RHISoftwareCommandQueue::Submit(const std::shared_ptr<IRHIQueueCommandBatch>& batch, uint64_t value,
+bool RHISoftwareCommandQueue::Submit(const ce::pooled_owner<IRHIQueueCommandBatch>& batch, uint64_t value,
                                      RHITimelinePoint& point, std::string& error)
 {
     point = {};
     error.clear();
-    const auto software = std::dynamic_pointer_cast<RHISoftwareQueueCommandBatch>(batch);
+    const auto software = ce::dynamic_pooled_cast<RHISoftwareQueueCommandBatch>(batch);
     RHICommandFailureScope::SetStage(RHICommandFailureStage::Admission);
     if (software)
     {
         RHICommandFailureScope::SetIdentity(software->m_recordingId, software->m_backendGeneration);
     }
-    if (!software || software->m_domain != m_state.get() || software->GetQueueIdentity() != GetIdentity() ||
+    if (!software || software->m_domain != m_state.operator->() || software->GetQueueIdentity() != GetIdentity() ||
         value == 0 || value == UINT64_MAX)
     {
         error = "Software queue submission requires its own sealed batch and a valid signal value.";
@@ -639,8 +658,8 @@ size_t RHISoftwareCommandQueue::GetPendingBatchCount() const
     return m_native->GetPendingBatchCount();
 }
 
-RHISoftwareQueueRecorder::RHISoftwareQueueRecorder(std::shared_ptr<IRHIQueueRecorder> nativeRecorder,
-                                                   std::shared_ptr<const IRHISoftwareCommandValidator> validator,
+RHISoftwareQueueRecorder::RHISoftwareQueueRecorder(own::shared_owner<IRHIQueueRecorder> nativeRecorder,
+                                                   own::shared_owner<const IRHISoftwareCommandValidator> validator,
                                                    RHISoftwareQueueOptions options, job_scheduler& scheduler)
     : IRHIQueueRecorder(scheduler), m_state(ce::make_render_shared<RHISoftwareQueueState>())
 {
@@ -672,8 +691,8 @@ void RHISoftwareQueueRecorder::SetFrameDesc(const RHISoftwareBatchDesc& desc)
     m_state->m_frameDesc.queue = {};
 }
 
-bool RHISoftwareQueueRecorder::WrapQueue(const std::shared_ptr<IRHICommandQueue>& nativeQueue,
-                                         std::shared_ptr<IRHICommandQueue>& queue, std::string& error)
+bool RHISoftwareQueueRecorder::WrapQueue(const own::shared_owner<IRHICommandQueue>& nativeQueue,
+                                         own::shared_owner<IRHICommandQueue>& queue, std::string& error)
 {
     const auto input = nativeQueue;
     queue.reset();
@@ -683,9 +702,9 @@ bool RHISoftwareQueueRecorder::WrapQueue(const std::shared_ptr<IRHICommandQueue>
         error = "Software queue wrapper requires an identified native queue.";
         return false;
     }
-    if (const auto wrapped = std::dynamic_pointer_cast<RHISoftwareCommandQueue>(input))
+    if (const auto wrapped = own::dynamic_owner_cast<RHISoftwareCommandQueue>(input))
     {
-        if (wrapped->m_state != m_state)
+        if (wrapped->m_state.operator->() != m_state.operator->())
         {
             error = "A software queue belongs to another recording domain.";
             return false;
@@ -693,14 +712,13 @@ bool RHISoftwareQueueRecorder::WrapQueue(const std::shared_ptr<IRHICommandQueue>
         queue = wrapped;
         return true;
     }
-    queue = std::shared_ptr<RHISoftwareCommandQueue>(new RHISoftwareCommandQueue(m_state, input));
+    queue = own::make_shared<RHISoftwareCommandQueue>(RHISoftwareCommandQueue::ConstructionKey{}, m_state, input);
     return true;
 }
 
-bool RHISoftwareQueueRecorder::Record(const std::shared_ptr<IRHICommandQueue>& queue,
-                                      const std::function<void(RHIEncoder&)>& commands,
-                                      std::shared_ptr<const void> token, std::shared_ptr<IRHIQueueCommandBatch>& batch,
-                                      std::string& error)
+bool RHISoftwareQueueRecorder::Record(const own::shared_owner<IRHICommandQueue>& queue,
+                                      const std::function<void(RHIEncoder&)>& commands, ce::lifetime_token token,
+                                      ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error)
 {
     batch.reset();
     error.clear();
@@ -709,7 +727,7 @@ bool RHISoftwareQueueRecorder::Record(const std::shared_ptr<IRHICommandQueue>& q
         error = "Software queue recording requires a callback.";
         return false;
     }
-    std::shared_ptr<IRHIQueueRecording> recording;
+    ce::pooled_owner<IRHIQueueRecording> recording;
     if (!BeginRecording(queue, 1, std::move(token), recording, error))
     {
         return false;
@@ -734,14 +752,14 @@ bool RHISoftwareQueueRecorder::Record(const std::shared_ptr<IRHICommandQueue>& q
     return false;
 }
 
-bool RHISoftwareQueueRecorder::BeginRecording(const std::shared_ptr<IRHICommandQueue>& queue, uint32_t targetCount,
-                                              std::shared_ptr<const void> token,
-                                              std::shared_ptr<IRHIQueueRecording>& recording, std::string& error)
+bool RHISoftwareQueueRecorder::BeginRecording(const own::shared_owner<IRHICommandQueue>& queue, uint32_t targetCount,
+                                              ce::lifetime_token token, ce::pooled_owner<IRHIQueueRecording>& recording,
+                                              std::string& error)
 {
     recording.reset();
     error.clear();
-    const auto wrapped = std::dynamic_pointer_cast<RHISoftwareCommandQueue>(queue);
-    if (!wrapped || wrapped->m_state != m_state || !token || !targetCount ||
+    const auto wrapped = own::dynamic_owner_cast<RHISoftwareCommandQueue>(queue);
+    if (!wrapped || wrapped->m_state.operator->() != m_state.operator->() || !token || !targetCount ||
         targetCount > (std::max)(1u, GetWorkerCount()))
     {
         error = "Software recording requires this domain's queue, pinned owner and available targets.";
@@ -750,7 +768,7 @@ bool RHISoftwareQueueRecorder::BeginRecording(const std::shared_ptr<IRHICommandQ
     RHISoftwareBatchDesc desc;
     auto result = m_state->Acquire(desc);
     desc.lifetimeToken = std::move(token);
-    if (!result->Begin(m_state.get(), DeviceServices(), queue->GetIdentity(), targetCount, std::move(desc),
+    if (!result->Begin(m_state.operator->(), DeviceServices(), queue->GetIdentity(), targetCount, std::move(desc),
                        m_state->m_options, error))
     {
         return false;
@@ -773,10 +791,10 @@ RHIQueueCapabilities RHISoftwareQueueFactory::QueryQueueCapabilities() const
 {
     return m_native.QueryQueueCapabilities();
 }
-bool RHISoftwareQueueFactory::CreateQueue(RHIQueueKind kind, std::shared_ptr<IRHICommandQueue>& queue,
+bool RHISoftwareQueueFactory::CreateQueue(RHIQueueKind kind, own::shared_owner<IRHICommandQueue>& queue,
                                           std::string& error)
 {
     queue.reset();
-    std::shared_ptr<IRHICommandQueue> native;
+    own::shared_owner<IRHICommandQueue> native;
     return m_native.CreateQueue(kind, native, error) && m_recorder.WrapQueue(native, queue, error);
 }

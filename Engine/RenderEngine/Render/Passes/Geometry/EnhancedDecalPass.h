@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../../Utility_Framework/Ownership.h"
 #include "../../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 
@@ -142,7 +143,7 @@ public:
 
 private:
     GpuGeometryVisibility m_visibility;
-    std::shared_ptr<const GpuGeometryVisibility::Frame> m_visibilityFrame;
+    own::shared_owner<const GpuGeometryVisibility::Frame> m_visibilityFrame;
     bool m_gpuVisibilityEnabled{ false };
     std::vector<math::vector4> m_visibilitySpheres;
 
@@ -216,4 +217,3 @@ private:
     RHIPipelineHandle m_pipelines[kChannelCount]{};
     RHIPipelineHandle m_temporalPipeline;
 };
-

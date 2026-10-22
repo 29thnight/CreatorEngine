@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 
 #include "XeSSSdkPrivate.h"
 #include "../../Render/Temporal/ITemporalUpscaler.h"
@@ -74,12 +75,12 @@ public:
     TemporalResult Shutdown();
 
 private:
-    std::unique_ptr<XeSSUpscalerDX12State> m_state;
+    own::unique_owner<XeSSUpscalerDX12State> m_state;
 };
 
 TemporalResult CreateXeSSUpscalerDX12(DX12DeviceResources& resources, const wchar_t* runtimeDirectory,
     const XeSSUpscalerConfig& config, std::function<TemporalResult()> drain,
-    std::unique_ptr<ITemporalUpscaler>& upscaler);
+    own::unique_owner<ITemporalUpscaler>& upscaler);
 
 #if CREATOR_ENABLE_XESS_VULKAN_SDK
 #include "../Vulkan/VulkanLoader.h"
@@ -137,12 +138,12 @@ public:
     TemporalResult Shutdown(); // After every submitted SDK command has retired.
 
 private:
-    std::unique_ptr<XeSSUpscalerVulkanState> m_state;
+    own::unique_owner<XeSSUpscalerVulkanState> m_state;
 };
 
 // preparedRuntime has already supplied requirements before device creation.
 // On success ownership moves into the neutral adapter; failure retains it.
 TemporalResult CreateXeSSUpscalerVulkan(VulkanDeviceResources& resources,
-    std::unique_ptr<XeSSUpscalerVulkan>& preparedRuntime, const XeSSUpscalerConfig& config,
-    std::function<TemporalResult()> drain, std::unique_ptr<ITemporalUpscaler>& upscaler);
+    own::unique_owner<XeSSUpscalerVulkan>& preparedRuntime, const XeSSUpscalerConfig& config,
+    std::function<TemporalResult()> drain, own::unique_owner<ITemporalUpscaler>& upscaler);
 #endif

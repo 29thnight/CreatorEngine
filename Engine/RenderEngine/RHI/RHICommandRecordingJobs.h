@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Ownership.h"
 #include "JobScheduler.h"
 #include "RHIRecordingTaskGraph.h"
 #include "../../Utility_Framework/StandardLibrary.h"
@@ -6,7 +7,7 @@
 struct RHIRecordingExecutionOptions
 {
     bool batchSubmit{true};
-    std::shared_ptr<job_graph_diagnostics> diagnostics;
+    own::shared_owner<job_graph_diagnostics> diagnostics;
     uint64_t* waitBeginNanoseconds{nullptr};
 };
 

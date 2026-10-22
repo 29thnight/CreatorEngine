@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 #include "VulkanLoader.h"
 #include "VulkanFrameAllocators.h"
 #include "../RHIParallelCommandPool.h"
@@ -30,9 +31,9 @@ public:
     uint32_t GetWorkerCount() const override { return m_workerCount; }
     void BeginFrame(uint32_t frameIndex) override;
     bool Prepare(std::string& outError) override;
-    bool CreateTranslationPool(std::shared_ptr<VulkanCommandBufferPool>& result, std::string& outError);
+    bool CreateTranslationPool(own::shared_owner<VulkanCommandBufferPool>& result, std::string& outError);
     bool GetTranslationRecording(uint64_t& recordingId, uint64_t& descriptorVersion) const override;
-    std::shared_ptr<IRHICommandTranslator> GetTranslator(RHIQueueIdentity queue);
+    own::shared_owner<IRHICommandTranslator> GetTranslator(RHIQueueIdentity queue);
     bool SupportsParallelTranslation() const override { return m_recordingResources != nullptr; }
     bool OpenWorker(uint32_t worker, std::string& outError) override;
     RHIEncoder& AcquireEncoder(uint32_t worker) override;
@@ -53,7 +54,7 @@ private:
     {
         VkCommandPool pool{ VK_NULL_HANDLE };
         VkCommandBuffer buffer{ VK_NULL_HANDLE };
-        std::unique_ptr<VulkanEncoder> encoder;
+        own::unique_owner<VulkanEncoder> encoder;
         bool opened{ false };
     };
 
@@ -75,15 +76,14 @@ private:
     uint32_t m_frameCount{ 0 };
     uint32_t m_frameIndex{ 0 };
 
-    std::shared_ptr<VulkanRecordingResources> m_recordingResources;
+    own::shared_owner<VulkanRecordingResources> m_recordingResources;
     VulkanDescriptorPoolRecycler m_translationDescriptors;
-    std::vector<std::shared_ptr<VulkanCommandBufferPool>> m_translationPools;
+    std::vector<own::shared_owner<VulkanCommandBufferPool>> m_translationPools;
     uint64_t m_translationDescriptorRecording{};
-    std::shared_ptr<IRHICommandTranslator> m_translator;
+    own::shared_owner<IRHICommandTranslator> m_translator;
     RHIQueueIdentity m_translatorQueue;
     RHIQueueIdentity m_translationQueue;
 
     std::atomic<uint32_t> m_encoderUnimplemented{ 0 };
     std::atomic<const char*> m_lastUnimplemented{ nullptr };
 };
-

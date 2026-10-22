@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "ImporterModelDecoder.h"
 
 #include "FbxImporter.h"
@@ -56,12 +57,12 @@ namespace experiment::importer
     ImporterModelDecoder::ImporterModelDecoder(ImporterDecoderOptions options)
         : options_(std::move(options))
     {
-        importers_.push_back(std::make_unique<GltfImporter>());
-        importers_.push_back(std::make_unique<FbxImporter>());
+        importers_.push_back(own::make_unique<GltfImporter>());
+        importers_.push_back(own::make_unique<FbxImporter>());
     }
 
     ImporterModelDecoder::ImporterModelDecoder(ImporterDecoderOptions options,
-        std::vector<std::unique_ptr<IAssetImporter>> importers)
+        std::vector<own::unique_owner<IAssetImporter>> importers)
         : options_(std::move(options))
         , importers_(std::move(importers))
     {
@@ -70,7 +71,7 @@ namespace experiment::importer
     bool ImporterModelDecoder::CanDecode(
         const std::filesystem::path& sourcePath) const
     {
-        for (const std::unique_ptr<IAssetImporter>& importer : importers_)
+        for (const own::unique_owner<IAssetImporter>& importer : importers_)
         {
             if (importer && importer->CanImport(sourcePath)) return true;
         }
@@ -101,11 +102,11 @@ namespace experiment::importer
         }
 
         IAssetImporter* chosen = nullptr;
-        for (const std::unique_ptr<IAssetImporter>& importer : importers_)
+        for (const own::unique_owner<IAssetImporter>& importer : importers_)
         {
             if (importer && importer->CanImport(request.sourcePath))
             {
-                chosen = importer.get();
+                chosen = importer.operator->();
                 break;
             }
         }

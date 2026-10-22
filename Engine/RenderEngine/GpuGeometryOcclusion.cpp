@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "GpuGeometryOcclusion.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 
@@ -141,7 +142,7 @@ struct GpuGeometryOcclusion::DeclarationLayout
 };
 
 bool GpuGeometryOcclusion::Prepare(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection,
-                                   std::shared_ptr<const Pyramid>& result, std::string& error, const std::string& name)
+                                   own::shared_owner<const Pyramid>& result, std::string& error, const std::string& name)
 {
     result.reset();
     const auto levels = LevelCount(context.width, context.height);
@@ -178,7 +179,7 @@ bool GpuGeometryOcclusion::Prepare(const EnhancedFrameContext& context, const ma
         }
         m_device = context.resources;
     }
-    std::shared_ptr<const DeclarationLayout> declarationLayout;
+    own::shared_owner<const DeclarationLayout> declarationLayout;
     for (const auto& candidate : std::span{m_declarationLayouts})
     {
         if (candidate && candidate->width == context.width && candidate->height == context.height &&
@@ -191,7 +192,7 @@ bool GpuGeometryOcclusion::Prepare(const EnhancedFrameContext& context, const ma
     if (!declarationLayout)
     {
         ce::profile_scope layoutProfile{ce::marker<"GeometryOcclusionLayoutBuild">()};
-        auto layout = std::make_shared<DeclarationLayout>();
+        auto layout = own::make_shared<DeclarationLayout>();
         layout->width = context.width;
         layout->height = context.height;
         layout->name = name;
@@ -221,7 +222,7 @@ bool GpuGeometryOcclusion::Prepare(const EnhancedFrameContext& context, const ma
     {
         ce::profile_scope layoutProfile{ce::marker<"GeometryOcclusionLayoutReuse">()};
     }
-    auto pyramid = std::make_shared<Pyramid>();
+    auto pyramid = own::make_shared<Pyramid>();
     pyramid->m_declarationLayout = std::move(declarationLayout);
     pyramid->m_view = CaptureView(context, viewProjection);
     pyramid->m_name = name;
@@ -260,14 +261,15 @@ GpuGeometryOcclusion::History::~History()
 
 bool GpuGeometryOcclusion::PrepareHistory(const EnhancedFrameContext& context, const math::matrix4x4& projection,
                                           std::uint64_t viewId, std::uint64_t revision,
-                                          std::shared_ptr<const Pyramid>& result, std::string& error,
+                                          own::shared_owner<const Pyramid>& result, std::string& error,
                                           const std::string& name)
 {
     ce::profile_scope profile{ce::marker<"GeometryHistoryPrepare">()};
     if (!Prepare(context, projection, result, error, name))
         return false;
-    auto pyramid = std::const_pointer_cast<Pyramid>(result);
-    auto history = std::make_shared<History>();
+    // Prepare created this mutable object; history is attached before publication.
+    auto* pyramid = const_cast<Pyramid*>(result.operator->());
+    auto history = own::make_shared<History>();
     history->device = context.resources;
     history->source = pyramid->m_view;
     history->viewId = viewId;
@@ -275,7 +277,7 @@ bool GpuGeometryOcclusion::PrepareHistory(const EnhancedFrameContext& context, c
     history->name = name == "Geometry.Occlusion" ? "METEOR.Camera" : name;
     if (!m_historyPool)
     {
-        m_historyPool = std::make_shared<HistoryPool>(*context.resources);
+        m_historyPool = own::make_shared<HistoryPool>(*context.resources);
     }
     history->pool = m_historyPool;
     if (m_historyPool->Acquire(context.width, context.height, history->textures))
@@ -310,8 +312,8 @@ bool GpuGeometryOcclusion::PrepareHistory(const EnhancedFrameContext& context, c
     return true;
 }
 
-std::shared_ptr<const GpuGeometryOcclusion::Pyramid> GpuGeometryOcclusion::ReadHistory(
-    const EnhancedFrameContext& context, const math::matrix4x4& projection, const std::shared_ptr<History>& history)
+own::shared_owner<const GpuGeometryOcclusion::Pyramid> GpuGeometryOcclusion::ReadHistory(
+    const EnhancedFrameContext& context, const math::matrix4x4& projection, const own::shared_owner<History>& history)
 {
     if (!history || !history->recorded.load() || !history->completion || history->textures.empty() ||
         history->textures.size() > kMaximumLevels || history->device != context.resources ||
@@ -320,7 +322,7 @@ std::shared_ptr<const GpuGeometryOcclusion::Pyramid> GpuGeometryOcclusion::ReadH
     {
         throw std::runtime_error("History HZB does not match the current device, extent, scene or frame order.");
     }
-    auto pyramid = std::make_shared<Pyramid>();
+    auto pyramid = own::make_shared<Pyramid>();
     pyramid->m_view = CaptureView(context, projection);
     pyramid->m_levelCount = static_cast<std::uint32_t>(history->textures.size());
     pyramid->m_history = history;

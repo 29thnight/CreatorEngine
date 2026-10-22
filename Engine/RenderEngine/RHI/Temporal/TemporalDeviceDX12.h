@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 #include "DlssTemporalAdapter.h"
 #include <d3d12.h>
 #include <dxgi1_6.h>
@@ -9,12 +10,12 @@
 // This avoids binding a process-global SDK to two unrelated D3D12 devices.
 struct TemporalDeviceDX12
 {
-    std::shared_ptr<DlssTemporalAdapter> session;
+    own::shared_owner<DlssTemporalAdapter> session;
     Microsoft::WRL::ComPtr<IDXGIFactory6> nativeFactory, factory;
     Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
     Microsoft::WRL::ComPtr<ID3D12Device> nativeDevice, device;
     ~TemporalDeviceDX12();
 };
-std::shared_ptr<TemporalDeviceDX12> AcquireTemporalDeviceDX12(uint32_t factoryFlags,
+own::shared_owner<TemporalDeviceDX12> AcquireTemporalDeviceDX12(uint32_t factoryFlags,
     LUID adapterLuid, TemporalResult& result);
 bool HasTemporalDeviceDX12();

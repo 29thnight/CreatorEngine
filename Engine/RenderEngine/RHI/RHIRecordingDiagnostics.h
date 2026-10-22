@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Ownership.h"
 #include "JobGraph.h"
 #include "RHIRecordingTaskGraph.h"
 #include "../../Utility_Framework/StandardLibrary.h"
@@ -23,7 +24,7 @@ struct RHIRecordingDiagnostics
     bool timingEnabled{false}, dependencyGraph{false}, batchSubmit{false};
     bool unitTimingsTruncated{false}, jobTimingsTruncated{false};
     uint64_t dispatchBeginNanoseconds{0}, waitBeginNanoseconds{0}, returnNanoseconds{0};
-    std::shared_ptr<job_graph_diagnostics> jobs;
+    own::shared_owner<job_graph_diagnostics> jobs;
     std::vector<RHIRecordingTaskIdentity> tasks;
     std::vector<RHIRecordingUnitTiming> units;
     RHIRecordingTaskTopology topology;
@@ -37,15 +38,19 @@ struct RHIRecordingPolicy
     {
         // 값은 프로세스에서 한 번 읽는다. 부호·공백·쓰레기 접미사는 묵인하지 않는다.
 #if defined(_WIN32)
-        std::unique_ptr<char, decltype(&std::free)> owned{nullptr, &std::free};
+        struct environment_release
+        {
+            char* value_{};
+            ~environment_release() { std::free(value_); }
+        } owned;
         char* environment = nullptr;
         size_t length = 0;
         if (_dupenv_s(&environment, &length, name) != 0)
         {
             return fallback;
         }
-        owned.reset(environment);
-        const char* text = owned.get();
+        owned.value_ = environment;
+        const char* text = owned.value_;
 #else
         const char* text = std::getenv(name);
 #endif

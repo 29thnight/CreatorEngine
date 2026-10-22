@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "DX12UploadRing.h"
 
 #include "DX12ResourceTable.h"
@@ -73,7 +75,7 @@ DX12UploadSegmentAllocator::Segment* DX12UploadSegmentAllocator::CreateSegment(u
     desc.SampleDesc.Count = 1;
     desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-    auto segment = std::make_unique<Segment>();
+    auto segment = own::make_unique<Segment>();
     HRESULT hr = m_device->CreateCommittedResource(
         &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&segment->buffer));
     if (FAILED(hr))
@@ -108,7 +110,7 @@ DX12UploadSegmentAllocator::Segment* DX12UploadSegmentAllocator::CreateSegment(u
     std::swprintf(name, std::size(name), L"DX12UploadSegment.%s.%zu", large ? L"Large" : L"Regular", m_segments.size());
     segment->buffer->SetName(name);
 
-    Segment* result = segment.get();
+    Segment* result = segment.operator->();
     m_segments.push_back(std::move(segment));
     m_slowPathCreates.fetch_add(1, std::memory_order_relaxed);
     if (std::this_thread::get_id() != m_ownerThread)
@@ -276,7 +278,7 @@ DX12UploadSegmentAllocator::Segment* DX12UploadSegmentAllocator::FindAvailableSe
         }
         if (nullptr == best || candidate->capacity < best->capacity)
         {
-            best = candidate.get();
+            best = candidate.operator->();
         }
     }
     return best;
@@ -583,7 +585,7 @@ bool DX12UploadSegmentAllocator::ReserveBatch(uint64_t recordingId, std::span<co
     return true;
 }
 
-std::shared_ptr<const void> DX12UploadSegmentAllocator::PinRecording(uint64_t recordingId)
+ce::lifetime_token DX12UploadSegmentAllocator::PinRecording(uint64_t recordingId)
 {
     std::lock_guard lock(m_mutex);
     if (!recordingId || recordingId != m_currentRecordingId.load(std::memory_order_acquire) ||
@@ -594,10 +596,10 @@ std::shared_ptr<const void> DX12UploadSegmentAllocator::PinRecording(uint64_t re
     m_sealedRecordingId.store(recordingId, std::memory_order_release);
     struct Lease
     {
-        std::vector<std::shared_ptr<const void>> segments;
+        std::vector<ce::lifetime_token> segments;
         std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> resources;
     };
-    auto result = std::make_shared<Lease>();
+    auto result = own::make_shared<Lease>();
     for (const auto& segment : m_segments)
     {
         if (segment->recordingId != recordingId || segment->state != RHIUploadSegmentState::Active)
@@ -607,7 +609,7 @@ std::shared_ptr<const void> DX12UploadSegmentAllocator::PinRecording(uint64_t re
         auto lease = segment->translationLease.lock();
         if (!lease)
         {
-            lease = std::make_shared<const uint64_t>(recordingId);
+            lease = own::make_shared<const uint64_t>(recordingId);
             segment->translationLease = lease;
         }
         result->segments.push_back(std::move(lease));

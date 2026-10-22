@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 
 // METEOR — Material Expression & Topology Editor for Optimized Rendering.
 // The scene renderer that draws LX materials: geometry transform, culling,
@@ -127,12 +128,12 @@ class SceneHost final : private IRHIUploadTransactionListener
     struct ShadowMeshletOutput
     {
         unsigned cascade{}, bin{};
-        std::shared_ptr<const GpuGeometryVisibility::Frame> frame;
+        own::shared_owner<const GpuGeometryVisibility::Frame> frame;
     };
     // Final light-space selection buffers. Static depth can be supplied by the
     // cache instead of replaying these lists; see CurrentShadowCacheStats.
     std::vector<ShadowMeshletOutput> ShadowMeshletOutputs() const;
-    std::shared_ptr<const GpuGeometryVisibility::Frame> ShadowFirstMeshletWork(unsigned cascade) const;
+    own::shared_owner<const GpuGeometryVisibility::Frame> ShadowFirstMeshletWork(unsigned cascade) const;
     bool UsesShadowDepthPrediction() const;
 
     // Prepared lattice mesh draw bins, before GPU visibility rejection.
@@ -148,8 +149,8 @@ class SceneHost final : private IRHIUploadTransactionListener
     // not GPU-visible counts.
     GpuGeometryVisibility::PreparedStats CameraVisibilityStats() const;
     // Diagnostic owner for submitted GPU work-list/argument readback gates.
-    std::shared_ptr<const GpuGeometryVisibility::Frame> CameraMeshletWork() const;
-    std::shared_ptr<const GpuGeometryVisibility::Frame> CameraDepthMeshletWork() const;
+    own::shared_owner<const GpuGeometryVisibility::Frame> CameraMeshletWork() const;
+    own::shared_owner<const GpuGeometryVisibility::Frame> CameraDepthMeshletWork() const;
     std::array<GpuGeometryVisibility::PreparedStats, 3> ShadowVisibilityStats() const;
     MeshSurfaceCacheStats GeometryStats() const { return geometry_.CacheStats(); }
     // Select only exact requested graph instances and coverage for the current
@@ -239,10 +240,10 @@ class SceneHost final : private IRHIUploadTransactionListener
     RGHandle DeclareBlendedStream(EnhancedRenderGraph& graph, const SceneLayerWork& commands, RGHandle lighting,
                                   RGHandle shadowMap, const EnhancedForwardLighting& tiles) const;
     RGHandle DeclareVolume(EnhancedRenderGraph& graph, RGHandle lighting, RGHandle depth, RGHandle shadowMap) const;
-    std::shared_ptr<const SceneFrameGeometry> FrameGeometry() const;
-    std::shared_ptr<const SceneMaterialWork> MaterialWork() const;
-    std::shared_ptr<const SceneHybridVisibility> HybridVisibility() const;
-    std::shared_ptr<const SceneHybridVisibility> OccluderVisibility() const;
+    own::shared_owner<const SceneFrameGeometry> FrameGeometry() const;
+    own::shared_owner<const SceneMaterialWork> MaterialWork() const;
+    own::shared_owner<const SceneHybridVisibility> HybridVisibility() const;
+    own::shared_owner<const SceneHybridVisibility> OccluderVisibility() const;
     bool HasDraws() const;
     // Live callers provide the exact graph batch ticket; pending completion is
     // polled without waiting. An empty ticket requires prior successful CPU drain.
@@ -250,12 +251,12 @@ class SceneHost final : private IRHIUploadTransactionListener
                                RHISubmissionTicket ticket = {});
     RHIBufferHandle LookupStatistics() const;
     RGHandle GraphLookupStatistics(const EnhancedRenderGraph& graph) const;
-    std::shared_ptr<const SceneLookupFrame> LookupFrame() const;
-    std::shared_ptr<const SceneLookupFrame> ForwardLookupFrame() const;
+    own::shared_owner<const SceneLookupFrame> LookupFrame() const;
+    own::shared_owner<const SceneLookupFrame> ForwardLookupFrame() const;
     SceneSurfaceTargets::Outputs ForwardSurfaceOutputs() const;
-    std::shared_ptr<const SceneSubsurfaceFrame> SubsurfaceFrame() const;
-    std::shared_ptr<const SceneRefractionFrame> RefractionFrame() const;
-    std::shared_ptr<const SceneVolumeFrame> VolumeFrame() const;
+    own::shared_owner<const SceneSubsurfaceFrame> SubsurfaceFrame() const;
+    own::shared_owner<const SceneRefractionFrame> RefractionFrame() const;
+    own::shared_owner<const SceneVolumeFrame> VolumeFrame() const;
     // Release after graph/submission owners have drained and before the device.
     void ShutdownAfterIdle();
 
@@ -301,28 +302,28 @@ class SceneHost final : private IRHIUploadTransactionListener
                         own::shared_owner<const Program>& result, std::string& error);
     void PruneFailedPreparations(const own::shared_owner<const Generation>& requested = {});
     IRenderDeviceServices* device_{};
-    std::array<std::shared_ptr<const PassReadPlan>, 8> m_passReadPlans;
+    std::array<own::shared_owner<const PassReadPlan>, 8> m_passReadPlans;
     size_t m_nextPassReadPlan{};
     MeshSurfaceEvaluator geometry_;
     GpuGeometryVisibility visibility_;
     GpuGeometryOcclusion cameraOcclusion_;
     GpuGeometryOcclusion shadowOcclusion_;
-    std::map<std::pair<std::uint64_t, std::uint64_t>, std::vector<std::shared_ptr<ShadowCache>>> shadowCaches_;
-    std::vector<std::weak_ptr<ShadowCache>> shadowCacheAllocations_;
+    std::map<std::pair<std::uint64_t, std::uint64_t>, std::vector<own::shared_owner<ShadowCache>>> shadowCaches_;
+    std::vector<own::weak_owner<ShadowCache>> shadowCacheAllocations_;
     struct ShadowHistory
     {
-        std::array<std::shared_ptr<GpuGeometryOcclusion::History>, 3> cascades;
+        std::array<own::shared_owner<GpuGeometryOcclusion::History>, 3> cascades;
         std::uint64_t revision{}, temporalRevision{}, frameId{};
     };
     std::map<std::pair<std::uint64_t, std::uint64_t>, std::vector<ShadowHistory>> shadowHistories_;
     // Last bucket shape written to stdout; the line is printed only when it changes.
     std::optional<std::pair<std::uint32_t, std::size_t>> loggedMaterialBuckets_;
     // Per-frame scene buffers return here after their frame retires.
-    std::shared_ptr<TransientBufferPool> bufferPool_;
+    own::shared_owner<TransientBufferPool> bufferPool_;
     ResidentBufferCache sceneResidentBuffers_;
     struct CameraHistory
     {
-        std::shared_ptr<GpuGeometryOcclusion::History> pyramid;
+        own::shared_owner<GpuGeometryOcclusion::History> pyramid;
         FrameCameraSnapshot camera;
         std::uint64_t temporalRevision{};
     };
@@ -333,7 +334,7 @@ class SceneHost final : private IRHIUploadTransactionListener
     HybridVisibilityPipelines hybridPipelines_;
     LX::Runtime::GraphicsPipeline shadowMerge_;
     std::array<LX::Runtime::ComputePipeline, 6> materialWorkPipelines_;
-    std::shared_ptr<ScenePrimitiveCacheResources> m_primitiveCacheResources;
+    own::shared_owner<ScenePrimitiveCacheResources> m_primitiveCacheResources;
     SceneLookupCache lookup_;
     SceneRuntimeEffectsResources runtimeEffects_;
     SceneSubsurfaceResources subsurface_;
@@ -342,7 +343,7 @@ class SceneHost final : private IRHIUploadTransactionListener
     std::vector<own::shared_owner<const Program>> programs_;
     own::shared_owner<const Frame> frame_;
     job_scheduler& scheduler_;
-    std::unique_ptr<PreparationScratch> m_preparationScratch;
+    own::unique_owner<PreparationScratch> m_preparationScratch;
     std::atomic_flag m_preparing{};
     IRenderDeviceServices* programDevice_{};
     std::vector<own::unique_owner<Preparation>> preparations_;
@@ -358,10 +359,10 @@ class SceneHost final : private IRHIUploadTransactionListener
     void PollSubmittedFrames();
     // One HW producer per hybrid stage: occluder (first list, depth commands)
     // or final surface (recovered union, surface commands).
-    static void DeclareHardwareVisibility(EnhancedRenderGraph& graph, const own::shared_owner<const FrameInput>& frame,
-                                          const std::shared_ptr<const SceneHybridVisibility>& hybrid,
-                                          const std::shared_ptr<const GpuGeometryVisibility::Frame>& list,
-                                          const std::shared_ptr<const IndirectMaterialBatch>& commands, bool occluder,
+    static void DeclareHardwareVisibility(EnhancedRenderGraph& graph, const own::shared_owner<const Frame>& frame,
+                                          const own::shared_owner<const SceneHybridVisibility>& hybrid,
+                                          const own::shared_owner<const GpuGeometryVisibility::Frame>& list,
+                                          const own::shared_owner<const IndirectMaterialBatch>& commands, bool occluder,
                                           RGHandle commandInput);
     void OnUploadSubmitted(std::uint64_t recording, RHICompletionPoint completion) override;
     void OnUploadAccepted(std::uint64_t recording, RHICompletionPoint completion) override;

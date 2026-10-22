@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 
 #include "MaterialGraphTransientBufferPool.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
@@ -30,13 +31,13 @@ class ResidentBufferFrame final
         return result.size ? result : RHIBufferSlice{};
     }
 
-    void Declare(EnhancedRenderGraph& graph, std::shared_ptr<const ResidentBufferFrame> owner) const
+    void Declare(EnhancedRenderGraph& graph, own::shared_owner<const ResidentBufferFrame> owner) const
     {
         if (graphOwner_ == graph.DeclarationGraph() && graphEpoch_ == graph.DeclarationEpoch())
         {
             return;
         }
-        if (graphOwner_ || !owner || owner.get() != this ||
+        if (graphOwner_ || !owner || owner.operator->() != this ||
             graph.GetSchedulingMode() != RGSchedulingMode::ExplicitVersioned ||
             version_->device->GetCurrentUploadRecordingId() != recording_)
             throw std::runtime_error("METEOR resident table requires its current owned versioned graph.");
@@ -116,7 +117,7 @@ class ResidentBufferFrame final
     struct Version final
     {
         IRenderDeviceServices* device{};
-        std::shared_ptr<TransientBufferPool> pool;
+        own::shared_owner<TransientBufferPool> pool;
         RHIBufferHandle buffer;
         std::vector<std::byte> bytes;
         uint32_t stride{};
@@ -133,7 +134,7 @@ class ResidentBufferFrame final
         uint64_t offset{}, bytes{}, stagingOffset{};
         bool upload{};
     };
-    std::shared_ptr<const Version> version_, base_;
+    own::shared_owner<const Version> version_, base_;
     RHIBufferSlice staging_;
     std::vector<Copy> copies_;
     std::string name_;
@@ -160,12 +161,12 @@ class ResidentBufferCache final : private IRHIUploadTransactionListener
     ResidentBufferCache(const ResidentBufferCache&) = delete;
     ResidentBufferCache& operator=(const ResidentBufferCache&) = delete;
 
-    bool Initialize(IRenderDeviceServices& device, std::shared_ptr<TransientBufferPool> pool, std::string& error)
+    bool Initialize(IRenderDeviceServices& device, own::shared_owner<TransientBufferPool> pool, std::string& error)
     {
         error.clear();
         if (device_)
         {
-            if (device_ == &device && pool_ == pool)
+            if (device_ == &device && pool_.operator->() == pool.operator->())
                 return true;
             error = "METEOR resident table cache must retire before changing its device or pool.";
             return false;
@@ -177,7 +178,7 @@ class ResidentBufferCache final : private IRHIUploadTransactionListener
     }
 
     bool Prepare(const Key& key, std::span<const std::byte> bytes, uint32_t stride, std::string_view name,
-                 std::shared_ptr<const ResidentBufferFrame>& result, std::string& error)
+                 own::shared_owner<const ResidentBufferFrame>& result, std::string& error)
     {
         result.reset();
         error.clear();
@@ -187,7 +188,7 @@ class ResidentBufferCache final : private IRHIUploadTransactionListener
             error = "METEOR resident table requires current recording and nonempty word-aligned records.";
             return false;
         }
-        std::shared_ptr<const Version> base;
+        own::shared_owner<const Version> base;
         decltype(baselines_) retiredBaselines;
         uint64_t serial{};
         {
@@ -208,7 +209,7 @@ class ResidentBufferCache final : private IRHIUploadTransactionListener
             found->second.lastUse = serial;
             base = found->second.version;
         }
-        auto frame = std::make_shared<ResidentBufferFrame>();
+        auto frame = own::make_shared<ResidentBufferFrame>();
         frame->recording_ = recording;
         frame->name_ = std::string(name);
         if (base && base->stride == stride && base->bytes.size() == bytes.size() &&
@@ -219,7 +220,7 @@ class ResidentBufferCache final : private IRHIUploadTransactionListener
             return true;
         }
 
-        auto version = std::make_shared<Version>();
+        auto version = own::make_shared<Version>();
         version->device = device_;
         version->pool = pool_;
         version->stride = stride;
@@ -279,7 +280,7 @@ class ResidentBufferCache final : private IRHIUploadTransactionListener
         RHIBufferDesc desc;
         desc.bytes = bytes.size();
         desc.debugName = debugName.c_str();
-        if (!CreateSceneBuffer(*device_, pool_.get(), desc, version->buffer, error))
+        if (!CreateSceneBuffer(*device_, pool_.operator->(), desc, version->buffer, error))
             return false;
 
         // All ownership allocation precedes graph recording/native admission.
@@ -332,14 +333,14 @@ class ResidentBufferCache final : private IRHIUploadTransactionListener
     using Version = ResidentBufferFrame::Version;
     struct Baseline
     {
-        std::shared_ptr<const Version> version;
+        own::shared_owner<const Version> version;
         uint64_t lastUse{};
     };
     using BaselineMap = std::map<Key, Baseline>;
     struct Prepared
     {
         Key key;
-        std::shared_ptr<const Version> version;
+        own::shared_owner<const Version> version;
     };
     struct Recording
     {
@@ -449,7 +450,7 @@ class ResidentBufferCache final : private IRHIUploadTransactionListener
         }
     }
     IRenderDeviceServices* device_{};
-    std::shared_ptr<TransientBufferPool> pool_;
+    own::shared_owner<TransientBufferPool> pool_;
     std::mutex mutex_;
     BaselineMap baselines_;
     std::map<uint64_t, Recording> recordings_;

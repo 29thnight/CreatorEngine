@@ -1,4 +1,6 @@
 #pragma once
+#include "../../Utility_Framework/LifetimeToken.h"
+#include "../../Utility_Framework/Ownership.h"
 #include "RHIResourceTypes.h"
 #include "../../EngineDiagnostics/DxCaptureSubmission.h"
 
@@ -22,7 +24,7 @@ struct RHIRecordedBatchDesc
 
     // 그래프 transient처럼 GPU completion까지 붙잡아야 하는 소유자를 한 덩어리로
     // 넘기는 자리다. 3-15B의 retire queue가 batch와 함께 보관한다.
-    std::shared_ptr<const void> lifetimeToken;
+    ce::lifetime_token lifetimeToken;
 };
 
 enum class RHIRecordedBatchState : uint8_t
@@ -85,7 +87,7 @@ public:
     uint64_t GetRecordingId() const { return m_recordingId; }
     bool IsAdmitted() const { return m_admitted; }
     bool HasLifetimeToken() const { return nullptr != m_lifetimeToken; }
-    std::shared_ptr<const void> GetLifetimeToken() const { return m_lifetimeToken; }
+    ce::lifetime_token GetLifetimeToken() const { return m_lifetimeToken; }
 
 private:
     friend class IRHIParallelCommandPool;
@@ -140,7 +142,6 @@ private:
     RHICompletionPoint m_completion{};
     uint64_t m_recordingId{ 0 };
     bool m_admitted{ false };
-    std::shared_ptr<const void> m_lifetimeToken;
+    ce::lifetime_token m_lifetimeToken;
     RHIRecordedBatchState m_state{ RHIRecordedBatchState::Empty };
 };
-

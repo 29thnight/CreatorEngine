@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 
 #include "../Utility_Framework/StandardLibrary.h"
 #include <cstdlib>
@@ -36,7 +37,7 @@ namespace material_graph
                    buckets.capacity() * sizeof(BucketRange) +
                    (values.capacity() + selectors.capacity()) * sizeof(std::array<uint32_t, 4>);
         }
-        static std::shared_ptr<const PacketDispatchPlan> Build(uint32_t capacity, uint32_t dispatchWidth,
+        static own::shared_owner<const PacketDispatchPlan> Build(uint32_t capacity, uint32_t dispatchWidth,
                                                                uint32_t sliceCapacity,
                                                                std::span<const uint32_t> capacities, std::string& error)
         {
@@ -45,7 +46,7 @@ namespace material_graph
                 error = "METEOR packet plan dimensions are invalid.";
                 return {};
             }
-            auto plan = std::make_shared<PacketDispatchPlan>();
+            auto plan = own::make_shared<PacketDispatchPlan>();
             plan->capacity = capacity;
             plan->dispatchWidth = dispatchWidth;
             plan->sliceCapacity = sliceCapacity;
@@ -109,7 +110,7 @@ namespace material_graph
     {
       public:
         static constexpr size_t EntryLimit = 32, ByteLimit = 1024 * 1024;
-        std::shared_ptr<const PacketDispatchPlan> Acquire(uint32_t capacity, uint32_t dispatchWidth,
+        own::shared_owner<const PacketDispatchPlan> Acquire(uint32_t capacity, uint32_t dispatchWidth,
                                                           uint32_t sliceCapacity, std::span<const uint32_t> capacities,
                                                           std::string& error, bool reuse = true)
         {
@@ -173,7 +174,7 @@ namespace material_graph
         }
 
       private:
-        std::array<std::shared_ptr<const PacketDispatchPlan>, EntryLimit> entries_{};
+        std::array<own::shared_owner<const PacketDispatchPlan>, EntryLimit> entries_{};
         size_t next_{}, bytes_{}, hits_{}, builds_{};
     };
 } // namespace material_graph

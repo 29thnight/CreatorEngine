@@ -1,4 +1,6 @@
 #pragma once
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "VulkanLoader.h"
 #include "VulkanDescriptorLayout.h"
 
@@ -221,8 +223,8 @@ class VulkanPipelineCache : public IRenderPipelineCache, public IRenderRootSigna
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES };
     job_scheduler& m_scheduler;
     // The worker captures only PendingGraphics. Layout/device stay alive until Shutdown joins every job.
-    std::unordered_map<uint64_t, std::shared_ptr<PendingGraphics>> m_pendingGraphics;
-    std::vector<std::shared_ptr<PendingGraphics>> m_abandonedGraphics;
+    std::unordered_map<uint64_t, own::shared_owner<PendingGraphics>> m_pendingGraphics;
+    std::vector<own::shared_owner<PendingGraphics>> m_abandonedGraphics;
 
     std::unordered_map<uint64_t, RHIPipelineLayoutHandle> m_layoutByHash;
     std::unordered_map<uint64_t, RHIPipelineHandle> m_pipelineByHash;
@@ -232,7 +234,7 @@ class VulkanPipelineCache : public IRenderPipelineCache, public IRenderRootSigna
         VulkanPipelineEntry entry{};
         std::uint32_t generation{0};
         bool alive{false};
-        std::shared_ptr<const void> m_lease;
+        ce::lifetime_token m_lease;
     };
     // M5-C3b1: lookup에서 제거한 slot은 generation을 올려 재사용한다. VkPipeline은
     // 제출 완료를 이 cache가 직접 알기 전까지 retired 목록에 보존한다.
@@ -241,7 +243,7 @@ class VulkanPipelineCache : public IRenderPipelineCache, public IRenderRootSigna
     struct RetiredPipeline
     {
         VkPipeline m_pipeline{VK_NULL_HANDLE};
-        std::shared_ptr<const void> m_lease;
+        ce::lifetime_token m_lease;
     };
     RHICompletionRetireQueue<RetiredPipeline> m_retiredPipelines;
     std::vector<RetiredPipeline> m_pinnedRetiredPipelines;

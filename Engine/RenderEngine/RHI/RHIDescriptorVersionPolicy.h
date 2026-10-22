@@ -1,4 +1,6 @@
 #pragma once
+#include "../../Utility_Framework/LifetimeToken.h"
+#include "../../Utility_Framework/Ownership.h"
 
 #include "RHIResourceTypes.h"
 
@@ -235,7 +237,7 @@ class RHIDescriptorVersionPolicy
 
     // Called by the recording owner after writers join. The lease can be
     // released on another thread; only the owner mutates the slot table.
-    std::shared_ptr<const void> PinRecording(RHIDescriptorVersionHandle handle)
+    ce::lifetime_token PinRecording(RHIDescriptorVersionHandle handle)
     {
         if (!IsCurrent(handle))
         {
@@ -245,7 +247,7 @@ class RHIDescriptorVersionPolicy
         auto lease = slot.translationLease.lock();
         if (!lease)
         {
-            lease = std::make_shared<const uint64_t>(handle.ToToken());
+            lease = own::make_shared<const uint64_t>(handle.ToToken());
             slot.translationLease = lease;
         }
         return lease;
@@ -306,7 +308,7 @@ class RHIDescriptorVersionPolicy
         uint64_t completionValue{0};
         uint32_t generation{0};
         bool everUsed{false};
-        std::weak_ptr<const void> translationLease;
+        ce::weak_lifetime_token translationLease;
     };
 
     Slot* FindRecording(uint64_t recordingId)

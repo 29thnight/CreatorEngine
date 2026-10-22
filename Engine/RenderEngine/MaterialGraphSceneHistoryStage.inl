@@ -1,6 +1,6 @@
 // Stage implementation included by MaterialGraphSceneHost.cpp inside material_graph.
-void SceneHost::HistoryStage::DeclareHistory(const own::shared_owner<const FrameInput>& prepared,
-                                             EnhancedRenderGraph& graph, RGHandle expectedDepth, RGHandle depth) const
+void SceneHost::HistoryStage::DeclareHistory(const own::shared_owner<const Frame>& prepared, EnhancedRenderGraph& graph,
+                                             RGHandle expectedDepth, RGHandle depth) const
 {
     if (!prepared || !this->nextCameraHistory)
         return;

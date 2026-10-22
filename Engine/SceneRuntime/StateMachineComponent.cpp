@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "FSMState.h"
 #include "Transition.h"
 #include "StateMachineComponent.h"
@@ -26,7 +27,7 @@ void StateMachineComponent::OnRemovingFromScene()
 //{
 //	if (!m_currentState && !m_states.empty())
 //	{
-//		m_currentState = m_states.front().get();
+//		m_currentState = m_states.front().operator->();
 //	}
 //
 //	if (m_currentState)
@@ -48,22 +49,22 @@ void StateMachineComponent::OnRemovingFromScene()
 
 FSM::FSMState* StateMachineComponent::AddState(const std::string& name)
 {
-	m_states.emplace_back(std::make_shared<FSM::FSMState>(name));
-	return m_states.back().get(); // Return the raw pointer to the state
+	m_states.emplace_back(own::make_shared<FSM::FSMState>(name));
+	return m_states.back().operator->(); // Return the raw pointer to the state
 }
 
 void StateMachineComponent::RemoveState(FSM::FSMState* state)
 {
 	m_transitions.erase(
 		std::remove_if(m_transitions.begin(), m_transitions.end(),
-			[state](const std::shared_ptr<FSM::Transition>& transition) {
+			[state](const own::shared_owner<FSM::Transition>& transition) {
 				return transition->GetFrom() == state || transition->GetTo() == state;
 			}),
 		m_transitions.end());
 	m_states.erase(
 		std::remove_if(m_states.begin(), m_states.end(),
-			[state](const std::shared_ptr<FSM::FSMState>& s) {
-				return s.get() == state;
+			[state](const own::shared_owner<FSM::FSMState>& s) {
+				return s.operator->() == state;
 			}),
 		m_states.end());
 	if (m_currentState == state)
@@ -76,16 +77,16 @@ void StateMachineComponent::RemoveState(FSM::FSMState* state)
 
 FSM::Transition* StateMachineComponent::AddTransition(FSM::FSMState* from, FSM::FSMState* to, ConditionFunc condition)
 {
-	m_transitions.push_back(std::make_shared<FSM::Transition>(from, to, condition));
-	return m_transitions.back().get(); // Return the raw pointer to the transition
+	m_transitions.push_back(own::make_shared<FSM::Transition>(from, to, condition));
+	return m_transitions.back().operator->(); // Return the raw pointer to the transition
 }
 
 void StateMachineComponent::RemoveTransition(FSM::Transition* transition)
 {
 	m_transitions.erase(
 		std::remove_if(m_transitions.begin(), m_transitions.end(),
-			[transition](const std::shared_ptr<FSM::Transition>& t) {
-				return t.get() == transition;
+			[transition](const own::shared_owner<FSM::Transition>& t) {
+				return t.operator->() == transition;
 			}),
 		m_transitions.end());
 }
@@ -97,10 +98,8 @@ FSM::FSMState* StateMachineComponent::FindStateByName(const std::string& name) c
 	{
 		if (state->GetName() == name)
 		{
-			return state.get();
+			return state.operator->();
 		}
 	}
 	return nullptr; // Return nullptr if no state with the given name is found
 }
-
-

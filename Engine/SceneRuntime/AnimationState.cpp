@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "AnimationState.h"
 #include "AniBehavior.h"
 #include "AnimationBehviourFatory.h"
@@ -23,12 +24,12 @@ std::vector<AniTransition*> AnimationState::FindTransitions(const std::string& t
 	std::vector<AniTransition*> aniTransitions;
 	for (auto& sharedtrans : Transitions)
 	{
-		auto trans = sharedtrans.get();
+		auto trans = sharedtrans.operator->();
 
 		if (trans->GetNextState() == toStateName)
 			aniTransitions.push_back(trans);
 	}
-	
+
 	return aniTransitions;
 }
 
@@ -53,7 +54,7 @@ void AnimationState::SetBehaviour(std::string name, bool isReload)
 	// C++ 핫리로드 은퇴(9-4) — 애니메이션 상태 스크립트는 C#(ManagedAniBehavior)만 지원한다.
 	if (ClrHost::Get().HasAniBehavior(behaviourName))
 	{
-		auto managed = std::make_shared<ManagedAniBehavior>(behaviourName);
+		auto managed = own::make_shared<ManagedAniBehavior>(behaviourName);
 		if (managed->HasInstance())
 		{
 			behaviour = managed;

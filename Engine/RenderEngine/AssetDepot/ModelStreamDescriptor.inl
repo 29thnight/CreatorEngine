@@ -1,9 +1,10 @@
+#include "../../Utility_Framework/Ownership.h"
 // Included beside full CPU geometry admission. No raw payload is fabricated.
 own::shared_owner<const assets::ModelMeshDescriptor> DecodeModelStreamDescriptor(
     model_cooked::ResolvedAssetEntry resolved, own::shared_owner<const assets::ModelSkeletonPayload> skeleton,
     Error& error, std::string& failure, std::atomic<std::size_t>* inputStaging)
 {
-    std::shared_ptr<const model_cooked::ModelGeometryStreamMetadata> stream;
+    own::shared_owner<const model_cooked::ModelGeometryStreamMetadata> stream;
     if (!model_cooked::LoadModelGeometryStreamMetadata(resolved, stream, failure, inputStaging))
     { error = Error::IntegrityFailed; return {}; }
     const bool skin = assets::Has(stream->attributes, assets::VertexAttribute::BoneIndices);

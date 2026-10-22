@@ -1,3 +1,4 @@
+#include "../Engine/RenderEngine/RenderAllocator.h"
 #include "PlayerPresentation.h"
 #include "PlayerTemporalDX12.h"
 #include "Render/Temporal/TemporalRuntimeControl.h"
@@ -48,7 +49,7 @@ namespace Player
                     Shutdown();
                     return false;
                 }
-                m_temporal = std::make_unique<TemporalDX12>(m_resources);
+                m_temporal = own::make_unique<TemporalDX12>(m_resources);
                 if (!m_temporal->Configure(window, width, height, outError) ||
                     !(m_temporal->HasProxy() ? CreateProxyViews(outError) :
                         m_resources.AttachSwapChain(window, width, height, outError)) ||
@@ -196,7 +197,7 @@ namespace Player
             }
 
             uint64_t OpenSharedTexture(void* sharedHandle,
-                std::shared_ptr<RHIDisplayConsumerLease> consumerLease) override
+                own::shared_owner<RHIDisplayConsumerLease> consumerLease) override
             {
                 if (!m_frameOpen || !sharedHandle || !consumerLease ||
                     consumerLease->m_completionLost.load(std::memory_order_acquire))
@@ -205,7 +206,7 @@ namespace Player
                 }
                 if (m_pendingUse.lease)
                 {
-                    if (m_pendingUse.lease == consumerLease)
+                    if (own::identity(m_pendingUse.lease) == own::identity(consumerLease))
                     {
                         return 1;
                     }
@@ -217,7 +218,7 @@ namespace Player
                 for (SharedImage& image : m_sharedImages)
                 {
                     // A recycled HANDLE alone is not the producer allocation's identity.
-                    if (image.handle == sharedHandle && image.lease.lock() == consumerLease)
+                    if (image.handle == sharedHandle && own::identity(image.lease) == own::identity(consumerLease))
                     {
                         cached = &image;
                         break;
@@ -547,13 +548,13 @@ namespace Player
             }
             struct DisplayUse
             {
-                std::shared_ptr<RHIDisplayConsumerLease> lease;
+                own::shared_owner<RHIDisplayConsumerLease> lease;
                 ComPtr<ID3D12Resource> resource;
             };
             struct SharedImage
             {
                 void* handle{nullptr};
-                std::weak_ptr<RHIDisplayConsumerLease> lease;
+                own::weak_owner<RHIDisplayConsumerLease> lease;
                 ComPtr<ID3D12Resource> resource;
             };
 
@@ -685,7 +686,7 @@ namespace Player
             }
 
             DX12DeviceResources m_resources;
-            std::unique_ptr<TemporalDX12> m_temporal;
+            own::unique_owner<TemporalDX12> m_temporal;
             HWND m_window{nullptr};
             std::array<ComPtr<ID3D12Resource>, DX12DeviceResources::kFrameCount> m_proxyBuffers;
             ComPtr<ID3D12DescriptorHeap> m_proxyRtv;
@@ -711,15 +712,8 @@ namespace Player
         };
     }
 
-    std::shared_ptr<Presentation> CreateDX12Presentation()
+    own::shared_owner<Presentation> CreateDX12Presentation()
     {
-        return std::shared_ptr<Presentation>(new DX12Presentation, [](DX12Presentation* presentation)
-        {
-            presentation->Shutdown();
-            if (!presentation->IsQuarantined())
-            {
-                delete presentation;
-            }
-        });
+        return CreateRetiringPresentation<DX12Presentation>();
     }
 }

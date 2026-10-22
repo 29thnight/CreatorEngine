@@ -1,3 +1,5 @@
+#include "../../Utility_Framework/LifetimeToken.h"
+#include "../../Utility_Framework/Ownership.h"
 #include "RHISubmissionThread.h"
 #include "../../EngineDiagnostics/ProfileScope.h"
 
@@ -59,7 +61,7 @@ struct RHISubmissionTicket::State
     bool success{ false };
     std::string error;
     RHICommandFailure commandFailure;
-    std::shared_ptr<RHIRecordedBatch> recordedBatch;
+    own::shared_owner<RHIRecordedBatch> recordedBatch;
     RHISubmissionIdentity identity;
 
     void PublishCompletion(bool completedSuccessfully, std::string completionError)
@@ -115,10 +117,10 @@ struct RHISubmissionThread::Impl
         EntryKind kind{ EntryKind::Submission };
         std::string label;
         Work work;
-        std::shared_ptr<RHISubmissionTicket::State> ticket;
+        own::shared_owner<RHISubmissionTicket::State> ticket;
         RHICompletionPoint retirementPoint{};
         CompletionQuery completionQuery;
-        std::shared_ptr<const void> lifetimeToken;
+        ce::lifetime_token lifetimeToken;
         uint64_t softwareBytes{};
         ce::profile_rhi_context rhiContext;
     };
@@ -131,7 +133,7 @@ struct RHISubmissionThread::Impl
         EntryKind kind{ EntryKind::Submission };
         RHICompletionPoint point{};
         CompletionQuery completionQuery;
-        std::shared_ptr<const void> lifetimeToken;
+        ce::lifetime_token lifetimeToken;
         bool failedSubmission{ false };
         bool releaseReady{ false };
         ce::profile_rhi_context rhiContext;
@@ -421,15 +423,15 @@ bool RHISubmissionTicket::GetCommandFailure(RHICommandFailure& outFailure) const
 
 const RHIRecordedBatch* RHISubmissionTicket::GetRecordedBatch() const
 {
-    return m_state ? m_state->recordedBatch.get() : nullptr;
+    return m_state ? m_state->recordedBatch.operator->() : nullptr;
 }
 
 RHIRecordedBatch* RHISubmissionTicket::GetRecordedBatch()
 {
-    return m_state ? m_state->recordedBatch.get() : nullptr;
+    return m_state ? m_state->recordedBatch.operator->() : nullptr;
 }
 
-RHISubmissionThread::RHISubmissionThread(uint64_t softwareByteCapacity) : m_impl(std::make_unique<Impl>())
+RHISubmissionThread::RHISubmissionThread(uint64_t softwareByteCapacity) : m_impl(own::make_unique<Impl>())
 {
     m_impl->softwareByteCapacity = (std::max)(uint64_t{1}, softwareByteCapacity);
 }
@@ -589,7 +591,7 @@ void RHISubmissionThread::ReleaseClient(const void* owner)
 bool RHISubmissionThread::Enqueue(const void* owner, const char* label, Work work,
     RHISubmissionTicket& outTicket, std::string& outError,
     RHICompletionPoint retirementPoint, CompletionQuery completionQuery,
-    std::shared_ptr<const void> lifetimeToken)
+    ce::lifetime_token lifetimeToken)
 {
     if (!IsCurrentThread())
     {
@@ -602,8 +604,8 @@ bool RHISubmissionThread::Enqueue(const void* owner, const char* label, Work wor
 
 bool RHISubmissionThread::EnqueueInternal(
     const void* owner, const char* label, Work work, RHISubmissionTicket& outTicket, std::string& outError,
-    RHICompletionPoint retirementPoint, CompletionQuery completionQuery, std::shared_ptr<const void> lifetimeToken,
-    EntryKind kind, bool allowTransition, uint64_t expectedGeneration, std::shared_ptr<RHIRecordedBatch> recordedBatch,
+    RHICompletionPoint retirementPoint, CompletionQuery completionQuery, ce::lifetime_token lifetimeToken,
+    EntryKind kind, bool allowTransition, uint64_t expectedGeneration, own::shared_owner<RHIRecordedBatch> recordedBatch,
     RHISubmissionIdentity identity, uint64_t softwareBytes, uint64_t commandRecordingId)
 {
     if (nullptr == owner || !work)
@@ -623,7 +625,7 @@ bool RHISubmissionThread::EnqueueInternal(
         outError = "Software command arenas exceed the RHI admission byte capacity.";
         return false;
     }
-    auto state = std::make_shared<RHISubmissionTicket::State>();
+    auto state = own::make_shared<RHISubmissionTicket::State>();
     std::unique_lock lock(impl.mutex);
     const auto foundOwner = impl.owners.find(owner);
     if (foundOwner == impl.owners.end() || !foundOwner->second.registered)
@@ -1000,7 +1002,7 @@ bool RHISubmissionThread::AbandonForDeviceError(const void* owner,
     }
 
     Impl& impl = *m_impl;
-    std::vector<std::shared_ptr<RHISubmissionTicket::State>> cancelled;
+    std::vector<own::shared_owner<RHISubmissionTicket::State>> cancelled;
     std::vector<Impl::Entry> cancelledEntries;
     uint64_t cancelledSoftwareBytes{};
     std::unique_lock lock(impl.mutex);
@@ -1161,7 +1163,7 @@ bool RHISubmissionThread::EnqueueRecordedBatch(const void* owner, IRHIDeviceReso
         outError = "RHIRecordedBatch에 command pool이 없다";
         return false;
     }
-    std::shared_ptr<RHIRecordedBatch> queuedBatch;
+    own::shared_owner<RHIRecordedBatch> queuedBatch;
     RHIRecordingAdmissionGuard admission([&]
     {
         pool->RejectPreparedRecordedBatch(queuedBatch ? *queuedBatch : batch);
@@ -1178,7 +1180,7 @@ bool RHISubmissionThread::EnqueueRecordedBatch(const void* owner, IRHIDeviceReso
         return false;
     }
 
-    queuedBatch = std::make_shared<RHIRecordedBatch>(std::move(batch));
+    queuedBatch = own::make_shared<RHIRecordedBatch>(std::move(batch));
     const RHICompletionPoint completion = queuedBatch->GetCompletionPoint();
     // 완료 뒤에도 남는 ticket은 식별 정보만 보관한다. 그래프 자원은 retirement가 소유한다.
     auto lifetimeToken = std::move(queuedBatch->m_lifetimeToken);
@@ -1204,7 +1206,7 @@ bool RHISubmissionThread::EnqueueRecordedBatch(const void* owner, IRHIDeviceReso
 }
 
 bool RHISubmissionThread::EnqueueSoftwareBatch(const void* owner, IRHIDeviceResources& completionSource,
-    std::shared_ptr<IRHIParallelCommandPool> pool, std::shared_ptr<IRHICommandTranslator> translator,
+    own::shared_owner<IRHIParallelCommandPool> pool, own::shared_owner<IRHICommandTranslator> translator,
     RHISoftwareBatch&& batch, RHISubmissionTicket& outTicket, std::string& outError)
 {
     if (IsCurrentThread() || !pool || !translator || !batch.IsValid())
@@ -1247,12 +1249,12 @@ bool RHISubmissionThread::EnqueueSoftwareBatch(const void* owner, IRHIDeviceReso
     const RHISubmissionIdentity identity{batch.GetDesc().frameId, recordingId, completion};
     struct Lifetime
     {
-        std::shared_ptr<IRHIParallelCommandPool> pool;
-        std::shared_ptr<IRHICommandTranslator> translator;
-        std::shared_ptr<const void> resources;
+        own::shared_owner<IRHIParallelCommandPool> pool;
+        own::shared_owner<IRHICommandTranslator> translator;
+        ce::lifetime_token resources;
     };
-    auto lifetime = std::make_shared<Lifetime>(Lifetime{pool, translator, batch.GetDesc().lifetimeToken});
-    auto software = std::make_shared<RHISoftwareBatch>(std::move(batch));
+    auto lifetime = own::make_shared<Lifetime>(Lifetime{pool, translator, batch.GetDesc().lifetimeToken});
+    auto software = own::make_shared<RHISoftwareBatch>(std::move(batch));
     ce::cpu_span_context cpuContext{};
 #if !CE_SHIPPING
     cpuContext = ce::current_cpu_context;
@@ -1329,4 +1331,3 @@ RHISubmissionThread& GetRHISubmissionThread()
     static RHISubmissionThread* thread = new RHISubmissionThread();
     return *thread;
 }
-

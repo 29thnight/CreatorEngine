@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/Ownership.h"
 #include "EditorAudioClipCache.h"
 #include "AudioSourceInspection.h"
 #include "../../RenderEngine/Assets/AudioClipSourceMetadata.h"
@@ -22,7 +23,7 @@ namespace wave
 
         // Directory-relative operations prevent a project-controlled symlink
         // from redirecting publication outside the selected cache hierarchy.
-        class CacheDirectory final : public std::enable_shared_from_this<CacheDirectory>
+        class CacheDirectory final : public own::enable_owner_from_this<CacheDirectory>
         {
         public:
             ~CacheDirectory()
@@ -45,7 +46,7 @@ namespace wave
                 }
 #endif
             }
-            static std::shared_ptr<CacheDirectory> OpenRoot(const std::filesystem::path& requested, std::string& error)
+            static own::shared_owner<CacheDirectory> OpenRoot(const std::filesystem::path& requested, std::string& error)
             {
                 std::error_code code;
                 const auto absolute = std::filesystem::absolute(requested, code).lexically_normal();
@@ -54,7 +55,7 @@ namespace wave
                     error = "Invalid editor audio cache root";
                     return {};
                 }
-                auto root = std::make_shared<CacheDirectory>();
+                auto root = own::make_shared<CacheDirectory>();
                 root->m_path = absolute.root_path();
 #if defined(_WIN32)
                 root->m_handle = OpenWindowsDirectory(root->m_path);
@@ -77,7 +78,7 @@ namespace wave
                 }
                 return root;
             }
-            std::shared_ptr<CacheDirectory> Child(const std::filesystem::path& name,
+            own::shared_owner<CacheDirectory> Child(const std::filesystem::path& name,
                 bool create, bool exclusive, std::string& error)
             {
                 if (name.empty() || name.has_parent_path() || name == "." || name == "..")
@@ -85,7 +86,7 @@ namespace wave
                     error = "Invalid audio cache path component";
                     return {};
                 }
-                auto child = std::make_shared<CacheDirectory>();
+                auto child = own::make_shared<CacheDirectory>();
                 child->m_path = m_path / name;
                 child->m_parent = shared_from_this();
 #if defined(_WIN32)
@@ -196,7 +197,7 @@ namespace wave
             int m_handle{ -1 };
 #endif
             std::filesystem::path m_path;
-            std::shared_ptr<CacheDirectory> m_parent;
+            own::shared_owner<CacheDirectory> m_parent;
             // Windows path calls are safe only while every ancestor is pinned
             // without FILE_SHARE_DELETE. The importer retains this whole chain.
         };
@@ -218,10 +219,10 @@ namespace wave
                 }
 #endif
             }
-            static std::shared_ptr<CacheFile> Open(const CacheDirectory& directory,
+            static own::shared_owner<CacheFile> Open(const CacheDirectory& directory,
                 const std::filesystem::path& leaf, bool create, std::string path, std::string& error)
             {
-                auto file = std::make_shared<CacheFile>();
+                auto file = own::make_shared<CacheFile>();
                 file->m_virtualPath = std::move(path);
 #if defined(_WIN32)
                 file->m_handle = CreateFileW(directory.PinnedPath(leaf).c_str(), create ? GENERIC_WRITE : GENERIC_READ,
@@ -348,8 +349,8 @@ namespace wave
 
         struct ImportCleanup final
         {
-            std::shared_ptr<CacheDirectory> root;
-            std::shared_ptr<CacheDirectory> staging;
+            own::shared_owner<CacheDirectory> root;
+            own::shared_owner<CacheDirectory> staging;
             std::filesystem::path name;
             std::filesystem::path snapshot;
             ~ImportCleanup()

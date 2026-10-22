@@ -19,10 +19,10 @@ class SpriteSheetComponent;
 enum class ClipDirection : std::uint8_t;
 enum class TextAlignment : std::uint8_t;
 // Proxy responsible for drawing UI elements without keeping component pointers.
-class UIRenderProxy : public std::enable_shared_from_this<UIRenderProxy>
+class UIRenderProxy : public own::enable_owner_from_this<UIRenderProxy>
 {
 public:
-    struct ImageData 
+    struct ImageData
     {
 		std::vector<own::shared_owner<const Texture>>   textures;
         own::shared_owner<const Texture>                texture{ nullptr };
@@ -48,7 +48,7 @@ public:
         /// 폰트 자산 경로. SDF 계통이 이것으로 아틀라스를 찾는다(D4).
         std::string                             fontPath;
         std::string                             message;
-        std::shared_ptr<const TextLayout>        layout;
+        own::shared_owner<const TextLayout>        layout;
         math::color                             color{ math::color::black() };
 		math::vector2                           position{};
         math::vector2                          maxSize{};
@@ -120,7 +120,7 @@ private:
     uint64_t m_temporalIncarnation{s_temporalIncarnation.fetch_add(1, std::memory_order_relaxed)};
     std::variant<ImageData, TextData, SpriteSheetData>   m_data;
     own::shared_owner<const Texture>                             m_texture{ nullptr };
-    std::shared_ptr<SpriteSheet>                         m_spriteSheet{ nullptr };
+    own::shared_owner<SpriteSheet>                         m_spriteSheet{ nullptr };
     mutable SpriteSheet::SequenceState                   m_sequenceState{};
     HashedGuid			                                 m_instancedID{};
 	mutable math::vector2 								 m_textMeasureSize{ 0.f };

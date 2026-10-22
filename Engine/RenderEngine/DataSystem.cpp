@@ -1,4 +1,5 @@
-﻿#include "Assets/ModelCpuGeometryPayload.h"
+#include "../Utility_Framework/Ownership.h"
+#include "Assets/ModelCpuGeometryPayload.h"
 #include "../Utility_Framework/WindowsApartment.h"
 #include "DataSystem.h"
 #include "Experiment/Cooked/CookedCodeMaterial.h"
@@ -454,7 +455,7 @@ struct DataSystem::SceneAssetPreparation
     std::vector<own::shared_owner<const Material>> materialPins;
     std::vector<own::shared_owner<const experiment::Material>> authoredMaterialPins;
     std::vector<own::shared_owner<const Texture>> texturePins;
-    std::vector<std::shared_ptr<FontAsset>> fontPins;
+    std::vector<own::shared_owner<FontAsset>> fontPins;
     own::shared_owner<TextureFramePins> textureImages{ own::make_shared<TextureFramePins>() };
     std::vector<PreparedTextureImageRequest> imageRequests;
     std::map<std::pair<AssetDepot::AssetLink<Texture>, AssetDepot::TextureAssetVariant>,
@@ -519,7 +520,7 @@ void DataSystem::AssetBundlePreparation::Cancel()
     std::vector<assets::ModelAssetGeneration::Shared> retiredModels;
     std::vector<own::shared_owner<const Material>> retiredMaterials;
     std::vector<own::shared_owner<const Texture>> retiredTextures;
-    std::vector<std::shared_ptr<FontAsset>> retiredFonts;
+    std::vector<own::shared_owner<FontAsset>> retiredFonts;
     {
         std::lock_guard lock(mutex);
         bool pending = result.status == AssetDepot::AssetRequestStatus::Pending;
@@ -732,7 +733,7 @@ bool DataSystem::PublishRuntimeAsset(const own::shared_owner<PreparedRuntimeAsse
     if (asset->cancelled.load(std::memory_order_acquire) ||
         m_assetPreparationStopping || m_assetInvalidationDepth != 0 || asset->epoch != m_assetPreparationEpoch || asset->resolverRevision != m_assetDepotRevision ||
         asset->projectRoot != PathFinder::Relative() ||
-        !current || current.borrow().unsafe_get() != asset.borrow().unsafe_get())
+        !current || current.borrow().operator->() != asset.borrow().operator->())
     {
         error = "Asset changed while preparing the scene: " + asset->path.string();
         return false;
@@ -3953,15 +3954,15 @@ void DataSystem::SynchronizeLegacyMaterialProperties(Material& material) const
 	};
 
 	synchronize(standard_material::property::BaseColorMap,
-		material.m_baseColorTexName, material.GetBaseColorMapShared().borrow().unsafe_get());
+		material.m_baseColorTexName, material.GetBaseColorMapShared().borrow().operator->());
 	synchronize(standard_material::property::NormalMap,
-		material.m_normalTexName, material.GetNormalMapShared().borrow().unsafe_get());
+		material.m_normalTexName, material.GetNormalMapShared().borrow().operator->());
 	synchronize(standard_material::property::OrmMap,
-		material.m_ORM_TexName, material.GetOccRoughMetalMapShared().borrow().unsafe_get());
+		material.m_ORM_TexName, material.GetOccRoughMetalMapShared().borrow().operator->());
 	synchronize(standard_material::property::AoMap,
-		material.m_AO_TexName, material.GetAOMapShared().borrow().unsafe_get());
+		material.m_AO_TexName, material.GetAOMapShared().borrow().operator->());
 	synchronize(standard_material::property::EmissiveMap,
-		material.m_EmissiveTexName, material.GetEmissiveMapShared().borrow().unsafe_get());
+		material.m_EmissiveTexName, material.GetEmissiveMapShared().borrow().operator->());
 }
 
 bool DataSystem::SerializeMaterialPayload(Material& material,
@@ -5794,7 +5795,7 @@ own::shared_owner<const experiment::Material> DataSystem::LoadAuthoredMaterialSh
 	Material discardedLegacy;
 	auto authored = own::make_shared<experiment::Material>();
 	if (!DeserializeMaterialPayload(discardedLegacy,
-		Authoring::NodeViewAccess::Make(node), authored.borrow().unsafe_get()))
+		Authoring::NodeViewAccess::Make(node), authored.borrow().operator->()))
 	{
 		return nullptr;
 	}
@@ -6153,7 +6154,7 @@ own::shared_owner<Material> DataSystem::CreateMaterial()
     return material;
 }
 
-std::shared_ptr<FontAsset> DataSystem::LoadFontFile(const file::path& path, std::string& error) const
+own::shared_owner<FontAsset> DataSystem::LoadFontFile(const file::path& path, std::string& error) const
 {
     const auto extension = Lowercase(path.extension().string());
     if (extension != ".ttf" && extension != ".otf")
@@ -6178,7 +6179,7 @@ std::shared_ptr<FontAsset> DataSystem::LoadFontFile(const file::path& path, std:
     return font;
 }
 
-std::shared_ptr<FontAsset> DataSystem::LoadFontShared(std::string_view requestedPath, std::string& error)
+own::shared_owner<FontAsset> DataSystem::LoadFontShared(std::string_view requestedPath, std::string& error)
 {
     error.clear();
     try
@@ -6258,7 +6259,7 @@ std::shared_ptr<FontAsset> DataSystem::LoadFontShared(std::string_view requested
     }
 }
 
-std::vector<std::pair<std::string, std::shared_ptr<FontAsset>>> DataSystem::SnapshotFonts() const
+std::vector<std::pair<std::string, own::shared_owner<FontAsset>>> DataSystem::SnapshotFonts() const
 {
     std::lock_guard lock(m_fontMutex);
     return { m_fonts.begin(), m_fonts.end() };
@@ -6870,7 +6871,7 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
         std::vector<assets::ModelAssetGeneration::Shared> models;
         std::vector<own::shared_owner<const Material>> materials;
         std::vector<own::shared_owner<const Texture>> textures;
-        std::vector<std::shared_ptr<FontAsset>> fonts;
+        std::vector<own::shared_owner<FontAsset>> fonts;
         std::vector<PreparedTextureImageRequest> imageRequests;
         std::vector<AssetDepot::AssetRequest<Texture>> descriptorRequests;
         own::shared_owner<TextureFramePins> images;
@@ -7007,7 +7008,7 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
             assets::ModelAssetGeneration::Shared model;
             own::shared_owner<const Material> material;
             own::shared_owner<const Texture> texture;
-            std::shared_ptr<FontAsset> font;
+            own::shared_owner<FontAsset> font;
             switch (type)
             {
             case ManagedAssetType::Model:

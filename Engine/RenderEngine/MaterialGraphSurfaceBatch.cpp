@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "MaterialGraphSurfaceBatch.h"
 #include "MaterialGraphMeshSurface.h"
 
@@ -95,7 +96,7 @@ namespace material_graph
 
     bool SurfaceBatch::Matches(const Instance& instance, const SurfaceGeometrySource& mesh) const
     {
-        return mesh_ && bindings_->instance->representationId == instance.representationId && mesh_.get() == &mesh;
+        return mesh_ && bindings_->instance->representationId == instance.representationId && mesh_.operator->() == &mesh;
     }
 
     bool SurfaceBatch::ValidateReadback(std::span<const IblBakePoint> points, std::string& error) const
@@ -197,14 +198,14 @@ namespace material_graph
 
     bool SurfaceEvaluator::Record(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
                                   const SurfaceView& view, std::span<const SurfacePoint> points,
-                                  std::shared_ptr<const SurfaceBatch>& result, std::string& error)
+                                  own::shared_owner<const SurfaceBatch>& result, std::string& error)
     {
         return RecordInputs(device, std::move(bindings), view, points, {}, result, error);
     }
 
     bool SurfaceEvaluator::RecordGpu(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
-                                     std::shared_ptr<const SurfaceGeometrySource> mesh,
-                                     std::shared_ptr<const SurfaceBatch>& result, std::string& error)
+                                     own::shared_owner<const SurfaceGeometrySource> mesh,
+                                     own::shared_owner<const SurfaceBatch>& result, std::string& error)
     {
         if (!mesh || mesh->Device() != &device || !mesh->Buffer().IsValid() || !mesh->Count() ||
             mesh->Count() > IblBaker::MaxPoints || !mesh->IsReadyForEvaluation() ||
@@ -219,10 +220,10 @@ namespace material_graph
 
     bool SurfaceEvaluator::RecordInputs(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
                                         const SurfaceView& view, std::span<const SurfacePoint> points,
-                                        std::shared_ptr<const SurfaceGeometrySource> mesh,
-                                        std::shared_ptr<const SurfaceBatch>& result, std::string& error)
+                                        own::shared_owner<const SurfaceGeometrySource> mesh,
+                                        own::shared_owner<const SurfaceBatch>& result, std::string& error)
     {
-        std::shared_ptr<const SurfaceBatch> candidate;
+        own::shared_owner<const SurfaceBatch> candidate;
         if (!PrepareInputs(device, std::move(bindings), view, points, std::move(mesh), candidate, error))
         {
             return false;
@@ -257,8 +258,8 @@ namespace material_graph
     }
 
     bool SurfaceEvaluator::PrepareGpu(IRenderDeviceServices& device, own::shared_owner<const RenderBindings> bindings,
-                                      std::shared_ptr<const SurfaceGeometrySource> source,
-                                      std::shared_ptr<const SurfaceBatch>& result, std::string& error)
+                                      own::shared_owner<const SurfaceGeometrySource> source,
+                                      own::shared_owner<const SurfaceBatch>& result, std::string& error)
     {
         if (!source || source->Device() != &device || !source->Buffer().IsValid() || source->Count() == 0 ||
             source->Count() > IblBaker::MaxPoints ||
@@ -275,8 +276,8 @@ namespace material_graph
     bool SurfaceEvaluator::PrepareInputs(IRenderDeviceServices& device,
                                          own::shared_owner<const RenderBindings> bindings, const SurfaceView& view,
                                          std::span<const SurfacePoint> points,
-                                         std::shared_ptr<const SurfaceGeometrySource> mesh,
-                                         std::shared_ptr<const SurfaceBatch>& result, std::string& error)
+                                         own::shared_owner<const SurfaceGeometrySource> mesh,
+                                         own::shared_owner<const SurfaceBatch>& result, std::string& error)
     {
         const auto recordingId = device.GetCurrentUploadRecordingId();
         const auto descriptorVersion = device.GetDescriptorVersionToken();
@@ -296,7 +297,7 @@ namespace material_graph
         {
             return false;
         }
-        auto candidate = std::shared_ptr<SurfaceBatch>(new SurfaceBatch);
+        auto candidate = own::make_shared<SurfaceBatch>(SurfaceBatch::ConstructionKey{});
         candidate->device_ = &device;
         candidate->view_ = view;
         candidate->points_.assign(points.begin(), points.end());

@@ -577,4 +577,3 @@ void EnhancedUIPass::Shutdown()
 
     m_pso = {};
 }
-

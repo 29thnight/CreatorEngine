@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 
 #include "ArtifactByteSource.h"
 #include "CookedAssetManifest.h"
@@ -92,14 +93,14 @@ namespace experiment::cooked
         }
 
         friend bool OpenCookedAudioClipEntry(const CookedAssetManifestEntry&,
-            std::shared_ptr<const ArtifactByteSource>, CookedAudioClipSource&,
+            own::shared_owner<const ArtifactByteSource>, CookedAudioClipSource&,
             std::string&);
 
     private:
         AssetId id_{};
         // Keep the legacy std owner only for already-immutable sources. Loose
         // clips retain exactly one narrowed own source, never the entire mount.
-        std::shared_ptr<const ArtifactByteSource> bytes_{};
+        own::shared_owner<const ArtifactByteSource> bytes_{};
         own::shared_owner<const ArtifactByteSource> exactBytes_{};
         std::string path_{};
         CookedAudioClipHeader metadata_{};
@@ -113,7 +114,7 @@ namespace experiment::cooked
     // remain a caller immutability violation. Pak/memory retain their contract.
     [[nodiscard]] inline bool OpenCookedAudioClipEntry(
         const CookedAssetManifestEntry& entry,
-        std::shared_ptr<const ArtifactByteSource> bytes,
+        own::shared_owner<const ArtifactByteSource> bytes,
         CookedAudioClipSource& out, std::string& failure)
     {
         if (!bytes || entry.kind != CookedAssetKind::AudioClip

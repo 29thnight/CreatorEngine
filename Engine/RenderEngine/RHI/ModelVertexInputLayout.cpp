@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/Ownership.h"
 #include "ModelVertexInputLayout.h"
 
 #include "../../Utility_Framework/StandardLibrary.h"
@@ -91,20 +92,20 @@ namespace ModelVertexInput
         using CacheKey = std::pair<assets::VertexAttributeMask,
             assets::VertexAttributeMask>;
         static std::map<CacheKey,
-            std::unique_ptr<const std::vector<RHIInputElement>>> cache;
+            own::unique_owner<const std::vector<RHIInputElement>>> cache;
         std::lock_guard lock(mutex);
         const CacheKey key{ layoutMask, consumedMask };
         if (const auto found = cache.find(key); found != cache.end())
         {
             outError.clear();
-            return found->second.get();
+            return found->second.operator->();
         }
         std::vector<RHIInputElement> elements;
         if (!BuildInputElements(layoutMask, consumedMask, elements, outError))
             return nullptr;
-        auto stable = std::make_unique<const std::vector<RHIInputElement>>(
+        auto stable = own::make_unique<const std::vector<RHIInputElement>>(
             std::move(elements));
-        const auto* result = stable.get();
+        const auto* result = stable.operator->();
         cache.emplace(key, std::move(stable));
         return result;
     }

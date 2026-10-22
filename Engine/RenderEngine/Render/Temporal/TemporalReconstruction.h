@@ -1,4 +1,6 @@
 #pragma once
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 
 #include "../../RHI/RHIHandle.h"
 
@@ -146,7 +148,7 @@ struct TemporalFrameGenerationInputs
     // Reuse the existing graph/recorded-batch lifetime owner. Native resource
     // references alone do not prevent placed-memory aliasing or pool reuse.
     // The FG bridge retains this through SDK final consumption, not CPU Present.
-    std::shared_ptr<const void> lifetimeToken;
+    ce::lifetime_token lifetimeToken;
 };
 
 struct TemporalCapabilities

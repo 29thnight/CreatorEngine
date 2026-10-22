@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Ownership.h"
 #include "MeshletCompression.h"
 #include "../../Utility_Framework/DynamicBitset.h"
 #include "ClusterTopologyPage.h"
@@ -11,16 +12,16 @@ namespace assets::cluster
     class PageIo final
     {
       public:
-        using Page = std::shared_ptr<const std::vector<std::byte>>;
+        using Page = own::shared_owner<const std::vector<std::byte>>;
         using Result = std::shared_future<Page>;
         static PageIo& Shared()
         {
             static PageIo instance;
             return instance;
         }
-        Result Request(std::shared_ptr<const Archive> archive, uint32_t page)
+        Result Request(own::shared_owner<const Archive> archive, uint32_t page)
         {
-            auto task = std::make_shared<std::packaged_task<Page()>>(
+            auto task = own::make_shared<std::packaged_task<Page()>>(
                 [archive = std::move(archive), page]
                 {
                     auto bytes = archive->Read(page);
@@ -31,7 +32,7 @@ namespace assets::cluster
                             ? InspectTopologyPage(bytes, archive->sourceVertices, UINT32_MAX).attributes
                             : std::span<const std::byte>(bytes);
                     quantized::Require(Decode(attributes, decoded, error), "Invalid streamed cluster page");
-                    return std::make_shared<const std::vector<std::byte>>(std::move(bytes));
+                    return own::make_shared<const std::vector<std::byte>>(std::move(bytes));
                 });
             auto result = task->get_future().share();
             std::lock_guard lock(m_mutex);
@@ -96,7 +97,7 @@ namespace assets::cluster
         uint64_t revision{}, bytes{}, uploadedBytes{}, evictions{}, readFailures{};
         uint64_t residencyAlignment{1}, residentLimit{};
         std::vector<uint32_t> groups;
-        std::vector<std::shared_ptr<const std::vector<std::byte>>> packets;
+        std::vector<own::shared_owner<const std::vector<std::byte>>> packets;
     };
     // An immutable snapshot is held by the submitted buffer's upload transaction.
     // Eviction changes future snapshots only; in-flight buffers remain owned by
@@ -134,7 +135,7 @@ namespace assets::cluster
                 ++m_feedbackGroups;
             }
         }
-        Stream(std::shared_ptr<const Archive> archive, std::vector<experiment::MeshClusterGroup> groups)
+        Stream(own::shared_owner<const Archive> archive, std::vector<experiment::MeshClusterGroup> groups)
             : m_archive(std::move(archive)), m_groups(std::move(groups))
         {
             quantized::Require(m_archive && !m_archive->packets.empty(), "Empty cluster archive");
@@ -158,7 +159,7 @@ namespace assets::cluster
                     "Cluster stream group range");
             }
         }
-        std::shared_ptr<const ResidentSet> Prepare(uint64_t recording, std::span<const uint32_t> requests,
+        own::shared_owner<const ResidentSet> Prepare(uint64_t recording, std::span<const uint32_t> requests,
                                                    const StreamBudget& budget = {})
         {
             std::lock_guard lock(m_mutex);
@@ -236,7 +237,7 @@ namespace assets::cluster
                               return !wantedPages.test(read.first) &&
                                      read.second.wait_for(std::chrono::seconds(0)) == std::future_status::ready;
                           });
-            auto next = std::make_shared<ResidentSet>();
+            auto next = own::make_shared<ResidentSet>();
             next->residencyAlignment = budget.residencyAlignment;
             next->residentLimit = budget.residentBytes;
             next->packets.resize(m_archive->packets.size());
@@ -285,7 +286,7 @@ namespace assets::cluster
                     {
                         if (mandatory || !m_archive->pageReader)
                         {
-                            next->packets[id] = std::make_shared<const std::vector<std::byte>>(m_archive->Read(id));
+                            next->packets[id] = own::make_shared<const std::vector<std::byte>>(m_archive->Read(id));
                         }
                         else
                         {
@@ -384,7 +385,7 @@ namespace assets::cluster
                 }
             }
             const bool changed = !m_current || next->groups != m_current->groups ||
-                                 next->packets != m_current->packets ||
+                                 !std::ranges::equal(next->packets, m_current->packets, [](const auto& a, const auto& b) { return a.operator->() == b.operator->(); }) ||
                                  next->residencyAlignment != m_current->residencyAlignment;
             next->revision = m_current ? m_current->revision + changed : 1;
             m_allResident = std::ranges::all_of(std::span(next->groups), [](auto resident) { return resident != 0; });
@@ -398,7 +399,7 @@ namespace assets::cluster
       private:
         static constexpr std::size_t kMaximumPendingReads = 8;
 
-        std::shared_ptr<const Archive> m_archive;
+        own::shared_owner<const Archive> m_archive;
         std::vector<experiment::MeshClusterGroup> m_groups;
         mutable std::mutex m_mutex;
         std::vector<uint32_t> m_pending;
@@ -410,7 +411,7 @@ namespace assets::cluster
         ce::dynamic_bitset m_pendingGroups, m_wantedPages, m_attempted;
         std::vector<uint32_t> m_chain, m_retained;
         uint64_t m_clock{};
-        std::shared_ptr<const ResidentSet> m_current;
+        own::shared_owner<const ResidentSet> m_current;
         uint64_t m_recording{};
         bool m_allResident{};
         StreamBudget m_budget;

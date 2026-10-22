@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 
 #include "ArtifactByteSource.h"
 #include "../../../Utility_Framework/Paklib.hpp"
@@ -16,7 +17,7 @@ namespace experiment::cooked
     class PakAudioClipByteSource final : public ArtifactByteSource
     {
     public:
-        explicit PakAudioClipByteSource(std::shared_ptr<const Pak::Archive> archive)
+        explicit PakAudioClipByteSource(own::shared_owner<const Pak::Archive> archive)
             : archive_(std::move(archive)) {}
 
         [[nodiscard]] bool Size(std::string_view path,
@@ -66,6 +67,6 @@ namespace experiment::cooked
         }
 
     private:
-        std::shared_ptr<const Pak::Archive> archive_{};
+        own::shared_owner<const Pak::Archive> archive_{};
     };
 }

@@ -1,4 +1,6 @@
 #pragma once
+#include "../../Utility_Framework/LifetimeToken.h"
+#include "../../Utility_Framework/Ownership.h"
 
 #include "../FrameCameraSnapshot.h"
 #include "../Render/Temporal/TemporalReconstruction.h"
@@ -49,8 +51,8 @@ struct RHITemporalDisplayPacket
     TemporalMeasurementProvenance provenance;
     // HUD-less post-tone-map RGBA8, premultiplied RGBA8 UI, R32F depth, RG16F motion.
     std::array<void*, 4> sharedHandles{};
-    std::shared_ptr<RHIDisplayConsumerLease> consumerLease;
-    std::shared_ptr<const void> lifetimeToken;
+    own::shared_owner<RHIDisplayConsumerLease> consumerLease;
+    ce::lifetime_token lifetimeToken;
     bool valid{ false };
     bool nativeGateActive{ false }; // Immutable capture/quality-gate provenance.
 };

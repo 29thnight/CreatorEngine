@@ -66,6 +66,19 @@ namespace material_graph
             return instances_.at(index);
         }
 
+        // The table owns the instance. Identity checks do not acquire a strong owner.
+        bool Matches(std::size_t index, const own::weak_owner<const Instance>& expected) const
+        {
+            std::lock_guard lock(mutex_);
+            return index < instances_.size() && own::identity(instances_[index]) == own::identity(expected);
+        }
+
+        own::weak_owner<const Instance> Observe(std::size_t index) const
+        {
+            std::lock_guard lock(mutex_);
+            return instances_.at(index);
+        }
+
         std::size_t Size() const
         {
             std::lock_guard lock(mutex_);

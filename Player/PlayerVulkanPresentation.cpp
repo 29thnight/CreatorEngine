@@ -1,3 +1,4 @@
+#include "../Engine/RenderEngine/RenderAllocator.h"
 #include "PlayerPresentation.h"
 #include "Render/Temporal/TemporalRuntimeControl.h"
 #include "RHI/RHIShaderCompiler.h"
@@ -359,7 +360,7 @@ namespace Player
                 return true;
             }
 
-            uint64_t OpenSharedTexture(void*, std::shared_ptr<RHIDisplayConsumerLease>) override
+            uint64_t OpenSharedTexture(void*, own::shared_owner<RHIDisplayConsumerLease>) override
             {
                 // A DXGI shared handle is not a Vulkan texture. This backend retains the
                 // existing scene readback -> CPU mailbox -> Vulkan upload bridge.
@@ -884,15 +885,8 @@ namespace Player
         };
     }
 
-    std::shared_ptr<Presentation> CreateVulkanPresentation()
+    own::shared_owner<Presentation> CreateVulkanPresentation()
     {
-        return std::shared_ptr<Presentation>(new VulkanPresentation, [](VulkanPresentation* presentation)
-        {
-            presentation->Shutdown();
-            if (!presentation->IsQuarantined())
-            {
-                delete presentation;
-            }
-        });
+        return CreateRetiringPresentation<VulkanPresentation>();
     }
 }

@@ -1,3 +1,4 @@
+#include "Ownership.h"
 #include "JobScheduler.h"
 #include "StandardLibrary.h"
 
@@ -50,7 +51,7 @@ namespace job_detail
         std::function<void(std::size_t, std::function<void(std::size_t)>, std::function<void(std::exception_ptr)>)>
             dispatch_indexed_;
         std::function<void(std::span<const job_graph_node>, std::function<void(std::size_t)>,
-                           std::function<void(std::exception_ptr)>, std::shared_ptr<job_graph_diagnostics>)>
+                           std::function<void(std::exception_ptr)>, own::shared_owner<job_graph_diagnostics>)>
             dispatch_graph_;
         mutable std::mutex mutex_;
         std::condition_variable done_;
@@ -232,7 +233,7 @@ job_scheduler::job_scheduler(thread_pool& pool) : state_(std::make_shared<job_de
     { pool.dispatch(count, std::move(task), std::move(complete)); };
     state_->dispatch_graph_ = [&pool](std::span<const job_graph_node> nodes, std::function<void(std::size_t)> task,
                                       std::function<void(std::exception_ptr)> complete,
-                                      std::shared_ptr<job_graph_diagnostics> diagnostics)
+                                      own::shared_owner<job_graph_diagnostics> diagnostics)
     { pool.dispatch_graph(nodes, std::move(task), std::move(complete), std::move(diagnostics)); };
 }
 job_scheduler::~job_scheduler()
@@ -346,7 +347,7 @@ job_handle job_scheduler::submit_indexed(std::size_t count, std::function<void(s
     return job_handle(std::move(job));
 }
 job_handle job_scheduler::submit_graph(std::span<const job_graph_node> nodes, std::function<void(std::size_t)> task,
-                                       std::shared_ptr<job_graph_diagnostics> diagnostics)
+                                       own::shared_owner<job_graph_diagnostics> diagnostics)
 {
     if (nodes.size() >= static_cast<std::size_t>((std::numeric_limits<int32_t>::max)()))
     {

@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "ProxyCommand.h"
 #include "AnimationDiagnostics.h"
 #include "Animator.h"
@@ -382,7 +383,7 @@ ProxyCommand::ProxyCommand(TextComponent* component, uint64_t sceneEpoch) :
 }
 
 ProxyCommand ProxyCommand::CreatePrimitive(
-	std::shared_ptr<PrimitiveRenderProxy> proxy, uint64_t sceneEpoch)
+	own::shared_owner<PrimitiveRenderProxy> proxy, uint64_t sceneEpoch)
 {
 	ProxyCommand command;
 	if (nullptr == proxy) return command;
@@ -393,7 +394,7 @@ ProxyCommand ProxyCommand::CreatePrimitive(
 }
 
 ProxyCommand ProxyCommand::CreateLight(
-	std::shared_ptr<LightRenderProxy> proxy, uint64_t sceneEpoch)
+	own::shared_owner<LightRenderProxy> proxy, uint64_t sceneEpoch)
 {
 	ProxyCommand command;
 	if (nullptr == proxy) return command;
@@ -404,7 +405,7 @@ ProxyCommand ProxyCommand::CreateLight(
 }
 
 ProxyCommand ProxyCommand::CreateUI(
-	std::shared_ptr<UIRenderProxy> proxy, uint64_t sceneEpoch)
+	own::shared_owner<UIRenderProxy> proxy, uint64_t sceneEpoch)
 {
 	ProxyCommand command;
 	if (nullptr == proxy) return command;
@@ -443,7 +444,7 @@ ProxyCommand ProxyCommand::DestroyUI(HashedGuid guid, uint64_t sceneEpoch)
 
 ProxyCommand::ApplyResult ProxyCommand::Apply(
 	RenderScene& renderScene, uint64_t sceneEpoch,
-	std::shared_ptr<const ce::animation_palette_arena> paletteArena,
+	own::shared_owner<const ce::animation_palette_arena> paletteArena,
 	std::uint32_t localPaletteOffset)
 {
 	bool applied = false;

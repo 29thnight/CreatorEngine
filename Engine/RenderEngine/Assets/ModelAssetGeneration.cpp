@@ -27,7 +27,7 @@ namespace assets
         result.domain = ModelMeshDomain::Granular;
         result.meshId = descriptor.meshId;
         result.asset = descriptor.origin.entry.asset;
-        result.blob = descriptor.origin.blob;
+        result.blob = own::make_shared<const experiment::cooked::AssetBlobRecord>(descriptor.origin.blob);
         result.resolverRevision = descriptor.origin.resolverRevision;
         result.mountId = descriptor.origin.mountId.value;
         result.assetSetId = descriptor.origin.assetSetId;
