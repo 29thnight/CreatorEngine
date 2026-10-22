@@ -1,6 +1,7 @@
 #pragma once
 #include "Ownership.h"
 #include "../Core/EnhancedLivePipelineDesc.h"
+#include "LiveViewScheduling.h"
 #include "../Temporal/TemporalMeasurementProvenance.h"
 #include "../Graph/EnhancedRenderGraph.h"
 #include "../../RHI/RHICommandProvenance.h"
@@ -177,6 +178,8 @@ struct EnhancedLiveViewPacket
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
     own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;
     std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
+    LiveViewUpdatePolicy updatePolicy{};
+    uint64_t contentRevision{};
 };
 
 /// Host가 프레임 밀봉에 넘기는 뷰 요청 하나. 표시 대상과 도구 기능은
@@ -189,6 +192,10 @@ struct EnhancedLiveViewRequest
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
     own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;
     std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
+    LiveViewUpdatePolicy updatePolicy{};
+    // OnDemand 뷰의 입력이 바뀔 때 Host가 올린다. historyRevision은
+    // 카메라 history의 신원이므로 일반 dirty 표시와 별개로 유지한다.
+    uint64_t contentRevision{};
 };
 
 /// GT가 DataSystem generation handle과 immutable 값을 한 쌍으로 밀봉한 셰이더 입력.
