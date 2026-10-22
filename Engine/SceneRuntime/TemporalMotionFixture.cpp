@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "TemporalMotionFixture.h"
 #if CE_DEVELOPMENT && !CE_SHIPPING
 #include "TemporalMotionFixtureAssets.h"
@@ -86,7 +87,7 @@ namespace
         std::array<std::uint64_t, 2> instances{};
         std::vector<std::pair<gc::weak_ref<Component>, bool>> previousComponents;
         std::optional<TemporalNativeCaptureExclusion> exclusion;
-        std::shared_ptr<BuildResult> build;
+        own::shared_owner<BuildResult> build;
         job_handle buildJob;
         AssetDepot::AssetMountId mount;
         AssetDepot::AssetRequest<assets::ModelMeshDescriptor> staticMesh, skinnedMesh, meshletMesh;
@@ -849,7 +850,7 @@ bool TemporalMotionFixture::Begin(const std::string& directory, std::string& err
                 session->sdkProvider != TemporalProvider::Dlss)))
             throw std::runtime_error("SDK sequence requires enabled FSR/DLSS/XeSS without native capture exclusion");
         if (!sdkQuality) session->exclusion.emplace();
-        session->build = std::make_shared<BuildResult>();
+        session->build = own::make_shared<BuildResult>();
         std::filesystem::create_directories(destination.parent_path());
         if (!std::filesystem::create_directory(destination))
         {

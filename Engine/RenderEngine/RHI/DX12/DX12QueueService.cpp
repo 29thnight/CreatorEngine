@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "DX12QueueService.h"
 #include "DX12QueueBatchAdapter.h"
 #include "DX12QueueRecorder.h"
@@ -28,8 +30,8 @@ struct DX12QueueServiceState
     uint64_t nextRecording{1};
     bool submissionClient{false};
     int testRejection{0};
-    std::vector<std::shared_ptr<DX12ServiceQueue>> queues;
-    std::shared_ptr<IRHITimelineFence> primaryTimeline;
+    std::vector<own::shared_owner<DX12ServiceQueue>> queues;
+    own::shared_owner<IRHITimelineFence> primaryTimeline;
     ComPtr<ID3D12CommandQueue> primaryQueue;
     std::vector<ComPtr<ID3D12Fence>> primaryWaits;
 };
@@ -40,7 +42,7 @@ namespace
     {
         ComPtr<ID3D12CommandAllocator> allocator;
         ComPtr<ID3D12GraphicsCommandList> list;
-        std::unique_ptr<DX12Encoder> encoder;
+        own::unique_owner<DX12Encoder> encoder;
     };
 
     struct DX12QueueRecordingPool
@@ -52,16 +54,16 @@ namespace
         std::mutex mutex;
         bool active{true};
         uint64_t created{0}, reused{0}, leased{0};
-        std::vector<std::unique_ptr<DX12QueueRecordingStorage>> free;
+        std::vector<own::unique_owner<DX12QueueRecordingStorage>> free;
     };
 
     // Only batch retirement (or a never-submitted recording) releases this lease.
     // Cached storage must not retain graph/resource ownership between recordings.
     struct DX12QueueRecordingLease
     {
-        std::shared_ptr<DX12QueueRecordingPool> pool;
-        std::unique_ptr<DX12QueueRecordingStorage> storage;
-        std::shared_ptr<const void> owner;
+        own::shared_owner<DX12QueueRecordingPool> pool;
+        own::unique_owner<DX12QueueRecordingStorage> storage;
+        ce::lifetime_token owner;
         bool closed{false};
         ~DX12QueueRecordingLease()
         {
@@ -82,9 +84,9 @@ namespace
     {
       public:
         static constexpr uint32_t kMaxTargets = 8;
-        using Targets = std::array<std::shared_ptr<DX12QueueRecordingLease>, kMaxTargets>;
-        std::shared_ptr<IRHICommandQueue> queue;
-        std::shared_ptr<Targets> leases{std::make_shared<Targets>()};
+        using Targets = std::array<own::shared_owner<DX12QueueRecordingLease>, kMaxTargets>;
+        own::shared_owner<IRHICommandQueue> queue;
+        own::shared_owner<Targets> leases{own::make_shared<Targets>()};
         uint32_t targetCount{};
         bool finished{false};
 
@@ -118,7 +120,7 @@ namespace
             return encoder;
         }
 
-        bool Finish(std::shared_ptr<IRHIQueueCommandBatch>& batch, std::string& error) override
+        bool Finish(ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error) override
         {
             batch.reset();
             if (finished)
@@ -149,7 +151,7 @@ namespace
         }
     };
 
-    bool QueueOperation(const std::shared_ptr<DX12QueueServiceState>& state,
+    bool QueueOperation(const own::shared_owner<DX12QueueServiceState>& state,
         const std::function<HRESULT()>& operation, std::string& error)
     {
         HRESULT result = E_FAIL;
@@ -165,21 +167,21 @@ namespace
         {
             work(error);
         }
-        else if (!GetRHISubmissionThread().ExecuteAndWait(state.get(), "Q0 queue operation", work, error))
+        else if (!GetRHISubmissionThread().ExecuteAndWait(state.operator->(), "Q0 queue operation", work, error))
         {
             return false;
         }
         return SUCCEEDED(result);
     }
 
-    bool DispatchQueueOperation(const std::shared_ptr<DX12QueueServiceState>& state,
+    bool DispatchQueueOperation(const own::shared_owner<DX12QueueServiceState>& state,
         const std::function<bool()>& operation, std::string& error)
     {
         bool accepted = false;
         std::string dispatchError;
         auto* const commandFailure = RHICommandFailureScope::Current();
         const bool dispatched = GetRHISubmissionThread().ExecuteAndWait(
-            state.get(), "Q0 queue admission",
+            state.operator->(), "Q0 queue admission",
             [&](std::string&)
             {
                 const RHICommandFailureScope diagnostic(
@@ -198,7 +200,7 @@ namespace
     class DX12ServiceBatch final : public IRHIQueueCommandBatch
     {
       public:
-        std::shared_ptr<DX12QueueServiceState> state;
+        own::shared_owner<DX12QueueServiceState> state;
         RHIQueueIdentity identity;
         uint64_t recording{0};
         bool consumed{false};
@@ -208,7 +210,7 @@ namespace
         std::vector<ComPtr<ID3D12CommandList>> sealedLists;
         uint32_t sealedListCount{};
         ComPtr<ID3D12Resource> source, destination;
-        std::shared_ptr<const void> token;
+        ce::lifetime_token token;
         RHIQueueIdentity GetQueueIdentity() const override { return identity; }
         uint64_t GetRecordingId() const override { return recording; }
         std::span<const ComPtr<ID3D12CommandList>> GetSealedLists() const
@@ -221,7 +223,7 @@ namespace
     class DX12ServiceTimeline final : public IRHITimelineFence
     {
       public:
-        std::shared_ptr<DX12QueueServiceState> state;
+        own::shared_owner<DX12QueueServiceState> state;
         ComPtr<ID3D12Fence> native;
         RHIQueueIdentity identity;
         std::atomic<uint64_t> issued{0};
@@ -246,15 +248,15 @@ namespace
     {
     public:
         ComPtr<ID3D12CommandQueue> native;
-        std::shared_ptr<DX12ServiceTimeline> timeline;
-        std::shared_ptr<DX12QueueRecordingPool> recordingPool{std::make_shared<DX12QueueRecordingPool>()};
+        own::shared_owner<DX12ServiceTimeline> timeline;
+        own::shared_owner<DX12QueueRecordingPool> recordingPool{own::make_shared<DX12QueueRecordingPool>()};
         // Keep waited fences alive until the entire service has drained. Resource
         // submission/retirement is intentionally not exposed by this primitive API.
-        std::vector<std::shared_ptr<DX12ServiceTimeline>> waits;
+        std::vector<own::shared_owner<DX12ServiceTimeline>> waits;
         std::vector<ComPtr<ID3D12Fence>> testGates;
         struct Retirement
         {
-            std::shared_ptr<DX12ServiceBatch> batch;
+            ce::pooled_owner<DX12ServiceBatch> batch;
             uint64_t value;
             ce::profile_rhi_context rhiContext;
         };
@@ -304,8 +306,8 @@ namespace
                 error = "Unavailable queue or invalid wait: " + error;
                 return false;
             }
-            const auto producer = std::dynamic_pointer_cast<DX12ServiceTimeline>(point.fence);
-            if (!producer || producer->state != timeline->state ||
+            const auto producer = own::dynamic_owner_cast<DX12ServiceTimeline>(point.fence);
+            if (!producer || producer->state.operator->() != timeline->state.operator->() ||
                 FAILED(timeline->state->device->GetDeviceRemovedReason()))
             {
                 error = "Wait requires a native timeline from this device service.";
@@ -313,7 +315,7 @@ namespace
             }
             // Allocate retention before enqueue; an allocation failure cannot leave
             // an accepted GPU wait referring to an unretained native fence.
-            if (std::find(waits.begin(), waits.end(), producer) == waits.end())
+            if (std::find_if(waits.begin(), waits.end(), [&](const auto& item) { return item.operator->() == producer.operator->(); }) == waits.end())
             {
                 waits.push_back(producer);
             }
@@ -327,7 +329,7 @@ namespace
             }
             return true;
         }
-        bool Submit(const std::shared_ptr<IRHIQueueCommandBatch>& batch,
+        bool Submit(const ce::pooled_owner<IRHIQueueCommandBatch>& batch,
             uint64_t value, RHITimelinePoint& point, std::string& error) override
         {
             point = {};
@@ -337,9 +339,9 @@ namespace
                 return DispatchQueueOperation(timeline->state, [&] { return Submit(batch, value, point, error); }, error);
             }
             std::lock_guard lock(timeline->state->admission);
-            const auto recording = std::dynamic_pointer_cast<DX12ServiceBatch>(batch);
+            const auto recording = ce::dynamic_pooled_cast<DX12ServiceBatch>(batch);
             if (!timeline->state->active.load() || faulted || !recording ||
-                recording->state != timeline->state || recording->identity != GetIdentity() ||
+                recording->state.operator->() != timeline->state.operator->() || recording->identity != GetIdentity() ||
                 recording->consumed || value == 0 || value == UINT64_MAX || value <= timeline->issued.load() ||
                 FAILED(timeline->state->device->GetDeviceRemovedReason()))
             {
@@ -466,8 +468,8 @@ namespace
         }
     };
 
-    void ReleaseServiceOwners(const std::shared_ptr<DX12QueueServiceState>& state,
-        std::vector<std::shared_ptr<DX12ServiceBatch>>& released)
+    void ReleaseServiceOwners(const own::shared_owner<DX12QueueServiceState>& state,
+        std::vector<ce::pooled_owner<DX12ServiceBatch>>& released)
     {
         for (const auto& queue : state->queues)
         {
@@ -492,14 +494,14 @@ namespace
 }
 
 DX12QueueService::DX12QueueService(ID3D12Device* device)
-    : state_(std::make_shared<DX12QueueServiceState>())
+    : state_(own::make_shared<DX12QueueServiceState>())
 {
     state_->device = device;
     state_->active.store(device != nullptr);
     if (device)
     {
         std::string error;
-        if (!GetRHISubmissionThread().AcquireClient(state_.get(), error))
+        if (!GetRHISubmissionThread().AcquireClient(state_.operator->(), error))
         {
             throw std::runtime_error(error);
         }
@@ -525,7 +527,7 @@ RHIQueueCapabilities DX12QueueService::QueryQueueCapabilities() const
 }
 
 bool DX12QueueService::CreateQueue(RHIQueueKind kind,
-    std::shared_ptr<IRHICommandQueue>& queue, std::string& error)
+    own::shared_owner<IRHICommandQueue>& queue, std::string& error)
 {
     queue.reset();
     error.clear();
@@ -535,8 +537,8 @@ bool DX12QueueService::CreateQueue(RHIQueueKind kind,
         error = "Queue service or queue kind is unavailable.";
         return false;
     }
-    auto result = std::make_shared<DX12ServiceQueue>();
-    result->timeline = std::make_shared<DX12ServiceTimeline>();
+    auto result = own::make_shared<DX12ServiceQueue>();
+    result->timeline = own::make_shared<DX12ServiceTimeline>();
     result->timeline->state = state_;
     result->timeline->identity = {state_->incarnation, state_->nextQueue++, kind};
     D3D12_COMMAND_QUEUE_DESC desc{};
@@ -567,7 +569,7 @@ bool DX12QueueService::ImportPrimaryCompletion(ID3D12Fence* fence, uint64_t valu
         error = "Primary completion requires a live fence from this device.";
         return false;
     }
-    auto timeline = std::dynamic_pointer_cast<DX12ServiceTimeline>(state_->primaryTimeline);
+    auto timeline = own::dynamic_owner_cast<DX12ServiceTimeline>(state_->primaryTimeline);
     if (!timeline)
     {
         if (state_->nextQueue == 0)
@@ -575,7 +577,7 @@ bool DX12QueueService::ImportPrimaryCompletion(ID3D12Fence* fence, uint64_t valu
             error = "Primary timeline identity range is exhausted.";
             return false;
         }
-        timeline = std::make_shared<DX12ServiceTimeline>();
+        timeline = own::make_shared<DX12ServiceTimeline>();
         timeline->state = state_;
         timeline->native = fence;
         timeline->identity = {state_->incarnation, state_->nextQueue++, RHIQueueKind::Graphics};
@@ -592,7 +594,7 @@ bool DX12QueueService::ImportPrimaryCompletion(ID3D12Fence* fence, uint64_t valu
 }
 
 bool DX12QueueService::GetPrimaryGraphicsQueue(ID3D12CommandQueue* primary,
-    std::shared_ptr<IRHICommandQueue>& queue, std::string& error)
+    own::shared_owner<IRHICommandQueue>& queue, std::string& error)
 {
     queue.reset();
     error.clear();
@@ -624,9 +626,9 @@ bool DX12QueueService::GetPrimaryGraphicsQueue(ID3D12CommandQueue* primary,
         error = "Queue identity range is exhausted.";
         return false;
     }
-    auto endpoint = std::make_shared<DX12ServiceQueue>();
+    auto endpoint = own::make_shared<DX12ServiceQueue>();
     endpoint->native = primary;
-    endpoint->timeline = std::make_shared<DX12ServiceTimeline>();
+    endpoint->timeline = own::make_shared<DX12ServiceTimeline>();
     endpoint->timeline->state = state_;
     endpoint->timeline->identity = {state_->incarnation, state_->nextQueue++, RHIQueueKind::Graphics};
     if (FAILED(state_->device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
@@ -641,9 +643,9 @@ bool DX12QueueService::GetPrimaryGraphicsQueue(ID3D12CommandQueue* primary,
     return true;
 }
 
-ID3D12CommandQueue* DX12QueueService::NativeQueue(const std::shared_ptr<IRHICommandQueue>& queue)
+ID3D12CommandQueue* DX12QueueService::NativeQueue(const own::shared_owner<IRHICommandQueue>& queue)
 {
-    const auto native = std::dynamic_pointer_cast<DX12ServiceQueue>(queue);
+    const auto native = own::dynamic_owner_cast<DX12ServiceQueue>(queue);
     if (!native || !native->timeline->state->active.load() || native->faulted)
     {
         return nullptr;
@@ -655,11 +657,11 @@ bool DX12QueueService::JoinPrimaryQueue(ID3D12CommandQueue* queue,
     const RHITimelinePoint& point, std::string& error)
 {
     std::unique_lock lock(state_->admission);
-    const auto producer = std::dynamic_pointer_cast<DX12ServiceTimeline>(point.fence);
+    const auto producer = own::dynamic_owner_cast<DX12ServiceTimeline>(point.fence);
     ComPtr<ID3D12Device> device;
     if (!state_->active.load() || !queue || queue->GetDesc().Type != D3D12_COMMAND_LIST_TYPE_DIRECT ||
         FAILED(queue->GetDevice(IID_PPV_ARGS(&device))) || device.Get() != state_->device.Get() ||
-        !producer || producer->state != state_ || !point.IsValid() ||
+        !producer || producer->state.operator->() != state_.operator->() || !point.IsValid() ||
         (state_->primaryQueue && state_->primaryQueue.Get() != queue) ||
         FAILED(state_->device->GetDeviceRemovedReason()))
     {
@@ -669,7 +671,7 @@ bool DX12QueueService::JoinPrimaryQueue(ID3D12CommandQueue* queue,
     state_->primaryQueue = queue;
     for (const auto& endpoint : state_->queues)
     {
-        if (endpoint->native.Get() == queue && endpoint->timeline == producer)
+        if (endpoint->native.Get() == queue && endpoint->timeline.operator->() == producer.operator->())
         {
             // Graph epilogue already joined compute. The primary frame suffix
             // follows it in FIFO order and retains the ordinary frame-slot fence.
@@ -693,8 +695,8 @@ bool DX12QueueService::JoinPrimaryQueue(ID3D12CommandQueue* queue,
 bool DX12QueueService::Shutdown(std::string& error)
 {
     error.clear();
-    std::vector<std::shared_ptr<DX12ServiceBatch>> released;
-    std::vector<std::shared_ptr<DX12ServiceQueue>> queues;
+    std::vector<ce::pooled_owner<DX12ServiceBatch>> released;
+    std::vector<own::shared_owner<DX12ServiceQueue>> queues;
     ComPtr<ID3D12CommandQueue> primary;
     {
         std::lock_guard lock(state_->admission);
@@ -712,7 +714,7 @@ bool DX12QueueService::Shutdown(std::string& error)
         }
         if (releaseClient)
         {
-            GetRHISubmissionThread().ReleaseClient(state_.get());
+            GetRHISubmissionThread().ReleaseClient(state_.operator->());
         }
         return true;
     };
@@ -775,14 +777,14 @@ bool DX12QueueService::Shutdown(std::string& error)
     return release();
 }
 
-bool DX12QueueService::RecordBufferCopy(const std::shared_ptr<IRHICommandQueue>& queue,
+bool DX12QueueService::RecordBufferCopy(const own::shared_owner<IRHICommandQueue>& queue,
     ID3D12Resource* source, ID3D12Resource* destination, uint64_t bytes,
-    std::shared_ptr<IRHIQueueCommandBatch>& batch, std::string& error,
-    std::shared_ptr<const void> lifetimeToken)
+    ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error,
+    ce::lifetime_token lifetimeToken)
 {
     batch.reset();
     error.clear();
-    const auto target = std::dynamic_pointer_cast<DX12ServiceQueue>(queue);
+    const auto target = own::dynamic_owner_cast<DX12ServiceQueue>(queue);
     if (!target)
     {
         error = "Buffer recording requires a native DX12 queue.";
@@ -814,7 +816,7 @@ bool DX12QueueService::RecordBufferCopy(const std::shared_ptr<IRHICommandQueue>&
         error = "Unsupported device, buffer size or heap type for COMMON copy recording.";
         return false;
     }
-    auto result = std::make_shared<DX12ServiceBatch>();
+    auto result = own::make_shared<DX12ServiceBatch>();
     result->state = recordingState;
     result->identity = queue->GetIdentity();
     result->recording = recordingState->nextRecording++;
@@ -863,13 +865,13 @@ bool DX12QueueService::RecordBufferCopy(const std::shared_ptr<IRHICommandQueue>&
     return true;
 }
 
-bool DX12SealQueueRecording(const std::shared_ptr<IRHICommandQueue>& queue,
-    std::span<ID3D12CommandList* const> lists, std::shared_ptr<const void> lifetimeToken,
-    std::shared_ptr<IRHIQueueCommandBatch>& batch, std::string& error)
+bool DX12SealQueueRecording(const own::shared_owner<IRHICommandQueue>& queue,
+    std::span<ID3D12CommandList* const> lists, ce::lifetime_token lifetimeToken,
+    ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error)
 {
     batch.reset();
     error.clear();
-    const auto target = std::dynamic_pointer_cast<DX12ServiceQueue>(queue);
+    const auto target = own::dynamic_owner_cast<DX12ServiceQueue>(queue);
     if (!target || lists.empty() || lists.size() > UINT_MAX || !lifetimeToken)
     {
         error = "Sealed recording needs a native queue, closed lists and pinned storage.";
@@ -882,7 +884,7 @@ bool DX12SealQueueRecording(const std::shared_ptr<IRHICommandQueue>& queue,
         error = "Recording queue is unavailable.";
         return false;
     }
-    auto result = std::make_shared<DX12ServiceBatch>();
+    auto result = own::make_shared<DX12ServiceBatch>();
     result->state = state;
     result->identity = queue->GetIdentity();
     result->recording = state->nextRecording++;
@@ -919,9 +921,9 @@ IRenderDeviceServices& DX12QueueRecorder::DeviceServices() const
     return resources_;
 }
 
-bool DX12QueueRecorder::Record(const std::shared_ptr<IRHICommandQueue>& queue,
-    const std::function<void(RHIEncoder&)>& commands, std::shared_ptr<const void> token,
-    std::shared_ptr<IRHIQueueCommandBatch>& batch, std::string& error)
+bool DX12QueueRecorder::Record(const own::shared_owner<IRHICommandQueue>& queue,
+    const std::function<void(RHIEncoder&)>& commands, ce::lifetime_token token,
+    ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error)
 {
     batch.reset();
     error.clear();
@@ -930,7 +932,7 @@ bool DX12QueueRecorder::Record(const std::shared_ptr<IRHICommandQueue>& queue,
         error = "Queue recording requires a command callback.";
         return false;
     }
-    std::shared_ptr<IRHIQueueRecording> recording;
+    ce::pooled_owner<IRHIQueueRecording> recording;
     if (!BeginRecording(queue, 1, std::move(token), recording, error))
     {
         return false;
@@ -952,13 +954,13 @@ bool DX12QueueRecorder::Record(const std::shared_ptr<IRHICommandQueue>& queue,
     return recording->Finish(batch, error);
 }
 
-bool DX12QueueRecorder::BeginRecording(const std::shared_ptr<IRHICommandQueue>& queue,
-    uint32_t targetCount, std::shared_ptr<const void> token,
-    std::shared_ptr<IRHIQueueRecording>& recording, std::string& error)
+bool DX12QueueRecorder::BeginRecording(const own::shared_owner<IRHICommandQueue>& queue,
+    uint32_t targetCount, ce::lifetime_token token,
+    ce::pooled_owner<IRHIQueueRecording>& recording, std::string& error)
 {
     recording.reset();
     error.clear();
-    const auto target = std::dynamic_pointer_cast<DX12ServiceQueue>(queue);
+    const auto target = own::dynamic_owner_cast<DX12ServiceQueue>(queue);
     if (!target || !token || targetCount == 0 || targetCount > workers_ ||
         targetCount > DX12QueueRecording::kMaxTargets ||
         target->timeline->state->device.Get() != resources_.GetDevice() ||
@@ -967,11 +969,11 @@ bool DX12QueueRecorder::BeginRecording(const std::shared_ptr<IRHICommandQueue>& 
         error = "Queue encoder requires a matching graphics/compute device and pinned callback storage.";
         return false;
     }
-    auto result = std::make_shared<DX12QueueRecording>();
+    auto result = own::make_shared<DX12QueueRecording>();
     result->queue = queue;
     for (uint32_t index = 0; index < targetCount; ++index)
     {
-        auto lease = std::make_shared<DX12QueueRecordingLease>();
+        auto lease = own::make_shared<DX12QueueRecordingLease>();
         lease->owner = token;
         lease->pool = target->recordingPool;
         bool reused = false;
@@ -991,7 +993,7 @@ bool DX12QueueRecorder::BeginRecording(const std::shared_ptr<IRHICommandQueue>& 
             }
             else
             {
-                lease->storage = std::make_unique<DX12QueueRecordingStorage>();
+                lease->storage = own::make_unique<DX12QueueRecordingStorage>();
                 ++lease->pool->created;
             }
             ++lease->pool->leased;
@@ -1010,7 +1012,7 @@ bool DX12QueueRecorder::BeginRecording(const std::shared_ptr<IRHICommandQueue>& 
         }
         if (!storage->encoder || !storage->encoder->UsesResources(&resources_))
         {
-            storage->encoder = std::make_unique<DX12Encoder>(storage->list.Get(), &resources_);
+            storage->encoder = own::make_unique<DX12Encoder>(storage->list.Get(), &resources_);
         }
         else
         {
@@ -1059,9 +1061,9 @@ bool DX12QueueRecorder::ExecuteSubmission(const std::function<bool(std::string&)
 }
 
 DX12QueueService::RecordingPoolStats DX12QueueService::QueryRecordingPool(
-    const std::shared_ptr<IRHICommandQueue>& queue)
+    const own::shared_owner<IRHICommandQueue>& queue)
 {
-    const auto target = std::dynamic_pointer_cast<DX12ServiceQueue>(queue);
+    const auto target = own::dynamic_owner_cast<DX12ServiceQueue>(queue);
     if (!target)
     {
         return {};
@@ -1072,7 +1074,7 @@ DX12QueueService::RecordingPoolStats DX12QueueService::QueryRecordingPool(
 }
 
 #if !CE_SHIPPING
-bool DX12QueueService::EnqueueTestGate(const std::shared_ptr<IRHICommandQueue>& queue,
+bool DX12QueueService::EnqueueTestGate(const own::shared_owner<IRHICommandQueue>& queue,
     ID3D12Fence* fence, uint64_t value, std::string& error)
 {
     if (!GetRHISubmissionThread().IsCurrentThread())
@@ -1080,8 +1082,8 @@ bool DX12QueueService::EnqueueTestGate(const std::shared_ptr<IRHICommandQueue>& 
         return DispatchQueueOperation(state_, [&] { return EnqueueTestGate(queue, fence, value, error); }, error);
     }
     std::lock_guard lock(state_->admission);
-    const auto target = std::dynamic_pointer_cast<DX12ServiceQueue>(queue);
-    if (!state_->active.load() || !target || target->timeline->state != state_ || !fence)
+    const auto target = own::dynamic_owner_cast<DX12ServiceQueue>(queue);
+    if (!state_->active.load() || !target || target->timeline->state.operator->() != state_.operator->() || !fence)
     {
         error = "Invalid test gate target.";
         return false;

@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "Core.Minimal.h"
 #include "MetaPolymorphic.h"
@@ -48,13 +49,13 @@ struct Vertex
 		const math::vector4& _boneIndices,
 		const math::vector4& _boneWeights
 	) :
-		position(_position), 
-		normal(_normal), 
+		position(_position),
+		normal(_normal),
 		uv0(_uv0),
 		uv1(_uv1),
-		tangent(_tangent), 
-		bitangent(_bitangent), 
-		boneIndices(_boneIndices), 
+		tangent(_tangent),
+		bitangent(_bitangent),
+		boneIndices(_boneIndices),
 		boneWeights(_boneWeights) {}
 
 	Vertex(const math::vector3& _position, const math::vector3& _normal, const math::vector2& _uv) :
@@ -82,7 +83,7 @@ class Material;
 class ModelLoader;
 class MeshOptimizer;
 class Camera;
-class [[reflgen::reflect]] Mesh : public meta::polymorphic, public std::enable_shared_from_this<Mesh>,
+class [[reflgen::reflect]] Mesh : public meta::polymorphic, public own::enable_owner_from_this<Mesh>,
 	private Diagnostics::CountedResource<Diagnostics::EngineResource::Mesh>
 {
    friend struct reflgen::access;

@@ -1,4 +1,6 @@
 #pragma once
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "../RHIPipelineLayout.h"
 #include "../RHIDescriptorVersionPolicy.h"
 #include "../../../Utility_Framework/StandardLibrary.h"
@@ -92,7 +94,7 @@ class DX12DescriptorRecycler
     struct RecordingLease
     {
         Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> heap;
-        std::shared_ptr<const void> reuseLease;
+        ce::lifetime_token reuseLease;
         uint64_t version{};
         bool IsValid() const { return heap && reuseLease && version != 0; }
     };
@@ -174,7 +176,7 @@ class DX12DescriptorRecycler
 
     ComPtr<ID3D12Device> m_device;
     D3D12_DESCRIPTOR_HEAP_TYPE m_type{D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV};
-    std::vector<std::unique_ptr<Page>> m_pages;
+    std::vector<own::unique_owner<Page>> m_pages;
     RHIDescriptorVersionPolicy m_versions;
     RHIDescriptorVersionHandle m_activeVersion{};
     Page* m_activePage{nullptr};

@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "TemporalUpscalerHost.h"
 #include "../../RHI/IRHIDeviceResources.h"
 #include "../../RHI/DX12/DX12DeviceResources.h"
@@ -48,18 +49,21 @@ struct TemporalUpscalerHost::State
     TemporalProvider provider{ TemporalProvider::None };
     TemporalResult result{ TemporalStatus::NotQueried }, requestedResult{ TemporalStatus::NotQueried };
     std::vector<TemporalCapabilities> capabilities;
-    std::unique_ptr<ITemporalUpscaler> adapter;
-    std::shared_ptr<DlssTemporalAdapter> dlss;
+    own::unique_owner<ITemporalUpscaler> adapter;
+    own::shared_owner<DlssTemporalAdapter> dlss;
     std::array<bool, 4> failed{};
     std::array<TemporalResult, 4> failures{};
     uint32_t viewportId{ g_nextViewport.fetch_add(1) };
     bool dirty{ false }, depthInverted{ false }, orthographic{ false };
 };
-TemporalUpscalerHost::TemporalUpscalerHost() : m_state(std::make_unique<State>()) {}
+TemporalUpscalerHost::TemporalUpscalerHost() : m_state(own::make_unique<State>()) {}
 TemporalUpscalerHost::~TemporalUpscalerHost()
 {
     // Do not release a context after unproven GPU retirement.
-    if (!Shutdown().IsSuccess()) (void)m_state.release();
+    if (!Shutdown().IsSuccess())
+    {
+        (void)new decltype(m_state)(std::move(m_state));
+    }
 }
 TemporalExtent TemporalUpscalerHost::RenderExtent() const { return m_state->render; }
 TemporalProvider TemporalUpscalerHost::Provider() const { return m_state->provider; }
@@ -210,7 +214,7 @@ TemporalResult TemporalUpscalerHost::Configure(IRHIDeviceResources& resources, T
             auto* vk = dynamic_cast<VulkanDeviceResources*>(&resources);
             if (vk && vk->SupportsTemporalXeSS(settings.runtimeDirectory))
             {
-                auto prepared = std::make_unique<XeSSUpscalerVulkan>();
+                auto prepared = own::make_unique<XeSSUpscalerVulkan>();
                 auto loaded = prepared->Load(settings.runtimeDirectory.c_str());
                 if (!loaded.IsSuccess()) return loaded;
                 return CreateXeSSUpscalerVulkan(*vk, prepared, config,

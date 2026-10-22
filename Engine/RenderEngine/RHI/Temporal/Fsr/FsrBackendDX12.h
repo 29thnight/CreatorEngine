@@ -1,4 +1,6 @@
 #pragma once
+#include "../../../../Utility_Framework/LifetimeToken.h"
+#include "../../../../Utility_Framework/Ownership.h"
 #include "FsrBackend.h"
 #if CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_DX12_SDK
 #include "../../../Render/Temporal/ITemporalUpscaler.h"
@@ -10,7 +12,7 @@ class DX12DeviceResources;
 
 FsrBackendDevice MakeFsrBackendDeviceDX12(ID3D12Device* device);
 TemporalResult CreateFsrUpscalerDX12(DX12DeviceResources& resources, const FsrContextDescription& description,
-    FsrGpuSynchronization synchronization, std::unique_ptr<ITemporalUpscaler>& output);
+    FsrGpuSynchronization synchronization, own::unique_owner<ITemporalUpscaler>& output);
 
 struct FsrPlayerSwapchainDescriptionDX12
 {
@@ -50,14 +52,14 @@ public:
 
 private:
     DX12DeviceResources* m_resources{ nullptr };
-    std::unique_ptr<FsrFrameGenerator> m_generator{ std::make_unique<FsrFrameGenerator>() };
+    own::unique_owner<FsrFrameGenerator> m_generator{ own::make_unique<FsrFrameGenerator>() };
     Microsoft::WRL::ComPtr<IDXGISwapChain4> m_swapchain;
     struct FramePins
     {
         Microsoft::WRL::ComPtr<ID3D12Resource> resources[4];
-        std::shared_ptr<const void> lifetimeToken;
+        ce::lifetime_token lifetimeToken;
     };
-    std::unique_ptr<FramePins> m_lifetime;
+    own::unique_owner<FramePins> m_lifetime;
     bool m_canPresent{ false };
     uint32_t m_uiFlags{ 0 };
     bool m_pending{ false };
@@ -67,5 +69,5 @@ private:
 // ITemporalFrameGenerator base. Creation does not replace a live engine swapchain.
 TemporalResult CreateFsrFrameGeneratorDX12(DX12DeviceResources&, const FsrContextDescription&,
     const TemporalFrameGenerationConfig&, const FsrPlayerSwapchainDescriptionDX12&, FsrGpuSynchronization,
-    std::unique_ptr<FsrFrameGeneratorDX12>& output);
+    own::unique_owner<FsrFrameGeneratorDX12>& output);
 #endif

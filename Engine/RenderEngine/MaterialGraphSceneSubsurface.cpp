@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "MaterialGraphSceneSubsurface.h"
 
 #include "RHI/RHIShaderCompiler.h"
@@ -118,7 +119,7 @@ namespace material_graph
 
     bool SceneSubsurfaceResources::Prepare(const EnhancedFrameContext& context, RHITextureHandle environment,
                                            std::uint64_t memoryBudget,
-                                           std::shared_ptr<const SceneSubsurfaceFrame>& result, std::string& error)
+                                           own::shared_owner<const SceneSubsurfaceFrame>& result, std::string& error)
     {
         const auto count = std::uint64_t(context.width) * context.height;
         if (!context.resources || !context.rootSignatures || !context.psoManager || !count || count > UINT32_MAX ||
@@ -130,7 +131,7 @@ namespace material_graph
         {
             return false;
         }
-        auto candidate = std::make_shared<SceneSubsurfaceFrame>();
+        auto candidate = own::make_shared<SceneSubsurfaceFrame>();
         candidate->device_ = device_;
         candidate->width_ = context.width;
         candidate->height_ = context.height;

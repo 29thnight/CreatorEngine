@@ -1,4 +1,6 @@
 #pragma once
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 
 #include "XeSSUpscaler.h"
 #include "../../Render/Temporal/ITemporalFrameGenerator.h"
@@ -64,7 +66,7 @@ public:
     // Serial baseline drains the previous frame before replacing its retained
     // owner. A failed/partially recorded tag keeps the owner until a successful drain.
     TemporalResult Prepare(ID3D12CommandList* commands, const TemporalFrame& frame,
-        const XeSSFrameGenerationDX12Bindings& bindings, std::shared_ptr<const void> lifetimeToken);
+        const XeSSFrameGenerationDX12Bindings& bindings, ce::lifetime_token lifetimeToken);
     // Optional raw native-call observation, independent of PresentEnd marker results.
     TemporalResult Present(uint64_t realFrameId, uint32_t syncInterval, uint32_t flags,
         TemporalResult* presentObservation = nullptr);
@@ -79,7 +81,7 @@ public:
     TemporalResult Shutdown();
 
 private:
-    std::unique_ptr<XeSSFrameGenerationDX12State> m_state;
+    own::unique_owner<XeSSFrameGenerationDX12State> m_state;
 };
 
 // The drain callback must prove retirement of both engine tagging lists and SDK
@@ -90,5 +92,5 @@ TemporalResult CreateXeSSFrameGeneratorDX12(DX12DeviceResources& resources,
     const DXGI_SWAP_CHAIN_DESC1& description, const wchar_t* runtimeDirectory,
     const TemporalFrameGenerationConfig& config, bool depthInverted,
     std::function<TemporalResult()> drain,
-    std::unique_ptr<ITemporalFrameGenerator>& frameGenerator,
+    own::unique_owner<ITemporalFrameGenerator>& frameGenerator,
     XeSSFrameGenerationDX12*& presentation);

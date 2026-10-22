@@ -1,6 +1,8 @@
 #include "ExternUI.h"
+#include "ImGui.h"
 #include "EditorSessionState.h"
 #include "DataSystem.h"
+#include "Scene.h"
 #include "EditorAssetDragPayload.h"
 #include "Assets/ModelAssetGeneration.h" // MBC9
 #include "EditorImGuiTexture.h"

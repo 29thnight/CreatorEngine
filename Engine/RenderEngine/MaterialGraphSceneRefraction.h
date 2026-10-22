@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 
 #include "LXMaterialPipeline.h"
 
@@ -41,12 +42,12 @@ class SceneRefractionFrame
     RHITextureHandle environment_;
     std::array<RHITextureHandle, 2> inputs_{};
     RHIBufferHandle samples_;
-    std::shared_ptr<const LX::Runtime::ComputeGeneration> bake_;
+    own::shared_owner<const LX::Runtime::ComputeGeneration> bake_;
     std::vector<RHIBufferSlice> constants_;
     RHIBindingTable outputs_;
-    std::shared_ptr<const SceneVolumeFrame> volume_;
+    own::shared_owner<const SceneVolumeFrame> volume_;
     RHIBufferSlice emptyVolumeConstants_, emptyVolumeBuffer_;
-    std::weak_ptr<const SceneRefractionFrame> self_;
+    own::weak_owner<const SceneRefractionFrame> self_;
     mutable const EnhancedRenderGraph* graph_{};
     mutable std::uint64_t graphEpoch_{};
     mutable std::array<RGHandle, 2> graphInputs_{};
@@ -59,8 +60,8 @@ class SceneRefractionResources
   public:
     bool Prepare(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection,
                  RHITextureHandle environment, std::uint64_t memoryBudget,
-                 std::shared_ptr<const SceneRefractionFrame>& result, std::string& error,
-                 std::shared_ptr<const SceneVolumeFrame> volume = {});
+                 own::shared_owner<const SceneRefractionFrame>& result, std::string& error,
+                 own::shared_owner<const SceneVolumeFrame> volume = {});
     void ShutdownAfterIdle();
 
   private:

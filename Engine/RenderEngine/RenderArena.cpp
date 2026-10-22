@@ -177,7 +177,16 @@ namespace ce
         }
         if (!set)
         {
-            set = make_render_unique<RenderArenaSet>().release();
+            auto* memory = render_allocator<RenderArenaSet>{}.allocate(1);
+            try
+            {
+                set = std::construct_at(memory);
+            }
+            catch (...)
+            {
+                render_allocator<RenderArenaSet>{}.deallocate(memory, 1);
+                throw;
+            }
         }
         return RenderArenaLease(
             set, [state = m_state](RenderArenaSet* value) { state->Release(value); }, render_allocator<std::byte>{});

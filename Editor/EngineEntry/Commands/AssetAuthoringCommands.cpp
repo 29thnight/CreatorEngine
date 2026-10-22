@@ -1,3 +1,4 @@
+#include "../../../Engine/Utility_Framework/Ownership.h"
 #include "../../../Tools/regression/gcce_probe_cleanup.h"
 #include "../EditorModelPlacement.h"
 #include <DirectXTex.h>
@@ -173,7 +174,7 @@ namespace ConsoleCmd
         {
             const auto project = m_project.lock();
             Scene* scene = SceneManagers->GetActiveScene();
-            if (!project || project != SceneManagers->ProjectLayers() || !scene || SceneManagers->IsPlayCommitted() ||
+            if (!project || project.operator->() != SceneManagers->ProjectLayers().operator->() || !scene || SceneManagers->IsPlayCommitted() ||
                 file::canonical(PathFinder::Relative()) != m_root)
                 throw std::runtime_error("Geometry Undo target is not an idle active project");
 
@@ -187,7 +188,7 @@ namespace ConsoleCmd
         file::path m_destination;
         Editor::CollisionGeometryRevisionEdit m_edit;
         file::path m_root;
-        std::weak_ptr<ProjectLayerSettings> m_project;
+        own::weak_owner<ProjectLayerSettings> m_project;
     };
 
     static CommandCore::CommandResult Cmd_geometry_update(const ConsoleCommandContext& ctx)

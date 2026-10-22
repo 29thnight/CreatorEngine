@@ -24,7 +24,7 @@ struct ImGuiHostPresentationSink final : IDisplayPresentationSink
         return GetImGuiHost().GetBackendName();
     }
     uint64_t OpenSharedTexture(void* sharedHandle,
-        std::shared_ptr<RHIDisplayConsumerLease> consumerLease) override
+        own::shared_owner<RHIDisplayConsumerLease> consumerLease) override
     {
         const uint64_t textureId = GetImGuiHost().OpenSharedTexture(
             sharedHandle, std::move(consumerLease));

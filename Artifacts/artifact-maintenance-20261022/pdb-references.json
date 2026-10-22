@@ -1,0 +1,432 @@
+{
+  "schema": 1,
+  "policy": "Identical PDB SHA256 copies share one preserved canonical file. Resolve-ProfilingSymbolPath.ps1 includes canonical directories for symbol lookup.",
+  "references": [
+    {
+      "path": "Artifacts/container-reuse-20261021/before/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/container-reuse-isolated-20261021/off-a/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/container-reuse-isolated-20261021/off-b/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/container-reuse-isolated-20261021/on-a/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/container-reuse-isolated-20261021/on-b/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/gpu-marker-blob-20261022/off-a/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/gpu-marker-blob-20261022/off-b/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/gpu-marker-blob-20261022/on-a/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/gpu-marker-blob-20261022/on-b/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/node-declare-parallel-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/node-declare-parallel-20261021/before/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/node-declare-parallel-20261021/first-before/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/owner-borrow-20261022/off-a/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/owner-borrow-20261022/off-b/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/owner-borrow-20261022/on-a/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/owner-borrow-20261022/on-b/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/ownership-update-20261022/off-a/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/ownership-update-20261022/off-b/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/ownership-update-20261022/on-a/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/ownership-update-20261022/on-b/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/packet-group-reuse-20261021/off-a/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/packet-group-reuse-20261021/off-b/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/packet-group-reuse-20261021/on-a/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/packet-group-reuse-20261021/on-b/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/packet-group-reuse-final-20261021/off-a/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/packet-group-reuse-final-20261021/off-b/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/packet-group-reuse-final-20261021/on-a/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/packet-group-reuse-final-20261021/on-b/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/scene-preparation-ownership-20261021/off-a/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/scene-preparation-ownership-20261021/off-b/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/scene-preparation-ownership-20261021/on-a/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/scene-preparation-ownership-20261021/on-b/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/container-reuse-20261021/failed-missing-fixtures/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/gpu-marker-blob-20261022/superseded-on-a-convention/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/owner-borrow-20261022/failed-off-b-exit/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/owner-borrow-20261022/failed-off-b-socket/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/owner-borrow-20261022/failed-on-b-foreground/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/packet-group-reuse-20261021/rejected/on-a-source-event-loss/BinarySnapshot/enkiTS.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/after/BinarySnapshot/enkiTS.pdb",
+      "bytes": 1372160,
+      "sha256": "b5c33c00ff86b26e25d0f802c6685766d4abfc9511b589e81a42346ffa0330dd"
+    },
+    {
+      "path": "Artifacts/node-declare-parallel-20261021/after/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/before/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "bf80dda83b8c1964d9db617f12c3d5dc85158622457a1edbd462893ac34e5e3e"
+    },
+    {
+      "path": "Artifacts/node-declare-parallel-20261021/before/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/before/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "bf80dda83b8c1964d9db617f12c3d5dc85158622457a1edbd462893ac34e5e3e"
+    },
+    {
+      "path": "Artifacts/container-reuse-20261021/failed-missing-fixtures/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/container-reuse-20261021/before/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "bf80dda83b8c1964d9db617f12c3d5dc85158622457a1edbd462893ac34e5e3e"
+    },
+    {
+      "path": "Artifacts/container-reuse-isolated-20261021/off-b/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/container-reuse-isolated-20261021/off-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "b7a5edf7f9e588d62454eaa3c8d8792604f52d76b6742c0c06740edfcea63b77"
+    },
+    {
+      "path": "Artifacts/container-reuse-isolated-20261021/on-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/container-reuse-isolated-20261021/off-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "b7a5edf7f9e588d62454eaa3c8d8792604f52d76b6742c0c06740edfcea63b77"
+    },
+    {
+      "path": "Artifacts/container-reuse-isolated-20261021/on-b/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/container-reuse-isolated-20261021/off-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "b7a5edf7f9e588d62454eaa3c8d8792604f52d76b6742c0c06740edfcea63b77"
+    },
+    {
+      "path": "Artifacts/gpu-marker-blob-20261022/on-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/gpu-marker-blob-20261022/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 363925504,
+      "sha256": "7ffa91a3ec5c39605ab53c0dcf1ff687a9fff7835886306b0ad7f4d9265a9c5f"
+    },
+    {
+      "path": "Artifacts/gpu-marker-blob-20261022/on-b/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/gpu-marker-blob-20261022/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 363925504,
+      "sha256": "7ffa91a3ec5c39605ab53c0dcf1ff687a9fff7835886306b0ad7f4d9265a9c5f"
+    },
+    {
+      "path": "Artifacts/gpu-marker-blob-20261022/off-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/ownership-update-20261022/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "04130fd9d7692825ca384bed580b6acd35fc0bcc305b236078c4aab39c688473"
+    },
+    {
+      "path": "Artifacts/gpu-marker-blob-20261022/off-b/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/ownership-update-20261022/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "04130fd9d7692825ca384bed580b6acd35fc0bcc305b236078c4aab39c688473"
+    },
+    {
+      "path": "Artifacts/ownership-update-20261022/on-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/ownership-update-20261022/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "04130fd9d7692825ca384bed580b6acd35fc0bcc305b236078c4aab39c688473"
+    },
+    {
+      "path": "Artifacts/ownership-update-20261022/on-b/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/ownership-update-20261022/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "04130fd9d7692825ca384bed580b6acd35fc0bcc305b236078c4aab39c688473"
+    },
+    {
+      "path": "Artifacts/node-declare-parallel-20261021/failed-shared-scratch/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/node-declare-parallel-20261021/first-before/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "bytes": 1142706176,
+      "sha256": "f7a454a421e2076599c50cba026d8c961cd51b745fb7ff66c746fa6306d24b75"
+    },
+    {
+      "path": "Artifacts/owner-borrow-20261022/on-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/owner-borrow-20261022/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "3afabf4be30389387968765860fa43b8f7a20b7ab80da8b610e8882c3aabbfe4"
+    },
+    {
+      "path": "Artifacts/owner-borrow-20261022/on-b/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/owner-borrow-20261022/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "3afabf4be30389387968765860fa43b8f7a20b7ab80da8b610e8882c3aabbfe4"
+    },
+    {
+      "path": "Artifacts/ownership-update-20261022/off-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/owner-borrow-20261022/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "3afabf4be30389387968765860fa43b8f7a20b7ab80da8b610e8882c3aabbfe4"
+    },
+    {
+      "path": "Artifacts/ownership-update-20261022/off-b/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/owner-borrow-20261022/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "3afabf4be30389387968765860fa43b8f7a20b7ab80da8b610e8882c3aabbfe4"
+    },
+    {
+      "path": "Artifacts/owner-borrow-20261022/failed-on-b-foreground/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/owner-borrow-20261022/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "3afabf4be30389387968765860fa43b8f7a20b7ab80da8b610e8882c3aabbfe4"
+    },
+    {
+      "path": "Artifacts/owner-borrow-20261022/off-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/scene-preparation-ownership-20261021/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "679d18bd04dca989a2a16484698d4a62a6e0ec86a28817133a29aa180e404ee8"
+    },
+    {
+      "path": "Artifacts/owner-borrow-20261022/off-b/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/scene-preparation-ownership-20261021/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "679d18bd04dca989a2a16484698d4a62a6e0ec86a28817133a29aa180e404ee8"
+    },
+    {
+      "path": "Artifacts/scene-preparation-ownership-20261021/on-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/scene-preparation-ownership-20261021/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "679d18bd04dca989a2a16484698d4a62a6e0ec86a28817133a29aa180e404ee8"
+    },
+    {
+      "path": "Artifacts/scene-preparation-ownership-20261021/on-b/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/scene-preparation-ownership-20261021/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "679d18bd04dca989a2a16484698d4a62a6e0ec86a28817133a29aa180e404ee8"
+    },
+    {
+      "path": "Artifacts/owner-borrow-20261022/failed-off-b-exit/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/scene-preparation-ownership-20261021/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "679d18bd04dca989a2a16484698d4a62a6e0ec86a28817133a29aa180e404ee8"
+    },
+    {
+      "path": "Artifacts/owner-borrow-20261022/failed-off-b-socket/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/scene-preparation-ownership-20261021/BinaryAfter/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "679d18bd04dca989a2a16484698d4a62a6e0ec86a28817133a29aa180e404ee8"
+    },
+    {
+      "path": "Artifacts/packet-group-reuse-20261021/off-b/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/packet-group-reuse-20261021/off-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "53dbaac7e159f902148352a2c38fda56327e75af9bd4fac496ed7c52c02e1202"
+    },
+    {
+      "path": "Artifacts/packet-group-reuse-20261021/on-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/packet-group-reuse-20261021/off-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "53dbaac7e159f902148352a2c38fda56327e75af9bd4fac496ed7c52c02e1202"
+    },
+    {
+      "path": "Artifacts/packet-group-reuse-20261021/on-b/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/packet-group-reuse-20261021/off-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "53dbaac7e159f902148352a2c38fda56327e75af9bd4fac496ed7c52c02e1202"
+    },
+    {
+      "path": "Artifacts/packet-group-reuse-20261021/rejected/on-a-source-event-loss/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/packet-group-reuse-20261021/off-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "53dbaac7e159f902148352a2c38fda56327e75af9bd4fac496ed7c52c02e1202"
+    },
+    {
+      "path": "Artifacts/packet-group-reuse-final-20261021/off-b/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/packet-group-reuse-final-20261021/off-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "5967b42482b088ec57e6c05c17f827fa3717c85c5a36e1aaef2d48c9ae2eaac5"
+    },
+    {
+      "path": "Artifacts/packet-group-reuse-final-20261021/on-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/packet-group-reuse-final-20261021/off-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "5967b42482b088ec57e6c05c17f827fa3717c85c5a36e1aaef2d48c9ae2eaac5"
+    },
+    {
+      "path": "Artifacts/packet-group-reuse-final-20261021/on-b/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/packet-group-reuse-final-20261021/off-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "5967b42482b088ec57e6c05c17f827fa3717c85c5a36e1aaef2d48c9ae2eaac5"
+    },
+    {
+      "path": "Artifacts/scene-preparation-ownership-20261021/off-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/packet-group-reuse-final-20261021/off-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "5967b42482b088ec57e6c05c17f827fa3717c85c5a36e1aaef2d48c9ae2eaac5"
+    },
+    {
+      "path": "Artifacts/scene-preparation-ownership-20261021/off-b/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "canonical": "Artifacts/packet-group-reuse-final-20261021/off-a/BinarySnapshot/CreatorEditor.runtime.pdb",
+      "bytes": 1206292480,
+      "sha256": "5967b42482b088ec57e6c05c17f827fa3717c85c5a36e1aaef2d48c9ae2eaac5"
+    }
+  ]
+}

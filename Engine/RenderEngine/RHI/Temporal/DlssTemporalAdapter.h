@@ -1,4 +1,6 @@
 #pragma once
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 
 #include "../../Render/Temporal/TemporalReconstruction.h"
 #include "../../Render/Temporal/ITemporalUpscaler.h"
@@ -59,7 +61,7 @@ struct DlssFrameGenerationResources
     DlssDX12Texture uiColor; // Display size, premultiplied color and alpha; optional.
     DlssDX12Texture depth;
     DlssDX12Texture motionVectors;
-    std::shared_ptr<const void> lifetimeToken; // Existing graph/presentation owner, includes alias/pool lifetime.
+    ce::lifetime_token lifetimeToken; // Existing graph/presentation owner, includes alias/pool lifetime.
 };
 
 struct DlssOptimalSettings
@@ -184,7 +186,7 @@ public:
 
 private:
     struct Implementation;
-    std::unique_ptr<Implementation> m_implementation;
+    own::unique_owner<Implementation> m_implementation;
 };
 
 // Backend-private factories: the supplied session/device must outlive all SDK
@@ -196,8 +198,8 @@ private:
 // shared session rather than unloading live code or freeing active GPU memory.
 using DlssFinalConsumptionDrain = std::function<TemporalResult()>;
 TemporalResult CreateDlssDX12Upscaler(DX12DeviceResources& resources,
-    std::shared_ptr<DlssTemporalAdapter> session, uint32_t viewportId, TemporalQuality quality,
-    DlssFinalConsumptionDrain drain, std::unique_ptr<ITemporalUpscaler>& upscaler);
+    own::shared_owner<DlssTemporalAdapter> session, uint32_t viewportId, TemporalQuality quality,
+    DlssFinalConsumptionDrain drain, own::unique_owner<ITemporalUpscaler>& upscaler);
 TemporalResult CreateDlssDX12FrameGenerator(DX12DeviceResources& resources,
-    std::shared_ptr<DlssTemporalAdapter> session, const TemporalFrameGenerationConfig& configuration,
-    DlssFinalConsumptionDrain drain, std::unique_ptr<ITemporalFrameGenerator>& frameGenerator);
+    own::shared_owner<DlssTemporalAdapter> session, const TemporalFrameGenerationConfig& configuration,
+    DlssFinalConsumptionDrain drain, own::unique_owner<ITemporalFrameGenerator>& frameGenerator);

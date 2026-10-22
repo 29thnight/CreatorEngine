@@ -1,0 +1,20 @@
+[
+  {
+    "id": "off-a-baseline",
+    "variant": "off-a",
+    "mode": "baseline",
+    "begin": 0,
+    "end": 15496.4609,
+    "events": 1522978,
+    "measurements": 764
+  },
+  {
+    "id": "off-a-etw",
+    "variant": "off-a",
+    "mode": "etw",
+    "begin": 0,
+    "end": 41623.662,
+    "events": 1406711,
+    "measurements": 691
+  }
+]

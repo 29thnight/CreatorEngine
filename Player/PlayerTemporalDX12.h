@@ -1,3 +1,4 @@
+#include "../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
 
 #include "RHI/RHIDisplayFrame.h"
@@ -45,6 +46,6 @@ public:
 
 private:
     struct State;
-    std::unique_ptr<State> m_state;
+    own::unique_owner<State> m_state;
 };
 }

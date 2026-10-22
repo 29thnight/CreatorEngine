@@ -1,3 +1,4 @@
+#include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #include "RHI/DX12/Tests/Geometry/GraphSceneFixture.h"
 #include "../../../../../Tools/regression/material_owner_checks.h"
 #include "RHI/DX12/DX12Format.h"
@@ -22,6 +23,7 @@
 #include "Render/Core/PassResourceRetirement.h"
 #include "Render/Passes/Geometry/SceneSurfaceTargets.h"
 #include "MaterialGraphSceneHost.h"
+#include "MaterialGraphIndirectBatch.h"
 #include "MaterialGraphSceneLookup.h"
 #include "MaterialGraphSceneRefraction.h"
 #include "MaterialGraphSceneSubsurface.h"
@@ -1139,7 +1141,7 @@ passes:
         frame.frameId = 1;
         for (const auto policy : {RGOrderPolicy::DependencyOrder, RGOrderPolicy::PreserveDeclarationOrder})
         {
-            std::shared_ptr<const material_graph::SceneLookupFrame> owner;
+            own::shared_owner<const material_graph::SceneLookupFrame> owner;
             if (!cache.Prepare(frame, 1, {}, {}, {}, 0, 1024 * 1024, owner, error, {}, {}, true))
             {
                 return false;
@@ -1341,10 +1343,10 @@ passes:
         }
         for (const auto policy : {RGOrderPolicy::DependencyOrder, RGOrderPolicy::PreserveDeclarationOrder})
         {
-            std::shared_ptr<const SceneLookupFrame> lookup;
-            std::shared_ptr<const SceneVolumeFrame> volume;
-            std::shared_ptr<const SceneRefractionFrame> refraction;
-            std::shared_ptr<const SceneSubsurfaceFrame> subsurface;
+            own::shared_owner<const SceneLookupFrame> lookup;
+            own::shared_owner<const SceneVolumeFrame> volume;
+            own::shared_owner<const SceneRefractionFrame> refraction;
+            own::shared_owner<const SceneSubsurfaceFrame> subsurface;
             if (!cache.Prepare(frame, 1, {}, {}, {}, 0, 1024 * 1024, lookup, error, {}, {}, true) ||
                 !volumes.Prepare(frame, *input, {}, {}, 1024 * 1024, volume, error) ||
                 !refractions.Prepare(frame, input->ViewProjection(), {}, 1024 * 1024, refraction, error, volume) ||
@@ -1353,7 +1355,7 @@ passes:
                 return false;
             }
             EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, policy);
-            std::shared_ptr<const MeshSurfaceBatch> meshBatch;
+            own::shared_owner<const MeshSurfaceBatch> meshBatch;
             if (!geometry.Prepare(resources, input->Draws()[0].geometry->Chunks()[0].input, meshBatch, error, true) ||
                 !meshBatch->Declare(graph, error) || meshBatch->GraphOutput(graph).version != 1)
             {
@@ -1749,7 +1751,7 @@ passes:
             }
             const auto staticMesh = fixture.AddMesh(vertices, indices), skinMesh = fixture.AddMesh(skinned, indices);
             if (!resources.BeginFrame(error)) return false;
-            std::vector<std::shared_ptr<const material_graph::MeshSurfaceBatch>> owners;
+            std::vector<own::shared_owner<const material_graph::MeshSurfaceBatch>> owners;
             std::vector<const material_graph::MeshSurfaceBatch*> batches;
             std::vector<RHIReadback> readbacks(count);
             for (uint32_t i = 0; i < count; ++i)
@@ -1761,14 +1763,14 @@ passes:
                 auto bone = math::matrix4x4::identity(); bone.m[3][0] = float(i % 7) * .1f;
                 if (i % 2) { draw.bonePalette = &bone; draw.boneCount = 1; }
                 const std::vector<float> lods(pointCount, float(i % 4) * .5f);
-                std::shared_ptr<const material_graph::MeshSurfaceInput> input;
+                own::shared_owner<const material_graph::MeshSurfaceInput> input;
                 const material_graph::SurfaceView view{{0, 0, 1000, 0}, 1, 1, uint64_t(i + 1)};
-                std::shared_ptr<const material_graph::MeshSurfaceBatch> batch;
+                own::shared_owner<const material_graph::MeshSurfaceBatch> batch;
                 if (!material_graph::MeshSurfaceInput::Seal(draw, view, lods, input, error) ||
                     !evaluator.Prepare(resources, input, batch, error) ||
                     !resources.CreateBufferReadback(pointCount * sizeof(material_graph::SurfacePoint), readbacks[i], error))
                     return false;
-                batches.push_back(batch.get()); owners.push_back(std::move(batch));
+                batches.push_back(batch.operator->()); owners.push_back(std::move(batch));
             }
             EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, RGOrderPolicy::DependencyOrder);
             if (!material_graph::MeshSurfaceBatch::DeclareBatch(graph, batches, error)) return false;
@@ -1857,7 +1859,7 @@ passes:
             indices[i] = i;
         }
         const auto mesh = fixture.AddMesh(vertices, indices);
-        std::vector<std::shared_ptr<const material_graph::MeshSurfaceInput>> inputs(count);
+        std::vector<own::shared_owner<const material_graph::MeshSurfaceInput>> inputs(count);
         const std::vector<float> lods(points, 0.f);
         const material_graph::SurfaceView view{{0,0,1000,0},1,1,1};
         for (uint32_t i = 0; i < count; ++i) {
@@ -1866,15 +1868,15 @@ passes:
         }
         // Delayed evaluator completion publication must not age out an active
         // immutable key before it first becomes eligible for reuse.
-        std::shared_ptr<const material_graph::MeshSurfaceInput> pendingInput;
+        own::shared_owner<const material_graph::MeshSurfaceInput> pendingInput;
         auto pendingWorld = math::matrix4x4::identity(); pendingWorld.m[3][0] = -3.f;
         if (!material_graph::MeshSurfaceInput::Seal(fixture.Draw(mesh, pendingWorld), view, lods, pendingInput, error)) return false;
         for (uint32_t round = 0; round < 5; ++round) {
             if (round == 4) evaluator.NotifyCompleted(resources.GetCompletedFenceValue());
             if (!resources.BeginFrame(error)) return false;
-            std::shared_ptr<const material_graph::MeshSurfaceBatch> owner;
+            own::shared_owner<const material_graph::MeshSurfaceBatch> owner;
             if (!evaluator.Prepare(resources, pendingInput, owner, error, true)) return false;
-            const material_graph::MeshSurfaceBatch* batch = owner.get();
+            const material_graph::MeshSurfaceBatch* batch = owner.operator->();
             EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, RGOrderPolicy::DependencyOrder);
             if (!material_graph::MeshSurfaceBatch::DeclareBatch(graph, {&batch,1}, error)) return false;
             graph.AddPass("METEOR.Pending.Consumer", {{owner->GraphOutput(graph), RHIResourceState::ShaderResource, RGAccessMode::Read}}, nullptr, true);
@@ -1893,21 +1895,21 @@ passes:
         }
         pendingInput.reset();
         log += "LX_RESIDENCY_PENDING_OK recordings=5 pendingOwnersPreserved=4 completedNativeDispatches=0\n";
-        std::shared_ptr<const material_graph::MeshSurfaceBatch> pinned;
+        own::shared_owner<const material_graph::MeshSurfaceBatch> pinned;
         for (uint32_t round = 0; round < 4; ++round) {
             if (round == 3) {
                 auto world = math::matrix4x4::identity(); world.m[3][0] = 3.f;
                 if (!material_graph::MeshSurfaceInput::Seal(fixture.Draw(mesh, world), view, lods, inputs[0], error)) return false;
             }
             if (!resources.BeginFrame(error)) return false;
-            std::vector<std::shared_ptr<const material_graph::MeshSurfaceBatch>> owners;
+            std::vector<own::shared_owner<const material_graph::MeshSurfaceBatch>> owners;
             std::vector<const material_graph::MeshSurfaceBatch*> batches;
             std::vector<RHIReadback> readbacks(count);
             for (uint32_t i = 0; i < count; ++i) {
-                std::shared_ptr<const material_graph::MeshSurfaceBatch> batch;
+                own::shared_owner<const material_graph::MeshSurfaceBatch> batch;
                 if (!evaluator.Prepare(resources, inputs[i], batch, error, true) ||
                     !resources.CreateBufferReadback(points * sizeof(material_graph::SurfacePoint), readbacks[i], error)) return false;
-                batches.push_back(batch.get()); owners.push_back(std::move(batch));
+                batches.push_back(batch.operator->()); owners.push_back(std::move(batch));
             }
             if (!round) pinned = owners.front();
             EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned, RGOrderPolicy::DependencyOrder);
@@ -4838,211 +4840,55 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
         return false;
     }
 
+    if (RenderContainerReuseEnabled())
     {
-        R6bFakeReadbackServices services;
-        EnhancedRenderGraph graph{services, RGSchedulingMode::ExplicitVersioned};
-        const RHIBufferHandle buffer{RHIHandleBits::Encode(1, 1)};
-        const RHITextureHandle texture{RHIHandleBits::Encode(2, 1)};
-        const auto parentBuffer = graph.ImportBuffer(buffer, RHIResourceState::ShaderResource, "Lookup.Buffer");
-        const auto parentTexture = graph.ImportTexture(texture, RHIResourceState::ShaderResource, "Lookup.Texture");
-        auto branch = graph.CreateDeclarationBranch({});
-        const auto localTexture = branch->FindImportedTexture(texture);
-        const auto localBuffer = branch->FindImportedBuffer(buffer);
-        if (!localBuffer.IsValid() || !localTexture.IsValid() ||
-            branch->FindImportedTexture(RHITextureHandle{RHIHandleBits::Encode(3, 1)}).IsValid())
+        material_graph::IndirectMaterialBatchPool batches;
+        auto first = batches.Acquire();
+        auto& bucket = first->AppendBucket();
+        bucket.roots.assign({1u, 3u, 5u});
+        const auto* roots = bucket.roots.data();
+        first->packetWork = own::make_unique<material_graph::PacketDispatchWork>();
+        first->packetWork->levels.resize(3);
+        first->packetWork->slices.resize(4);
+        auto* packet = first->packetWork.operator->();
+        const auto* levels = packet->levels.data();
+        const auto* slices = packet->slices.data();
+        const auto* identity = first.operator->();
+        auto pending = first;
+        first.reset();
+        auto second = batches.Acquire();
+        if (second.operator->() == identity || pending->buckets.front().roots.size() != 3)
         {
-            outLog += "RDG_BRANCH_IMPORT_LOOKUP_FAILED missing parent import or accepted absent texture\n";
+            outLog += "MATERIAL_BATCH_REUSE_FAILED pending owner was recycled\n";
             return false;
         }
-        auto uses = branch->CreateDeclarationUsages({
-            {parentBuffer, RHIResourceState::ShaderResource, RGAccessMode::Read},
-            {localTexture, RHIResourceState::ShaderResource, RGAccessMode::Read},
-            {localBuffer, RHIResourceState::ShaderResource, RGAccessMode::Read}});
-        material_graph::NormalizeSceneReads(*branch, uses);
-        if (uses.size() != 2 || uses[0].handle.kind == uses[1].handle.kind)
+        pending.reset();
+        auto reused = batches.Acquire();
+        auto& reusedBucket = reused->AppendBucket();
+        if (reused.operator->() != identity || reusedBucket.roots.data() != roots || !reusedBucket.roots.empty() ||
+            reused->packetWork.operator->() != packet || packet->levels.data() != levels || packet->slices.data() != slices ||
+            !packet->levels.empty() || !packet->slices.empty() || reused->PacketMode())
         {
-            outLog += "RDG_BRANCH_IMPORT_LOOKUP_FAILED cross-branch index collision or duplicate read\n";
+            outLog += "MATERIAL_BATCH_REUSE_FAILED nested capacity or mode was lost\n";
             return false;
         }
-        branch->AddPass("Lookup.Read",
-                        {{localBuffer, RHIResourceState::ShaderResource, RGAccessMode::Read},
-                         {localTexture, RHIResourceState::ShaderResource, RGAccessMode::Read}},
-                        [](const auto&) {}, true);
-        graph.MergeDeclarationBranch(branch);
-        if (graph.CanonicalDeclarationHandle(localBuffer).index != parentBuffer.index ||
-            graph.CanonicalDeclarationHandle(localTexture).index != parentTexture.index || !graph.Compile(error))
-        {
-            outLog += "RDG_BRANCH_IMPORT_LOOKUP_FAILED " + error + "\n";
-            return false;
-        }
-        graph.Reset();
-        if (graph.CanonicalDeclarationHandle(localTexture).IsValid())
-        {
-            outLog += "RDG_BRANCH_IMPORT_LOOKUP_FAILED stale imported alias survived reset\n";
-            return false;
-        }
-        outLog += "RDG_BRANCH_IMPORT_LOOKUP_OK parent-buffer parent-texture cross-branch-normalization absent-rejected reset\n";
+        outLog += "MATERIAL_BATCH_REUSE_OK pending-owner roots packet scan slices reset\n";
     }
-
+    else
     {
-        EnhancedRenderGraph graph{resources, RGSchedulingMode::ExplicitVersioned};
-        RGBufferDesc description{};
-        description.bytes = 64;
-        description.allowUnorderedAccess = true;
-        description.name = "Setup.Seed";
-        const auto seed = graph.Write(graph.CreateBuffer(description));
-        graph.AddPass(
-            "Setup.Seed", {{seed, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, [](const auto&) {}, true);
-        const std::array inputs{seed};
-        auto left = graph.CreateDeclarationBranch(inputs);
-        auto right = graph.CreateDeclarationBranch({});
-        description.name = "Setup.Left";
-        const auto first = left->Write(left->CreateBuffer(description));
-        left->AddPass(
-            "Setup.Left",
-            {{seed, RHIResourceState::ShaderResource, RGAccessMode::Read},
-             {first, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
-            [](const auto&) {}, true);
-        description.name = "Setup.Right";
-        const auto second = right->Write(right->CreateBuffer(description));
-        if (left->DeclarationGraph() != &graph || right->DeclarationEpoch() != graph.ResourceEpoch())
+        material_graph::IndirectMaterialBatchPool batches;
+        auto previous = batches.Acquire();
+        const auto weak = own::weak_owner<material_graph::IndirectMaterialBatch>(previous);
+        previous.reset();
+        if (!weak.expired())
         {
-            outLog += "RDG_DECLARATION_BRANCH_FAILED frame identity differs across branches\n";
+            outLog += "MATERIAL_BATCH_FRESH_FAILED pool retained the control object\n";
             return false;
         }
-        right->AddPass(
-            "Setup.Right",
-            {{seed, RHIResourceState::ShaderResource, RGAccessMode::Read},
-             {second, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
-            [](const auto&) {}, true);
-        const std::array readUsages{
-            EnhancedRenderGraph::RGPassUsage{seed, RHIResourceState::ShaderResource, RGAccessMode::Read}};
-        const std::array phases{EnhancedRenderGraph::RepeatedPhaseView{"Setup.Repeated.Read", readUsages}};
-        left->AddRepeatedPassView(
-            "Setup.Repeated", readUsages, phases, 2, [](const auto&, uint32_t, uint32_t) {}, true);
-        right->AddSplitPass(
-            "Setup.Split", {{seed, RHIResourceState::ShaderResource, RGAccessMode::Read}},
-            [](const auto&, uint32_t, uint32_t) {}, 2, true);
-        graph.MergeDeclarationBranch(left);
-        graph.MergeDeclarationBranch(right);
-        const auto firstPublished = graph.CanonicalDeclarationHandle(first);
-        const auto secondPublished = graph.CanonicalDeclarationHandle(second);
-        if (firstPublished.index == secondPublished.index || !graph.Compile(error) ||
-            !left->ResolveBufferHandle(first).IsValid() || !right->ResolveBufferHandle(second).IsValid() ||
-            left->ResolveBufferHandle(first) != graph.ResolveBufferHandle(firstPublished) ||
-            right->ResolveBufferHandle(second) != graph.ResolveBufferHandle(secondPublished))
-        {
-            outLog += "RDG_DECLARATION_BRANCH_FAILED " + error + "\n";
-            return false;
-        }
-        graph.Reset();
-        if (graph.CanonicalDeclarationHandle(first).IsValid())
-        {
-            outLog += "RDG_DECLARATION_BRANCH_FAILED stale alias survived Reset\n";
-            return false;
-        }
-        outLog += "RDG_DECLARATION_BRANCH_OK independent-local-ids lazy-hidden-input canonical-versions "
-                  "native-resolution reset\n";
+        outLog += "MATERIAL_BATCH_FRESH_OK object-retention=off\n";
     }
-
-    {
-        EnhancedRenderGraph graph{resources, RGSchedulingMode::ExplicitVersioned};
-        LivePipelineDesc pipeline;
-        LiveBlackboard board;
-        EnhancedFrameContext context{};
-        LiveFrameBinding binding{};
-        RGBufferDesc description{};
-        description.bytes = 64;
-        description.allowUnorderedAccess = true;
-        std::mutex mutex;
-        std::condition_variable ready;
-        unsigned entered{};
-        std::array<unsigned, 4> calls{};
-        const bool rendezvous = RGParallelSetupEnabled() && ce::get_job_scheduler().worker_count() > 1;
-        const auto meet = [&]
-        {
-            if (!rendezvous)
-            {
-                return;
-            }
-            std::unique_lock lock{mutex};
-            ++entered;
-            ready.notify_all();
-            if (!ready.wait_for(lock, std::chrono::seconds{2}, [&] { return entered == 2; }))
-            {
-                throw std::runtime_error("Node declaration bodies did not overlap.");
-            }
-        };
-        LivePassNode producer;
-        producer.name = "Fork.Producer";
-        producer.writes = {"Fork.A"};
-        producer.declare = [&](auto& blackboard, auto& target, const auto&, const auto&)
-        {
-            ++calls[0];
-            const auto value = target.Write(target.CreateBuffer(description));
-            target.AddPass(
-                "Fork.Producer", {{value, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, [](const auto&) {},
-                true);
-            blackboard.Set("Fork.A", value);
-        };
-        pipeline.AddNode(std::move(producer));
-        LivePassNode optional;
-        optional.name = "Fork.Inactive";
-        optional.modifies = {"Fork.A"};
-        optional.active = [] { return false; };
-        optional.declare = [](auto&, auto&, const auto&, const auto&)
-        { throw std::runtime_error("Inactive declaration executed."); };
-        pipeline.AddNode(std::move(optional));
-        const auto addConsumer = [&](const char* name, const char* slot, unsigned index, bool worker)
-        {
-            LivePassNode node;
-            node.name = name;
-            node.reads = {"Fork.A"};
-            node.writes = {slot};
-            node.parallelDeclare = worker;
-            node.setupDependencies = {"Fork.Producer"};
-            node.declare = [&, name, slot, index](auto& blackboard, auto& target, const auto&, const auto&)
-            {
-                ++calls[index];
-                meet();
-                const auto value = target.Write(target.CreateBuffer(description));
-                target.AddPass(
-                    name,
-                    {{blackboard.Get("Fork.A"), RHIResourceState::ShaderResource, RGAccessMode::Read},
-                     {value, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
-                    [](const auto&) {}, true);
-                blackboard.Set(slot, value);
-            };
-            pipeline.AddNode(std::move(node));
-        };
-        addConsumer("Fork.Owner", "Fork.C", 1, false);
-        addConsumer("Fork.Worker", "Fork.B", 2, true);
-        LivePassNode consumer;
-        consumer.name = "Fork.Consumer";
-        consumer.reads = {"Fork.B", "Fork.C"};
-        consumer.declare = [&](auto& blackboard, auto& target, const auto&, const auto&)
-        {
-            ++calls[3];
-            target.AddPass(
-                "Fork.Consumer",
-                {{blackboard.Get("Fork.B"), RHIResourceState::ShaderResource, RGAccessMode::Read},
-                 {blackboard.Get("Fork.C"), RHIResourceState::ShaderResource, RGAccessMode::Read}},
-                [](const auto&) {}, true);
-        };
-        pipeline.AddNode(std::move(consumer));
-        std::vector<std::string> publication;
-        pipeline.DeclareAll(board, graph, context, binding,
-                            [&](const auto& node, const auto&) { publication.push_back(node.name); });
-        if (calls != std::array<unsigned, 4>{1, 1, 1, 1} || board.Get("Fork.C").index >= board.Get("Fork.B").index ||
-            publication != std::vector<std::string>{"Fork.Producer", "Fork.Owner", "Fork.Worker", "Fork.Consumer"} ||
-            !graph.Compile(error))
-        {
-            outLog += "RDG_NODE_FORKJOIN_FAILED " + error + "\n";
-            return false;
-        }
-        outLog += "RDG_NODE_FORKJOIN_OK inactive=pass-through publication=ordered callbacks=once overlap=" +
-                  std::string(rendezvous ? "true" : "inline") + "\n";
-    }
+    outLog +=
+        RenderContainerReuseEnabled() ? "RENDER_CONTAINER_REUSE_POLICY=ON\n" : "RENDER_CONTAINER_REUSE_POLICY=OFF\n";
 
     if (!ValidateRg5ConsumerDeclarations(resources, error))
     {

@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "MaterialGraphSceneVolume.h"
 
 #include "RHI/RHIShaderCompiler.h"
@@ -170,7 +171,7 @@ namespace material_graph
 
     bool SceneVolumeResources::Prepare(const EnhancedFrameContext& context, const SceneViewInput& input,
                                        RHITextureHandle environment, const EnhancedShadowData& shadow,
-                                       std::uint64_t memoryBudget, std::shared_ptr<const SceneVolumeFrame>& result,
+                                       std::uint64_t memoryBudget, own::shared_owner<const SceneVolumeFrame>& result,
                                        std::string& error)
     {
         const auto pixels = std::uint64_t(context.width) * context.height;
@@ -226,7 +227,7 @@ namespace material_graph
         {
             return false;
         }
-        auto candidate = std::make_shared<SceneVolumeFrame>();
+        auto candidate = own::make_shared<SceneVolumeFrame>();
         candidate->device_ = device_;
         candidate->width_ = context.width;
         candidate->height_ = context.height;

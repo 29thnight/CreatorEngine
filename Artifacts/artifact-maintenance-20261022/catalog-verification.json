@@ -1,0 +1,59 @@
+{
+  "passed": true,
+  "measurements": [
+    {
+      "manifest": "/Artifacts/node-declare-parallel-20261021/timeline/viewer.json",
+      "datasets": 4,
+      "dataFiles": 8,
+      "reportExists": true
+    },
+    {
+      "manifest": "/Artifacts/container-reuse-20261021/timeline/viewer.json",
+      "datasets": 4,
+      "dataFiles": 8,
+      "reportExists": true
+    },
+    {
+      "manifest": "/Artifacts/container-reuse-isolated-20261021/timeline/viewer.json",
+      "datasets": 6,
+      "dataFiles": 12,
+      "reportExists": true
+    },
+    {
+      "manifest": "/Artifacts/packet-group-reuse-20261021/timeline/viewer.json",
+      "datasets": 6,
+      "dataFiles": 12,
+      "reportExists": true
+    },
+    {
+      "manifest": "/Artifacts/packet-group-reuse-final-20261021/timeline/viewer.json",
+      "datasets": 6,
+      "dataFiles": 12,
+      "reportExists": true
+    },
+    {
+      "manifest": "/Artifacts/scene-preparation-ownership-20261021/timeline/viewer.json",
+      "datasets": 6,
+      "dataFiles": 12,
+      "reportExists": true
+    },
+    {
+      "manifest": "/Artifacts/owner-borrow-20261022/timeline/viewer.json",
+      "datasets": 6,
+      "dataFiles": 12,
+      "reportExists": true
+    },
+    {
+      "manifest": "/Artifacts/ownership-update-20261022/timeline/viewer.json",
+      "datasets": 6,
+      "dataFiles": 12,
+      "reportExists": true
+    },
+    {
+      "manifest": "/Artifacts/gpu-marker-blob-20261022/timeline/viewer.json",
+      "datasets": 6,
+      "dataFiles": 12,
+      "reportExists": true
+    }
+  ]
+}

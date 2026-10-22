@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 // Included inside material_graph by MaterialGraphSceneHost.cpp.
 namespace
 {
@@ -36,9 +37,8 @@ RGHandle CreateShadowDepth(EnhancedRenderGraph& graph, unsigned extent, const st
 }
 } // namespace
 
-RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameInput>& frame,
-                                            EnhancedRenderGraph& graph,
-                                            const std::shared_ptr<const IndirectMaterialBatch>& commands,
+RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const Frame>& frame, EnhancedRenderGraph& graph,
+                                            const own::shared_owner<const IndirectMaterialBatch>& commands,
                                             RGHandle depth, unsigned cascade, unsigned slice, bool staticCasters,
                                             bool count, const std::string& name)
 {
@@ -81,67 +81,71 @@ RGHandle SceneHost::ShadowRasterStage::Draw(const own::shared_owner<const FrameI
     NormalizeSceneReads(graph, uses);
     const auto statisticsSlot = cascade * 2 + (staticCasters ? 0 : 1);
     const auto bucketCount = static_cast<uint32_t>(commands->buckets.size());
-    const auto pass = graph.AddSplitPass(name, uses,
-        [frame, commands, depth, cascade, slice, count, statisticsSlot](const auto& execution,
-                                                            uint32_t recordSlice, uint32_t sliceCount) {
-        frame->CheckCurrent(execution.graph);
-        auto& encoder = *execution.encoder;
-        const auto texture = execution.ResolveHandle(depth);
-        const auto desc = frame->device->DescribeTexture(texture);
-        if (desc.width != frame->shadowExtent || desc.height != frame->shadowExtent || desc.depthOrArraySize <= slice ||
-            desc.format != RHIFormat::D32Float)
+    const auto pass = graph.AddSplitPass(
+        name, uses,
+        [frame = frame, commands, depth, cascade, slice, count,
+         statisticsSlot](const auto& execution, uint32_t recordSlice, uint32_t sliceCount)
         {
-            throw std::runtime_error("Shadow raster target differs from its sealed light extent/slice.");
-        }
-        const auto depthTarget = desc.depthOrArraySize == 1
-                                     ? RHIDepthTargetDesc::Depth(texture, RHIFormat::D32Float)
-                                     : RHIDepthTargetDesc::DepthSlice(texture, RHIFormat::D32Float, slice);
-        const auto targets = frame->device->CreateRenderTargets(std::span<const RHITextureHandle>{}, &depthTarget);
-        if (!targets.IsValid())
-        {
-            throw std::runtime_error("Shadow raster depth binding failed.");
-        }
-        encoder.BindRenderTargets(targets);
-        encoder.SetViewportAndScissor(desc.width, desc.height);
-        encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
-        uint32_t recordedBuckets{};
-        uint32_t recordedCommands{};
-        const auto first = commands->buckets.size() * recordSlice / sliceCount;
-        const auto last = commands->buckets.size() * (recordSlice + 1) / sliceCount;
-        for (auto bucket = first; bucket < last; ++bucket)
-        {
-            const auto& range = commands->buckets[bucket];
-            const auto& draw = frame->shadowDraws[range.representative];
-            encoder.SetPipeline(RHIBindPoint::Graphics, frame->RasterPipeline(draw, draw.program->shadow.GetHandle()));
-            std::string error;
-            if (!RenderBindingCache::BindPass(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings,
-                                              draw.program->shadowLayout, error))
+            frame->CheckCurrent(execution.graph);
+            auto& encoder = *execution.encoder;
+            const auto texture = execution.ResolveHandle(depth);
+            const auto desc = frame->device->DescribeTexture(texture);
+            if (desc.width != frame->shadowExtent || desc.height != frame->shadowExtent ||
+                desc.depthOrArraySize <= slice || desc.format != RHIFormat::D32Float)
             {
-                throw std::runtime_error(error);
+                throw std::runtime_error("Shadow raster target differs from its sealed light extent/slice.");
             }
-            frame->BindPacketResources(encoder, draw, frame->packetBindings.at(commands.get()),
-                                         draw.program->shadowPacketRoots, cascade);
-            commands->Draw(encoder, bucket, draw.program->shadowPacketRoots.selector);
+            const auto depthTarget = desc.depthOrArraySize == 1
+                                         ? RHIDepthTargetDesc::Depth(texture, RHIFormat::D32Float)
+                                         : RHIDepthTargetDesc::DepthSlice(texture, RHIFormat::D32Float, slice);
+            const auto targets = frame->device->CreateRenderTargets(std::span<const RHITextureHandle>{}, &depthTarget);
+            if (!targets.IsValid())
+            {
+                throw std::runtime_error("Shadow raster depth binding failed.");
+            }
+            encoder.BindRenderTargets(targets);
+            encoder.SetViewportAndScissor(desc.width, desc.height);
+            encoder.SetPrimitiveTopology(RHIPrimitiveTopology::TriangleList);
+            uint32_t recordedBuckets{};
+            uint32_t recordedCommands{};
+            const auto first = commands->buckets.size() * recordSlice / sliceCount;
+            const auto last = commands->buckets.size() * (recordSlice + 1) / sliceCount;
+            for (auto bucket = first; bucket < last; ++bucket)
+            {
+                const auto& range = commands->buckets[bucket];
+                const auto& draw = frame->shadowDraws[range.representative];
+                encoder.SetPipeline(RHIBindPoint::Graphics,
+                                    frame->RasterPipeline(draw, draw.program->shadow.GetHandle()));
+                std::string error;
+                if (!RenderBindingCache::BindPass(*frame->device, encoder, RHIBindPoint::Graphics, *draw.bindings,
+                                                  draw.program->shadowLayout, error))
+                {
+                    throw std::runtime_error(error);
+                }
+                frame->BindPacketResources(encoder, draw, frame->packetBindings.at(commands.operator->()),
+                                           draw.program->shadowPacketRoots, cascade);
+                commands->Draw(encoder, bucket, draw.program->shadowPacketRoots.selector);
+                if (count)
+                {
+                    ++recordedBuckets;
+                    recordedCommands += range.count;
+                }
+            }
             if (count)
             {
-                ++recordedBuckets;
-                recordedCommands += range.count;
+                auto& statistics = frame->shadowRecordingStats[statisticsSlot][recordSlice];
+                statistics.buckets += recordedBuckets;
+                statistics.commands += recordedCommands;
             }
-        }
-        if (count)
-        {
-            auto& statistics = frame->shadowRecordingStats[statisticsSlot][recordSlice];
-            statistics.buckets += recordedBuckets;
-            statistics.commands += recordedCommands;
-        }
-    }, FrameInput::RasterRecordingSlices(bucketCount), false, bucketCount);
+        },
+        FrameInput::RasterRecordingSlices(bucketCount), false, bucketCount);
     // 명령/기하 입력은 밀봉되어 있다. 통계는 cascade/static/slice 전용 슬롯에
     // 기록하며 occluder는 통계를 쓰지 않는다. 합산은 전체 recording join 뒤다.
     graph.DeclareRecordingIndependent(pass);
     return depth;
 }
 
-SceneShadowResources SceneHost::ShadowCacheStage::Declare(const own::shared_owner<const FrameInput>& frame,
+SceneShadowResources SceneHost::ShadowCacheStage::Declare(const own::shared_owner<const Frame>& frame,
                                                           EnhancedRenderGraph& graph, RGHandle geometry) const
 {
     if (!frame || !frame->shadow || !cache)
@@ -168,7 +172,8 @@ SceneShadowResources SceneHost::ShadowCacheStage::Declare(const own::shared_owne
         {
             depth = graph.Write(depth);
             graph.AddPass(name + ".Clear", {{depth, RHIResourceState::DepthWrite, RGAccessMode::Write}},
-                          [frame, depth](const auto& execution) {
+                          [frame = frame, depth](const auto& execution)
+                          {
                               const auto target =
                                   RHIDepthTargetDesc::Depth(execution.ResolveHandle(depth), RHIFormat::D32Float);
                               const auto binding =
@@ -182,7 +187,7 @@ SceneShadowResources SceneHost::ShadowCacheStage::Declare(const own::shared_owne
                           });
             if (meshlets[cascade])
             {
-                const std::shared_ptr<const GpuGeometryVisibility::Frame> lists[]{meshlets[cascade]};
+                const own::shared_owner<const GpuGeometryVisibility::Frame> lists[]{meshlets[cascade]};
                 GpuGeometryVisibility::Frame::DeclareMeshletBatch(graph, lists, (name + ".Cull").c_str());
             }
             depth = ShadowRasterStage::Draw(frame, graph, commands[cascade], depth, cascade, 0, true, true,
@@ -241,7 +246,7 @@ SceneShadowResources SceneHost::ShadowFirstCullStage::Declare(const own::shared_
     return outputs;
 }
 
-SceneShadowResources SceneHost::ShadowOccluderStage::Declare(const own::shared_owner<const FrameInput>& frame,
+SceneShadowResources SceneHost::ShadowOccluderStage::Declare(const own::shared_owner<const Frame>& frame,
                                                              EnhancedRenderGraph& graph,
                                                              const SceneShadowResources& cache,
                                                              const SceneShadowResources& first) const
@@ -277,7 +282,7 @@ SceneShadowResources SceneHost::ShadowOccluderStage::Declare(const own::shared_o
     return outputs;
 }
 
-SceneShadowResources SceneHost::ShadowFinalCullStage::Declare(const own::shared_owner<const FrameInput>& frame,
+SceneShadowResources SceneHost::ShadowFinalCullStage::Declare(const own::shared_owner<const Frame>& frame,
                                                               EnhancedRenderGraph& graph,
                                                               const SceneShadowResources& depths) const
 {
@@ -304,9 +309,9 @@ SceneShadowResources SceneHost::ShadowFinalCullStage::Declare(const own::shared_
     return outputs;
 }
 
-RGHandle SceneHost::ShadowRasterStage::Declare(const own::shared_owner<const FrameInput>& frame,
-                                               EnhancedRenderGraph& graph, const SceneShadowResources& cache,
-                                               const SceneShadowResources& lists, RGHandle shadowMap) const
+RGHandle SceneHost::ShadowRasterStage::Declare(const own::shared_owner<const Frame>& frame, EnhancedRenderGraph& graph,
+                                               const SceneShadowResources& cache, const SceneShadowResources& lists,
+                                               RGHandle shadowMap) const
 {
     if (!frame || !frame->shadow)
     {
@@ -334,7 +339,7 @@ RGHandle SceneHost::ShadowRasterStage::Declare(const own::shared_owner<const Fra
         graph.AddPass(name + ".StaticMerge",
                       {{cache[cascade], RHIResourceState::PixelShaderResource, RGAccessMode::Read},
                        {shadowMap, RHIResourceState::DepthWrite, RGAccessMode::ReadWrite}},
-                      [frame, pipeline = merge, source = cache[cascade], shadowMap, cascade](const auto& execution) {
+                      [frame = frame, pipeline = merge, source = cache[cascade], shadowMap, cascade](const auto& execution) {
                           const auto texture = execution.ResolveHandle(shadowMap);
                           const auto desc = frame->device->DescribeTexture(texture);
                           if (desc.width != frame->shadowExtent || desc.height != frame->shadowExtent ||
@@ -365,8 +370,8 @@ RGHandle SceneHost::ShadowRasterStage::Declare(const own::shared_owner<const Fra
     return output;
 }
 
-void SceneHost::ShadowHistoryStage::Declare(const own::shared_owner<const FrameInput>& frame,
-                                            EnhancedRenderGraph& graph, RGHandle expected, RGHandle shadowMap) const
+void SceneHost::ShadowHistoryStage::Declare(const own::shared_owner<const Frame>& frame, EnhancedRenderGraph& graph,
+                                            RGHandle expected, RGHandle shadowMap) const
 {
     if (!frame || !frame->shadow || !next[0])
     {

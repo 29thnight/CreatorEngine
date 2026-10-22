@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/Ownership.h"
 #include "EngineRuntimePaths.h"
 #include "RHIShaderCompiler.h"
 #include "RHIShaderVerifiedCache.h"
@@ -259,7 +260,7 @@ namespace
         std::once_flag loadOnce;
         std::mutex slotsMutex;
         std::condition_variable slotFreed;
-        std::vector<std::unique_ptr<SlangSlot>> slots;
+        std::vector<own::unique_owner<SlangSlot>> slots;
 
         ~SlangRuntime()
         {
@@ -338,7 +339,7 @@ namespace
             }
             if (runtime.slots.size() < cap)
             {
-                auto created = std::make_unique<SlangSlot>();
+                auto created = own::make_unique<SlangSlot>();
                 created->busy = true;
                 SlangSlot& slot = *created;
                 runtime.slots.push_back(std::move(created));
@@ -349,7 +350,7 @@ namespace
                 if (SLANG_FAILED(runtime.createGlobalSession(&desc, slot.globalSession.writeRef())))
                 {
                     lock.lock();
-                    std::erase_if(runtime.slots, [&](const auto& item) { return item.get() == &slot; });
+                    std::erase_if(runtime.slots, [&](const auto& item) { return item.operator->() == &slot; });
                     lock.unlock();
                     runtime.slotFreed.notify_one();
                     outError = "Slang global session 추가 생성 실패";
@@ -594,7 +595,7 @@ namespace
             runtime.loadError = "Slang global session 생성 실패";
             return;
         }
-        runtime.slots.push_back(std::make_unique<SlangSlot>());
+        runtime.slots.push_back(own::make_unique<SlangSlot>());
         runtime.slots.back()->globalSession = runtime.globalSession;
         const char* buildTag = runtime.globalSession->getBuildTagString();
         // 하위 RHI 캐시의 기존 완료키 형식은 유지한다.
@@ -1350,7 +1351,7 @@ namespace
         slang::ProgramLayout* program = linked.getLayout(0, diagnostics.writeRef());
         if (nullptr == program)
         {
-            const std::string detail = ReadSlangDiagnostics(diagnostics.get());
+            const std::string detail = ReadSlangDiagnostics(diagnostics.operator->());
             outError = std::string(request.name) + " Slang reflection 실패: "
                 + (detail.empty() ? "program layout이 없다" : detail);
             return false;
@@ -1760,7 +1761,7 @@ namespace
                 if (!shaderModule)
                 {
                     ++g_failures;
-                    const std::string detail = ReadSlangDiagnostics(diagnostics.get());
+                    const std::string detail = ReadSlangDiagnostics(diagnostics.operator->());
                     outError = std::string(request.name) + " Slang 모듈 로드 실패: "
                         + (detail.empty() ? "원인 미상" : detail);
                     return false;
@@ -1809,14 +1810,14 @@ namespace
                 diagnostics.writeRef())))
             {
                 ++g_failures;
-                const std::string detail = ReadSlangDiagnostics(diagnostics.get());
+                const std::string detail = ReadSlangDiagnostics(diagnostics.operator->());
                 outError = std::string(request.name) + " (" + std::string(request.entryPoint)
                     + ") Slang 엔트리 검증 실패: "
                     + (detail.empty() ? "원인 미상" : detail);
                 return false;
             }
 
-            slang::IComponentType* components[] = { shaderModule.get(), entryPoint.get() };
+            slang::IComponentType* components[] = { shaderModule.operator->(), entryPoint.operator->() };
             diagnostics.setNull();
             Slang::ComPtr<slang::IComponentType> composite;
             if (SLANG_FAILED(session->createCompositeComponentType(components,
@@ -1824,7 +1825,7 @@ namespace
                 diagnostics.writeRef())))
             {
                 ++g_failures;
-                const std::string detail = ReadSlangDiagnostics(diagnostics.get());
+                const std::string detail = ReadSlangDiagnostics(diagnostics.operator->());
                 outError = std::string(request.name) + " Slang 프로그램 조립 실패: "
                     + (detail.empty() ? "원인 미상" : detail);
                 return false;
@@ -1835,7 +1836,7 @@ namespace
             if (SLANG_FAILED(composite->link(linked.writeRef(), diagnostics.writeRef())))
             {
                 ++g_failures;
-                const std::string detail = ReadSlangDiagnostics(diagnostics.get());
+                const std::string detail = ReadSlangDiagnostics(diagnostics.operator->());
                 outError = std::string(request.name) + " Slang 링크 실패: "
                     + (detail.empty() ? "원인 미상" : detail);
                 return false;
@@ -1861,7 +1862,7 @@ namespace
                 || !code || 0 == code->getBufferSize())
             {
                 ++g_failures;
-                const std::string detail = ReadSlangDiagnostics(diagnostics.get());
+                const std::string detail = ReadSlangDiagnostics(diagnostics.operator->());
                 outError = std::string(request.name) + " ("
                     + std::string(request.entryPoint) + "/"
                     + (RHIShaderBinary::Dxil == request.output ? "DXIL" : "SPIR-V")

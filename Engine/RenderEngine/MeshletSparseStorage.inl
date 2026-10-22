@@ -1,12 +1,13 @@
+#include "../Utility_Framework/Ownership.h"
 // Included inside material_graph. One stable virtual buffer per sealed chunk.
 struct MeshletSparseStorage
 {
     IRenderDeviceServices& device;
-    std::shared_ptr<RHISharedSparsePagePool> pool;
-    std::shared_ptr<RHISharedSparsePagePool::Allocation> allocation;
+    own::shared_owner<RHISharedSparsePagePool> pool;
+    own::shared_owner<RHISharedSparsePagePool::Allocation> allocation;
     RHIBufferHandle buffer;
     uint64_t virtualBytes{}, revision{}, serial{}, committedSerial{};
-    std::map<uint32_t, std::shared_ptr<const std::vector<std::byte>>> committedPackets;
+    std::map<uint32_t, own::shared_owner<const std::vector<std::byte>>> committedPackets;
     std::vector<std::byte> committedMetadata;
     std::map<uint32_t, uint32_t> committedTiles;
     explicit MeshletSparseStorage(IRenderDeviceServices& owner)
@@ -89,7 +90,7 @@ struct MeshletSparseStorage
     bool NeedsPacket(const SparseClusterPayload::Packet& packet) const
     {
         const auto found = committedPackets.find(packet.offset);
-        return found == committedPackets.end() || found->second != packet.bytes;
+        return found == committedPackets.end() || found->second.operator->() != packet.bytes.operator->();
     }
     void Commit(uint64_t uploadSerial, uint64_t uploadRevision, const SparseClusterPayload& payload,
                 const std::vector<std::byte>& metadata)

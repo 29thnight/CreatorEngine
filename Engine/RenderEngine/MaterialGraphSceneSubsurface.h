@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 
 #include "LXMaterialPipeline.h"
 
@@ -42,10 +43,10 @@ class SceneSubsurfaceFrame
     RHITextureHandle environment_;
     std::array<RHITextureHandle, 7> inputs_{};
     RHIBufferHandle reflection_, irradiance_;
-    std::shared_ptr<const LX::Runtime::ComputeGeneration> bake_, filter_;
+    own::shared_owner<const LX::Runtime::ComputeGeneration> bake_, filter_;
     std::vector<RHIBufferSlice> constants_;
     RHIBindingTable outputs_;
-    std::weak_ptr<const SceneSubsurfaceFrame> self_;
+    own::weak_owner<const SceneSubsurfaceFrame> self_;
     mutable const EnhancedRenderGraph* graph_{};
     mutable std::uint64_t graphEpoch_{};
     mutable std::array<RGHandle, 7> graphInputs_{};
@@ -57,7 +58,7 @@ class SceneSubsurfaceResources
 {
   public:
     bool Prepare(const EnhancedFrameContext& context, RHITextureHandle environment, std::uint64_t memoryBudget,
-                 std::shared_ptr<const SceneSubsurfaceFrame>& result, std::string& error);
+                 own::shared_owner<const SceneSubsurfaceFrame>& result, std::string& error);
     void ShutdownAfterIdle();
 
   private:

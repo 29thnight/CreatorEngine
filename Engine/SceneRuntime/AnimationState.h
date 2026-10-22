@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #pragma once
 #include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../Utility_Framework/Core.Minimal.h"
@@ -7,7 +8,7 @@
 class AnimationController;
 class ConditionParameter;
 class [[reflgen::reflect]] AnimationState
-{	
+{
    public:
 public:
 	AnimationState();
@@ -34,15 +35,15 @@ public:
 	std::string behaviourName{};
 
 	[[reflgen::ignore]]
-	std::shared_ptr<AniBehavior> behaviour{};
+	own::shared_owner<AniBehavior> behaviour{};
 
 	[[reflgen::ignore]]
 	AnimationController* m_ownerController{};
 
-	std::vector<std::shared_ptr<AniTransition>> Transitions;
-	int index =0; 
+	std::vector<own::shared_owner<AniTransition>> Transitions;
+	int index =0;
 	int AnimationIndex = 0;
-	
+
 	//기본속도
 	float animationSpeed = 1;
 	//파라미터로 더 곱해줄 속도 이동속도 비례,공격속도비례
@@ -67,4 +68,3 @@ public:
 	[[reflgen::ignore]]
 	std::string m_speedParameterName{};
 };
-

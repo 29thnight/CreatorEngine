@@ -1,3 +1,4 @@
+#include "../../Engine/Utility_Framework/Ownership.h"
 #include "EditorProjectOperations.h"
 #include "TagManager.h"
 #include "SceneManager.h"
@@ -59,7 +60,7 @@ class LayerSettingsCommand final : public Meta::IUndoableCommand
     void Apply(const project_layer_snapshot& definitions)
     {
         const auto project = m_project.lock();
-        if (!project || project != SceneManagers->ProjectLayers())
+        if (!project || project.operator->() != SceneManagers->ProjectLayers().operator->())
             throw std::runtime_error("Project layer Undo target is no longer active");
 
         if (!project->Restore(definitions, [this](const auto& prepared) -> ce::layers::result<void> {
@@ -71,7 +72,7 @@ class LayerSettingsCommand final : public Meta::IUndoableCommand
     }
 
     project_layer_snapshot m_before, m_after;
-    std::weak_ptr<ProjectLayerSettings> m_project;
+    own::weak_owner<ProjectLayerSettings> m_project;
     // Keep the command's publication policy across Undo/Redo and host mode transitions.
     const bool m_persistAuthoring;
 };

@@ -1,0 +1,79 @@
+{
+  "left": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\gpu-marker-blob-20261022\\on-a\\Matched",
+  "right": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\gpu-marker-blob-20261022\\on-a\\Reload",
+  "width": 1186,
+  "height": 514,
+  "passed": true,
+  "attachments": [
+    {
+      "name": "baseColor",
+      "components": 2438416,
+      "maxAbs": 0.0,
+      "maxNormalized": 0.0,
+      "meanAbs": 0.0,
+      "rms": 0.0,
+      "nonfinite": 0,
+      "passed": true
+    },
+    {
+      "name": "metalRough",
+      "components": 2438416,
+      "maxAbs": 0.0,
+      "maxNormalized": 0.0,
+      "meanAbs": 0.0,
+      "rms": 0.0,
+      "nonfinite": 0,
+      "passed": true
+    },
+    {
+      "name": "normal",
+      "components": 2438416,
+      "maxAbs": 0.0,
+      "maxNormalized": 0.0,
+      "meanAbs": 0.0,
+      "rms": 0.0,
+      "nonfinite": 0,
+      "passed": true
+    },
+    {
+      "name": "emissive",
+      "components": 2438416,
+      "maxAbs": 0.0,
+      "maxNormalized": 0.0,
+      "meanAbs": 0.0,
+      "rms": 0.0,
+      "nonfinite": 0,
+      "passed": true
+    },
+    {
+      "name": "depth",
+      "components": 609604,
+      "maxAbs": 0.0,
+      "maxNormalized": 0.0,
+      "meanAbs": 0.0,
+      "rms": 0.0,
+      "nonfinite": 0,
+      "passed": true
+    },
+    {
+      "name": "preToneHdr",
+      "components": 2438416,
+      "maxAbs": 0.0,
+      "maxNormalized": 0.0,
+      "meanAbs": 0.0,
+      "rms": 0.0,
+      "nonfinite": 0,
+      "passed": true
+    },
+    {
+      "name": "display",
+      "components": 2438416,
+      "maxAbs": 0.0,
+      "maxNormalized": 0.0,
+      "meanAbs": 0.0,
+      "rms": 0.0,
+      "nonfinite": 0,
+      "passed": true
+    }
+  ]
+}

@@ -1,3 +1,4 @@
+#include "../../../Engine/RenderEngine/RenderAllocator.h"
 #include "Animation/AnimationBaselineProbe.h"
 #include "AnimationScheduler.h"
 #include "Animator.h"
@@ -98,7 +99,7 @@ namespace RenderTest
                 if (sceneBones + 1 != report.m_bones) throw std::runtime_error("Incomplete Scene bone hierarchy");
                 report.m_sceneBones += sceneBones;
                 animator->ClearControllersAndParams();
-                auto controller = std::make_shared<AnimationController>();
+                auto controller = own::make_shared<AnimationController>();
                 controller->m_owner = animator;
                 controller->CreateState("Walk", walk);
                 controller->CheckTransition();

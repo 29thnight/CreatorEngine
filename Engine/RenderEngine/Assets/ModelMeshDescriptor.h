@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Ownership.h"
 
 #include "ModelSkeletonPayload.h"
 #include "../Experiment/Cooked/CookedModelSubAssetCodec.h"
@@ -101,7 +102,7 @@ namespace assets
         std::array<ModelMeshLodSummary, experiment::kMeshLodMaxLevels> coarseLods{};
         std::uint32_t coarseLodCount{};
         std::size_t metadataBytes{};
-        std::shared_ptr<const experiment::cooked::ModelGeometryStreamMetadata> streamMetadata;
+        own::shared_owner<const experiment::cooked::ModelGeometryStreamMetadata> streamMetadata;
 
         [[nodiscard]] bool Matches(const experiment::cooked::ModelMeshSummary& summary) const noexcept
         {

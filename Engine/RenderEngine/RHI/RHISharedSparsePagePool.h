@@ -1,16 +1,17 @@
 #pragma once
+#include "../../Utility_Framework/Ownership.h"
 #include "../../Utility_Framework/DynamicBitset.h"
 #include "IRenderDeviceServices.h"
 #include "../../Utility_Framework/StandardLibrary.h"
 
 // One physical heap per device, with independent stable virtual buffers per asset.
 // Only completed, unreferenced cache entries may offer their pages for eviction.
-class RHISharedSparsePagePool : public std::enable_shared_from_this<RHISharedSparsePagePool>
+class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSparsePagePool>
 {
   public:
     struct Allocation
     {
-        std::shared_ptr<RHISharedSparsePagePool> pool;
+        own::shared_owner<RHISharedSparsePagePool> pool;
         RHIBufferHandle buffer;
         uint64_t virtualBytes{}, revision{}, lastUse{};
         bool evictable{};
@@ -39,20 +40,20 @@ class RHISharedSparsePagePool : public std::enable_shared_from_this<RHISharedSpa
             device_.ReleaseBuffer(anchor_);
         }
     }
-    static std::shared_ptr<RHISharedSparsePagePool> ForDevice(IRenderDeviceServices& device)
+    static own::shared_owner<RHISharedSparsePagePool> ForDevice(IRenderDeviceServices& device)
     {
         static std::mutex registryMutex;
-        static std::map<IRenderDeviceServices*, std::weak_ptr<RHISharedSparsePagePool>> registry;
+        static std::map<IRenderDeviceServices*, own::weak_owner<RHISharedSparsePagePool>> registry;
         std::lock_guard lock(registryMutex);
         auto result = registry[&device].lock();
         if (!result)
         {
-            result = std::make_shared<RHISharedSparsePagePool>(device);
+            result = own::make_shared<RHISharedSparsePagePool>(device);
             registry[&device] = result;
         }
         return result;
     }
-    std::shared_ptr<Allocation> Create(uint64_t virtualBytes, std::string& error)
+    own::shared_owner<Allocation> Create(uint64_t virtualBytes, std::string& error)
     {
         std::lock_guard lock(mutex_);
         if (!anchor_.IsValid() &&
@@ -61,7 +62,7 @@ class RHISharedSparsePagePool : public std::enable_shared_from_this<RHISharedSpa
         {
             return {};
         }
-        auto result = std::make_shared<Allocation>();
+        auto result = own::make_shared<Allocation>();
         if (!device_.CreateSparseBuffer({virtualBytes, capacity_, false, L"METEOR.AssetVirtualPages", anchor_},
                                         result->buffer, error))
         {
@@ -72,7 +73,7 @@ class RHISharedSparsePagePool : public std::enable_shared_from_this<RHISharedSpa
         allocations_.push_back(result);
         return result;
     }
-    void SetEvictable(const std::shared_ptr<Allocation>& allocation, bool value)
+    void SetEvictable(const own::shared_owner<Allocation>& allocation, bool value)
     {
         std::lock_guard lock(mutex_);
         allocation->evictable = value;
@@ -81,7 +82,7 @@ class RHISharedSparsePagePool : public std::enable_shared_from_this<RHISharedSpa
             allocation->lastUse = ++clock_;
         }
     }
-    uint64_t Revision(const std::shared_ptr<Allocation>& allocation) const
+    uint64_t Revision(const own::shared_owner<Allocation>& allocation) const
     {
         std::lock_guard lock(mutex_);
         return allocation->revision;
@@ -92,7 +93,7 @@ class RHISharedSparsePagePool : public std::enable_shared_from_this<RHISharedSpa
         return {anchor_.IsValid() ? uint64_t(capacity_) * RHISparseTileBytes : 0,
                 uint64_t(occupied_.count()), evictions_, reuses_};
     }
-    bool Prepare(const std::shared_ptr<Allocation>& allocation, const std::map<uint32_t, uint32_t>& wanted,
+    bool Prepare(const own::shared_owner<Allocation>& allocation, const std::map<uint32_t, uint32_t>& wanted,
                  std::string& error)
     {
         std::lock_guard lock(mutex_);
@@ -117,7 +118,7 @@ class RHISharedSparsePagePool : public std::enable_shared_from_this<RHISharedSpa
         }
         struct Victim
         {
-            std::shared_ptr<Allocation> owner;
+            own::shared_owner<Allocation> owner;
             uint32_t tile{}, priority{};
         };
         std::vector<Victim> candidates;
@@ -129,7 +130,7 @@ class RHISharedSparsePagePool : public std::enable_shared_from_this<RHISharedSpa
                 it = allocations_.erase(it);
                 continue;
             }
-            if (owner != allocation && owner->evictable)
+            if (owner.operator->() != allocation.operator->() && owner->evictable)
             {
                 for (const auto& [tile, physical] : owner->tiles)
                 {
@@ -244,6 +245,6 @@ class RHISharedSparsePagePool : public std::enable_shared_from_this<RHISharedSpa
     RHIBufferHandle anchor_;
     mutable std::recursive_mutex mutex_;
     ce::dynamic_bitset occupied_, usedBefore_;
-    std::vector<std::weak_ptr<Allocation>> allocations_;
+    std::vector<own::weak_owner<Allocation>> allocations_;
     uint64_t clock_{}, evictions_{}, reuses_{};
 };

@@ -1,10 +1,11 @@
+#include "../Utility_Framework/Ownership.h"
 // Included inside material_graph after RHIModelMeshletUpload.h.
 struct SparseClusterPayload
 {
     struct Packet
     {
         uint32_t offset{}, priority{};
-        std::shared_ptr<const std::vector<std::byte>> bytes;
+        own::shared_owner<const std::vector<std::byte>> bytes;
     };
     uint64_t virtualBytes{};
     std::vector<Packet> packets;

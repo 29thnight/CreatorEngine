@@ -1,0 +1,20 @@
+[
+  "Engine/EngineDiagnostics/ProfileMarker.cpp",
+  "Engine/RenderEngine/Assets/ModelAssetGeneration.h",
+  "Engine/RenderEngine/Assets/ModelAssetGeneration.cpp",
+  "Engine/RenderEngine/RHI/IRenderDeviceServices.h",
+  "Engine/RenderEngine/Render/Scene/EnhancedDrawReplayInput.h",
+  "Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h",
+  "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp",
+  "Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp",
+  "ThirdParty/ownership_cpp/include/own/ownership.hpp",
+  "ThirdParty/ownership_cpp/PROVENANCE.md",
+  "ThirdParty/README.md",
+  "Tools/regression/gpu_marker_blob_probe.cpp",
+  "Tools/regression/verify-gpu-marker-blob.ps1",
+  "Engine/RenderEngine/RenderAllocator.h",
+  "Engine/Utility_Framework/LifetimeToken.h",
+  "Engine/RenderEngine/RenderArena.cpp",
+  "Engine/RenderEngine/RHI/RHISoftwareCommandList.cpp",
+  "Editor/RenderTests/AssetIdentity/ModelAssetGenerationSelfTest.cpp"
+]

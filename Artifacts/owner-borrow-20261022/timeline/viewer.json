@@ -1,0 +1,79 @@
+{
+  "schema": 1,
+  "title": "즉시 조회 차용·소유 핸들 복사 제거",
+  "report": "../index.html",
+  "datasets": [
+    {
+      "id": "on-a-baseline",
+      "variant": "on-a",
+      "mode": "baseline",
+      "begin": 0,
+      "end": 15470.3115,
+      "events": 1409750,
+      "measurements": 694,
+      "cpu": "on-a-baseline.json",
+      "gpu": "on-a-baseline-gpu.json",
+      "label": "변경 후 · A · 기록 ON"
+    },
+    {
+      "id": "on-a-etw",
+      "variant": "on-a",
+      "mode": "etw",
+      "begin": 0,
+      "end": 46521.997,
+      "events": 1200402,
+      "measurements": 565,
+      "cpu": "on-a-etw.json",
+      "gpu": "on-a-etw-gpu.json",
+      "label": "변경 후 · A · ETW"
+    },
+    {
+      "id": "off-a-baseline",
+      "variant": "off-a",
+      "mode": "baseline",
+      "begin": 0,
+      "end": 15493.9537,
+      "events": 1530813,
+      "measurements": 770,
+      "cpu": "off-a-baseline.json",
+      "gpu": "off-a-baseline-gpu.json",
+      "label": "변경 전 · A · 기록 ON"
+    },
+    {
+      "id": "off-a-etw",
+      "variant": "off-a",
+      "mode": "etw",
+      "begin": 0,
+      "end": 41204.47,
+      "events": 1364497,
+      "measurements": 664,
+      "cpu": "off-a-etw.json",
+      "gpu": "off-a-etw-gpu.json",
+      "label": "변경 전 · A · ETW"
+    },
+    {
+      "id": "off-b-baseline",
+      "variant": "off-b",
+      "mode": "baseline",
+      "begin": 0,
+      "end": 15539.4831,
+      "events": 1404280,
+      "measurements": 688,
+      "cpu": "off-b-baseline.json",
+      "gpu": "off-b-baseline-gpu.json",
+      "label": "변경 전 · B · 기록 ON"
+    },
+    {
+      "id": "on-b-baseline",
+      "variant": "on-b",
+      "mode": "baseline",
+      "begin": 0,
+      "end": 15582.7239,
+      "events": 1397269,
+      "measurements": 686,
+      "cpu": "on-b-baseline.json",
+      "gpu": "on-b-baseline-gpu.json",
+      "label": "변경 후 · B · 기록 ON"
+    }
+  ]
+}

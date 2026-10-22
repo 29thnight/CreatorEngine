@@ -1,4 +1,5 @@
-﻿#include "EditorModelPlacement.h"
+#include "../../Engine/Utility_Framework/Ownership.h"
+#include "EditorModelPlacement.h"
 #include "../../Engine/Utility_Framework/WindowsApartment.h"
 #include "EditorModelCollisionGeometry.h"
 
@@ -25,7 +26,7 @@ namespace Editor
         std::optional<math::vector3> position;
         bool gameMode{};
         file::path assetRoot;
-        std::weak_ptr<ProjectLayerSettings> project;
+        own::weak_owner<ProjectLayerSettings> project;
         DataSystem::ModelPreparation modelPreparation;
         job_handle preparation;
         std::atomic<bool> cancelled{ false };
@@ -139,7 +140,7 @@ namespace Editor
                             -> ce::physics::result<ce::physics::geometry_asset_key>
                         {
                             const auto current = expectedProject.lock();
-                            if (!current || current != SceneManagers->ProjectLayers() ||
+                            if (!current || own::identity(current) != own::identity(SceneManagers->ProjectLayers()) ||
                                 assetRoot != PathFinder::Relative() || SceneManagers->IsPlayCommitted() ||
                                 meshIndex >= meshes.size())
                             {
@@ -210,7 +211,7 @@ namespace Editor
                             -> ce::physics::result<ce::physics::geometry_asset_key>
                         {
                             const auto current = expectedProject.lock();
-                            if (!current || current != SceneManagers->ProjectLayers() ||
+                            if (!current || own::identity(current) != own::identity(SceneManagers->ProjectLayers()) ||
                                 assetRoot != PathFinder::Relative() || SceneManagers->IsPlayCommitted() ||
                                 meshIndex >= meshes.size())
                             {
@@ -332,7 +333,7 @@ namespace Editor
         if (request->root.IsValid() || request->modelPublished || request->preparationRetries >= 3
             || request->cancelled.load(std::memory_order_acquire)
             || request->assetRoot != PathFinder::Relative()
-            || request->project.lock() != SceneManagers->ProjectLayers()
+            || own::identity(request->project.lock()) != own::identity(SceneManagers->ProjectLayers())
             || !DataSystems->IsModelPreparationInvalidated(request->modelPreparation)) return false;
         const auto previousRecipe = request->preparation;
         auto preparation = DataSystems->PrepareModelAssetByPath(request->path);

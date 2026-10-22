@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 
 #include "LXMaterialPipeline.h"
 
@@ -78,7 +79,7 @@ class SceneLookupFrame
     friend class SceneLookupCache;
     friend struct SceneLookupResourcePool;
     IRenderDeviceServices* device_{};
-    std::shared_ptr<SceneLookupResourcePool> resourcePool_;
+    own::shared_owner<SceneLookupResourcePool> resourcePool_;
     mutable RHICompletionPoint completion_{};
     mutable bool submissionConfirmed_{};
     std::uint32_t width_{}, height_{};
@@ -88,15 +89,15 @@ class SceneLookupFrame
     std::array<RHITextureHandle, 3> importance_{};
     std::array<RHITextureHandle, 11> inputs_{};
     RHIBufferHandle samples_, statistics_, emptyPrevious_;
-    std::shared_ptr<const LX::Runtime::ComputeGeneration> bake_, clear_;
+    own::shared_owner<const LX::Runtime::ComputeGeneration> bake_, clear_;
     std::vector<RHIBufferSlice> constants_;
     RHIBindingTable outputs_;
     RHIBindingTable runtimeInputs_;
     RHIBufferSlice runtimeConstants_;
     RHIBufferSlice filmSensitivityConstants_;
-    std::weak_ptr<const SceneLookupFrame> previous_;
+    own::weak_owner<const SceneLookupFrame> previous_;
     bool reuse_{}, standalone_{}, runtimeEvaluation_{}, capture_ = true;
-    std::weak_ptr<const SceneLookupFrame> self_;
+    own::weak_owner<const SceneLookupFrame> self_;
     mutable const EnhancedRenderGraph* graph_{};
     mutable std::uint64_t graphEpoch_{};
     mutable std::array<RGHandle, 11> graphInputs_{};
@@ -113,7 +114,7 @@ class SceneLookupCache : private IRHIUploadTransactionListener
   public:
     bool Prepare(const EnhancedFrameContext& context, std::uint64_t viewId, RHITextureHandle environment,
                  RHITextureHandle irradiance, RHITextureHandle prefiltered, std::uint64_t environmentGeneration,
-                 std::uint64_t memoryBudget, std::shared_ptr<const SceneLookupFrame>& result, std::string& error,
+                 std::uint64_t memoryBudget, own::shared_owner<const SceneLookupFrame>& result, std::string& error,
                  std::array<RHITextureHandle, 3> importance = {}, RHITextureHandle source = {}, bool standalone = false,
                  bool approximate = false, bool capture = true, bool runtimeEvaluation = false);
     void ResetPreparationStatus() { preparationDeferred_ = false; }
@@ -132,8 +133,8 @@ class SceneLookupCache : private IRHIUploadTransactionListener
   private:
     IRenderDeviceServices* device_{};
     LX::Runtime::ComputePipeline bake_, clear_;
-    std::vector<std::shared_ptr<const SceneLookupFrame>> published_;
-    std::shared_ptr<SceneLookupResourcePool> resourcePool_;
+    std::vector<own::shared_owner<const SceneLookupFrame>> published_;
+    own::shared_owner<SceneLookupResourcePool> resourcePool_;
     std::mutex submissionMutex_;
     std::map<std::uint64_t, RHICompletionPoint> submitted_;
     std::set<std::uint64_t> acceptedRecordings_;

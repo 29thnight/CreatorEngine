@@ -1,0 +1,15 @@
+{
+  "passed": true,
+  "newest": {
+    "id": "on-a-etw",
+    "identities": 128863,
+    "collections": 9,
+    "overflow": false
+  },
+  "legacy": {
+    "id": "after-etw",
+    "status": "after-etw · 1,529,448 CPU 스코프 · 뷰 구간 480개 · 135 TID · ETW 상태 있음 · t=0 CEPROF 첫 프레임 · CPU·GPU QPC 시간축 ms · GPU 67,440 spans"
+  },
+  "redirect": "http://127.0.0.1:8765/Artifacts/timeline-viewer/index.html?manifest=%2FArtifacts%2Fgpu-marker-blob-20261022%2Ftimeline%2Fviewer.json&dataset=on-b-baseline",
+  "errors": []
+}

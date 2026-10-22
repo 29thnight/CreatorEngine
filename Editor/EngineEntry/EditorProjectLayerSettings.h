@@ -1,3 +1,4 @@
+#include "../../Engine/Utility_Framework/Ownership.h"
 #pragma once
 
 #include "ProjectLayerSettingsIO.h"
@@ -19,10 +20,10 @@ inline bool SaveProjectLayerSettings(const project_layer_snapshot& snapshot)
 }
 
 // Only Editor imports legacy YAML. Player's loader accepts CLYR exclusively.
-inline std::shared_ptr<ProjectLayerSettings> LoadProjectLayerSettings()
+inline own::shared_owner<ProjectLayerSettings> LoadProjectLayerSettings()
 {
     const auto path = PathFinder::ProjectSettingPath(ProjectLayerSettingsIO::filename);
-    auto state = std::make_shared<ProjectLayerSettings>();
+    auto state = own::make_shared<ProjectLayerSettings>();
     if (std::filesystem::exists(path))
     {
         auto loaded = ProjectLayerSettingsIO::Read(path);

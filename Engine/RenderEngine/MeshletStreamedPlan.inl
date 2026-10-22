@@ -1,7 +1,8 @@
+#include "../Utility_Framework/Ownership.h"
 // A descriptor-only partition. Original connectivity remains in QMC2 pages;
 // local logical vertex ranges deliberately do not weld across meshlets.
 bool MeshSurfacePlan::BuildStreamed(const EnhancedDrawItem& draw, const SurfaceView& view,
-                                     const MeshSurfacePlanBudget& budget, std::shared_ptr<const MeshSurfacePlan>& result,
+                                     const MeshSurfacePlanBudget& budget, own::shared_owner<const MeshSurfacePlan>& result,
                                      std::string& error)
 {
     const auto& geometry = draw.modelMeshView;
@@ -18,8 +19,8 @@ bool MeshSurfacePlan::BuildStreamed(const EnhancedDrawItem& draw, const SurfaceV
     for (const auto& descriptor : *metadata->flatDescriptors) points += descriptor.vertexCount;
     if (triangles > budget.maxTriangles || triangles * 3 > UINT32_MAX || points > UINT32_MAX)
         return Fail(error, "Thin geometry exceeds the logical topology budget.");
-    auto candidate = std::shared_ptr<MeshSurfacePlan>(new MeshSurfacePlan);
-    auto source = std::shared_ptr<MeshSurfaceInput>(new MeshSurfaceInput);
+    auto candidate = own::make_shared<MeshSurfacePlan>(MeshSurfacePlan::ConstructionKey{});
+    auto source = own::make_shared<MeshSurfaceInput>(MeshSurfaceInput::ConstructionKey{});
     source->geometry_ = geometry; source->geometry_.sourceDescriptor = nullptr;
     source->geometry_.sourcePayload = nullptr; source->geometry_.sourceGeneration = nullptr; source->geometry_.sourceMeshIndex = UINT32_MAX;
     source->world_ = draw.worldMatrix; source->view_ = view;
@@ -28,7 +29,7 @@ bool MeshSurfacePlan::BuildStreamed(const EnhancedDrawItem& draw, const SurfaceV
     source->originalIndexCount_ = metadata->counts[0].indexCount;
     source->geometry_.vertexBytes = points * geometry.vertexStride; source->geometry_.indexCount = static_cast<uint32_t>(triangles * 3);
     source->clusterArchive_ = metadata->archive;
-    source->clusterStream_ = std::make_shared<assets::cluster::Stream>(metadata->archive, metadata->lods.groups);
+    source->clusterStream_ = own::make_shared<assets::cluster::Stream>(metadata->archive, metadata->lods.groups);
     source->hierarchy_.groups = metadata->lods.groups;
     source->hierarchy_.groupCount = static_cast<uint32_t>(metadata->lods.groups.size());
     source->hierarchy_.rootGroup = source->hierarchy_.groupCount ? source->hierarchy_.groupCount - 1 : UINT32_MAX;
@@ -47,10 +48,10 @@ bool MeshSurfacePlan::BuildStreamed(const EnhancedDrawItem& draw, const SurfaceV
     cost.cpuPayloadBytes = sizeof(MeshSurfacePlan) + sizeof(MeshSurfaceInput) +
         source->meshlets_.descriptors.capacity() * sizeof(experiment::MeshletDescriptor) +
         source->hierarchy_.groups.capacity() * sizeof(experiment::MeshClusterGroup) + source->bones_.capacity() * sizeof(PackedBoneMatrix);
-    std::shared_ptr<MeshSurfaceInput> chunk;
+    own::shared_owner<MeshSurfaceInput> chunk;
     uint32_t firstTriangle{}, triangleCursor{}, logicalCursor{};
     const auto start = [&] {
-        chunk = std::shared_ptr<MeshSurfaceInput>(new MeshSurfaceInput);
+        chunk = own::make_shared<MeshSurfaceInput>(MeshSurfaceInput::ConstructionKey{});
         chunk->geometry_ = source->geometry_; chunk->geometry_.vertexBytes = 0; chunk->geometry_.indexCount = 0;
         chunk->world_ = source->world_; chunk->view_ = source->view_; chunk->bones_ = source->bones_;
         chunk->streamedTopology_ = true; chunk->sourceVertexCount_ = source->sourceVertexCount_;

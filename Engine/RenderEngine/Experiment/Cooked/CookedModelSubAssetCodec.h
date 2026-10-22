@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 
 #include "CookedAssetManifest.h"
 #include "../ModelData.h"
@@ -68,9 +69,9 @@ struct ModelGeometryStreamMetadata final
     MeshletPayload meshlets{}; // Descriptors only; connectivity lives in pages.
     MeshLodChain lods{};       // Descriptors/DAG only; level.indices are empty.
     std::vector<ModelStreamLodCounts> counts;
-    std::shared_ptr<const assets::cluster::Archive> archive;
+    own::shared_owner<const assets::cluster::Archive> archive;
     std::vector<Sha256Digest> pageHashes;
-    std::shared_ptr<const std::vector<MeshletDescriptor>> flatDescriptors;
+    own::shared_owner<const std::vector<MeshletDescriptor>> flatDescriptors;
     std::uint64_t metadataBytes{}, cpuGeometryBytes{};
     Sha256Digest cpuGeometrySha256{};
     std::function<std::vector<std::byte>()> cpuReader;
@@ -85,7 +86,7 @@ struct ResolvedAssetEntry;
 [[nodiscard]] std::string ModelGeometryStreamDirectory(const Sha256Digest& digest);
 [[nodiscard]] bool ModelGeometryStreamIdentity(std::string_view path, Sha256Digest& digest);
 [[nodiscard]] bool LoadModelGeometryStreamMetadata(ResolvedAssetEntry& resolved,
-    std::shared_ptr<const ModelGeometryStreamMetadata>& out, std::string& failure,
+    own::shared_owner<const ModelGeometryStreamMetadata>& out, std::string& failure,
     std::atomic<std::size_t>* inputStaging = nullptr);
 
 struct ModelMeshSummary final

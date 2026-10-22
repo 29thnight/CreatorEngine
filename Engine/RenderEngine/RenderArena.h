@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 #include "RenderAllocator.h"
 #include <array>
 #include <algorithm>
@@ -443,7 +444,7 @@ namespace ce
         std::array<render_arena_resource, DomainCount> m_resources;
     };
 
-    using RenderArenaLease = std::shared_ptr<RenderArenaSet>;
+    using RenderArenaLease = pooled_owner<RenderArenaSet>;
 
     // Last lease release resets the set. Pending CPU/RHI/GPU owners exclude reuse.
     // Shared state outlives the pool facade when a retirement still owns a lease.
@@ -455,6 +456,6 @@ namespace ce
 
       private:
         struct State;
-        std::shared_ptr<State> m_state;
+        own::shared_owner<State> m_state;
     };
 } // namespace ce

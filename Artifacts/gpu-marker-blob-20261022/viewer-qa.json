@@ -1,0 +1,32 @@
+{
+  "passed": true,
+  "viewport": [
+    1600,
+    1000
+  ],
+  "errors": [],
+  "first": {
+    "id": "on-a-etw",
+    "identities": 128863,
+    "overflow": false,
+    "status": "on-a-etw · 1,466,431 CPU 스코프 · 뷰 구간 727개 · 32 TID · ETW 상태 있음 · t=0 2026/10/21:23:18:34.3661365 UTC · CPU·GPU QPC 시간축 ms · GPU 102,145 spans"
+  },
+  "second": {
+    "id": "off-b-baseline",
+    "identities": 138190,
+    "status": "off-b-baseline · 1,549,962 CPU 스코프 · 뷰 구간 780개 · 16 TID · 비추적: OS 상태 없음 · t=0 CEPROF 첫 프레임 · CPU·GPU QPC 시간축 ms · GPU 109,590 spans"
+  },
+  "requests": [
+    "http://127.0.0.1:8765/Tools/profiling-validation/viewer/index.html?manifest=/Artifacts/gpu-marker-blob-20261022/timeline/viewer.json&dataset=on-a-etw&detail=all",
+    "https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap",
+    "http://127.0.0.1:8765/Tools/profiling-validation/viewer/viewer.js",
+    "https://fonts.gstatic.com/s/geist/v5/gyByhwUxId8gMEwcGFU.woff2",
+    "https://fonts.gstatic.com/s/geistmono/v6/or3nQ6H-1_WfwkMZI_qYFrcdmg.woff2",
+    "http://127.0.0.1:8765/Artifacts/profiling-catalog.json",
+    "http://127.0.0.1:8765/Artifacts/gpu-marker-blob-20261022/timeline/viewer.json",
+    "http://127.0.0.1:8765/Artifacts/gpu-marker-blob-20261022/timeline/on-a-etw.json",
+    "http://127.0.0.1:8765/Artifacts/gpu-marker-blob-20261022/timeline/on-a-etw-gpu.json",
+    "http://127.0.0.1:8765/Artifacts/gpu-marker-blob-20261022/timeline/off-b-baseline.json",
+    "http://127.0.0.1:8765/Artifacts/gpu-marker-blob-20261022/timeline/off-b-baseline-gpu.json"
+  ]
+}

@@ -123,7 +123,7 @@ namespace experiment::cooked
         // GUID lookup plus CEAC/CEMF integrity verification. The byte source
         // may address the loose cooked tree or a mounted pak.
         [[nodiscard]] bool OpenAudioClip(const AssetId& assetId,
-            std::shared_ptr<const ArtifactByteSource> bytes,
+            own::shared_owner<const ArtifactByteSource> bytes,
             CookedAudioClipSource& out, std::string& failure) const;
 
         [[nodiscard]] bool ReadCollisionGeometry(const AssetId& assetId, const ArtifactByteSource& bytes,

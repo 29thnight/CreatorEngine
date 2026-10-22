@@ -1,0 +1,1 @@
+{"variant": "on-a", "passed": true, "referenceChecks": [], "events": {"Interrupt": 49417, "DPC": 118941, "CSwitch": 1493467, "ReadyThread": 849876, "DPCTmr": 6402, "T-Start": 463, "T-End": 518}, "unknownSwitchStates": {"Running": 293}, "threads": 32}

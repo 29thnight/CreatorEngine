@@ -1,3 +1,4 @@
+#include "../../Engine/Utility_Framework/Ownership.h"
 #include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "CollisionGeometryAuthoring.h"
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
@@ -744,7 +745,7 @@ namespace
 }
 
 struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
-    std::enable_shared_from_this<EditorAssetDatabase::Impl>
+    own::enable_owner_from_this<EditorAssetDatabase::Impl>
 {
 	explicit Impl(file::path root) : m_root(std::move(root)) {}
 
@@ -1291,7 +1292,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
             {
                 return;
             }
-            auto work = std::make_shared<AutomaticModelLoad>();
+            auto work = own::make_shared<AutomaticModelLoad>();
             work->job = ce::get_job_scheduler().submit([id, work]
             {
                 try
@@ -1583,10 +1584,10 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
     struct TextureImportWork final
     {
         std::array<ModelSourceStamp, 2> stamps{};
-        std::shared_ptr<std::atomic<std::uint64_t>> latestRevision{
-            std::make_shared<std::atomic<std::uint64_t>>(0u) };
+        own::shared_owner<std::atomic<std::uint64_t>> latestRevision{
+            own::make_shared<std::atomic<std::uint64_t>>(0u) };
         job_handle completion{};
-        std::shared_ptr<std::atomic<bool>> dispatchFailed{ std::make_shared<std::atomic<bool>>(false) };
+        own::shared_owner<std::atomic<bool>> dispatchFailed{ own::make_shared<std::atomic<bool>>(false) };
         own::shared_owner<RuntimeTexturePublication> publication{};
         AssetDepot::AssetRequest<Texture> refreshRequest{};
         std::uint64_t refreshRevision{};
@@ -1774,7 +1775,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         work.stamps = stamps;
         work.failure.clear();
         work.cooking = true;
-        work.dispatchFailed = std::make_shared<std::atomic<bool>>(false);
+        work.dispatchFailed = own::make_shared<std::atomic<bool>>(false);
         const auto revision = work.latestRevision->fetch_add(1u, std::memory_order_acq_rel) + 1u;
         const auto self = shared_from_this();
         job_group jobs;
@@ -4249,7 +4250,7 @@ private:
     std::chrono::steady_clock::time_point m_nextLiveRefresh{};
     std::atomic<std::uint64_t> m_modelRefreshEpoch{ 1u };
     std::uint64_t m_observedModelRefreshEpoch{};
-    std::map<Uuid::Uuid16, std::shared_ptr<AutomaticModelLoad>> m_automaticModelLoads;
+    std::map<Uuid::Uuid16, own::shared_owner<AutomaticModelLoad>> m_automaticModelLoads;
     std::vector<job_handle> m_modelReloads;
     std::mutex m_automaticSaveMutex;
     std::map<file::path, AutomaticSave> m_automaticSaves;
@@ -4415,10 +4416,10 @@ bool EditorAssetDatabase::Initialize()
     }
 
     Authoring::InstallTextureSourceProcessing();
-    std::shared_ptr<Impl> implementation;
+    own::shared_owner<Impl> implementation;
     try
     {
-        implementation = std::make_shared<Impl>(PathFinder::Relative());
+        implementation = own::make_shared<Impl>(PathFinder::Relative());
         if (!implementation->Start())
         {
             implementation->Stop();
@@ -4799,7 +4800,7 @@ void EditorAssetDatabase::QueueAutomaticImportMetadata(const file::path& source,
 {
     if (m_impl)
     {
-        m_impl->QueueAutomaticSave(source.string() + ".meta", [impl = m_impl.get(), source, payload = std::move(payload)](const std::string& expectedDisk, std::string& error)
+        m_impl->QueueAutomaticSave(source.string() + ".meta", [impl = m_impl.operator->(), source, payload = std::move(payload)](const std::string& expectedDisk, std::string& error)
         {
             return impl->SaveImportMetadata(source, payload, error, &expectedDisk);
         });
@@ -4811,7 +4812,7 @@ void EditorAssetDatabase::QueueAutomaticTextureSettings(const file::path& source
 {
     if (m_impl)
     {
-        m_impl->QueueAutomaticSave(source.string() + ".meta", [impl = m_impl.get(), source, settings](const std::string& expectedDisk, std::string& error)
+        m_impl->QueueAutomaticSave(source.string() + ".meta", [impl = m_impl.operator->(), source, settings](const std::string& expectedDisk, std::string& error)
         {
             return impl->SetTextureImportSettingsAndReimport(source, settings, error, &expectedDisk);
         });
@@ -4823,7 +4824,7 @@ void EditorAssetDatabase::QueueAutomaticRenderProfile(FileGuid guid, const Scene
     const auto path = DataSystems->GetFilePath(guid);
     if (m_impl && !path.empty())
     {
-        m_impl->QueueAutomaticSave(path, [impl = m_impl.get(), path, payload = Meta::SerializeDocument(const_cast<SceneRenderProfile*>(&profile)).Dump()](const std::string& expectedDisk, std::string& error)
+        m_impl->QueueAutomaticSave(path, [impl = m_impl.operator->(), path, payload = Meta::SerializeDocument(const_cast<SceneRenderProfile*>(&profile)).Dump()](const std::string& expectedDisk, std::string& error)
         {
             return impl->SaveAutomaticRenderProfilePayload(path, payload, error, &expectedDisk);
         });

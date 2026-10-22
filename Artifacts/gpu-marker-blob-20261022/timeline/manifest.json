@@ -1,0 +1,56 @@
+[
+  {
+    "id": "on-a-baseline",
+    "variant": "on-a",
+    "mode": "baseline",
+    "begin": 0,
+    "end": 15484.5182,
+    "events": 1513649,
+    "measurements": 758
+  },
+  {
+    "id": "on-a-etw",
+    "variant": "on-a",
+    "mode": "etw",
+    "begin": 0,
+    "end": 42020.633,
+    "events": 1466431,
+    "measurements": 727
+  },
+  {
+    "id": "off-a-baseline",
+    "variant": "off-a",
+    "mode": "baseline",
+    "begin": 0,
+    "end": 15496.4609,
+    "events": 1522978,
+    "measurements": 764
+  },
+  {
+    "id": "off-a-etw",
+    "variant": "off-a",
+    "mode": "etw",
+    "begin": 0,
+    "end": 41623.662,
+    "events": 1406711,
+    "measurements": 691
+  },
+  {
+    "id": "off-b-baseline",
+    "variant": "off-b",
+    "mode": "baseline",
+    "begin": 0,
+    "end": 15530.2419,
+    "events": 1549962,
+    "measurements": 780
+  },
+  {
+    "id": "on-b-baseline",
+    "variant": "on-b",
+    "mode": "baseline",
+    "begin": 0,
+    "end": 15513.4085,
+    "events": 1603151,
+    "measurements": 810
+  }
+]

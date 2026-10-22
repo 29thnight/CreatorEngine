@@ -134,8 +134,8 @@ public:
     void UpdateAnimation();
 
     void CreateController(std::string name);
-    std::shared_ptr<AnimationController> CreateController_UI();
-    std::shared_ptr<AnimationController> CreateController_UINoAni();
+    own::shared_owner<AnimationController> CreateController_UI();
+    own::shared_owner<AnimationController> CreateController_UINoAni();
     void DeleteController(int index);
     void DeleteController(std::string controllerName);
     AnimationController* GetController(std::string name);
@@ -296,7 +296,7 @@ public:
     [[reflgen::ignore]]
     std::vector<Socket*> socketvec;
 
-    std::vector<std::shared_ptr<AnimationController>> m_animationControllers{}; 
+    std::vector<own::shared_owner<AnimationController>> m_animationControllers{};
     std::vector<ConditionParameter*> Parameters;
 
     [[reflgen::ignore]]
@@ -348,7 +348,7 @@ private:
             bool enabled{ true };
             float weight{ 1.f };
         };
-        std::weak_ptr<AnimationController> controller{};
+        own::weak_owner<AnimationController> controller{};
         std::vector<Bone> bones{};
     };
 

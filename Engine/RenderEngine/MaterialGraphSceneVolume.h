@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 
 #include "MaterialGraphSceneInput.h"
 #include "MaterialGraphRenderBindings.h"
@@ -29,7 +30,7 @@ namespace material_graph
     struct SceneVolumeBinding
     {
         own::shared_owner<const RenderBindings> material;
-        std::shared_ptr<const LX::Runtime::ComputeGeneration> pipeline;
+        own::shared_owner<const LX::Runtime::ComputeGeneration> pipeline;
         RHIBufferSlice constants;
     };
 
@@ -70,10 +71,10 @@ namespace material_graph
         RHIBufferSlice triangles_;
         RHIBufferHandle coefficients_;
         RHITextureHandle environment_;
-        std::shared_ptr<const LX::Runtime::ComputeGeneration> composite_;
+        own::shared_owner<const LX::Runtime::ComputeGeneration> composite_;
         RHIBindingTable coefficientOutput_;
         std::vector<RHIBufferSlice> constants_;
-        std::weak_ptr<const SceneVolumeFrame> self_;
+        own::weak_owner<const SceneVolumeFrame> self_;
         mutable const EnhancedRenderGraph* graph_{};
         mutable std::uint64_t graphEpoch_{};
         mutable RGHandle graphCoefficients_, output_;
@@ -85,7 +86,7 @@ namespace material_graph
       public:
         bool Prepare(const EnhancedFrameContext& context, const SceneViewInput& input, RHITextureHandle environment,
                      const EnhancedShadowData& shadow, std::uint64_t memoryBudget,
-                     std::shared_ptr<const SceneVolumeFrame>& result, std::string& error);
+                     own::shared_owner<const SceneVolumeFrame>& result, std::string& error);
         void ShutdownAfterIdle();
 
       private:

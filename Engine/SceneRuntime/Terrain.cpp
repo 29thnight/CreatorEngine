@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "Transform.h"
 #include "Scene.h"
 #include "Terrain.h"
@@ -85,7 +86,7 @@ void TerrainComponent::Initialize()
 	}
 
 	// TerrainMesh 생성 (한 번만)
-	m_pTerrainMesh = std::make_shared<TerrainMesh>(m_name.ToString(), verts, indices, (uint32_t)m_width);
+	m_pTerrainMesh = own::make_shared<TerrainMesh>(m_name.ToString(), verts, indices, (uint32_t)m_width);
 	/*m_pMesh = new TerrainMesh(
 		m_name.ToString(),
 		verts,
@@ -93,7 +94,7 @@ void TerrainComponent::Initialize()
 		(uint32_t)m_width
 	);*/
 
-	m_pMaterial = std::make_shared<TerrainMaterial>();
+	m_pMaterial = own::make_shared<TerrainMaterial>();
 	//// TerrainMaterial 초기화 -> 스플랫맵 텍스처 생성
 	m_pMaterial->Initialize(m_width, m_height);
 }
@@ -141,7 +142,7 @@ void TerrainComponent::Resize(int newWidth, int newHeight)
 				indices.push_back(bl); indices.push_back(br); indices.push_back(tr);
 			}
 		}
-		m_pTerrainMesh = std::make_shared<TerrainMesh>(m_name.ToString(), verts, indices, (uint32_t)m_width);
+		m_pTerrainMesh = own::make_shared<TerrainMesh>(m_name.ToString(), verts, indices, (uint32_t)m_width);
 	}
 
 	// [수정] MateialDataUpdate를 호출하여 모든 머티리얼 리소스를 새 크기에 맞게 재구성합니다.
@@ -1004,8 +1005,8 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
                 }
             }
         }
-        auto mesh = std::make_shared<TerrainMesh>(m_name.ToString(), vertices, indices, terrain.width);
-        auto material = std::make_shared<TerrainMaterial>();
+        auto mesh = own::make_shared<TerrainMesh>(m_name.ToString(), vertices, indices, terrain.width);
+        auto material = own::make_shared<TerrainMaterial>();
         material->MateialDataUpdate(width, height, layers, weights);
         std::wstring targetPath = filePath;
         m_width = width;
@@ -1046,4 +1047,3 @@ void TerrainComponent::OnDeserialized()
 		Debug::PrintLog(spdlog::level::err, "Terrain component is missing m_trrainAssetGuid");
 	}
 }
-

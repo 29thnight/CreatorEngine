@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/Ownership.h"
 #include "AudioCatalog.h"
 #include "SoundAssetSerialization.h"
 #include "EditorAudioClipCache.h"
@@ -14,7 +15,7 @@ namespace wave
     namespace
     {
         namespace ck = experiment::cooked;
-        using Graphs = std::unordered_map<ClipKey, std::shared_ptr<const SoundGraphProgram>>;
+        using Graphs = std::unordered_map<ClipKey, own::shared_owner<const SoundGraphProgram>>;
         using Presets = std::unordered_map<ClipKey, SoundPreset>;
 
         std::string Lower(std::string text)
@@ -321,7 +322,7 @@ namespace wave
     }
 
     bool AudioCatalog::LoadCookedAssets(const ck::CookedAssetCatalog& catalog,
-        std::shared_ptr<const ck::ArtifactByteSource> bytes, std::string& error)
+        own::shared_owner<const ck::ArtifactByteSource> bytes, std::string& error)
     {
         if (!bytes)
         {

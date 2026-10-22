@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/Ownership.h"
 #include "SoundGraph.h"
 
 #include "../../Utility_Framework/StandardLibrary.h"
@@ -60,11 +61,11 @@ namespace wave
         return static_cast<ParameterType>(value.index());
     }
 
-    std::shared_ptr<const SoundGraphProgram> CompileSoundGraph(const SoundGraphDefinition& definition,
+    own::shared_owner<const SoundGraphProgram> CompileSoundGraph(const SoundGraphDefinition& definition,
         const std::function<bool(const ClipKey&)>& hasClip, std::string& error)
     {
         error.clear();
-        const auto fail = [&error](std::string reason) -> std::shared_ptr<const SoundGraphProgram>
+        const auto fail = [&error](std::string reason) -> own::shared_owner<const SoundGraphProgram>
         {
             error = std::move(reason);
             return {};
@@ -85,7 +86,7 @@ namespace wave
                 return fail("SoundGraph parameter name, type or default is invalid: " + parameter.name);
             }
         }
-        auto program = std::make_shared<SoundGraphProgram>();
+        auto program = own::make_shared<SoundGraphProgram>();
         program->definition = definition;
         std::size_t outputs = 0u;
         for (std::size_t index = 0u; index < definition.nodes.size(); ++index)

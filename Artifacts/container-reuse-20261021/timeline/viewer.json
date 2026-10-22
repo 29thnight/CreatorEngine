@@ -1,0 +1,71 @@
+{
+  "schema": 1,
+  "title": "이전 합산 측정 · 노드 병렬화 제거 + 컨테이너 재사용",
+  "datasets": [
+    {
+      "id": "before-baseline",
+      "variant": "before",
+      "mode": "baseline",
+      "begin": 0,
+      "end": 15474.0138,
+      "events": 1617849,
+      "measurements": 512,
+      "cpu": "before-baseline.json",
+      "gpu": "before-baseline-gpu.json",
+      "label": "합산 변경 전",
+      "windows": [
+        {
+          "name": "native recording ON",
+          "begin": 286.303,
+          "end": 15441.2175
+        }
+      ]
+    },
+    {
+      "id": "before-etw",
+      "variant": "before",
+      "mode": "etw",
+      "begin": 0,
+      "end": 43381.625,
+      "events": 1472595,
+      "measurements": 458,
+      "cpu": "before-etw.json",
+      "gpu": "before-etw-gpu.json",
+      "label": "합산 변경 전",
+      "traceUtc": "2026/10/21:07:05:14.3589539 UTC"
+    },
+    {
+      "id": "after-baseline",
+      "variant": "after",
+      "mode": "baseline",
+      "begin": 0,
+      "end": 15509.316,
+      "events": 1477729,
+      "measurements": 744,
+      "cpu": "after-baseline.json",
+      "gpu": "after-baseline-gpu.json",
+      "label": "합산 변경 후",
+      "windows": [
+        {
+          "name": "native recording ON",
+          "begin": 314.11,
+          "end": 15493.2761
+        }
+      ]
+    },
+    {
+      "id": "after-etw",
+      "variant": "after",
+      "mode": "etw",
+      "begin": 0,
+      "end": 41428.471,
+      "events": 1337076,
+      "measurements": 654,
+      "cpu": "after-etw.json",
+      "gpu": "after-etw-gpu.json",
+      "label": "합산 변경 후",
+      "traceUtc": "2026/10/21:07:32:20.9835884 UTC"
+    }
+  ],
+  "report": "../index.html"
+}

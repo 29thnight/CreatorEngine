@@ -1,0 +1,20 @@
+{
+  "Engine/EngineDiagnostics/ProfileMarker.cpp": "695c91f0622b41983fe9fa8f8b3bbd3dd4314848e9f284fce6df5b22add7a7dc",
+  "Engine/RenderEngine/Assets/ModelAssetGeneration.h": "ba25c14960937009cd6fa8b2e71186c965f997d58ba2d4ac6b92e80cad1ee3f6",
+  "Engine/RenderEngine/Assets/ModelAssetGeneration.cpp": "84a8cec0b7c90ece6a93dc672897605e551adcee73b5f3aa40f232aba6800573",
+  "Engine/RenderEngine/RHI/IRenderDeviceServices.h": "ae3a12b5d9c6d5b81805a02e08330b71a6741a86b803869ba9d0c36ce003cc25",
+  "Engine/RenderEngine/Render/Scene/EnhancedDrawReplayInput.h": "23791e2aeb8ceaca6b46c9aca4a728690c7fe761d99afa74e9247a026b5f79f4",
+  "Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h": "4fe2bfac168349e6d50b9dd79b2646bf9977be7da2588881c47ab90e006f1104",
+  "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp": "71afc23c171e168889663fb2098b6fb66444ba1ef5cd1b63a42e7b059032f072",
+  "Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp": "c8b1bcb27ee6405f198340c0f4b0d95bf3d6c54c59de31a66e4c8a197dd352ad",
+  "ThirdParty/ownership_cpp/include/own/ownership.hpp": "c17c871d25ea68c3d6f4284c19a22240d825632b3017ea643081be239293a6e7",
+  "ThirdParty/ownership_cpp/PROVENANCE.md": "8b7f24851f98f0c897b4fa703fbca77de5ebf417900d0c1243557e971f8118a9",
+  "ThirdParty/README.md": "7a44130e9b1045e7cc6f0f8937748f8cbdb920df51a73c936eac77b873d2c0f0",
+  "Tools/regression/gpu_marker_blob_probe.cpp": "e01bb9c0b3322cd71c17ba392f3f827bd1bdc17f00ac212320f3de2212d07f52",
+  "Tools/regression/verify-gpu-marker-blob.ps1": "4cd0cc47afaad97f0facf47992fa76f3e8b6cb66532b63c53c867d945d21b76f",
+  "Engine/RenderEngine/RenderAllocator.h": "e821bc6865d5279fe6eb845ef1f34f76c204ff92cc194bbfaa2bd6b8057b6e8a",
+  "Engine/Utility_Framework/LifetimeToken.h": "e5aa483240c84c01f8b7886401712e0b52f3fd7afb0c620c5d9f7461f5ae3939",
+  "Engine/RenderEngine/RenderArena.cpp": "853ddfeceec833b33dbfcad89b5852f9e1ab787a39e135443c727030b2821a88",
+  "Engine/RenderEngine/RHI/RHISoftwareCommandList.cpp": "0ee251981b6062b6cb83b95523c7b41325944bf9e6078947fd268f6b66703d4f",
+  "Editor/RenderTests/AssetIdentity/ModelAssetGenerationSelfTest.cpp": "d18aaed249a7e817696101a553dd6ba47b430c35652cd2f66ea1ef79ed88f18f"
+}

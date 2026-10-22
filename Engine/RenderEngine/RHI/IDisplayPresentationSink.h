@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Ownership.h"
 
 #include "../../Utility_Framework/StandardLibrary.h"
 #include "RHIDisplayFrame.h"
@@ -24,7 +25,7 @@ struct IDisplayPresentationSink
     /// 직렬화되는 것은 Core의 몫이다. 성공한 구현은 consumerLease를 이번
     /// 프레임의 GPU 사용이 실제 완료될 때까지 보유한다. 캐시만으로는 부족하다.
     virtual uint64_t OpenSharedTexture(void* sharedHandle,
-        std::shared_ptr<RHIDisplayConsumerLease> consumerLease) = 0;
+        own::shared_owner<RHIDisplayConsumerLease> consumerLease) = 0;
 
     // Editor implementations deliberately keep the default false. The native
     // Player consumer opens all resources on its own device; producer RHI handles

@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "../Utility_Framework/DynamicBitset.h"
 #include "Animator.h"
 #include "AuthoringNodeViewAccess.h" // D3-a-4
@@ -90,13 +91,13 @@ void Animator::ReleaseManagedResources()
     m_requestedClips.clear();
     m_deferredAvatarMasks.clear();
 
-    const auto releaseState = [](const std::shared_ptr<AnimationState>& state)
+    const auto releaseState = [](const own::shared_owner<AnimationState>& state)
     {
         if (!state)
         {
             return;
         }
-        if (auto* behavior = dynamic_cast<ManagedAniBehavior*>(state->behaviour.get()))
+        if (auto* behavior = dynamic_cast<ManagedAniBehavior*>(state->behaviour.operator->()))
         {
             behavior->ReleaseInstance();
         }
@@ -979,13 +980,13 @@ void Animator::UpdateAnimation()
 
 	SetSelectedClipIndex(static_cast<uint32_t>(m_AnimIndex));
 	GetInstance().timeElapsed = 0;
-	
+
 }
 
 void Animator::CreateController(std::string name)
 {
-	
-	std::shared_ptr<AnimationController> animationController = std::make_shared<AnimationController>();
+
+	own::shared_owner<AnimationController> animationController = own::make_shared<AnimationController>();
 	//AnimationController* animationController = new AnimationController();
 	animationController->m_owner = this;
 	animationController->name = name;
@@ -993,9 +994,9 @@ void Animator::CreateController(std::string name)
 	m_animationControllers.push_back(animationController);
 }
 
-std::shared_ptr<AnimationController> Animator::CreateController_UI()
+own::shared_owner<AnimationController> Animator::CreateController_UI()
 {
-	std::shared_ptr<AnimationController> animationController = std::make_shared<AnimationController>();
+	own::shared_owner<AnimationController> animationController = own::make_shared<AnimationController>();
 	//AnimationController* animationController = new AnimationController();
 	animationController->m_owner = this;
 	animationController->name = "NewLayer" + std::to_string(m_animationControllers.size());
@@ -1003,9 +1004,9 @@ std::shared_ptr<AnimationController> Animator::CreateController_UI()
 	m_animationControllers.push_back(animationController);
 	return animationController;
 }
-std::shared_ptr<AnimationController> Animator::CreateController_UINoAni()
+own::shared_owner<AnimationController> Animator::CreateController_UINoAni()
 {
-	std::shared_ptr<AnimationController> animationController = std::make_shared<AnimationController>();
+	own::shared_owner<AnimationController> animationController = own::make_shared<AnimationController>();
 	//AnimationController* animationController = new AnimationController();
 	animationController->m_owner = this;
 	animationController->name = "NewLayer" + std::to_string(m_animationControllers.size());
@@ -1015,20 +1016,20 @@ std::shared_ptr<AnimationController> Animator::CreateController_UINoAni()
 }
 
 void Animator::DeleteController(int index)
-{	
+{
 	m_animationControllers.erase(m_animationControllers.begin() + index);
 }
 
 void Animator::DeleteController(std::string controllerName)
 {
 	auto it = std::remove_if(m_animationControllers.begin(), m_animationControllers.end(),
-		[&](std::shared_ptr<AnimationController> controller)
+		[&](own::shared_owner<AnimationController> controller)
 		{
 				return controller->name == controllerName;
 		});
 
-	m_animationControllers.erase(it, m_animationControllers.end()); 
-	
+	m_animationControllers.erase(it, m_animationControllers.end());
+
 }
 
 AnimationController* Animator::GetController(std::string name)
@@ -1036,7 +1037,7 @@ AnimationController* Animator::GetController(std::string name)
     for (const auto Controller : m_animationControllers)
     {
             if (Controller->name == name)
-                    return Controller.get();
+                    return Controller.operator->();
     }
     return nullptr;
 }
@@ -1111,7 +1112,7 @@ void Animator::ClearControllersAndParams()
 	std::unique_lock lock(m_paramMutex);
 	for (auto* p : Parameters)
 	{
-		delete p;  
+		delete p;
 	}
 	Parameters.clear();
 	NotifyParameterLayoutChanged();
@@ -1201,7 +1202,7 @@ ConditionParameter* Animator::FindParameter(std::string_view valueName)
 			return parameter;
 		}
 	}
-	return nullptr; 
+	return nullptr;
 }
 
 bool Animator::ConvertLegacyAvatarMask(AvatarMask& mask)
@@ -1379,8 +1380,8 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 
 		for (const auto layer : animationControllerNode)
 		{
-			std::shared_ptr<AnimationController> animationController = std::make_shared<AnimationController>();
-			Meta::Deserialize(animationController.get(), layer);
+			own::shared_owner<AnimationController> animationController = own::make_shared<AnimationController>();
+			Meta::Deserialize(animationController.operator->(), layer);
 			animationController->m_owner = this;
 			if (animationController->useMask == true)
 			{
@@ -1438,12 +1439,12 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 				const auto StatesNode = layer["StateVec"];
 				for (const auto state : StatesNode)
 				{
-					std::shared_ptr<AnimationState> sharedState = std::make_shared<AnimationState>();
-					Meta::Deserialize(sharedState.get(), state);
+					own::shared_owner<AnimationState> sharedState = own::make_shared<AnimationState>();
+					Meta::Deserialize(sharedState.operator->(), state);
 					animationController->StateVec.push_back(sharedState);
 					animationController->StateNameSet.insert(sharedState->m_name);
 					animationController->m_nameToState.insert(std::make_pair(sharedState->m_name, sharedState));
-					sharedState->m_ownerController = animationController.get();
+					sharedState->m_ownerController = animationController.operator->();
 					sharedState->SetBehaviour(sharedState->behaviourName);
 					if (sharedState->m_isAny)
 						animationController->m_anyState = sharedState;
@@ -1453,16 +1454,16 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 
 						for (const auto transition : transitionNode)
 						{
-							std::shared_ptr<AniTransition> sharedTransition = std::make_shared<AniTransition>();
-							Meta::Deserialize(sharedTransition.get(), transition);
+							own::shared_owner<AniTransition> sharedTransition = own::make_shared<AniTransition>();
+							Meta::Deserialize(sharedTransition.operator->(), transition);
 							sharedState->Transitions.push_back(sharedTransition);
-							sharedTransition->m_ownerController = animationController.get();
+							sharedTransition->m_ownerController = animationController.operator->();
 
 							// TransCondition은 값 벡터라 typed deserializer가 이미 채운다.
 							// 여기서는 런타임 전용 owner/parameter 포인터만 다시 결합한다.
 							for (TransCondition& condition : sharedTransition->conditions)
 							{
-								condition.m_ownerController = animationController.get();
+								condition.m_ownerController = animationController.operator->();
 								condition.SetValue(condition.valueName);
 							}
 						}
@@ -1546,4 +1547,3 @@ void Animator::OnAfterSerialize(const Authoring::MutableNodeView& view)
 		}
 	}
 }
-

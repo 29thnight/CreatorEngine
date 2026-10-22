@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #pragma once
 #include "Component.h"
 #include "IAIComponent.h"
@@ -22,7 +23,7 @@ class [[reflgen::reflect]] StateMachineComponent :public meta::identity<StateMac
 public:
 	using ConditionFunc = std::function<bool(const BlackBoard&)>;
 public:
-   StateMachineComponent() 
+   StateMachineComponent()
    {
    }
    virtual ~StateMachineComponent() = default;
@@ -33,7 +34,7 @@ public:
 	void OnAddedToScene() override;
 	void OnRemovingFromScene() override;
 	//void Tick(float deltaTime) override;
-		
+
 	FSM::FSMState* AddState(const std::string& name);
 	void RemoveState(FSM::FSMState* state);
 	FSM::Transition* AddTransition(FSM::FSMState* from, FSM::FSMState* to, ConditionFunc condition);
@@ -41,10 +42,10 @@ public:
 	FSM::FSMState* FindStateByName(const std::string& name) const;
 private:
 	[[reflgen::ignore]]
-	std::vector<std::shared_ptr<FSM::FSMState>> m_states;
+	std::vector<own::shared_owner<FSM::FSMState>> m_states;
 
 	[[reflgen::ignore]]
-	std::vector<std::shared_ptr<FSM::Transition>> m_transitions;
+	std::vector<own::shared_owner<FSM::Transition>> m_transitions;
 
 	[[reflgen::ignore]]
 	FSM::FSMState* m_currentState = nullptr;

@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "CookedAssetCatalog.h"
 #include "CookedAudioClipSource.h"
 
@@ -114,7 +115,7 @@ namespace experiment::cooked
     }
 
     bool CookedAssetCatalog::OpenAudioClip(const AssetId& assetId,
-        std::shared_ptr<const ArtifactByteSource> bytes,
+        own::shared_owner<const ArtifactByteSource> bytes,
         CookedAudioClipSource& out, std::string& failure) const
     {
         const CookedAssetManifestEntry* entry = Find(assetId);

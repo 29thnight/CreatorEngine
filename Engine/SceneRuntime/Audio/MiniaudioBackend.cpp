@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/Ownership.h"
 #include "MiniaudioBackend.h"
 #include "AudioSourceInspection.h"
 #include "AudioSourceValidation.h"
@@ -69,14 +70,14 @@ namespace wave
             ma_vfs_callbacks callbacks{}; // Required first member by the VFS ABI.
             ma_default_vfs files{};
             std::mutex registryMutex;
-            std::unordered_map<std::string, std::shared_ptr<const experiment::cooked::CookedAudioClipSource>> sources;
+            std::unordered_map<std::string, own::shared_owner<const experiment::cooked::CookedAudioClipSource>> sources;
             std::atomic<bool> cancelling{ false };
             std::atomic<std::uint64_t> readFailures{ 0u };
             std::atomic<std::uint64_t> bytesRead{ 0u };
 
             struct File final
             {
-                std::shared_ptr<const experiment::cooked::CookedAudioClipSource> source;
+                own::shared_owner<const experiment::cooked::CookedAudioClipSource> source;
                 ma_vfs_file native{};
                 std::uint64_t cursor{ 0u };
             };
@@ -434,7 +435,7 @@ namespace wave
         struct VoiceSlot final
         {
             std::array<Source, 2u> sources;
-            std::shared_ptr<Clip> clip;
+            own::shared_owner<Clip> clip;
             PlayRequest request{};
             bool initialized{ false };
             bool paused{ false };
@@ -461,8 +462,8 @@ namespace wave
         float retrySeconds{ 1.0f };
         RoomReverb reverb;
         ReverbPreset preset{ ReverbPreset::Room };
-        std::unordered_map<ClipKey, std::shared_ptr<Clip>> clips;
-        std::unordered_map<std::uint64_t, std::shared_ptr<Clip>> clipLeases;
+        std::unordered_map<ClipKey, own::shared_owner<Clip>> clips;
+        std::unordered_map<std::uint64_t, own::shared_owner<Clip>> clipLeases;
         std::uint64_t nextClipLease{ 1u };
         std::unordered_map<std::uint16_t, std::unique_ptr<ma_sound_group>> busGroups;
         std::unordered_map<std::uint16_t, float> busVolumes;
@@ -742,15 +743,15 @@ namespace wave
             const auto found = busGroups.find(bus.value);
             if (found != busGroups.end())
             {
-                return found->second.get();
+                return found->second.operator->();
             }
             ma_sound_group* parent = bus == Buses::Master ? nullptr : GroupFor(Buses::Master);
             auto group = std::make_unique<ma_sound_group>();
-            if (ma_sound_group_init(&engine, MA_SOUND_FLAG_NO_SPATIALIZATION, parent, group.get()) != MA_SUCCESS)
+            if (ma_sound_group_init(&engine, MA_SOUND_FLAG_NO_SPATIALIZATION, parent, group.operator->()) != MA_SUCCESS)
             {
                 return nullptr;
             }
-            auto* raw = group.get();
+            auto* raw = group.operator->();
             busGroups.emplace(bus.value, std::move(group));
             const auto gain = busVolumes.find(bus.value);
             if (gain != busVolumes.end())
@@ -791,7 +792,7 @@ namespace wave
             }
         }
 
-        bool InitializeSource(Source& source, const std::shared_ptr<Clip>& clip, BusId bus)
+        bool InitializeSource(Source& source, const own::shared_owner<Clip>& clip, BusId bus)
         {
             ma_result result = MA_SUCCESS;
             if (!clip->pcm.empty())
@@ -1122,13 +1123,13 @@ namespace wave
             {
                 if (bus != Buses::Master.value)
                 {
-                    ma_sound_group_uninit(group.get());
+                    ma_sound_group_uninit(group.operator->());
                 }
             }
             const auto master = state.busGroups.find(Buses::Master.value);
             if (master != state.busGroups.end())
             {
-                ma_sound_group_uninit(master->second.get());
+                ma_sound_group_uninit(master->second.operator->());
             }
             state.busGroups.clear();
             ma_engine_uninit(&state.engine);
@@ -1192,7 +1193,7 @@ namespace wave
             && channels > 0u && channels <= 2u
             && ma_decoder_get_length_in_pcm_frames(&decoder, &frames) == MA_SUCCESS
             && frames > 0u && frames <= Implementation::kResidentPcmBudgetBytes / (channels * sizeof(float));
-        auto clip = std::make_shared<Implementation::Clip>();
+        auto clip = own::make_shared<Implementation::Clip>();
         if (valid)
         {
             clip->info = { channels, sampleRate, frames, false };
@@ -1251,14 +1252,14 @@ namespace wave
             state.lastError = "Invalid cooked audio metadata or resident 64 MiB budget exceeded";
             return false;
         }
-        auto clip = std::make_shared<Implementation::Clip>();
+        auto clip = own::make_shared<Implementation::Clip>();
         clip->cooked = true;
         clip->registry = &state.vfs;
         clip->info = { metadata.channels, metadata.sampleRate, metadata.frameCount, streaming };
         clip->path = "ceac:" + key.Text() + ":" + std::to_string(state.nextSource++);
         {
             std::lock_guard lock(state.vfs.registryMutex);
-            state.vfs.sources.emplace(clip->path, std::make_shared<const ck::CookedAudioClipSource>(source));
+            state.vfs.sources.emplace(clip->path, own::make_shared<const ck::CookedAudioClipSource>(source));
         }
         auto removeSource = [&]()
         {
@@ -1369,7 +1370,7 @@ namespace wave
         {
             return {};
         }
-        std::shared_ptr<Implementation::Clip> clip;
+        own::shared_owner<Implementation::Clip> clip;
         if (retained.IsValid())
         {
             const auto found = state.clipLeases.find(retained.value);

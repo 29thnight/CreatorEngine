@@ -1,0 +1,125 @@
+{
+  "passed": true,
+  "checks": {
+    "markerBlobRegression": true,
+    "softwareLifetimeRegression": true,
+    "ownershipRegression": true,
+    "build": true,
+    "groupRegression": true,
+    "nativeGpu": true,
+    "source": true,
+    "expectedRuntimePerVariant": true,
+    "captures": true,
+    "policyAndSerialNodes": true,
+    "pixels": true,
+    "noEtwLoss": true,
+    "ownershipAudit": true,
+    "gpuProvenanceAndLosses": true,
+    "allRawJsonVerified": true,
+    "pcViewer": true,
+    "pcReport": true,
+    "intermediateCleanup": true
+  },
+  "rawJson": {
+    "on-a": {
+      "files": 1318,
+      "bytes": 7513410674,
+      "captures": [
+        {
+          "id": "baseline",
+          "counts": {
+            "frames": 389,
+            "events": 1620148,
+            "gpuEvents": 106499,
+            "counters": 51020,
+            "measurements": 241568
+          },
+          "roundTripEqual": true,
+          "sha256": "0e07c70f55782eca7c8b09d212a3ae7236cf2ffa8695d6dd0bfcb2b409abbdc4"
+        },
+        {
+          "id": "etw",
+          "counts": {
+            "frames": 381,
+            "events": 1568576,
+            "gpuEvents": 102145,
+            "counters": 50817,
+            "measurements": 231735
+          },
+          "roundTripEqual": true,
+          "sha256": "d0de4301fe15625b976f78542729e4c7e1b7a1b6077add712d98ec6fd848de2b"
+        }
+      ],
+      "allProviderExportRows": 52148407
+    },
+    "off-a": {
+      "files": 1316,
+      "bytes": 7476216037,
+      "captures": [
+        {
+          "id": "baseline",
+          "counts": {
+            "frames": 396,
+            "events": 1630320,
+            "gpuEvents": 107342,
+            "counters": 51372,
+            "measurements": 243480
+          },
+          "roundTripEqual": true,
+          "sha256": "b049c1cec9a9e54f8d1c49096d67ff40b0edc5490b827012de7142eb982c62d2"
+        },
+        {
+          "id": "etw",
+          "counts": {
+            "frames": 373,
+            "events": 1503798,
+            "gpuEvents": 97087,
+            "counters": 50113,
+            "measurements": 220269
+          },
+          "roundTripEqual": true,
+          "sha256": "eab879afb36517f125b2e05b7b3c154d8bf9af2496237bead89a74010e4626fa"
+        }
+      ],
+      "allProviderExportRows": 52025380
+    },
+    "off-b": {
+      "files": 97,
+      "bytes": 373915647,
+      "captures": [
+        {
+          "id": "baseline",
+          "counts": {
+            "frames": 401,
+            "events": 1659552,
+            "gpuEvents": 109590,
+            "counters": 51762,
+            "measurements": 248560
+          },
+          "roundTripEqual": true,
+          "sha256": "2612b94ab95453997f59bceb0af80d5705cef5ac104be7f8f2a2b4bfb3064da7"
+        }
+      ],
+      "allProviderExportRows": 0
+    },
+    "on-b": {
+      "files": 98,
+      "bytes": 387162623,
+      "captures": [
+        {
+          "id": "baseline",
+          "counts": {
+            "frames": 413,
+            "events": 1716956,
+            "gpuEvents": 113805,
+            "counters": 52351,
+            "measurements": 258203
+          },
+          "roundTripEqual": true,
+          "sha256": "1ae12639fd049b1433fdebb022de04dc83e65ebbed3475533c7023e900878dbd"
+        }
+      ],
+      "allProviderExportRows": 0
+    }
+  }
+}

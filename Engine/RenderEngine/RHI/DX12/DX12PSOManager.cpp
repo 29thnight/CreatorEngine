@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "DX12PipelineLayoutTranslate.h"
 #include "DX12PSOManager.h"
 #include "DX12DeviceResources.h"
@@ -899,7 +900,7 @@ DX12PSOManager::RequestState DX12PSOManager::Request(const RHIGraphicsPipelineDe
     // Insert before submission: no allocation failure may orphan an accepted job.
     try
     {
-        auto compile = std::make_shared<PendingCompile>();
+        auto compile = own::make_shared<PendingCompile>();
         std::string ignored;
         if (!compile->m_input.Prepare(desc, ignored))
         {
@@ -984,4 +985,3 @@ DX12PSOManager::Stats DX12PSOManager::GetStats() const
     std::lock_guard<std::mutex> guard(m_mutex);
     return m_stats;
 }
-

@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Ownership.h"
 #include "../../../Utility_Framework/StandardLibrary.h"
 #include <wrl/client.h>
 #include <d3d12.h>
@@ -32,7 +33,7 @@ class DX12CommandListPool : public IRHIParallelCommandPool
     /// (DX12DeviceResources::BeginFrame의 펜스 대기가 그것을 보장한다).
     void BeginFrame(uint32_t frameIndex) override;
 
-    bool CreateTranslationPool(std::shared_ptr<DX12CommandListPool>& result, std::string& outError);
+    bool CreateTranslationPool(own::shared_owner<DX12CommandListPool>& result, std::string& outError);
     bool GetTranslationRecording(uint64_t& uploadRecordingId, uint64_t& descriptorVersion) const override;
 
     bool SupportsParallelTranslation() const override { return m_recordingResources != nullptr; }
@@ -80,11 +81,11 @@ class DX12CommandListPool : public IRHIParallelCommandPool
 
     ComPtr<ID3D12Device> m_device;
     DX12DeviceResources* m_resources{nullptr};
-    std::shared_ptr<const DX12RecordingResources> m_recordingResources;
-    std::vector<std::unique_ptr<DX12Encoder>> m_encoders;
+    own::shared_owner<const DX12RecordingResources> m_recordingResources;
+    std::vector<own::unique_owner<DX12Encoder>> m_encoders;
     // A cached fork can be reused only when retirement has released every
     // external owner. Otherwise the new recording receives a different fork.
-    std::vector<std::shared_ptr<DX12CommandListPool>> m_translationPools;
+    std::vector<own::shared_owner<DX12CommandListPool>> m_translationPools;
     uint32_t m_workerCount{0};
     uint32_t m_frameCount{0};
     uint32_t m_frameIndex{0};

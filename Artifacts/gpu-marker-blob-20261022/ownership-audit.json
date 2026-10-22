@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "commit": "3574d238d8000fb21825e5391047da7337ac7529",
+  "previousCommit": "e1ccf48a73ac66e95c67e23906af44b678305a83",
+  "gates": {
+    "upstream-tests": true,
+    "ownership-probe": true,
+    "group-probe": true,
+    "software-probe": true,
+    "marker-blob-probe": true
+  },
+  "vendorUnmodified": true,
+  "headerSha256": "c17c871d25ea68c3d6f4284c19a22240d825632b3017ea643081be239293a6e7",
+  "upstreamBlobSha256": "2c11f5adf977bb1a407fe7a8315bb2e2a5ef00bb19016dabc7d4caf9760d893f",
+  "scope": "Bounded runtime marker cache, retained GPU collection strings, shared immutable blob metadata; pending/RHI/GPU retirement gates unchanged."
+}

@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 #include "MaterialGraphPrimitiveCacheContract.h"
 
 #include "MaterialGraphGeometryContract.h"
@@ -41,7 +42,7 @@ struct SceneGpuData final
         };
         std::vector<Vertex> vertices;
         std::vector<RHIBufferSlice> topology;
-        std::vector<std::shared_ptr<const MeshSurfaceBatch>> owners;
+        std::vector<own::shared_owner<const MeshSurfaceBatch>> owners;
         RHIBindingTable vertexTable, topologyTable;
     };
     std::vector<Record> records{Record{}};
@@ -50,7 +51,7 @@ struct SceneGpuData final
     // Offset zero is a valid all-zero default, including material-less passes.
     std::vector<std::byte> materialBytes = std::vector<std::byte>(512);
     std::map<const RenderBindings*, std::pair<uint32_t, uint32_t>> materialOffsets;
-    std::shared_ptr<const ResidentBufferFrame> recordBuffer, materialBuffer;
+    own::shared_owner<const ResidentBufferFrame> recordBuffer, materialBuffer;
     RHIBufferSlice viewConstants;
     std::array<RHIBufferSlice, 3> shadowConstants;
 
@@ -81,8 +82,8 @@ struct SceneGpuData final
         return true;
     }
 
-    bool AssignGeometry(uint32_t record, const std::shared_ptr<const MeshSurfaceBatch>& current,
-                        const std::shared_ptr<const MeshSurfaceBatch>& previous, std::string& error)
+    bool AssignGeometry(uint32_t record, const own::shared_owner<const MeshSurfaceBatch>& current,
+                        const own::shared_owner<const MeshSurfaceBatch>& previous, std::string& error)
     {
         if (!record || record >= records.size() || recordPages.size() != records.size() || !current || !previous ||
             !current->Buffer().IsValid() || !previous->Buffer().IsValid())
@@ -142,7 +143,7 @@ struct SceneGpuData final
         auto& page = pages.back();
         // 페이지 여유를 확인하며 찾은 슬롯을 그대로 쓴다. 새 페이지에서만 무효화해
         // 같은 스트림과 토폴로지를 다시 검색하지 않고 기존 삽입·소유 순서를 지킨다.
-        const auto appendVertex = [&](const std::shared_ptr<const MeshSurfaceBatch>& batch, uint32_t slot)
+        const auto appendVertex = [&](const own::shared_owner<const MeshSurfaceBatch>& batch, uint32_t slot)
         {
             if (slot == UINT32_MAX)
             {

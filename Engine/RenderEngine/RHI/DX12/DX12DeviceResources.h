@@ -1,4 +1,6 @@
-﻿#pragma once
+#pragma once
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
 #include "../IRenderDeviceServices.h"
 #include "../IRHIDeviceResources.h"
 #include "../../Render/Temporal/TemporalReconstruction.h"
@@ -23,13 +25,13 @@
 // shader-visible page/upload segments independently of the active recording.
 struct DX12RecordingResources
 {
-    std::shared_ptr<const DX12ResourceTable::RecordingSnapshot> resourceTable;
+    own::shared_owner<const DX12ResourceTable::RecordingSnapshot> resourceTable;
     uint64_t uploadRecordingId{};
     DX12DescriptorRecycler::RecordingLease descriptors;
     DX12TargetViewHeap::Snapshot renderTargets;
     DX12TargetViewHeap::Snapshot depthTargets;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> samplers;
-    std::shared_ptr<const void> uploads;
+    ce::lifetime_token uploads;
     Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> clearDescriptors;
     uint32_t descriptorCount{};
     uint32_t descriptorIncrement{};
@@ -68,11 +70,11 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
 {
   public:
     RHIQueueCapabilities QueryQueueCapabilities() const override;
-    bool CreateQueue(RHIQueueKind kind, std::shared_ptr<IRHICommandQueue>& queue, std::string& error) override;
+    bool CreateQueue(RHIQueueKind kind, own::shared_owner<IRHICommandQueue>& queue, std::string& error) override;
     bool SupportsTransientAliasing() const override { return true; }
     bool DescribeTransientAllocation(const RHITransientResourceDesc& desc, RHITransientAllocationInfo& info,
                                      std::string& error) const override;
-    bool CreateTransientHeap(const RHITransientAllocationInfo& info, std::shared_ptr<RHITransientHeap>& heap,
+    bool CreateTransientHeap(const RHITransientAllocationInfo& info, own::shared_owner<RHITransientHeap>& heap,
                              std::string& error) override;
     bool CreatePlacedTransient(const RHITransientResourceDesc& desc, RHITransientHeap& heap, RHITextureHandle& texture,
                                RHIBufferHandle& buffer, std::string& error) override;
@@ -98,7 +100,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
         Host = 1u << 1
     };
     static void RequestTestDeviceRemoval(TestDeviceRemovalTarget target);
-    bool EnqueueQueueTestGate(const std::shared_ptr<IRHICommandQueue>& queue, ID3D12Fence* fence, uint64_t value,
+    bool EnqueueQueueTestGate(const own::shared_owner<IRHICommandQueue>& queue, ID3D12Fence* fence, uint64_t value,
                               std::string& error)
     {
         return m_queueService && m_queueService->EnqueueTestGate(queue, fence, value, error);
@@ -196,8 +198,8 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     // EndFrame requires JoinQueueFrame; AbortFrame drains and revokes the queue
     // service. Queue execution then needs backend reinitialization; legacy frames
     // remain usable. Prefix reservations retire with EndFrame, never prefix alone.
-    bool BeginQueueFrame(const std::shared_ptr<IRHICommandQueue>& graphics, std::string& outError);
-    bool GetPrimaryGraphicsQueue(std::shared_ptr<IRHICommandQueue>& queue, std::string& outError);
+    bool BeginQueueFrame(const own::shared_owner<IRHICommandQueue>& graphics, std::string& outError);
+    bool GetPrimaryGraphicsQueue(own::shared_owner<IRHICommandQueue>& queue, std::string& outError);
     bool JoinQueueFrame(const RHITimelinePoint& completion, std::string& outError);
     bool WaitForLastFrameSubmission(std::string& outError);
     bool ShutdownQueueService(std::string& outError);
@@ -284,7 +286,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
 
     bool DetachSwapChain(std::string& outError);
     IDXGIFactory6* GetFactory() const { return m_factory.Get(); }
-    std::shared_ptr<DlssTemporalAdapter> GetTemporalDlssSession() const;
+    own::shared_owner<DlssTemporalAdapter> GetTemporalDlssSession() const;
     TemporalResult GetTemporalBootstrapResult() const { return m_temporalBootstrapResult; }
     bool HasTemporalSharedDevice() const { return static_cast<bool>(m_temporalDevice); }
     ID3D12Device* GetDevice() const { return m_device.Get(); }
@@ -385,7 +387,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     const DX12DescriptorRecycler& GetDescriptorRecycler() const { return m_descriptorRecycler; }
     void ClearRecordedUnorderedAccess(ID3D12GraphicsCommandList& commandList, const DX12RecordingResources& recording,
                                       const RHIBindingDesc& view, const float rgba[4]);
-    bool CaptureRecordingResources(std::shared_ptr<const DX12RecordingResources>& result, std::string& outError,
+    bool CaptureRecordingResources(own::shared_owner<const DX12RecordingResources>& result, std::string& outError,
                                    const DX12RecordingResources* retiredResources = nullptr);
     bool IsDescriptorVersionCurrent(uint64_t token) const { return m_descriptorRecycler.IsCurrentVersion(token); }
 
@@ -595,12 +597,12 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     bool CreateSizeDependentResources(uint32_t width, uint32_t height, std::string& outError);
 
     TemporalResult m_temporalBootstrapResult;
-    std::shared_ptr<TemporalDeviceDX12> m_temporalDevice;
+    own::shared_owner<TemporalDeviceDX12> m_temporalDevice;
     ComPtr<IDXGIFactory6> m_factory;
     ComPtr<IDXGIAdapter1> m_adapter;
-    std::unique_ptr<DX12MemorySamplingSession> m_memorySampling;
+    own::unique_owner<DX12MemorySamplingSession> m_memorySampling;
     ComPtr<ID3D12Device> m_device;
-    std::unique_ptr<DX12QueueService> m_queueService;
+    own::unique_owner<DX12QueueService> m_queueService;
     bool m_queueFrameActive{false};
     bool m_queueFrameJoined{false};
     void DrainAbortedQueueFrame();
@@ -638,11 +640,11 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     /// 지금 열린 리스트에 붙은 인코더 (A-3). 리스트를 Reset 할 때마다 다시
     /// 만든다 — 인코더가 기억하는 디스크립터 힙 바인딩이 Reset 으로 풀리므로,
     /// 들고 있으면 '걸었다고 기억하는데 안 걸린' 상태가 된다.
-    std::unique_ptr<DX12Encoder> m_immediateEncoder;
+    own::unique_owner<DX12Encoder> m_immediateEncoder;
     struct DeferredImmediate;
     struct DeferredNativeFrame;
     struct PendingViews;
-    std::shared_ptr<PendingViews> m_pendingViews;
+    own::shared_owner<PendingViews> m_pendingViews;
     void FlushPendingViews();
     void WriteShaderResourceView(ID3D12Resource*, const D3D12_SHADER_RESOURCE_VIEW_DESC*, D3D12_CPU_DESCRIPTOR_HANDLE);
     void WriteUnorderedAccessView(ID3D12Resource*, ID3D12Resource*, const D3D12_UNORDERED_ACCESS_VIEW_DESC*, D3D12_CPU_DESCRIPTOR_HANDLE);
@@ -651,9 +653,9 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     void CopyNativeDescriptors(UINT, D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_CPU_DESCRIPTOR_HANDLE, D3D12_DESCRIPTOR_HEAP_TYPE);
     bool m_deferredImmediate{};
     ce::RenderArenaPool m_pendingCommandPool;
-    std::shared_ptr<DX12PendingCommands> m_pendingCommands;
-    std::shared_ptr<DeferredImmediate> m_deferred;
-    std::array<std::shared_ptr<DeferredNativeFrame>, kFrameCount> m_deferredFrames;
+    own::shared_owner<DX12PendingCommands> m_pendingCommands;
+    own::shared_owner<DeferredImmediate> m_deferred;
+    std::array<own::shared_owner<DeferredNativeFrame>, kFrameCount> m_deferredFrames;
     void BeginDeferredImmediate();
     void BeginPendingImmediate();
     RHIEncoder& GetDeferredImmediateEncoder();

@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 // RenderScene의 컴포넌트 접점 구현 (PHASE 4-2 C1).
 //
 // Register/Update/Unregister/InvaildCheck/MakeProxyCommand 계열은 게임플레이
@@ -33,7 +34,7 @@ void RenderScene::RegisterCommand(MeshRenderer* meshRendererPtr)
 	if (nullptr == meshRendererPtr) return;
 
 	EnqueueProxyDelta(ProxyCommand::CreatePrimitive(
-		std::make_shared<MeshRenderProxy>(meshRendererPtr), GetSceneEpoch()));
+		own::make_shared<MeshRenderProxy>(meshRendererPtr), GetSceneEpoch()));
 }
 
 void RenderScene::RegisterCommand(FoliageComponent* foliagePtr)
@@ -41,7 +42,7 @@ void RenderScene::RegisterCommand(FoliageComponent* foliagePtr)
     if (nullptr == foliagePtr) return;
 
 	EnqueueProxyDelta(ProxyCommand::CreatePrimitive(
-		std::make_shared<FoliageRenderProxy>(foliagePtr), GetSceneEpoch()));
+		own::make_shared<FoliageRenderProxy>(foliagePtr), GetSceneEpoch()));
 }
 
 void RenderScene::UpdateCommand(MeshRenderer* meshRendererPtr)
@@ -66,7 +67,7 @@ void RenderScene::RegisterCommand(TerrainComponent* terrainPtr)
 {
 	if (nullptr == terrainPtr) return;
 	EnqueueProxyDelta(ProxyCommand::CreatePrimitive(
-		std::make_shared<TerrainRenderProxy>(terrainPtr), GetSceneEpoch()));
+		own::make_shared<TerrainRenderProxy>(terrainPtr), GetSceneEpoch()));
 }
 
 void RenderScene::UpdateCommand(TerrainComponent* terrainPtr)
@@ -94,7 +95,7 @@ void RenderScene::RegisterCommand(DecalComponent* decalPtr)
 	if (nullptr == decalPtr) return;
 
 	EnqueueProxyDelta(ProxyCommand::CreatePrimitive(
-		std::make_shared<DecalRenderProxy>(decalPtr), GetSceneEpoch()));
+		own::make_shared<DecalRenderProxy>(decalPtr), GetSceneEpoch()));
 }
 
 void RenderScene::UpdateCommand(DecalComponent* decalPtr)
@@ -114,7 +115,7 @@ void RenderScene::RegisterCommand(ImageComponent* imagePtr)
 {
 	if (nullptr == imagePtr) return;
 	EnqueueProxyDelta(ProxyCommand::CreateUI(
-		std::make_shared<UIRenderProxy>(imagePtr), GetSceneEpoch()));
+		own::make_shared<UIRenderProxy>(imagePtr), GetSceneEpoch()));
 }
 
 void RenderScene::UpdateCommand(ImageComponent* imagePtr)
@@ -138,7 +139,7 @@ void RenderScene::RegisterCommand(TextComponent* textPtr)
 	if (nullptr == textPtr) return;
 	textPtr->TickLayout(0.f);
 	EnqueueProxyDelta(ProxyCommand::CreateUI(
-		std::make_shared<UIRenderProxy>(textPtr), GetSceneEpoch()));
+		own::make_shared<UIRenderProxy>(textPtr), GetSceneEpoch()));
 }
 
 void RenderScene::UpdateCommand(TextComponent* textPtr)
@@ -162,7 +163,7 @@ void RenderScene::RegisterCommand(SpriteSheetComponent* spriteSheetPtr)
 {
 	if (nullptr == spriteSheetPtr) return;
 	EnqueueProxyDelta(ProxyCommand::CreateUI(
-		std::make_shared<UIRenderProxy>(spriteSheetPtr), GetSceneEpoch()));
+		own::make_shared<UIRenderProxy>(spriteSheetPtr), GetSceneEpoch()));
 }
 
 void RenderScene::UnregisterCommand(SpriteSheetComponent* spriteSheetPtr)
@@ -181,7 +182,7 @@ void RenderScene::RegisterCommand(SpriteRenderer* spriteRendererPtr)
 {
 	if (nullptr == spriteRendererPtr) return;
 	EnqueueProxyDelta(ProxyCommand::CreatePrimitive(
-		std::make_shared<SpriteRenderProxy>(spriteRendererPtr), GetSceneEpoch()));
+		own::make_shared<SpriteRenderProxy>(spriteRendererPtr), GetSceneEpoch()));
 }
 
 void RenderScene::UpdateCommand(SpriteRenderer* spriteRendererPtr)
@@ -207,7 +208,7 @@ void RenderScene::RegisterCommand(LightComponent* lightPtr)
 	if (nullptr == lightPtr) return;
 
 	EnqueueProxyDelta(ProxyCommand::CreateLight(
-		std::make_shared<LightRenderProxy>(lightPtr), GetSceneEpoch()));
+		own::make_shared<LightRenderProxy>(lightPtr), GetSceneEpoch()));
 }
 
 void RenderScene::UpdateCommand(LightComponent* lightPtr)

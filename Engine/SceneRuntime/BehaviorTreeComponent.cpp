@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "BehaviorTreeComponent.h"
 #include "DataSystem.h"
 #include "BTGraphFlatten.h"
@@ -144,7 +145,7 @@ void BehaviorTreeComponent::SendGraphToManaged(const BTBuildGraph& graph)
 void BehaviorTreeComponent::GraphToBuild()
 {
 	Benchmark bm;
-	std::shared_ptr<BTBuildGraph> cachedGraph = AIManagers->GetBTBuildGraphCache(m_BehaviorTreeGuid);
+	own::shared_owner<BTBuildGraph> cachedGraph = AIManagers->GetBTBuildGraphCache(m_BehaviorTreeGuid);
 	if (cachedGraph)
 	{
 		SendGraphToManaged(*cachedGraph);
@@ -154,7 +155,7 @@ void BehaviorTreeComponent::GraphToBuild()
 		file::path BTpath = DataSystems->GetFilePath(m_BehaviorTreeGuid);
 		if (!BTpath.empty() && file::exists(BTpath))
 		{
-			std::shared_ptr<BTBuildGraph> graph = std::make_shared<BTBuildGraph>();
+			own::shared_owner<BTBuildGraph> graph = own::make_shared<BTBuildGraph>();
 			std::string parseError;
 			const Authoring::ParsedDocument document =
 				Authoring::ParsedDocument::ParseFile(BTpath.string(), parseError);
@@ -184,5 +185,3 @@ void BehaviorTreeComponent::GraphToBuild()
 	}
 	Debug::PrintLog(spdlog::level::info, "Behavior Tree Build Time: {} ms\n", bm.GetElapsedTime());
 }
-
-

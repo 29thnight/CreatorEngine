@@ -1,4 +1,5 @@
-﻿#include "DX12CommandListPool.h"
+#include "../../../Utility_Framework/Ownership.h"
+#include "DX12CommandListPool.h"
 #include "DX12DeviceResources.h"
 #include "DX12Encoder.h"
 #include "../RHIBackendExecution.h"
@@ -123,7 +124,7 @@ void DX12CommandListPool::BeginFrame(uint32_t frameIndex)
     }
 }
 
-bool DX12CommandListPool::CreateTranslationPool(std::shared_ptr<DX12CommandListPool>& result, std::string& outError)
+bool DX12CommandListPool::CreateTranslationPool(own::shared_owner<DX12CommandListPool>& result, std::string& outError)
 {
     if (result || !m_resources || m_slots.empty() || m_recordingResources)
     {
@@ -140,7 +141,7 @@ bool DX12CommandListPool::CreateTranslationPool(std::shared_ptr<DX12CommandListP
     }
     m_translationPools.resize(m_frameCount);
     auto& cached = m_translationPools[m_frameIndex];
-    auto frozen = cached && cached.use_count() == 1 ? cached : std::make_shared<DX12CommandListPool>();
+    auto frozen = cached && cached.use_count() == 1 ? cached : own::make_shared<DX12CommandListPool>();
     // Only an exclusively cached fork reaches this point. Its previous CPU
     // translation and GPU retirement owners have gone away.
     auto previousResources = std::move(frozen->m_recordingResources);
@@ -151,7 +152,7 @@ bool DX12CommandListPool::CreateTranslationPool(std::shared_ptr<DX12CommandListP
             encoder->SetRecordingResources({});
         }
     }
-    if (!m_resources->CaptureRecordingResources(frozen->m_recordingResources, outError, previousResources.get()))
+    if (!m_resources->CaptureRecordingResources(frozen->m_recordingResources, outError, previousResources.operator->()))
     {
         return false;
     }
@@ -199,10 +200,10 @@ RHIEncoder& DX12CommandListPool::AcquireEncoder(uint32_t worker)
     }
 
     ID3D12GraphicsCommandList* const list = Get(worker);
-    std::unique_ptr<DX12Encoder>& encoder = m_encoders[worker];
+    own::unique_owner<DX12Encoder>& encoder = m_encoders[worker];
     if (!encoder)
     {
-        encoder = std::make_unique<DX12Encoder>(list, m_resources);
+        encoder = own::make_unique<DX12Encoder>(list, m_resources);
     }
     else
     {

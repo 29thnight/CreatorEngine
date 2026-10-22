@@ -1,4 +1,6 @@
-﻿#include "../../../EngineDiagnostics/ProfileScope.h"
+#include "../../../Utility_Framework/LifetimeToken.h"
+#include "../../../Utility_Framework/Ownership.h"
+#include "../../../EngineDiagnostics/ProfileScope.h"
 #include "../../../EngineDiagnostics/DxCaptureSubmission.h"
 #include "DX12DeviceResources.h"
 #include "../RHIBackendExecution.h"
@@ -430,7 +432,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     {
         try
         {
-            m_memorySampling = std::make_unique<DX12MemorySamplingSession>(m_adapter.Get(), samplingPath);
+            m_memorySampling = own::make_unique<DX12MemorySamplingSession>(m_adapter.Get(), samplingPath);
         }
         catch (const std::exception& error)
         {
@@ -728,7 +730,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         return false;
     }
     m_submissionClient = true;
-    m_queueService = std::make_unique<DX12QueueService>(m_device.Get());
+    m_queueService = own::make_unique<DX12QueueService>(m_device.Get());
     return true;
 }
 
@@ -737,7 +739,7 @@ RHIQueueCapabilities DX12DeviceResources::QueryQueueCapabilities() const
     return m_queueService ? m_queueService->QueryQueueCapabilities() : RHIQueueCapabilities{};
 }
 
-bool DX12DeviceResources::CreateQueue(RHIQueueKind kind, std::shared_ptr<IRHICommandQueue>& queue, std::string& error)
+bool DX12DeviceResources::CreateQueue(RHIQueueKind kind, own::shared_owner<IRHICommandQueue>& queue, std::string& error)
 {
     if (!m_queueService)
     {
@@ -918,7 +920,7 @@ void DX12DeviceResources::ResetImmediateEncoder()
     // 리스트를 Reset 할 때마다 새로 만든다. 들고 있으면 인코더가 기억하는
     // 디스크립터 힙 바인딩이 낡는다 — Reset 이 그것을 푸는데 인코더는
     // '이미 걸었다'로 남아, 다음 테이블 바인딩이 힙 없이 나간다.
-    m_immediateEncoder = std::make_unique<DX12Encoder>(m_commandList.Get(), this);
+    m_immediateEncoder = own::make_unique<DX12Encoder>(m_commandList.Get(), this);
 }
 
 RHIEncoder& DX12DeviceResources::GetImmediateEncoder()
@@ -1243,7 +1245,7 @@ bool DX12DeviceResources::FlushCommandListImpl(bool preserveRecording, std::stri
     return true;
 }
 
-bool DX12DeviceResources::GetPrimaryGraphicsQueue(std::shared_ptr<IRHICommandQueue>& queue, std::string& outError)
+bool DX12DeviceResources::GetPrimaryGraphicsQueue(own::shared_owner<IRHICommandQueue>& queue, std::string& outError)
 {
     if (!m_queueService)
     {
@@ -1253,7 +1255,7 @@ bool DX12DeviceResources::GetPrimaryGraphicsQueue(std::shared_ptr<IRHICommandQue
     return m_queueService->GetPrimaryGraphicsQueue(m_queue.Get(), queue, outError);
 }
 
-bool DX12DeviceResources::BeginQueueFrame(const std::shared_ptr<IRHICommandQueue>& graphics, std::string& outError)
+bool DX12DeviceResources::BeginQueueFrame(const own::shared_owner<IRHICommandQueue>& graphics, std::string& outError)
 {
     if (!m_queueService || !graphics || m_queueFrameActive || m_currentRecordingId == 0 ||
         graphics->GetIdentity().kind != RHIQueueKind::Graphics)
@@ -2714,7 +2716,7 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
     return table;
 }
 
-bool DX12DeviceResources::CaptureRecordingResources(std::shared_ptr<const DX12RecordingResources>& result,
+bool DX12DeviceResources::CaptureRecordingResources(own::shared_owner<const DX12RecordingResources>& result,
                                                     std::string& outError,
                                                     const DX12RecordingResources* retiredResources)
 {
@@ -2731,7 +2733,7 @@ bool DX12DeviceResources::CaptureRecordingResources(std::shared_ptr<const DX12Re
         outError = "Recording resource capture requires an active recording and empty output.";
         return false;
     }
-    auto recording = std::make_shared<DX12RecordingResources>();
+    auto recording = own::make_shared<DX12RecordingResources>();
     FlushPendingViews();
     recording->resourceTable = m_resourceTable.CaptureRecordingSnapshot();
     recording->uploadRecordingId = m_currentRecordingId;
@@ -3311,7 +3313,7 @@ bool DX12DeviceResources::CreateSparseBuffer(const RHISparseBufferDesc& desc, RH
             coordinator.UnregisterOwner(owner);
         }
     };
-    auto budget = std::make_shared<SparseBudgetLease>(m_persistentMemoryBudget);
+    auto budget = own::make_shared<SparseBudgetLease>(m_persistentMemoryBudget);
     budget->ticket = m_persistentMemoryBudget.TryReserveGrowth(budget->owner, kRHIDeviceLocalMemoryBudgetDomain,
                                                                heapDesc.SizeInBytes);
     if (!budget->ticket.IsValid())
@@ -3394,9 +3396,9 @@ bool DX12DeviceResources::UpdateSparseBufferMappings(RHIBufferHandle buffer,
         ComPtr<ID3D12Resource> resource;
         ComPtr<ID3D12Heap> heap;
         ComPtr<ID3D12Fence> fence;
-        std::shared_ptr<const void> budget;
+        ce::lifetime_token budget;
     };
-    auto lifetime = std::make_shared<MappingLifetime>();
+    auto lifetime = own::make_shared<MappingLifetime>();
     lifetime->resource = retainedResource;
     lifetime->heap = retainedHeap;
     lifetime->budget = m_resourceTable.ResolveBufferLifetime(buffer);
@@ -3539,7 +3541,7 @@ bool DX12DeviceResources::DescribeTransientAllocation(const RHITransientResource
 }
 
 bool DX12DeviceResources::CreateTransientHeap(const RHITransientAllocationInfo& info,
-                                              std::shared_ptr<RHITransientHeap>& heap, std::string& error)
+                                              own::shared_owner<RHITransientHeap>& heap, std::string& error)
 {
     if (m_deferredImmediate && !RHIBackendExecutionScope::IsActive() && !GetRHISubmissionThread().IsCurrentThread())
     {
@@ -3567,7 +3569,7 @@ bool DX12DeviceResources::CreateTransientHeap(const RHITransientAllocationInfo& 
         error = "Invalid transient heap allocation";
         return false;
     }
-    auto result = std::make_shared<DX12GraphTransientHeap>();
+    auto result = own::make_shared<DX12GraphTransientHeap>();
     D3D12_HEAP_DESC desc{};
     desc.SizeInBytes = info.bytes;
     desc.Alignment = info.alignment;
@@ -3994,7 +3996,7 @@ bool DX12DeviceResources::MapReadback(const RHIReadback& readback, RHIReadbackIm
     return true;
 }
 
-std::shared_ptr<DlssTemporalAdapter> DX12DeviceResources::GetTemporalDlssSession() const
+own::shared_owner<DlssTemporalAdapter> DX12DeviceResources::GetTemporalDlssSession() const
 {
     return m_temporalDevice ? m_temporalDevice->session : nullptr;
 }

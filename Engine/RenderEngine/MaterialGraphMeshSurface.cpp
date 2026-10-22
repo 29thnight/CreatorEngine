@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "../Utility_Framework/DynamicBitset.h"
 #include "MaterialGraphMeshSurface.h"
 #include "MeshTransformDeclarationPlan.h"
@@ -63,8 +64,8 @@ namespace material_graph
                                std::array<std::uint32_t, 4>>;
         struct Entry
         {
-            std::weak_ptr<const MeshSurfaceInput> identity;
-            std::shared_ptr<const std::vector<std::uint32_t>> requests;
+            own::weak_owner<const MeshSurfaceInput> identity;
+            own::shared_owner<const std::vector<std::uint32_t>> requests;
             std::uint64_t generation{}, lastUse{};
         };
         std::map<Key, Entry> entries;
@@ -86,18 +87,18 @@ namespace material_graph
                           });
         }
 
-        std::shared_ptr<const std::vector<std::uint32_t>> Acquire(
-            const std::shared_ptr<const MeshSurfaceInput>& identity, const MeshSurfaceInput& input, std::uint64_t view,
+        own::shared_owner<const std::vector<std::uint32_t>> Acquire(
+            const own::shared_owner<const MeshSurfaceInput>& identity, const MeshSurfaceInput& input, std::uint64_t view,
             std::uint64_t generation)
         {
-            const Key key{reinterpret_cast<std::uintptr_t>(identity.get()), view, input.View().sceneEpoch,
+            const Key key{reinterpret_cast<std::uintptr_t>(identity.operator->()), view, input.View().sceneEpoch,
                           std::bit_cast<std::array<std::uint32_t, 16>>(input.World()),
                           std::bit_cast<std::array<std::uint32_t, 4>>(input.View().eye)};
             if (const auto found = entries.find(key); found != entries.end())
             {
-                // The lookup address is not ownership. Lock and compare before
-                // accepting a hit so an expired/recycled partition cannot alias it.
-                if (const auto owner = found->second.identity.lock(); owner == identity)
+                // The live caller pins the partition. Compare control-block identity
+                // without a temporary strong lock; recycled addresses cannot alias it.
+                if (own::identity(found->second.identity) == own::identity(identity))
                 {
                     found->second.generation = generation;
                     found->second.lastUse = ++clock;
@@ -110,7 +111,7 @@ namespace material_graph
             ce::profile_scope sortProfile{ce::marker<"MaterialClusterRequestSort">()};
             const auto count = input.Hierarchy().groupCount ? input.Hierarchy().groupCount : 1;
             const auto& groups = input.Hierarchy().groups;
-            auto requests = std::make_shared<std::vector<std::uint32_t>>(count);
+            auto requests = own::make_shared<std::vector<std::uint32_t>>(count);
             std::vector<double> distances(count);
             for (std::uint32_t group = 0; group < count; ++group)
             {
@@ -155,9 +156,9 @@ namespace material_graph
     struct MeshSurfaceStaticBuffers
     {
         IRenderDeviceServices& device;
-        std::shared_ptr<const MeshSurfaceInput> identity;
-        std::shared_ptr<const assets::cluster::ResidentSet> residency;
-        std::shared_ptr<MeshletSparseStorage> sparse;
+        own::shared_owner<const MeshSurfaceInput> identity;
+        own::shared_owner<const assets::cluster::ResidentSet> residency;
+        own::shared_owner<MeshletSparseStorage> sparse;
         std::vector<std::pair<RHIBufferSlice, RHIBufferSlice>> sparseCopies;
         SparseClusterPayload sparsePayload;
         std::vector<std::byte> sparseMetadata;
@@ -193,13 +194,13 @@ namespace material_graph
     {
         IRenderDeviceServices& device;
         mutable std::mutex mutex;
-        std::vector<std::shared_ptr<MeshSurfaceStaticBuffers>> entries;
+        std::vector<own::shared_owner<MeshSurfaceStaticBuffers>> entries;
         // Guarded by mutex; reuse storage while checking every current owner.
         std::vector<std::pair<MeshletSparseStorage*, bool>> idleScratch;
-        std::map<std::uint64_t, std::vector<std::shared_ptr<MeshSurfaceStaticBuffers>>> recordings;
+        std::map<std::uint64_t, std::vector<own::shared_owner<MeshSurfaceStaticBuffers>>> recordings;
         struct ProvisionalEntry
         {
-            std::shared_ptr<MeshSurfaceStaticBuffers> entry;
+            own::shared_owner<MeshSurfaceStaticBuffers> entry;
             std::uint64_t previousCompletion{};
             bool initialUpload{};
         };
@@ -230,7 +231,7 @@ namespace material_graph
                 for (auto& entry : found->second)
                 {
                     if (std::ranges::none_of(submission.entries,
-                                             [&](const auto& prior) { return prior.entry == entry; }))
+                                             [&](const auto& prior) { return prior.entry.operator->() == entry.operator->(); }))
                     {
                         submission.entries.push_back(
                             {entry, entry->completion,
@@ -350,16 +351,16 @@ namespace material_graph
                 }
             }
         }
-        bool Acquire(std::shared_ptr<const MeshSurfaceInput> identity,
-                     std::shared_ptr<MeshSurfaceStaticBuffers>& result, std::string& error,
-                     std::shared_ptr<const assets::cluster::ResidentSet> residency = {})
+        bool Acquire(own::shared_owner<const MeshSurfaceInput> identity,
+                     own::shared_owner<MeshSurfaceStaticBuffers>& result, std::string& error,
+                     own::shared_owner<const assets::cluster::ResidentSet> residency = {})
         {
             const auto recording = device.GetCurrentUploadRecordingId();
             const auto& geometry = identity->Geometry();
             RHIModelMeshletUpload topology;
             SparseClusterPayload sparsePayload;
             const bool sparseClusters = residency && device.SparseBufferTileBytes();
-            std::shared_ptr<MeshletSparseStorage> sparseStorage;
+            own::shared_owner<MeshletSparseStorage> sparseStorage;
             // Transform-only consumers may have no meshlets. Scene admission
             // rejects missing cooked topology before reaching this cache.
             std::uint64_t sizes[]{
@@ -380,7 +381,7 @@ namespace material_graph
                         const bool eligible = cached.use_count() == 1 &&
                                               cached->state == RHIUploadTransactionState::Resident &&
                                               cached->completion <= completed;
-                        idleScratch.emplace_back(cached->sparse.get(), eligible);
+                        idleScratch.emplace_back(cached->sparse.operator->(), eligible);
                     }
                 }
                 auto idle = std::span(idleScratch);
@@ -398,12 +399,12 @@ namespace material_graph
                 }
                 for (const auto& entry : std::span(entries))
                 {
-                    if (sparseClusters && entry->identity == identity && entry->sparse)
+                    if (sparseClusters && entry->identity.operator->() == identity.operator->() && entry->sparse)
                     {
                         sparseStorage = entry->sparse;
                         sparseStorage->SetEvictable(false);
                     }
-                    if (entry->identity == identity && bool(entry->residency) == bool(residency) &&
+                    if (entry->identity.operator->() == identity.operator->() && bool(entry->residency) == bool(residency) &&
                         (!residency || (entry->residency->revision == residency->revision &&
                                         entry->residency->residentLimit == residency->residentLimit &&
                                         entry->residency->residencyAlignment == residency->residencyAlignment)) &&
@@ -457,12 +458,12 @@ namespace material_graph
                     }
                 }
             }
-            auto entry = std::make_shared<MeshSurfaceStaticBuffers>(device);
+            auto entry = own::make_shared<MeshSurfaceStaticBuffers>(device);
             entry->identity = std::move(identity);
             entry->residency = std::move(residency);
             if (sparseClusters)
             {
-                entry->sparse = sparseStorage ? sparseStorage : std::make_shared<MeshletSparseStorage>(device);
+                entry->sparse = sparseStorage ? sparseStorage : own::make_shared<MeshletSparseStorage>(device);
                 if (!entry->sparse->Prepare(sparsePayload, topology.bytes.size(), entry->residency->residentLimit,
                                             error))
                 {
@@ -713,7 +714,7 @@ namespace material_graph
         // GPU 버퍼 풀의 수명 동안 한 번만 만든다. 선언별 원본 포인터와 출력
         // 설명만 덮어쓰며, 버퍼 회수 mutex를 쥔 채 워커에 합류하지 않는다.
         std::mutex m_declarationMutex;
-        std::unique_ptr<MeshTransformDeclarationScratch> m_declarationScratch;
+        own::unique_owner<MeshTransformDeclarationScratch> m_declarationScratch;
     };
 
     void MeshSurfaceInput::SealInstanceBounds()
@@ -768,13 +769,13 @@ namespace material_graph
     }
 
     bool MeshSurfaceInput::Seal(const EnhancedDrawItem& draw, const SurfaceView& view, std::span<const float> lods,
-                                std::shared_ptr<const MeshSurfaceInput>& result, std::string& error)
+                                own::shared_owner<const MeshSurfaceInput>& result, std::string& error)
     {
         return SealImpl(draw, view, lods, IblBaker::MaxPoints, result, error);
     }
 
     bool MeshSurfaceInput::SealImpl(const EnhancedDrawItem& draw, const SurfaceView& view, std::span<const float> lods,
-                                    std::uint32_t maxVertices, std::shared_ptr<const MeshSurfaceInput>& result,
+                                    std::uint32_t maxVertices, own::shared_owner<const MeshSurfaceInput>& result,
                                     std::string& error, bool includeHierarchy)
     {
         const auto& geometry = draw.modelMeshView;
@@ -792,7 +793,7 @@ namespace material_graph
         {
             return Fail(error, "Mesh surface pose does not match its product vertex layout.");
         }
-        auto candidate = std::shared_ptr<MeshSurfaceInput>(new MeshSurfaceInput);
+        auto candidate = own::make_shared<MeshSurfaceInput>(MeshSurfaceInput::ConstructionKey{});
         candidate->geometry_ = geometry;
         candidate->originalIndexCount_ = geometry.indexCount;
         candidate->sourcePrimitiveCount_ = geometry.indexCount / 3;
@@ -954,7 +955,7 @@ namespace material_graph
                     : assets::cluster::Build(geometry.vertexAttributeMask, candidate->sourceVertexCount_,
                                              candidate->vertices_, candidate->meshlets_);
             candidate->clusterStream_ =
-                std::make_shared<assets::cluster::Stream>(candidate->clusterArchive_, candidate->hierarchy_.groups);
+                own::make_shared<assets::cluster::Stream>(candidate->clusterArchive_, candidate->hierarchy_.groups);
         }
         candidate->SealInstanceBounds();
         result = std::move(candidate);
@@ -966,7 +967,7 @@ namespace material_graph
     {
         if (StreamedTopology() || other.StreamedTopology())
         {
-            return StreamedTopology() && other.StreamedTopology() && ClusterArchive() == other.ClusterArchive() &&
+            return StreamedTopology() && other.StreamedTopology() && ClusterArchive().operator->() == other.ClusterArchive().operator->() &&
                    geometry_.handle == other.geometry_.handle && Count() == other.Count() &&
                    view_.sceneEpoch == other.view_.sceneEpoch && view_.viewRevision == other.view_.viewRevision &&
                    view_.geometryRevision == other.view_.geometryRevision && view_.eye == other.view_.eye &&
@@ -991,7 +992,7 @@ namespace material_graph
     }
 
     bool MeshSurfacePlan::Build(const EnhancedDrawItem& draw, const SurfaceView& view, std::span<const float> lods,
-                                const MeshSurfacePlanBudget& budget, std::shared_ptr<const MeshSurfacePlan>& result,
+                                const MeshSurfacePlanBudget& budget, own::shared_owner<const MeshSurfacePlan>& result,
                                 std::string& error)
     {
         return BuildPartitioned(draw, view, lods, budget, IblBaker::MaxPoints, result, error);
@@ -999,7 +1000,7 @@ namespace material_graph
 
     bool MeshSurfacePlan::BuildPartitioned(const EnhancedDrawItem& draw, const SurfaceView& view,
                                            std::span<const float> lods, const MeshSurfacePlanBudget& budget,
-                                           std::uint32_t chunkCeiling, std::shared_ptr<const MeshSurfacePlan>& result,
+                                           std::uint32_t chunkCeiling, own::shared_owner<const MeshSurfacePlan>& result,
                                            std::string& error, bool includeHierarchy)
     {
         const auto& geometry = draw.modelMeshView;
@@ -1010,7 +1011,7 @@ namespace material_graph
         {
             return Fail(error, "Mesh surface partition exceeds its source/chunk/triangle budget.");
         }
-        auto candidate = std::shared_ptr<MeshSurfacePlan>(new MeshSurfacePlan);
+        auto candidate = own::make_shared<MeshSurfacePlan>(MeshSurfacePlan::ConstructionKey{});
         candidate->chunkLimit_ = budget.maxChunkPoints;
         auto& cost = candidate->cost_;
         cost.sourceVertices = static_cast<std::uint32_t>(geometry.vertexBytes / geometry.vertexStride);
@@ -1046,12 +1047,12 @@ namespace material_graph
         constexpr auto unused = std::numeric_limits<std::uint32_t>::max();
         std::vector<std::uint32_t> remap(cost.sourceVertices, unused);
         ce::dynamic_bitset referenced(cost.sourceVertices);
-        std::shared_ptr<MeshSurfaceInput> chunk;
+        own::shared_owner<MeshSurfaceInput> chunk;
         MeshSurfaceChunk description;
-        std::shared_ptr<std::vector<std::uint32_t>> sourceVertices;
+        own::shared_owner<std::vector<std::uint32_t>> sourceVertices;
         const auto start = [&](std::uint32_t firstTriangle)
         {
-            chunk = std::shared_ptr<MeshSurfaceInput>(new MeshSurfaceInput);
+            chunk = own::make_shared<MeshSurfaceInput>(MeshSurfaceInput::ConstructionKey{});
             chunk->geometry_ = source.geometry_;
             chunk->hierarchy_ = source.Hierarchy();
             chunk->originalIndexCount_ = source.OriginalIndexCount();
@@ -1061,7 +1062,7 @@ namespace material_graph
             chunk->clusterArchive_ = source.ClusterArchive();
             chunk->clusterStream_ = source.ClusterStream();
             description = {};
-            sourceVertices = std::make_shared<std::vector<std::uint32_t>>();
+            sourceVertices = own::make_shared<std::vector<std::uint32_t>>();
             description.firstTriangle = firstTriangle;
         };
         const auto finish = [&]()
@@ -1248,7 +1249,7 @@ namespace material_graph
         {
             while (plan->staticOwner_)
             {
-                plan = plan->staticOwner_.get();
+                plan = plan->staticOwner_.operator->();
             }
             return plan;
         };
@@ -1257,12 +1258,12 @@ namespace material_graph
         return root(this) == root(&other);
     }
 
-    std::weak_ptr<const MeshSurfaceInput> MeshSurfacePlan::SceneTopologyIdentity() const
+    own::weak_owner<const MeshSurfaceInput> MeshSurfacePlan::SceneTopologyIdentity() const
     {
         const auto* root = this;
         while (root->staticOwner_)
         {
-            root = root->staticOwner_.get();
+            root = root->staticOwner_.operator->();
         }
         // source는 partition 생성마다 새로 봉인된다. 재생성/eviction은 보수적인 cache miss다.
         return root->source_;
@@ -1270,7 +1271,7 @@ namespace material_graph
 
     bool MeshSurfacePlan::BuildForScene(const EnhancedDrawItem& draw, const SurfaceView& view,
                                         std::span<const float> lods, const MeshSurfacePlanBudget& budget,
-                                        std::shared_ptr<const MeshSurfacePlan>& result, std::string& error)
+                                        own::shared_owner<const MeshSurfacePlan>& result, std::string& error)
     {
         // The raster scene computes the actual mip footprint from pixel UV
         // derivatives. Only its zero-initialized vertex LOD transport is reusable.
@@ -1285,20 +1286,20 @@ namespace material_graph
 
     bool MeshSurfacePlan::BuildForScene(const EnhancedDrawItem& draw, const SurfaceView& view,
                                         const MeshSurfacePlanBudget& budget,
-                                        std::shared_ptr<const MeshSurfacePlan>& result, std::string& error)
+                                        own::shared_owner<const MeshSurfacePlan>& result, std::string& error)
     {
         return BuildSceneZeroLod(draw, view, {}, budget, result, error);
     }
 
     bool MeshSurfacePlan::BuildSceneZeroLod(const EnhancedDrawItem& draw, const SurfaceView& view,
                                             std::span<const float> lods, const MeshSurfacePlanBudget& budget,
-                                            std::shared_ptr<const MeshSurfacePlan>& result, std::string& error)
+                                            own::shared_owner<const MeshSurfacePlan>& result, std::string& error)
     {
         ce::profile_scope profile{ce::marker<"MaterialMeshPlanForScene">()};
 
         struct Entry
         {
-            std::shared_ptr<const MeshSurfacePlan> plan;
+            own::shared_owner<const MeshSurfacePlan> plan;
             MeshSurfacePlanBudget budget;
             const void* vertexData{};
             const std::uint32_t* indexData{};
@@ -1324,7 +1325,7 @@ namespace material_graph
                    a.maxChunkPoints == b.maxChunkPoints && a.maxChunks == b.maxChunks &&
                    a.maxCpuPayloadBytes == b.maxCpuPayloadBytes && a.maxGpuPayloadBytes == b.maxGpuPayloadBytes;
         };
-        std::shared_ptr<const MeshSurfacePlan> reusable;
+        own::shared_owner<const MeshSurfacePlan> reusable;
         if (geometry.IsSceneComplete())
         {
             std::lock_guard lock(cacheMutex);
@@ -1414,13 +1415,13 @@ namespace material_graph
                                    " cached=" + std::to_string(reusable->source_->bones_.size()) + ".");
         }
 
-        auto candidate = std::shared_ptr<MeshSurfacePlan>(new MeshSurfacePlan);
+        auto candidate = own::make_shared<MeshSurfacePlan>(MeshSurfacePlan::ConstructionKey{});
         candidate->staticOwner_ = reusable;
         candidate->cost_ = reusable->cost_;
         candidate->chunkLimit_ = reusable->chunkLimit_;
-        const auto bind = [&](const std::shared_ptr<const MeshSurfaceInput>& original)
+        const auto bind = [&](const own::shared_owner<const MeshSurfaceInput>& original)
         {
-            auto input = std::shared_ptr<MeshSurfaceInput>(new MeshSurfaceInput);
+            auto input = own::make_shared<MeshSurfaceInput>(MeshSurfaceInput::ConstructionKey{});
             input->staticOwner_ = original;
             input->geometry_ = original->geometry_;
             input->world_ = draw.worldMatrix;
@@ -1553,7 +1554,7 @@ namespace material_graph
         pipeline_ = pipeline.GetGeneration();
         if (!bufferPool_)
         {
-            bufferPool_ = std::make_shared<MeshSurfaceBufferPool>(device);
+            bufferPool_ = own::make_shared<MeshSurfaceBufferPool>(device);
         }
         error.clear();
         return true;
@@ -1599,10 +1600,10 @@ namespace material_graph
         }
     }
 
-    bool MeshSurfaceEvaluator::Record(IRenderDeviceServices& device, std::shared_ptr<const MeshSurfaceInput> input,
-                                      std::shared_ptr<const MeshSurfaceBatch>& result, std::string& error)
+    bool MeshSurfaceEvaluator::Record(IRenderDeviceServices& device, own::shared_owner<const MeshSurfaceInput> input,
+                                      own::shared_owner<const MeshSurfaceBatch>& result, std::string& error)
     {
-        std::shared_ptr<const MeshSurfaceBatch> candidate;
+        own::shared_owner<const MeshSurfaceBatch> candidate;
         if (!Prepare(device, std::move(input), candidate, error))
         {
             return false;
@@ -1610,8 +1611,8 @@ namespace material_graph
         // Upload/descriptor allocation may submit a command-list prefix and rotate
         // its encoder. Reject that recording change before any command references
         // this candidate: failure must not release a submitted GPU resource.
-        const std::shared_ptr<const MeshSurfaceBatch> batches[]{candidate};
-        std::shared_ptr<MeshTransformDispatch> dispatch;
+        const own::shared_owner<const MeshSurfaceBatch> batches[]{candidate};
+        own::shared_owner<MeshTransformDispatch> dispatch;
         if (!MeshSurfaceBatch::PrepareDispatch(batches, dispatch, error))
         {
             return false;
@@ -1633,8 +1634,8 @@ namespace material_graph
         return true;
     }
 
-    bool MeshSurfaceEvaluator::Prepare(IRenderDeviceServices& device, std::shared_ptr<const MeshSurfaceInput> input,
-                                       std::shared_ptr<const MeshSurfaceBatch>& result, std::string& error,
+    bool MeshSurfaceEvaluator::Prepare(IRenderDeviceServices& device, own::shared_owner<const MeshSurfaceInput> input,
+                                       own::shared_owner<const MeshSurfaceBatch>& result, std::string& error,
                                        bool cacheStatic, std::uint64_t auditRealFrame, std::uint64_t auditView,
                                        bool objectSpace, bool directClusters,
                                        const assets::cluster::StreamBudget& clusterBudget)
@@ -1654,7 +1655,7 @@ namespace material_graph
             return Fail(error, "Mesh surface transform needs a sealed input on its initialized device in a recording.");
         }
         nextDetail(ce::marker<"MeshPrepareOwner">());
-        auto candidate = std::shared_ptr<MeshSurfaceBatch>(new MeshSurfaceBatch);
+        auto candidate = own::make_shared<MeshSurfaceBatch>(MeshSurfaceBatch::ConstructionKey{});
         candidate->device_ = &device;
         candidate->input_ = std::move(input);
         candidate->count_ = candidate->input_->Count();
@@ -1685,9 +1686,9 @@ namespace material_graph
         {
             if (!requestCache_)
             {
-                requestCache_ = std::make_shared<MeshSurfaceRequestCache>();
+                requestCache_ = own::make_shared<MeshSurfaceRequestCache>();
             }
-            std::shared_ptr<const std::vector<std::uint32_t>> requests;
+            own::shared_owner<const std::vector<std::uint32_t>> requests;
             {
                 ce::profile_scope requestProfile{ce::marker<"MeshClusterRequests">()};
                 requests = requestCache_->Acquire(identity, *candidate->input_, auditView, cacheGeneration_);
@@ -1715,7 +1716,7 @@ namespace material_graph
             candidate->lastUsedGeneration_ = cacheGeneration_;
             if (!staticCache_)
             {
-                staticCache_ = std::make_shared<MeshSurfaceStaticCache>(device);
+                staticCache_ = own::make_shared<MeshSurfaceStaticCache>(device);
             }
             if (!staticCache_->Acquire(std::move(identity), candidate->staticBuffers_, error,
                                        candidate->clusterResidency_))
@@ -1730,7 +1731,7 @@ namespace material_graph
                     const auto& prior = *previous->input_;
                     // One geometry/pose has one immutable output. Object-space
                     // instances keep separate world matrices and share its producer.
-                    if (previous->staticBuffers_ != candidate->staticBuffers_ || previous->pipeline_ != pipeline_ ||
+                    if (previous->staticBuffers_.operator->() != candidate->staticBuffers_.operator->() || previous->pipeline_.operator->() != pipeline_.operator->() ||
                         previous->objectSpace_ != objectSpace ||
                         (!objectSpace && std::memcmp(&prior.World(), &source.World(), sizeof(math::matrix4x4)) != 0) ||
                         prior.Bones().size() != source.Bones().size() ||
@@ -1862,14 +1863,14 @@ namespace material_graph
         uint64_t pointCount{}, inputBytes{};
     };
 
-    bool MeshSurfaceBatch::PrepareDispatch(std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,
-                                           std::shared_ptr<MeshTransformDispatch>& result, std::string& error)
+    bool MeshSurfaceBatch::PrepareDispatch(std::span<const own::shared_owner<const MeshSurfaceBatch>> batches,
+                                           own::shared_owner<MeshTransformDispatch>& result, std::string& error)
     {
         if (batches.empty() || batches.size() > MeshTransformDispatch::MaxJobs)
         {
             return Fail(error, "METEOR transform work list requires 1..4096 jobs; no alternate dispatch route.");
         }
-        auto dispatch = std::make_shared<MeshTransformDispatch>();
+        auto dispatch = own::make_shared<MeshTransformDispatch>();
         auto& device = *batches.front()->device_;
         ce::profile_scope prepareScope{ce::marker<"MaterialMeshDispatchPrepare">()};
         std::vector<std::byte> inputs;
@@ -1907,7 +1908,7 @@ namespace material_graph
         for (const auto& batch : batches)
         {
             if (!batch->IsPreparedForGraph() || batch->device_ != &device ||
-                batch->pipeline_ != batches.front()->pipeline_ || batch->transformedOwner_)
+                batch->pipeline_.operator->() != batches.front()->pipeline_.operator->() || batch->transformedOwner_)
             {
                 return Fail(error, "METEOR transform jobs require one fresh pipeline/device/recording.");
             }
@@ -1973,8 +1974,8 @@ namespace material_graph
         return true;
     }
 
-    bool MeshSurfaceBatch::PrepareDeclarationDispatch(std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,
-                                                      std::shared_ptr<MeshTransformDispatch>& result,
+    bool MeshSurfaceBatch::PrepareDeclarationDispatch(std::span<const own::shared_owner<const MeshSurfaceBatch>> batches,
+                                                      own::shared_owner<MeshTransformDispatch>& result,
                                                       std::string& error)
     {
         ce::profile_scope prepareScope{ce::marker<"MaterialMeshDispatchPrepare">()};
@@ -1991,12 +1992,12 @@ namespace material_graph
         }
         if (!pool.m_declarationScratch)
         {
-            pool.m_declarationScratch = std::make_unique<MeshTransformDeclarationScratch>();
+            pool.m_declarationScratch = own::make_unique<MeshTransformDeclarationScratch>();
         }
         auto& scratch = *pool.m_declarationScratch;
         auto& plan = scratch.m_plan;
         plan.Reset();
-        auto dispatch = std::make_shared<MeshTransformDispatch>();
+        auto dispatch = own::make_shared<MeshTransformDispatch>();
         auto& device = *batches.front()->device_;
         {
             ce::profile_scope planScope{ce::marker<"RenderGraphDeclareMeshPlan">()};
@@ -2004,7 +2005,7 @@ namespace material_graph
             {
                 const auto& batch = batches[index];
                 if (!batch || !batch->IsPreparedForGraph() || batch->device_ != &device ||
-                    batch->pipeline_ != batches.front()->pipeline_ || batch->transformedOwner_)
+                    batch->pipeline_.operator->() != batches.front()->pipeline_.operator->() || batch->transformedOwner_)
                 {
                     return Fail(error, "METEOR transform jobs require one fresh pipeline/device/recording.");
                 }
@@ -2105,7 +2106,7 @@ namespace material_graph
     }
 
     bool MeshSurfaceBatch::RecordDispatch(RHIEncoder& encoder,
-                                          std::span<const std::shared_ptr<const MeshSurfaceBatch>> batches,
+                                          std::span<const own::shared_owner<const MeshSurfaceBatch>> batches,
                                           const MeshTransformDispatch& dispatch, std::string& error)
     {
         ce::profile_scope recordScope{ce::marker<"MaterialMeshDispatchRecord">()};
@@ -2168,7 +2169,7 @@ namespace material_graph
     {
         struct DeclarationScratch
         {
-            std::vector<std::shared_ptr<const MeshSurfaceBatch>> transformed, reused, direct, aliases, producers;
+            std::vector<own::shared_owner<const MeshSurfaceBatch>> transformed, reused, direct, aliases, producers;
             std::vector<EnhancedRenderGraph::RGPassUsage> transformUses, readyUses, reuseUses, clusterUses,
                 clusterReadyUses;
             ce::render_pointer_set<MeshSurfaceBatch> selected, producerSet;
@@ -2219,7 +2220,7 @@ namespace material_graph
         {
             const auto instance = batch ? batch->self_.lock() : nullptr;
             if (!instance || &graph.DeviceServices() != instance->device_ || !instance->IsPreparedForGraph() ||
-                instance->declared_.load() || !selected.insert(instance.get()))
+                instance->declared_.load() || !selected.insert(instance.operator->()))
             {
                 return Fail(error, "Mesh declaration requires distinct fresh instances on their owning recording.");
             }
@@ -2228,11 +2229,11 @@ namespace material_graph
             {
                 producer = producer->declarationOwner_;
             }
-            if (producerSet.insert(producer.get()))
+            if (producerSet.insert(producer.operator->()))
             {
                 producers.push_back(producer);
             }
-            if (producer != instance)
+            if (producer.operator->() != instance.operator->())
             {
                 aliases.push_back(instance);
             }
@@ -2295,11 +2296,11 @@ namespace material_graph
         NormalizeSceneReads(graph, transformUses);
         NormalizeSceneReads(graph, reuseUses);
         const auto reusedOwners =
-            graph.CopyDeclaration(std::span<const std::shared_ptr<const MeshSurfaceBatch>>{reused});
+            graph.CopyDeclaration(std::span<const own::shared_owner<const MeshSurfaceBatch>>{reused});
         const auto directOwners =
-            graph.CopyDeclaration(std::span<const std::shared_ptr<const MeshSurfaceBatch>>{direct});
+            graph.CopyDeclaration(std::span<const own::shared_owner<const MeshSurfaceBatch>>{direct});
         const auto transformedOwners =
-            graph.CopyDeclaration(std::span<const std::shared_ptr<const MeshSurfaceBatch>>{transformed});
+            graph.CopyDeclaration(std::span<const own::shared_owner<const MeshSurfaceBatch>>{transformed});
         if (!reused.empty())
         {
             graph.AddPass(
@@ -2343,7 +2344,7 @@ namespace material_graph
             error.clear();
             return true;
         }
-        std::shared_ptr<MeshTransformDispatch> dispatch;
+        own::shared_owner<MeshTransformDispatch> dispatch;
         if (!PrepareDeclarationDispatch(transformed, dispatch, error))
         {
             return false;
@@ -2528,9 +2529,9 @@ namespace material_graph
     }
 
     bool MeshSurfaceEvaluator::RecordSamples(IRenderDeviceServices& device,
-                                             std::shared_ptr<const MeshSurfaceBatch> vertices,
+                                             own::shared_owner<const MeshSurfaceBatch> vertices,
                                              std::span<const MeshSurfaceSample> samples,
-                                             std::shared_ptr<const MeshSurfaceBatch>& result, std::string& error)
+                                             own::shared_owner<const MeshSurfaceBatch>& result, std::string& error)
     {
         if (device_ != &device || !(samplerPipeline_ && samplerPipeline_->IsValid()) ||
             !device.GetCurrentUploadRecordingId() || !vertices || vertices->Device() != &device ||
@@ -2552,7 +2553,7 @@ namespace material_graph
                             "Mesh surface sample " + std::to_string(i) + " has an invalid triangle, weight or LOD.");
             }
         }
-        auto candidate = std::shared_ptr<MeshSurfaceBatch>(new MeshSurfaceBatch);
+        auto candidate = own::make_shared<MeshSurfaceBatch>(MeshSurfaceBatch::ConstructionKey{});
         candidate->device_ = &device;
         candidate->input_ = vertices->Input();
         candidate->source_ = std::move(vertices);

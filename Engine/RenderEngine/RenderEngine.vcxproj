@@ -1,4 +1,4 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8"?>
 <Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
   <ItemGroup Label="ProjectConfigurations">
     <ProjectConfiguration Include="Debug|Win32">
@@ -364,7 +364,6 @@
     <ClCompile Include="RHI\DX12\DX12CommandListPool.cpp" />
     <ClCompile Include="RHI\DX12\DX12DescriptorHeaps.cpp" />
     <ClCompile Include="Render\Graph\EnhancedRenderGraph.cpp" />
-    <ClCompile Include="Render\Graph\EnhancedRenderGraphDeclaration.cpp" />
     <ClCompile Include="Render\Graph\EnhancedRenderGraphQueues.cpp" />
     <ClCompile Include="Render\Core\EnhancedLivePipelineDesc.cpp" />
     <ClCompile Include="Render\Passes\Geometry\SceneSurfaceTargets.cpp">
@@ -788,6 +787,7 @@
     <ClInclude Include="MeshTransformDeclarationPlan.h" />
     <ClInclude Include="MaterialGraphGeometryContract.h" />
     <ClInclude Include="MaterialGraphFrameGeometry.h" />
+    <ClInclude Include="MaterialGraphPacketGroups.h" />
     <ClInclude Include="MaterialGraphPacketPlan.h" />
     <ClInclude Include="MaterialGraphPassReadPlan.h" />
     <ClInclude Include="MaterialGraphPacketWork.h" />
@@ -913,7 +913,6 @@
     <ClInclude Include="RHI\DX12\EnhancedIBLGenerator.h" />
     <ClInclude Include="Assets\CookedEnvironment.h" />
     <ClInclude Include="Render\Core\EnhancedLivePipelineDesc.h" />
-    <ClInclude Include="Render\Graph\RGSetupTaskGraph.h" />
     <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainPass.h" />
     <ClInclude Include="Render\Passes\PostProcess\EnhancedPostChainShaders.h" />
     <ClInclude Include="Render\Graph\EnhancedRenderGraph.h" />
@@ -1061,6 +1060,7 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="RenderContainerReusePolicy.h" />
     <ClInclude Include="RenderArena.h" />
     <ClCompile Include="RenderArena.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
   </ItemGroup>

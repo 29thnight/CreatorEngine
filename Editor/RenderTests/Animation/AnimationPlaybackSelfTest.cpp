@@ -1,3 +1,4 @@
+#include "../../../Engine/RenderEngine/RenderAllocator.h"
 #include "../../../Tools/regression/gcce_probe_cleanup.h"
 #include "Animation/AnimationPlaybackSelfTest.h"
 #include "AnimationScheduler.h"
@@ -378,13 +379,13 @@ namespace RenderTest
                 auto layerOwnerRoot = Component::CreateManaged<Animator>(layerOwnerDomain);
                 Animator& layerOwner = *layerOwnerRoot;
                 gcce_probe::cleanup layerOwnerCleanup(layerOwner);
-                std::vector<std::shared_ptr<AnimationController>> layers;
+                std::vector<own::shared_owner<AnimationController>> layers;
                 std::vector<std::uintptr_t> slotAddresses;
                 layers.reserve(10);
                 slotAddresses.reserve(10);
                 for (int index = 0; index < 10; ++index)
                 {
-                    auto layer = std::make_shared<AnimationController>();
+                    auto layer = own::make_shared<AnimationController>();
                     layer->m_owner = &layerOwner;
                     auto& playback = layer->GetPlayback();
                     playback.timeElapsed = static_cast<float>(index) + 0.5f;
@@ -412,7 +413,7 @@ namespace RenderTest
                     && firstLayer->timeElapsed == 0.5f
                     && lastLayer->timeElapsed == 9.5f,
                     "Controller slot compaction preserves surviving playback addresses and state");
-                auto replacement = std::make_shared<AnimationController>();
+                auto replacement = own::make_shared<AnimationController>();
                 replacement->m_owner = &layerOwner;
                 auto& replacementPlayback = replacement->GetPlayback();
                 require(&replacementPlayback == retiredLayer
@@ -772,7 +773,7 @@ namespace RenderTest
                 if (i == 0) firstRecord = &animator.GetInstance();
                 animator.m_Motion.m_guid = generation->Identity().modelId;
                 animator.BindModelGeneration(generation);
-                auto controller = std::make_shared<AnimationController>();
+                auto controller = own::make_shared<AnimationController>();
                 controller->m_owner = &animator;
                 controller->CreateState("Any", -1, true);
                 controller->CreateState("Current", 0);
@@ -1195,7 +1196,7 @@ namespace RenderTest
                 pose.qualityOverride = -1;
                 job.Update(0.f);
             }
-            auto second = std::make_shared<AnimationController>();
+            auto second = own::make_shared<AnimationController>();
             second->m_owner = &animator;
             second->CreateState("Layer", 1);
             second->CheckTransition();
@@ -1301,10 +1302,10 @@ namespace RenderTest
             }
             const float firstTimeBeforeReorder = firstPlayback->timeElapsed;
             const float secondTimeBeforeReorder = secondPlayback->timeElapsed;
-            std::vector<std::shared_ptr<AnimationController>> extraLayers;
+            std::vector<own::shared_owner<AnimationController>> extraLayers;
             for (int index = 0; index < 4; ++index)
             {
-                auto extra = std::make_shared<AnimationController>();
+                auto extra = own::make_shared<AnimationController>();
                 extra->m_owner = &animator;
                 extra->CreateState("Extra", 1);
                 extra->CheckTransition();
@@ -1617,7 +1618,7 @@ namespace RenderTest
             require(first->GetCurrentState() == first->FindState("Current")
                 && first->m_curState == first->GetCurrentState(),
                 "Removing another state preserves the active instance selection");
-            AnimationState speedState(first.get(), "SpeedHandleProbe");
+            AnimationState speedState(first.operator->(), "SpeedHandleProbe");
             speedState.animationSpeedParameterName = "SpeedBinding";
             ConditionParameter* speedParameter = animator.AddDefaultParameter(ValueType::Float);
             const std::size_t speedIndex = animator.Parameters.size() - 1;
@@ -1656,7 +1657,7 @@ namespace RenderTest
             auto* ddolAnimator = ddolRoot->AddComponent<Animator>();
             ddolAnimator->m_Motion.m_guid = generation->Identity().modelId;
             ddolAnimator->BindModelGeneration(generation);
-            auto ddolController = std::make_shared<AnimationController>();
+            auto ddolController = own::make_shared<AnimationController>();
             ddolController->m_owner = ddolAnimator;
             ddolController->CreateState("Current", 0);
             ddolController->CheckTransition();

@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Ownership.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include "MaterialGraphSceneLookup.h"
 #include "MaterialGraphThinFilmSensitivity.h"
@@ -346,7 +347,7 @@ bool SceneLookupCache::Initialize(const EnhancedFrameContext& context, std::stri
 bool SceneLookupCache::Prepare(const EnhancedFrameContext& context, std::uint64_t viewId, RHITextureHandle environment,
                                RHITextureHandle irradiance, RHITextureHandle prefiltered,
                                std::uint64_t environmentGeneration, std::uint64_t memoryBudget,
-                               std::shared_ptr<const SceneLookupFrame>& result, std::string& error,
+                               own::shared_owner<const SceneLookupFrame>& result, std::string& error,
                                std::array<RHITextureHandle, 3> importance, RHITextureHandle source, bool standalone,
                                bool approximate, bool capture, bool runtimeEvaluation)
 {
@@ -363,7 +364,7 @@ bool SceneLookupCache::Prepare(const EnhancedFrameContext& context, std::uint64_
     {
         return Fail(error, "Scene runtime evaluation requires the explicit split-sum quality policy.");
     }
-    std::shared_ptr<const SceneLookupFrame> previous;
+    own::shared_owner<const SceneLookupFrame> previous;
     for (const auto& cached : published_)
     {
         if (!runtimeEvaluation && !standalone && cached->viewId_ == viewId &&
@@ -380,7 +381,7 @@ bool SceneLookupCache::Prepare(const EnhancedFrameContext& context, std::uint64_
     {
         return false;
     }
-    auto candidate = std::make_shared<SceneLookupFrame>();
+    auto candidate = own::make_shared<SceneLookupFrame>();
     candidate->device_ = device_;
     candidate->width_ = context.width;
     candidate->height_ = context.height;
@@ -435,7 +436,7 @@ bool SceneLookupCache::Prepare(const EnhancedFrameContext& context, std::uint64_
         std::lock_guard lock(submissionMutex_);
         if (!resourcePool_)
         {
-            resourcePool_ = std::make_shared<SceneLookupResourcePool>(*device_);
+            resourcePool_ = own::make_shared<SceneLookupResourcePool>(*device_);
         }
         candidate->resourcePool_ = resourcePool_;
     }
@@ -971,7 +972,7 @@ void SceneLookupCache::OnUploadSubmitted(std::uint64_t recordingId, RHICompletio
 
 void SceneLookupCache::OnUploadCompleted(std::uint64_t completed)
 {
-    std::shared_ptr<SceneLookupResourcePool> pool;
+    own::shared_owner<SceneLookupResourcePool> pool;
     {
         std::lock_guard lock(submissionMutex_);
         pool = resourcePool_;

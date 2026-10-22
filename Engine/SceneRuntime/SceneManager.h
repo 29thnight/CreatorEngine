@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "Ownership.h"
 #include "SceneGC.h"
 #include "Object.h"
@@ -69,8 +69,8 @@ public:
     [[nodiscard]] wave::PlaybackScope AudioSessionScope() const noexcept { return m_audioSession; }
     void RefreshAudioClipKeys();
     void SynchronizeAudioWorld();
-    bool BindProjectLayerSettings(const std::shared_ptr<ProjectLayerSettings>& settings);
-    std::shared_ptr<ProjectLayerSettings> ProjectLayers() const { return m_projectLayers.lock(); }
+    bool BindProjectLayerSettings(const own::shared_owner<ProjectLayerSettings>& settings);
+    own::shared_owner<ProjectLayerSettings> ProjectLayers() const { return m_projectLayers.lock(); }
 
     bool CaptureSceneSnapshot();
     bool RestoreSceneSnapshot();
@@ -147,7 +147,7 @@ public:
     void AddDontDestroyOnLoad(Object* objPtr);
 	void RemoveDontDestroyOnLoad(Object* objPtr);
 	void RebindEventDontDestroyOnLoadObjects(Scene* scene);
-    
+
 	const std::vector<Scene*>& GetScenes() const { return m_scenes; }
 	std::vector<Object*>& GetDontDestroyOnLoadObjects() { return m_dontDestroyOnLoadObjects; }
     void SetActiveScene(Scene* scene);
@@ -236,7 +236,7 @@ public:
 	Core::Delegate<void>                resetSelectedObjectEvent{};
     Core::Delegate<void>                endOfFrameEvent{};
 	Core::Delegate<void>                resourceTrimEvent{};
-    
+
 	Core::Delegate<void>                AssetLoadEvent{};
 
     std::atomic_bool                    m_isGameStart{ false };
@@ -329,7 +329,7 @@ private:
     // D3-a-3: backend 노드를 값으로 들지 않고 문서 소유 타입이 감싼다(§3.3).
     // 이 헤더는 이 멤버 때문에 포맷 타입을 알 필요가 없다 — 실제 노드
     // 접근은 SceneManager.cpp가 `AuthoringDocumentAccess.h`로 얻는다.
-    std::weak_ptr<ProjectLayerSettings> m_projectLayers;
+    own::weak_owner<ProjectLayerSettings> m_projectLayers;
     std::shared_ptr<const project_layer_snapshot> m_editorLayerBackup;
     Authoring::Document                 m_editorSceneBackup{};
     std::vector<size_t>                 m_editorScenePersistentIds{};

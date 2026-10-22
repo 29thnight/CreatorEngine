@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Ownership.h"
 
 #include "LXMaterialPipeline.h"
 #include "RHI/IRenderDeviceServices.h"
@@ -38,7 +39,7 @@ class GpuGeometryOcclusion final
         std::vector<RHITextureHandle> textures;
         std::string name{"METEOR.Camera"};
         std::atomic<bool> recorded{};
-        std::shared_ptr<HistoryPool> pool;
+        own::shared_owner<HistoryPool> pool;
         RHIResourceState initialState{RHIResourceState::Common};
     };
 
@@ -82,7 +83,7 @@ class GpuGeometryOcclusion final
         std::array<RHIBindingDesc, kMaximumLevels> BindingInputs(
             const EnhancedRenderGraph::ExecuteContext& execution) const;
         std::uint32_t LevelCount() const { return m_levelCount; }
-        const std::shared_ptr<History>& HistoryOwner() const { return m_history; }
+        const own::shared_owner<History>& HistoryOwner() const { return m_history; }
         void ImportHistory(EnhancedRenderGraph& graph) const;
 
       private:
@@ -90,16 +91,16 @@ class GpuGeometryOcclusion final
         void CheckCurrent(const EnhancedRenderGraph* graph = nullptr) const;
 
         ViewKey m_view;
-        std::shared_ptr<const DeclarationLayout> m_declarationLayout;
+        own::shared_owner<const DeclarationLayout> m_declarationLayout;
         std::uint32_t m_levelCount{};
-        std::shared_ptr<const LX::Runtime::ComputeGeneration> m_build;
-        std::weak_ptr<const Pyramid> m_self;
+        own::shared_owner<const LX::Runtime::ComputeGeneration> m_build;
+        own::weak_owner<const Pyramid> m_self;
         mutable const EnhancedRenderGraph* m_graph{};
         mutable std::uint64_t m_graphEpoch{};
         mutable RGHandle m_depth;
         mutable std::array<RGHandle, kMaximumLevels> m_levels{};
         mutable std::uint32_t m_declaredLevels{};
-        std::shared_ptr<History> m_history;
+        own::shared_owner<History> m_history;
         bool m_historyReader{};
         std::string m_name{"Geometry.Occlusion"};
     };
@@ -107,21 +108,21 @@ class GpuGeometryOcclusion final
     static ViewKey CaptureView(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection);
     static std::uint32_t LevelCount(std::uint32_t width, std::uint32_t height);
     bool Prepare(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection,
-                 std::shared_ptr<const Pyramid>& result, std::string& error,
+                 own::shared_owner<const Pyramid>& result, std::string& error,
                  const std::string& name = "Geometry.Occlusion");
     bool PrepareHistory(const EnhancedFrameContext& context, const math::matrix4x4& projection, std::uint64_t viewId,
-                        std::uint64_t revision, std::shared_ptr<const Pyramid>& result, std::string& error,
+                        std::uint64_t revision, own::shared_owner<const Pyramid>& result, std::string& error,
                         const std::string& name = "Geometry.Occlusion");
-    static std::shared_ptr<const Pyramid> ReadHistory(const EnhancedFrameContext& context,
+    static own::shared_owner<const Pyramid> ReadHistory(const EnhancedFrameContext& context,
                                                       const math::matrix4x4& projection,
-                                                      const std::shared_ptr<History>& history);
+                                                      const own::shared_owner<History>& history);
     void ShutdownAfterIdle();
 
   private:
     IRenderDeviceServices* m_device{};
     LX::Runtime::ComputePipeline m_build;
-    std::shared_ptr<HistoryPool> m_historyPool;
+    own::shared_owner<HistoryPool> m_historyPool;
     // Bounded CPU-only descriptions. Submitted pyramids retain evicted layouts.
-    std::array<std::shared_ptr<const DeclarationLayout>, 16> m_declarationLayouts;
+    std::array<own::shared_owner<const DeclarationLayout>, 16> m_declarationLayouts;
     std::size_t m_nextDeclarationLayout{};
 };

@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/Ownership.h"
 #include "../Assets/ModelCpuGeometryPayload.h"
 #include "ModelAssetRuntime.h"
 #include "../DataSystem.h"
@@ -461,7 +462,7 @@ namespace
         }
         if (decoded.mesh.clusterArchive && resolved.byteSource)
         {
-            auto archive = std::make_shared<assets::cluster::Archive>(*decoded.mesh.clusterArchive);
+            auto archive = own::make_shared<assets::cluster::Archive>(*decoded.mesh.clusterArchive);
             std::vector<model_cooked::Sha256Digest> hashes;
             for (const auto& packet : archive->packets)
             {
@@ -997,7 +998,7 @@ AssetDepot::AssetRequest<assets::ModelCpuGeometryPayload> DataSystem::RequestMod
             if (!assets::ShouldPrepareModelCollider(colliderPolicy,root.asset->summary.createMeshCollider) ||
                 !root.asset->Instantiates(resolved.entry.asset.key.assetId))
             { finish(Status::Cancelled,Error::None,{}); return; }
-            std::shared_ptr<const model_cooked::ModelGeometryStreamMetadata> metadata; std::string error;
+            own::shared_owner<const model_cooked::ModelGeometryStreamMetadata> metadata; std::string error;
             if (!model_cooked::LoadModelGeometryStreamMetadata(resolved,metadata,error) || !metadata->cpuReader)
             { finish(Status::Failed,Error::IntegrityFailed,{},error); return; }
             auto result = own::make_shared<Payload>(); result->key = GeometryKey(resolved);

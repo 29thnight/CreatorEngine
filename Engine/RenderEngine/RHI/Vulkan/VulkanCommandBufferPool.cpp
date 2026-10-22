@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Ownership.h"
 #include "VulkanCommandBufferPool.h"
 #include "VulkanDeviceResources.h"
 #include "VulkanEncoder.h"
@@ -121,7 +122,7 @@ void VulkanCommandBufferPool::BeginFrame(uint32_t frameIndex)
     }
 }
 
-bool VulkanCommandBufferPool::CreateTranslationPool(std::shared_ptr<VulkanCommandBufferPool>& result,
+bool VulkanCommandBufferPool::CreateTranslationPool(own::shared_owner<VulkanCommandBufferPool>& result,
                                                     std::string& outError)
 {
     if (result || !m_resources || !m_resources->GetGraphicsQueueIdentity().IsValid() || m_slots.empty() ||
@@ -140,7 +141,7 @@ bool VulkanCommandBufferPool::CreateTranslationPool(std::shared_ptr<VulkanComman
     }
     m_translationPools.resize(m_frameCount);
     auto& cached = m_translationPools[m_frameIndex];
-    auto frozen = cached && cached.use_count() == 1 ? cached : std::make_shared<VulkanCommandBufferPool>();
+    auto frozen = cached && cached.use_count() == 1 ? cached : own::make_shared<VulkanCommandBufferPool>();
     if (!frozen->IsInitialized())
     {
         if (!frozen->Initialize(*m_resources, m_workerCount, 1, outError))
@@ -152,7 +153,7 @@ bool VulkanCommandBufferPool::CreateTranslationPool(std::shared_ptr<VulkanComman
         {
             return false;
         }
-        frozen->m_recordingResources = std::make_shared<VulkanRecordingResources>();
+        frozen->m_recordingResources = own::make_shared<VulkanRecordingResources>();
     }
     // Exclusive cached ownership proves both prior CPU replay and GPU retirement.
     frozen->BeginFrame(0);
@@ -171,7 +172,7 @@ bool VulkanCommandBufferPool::CreateTranslationPool(std::shared_ptr<VulkanComman
     return true;
 }
 
-std::shared_ptr<IRHICommandTranslator> VulkanCommandBufferPool::GetTranslator(RHIQueueIdentity queue)
+own::shared_owner<IRHICommandTranslator> VulkanCommandBufferPool::GetTranslator(RHIQueueIdentity queue)
 {
     if (!m_recordingResources || !m_resources || !queue.IsValid() || queue != m_translationQueue ||
         queue != m_resources->GetGraphicsQueueIdentity())
@@ -180,7 +181,7 @@ std::shared_ptr<IRHICommandTranslator> VulkanCommandBufferPool::GetTranslator(RH
     }
     if (!m_translator || m_translatorQueue != queue)
     {
-        m_translator = std::make_shared<VulkanCommandTranslator>(*this, *m_resources, queue);
+        m_translator = own::make_shared<VulkanCommandTranslator>(*this, *m_resources, queue);
         m_translatorQueue = queue;
     }
     return m_translator;
@@ -250,7 +251,7 @@ RHIEncoder& VulkanCommandBufferPool::AcquireEncoder(uint32_t worker)
     RetireEncoder(slot);
     if (!slot.encoder)
     {
-        slot.encoder = std::make_unique<VulkanEncoder>(VK_NULL_HANDLE, nullptr);
+        slot.encoder = own::make_unique<VulkanEncoder>(VK_NULL_HANDLE, nullptr);
     }
     slot.encoder->Rebind(
         slot.buffer, m_resources->m_pipelineCache, &m_resources->m_resourceTable,
@@ -258,7 +259,7 @@ RHIEncoder& VulkanCommandBufferPool::AcquireEncoder(uint32_t worker)
         m_recordingResources ? &m_translationDescriptors : &m_resources->m_descriptorRecycler,
         &m_resources->m_bindingTable, &m_resources->m_samplerTable, m_resources->GetIndirectDrawCapabilities(),
         m_resources->m_viewportLimits, m_resources->GetMeshShaderCapabilities());
-    slot.encoder->SetRecordingResources(m_recordingResources.get());
+    slot.encoder->SetRecordingResources(m_recordingResources.operator->());
     return *slot.encoder;
 }
 

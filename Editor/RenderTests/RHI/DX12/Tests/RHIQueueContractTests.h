@@ -1,3 +1,4 @@
+#include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
 #include "RHI/RHIQueueContract.h"
 #include <stdint.h>
@@ -32,7 +33,7 @@ bool DX12Test::RunQueueContractTest(std::string& outLog)
     {
         const RHIQueueIdentity graphics{71, 1, RHIQueueKind::Graphics};
         const RHIQueueIdentity compute{71, 2, RHIQueueKind::Compute};
-        auto fence = std::make_shared<QueueContractTestFence>();
+        auto fence = own::make_shared<QueueContractTestFence>();
         RHITimelinePoint point{fence, 7};
         std::string error;
         require(point.IsValid() && !point.IsComplete(), "Issued pending fence was treated as complete.");
@@ -75,7 +76,7 @@ bool DX12Test::RunQueueContractTest(std::string& outLog)
         require(!unavailable.Supports(RHIQueueKind::Compute) && !unavailable.crossQueueTimeline,
             "Unimplemented queue service advertised async availability.");
 
-        std::weak_ptr<IRHITimelineFence> weak = fence;
+        own::weak_owner<IRHITimelineFence> weak = fence;
         fence.reset();
         require(!weak.expired(), "Queued point failed to retain its timeline.");
         point.fence.reset();

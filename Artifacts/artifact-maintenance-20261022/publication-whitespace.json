@@ -1,0 +1,326 @@
+[
+  {
+    "path": "Editor/EngineEntry/EditorModelPlacement.cpp",
+    "beforeSha256": "5784436f96b0a2e1c261e74938f78581385b0853f418151ca2246e6aebd01676",
+    "afterSha256": "9fdcdb1c8328cb3af02a8d790f721a7e53a073ff084d6d7b587b7843647533b9",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Editor/EngineEntry/EditorObjectOperations.cpp",
+    "beforeSha256": "b938cefa34de019383522b398edc902cf5e0b72bef3e6e3503f109c4a70fd5c2",
+    "afterSha256": "538145c4c6771ec4a2e6e6472fd7a46743e7ad5e85e27ff68b07e93548a3e6ef",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Editor/EngineEntry/EditorProjectOperations.cpp",
+    "beforeSha256": "164d146121d36fc2991f5b10d40b2a4bb5e4f6a91f0b8940a015f8ba214c8f7c",
+    "afterSha256": "dd5ff545db8e3e20c479756ca3ba84e4fe318f4c578d26519a51b72415a98fd8",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Editor/EngineGUIWindow/AnimatorEditorWindows.cpp",
+    "beforeSha256": "8517216031793755b3a7881978a221633d9cad08dd5045d19b93ebb9399abf59",
+    "afterSha256": "7f4f1241a266d9120c6c09be4fa88b2f8b35607e977c92514e3f3a7657aa80cc",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Editor/RenderTests/RHI/DX12/Tests/EnhancedSceneRendererSelfTest.cpp",
+    "beforeSha256": "710841b781ab64afc4cb847bece7e30bf942c9ee9b8aa0b1e1753c14b328784f",
+    "afterSha256": "663754c63fb511750a26d7233b4e4ee997e20e41478a8f930db5dc457d4a68cf",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Editor/RenderTests/RHI/DX12/Tests/RenderQueueExecutionRg8Tests.h",
+    "beforeSha256": "e2bec81c465f3b206e52123ba85dc586d2fdf79fd23e54dc77478d2255b7dc23",
+    "afterSha256": "f50e92292a23e09a9dab5445371d4ed68c26c525136abea67094f961e4c1a2eb",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Editor/RenderTests/RHI/DX12/Tests/RenderQueueScheduleRg8Tests.h",
+    "beforeSha256": "48700ade2e7b394854d5836efd4770877d2cb85688b66ee741325b26761ba604",
+    "afterSha256": "4a5a4f1f44603e2e975c244e22ed92602aff96e79f6e075e03076fa3aada6afe",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/AssetDepot/ModelAssetRuntime.cpp",
+    "beforeSha256": "419861dc6e2f5d25fb09609530d1be3775405e4ccfd39d371a75719cda69ef52",
+    "afterSha256": "996ba2e57ba9636e9d8b11e57a9f7983b648df5e0b4029858331f4e8e96f17b7",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/DataSystem.h",
+    "beforeSha256": "729c399babf438d424f0e8c7fd5d54f23f0a7713cb7bf90061b5c1ac176dd62d",
+    "afterSha256": "eb325337cb094ee59aaae97fdb37b7ef39f2ac5a02c501f5ce67a91e87ccc665",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/EnhancedGizmoSceneBinding.h",
+    "beforeSha256": "177458266040d7afeec699addda0cab8938653689800e716d134e41f5cc43dac",
+    "afterSha256": "3c6fe4c80daea836553af5581a5dea7e50e7457818eaf559eec7bf9dbe5426d5",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/Mesh.h",
+    "beforeSha256": "15b1a3f9560347fdc3255830286586d83d98482bf581a103162743fcd837b688",
+    "afterSha256": "4cc557ac43418366f70729d63231a828aec1029cf3a66f8e01c96201b09818c2",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/RHI/DX12/DX12Encoder.h",
+    "beforeSha256": "eaecb4adbe88e34d6e5f7a08e5cef195b01328fcacda9ab59164ec1f8ee90f95",
+    "afterSha256": "c99e80cdd823a3527381b748534f89b050268c018c841b795febf3614dea32f7",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/RHI/DX12/DX12PSOManager.cpp",
+    "beforeSha256": "d78179947c534962407cbd04870b6f25d59bc631e5d595d651300d7f3c61dd92",
+    "afterSha256": "5ec56f128f65ddf476a130093cf215c12452a94ad50ec33ef5bbaa2779cf18df",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/RHI/DX12/DX12PSOManager.h",
+    "beforeSha256": "95f43f7d338c52151262dc2c3a18bd02f66c9b00c66009f46c2471a026098f96",
+    "afterSha256": "851d0dcc78a095f59a96acb0a0fc5f9e36ea618c89826290ecf45b41f860e671",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/RHI/DX12/DX12QueueService.cpp",
+    "beforeSha256": "4f542c16e444b0968596419377f4c71912dc67f565d6cc9bf3ce9dd9ff625dca",
+    "afterSha256": "2ff1aee143dbe5c87b2510ceb76d882914bdde1ba4447c348419a9908fc0837b",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/RHI/IRHIGpuProfiler.h",
+    "beforeSha256": "200c374b804962be8da393f7266b5137aa2bb8d87a485c88b8d7fb50d4fc8cff",
+    "afterSha256": "5e891aba3a3a10f733e5f30b8fd8a2d445bf229c735639afa72aae2cf70bfcf0",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/RHI/IRenderDeviceServices.h",
+    "beforeSha256": "ae3a12b5d9c6d5b81805a02e08330b71a6741a86b803869ba9d0c36ce003cc25",
+    "afterSha256": "b39a9758abc61442c3b2b3bac31f0b1349fb8887aed2a67b002e2fbd38fe1eae",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/RHI/RHIQueueContract.h",
+    "beforeSha256": "8724292958d9156e438c0eea7755594ce5d9562fc2e54b9f31740597c45820ca",
+    "afterSha256": "e2c5314196d54133c4c4fdb5d8c24abb39e937d048f91e0c7604157bd358ad93",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/RHI/RHIRecordedBatch.h",
+    "beforeSha256": "fb47d4422aef60cb20ce62f68e9b93696ce8df5a1641c4dcaa2f2b84bce99d59",
+    "afterSha256": "9d2ddd7cbd2520593b530903328baefce963e35e0bd57b4c345c5319a077c345",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/RHI/RHISubmissionThread.cpp",
+    "beforeSha256": "60e5bb150f097232bef26060a9fe621bd238ee9c8958be4ed268bdc10cef5a6c",
+    "afterSha256": "bb2fe006af21eb37dd35cc2cece0afd20ac23e307d3e58326126f346a2ec48b6",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/RHI/RHISubmissionThread.h",
+    "beforeSha256": "dbcbdd945bf3416aa40384d08cac7187922c7ec9d82d5e86d51e013d5408aa06",
+    "afterSha256": "5fa48346b2abf940a3e7c813f1525c05bccf18d55202dc694e85126c3e4bd057",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/RHI/Vulkan/VulkanBindingTable.h",
+    "beforeSha256": "cdb6720d758b43e06b89eb241e5dcc9c38cdbc2854651abf3da97d7ee905aa16",
+    "afterSha256": "9f47ce81824e192d41b5442ff70b75c02b2c582700769dd104010113bdd609d8",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/RHI/Vulkan/VulkanCommandBufferPool.h",
+    "beforeSha256": "7df80afab250cac4365f761b6eb43318f7127095eb18413d6c04d214ae076013",
+    "afterSha256": "51230f304e4a0aa90531d16e8f72c96a8eb6e6a97172e0ccc8fed1ab834f04d3",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/RHI/Vulkan/VulkanRenderTargetTable.h",
+    "beforeSha256": "ca7918eac51cf6b5db6e0b0f7ea3a3d3da20d6086860b60ed7eab55206ba0272",
+    "afterSha256": "5192918fd9a8d53c4a771c4f22b0805cd45449cb1577b91924e3e91196fe6544",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/RHI/Vulkan/VulkanResourceTable.h",
+    "beforeSha256": "61b9681cebaa720ad98691b5ad00bbb2b41c6f3d26fb969e3760732785ce099c",
+    "afterSha256": "974dd809a6d3af7185cb19b341b5cd50a1cee78eb05e57bdc57e3f46c7f41159",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.cpp",
+    "beforeSha256": "f96f50c0a3d4fd6378282041de895af10c474c9bca8645e45691cc646243b2b8",
+    "afterSha256": "eeb95bacaf938aa41afbe29aecf8f8fb1da34d0595fddcc66b9756c64c64018e",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/Render/Passes/Geometry/EnhancedDecalPass.h",
+    "beforeSha256": "b064b8d89050852690a42798140ac192f9f24fdb8077c077c6f90a375abc1096",
+    "afterSha256": "066f77b0f2f4952760a0097cb422da6cd174dcea687818a831270a85916d8c4f",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.cpp",
+    "beforeSha256": "67c2e1c9dae5b7dc59e53820b11c25a145c5c3f6136032ec8d48a3ffcf6d609b",
+    "afterSha256": "0a7f93b518d6599b8b266075df4fa232340ec587d5645fea7aba276974a962a0",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/Render/Scene/EnhancedSceneRendererLiveDX12Adapter.h",
+    "beforeSha256": "feb94eaee5c685f434bd1f5ecc2ac7dd2f41dbae976fbf9091dbf3276fea22c1",
+    "afterSha256": "54cb372b631c86d726d966f9a361bec4f2a079d8cbb0cbebd55f1e83e8e8cc2c",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/Render/Temporal/SpatialPostEffectsHost.cpp",
+    "beforeSha256": "e8c4956edab251df90d9294a016c7911b3381e48ea763ec63786befb2ca35c8d",
+    "afterSha256": "9600956ef7f4477cec4291df3d1bb7b93a73b923d18a5504e63cfa93f1189ba8",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/RenderEngine/UIRenderProxy.h",
+    "beforeSha256": "a6bd65d71c7b90204c57125d27a1ae3cebb1fb1c00f06055d49c4a1daee390a3",
+    "afterSha256": "46ba493a58a7c30f624f8ab4e56cad7df09b60bdb195f4141fd94e4ad83149db",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/SceneRuntime/AIManager.cpp",
+    "beforeSha256": "f513f0da0b25283acbdd7b0901a6eac37be18eda1ff09a52e6b9dbaa775f9bac",
+    "afterSha256": "57a7ce0ddd08809a0986de1309f10e56449accf9106e3a62fc2667456ff0496a",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/SceneRuntime/AIManager.h",
+    "beforeSha256": "1d4c18335f74ef5b56ca86c9c2101beb1833e007fe8665fb41fd0f62cd6b0694",
+    "afterSha256": "3b4ebd32b7c9151983fcc8d7c43826fb3ab6b537b5661de6dba89d9b95c3eb73",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/SceneRuntime/AnimationController.cpp",
+    "beforeSha256": "2bc9953a19a765450ad8443b95817b9d7fcaa94b1c365d0e9c08b34c3d1104de",
+    "afterSha256": "1485bd3cf08526838a838866990fc0393d4444d3a02a9b12226788d6c2d8d960",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/SceneRuntime/AnimationController.h",
+    "beforeSha256": "b1c83e0b61bf54fc511837ba4725ff92859bb29d25d01ccd4c0c18f9c4ff89d4",
+    "afterSha256": "72505a07e0f9172e70f61bf031c46f12cae2c5b5cd927f1963dab5c0b2b09cec",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/SceneRuntime/AnimationState.cpp",
+    "beforeSha256": "a214e287910634ef14a59d6f69ee41067d5283c26c2013ff6662557c5e19f605",
+    "afterSha256": "ca7db27d5a7f632fd58ea4302c2ed2505528eb8427597faa8e47299dfaf365aa",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/SceneRuntime/AnimationState.h",
+    "beforeSha256": "879191f9449bbe49262cc68f078804a84e3ec5a1ea424d3d271851174c264105",
+    "afterSha256": "4c16bbda43dd8eb4f09377bdfe4c53c9f0a6332fb52770ceec50953ad00a42ba",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/SceneRuntime/Animator.cpp",
+    "beforeSha256": "aad738b1952e72c63d98db6362436a6f7770437b012a129bdf04eac8328adfb2",
+    "afterSha256": "14d90ef400ea299cb66b210f732743b43115ac79b07f5b8bfd8682f0a22c2404",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/SceneRuntime/Animator.h",
+    "beforeSha256": "57c85e534775133df24fef802cd6f770d5a964c82cbcb6aef51b74b42973f268",
+    "afterSha256": "1021442a91818a5134a581eb61dcd552fd7718b9cead5dc8faa71dedd324b8be",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/SceneRuntime/BehaviorTreeComponent.cpp",
+    "beforeSha256": "8c362052f5082a23223ccc47f2f02c617778575a9cdf43e5e580658facf06721",
+    "afterSha256": "0d4a669774a73e6de5b67269855e9ce6b727670502fed2b91a6b2d3151828bfd",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/SceneRuntime/Scene.h",
+    "beforeSha256": "e2512e872d7bcf328edb94e30f052e39fed983346aa807a374b339bf7a30634a",
+    "afterSha256": "d15c96f8e1b961a867288ef6abf59accdf64e291207e1c304c9f9a4eb127f6c8",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/SceneRuntime/SceneManager.cpp",
+    "beforeSha256": "1462e5593a1ed1262b6b5b92338bcda1532b40a39c82dd16b1298c8e53c7f4be",
+    "afterSha256": "c4846f0bd4c8a27d1e2129ed90974a03f5f6e11912982016212db08117c66c3b",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/SceneRuntime/SceneManager.h",
+    "beforeSha256": "6f8b686881b292c916290032d2bdc029626a3fde6dffe89fa7a651ff38ef5994",
+    "afterSha256": "b9df383c87490ef2c090bbeca4bdb34beb2048fce2659c009f8769c4532015ef",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/SceneRuntime/StateMachineComponent.cpp",
+    "beforeSha256": "9fec658dfb76312de2af66a573a9077ca6dada6271d4e2f613def151552f51b5",
+    "afterSha256": "21da69493c8051cefc428729e4a256b0de5d9c3a55d45efe3f18b4febaffb2f6",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/SceneRuntime/StateMachineComponent.h",
+    "beforeSha256": "367e1cf7feceea53b78c9bb04bac103b6b43c10e2483d2d98cd8f22d17be9c3e",
+    "afterSha256": "df57e192497064ad7125e37fb9e206bf9021eeaa29b4643964bc138d9e2e5123",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/SceneRuntime/Terrain.cpp",
+    "beforeSha256": "0eb58b4b0f4232625f4ed8c2b10a8fa5df052dacd035fb6298c0d50113e17ceb",
+    "afterSha256": "6bb4363391333b1f213a461d3cbd350cda23e5ec5893808a3d01589194d81022",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/SceneRuntime/TextComponent.h",
+    "beforeSha256": "3e18d163f39c98691fb0337381cffe6b1e326cefd4e5e6a028dc10defb85b875",
+    "afterSha256": "d2cd3fcf4ff23303e2064dcf25ca629233d6285ba8a3add2d6c51ec91e0f128e",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Engine/Utility_Framework/Utility_Framework.vcxproj",
+    "beforeSha256": "46cd753c0e3646fb611a24edfc2fd47562bcf5582047d9fd99f15d93a60495e8",
+    "afterSha256": "1495698e070ce84102ab49f75fe461f46269e3f47d44c857ec5dd00537241930",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Tools/profiling-validation/Resolve-ProfilingSymbolPath.ps1",
+    "beforeSha256": "2eff91f7f5becb02b8ac35f2be892b11adf13625fa16ab444ac0a35749153fdc",
+    "afterSha256": "b05a5b856c24fa563d09c40425c6d7bc518fa3b1143fbeed66c2b4120ab55ad9",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Tools/profiling-validation/export-timeline-native.py",
+    "beforeSha256": "4df4d7474b2b4823b4d79cf70585cd3811c6b9c05431a957ad45ccc9dca6f8ff",
+    "afterSha256": "261fa696a64a0dfcad74f3bba8c061b1f80081555138b9b24d8f1afa95fcb06e",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Tools/regression/summarize-material-profile.py",
+    "beforeSha256": "d9c081c15a55e3d4322a93c99b4069b0dc38b9b48868359b16c523c82900922c",
+    "afterSha256": "20761f0405ee7799f93079b2924c44e11fe6d875e48572ae7f6f08cfc9f3a6de",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Tools/regression/verify-gpu-marker-blob.ps1",
+    "beforeSha256": "4cd0cc47afaad97f0facf47992fa76f3e8b6cb66532b63c53c867d945d21b76f",
+    "afterSha256": "efd0525b22056b38c2418f8ad0efab953b95e66fa6197410b7266f3fc2db4fb5",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Tools/regression/verify-render-ownership.ps1",
+    "beforeSha256": "3834c3f7ed0fcfe490a85baf9888968cb3cb417bc5413ba74bce72d2dd053e86",
+    "afterSha256": "450e5b16cbfcfc735dcf0ef00ce191357187565161451b519fc49ff9cb81323f",
+    "change": "Whitespace only; capture provenance hashes retained."
+  },
+  {
+    "path": "Tools/regression/verify-scene-packet-groups.ps1",
+    "beforeSha256": "0f74907532f62b94e4e4554e6fedbf91396186d752be3e73ab3c7f0a081bddb6",
+    "afterSha256": "67e72a8b2bbe818ae9b7e1036c5dce7cfe65c13e32de16d6987cbaa3b2377d43",
+    "change": "Whitespace only; capture provenance hashes retained."
+  }
+]

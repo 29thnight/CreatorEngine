@@ -378,7 +378,7 @@ namespace experiment
 		// Authored coarse topology plus complete cluster replacement hierarchy.
         // Empty means intentionally disabled/non-reducible, never a decoder fallback.
 		MeshLodChain coarseLods{};
-        std::shared_ptr<const assets::cluster::Archive> clusterArchive{};
+        own::shared_owner<const assets::cluster::Archive> clusterArchive{};
 	};
 
 	// parent 하나만 hierarchy 정본이다. children/count 중복 저장을 없앴고,

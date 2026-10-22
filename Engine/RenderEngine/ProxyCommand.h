@@ -38,17 +38,17 @@ public:
 
 	struct PrimitiveCreate
 	{
-		std::shared_ptr<PrimitiveRenderProxy> proxy{};
+		own::shared_owner<PrimitiveRenderProxy> proxy{};
 	};
 
 	struct LightCreate
 	{
-		std::shared_ptr<LightRenderProxy> proxy{};
+		own::shared_owner<LightRenderProxy> proxy{};
 	};
 
 	struct UICreate
 	{
-		std::shared_ptr<UIRenderProxy> proxy{};
+		own::shared_owner<UIRenderProxy> proxy{};
 	};
 
 	struct PrimitiveDestroy {};
@@ -92,8 +92,8 @@ public:
 		bool isEnabled{ false };
 		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		math::vector3 worldPosition{};
-		std::shared_ptr<TerrainMesh> terrainMesh{};
-		std::shared_ptr<TerrainMaterial> terrainMaterial{};
+		own::shared_owner<TerrainMesh> terrainMesh{};
+		own::shared_owner<TerrainMaterial> terrainMaterial{};
 	};
 
 	struct FoliageUpdate
@@ -179,11 +179,11 @@ public:
 
 public:
 	static ProxyCommand CreatePrimitive(
-		std::shared_ptr<PrimitiveRenderProxy> proxy, uint64_t sceneEpoch);
+		own::shared_owner<PrimitiveRenderProxy> proxy, uint64_t sceneEpoch);
 	static ProxyCommand CreateLight(
-		std::shared_ptr<LightRenderProxy> proxy, uint64_t sceneEpoch);
+		own::shared_owner<LightRenderProxy> proxy, uint64_t sceneEpoch);
 	static ProxyCommand CreateUI(
-		std::shared_ptr<UIRenderProxy> proxy, uint64_t sceneEpoch);
+		own::shared_owner<UIRenderProxy> proxy, uint64_t sceneEpoch);
 	static ProxyCommand DestroyPrimitive(HashedGuid guid, uint64_t sceneEpoch);
 	static ProxyCommand DestroyLight(HashedGuid guid, uint64_t sceneEpoch);
 	static ProxyCommand DestroyUI(HashedGuid guid, uint64_t sceneEpoch);
@@ -196,7 +196,7 @@ public:
 	// 단 한 번 소비한다. 대상이 이미 해제되었거나 타입이 다르면 false로
 	// drop하고 payload를 비운다.
 	ApplyResult Apply(RenderScene& renderScene, uint64_t sceneEpoch,
-		std::shared_ptr<const ce::animation_palette_arena> paletteArena = {},
+		own::shared_owner<const ce::animation_palette_arena> paletteArena = {},
 		std::uint32_t localPaletteOffset = 0);
 	[[nodiscard]] std::pair<std::uint32_t, std::uint32_t> GetPaletteSlice() const noexcept
 	{
@@ -209,7 +209,7 @@ public:
 		if (auto* update = std::get_if<MeshUpdate>(&m_payload); update && update->boneCount)
 			update->paletteOffset += base;
 	}
-	[[nodiscard]] std::shared_ptr<const ce::animation_palette_arena> TakeCaptureArena() noexcept
+	[[nodiscard]] own::shared_owner<const ce::animation_palette_arena> TakeCaptureArena() noexcept
 	{ return std::move(m_captureArena); }
 	uint64_t GetSceneEpoch() const noexcept { return m_sceneEpoch; }
 
@@ -229,7 +229,7 @@ private:
 	Payload		m_payload{};
 	// Producer-side handoff only. CapturePending moves this owner to its batch;
 	// the render-thread command payload contains just offset and count.
-	std::shared_ptr<const ce::animation_palette_arena> m_captureArena{};
+	own::shared_owner<const ce::animation_palette_arena> m_captureArena{};
 };
 
 static_assert(std::is_same_v<decltype(ProxyCommand::MeshUpdate::worldMatrix),
