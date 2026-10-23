@@ -47,7 +47,7 @@ int main()
     scheduler.MarkSubmitted(requests[2], start);
     plan = scheduler.BuildPlan(requests, 3, start + 1000000);
     Expect(!plan.due[0] && plan.due[1] && !plan.due[2], "Scene cadence and preview dirtiness are independent of Game");
-    Expect(scheduler.IsDue(requests[0], start + 16666667), "default Scene cadence reaches 60 Hz");
+    Expect(scheduler.IsDue(requests[0], start + 16666667), "default Scene cadence reaches 60 FPS");
     Expect(!scheduler.IsDue(requests[2], start + 1000000000), "unchanged preview stays cached");
 
     ++requests[2].contentRevision;
@@ -76,8 +76,8 @@ int main()
     requests[0].policy.mode = LiveViewUpdateMode::FixedRate;
     requests[0].policy.framesPerSecond = 30;
     scheduler.MarkSubmitted(requests[0], start);
-    Expect(!scheduler.IsDue(requests[0], start + 20000000), "Host can set Scene to 30 Hz");
-    Expect(scheduler.IsDue(requests[0], start + 33333334), "30 Hz becomes due after its interval");
+    Expect(!scheduler.IsDue(requests[0], start + 20000000), "Host can set Scene to 30 FPS");
+    Expect(scheduler.IsDue(requests[0], start + 33333334), "30 FPS becomes due after its interval");
     Expect(scheduler.IsDue(requests[0], start - 1), "clock rollback cannot permanently stall a view");
 
     // 매 틱 credit이 하나뿐이어도 계속 바뀌는 Game 입력이 다른 뷰를 굶기지 않는다.
@@ -105,6 +105,68 @@ int main()
            "invalid identities and oversized counts stay within bounded storage");
     scheduler.Reset();
     Expect(scheduler.IsDue(requests[2], start), "backend rebuild invalidates previous admissions");
+    // Host cadence includes variable submission work and alternating +/-0.4 ms jitter.
+    scheduler.Reset();
+    requests = Requests();
+    uint32_t rendered{};
+    constexpr uint64_t interval = 16666667;
+    for (uint32_t frame = 0; frame < 600; ++frame)
+    {
+        const uint64_t now = start + frame * interval + (frame % 2 == 0 ? 400000 : 0);
+        plan = scheduler.BuildPlan(requests, 1, now);
+        if (plan.due[0])
+        {
+            // Commit occurs later, but cadence consumes the original planning timestamp.
+            scheduler.MarkSubmitted(requests[0], plan.scheduledAt);
+            ++rendered;
+        }
+        const uint64_t completedAt = now + (frame % 3 + 1) * 1000000;
+        Expect(!scheduler.IsDue(requests[0], completedAt), "submission work does not request another frame");
+    }
+    Expect(rendered == 600, "60 FPS host ticks retain 60 FPS Scene cadence with jitter and submission work");
+    const uint64_t stalledAt = start + 20000000000ull;
+    plan = scheduler.BuildPlan(requests, 1, stalledAt);
+    Expect(plan.due[0], "a long stall admits one current frame");
+    scheduler.MarkSubmitted(requests[0], plan.scheduledAt);
+    Expect(!scheduler.IsDue(requests[0], stalledAt), "missed deadlines never cause catch-up bursts");
+    plan = scheduler.BuildPlan(requests, 1, stalledAt + interval);
+    Expect(plan.due[0], "cadence resumes on the next host tick after a stall");
+    Expect(scheduler.IsDue(requests[0], stalledAt + interval + 1000000), "failed submission leaves the deadline due");
+    scheduler.MarkSubmitted(requests[0], plan.scheduledAt);
+    requests[0].force = true;
+    plan = scheduler.BuildPlan(requests, 1, stalledAt + interval + 1000000);
+    Expect(plan.due[0], "forced capture bypasses cadence");
+    scheduler.MarkSubmitted(requests[0], plan.scheduledAt);
+    requests[0].force = false;
+    Expect(!scheduler.IsDue(requests[0], plan.scheduledAt + 2000000), "forced capture starts a fresh interval");
+    scheduler.Reset();
+    requests = Requests();
+    requests[0].policy.mode = LiveViewUpdateMode::FixedRate;
+    requests[0].policy.framesPerSecond = 30;
+    rendered = 0;
+    for (uint32_t frame = 0; frame < 600; ++frame)
+    {
+        plan = scheduler.BuildPlan(requests, 1, start + frame * interval);
+        if (plan.due[0])
+        {
+            scheduler.MarkSubmitted(requests[0], plan.scheduledAt);
+            ++rendered;
+        }
+    }
+    Expect(rendered == 300, "explicit 30 FPS policy remains limited to 30 FPS on a 60 FPS host");
+    scheduler.Reset();
+    requests = Requests();
+    rendered = 0;
+    for (uint32_t frame = 0; frame < 1200; ++frame)
+    {
+        plan = scheduler.BuildPlan(requests, 1, start + frame * 8333334ull);
+        if (plan.due[0])
+        {
+            scheduler.MarkSubmitted(requests[0], plan.scheduledAt);
+            ++rendered;
+        }
+    }
+    Expect(rendered == 600, "120 FPS host does not exceed the Scene 60 FPS policy");
     std::printf("LiveViewScheduling: %s\n", failures == 0 ? "PASS" : "FAIL");
     return failures == 0 ? 0 : 1;
 }

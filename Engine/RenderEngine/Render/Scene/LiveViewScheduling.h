@@ -51,6 +51,7 @@ class LiveViewScheduler
         std::array<uint32_t, Capacity> order{};
         std::array<bool, Capacity> due{};
         uint32_t count{};
+        uint64_t scheduledAt{};
     };
 
     static LiveViewUpdatePolicy ResolvePolicy(const LiveViewScheduleRequest& request)
@@ -93,12 +94,21 @@ class LiveViewScheduler
         {
             return true;
         }
-        return now < state.submittedAt || now - state.submittedAt >= 1000000000ull / policy.framesPerSecond;
+        const uint64_t interval = 1000000000ull / policy.framesPerSecond;
+        // Accept bounded host-tick jitter without moving the fixed-rate deadline.
+        const uint64_t tolerance = (std::min)(interval / 16, uint64_t{1000000});
+        if (now < state.submittedAt)
+        {
+            return true;
+        }
+        return now - state.submittedAt >= interval - tolerance &&
+               (now >= state.nextDueAt || state.nextDueAt - now <= tolerance);
     }
 
     Plan BuildPlan(const std::array<LiveViewScheduleRequest, Capacity>& requests, uint32_t count, uint64_t now)
     {
         Plan plan;
+        plan.scheduledAt = now;
         plan.count = (std::min)(count, Capacity);
         std::array<bool, Capacity> overdue{};
         for (uint32_t index = 0; index < plan.count; ++index)
@@ -171,6 +181,24 @@ class LiveViewScheduler
             return;
         }
         auto& state = m_states[request.target];
+        const auto policy = ResolvePolicy(request);
+        if (policy.mode == LiveViewUpdateMode::FixedRate && policy.framesPerSecond != 0)
+        {
+            const uint64_t interval = (std::max)(uint64_t{1}, 1000000000ull / policy.framesPerSecond);
+            if (!state.submitted || !Matches(state.request, request) || request.force || now < state.submittedAt)
+            {
+                state.nextDueAt = now + interval;
+            }
+            else if (now >= state.nextDueAt)
+            {
+                // Skip missed deadlines; never queue a burst of catch-up frames.
+                state.nextDueAt += ((now - state.nextDueAt) / interval + 1) * interval;
+            }
+            else
+            {
+                state.nextDueAt += interval;
+            }
+        }
         state.request = request;
         state.submittedAt = now;
         state.submitted = true;
@@ -186,6 +214,7 @@ class LiveViewScheduler
     {
         LiveViewScheduleRequest request{};
         uint64_t submittedAt{};
+        uint64_t nextDueAt{};
         uint64_t waitingSince{};
         uint64_t waitingViewId{};
         bool submitted{};

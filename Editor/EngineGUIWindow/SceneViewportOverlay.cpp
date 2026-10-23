@@ -11,6 +11,21 @@
 #include "EditorClipContract.h"
 #include "EditorStateContract.h"
 
+void editor::DrawRenderViewFpsBadge(const char* viewName, float fps, ImVec2 clipMin, ImVec2 clipMax)
+{
+    char label[64]{};
+    std::snprintf(label, sizeof(label), "%s FPS %.1f", viewName, fps);
+    const ImVec2 size = ImGui::CalcTextSize(label);
+    const float pad = ThemePixels(7.f);
+    const ImVec2 max{clipMax.x - pad, clipMax.y - pad};
+    const ImVec2 min{max.x - size.x - 2.f * pad, max.y - size.y - 2.f * pad};
+    auto* draw = ImGui::GetWindowDrawList();
+    draw->PushClipRect(clipMin, clipMax, true);
+    draw->AddRectFilled(min, max, IM_COL32(18, 21, 25, 205), ThemePixels(4.f));
+    draw->AddText({min.x + pad, min.y + pad}, IM_COL32(235, 239, 244, 255), label);
+    draw->PopClipRect();
+}
+
 namespace editor::scene_overlay_detail
 {
     std::mutex snapshotMutex;
@@ -161,7 +176,7 @@ void editor::SceneViewportOverlay::Draw(
     };
     const auto showMenu = [&] {
         ImGui::MenuItem("Orientation gizmo", nullptr, &showViewGizmo);
-        ImGui::MenuItem("View update rate", nullptr, &showFps);
+        ImGui::MenuItem("FPS", nullptr, &showFps);
         ImGui::MenuItem("SkyBox", nullptr, &showSkyBox);
         if (ImGui::MenuItem("Grid settings")) open_window(EditorWindowName::kGridSettings);
         ImGui::MenuItem("Render Statistics", nullptr, &showStatistics);
@@ -349,7 +364,7 @@ void editor::SceneViewportOverlay::Draw(
                 proof.renderExtent.width, proof.renderExtent.height,
                 proof.displayExtent.width, proof.displayExtent.height,
                 static_cast<unsigned long long>(scene.completedFrameId - costs.lastGpuFrameId));
-        std::snprintf(label, sizeof(label), "%u x %u   View updates %.1f/s\nEnhanced / %s   %s\n%s",
+        std::snprintf(label, sizeof(label), "%u x %u   Scene FPS %.1f\nEnhanced / %s   %s\n%s",
             scene.completedWidth, scene.completedHeight, sceneFps, displayed.backend == EnhancedLiveBackend::Vulkan ? "Vulkan" : "DX12",
             scene.ready ? "ready" : "preparing", gpu);
         const ImVec2 textSize = ImGui::CalcTextSize(label);
@@ -364,15 +379,7 @@ void editor::SceneViewportOverlay::Draw(
     }
     if (showFps && !showStatistics && canvas.valid)
     {
-        char label[48]{};
-        std::snprintf(label, sizeof(label), "Scene updates %.1f/s", sceneFps);
-        const ImVec2 size = ImGui::CalcTextSize(label);
-        const float pad = ThemePixels(7.f);
-        const ImVec2 max{imageMax.x - pad, imageMax.y - pad};
-        const ImVec2 min{max.x - size.x - 2.f * pad, max.y - size.y - 2.f * pad};
-        auto* draw = ImGui::GetWindowDrawList();
-        draw->AddRectFilled(min, max, IM_COL32(18, 21, 25, 205), ThemePixels(4.f));
-        draw->AddText({min.x + pad, min.y + pad}, IM_COL32(235, 239, 244, 255), label);
+        DrawRenderViewFpsBadge("Scene", sceneFps, canvas.clipMin, canvas.clipMax);
     }
     ImGui::SetCursorScreenPos(savedCursor);
     ImGui::Dummy({0.f, 0.f}); // Complete the restored cursor's layout item (ImGui 1.92).

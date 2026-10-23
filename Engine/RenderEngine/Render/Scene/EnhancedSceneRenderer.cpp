@@ -10538,7 +10538,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
                  (!viewPacket.materialPreview || p.Execution().graphInput->Draws()[0].material->representationId ==
                                                      viewPacket.materialPreview->instance->representationId)))
             {
-                state.viewScheduler.MarkSubmitted(viewScheduleRequests[packetViewIndex], capture_steady_nanoseconds());
+                state.viewScheduler.MarkSubmitted(viewScheduleRequests[packetViewIndex], viewPlan.scheduledAt);
             }
             // W8: 인코더가 버린 명령을 프레임마다 비우며 모은다. 성공한 프레임에
             // 쌓이는 것이 특히 중요하다 — 실패 경로는 이미 소리를 내지만 이쪽은
@@ -10944,7 +10944,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         if (viewPacket.displayTarget != EnhancedLiveDisplayTarget::MaterialPreview ||
             view->slots[renderSlot].previewComplete)
         {
-            state.viewScheduler.MarkSubmitted(viewScheduleRequests[packetViewIndex], capture_steady_nanoseconds());
+            state.viewScheduler.MarkSubmitted(viewScheduleRequests[packetViewIndex], viewPlan.scheduledAt);
         }
         ++totalPending;
         state.gpuMaxPendingSubmissions = (std::max)(

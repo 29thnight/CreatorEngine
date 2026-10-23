@@ -1,4 +1,6 @@
 #include "GameViewWindow.h"
+#include "RenderViewFps.h"
+#include "SceneViewportOverlay.h"
 #include "RHI/ScreenSizedResource.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "EditorIcons.h"
@@ -22,7 +24,10 @@ void editor::windows::draw_game_view()
 {
 	const ImVec2 contentMin = ImGui::GetCursorScreenPos();
 	const ImVec2 contentSize = ImGui::GetContentRegionAvail();
-	if (contentSize.x <= 0.f || contentSize.y <= 0.f) return;
+	if (contentSize.x <= 0.f || contentSize.y <= 0.f)
+	{
+		return;
+	}
 
 	const auto displayed =
 		EnhancedSceneRenderer::GetLiveDisplayTexture(EnhancedLiveDisplayTarget::Game);
@@ -36,15 +41,18 @@ void editor::windows::draw_game_view()
 	// 활성 항목으로 잡아야 글자 입력이 끊기고 소유권이 게임으로 넘어간다.
 	// Scene 은 기즈모를 위해 Dummy 로 두지만 Game 은 그럴 이유가 없다.
 	ImGui::InvisibleButton("##Editor.GameCanvas", contentSize);
-	if (ImGui::IsItemClicked(ImGuiMouseButton_Left)) note_game_canvas_clicked();
+	if (ImGui::IsItemClicked(ImGuiMouseButton_Left))
+	{
+		note_game_canvas_clicked();
+	}
 	auto* draw = ImGui::GetWindowDrawList();
 
 	// 2단 신호를 그대로 쓴다(계획서 W4). `active` 는 "그릴 카메라가 있는가",
 	// 텍스처 ID 는 "그림이 준비됐는가" 다 — 둘은 다른 프레임에 참이 된다.
-	const EnhancedLiveDisplaySnapshot displaySnapshot =
-		EnhancedSceneRenderer::GetLiveDisplaySnapshot();
-	const EnhancedLiveDisplayEntrySnapshot& gameDisplay =
-		displaySnapshot.Get(EnhancedLiveDisplayTarget::Game);
+	const auto& gameDisplay = displayed.frame;
+    static editor::RenderViewFps gameFps;
+    const float fps = gameFps.Update(gameDisplay.promotionCount, gameDisplay.key.viewId,
+        gameDisplay.completedSceneEpoch, gameDisplay.active && gameDisplay.ready, ImGui::GetTime());
 
 	// 그림이 없을 때의 자리는 content 전체다. 캔버스가 무효인 경우(타깃이 아직
 	// 0×0)도 여기로 온다 — 사각형을 억지로 만들지 않는다.
@@ -68,6 +76,10 @@ void editor::windows::draw_game_view()
 	{
 		draw->AddImage(displayed.textureId, canvas.clipMin, canvas.clipMax,
 			canvas.uvMin, canvas.uvMax);
+        if (editor::ReadSceneOverlaySnapshot().fpsVisible)
+        {
+            editor::DrawRenderViewFpsBadge("Game", fps, canvas.clipMin, canvas.clipMax);
+        }
 		return;
 	}
 	draw->AddRectFilled(rectMin, rectMax, ImGui::GetColorU32(ImVec4(0.08f, 0.08f, 0.09f, 1.f)));

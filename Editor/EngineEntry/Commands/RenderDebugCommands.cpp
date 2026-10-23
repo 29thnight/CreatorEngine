@@ -733,6 +733,7 @@ namespace ConsoleCmd
             target.Set("active", CommandData::Bool(entry.active));
             target.Set("ready", CommandData::Bool(entry.ready));
             target.Set("completedFrame", CommandData::Int(entry.completedFrameId));
+            target.Set("promotionCount", CommandData::Int(entry.promotionCount));
             target.Set("completedCaptureAgeMs", CommandData::Double(entry.completedAgeMs));
             target.Set("lastTextureCaptureAgeMs", CommandData::Double(entry.lastTextureAgeMs));
             target.Set("sourceFrame", CommandData::Int(entry.sourceFrameId));

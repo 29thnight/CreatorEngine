@@ -1,6 +1,7 @@
 #pragma once
 #include "ImGui.h"
 #include "SceneViewportOverlay.h"
+#include "RenderViewFps.h"
 #include "EditorViewportCanvas.h"
 #include "EntityHandle.h"
 #include "SceneGC.h"
@@ -74,9 +75,7 @@ private:
 	Camera* m_editorCamera{ nullptr };
 	editor::SceneViewportOverlay m_overlay;
     editor::ViewportCanvas m_canvas;
-	std::uint64_t m_lastScenePromotionCount{};
-	double m_lastSceneFpsSampleTime{};
-	float m_sceneFps{};
+	editor::RenderViewFps m_sceneFps;
 	EditorCameraRig* m_editorCameraRig{ nullptr };
 	GizmoRenderer* m_gizmoRenderer{ nullptr };
 

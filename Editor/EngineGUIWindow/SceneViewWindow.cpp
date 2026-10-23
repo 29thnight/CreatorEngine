@@ -167,22 +167,8 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
     // 똑같이 빈 검정으로 보였다 — 모드가 하나로 합쳐진 뒤에는 그 구분이 더 필요하다.
     // 별도 조회를 하면 Image를 취득한 뒤 승격된 다른 프레임의 신원이 섞인다.
     const auto& sceneDisplay = displayed.frame;
-    const double now = ImGui::GetTime();
-    if (!sceneDisplay.active || !sceneDisplay.ready ||
-        sceneDisplay.promotionCount < m_lastScenePromotionCount ||
-        now - m_lastSceneFpsSampleTime > 2.0)
-    {
-        m_lastScenePromotionCount = sceneDisplay.promotionCount;
-        m_lastSceneFpsSampleTime = now;
-        m_sceneFps = 0.f;
-    }
-    else if (now - m_lastSceneFpsSampleTime >= 0.5)
-    {
-        m_sceneFps = static_cast<float>(sceneDisplay.promotionCount - m_lastScenePromotionCount) /
-            static_cast<float>(now - m_lastSceneFpsSampleTime);
-        m_lastScenePromotionCount = sceneDisplay.promotionCount;
-        m_lastSceneFpsSampleTime = now;
-    }
+    const float sceneFps = m_sceneFps.Update(sceneDisplay.promotionCount, sceneDisplay.key.viewId,
+        sceneDisplay.completedSceneEpoch, sceneDisplay.active && sceneDisplay.ready, ImGui::GetTime());
     if (!sceneDisplay.active)
     {
         const char* noCamera = "No editor camera";
@@ -199,7 +185,7 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
     }
     ImGuizmo::BeginFrame();
     ImGuizmo::SetDrawlist();
-    m_overlay.Draw(*m_editorCameraRig, m_gizmoRenderer, m_canvas, m_sceneFps, displayed);
+    m_overlay.Draw(*m_editorCameraRig, m_gizmoRenderer, m_canvas, sceneFps, displayed);
     // 카메라 조작에는 content 사각형과 PT 입력만 필요하다. 표시 결과가 없거나
     // 오래됐다는 이유로 다음 카메라 스냅샷을 만드는 조작까지 막지 않는다.
     const ImVec2 inputMin = m_canvas.valid ? m_canvas.clipMin : m_canvas.contentMin;

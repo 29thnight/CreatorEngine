@@ -43,6 +43,8 @@ namespace editor
         return r;
     }
 
+    void DrawRenderViewFpsBadge(const char* viewName, float fps, ImVec2 clipMin, ImVec2 clipMax);
+
     struct SceneViewportOverlay
     {
         int operation{1}; // Select, Move, Rotate, Scale
