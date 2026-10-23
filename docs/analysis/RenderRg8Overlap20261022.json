@@ -1,0 +1,1404 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-22",
+  "phase": "4.3",
+  "task": "RG8 product insufficient-gain diagnosis, topology reuse and whole-frame OFF/ON comparison",
+  "status": "progress",
+  "defaultQueueMode": 0,
+  "adoptionEstablished": false,
+  "acceptedDays": 0,
+  "scopeComplete": 3,
+  "scopeTotal": 5,
+  "binary": {
+    "exe": "B24E07E9277AE98F170FF252E49A9824D6B42B218EEBEE548E62CDD6E391F8A8",
+    "head": "ea87639ece7b6068456940ddddd83a9d23f86c58",
+    "configuration": "Release",
+    "runtime": "768C94A43612FECC479BB5F1CA6E0945C647809185B8D569E4F28DE92A8847CE"
+  },
+  "scene": "C:\\Users\\lance\\source\\CreatorEngine\\Dynamic_CPP\\Assets\\Scenes\\TestShadow.creator",
+  "sceneSha256": "AE83C01C07F82058F6ACD5DF6D22E4CFEFF5F4E9CDAC8175A518C9C69ABBD137",
+  "nativeRenderSize": [
+    972,
+    394
+  ],
+  "windowSize": [
+    1600,
+    900
+  ],
+  "gpu": "NVIDIA GeForce RTX 4070 Ti",
+  "driver": "610.88",
+  "causalFindings": [
+    "The preceding viewer experiment used empty SampleScene; initial complete-history snapshot with 23 eligible candidates failed final modeled-gain gate, not state legality.",
+    "Actual warmed TestShadow submitted compute in all 64 chronological mode-2 samples for each binary.",
+    "Measured overlap is positive but 48 batches, 23 waits and roughly 1968 barriers cost more than graphics-only owned execution.",
+    "The model prices measured pass durations and fixed 20us handoffs; explicit CPU/batch/barrier calibration is absent."
+  ],
+  "implementation": {
+    "topologyCacheEntries": 128,
+    "maxCachedPasses": 256,
+    "maxCachedEdges": 4096,
+    "exactStructureAndQueueKey": true,
+    "excludeQueueOverriddenOrder": true,
+    "retainedThreadScratch": true,
+    "placementAndGpuOwnershipUnchanged": true
+  },
+  "acceptedNormalSamples": 384,
+  "recordedCpuWindowSeconds": 12,
+  "normalAndRecordedWindowsSeparate": true,
+  "before": {
+    "axis": "complete-RenderThreadFrame-cpu-wall-time",
+    "runs": {
+      "Forward-0": {
+        "sha256": "017399b8d1313255ca1a22e81f1e9de9f2f554fec166dea6f8414528c785ddb0",
+        "frames": 732,
+        "wholeRenderThread": {
+          "thread": "[RenderThread]",
+          "name": "RenderThreadFrame",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 730,
+          "perEngineFrame": 3.178633879781421,
+          "mean": 3.187342465753425,
+          "p50": 3.1557500000000003,
+          "p95": 3.6996,
+          "max": 4.491
+        },
+        "renderGroups": [
+          {
+            "frameKind": 1,
+            "viewId": 1,
+            "sceneEpoch": 3,
+            "renderWidth": 972,
+            "renderHeight": 394,
+            "displayWidth": 972,
+            "displayHeight": 394,
+            "upscaler": 0,
+            "frameGenerator": 0,
+            "resolutionState": 1,
+            "spatialMode": 0,
+            "deepDvcApplied": 0,
+            "realFrameCount": 728,
+            "cpuRenderSubmitMs": {
+              "mean": 2.780909752747253,
+              "p50": 2.74275,
+              "p95": 3.2306,
+              "max": 4.1157
+            },
+            "cpuSamples": 728,
+            "gpuPassMs": {
+              "mean": 0.04124967052874662,
+              "p50": 0.0041,
+              "p95": 0.1341,
+              "max": 1.1633
+            },
+            "gpuPassSamples": 100464
+          }
+        ],
+        "gpuQueueSpanMs": {
+          "mean": 5.840119,
+          "p50": 5.857279999999999,
+          "p95": 6.19008,
+          "max": 6.201344
+        },
+        "measuredOverlapMs": {
+          "mean": 0,
+          "p50": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "positiveOverlapFrames": 0,
+        "cpuFullGraphMs": {
+          "mean": 2.7657875,
+          "p50": 2.64555,
+          "p95": 3.5402,
+          "max": 3.9318
+        },
+        "cpuScheduleMs": null,
+        "cpuDependencyMs": null,
+        "cpuSimulationMs": null,
+        "computeFrames": 0,
+        "insufficientGainFrames": 0
+      },
+      "Forward-1": {
+        "sha256": "8670c7cd99df55e9f50165b4dcf9a9c87b8f63f7e29457875c08b12913f61678",
+        "frames": 741,
+        "wholeRenderThread": {
+          "thread": "[RenderThread]",
+          "name": "RenderThreadFrame",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 739,
+          "perEngineFrame": 4.7802775978407555,
+          "mean": 4.793214749661705,
+          "p50": 4.6106,
+          "p95": 5.6823,
+          "max": 29.5508
+        },
+        "renderGroups": [
+          {
+            "frameKind": 1,
+            "viewId": 1,
+            "sceneEpoch": 3,
+            "renderWidth": 972,
+            "renderHeight": 394,
+            "displayWidth": 972,
+            "displayHeight": 394,
+            "upscaler": 0,
+            "frameGenerator": 0,
+            "resolutionState": 1,
+            "spatialMode": 0,
+            "deepDvcApplied": 0,
+            "realFrameCount": 737,
+            "cpuRenderSubmitMs": {
+              "mean": 4.40853487109905,
+              "p50": 4.2081,
+              "p95": 5.2765,
+              "max": 29.2216
+            },
+            "cpuSamples": 737,
+            "gpuPassMs": {
+              "mean": 0.040347347864432406,
+              "p50": 0.0031,
+              "p95": 0.13,
+              "max": 1.1765
+            },
+            "gpuPassSamples": 103181
+          }
+        ],
+        "gpuQueueSpanMs": {
+          "mean": 5.80676,
+          "p50": 5.766655999999999,
+          "p95": 6.189056,
+          "max": 6.272063999999999
+        },
+        "measuredOverlapMs": {
+          "mean": 0,
+          "p50": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "positiveOverlapFrames": 0,
+        "cpuFullGraphMs": {
+          "mean": 4.55359375,
+          "p50": 4.529999999999999,
+          "p95": 5.5755,
+          "max": 5.9123
+        },
+        "cpuScheduleMs": {
+          "mean": 0.0263,
+          "p50": 0.0236,
+          "p95": 0.0351,
+          "max": 0.0417
+        },
+        "cpuDependencyMs": {
+          "mean": 0,
+          "p50": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "cpuSimulationMs": {
+          "mean": 0,
+          "p50": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "computeFrames": 0,
+        "insufficientGainFrames": 0
+      },
+      "Forward-2": {
+        "sha256": "794a11050337a203fccf82893dc48201cdaf005298ebe635c54feed028807395",
+        "frames": 740,
+        "wholeRenderThread": {
+          "thread": "[RenderThread]",
+          "name": "RenderThreadFrame",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 738,
+          "perEngineFrame": 11.990121756756757,
+          "mean": 12.022615311653116,
+          "p50": 11.9466,
+          "p95": 15.0874,
+          "max": 18.1965
+        },
+        "renderGroups": [
+          {
+            "frameKind": 1,
+            "viewId": 1,
+            "sceneEpoch": 3,
+            "renderWidth": 972,
+            "renderHeight": 394,
+            "displayWidth": 972,
+            "displayHeight": 394,
+            "upscaler": 0,
+            "frameGenerator": 0,
+            "resolutionState": 1,
+            "spatialMode": 0,
+            "deepDvcApplied": 0,
+            "realFrameCount": 734,
+            "cpuRenderSubmitMs": {
+              "mean": 11.668018392370572,
+              "p50": 11.5816,
+              "p95": 14.7859,
+              "max": 17.8434
+            },
+            "cpuSamples": 734,
+            "gpuPassMs": {
+              "mean": 0.038565239253063606,
+              "p50": 0.0041,
+              "p95": 0.0799,
+              "max": 1.5011
+            },
+            "gpuPassSamples": 102820
+          }
+        ],
+        "gpuQueueSpanMs": {
+          "mean": 7.18983125,
+          "p50": 7.2095,
+          "p95": 7.948200000000001,
+          "max": 7.9564
+        },
+        "measuredOverlapMs": {
+          "mean": 0.160059375,
+          "p50": 0.1493,
+          "p95": 0.302,
+          "max": 0.3514
+        },
+        "positiveOverlapFrames": 30,
+        "cpuFullGraphMs": {
+          "mean": 12.05985625,
+          "p50": 11.7411,
+          "p95": 14.6113,
+          "max": 15.0865
+        },
+        "cpuScheduleMs": {
+          "mean": 3.767490625,
+          "p50": 3.693,
+          "p95": 4.4983,
+          "max": 5.1932
+        },
+        "cpuDependencyMs": {
+          "mean": 2.213940625,
+          "p50": 2.1261,
+          "p95": 2.8483000000000005,
+          "max": 3.4238
+        },
+        "cpuSimulationMs": {
+          "mean": 1.0264125,
+          "p50": 1.0062000000000002,
+          "p95": 1.1683,
+          "max": 1.2447000000000001
+        },
+        "computeFrames": 32,
+        "insufficientGainFrames": 0
+      },
+      "Reverse-0": {
+        "sha256": "ad953eedde372ca18f3b60df383c0b2b653bf1eff2798ab3203030af36abd87b",
+        "frames": 729,
+        "wholeRenderThread": {
+          "thread": "[RenderThread]",
+          "name": "RenderThreadFrame",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 727,
+          "perEngineFrame": 3.2239526748971192,
+          "mean": 3.232821870701513,
+          "p50": 3.1897,
+          "p95": 3.7945,
+          "max": 4.5291
+        },
+        "renderGroups": [
+          {
+            "frameKind": 1,
+            "viewId": 1,
+            "sceneEpoch": 3,
+            "renderWidth": 972,
+            "renderHeight": 394,
+            "displayWidth": 972,
+            "displayHeight": 394,
+            "upscaler": 0,
+            "frameGenerator": 0,
+            "resolutionState": 1,
+            "spatialMode": 0,
+            "deepDvcApplied": 0,
+            "realFrameCount": 725,
+            "cpuRenderSubmitMs": {
+              "mean": 2.819192,
+              "p50": 2.7567,
+              "p95": 3.3742,
+              "max": 4.1814
+            },
+            "cpuSamples": 725,
+            "gpuPassMs": {
+              "mean": 0.04105726836581709,
+              "p50": 0.0041,
+              "p95": 0.128,
+              "max": 1.195
+            },
+            "gpuPassSamples": 100050
+          }
+        ],
+        "gpuQueueSpanMs": {
+          "mean": 5.70994,
+          "p50": 5.684735999999999,
+          "p95": 6.054816,
+          "max": 6.213632
+        },
+        "measuredOverlapMs": {
+          "mean": 0,
+          "p50": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "positiveOverlapFrames": 0,
+        "cpuFullGraphMs": {
+          "mean": 2.79675,
+          "p50": 2.7943499999999997,
+          "p95": 3.306,
+          "max": 3.3628
+        },
+        "cpuScheduleMs": null,
+        "cpuDependencyMs": null,
+        "cpuSimulationMs": null,
+        "computeFrames": 0,
+        "insufficientGainFrames": 0
+      },
+      "Reverse-1": {
+        "sha256": "659d0f9e54dfa20d795689e4d5b51e8ee923cde1de76911712db2765d49ac83d",
+        "frames": 737,
+        "wholeRenderThread": {
+          "thread": "[RenderThread]",
+          "name": "RenderThreadFrame",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 735,
+          "perEngineFrame": 4.805449118046133,
+          "mean": 4.818525170068027,
+          "p50": 4.6743,
+          "p95": 5.822,
+          "max": 29.5816
+        },
+        "renderGroups": [
+          {
+            "frameKind": 1,
+            "viewId": 1,
+            "sceneEpoch": 3,
+            "renderWidth": 972,
+            "renderHeight": 394,
+            "displayWidth": 972,
+            "displayHeight": 394,
+            "upscaler": 0,
+            "frameGenerator": 0,
+            "resolutionState": 1,
+            "spatialMode": 0,
+            "deepDvcApplied": 0,
+            "realFrameCount": 733,
+            "cpuRenderSubmitMs": {
+              "mean": 4.460690040927695,
+              "p50": 4.2935,
+              "p95": 5.4702,
+              "max": 29.2563
+            },
+            "cpuSamples": 733,
+            "gpuPassMs": {
+              "mean": 0.04065647966790423,
+              "p50": 0.0041,
+              "p95": 0.128,
+              "max": 1.2595
+            },
+            "gpuPassSamples": 102621
+          }
+        ],
+        "gpuQueueSpanMs": {
+          "mean": 5.73152,
+          "p50": 5.699071999999999,
+          "p95": 6.002688,
+          "max": 6.490112
+        },
+        "measuredOverlapMs": {
+          "mean": 0,
+          "p50": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "positiveOverlapFrames": 0,
+        "cpuFullGraphMs": {
+          "mean": 4.6537625,
+          "p50": 4.31975,
+          "p95": 5.6268,
+          "max": 9.1673
+        },
+        "cpuScheduleMs": {
+          "mean": 0.026153125,
+          "p50": 0.0239,
+          "p95": 0.0337,
+          "max": 0.0505
+        },
+        "cpuDependencyMs": {
+          "mean": 0,
+          "p50": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "cpuSimulationMs": {
+          "mean": 0,
+          "p50": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "computeFrames": 0,
+        "insufficientGainFrames": 0
+      },
+      "Reverse-2": {
+        "sha256": "9621f192bac76a56bbc82d03c8e1f8c13a0034c81d74c786b7a804817c106b5b",
+        "frames": 728,
+        "wholeRenderThread": {
+          "thread": "[RenderThread]",
+          "name": "RenderThreadFrame",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 726,
+          "perEngineFrame": 11.260405631868132,
+          "mean": 11.291426033057851,
+          "p50": 11.44445,
+          "p95": 13.2146,
+          "max": 16.2784
+        },
+        "renderGroups": [
+          {
+            "frameKind": 1,
+            "viewId": 1,
+            "sceneEpoch": 3,
+            "renderWidth": 972,
+            "renderHeight": 394,
+            "displayWidth": 972,
+            "displayHeight": 394,
+            "upscaler": 0,
+            "frameGenerator": 0,
+            "resolutionState": 1,
+            "spatialMode": 0,
+            "deepDvcApplied": 0,
+            "realFrameCount": 724,
+            "cpuRenderSubmitMs": {
+              "mean": 10.916269889502763,
+              "p50": 11.063749999999999,
+              "p95": 12.8653,
+              "max": 15.9872
+            },
+            "cpuSamples": 724,
+            "gpuPassMs": {
+              "mean": 0.03732404921038623,
+              "p50": 0.004,
+              "p95": 0.0768,
+              "max": 1.4787
+            },
+            "gpuPassSamples": 101442
+          }
+        ],
+        "gpuQueueSpanMs": {
+          "mean": 7.0762875,
+          "p50": 6.952500000000001,
+          "p95": 7.8826,
+          "max": 8.339400000000001
+        },
+        "measuredOverlapMs": {
+          "mean": 0.20069687500000002,
+          "p50": 0.20515,
+          "p95": 0.5218,
+          "max": 0.5223
+        },
+        "positiveOverlapFrames": 31,
+        "cpuFullGraphMs": {
+          "mean": 11.065434375,
+          "p50": 10.859100000000002,
+          "p95": 13.2035,
+          "max": 13.9533
+        },
+        "cpuScheduleMs": {
+          "mean": 3.7921625,
+          "p50": 3.6929499999999997,
+          "p95": 4.8181,
+          "max": 5.561
+        },
+        "cpuDependencyMs": {
+          "mean": 2.21064375,
+          "p50": 2.12265,
+          "p95": 3.0463000000000005,
+          "max": 3.3103000000000016
+        },
+        "cpuSimulationMs": {
+          "mean": 1.046009375,
+          "p50": 1.0136500000000002,
+          "p95": 1.2698,
+          "max": 1.672
+        },
+        "computeFrames": 32,
+        "insufficientGainFrames": 0
+      }
+    },
+    "comparisons": [
+      {
+        "order": "Forward",
+        "mode": 1,
+        "p50Percent": 46.101560643270204,
+        "p95Percent": 53.59228024651313
+      },
+      {
+        "order": "Forward",
+        "mode": 2,
+        "p50Percent": 278.5661094826903,
+        "p95Percent": 307.81165531408806
+      },
+      {
+        "order": "Reverse",
+        "mode": 1,
+        "p50Percent": 46.543562090478716,
+        "p95Percent": 53.432599815522465
+      },
+      {
+        "order": "Reverse",
+        "mode": 2,
+        "p50Percent": 258.79393046367994,
+        "p95Percent": 248.2566873105811
+      }
+    ],
+    "presentationOrDisplayFps": false
+  },
+  "after": {
+    "axis": "complete-RenderThreadFrame-cpu-wall-time",
+    "runs": {
+      "Forward-0": {
+        "sha256": "c3bdc6221a2f931e63826659df22675fcd2cd7b6910b4eed44712a6ab8779d0a",
+        "frames": 738,
+        "wholeRenderThread": {
+          "thread": "[RenderThread]",
+          "name": "RenderThreadFrame",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 736,
+          "perEngineFrame": 3.5204981029810294,
+          "mean": 3.5300646739130435,
+          "p50": 3.44695,
+          "p95": 4.1115,
+          "max": 26.0745
+        },
+        "renderGroups": [
+          {
+            "frameKind": 1,
+            "viewId": 1,
+            "sceneEpoch": 3,
+            "renderWidth": 972,
+            "renderHeight": 394,
+            "displayWidth": 972,
+            "displayHeight": 394,
+            "upscaler": 0,
+            "frameGenerator": 0,
+            "resolutionState": 1,
+            "spatialMode": 0,
+            "deepDvcApplied": 0,
+            "realFrameCount": 734,
+            "cpuRenderSubmitMs": {
+              "mean": 3.1907371934604907,
+              "p50": 3.1048999999999998,
+              "p95": 3.7437,
+              "max": 25.7399
+            },
+            "cpuSamples": 734,
+            "gpuPassMs": {
+              "mean": 0.041081987087093014,
+              "p50": 0.0041,
+              "p95": 0.1341,
+              "max": 1.1725
+            },
+            "gpuPassSamples": 101294
+          }
+        ],
+        "gpuQueueSpanMs": {
+          "mean": 5.72982,
+          "p50": 5.62688,
+          "p95": 6.224895999999999,
+          "max": 6.334464
+        },
+        "measuredOverlapMs": {
+          "mean": 0,
+          "p50": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "positiveOverlapFrames": 0,
+        "cpuFullGraphMs": {
+          "mean": 3.37364375,
+          "p50": 3.2486499999999996,
+          "p95": 4.4819,
+          "max": 5.7544
+        },
+        "cpuScheduleMs": null,
+        "cpuDependencyMs": null,
+        "cpuSimulationMs": null,
+        "computeFrames": 0,
+        "insufficientGainFrames": 0
+      },
+      "Forward-1": {
+        "sha256": "9731eb028efcf1178d3158ab98ecafaa46a37b37de8ba4e9a3e792983c0e3b9e",
+        "frames": 735,
+        "wholeRenderThread": {
+          "thread": "[RenderThread]",
+          "name": "RenderThreadFrame",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 733,
+          "perEngineFrame": 4.7262620408163265,
+          "mean": 4.739157708049113,
+          "p50": 4.6587,
+          "p95": 5.5517,
+          "max": 6.815
+        },
+        "renderGroups": [
+          {
+            "frameKind": 1,
+            "viewId": 1,
+            "sceneEpoch": 3,
+            "renderWidth": 972,
+            "renderHeight": 394,
+            "displayWidth": 972,
+            "displayHeight": 394,
+            "upscaler": 0,
+            "frameGenerator": 0,
+            "resolutionState": 1,
+            "spatialMode": 0,
+            "deepDvcApplied": 0,
+            "realFrameCount": 731,
+            "cpuRenderSubmitMs": {
+              "mean": 4.435807250341997,
+              "p50": 4.3556,
+              "p95": 5.2363,
+              "max": 6.4808
+            },
+            "cpuSamples": 731,
+            "gpuPassMs": {
+              "mean": 0.040849037521985536,
+              "p50": 0.0031,
+              "p95": 0.1269,
+              "max": 1.1735
+            },
+            "gpuPassSamples": 102340
+          }
+        ],
+        "gpuQueueSpanMs": {
+          "mean": 5.76469,
+          "p50": 5.733887999999999,
+          "p95": 6.148096,
+          "max": 6.24128
+        },
+        "measuredOverlapMs": {
+          "mean": 0,
+          "p50": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "positiveOverlapFrames": 0,
+        "cpuFullGraphMs": {
+          "mean": 5.02104375,
+          "p50": 5.027699999999999,
+          "p95": 5.6511,
+          "max": 5.6975
+        },
+        "cpuScheduleMs": {
+          "mean": 0.031646875,
+          "p50": 0.031,
+          "p95": 0.0361,
+          "max": 0.0886
+        },
+        "cpuDependencyMs": {
+          "mean": 0,
+          "p50": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "cpuSimulationMs": {
+          "mean": 0,
+          "p50": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "computeFrames": 0,
+        "insufficientGainFrames": 0
+      },
+      "Forward-2": {
+        "sha256": "5f8a2810ec58984e156b704305e274c7689532ebd0c27257329e1eb862c33b4a",
+        "frames": 742,
+        "wholeRenderThread": {
+          "thread": "[RenderThread]",
+          "name": "RenderThreadFrame",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 740,
+          "perEngineFrame": 10.93742142857143,
+          "mean": 10.966982027027028,
+          "p50": 10.89075,
+          "p95": 13.5645,
+          "max": 17.9581
+        },
+        "renderGroups": [
+          {
+            "frameKind": 1,
+            "viewId": 1,
+            "sceneEpoch": 3,
+            "renderWidth": 972,
+            "renderHeight": 394,
+            "displayWidth": 972,
+            "displayHeight": 394,
+            "upscaler": 0,
+            "frameGenerator": 0,
+            "resolutionState": 1,
+            "spatialMode": 0,
+            "deepDvcApplied": 0,
+            "realFrameCount": 738,
+            "cpuRenderSubmitMs": {
+              "mean": 10.649482791327914,
+              "p50": 10.57275,
+              "p95": 13.2139,
+              "max": 17.6748
+            },
+            "cpuSamples": 738,
+            "gpuPassMs": {
+              "mean": 0.03933017192171128,
+              "p50": 0.0041,
+              "p95": 0.0802,
+              "max": 1.5934
+            },
+            "gpuPassSamples": 103361
+          }
+        ],
+        "gpuQueueSpanMs": {
+          "mean": 7.3072437500000005,
+          "p50": 7.3745,
+          "p95": 7.991300000000001,
+          "max": 8.0888
+        },
+        "measuredOverlapMs": {
+          "mean": 0.182078125,
+          "p50": 0.20275,
+          "p95": 0.2982,
+          "max": 0.4126
+        },
+        "positiveOverlapFrames": 29,
+        "cpuFullGraphMs": {
+          "mean": 11.142746875,
+          "p50": 10.5618,
+          "p95": 15.8609,
+          "max": 16.2807
+        },
+        "cpuScheduleMs": {
+          "mean": 2.34515625,
+          "p50": 2.10445,
+          "p95": 3.9723,
+          "max": 4.089
+        },
+        "cpuDependencyMs": {
+          "mean": 0.7113031249999999,
+          "p50": 0.56195,
+          "p95": 2.115599999999999,
+          "max": 2.4328
+        },
+        "cpuSimulationMs": {
+          "mean": 1.05638125,
+          "p50": 0.97635,
+          "p95": 1.4769,
+          "max": 1.5285
+        },
+        "computeFrames": 32,
+        "insufficientGainFrames": 0
+      },
+      "Reverse-0": {
+        "sha256": "d03a3ef9025bc01182a6d75528f867105898a5b858adada440cc146dd2eb522b",
+        "frames": 728,
+        "wholeRenderThread": {
+          "thread": "[RenderThread]",
+          "name": "RenderThreadFrame",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 726,
+          "perEngineFrame": 3.2066037087912087,
+          "mean": 3.2154373278236914,
+          "p50": 3.17755,
+          "p95": 3.6986,
+          "max": 6.0356
+        },
+        "renderGroups": [
+          {
+            "frameKind": 1,
+            "viewId": 1,
+            "sceneEpoch": 3,
+            "renderWidth": 972,
+            "renderHeight": 394,
+            "displayWidth": 972,
+            "displayHeight": 394,
+            "upscaler": 0,
+            "frameGenerator": 0,
+            "resolutionState": 1,
+            "spatialMode": 0,
+            "deepDvcApplied": 0,
+            "realFrameCount": 724,
+            "cpuRenderSubmitMs": {
+              "mean": 2.8261812154696133,
+              "p50": 2.7656,
+              "p95": 3.3293,
+              "max": 5.7231
+            },
+            "cpuSamples": 724,
+            "gpuPassMs": {
+              "mean": 0.04121611718312115,
+              "p50": 0.0041,
+              "p95": 0.1321,
+              "max": 1.2207
+            },
+            "gpuPassSamples": 99912
+          }
+        ],
+        "gpuQueueSpanMs": {
+          "mean": 5.729001,
+          "p50": 5.69176,
+          "p95": 6.209536,
+          "max": 6.3999999999999995
+        },
+        "measuredOverlapMs": {
+          "mean": 0,
+          "p50": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "positiveOverlapFrames": 0,
+        "cpuFullGraphMs": {
+          "mean": 2.86111875,
+          "p50": 2.8658,
+          "p95": 3.3657,
+          "max": 3.9678
+        },
+        "cpuScheduleMs": null,
+        "cpuDependencyMs": null,
+        "cpuSimulationMs": null,
+        "computeFrames": 0,
+        "insufficientGainFrames": 0
+      },
+      "Reverse-1": {
+        "sha256": "43c9b88435003be766d46963b60c5f107278d5e47007d0e9dabf9ec2f2b2be1f",
+        "frames": 738,
+        "wholeRenderThread": {
+          "thread": "[RenderThread]",
+          "name": "RenderThreadFrame",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 736,
+          "perEngineFrame": 4.779892276422764,
+          "mean": 4.792881114130434,
+          "p50": 4.6796500000000005,
+          "p95": 5.7217,
+          "max": 12.6074
+        },
+        "renderGroups": [
+          {
+            "frameKind": 1,
+            "viewId": 1,
+            "sceneEpoch": 3,
+            "renderWidth": 972,
+            "renderHeight": 394,
+            "displayWidth": 972,
+            "displayHeight": 394,
+            "upscaler": 0,
+            "frameGenerator": 0,
+            "resolutionState": 1,
+            "spatialMode": 0,
+            "deepDvcApplied": 0,
+            "realFrameCount": 734,
+            "cpuRenderSubmitMs": {
+              "mean": 4.417005994550409,
+              "p50": 4.298349999999999,
+              "p95": 5.3584,
+              "max": 12.275
+            },
+            "cpuSamples": 734,
+            "gpuPassMs": {
+              "mean": 0.04089516937359504,
+              "p50": 0.0031,
+              "p95": 0.1291,
+              "max": 1.2411
+            },
+            "gpuPassSamples": 102761
+          }
+        ],
+        "gpuQueueSpanMs": {
+          "mean": 5.7348609999999995,
+          "p50": 5.711872,
+          "p95": 6.093824,
+          "max": 6.58848
+        },
+        "measuredOverlapMs": {
+          "mean": 0,
+          "p50": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "positiveOverlapFrames": 0,
+        "cpuFullGraphMs": {
+          "mean": 4.53753125,
+          "p50": 4.30095,
+          "p95": 5.5593,
+          "max": 8.1303
+        },
+        "cpuScheduleMs": {
+          "mean": 0.024915625,
+          "p50": 0.023350000000000003,
+          "p95": 0.0334,
+          "max": 0.0338
+        },
+        "cpuDependencyMs": {
+          "mean": 0,
+          "p50": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "cpuSimulationMs": {
+          "mean": 0,
+          "p50": 0.0,
+          "p95": 0,
+          "max": 0
+        },
+        "computeFrames": 0,
+        "insufficientGainFrames": 0
+      },
+      "Reverse-2": {
+        "sha256": "4b59d82cd0cfc60746ccbb3dd2da60830ddf830a4aa23a930ed60635005eefb9",
+        "frames": 760,
+        "wholeRenderThread": {
+          "thread": "[RenderThread]",
+          "name": "RenderThreadFrame",
+          "gpu": false,
+          "view": 0,
+          "file": "",
+          "calls": 758,
+          "perEngineFrame": 10.057925657894737,
+          "mean": 10.084463720316622,
+          "p50": 10.07205,
+          "p95": 11.9111,
+          "max": 15.4844
+        },
+        "renderGroups": [
+          {
+            "frameKind": 1,
+            "viewId": 1,
+            "sceneEpoch": 3,
+            "renderWidth": 972,
+            "renderHeight": 394,
+            "displayWidth": 972,
+            "displayHeight": 394,
+            "upscaler": 0,
+            "frameGenerator": 0,
+            "resolutionState": 1,
+            "spatialMode": 0,
+            "deepDvcApplied": 0,
+            "realFrameCount": 756,
+            "cpuRenderSubmitMs": {
+              "mean": 9.802243121693122,
+              "p50": 9.7912,
+              "p95": 11.6146,
+              "max": 15.1189
+            },
+            "cpuSamples": 756,
+            "gpuPassMs": {
+              "mean": 0.03876928976923876,
+              "p50": 0.0041,
+              "p95": 0.0799,
+              "max": 1.62
+            },
+            "gpuPassSamples": 105867
+          }
+        ],
+        "gpuQueueSpanMs": {
+          "mean": 7.447265625,
+          "p50": 7.48285,
+          "p95": 8.0252,
+          "max": 8.0343
+        },
+        "measuredOverlapMs": {
+          "mean": 0.231571875,
+          "p50": 0.20550000000000002,
+          "p95": 0.4223,
+          "max": 0.4229
+        },
+        "positiveOverlapFrames": 31,
+        "cpuFullGraphMs": {
+          "mean": 10.60174375,
+          "p50": 10.17,
+          "p95": 13.1745,
+          "max": 21.5492
+        },
+        "cpuScheduleMs": {
+          "mean": 2.620671875,
+          "p50": 2.5011,
+          "p95": 4.1218,
+          "max": 4.896
+        },
+        "cpuDependencyMs": {
+          "mean": 0.959459375,
+          "p50": 0.5815000000000001,
+          "p95": 2.4393,
+          "max": 2.494
+        },
+        "cpuSimulationMs": {
+          "mean": 1.1196125000000001,
+          "p50": 1.0347999999999997,
+          "p95": 1.6021999999999998,
+          "max": 1.7374
+        },
+        "computeFrames": 32,
+        "insufficientGainFrames": 0
+      }
+    },
+    "comparisons": [
+      {
+        "order": "Forward",
+        "mode": 1,
+        "p50Percent": 35.154266815590574,
+        "p95Percent": 35.02857837772102
+      },
+      {
+        "order": "Forward",
+        "mode": 2,
+        "p50Percent": 215.95323401848012,
+        "p95Percent": 229.91608901860633
+      },
+      {
+        "order": "Reverse",
+        "mode": 1,
+        "p50Percent": 47.272269515821954,
+        "p95Percent": 54.699075325798965
+      },
+      {
+        "order": "Reverse",
+        "mode": 2,
+        "p50Percent": 216.97534263819608,
+        "p95Percent": 222.0434759098037
+      }
+    ],
+    "presentationOrDisplayFps": false
+  },
+  "changes": {
+    "Forward-0": {
+      "wholeCpuP50Percent": 9.227600411946435,
+      "wholeCpuP95Percent": 11.133636068764186
+    },
+    "Forward-1": {
+      "wholeCpuP50Percent": 1.0432481672667304,
+      "wholeCpuP95Percent": -2.298365098639621
+    },
+    "Forward-2": {
+      "wholeCpuP50Percent": -8.83807945356837,
+      "wholeCpuP95Percent": -10.093853148985243,
+      "dependencyP50Percent": -73.56897605945159,
+      "scheduleP50Percent": -43.015163823449775
+    },
+    "Reverse-0": {
+      "wholeCpuP50Percent": -0.3809135655390872,
+      "wholeCpuP95Percent": -2.5273422058242234
+    },
+    "Reverse-1": {
+      "wholeCpuP50Percent": 0.11445564041676626,
+      "wholeCpuP95Percent": -1.7227756784610082
+    },
+    "Reverse-2": {
+      "wholeCpuP50Percent": -11.991838838913171,
+      "wholeCpuP95Percent": -9.864089718947234,
+      "dependencyP50Percent": -72.604998468895,
+      "scheduleP50Percent": -32.27365656182726
+    }
+  },
+  "nativeRegression": {
+    "Debug": {
+      "schemaVersion": 2,
+      "passed": true,
+      "phaseComplete": false,
+      "acceptanceSchema": 3,
+      "checks": 437,
+      "scope": "Native queue execution in existing offscreen Editor",
+      "fullRegression": true,
+      "scheduleChecks": 131,
+      "nativeQueueExecutionTested": true,
+      "frameRetirementTested": true,
+      "positiveOverlapExecutionTested": true,
+      "negativeFallbackExecutionTested": true,
+      "declarationOrderTested": true,
+      "readReadOwnershipTested": true,
+      "reorderedFailureTested": true,
+      "parallelRecordingTested": true,
+      "calibratedIntervalsTested": true,
+      "measuredOverlapRequired": false,
+      "measuredOverlapEstablished": false,
+      "intervalEvidence": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\rg8-overlap-20261022\\native-final-Debug/native-intervals.json",
+      "performanceValidated": false,
+      "adoptionEstablished": false,
+      "sharedGraphicsReadsTested": true,
+      "readerEpochJoinTested": true,
+      "sideEffectsTested": true,
+      "fallbackReasonsTested": true,
+      "measurementDomainsTested": true,
+      "liveSceneQueueCutover": false,
+      "binary": {
+        "configuration": "Debug",
+        "head": "ea87639ece7b6068456940ddddd83a9d23f86c58",
+        "exe": "F2ED65B00B72711B0753CDB95188A491A52D2C3A888A1CBC19FFDF42BE90BADC",
+        "runtime": "50F1659C11AC48372D719B7AA62FFC85D791E492791B04407346FF313DDE4299",
+        "acceptanceSchema": 3,
+        "expectedChecks": 437,
+        "expectedLog": "RG8_QUEUE_EXECUTION_OK schema=3 checks=437 payloadError=0 validationErrors=0 modes=2 overlapCases=7 positiveOverlapExecution=true negativeFallbackExecution=true declarationOrder=true readRead=true reorderedFailure=true delayedLifetime=true quarantineReleased=true frameRetirement=true parallelRecording=true calibratedIntervals=true measuredGain=false\n",
+        "expectedScheduleChecks": 131,
+        "expectedScheduleLog": "RG8_QUEUE_SCHEDULE_OK schema=3 checks=131 scope=compiled-plan nativeExecution=false overlap=true declarationOrder=true readRead=true sharedGraphicsReads=true readerEpochJoin=true sideEffects=true fallbackReasons=true modelGuards=true timingIdentity=true measurementDomains=true\n",
+        "wrapper": "8678462DE30C0712C852745E796848F8EAD6DAA0B81AF16038E9074915004C9A",
+        "scheduleWrapper": "EC328375258BDF9C529F6BDDDBD3FC601E4DC1C7F28D14DEB1C80ED565AA99A3",
+        "scheduleTests": "4300C402C1242AE55E5C52B8C8ECC7FD5AD28936AE1A427A53FEBE046B7AC8FE",
+        "timingContract": "5E891ABA3A3A10F733E5F30B8FD8A2D445BF229C735639AFA72AAE2CF70BFCF0",
+        "measurementHistory": "C640336857C071C329B4454588806E680B3A5B96648005C17F8FACA414D5380B",
+        "profiler": "C2C381C05B532134B46554F3A7A30E7551DE3A2A696553C7D741D034F5B188A4",
+        "recorderContract": "482C2FB0DB143DC4BB0989E5C7F95EF8B73988D4786663D391CA61F82B062366",
+        "recorderHeader": "0E8498B1D84AE728318020EF4E0B55F5829FF7461CF6E52B7B86AA111D688E6E",
+        "executor": "5C674859157D7AC5C054EF429A294A8307B241ED512B98450380D5498DEDC6C7",
+        "provider": "2FF1AEE143DBE5C87B2510CEB76D882914BDDE1BA4447C348419A9908FC0837B",
+        "frameResources": "53ECED5C092997D757269D1BB99980D8109E0A196B48BF4833C00D235507529D",
+        "frameContract": "76EB3F340055E69F85EBA499E7D8050E97AF7EE2B7EB111DAB7DB89A08583E55",
+        "liveAdapter": "C8B1BCB27EE6405F198340C0F4B0D95BF3D6C54C59DE31A66E4C8A197DD352AD",
+        "sceneContract": "401BC4FE4D3EE8A942FA719F4A4309C890333E9A7F88EB800BA5D6BE310E8B82",
+        "captureContract": "4FE2BFAC168349E6D50B9DD79B2646BF9977BE7DA2588881C47AB90E006F1104",
+        "computeAuthor": "F7BB77E25E199D9D4C8DD8FB74C20D4961C7C53E70A5505FE3782E7C6869A214",
+        "liveScene": "85000AE9DA8E6185CAA569383FDA3C069CBB90D23DBD391875069B8A48FD3E67",
+        "encoder": "0B2568F72948FF8A26E2C4F179E7FDBB6E05B5DF72C94CACAD7645DCE61C2179",
+        "shader": "444A18420D24F2FB40E908BA1E3F0E8C29643D2EE0C4EEFFF72655DE421D9A83",
+        "implementation": "DF6E9201973C3AD706C4ECEBCFED5995DA8D8A5F105085C0A4120503925C7514",
+        "contract": "FCB2733FD96147EDA2AAEF7DA44A3C907EEF24B0D685BA4C7EA2272177FA551C",
+        "tests": "A88C0222995C43402AC69BAC60D623A9FD973677C519FDEF5621CE8D51E929B7"
+      },
+      "exitCode": 0
+    },
+    "Release": {
+      "schemaVersion": 2,
+      "passed": true,
+      "phaseComplete": false,
+      "acceptanceSchema": 3,
+      "checks": 437,
+      "scope": "Native queue execution in existing offscreen Editor",
+      "fullRegression": true,
+      "scheduleChecks": 131,
+      "nativeQueueExecutionTested": true,
+      "frameRetirementTested": true,
+      "positiveOverlapExecutionTested": true,
+      "negativeFallbackExecutionTested": true,
+      "declarationOrderTested": true,
+      "readReadOwnershipTested": true,
+      "reorderedFailureTested": true,
+      "parallelRecordingTested": true,
+      "calibratedIntervalsTested": true,
+      "measuredOverlapRequired": false,
+      "measuredOverlapEstablished": false,
+      "intervalEvidence": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\rg8-overlap-20261022\\native-final-Release/native-intervals.json",
+      "performanceValidated": false,
+      "adoptionEstablished": false,
+      "sharedGraphicsReadsTested": true,
+      "readerEpochJoinTested": true,
+      "sideEffectsTested": true,
+      "fallbackReasonsTested": true,
+      "measurementDomainsTested": true,
+      "liveSceneQueueCutover": false,
+      "binary": {
+        "configuration": "Release",
+        "head": "ea87639ece7b6068456940ddddd83a9d23f86c58",
+        "exe": "B24E07E9277AE98F170FF252E49A9824D6B42B218EEBEE548E62CDD6E391F8A8",
+        "runtime": "768C94A43612FECC479BB5F1CA6E0945C647809185B8D569E4F28DE92A8847CE",
+        "acceptanceSchema": 3,
+        "expectedChecks": 437,
+        "expectedLog": "RG8_QUEUE_EXECUTION_OK schema=3 checks=437 payloadError=0 validationErrors=0 modes=2 overlapCases=7 positiveOverlapExecution=true negativeFallbackExecution=true declarationOrder=true readRead=true reorderedFailure=true delayedLifetime=true quarantineReleased=true frameRetirement=true parallelRecording=true calibratedIntervals=true measuredGain=false\n",
+        "expectedScheduleChecks": 131,
+        "expectedScheduleLog": "RG8_QUEUE_SCHEDULE_OK schema=3 checks=131 scope=compiled-plan nativeExecution=false overlap=true declarationOrder=true readRead=true sharedGraphicsReads=true readerEpochJoin=true sideEffects=true fallbackReasons=true modelGuards=true timingIdentity=true measurementDomains=true\n",
+        "wrapper": "8678462DE30C0712C852745E796848F8EAD6DAA0B81AF16038E9074915004C9A",
+        "scheduleWrapper": "EC328375258BDF9C529F6BDDDBD3FC601E4DC1C7F28D14DEB1C80ED565AA99A3",
+        "scheduleTests": "4300C402C1242AE55E5C52B8C8ECC7FD5AD28936AE1A427A53FEBE046B7AC8FE",
+        "timingContract": "5E891ABA3A3A10F733E5F30B8FD8A2D445BF229C735639AFA72AAE2CF70BFCF0",
+        "measurementHistory": "C640336857C071C329B4454588806E680B3A5B96648005C17F8FACA414D5380B",
+        "profiler": "C2C381C05B532134B46554F3A7A30E7551DE3A2A696553C7D741D034F5B188A4",
+        "recorderContract": "482C2FB0DB143DC4BB0989E5C7F95EF8B73988D4786663D391CA61F82B062366",
+        "recorderHeader": "0E8498B1D84AE728318020EF4E0B55F5829FF7461CF6E52B7B86AA111D688E6E",
+        "executor": "5C674859157D7AC5C054EF429A294A8307B241ED512B98450380D5498DEDC6C7",
+        "provider": "2FF1AEE143DBE5C87B2510CEB76D882914BDDE1BA4447C348419A9908FC0837B",
+        "frameResources": "53ECED5C092997D757269D1BB99980D8109E0A196B48BF4833C00D235507529D",
+        "frameContract": "76EB3F340055E69F85EBA499E7D8050E97AF7EE2B7EB111DAB7DB89A08583E55",
+        "liveAdapter": "C8B1BCB27EE6405F198340C0F4B0D95BF3D6C54C59DE31A66E4C8A197DD352AD",
+        "sceneContract": "401BC4FE4D3EE8A942FA719F4A4309C890333E9A7F88EB800BA5D6BE310E8B82",
+        "captureContract": "4FE2BFAC168349E6D50B9DD79B2646BF9977BE7DA2588881C47AB90E006F1104",
+        "computeAuthor": "F7BB77E25E199D9D4C8DD8FB74C20D4961C7C53E70A5505FE3782E7C6869A214",
+        "liveScene": "85000AE9DA8E6185CAA569383FDA3C069CBB90D23DBD391875069B8A48FD3E67",
+        "encoder": "0B2568F72948FF8A26E2C4F179E7FDBB6E05B5DF72C94CACAD7645DCE61C2179",
+        "shader": "444A18420D24F2FB40E908BA1E3F0E8C29643D2EE0C4EEFFF72655DE421D9A83",
+        "implementation": "DF6E9201973C3AD706C4ECEBCFED5995DA8D8A5F105085C0A4120503925C7514",
+        "contract": "FCB2733FD96147EDA2AAEF7DA44A3C907EEF24B0D685BA4C7EA2272177FA551C",
+        "tests": "A88C0222995C43402AC69BAC60D623A9FD973677C519FDEF5621CE8D51E929B7"
+      },
+      "exitCode": 0
+    }
+  },
+  "basicProductValidation": {
+    "passed": true,
+    "validation": {
+      "layerEnabled": true,
+      "mode": "basic",
+      "devices": 2,
+      "drains": 942,
+      "messages": 0,
+      "problems": 0,
+      "droppedMessages": 0,
+      "retained": []
+    },
+    "recordUnits": 176,
+    "normalComputeFrames": 5,
+    "scope": "TestShadow ordinary live frames with basic DX12 debug layer; no GBV shader instrumentation"
+  },
+  "admissionMutations": {
+    "passed": true,
+    "actualSnapshots": 6,
+    "sourceSha256": "bb8ce8342819e6bcf123ee655b5b7c4c4991c702fb8341f996b98b8ed5f5be03",
+    "rejected": [
+      "temporalProvenance.missing-schemaVersion",
+      "temporalProvenance.missing-valid",
+      "temporalProvenance.missing-frameKind",
+      "temporalProvenance.missing-realFrameId",
+      "temporalProvenance.missing-publicationFrameId",
+      "temporalProvenance.missing-viewId",
+      "temporalProvenance.missing-sceneEpoch",
+      "temporalProvenance.missing-generatedOrdinal",
+      "temporalProvenance.missing-renderWidth",
+      "temporalProvenance.missing-renderHeight",
+      "temporalProvenance.missing-displayWidth",
+      "temporalProvenance.missing-displayHeight",
+      "temporalProvenance.missing-upscaler",
+      "temporalProvenance.missing-frameGenerator",
+      "temporalProvenance.missing-resolutionState",
+      "temporalProvenance.missing-spatialMode",
+      "temporalProvenance.missing-deepDvcApplied",
+      "temporalProvenance.invalid-frameKind",
+      "temporalProvenance.invalid-generatedOrdinal",
+      "temporalProvenance.invalid-deepDvcApplied",
+      "temporalProvenance.invalid-upscaler",
+      "temporalProvenance.invalid-frameGenerator",
+      "temporalProvenance.invalid-spatialMode",
+      "temporalProvenance.invalid-resolutionState",
+      "gpuTemporalProvenance.missing-schemaVersion",
+      "gpuTemporalProvenance.missing-valid",
+      "gpuTemporalProvenance.missing-frameKind",
+      "gpuTemporalProvenance.missing-realFrameId",
+      "gpuTemporalProvenance.missing-publicationFrameId",
+      "gpuTemporalProvenance.missing-viewId",
+      "gpuTemporalProvenance.missing-sceneEpoch",
+      "gpuTemporalProvenance.missing-generatedOrdinal",
+      "gpuTemporalProvenance.missing-renderWidth",
+      "gpuTemporalProvenance.missing-renderHeight",
+      "gpuTemporalProvenance.missing-displayWidth",
+      "gpuTemporalProvenance.missing-displayHeight",
+      "gpuTemporalProvenance.missing-upscaler",
+      "gpuTemporalProvenance.missing-frameGenerator",
+      "gpuTemporalProvenance.missing-resolutionState",
+      "gpuTemporalProvenance.missing-spatialMode",
+      "gpuTemporalProvenance.missing-deepDvcApplied",
+      "gpuTemporalProvenance.invalid-frameKind",
+      "gpuTemporalProvenance.invalid-generatedOrdinal",
+      "gpuTemporalProvenance.invalid-deepDvcApplied",
+      "gpuTemporalProvenance.invalid-upscaler",
+      "gpuTemporalProvenance.invalid-frameGenerator",
+      "gpuTemporalProvenance.invalid-spatialMode",
+      "gpuTemporalProvenance.invalid-resolutionState",
+      "gpu-mismatch-frame",
+      "gpu-mismatch-viewId",
+      "display-mismatch",
+      "wrong-axis"
+    ],
+    "performanceAdoptionAccepted": false,
+    "physicalAcceptance": false
+  },
+  "harnessCountCause": {
+    "actual": 437,
+    "baselineReproduced": true,
+    "countEvidence": "native-debug-count/results.jsonl",
+    "previousExpected": 434,
+    "addedChecks": 3,
+    "cause": "ResetSoftwareSegment assertion added inside the three-frame loop without updating the acceptance count",
+    "baselineEvidence": "native-baseline-diagnostic/results.jsonl",
+    "causeCommit": "1162d4f9a"
+  },
+  "productGbvCapture": {
+    "passed": false,
+    "stage": "D3D12SDKLayers GBV patched pipeline creation in NVIDIA shader creation",
+    "stack": "Artifacts/rg8-overlap-20261022/product-validation/capture-stack-cdb.log",
+    "termination": "HTTP polling timed out during debugger stack collection; no acceptance claimed"
+  },
+  "excludedCollection": {
+    "path": "Artifacts/rg8-overlap-20261022/baseline-normal",
+    "reason": "All normal candidates had recorder captureGeneration != 0; recording moved after normal collection and matrix rerun"
+  },
+  "remaining": [
+    "Price batch, boundary transitions, CPU submission and whole-frame bottleneck in placement model",
+    "Bound placement search cost",
+    "RG7 combination and support matrix acceptance"
+  ],
+  "sourceManifest": [
+    {
+      "path": "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp",
+      "sha256": "df6e9201973c3ad706c4ecebcfed5995da8d8a5f105085c0a4120503925c7514"
+    },
+    {
+      "path": "Editor/RenderTests/RHI/DX12/Tests/RenderQueueExecutionRg8Tests.h",
+      "sha256": "a88c0222995c43402ac69bac60d623a9fd973677c519fdef5621ce8d51e929b7"
+    },
+    {
+      "path": "Editor/RenderTests/RHI/DX12/Tests/RenderQueueScheduleRg8Tests.h",
+      "sha256": "4300c402c1242ae55e5c52b8c8ecc7fd5ad28936ae1a427a53febe046b7ac8fe"
+    },
+    {
+      "path": "Tools/regression/measure-rg8-adoption.ps1",
+      "sha256": "304242989ba787633982a588eb05e1c079d298a91e325fb82e5821e59134fd83"
+    },
+    {
+      "path": "Tools/regression/verify-rg8-queue-execution.ps1",
+      "sha256": "8678462de30c0712c852745e796848f8ead6daa0b81af16038e9074915004c9a"
+    },
+    {
+      "path": "Tools/regression/verify-rg8-queue-plan.ps1",
+      "sha256": "ec328375258bdf9c529f6bdddbd3fc601e4dc1c7f28d14deb1c80ed565aa99a3"
+    },
+    {
+      "path": "Tools/regression/verify-rg8-live-queues.ps1",
+      "sha256": "2deabe1f43c4431a4612787caab55c4d4cff9c356d2e3d8ab8d8a7349701ecb2"
+    },
+    {
+      "path": "Tools/regression/summarize-rg8-whole-frame.py",
+      "sha256": "18e9691f41795b82ff85ea6146e93ef8dd61c1e0dd7a0d9acc029150884b9c1b"
+    },
+    {
+      "path": "docs/RefactoringPlanDashboard.html",
+      "sha256": "cdeaa4b224591886b5c3b52a29f7f3b74cd8e8a3ff418f56cac01fb528e4750b"
+    },
+    {
+      "path": "docs/plans/RenderGraphDependencySchedulingPlan.md",
+      "sha256": "5d60e92f560eba80e5850389e25666902d1a5d675b8d5ea4aabfa79527d4f4ea"
+    },
+    {
+      "path": "docs/analysis/RenderRg8Overlap20261022.md",
+      "sha256": "d0c9ca46f819b6d7d54db919f16f73a3bdddc7bbc0f84b6de9abf1603d0721ad"
+    }
+  ]
+}

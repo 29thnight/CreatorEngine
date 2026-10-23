@@ -1,0 +1,308 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/TemporalTr2Resolution20261023.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TR2 — render/display·jitter 및 멀티뷰 품질 수용</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#구현과-원인-수정">구현과 원인 수정</a></li><li><a href="#독립-route-초기화와-fsr-노출-연산">독립 route 초기화와 FSR 노출 연산</a></li><li><a href="#표시-셰이더-정밀도와-추가-입력-검증">표시 셰이더 정밀도와 추가 입력 검증</a></li><li><a href="#sdk-설치와-재현">SDK 설치와 재현</a></li><li><a href="#debug--release-결과">Debug / Release 결과</a></li><li><a href="#픽셀-판정">픽셀 판정</a></li><li><a href="#증거와-후속-소유-범위">증거와 후속 소유 범위</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="TemporalTr2Resolution20261023.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>TR2 — render/display·jitter 및 멀티뷰 품질 수용</h1>
+<div class="meta"><p>2026-10-23 · master <code>0509753a380866e8dd96bc648fd71c5c5d8792e2</code>와 보존된 로컬 변경 · DX12 Editor · RTX 4070 Ti</p>
+<p>TR2의 남은 멀티뷰·전체 route/해상도 품질 검증을 완료했다. 기존 temporal snapshot, 성공한 제출에 따른 history, SSGI reset, command service와 GPU attachment 캡처를 재사용했다. <strong>TR2 4/4·5인일 수용</strong>이다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 7개의 분량 막대">
+<a class="map-row" href="#구현과-원인-수정"><span class="ve-label">§00</span><span class="map-name">구현과 원인 수정</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#독립-route-초기화와-fsr-노출-연산"><span class="ve-label">§01</span><span class="map-name">독립 route 초기화와 FSR 노출 연산</span><span class="map-bar"><i style="width:69.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#표시-셰이더-정밀도와-추가-입력-검증"><span class="ve-label">§02</span><span class="map-name">표시 셰이더 정밀도와 추가 입력 검증</span><span class="map-bar"><i style="width:62.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#sdk-설치와-재현"><span class="ve-label">§03</span><span class="map-name">SDK 설치와 재현</span><span class="map-bar"><i style="width:95.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#debug--release-결과"><span class="ve-label">§04</span><span class="map-name">Debug / Release 결과</span><span class="map-bar"><i style="width:82.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#픽셀-판정"><span class="ve-label">§05</span><span class="map-name">픽셀 판정</span><span class="map-bar"><i style="width:65.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#증거와-후속-소유-범위"><span class="ve-label">§06</span><span class="map-name">증거와 후속 소유 범위</span><span class="map-bar"><i style="width:31.6%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 7개 가운데 「구현과 원인 수정」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-구현과-원인-수정">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="구현과-원인-수정">구현과 원인 수정</h2></div>
+<div class="prose"><ul>
+<li><p><code>sdk-routes</code> / <code>sdk-routes-solo</code>가 실제 Game view의 7개 route와 별도 Editor companion view를 실행한다. static·skinned·instanced·decal·alpha·world-space UI·meshlet을 같은 authored 입력으로 검사한다. render/display 크기, 카메라, 품질, 정확한 34회 warmup과 Halton 단계, 현재/이전 제출 소유권을 캡처에 남긴다.</p>
+</li>
+<li><p>fixture를 현재 METEOR cooked geometry 계약에 맞췄다. 모든 불투명 geometry에 meshlet topology를 만들고, 중복 blob을 공유하며 geometry locator에 thin metadata digest를 사용한다.</p>
+</li>
+<li><p>cooked loader의 진단 문자열은 validator 실행 이후 전달한다. 기존 단일 표현식은 validator가 문자열을 재할당하기 전에 <code>c_str()</code>를 평가할 수 있었다. meshlet 계약 검사는 정확한 오류 문자열까지 확인한다.</p>
+</li>
+<li><p>full CEMF3의 DXIL/SPIR-V cook에서 필요한 descriptor-heap texture source capability를 SceneCompiler가 명시하고 shader cache key에 반영한다. 경고를 오류로 처리하는 정책을 유지한다.</p>
+</li>
+<li><p>world-space UI fixture의 transient cooked texture를 기존 DeserializeTexture 경로에 바인딩했다. authoring path가 없는 texture를 Load로 처리하던 fixture의 빈 출력이 사라졌다.</p>
+</li>
+<li><p>fixture 사이에는 완료된 immutable prepared asset만 재사용한다. compiler·platform·ABI·shader 원본 해시를 대조하며, 매 fixture마다 원본 asset bytes와 해시 증거를 다시 기록한다.</p>
+</li>
+<li><p>SDK route마다 기준 입력의 첫 제출에서 adapter를 종료·재생성한다. private resource·counter를 포함한 시작 상태를 통일한 뒤 정확히 34회 warmup을 수행한다. manifest의 <code>historyStart</code>도 판정 도구가 확인한다.</p>
+</li>
+<li><p>cold material cook과 GPU capture에 각각 5분 제한을 둔다. 이전에는 두 단계가 한 제한을 공유해 큰 해상도로 바로 시작한 Debug 검사의 마지막 capture가 취소됐다.</p>
+</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-독립-route-초기화와-fsr-노출-연산">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="독립-route-초기화와-fsr-노출-연산">독립 route 초기화와 FSR 노출 연산</h2></div>
+<div class="prose"><p>각 route의 기준 입력이 준비된 첫 실제 제출에서 SDK context를 새로 만들고 jitter/history를 초기화한다. 이후 34회의 warmup과 current/control history는 그대로 이어진다. 이 정책은 명시적인 SDK fixture에만 적용된다. 카메라 전환 후 binding을 기다리며 제출된 프레임이 독립 비교의 시작 상태에 섞이지 않게 한다.</p>
+<p>초기화만으로는 Debug의 큰 해상도에서 FSR 출력 차이가 남았다. 37회 전체 SDK 입력을 읽어 비교한 결과, 색·깊이·모션·마스크와 내부 상수가 모두 같았다. 첫 차이는 자동 노출의 로그 휘도 이력에서 부동소수점 한 단계로 나타났고 이후 FP16 누적 색상과 display 출력에 전파됐다. 원래 휘도 reduction 값도 같았다. 매 프레임 GPU 완료를 기다리는 직접 재생은 8회씩 세 실험에서 최종 출력이 일치했다.</p>
+<p>자동 노출 누적 변수에 <code>precise</code>를 지정해 계산 순서를 보존했다. 임시 GPU 입력·내부 버퍼 계측을 제거한 최종 Debug/Release 빌드에서 전체 행렬과 독립 solo 반복 비교를 1e-6 기준 그대로 통과했다. 고정 SDK에 적용되는 변경은 별도 patch로 보존한다. <a href="../../Artifacts/tr2-20261023/fsr-diagnostic-summary.json">진단 비교 기록</a>.</p>
+<p>SPD memory barrier·전체 mip 초기화·reset 시점 정렬 실험은 차이를 해결하지 못했다. 이 실험들은 최종 SDK에서 제거했다. SDK 파일 복원 시 이전 수정 시각이 남아 셰이더 재생성이 생략된 구간도 확인했으며, 최종 빌드에서는 원본과 검증한 precision patch로 shader blob과 라이브러리를 다시 생성했다. 실패 결과와 원본 캡처는 Artifacts에 보존했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-표시-셰이더-정밀도와-추가-입력-검증">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="표시-셰이더-정밀도와-추가-입력-검증">표시 셰이더 정밀도와 추가 입력 검증</h2></div>
+<div class="prose"><p>FSR 노출 수정을 적용한 뒤, Release FSR Balanced와 Debug DLSS Native AA에서 HDR 출력은 같지만 표시 출력 일부 성분이 1/255씩 달랐다. bloom 최종 텍스처와 포스트 설정을 기존 캡처에 추가한 결과, 단독·교차·단독 반복의 28개 route/단계에서 HDR·bloom·설정이 모두 같고 표시값만 달랐다. 실제 생성된 표시 셰이더를 같은 입력으로 직접 128회씩 재생한 RGBA32F·RGBA8 출력은 각각 전부 일치했다. <a href="../../Artifacts/tr2-20261023/post-bloom-trace-comparison.json">추가 입력 비교</a>.</p>
+<p>8비트 표시 코드를 명시적으로 반올림하는 후보는 Release 집중 검사에서 통과했지만 Debug의 독립 단독 반복에서 다시 실패했다. 이 후보는 제거했다. 최종 변경은 <code>EnhancedPostChainPass::CompilePostShader</code>에서 Uber·UberHDR 두 톤매핑 셰이더에 기존 <code>strictMath</code> 옵션을 적용하는 것이다. 해당 옵션은 shader cache identity에 포함되며 Slang의 <code>-fp-mode precise</code>로 전달된다.</p>
+<p>bloom·포스트 설정 캡처는 동일 입력을 검증하는 도구로 유지했다. 일반 렌더링에는 추가 readback을 넣지 않고 명시적 캡처에서만 실행한다. 최종 단독/교차 검사는 기존 10개 이미지에 bloom을 더한 11개 전체 이미지를 비교하고 포스트 설정도 일치해야 통과한다. 기존 <code>dx12.post</code>의 bloom·tone map·vignette·FXAA 검사도 함께 실행했다. 픽셀 비교 허용 오차는 1e-6을 그대로 유지했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-sdk-설치와-재현">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="sdk-설치와-재현">SDK 설치와 재현</h2></div>
+<div class="prose"><p>SDK는 <code>ThirdParty/Temporal</code>에 설치했다. FidelityFX SDK v1.1.4(FSR 3.1.4), Streamline v2.14.1, XeSS v3.0.2를 고정했다. 버전·revision·원본 archive 및 배포 DLL 해시는 <a href="../../ThirdParty/Temporal/SDKVersions.json">SDKVersions.json</a>에 있다.</p>
+<p>검증 빌드는 <code>Validation.props</code>를 opt-in으로 적용한다. 일반 엔진 빌드의 SDK 기본 옵션은 유지한다. 외부 SDK 빌드는 별도 Directory.Build 파일로 엔진 module/reflection 설정을 격리했다. 구성별 20개 temporal runtime DLL을 Editor/Temporal에 배포했다. <a href="../../ThirdParty/Temporal/README.md">설치·빌드 안내</a>.</p>
+<pre><code class="language-powershell">&amp; ThirdParty/Temporal/Build-Validation.ps1 -OutputDirectory Artifacts/tr2-rebuild
+&amp; Tools/regression/verify-tr2-history.ps1 -Configuration Debug -OutputDirectory Artifacts/tr2-history-debug -IncludePostChain
+&amp; Tools/regression/verify-tr2-resolution.ps1 -Configuration Debug -OutputDirectory Artifacts/tr2-matrix-debug -Resolutions 1600x900,960x640,1280x720 -RepeatFirstSoloControl
+# Release도 같은 두 회귀 도구의 Configuration을 Release로 실행한다.
+# 반복 대조군 없는 matrix만 같은 바이너리·출력 경로에 -Resume을 사용할 수 있다.</code></pre>
+<p>Resume은 이전 프로세스의 validation 0 기록과 완료된 단독/교차 oracle·isolation 세트가 함께 있을 때 재사용한다. 미완료 세트는 보존 디렉토리로 이동한 뒤 단독/교차를 함께 다시 만든다. 바이너리 해시가 다르면 재개를 거부한다.</p>
+<p>최종 Debug 행렬은 동일 바이너리로 해상도 그룹을 나눠 실행했다. 초기 9조건의 모든 캡처가 validation 0 확인 전에 완료됐음을 대조한 뒤 정상 종료하고, 큰·작은 해상도 그룹을 Resume으로 이어갔다. 중간 해상도는 별도 프로세스에서 실행했다. 미완료 조건은 재사용하지 않았다. <a href="../../Artifacts/tr2-20261023/debug-resume-reuse-audit.json">재사용 증거 대조</a>.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-debug--release-결과">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="debug--release-결과">Debug / Release 결과</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>구성</th><th style="text-align:right">native fixture</th><th style="text-align:right">SDK 조건 / fixture</th><th style="text-align:right">GPU 캡처</th><th style="text-align:right">전체 이미지 비교</th><th style="text-align:right">단독/교차 최대 오차</th><th style="text-align:right">SDK 내부 최대 상대 색상 오차</th></tr></thead>
+<tbody><tr><td>Debug</td><td class="num" style="text-align:right">3</td><td style="text-align:right">45 / 90</td><td class="num" style="text-align:right">1,316</td><td class="num" style="text-align:right">6,930</td><td class="num" style="text-align:right">0.0</td><td class="num" style="text-align:right">0.6414%</td></tr>
+<tr><td>Release</td><td class="num" style="text-align:right">3</td><td style="text-align:right">45 / 90</td><td class="num" style="text-align:right">1,316</td><td class="num" style="text-align:right">6,930</td><td class="num" style="text-align:right">0.0</td><td class="num" style="text-align:right">0.6414%</td></tr></tbody></table></div>
+<p>각 구성의 SDK 행렬은 <strong>3 provider × 5 quality × 3 해상도</strong>다. quality는 Native AA·Quality·Balanced·Performance·Ultra Performance이며 매 조건에 단독/교차 view를 각각 실행했다. host 창 960×640·1280×720·1600×900에 대응하는 실제 display extent는 캡처 manifest와 <a href="TemporalTr2Resolution20261023.json">세부 결과 JSON</a>에 기록했다. 창 크기를 실제 viewport 크기로 대체해 기록하지 않는다.</p>
+<ul>
+<li>Debug/Release 최종 빌드 오류 0. Debug 경고 25개, Release 경고 33개가 기록됐다. 구체적인 경고 종류는 링크한 빌드 로그에 보존했다.</li>
+<li>구성별 temporal history 계약 <strong>2,171검사</strong>, meshlet 계약 <strong>73검사</strong> 통과.</li>
+<li>구성별 <code>dx12.post</code> 포스트 체인 회귀 통과.</li>
+<li>구성별 SSGI GPU <strong>16비교 / 999,424 scalar</strong>, 최대 오차 <strong>0</strong>. view state·reset·실패 복구 검증을 같은 최종 바이너리로 재실행했다.</li>
+<li>matrix 및 history/SSGI의 DX12 validation messages·problems·dropped 모두 <strong>0</strong>, 프로세스 정상 종료.</li>
+<li>독립 motion oracle <strong>26개</strong>, resolution oracle <strong>8개</strong> 단위 검사 통과.</li>
+</ul>
+<p>최종 행렬마다 큰 해상도의 FSR Native AA에서 독립 solo fixture를 한 번 더 실행했다. 구성별 14캡처·154개 전체 이미지 반복 비교가 추가됐고 최대 차이는 0이다. 최종 행렬 증거는 <strong>2,632캡처·14,168개 전체 이미지 비교</strong>다. 이전 실패·시간 초과·수정 전 대조군은 보존하되 이 합계에 포함하지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-픽셀-판정">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="픽셀-판정">픽셀 판정</h2></div>
+<div class="prose"><p>원본 asset·shader·pose·camera·render/display·jitter를 먼저 대조하고 color/depth/motion의 route 소유권과 negative control을 검사한다. 실제 SDK HDR 입력과 reactive·transparency·responsive mask도 함께 대조한다. 단독/교차 view는 7 route × 2 capture 단계 × 11 attachment의 <strong>모든 픽셀</strong>을 비교한다. 허용 오차는 1e-6이며 결과는 전부 0이다.</p>
+<p>SDK 내부 색상은 source silhouette·binary alpha contour에서 최소 3 render pixel 떨어진 authored probe를 사용한다. 각 instance마다 최소 3개를 요구하며 상대 색상 오차 10% 및 출력 contrast 기준을 적용한다. DLSS Performance에서 alpha contour로부터 0.47 input pixel 떨어진 probe가 내부로 분류되어 11.17%를 기록했다. 실제 alpha texture contour와 inverse UV Jacobian으로 경계 거리를 계산하도록 고쳤다. 경계의 입력 ownership 검사와 전체 이미지 멀티뷰 비교는 유지한다. 출력 색상에 따라 probe를 선택하지 않는다.</p>
+<p>파일 해석과 전체 이미지 비교에는 설치된 NumPy를 사용하고, 미설치 환경에서는 기존 scalar 경로로 실행한다. float64 차이 계산은 Python float 계산과 같으며 scalar/vectorized의 84개 비교 결과 일치와 NaN/무한대 거부를 확인했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-증거와-후속-소유-범위">
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="증거와-후속-소유-범위">증거와 후속 소유 범위</h2></div>
+<div class="prose"><ul>
+<li><a href="../../Artifacts/tr2-20261023/source-freeze.json">소스·shader·runtime DLL·바이너리 해시</a></li>
+<li><a href="../../Artifacts/tr2-20261023/stable-matrix-Debug/matrix.json">Debug 큰·작은 해상도</a> · <a href="../../Artifacts/tr2-20261023/stable-matrix-Debug-medium/matrix.json">Debug 중간 해상도</a> · <a href="../../Artifacts/tr2-20261023/stable-matrix-Release/matrix.json">Release 행렬</a></li>
+<li><a href="../../Artifacts/tr2-20261023/stable-build-Debug/build-Debug.log">Debug 최종 빌드</a> · <a href="../../Artifacts/tr2-20261023/stable-build-Release/build-Release.log">Release 최종 빌드</a></li>
+<li><a href="../../Artifacts/tr2-20261023/stable-history-Debug/result.json">Debug history</a> · <a href="../../Artifacts/tr2-20261023/stable-history-Release/result.json">Release history</a></li>
+<li><a href="../../Artifacts/tr2-20261023/stable-ssgi-Debug/results.json">Debug SSGI</a> · <a href="../../Artifacts/tr2-20261023/stable-ssgi-Release/results.json">Release SSGI</a></li>
+</ul>
+<p>이번 수용은 DX12 실제 Editor의 제어된 7-route·SDK 품질·해상도·멀티뷰 행렬이다. 복잡 제품 장면의 장기 잔상·disocclusion, 전체 프레임 비용, 장치별 지원·배포·폴백은 TU0~4에서 계속 추적한다. FG와 Player 물리 표시 cadence/latency는 각 FG 항목에서 추적한다. SPIR-V는 CEMF3 cook으로 생성했고 실행 검증은 DX12에서 수행했다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="TemporalTr2Resolution20261023.md"><code>docs/analysis/TemporalTr2Resolution20261023.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

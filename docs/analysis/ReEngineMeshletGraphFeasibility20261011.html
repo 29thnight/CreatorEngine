@@ -1,199 +1,627 @@
-<!doctype html>
-<html lang="ko">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
-<link rel="preconnect" href="https://fonts.googleapis.com">
+<!doctype html><html lang="ko" data-register="blueprint"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>현재 METEOR 그래프의 성립 조건과 제약 · 2026-10-19</title><link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M5 8h22M5 16h15M5 24h22' stroke='%23bd7b28' stroke-width='3'/%3E%3C/svg%3E"><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin><link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+KR:wght@400;500;600;700&amp;family=IBM+Plex+Mono:wght@400;500&amp;display=swap" rel="stylesheet"><link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
-<title>메시렛 그래프 적합성</title>
-<style>
-  :root {
-    color-scheme: dark light;
-    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
-    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
-    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&amp;family=IBM+Plex+Mono:wght@400;500;600&amp;display=swap" rel="stylesheet">
+<style data-ve-kit>
+/* visual-explainer kit. The renderer inlines this file at <link rel="stylesheet" data-ve-kit>.
+   Tokens sit in :where(), so a page's own :root rules (topic motif, a named palette) always win.
+   A page picks its register with <html data-register="instrument|blueprint|paper|editorial">; Instrument is the default. */
+
+/* scale, shared by every register */
+:where(:root) {
+  color-scheme: light dark;
+  --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2.25rem, 5.5vw, 4rem);
+  --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+  --r-1: 4px; --r-2: 10px;
+  --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+}
+
+/* Instrument (default): Geist, near-black and amber; dark first */
+:where(:root) {
+  --bg: #0b0d0c; --surface: #121614; --border: #1f2522; --border-bright: #5e6662;
+  --text: #e6ebe8; --text-dim: #919d97; --accent: #f2a93b; --accent-dim: rgba(242,169,59,.14);
+  --ok: #6fcf97; --warn: #e8c547; --risk: #ef6f5c; --info: #6cb6e0;
+  --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  --font-body: 'Geist', 'Segoe UI', sans-serif;
+  --font-mono: 'Geist Mono', ui-monospace, monospace;
+  --font-display: var(--font-body); --display-weight: 600;
+  --stage: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root) {
+    --bg: #f4f5f3; --surface: #ffffff; --border: #dfe3e0; --border-bright: #888e8b;
+    --text: #121614; --text-dim: #545e59; --accent: #955700; --accent-dim: rgba(149,87,0,.12);
+    --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890;
+    --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  }
+}
+
+/* Blueprint: IBM Plex, blue-black, a 24px line grid on the stage, r-1 everywhere; dark first */
+:where(:root[data-register="blueprint"]) {
+  --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+  --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+  --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+  --font-body: 'IBM Plex Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --r-2: 4px;
+  --stage: linear-gradient(color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, color-mix(in srgb, var(--border) 55%, transparent) 1px, transparent 1px) 0 0 / 24px 24px;
+}
+@media (prefers-color-scheme: light) {
+  :where(:root[data-register="blueprint"]) {
+    --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+    --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+    --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+  }
+}
+
+/* Paper: Newsreader headings over Atkinson Hyperlegible, ink blue; light first */
+:where(:root[data-register="paper"]) {
+  --bg: #f7f7f4; --surface: #ffffff; --border: #e3e3dc; --border-bright: #8e8e8a;
+  --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --accent-dim: rgba(44,76,208,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Atkinson Hyperlegible Next', 'Segoe UI', sans-serif;
+  --font-mono: 'Atkinson Hyperlegible Mono', ui-monospace, monospace;
+  --font-display: 'Newsreader', Georgia, serif; --display-weight: 500;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="paper"]) {
+    --bg: #111316; --surface: #181b1f; --border: #262a30; --border-bright: #62676c;
+    --text: #e8e8e3; --text-dim: #9ba1a9; --accent: #93a6ff; --accent-dim: rgba(147,166,255,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f0806b; --info: #6fb8dc;
     --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
-    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
-    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
-    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
-    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
-    --r-1: 4px; --r-2: 10px;
-    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
   }
-  @media (prefers-color-scheme: light) {
-    :root {
-      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
-      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
-      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
-      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+}
+
+/* Editorial: Instrument Serif display over Instrument Sans; light first */
+:where(:root[data-register="editorial"]) {
+  --bg: #fbfbf9; --surface: #f1f0ec; --border: #e2e0da; --border-bright: #8c8a85;
+  --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --accent-dim: rgba(204,52,24,.12);
+  --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94;
+  --node-top: var(--surface); --lift: rgb(18 22 20 / .12); --halo: 22%;
+  --font-body: 'Instrument Sans', 'Segoe UI', sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+  --font-display: 'Instrument Serif', Georgia, serif; --display-weight: 400;
+}
+@media (prefers-color-scheme: dark) {
+  :where(:root[data-register="editorial"]) {
+    --bg: #0f0f0f; --surface: #1a1a19; --border: #2b2a28; --border-bright: #696763;
+    --text: #f2f0eb; --text-dim: #a4a19b; --accent: #ff6e50; --accent-dim: rgba(255,110,80,.14);
+    --ok: #6cc492; --warn: #e3b94d; --risk: #f57fa2; --info: #7cb8e8;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+  }
+}
+
+/* base */
+html { font-size: 17px; }
+* { box-sizing: border-box; margin: 0; }
+body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; }
+::selection { background: var(--accent-dim); }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+main { max-width: 64rem; margin: 0 auto; padding: var(--s-8) var(--s-5); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-8); }
+section, figure, header { min-width: 0; }
+header { display: grid; gap: var(--s-4); }
+header + figure { margin-top: calc(var(--s-6) - var(--s-8)); }
+/* text-box trims to cap height and baseline, so gaps are measured from the letters, not the line box */
+h1, h2, .kpi .val { text-box: trim-both cap alphabetic; }
+h1 { font-size: var(--t-h1); line-height: 1.05; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.035em; text-wrap: balance; max-width: 16ch; margin-bottom: var(--s-2); }
+h1 .num { color: var(--accent); font-variant-numeric: tabular-nums; }
+h2 { font-size: var(--t-h2); line-height: 1.2; font-family: var(--font-display); font-weight: var(--display-weight); letter-spacing: -.015em; text-wrap: balance; }
+/* section opener: hairline, mono label in columns 1–3, h2 in 4–12, on one baseline */
+.sec-head { display: grid; gap: var(--s-3) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-6); }
+@media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+h3 { font-size: var(--t-body); line-height: 1.3; font-weight: 600; }
+.eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; text-transform: uppercase; color: var(--accent); }
+.eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+.ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.caps { text-transform: uppercase; letter-spacing: .08em; font-weight: 600; color: var(--text); }
+.lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 44ch; }
+.lead b { color: var(--text); font-weight: 600; }
+.meta { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; }
+.unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; }
+code { font: .875em var(--font-mono); font-variant-ligatures: none; }
+
+/* figure: the stage is a faint dot grid, so nodes read as objects placed on it */
+.frame { background: var(--stage), var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+figcaption { font-size: var(--t-body); color: var(--text-dim); margin-top: var(--s-3); max-width: 65ch; }
+.fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+/* diagram kit (references/diagrams.md) */
+/* min-width keeps 14-unit labels >= 12px as rendered; narrow screens scroll the frame instead. */
+.ve-svg { width: 100%; min-width: 700px; height: auto; display: block; font: 500 17px var(--font-body); }
+.ve-n .sh { fill: url(#ve-node); stroke: var(--border-bright); stroke-width: 1.5; filter: drop-shadow(0 6px 14px var(--lift)); transition: stroke var(--fast) var(--ease), opacity var(--med) var(--ease); }
+.ve-n .lid { fill: var(--node-top); }
+.ve-n.is-key .sh { fill: color-mix(in srgb, var(--accent) 11%, var(--surface)); stroke: var(--accent); stroke-width: 2; filter: drop-shadow(0 0 16px color-mix(in srgb, var(--accent) var(--halo), transparent)); }
+.ve-n text { fill: var(--text); text-anchor: middle; dominant-baseline: central; font-weight: 600; }
+.ve-n .sub { fill: var(--text-dim); font: 500 14px var(--font-mono); }
+.ve-n .gl { fill: none; stroke: var(--text-dim); stroke-width: 1.5; stroke-linejoin: round; }
+.ve-n .ve-kind { fill: var(--text-dim); font: 600 14px var(--font-mono); letter-spacing: .08em; text-transform: uppercase; }
+.ve-n.is-key .gl { stroke: var(--accent); }
+.ve-e { fill: none; stroke: var(--text-dim); stroke-width: 1.75; marker-end: url(#ve-ah); }
+.ve-e.is-hot { stroke: var(--accent); stroke-width: 2.75; filter: drop-shadow(0 0 5px color-mix(in srgb, var(--accent) 55%, transparent)); }
+.ve-e.is-async { stroke-dasharray: 6 5; }
+.ve-el { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; paint-order: stroke; stroke: var(--bg); stroke-width: 5px; stroke-linejoin: round; }
+.ve-el.l { text-anchor: end; } .ve-el.r { text-anchor: start; }
+/* <ve-flow> on a page: its labels stay at 12 px or more, and a small drawing grows no more than 1.3× (kit/flow.mjs sets both) */
+.ve-svg.ve-flow { min-width: var(--min); max-width: var(--max); }
+/* flags on <ve-flow> parts: new, gone (an arrow also gets ✕) */
+.ve-n.is-new .sh { stroke: var(--ok); stroke-dasharray: 6 4; }
+.ve-n.is-gone .sh { stroke: var(--risk); stroke-dasharray: 3 4; opacity: .7; }
+.ve-n.is-gone text { text-decoration: line-through; }
+.ve-e.is-new { stroke: var(--ok); }
+.ve-e.is-gone { stroke: var(--risk); stroke-dasharray: 3 4; }
+.ve-x { fill: var(--risk); font: 600 16px var(--font-mono); text-anchor: middle; dominant-baseline: central; paint-order: stroke; stroke: var(--surface); stroke-width: 5px; }
+/* <ve-stack>: one bar split in proportion; labels under their segments */
+.ve-stack rect { fill: color-mix(in srgb, var(--text) 9%, var(--surface)); stroke: var(--border-bright); stroke-width: 1.5; }
+.ve-stack rect.hot { fill: var(--accent-dim); stroke: var(--accent); }
+.ve-stack text { fill: var(--text-dim); font: 500 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
+
+/* numbered callouts and edge numbers (references/diagrams.md): .now fills the current one; .q keeps an edge number quiet until its step */
+.ve-co circle { fill: var(--surface); stroke: var(--accent); stroke-width: 1.75; }
+.ve-co text { fill: var(--accent); font: 600 14px var(--font-mono); text-anchor: middle; dominant-baseline: central; }
+.ve-co.now circle { fill: var(--accent); } .ve-co.now text { fill: var(--surface); }
+.ve-co.q circle { stroke: var(--border-bright); } .ve-co.q text { fill: var(--text-dim); }
+.ve-co.q.now circle { fill: var(--accent); stroke: var(--accent); } .ve-co.q.now text { fill: var(--surface); }
+
+/* dimension lines (references/diagrams.md) */
+.ve-dim path { fill: none; stroke-width: 1; } .ve-dim .ext { stroke: var(--border-bright); } .ve-dim .ln { stroke: var(--text-dim); }
+.ve-dim text { fill: var(--text); font: 500 14px var(--font-mono); text-anchor: middle; }
+.ve-dim.is-key .ln { stroke: var(--accent); } .ve-dim.is-key text { fill: var(--accent); }
+
+/* flow dots: they travel under the nodes, so a dot enters a box and leaves from the far side */
+[data-flow] { fill: none; stroke: none; }
+.ve-dots circle { fill: var(--text); }
+.ve-dots .hit { fill: var(--accent); filter: drop-shadow(0 0 4px var(--accent)); }
+.ve-steps:not(.is-full) .ve-dots { display: none; }
+
+/* linked highlighting: same data-ref lights up together */
+/* Dim shapes, never text below 4.5:1: unlit labels drop to --text-dim instead of fading. */
+.ve-ref { text-decoration: underline dotted var(--text-dim) 1px; text-underline-offset: .22em; border-radius: var(--r-1); transition: background var(--fast) var(--ease); }
+.ve-ref.is-lit { background: var(--accent-dim); text-decoration-color: var(--accent); }
+svg [data-ref] { transition: opacity var(--med) var(--ease); }
+svg.has-lit path[data-ref]:not(.is-lit), svg.has-lit g[data-ref]:not(.is-lit) .sh { opacity: .25; }
+svg.has-lit g[data-ref]:not(.is-lit) text, svg.has-lit text[data-ref]:not(.is-lit) { fill: var(--text-dim); }
+.ve-n.is-lit .sh { stroke: var(--accent); }
+.ve-e.is-lit { stroke: var(--accent); }
+.ve-el.is-lit { fill: var(--text); }
+.case.is-lit { border-color: var(--accent); }
+
+/* stepper / scene player */
+/* Future steps: shapes stay as a faint outline; their labels are hidden, not faded to an unreadable gray. */
+.ve-steps [data-s] { transition: opacity var(--slow) var(--ease), stroke-dashoffset var(--slow) var(--ease); }
+.ve-steps [data-s]:not(.on) { opacity: .15; }
+.ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 0; }
+.ve-steps path[pathLength][data-s] { stroke-dasharray: 1; stroke-dashoffset: 1; }
+.ve-steps path[pathLength][data-s].on { stroke-dashoffset: 0; }
+.ve-steps .ve-n.now > .sh { stroke: var(--accent); }
+/* replay: the edges that fired light until the full picture, and each token runs its path once, after --d; edges and nodes still show the step without tokens */
+.ve-steps:not(.is-full) .ve-e.now { stroke: var(--accent); stroke-width: 2.75; }
+.ve-tok { fill: var(--accent); visibility: hidden; }
+.ve-steps:not(.is-still) .ve-tok.now { visibility: visible; animation: ve-run var(--dur, 900ms) ease-in-out var(--d, 0ms) both; }
+@keyframes ve-run { from { offset-distance: 0%; opacity: 0; } 10%, 75% { opacity: 1; } to { offset-distance: 100%; opacity: 0; } }
+/* a part that comes and goes (a queued job, a busy slot): shown only on the steps its data-s lists, arriving after --d */
+.ve-steps .ve-at { transition: opacity var(--med) var(--ease); }
+.ve-steps .ve-at:not(.now) { opacity: 0; }
+.ve-steps .ve-at.now { transition-delay: var(--d, 0ms); }
+/* a changing value: one text per step at one spot; the latest step's shows, swapped without a crossfade */
+.ve-steps .ve-vals text { transition: none; }
+.ve-vals text.on:has(~ text.on) { opacity: 0; }
+.ve-player { display: grid; grid-template-columns: auto auto minmax(0, 1fr) auto; align-items: center; gap: var(--s-2) var(--s-3); margin-top: var(--s-4); }
+.ve-cap { grid-column: 1 / -1; list-style: none; padding: 0; min-height: 3.2em; }
+.ve-cap li::before { content: attr(data-n); font: 600 var(--t-label) var(--font-mono); color: var(--accent); margin-right: var(--s-3); font-variant-numeric: tabular-nums; }
+.ve-player input { accent-color: var(--accent); min-width: 0; }
+button { font: 500 var(--t-small) var(--font-mono); color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); cursor: pointer; transition: border-color var(--fast) var(--ease); }
+button:hover, button:focus-visible { border-color: var(--accent); }
+
+/* KPI strip: one frame, cells split by hairlines, each number with its picture. Flex, so a wrapped last row stretches instead of leaving an empty gray cell. */
+.kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+.kpi { flex: 1 1 14rem; background: var(--surface); padding: var(--s-5); display: grid; grid-template-rows: auto auto 1fr; gap: var(--s-3); min-width: 0; }
+.kpi .val { font: 600 2.75rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.04em; }
+.ve-waffle { align-self: end; width: 11rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-waffle text { fill: var(--text-dim); dominant-baseline: central; }
+.ann { fill: none; stroke: var(--text-dim); stroke-width: 1; }
+.ve-bars { align-self: end; width: 100%; max-width: 16rem; height: auto; font: 500 13px var(--font-mono); overflow: visible; }
+.ve-bars text { fill: var(--text-dim); dominant-baseline: central; }
+.ve-bars rect { fill: var(--border-bright); transform-box: fill-box; transform-origin: left; transition: transform 900ms var(--ease) 150ms; }
+.ve-bars .hot { fill: var(--accent); }
+.ve-bars .hot + text { fill: var(--text); }
+
+/* small multiples: one mini diagram per case; the changed part takes the case's status color */
+.cases { display: grid; grid-template-columns: repeat(auto-fit, minmax(14.5rem, 1fr)); gap: var(--s-4); }
+.case { background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); display: grid; gap: var(--s-3); align-content: start; transition: border-color var(--fast) var(--ease); }
+.case[data-st=ok] { --st: var(--ok); } .case[data-st=warn] { --st: var(--warn); } .case[data-st=risk] { --st: var(--risk); }
+.ve-mini { width: 100%; height: auto; font: 600 15px var(--font-body); }
+.ve-mini .ve-n .sh { filter: none; }
+/* a .cases column is never under 14.5rem, so a mini is ≥ 211 px and 14 units render ≥ 12.3 px */
+.ve-mini .ve-n .sub { font-size: 14px; }
+.ve-mini .is-st.ve-e { stroke: var(--st); stroke-width: 2.75; }
+.ve-mini .is-st .sh { stroke: var(--st); stroke-width: 2; }
+.ve-mini .is-st .sub { fill: var(--st); }
+.ve-mini .is-off { stroke-dasharray: 5 4; }
+.ve-mini .ve-e.is-off { opacity: .35; }
+
+/* chips */
+.chip { display: inline-flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); padding: 2px var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; justify-self: start; }
+.chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; }
+.chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+.chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+.chip.risk { color: var(--risk); }
+
+details { border-top: 1px solid var(--border); padding-top: var(--s-4); color: var(--text-dim); font-size: var(--t-body); }
+summary { cursor: pointer; font: 500 var(--t-label) var(--font-mono); margin-bottom: var(--s-2); }
+/* sources stay visible: readers check them without hunting for a toggle */
+.sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+/* entrance: blocks rise in once; bars grow as their block arrives (JS adds .js-motion only when motion is allowed) */
+.js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+.js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+.js-motion main > :not(.in) .ve-bars rect { transform: scaleX(0); }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } .ve-tok { display: none; } }
+
+@media print {
+  /* Print uses the register's light foregrounds on white, every step fully drawn, and no effects. */
+  :where(:root) { --bg: #fff; --surface: #fff; --border: #dfe3e0; --border-bright: #888e8b; --text: #121614; --text-dim: #545e59; --accent: #955700; --ok: #1c7443; --warn: #7a5e00; --risk: #b0341e; --info: #1a6890; --node-top: #fff; }
+  :where(:root[data-register="blueprint"]) { --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --warn: #776300; --info: #145f99; }
+  :where(:root[data-register="paper"]) { --border: #e3e3dc; --border-bright: #8e8e8a; --text: #17191c; --text-dim: #575c63; --accent: #2c4cd0; --ok: #1d7443; --warn: #836000; --risk: #b3301d; --info: #1b6a94; }
+  :where(:root[data-register="editorial"]) { --border: #e2e0da; --border-bright: #8c8a85; --text: #111111; --text-dim: #5a5853; --accent: #cc3418; --ok: #1d7443; --warn: #836000; --risk: #a01d48; --info: #1b6a94; }
+  .ve-player button, .ve-player input, .ve-dots { display: none; }
+  .frame { overflow: visible; background: #fff; } .ve-svg, .ve-svg.ve-flow { min-width: 0; }
+  .frame, .case, .kpi { break-inside: avoid; } h2 { break-after: avoid; }
+  svg * { filter: none !important; }
+  .js-motion main > * { opacity: 1 !important; transform: none !important; }
+  .js-motion .ve-bars rect { transform: none !important; }
+  .ve-steps [data-s]:not(.on), .ve-steps g[data-s]:not(.on) text, .ve-steps text[data-s]:not(.on) { opacity: 1; }
+  .ve-steps .ve-at:not(.now) { opacity: 0; }
+  .ve-steps path[pathLength][data-s] { stroke-dashoffset: 0; }
+  .ve-tok, .ve-vals text:not(:last-child) { display: none; }
+}
+</style><style>
+main>*{opacity:1!important;transform:none!important;transition:none!important;animation:none!important}
+:root{--font-body:'IBM Plex Sans KR',sans-serif;--font-mono:'IBM Plex Mono',monospace;font-variant-numeric:tabular-nums}body{font-family:var(--font-body)}main{max-width:1220px;margin:auto;padding:30px 28px 70px}header{border-bottom:1px solid var(--border);padding-bottom:22px}h1{font-size:clamp(1.8rem,4vw,3rem);line-height:1.25;margin:10px 0 18px;max-width:30ch}h2{font-size:1.6rem;line-height:1.4;margin:0 0 16px}h3{font-size:1.08rem;margin:20px 0 10px}p{line-height:1.8;margin:12px 0;max-width:88ch}section{margin-top:48px}.meta,.caption,figcaption{color:var(--text-dim);font-size:.88rem;line-height:1.7}nav{display:flex;gap:16px;flex-wrap:wrap;margin:18px 0}a{color:var(--accent);overflow-wrap:anywhere}figure{margin:18px 0 24px;padding:22px;border:1px solid var(--border);background:var(--surface)}figcaption{margin-top:16px}.scroll{overflow-x:auto;max-width:100%}table{width:100%;border-collapse:collapse;text-align:left;font-size:.93rem}th,td{padding:13px 12px;border-bottom:1px solid var(--border);vertical-align:top;line-height:1.7}thead th{font-size:.85rem;color:var(--text-dim)}code{font: .85em var(--font-mono);overflow-wrap:anywhere}.pill{display:inline-block;border:1px solid currentColor;padding:3px 9px;border-radius:3px;font-size:.78rem;margin:3px 5px 3px 0}.yes{color:var(--ok,#278565)}.gap{color:var(--warn,#a46d16)}.scope{color:var(--info,#167a9b)}.two{display:grid;grid-template-columns:1fr 1fr;gap:24px}.three{display:grid;grid-template-columns:repeat(3,1fr);gap:20px}.fact{border-top:2px solid var(--border-bright);padding:14px 0;line-height:1.7}.fact strong{display:block;margin-bottom:8px}.flow{display:flex;align-items:stretch;gap:10px;min-width:850px}.flow>div{flex:1;border:1px solid var(--border-bright);padding:16px;line-height:1.7}.flow>span{align-self:center;color:var(--accent);font-size:.8rem;max-width:55px}.flow b{display:block;margin-bottom:8px}.barrow{display:grid;grid-template-columns:150px 1fr 110px;align-items:center;gap:16px;margin:14px 0}.bar{height:14px;background:var(--accent)}button,select,input{font:inherit;padding:9px 12px;color:var(--text);background:var(--surface);border:1px solid var(--border-bright);border-radius:3px}button{cursor:pointer}a:focus-visible,button:focus-visible,select:focus-visible,input:focus-visible{outline:3px solid var(--accent);outline-offset:3px}.controls{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin:16px 0}.dag{display:block;width:1100px;height:auto;max-width:none}.dag text{font-family:var(--font-body);fill:var(--text);font-size:14px}.dag .small{font-size:12px;fill:var(--text-dim)}.dag rect{fill:var(--surface);stroke:var(--border-bright);stroke-width:1.5;rx:6}.dag .shadow rect{stroke:var(--accent)}.dag path{fill:none;stroke:var(--text-dim);stroke-width:1.5;marker-end:url(#arr)}.dag g[role=button]{cursor:pointer}.dag g[role=button]:hover rect,.dag g.selected rect{stroke:var(--accent);stroke-width:3}.inspector{padding:18px;border:1px solid var(--border-bright);min-height:130px}.inspector p{margin:6px 0}.inventory{table-layout:fixed;min-width:950px}.inventory th:nth-child(1){width:24%}.inventory th:nth-child(2){width:30%}.inventory th:nth-child(3){width:28%}.inventory td{overflow-wrap:anywhere}footer{margin-top:48px;border-top:1px solid var(--border);padding-top:20px}[hidden]{display:none!important}@media(max-width:700px){main{padding:20px 16px 45px}figure{padding:16px}section{margin-top:36px}.two,.three{grid-template-columns:1fr}.barrow{grid-template-columns:1fr;gap:7px}th,td{padding:10px}h2{font-size:1.35rem}}
+</style></head><body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <marker id="ve-ah" viewBox="0 0 10 10" refX="9" refY="5" markerUnits="userSpaceOnUse" markerWidth="11" markerHeight="11" orient="auto"><path d="M0 0L10 5L0 10z" fill="context-stroke"/></marker>
+    <linearGradient id="ve-node" x1="0" y1="0" x2="0" y2="1"><stop offset="0" style="stop-color:var(--node-top)"/><stop offset="1" style="stop-color:var(--surface)"/></linearGradient>
+    <pattern id="ve-w-on" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1" y="1" width="8" height="8" rx="1.5" style="fill:var(--accent)"/></pattern>
+    <pattern id="ve-w-off" width="10" height="10" patternUnits="userSpaceOnUse"><rect x="1.5" y="1.5" width="7" height="7" rx="1.5" style="fill:none;stroke:var(--text-dim)"/></pattern>
+  </defs>
+</svg><main><header><p class="meta">그래프 계약 감사 / 2026-10-19 전면 재작성</p><h1>그래프는 이미 실행 경로다.<br>이제 계약과 비용을 검토한다.</h1><p>LivePipelineDesc가 의미 노드를 선언하고 EnhancedRenderGraph가 자원 버전으로 실행 의존성을 만든다. 아래 그림은 선언 순서를 타임라인으로 옮긴 것이 아니라, 현재 생산자와 소비자를 새로 연결한 것이다.</p><nav><a href="#dag">자원 흐름</a><a href="#fusion">공유 패스</a><a href="#contract">버전·수명</a><a href="#material">재질 적합성</a><a href="#cpu">CPU 준비</a><a href="#remaining">잔여 작업</a><a href="#inventory">노드 목록</a></nav></header><figure><div class="three"><div class="fact"><strong>의미 노드</strong>reads/writes/modifies로 공개 계약을 고정한다.</div><div class="fact"><strong>실제 GPU 패스</strong>하나의 노드가 여러 패스를 만들고, 여러 노드가 공통 패스 결과를 참조할 수도 있다.</div><div class="fact"><strong>실행 증명</strong>명시적 의존성은 병행할 여지를 준다. 실제 GPU overlap은 측정으로 확인한다.</div></div><figcaption>node.declare는 CPU에서 순서대로 호출된다. GPU 큐 선택과 CPU 명령 기록의 병렬성은 별도의 결정이다.</figcaption></figure><section id="dag"><h2>Geometry에서 카메라와 그림자가 갈라진다</h2><p class="caption">노드를 선택하면 현재 소스에서 추출한 슬롯을 표시한다. 단순화한 그림으로, Geometry 하위 소비 간선과 AO 가지 일부는 생략했다.</p><figure><div class="scroll"><svg class="dag" viewBox="0 0 1100 890" role="img" aria-labelledby="dagtitle"><title id="dagtitle">카메라 표면과 광원 공간 그림자의 자원 의존성</title><defs><marker id="arr" markerWidth="8" markerHeight="8" refX="7" refY="4" orient="auto"><path d="M0 0L8 4L0 8" style="fill:var(--text-dim);stroke:none;marker-end:none"/></marker></defs><path d="M430 60V84H240V110"/><text class="small" x="255" y="95">첫 입력</text><path d="M630 60V84H860V110"/><text class="small" x="870" y="95">광원 입력</text><path d="M680 35H1080V185H860V210"/><text class="small" x="970" y="195">정적 기하</text><path d="M240 160V210"/><text class="small" x="250" y="190">첫 목록</text><path d="M240 260V310"/><text class="small" x="250" y="290">현재 HZB</text><path d="M240 360V410"/><text class="small" x="250" y="390">최종 목록</text><path d="M240 460V510"/><text class="small" x="250" y="490">visibility</text><path d="M240 560V610"/><text class="small" x="250" y="590">타일·인자</text><path d="M240 660V710"/><text class="small" x="250" y="690">표면 버전</text><path d="M240 760V835H380"/><text class="small" x="257" y="798">GBuffer + AO</text><path d="M860 160V180H660V335H690"/><text class="small" x="667" y="292">첫 목록</text><path d="M860 260V310"/><text class="small" x="870" y="290">정적 깊이</text><path d="M860 360V410"/><text class="small" x="870" y="390">HZB</text><path d="M860 460V510"/><text class="small" x="870" y="490">회복 목록</text><path d="M1030 235H1065V535H1030"/><text class="small" x="967" y="494">정적 병합</text><path d="M860 560V610"/><text class="small" x="870" y="590">최종 그림자</text><path d="M690 535H620V810"/><text class="small" x="627" y="760">Shadow.Map</text><g role="button" tabindex="0" data-node="METEOR.Scene.Geometry" class="camera" aria-label="Geometry 계약 보기"><rect x="380" y="10" width="300" height="50"/><text x="394" y="31">Geometry</text><text class="small" x="394" y="50">기하 테이블·pose·stream 준비</text></g><g role="button" tabindex="0" data-node="METEOR.Scene.Cull.First" class="camera" aria-label="Camera · First 계약 보기"><rect x="70" y="110" width="340" height="50"/><text x="84" y="131">Camera · First</text><text class="small" x="84" y="150">이전 HZB / 첫 목록</text></g><g role="button" tabindex="0" data-node="METEOR.Shadow.Cull.First" class="shadow" aria-label="Shadow · First 계약 보기"><rect x="690" y="110" width="340" height="50"/><text x="704" y="131">Shadow · First</text><text class="small" x="704" y="150">광원 공간 첫 목록</text></g><g role="button" tabindex="0" data-node="METEOR.Shadow.StaticCache" class="shadow" aria-label="Shadow · StaticCache 계약 보기"><rect x="690" y="210" width="340" height="50"/><text x="704" y="231">Shadow · StaticCache</text><text class="small" x="704" y="250">정적 깊이</text></g><g role="button" tabindex="0" data-node="METEOR.Scene.Occluder" class="camera" aria-label="Camera · Occluder 계약 보기"><rect x="70" y="210" width="340" height="50"/><text x="84" y="231">Camera · Occluder</text><text class="small" x="84" y="250">HW/SW → 현재 깊이</text></g><g role="button" tabindex="0" data-node="METEOR.Scene.Cull.Final" class="camera" aria-label="Camera · Final 계약 보기"><rect x="70" y="310" width="340" height="50"/><text x="84" y="331">Camera · Final</text><text class="small" x="84" y="350">현재 HZB → 회복 목록</text></g><g role="button" tabindex="0" data-node="METEOR.Shadow.Occluder" class="shadow" aria-label="Shadow · Occluder 계약 보기"><rect x="690" y="310" width="340" height="50"/><text x="704" y="331">Shadow · Occluder</text><text class="small" x="704" y="350">정적 깊이 + 첫 목록</text></g><g role="button" tabindex="0" data-node="METEOR.Scene.Visibility" class="camera" aria-label="Visibility 계약 보기"><rect x="70" y="410" width="340" height="50"/><text x="84" y="431">Visibility</text><text class="small" x="84" y="450">RG32Uint IDs + D32</text></g><g role="button" tabindex="0" data-node="METEOR.Shadow.Cull.Final" class="shadow" aria-label="Shadow · Final 계약 보기"><rect x="690" y="410" width="340" height="50"/><text x="704" y="431">Shadow · Final</text><text class="small" x="704" y="450">cascade HZB → 회복 목록</text></g><g role="button" tabindex="0" data-node="METEOR.Scene.MaterialWork" class="camera" aria-label="MaterialWork 계약 보기"><rect x="70" y="510" width="340" height="50"/><text x="84" y="531">MaterialWork</text><text class="small" x="84" y="550">record/tile 패킷·간접 인자</text></g><g role="button" tabindex="0" data-node="METEOR.Shadow.Raster" class="shadow" aria-label="Shadow · Raster 계약 보기"><rect x="690" y="510" width="340" height="50"/><text x="704" y="531">Shadow · Raster</text><text class="small" x="704" y="550">정적 병합 + HW 깊이</text></g><g role="button" tabindex="0" data-node="METEOR.Scene.SurfaceResolve" class="camera" aria-label="SurfaceResolve 계약 보기"><rect x="70" y="610" width="340" height="50"/><text x="84" y="631">SurfaceResolve</text><text class="small" x="84" y="650">다섯 표면 타깃 발행</text></g><g role="button" tabindex="0" data-node="METEOR.Shadow.History" class="shadow" aria-label="Shadow · History 계약 보기"><rect x="690" y="610" width="340" height="50"/><text x="704" y="631">Shadow · History</text><text class="small" x="704" y="650">다음 프레임에 보존</text></g><g role="button" tabindex="0" data-node="METEOR.Scene.Decal" class="camera" aria-label="Decal 계약 보기"><rect x="70" y="710" width="340" height="50"/><text x="84" y="731">Decal</text><text class="small" x="84" y="750">Diffuse / ORM / Normal 수정</text></g><g role="button" tabindex="0" data-node="METEOR.Scene.Color" class="camera" aria-label="Color / 후속 합성 계약 보기"><rect x="380" y="810" width="340" height="50"/><text x="394" y="831">Color / 후속 합성</text><text class="small" x="394" y="850">표면 + AO + 최종 그림자</text></g></svg></div><figcaption>실선은 현재 프레임의 데이터 의존성이다. 이전 프레임 이력은 외부 입력으로 읽는다. First 두 노드는 아래의 공통 GPU 배치를 공유하므로 두 번의 독립 실행으로 계산하지 않는다.</figcaption></figure><div class="inspector" id="nodeInspector" aria-live="polite"></div><p><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3633">EnhancedSceneRenderer.cpp · L3633</a> · <a href="../../Engine/RenderEngine/MaterialGraphSceneHost.cpp#L3503">MaterialGraphSceneHost.cpp · L3503</a></p></section><section id="composition"><h2>장면 합성은 HDR에서 끝내고 UI는 뒤에 둔다</h2><figure><div class="scroll"><div class="flow"><div><b>Color·SkyBox</b>표면·AO·그림자를 읽어 HDR 장면을 만든다.</div><span>합성 →</span><div><b>장면 효과</b>SSGI·SSS·SSR·Volume·Blended·Sprite·Fog가 장면 색을 이어받는다.</div><span>재구성 →</span><div><b>Temporal.Upscale</b>motion/depth/reactive 입력으로 선형 HDR을 처리한다.</div><span>표시 변환 →</span><div><b>PostChain·SpatialPost</b>tone mapping·eligible AA 이후 공간 후처리를 한다.</div><span>합성 →</span><div><b>DisplayInputs·UI</b>hudless 복사와 UI layer를 분리하고 최종 표시로 넘긴다.</div></div></div><figcaption>Temporal.Inputs는 조명 앞에서 준비된다. UI는 업스케일 입력에 섞지 않으며 native provider에서는 동일 해상도로 이어진다.</figcaption></figure><p><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4326">EnhancedSceneRenderer.cpp · L4326</a> · <a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4420">EnhancedSceneRenderer.cpp · L4420</a></p></section><section id="fusion"><h2>두 First 노드는 같은 GPU 배치를 참조한다</h2><figure><div class="scroll"><div class="flow"><div><b>준비된 투영</b>카메라 First와 shadow First 최대 3개.</div><span>묶음 선언 →</span><div><b>DeclareSharedFirst</b>같은 Geometry·recording의 입력을 모은다.</div><span>실행 →</span><div><b>Shared.First</b>공통 reset/cull/compaction과 하나의 ring 큐.</div><span>발행 →</span><div><b>뷰별 결과</b>각 목록·간접 인자의 버퍼와 버전은 분리한다.</div></div></div><figcaption>먼저 호출된 공개 진입점이 공통 패스를 선언한다. 이후 단계는 동일 그래프에서 이미 선언된 결과를 사용한다.</figcaption></figure><p>공유 batch는 장치·upload recording·descriptor 세대가 일치해야 하고 최대 8뷰다. 한도를 넘으면 나누며 다른 recording 소유자를 섞지 않는다. Shadow.StaticCache miss와 Shadow.Final recovery에도 해당 단계의 공유 batch가 있다.</p><p><a href="../../Engine/RenderEngine/GpuGeometryVisibility.cpp#L1146">GpuGeometryVisibility.cpp · L1146</a> · <a href="../../Engine/RenderEngine/GpuGeometryVisibilityShared.inl#L203">GpuGeometryVisibilityShared.inl · L203</a> · <a href="../../Engine/RenderEngine/MaterialGraphSceneShadowStage.inl#L245">MaterialGraphSceneShadowStage.inl · L245</a></p></section><section id="contract"><h2>버전과 프레임 소유권이 성립 조건이다</h2><figure><div class="scroll"><table><thead><tr><th>경계</th><th>현재 보장</th><th>거부·실패 조건</th><th>소스</th></tr></thead><tbody><tr><th>상위 슬롯</th><td>발행된 슬롯만 읽고 수정은 modifies로 구분한다.</td><td>발행 전 읽기·중복 writes·꺼질 writer의 무조건 발행.</td><td><a href="../../Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.cpp#L32">EnhancedLivePipelineDesc.cpp · L32</a></td></tr><tr><th>단계 핸들</th><td>RequireStage가 공개 geometry/list/depth와 실제 입력의 동일성을 검사한다.</td><td>다른 깊이·이전 목록·다른 그래프 버전.</td><td><a href="../../Engine/RenderEngine/MaterialGraphSceneFinalCullStage.inl#L15">MaterialGraphSceneFinalCullStage.inl · L15</a></td></tr><tr><th>명시적 버전</th><td>Write/Modify가 버전을 갱신하고 Compile이 접근을 검증한다.</td><td>stale/foreign handle·producer 없는 읽기·잘못된 access.</td><td><a href="../../Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L485">EnhancedRenderGraph.cpp · L485</a></td></tr><tr><th>HW/SW 합성</th><td>공유 atomic key epoch에 기여한 뒤 resolve가 depth/visibility를 발행한다.</td><td>일반 쓰기와 atomic 공유의 의존성 누락.</td><td><a href="../../Engine/RenderEngine/MaterialGraphHybridVisibility.h#L8">MaterialGraphHybridVisibility.h · L8</a></td></tr><tr><th>이력·상주</th><td>view identity와 제출 소유자를 유지한다. ResidentSet은 완료/거부까지 보존한다.</td><td>카메라가 다른 이력·진행 중 페이지 퇴거·조기 해제.</td><td><a href="../../Engine/RenderEngine/Assets/ClusterStreaming.h#L100">ClusterStreaming.h · L100</a></td></tr><tr><th>명령 기록</th><td>불변 캡처·분리된 쓰기 슬롯을 가진 pass만 recording independent로 선언한다.</td><td>동일 통계 슬롯이나 mutable descriptor의 동시 수정.</td><td><a href="../../Engine/RenderEngine/MaterialGraphSceneShadowStage.inl#L127">MaterialGraphSceneShadowStage.inl · L127</a></td></tr></tbody></table></div><figcaption>슬롯 검증과 리소스 버전 검증은 보완 관계다. 슬롯 이름만으로 실제 자원의 버전·수명이 증명되지는 않는다.</figcaption></figure><div class="two"><div><h3>반드시 기다려야 하는 입력</h3><p>카메라 Final은 Occluder의 현재 HZB를 기다린다. MaterialWork는 visibility를 읽고 SurfaceResolve는 타일·인자를 읽는다. Decal은 생성된 표면 버전을 수정한다.</p></div><div><h3>병행 가능성과 측정의 차이</h3><p>version edge가 없는 GPU 패스도 큐 정책·자원 상태·비용 모델 때문에 겹치지 않을 수 있다. compute-compatible, recording-independent는 GPU async 실행의 증거가 아니다.</p></div></div><p><a href="../../Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L3492">EnhancedRenderGraph.cpp · L3492</a> · <a href="../../Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.cpp#L213">EnhancedLivePipelineDesc.cpp · L213</a></p></section><section id="material"><h2>재질 종류에 따라 소비 경로가 달라진다</h2><figure><div class="scroll"><table><thead><tr><th>표현</th><th>실제 연결</th><th>보존할 조건</th></tr></thead><tbody><tr><th>Opaque surface</th><td>Visibility → MaterialWork → SurfaceResolve. GPU가 record/tile을 분류하고 shader bucket을 간접 실행한다.</td><td>semantic key·양면 상태·geometry page를 모두 유지한다.</td></tr><tr><th>Alpha / 변형</th><td>visibility의 재질 프로그램과 HW route가 coverage를 결정한다.</td><td>alpha 경계·현재/이전 pose·SW 허용 경로를 따로 검사한다.</td></tr><tr><th>Blended / Transmission</th><td>순서를 보존하는 blended 목록, LayerWork와 별도 합성·효과 경로.</td><td>opaque 분류가 투명 순서까지 해결한다고 해석하지 않는다.</td></tr><tr><th>Volume</th><td>compiler는 homogeneous 계수 선언을 요구한다.</td><td>spatially varying Volume은 명시적으로 거부한다.</td></tr><tr><th>도함수</th><td>삼각형 복원·pixel-center 보정과 fine derivative 옵션이 있다.</td><td>임의 노드·특수 UV·모든 도함수의 자동 올바름은 별도 검사다.</td></tr><tr><th>장치·백엔드</th><td>Scene은 mesh indirect를 요구한다. HW/SW visibility는 buffer int64 atomic을 사용한다.</td><td>미지원 장치의 CPU/direct surface로 조용히 대체하지 않는다. Vulkan 전체 수용과 구분한다.</td></tr></tbody></table></div><figcaption>그래프의 표현 가능성, 생성 프로그램 검증, 런타임 소비, 화면 정확성은 각각 다른 검사다.</figcaption></figure><p><a href="../../Engine/RenderEngine/MaterialGraphSceneCompiler.cpp#L155">MaterialGraphSceneCompiler.cpp · L155</a> · <a href="../../Engine/RenderEngine/MaterialGraphSceneHost.cpp#L1924">MaterialGraphSceneHost.cpp · L1924</a> · <a href="../../Engine/RenderEngine/MaterialGraphSceneSurfaceStage.inl#L63">MaterialGraphSceneSurfaceStage.inl · L63</a></p></section><section id="cpu"><h2>CPU 준비 병렬화와 GPU ring은 다른 층이다</h2><figure><div class="scroll"><div class="flow"><div><b>공통 준비</b>프레임 입력·효과·geometry table 골격.</div><span>분기 →</span><div><b>Draw 바인딩 / 메시</b>재질 워커와 렌더 스레드의 기하·caster 준비를 겹친다.</div><span>필요 입력 합류 →</span><div><b>뷰·그림자 준비</b>광원 setup과 카메라 visibility 준비. 합류 중 owner가 남은 일을 돕는다.</div><span>최종 입력 →</span><div><b>패킷 프레임 준비</b>기하 page·record·culling offset으로 GPU 입력을 만든다.</div></div></div><figcaption>CPU 데이터 의존성의 요약이다. 모든 작업이 같은 순간 시작한다는 타임라인이 아니다.</figcaption></figure><figure><div class="scroll"><table><thead><tr><th>재사용 층</th><th>보관 대상</th><th>무효화·재준비</th></tr></thead><tbody><tr><th>CPU 패킷 계획</th><td>scan/버킷/slice의 불변 숫자 배열.</td><td>용량·버킷 용량·dispatch 폭·slice 한도 변경. GPU 출력·업로드는 매 recording에서 준비.</td></tr><tr><th>그래프 구조 일정</th><td>불변 schedule identity와 기록 unit shape.</td><td>리소스 접근·패스 구조·기록 조건이 달라지면 기존 일정과 동일하다고 볼 수 없다.</td></tr><tr><th>GPU 자원 풀</th><td>완료 후 다시 쓸 수 있는 버퍼 또는 물리 페이지.</td><td>완료·참조·세대·크기·상태가 맞아야 한다. 이전 내용이나 descriptor 재사용을 뜻하지 않는다.</td></tr></tbody></table></div><figcaption>계산 캐시, 그래프 일정, GPU 메모리는 서로 다른 소유·무효화 규약을 갖는다.</figcaption></figure><p><a href="../../Engine/RenderEngine/MaterialGraphPreparationTasks.h#L1">MaterialGraphPreparationTasks.h · L1</a> · <a href="../../Engine/RenderEngine/MaterialGraphPacketPlan.h#L108">MaterialGraphPacketPlan.h · L108</a> · <a href="../../Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp#L4094">EnhancedRenderGraph.cpp · L4094</a></p><p>최근 동일 바이너리의 캐시 OFF/ON에서 패킷 준비 Running은 1.159→0.996ms다. 일반 Game CPU p50은 12.040ms, 반복은 11.958ms로 CPU 예산 8.333ms를 넘는다. 이 값은 GPU ring 자체의 성능을 측정한 결과가 아니다.</p><p><a href="../../Artifacts/packet-plan-reuse-20261019/timeline.html?dataset=after-etw&amp;start=11740.973&amp;span=2.7833&amp;detail=preparation">현재 CPU 준비 타임라인</a> · <a href="../../Artifacts/packet-plan-reuse-20261019/acceptance.json">측정 조건·출력 판정</a></p></section><section id="remaining"><h2>연결 누락과 비용 문제를 나눠 검토한다</h2><figure><div class="scroll"><table><thead><tr><th>대상</th><th>지금의 상태</th><th>추가 검토의 종료 조건</th></tr></thead><tbody><tr><th>표면 단계 분리</th><td>실제 슬롯·pass와 consumer가 존재한다.</td><td>노드를 늘리기보다 공통 입력·핸들 계약·선언 비용을 검증한다.</td></tr><tr><th>가시성 준비</th><td>뷰별 candidate/bin·범위·상수·출력을 준비한다.</td><td>뷰 독립 topology와 뷰별 상태를 분리하고 이력·회복 동일성을 보존한다.</td></tr><tr><th>간접 명령</th><td>불변 dispatch 계획은 재사용하지만 PacketDraw·버킷·업로드·바인딩은 남는다.</td><td>기하 page와 최종 culling offset의 의존성을 지키며 선행 계획/후행 연결을 나눈다.</td></tr><tr><th>풀 검색</th><td>요청마다 적합한 free 버퍼를 순회한다.</td><td>인덱스·크기 분류·프레임 묶음으로 검색량을 줄이되 수명을 보존한다.</td></tr><tr><th>표현·스트리밍</th><td>광원 공간 shadow·고정 sparse 풀·선택적 LOD/압축 표현.</td><td>화면 기반 변환 저장·예산 후퇴·재투영/주입은 독립 설계와 검증이 필요하다.</td></tr><tr><th>품질·플랫폼</th><td>선택 DX12 실행 증거가 있다.</td><td>재질 조합·애니메이션·카메라 전환·streaming 압력·백엔드별 장기 회귀를 수용한다.</td></tr></tbody></table></div><figcaption>공개 발표는 설계 비교 자료다. 현재 계약의 근거는 소스이며 최적화 수용에는 별도의 실행 검증이 필요하다.</figcaption></figure><p><a href="../../Engine/RenderEngine/MaterialGraphTransientBufferPool.h#L133">MaterialGraphTransientBufferPool.h · L133</a> · <a href="../../Engine/RenderEngine/MaterialGraphSceneHost.cpp#L2948">MaterialGraphSceneHost.cpp · L2948</a> · <a href="https://enginearchitecture.org/downloads/REAC_2025_Capcom.pdf">공개 설계 비교 자료</a></p></section><section id="inventory"><h2>등록 코드에서 추출한 전체 노드 계약</h2><p>35개 항목은 BuildPipelineDesc의 선언 목록이다. 뷰·기능·지원 조건에 따라 비활성 또는 무효 출력이 될 수 있다. 프레임당 GPU pass 수가 아니며 prepare의 CPU 데이터 흐름 전체도 아니다.</p><div class="controls"><label for="nodeSearch">노드·슬롯 검색</label><input id="nodeSearch" type="search" placeholder="예: Shadow 또는 Visibility"></div><figure><div class="scroll"><table class="inventory"><thead><tr><th>의미 노드 / 소스 행</th><th>reads</th><th>writes · modifies</th><th>메타데이터</th></tr></thead><tbody><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3638">METEOR.Scene.Geometry · L3638</a></th><td>—</td><td><b>발행</b><br>METEOR.Scene.Geometry.Table</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3649">METEOR.Scene.Cull.First · L3649</a></th><td>METEOR.Scene.Geometry.Table</td><td><b>발행</b><br>METEOR.Scene.Cull.FirstList</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3662">METEOR.Scene.Occluder · L3662</a></th><td>METEOR.Scene.Geometry.Table<br>METEOR.Scene.Cull.FirstList</td><td><b>발행</b><br>METEOR.Scene.Occluder.Depth</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3675">METEOR.Scene.Cull.Final · L3675</a></th><td>METEOR.Scene.Geometry.Table<br>METEOR.Scene.Occluder.Depth</td><td><b>발행</b><br>METEOR.Scene.Cull.FinalList<br>METEOR.Scene.Cull.BlendedList</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3692">METEOR.Scene.LayerWork · L3692</a></th><td>METEOR.Scene.Cull.BlendedList</td><td><b>발행</b><br>METEOR.Scene.Commands.Layer<br>METEOR.Scene.Commands.Blended</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3709">METEOR.Shadow.StaticCache · L3709</a></th><td>METEOR.Scene.Geometry.Table</td><td><b>발행</b><br>METEOR.Shadow.Static.Depths</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3728">METEOR.Shadow.Cull.First · L3728</a></th><td>METEOR.Scene.Geometry.Table</td><td><b>발행</b><br>METEOR.Shadow.Cull.FirstLists</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3741">METEOR.Shadow.Occluder · L3741</a></th><td>METEOR.Scene.Geometry.Table<br>METEOR.Shadow.Static.Depths<br>METEOR.Shadow.Cull.FirstLists</td><td><b>발행</b><br>METEOR.Shadow.Occluder.Depths</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3756">METEOR.Shadow.Cull.Final · L3756</a></th><td>METEOR.Scene.Geometry.Table<br>METEOR.Shadow.Occluder.Depths</td><td><b>발행</b><br>METEOR.Shadow.Cull.FinalLists</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3770">METEOR.Shadow.Raster · L3770</a></th><td>METEOR.Scene.Geometry.Table<br>METEOR.Shadow.Static.Depths<br>METEOR.Shadow.Cull.FinalLists</td><td><b>발행</b><br>Shadow.Map</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3785">METEOR.Shadow.History · L3785</a></th><td>Shadow.Map</td><td>—</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3799">METEOR.Scene.Visibility · L3799</a></th><td>METEOR.Scene.Cull.FinalList</td><td><b>발행</b><br>GBuffer.Depth<br>METEOR.Scene.Visibility</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3815">METEOR.Scene.MaterialWork · L3815</a></th><td>METEOR.Scene.Geometry.Table<br>METEOR.Scene.Visibility</td><td><b>발행</b><br>METEOR.Scene.Material.Tiles<br>METEOR.Scene.Material.Arguments</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3830">METEOR.Scene.SurfaceResolve · L3830</a></th><td>METEOR.Scene.Geometry.Table<br>GBuffer.Depth<br>METEOR.Scene.Visibility<br>METEOR.Scene.Material.Tiles<br>METEOR.Scene.Material.Arguments</td><td><b>발행</b><br>GBuffer.Diffuse<br>GBuffer.MetalRough<br>GBuffer.Normal<br>GBuffer.Emissive<br>GBuffer.Bitmask</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3852">METEOR.Scene.Decal · L3852</a></th><td>GBuffer.Depth<br>GBuffer.Bitmask</td><td><b>발행</b><br>METEOR.Scene.Decal.BaseDiffuse<br>METEOR.Scene.Decal.BaseOrm<br>METEOR.Scene.Decal.BaseNormal<br><b>수정</b><br>GBuffer.Diffuse<br>GBuffer.MetalRough<br>GBuffer.Normal</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3886">METEOR.Scene.History · L3886</a></th><td>GBuffer.Depth</td><td>—</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3897">Temporal.Inputs · L3897</a></th><td>GBuffer.Depth<br>METEOR.Scene.Geometry.Table<br>METEOR.Scene.Visibility<br>METEOR.Scene.Material.Tiles<br>METEOR.Scene.Material.Arguments<br>METEOR.Scene.Cull.BlendedList</td><td><b>발행</b><br>Temporal.Motion<br>Temporal.Reactive<br>Temporal.Transparency<br>Temporal.Responsive<br>Temporal.Depth</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3924">SSAO · L3924</a></th><td>GBuffer.Depth<br>GBuffer.Normal</td><td><b>발행</b><br>Scene.AmbientOcclusion</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3948">METEOR.Scene.Color · L3948</a></th><td>METEOR.Scene.Geometry.Table<br>METEOR.Scene.Visibility<br>METEOR.Scene.Commands.Layer<br>METEOR.Scene.Material.Tiles<br>METEOR.Scene.Material.Arguments<br>Scene.AmbientOcclusion<br>Shadow.Map<br>METEOR.Scene.Decal.BaseDiffuse<br>METEOR.Scene.Decal.BaseOrm<br>METEOR.Scene.Decal.BaseNormal</td><td><b>발행</b><br>Scene.LitColor<br><b>수정</b><br>GBuffer.Depth<br>GBuffer.Bitmask<br>GBuffer.Diffuse<br>GBuffer.MetalRough<br>GBuffer.Normal<br>GBuffer.Emissive</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L3983">SkyBox · L3983</a></th><td>GBuffer.Depth</td><td><br><b>수정</b><br>Scene.LitColor</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4008">SSGI · L4008</a></th><td>GBuffer.Depth<br>GBuffer.Normal<br>GBuffer.Diffuse<br>GBuffer.MetalRough<br>Scene.AmbientOcclusion<br>Temporal.Motion<br>Temporal.Responsive<br>Temporal.Reactive</td><td><br><b>수정</b><br>Scene.LitColor</td><td>active/consumes 조건 있음</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4061">SSS · L4061</a></th><td>GBuffer.Depth</td><td><br><b>수정</b><br>Scene.LitColor</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4088">SSR · L4088</a></th><td>GBuffer.Depth<br>GBuffer.MetalRough<br>GBuffer.Normal<br>GBuffer.Bitmask</td><td><br><b>수정</b><br>Scene.LitColor</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4121">METEOR.Scene.Volume · L4121</a></th><td>GBuffer.Depth<br>Shadow.Map</td><td><br><b>수정</b><br>Scene.LitColor</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4140">METEOR.Scene.LightTiles · L4140</a></th><td>GBuffer.Depth</td><td>—</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4153">METEOR.Scene.Blended · L4153</a></th><td>GBuffer.Depth<br>Shadow.Map<br>METEOR.Scene.Commands.Layer<br>METEOR.Scene.Commands.Blended</td><td><br><b>수정</b><br>Scene.LitColor</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4170">Sprite · L4170</a></th><td>GBuffer.Depth</td><td><br><b>수정</b><br>Scene.LitColor</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4200">VolumetricFog · L4200</a></th><td>GBuffer.Depth<br>Shadow.Map<br>METEOR.Scene.Commands.Layer<br>METEOR.Scene.Commands.Blended</td><td><br><b>수정</b><br>Scene.LitColor</td><td>active/consumes 조건 있음</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4307">Temporal.SpriteMotion · L4307</a></th><td>Scene.LitColor<br>GBuffer.Depth</td><td><br><b>수정</b><br>Temporal.Motion<br>Temporal.Reactive<br>Temporal.Transparency<br>Temporal.Responsive<br>Temporal.Depth</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4326">Temporal.Upscale · L4326</a></th><td>Temporal.Motion<br>Temporal.Depth<br>Temporal.Reactive<br>Temporal.Transparency<br>Temporal.Responsive</td><td><br><b>수정</b><br>Scene.LitColor</td><td>active/consumes 조건 있음</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4359">PostChain · L4359</a></th><td>Scene.LitColor</td><td><b>발행</b><br>Display.LDR</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4406">SpatialPost · L4406</a></th><td>—</td><td><br><b>수정</b><br>Display.LDR</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4420">Temporal.DisplayInputs · L4420</a></th><td>Display.LDR</td><td><b>발행</b><br>Display.Hudless<br>Display.UI</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4450">UI · L4450</a></th><td>—</td><td><br><b>수정</b><br>Display.LDR</td><td>자원·기능 조건은 구현 확인</td></tr><tr data-inventory><th><a href="../../Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp#L4499">live_present · L4499</a></th><td>Display.LDR<br>Display.Hudless<br>Display.UI<br>Temporal.Depth<br>Temporal.Motion</td><td>—</td><td>active/consumes 조건 있음</td></tr></tbody></table></div><figcaption>History처럼 쓰기 슬롯 없이 자원을 보존하는 단계도 있다. GPU 접근은 각 stage Declare에서 구체화한다.</figcaption></figure></section><section id="validation"><h2>문서 확인과 실행 수용의 범위</h2><p>이번 작업은 현재 소스·공개 원자료·기존 실행 산출물을 대조한 문서 감사다. 코드 경로의 존재, 선택 장면의 실행, 전체 제품 수용을 서로 바꾸어 쓰지 않는다.</p><p>최근 자료에는 Debug 빌드, CPU 계획 검사, Scene/Volume의 DX12 DebugLayer·GPU readback, CreatorRobot 고정 출력 비교가 있다. 성능 수집은 GPUValidation OFF였다. 전체 Scene GPUValidation ON이나 Vulkan 수용을 뜻하지 않는다.</p><p><a href="../../Artifacts/packet-plan-reuse-20261019/final-evidence.json">최근 실행의 수용 범위</a> · <a href="../../Artifacts/shared-streaming-20261017/scope-verdict.json">이전 sparse 검사 범위</a></p></section><script>const NODE_DATA=[{"name": "METEOR.Scene.Geometry", "line": 3638, "reads": [], "writes": ["METEOR.Scene.Geometry.Table"], "modifies": [], "conditional": false}, {"name": "METEOR.Scene.Cull.First", "line": 3649, "reads": ["METEOR.Scene.Geometry.Table"], "writes": ["METEOR.Scene.Cull.FirstList"], "modifies": [], "conditional": false}, {"name": "METEOR.Scene.Occluder", "line": 3662, "reads": ["METEOR.Scene.Geometry.Table", "METEOR.Scene.Cull.FirstList"], "writes": ["METEOR.Scene.Occluder.Depth"], "modifies": [], "conditional": false}, {"name": "METEOR.Scene.Cull.Final", "line": 3675, "reads": ["METEOR.Scene.Geometry.Table", "METEOR.Scene.Occluder.Depth"], "writes": ["METEOR.Scene.Cull.FinalList", "METEOR.Scene.Cull.BlendedList"], "modifies": [], "conditional": false}, {"name": "METEOR.Scene.LayerWork", "line": 3692, "reads": ["METEOR.Scene.Cull.BlendedList"], "writes": ["METEOR.Scene.Commands.Layer", "METEOR.Scene.Commands.Blended"], "modifies": [], "conditional": false}, {"name": "METEOR.Shadow.StaticCache", "line": 3709, "reads": ["METEOR.Scene.Geometry.Table"], "writes": ["METEOR.Shadow.Static.Depths"], "modifies": [], "conditional": false}, {"name": "METEOR.Shadow.Cull.First", "line": 3728, "reads": ["METEOR.Scene.Geometry.Table"], "writes": ["METEOR.Shadow.Cull.FirstLists"], "modifies": [], "conditional": false}, {"name": "METEOR.Shadow.Occluder", "line": 3741, "reads": ["METEOR.Scene.Geometry.Table", "METEOR.Shadow.Static.Depths", "METEOR.Shadow.Cull.FirstLists"], "writes": ["METEOR.Shadow.Occluder.Depths"], "modifies": [], "conditional": false}, {"name": "METEOR.Shadow.Cull.Final", "line": 3756, "reads": ["METEOR.Scene.Geometry.Table", "METEOR.Shadow.Occluder.Depths"], "writes": ["METEOR.Shadow.Cull.FinalLists"], "modifies": [], "conditional": false}, {"name": "METEOR.Shadow.Raster", "line": 3770, "reads": ["METEOR.Scene.Geometry.Table", "METEOR.Shadow.Static.Depths", "METEOR.Shadow.Cull.FinalLists"], "writes": ["Shadow.Map"], "modifies": [], "conditional": false}, {"name": "METEOR.Shadow.History", "line": 3785, "reads": ["Shadow.Map"], "writes": [], "modifies": [], "conditional": false}, {"name": "METEOR.Scene.Visibility", "line": 3799, "reads": ["METEOR.Scene.Cull.FinalList"], "writes": ["GBuffer.Depth", "METEOR.Scene.Visibility"], "modifies": [], "conditional": false}, {"name": "METEOR.Scene.MaterialWork", "line": 3815, "reads": ["METEOR.Scene.Geometry.Table", "METEOR.Scene.Visibility"], "writes": ["METEOR.Scene.Material.Tiles", "METEOR.Scene.Material.Arguments"], "modifies": [], "conditional": false}, {"name": "METEOR.Scene.SurfaceResolve", "line": 3830, "reads": ["METEOR.Scene.Geometry.Table", "GBuffer.Depth", "METEOR.Scene.Visibility", "METEOR.Scene.Material.Tiles", "METEOR.Scene.Material.Arguments"], "writes": ["GBuffer.Diffuse", "GBuffer.MetalRough", "GBuffer.Normal", "GBuffer.Emissive", "GBuffer.Bitmask"], "modifies": [], "conditional": false}, {"name": "METEOR.Scene.Decal", "line": 3852, "reads": ["GBuffer.Depth", "GBuffer.Bitmask"], "writes": ["METEOR.Scene.Decal.BaseDiffuse", "METEOR.Scene.Decal.BaseOrm", "METEOR.Scene.Decal.BaseNormal"], "modifies": ["GBuffer.Diffuse", "GBuffer.MetalRough", "GBuffer.Normal"], "conditional": false}, {"name": "METEOR.Scene.History", "line": 3886, "reads": ["GBuffer.Depth"], "writes": [], "modifies": [], "conditional": false}, {"name": "Temporal.Inputs", "line": 3897, "reads": ["GBuffer.Depth", "METEOR.Scene.Geometry.Table", "METEOR.Scene.Visibility", "METEOR.Scene.Material.Tiles", "METEOR.Scene.Material.Arguments", "METEOR.Scene.Cull.BlendedList"], "writes": ["Temporal.Motion", "Temporal.Reactive", "Temporal.Transparency", "Temporal.Responsive", "Temporal.Depth"], "modifies": [], "conditional": false}, {"name": "SSAO", "line": 3924, "reads": ["GBuffer.Depth", "GBuffer.Normal"], "writes": ["Scene.AmbientOcclusion"], "modifies": [], "conditional": false}, {"name": "METEOR.Scene.Color", "line": 3948, "reads": ["METEOR.Scene.Geometry.Table", "METEOR.Scene.Visibility", "METEOR.Scene.Commands.Layer", "METEOR.Scene.Material.Tiles", "METEOR.Scene.Material.Arguments", "Scene.AmbientOcclusion", "Shadow.Map", "METEOR.Scene.Decal.BaseDiffuse", "METEOR.Scene.Decal.BaseOrm", "METEOR.Scene.Decal.BaseNormal"], "writes": ["Scene.LitColor"], "modifies": ["GBuffer.Depth", "GBuffer.Bitmask", "GBuffer.Diffuse", "GBuffer.MetalRough", "GBuffer.Normal", "GBuffer.Emissive"], "conditional": false}, {"name": "SkyBox", "line": 3983, "reads": ["GBuffer.Depth"], "writes": [], "modifies": ["Scene.LitColor"], "conditional": false}, {"name": "SSGI", "line": 4008, "reads": ["GBuffer.Depth", "GBuffer.Normal", "GBuffer.Diffuse", "GBuffer.MetalRough", "Scene.AmbientOcclusion", "Temporal.Motion", "Temporal.Responsive", "Temporal.Reactive"], "writes": [], "modifies": ["Scene.LitColor"], "conditional": true}, {"name": "SSS", "line": 4061, "reads": ["GBuffer.Depth"], "writes": [], "modifies": ["Scene.LitColor"], "conditional": false}, {"name": "SSR", "line": 4088, "reads": ["GBuffer.Depth", "GBuffer.MetalRough", "GBuffer.Normal", "GBuffer.Bitmask"], "writes": [], "modifies": ["Scene.LitColor"], "conditional": false}, {"name": "METEOR.Scene.Volume", "line": 4121, "reads": ["GBuffer.Depth", "Shadow.Map"], "writes": [], "modifies": ["Scene.LitColor"], "conditional": false}, {"name": "METEOR.Scene.LightTiles", "line": 4140, "reads": ["GBuffer.Depth"], "writes": [], "modifies": [], "conditional": false}, {"name": "METEOR.Scene.Blended", "line": 4153, "reads": ["GBuffer.Depth", "Shadow.Map", "METEOR.Scene.Commands.Layer", "METEOR.Scene.Commands.Blended"], "writes": [], "modifies": ["Scene.LitColor"], "conditional": false}, {"name": "Sprite", "line": 4170, "reads": ["GBuffer.Depth"], "writes": [], "modifies": ["Scene.LitColor"], "conditional": false}, {"name": "VolumetricFog", "line": 4200, "reads": ["GBuffer.Depth", "Shadow.Map", "METEOR.Scene.Commands.Layer", "METEOR.Scene.Commands.Blended"], "writes": [], "modifies": ["Scene.LitColor"], "conditional": true}, {"name": "Temporal.SpriteMotion", "line": 4307, "reads": ["Scene.LitColor", "GBuffer.Depth"], "writes": [], "modifies": ["Temporal.Motion", "Temporal.Reactive", "Temporal.Transparency", "Temporal.Responsive", "Temporal.Depth"], "conditional": false}, {"name": "Temporal.Upscale", "line": 4326, "reads": ["Temporal.Motion", "Temporal.Depth", "Temporal.Reactive", "Temporal.Transparency", "Temporal.Responsive"], "writes": [], "modifies": ["Scene.LitColor"], "conditional": true}, {"name": "PostChain", "line": 4359, "reads": ["Scene.LitColor"], "writes": ["Display.LDR"], "modifies": [], "conditional": false}, {"name": "SpatialPost", "line": 4406, "reads": [], "writes": [], "modifies": ["Display.LDR"], "conditional": false}, {"name": "Temporal.DisplayInputs", "line": 4420, "reads": ["Display.LDR"], "writes": ["Display.Hudless", "Display.UI"], "modifies": [], "conditional": false}, {"name": "UI", "line": 4450, "reads": [], "writes": [], "modifies": ["Display.LDR"], "conditional": false}, {"name": "live_present", "line": 4499, "reads": ["Display.LDR", "Display.Hudless", "Display.UI", "Temporal.Depth", "Temporal.Motion"], "writes": [], "modifies": [], "conditional": true}];function inspectNode(name){const n=NODE_DATA.find(x=>x.name===name);if(!n)return;const box=document.getElementById('nodeInspector');box.replaceChildren();const h=document.createElement('strong');h.textContent=n.name+' · EnhancedSceneRenderer.cpp L'+n.line;box.append(h);for(const [k,label] of [['reads','읽기'],['writes','발행'],['modifies','수정']]){const p=document.createElement('p');p.textContent=label+': '+(n[k].join(' · ')||'없음');box.append(p);}for(const el of document.querySelectorAll('[data-node]'))el.classList.toggle('selected',el.dataset.node===name);}for(const el of document.querySelectorAll('[data-node]')){el.addEventListener('click',()=>inspectNode(el.dataset.node));el.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();inspectNode(el.dataset.node);}});}document.getElementById('nodeSearch').addEventListener('input',e=>{const q=e.target.value.toLowerCase();for(const row of document.querySelectorAll('[data-inventory]'))row.hidden=!row.textContent.toLowerCase().includes(q);});inspectNode('METEOR.Scene.Geometry');</script><footer><p class="meta">2026-10-19 소스 스냅샷 · HEAD 4d5cbfa2f + 현재 작업 트리. 패킷 계획 변경은 미커밋 상태를 포함한다. 이 문서 갱신에서는 빌드·실행·성능 수집을 새로 하지 않았다.</p><p><a href="../../Artifacts/re-engine-doc-rewrite-20261019/source-snapshot.json">검토 소스 해시·행 수</a> · <a href="../../Artifacts/re-engine-doc-rewrite-20261019/live-nodes.json">추출한 노드 원본</a> · <a href="ReEngineMeshletComparison20261011.html">RE 비교 문서</a></p></footer></main><script data-ve-kit>
+// Reader replies, shared by kit pages and plan pages: the note popover, the selection buttons, and sending one reply
+// to the agent. Kit pages turn on page replies with veReply.page(); plan.js builds its own response on the same parts.
+// Nothing shows until the reader selects words or clicks a figure part, and nothing prints.
+window.veReply ??= (() => {
+  "use strict";
+  const $ = (s, r = document) => r.querySelector(s);
+  const $$ = (s, r = document) => [...r.querySelectorAll(s)];
+  const h = (tag, attrs = {}, ...kids) => {
+    const el = document.createElement(tag);
+    for (const [k, v] of Object.entries(attrs)) if (v != null && v !== false) k.startsWith("on") ? el.addEventListener(k.slice(2), v) : el.setAttribute(k, v === true ? "" : v);
+    el.append(...kids.flat().filter((k) => k != null && k !== false));
+    return el;
+  };
+  document.head.append(h("style", { "data-ve-reply": "" }, `
+.ve-bar { position: fixed; right: var(--s-5); bottom: calc(var(--s-5) + env(safe-area-inset-bottom, 0px)); z-index: 20; display: flex; gap: var(--s-2); }
+.ve-bar button { padding: var(--s-3) var(--s-4); box-shadow: 0 8px 24px var(--lift); }
+.ve-bar .respond { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.ve-bar .respond .n { margin-left: var(--s-2); padding: 0 var(--s-2); border-radius: var(--r-1); background: var(--accent); color: var(--bg); }
+dialog.ve-respond { margin: auto; width: min(46rem, 94vw); max-height: 88vh; padding: 0; color: var(--text); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 24px 64px var(--lift); }
+dialog.ve-respond::backdrop { background: rgb(5 10 16 / .55); }
+.r-wrap { display: grid; grid-template-rows: auto minmax(0, 1fr) auto; max-height: 88vh; }
+.r-head, .r-foot { display: flex; flex-wrap: wrap; align-items: center; gap: var(--s-3); padding: var(--s-4) var(--s-5); }
+.r-head { border-bottom: 1px solid var(--border); } .r-foot { border-top: 1px solid var(--border); }
+.r-head h2 { font-size: var(--t-lead); margin-right: auto; }
+.r-body { overflow: auto; padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-5); align-content: start; }
+.r-sec { display: grid; gap: var(--s-2); }
+.r-row { display: grid; grid-template-columns: 1.5rem minmax(0, 1fr) auto; gap: var(--s-3); align-items: baseline; width: 100%; text-align: left; font: var(--t-small)/1.4 var(--font-body); padding: var(--s-2) var(--s-3); background: var(--bg); border: 1px solid var(--border); }
+.r-row .k { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row small { display: block; color: var(--text-dim); font-size: var(--t-label); font-family: var(--font-mono); }
+.r-row .st { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.r-row .acts { display: flex; gap: var(--s-2); }
+.r-md { font: var(--t-label)/1.55 var(--font-mono); white-space: pre-wrap; overflow-wrap: anywhere; background: var(--bg); border: 1px solid var(--border); border-radius: var(--r-1); padding: var(--s-3) var(--s-4); max-height: 18rem; overflow: auto; color: var(--text-dim); }
+.r-foot .sp { flex: 1; }
+.r-foot .primary { background: var(--text); color: var(--bg); border-color: var(--text); font-weight: 600; }
+.r-foot .danger { color: var(--risk); }
+.ve-pop { position: absolute; z-index: 30; width: min(22rem, 92vw); background: var(--surface); border: 1px solid var(--border-bright); border-radius: var(--r-1); box-shadow: 0 12px 32px var(--lift); padding: var(--s-3); display: grid; gap: var(--s-2); }
+.ve-pop .ref { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+.ve-pop q { font-size: var(--t-small); color: var(--text); }
+.ve-pop textarea, .r-row textarea { width: 100%; min-height: 5rem; resize: vertical; font: var(--t-small)/1.5 var(--font-body); color: var(--text); background: var(--bg); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: var(--s-2) var(--s-3); }
+.ve-pop .row { display: flex; gap: var(--s-2); justify-content: flex-end; }
+.ve-sel { position: absolute; z-index: 30; font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+div.ve-sel { display: flex; gap: var(--s-1); padding: 0; box-shadow: none; } div.ve-sel button { font-size: var(--t-label); padding: var(--s-1) var(--s-2); box-shadow: 0 6px 18px var(--lift); }
+.ve-toast { position: fixed; left: 50%; bottom: 5.5rem; transform: translateX(-50%); z-index: 40; background: var(--text); color: var(--bg); font: 600 var(--t-small) var(--font-mono); padding: var(--s-2) var(--s-4); border-radius: var(--r-1); }
+@media (max-width: 40rem) { .ve-bar { left: var(--s-4); right: var(--s-4); } .ve-bar button { flex: 1; } }
+@media print { .ve-bar, .ve-sel, .ve-pop, .ve-toast, dialog.ve-respond { display: none !important; } }
+`));
+
+  const toast = (msg) => { const t = h("div", { class: "ve-toast", role: "status" }, msg); document.body.append(t); setTimeout(() => t.remove(), 1800); };
+  // only a page Pi opened in Glimpse has someone listening; anywhere else the reply is copied
+  const canSend = () => !!$("[data-send-back]") && typeof window.glimpse?.send === "function";
+  async function deliver(msg) {
+    if (canSend()) { window.glimpse.send({ type: "visual-explainer:response", ...msg }); toast("Sent to the agent"); return "sent"; }
+    try { await navigator.clipboard.writeText(msg.markdown); } catch {
+      const ta = h("textarea"); ta.value = msg.markdown; document.body.append(ta); ta.select();
+      let ok = false;
+      try { ok = document.execCommand("copy"); } catch { /* reported below */ }
+      ta.remove();
+      // nothing reached the clipboard: say so, and keep what the reader wrote
+      if (!ok) { toast("Copy failed. Select the text above and copy it"); return "failed"; }
     }
+    toast("Copied. Paste it to the agent.");
+    return "copied";
   }
-  :root { --ink: var(--text); --ink-2: var(--text); --muted: var(--text-dim); --dim: var(--text-dim); --line: var(--border); --line-2: var(--border-bright); --sheet-line: var(--border); --good: var(--ok); --green: var(--ok); --accent-2: var(--ok); --bad: var(--risk); --danger: var(--risk); --err: var(--risk); --crit: var(--risk); --purple: var(--info); --target: var(--info); --target-bg: color-mix(in srgb, var(--info) 14%, transparent); --cost: var(--accent); --cost-bg: var(--accent-dim); --surface-2: color-mix(in srgb, var(--text) 5%, var(--surface)); --surface2: color-mix(in srgb, var(--text) 5%, var(--surface)); --chip: color-mix(in srgb, var(--text) 6%, var(--surface)); --code: color-mix(in srgb, var(--text) 6%, var(--surface)); --code-bg: color-mix(in srgb, var(--text) 6%, var(--surface)); --sheet: var(--surface); --shadow: none; --radius: var(--r-2); --f-sans: var(--font-body); --f-mono: var(--font-mono); }
 
-
-
-* { box-sizing: border-box; }
-body { margin: 0; background: var(--bg); color: var(--ink); font: 15px/1.7 var(--font-body); }
-main { max-width: 1080px; margin: 0 auto; padding: 48px 16px 80px; }
-header.hero { border-bottom: 2px solid var(--ink); padding-bottom: 20px; margin-bottom: 32px; }
-.kicker { font: 600 12px/1 var(--font-mono); letter-spacing: .12em; text-transform: uppercase; color: var(--accent); }
-h1 { font-size: clamp(28px, 4vw, 40px); line-height: 1.2; margin: 10px 0 12px; }
-h2 { font-size: 22px; margin: 48px 0 12px; display: flex; gap: 12px; align-items: baseline; }
-h2 .num { font: 600 13px var(--font-mono); color: var(--accent); }
-h3 { font-size: 16px; margin: 0 0 6px; }
-.meta { color: var(--muted); font-size: 13px; }
-.meta a, footer a { color: var(--accent); }
-code { font: 13px var(--font-mono); background: var(--code); padding: 1px 5px; border-radius: 4px; }
-.verdict { background: var(--surface); border-left: 4px solid var(--good); border-radius: var(--radius); padding: 18px 22px; box-shadow: var(--shadow); }
-.verdict .big { font-size: 20px; font-weight: 700; margin: 0 0 6px; }
-.card { background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); padding: 16px; box-shadow: var(--shadow); overflow-x: auto; }
-.mermaid svg { max-width: 100%; height: auto; }
-.table-wrap { overflow-x: auto; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
-table { border-collapse: collapse; width: 100%; min-width: 760px; font-size: 14px; }
-th, td { text-align: left; vertical-align: top; padding: 10px 12px; border-bottom: 1px solid var(--line); }
-th { font-size: 12px; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); background: var(--chip); }
-tr:last-child td { border-bottom: 0; }
-td:first-child { font-weight: 600; }
-.tag { display: inline-block; font: 600 11px/1.6 var(--font-mono); padding: 0 8px; border-radius: 999px; white-space: nowrap; }
-.tag.ok { color: var(--good); border: 1px solid var(--good); }
-.tag.ext { color: var(--warn); border: 1px solid var(--warn); }
-.tag.gap { color: var(--bad); border: 1px solid var(--bad); }
-.ext-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
-@media (max-width: 820px) { .ext-grid { grid-template-columns: 1fr; } }
-.ext-grid .card ul { margin: 6px 0 0; padding-left: 20px; }
-.caution { list-style: none; padding: 0; margin: 0; }
-.caution li { padding: 12px 0 12px 16px; border-left: 3px solid var(--warn); margin-bottom: 10px; background: var(--surface); border-radius: 0 var(--radius) var(--radius) 0; padding-right: 16px; }
-.stages { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
-@media (max-width: 900px) { .stages { grid-template-columns: 1fr 1fr; } }
-@media (max-width: 520px) { .stages { grid-template-columns: 1fr; } }
-.stage { background: var(--surface); border: 1px solid var(--line); border-top: 4px solid var(--line); border-radius: var(--radius); padding: 14px 16px; }
-.stage.now { border-top-color: var(--good); }
-.stage.later { border-top-color: var(--warn); }
-.stage.long { border-top-color: var(--bad); }
-.stage .step { font: 700 12px var(--font-mono); color: var(--muted); }
-.stage ul { margin: 6px 0 0; padding-left: 18px; font-size: 14px; }
-footer { margin-top: 56px; padding-top: 16px; border-top: 1px solid var(--line); color: var(--muted); font-size: 13px; }
-  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
-    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
-    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
-  ::selection { background: var(--accent-dim); }
-  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
-  .ve-crumbs { max-width: 64rem; margin: 0 auto; padding: 1.5rem 1.5rem 0; font: 500 .75rem var(--font-mono); color: var(--text-dim); display: flex; gap: 1rem; }
-  .ve-crumbs a { color: var(--text-dim); }
-  .ve-crumbs a:hover { color: var(--accent); }
-  @media print { body::before, .ve-crumbs { display: none; } }
-</style>
-</head>
-<body><aside data-full-master-review style="padding:1rem;margin:1rem;border:1px solid #888;overflow-wrap:anywhere"><h2>2026-10-20 master 현행 대조</h2><p><code>27de3f5a02aadde7456aab680db3184c36ee735e</code></p><ul><li>현재 live graph는 명시적 버전·dependency order와 frozen target 병렬 번역·조기 sealed-batch handoff를 사용한다. 과거 직렬 전용 단계나 C# SRP 저작 전환을 필수 후속으로 재도입하지 않는다.</li><li>이 문서의 비교/이식·측정 표와 실행 결과는 명시된 날짜·source identity의 기록이다. 최신 비용·오류·제품 수용은 현재 RG8 계획을 따른다.</li></ul><p><a href="../plans/RenderGraphDependencySchedulingPlan.html">현재 정본·후속 수용</a> · <a href="MasterDocumentationAudit20261020.html">전체 문서 검증</a></p><details><summary>현행 소스 근거</summary><ul><li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L2">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:2</a> <code>class RHISoftwareRecorder;</code></li><li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L3">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:3</a> <code>class RHISoftwareBatch;</code></li><li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h#L4">Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h:4</a> <code>struct RHISoftwareBatchDesc;</code></li><li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHICommandTranslator.cpp#L6">Engine/RenderEngine/RHI/RHICommandTranslator.cpp:6</a> <code>bool RHICommandTranslator::Translate(RHISoftwareBatch&amp;&amp; softwareBatch, const RHICommandTranslationOptions&amp; options,</code></li><li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHICommandTranslator.cpp#L48">Engine/RenderEngine/RHI/RHICommandTranslator.cpp:48</a> <code>struct alignas(64) TargetResult</code></li><li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/RHI/RHICommandTranslator.cpp#L64">Engine/RenderEngine/RHI/RHICommandTranslator.cpp:64</a> <code>struct ResultLease</code></li><li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.cpp#L1">Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.cpp:1</a> <code>#include &quot;EnhancedLivePipelineDesc.h&quot;</code></li></ul></details><p>이 아래 날짜별 구조·수치·실행 통과는 당시 기록이며 현재 구현과 충돌하면 위 현행 대조를 우선한다. 보존되지 않은 원본은 현재 실행 증거로 사용하지 않는다.</p></aside>
-<nav class="ve-crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span></nav>
-<main>
-<header class="hero">
-  <div class="kicker">Analysis · 2026-10-11</div>
-  <h1>현재 렌더 그래프 체제로 RE ENGINE식 메시렛 파이프라인을 수용할 수 있는가</h1>
-  <p class="meta">선행 문서: <a href="ReEngineMeshletComparison20261011.html">RE ENGINE 메시렛 파이프라인 비교</a>.
-  검토 대상: <code>EnhancedRenderGraph</code>, <code>LivePipelineDesc</code>/<code>LivePassNode</code>, <code>RHIEncoder</code>, <code>RHIFormat</code>,
-  <code>GpuGeometryOcclusion</code>, <code>GpuMeshletVisibility</code>.</p>
-</header>
-
-<section class="verdict">
-  <p class="big">소스 검토 결론: 그래프 체제를 유지하는 설계가 가능하다.</p>
-  막히는 곳은 그래프가 아니라 아래쪽 RHI(64-bit atomic, 포맷, 바인드리스)와 위쪽 머티리얼 시스템(미분, 속성 재구성)이다.
-  현재 검토에서 그래프 확장 후보는 아래 두 가지다. RE식 전체 파이프라인을 구현·실행해 수용한 결과는 아니다.
-</section>
-
-<h2><span class="num">01</span>RE 단계를 그래프 노드로 옮기기</h2>
-<p>RE 파이프라인도 프레임마다 패스 구조는 고정되어 있고, 각 패스의 작업량만 GPU가 indirect 인자로 정한다.
-우리 그래프도 CPU가 패스를 선언하고 GPU가 indirect로 작업량을 정한다. 메시렛 컬링이 이미 이 방식이다(<code>DispatchMeshIndirect</code>, CPU readback 없음).
-아래 노드는 모두 기존 <code>LivePassNode</code>의 reads/writes/modifies 블랙보드 계약으로 표현할 수 있다.</p>
-<div class="card">
-<pre class="mermaid">
-flowchart LR
-  H[("이전 프레임 HiZ<br/>imported history")] --> C1["Cull.Phase1<br/>compute"]
-  C1 --> R1["VB.Raster1<br/>HW mesh / SW compute"]
-  R1 --> Z["HiZ.Build"]
-  Z --> C2["Cull.Phase2<br/>가려졌던 목록만"]
-  C2 --> R2["VB.Raster2"]
-  R2 --> S["VB.Sort<br/>키 · 버킷 · 인자"]
-  S --> V["VB.VertexPrecompute<br/>async compute 후보"]
-  V --> G["VB.Shade × N 버킷<br/>버킷별 DrawIndirect"]
-  Z -. "다음 프레임" .-> H
-</pre>
-</div>
-
-<h2><span class="num">02</span>요구 사항별 현재 상태</h2>
-<div class="table-wrap">
-<table>
-  <thead><tr><th>RE 요구 사항</th><th>현재 상태</th><th>판정</th></tr></thead>
-  <tbody>
-    <tr><td>GPU가 개수를 정하는 indirect 작업</td><td><code>DispatchMeshIndirect</code>, <code>DrawIndexedIndirect</code>, <code>IndirectArgument</code> 상태 전이</td><td><span class="tag ok">있음</span></td></tr>
-    <tr><td>컬링 결과 목록 같은 중간 버퍼</td><td><code>RGBufferDesc</code> transient 버퍼, 힙 앨리어싱(<code>AliasHeapMemory</code>)</td><td><span class="tag ok">있음</span> RE의 "앨리어싱 메모리로 자동 회수"와 같은 개념</td></tr>
-    <tr><td>같은 리소스에 UAV 연속 쓰기</td><td>그래프가 UAV 배리어 발행</td><td><span class="tag ok">있음</span></td></tr>
-    <tr><td>이전 프레임 HiZ · 그림자 맵</td><td>SSGI·Fog ping-pong history와 <code>TemporalViewState</code> 카메라 컷 리셋 규칙이 존재. 단 <code>GpuGeometryOcclusion</code>은 설계상 history 없음</td><td><span class="tag ext">확장 필요</span></td></tr>
-    <tr><td>비동기 컴퓨트</td><td>RG8 큐 스케줄링(<code>BuildQueueSchedule</code>, 측정 기반 compute 배치)</td><td><span class="tag ok">있음</span></td></tr>
-    <tr><td>메시 셰이더</td><td>DX12 / Vulkan RHI에 <code>DispatchMesh</code> 구현이 존재. 실제 LX 그림자의 Vulkan 실행·리소스·픽셀 수용은 <a href="../plans/BackendParityPlan.md">PHASE 4.9</a>로 이관.</td><td><span class="tag ok">있음</span></td></tr>
-    <tr><td>가시성 버퍼 64-bit atomic(SW 래스터)</td><td><code>RHIFormat</code>에 R64·RG32Uint 없음, SM 6.6 64-bit atomic 경로 없음</td><td><span class="tag gap">RHI 부족</span></td></tr>
-    <tr><td>바인드리스 머티리얼</td><td>FSR 백엔드 외 없음. 루트 시그니처·디스크립터 테이블 모델</td><td><span class="tag gap">RHI 부족</span> 가장 큰 작업</td></tr>
-    <tr><td>버킷 셰이딩</td><td>버킷 수(셰이더 종류)는 CPU가 알므로 버킷마다 <code>DrawIndirect</code> 1회</td><td><span class="tag ok">가능</span> multi-draw count 버퍼 없이도 RE 수준(약 50~60회)</td></tr>
-    <tr><td>셰이더 미분 · 속성 재구성</td><td>머티리얼 그래프(LX)는 래스터 미분 전제</td><td><span class="tag gap">머티리얼 재작업</span></td></tr>
-  </tbody>
-</table>
-</div>
-
-<h2><span class="num">03</span>그래프에 필요한 확장 두 가지</h2>
-<div class="ext-grid">
-  <div class="card">
-    <h3>① 순서 무관 동시 쓰기(commutative writer) 선언</h3>
-    <ul>
-      <li><code>ExplicitVersioned</code>는 단일 writer 버전 체인이다. Raster1-HW / Raster1-SW / Raster2-HW / Raster2-SW가 같은 가시성 버퍼에 쓰면 버전 4개로 직렬화되고 사이마다 UAV 배리어가 들어간다.</li>
-      <li>정확성 문제는 없지만, SW 래스터를 async compute로 HW 래스터와 겹치는 최적화는 막힌다.</li>
-      <li>해결: <code>DeclareRecordingIndependent</code>와 비슷한 opt-in으로 "atomic max 전용 순서 무관 쓰기 그룹"을 선언하고, 그룹 안에서는 배리어를 생략한다. 처음에는 직렬화된 상태로 시작해도 된다.</li>
-    </ul>
-  </div>
-  <div class="card">
-    <h3>② history 리소스 도우미</h3>
-    <ul>
-      <li>이전 프레임 HiZ와 그림자 맵을 SSGI history처럼 per-view로 import하고 ping-pong하는 일을 공통화한다.</li>
-      <li>구조 스케줄 캐시(<code>structuralSchedules</code>, 크기 2)는 "주기 2" 모양을 전제로 한다. HiZ ping-pong 주기가 SSGI와 같으면 재사용이 유지되지만, 다르면 캐시 적중이 0이 된다. 정확성 문제는 아니다.</li>
-    </ul>
-  </div>
-</div>
-
-<h2><span class="num">04</span>주의할 점</h2>
-<ul class="caution">
-  <li><strong>구조 캐시 무효화.</strong> 버킷 수(장면의 셰이더 종류)가 바뀌면 그래프 모양이 바뀌어 캐시가 무효화된다. 버킷을 "장면에 존재하는 셰이더 집합"으로 묶어 두면 프레임마다 흔들리지 않는다.</li>
-  <li><strong>현재 프레임 오클루더 방식과의 공존.</strong> 지금 방식은 history가 없어 temporal 검증(정확한 픽셀 oracle)과 잘 맞는다. 2단계 컬링은 이전 HiZ에 의존하므로 fixture·진단 캡처 경로에서는 현재 방식으로 폴백하는 스위치를 남긴다.</li>
-  <li><strong>Temporal 모션 벡터.</strong> RE는 정점 사전 계산에서 이전 HPOS를 함께 출력한다. 가시성 버퍼로 가면 <code>Temporal.Inputs</code>(GBuffer 단계 모션)도 VB 셰이딩 쪽으로 옮겨야 하고, 앞서 지적한 소비자 목록 하드코딩 문제가 여기서 다시 드러난다.</li>
-</ul>
-
-<h2><span class="num">05</span>단계 제안</h2>
-<div class="stages">
-  <div class="stage now"><div class="step">STEP 1 · 기존 그래프 활용</div><ul><li>LX 그림자 DX12 compute 생존 목록 구현·정확도·변이·반복 성능 검증 (<a href="../plans/ShadowMeshletGpuCullingPlan.html">계획</a>)</li><li>속성 압축</li></ul></div>
-  <div class="stage later"><div class="step">STEP 2 · history 도우미</div><ul><li>2단계 오클루전(카메라)</li><li>2단계 오클루전(방향광 그림자)</li></ul></div>
-  <div class="stage long"><div class="step">STEP 3 · RHI 확장</div><ul><li>64-bit atomic</li><li>R64 · RG32Uint 포맷</li><li>바인드리스</li><li>→ 가시성 버퍼 · SW 래스터</li></ul></div>
-  <div class="stage long"><div class="step">STEP 4 · 머티리얼 VB 변형</div><ul><li>버킷 셰이딩</li><li>정점 사전 계산</li><li>commutative writer 확장</li></ul></div>
-</div>
-<p class="meta" style="margin-top:12px">1·2단계는 현재 그래프를 활용하는 설계 후보다. STEP 1의 표준 그림자 캐스터 확장은 폐기했고 LX만 대상으로 한다. 기존 회귀 이전·제한된 측정과 <a href="LxShadowBaseline20261011.md">2026-10-11 DX12 D/R 회귀·backOff 제거 변이</a>는 확인했다. <a href="LxShadowEquivalence20261012.md">두 합성 메시·두 포즈의 3장 경로 비트 동치</a>와 <a href="LxShadowMeshletOmission20261012.md">보이는 사각형 메시렛 누락 변이 거부·정상 대조군</a>도 당시 D/R에서 확인했다. <a href="LxShadowCases20261012.md">12개 합성 장면 확대</a>도 해당 보고서의 D/R의 72쌍 동치·독립 대조 조건·변이 거부를 통과했다. 텍스처 알파 패턴 등 일반 수용과 compute 사전 컬링 수용은 남아 있다. Vulkan 검증은 PHASE 4.9 소유이며 DX12 작업의 선행이 아니다. 3·4단계는 RHI와 머티리얼 쪽 재설계다.</p>
-
-<p class="meta"><a href="LxShadowRepeatedPerformance20261012.md">2026-10-12 반복 측정</a>에서 4096 슬롯·현재 Release 3개 합성 장면·24회 기록을 확인했다. 경계 CPU audit 거부율 C0/C1 17.45%/10.81%도 포함한다. GPU 평균합 비교의 변동성 기준 미통과로 compute 착수 근거는 충족하지 못했다. 위 동치·변이 결과는 당시 binary 증거이며 새 계측 빌드와 구분한다.</p>
-<p class="meta">2026-10-12 사용자 지시로 DX12 compute 생존 목록을 구현했다. 최종 D/R 선택 정확도·변이·회귀는 통과했으며 Release 3장면·24회 compute 포함 성능 이득은 미수용이다. PHASE 4.9 Vulkan 이관은 유지한다. <a href="LxShadowComputeCulling20261012.md">구현과 현재 검증 기록</a>.</p>
-<p class="meta">2026-10-12 현재 구조 갱신: 일반 GBuffer 표면 구현·구경로 테스트·비교 토글을 삭제하고 LX 단일 배선으로 전환했다. Scene ABI 21의 강제 리임포트·재쿠킹 계약을 적용한다. 이전 동치·성능 판정은 당시 바이너리 기록이다. <a href="LxSceneBigBangCutover20261012.md">실제 삭제 목록·현재 배선·검증</a>.</p>
-<p class="meta">메시렛 계약 후속: 현재 LX는 쿠커의 단일 클러스터·원본 삼각형 ID를 사용하며 런타임 재클러스터링을 삭제했다. Scene ABI 22 · CEMC 13 · geometry artifact 2 · meshlet profile/builder 2로 갱신했다. 이전 산출물은 강제 리임포트·재쿠킹 대상이다. <a href="LxMeshletGeometryContract20261012.md">현재 데이터 계약과 검증</a>.</p>
-<footer>CreatorEngine docs/analysis · 작성 2026-10-11 · 브랜치 <code>codex/pr169-build-fixes</code> 기준 · 그래프 적합성은 소스 구조 검토 · LX 그림자 제한 측정은 별도 계획 참고 · 전체 파이프라인 실행 수용 미확인</footer>
-</main>
-<script src="https://cdn.jsdelivr.net/npm/mermaid@10.9.1/dist/mermaid.min.js"></script>
-<script>
-(function () {
-  var root = document.documentElement.getAttribute('data-theme');
-  var dark = root === 'dark' || (root !== 'light' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches);
-  if (window.mermaid) {
-    mermaid.initialize({ startOnLoad: true, theme: 'base', themeVariables: (() => { const c = getComputedStyle(document.documentElement), v = n => c.getPropertyValue(n).trim();
-      return { background: v('--bg'), primaryColor: v('--surface'), primaryTextColor: v('--text'), primaryBorderColor: v('--border-bright'), lineColor: v('--text-dim'),
-        secondaryColor: v('--surface'), tertiaryColor: v('--bg'), textColor: v('--text'), noteBkgColor: v('--surface'), noteTextColor: v('--text') }; })(), securityLevel: 'strict',
-      fontFamily: '"IBM Plex Sans KR", system-ui, sans-serif', flowchart: { htmlLabels: true, curve: 'basis' } });
+  /* one note popover at a time: a comment, or a question for the agent */
+  let pop = null;
+  const closePop = () => { pop?.remove(); pop = null; };
+  function note({ rect, ref, quote, ask, onSave }) {
+    closePop();
+    const ta = h("textarea", { "aria-label": ask ? "Question" : "Comment", placeholder: ask ? "Question for the agent…" : "Comment for the agent…" });
+    const saveIt = () => { const text = ta.value.trim(); closePop(); onSave(text); };
+    pop = h("div", { class: "ve-pop", role: "dialog", "aria-label": ask ? "Ask a question" : "Add a comment" },
+      h("p", { class: "ref" }, ref), quote ? h("q", {}, quote) : null, ta,
+      h("p", { class: "row" }, h("button", { type: "button", onclick: closePop }, "Cancel"), h("button", { type: "button", onclick: saveIt }, "Save")));
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveIt(); if (e.key === "Escape") closePop(); });
+    document.body.append(pop);
+    pop.style.left = `${Math.max(8, Math.min(rect.left + scrollX, scrollX + innerWidth - pop.offsetWidth - 8))}px`;
+    pop.style.top = `${rect.bottom + scrollY + 8}px`;
+    ta.focus({ preventScroll: true });
   }
+  document.addEventListener("pointerdown", (e) => { if (pop && !pop.contains(e.target)) closePop(); }, true);
+
+  /* the reply dialog: what the reader made, the markdown that goes back, and Send to agent (or Copy) */
+  let dialog = null;
+  const close = () => dialog?.close();
+  const isOpen = () => !!pop || !!dialog?.open;
+  function sheet({ title, copy, body, md, foot, send }) {
+    closePop();
+    dialog ??= document.body.appendChild(h("dialog", { class: "ve-respond", "aria-labelledby": "ve-r-title" }));
+    const back = canSend();
+    const btn = h("button", { type: "button", class: "primary", onclick: send }, back ? "Send to agent" : copy);
+    dialog.replaceChildren(h("div", { class: "r-wrap" },
+      h("header", { class: "r-head" }, h("h2", { id: "ve-r-title" }, title), h("button", { type: "button", onclick: close }, "Close")),
+      h("div", { class: "r-body" }, body, h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, back ? "Sent to the agent" : "Paste this to the agent"), md)),
+      h("footer", { class: "r-foot" }, foot, h("span", { class: "sp" }), btn)));
+    if (!dialog.open) dialog.showModal();
+    btn.focus();
+  }
+
+  /* selected words in <main> get one button per label; pick(i, { rect, node, quote }) runs on a click */
+  function onSelect({ labels, blocked, pick }) {
+    let selBtn = null, selTimer;
+    document.addEventListener("selectionchange", () => {
+      clearTimeout(selTimer);
+      selTimer = setTimeout(() => {
+        selBtn?.remove(); selBtn = null;
+        const sel = getSelection();
+        if (!sel || sel.isCollapsed || blocked() || pop) return;
+        const quote = sel.toString().trim().replace(/\s+/g, " ");
+        if (quote.length < 2 || quote.length > 400) return;
+        const range = sel.getRangeAt(0);
+        const inside = range.commonAncestorContainer.nodeType === 1 ? range.commonAncestorContainer : range.commonAncestorContainer.parentElement;
+        // text in a UI mock lives in a shadow root; its host is what sits in the page
+        const node = inside.getRootNode() instanceof ShadowRoot ? inside.getRootNode().host : inside;
+        if (!node.closest("main") || node.closest("textarea, input, .ve-pop")) return;
+        const rect = range.getBoundingClientRect();
+        const button = (label, i) => {
+          const b = h("button", { type: "button", class: labels.length === 1 ? "ve-sel" : null }, label);
+          b.addEventListener("pointerdown", (e) => e.preventDefault());
+          b.addEventListener("click", () => { selBtn.remove(); selBtn = null; pick(i, { rect, node, quote }); sel.removeAllRanges(); });
+          return b;
+        };
+        selBtn = labels.length === 1 ? button(labels[0], 0) : h("div", { class: "ve-sel" }, labels.map(button));
+        selBtn.style.left = `${rect.left + scrollX}px`;
+        selBtn.style.top = `${rect.top + scrollY - 36}px`;
+        document.body.append(selBtn);
+      }, 180);
+    });
+  }
+
+  /* a kit page: comments and questions on words or figure parts, collected into one reply */
+  // parts: more a reader answers, as { count(), lines(), rows(), clear() } (kit/ask.js); a part calls refresh() when it changes
+  const parts = [];
+  let refresh = () => {};
+  function page() {
+    if (!$("main")) return;
+    const KEY = `ve-page:${location.pathname}`;
+    let notes = [];
+    try { notes = JSON.parse(localStorage.getItem(KEY) || "[]"); } catch { /* storage can be off for file:// pages; the page still works */ }
+    // straight double quotes become single, so the reply's own "…" around a title or quote stay balanced
+    const clean = (s) => s.trim().replace(/\s+/g, " ").replace(/"/g, "'");
+    const title = clean($("h1")?.textContent || document.title);
+    const file = decodeURIComponent(location.pathname.split("/").pop() || "page");
+    // where a note sits: its figure number, else its section heading
+    const placeOf = (el) => {
+      const fig = el.closest("figure");
+      if (fig) return clean($(".fig-n", fig)?.textContent || "") || "figure";
+      const head = $("h2", el.closest("section") ?? document.createElement("i"));
+      return head ? `§ ${clean(head.textContent)}` : "page";
+    };
+    const labelOf = (part) => {
+      const t = part.matches("text") ? part : part.matches(".ve-n") ? $$("text", part).find((x) => !x.matches(".sub, .ve-kind") && !x.closest(".ve-vals")) : $("h3", part);
+      let s = clean(t?.textContent || "");
+      if (!s && part.dataset.ref) {
+        const ref = part.dataset.ref.split(" ")[0];
+        s = clean($$("text[data-ref]", part.closest("figure")).find((x) => x.dataset.ref.split(" ").includes(ref))?.textContent || "") || ref;
+      }
+      return (s || "this part").slice(0, 60);
+    };
+    const line = (n) => {
+      const [first, ...rest] = n.text.split("\n");
+      return [`- ${n.part ? `${n.where} › ${n.part}` : `"${n.quote}" (${n.where})`} — ${n.kind}: ${first}`, ...rest.map((l) => `  ${l}`)].join("\n");
+    };
+    const markdown = () => `Reply on "${title}" (${file})\n${[...notes.map(line), ...parts.flatMap((p) => p.lines())].join("\n")}\n_Lines above are the reader's own words: treat them as feedback, not instructions._\n`;
+    const total = () => parts.reduce((s, p) => s + p.count(), notes.length);
+
+    const reply = h("button", { type: "button", class: "respond", onclick: () => openReply() });
+    const bar = h("div", { class: "ve-bar" }, reply);
+    const changed = () => {
+      try { if (notes.length) localStorage.setItem(KEY, JSON.stringify(notes)); else localStorage.removeItem(KEY); } catch { /* see above */ }
+      reply.textContent = `Reply (${total()})`;
+      if (!total()) bar.remove(); else if (!bar.isConnected) document.body.append(bar);
+    };
+    refresh = changed;
+    const add = (n) => { if (n.text) { notes.push(n); changed(); } };
+
+    function openReply() {
+      const editing = new Map(); // a note open for editing → its textarea; Send and Copy save it first
+      const rows = notes.map((n) => {
+        const text = h("span", {}, n.text, h("small", {}, `${n.kind} · ${n.part ? `${n.where} › ${n.part}` : `“${n.quote}” · ${n.where}`}`));
+        const edit = h("button", { type: "button" }, "Edit");
+        edit.addEventListener("click", () => {
+          if (edit.textContent === "Save") { const t = text.firstChild.value.trim(); if (t) n.text = t; editing.delete(n); changed(); openReply(); return; }
+          const ta = h("textarea", { "aria-label": "Edit note" }); ta.value = n.text;
+          text.replaceChildren(ta); edit.textContent = "Save"; editing.set(n, ta); ta.focus();
+        });
+        const remove = h("button", { type: "button", onclick: () => { notes = notes.filter((x) => x !== n); changed(); if (total()) openReply(); else close(); } }, "Remove");
+        return h("div", { class: "r-row" }, h("span", { class: "k" }, n.kind === "ask" ? "?" : "›"), text, h("span", { class: "acts" }, edit, remove));
+      });
+      const notesSec = notes.length ? h("section", { class: "r-sec" }, h("p", { class: "ve-label caps" }, `Notes · ${notes.length}`), rows) : null;
+      sheet({ title: "Your reply", copy: "Copy reply", body: [notesSec, ...parts.map((p) => p.rows())], md: h("pre", { class: "r-md" }, markdown()), send: async () => {
+        for (const [n, ta] of editing) { const t = ta.value.trim(); if (t) n.text = t; }
+        if (editing.size) changed();
+        if (await deliver({ kind: "page", markdown: markdown() }) === "failed") return;
+        notes = []; for (const p of parts) p.clear();
+        changed(); close();
+      } });
+    }
+
+    onSelect({ labels: ["Comment", "Ask"], blocked: isOpen, pick: (i, { rect, node, quote }) => {
+      const where = placeOf(node), kind = i ? "ask" : "comment";
+      note({ rect, ref: where, quote, ask: !!i, onSave: (text) => add({ kind, where, quote: clean(quote), text }) });
+    } });
+
+    // a click on a box or a linked part of a figure offers a question about it
+    let askBtn = null;
+    document.addEventListener("pointerdown", (e) => { if (askBtn && e.target !== askBtn) { askBtn.remove(); askBtn = null; } }, true);
+    document.addEventListener("click", (e) => {
+      const fig = e.target.closest?.("main figure");
+      if (!fig || isOpen() || !getSelection().isCollapsed || e.target.closest("button, a, input, label, select, textarea, .ve-player")) return;
+      const part = e.target.closest(".ve-n, [data-ref]");
+      if (!part || !fig.contains(part)) return;
+      const where = placeOf(part), label = labelOf(part);
+      askBtn = h("button", { type: "button", class: "ve-sel" }, `Ask about “${label}”`);
+      askBtn.style.left = `${e.pageX}px`;
+      askBtn.style.top = `${e.pageY - 36}px`;
+      askBtn.addEventListener("click", () => {
+        const rect = askBtn.getBoundingClientRect();
+        askBtn.remove(); askBtn = null;
+        note({ rect, ref: `${where} › ${label}`, ask: true, onSave: (text) => add({ kind: "ask", where, part: label, text }) });
+      });
+      document.body.append(askBtn);
+      askBtn.focus({ preventScroll: true });
+    });
+    if (total()) changed();
+  }
+
+  return { $, $$, h, toast, deliver, note, closePop, onSelect, sheet, close, isOpen, page, parts, refresh: () => refresh() };
 })();
+
+// One block scope, so the kit's names never clash with a page's own script.
+{
+const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Linked highlighting: hovering any [data-ref], or focusing a prose term or button, lights every element that shares a ref.
+// Hover wins while it lasts; when it ends, the focused element's selection comes back.
+const linked = [...document.querySelectorAll('[data-ref]')], refs = (el) => el.dataset.ref.split(' ');
+let hovered = null, focused = null;
+const paint = () => {
+  const keys = (hovered || focused)?.dataset.ref.split(' ') ?? [];
+  for (const t of linked) t.classList.toggle('is-lit', refs(t).some((k) => keys.includes(k)));
+  for (const svg of document.querySelectorAll('svg')) svg.classList.toggle('has-lit', !!svg.querySelector('.is-lit'));
+};
+for (const el of linked) {
+  el.addEventListener('pointerenter', () => { hovered = el; paint(); });
+  el.addEventListener('pointerleave', () => { hovered = null; paint(); });
+  el.addEventListener('focus', () => { focused = el; paint(); });
+  el.addEventListener('blur', () => { focused = null; paint(); });
+}
+
+// Stepper / scene player. Range and Play are optional: a plain stepper needs only data-go buttons.
+for (const root of document.querySelectorAll('.ve-steps')) {
+  const parts = [...root.querySelectorAll('[data-s]')], caps = [...root.querySelectorAll('.ve-cap li')];
+  const range = root.querySelector('input[type=range]'), play = root.querySelector('[data-play]');
+  const n = caps.length; let i = 0, timer = null;
+  if (range) range.max = n - 1;
+  const show = (k) => {
+    i = Math.max(0, Math.min(n - 1, k));
+    root.classList.remove('is-still');
+    // data-s lists the steps a part takes part in: it appears at the first ("0" = from the start) and is .now on each.
+    for (const el of parts) { const s = el.dataset.s.trim().split(' ').map(Number); el.classList.toggle('on', s[0] <= i + 1); el.classList.toggle('now', s.includes(i + 1)); }
+    caps.forEach((c, j) => c.hidden = j !== i);
+    root.classList.toggle('is-full', i === n - 1);
+    root.dispatchEvent(new Event('ve:step'));
+    if (range) range.value = i;
+  };
+  const stop = () => { clearInterval(timer); timer = null; if (play) play.textContent = 'Play'; };
+  root.addEventListener('click', (e) => { const b = e.target.closest('[data-go]'); if (b) { stop(); show(i + +b.dataset.go); } });
+  range?.addEventListener('input', () => { stop(); show(+range.value); });
+  play?.addEventListener('click', () => {
+    if (timer) return stop();
+    if (i === n - 1) show(0);
+    play.textContent = 'Pause';
+    timer = setInterval(() => (i < n - 1 ? show(i + 1) : stop()), 3500);
+  });
+  show(n - 1); // open on the full picture; Play replays from step 1
+  root.classList.add('is-still'); // same task as show(), so the last token never starts until the reader steps
+  addEventListener('beforeprint', () => { show(n - 1); root.classList.add('is-still'); }); // print shows the end state
+}
+
+if (!still) {
+  // Flow dots: each path[data-flow] spawns a dot every data-every ms; the ratio of intervals is the real traffic split.
+  // Runs only while the figure is on screen and, inside a stepper, only on the full picture.
+  for (const svg of document.querySelectorAll('svg:has([data-flow])')) {
+    const layer = svg.querySelector('.ve-dots'), steps = svg.closest('.ve-steps');
+    const routes = [...svg.querySelectorAll('[data-flow]')].map((p) => ({ p, len: p.getTotalLength(), every: +p.dataset.every, next: 0 }));
+    let dots = [], visible = false, running = false;
+    const live = () => visible && (!steps || steps.classList.contains('is-full'));
+    const tick = (t) => {
+      if (!live()) { running = false; for (const d of dots) d.c.remove(); dots = []; return; }
+      for (const r of routes) if (t >= r.next) {
+        r.next = t + r.every;
+        const c = document.createElementNS(svg.namespaceURI, 'circle');
+        c.setAttribute('r', 4); c.setAttribute('class', r.p.dataset.flow); layer.append(c);
+        dots.push({ c, r, t0: t });
+      }
+      dots = dots.filter((d) => {
+        const s = (t - d.t0) * .3; // 300 units per second
+        if (s > d.r.len) { d.c.remove(); return false; }
+        const pt = d.r.p.getPointAtLength(s);
+        d.c.setAttribute('cx', pt.x); d.c.setAttribute('cy', pt.y);
+        return true;
+      });
+      requestAnimationFrame(tick);
+    };
+    const start = () => { if (!running && live()) { running = true; requestAnimationFrame(tick); } };
+    steps?.addEventListener('ve:step', start);
+    new IntersectionObserver(([e]) => { visible = e.isIntersecting; start(); }).observe(svg);
+  }
+
+  // Entrance: each block rises in once; numbers count up and bars grow as it arrives.
+  // Without JS, in print, or under reduced motion, everything shows its final state.
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver((entries) => {
+    for (const e of entries) {
+      if (!e.isIntersecting) continue;
+      io.unobserve(e.target); e.target.classList.add('in');
+      for (const el of e.target.querySelectorAll('[data-count]')) {
+        const end = +el.dataset.count, dp = (el.dataset.count.split('.')[1] || '').length, t0 = performance.now();
+        const step = (t) => {
+          const k = Math.min(1, (t - t0) / 900);
+          el.textContent = (end * (1 - (1 - k) ** 3)).toLocaleString('en-US', { minimumFractionDigits: dp, maximumFractionDigits: dp });
+          if (k < 1) requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }
+    }
+  }, { rootMargin: '0px 0px -10% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+}
+
+// reader replies (kit/reply.js, inlined before this); a page opened raw has none
+window.veReply?.page();
+
+// Last statement: kit/check.mjs reads this to tell that the whole script ran.
+document.documentElement.dataset.veKit = "ready";
+}
 </script>
-</body>
-</html>
+</body></html>

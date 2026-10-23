@@ -1,0 +1,101 @@
+{
+  "date": "2026-10-23",
+  "head": "0509753a380866e8dd96bc648fd71c5c5d8792e2",
+  "includesPreservedLocalChanges": true,
+  "status": "accepted",
+  "id": "TR3",
+  "configurations": {
+    "Debug": {
+      "binarySha256": "C77A69561F3686FC50DB17E79180DEF4D36177E78D95BF3E7431D46B20A935E4",
+      "buildErrors": 0,
+      "buildWarnings": {
+        "MSB8027": 1
+      },
+      "viewHistoryChecks": 21,
+      "nativePixelComparisons": 16,
+      "nativeScalarSamples": 999424,
+      "nativeMaxError": 0.0,
+      "liveCaptures": 13,
+      "liveComparisons": 6,
+      "liveMaxErrors": {
+        "ssgiMaxError": 0.0,
+        "displayMaxError": 0.0,
+        "reconstructedMaxError": 0.0
+      },
+      "cameraDepthMaxDifference": 0.03980785608291626,
+      "cameraRgbMaxDifference": {
+        "reconstructed": 2.422515869140625,
+        "display": 0.6039215847849846
+      },
+      "nativeValidation": {
+        "layerEnabled": true,
+        "mode": "basic",
+        "devices": 2,
+        "drains": 1,
+        "messages": 0,
+        "problems": 0,
+        "droppedMessages": 0,
+        "retained": []
+      },
+      "liveValidation": {
+        "layerEnabled": true,
+        "mode": "basic",
+        "devices": 2,
+        "drains": 4178,
+        "messages": 0,
+        "problems": 0,
+        "droppedMessages": 0,
+        "retained": []
+      },
+      "normalExit": true
+    },
+    "Release": {
+      "binarySha256": "74AF0F972D4C10937440677F035047BC1BCBD32FEB6CF28ADEA52DBB5DAA9CF4",
+      "buildErrors": 0,
+      "buildWarnings": {
+        "LNK4020": 8,
+        "MSB8027": 1
+      },
+      "viewHistoryChecks": 21,
+      "nativePixelComparisons": 16,
+      "nativeScalarSamples": 999424,
+      "nativeMaxError": 0.0,
+      "liveCaptures": 13,
+      "liveComparisons": 6,
+      "liveMaxErrors": {
+        "ssgiMaxError": 0.0,
+        "displayMaxError": 0.0,
+        "reconstructedMaxError": 0.0
+      },
+      "cameraDepthMaxDifference": 0.03980785608291626,
+      "cameraRgbMaxDifference": {
+        "reconstructed": 2.422515869140625,
+        "display": 0.6039215847849846
+      },
+      "nativeValidation": {
+        "layerEnabled": true,
+        "mode": "basic",
+        "devices": 2,
+        "drains": 1,
+        "messages": 0,
+        "problems": 0,
+        "droppedMessages": 0,
+        "retained": []
+      },
+      "liveValidation": {
+        "layerEnabled": true,
+        "mode": "basic",
+        "devices": 2,
+        "drains": 4171,
+        "messages": 0,
+        "problems": 0,
+        "droppedMessages": 0,
+        "retained": []
+      },
+      "normalExit": true
+    }
+  },
+  "scope": "Per-view shared temporal lifetime, DX12 SSGI interleaving/reset/recording failure recovery and native product-live cut/resize pixels.",
+  "futureOwners": "TR2/TU retain SDK quality, all material/resolution quality and cost acceptance; Vulkan execution remains PHASE 4.9.",
+  "artifactRoot": "Artifacts/tr3-20261023"
+}

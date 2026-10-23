@@ -19,8 +19,6 @@ const GENERATOR = 'Tools/docs/render-markdown-docs.mjs';
 
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28 });
 const toPosix = p => p.replace(/\\/g, '/');
-const sourceRevision = git('rev-parse', 'HEAD').trim();
-const sourcePaths = new Set(git('ls-tree','-r','--name-only',sourceRevision).trim().split(/\r?\n/));
 
 // 추적·미추적(무시 제외) Markdown 전부. 지운 파일이 목록에 남지 않도록 실재를 확인한다.
 function listMarkdown() {
@@ -182,12 +180,8 @@ function renderDocument(source, file, markdownSet) {
 function rewriteHref(href, here, markdownSet) {
   if (!href || /^(?:[a-z]+:|#|\/\/)/i.test(href)) return href;
   const [path, hash] = href.split('#');
-  const target = posix.normalize(posix.join(here, decodeURI(path.split('?')[0])));
-  if (!target.startsWith('docs/')) {
-    if (sourcePaths.has(target)) return `https://github.com/29thnight/CreatorEngine/blob/${sourceRevision}/${target}${hash ? '#'+hash : ''}`;
-    if ([...sourcePaths].some(p=>p.startsWith(target.replace(/\/$/,'')+'/'))) return `https://github.com/29thnight/CreatorEngine/tree/${sourceRevision}/${target}`;
-  }
   if (!path.toLowerCase().endsWith('.md')) return href;
+  const target = posix.normalize(posix.join(here, decodeURI(path)));
   if (!markdownSet.has(target)) return href;
   return path.replace(/\.md$/i, '.html') + (hash !== undefined ? `#${hash}` : '');
 }
@@ -295,32 +289,11 @@ function main() {
   const args = process.argv.slice(2).map(a => toPosix(relative(ROOT, resolve(a))));
   const targets = args.length ? args : all;
   const dates = lastCommitDates();
-  const auditManifest = join(ROOT, 'docs/plans/MasterPlanAudit20261020.json');
-  const auditOwned = existsSync(auditManifest)
-    ? new Set(JSON.parse(readFileSync(auditManifest, 'utf8')).documents.map(d => d.path))
-    : new Set();
-  const fullManifest = join(ROOT, 'docs/analysis/MasterDocumentationAudit20261020.json');
-  const fullOwned = existsSync(fullManifest)
-    ? new Set(JSON.parse(readFileSync(fullManifest, 'utf8')).documents.map(d => d.path)) : new Set();
-  if (targets.some(file => auditOwned.has(file))) {
-    execFileSync(process.execPath, [join(ROOT, 'Tools/docs/render-master-plan-audit.mjs'), '--check'], { cwd: ROOT, stdio: 'inherit' });
-  }
-  if (targets.some(file => fullOwned.has(file))) {
-    execFileSync(process.execPath, [join(ROOT, 'Tools/docs/render-master-plan-audit.mjs'), '--full-docs', '--check'], { cwd: ROOT, stdio: 'inherit' });
-  }
   let written = 0;
   for (const file of targets) {
     // 전용 visual-explainer 도식 생성기가 소유하는 문서는 일반 템플릿으로 덮어쓰지 않는다.
     if (file === 'docs/design/DedicatedServerHandoff.md') { continue; }
     if (!markdownSet.has(file)) { console.error(`Markdown 목록에 없다: ${file}`); process.exitCode = 1; continue; }
-    // These pages use the upstream visual-explainer kit and its visual checks.
-    // Refuse stale sources rather than silently replacing their diagrams/layout.
-    if (auditOwned.has(file) || fullOwned.has(file)) {
-      if (!existsSync(join(ROOT, file.replace(/\.md$/, '.src.html')))) {
-        throw new Error(`Run node Tools/docs/render-master-plan-audit.mjs --render: ${file}`);
-      }
-      continue;
-    }
     // 원본의 줄바꿈이 섞여 있어도 결과는 LF 로 만든다.
     const source = readFileSync(join(ROOT, file), 'utf8').replace(/^﻿/, '').replace(/\r\n?/g, '\n');
     const doc = renderDocument(source, file, markdownSet);

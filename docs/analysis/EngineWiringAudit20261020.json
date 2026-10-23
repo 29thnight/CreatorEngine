@@ -111,10 +111,12 @@
             },
             "TEST": {
               "status": "fail",
-              "note": "기존 include 경계 위반 미해결. 전후 exit=1, 진단 동일. 검사완료로 표시하지 않는다.",
+              "note": "기존 include 경계 위반 미해결. 전후 exit=1, 진단 동일. 검사완료로 표시하지 않는다. | 최신 고정 SHA 격리 사본의 include gate exit=1. 기존 27개 상향 간선과 미등록 프로젝트 보고. 원본 baseline/allowlist를 갱신해 통과로 만들지 않음.",
               "evidence": [
                 "docs/analysis/MasterStructureReduction20261020.html",
-                "Build/empty-function-boundary-result.json"
+                "Build/empty-function-boundary-result.json",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/include-boundary.log",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/inventory-drift.json"
               ]
             }
           },
@@ -346,11 +348,33 @@
           "inventoryNote": "",
           "objects": [],
           "wires": [],
-          "checks": {},
-          "reviewer": "",
-          "reviewedAt": "",
-          "runBase": "",
-          "summary": "",
+          "checks": {
+            "TEST": {
+              "status": "partial",
+              "note": "2026-10-22 latest RDG setup 회귀 Debug/Release exit=0, workers=1,4,8, dependency order/failure drain/lifetime release/stale rejection. production scheduler/enkiTS 사용; watchdog 강제 종료만 제거한 저장소 게이트 사본. 전체 구획 완료 아님. | 이전 기록 보존: 최신 3531f1aa의 production scheduler/enkiTS CPU 선언 헬퍼와 recording DAG를 HeroP Debug/Release에서 검사. 정상 및 wave-join 변이 검출 통과. 전체 스케줄러 구획 완료 아님.",
+              "evidence": [
+                "Artifacts/scheduled-audit-20261021-1400-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/gates.json",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/declaration-gates.json",
+                "Artifacts/scheduled-audit-20261022-0200-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/cpu-gates.json",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/code-excerpts.json"
+              ]
+            },
+            "LIFE": {
+              "status": "partial",
+              "note": "선언 헬퍼의 scope drain·예외 전파·owner assistance·중첩 lock, recording DAG callback/observer 수명 회귀를 통과. profiler/GPU 미검증.",
+              "evidence": [
+                "Artifacts/scheduled-audit-20261021-1400-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/gates.json",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/declaration-gates.json"
+              ]
+            }
+          },
+          "reviewer": "Codex",
+          "reviewedAt": "2026-10-22",
+          "runBase": "b8b84e9cea8a6a34153b06ff670dcd097e6f685b; HeroP-PC-W5820; isolated 02:00 KST audit",
+          "summary": "2026-10-22: 최신 private branch 병렬 경로 재감사, 부분검사. 14시 정기 감사: 부분검사. 제품 코드 수정 없음.",
           "findings": [],
           "notApplicableObjects": "",
           "notApplicableWires": ""
@@ -763,11 +787,66 @@
           "inventoryNote": "",
           "objects": [],
           "wires": [],
-          "checks": {},
-          "reviewer": "",
-          "reviewedAt": "",
-          "runBase": "",
-          "summary": "",
+          "checks": {
+            "CALL": {
+              "status": "partial",
+              "note": "2026-10-22 b8b84e9c 재검사: LivePipelineDesc::DeclareAll 254-405. parallel setup+ExplicitVersioned에서 private input snapshot/branch를 worker에 넘기고 Wait→Merge→Publish 후 원래 노드 순서로 공개한다. 259-291에는 원래 직렬 A/B 경로가 남는다. 이전 3531f1aa의 전부 직렬 판단은 최신 경로에 적용하지 않는다. | 이전 기록 보존: LivePipelineDesc::DeclareAll 211-244에서 활성 node.declare()가 직렬 for 루프로 실행됨을 확인. helper 병렬 검증과 구별. 사용자 미커밋 구현과 겹쳐 제품 변경 없음.",
+              "evidence": [
+                "Artifacts/scheduled-audit-20261021-1400-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/gates.json",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/declaration-gates.json",
+                "Artifacts/scheduled-audit-20261022-0200-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/cpu-gates.json",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/code-excerpts.json"
+              ]
+            },
+            "CONTRACT": {
+              "status": "partial",
+              "note": "입력 snapshot, branch handle remap, writes/modifies publish와 afterDeclare의 owner-side publish를 정적으로 추적. RDG setup CPU 회귀는 merge/GPU 검증 전체를 대신하지 않는다. | 이전 기록 보존: 선언 packet 경계와 예외 CancelDeclarationPackets를 정적으로 추적. 노드 본문 병렬화의 안전성·성능은 이번 검사로 입증하지 않음.",
+              "evidence": [
+                "Artifacts/scheduled-audit-20261021-1400-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/gates.json",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/declaration-gates.json",
+                "Artifacts/scheduled-audit-20261022-0200-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/cpu-gates.json",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/code-excerpts.json"
+              ]
+            },
+            "TEST": {
+              "status": "partial",
+              "note": "latest source RDG setup Debug/Release 회귀 통과. 전체 빌드·pipeline/GPU의 실제 결과는 이번 보고서와 로그를 따른다. 구획 완료로 승격하지 않음. | 이전 기록 보존: 선언 헬퍼 및 recording DAG CPU Debug/Release 통과. 제품 pipeline 게이트는 격리 Editor 바이너리 부재로 실행 전 차단. | 최종 3-include 후보 전체 Debug/Release는 Editor ImGui 가시성 오류로 실패. 저장소의 RDG_NODE_FORKJOIN/branch merge selftest 코드는 읽었으나 Editor 바이너리 부재로 실행하지 못함. RDG setup CPU 통과를 이 테스트 통과로 간주하지 않음.",
+              "evidence": [
+                "Artifacts/scheduled-audit-20261021-1400-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/gates.json",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/declaration-gates.json",
+                "Artifacts/scheduled-audit-20261022-0200-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/cpu-gates.json",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/code-excerpts.json"
+              ]
+            },
+            "LIFE": {
+              "status": "partial",
+              "note": "worker 작업은 work[index]의 branch/snapshot을 참조하고 catch에서 tasks.Drain한다. MergeDeclarationBranch는 parent/merged/sealed 상태를 검사하고 immutable mapping 이후 shared branch를 root m_declarationBranches에 보존하여 raw owner callback 수명을 유지한다. GPU retirement까지의 전체 수명은 미완료. | 이전 기록 보존: ",
+              "evidence": [
+                "Artifacts/scheduled-audit-20261022-0200-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/cpu-gates.json",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/code-excerpts.json"
+              ]
+            },
+            "COST": {
+              "status": "partial",
+              "note": "m_setupWork 및 branch pool/arena 재사용을 확인. 성능 수치·할당 수 계측은 미실행. 런타임 코드·컨테이너·복사·락을 추가하지 않음. | 이전 기록 보존: ",
+              "evidence": [
+                "Artifacts/scheduled-audit-20261022-0200-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/cpu-gates.json",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/code-excerpts.json"
+              ]
+            }
+          },
+          "reviewer": "Codex",
+          "reviewedAt": "2026-10-22",
+          "runBase": "b8b84e9cea8a6a34153b06ff670dcd097e6f685b; HeroP-PC-W5820; isolated 02:00 KST audit",
+          "summary": "2026-10-22: 최신 private branch 병렬 경로 재감사, 부분검사. 14시 정기 감사: 부분검사. 제품 코드 수정 없음.",
           "findings": [],
           "notApplicableObjects": "",
           "notApplicableWires": ""
@@ -859,11 +938,39 @@
           "inventoryNote": "",
           "objects": [],
           "wires": [],
-          "checks": {},
-          "reviewer": "",
-          "reviewedAt": "",
-          "runBase": "",
-          "summary": "",
+          "checks": {
+            "CALL": {
+              "status": "partial",
+              "note": "EnqueueSoftwareBatch 1255에서 batch 이동 후 1260 EnqueueInternal을 호출. 거절 경로 소유권 계약은 독립 동적 재현 미완료이므로 버그 확정/수정하지 않음.",
+              "evidence": [
+                "Artifacts/scheduled-audit-20261021-1400-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/gates.json",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/declaration-gates.json"
+              ]
+            },
+            "DOC": {
+              "status": "partial",
+              "note": "최신 명세 §7은 public Serial 기본과 제품의 지원 pool Parallel 선택을 구별한다. IRHICommandTranslator.h:17 및 RHISubmissionThread.cpp:1275-1280과 부합. 구형 지적을 현재 결함으로 승계하지 않음.",
+              "evidence": [
+                "Artifacts/scheduled-audit-20261021-1400-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/gates.json",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/declaration-gates.json"
+              ]
+            },
+            "TEST": {
+              "status": "partial",
+              "note": "CPU recording DAG 통과는 RHI admission·GPU retirement 통과가 아님. 관련 전체 native/GPU 게이트는 별도 결과·차단 사유를 이번 보고서에 기록.",
+              "evidence": [
+                "Artifacts/scheduled-audit-20261021-1400-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/gates.json",
+                "Artifacts/scheduled-audit-20261021-1400-KST/evidence/declaration-gates.json"
+              ]
+            }
+          },
+          "reviewer": "Codex",
+          "reviewedAt": "2026-10-21",
+          "runBase": "3531f1aa201f4d9e0db97c39442d2cd0bdd8b0cc; HeroP-PC-W5820; isolated source; 14:00 KST",
+          "summary": "14시 정기 감사: 부분검사. 제품 코드 수정 없음.",
           "findings": [],
           "notApplicableObjects": "",
           "notApplicableWires": ""
@@ -937,12 +1044,32 @@
           "inventoryNote": "",
           "objects": [],
           "wires": [],
-          "checks": {},
-          "reviewer": "",
-          "reviewedAt": "",
-          "runBase": "",
+          "checks": {
+            "TEST": {
+              "status": "fail",
+              "note": "DX12TextureCache.cpp와 DX12Encoder.cpp의 ToDXGI 직접 선언 의존성 누락을 non-unity 빌드에서 확인. DX12Format.h 직접 include 후보로 RenderEngine Debug/Release 라이브러리가 출력됨. 원본/master 미적용으로 open 유지; 다른 런타임 정책·할당·동기화 변경 없음. | 이전 기록: ",
+              "evidence": [
+                "Artifacts/scheduled-audit-20261022-0200-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/final-gates.json"
+              ]
+            }
+          },
+          "reviewer": "Codex",
+          "reviewedAt": "2026-10-22",
+          "runBase": "b8b84e9cea8a6a34153b06ff670dcd097e6f685b baseline + isolated three-include candidate; original code not changed",
           "summary": "",
-          "findings": [],
+          "findings": [
+            {
+              "id": "AUD-10-02-F001",
+              "status": "open",
+              "description": "DX12TextureCache.cpp와 DX12Encoder.cpp의 ToDXGI 직접 선언 의존성 누락을 non-unity 빌드에서 확인. DX12Format.h 직접 include 후보로 RenderEngine Debug/Release 라이브러리가 출력됨. 원본/master 미적용으로 open 유지; 다른 런타임 정책·할당·동기화 변경 없음.",
+              "evidence": [
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/direct-include.patch",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/error-summary.json",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/component-libraries.json"
+              ]
+            }
+          ],
           "notApplicableObjects": "",
           "notApplicableWires": ""
         },
@@ -1902,12 +2029,32 @@
           "inventoryNote": "",
           "objects": [],
           "wires": [],
-          "checks": {},
-          "reviewer": "",
-          "reviewedAt": "",
-          "runBase": "",
+          "checks": {
+            "TEST": {
+              "status": "fail",
+              "note": "non-unity 기준 Debug에서 EntityAuthoringRead.cpp:25가 Meta::ExtractTypeFromYAML 선언을 찾지 못함. ReflectionYml.h 직접 include 후보를 격리 검증했고 SceneRuntime Debug/Release 라이브러리가 출력됐으나 원본/master에는 미적용이므로 open. 전체 Editor/GPU 검증은 차단. | 이전 기록: ",
+              "evidence": [
+                "Artifacts/scheduled-audit-20261022-0200-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/final-gates.json"
+              ]
+            }
+          },
+          "reviewer": "Codex",
+          "reviewedAt": "2026-10-22",
+          "runBase": "b8b84e9cea8a6a34153b06ff670dcd097e6f685b baseline + isolated three-include candidate; original code not changed",
           "summary": "",
-          "findings": [],
+          "findings": [
+            {
+              "id": "AUD-22-01-F001",
+              "status": "open",
+              "description": "non-unity 기준 Debug에서 EntityAuthoringRead.cpp:25가 Meta::ExtractTypeFromYAML 선언을 찾지 못함. ReflectionYml.h 직접 include 후보를 격리 검증했고 SceneRuntime Debug/Release 라이브러리가 출력됐으나 원본/master에는 미적용이므로 open. 전체 Editor/GPU 검증은 차단.",
+              "evidence": [
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/direct-include.patch",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/error-summary.json",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/component-libraries.json"
+              ]
+            }
+          ],
           "notApplicableObjects": "",
           "notApplicableWires": ""
         },
@@ -2146,12 +2293,33 @@
           "inventoryNote": "",
           "objects": [],
           "wires": [],
-          "checks": {},
-          "reviewer": "",
-          "reviewedAt": "",
-          "runBase": "",
+          "checks": {
+            "TEST": {
+              "status": "fail",
+              "note": "최종 후보 전체 Debug/Release는 Editor의 imgui_stdlib.h 및 ImGuiDrawHelper 계열에서 IMGUI_API/ImGuiInputTextFlags/ImGui 이름·타입 가시성 오류로 exit=1. 기존 사용자 수정 경로와 모듈/헤더 계약이 겹쳐 자동 확대 수정하지 않음. 검증된 Editor가 없어 pipeline/native GPU 게이트는 사전 차단; 사용자 바이너리로 대체하지 않음. | 이전 기록: ",
+              "evidence": [
+                "Artifacts/scheduled-audit-20261022-0200-KST/report.ko.html",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/final-gates.json"
+              ]
+            }
+          },
+          "reviewer": "Codex",
+          "reviewedAt": "2026-10-22",
+          "runBase": "b8b84e9cea8a6a34153b06ff670dcd097e6f685b baseline + isolated three-include candidate; original code not changed",
           "summary": "",
-          "findings": [],
+          "findings": [
+            {
+              "id": "AUD-24-03-F001",
+              "status": "open",
+              "description": "최종 후보 전체 Debug/Release는 Editor의 imgui_stdlib.h 및 ImGuiDrawHelper 계열에서 IMGUI_API/ImGuiInputTextFlags/ImGui 이름·타입 가시성 오류로 exit=1. 기존 사용자 수정 경로와 모듈/헤더 계약이 겹쳐 자동 확대 수정하지 않음. 검증된 Editor가 없어 pipeline/native GPU 게이트는 사전 차단; 사용자 바이너리로 대체하지 않음.",
+              "evidence": [
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/patched-Debug.log",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/patched-Release.log",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/pipeline-gate.log",
+                "Artifacts/scheduled-audit-20261022-0200-KST/evidence/native-gate.log"
+              ]
+            }
+          ],
           "notApplicableObjects": "",
           "notApplicableWires": ""
         }
@@ -15318,6 +15486,32 @@
       "action": "구획·고정 ID 신설. 과거 선별 검증은 부분 검사로만 이관. 검사완료 0건.",
       "evidence": [
         "docs/analysis/MasterStructureReduction20261020.html"
+      ]
+    },
+    {
+      "date": "2026-10-21",
+      "action": "14:00 KST 정기 감사: 3531f1aa 기준 AUD-05-01/07-03/09-01 부분검사와 AUD-01-03 기존 실패 기록. 역사적 baseline 및 inventory 해시는 유지. 구획 검사완료 승격 없음.",
+      "evidence": [
+        "Artifacts/scheduled-audit-20261021-1400-KST/report.ko.html",
+        "Artifacts/scheduled-audit-20261021-1400-KST/evidence/inventory-drift.json"
+      ]
+    },
+    {
+      "date": "2026-10-22",
+      "action": "02:00 KST 감사: b8b84e9c 기준 최신 private branch 선언·merge/publish 재추적, RDG setup Debug/Release 회귀. 과거 serial 판단을 최신에 재사용하지 않음. 기존 사용자 데이터·역사 baseline/inventory hash 보존. 구획 완료 승격 없음.",
+      "evidence": [
+        "Artifacts/scheduled-audit-20261022-0200-KST/report.ko.html",
+        "Artifacts/scheduled-audit-20261022-0200-KST/evidence/cpu-gates.json",
+        "Artifacts/scheduled-audit-20261022-0200-KST/evidence/inventory-drift.json"
+      ]
+    },
+    {
+      "date": "2026-10-22",
+      "action": "최종 게이트 기록: 제한 MSBuild C1902를 최소 재현자로 분리했고 승인 호스트의 최소/EngineContracts 통과. non-unity 직접 include 누락 3개 후보와 별도 Editor ImGui 실패 기록. 후보는 격리 라이브러리 생성까지 검증했지만 원본 코드 미적용 및 GPU 차단으로 구획 완료 승격 없음. 연결 알림 후 기존 프로세스/로그를 확인했고 중복 재시작하지 않음.",
+      "evidence": [
+        "Artifacts/scheduled-audit-20261022-0200-KST/report.ko.html",
+        "Artifacts/scheduled-audit-20261022-0200-KST/evidence/final-gates.json",
+        "Artifacts/scheduled-audit-20261022-0200-KST/evidence/reconnection-processes.json"
       ]
     }
   ]

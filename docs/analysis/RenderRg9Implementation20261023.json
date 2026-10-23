@@ -1,0 +1,236 @@
+{
+  "date": "2026-10-23",
+  "head": "0509753a380866e8dd96bc648fd71c5c5d8792e2",
+  "includesPreservedLocalChanges": true,
+  "passed": true,
+  "productAccepted": true,
+  "acceptedDays": 10,
+  "scope": "RG9 DX12 range/transient mips/same-repeated-pass split/Full fallback/readonly Inspector; Vulkan runtime comparison owned by Phase 4.9",
+  "native": {
+    "Debug": {
+      "rg9": {
+        "checks": 13315,
+        "frames": 512,
+        "exitCode": 0,
+        "fullFrames": 256,
+        "configuration": "Debug",
+        "validationErrors": 0,
+        "splitFrames": 256,
+        "repetitions": 3,
+        "pixelError": 0,
+        "passed": true
+      },
+      "sharedQueueChecks": 441,
+      "sharedScheduleChecks": 82,
+      "fullGraphPassed": true,
+      "binary": {
+        "head": "0509753a380866e8dd96bc648fd71c5c5d8792e2",
+        "configuration": "Debug",
+        "test": "80155D58E37DCFB5B4CAEB21C042DFAC542AAF6E20C77AED484866EAFB25A44F",
+        "runtime": "F7C1ACE2F3516F45106DEA1A7DD208F47C4BE3EA93785E3C01E4AEE39EC876F1",
+        "exe": "F2ED65B00B72711B0753CDB95188A491A52D2C3A888A1CBC19FFDF42BE90BADC"
+      },
+      "buildErrors": 0,
+      "buildWarnings": {
+        "LNK4006": 2,
+        "MSB8027": 1
+      }
+    },
+    "Release": {
+      "rg9": {
+        "checks": 13315,
+        "frames": 512,
+        "exitCode": 0,
+        "fullFrames": 256,
+        "configuration": "Release",
+        "validationErrors": 0,
+        "splitFrames": 256,
+        "repetitions": 3,
+        "pixelError": 0,
+        "passed": true
+      },
+      "sharedQueueChecks": 441,
+      "sharedScheduleChecks": 82,
+      "fullGraphPassed": true,
+      "binary": {
+        "head": "0509753a380866e8dd96bc648fd71c5c5d8792e2",
+        "configuration": "Release",
+        "test": "80155D58E37DCFB5B4CAEB21C042DFAC542AAF6E20C77AED484866EAFB25A44F",
+        "runtime": "1E35A82F7E47C49240946D14648C3EB25C40213B5A714047F64ED4B51AD45512",
+        "exe": "B24E07E9277AE98F170FF252E49A9824D6B42B218EEBEE548E62CDD6E391F8A8"
+      },
+      "buildErrors": 0,
+      "buildWarnings": {
+        "LNK4020": 8,
+        "MSB8027": 1
+      }
+    }
+  },
+  "software": {
+    "normalExit": true,
+    "uploadRollover": true,
+    "declarationMetadata": true,
+    "translationPoolReuse": true,
+    "validation": "gpu",
+    "nativeClearBarrierReadback": true,
+    "frozenTargets": true,
+    "ownedQueue": true,
+    "declarationPackets": true,
+    "singleCopyPassUsages": true,
+    "asynchronousTranslation": true,
+    "creatorRobotSoftwarePath": false,
+    "retainedBlackboard": true,
+    "parallelTranslation": true,
+    "fullRenderGraph": true,
+    "passed": true,
+    "arenaRetirement": true,
+    "multiqueueTimeline": true,
+    "gpuMergeReuse": true,
+    "ownedPoolReuse": true
+  },
+  "viewer": {
+    "sizes": 2,
+    "gpuExecution": false,
+    "resources": 120,
+    "passes": 80,
+    "actualSnapshotType": true,
+    "model": true,
+    "imgui": true,
+    "passed": true
+  },
+  "allocation": {
+    "passed": true,
+    "cases": 10,
+    "iterations": 512,
+    "warmups": 8,
+    "submitLeaseBytes": 56,
+    "measurements": [
+      {
+        "name": "plain_stream_declare",
+        "iterations": 512,
+        "standard_calls": 0,
+        "standard_bytes": 0,
+        "mimalloc_calls": 0,
+        "mimalloc_bytes": 0,
+        "cpu_nanoseconds": 2684600
+      },
+      {
+        "name": "plain_compile",
+        "iterations": 512,
+        "standard_calls": 0,
+        "standard_bytes": 0,
+        "mimalloc_calls": 0,
+        "mimalloc_bytes": 0,
+        "cpu_nanoseconds": 1246900
+      },
+      {
+        "name": "range_stream_declare",
+        "iterations": 512,
+        "standard_calls": 0,
+        "standard_bytes": 0,
+        "mimalloc_calls": 0,
+        "mimalloc_bytes": 0,
+        "cpu_nanoseconds": 3625800
+      },
+      {
+        "name": "range_compile",
+        "iterations": 512,
+        "standard_calls": 0,
+        "standard_bytes": 0,
+        "mimalloc_calls": 0,
+        "mimalloc_bytes": 0,
+        "cpu_nanoseconds": 9819300
+      },
+      {
+        "name": "alias_stream_declare",
+        "iterations": 512,
+        "standard_calls": 0,
+        "standard_bytes": 0,
+        "mimalloc_calls": 0,
+        "mimalloc_bytes": 0,
+        "cpu_nanoseconds": 3268500
+      },
+      {
+        "name": "alias_compile",
+        "iterations": 512,
+        "standard_calls": 0,
+        "standard_bytes": 0,
+        "mimalloc_calls": 0,
+        "mimalloc_bytes": 0,
+        "cpu_nanoseconds": 6880700
+      },
+      {
+        "name": "queue_authored_with_hints",
+        "iterations": 512,
+        "standard_calls": 0,
+        "standard_bytes": 0,
+        "mimalloc_calls": 0,
+        "mimalloc_bytes": 0,
+        "cpu_nanoseconds": 860800
+      },
+      {
+        "name": "queue_authored_without_hints",
+        "iterations": 512,
+        "standard_calls": 0,
+        "standard_bytes": 0,
+        "mimalloc_calls": 0,
+        "mimalloc_bytes": 0,
+        "cpu_nanoseconds": 851200
+      },
+      {
+        "name": "queue_submit_graphics_excluding_native_mock",
+        "iterations": 512,
+        "standard_calls": 512,
+        "standard_bytes": 28672,
+        "mimalloc_calls": 0,
+        "mimalloc_bytes": 0,
+        "cpu_nanoseconds": 3297200
+      },
+      {
+        "name": "queue_submit_compute_excluding_native_mock",
+        "iterations": 512,
+        "standard_calls": 512,
+        "standard_bytes": 28672,
+        "mimalloc_calls": 0,
+        "mimalloc_bytes": 0,
+        "cpu_nanoseconds": 9083500
+      }
+    ]
+  },
+  "sourceHashes": {
+    "Editor/EngineEntry/Commands/RenderDebugCommands.cpp": "ee8c24b0a01f2b326f500d2a488198f04a459ed1e88cbbc632101ac90f4d66f7",
+    "Editor/EngineEntry/Commands/RenderTestCommands.cpp": "469c75d1f9bb85fd509c39bee8e678f15c0b17192baafbfcd17f1f57418fb274",
+    "Editor/EngineGUIWindow/CompiledGraphViewer.inl": "4013d2504c050709f2a86c293fc0f5095b62d30559649d826134a9dc99cc5db3",
+    "Editor/RenderTests/RHI/DX12/Tests/DX12SelfTest.h": "2f5d35bfd40deacd6df3c484256ce2c224d98a3f0d040244b3e8c35f7869e143",
+    "Editor/RenderTests/RHI/DX12/Tests/EnhancedSceneRendererSelfTest.cpp": "3d2767061e3614f3bb2d1301e785ae16f53bf5a49c7eb1bb03f6c1c74990889c",
+    "Editor/RenderTests/RHI/DX12/Tests/RenderSubresourceRg9Tests.h": "80155d58e37dcfb5b4caeb21c042dfac542aaf6e20c77aed484866eafb25a44f",
+    "Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp": "3286958558a62837c97f0a4178f282c7daa0a161696fe6eebdf479ee7f1e1e33",
+    "Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h": "376a4162111b9a901a0f8b6df5f305e3ff2436dcbaf2b2a04d8d9aaf75f2ba30",
+    "Engine/RenderEngine/RHI/DX12/DX12Encoder.cpp": "8b254bcb293098c09eee139a867a5c0a44e7ae03cf785c05fe9cc137e5d80593",
+    "Engine/RenderEngine/RHI/DX12/DX12SubresourceRange.h": "ae2e87c5e4397a935cc527eb4bfd60afb553062b6b248b15865cb858130698d1",
+    "Engine/RenderEngine/RHI/IRenderDeviceServices.h": "45927ab25235c48f4b1ff0a06e80db2e5a393b94cc783af71dedf277ae320d9b",
+    "Engine/RenderEngine/RHI/RHIResourceState.h": "3289523a525a32270e2ad9f76274cf3d68e9e04bbef9124e8c78b15145e91310",
+    "Engine/RenderEngine/RHI/Vulkan/VulkanEncoder.cpp": "9b6356ab477e3955e3ec795b051cbfdd31dc652b32a2438d4bf5b38c396ec2de",
+    "Engine/RenderEngine/RHI/Vulkan/VulkanRenderServices.cpp": "c669ecfadcb68d5e0c27e0992aba9255e80f0102e35c5c6a43cc078251c6e0ad",
+    "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp": "087812bf850f2a064a0f2eb6be444e6dc56b9e403af9369b25d0156635963982",
+    "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h": "175669fa29a6dd66a80504c7c363ebfac9e46c981f2896acdf2b768353ac9a6e",
+    "Engine/RenderEngine/Render/Graph/EnhancedRenderGraphSubresources.cpp": "54e97973a445f294b4d19f5686475434dca3b11afd468182a128cd98f2be869c",
+    "Tools/regression/compiled_graph_viewer_imgui_probe.cpp": "15c4e0a189ce04bc4b0365983c37ba294f24e46c89e509842bae04515daf880f",
+    "Tools/regression/render_graph_program_probe.cpp": "c5d7e03e41b2363340854ffabfca9755fb31c82190ab8a49dc4b3d02e329300f",
+    "Tools/regression/verify-compiled-graph-viewer.ps1": "6519d68b6fc5650ca5c1dcbb9e0d8ae38fdef7e88104013117e296f3e5c30e57",
+    "Tools/regression/verify-rg9-subresources.ps1": "8af9c4afa00196b06ebcb2353a1c22f7b0242dbf535105fbefabf63d31ebd316"
+  },
+  "rawEvidence": "Artifacts/rg9-20261023/result.json",
+  "phase43": {
+    "acceptedDays": 100,
+    "days": 100,
+    "implementationPct": 100,
+    "acceptancePct": 100
+  },
+  "phase4x": {
+    "acceptedDays": 164,
+    "days": 531,
+    "implementationPct": 40,
+    "acceptancePct": 31
+  }
+}

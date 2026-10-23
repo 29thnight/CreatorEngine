@@ -6,9 +6,21 @@
 
 [전체 문서 대조·충돌 판정](MasterPlanAudit20261020.html) · [정리 전 원문](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/TemporalReconstructionPlan.md)
 
+## 2026-10-23 TR3 수용
+
+현재 master `0509753a380866e8dd96bc648fd71c5c5d8792e2`와 보존된 로컬 변경에서 view별 history·SSGI reset·실패 복구를 완료했다. `Begin`의 invalid camera 입력은 기존 history를 보존하고 SSGI는 reset 이전 recording 수락을 세대로 격리한다. Debug/Release 빌드, view state 21검사·native GPU 16비교 및 각 13개 제품 캡처/6쌍 비교가 통과했다. TR3 5/5·5인일 수용. [실행 보고서](../analysis/TemporalTr3History20261023.html).
+
+3개 view 상태와 2개 SSGI 카메라의 교차 실행·독립 reset을 확인했다. SDK 전체 품질·route·해상도·비용은 아래 TR2/TU 잔여 항목에서 계속 추적한다. 기존 10월 20일 master-only 정리는 이 TR3 갱신의 기준과 구분한다.
+
+## 2026-10-23 TR2 수용
+
+기존 temporal snapshot·history·SSGI와 캡처 도구를 활용해 멀티뷰·전체 route·해상도 검증을 완료했다. Debug/Release 각각 native 7-route를 3개 해상도에서 검사하고, FSR/DLSS/XeSS의 5개 품질×3개 실제 viewport를 단독·교차 view로 실행했다. 구성별 SDK 90fixture와 전체 픽셀 6,930비교가 통과했고 동일 Game view의 단독·교차 실행 간 픽셀 차이는 0이다. TR2 4/4·5인일 수용. [실행 보고서](../analysis/TemporalTr2Resolution20261023.html).
+
+SDK는 `ThirdParty/Temporal`에 고정 버전으로 설치하고 검증용 opt-in 빌드로 사용한다. TU0~4의 복잡 제품 장면·성능·배포와 FG 검증은 계속 해당 항목에서 추적한다.
+
 ## 남은 작업과 완료 판정
 
-- TR0/2/3·TU0~4: sealed 입력·모션 소유권·history reset·품질/AA·fallback을 전체 실제 material route와 SDK 품질 행렬에서 수용한다. TR1/TU5의 완료 구현을 다시 만들지 않는다.
+- TR0·TU0~4: sealed 입력·모션 소유권·history reset·품질/AA·fallback을 전체 실제 material route와 SDK 품질 행렬에서 수용한다. TR1/TU5의 완료 구현을 다시 만들지 않는다.
 - FG/TFG9: 실제 Player generated output identity·물리 표시 cadence/latency·resize/device loss/teardown 및 장치별 비용을 검증한다. requested/configured/active count와 CPU Present 반환을 실제 생성/표시 증거로 바꾸지 않는다.
 - 현재 portable renderFeatures·startup precedence·camera cut revision·profiler provenance/continuous presenter 기록을 기준으로 persistence/cook·실패 복원·계측 무해화를 수용한다.
 
@@ -23,7 +35,7 @@
 | 추적 ID | 소유 단위 (잔여 작업은 위 목록) | 대시보드 보존 상태 |
 |---|---|---|
 | `TR0` · PHASE 4.5 | 계측 무해화 계약 — 측정 표면의 해상도·프레임 종류 선언 | progress |
-| `TR2` · PHASE 4.5 | 렌더 해상도 ≠ 표시 해상도 계약·jitter 시퀀스 | progress |
+| `TR2` · PHASE 4.5 | 렌더 해상도 ≠ 표시 해상도 계약·jitter 시퀀스·멀티뷰 품질 수용 | done |
 | `TU0` · PHASE 4.5 | 벤더 중립 Upscaler 인터페이스·기능 질의·폴백 사슬 | progress |
 | `TU1` · PHASE 4.5 | 무-upscale 기준 경로·A/B 대조군 | progress |
 | `TU2` · PHASE 4.5 | FSR 백엔드 — 벤더 중립 베이스라인 | progress |

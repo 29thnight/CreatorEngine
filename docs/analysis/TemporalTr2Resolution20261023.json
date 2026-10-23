@@ -1,0 +1,1563 @@
+{
+  "id": "TR2",
+  "date": "2026-10-23",
+  "head": "0509753a380866e8dd96bc648fd71c5c5d8792e2",
+  "includesPreservedLocalChanges": true,
+  "scope": "DX12 Editor: native seven routes and FSR/DLSS/XeSS, five qualities, three display extents, paired solo/interleaved views",
+  "configurations": {
+    "Debug": {
+      "binarySha256": "c36e1bf531ca6ca297e9991fc885141a262b8c1c7c05298dae7ebd75db7758ff",
+      "buildErrors": 0,
+      "buildWarnings": 25,
+      "nativeFixtures": 3,
+      "sdkConditions": 45,
+      "sdkFixtures": 90,
+      "repeatedSoloFixtures": 1,
+      "captures": 1316,
+      "viewIsolationComparisons": 6930,
+      "viewIsolationScalarSamples": 5115300960,
+      "viewIsolationMaximumError": 0.0,
+      "repeatComparisons": 154,
+      "repeatMaximumError": 0.0,
+      "maximumRelativeInteriorError": 0.006414172266340868,
+      "postChainPassed": true,
+      "historyChecks": 2171,
+      "meshletChecks": 73,
+      "ssgiComparisons": 16,
+      "ssgiScalarSamples": 999424,
+      "ssgiMaximumError": 0.0,
+      "validation": {
+        "layerEnabled": true,
+        "messages": 0,
+        "problems": 0,
+        "droppedMessages": 0,
+        "processes": [
+          {
+            "layerEnabled": true,
+            "mode": "basic",
+            "devices": 2,
+            "drains": 85744,
+            "messages": 0,
+            "problems": 0,
+            "droppedMessages": 0,
+            "retained": []
+          },
+          {
+            "layerEnabled": true,
+            "mode": "basic",
+            "devices": 2,
+            "drains": 83101,
+            "messages": 0,
+            "problems": 0,
+            "droppedMessages": 0,
+            "retained": []
+          },
+          {
+            "layerEnabled": true,
+            "mode": "basic",
+            "devices": 2,
+            "drains": 71430,
+            "messages": 0,
+            "problems": 0,
+            "droppedMessages": 0,
+            "retained": []
+          }
+        ]
+      },
+      "matrixRuns": [
+        "Artifacts/tr2-20261023/stable-matrix-Debug",
+        "Artifacts/tr2-20261023/stable-matrix-Debug-medium"
+      ],
+      "matrix": [
+        {
+          "hostExtent": "960x640",
+          "provider": "fsr",
+          "quality": "native-aa",
+          "renderExtent": [
+            818,
+            332
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/960x640/fsr-native-aa"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "fsr",
+          "quality": "quality",
+          "renderExtent": [
+            545,
+            221
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0008319467554076539,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/960x640/fsr-quality"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "fsr",
+          "quality": "balanced",
+          "renderExtent": [
+            481,
+            195
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/960x640/fsr-balanced"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "fsr",
+          "quality": "performance",
+          "renderExtent": [
+            409,
+            166
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0008319467554076539,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/960x640/fsr-performance"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "fsr",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            272,
+            110
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0024449877750611247,
+          "interiorProbes": 102,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/960x640/fsr-ultra-performance"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "dlss",
+          "quality": "native-aa",
+          "renderExtent": [
+            818,
+            332
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.005497861942577886,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/960x640/dlss-native-aa"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "dlss",
+          "quality": "quality",
+          "renderExtent": [
+            545,
+            221
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.004886988393402566,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/960x640/dlss-quality"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "dlss",
+          "quality": "balanced",
+          "renderExtent": [
+            474,
+            193
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.004886988393402566,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/960x640/dlss-balanced"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "dlss",
+          "quality": "performance",
+          "renderExtent": [
+            409,
+            166
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.004273504273504274,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/960x640/dlss-performance"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "dlss",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            273,
+            111
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.004904966278356836,
+          "interiorProbes": 98,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/960x640/dlss-ultra-performance"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "xess",
+          "quality": "native-aa",
+          "renderExtent": [
+            818,
+            332
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0024834437086092716,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/960x640/xess-native-aa"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "xess",
+          "quality": "quality",
+          "renderExtent": [
+            482,
+            196
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0033250207813798837,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/960x640/xess-quality"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "xess",
+          "quality": "balanced",
+          "renderExtent": [
+            409,
+            166
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0030525030525030525,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/960x640/xess-balanced"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "xess",
+          "quality": "performance",
+          "renderExtent": [
+            356,
+            145
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0024875621890547263,
+          "interiorProbes": 108,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/960x640/xess-performance"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "xess",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            273,
+            111
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0041390728476821195,
+          "interiorProbes": 98,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/960x640/xess-ultra-performance"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "fsr",
+          "quality": "native-aa",
+          "renderExtent": [
+            1138,
+            412
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.0008278145695364238,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug-medium/1280x720/fsr-native-aa"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "fsr",
+          "quality": "quality",
+          "renderExtent": [
+            758,
+            274
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug-medium/1280x720/fsr-quality"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "fsr",
+          "quality": "balanced",
+          "renderExtent": [
+            669,
+            242
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug-medium/1280x720/fsr-balanced"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "fsr",
+          "quality": "performance",
+          "renderExtent": [
+            569,
+            206
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug-medium/1280x720/fsr-performance"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "fsr",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            379,
+            137
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug-medium/1280x720/fsr-ultra-performance"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "dlss",
+          "quality": "native-aa",
+          "renderExtent": [
+            1138,
+            412
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.006108735491753207,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug-medium/1280x720/dlss-native-aa"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "dlss",
+          "quality": "quality",
+          "renderExtent": [
+            759,
+            275
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.004581551618814905,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug-medium/1280x720/dlss-quality"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "dlss",
+          "quality": "balanced",
+          "renderExtent": [
+            660,
+            239
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.005192425167990226,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug-medium/1280x720/dlss-balanced"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "dlss",
+          "quality": "performance",
+          "renderExtent": [
+            569,
+            206
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.005494505494505495,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug-medium/1280x720/dlss-performance"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "dlss",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            379,
+            137
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.004886988393402566,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug-medium/1280x720/dlss-ultra-performance"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "xess",
+          "quality": "native-aa",
+          "renderExtent": [
+            1138,
+            412
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.0033030553261767133,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug-medium/1280x720/xess-native-aa"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "xess",
+          "quality": "quality",
+          "renderExtent": [
+            670,
+            243
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.0033112582781456954,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug-medium/1280x720/xess-quality"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "xess",
+          "quality": "balanced",
+          "renderExtent": [
+            569,
+            206
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.003355704697986577,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug-medium/1280x720/xess-balanced"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "xess",
+          "quality": "performance",
+          "renderExtent": [
+            495,
+            180
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.0033112582781456954,
+          "interiorProbes": 104,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug-medium/1280x720/xess-performance"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "xess",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            380,
+            138
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.003663003663003663,
+          "interiorProbes": 104,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug-medium/1280x720/xess-ultra-performance"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "fsr",
+          "quality": "native-aa",
+          "renderExtent": [
+            1458,
+            592
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/1600x900/fsr-native-aa"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "fsr",
+          "quality": "quality",
+          "renderExtent": [
+            972,
+            394
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0008319467554076539,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/1600x900/fsr-quality"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "fsr",
+          "quality": "balanced",
+          "renderExtent": [
+            857,
+            348
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0008312551953449709,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/1600x900/fsr-balanced"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "fsr",
+          "quality": "performance",
+          "renderExtent": [
+            729,
+            296
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/1600x900/fsr-performance"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "fsr",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            486,
+            197
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/1600x900/fsr-ultra-performance"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "dlss",
+          "quality": "native-aa",
+          "renderExtent": [
+            1458,
+            592
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.006414172266340868,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/1600x900/dlss-native-aa"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "dlss",
+          "quality": "quality",
+          "renderExtent": [
+            972,
+            395
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.005803298717165547,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/1600x900/dlss-quality"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "dlss",
+          "quality": "balanced",
+          "renderExtent": [
+            846,
+            343
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.005192425167990226,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/1600x900/dlss-balanced"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "dlss",
+          "quality": "performance",
+          "renderExtent": [
+            729,
+            296
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.005803298717165547,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/1600x900/dlss-performance"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "dlss",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            486,
+            197
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.005192425167990226,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/1600x900/dlss-ultra-performance"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "xess",
+          "quality": "native-aa",
+          "renderExtent": [
+            1458,
+            592
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0024834437086092716,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/1600x900/xess-native-aa"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "xess",
+          "quality": "quality",
+          "renderExtent": [
+            858,
+            349
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0024875621890547263,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/1600x900/xess-quality"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "xess",
+          "quality": "balanced",
+          "renderExtent": [
+            729,
+            296
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0030450669914738123,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/1600x900/xess-balanced"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "xess",
+          "quality": "performance",
+          "renderExtent": [
+            634,
+            258
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0030543677458766036,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/1600x900/xess-performance"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "xess",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            486,
+            198
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.004975124378109453,
+          "interiorProbes": 108,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Debug/1600x900/xess-ultra-performance"
+        }
+      ]
+    },
+    "Release": {
+      "binarySha256": "b4661b053fb725a16729e680226e19b43809d8bc4e8ef08e4a8afa778e3324f7",
+      "buildErrors": 0,
+      "buildWarnings": 33,
+      "nativeFixtures": 3,
+      "sdkConditions": 45,
+      "sdkFixtures": 90,
+      "repeatedSoloFixtures": 1,
+      "captures": 1316,
+      "viewIsolationComparisons": 6930,
+      "viewIsolationScalarSamples": 5115300960,
+      "viewIsolationMaximumError": 0.0,
+      "repeatComparisons": 154,
+      "repeatMaximumError": 0.0,
+      "maximumRelativeInteriorError": 0.006414172266340868,
+      "postChainPassed": true,
+      "historyChecks": 2171,
+      "meshletChecks": 73,
+      "ssgiComparisons": 16,
+      "ssgiScalarSamples": 999424,
+      "ssgiMaximumError": 0.0,
+      "validation": {
+        "layerEnabled": true,
+        "messages": 0,
+        "problems": 0,
+        "droppedMessages": 0,
+        "processes": [
+          {
+            "layerEnabled": true,
+            "mode": "basic",
+            "devices": 2,
+            "drains": 311189,
+            "messages": 0,
+            "problems": 0,
+            "droppedMessages": 0,
+            "retained": []
+          }
+        ]
+      },
+      "matrixRuns": [
+        "Artifacts/tr2-20261023/stable-matrix-Release"
+      ],
+      "matrix": [
+        {
+          "hostExtent": "960x640",
+          "provider": "fsr",
+          "quality": "native-aa",
+          "renderExtent": [
+            818,
+            332
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/960x640/fsr-native-aa"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "fsr",
+          "quality": "quality",
+          "renderExtent": [
+            545,
+            221
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0008319467554076539,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/960x640/fsr-quality"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "fsr",
+          "quality": "balanced",
+          "renderExtent": [
+            481,
+            195
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/960x640/fsr-balanced"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "fsr",
+          "quality": "performance",
+          "renderExtent": [
+            409,
+            166
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0008319467554076539,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/960x640/fsr-performance"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "fsr",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            272,
+            110
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0024449877750611247,
+          "interiorProbes": 102,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/960x640/fsr-ultra-performance"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "dlss",
+          "quality": "native-aa",
+          "renderExtent": [
+            818,
+            332
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.005497861942577886,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/960x640/dlss-native-aa"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "dlss",
+          "quality": "quality",
+          "renderExtent": [
+            545,
+            221
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.004886988393402566,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/960x640/dlss-quality"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "dlss",
+          "quality": "balanced",
+          "renderExtent": [
+            474,
+            193
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.004886988393402566,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/960x640/dlss-balanced"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "dlss",
+          "quality": "performance",
+          "renderExtent": [
+            409,
+            166
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.004273504273504274,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/960x640/dlss-performance"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "dlss",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            273,
+            111
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.004904966278356836,
+          "interiorProbes": 98,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/960x640/dlss-ultra-performance"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "xess",
+          "quality": "native-aa",
+          "renderExtent": [
+            818,
+            332
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0024834437086092716,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/960x640/xess-native-aa"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "xess",
+          "quality": "quality",
+          "renderExtent": [
+            482,
+            196
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0033250207813798837,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/960x640/xess-quality"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "xess",
+          "quality": "balanced",
+          "renderExtent": [
+            409,
+            166
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0030525030525030525,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/960x640/xess-balanced"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "xess",
+          "quality": "performance",
+          "renderExtent": [
+            356,
+            145
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0024875621890547263,
+          "interiorProbes": 108,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/960x640/xess-performance"
+        },
+        {
+          "hostExtent": "960x640",
+          "provider": "xess",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            273,
+            111
+          ],
+          "displayExtent": [
+            818,
+            332
+          ],
+          "maximumRelativeInteriorError": 0.0041390728476821195,
+          "interiorProbes": 98,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/960x640/xess-ultra-performance"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "fsr",
+          "quality": "native-aa",
+          "renderExtent": [
+            1138,
+            412
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.0008278145695364238,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1280x720/fsr-native-aa"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "fsr",
+          "quality": "quality",
+          "renderExtent": [
+            758,
+            274
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1280x720/fsr-quality"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "fsr",
+          "quality": "balanced",
+          "renderExtent": [
+            669,
+            242
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1280x720/fsr-balanced"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "fsr",
+          "quality": "performance",
+          "renderExtent": [
+            569,
+            206
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1280x720/fsr-performance"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "fsr",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            379,
+            137
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1280x720/fsr-ultra-performance"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "dlss",
+          "quality": "native-aa",
+          "renderExtent": [
+            1138,
+            412
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.006108735491753207,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1280x720/dlss-native-aa"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "dlss",
+          "quality": "quality",
+          "renderExtent": [
+            759,
+            275
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.004581551618814905,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1280x720/dlss-quality"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "dlss",
+          "quality": "balanced",
+          "renderExtent": [
+            660,
+            239
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.005192425167990226,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1280x720/dlss-balanced"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "dlss",
+          "quality": "performance",
+          "renderExtent": [
+            569,
+            206
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.005494505494505495,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1280x720/dlss-performance"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "dlss",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            379,
+            137
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.004886988393402566,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1280x720/dlss-ultra-performance"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "xess",
+          "quality": "native-aa",
+          "renderExtent": [
+            1138,
+            412
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.0033030553261767133,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1280x720/xess-native-aa"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "xess",
+          "quality": "quality",
+          "renderExtent": [
+            670,
+            243
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.0033112582781456954,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1280x720/xess-quality"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "xess",
+          "quality": "balanced",
+          "renderExtent": [
+            569,
+            206
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.003355704697986577,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1280x720/xess-balanced"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "xess",
+          "quality": "performance",
+          "renderExtent": [
+            495,
+            180
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.0033112582781456954,
+          "interiorProbes": 104,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1280x720/xess-performance"
+        },
+        {
+          "hostExtent": "1280x720",
+          "provider": "xess",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            380,
+            138
+          ],
+          "displayExtent": [
+            1138,
+            412
+          ],
+          "maximumRelativeInteriorError": 0.003663003663003663,
+          "interiorProbes": 104,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1280x720/xess-ultra-performance"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "fsr",
+          "quality": "native-aa",
+          "renderExtent": [
+            1458,
+            592
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1600x900/fsr-native-aa"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "fsr",
+          "quality": "quality",
+          "renderExtent": [
+            972,
+            394
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0008319467554076539,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1600x900/fsr-quality"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "fsr",
+          "quality": "balanced",
+          "renderExtent": [
+            857,
+            348
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0008312551953449709,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1600x900/fsr-balanced"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "fsr",
+          "quality": "performance",
+          "renderExtent": [
+            729,
+            296
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1600x900/fsr-performance"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "fsr",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            486,
+            197
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0008326394671107411,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1600x900/fsr-ultra-performance"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "dlss",
+          "quality": "native-aa",
+          "renderExtent": [
+            1458,
+            592
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.006414172266340868,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1600x900/dlss-native-aa"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "dlss",
+          "quality": "quality",
+          "renderExtent": [
+            972,
+            395
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.005803298717165547,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1600x900/dlss-quality"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "dlss",
+          "quality": "balanced",
+          "renderExtent": [
+            846,
+            343
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.005192425167990226,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1600x900/dlss-balanced"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "dlss",
+          "quality": "performance",
+          "renderExtent": [
+            729,
+            296
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.005803298717165547,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1600x900/dlss-performance"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "dlss",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            486,
+            197
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.005192425167990226,
+          "interiorProbes": 110,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1600x900/dlss-ultra-performance"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "xess",
+          "quality": "native-aa",
+          "renderExtent": [
+            1458,
+            592
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0024834437086092716,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1600x900/xess-native-aa"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "xess",
+          "quality": "quality",
+          "renderExtent": [
+            858,
+            349
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0024875621890547263,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1600x900/xess-quality"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "xess",
+          "quality": "balanced",
+          "renderExtent": [
+            729,
+            296
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0030450669914738123,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1600x900/xess-balanced"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "xess",
+          "quality": "performance",
+          "renderExtent": [
+            634,
+            258
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.0030543677458766036,
+          "interiorProbes": 106,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1600x900/xess-performance"
+        },
+        {
+          "hostExtent": "1600x900",
+          "provider": "xess",
+          "quality": "ultra-performance",
+          "renderExtent": [
+            486,
+            198
+          ],
+          "displayExtent": [
+            1458,
+            592
+          ],
+          "maximumRelativeInteriorError": 0.004975124378109453,
+          "interiorProbes": 108,
+          "oracle": "Artifacts/tr2-20261023/stable-matrix-Release/1600x900/xess-ultra-performance"
+        }
+      ]
+    }
+  },
+  "diagnosticResetContract": "each sealed SDK route begins with a fresh SDK context and its own reset submission",
+  "status": "accepted",
+  "sourceFreeze": "Artifacts/tr2-20261023/source-freeze.json"
+}

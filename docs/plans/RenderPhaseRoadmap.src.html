@@ -1,5 +1,84 @@
 <!doctype html>
-<html lang="ko" data-register="instrument"><head><title>PHASE 4 계열 재배치 — C++ Pass·그래프·기능 완료선</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="RenderPhaseRoadmap.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/RenderPhaseRoadmap.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>PHASE 4 계열 재배치 — C++ Pass·그래프·기능 완료선</h1><p>RG8/9, Temporal/TR/TU/FG, Lightmap, Renderer quality/Environment, GPU 설계/RT/PT, backend 비교의 완료선을 전문 계획별로 유지한다. 완료 기반을 잔여 공수에 다시 더하지 않는다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<html lang="ko" data-register="instrument"><head><title>PHASE 4 계열 재배치 — C++ Pass·그래프·기능 완료선</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="RenderPhaseRoadmap.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/RenderPhaseRoadmap.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>PHASE 4 계열 재배치 — C++ Pass·그래프·기능 완료선</h1><p>RG8/9, Temporal/TR/TU/FG, Lightmap, Renderer quality/Environment, GPU 설계/RT/PT, backend 비교의 완료선을 전문 계획별로 유지한다. 완료 기반을 잔여 공수에 다시 더하지 않는다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header>
+<section id="phase4-review-20261022"><h2>2026-10-22 현재 진척 재평가</h2>
+<p>현재 master ea87639e·작업트리 구현과 보존된 실행 기록을 대조해 대시보드 항목을 다시 작성했다. 작업 진척은 명시적 하위 산출물의 완료 비율을 기존 인일로 가중하고, 제품 수용 공수는 독립 원장으로 유지한다.</p>
+<table>
+<thead>
+<tr>
+<th>PHASE</th>
+<th align="right">작업 진척</th>
+<th align="right">제품 수용</th>
+<th align="right">수용/기존 산정 인일</th>
+<th>미산정 잔여</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>4</td>
+<td align="right">100%</td>
+<td align="right">100%</td>
+<td align="right">18/18</td>
+<td>없음</td>
+</tr>
+<tr>
+<td>4.25</td>
+<td align="right">88%</td>
+<td align="right">80%</td>
+<td align="right">32/40</td>
+<td>LX-1 1/3, LX-3 3/5, LX-3H 2/4</td>
+</tr>
+<tr>
+<td>4.3</td>
+<td align="right">84%</td>
+<td align="right">74%</td>
+<td align="right">74/100</td>
+<td>없음</td>
+</tr>
+<tr>
+<td>4.5</td>
+<td align="right">63%</td>
+<td align="right">17%</td>
+<td align="right">12/71</td>
+<td>없음</td>
+</tr>
+<tr>
+<td>4.7</td>
+<td align="right">6%</td>
+<td align="right">6%</td>
+<td align="right">2/35</td>
+<td>없음</td>
+</tr>
+<tr>
+<td>4.75</td>
+<td align="right">34%</td>
+<td align="right">0%</td>
+<td align="right">0/28</td>
+<td>없음</td>
+</tr>
+<tr>
+<td>4.8</td>
+<td align="right">37%</td>
+<td align="right">0%</td>
+<td align="right">0/9</td>
+<td>없음</td>
+</tr>
+<tr>
+<td>4.85</td>
+<td align="right">0%</td>
+<td align="right">0%</td>
+<td align="right">0/208</td>
+<td>없음</td>
+</tr>
+<tr>
+<td>4.9</td>
+<td align="right">0%</td>
+<td align="right">0%</td>
+<td align="right">0/22</td>
+<td>없음</td>
+</tr>
+</tbody></table>
+<p>전체 작업 진척 <strong>37%</strong>, 제품 수용 <strong>26% (138/531인일)</strong>. LX 잔여 3행은 미산정이며 RTP 208인일은 과거 중앙 추정이다. <a href="../analysis/Phase4Progress20261022.html">항목별 평가·계산 규칙</a> · <a href="../analysis/Phase4Progress20261022.json">원장</a>. 4.x의 현재 수치는 이 표와 대시보드를 따른다. 아래 10월 20일 기준 설명은 구조/소유권 기록이다.</p>
+</section>
+<figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Live pipeline</ve-node><ve-node id="n1" at="2 1">Versions</ve-node><ve-node id="n2" at="3 1" key>DAG</ve-node><ve-node id="n3" at="3 2">Record tasks</ve-node><ve-node id="n4" at="2 2">Queue submit</ve-node><ve-node id="n5" at="1 2">Completion</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
 <ul>
 <li>RG8/9, Temporal/TR/TU/FG, Lightmap, Renderer quality/Environment, GPU 설계/RT/PT, backend 비교의 완료선을 전문 계획별로 유지한다. 완료 기반을 잔여 공수에 다시 더하지 않는다.</li>
 <li>DX12 D/R 제품 수용과 Vulkan 비교(PHASE4.9), source 구현과 GPU/SDK/표시/성능 수용을 분리한다. 선행 관계는 공통 frame/graph 계약과 실제 소비 경로에서만 부여한다.</li>

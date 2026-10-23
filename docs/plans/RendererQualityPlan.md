@@ -6,6 +6,10 @@
 
 [전체 문서 대조·충돌 판정](MasterPlanAudit20261020.html) · [정리 전 원문](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/RendererQualityPlan.md)
 
+## 2026-10-22 진척 재평가
+
+[현재 작업 진척·제품 수용 평가](../analysis/Phase4Progress20261022.md)를 반영했다. 이미 있는 구현을 진행으로 표시하고 남은 제품 수용을 유지한다. progress에 자동 50% 완료 공수를 주지 않는다. 아래 추적 표 상태는 이번 평가를 반영한다.
+
 ## 남은 작업과 완료 판정
 
 - RND-1: local reflection probe/specular AO의 자산·우선순위·golden/비용을 닫는다.
@@ -22,9 +26,9 @@
 
 | 추적 ID | 소유 단위 (잔여 작업은 위 목록) | 대시보드 보존 상태 |
 |---|---|---|
-| `RND-1` · PHASE 4.75 | local reflection probe·specular AO | todo |
-| `RND-2` · PHASE 4.75 | shadow module·point/spot atlas·quality tier | todo |
-| `RND-3` · PHASE 4.75 | display OETF·AgX·auto exposure·bloom | todo |
+| `RND-1` · PHASE 4.75 | local reflection probe·specular AO | progress |
+| `RND-2` · PHASE 4.75 | shadow module·point/spot atlas·quality tier | progress |
+| `RND-3` · PHASE 4.75 | display OETF·AgX·auto exposure·bloom | progress |
 | `RND-ENV` · PHASE 4.75 | Environment 배경·diffuse/specular IBL 독립 설정 | progress |
 
 대시보드 상태는 인계용 식별 정보다. 위 구현 기반에서 이미 충족한 하위 요구는 재작성하지 않고, 남은 제품/실패/비용 수용을 수행한다.
