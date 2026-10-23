@@ -46,49 +46,75 @@ public sealed class PackageSmokeProbe : Component
         }
     }
 
-    public override async Task OnSimulate()
+    public override void OnInitialized() => Console.WriteLine("[SMOKE] managed OnInitialized: PackageSmokeProbe");
+    public override void OnBeginSimulation()
     {
+        Console.WriteLine("[SMOKE] managed OnBeginSimulation: PackageSmokeProbe");
         Require(Audio.World.IsValid && Audio.Session.IsValid, "World and session scopes");
-        var source = new AudioSource(AudioAssetId.Parse("01234567-89ab-4cde-8fab-0123456789ab"));
-        var settings = new AudioPlaySettings { Volume = 0.001f, Loop = 1, SpatialBlend = 0 };
         Require(Audio.ConfigureBus(AudioBus.SFX, 128, AudioStealPolicy.Oldest), "Configure bus");
         Require(Audio.SetReverbPreset(AudioReverbPreset.Hall), "Configure reverb");
-        int completions = 0;
-        for (int cycle = 0; cycle < 100; ++cycle)
-        {
-            var handle = Audio.Play2D(Audio.World, source, settings);
-            Require(handle.IsValid && handle.IsPlaying, "Play2D " + cycle);
-            var copy = handle;
-            GC.Collect();
-            await Scope.Delay(0f);
-            Require(copy.IsPlaying, "Value handle survives managed GC " + cycle);
-            copy.Pause();
-            Require(copy.State == AudioPlaybackState.Paused, "Pause " + cycle);
-            await Scope.Delay(0f);
-            copy.Resume();
-            Require(copy.State == AudioPlaybackState.Playing, "Resume " + cycle);
-            copy.SetGainPitch(0.001f, 1f);
-            copy.Stop();
-            Require(copy.State == AudioPlaybackState.Stopped, "Stop " + cycle);
-            await Scope.Delay(0f);
-            while (Audio.TryDequeueCompletion(out var completion))
-            {
-                if (completion.Playback == copy && completion.Reason == AudioPlaybackEndReason.Stopped)
-                {
-                    ++completions;
-                }
-            }
-        }
-        Require(completions == 100, "100 value completions");
-        var attached = Audio.PlayAttached(Audio.World, source, Entity, settings);
-        var positioned = Audio.PlayAt(Audio.Session, source, default, settings);
-        Require(attached.IsValid && positioned.IsValid, "Attached and positioned playback");
-        await Scope.Delay(0f);
-        attached.Stop();
-        positioned.Stop();
-        Console.WriteLine("[AUDIO_CLR_PASS] cycles=100 completions=100 stream=Pak GC=valueHandle scopes=World,Session attached=pass positioned=pass");
     }
+
+    private int _cycle, _phase, _completions;
+    private PlaybackHandle _handle, _attached, _positioned;
+    public override void OnTickSimulate(float dt)
+    {
+        if (_cycle < 100)
+        {
+            if (_phase == 0)
+            {
+                _handle = Audio.Play2D(Audio.World, new AudioSource(AudioAssetId.Parse("01234567-89ab-4cde-8fab-0123456789ab")), new AudioPlaySettings { Volume=.001f, Loop=1, SpatialBlend=0 });
+                Require(_handle.IsValid && _handle.IsPlaying, "Play " + _cycle);
+                GC.Collect();
+                _phase = 1;
+            }
+            else if (_phase == 1)
+            {
+                Require(_handle.IsPlaying, "GC value handle " + _cycle);
+                _handle.Pause();
+                Require(_handle.State == AudioPlaybackState.Paused, "Pause " + _cycle);
+                _phase = 2;
+            }
+            else if (_phase == 2)
+            {
+                _handle.Resume();
+                Require(_handle.State == AudioPlaybackState.Playing, "Resume " + _cycle);
+                _handle.SetGainPitch(.001f, 1f);
+                _handle.Stop();
+                Require(_handle.State == AudioPlaybackState.Stopped, "Stop " + _cycle);
+                _phase = 3;
+            }
+            else
+            {
+                bool completed = false;
+                while (Audio.TryDequeueCompletion(out var completion))
+                    if (completion.Playback == _handle && completion.Reason == AudioPlaybackEndReason.Stopped)
+                    { ++_completions; completed = true; }
+                if (!completed) return; // Native audio completion is asynchronous, not an assumed next-frame result.
+                ++_cycle;
+                _phase = 0;
+            }
+            return;
+        }
+        if (_phase == 0)
+        {
+            Require(_completions == 100, "Completion count " + _completions);
+            var mono = new AudioSource(AudioAssetId.Parse("01234567-89ab-4cde-8fab-0123456789ab"));
+            _attached = Audio.PlayAttached(Audio.World, mono, Entity, new AudioPlaySettings { Volume=.001f, Loop=1, SpatialBlend=0 });
+            _positioned = Audio.PlayAt(Audio.Session, mono, default, new AudioPlaySettings { Volume=.001f, Loop=1, SpatialBlend=0 });
+            Require(_attached.IsPlaying && _positioned.IsPlaying, "Attached/positioned playback");
+            _phase = 1;
+        }
+        else if (_phase == 1)
+        {
+            _attached.Stop(); _positioned.Stop(); _phase = 2;
+            Console.WriteLine("[AUDIO_CLR_PASS] cycles=100 completions=100 GC=valueHandle scopes=World,Session attached=pass positioned=pass");
+        }
+    }
+
+    public override void OnEndSimulation() { _handle.Stop(); _attached.Stop(); _positioned.Stop(); }
 }
+
 '@
 [IO.File]::WriteAllText((Join-Path $project 'Assets/Script/PackageSmokeProbe.cs'), $script)
 $tool = Join-Path $repo "Bin/x64-$Configuration/Tools/CreatorBuildTool/CreatorBuildTool.exe"

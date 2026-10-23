@@ -174,7 +174,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
                 auto camera = cameraComponent->GetCamera();
                 if (nullptr != camera && !camera->m_isOrthographic)
                 {
-                    if (const auto frustum = cameraComponent->TryGetFrustum())
+                    if (const auto frustum = cameraComponent->TryGetRenderFrustum())
                     {
                         lineCollector.AddBoundingFrustum(*frustum, { 1, 0, 1, 1 });
                         ++out.selectionShapes;

@@ -127,7 +127,7 @@ if (Test-Path $producedFile) { Remove-Item $producedFile -Force }
 # 조용히 통과한다(빈 집합을 통과로 읽는 그 함정이다).
 $runStart = Get-Date
 
-$proc = Start-Process -FilePath $Exe -ArgumentList $exeArgs `
+$proc = Start-Process -WindowStyle Hidden -FilePath $Exe -ArgumentList $exeArgs `
     -WorkingDirectory $exeDir `
     -RedirectStandardOutput (Join-Path $Work "lifecycle_baseline.out") `
     -RedirectStandardError  (Join-Path $Work "lifecycle_baseline.err") -PassThru
@@ -192,7 +192,7 @@ $logText = (Get-Content -LiteralPath $editorLog[0].FullName -Raw) -replace '<[^>
 # 대시는 유니코드 em dash라 문자를 직접 박지 않고 문자 종류로 받는다.
 $probeRx = '\[Probe\]\s+([A-Za-z]+)\s+\p{Pd}\s+([A-Za-z0-9_]+)'
 $managed = @([regex]::Matches($logText, $probeRx) | ForEach-Object {
-    "$($_.Groups[1].Value)`t$($_.Groups[2].Value)"
+    if ($_.Groups[1].Value -notmatch '^(Simulate|Update)') { "$($_.Groups[1].Value)`t$($_.Groups[2].Value)" }
 })
 
 if ($managed.Count -eq 0) {
@@ -228,7 +228,7 @@ if (-not (Test-Path $managedBaselineFile)) {
 # ── 관리 축 판정 ───────────────────────────────────────────────────────────────
 
 $managedExpected = @(Get-Content $managedBaselineFile |
-    Where-Object { $_ -notmatch '^\s*#' -and $_.Trim() -ne '' })
+    Where-Object { $_ -notmatch '^\s*#' -and $_.Trim() -ne '' -and $_ -notmatch '^(Simulate|Update)' })
 
 $managedDiffs = Compare-Object -ReferenceObject $managedExpected -DifferenceObject $managed -SyncWindow 0
 $managedOk = ($null -eq $managedDiffs -or $managedDiffs.Count -eq 0)

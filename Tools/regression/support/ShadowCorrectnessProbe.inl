@@ -27,7 +27,7 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
     {
         SceneHost host;
         GpuGeometryOcclusion predictionHistoryCompiler;
-        std::shared_ptr<const GpuGeometryOcclusion::Pyramid> predictionHistory;
+        own::shared_owner<const GpuGeometryOcclusion::Pyramid> predictionHistory;
         EnhancedFrameContext context;
         context.resources = &device;
         context.rootSignatures = &roots;
@@ -94,7 +94,7 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
             textures.BeginFrame(context.frameId);
             host.PollPrograms(context);
             Check(host.PrepareResidency(context, input, error), "Shadow correctness residency " + error);
-            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned, RGOrderPolicy::DependencyOrder);
+            auto graph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned, RGOrderPolicy::DependencyOrder);
             if (workers)
             {
                 pool.BeginFrame(unsigned(context.frameId));

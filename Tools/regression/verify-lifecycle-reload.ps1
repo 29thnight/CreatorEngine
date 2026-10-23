@@ -1,53 +1,5 @@
-# 생명주기 어셈블리 리로드 게이트 (LC7-d).
-#
-# ── 무엇을 메우는가 ──
-#
-# `script.reload` 는 CLI에 있는데 **어떤 회귀 시나리오도 부르지 않는다**. 그래서
-# ScriptRegistry.Clear 가 도는 경로 전체가 관측 밖이었다 — LC5-b 에서 그 자리에 넣은
-# "재개 n건을 버렸다" 배수 폐기까지 포함해서.
-#
-# 설계 문서 §3 LC7 이 이 시나리오에 요구하는 불변식: 대기·구독·팩터리·BT 참조 해제,
-# 이전 로드 문맥 회수, 새 세대 오염 없음.
-#
-# ── 착수 시 실측 ──
-#
-#   f=159  1세대: init·added·enable·begin·sim
-#   f=219  리로드: disable·cancelled·end·removing·uninit   ← 축소는 온전하다
-#          세대 2 어셈블리 로드 · "이전 어셈블리 정리됨"    ← 문맥 회수도 된다
-#   f=219  2세대: **init 뿐**                               ← added·enable·begin·sim 없음
-#   f=404  정지: disable·uninit                             ← 짝 규칙상 일관된 결과
-#
-# 결함은 하나다. **재생 중 핫리로드하면 새 인스턴스가 씬 진입·시뮬레이션 시작을
-# 받지 못하고, 스크립트가 죽은 채로 재생이 계속된다.** 원인은 Cmd_script_reload 가
-# `OnInitialized()` 만 부르고 나머지 단계는 Scene::DrainPendingLifecycle 이 상태
-# 머신을 보고 구동하는 데 있다 — 리로드가 그 상태를 되돌리지 않으므로 엔티티 쪽에는
-# "이미 다 돌았다"로 보인다.
-#
-# 정지 시 end·removing 이 없는 것은 별개의 결함이 아니다. 짝이 열리지 않았으면
-# 닫지 않는다는 규칙(LC1)이 정확히 지켜진 결과다.
-#
-# ── 판정 ──
-#
-#   NN 리로드 발생   어셈블리가 실제로 갈리고 새 인스턴스가 선다
-#   OO 이전 세대 축소  리로드 전 인스턴스가 축소 삼단을 받는다
-#   PP 대기 비유출   리로드 전 대기가 취소되고 다음 세대로 흐르지 않는다
-#   QQ 새 세대 완결  리로드 후 인스턴스가 재생 중이므로 전체 진입 단계를 받는다
-#   RR 문맥 회수     이전 어셈블리가 정리된다(참조 누수 없음)
-#   SS 편집 모드 무음  재생 전 리로드는 관리 훅을 하나도 흘리지 않는다
-#
-# SS 는 고침이 만든 분기를 태우기 위한 것이다. 편집 모드에서 관리 훅을 돌리지 않는
-# 것은 규약인데(bd13620c) 그 가드는 Scene 드레인 쪽에 있고, 리로드 복원은 CLI 가
-# 직접 부르므로 그 가드를 지나지 않는다. 시나리오가 재생 **전에** 리로드를 한 번
-# 더 넣어 그 분기를 밟는다 — 안 그러면 코드에만 있고 아무도 밟지 않는 분기가 된다.
-#
-# ── 세대를 어떻게 가르는가 ──
-#
-# 리로드는 어셈블리를 갈아치우므로 픽스처의 **정적 카운터가 1로 되돌아간다** —
-# 재생 재시작(세대 게이트)에서는 계속 증가했다. 그래서 id 로는 세대를 못 가르고,
-# `init` 표지가 두 번 나오는 것을 경계로 삼는다. 그 되돌아감 자체가 NN 의 증거다.
-#
-# 사용법: pwsh Tools\regression\verify-lifecycle-reload.ps1
-
+# Verifies actual native script.reload, old instance teardown, new OnTickSimulate and old ALC collection.
+# Dedicated simulation coroutine cancellation was retired 2026-10-22.
 param(
     [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP,
@@ -198,19 +150,9 @@ if ($bad.Count -gt 0) {
 # 취소를 아예 안 해도 누수 표지는 0으로 나온다 — 컴포넌트가 목록에서 빠져 재개될
 # 기회 자체가 없기 때문이다.
 
-$cancelled = Count-In $gen1 'cancelled'
-$leaked = @($rows | Where-Object { $_.Point -eq 'leaked' }).Count
-"판정 PP 대기 비유출: 취소 $cancelled 건 · 누수 $leaked 건 (기대 1 / 0)"
-if ($leaked -gt 0) {
-    "  → 리로드를 지나 대기가 살아남아 재개됐다. 이전 어셈블리의 코드가 새 세대의"
-    "     틱을 타고 있다."
-    $failed.Add('PP(누수)')
-}
-if ($cancelled -ne 1) {
-    "  → 취소 표지가 1건이 아니다. 누수 0건만으로는 아무것도 증명하지 못한다 —"
-    "     취소로 풀린 것과 애초에 대기에 도달하지 못한 것을 가를 수 없다."
-    $failed.Add('PP(취소)')
-}
+$oldUpdate = Count-In $gen1 'update'
+if ($oldUpdate -ne 1) { $failed.Add('PP(old-fixed-update)') }
+# The removed API has no pending simulation coroutine to cancel. New generation must update independently.
 
 # ── 판정 QQ: 리로드 후 인스턴스가 전체 진입 단계를 받는다 ─────────────────────
 #
@@ -219,7 +161,7 @@ if ($cancelled -ne 1) {
 # 코드도 돌리지 않는다.
 
 $bad = @()
-foreach ($p in @('init', 'added', 'enable', 'begin', 'sim')) {
+foreach ($p in @('init', 'added', 'enable', 'begin', 'update')) {
     $c = Count-In $gen2 $p
     if ($c -ne 1) { $bad += "$p=$c" }
 }

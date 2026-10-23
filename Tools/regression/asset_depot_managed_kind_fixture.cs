@@ -196,11 +196,14 @@ namespace AssetDepotRegression
             }
         }
 
+        [System.Runtime.InteropServices.UnmanagedCallersOnly] static int TickStatusStub(SimulationStatus* s) { *s = default; return 0; }
+        [System.Runtime.InteropServices.UnmanagedCallersOnly] static int TickSubmitStub(ulong e, ulong t, uint k, byte* p, int n, ulong* s) { *s = 0; return 1; }
+        [System.Runtime.InteropServices.UnmanagedCallersOnly] static int TickReadStub(ulong e, ulong t, SimulationSnapshot* s, byte* p, int n) { *s = default; return 7; }
         internal static void VerifyVersionAndTypedEntries()
         {
             Require(!Native.IsReady, "ABI fixture requires a fresh isolated managed session");
             var table = new ScriptApiTable { Version = 34, StructSize = sizeof(ScriptApiTable) };
-            Require(Native.ExpectedVersion == 41, "Fixture expects the integrated physics and camera-cut ABI 41");
+            Require(Native.ExpectedVersion == 45, "Fixture expects ABI 45 with the F# runtime and static lifecycle contract");
             Require(!Native.Bind(&table), "A legacy version 34 table bound to the current managed API");
             table.Version = Native.ExpectedVersion;
             Require(!Native.Bind(&table), "Missing typed entries were accepted");
@@ -209,9 +212,13 @@ namespace AssetDepotRegression
             table.Asset_TryAcquireTyped = &ResidentStub;
             Require(!Native.Bind(&table), "Missing camera-cut entry was accepted");
             table.Camera_NotifyCameraCut = &CameraCutStub;
+            Require(!Native.Bind(&table), "Missing simulation exchange entries were accepted");
+            table.Simulation_Status = &TickStatusStub;
+            table.Simulation_Submit = &TickSubmitStub;
+            table.Simulation_Read = &TickReadStub;
             table.Asset_Request = &LegacyRequestStub;
             table.StructSize = sizeof(ScriptApiTable) - IntPtr.Size;
-            Require(!Native.Bind(&table), "The old v40 table size without the camera-cut slot was accepted");
+            Require(!Native.Bind(&table), "A truncated simulation exchange table was accepted");
             table.StructSize = sizeof(ScriptApiTable);
             table.Version = 36;
             Require(!Native.Bind(&table), "The pre-merge camera-only ABI 36 was accepted");

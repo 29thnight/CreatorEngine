@@ -117,7 +117,7 @@ void TextComponent::TickLayout(float tick)
         || previousSize.x != stretchSize.x || previousSize.y != stretchSize.y
         || previousScale != layoutScale || previousLayer != _layerorder)
     {
-        PublishRenderProxyDirty(ProxyDirty::Transform | ProxyDirty::Payload);
+        PublishRenderPropertyWrite(ProxyDirty::Transform | ProxyDirty::Payload);
     }
 
     // Linking is deferred by UIManager, and a Canvas mode/order change can leave
@@ -166,7 +166,7 @@ void TextComponent::TickLayout(float tick)
     m_layoutCanvasRect = canvasRect;
     if (canvasChanged)
     {
-        PublishRenderProxyDirty(ProxyDirty::Transform | ProxyDirty::Payload);
+        PublishRenderPropertyWrite(ProxyDirty::Transform | ProxyDirty::Payload);
     }
     PrepareTextLayout();
 }
@@ -240,7 +240,7 @@ void TextComponent::SetFont(const file::path& path)
     fontPath = guid != FileGuid{} ? guid.ToString() : std::string(utf8.begin(), utf8.end());
     m_fontLoadAttempted = false;
     m_textLayoutDirty = true;
-    PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+    PublishRenderPropertyWrite(ProxyDirty::Material | ProxyDirty::Payload);
 }
 
 void TextComponent::OnDeserialized()
@@ -259,51 +259,51 @@ void TextComponent::SetMessage(std::string value)
     }
     message = std::move(value);
     m_textLayoutDirty = true;
-    PublishRenderProxyDirty(ProxyDirty::Payload);
+    PublishRenderPropertyWrite(ProxyDirty::Payload);
 }
 
 void TextComponent::SetColor(const math::color& value)
 {
     color = value;
-    PublishRenderProxyDirty(ProxyDirty::Payload);
+    PublishRenderPropertyWrite(ProxyDirty::Payload);
 }
 
 void TextComponent::SetAlpha(float alpha)
 {
     color.a = std::isfinite(alpha) ? std::clamp(alpha, 0.f, 1.f) : 0.f;
-    PublishRenderProxyDirty(ProxyDirty::Payload);
+    PublishRenderPropertyWrite(ProxyDirty::Payload);
 }
 
 void TextComponent::SetFontSize(float size)
 {
     fontSize = std::isfinite(size) && size > 0.f ? size : 0.f;
     m_textLayoutDirty = true;
-    PublishRenderProxyDirty(ProxyDirty::Payload);
+    PublishRenderPropertyWrite(ProxyDirty::Payload);
 }
 
 void TextComponent::SetRelativePosition(const math::vector2& position)
 {
     relpos = position;
-    PublishRenderProxyDirty(ProxyDirty::Transform);
+    PublishRenderPropertyWrite(ProxyDirty::Transform);
 }
 
 void TextComponent::SetHorizontalAlignment(TextAlignment alignment)
 {
     horizontalAlignment = alignment;
     m_textLayoutDirty = true;
-    PublishRenderProxyDirty(ProxyDirty::Payload);
+    PublishRenderPropertyWrite(ProxyDirty::Payload);
 }
 
 void TextComponent::SetManualRect(const math::rect& rect)
 {
     manualRect = rect;
-    PublishRenderProxyDirty(ProxyDirty::Transform);
+    PublishRenderPropertyWrite(ProxyDirty::Transform);
 }
 
 void TextComponent::SetUseManualRect(bool use)
 {
     useManualRect = use;
-    PublishRenderProxyDirty(ProxyDirty::Transform);
+    PublishRenderPropertyWrite(ProxyDirty::Transform);
 }
 
 void TextComponent::OnPropertyChanged(std::string_view propertyName, Meta::PropertyChangeSource source)
@@ -368,6 +368,6 @@ void TextComponent::PrepareTextLayout()
     {
         Debug::PrintLog(spdlog::level::warn, "Text font '{}': {}", fontPath, error);
     }
-    PublishRenderProxyDirty(ProxyDirty::Payload);
+    PublishRenderPropertyWrite(ProxyDirty::Payload);
 }
 

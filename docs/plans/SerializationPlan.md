@@ -33,6 +33,12 @@
 - [Engine/Utility_Framework/ReflgenAuthoringSerializers.h:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflgenAuthoringSerializers.h#L26) — `concept ReflgenRecord = std::is_class_v<T> && reflgen::reflectable<T>;`
 - [Engine/SceneRuntime/SceneManager.h:21](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/SceneManager.h#L21) — `class Scene;`
 
+## N1 후속 수용 — 2026-10-22
+
+[Archive·Parser 경계 계약](../design/ArchiveParserBoundaryContract.md)에 따라 진단 출력 2곳의 직접 backend를 Utility 내부 writer로 밀봉했다. 공통 reflgen schema의 Authoring/CEDO 왕복·잘못된 cooked 입력 거부·진단 자료형/수명은 production codec Debug/Release로 검증했다. 기존 scene/prefab/component factory의 로컬 facade 읽기는 유지한다.
+
+새 cooked Player에서 parser 호출 0과 패키지 불변을 실제 수용했다. 이는 해당 패키지의 bootstrap/문서 소비 결과다. 전체 runtime parser 라이브러리 unlink, 모든 자산 종류, 서버 제품 및 I7 전체를 완료로 확대하지 않는다. [현재 실행 기록](../analysis/ArchiveParserAcceptance20261022.md).
+
 ## 검증 경계
 
 이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.

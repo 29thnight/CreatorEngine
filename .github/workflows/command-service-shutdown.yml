@@ -1,0 +1,72 @@
+name: Command service shutdown
+
+on:
+  pull_request:
+    paths:
+      - 'Engine/CommandService/**'
+      - 'Engine/Utility_Framework/StandardLibrary.h'
+      - 'Tools/regression/CommandServiceShutdownProbe.cpp'
+      - 'Tools/regression/verify-command-service-shutdown*.ps1'
+      - 'Tools/regression/verify-process-exit-code.ps1'
+      - 'Tools/regression/verify-fsharp-editor-authoring.ps1'
+      - 'Tools/regression/verify-shutdown-order.ps1'
+      - '.github/workflows/command-service-shutdown.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'Engine/CommandService/**'
+      - 'Engine/Utility_Framework/StandardLibrary.h'
+      - 'Tools/regression/CommandServiceShutdownProbe.cpp'
+      - 'Tools/regression/verify-command-service-shutdown*.ps1'
+      - 'Tools/regression/verify-process-exit-code.ps1'
+      - 'Tools/regression/verify-fsharp-editor-authoring.ps1'
+      - 'Tools/regression/verify-shutdown-order.ps1'
+      - '.github/workflows/command-service-shutdown.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-contracts:
+    runs-on: windows-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Real socket shutdown and pre-fix canary
+        shell: pwsh
+        run: ./Tools/regression/verify-command-service-shutdown.ps1 -Configuration ${{ matrix.configuration }} -Canary
+      - name: Native exit codes in PowerShell 5 and 7
+        shell: pwsh
+        run: |
+          $report=Get-ChildItem Build/Verification/CommandServiceShutdown -Filter result.json -Recurse | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+          $probe=(Get-Content $report.FullName -Raw|ConvertFrom-Json).probe
+          foreach($shellName in @('powershell','pwsh')) {
+            & $shellName -NoProfile -File Tools/regression/verify-process-exit-code.ps1 -ProbeExe $probe -Work "Build/Verification/CommandServiceShutdown/ExitCodes-$shellName"
+            if($LASTEXITCODE){throw "Exit-code contract failed in $shellName"}
+          }
+      - name: Parse shared regression scripts in PowerShell 5 and 7
+        shell: pwsh
+        run: |
+          foreach($shellName in @('powershell','pwsh')) {
+            & $shellName -NoProfile -Command {
+              foreach($path in @('Tools/regression/verify-command-service-shutdown.ps1','Tools/regression/verify-command-service-shutdown-product.ps1','Tools/regression/verify-fsharp-editor-authoring.ps1','Tools/regression/verify-shutdown-order.ps1')) {
+                $parseTokens=$null; $parseErrors=$null
+                [Management.Automation.Language.Parser]::ParseFile($path,[ref]$parseTokens,[ref]$parseErrors)|Out-Null
+                if($parseErrors.Count){throw "PowerShell parse errors in $path"}
+              }
+            }
+            if($LASTEXITCODE){throw "Regression script parsing failed in $shellName"}
+          }
+      - name: Preserve contract evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: command-service-shutdown-${{ matrix.configuration }}
+          path: Build/Verification/CommandServiceShutdown/**

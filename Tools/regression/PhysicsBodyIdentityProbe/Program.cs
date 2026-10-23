@@ -17,6 +17,9 @@ unsafe class Program
         }
     }
 
+    [UnmanagedCallersOnly] static int TickStatus(SimulationStatus* s) { *s = default; return 0; }
+    [UnmanagedCallersOnly] static int Submit(ulong e, ulong t, uint k, byte* p, int n, ulong* s) { *s = 0; return 1; }
+    [UnmanagedCallersOnly] static int TickRead(ulong e, ulong t, SimulationSnapshot* s, byte* p, int n) { *s = default; return 7; }
     static void Main()
     {
         // Real managed wrappers and unmanaged ABI calls; the native registry is modeled here.
@@ -31,7 +34,8 @@ unsafe class Program
             // Required host entries are stubbed; this probe exercises body identity only.
             Asset_RequestTyped = &AssetUnavailable,
             Asset_TryAcquireTyped = &AssetUnavailable,
-            Camera_NotifyCameraCut = &CameraCut
+            Camera_NotifyCameraCut = &CameraCut,
+            Simulation_Status = &TickStatus, Simulation_Submit = &Submit, Simulation_Read = &TickRead
         };
         Check(Native.Bind(&api), "bind current ABI");
 

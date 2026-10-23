@@ -108,7 +108,7 @@ ColdGeometryFixture MakeColdGeometryFixture(const experiment::cooked::ModelGeome
         const auto expectedPage = std::span<const std::byte>(source.bytes).subspan(table.archive->fileOffsets[rootPage], table.archive->packetSizes[rootPage]);
         auto loose = descriptor->origin;
         loose.byteSource = own::make_shared<ck::LooseArtifactByteSource>(directory);
-        std::shared_ptr<const ck::ModelGeometryStreamMetadata> looseMetadata;
+        own::shared_owner<const ck::ModelGeometryStreamMetadata> looseMetadata;
         Check(ck::LoadModelGeometryStreamMetadata(loose, looseMetadata, error), "Actual loose thin metadata load " + error);
         loose.byteSource.reset();
         Check(std::ranges::equal(looseMetadata->archive->Read(rootPage), expectedPage), "Captured loose page survives root owner release");
@@ -118,9 +118,9 @@ ColdGeometryFixture MakeColdGeometryFixture(const experiment::cooked::ModelGeome
         Pak::Builder builder(pakFile, options);
         builder.addMemory("Assets/" + descriptor->origin.blob.artifactPath, source.bytes);
         builder.addMemory("Assets/" + cpuPath,cpuBytes); builder.finish();
-        auto pak = std::make_shared<const Pak::Archive>(pakFile, Pak::OpenOptions{.key = builder.key()});
+        auto pak = own::make_shared<const Pak::Archive>(pakFile, Pak::OpenOptions{.key = builder.key()});
         auto packed = descriptor->origin; packed.byteSource = own::make_shared<ck::PakAudioClipByteSource>(pak);
-        std::shared_ptr<const ck::ModelGeometryStreamMetadata> pakMetadata;
+        own::shared_owner<const ck::ModelGeometryStreamMetadata> pakMetadata;
         Check(ck::LoadModelGeometryStreamMetadata(packed, pakMetadata, error), "Encrypted/compressed pak thin metadata load " + error);
         packed.byteSource.reset(); pak.reset();
         Check(std::ranges::equal(pakMetadata->archive->Read(rootPage), expectedPage), "Captured pak page survives archive/root owner release");
@@ -131,7 +131,7 @@ ColdGeometryFixture MakeColdGeometryFixture(const experiment::cooked::ModelGeome
     damaged->bytes = source.bytes; damaged->allowed = source.allowed;
     damaged->bytes[prefix - 1] ^= std::byte{1};
     auto bad = descriptor->origin; bad.byteSource = damaged;
-    std::shared_ptr<const ck::ModelGeometryStreamMetadata> rejected;
+    own::shared_owner<const ck::ModelGeometryStreamMetadata> rejected;
     Check(!ck::LoadModelGeometryStreamMetadata(bad, rejected, error) && !rejected && !damaged->rejectedBulk,
           "Corrupt metadata rejects before deferred geometry access");
     source.corruptPage = true;

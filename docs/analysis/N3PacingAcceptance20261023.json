@@ -1,0 +1,685 @@
+{
+  "date": "2026-10-23",
+  "result": "N3_PACING_ACCEPTED",
+  "scope": "Local fixed tick C#/CCT/render interpolation on actual paced DX12 Editor frames plus fresh primitive cooked Player",
+  "window": [
+    640,
+    480
+  ],
+  "renderExtent": [
+    332,
+    114
+  ],
+  "temporalUpscale": "none",
+  "cadenceTolerancePercent": 5,
+  "suite": {
+    "evidence": "Build/Verification/NDA/Suite-9883ae0a29ce4ae3897c4788716cdd3a",
+    "result": {
+      "manifestHash": "7B0CED38B8ECF71B88B0F4EE5387C75A40F334B75DA26C364B80C891C8249677",
+      "configuration": [
+        "Debug",
+        "Release"
+      ],
+      "scope": "All registered NetworkHandoff gates; not all engine/GPU/device/soak tests",
+      "product": true,
+      "suite": "NetworkHandoff",
+      "failures": [],
+      "passed": [
+        "ND-a-All",
+        "W4-ND-b-All",
+        "N1-All",
+        "N3-Debug",
+        "N3-Release",
+        "PhysicsABI-All",
+        "PhysicsIdentity-Debug",
+        "PhysicsIdentity-Release",
+        "LifecycleEnums-None",
+        "N3Product",
+        "W4NDBProduct",
+        "N1Product",
+        "N1DiagnosticProduct",
+        "N3PacingProduct",
+        "N3MovingGpuProduct"
+      ],
+      "result": "NETWORK_HANDOFF_REGRESSIONS_OK"
+    }
+  },
+  "matrix": {
+    "evidence": "Build/Verification/N3Pacing/Editor-dd260c7b9c4645bd839cc25a50c9b649",
+    "result": {
+      "result": "N3_PACING_PRODUCT_OK",
+      "runtimeHash": "7ED8F5EB3C664D562028571914BF92AA37BB3171000AF32280FED8389F57546A",
+      "matrix": [
+        {
+          "fps": 30,
+          "measuredFps": 30.00466490708401,
+          "frameP95ms": 33.86975000000006,
+          "frames": 61,
+          "zeroTickFrames": 0,
+          "multiTickFrames": 60,
+          "movingZeroTickFrames": 0,
+          "maxCctInterpolationError": 1.1386631149079562e-07,
+          "maxRigidInterpolationError": 5.921110823869924e-08,
+          "maxCameraInterpolationError": 4.392641130834818e-07,
+          "quality": [
+            {
+              "color": "green",
+              "pixels": 72,
+              "maxBoundsErrorPx": 0.2858951144406774
+            },
+            {
+              "color": "red",
+              "pixels": 48,
+              "maxBoundsErrorPx": 0.29439554713243865
+            }
+          ],
+          "movingGpuZeroTick": false,
+          "lifetime": []
+        },
+        {
+          "fps": 60,
+          "measuredFps": 59.51471061561748,
+          "frameP95ms": 20.988549999999968,
+          "frames": 120,
+          "zeroTickFrames": 5,
+          "multiTickFrames": 6,
+          "movingZeroTickFrames": 5,
+          "maxCctInterpolationError": 1.1903847285665847e-07,
+          "maxRigidInterpolationError": 5.803187774766627e-08,
+          "maxCameraInterpolationError": 6.223756772172351e-07,
+          "quality": [
+            {
+              "color": "green",
+              "pixels": 72,
+              "maxBoundsErrorPx": 0.2858951144406774
+            },
+            {
+              "color": "red",
+              "pixels": 48,
+              "maxBoundsErrorPx": 0.3255425492075119
+            }
+          ],
+          "movingGpuZeroTick": false,
+          "lifetime": []
+        },
+        {
+          "fps": 144,
+          "measuredFps": 143.10109360739114,
+          "frameP95ms": 7.9044299999999845,
+          "frames": 286,
+          "zeroTickFrames": 163,
+          "multiTickFrames": 0,
+          "movingZeroTickFrames": 163,
+          "maxCctInterpolationError": 1.192092602408934e-07,
+          "maxRigidInterpolationError": 6.071653757544482e-08,
+          "maxCameraInterpolationError": 6.428664178770305e-07,
+          "quality": [
+            {
+              "color": "green",
+              "pixels": 72,
+              "maxBoundsErrorPx": 0.2858951144406774
+            },
+            {
+              "color": "red",
+              "pixels": 54,
+              "maxBoundsErrorPx": 0.36547827678055
+            }
+          ],
+          "movingGpuZeroTick": false,
+          "lifetime": [
+            {
+              "transition": "prepare",
+              "pixels": 72,
+              "boundsErrorPx": 0.2858951144406774
+            },
+            {
+              "transition": "remove",
+              "pixels": 72,
+              "boundsErrorPx": 0.2858951144406774
+            }
+          ]
+        }
+      ],
+      "comparisons": [
+        {
+          "fps": 60,
+          "cctMaxDelta": 0.0,
+          "rigidRelativeMaxDelta": 0.0
+        },
+        {
+          "fps": 144,
+          "cctMaxDelta": 0.0,
+          "rigidRelativeMaxDelta": 0.0
+        }
+      ],
+      "scope": "Actual DX12 Editor cadence/CCT fixed ticks/render matrix and GPU silhouettes; server/transport and other GPU devices separate"
+    }
+  },
+  "movingGpu": {
+    "evidence": "Build/Verification/N3Pacing/Editor-bbc15142404e4720a62d44766c8495a4",
+    "result": {
+      "result": "N3_PACING_PRODUCT_OK",
+      "runtimeHash": "7ED8F5EB3C664D562028571914BF92AA37BB3171000AF32280FED8389F57546A",
+      "matrix": [
+        {
+          "fps": 144,
+          "measuredFps": 126.10477939251267,
+          "frameP95ms": 9.109375000000016,
+          "frames": 256,
+          "zeroTickFrames": 140,
+          "multiTickFrames": 4,
+          "movingZeroTickFrames": 139,
+          "maxCctInterpolationError": 1.1778845632193224e-07,
+          "maxRigidInterpolationError": 6.010824105118218e-08,
+          "maxCameraInterpolationError": 6.11229077129849e-07,
+          "quality": [
+            {
+              "color": "green",
+              "pixels": 72,
+              "maxBoundsErrorPx": 0.2858951144406774
+            },
+            {
+              "color": "red",
+              "pixels": 42,
+              "maxBoundsErrorPx": 0.31981854472233806
+            }
+          ],
+          "movingGpuZeroTick": true,
+          "lifetime": [
+            {
+              "transition": "disable",
+              "pixels": 72,
+              "boundsErrorPx": 0.2858951144406774
+            },
+            {
+              "transition": "enable",
+              "pixels": 72,
+              "boundsErrorPx": 0.2858951144406774
+            },
+            {
+              "transition": "prepare",
+              "pixels": 72,
+              "boundsErrorPx": 0.2858951144406774
+            },
+            {
+              "transition": "warp",
+              "pixels": 72,
+              "boundsErrorPx": 0.2858951144406774
+            }
+          ]
+        }
+      ],
+      "comparisons": [],
+      "scope": "Actual DX12 Editor cadence/CCT fixed ticks/render matrix and GPU silhouettes; server/transport and other GPU devices separate"
+    },
+    "sourceEngineFrame": 467,
+    "frameId": 467,
+    "nativeFrameIndex": 67,
+    "zeroTick": true
+  },
+  "native": {
+    "evidence": "Build/n3-character-regression-closed.log",
+    "configurations": [
+      {
+        "configuration": "Debug",
+        "checks": 2304,
+        "gpuVerified": true
+      },
+      {
+        "configuration": "Release",
+        "checks": 2304,
+        "gpuVerified": true
+      },
+      {
+        "configuration": "Shipping",
+        "checks": 2302,
+        "gpuVerified": true
+      },
+      {
+        "configuration": "ASan",
+        "checks": 2304,
+        "gpuVerified": true
+      }
+    ],
+    "totalChecks": 9214
+  },
+  "player": {
+    "evidence": "Build/Obj/Phase19Player/run-7607fb1ee89d4ca7a6e2eb05419b98b9",
+    "result": {
+      "finalPolicy": {
+        "name": "PhysicsCharacterPlayer",
+        "objects": 4,
+        "simulating": true,
+        "editorSceneLoaded": false,
+        "hasAuthoringSnapshot": false
+      },
+      "smoke": null,
+      "immutableFiles": 239,
+      "mesh": null,
+      "ddolProbe": null,
+      "geometryProbe": null,
+      "exitCode": 0,
+      "ddol": false,
+      "runtimeSha256": "EC24874F247D62942278188EE16EC45E0714E3F708117D1181BB65673073505E",
+      "initialPolicy": {
+        "name": "PhysicsCharacterPlayer",
+        "objects": 4,
+        "simulating": true,
+        "editorSceneLoaded": false,
+        "hasAuthoringSnapshot": false
+      },
+      "hierarchy": false,
+      "geometryMotion": {},
+      "hierarchyProbe": null,
+      "planarInput": false,
+      "result": "PHYSICS_CHARACTER_PLAYER_OK",
+      "destinationScene": "",
+      "shipping": false,
+      "stage": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\V\\N3CL-3a646a19\\Staging\\Game-44690d9824124b638c4d685346fcc6fa",
+      "offscreen": false,
+      "probe": {
+        "passed": 12,
+        "failed": 0,
+        "tick": 142,
+        "complete": true
+      }
+    }
+  },
+  "sdk": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\V\\N3C-f52b1dcf\\local-0.0.0.0-win-x64-Release-70e755e9-7f4a-47cd-b6f9-2a066afe6e49",
+  "wiring": {
+    "evidence": "Build/Verification/N3Pacing/Wiring-27b9fecf2b6e4586b92d7765a73e1e9e",
+    "result": {
+      "productionSourcesChanged": false,
+      "cases": [
+        {
+          "mode": "cadence",
+          "propagated": true,
+          "gate": "N3PacingProduct",
+          "failedGateExit": 37
+        },
+        {
+          "mode": "moving",
+          "propagated": true,
+          "gate": "N3MovingGpuProduct",
+          "failedGateExit": 37
+        }
+      ],
+      "fixtureOnly": true,
+      "result": "N3_PACING_WIRING_OK",
+      "registeredGroups": 15
+    }
+  },
+  "oracleCanaries": {
+    "result": "N3_PACING_ORACLE_CANARIES_OK",
+    "cases": [
+      {
+        "name": "missing tick",
+        "result": "rejected",
+        "reason": "tick commit order/count"
+      },
+      {
+        "name": "SDK skipped tick",
+        "result": "rejected",
+        "reason": "SDK step count differs from fixed clock"
+      },
+      {
+        "name": "duplicate OnUpdate",
+        "result": "rejected",
+        "reason": "OnUpdate skipped/duplicated or bad dt"
+      },
+      {
+        "name": "frame delta OnUpdate",
+        "result": "rejected",
+        "reason": "OnUpdate frame dt leaked"
+      },
+      {
+        "name": "fake requested FPS",
+        "result": "rejected",
+        "reason": "actual cadence 71.55 outside requested 144 +/-5%"
+      },
+      {
+        "name": "CCT interpolation removed",
+        "result": "rejected",
+        "reason": "CCT child did not inherit interpolated matrix"
+      },
+      {
+        "name": "CCT and child snap",
+        "result": "rejected",
+        "reason": "CCT render interpolation error 0.078129"
+      },
+      {
+        "name": "child publication removed",
+        "result": "rejected",
+        "reason": "CCT child did not inherit interpolated matrix"
+      },
+      {
+        "name": "GPU consumes stale proxy",
+        "result": "rejected",
+        "reason": "GPU draw did not consume recorded interpolated pose"
+      },
+      {
+        "name": "GPU validation failure",
+        "result": "rejected",
+        "reason": "GPU validation failed"
+      },
+      {
+        "name": "GPU projection drift",
+        "result": "rejected",
+        "reason": "green pixel silhouette differs from projection: [162  72 170  81] vs [157.77275875  71.71410489 174.22724125  81.16752148]"
+      },
+      {
+        "name": "camera uses simulation pose",
+        "result": "rejected",
+        "reason": "CCT camera did not consume interpolated pose"
+      },
+      {
+        "name": "GPU camera binding drift",
+        "result": "rejected",
+        "reason": "GPU camera did not consume recorded interpolated pose"
+      },
+      {
+        "name": "AI frustum receives render alpha",
+        "result": "rejected",
+        "reason": "simulation frustum received render interpolation"
+      },
+      {
+        "name": "removed CCT leaves stale GPU pose",
+        "result": "rejected",
+        "reason": "CCT transition draw stale: remove"
+      }
+    ],
+    "productionEvidenceChanged": false
+  },
+  "preFix": {
+    "evidence": "Build/Verification/N3Pacing/Editor-4b616d103ff347e086a40ca09e682721",
+    "cctInterpolationMaxErrorMeters": 0.06858499496116344,
+    "acceptedCadence": false
+  },
+  "buildLogs": [
+    "Build/n3-closure-Editor-build.log",
+    "Build/n3-closure-Player-build.log",
+    "Build/n3-closure-AssetCooker-build.log",
+    "Build/n3-closure-AssetPacker-build.log"
+  ],
+  "limitations": [
+    {
+      "name": "Unused Prim_Cube model shader cook",
+      "result": "failed-outside-primitive-CCT-scope",
+      "evidence": "Build/n3-player-package.log",
+      "detail": "Unused model automatic Scene material compilation failed with Slang E41012/SPIR-V capability profile upgrade. Preserved failure; primitive-only CCT acceptance uses explicit NoUnusedModel. Mesh/geometry fixture behavior is unchanged."
+    },
+    {
+      "name": "Oversized fixture cadence",
+      "result": "rejected",
+      "evidence": [
+        "Build/n3-matrix-final.log",
+        "Build/n3-matrix-800.log"
+      ],
+      "detail": "144 requested measured 135.42 / 136.79 outside +/-5%; final isolated 640x480 window is used. No general scene performance claim."
+    },
+    {
+      "name": "Initial prewarm diagnostic",
+      "result": "rejected-as-FPS-evidence",
+      "evidence": "Build/n3-baseline-capture-3.log",
+      "detail": "Material preparation failed and renderer debug snapshot stalled; not counted as FPS acceptance."
+    },
+    {
+      "name": "Other device/API/server/temporal reconstruction",
+      "result": "not-executed",
+      "detail": "DX12 Editor fixture and primitive cooked Player only. No server/transport, full model package, TAA/FSR/DLSS/FG quality or general performance acceptance. Earlier seven-route Temporal Motion fixture preparation failure remains separate."
+    },
+    {
+      "name": "Remote CI",
+      "result": "wired-not-executed"
+    },
+    {
+      "name": "Full document index",
+      "result": "existing-RHI-source-drift",
+      "detail": "Targeted Markdown/plan HTML/links/scripts checked separately."
+    }
+  ],
+  "sourceSha256": {
+    "Editor/EngineEntry/App.cpp": "fd7f7c15febd965a4b3c683ce0ef727fc1c5d017cddbe92cd4e1a622e64edbd4",
+    "Editor/EngineEntry/EditorPreferences.h": "30bffcfeb9220d62bf475d641e7545be17c548c5f82a295f7945e92582fa4ced",
+    "Editor/EngineEntry/Commands/RenderDebugCommands.cpp": "5db0f4258181ae733c003eb1a234a40e63285b8cf3dc247c6d19df58c4a67c07",
+    "Editor/EngineEntry/Commands/RenderTestCommands.cpp": "e56732914e162b525e691652ef491f60ba8059633873fcd45e11f3ff463e6a49",
+    "Editor/EngineEntry/Commands/N3PacingCapture.h": "c090f4d4688c1d6bca27f7b30bb9a6602d9dd25dc4990ff4ba163f5d9ee5c6c8",
+    "Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp": "92ebfeca0b8d8f799b048e65472f227919ca129602706da970634fe0a6c050b3",
+    "Engine/SceneRuntime/CameraComponent.h": "4ac9b7f64d1391067ceaac4e9ba216ea3a8a8533b2b7a76e7cc3641604d20d43",
+    "Engine/SceneRuntime/CharacterMovementComponent.cpp": "b9c4460a88193a64efc9ce02eb77aef693326cff5e9684e3e4a08ac401ec7c5f",
+    "Engine/SceneRuntime/AnimationScheduler.cpp": "2c1fa39dd2003b9d865c9283bfd11be148098329b4908d8df009d737185dbded",
+    "Engine/SceneRuntime/FoliageSystem.cpp": "49725860230494ea9987cd8d368e57631d6284963055587ff7791d78f06ea31e",
+    "Engine/SceneRuntime/EnhancedGizmoSceneBinding.cpp": "23fe6af00f4ae12364a85bfc287cafc4add0deeb85614b9f206b3f2757f9f6eb",
+    "Engine/SceneRuntime/Scene.cpp": "b8334ed1bdd75733fcacf41c25166d0f8d5276b110c18d93b06e4f736e790658",
+    "Engine/SceneRuntime/Scene.h": "55b135555631578a3015a457992ceb67f3de5e9f138e113b852590437240411e",
+    "Engine/SceneRuntime/ScenePhysicsSimulation.cpp": "57246f5c41e09a45634b7551d8aad2a822202861d10623eb4539c42e659633fc",
+    "Engine/SceneRuntime/ScenePhysicsSimulation.h": "c032d4b2d29d1db12e4da8776974d0a725fea1e9116f7a719898e84d3cf8ac5d",
+    "Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h": "3bacbb39bd9be6c94b21cd16396af775035ac516193c14380487f7858ea43b50",
+    "GameScripts/N3PacingProbe.cs": "ab6c17e4e387aaec541ff7f404ab271519ad1b000e6a52a555fd8b4f3329c4ac",
+    "Tools/regression/verify-n3-pacing-product.ps1": "a3b7bed996128d59504b0486fa25e90b95543e3da9c772fdaba79f9d5478612d",
+    "Tools/regression/verify-n3-pacing.py": "4e84c4150fe22363d5cb6b9d4392d95271b50a5bfd42564337f0765f088da1e2",
+    "Tools/regression/n3_pacing_oracle_tests.py": "f712257b593a6db28a94b5fb09dd67f9d524064c0a6c654210f2adef4786eee2",
+    "Tools/regression/new-n3-pacing-fixture.py": "a10fb2955151ba470489b05c4eea1b5cb8adaa7175483e68f292ea9f98f12648",
+    "Tools/regression/verify-n3-pacing-wiring.ps1": "f67b165a7cf0850b52e1e3d3656efdcde16443c39f0c0cc83f8db5ab85992577",
+    "Tools/regression/physics_character_motion_probe.cpp": "513b21b8bcd892f746b617c6443a1d155ec886a2f9c374e6154bf27d40294790",
+    "Tools/regression/verify-physics-character-motion.ps1": "fedeeedbc664da7c4febf354cb2c9f7e9793ac11ba755a799c8a24e0ecf20732",
+    "Tools/regression/build-physics-character-player-fixture.ps1": "f49c300c06babf8b0124c9122c7e1c7b804980c6cce1264b5ae26dcdfb7f739b",
+    "Tools/regression/run-all.ps1": "a5d5bb226e319c94e1f2f39c8f34335818563ad854f3a9c93720d9103f28079e",
+    ".github/workflows/network-contracts.yml": "be4b3ab61bfeb6872acdcfe28512e18f20f208d21d83c07506c2777d67852c39",
+    "Engine/SceneRuntime/Transform.cpp": "5812482078644607161cda531ba25dd75e690fb264278e3edef85157a3060dc1",
+    "Engine/SceneRuntime/PrimitiveProxyBridge.cpp": "b3f95579ed9d3c7d9d132763d8e31a3306b86851108ae1c61e4e6bb08d7705bf",
+    "Engine/SceneRuntime/ProxyCommand.cpp": "f3cf8bebddc4ffa0975735a0a490d8a1ede0f31f31b4f46f433db3a0e587f263",
+    "Engine/Physics/PhysicsScene.cpp": "ce50750b4bb6aa86bfebb959b2400f8121f3474591504b9ff7f9159d53d42c51"
+  },
+  "cameraFollow": true,
+  "simulationFrustumPreserved": true,
+  "extraRegressions": {
+    "cameraScript": {
+      "evidence": "Build/Verification/N3Pacing/CameraScript-f13b715bbd9a484cb6ae0161c77a598d",
+      "checks": 15,
+      "result": "PASS"
+    },
+    "animation": {
+      "evidence": "Build/Verification/N3Pacing/Animation-bab82028fc8e409ba602ded20f8f0efb",
+      "actors": 100,
+      "rounds": 12,
+      "checks": 234835,
+      "managedThreadErrors": 0,
+      "result": "ANIMATION_PRODUCT_OK"
+    },
+    "characterDdol": {
+      "evidence": "Build/Obj/Phase19C0/http-dad25010b5f843f3ad4867223663f10b",
+      "result": "PHYSICS_CHARACTER_HTTP_OK"
+    }
+  },
+  "consumerInventory": [
+    {
+      "file": "Engine/SceneRuntime/AnimationScheduler.cpp",
+      "line": 124,
+      "code": "component->CaptureFrameSnapshot(), component->TryGetRenderFrustum(),"
+    },
+    {
+      "file": "Engine/SceneRuntime/CameraComponent.h",
+      "line": 54,
+      "code": "std::optional<math::bounding_frustum> TryGetRenderFrustum(float aspectRatio = 0.f) const"
+    },
+    {
+      "file": "Engine/SceneRuntime/CameraComponent.h",
+      "line": 79,
+      "code": "resolved.m_eyePosition = presentation ? m_pOwner->Transform_().GetRenderWorldPosition()"
+    },
+    {
+      "file": "Engine/SceneRuntime/CameraComponent.h",
+      "line": 82,
+      "code": "presentation ? m_pOwner->Transform_().GetRenderWorldQuaternion()"
+    },
+    {
+      "file": "Engine/SceneRuntime/EnhancedGizmoSceneBinding.cpp",
+      "line": 176,
+      "code": "if (const auto frustum = cameraComponent->TryGetRenderFrustum())"
+    },
+    {
+      "file": "Engine/SceneRuntime/FoliageSystem.cpp",
+      "line": 61,
+      "code": "const auto cameraFrustum = camera->TryGetRenderFrustum();"
+    },
+    {
+      "file": "Engine/SceneRuntime/PrimitiveProxyBridge.cpp",
+      "line": 29,
+      "code": "proxy.m_worldMatrix = owner->Transform_().GetRenderWorldMatrix();"
+    },
+    {
+      "file": "Engine/SceneRuntime/PrimitiveProxyBridge.cpp",
+      "line": 30,
+      "code": "proxy.m_worldPosition = owner->Transform_().GetRenderWorldPosition();"
+    },
+    {
+      "file": "Engine/SceneRuntime/PrimitiveProxyBridge.cpp",
+      "line": 117,
+      "code": "m_worldBounds = component->GetBoundingBox(component->GetOwner()->Transform_().GetRenderWorldMatrix());"
+    },
+    {
+      "file": "Engine/SceneRuntime/PrimitiveProxyBridge.cpp",
+      "line": 199,
+      "code": "values.worldPosition = owner->Transform_().GetRenderWorldPosition();"
+    },
+    {
+      "file": "Engine/SceneRuntime/PrimitiveProxyBridge.cpp",
+      "line": 202,
+      "code": "math::normalize(owner->Transform_().GetRenderWorldQuaternion())));"
+    },
+    {
+      "file": "Engine/SceneRuntime/ProxyCommand.cpp",
+      "line": 88,
+      "code": "update.worldMatrix = owner->Transform_().GetRenderWorldMatrix();"
+    },
+    {
+      "file": "Engine/SceneRuntime/ProxyCommand.cpp",
+      "line": 89,
+      "code": "update.worldPosition = owner->Transform_().GetRenderWorldPosition();"
+    },
+    {
+      "file": "Engine/SceneRuntime/ProxyCommand.cpp",
+      "line": 93,
+      "code": "update.worldBounds = component->GetBoundingBox(component->GetOwner()->Transform_().GetRenderWorldMatrix());"
+    },
+    {
+      "file": "Engine/SceneRuntime/ProxyCommand.cpp",
+      "line": 177,
+      "code": "update.worldMatrix = owner->Transform_().GetRenderWorldMatrix();"
+    },
+    {
+      "file": "Engine/SceneRuntime/ProxyCommand.cpp",
+      "line": 178,
+      "code": "update.worldPosition = owner->Transform_().GetRenderWorldPosition();"
+    },
+    {
+      "file": "Engine/SceneRuntime/ProxyCommand.cpp",
+      "line": 200,
+      "code": "update.worldMatrix = owner->Transform_().GetRenderWorldMatrix();"
+    },
+    {
+      "file": "Engine/SceneRuntime/ProxyCommand.cpp",
+      "line": 201,
+      "code": "update.worldPosition = owner->Transform_().GetRenderWorldPosition();"
+    },
+    {
+      "file": "Engine/SceneRuntime/ProxyCommand.cpp",
+      "line": 218,
+      "code": "update.worldMatrix = owner->Transform_().GetRenderWorldMatrix();"
+    },
+    {
+      "file": "Engine/SceneRuntime/ProxyCommand.cpp",
+      "line": 219,
+      "code": "update.worldPosition = owner->Transform_().GetRenderWorldPosition();"
+    },
+    {
+      "file": "Engine/SceneRuntime/ProxyCommand.cpp",
+      "line": 241,
+      "code": "update.worldMatrix = owner->Transform_().GetRenderWorldMatrix();"
+    },
+    {
+      "file": "Engine/SceneRuntime/ProxyCommand.cpp",
+      "line": 323,
+      "code": "update.data.canvasWorld = canvasOwner->Transform_().GetRenderWorldMatrix();"
+    },
+    {
+      "file": "Engine/SceneRuntime/ProxyCommand.cpp",
+      "line": 362,
+      "code": "update.data.canvasWorld = canvasOwner->Transform_().GetRenderWorldMatrix();"
+    },
+    {
+      "file": "Engine/SceneRuntime/Scene.cpp",
+      "line": 3504,
+      "code": "auto batch = AIManagers->CaptureAIUpdate(*this, deltaSecond, camera->TryGetFrustum());"
+    },
+    {
+      "file": "Engine/SceneRuntime/TextComponent.cpp",
+      "line": 139,
+      "code": "canvasWorld = owner->Transform_().GetRenderWorldMatrix();"
+    },
+    {
+      "file": "Engine/SceneRuntime/Transform.cpp",
+      "line": 707,
+      "code": "math::matrix4x4 Transform::GetRenderWorldMatrix() const"
+    },
+    {
+      "file": "Engine/SceneRuntime/Transform.cpp",
+      "line": 716,
+      "code": "math::vector3 Transform::GetRenderWorldPosition() const"
+    },
+    {
+      "file": "Engine/SceneRuntime/Transform.cpp",
+      "line": 718,
+      "code": "return math::transform_point(math::vector3{}, GetRenderWorldMatrix());"
+    },
+    {
+      "file": "Engine/SceneRuntime/Transform.cpp",
+      "line": 721,
+      "code": "math::quaternion Transform::GetRenderWorldQuaternion() const"
+    },
+    {
+      "file": "Engine/SceneRuntime/Transform.cpp",
+      "line": 725,
+      "code": "if (!math::decompose(GetRenderWorldMatrix(), scale, rotation, position))"
+    },
+    {
+      "file": "Engine/SceneRuntime/Transform.h",
+      "line": 130,
+      "code": "math::matrix4x4 GetRenderWorldMatrix() const;"
+    },
+    {
+      "file": "Engine/SceneRuntime/Transform.h",
+      "line": 131,
+      "code": "math::vector3 GetRenderWorldPosition() const;"
+    },
+    {
+      "file": "Engine/SceneRuntime/Transform.h",
+      "line": 132,
+      "code": "math::quaternion GetRenderWorldQuaternion() const;"
+    }
+  ],
+  "documents": {
+    "targetedPages": [
+      "docs/analysis/N3PacingAcceptance20261023.html",
+      "docs/design/SimulationPacingAcceptanceContract.html",
+      "docs/design/ArchiveParserBoundaryContract.html",
+      "docs/design/SceneObservationContract.html",
+      "docs/plans/NetworkFrameworkPlan.html",
+      "docs/plans/ScriptSurfacePlan.html",
+      "docs/plans/SimulationEffectContractPlan.html",
+      "docs/plans/MasterPlanAudit20261020.html"
+    ],
+    "localLinkChecks": 156,
+    "missingLocalLinks": 0,
+    "inlineScripts": {
+      "pages": 670,
+      "scripts": 350,
+      "failures": 0
+    },
+    "dashboard": "453 tasks full parse/render PASS",
+    "planRenderReceipt": "Build/n3-plan-render-final.json",
+    "visual": "390/1280 renderer checks PASS; Network sheet inspected",
+    "scopedWhitespaceCheck": "PASS"
+  }
+}

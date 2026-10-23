@@ -1,4 +1,4 @@
-﻿using System.Collections.Generic;
+using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
@@ -125,14 +125,19 @@ public sealed class ScriptGenerator : IIncrementalGenerator
             IsAni: isAni,
             BTKind: btKind,
             Fields: fields.ToImmutableArray(),
-            Messages: messages.ToImmutableArray());
+            Messages: messages.ToImmutableArray(),
+            Lifecycle: symbol.GetMembers().OfType<IMethodSymbol>()
+                .Where(m => !m.IsStatic && m.ReturnsVoid && m.DeclaredAccessibility == Accessibility.Public
+                    && LifecycleMethods.Contains(m.Name)
+                    && (m.Parameters.Length == 0 || (m.Parameters.Length == 1 && m.Parameters[0].Type.SpecialType == SpecialType.System_Single)))
+                .Select(m => m.Name).Distinct().OrderBy(name => name).ToImmutableArray());
     }
 
     private static readonly ImmutableHashSet<string> LifecycleMethods = ImmutableHashSet.Create(
         "OnEnable", "OnDisable",
         "OnTriggerEnter", "OnTriggerStay", "OnTriggerExit",
         "OnCollisionEnter", "OnCollisionStay", "OnCollisionExit",
-        // L2가 추가한 6단계 씬 그래프 훅. 엔진이 Scene/SimulationScope 쪽에서 직접 부르므로
+        // L2가 추가한 6단계 씬 그래프 훅. 엔진이 native lifecycle driver 쪽에서 직접 부르므로
         // 여기 넣지 않으면 InvokeMessage 이름-디스패치 switch에도 잡혀 두 번 불릴 수 있다.
         "OnInitialized", "OnAddedToScene", "OnBeginSimulation",
         "OnEndSimulation", "OnRemovingFromScene", "OnUninitializing",
@@ -140,7 +145,7 @@ public sealed class ScriptGenerator : IIncrementalGenerator
         // L5가 세운 틱 축과 시뮬레이션 본문. 지금은 시그니처 필터(void·무인자)에도
         // 걸려 이중으로 막히지만, 그건 우연한 정확성이다 — 무인자 훅이 하나라도
         // 생기면 필터가 놓친다. 이 표가 정본이다.
-        "PrePhysics", "PostPhysics", "OnSimulate");
+        "PrePhysics", "PostPhysics", "OnTickSimulate");
 
     private static bool InheritsFrom(INamedTypeSymbol symbol, string baseFullName)
     {
@@ -401,6 +406,27 @@ public sealed class ScriptGenerator : IIncrementalGenerator
         sb.AppendLine("    }");
         sb.AppendLine();
 
+        // Internal legacy comparison fixtures use the same typed lifecycle table.
+        // The production authoring compiler remains F# only.
+        sb.AppendLine("    public static void RegisterAllLifecycle(global::System.Action<string, global::CreatorEngine.ScriptLifecycle> register)");
+        sb.AppendLine("    {");
+        foreach (ComponentInfo info in behaviours.Where(b => !b.IsAni && b.BTKind == BTNodeKind.None).OrderBy(b => b.TypeName))
+        {
+            sb.AppendLine($"        register(\"{info.TypeName}\", new global::CreatorEngine.ScriptLifecycle");
+            sb.AppendLine("        {");
+            foreach (string name in info.Lifecycle)
+            {
+                bool tick = name is "OnTickSimulate" or "PrePhysics" or "PostPhysics";
+                string parameters = tick ? "(script, dt)" : "script";
+                string argument = tick ? "dt" : string.Empty;
+                sb.AppendLine($"            {name} = static {parameters} => ((global::{info.FullName})script).{name}({argument}),");
+            }
+            sb.AppendLine("        });");
+            sb.AppendLine();
+        }
+        sb.AppendLine("    }");
+        sb.AppendLine();
+
         // 애니메이션 상태 스크립트는 목록을 따로 둔다 — 수명을 상태 머신이 쥐고 있어
         // Component와 섞으면 어느 팩토리로 만들지 구분할 수 없다.
         sb.AppendLine("    public static void RegisterAllAni(global::System.Action<string, global::System.Func<global::CreatorEngine.AniBehavior>> register)");
@@ -470,7 +496,8 @@ public sealed class ScriptGenerator : IIncrementalGenerator
         bool IsAni,
         BTNodeKind BTKind,
         ImmutableArray<FieldInfo> Fields,
-        ImmutableArray<string> Messages);
+        ImmutableArray<string> Messages,
+        ImmutableArray<string> Lifecycle);
 }
 
 

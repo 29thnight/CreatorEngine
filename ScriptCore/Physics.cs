@@ -4,9 +4,18 @@ namespace CreatorEngine;
 
 public enum PhysicsError
 {
-    None = 0, InvalidArgument = 1, UnsupportedGeometry = 2, StaleHandle = 3, WrongScene = 4,
-    WrongPhase = 5, BackendInitialization = 6, CookingFailed = 7, CapacityExceeded = 8,
-    OutOfMemory = 9, LateCommand = 10, DuplicateCommand = 11
+    None = 0,
+    InvalidArgument = 1,
+    UnsupportedGeometry = 2,
+    StaleHandle = 3,
+    WrongScene = 4,
+    WrongPhase = 5,
+    BackendInitialization = 6,
+    CookingFailed = 7,
+    CapacityExceeded = 8,
+    OutOfMemory = 9,
+    LateCommand = 10,
+    DuplicateCommand = 11
 }
 
 [StructLayout(LayoutKind.Sequential)]
@@ -29,7 +38,9 @@ public struct PhysicsHit
 [StructLayout(LayoutKind.Sequential)]
 internal struct NativePhysicsQueryResult
 {
-    public int Written, RequiredCapacity, Truncated;
+    public int Written;
+    public int RequiredCapacity;
+    public int Truncated;
 }
 
 public readonly record struct PhysicsQueryResult(PhysicsError Error, int Written, int RequiredCapacity, bool Truncated)
@@ -41,16 +52,27 @@ public readonly record struct PhysicsQueryResult(PhysicsError Error, int Written
 public readonly struct PhysicsQueryRequest
 {
     internal readonly int Kind;
-    public readonly Float3 Origin, Direction;
+    public readonly Float3 Origin;
+    public readonly Float3 Direction;
     public readonly float DistanceOrRadius;
     public readonly uint Layers;
     internal readonly int Sensors;
-    public readonly int Offset, Capacity;
+    public readonly int Offset;
+    public readonly int Capacity;
 
     private PhysicsQueryRequest(int kind, Float3 origin, Float3 direction, float distanceOrRadius,
                                 int offset, int capacity, uint layers, bool sensors)
-        => (Kind, Origin, Direction, DistanceOrRadius, Offset, Capacity, Layers, Sensors)
-            = (kind, origin, direction, distanceOrRadius, offset, capacity, layers, sensors ? 1 : 0);
+    {
+        Kind = kind;
+        Origin = origin;
+        Direction = direction;
+        DistanceOrRadius = distanceOrRadius;
+
+        Offset = offset;
+        Capacity = capacity;
+        Layers = layers;
+        Sensors = sensors ? 1 : 0;
+    }
 
     public static PhysicsQueryRequest Raycast(Float3 origin, Float3 direction, float distance, int offset, int capacity,
                                              uint layers = Physics.AllLayers, bool includeSensors = false)
@@ -65,8 +87,10 @@ public readonly struct PhysicsQueryRequest
 public readonly struct PhysicsBatchResult
 {
     public readonly PhysicsError Error;
-    public readonly int Written, RequiredCapacity;
+    public readonly int Written;
+    public readonly int RequiredCapacity;
     private readonly int _truncated;
+
     public bool Truncated => _truncated != 0;
     public bool Succeeded => Error == PhysicsError.None;
 }
@@ -99,7 +123,7 @@ public static class Physics
                 break;
             }
         if (!found) throw new ArgumentException("Shape does not belong to the body.");
-        ContactRouter.BindRole(body.OwnerHandle, body.ComponentId, shapeId, role, subscriber.Scope);
+        ContactRouter.BindRole(body.OwnerHandle, body.ComponentId, shapeId, role, subscriber.Lifetime);
     }
 
     public const uint AllLayers = uint.MaxValue;

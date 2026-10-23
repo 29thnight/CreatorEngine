@@ -6,12 +6,12 @@ namespace CreatorEngine.Scripts;
 /// </summary>
 public sealed partial class PackageSmokeProbe : Component
 {
-    public override void OnInitialized()
+    public void OnInitialized()
     {
         Console.WriteLine("[SMOKE] managed OnInitialized: PackageSmokeProbe");
     }
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         Console.WriteLine("[SMOKE] managed OnBeginSimulation: PackageSmokeProbe");
     }

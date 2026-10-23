@@ -38,7 +38,7 @@ void RunCsmVulkanInFlight(RecordingChangeDevice& device)
     const auto completed = device.GetCompletedFenceValue();
     std::array<RHITextureHandle, 3> textures{};
     std::array<RHIReadback, 3> readbacks{};
-    std::array<std::shared_ptr<EnhancedRenderGraph>, 3> graphs;
+    std::array<own::shared_owner<EnhancedRenderGraph>, 3> graphs;
     for (unsigned frame = 0; frame < 3; ++frame)
     {
         Check(device.BeginFrame(error), "CSM in-flight begin " + error);
@@ -47,7 +47,7 @@ void RunCsmVulkanInFlight(RecordingChangeDevice& device)
         desc.format = RHIFormat::D32Float; desc.allowDepthStencil = true;
         Check(device.CreateTexture(desc, textures[frame], error), "CSM in-flight depth");
         Check(device.CreateReadback(8, 8, RHIFormat::D32Float, 3, readbacks[frame], error), "CSM in-flight readback");
-        auto graph = std::make_shared<EnhancedRenderGraph>(device);
+        auto graph = own::make_shared<EnhancedRenderGraph>(device);
         graphs[frame] = graph;
         const auto map = graph->ImportTexture(textures[frame], RHIResourceState::Common, "CSM.InFlight");
         graph->AddPass("CSM.Clear", {{map, RHIResourceState::DepthWrite}}, [&, map, frame](const auto& execution) {

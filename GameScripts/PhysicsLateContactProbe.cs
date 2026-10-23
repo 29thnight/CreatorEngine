@@ -9,7 +9,7 @@ public sealed partial class PhysicsLateContactProbe : Component
     private ulong _firstTick, _lastTick;
     private bool _finished;
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         if (!PhysicsContactStreamProbe.AttackOwner.IsAlive || PhysicsContactStreamProbe.ObserverSpawnTick == 0)
             throw new InvalidOperationException("Observer started before active sensor pair.");
@@ -22,7 +22,7 @@ public sealed partial class PhysicsLateContactProbe : Component
         PhysicsContactStreamProbe.Track(_beginOnly);
     }
 
-    public override void PostPhysics(float dt)
+    public void PostPhysics(float dt)
     {
         if (_finished) return;
         try

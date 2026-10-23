@@ -1240,7 +1240,7 @@ bool MeshRenderer::RefreshModelGeneration(assets::ModelAssetGeneration::Shared g
         SetMaterial(std::move(material));
     }
     m_isNeedUpdateCulling = true;
-    PublishRenderProxyDirty(ProxyDirty::Payload | ProxyDirty::LOD | ProxyDirty::Material);
+    PublishRenderPropertyWrite(ProxyDirty::Payload | ProxyDirty::LOD | ProxyDirty::Material);
     return true;
 }
 
@@ -1290,7 +1290,7 @@ bool MeshRenderer::BindModelGeneration(
 	{
 		DataSystems->BindModelGenerationTextures(*m_Material, *m_modelGeneration);
 	}
-    PublishRenderProxyDirty(ProxyDirty::Payload | ProxyDirty::Material);
+    PublishRenderPropertyWrite(ProxyDirty::Payload | ProxyDirty::Material);
 	return true;
 }
 
@@ -1339,7 +1339,7 @@ bool MeshRenderer::BindMeshDescriptor(
     m_isSkinnedMesh = m_meshDescriptor->skinned;
     m_granularMeshBinding = true;
     m_isNeedUpdateCulling = true;
-    PublishRenderProxyDirty(ProxyDirty::Payload);
+    PublishRenderPropertyWrite(ProxyDirty::Payload);
     return true;
 }
 

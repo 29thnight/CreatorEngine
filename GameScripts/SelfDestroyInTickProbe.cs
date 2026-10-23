@@ -30,18 +30,18 @@ public sealed partial class SelfDestroyInTickProbe : Component
     private void Mark(string point)
         => Log($"[LC0] kind={Kind} point={point} frame={FrameCount} tid={Environment.CurrentManagedThreadId}");
 
-    public override void OnInitialized()       => Mark("init");
-    public override void OnAddedToScene()      => Mark("added");
-    public override void OnEnable()            => Mark("enable");
-    public override void OnBeginSimulation()   => Mark("beginhook");
-    public override void OnDisable()           => Mark("disable");
-    public override void OnEndSimulation()     => Mark("end");
-    public override void OnRemovingFromScene() => Mark("removing");
-    public override void OnUninitializing()    => Mark("uninit");
+    public void OnInitialized()       => Mark("init");
+    public void OnAddedToScene()      => Mark("added");
+    public void OnEnable()            => Mark("enable");
+    public void OnBeginSimulation()   => Mark("beginhook");
+    public void OnDisable()           => Mark("disable");
+    public void OnEndSimulation()     => Mark("end");
+    public void OnRemovingFromScene() => Mark("removing");
+    public void OnUninitializing()    => Mark("uninit");
 
     private int _ticks;
 
-    public override void PostPhysics(float tick)
+    public void PostPhysics(float tick)
     {
         ++_ticks;
 

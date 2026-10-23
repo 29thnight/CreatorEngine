@@ -1,0 +1,271 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/design/FSharpScriptingContract.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F# 단독 저작·네이티브 컴포넌트 계약 — 2026-10-23</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#현재-결정">현재 결정</a></li><li><a href="#생성저작배포">생성·저작·배포</a></li><li><a href="#사람이-읽는-저작-코드와-생성-코드">사람이 읽는 저작 코드와 생성 코드</a></li><li><a href="#네이티브-컴포넌트와-성능">네이티브 컴포넌트와 성능</a></li><li><a href="#수용-경계">수용 경계</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/design/</span><a href="FSharpScriptingContract.md">원본 Markdown</a></nav>
+<p class="eyebrow">설계</p>
+<h1>F# 단독 저작·네이티브 컴포넌트 계약 — 2026-10-23</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
+<a class="map-row" href="#현재-결정"><span class="ve-label">§00</span><span class="map-name">현재 결정</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#생성저작배포"><span class="ve-label">§01</span><span class="map-name">생성·저작·배포</span><span class="map-bar"><i style="width:85%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#사람이-읽는-저작-코드와-생성-코드"><span class="ve-label">§02</span><span class="map-name">사람이 읽는 저작 코드와 생성 코드</span><span class="map-bar"><i style="width:48.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#네이티브-컴포넌트와-성능"><span class="ve-label">§03</span><span class="map-name">네이티브 컴포넌트와 성능</span><span class="map-bar"><i style="width:57.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#수용-경계"><span class="ve-label">§04</span><span class="map-name">수용 경계</span><span class="map-bar"><i style="width:13.2%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「현재 결정」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-현재-결정">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="현재-결정">현재 결정</h2></div>
+<div class="prose"><p>게임 스크립트와 공통 관리 실행기는 F#으로 구현한다. <code>ScriptRuntime/ScriptRuntime.fsproj</code>가 <code>CreatorEngine.ManagedRuntime.dll</code>을 만들며, 팩토리·인스턴스/틱 멤버십·생명주기 실행·구독 정리·await 재개 큐·접촉 라우팅·collectible 로더·애니메이션/BT 등록과 인스턴스·진단 호출·GC 정책을 소유한다. C# ScriptCore에는 네이티브 함수 포인터·ABI 값 형식·공개 바인딩 타입과 전달 진입점을 남긴다. C# 바인딩에는 별도의 스크립트 실행 목록이나 생명주기 실행기를 두지 않는다.</p>
+<p>컴포넌트 생명주기 11종은 <code>override</code> 없이 일반 인스턴스 멤버로 선언한다. 생성기가 이름과 시그니처를 검사해 <code>RegisterAllLifecycle</code>에 형식이 확정된 콜백을 등록한다. Component 기반 타입에는 가상 생명주기를 두지 않는다. <code>member this.OnTickSimulate(dt: single) = ...</code>가 동기 고정틱 훅이며, PrePhysics/PostPhysics의 인자도 single, 나머지 훅은 무인자이고 모두 unit을 반환한다. 외부 생성 파일에서 접근할 수 있는 public/internal 멤버만 지원한다. private·static·generic·curried·overloaded·잘못된 인자/반환형은 CEF1020 오류로 거절한다. 생명주기는 일반 메시지 표에서 제외한다.</p>
+<p>11종은 지원 목록이다. <strong>필요한 훅만 작성하며, 생명주기가 하나도 없는 컴포넌트도 유효하다.</strong> 새 Editor 템플릿은 타입과 <code>inherit Component()</code>만 만든다. 빈 <code>OnTickSimulate</code>를 기본 생성하지 않는다. 동작·정리·순서 검증을 수행하는 기존 훅은 유지하고, 비어 있는 훅만 제거한다.</p>
+<p>기반 virtual의 추론이 없어졌으므로 쓰지 않는 틱 인자는 <code>(_: single)</code>로 지정한다. 예외만 던지는 훅도 <code>member _.OnInitialized() : unit = invalidOp &quot;...&quot;</code>처럼 반환형을 명시한다. 그렇지 않으면 F#이 generic 인자/반환형으로 추론할 수 있다. 이주한 제품 fixture에는 single/unit 서명을 명시했다.</p>
+<p>C++ ClrHost는 기존 unmanaged <code>Bootstrap.OnTickSimulate(float dt)</code>로 틱당 한 번 진입하며, 이후 순회·콜백 호출은 F# 실행기가 담당한다. 없는 훅은 null 콜백으로 표현해 빈 기본 함수를 호출하지 않는다. 매 틱 reflection이나 문자열 기반 생명주기 검색은 없다. API45는 네이티브 바인딩과 F# 공통 런타임에서 함께 검사하며, 새 로더는 생명주기 등록 표가 없는 스크립트 DLL을 거절한다. 이전 OnUpdate 이름은 제거한다. 60Hz/최대 catch-up4, 명령 적용→관리 tick→물리→접촉→성공 snapshot 순서, Enabled/세대/스레드/예외 격리와 기존 frame Pre/PostPhysics 의미는 유지한다. OnSimulate·Scope.Delay·F# 전용 simulation CE를 복원하지 않는다.</p>
+<pre><code class="language-fsharp">type Mover() =
+    inherit Component()
+
+    member this.OnTickSimulate(dt: single) =
+        this.Transform.Translate(Float3(dt, 0.0f, 0.0f))</code></pre>
+</div>
+</section>
+<section class="doc-sec" id="sec-생성저작배포">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="생성저작배포">생성·저작·배포</h2></div>
+<div class="prose"><ul>
+<li><a href="https://github.com/29thnight/FSharp_Tool_Pakage_for_CreatorEngine">도구 저장소</a>의 FCS 분석·파생 wrapper·정적 registry/field accessor/message switch를 사용한다. F# 타입의 lifecycle은 메시지 dispatch에서 제외한다.</li>
+<li>GameScripts/GameScripts.fsproj가 현재 Editor 빌드의 저작 프로젝트다. 별도 GameScripts.csproj는 기존 내부 C# 회귀에 남으며 F# 프로젝트가 참조하지 않는다.</li>
+<li>Assets/Script/compile.order는 의존 순서대로 상대 .fs 경로를 한 줄에 하나 기록한다. Editor 생성은 새 파일을 마지막에 추가한다. 기존 순서를 알파벳으로 재정렬하지 않는다.</li>
+<li>SDK에는 공통 실행기 CreatorEngine.ManagedRuntime.dll·deps와 엔진용 FSharp.Core.dll을 Managed 루트에 고정 배포한다. ScriptRuntime 프로젝트는 CopyLocalLockFileAssemblies로 실제 의존성을 배치한다. Scripts 아래에는 게임용 FSharp.Core와 조회 편의용 CreatorEngine.FSharp.Runtime.dll을 따로 배포한다. 이 helper DLL과 엔진 공통 실행기는 별개다. compiler private FSharp.Core도 별도 경로로 보존한다. 고정 CoreFiles/ManagedFiles 목록과 패키지 hash로 누락·변경을 검사한다.</li>
+<li>F# GameScripts.dll이 유일한 primary다. 엔진 공통 실행기와 엔진용 FSharp.Core는 ScriptCore가 올라간 동일한 상주 컨텍스트에 둔다. hostfxr의 component 컨텍스트를 Default로 가정하지 않는다. 스크립트의 collectible 컨텍스트에는 실제 ScriptCore를 공유하고, 게임용 FSharp.Core/private dependency는 그 세대 안에 로드한다. DLL/PDB stream load, 실패한 사전 검증의 이전 코드/인스턴스 보존, 성공한 reload의 콜백·팩토리·인스턴스·재개 큐 참조 해제를 유지한다. 공통 엔진 런타임의 코드 교체는 프로세스 재시작을 요구한다.</li>
+<li>스크립트별 C# 파일을 생성하지 않는다. ScriptRegistry.g.fs에 F# 필드/메시지 접근자·factory와 별도의 정적 생명주기 표를 만든다. factory가 만든 객체 하나에 타입별 콜백 표를 연결하며, 콜백은 저작 타입의 일반 멤버를 직접 호출한다. 접근자의 virtual 재정의는 인스펙터/직렬화용 내부 구현이다. GameScripts의 대응 .cs는 이주 전 원본/내부 비교 입력이며 F# 제품 프로젝트에 포함하지 않는다.</li>
+<li>public mutable val + SerializeField의 기존 지원 값 형식만 저장한다. DU/record/option의 임의 저장·AOT·IDE breakpoint 지원은 별도다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-사람이-읽는-저작-코드와-생성-코드">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="사람이-읽는-저작-코드와-생성-코드">사람이 읽는 저작 코드와 생성 코드</h2></div>
+<div class="prose"><p><a href="../../../FSharp_Tool_Pakage_for_CreatorEngine/vscode/README.md">VS Code 작성 도우미</a>는 현재 컴포넌트의 멤버 위치에서 <code>On…</code> 자동완성과 <strong>생명주기 추가</strong> 선택 메뉴를 제공한다. 선택한 일반 멤버만 single/unit 서명으로 삽입하며 기존 훅은 제외한다. 주석·문자열·메서드 본문에는 제안하지 않는다. 파일 저장·빌드·compile.order 변경은 수행하지 않는다. 다른 파일의 기반 타입과 복잡한 F# 구문은 편집 도우미가 추측하지 않으며 최종 검사는 FCS 생성기가 담당한다. <a href="../analysis/FSharpOptionalLifecycleAcceptance20261023.html">선택적 저작 수용 기록</a>을 따른다.</p>
+<p>F# 스크립트와 내부 C# 바인딩은 사람이 수정·검토하는 코드다. 공백만 늘리는 대신 다음 기준을 적용한다.</p>
+<ul>
+<li>상태와 단계는 역할을 드러내는 이름을 사용한다. 여러 의미를 겸하는 정수 단계 대신 명명된 상태와 별도 처리 메서드를 둔다.</li>
+<li>생명주기 본문은 실행 순서를 보여 주고, 명령 접수·스냅샷 검증·정리 등 독립된 책임은 이름 있는 메서드로 나눈다. 핫 틱에 새 할당이나 reflection을 넣지 않는다.</li>
+<li>ABI 필드는 선언 순서를 유지하면서 한 줄에 하나씩 쓴다. 포인터·출력 인자·실패 조건을 명시하고, 긴 생성자 대입을 튜플 한 줄로 압축하지 않는다.</li>
+<li>생성 접근자의 이름에 원본 스크립트 이름을 포함하고, factory와 접근자 구획을 구분한다. 생성기에서 고쳐 재생성 후에도 유지한다.</li>
+<li>주석은 상태의 수명, 호출 순서의 이유, ABI 제약을 설명한다. 코드의 단순 반복 설명은 추가하지 않는다.</li>
+</ul>
+<p>AniBehavior와 BT 노드도 F#의 정적 factory 등록을 사용한다. 컴포넌트·애니메이션·BT 카탈로그는 기존 호스트 계약대로 구분하며, 매 틱 reflection으로 생성하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-네이티브-컴포넌트와-성능">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="네이티브-컴포넌트와-성능">네이티브 컴포넌트와 성능</h2></div>
+<div class="prose"><p>F# → 기존 ScriptCore concrete wrapper → C ABI table → C++ component로 접근한다. Transform/Camera/Light/Animator/PhysicsBody/CCT에 별도 mirror 객체·틱 reflection·F# 수명 관리자를 추가하지 않는다. wrapper가 없는 native component의 자동 공개는 하지 않는다.</p>
+<p>NativeComponents.tryGet<T>는 기존 GetComponent<T>를 1회 호출하고 struct voption을 반환한다. 기존 조회는 wrapper를 할당하므로 초기화/필요한 재편입 시 조회하여 cache한다. Transform 등의 entity generation 검사와 PhysicsBody/CCT의 NativeInstance 검사는 서로 다른 계약이다. 제거된 body/character wrapper를 새 component에 재사용하지 않는다.</p>
+<p>API45 관리 테스트의 100,000회 반복에서 조회 direct/helper 각각9.6MB, cache LocalPosition 읽기는 반복 구간 추가 할당0 bytes였다. helper는 기존 wrapper 비용을 없애지 않는다. 단일 타이밍에서 helper가 더 느린 표본도 있어 CPU 성능 동등/향상으로 판정하지 않는다. cache 읽기는 iteration당 callback1회·추가 Exists 조회0회였다. 제어 native callback 관리 호스트 결과이며 실제 프레임 비용은 아니다. 이전 API44 기록의12.8MB는 당시 구현의 측정값이다.</p>
+<p>hot tick에서는 seq/list/closure 생성, 반복 GetComponent, 작은 native 호출을 숨기는 collection pipeline을 피한다. Span은 동기 본문에서 처리하고 외부 async 결과는 기존 명시 tick 명령으로 전달한다. 새 수명·시간 효과 계층은 없다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-수용-경계">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="수용-경계">수용 경계</h2></div>
+<div class="prose"><p><a href="../analysis/FSharpManagedRuntimeAcceptance20261023.html">API45 실행 기록</a>을 따른다. API43/OnUpdate와 API44/override 기록은 이전 단계의 수용이며 API45의 코드 신원 증명이 아니다. 새 source identity·관리 gate·실제 제품 gate를 구분한다. 전체 기존 fixture 이주·shader/일반 모델 cook·IDE·NativeAOT·다른 플랫폼·장시간 reload·일반 성능 예산은 자동 완료하지 않는다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="FSharpScriptingContract.md"><code>docs/design/FSharpScriptingContract.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

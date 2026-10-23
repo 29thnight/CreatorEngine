@@ -129,7 +129,7 @@ void DecalComponent::RequestTexture(std::string_view reference, std::size_t slot
     {
         owner.reset();
         alias = nullptr;
-        PublishRenderProxyDirty(ProxyDirty::Material);
+        PublishRenderPropertyWrite(ProxyDirty::Material);
         return;
     }
 
@@ -141,7 +141,7 @@ void DecalComponent::RequestTexture(std::string_view reference, std::size_t slot
     {
         owner.reset();
         alias = nullptr;
-        PublishRenderProxyDirty(ProxyDirty::Material);
+        PublishRenderPropertyWrite(ProxyDirty::Material);
         return;
     }
     if (!logicalIdentity)
@@ -170,7 +170,7 @@ void DecalComponent::RequestTexture(std::string_view reference, std::size_t slot
     {
         owner = std::move(prepared);
         alias = &*owner;
-        PublishRenderProxyDirty(ProxyDirty::Material);
+        PublishRenderPropertyWrite(ProxyDirty::Material);
         return;
     }
     request = DataSystems->RequestAsync<Texture>(link, variant);
@@ -191,7 +191,7 @@ void DecalComponent::ReplaceTextureOwner(const Texture* previous,
             *aliases[slot] = &*replacement;
             m_texturePending[slot] = false;
             m_textureRequests[slot] = {};
-            PublishRenderProxyDirty(ProxyDirty::Material);
+            PublishRenderPropertyWrite(ProxyDirty::Material);
         }
     }
 }
@@ -257,7 +257,7 @@ void DecalComponent::PollTextureRequests()
     }
     if (changed)
     {
-        PublishRenderProxyDirty(ProxyDirty::Material);
+        PublishRenderPropertyWrite(ProxyDirty::Material);
     }
 }
 

@@ -11,7 +11,7 @@ void RunTemporalBuckets(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     std::string error;
     if(transmitting){
         IndirectMaterialBatch invalid;invalid.device=&device;
-        IndirectMaterialBatch::Bucket bucket;bucket.roots={2,1};invalid.buckets.push_back(bucket);
+        auto& bucket = invalid.AppendBucket(); bucket.roots = {2, 1};
         const std::array<uint32_t,1> words{};const std::array<std::array<uint32_t,4>,1> records{};
         Check(!invalid.Upload(words,records,32,error)&&error.find("strictly increasing")!=std::string::npos&&!invalid.output.IsValid(),"Invalid indirect root order is rejected before allocation/recording");
     }
@@ -58,7 +58,7 @@ void RunTemporalBuckets(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             Check(SealScene(view, draws, {}, input, error, previous ? &*previous : nullptr), "Temporal seal " + error);
             Check(device.BeginFrame(error), "Temporal begin"); textures.BeginFrame(context.frameId);
             Check(host.PrepareResidency(context, input, error), "Temporal residency " + error);
-            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+            auto graph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
             if (workers) { pool.BeginFrame(unsigned(context.frameId)); Check(graph->PrepareParallel(pool, error), "Temporal parallel prepare"); }
             Check(host.Prepare(context, input, {}, {}, {}, {}, SceneHostBudget{.m_primitiveCache = primitiveCache},
                                error, 0),

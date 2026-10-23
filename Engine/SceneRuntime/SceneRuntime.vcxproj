@@ -335,6 +335,8 @@
     <ClInclude Include="Scene.h" />
     <ClInclude Include="ScenePhysicsSimulation.h" />
     <ClInclude Include="SimulationSessionPolicy.h" />
+    <ClInclude Include="SimulationTick.h" />
+    <ClInclude Include="SimulationExchange.h" />
     <ClInclude Include="ScriptPhysicsABI.h" />
     <ClInclude Include="PhysicsBodyComponent.h" />
     <ClInclude Include="CharacterMovementComponent.h" />
@@ -345,6 +347,7 @@
     <ClInclude Include="ScriptComponent.h" />
     <ClInclude Include="ScriptObjectRegistry.h" />
     <ClInclude Include="SceneManager.h" />
+    <ClInclude Include="SceneObservation.h" />
     <ClInclude Include="RuntimeFrame.h" />
     <ClInclude Include="SpriteRenderer.h" />
     <ClInclude Include="TagManager.h" />

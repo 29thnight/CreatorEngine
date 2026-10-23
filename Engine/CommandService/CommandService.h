@@ -133,9 +133,26 @@ namespace CommandService
         ///   `maxConnections` 검사는 동시 연결이 1 을 넘을 수 없어 죽은 코드였다.
         struct Worker
         {
+            // Stop interrupts I/O while the worker owns the final close. The
+            // shared state serializes those operations so a recycled socket
+            // handle cannot be interrupted after its connection has closed.
+            struct Connection
+            {
+                explicit Connection(SocketHandle socket) : client(socket) {}
+                ~Connection() { Close(); }
+
+                void Interrupt() noexcept;
+                void Close() noexcept;
+
+                std::atomic<bool> finished{ false };
+
+            private:
+                std::mutex socketMutex;
+                SocketHandle client;
+            };
+
             std::thread                        thread;
-            std::shared_ptr<std::atomic<bool>> finished;
-            SocketHandle                       client{};
+            std::shared_ptr<Connection>         connection;
         };
         std::mutex          m_workerMutex;
         std::vector<Worker> m_workers;

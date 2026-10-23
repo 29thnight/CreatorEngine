@@ -1,4 +1,5 @@
 #pragma once
+#include "DiagnosticDocument.h"
 
 #include "EnhancedSceneRenderer.h"
 #include "EnhancedCameraReplayInput.h"
@@ -14,11 +15,6 @@
 #include "../../RHI/IRHIDeviceResources.h"
 #include "../../MaterialGraphSceneInput.h"
 #include "../../MaterialGraphSceneHost.h"
-#include <AuthoringRymlErrorPolicy.h>
-#include <ryml/ryml.hpp>
-#include <ryml/ryml_std.hpp>
-#include <c4/yml/emit.hpp>
-#include <c4/format.hpp>
 
 // Explicit diagnostic capture only. The render thread owns this object and its
 // readbacks. Release must run after submission completion (or frame abort).
@@ -57,7 +53,7 @@ struct EnhancedPbrCapture
     std::vector<uint8_t> drawInputBytes;
     std::optional<EnhancedLatticeReplayInput> latticeReplay;
     std::vector<uint8_t> latticeInputBytes;
-    ryml::Tree manifest;
+    Diagnostics::Document manifest;
     std::array<RHIReadback, 12> readbacks{};
     struct StageReadback
     {
@@ -147,7 +143,7 @@ struct EnhancedPbrCapture
         return true;
     }
 
-    static void WriteMeshIdentity(ryml::NodeRef item, const assets::ModelMeshHandle& handle)
+    static void WriteMeshIdentity(Diagnostics::Node item, const assets::ModelMeshHandle& handle)
     {
         item["meshId"] << FileGuid(handle.meshId).ToString();
         item["meshDomain"] << (handle.domain == assets::ModelMeshDomain::Granular ? "granular" : "aggregate");
@@ -162,10 +158,10 @@ struct EnhancedPbrCapture
             item["artifactBytes"] << blob.byteSize;
             item["targetPlatform"] << blob.targetPlatform;
             item["targetAbi"] << blob.targetAbi;
-            item["contentSha256"] |= ryml::SEQ;
+            item["contentSha256"].SetSequence();
             for (const auto byte : blob.contentSha256)
             {
-                item["contentSha256"].append_child() << static_cast<uint32_t>(byte);
+                item["contentSha256"].Append() << static_cast<uint32_t>(byte);
             }
         }
         else
@@ -187,21 +183,22 @@ struct EnhancedPbrCapture
         capturedSceneEpoch = frame.sceneEpoch;
         capturedRealFrameId = view.displayTarget == EnhancedLiveDisplayTarget::Game && frame.temporalRealFrameId
             ? frame.temporalRealFrameId : frame.frameId;
-        Authoring::EnsureRymlErrorPolicy();
-        auto root = manifest.rootref();
-        root |= ryml::MAP;
+        auto root = manifest.Root();
+        root.SetMap();
         root["schemaVersion"] << 1;
         root["source"] << "product-live";
         root["backend"] << (backend == EnhancedLiveBackend::DX12 ? "dx12" : "vulkan");
         root["frameId"] << frame.frameId;
+        root["sourceEngineFrameAvailable"] << frame.sourceEngineFrameAvailable;
+        if(frame.sourceEngineFrameAvailable) root["sourceEngineFrame"] << frame.sourceEngineFrame;
         root["sourceRealFrameId"] << capturedRealFrameId;
         root["requestedAfterFrameId"] << afterFrameId;
         if (historyOrdinal)
         {
-            root["historyRecovery"] |= ryml::MAP;
+            root["historyRecovery"].SetMap();
             auto h = root["historyRecovery"];
             h["ordinal"] << historyOrdinal;
-            h["fixedSdkClock"] << c4::fmt::boolalpha(historyFixedSdkClock);
+            h["fixedSdkClock"] << (historyFixedSdkClock);
             h["acceptedBefore"] << historyAcceptedBefore;
             h["resetRealFrameId"] << historyResetFrame;
             h["historyRevision"] << historyResetRevision;
@@ -211,7 +208,7 @@ struct EnhancedPbrCapture
         }
         if (motionValidation)
         {
-            root["fixtureBindingRequired"] << c4::fmt::boolalpha(expectedFixture.IsValid());
+            root["fixtureBindingRequired"] << (expectedFixture.IsValid());
             root["motionEvidence"] << (expectedFixture.IsValid()
                 ? "exact-tagged-fixture" : "unbound-motion-observation");
             root["fixtureSessionId"] << frame.temporalFixture.sessionId;
@@ -219,8 +216,8 @@ struct EnhancedPbrCapture
             root["fixturePredecessorStepId"] << frame.temporalFixture.predecessorStepId;
             root["fixtureInputSha256"] << frame.temporalFixture.inputSha256;
             root["fixturePredecessorInputSha256"] << frame.temporalFixture.predecessorInputSha256;
-            root["fixtureAllowMeshlets"] << c4::fmt::boolalpha(frame.temporalFixture.allowMeshlets);
-            root["fixtureCoalesced"] << c4::fmt::boolalpha(frame.temporalFixtureCoalesced);
+            root["fixtureAllowMeshlets"] << (frame.temporalFixture.allowMeshlets);
+            root["fixtureCoalesced"] << (frame.temporalFixtureCoalesced);
         }
         root["sceneEpoch"] << frame.sceneEpoch;
         root["viewId"] << view.key.viewId;
@@ -267,34 +264,34 @@ struct EnhancedPbrCapture
             root["sampleIndex"] << 0;
             root["historyPolicy"] << "restart-ssgi-fog";
         }
-        const auto matrix = [](ryml::NodeRef node, const math::matrix4x4& value)
+        const auto matrix = [](Diagnostics::Node node, const math::matrix4x4& value)
         {
             std::array<float, 16> values;
             static_assert(sizeof(value) == sizeof(values));
             std::memcpy(values.data(), &value, sizeof(value));
-            node |= ryml::SEQ;
-            for (float component : values) node.append_child() << component;
+            node.SetSequence();
+            for (float component : values) node.Append() << component;
         };
-        root["camera"] |= ryml::MAP;
+        root["camera"].SetMap();
         matrix(root["camera"]["view"], view.camera.view);
         matrix(root["camera"]["projection"], view.camera.projection);
         root["skyBoxPath"] << skyBoxPath;
-        root["lights"] |= ryml::SEQ;
+        root["lights"].SetSequence();
         for (const auto& light : lights)
         {
             // EnhancedLight has an asserted packed 16-float layout.
             std::array<float, 16> values;
             std::memcpy(values.data(), &light, sizeof(light));
-            auto node = root["lights"].append_child();
-            node |= ryml::SEQ;
-            for (float component : values) node.append_child() << component;
+            auto node = root["lights"].Append();
+            node.SetSequence();
+            for (float component : values) node.Append() << component;
         }
-        root["draws"] |= ryml::SEQ;
+        root["draws"].SetSequence();
         const auto append = [&](const EnhancedDrawItem& draw, const auto& material,
             const char* route)
         {
-            auto item = root["draws"].append_child();
-            item |= ryml::MAP;
+            auto item = root["draws"].Append();
+            item.SetMap();
             item["route"] << route;
             matrix(item["world"], draw.worldMatrix);
             WriteMeshIdentity(item, draw.modelMeshView.handle);
@@ -302,7 +299,7 @@ struct EnhancedPbrCapture
             {
                 // W8: 이 packet이 어느 저작 값·어느 프레임의 밀봉인지.
                 auto seal = item["seal"];
-                seal |= ryml::MAP;
+                seal.SetMap();
                 seal["hash"] << material->seal.sealHash;
                 seal["authoredDigest"] << material->seal.authoredDigest;
                 seal["authoredRevision"] << material->seal.authoredRevision;
@@ -313,17 +310,17 @@ struct EnhancedPbrCapture
                 item["shaderMetaSlot"] << material->shaderMetaHandle.slot;
                 item["shaderMetaGeneration"] << material->shaderMetaHandle.generation;
                 item["permutation"] << material->permutationKey.Hex();
-                item["propertyBytes"] |= ryml::SEQ;
+                item["propertyBytes"].SetSequence();
                 for (auto byte : material->propertyBytes)
-                    item["propertyBytes"].append_child() << static_cast<uint32_t>(byte);
+                    item["propertyBytes"].Append() << static_cast<uint32_t>(byte);
                 item["useNormalMap"] << material->useNormalMap;
                 item["coverageFlags"] << material->coverage.flags;
                 item["alphaCutoff"] << material->coverage.cutoff;
-                item["textures"] |= ryml::SEQ;
+                item["textures"].SetSequence();
                 for (const auto& texture : material->textureBindings)
                 {
-                    auto binding = item["textures"].append_child();
-                    binding |= ryml::MAP;
+                    auto binding = item["textures"].Append();
+                    binding.SetMap();
                     binding["property"] << texture.propertyName;
                     binding["assetId"] << texture.textureGuid.ToString();
                     binding["register"] << texture.registerIndex;
@@ -341,11 +338,11 @@ struct EnhancedPbrCapture
         // key를 "없다"고 적었다. 이제 그 셋은 패스가 배치를 확정한 뒤에 알 수
         // 있으므로 Save 직전 RecordSealLedger가 채운다. 기록이 없는 채로 저장되면
         // 그것 자체가 배선 결함이므로 기본값을 "미기록"으로 둔다.
-        root["sealLedger"] |= ryml::MAP;
+        root["sealLedger"].SetMap();
         root["sealLedger"]["recorded"] << false;
     }
 
-    void WriteTemporalProvenance(ryml::NodeRef node) const
+    void WriteTemporalProvenance(Diagnostics::Node node) const
     {
         const auto& provenance = temporalProvenance;
         node["temporalProvenanceSchemaVersion"] << 2;
@@ -360,19 +357,19 @@ struct EnhancedPbrCapture
         node["frameGenerator"] << TemporalMeasuredProviderName(provenance.frameGenerator);
         node["resolutionState"] << TemporalResolutionStateName(provenance.resolutionState);
         node["spatialMode"] << SpatialScalingModeName(provenance.spatialMode);
-        node["deepDvcApplied"] << c4::fmt::boolalpha(provenance.deepDvcApplied);
-        node["temporalNativeGateActive"] << c4::fmt::boolalpha(provenance.nativeGateActive);
+        node["deepDvcApplied"] << (provenance.deepDvcApplied);
+        node["temporalNativeGateActive"] << (provenance.nativeGateActive);
     }
 
     void RecordTemporalProvenance(const TemporalMeasurementProvenance& provenance)
     {
         temporalProvenance = provenance;
-        auto root = manifest.rootref();
+        auto root = manifest.Root();
         WriteTemporalProvenance(root);
         root["goldenEligible"] << (!historyOrdinal && !expectedFixture.sdkQuality && provenance.IsGoldenEligible());
         // Graph timing is collected before submission. Refresh its frame/effect
         // labels when Commit supplies the successfully submitted provenance.
-        if (root.has_child("measurement"))
+        if (root.Has("measurement"))
         {
             WriteTemporalProvenance(root["measurement"]);
         }
@@ -384,29 +381,29 @@ struct EnhancedPbrCapture
         capturedPreviousSubmittedFrame = previousSubmittedFrame;
         if (historyOrdinal)
         {
-            auto h = manifest.rootref()["historyRecovery"];
+            auto h = manifest.Root()["historyRecovery"];
             h["sdkFrameMilliseconds"] << frame.frameTimeMilliseconds;
             h["upscaleQuality"] << static_cast<uint32_t>(quality);
-            h["capturedReset"] << c4::fmt::boolalpha(frame.reset);
+            h["capturedReset"] << (frame.reset);
             h["previousSubmittedRealFrameId"] << previousSubmittedFrame;
         }
         if (!motionValidation)
         {
             return;
         }
-        auto node = manifest.rootref()["temporalMotion"];
-        node |= ryml::MAP;
+        auto node = manifest.Root()["temporalMotion"];
+        node.SetMap();
         node["schemaVersion"] << 2;
-        node["fixtureAllowMeshlets"] << c4::fmt::boolalpha(expectedFixture.allowMeshlets);
-        node["sdkQuality"] << c4::fmt::boolalpha(expectedFixture.sdkQuality);
+        node["fixtureAllowMeshlets"] << (expectedFixture.allowMeshlets);
+        node["sdkQuality"] << (expectedFixture.sdkQuality);
         node["sdkFrameMilliseconds"] << frame.frameTimeMilliseconds;
         node["upscaleQuality"] << static_cast<uint32_t>(quality);
         node["source"] << "final-production-temporal-inputs";
         node["direction"] << "current-to-previous";
         node["units"] << "render-pixels";
         node["origin"] << "top-left";
-        node["jitterIncluded"] << c4::fmt::boolalpha(false);
-        node["historyReset"] << c4::fmt::boolalpha(frame.reset);
+        node["jitterIncluded"] << (false);
+        node["historyReset"] << (frame.reset);
         node["historyGeneration"] << frame.historyRevision;
         node["realFrameId"] << frame.realFrameId;
         // Read before this frame commits; do not infer adjacency from realFrameId.
@@ -417,11 +414,11 @@ struct EnhancedPbrCapture
         node["fixturePredecessorStepId"] << expectedFixture.predecessorStepId;
         node["fixtureInputSha256"] << expectedFixture.inputSha256;
         node["fixturePredecessorInputSha256"] << expectedFixture.predecessorInputSha256;
-        node["previousSubmittedFixtureAllowMeshlets"] << c4::fmt::boolalpha(previousFixtureSubmission.stamp.allowMeshlets);
+        node["previousSubmittedFixtureAllowMeshlets"] << (previousFixtureSubmission.stamp.allowMeshlets);
         node["previousSubmittedFixtureSessionId"] << previousFixtureSubmission.stamp.sessionId;
         node["previousSubmittedFixtureStepId"] << previousFixtureSubmission.stamp.stepId;
         node["previousSubmittedFixtureInputSha256"] << previousFixtureSubmission.stamp.inputSha256;
-        node["previousSubmittedFixtureSourceVerified"] << c4::fmt::boolalpha(previousFixtureSubmission.sourceVerified);
+        node["previousSubmittedFixtureSourceVerified"] << (previousFixtureSubmission.sourceVerified);
         node["previousSubmittedSourceFrameId"] << previousFixtureSubmission.sourceFrameId;
         node["previousSubmittedViewId"] << previousFixtureSubmission.viewId;
         node["previousSubmittedSceneEpoch"] << previousFixtureSubmission.sceneEpoch;
@@ -443,11 +440,11 @@ struct EnhancedPbrCapture
         {
             return;
         }
-        auto node = manifest.rootref()["fixtureSubmission"];
-        node |= ryml::MAP;
-        node["valid"] << c4::fmt::boolalpha(submitted.valid);
-        node["sourceVerified"] << c4::fmt::boolalpha(submitted.sourceVerified);
-        node["allowMeshlets"] << c4::fmt::boolalpha(submitted.stamp.allowMeshlets);
+        auto node = manifest.Root()["fixtureSubmission"];
+        node.SetMap();
+        node["valid"] << (submitted.valid);
+        node["sourceVerified"] << (submitted.sourceVerified);
+        node["allowMeshlets"] << (submitted.stamp.allowMeshlets);
         node["sessionId"] << submitted.stamp.sessionId;
         node["stepId"] << submitted.stamp.stepId;
         node["requestedPredecessorStepId"] << submitted.stamp.predecessorStepId;
@@ -463,8 +460,8 @@ struct EnhancedPbrCapture
         node["realFrameId"] << submitted.realFrameId;
         node["predecessorSourceFrameId"] << submitted.predecessorSourceFrameId;
         node["predecessorRealFrameId"] << submitted.predecessorRealFrameId;
-        node["historyReset"] << c4::fmt::boolalpha(submitted.historyReset);
-        node["coalesced"] << c4::fmt::boolalpha(submitted.coalesced);
+        node["historyReset"] << (submitted.historyReset);
+        node["coalesced"] << (submitted.coalesced);
         node["submissionProof"] << "native-submit-succeeded-and-temporal-history-committed";
     }
 
@@ -474,43 +471,43 @@ struct EnhancedPbrCapture
         {
             return;
         }
-        auto root = manifest.rootref();
+        auto root = manifest.Root();
         for (const auto& draw : input->Draws())
         {
-            auto item = root["draws"].append_child();
-            item |= ryml::MAP;
+            auto item = root["draws"].Append();
+            item.SetMap();
             item["route"] << "lattice";
             const auto& geometry = draw.geometry->Source()->Geometry();
             WriteMeshIdentity(item, geometry.handle);
-            item["world"] |= ryml::SEQ;
+            item["world"].SetSequence();
             std::array<float, 16> world;
             std::memcpy(world.data(), &draw.geometry->Source()->World(), sizeof(world));
-            for (float value : world) item["world"].append_child() << value;
-            item["pose"] |= ryml::SEQ;
+            for (float value : world) item["world"].Append() << value;
+            item["pose"].SetSequence();
             for (const auto& bone : draw.geometry->Source()->Bones())
             {
                 const auto* bytes = reinterpret_cast<const unsigned char*>(&bone);
                 for (size_t i = 0; i < sizeof(bone); ++i)
-                    item["pose"].append_child() << static_cast<uint32_t>(bytes[i]);
+                    item["pose"].Append() << static_cast<uint32_t>(bytes[i]);
             }
             const auto& instance = *draw.material;
             auto graph = item["lattice"];
-            graph |= ryml::MAP;
+            graph.SetMap();
             graph["graphId"] << FileGuid(instance.generation->assetId.value).ToString();
             graph["generation"] << instance.generation->generation;
             graph["slot"] << draw.materialSlot;
             graph["features"] << instance.generation->cooked.product.program.features;
             graph["coverage"] << static_cast<uint32_t>(draw.queue);
-            graph["uniformBytes"] |= ryml::SEQ;
+            graph["uniformBytes"].SetSequence();
             for (auto byte : instance.uniforms)
             {
-                graph["uniformBytes"].append_child() << static_cast<uint32_t>(byte);
+                graph["uniformBytes"].Append() << static_cast<uint32_t>(byte);
             }
-            graph["textures"] |= ryml::SEQ;
+            graph["textures"].SetSequence();
             for (const auto& texture : instance.textures)
             {
-                auto binding = graph["textures"].append_child();
-                binding |= ryml::MAP;
+                auto binding = graph["textures"].Append();
+                binding.SetMap();
                 binding["slot"] << texture.slot;
                 binding["assetId"] << FileGuid(texture.assetId.value).ToString();
                 binding["colorSpace"] << static_cast<uint32_t>(texture.colorSpace);
@@ -524,9 +521,9 @@ struct EnhancedPbrCapture
     void RecordRenderLedger(std::uint64_t encoderDrops, const std::string& lastEncoderDrop,
         std::uint32_t textureUploadFailures)
     {
-        auto root = manifest.rootref();
+        auto root = manifest.Root();
         auto ledger = root["sealLedger"];
-        ledger |= ryml::MAP;
+        ledger.SetMap();
         ledger["recorded"] << true;
         ledger["encoderDrops"] << encoderDrops;
         ledger["lastEncoderDrop"] << lastEncoderDrop;
@@ -546,32 +543,32 @@ struct EnhancedPbrCapture
         {
             throw std::runtime_error("recorded geometry route audit belongs to a different capture frame");
         }
-        auto node = manifest.rootref()["geometryRoutes"];
-        node |= ryml::MAP;
+        auto node = manifest.Root()["geometryRoutes"];
+        node.SetMap();
         node["source"] << "joined-command-recording-after-native-submission";
         node["pass"] << "METEOR.Scene.GBuffer";
         node["sourceFrameId"] << result.frameId;
         node["sceneEpoch"] << capturedSceneEpoch;
         node["viewId"] << capturedViewId;
-        node["emptyScene"] << c4::fmt::boolalpha((audit.sourceFrameId == 0));
+        node["emptyScene"] << ((audit.sourceFrameId == 0));
         const auto meshletCount = static_cast<uint32_t>(std::count_if(audit.draws.begin(), audit.draws.end(),
             [](const auto& draw) { return draw.meshShader; }));
         node["recordedMeshletBatchCount"] << meshletCount;
         node["recordedMeshletDispatchCount"] << meshletCount;
         node["gpuVisibleCountAvailable"] << false;
         auto selected = node["selected"];
-        selected |= ryml::SEQ;
+        selected.SetSequence();
         for (const auto& route : audit.draws)
         {
-            auto entry = selected.append_child();
-            entry |= ryml::MAP;
+            auto entry = selected.Append();
+            entry.SetMap();
             entry["geometryKey"] << route.geometryKey;
             entry["temporalObjectId"] << route.temporalObjectId;
             entry["temporalInstanceId"] << route.temporalInstanceId;
             entry["sourcePipeline"] << route.sourcePipeline;
             entry["recordedPipeline"] << route.recordedPipeline;
             entry["meshletCount"] << route.meshletCount;
-            entry["meshShader"] << c4::fmt::boolalpha(route.meshShader);
+            entry["meshShader"] << (route.meshShader);
             entry["indirect"] << route.indirect;
         }
     }
@@ -581,9 +578,9 @@ struct EnhancedPbrCapture
     {
         EnhancedRenderGraph::DiagnosticSnapshot snapshot;
         if (!graph.CaptureDiagnosticSnapshot(snapshot)) return false;
-        auto root = manifest.rootref();
+        auto root = manifest.Root();
         auto node = root["compiledGraph"];
-        node |= ryml::MAP;
+        node.SetMap();
         node["schemaVersion"] << 3;
         node["generation"] << snapshot.generation;
         node["graphEpoch"] << snapshot.graphEpoch;
@@ -598,7 +595,7 @@ struct EnhancedPbrCapture
         // Never reconstruct boundaries from the requested queue mode.
         const auto& diagnostics = graph.GetQueueDiagnostics();
         auto queue = node["queueExecution"];
-        queue |= ryml::MAP;
+        queue.SetMap();
         queue["schemaVersion"] << 2;
         queue["mode"] << diagnostics.requestedExecutionMode;
         queue["requestedExecutionMode"] << diagnostics.requestedExecutionMode;
@@ -608,7 +605,7 @@ struct EnhancedPbrCapture
         queue["specialized"] << diagnostics.specialized;
         queue["predictionCalibrated"] << false;
         auto execution = queue["execution"];
-        execution |= ryml::MAP;
+        execution.SetMap();
         execution["scheduleMilliseconds"] << diagnostics.execution.scheduleMilliseconds;
         execution["recordingMilliseconds"] << diagnostics.execution.recordingMilliseconds;
         execution["submissionMilliseconds"] << diagnostics.execution.submissionMilliseconds;
@@ -632,7 +629,7 @@ struct EnhancedPbrCapture
         execution["recoveryRequired"] << diagnostics.execution.recoveryRequired;
         execution["completed"] << diagnostics.execution.completed;
         auto schedule = queue["schedule"];
-        schedule |= ryml::MAP;
+        schedule.SetMap();
         queue["executionPath"] << (diagnostics.effectiveExecutionMode == 0 ? "primary-graphics" : "owned-queues");
         queue["primaryEnqueued"] << primaryEnqueued;
         schedule["placement"] << "authored";
@@ -645,84 +642,84 @@ struct EnhancedPbrCapture
         schedule["rejectedStatePasses"] << diagnostics.schedule.rejectedStatePasses;
         schedule["measuredPasses"] << diagnostics.schedule.measuredPasses;
         schedule["missingMeasurementPasses"] << diagnostics.schedule.missingMeasurementPasses;
-        schedule["entries"] |= ryml::SEQ;
+        schedule["entries"].SetSequence();
         for (const auto& entry : diagnostics.schedule.entries)
         {
-            auto item = schedule["entries"].append_child();
-            item |= ryml::MAP;
+            auto item = schedule["entries"].Append();
+            item.SetMap();
             item["pass"] << entry.pass;
             item["queue"] << static_cast<uint32_t>(entry.queue);
         }
-        schedule["waits"] |= ryml::SEQ;
+        schedule["waits"].SetSequence();
         for (const auto& wait : diagnostics.schedule.waits)
         {
-            auto item = schedule["waits"].append_child();
-            item |= ryml::MAP;
+            auto item = schedule["waits"].Append();
+            item.SetMap();
             item["producer"] << wait.producer;
             item["consumer"] << wait.consumer;
             item["resource"] << wait.resource;
         }
-        queue["batches"] |= ryml::SEQ;
+        queue["batches"].SetSequence();
         for (const auto& batch : diagnostics.batches)
         {
-            auto item = queue["batches"].append_child();
-            item |= ryml::MAP;
+            auto item = queue["batches"].Append();
+            item.SetMap();
             item["queue"] << static_cast<uint32_t>(batch.queue);
             item["barriers"] << batch.barriers;
             item["submitted"] << batch.submitted;
-            item["passes"] |= ryml::SEQ;
+            item["passes"].SetSequence();
             for (const auto pass : batch.passes)
             {
-                item["passes"].append_child() << pass;
+                item["passes"].Append() << pass;
             }
         }
-        queue["waits"] |= ryml::SEQ;
+        queue["waits"].SetSequence();
         for (const auto& wait : diagnostics.waits)
         {
-            auto item = queue["waits"].append_child();
-            item |= ryml::MAP;
+            auto item = queue["waits"].Append();
+            item.SetMap();
             item["producerBatch"] << wait.producerBatch;
             item["consumerBatch"] << wait.consumerBatch;
             item["submitted"] << wait.submitted;
         }
-        node["reachabilityEdges"] |= ryml::SEQ;
+        node["reachabilityEdges"].SetSequence();
         for (const auto& edge : snapshot.reachabilityEdges)
         {
-            auto item = node["reachabilityEdges"].append_child();
-            item |= ryml::MAP;
+            auto item = node["reachabilityEdges"].Append();
+            item.SetMap();
             item["producer"] << edge.producer;
             item["consumer"] << edge.consumer;
             item["resource"] << edge.resource;
         }
-        node["versionEdges"] |= ryml::SEQ;
+        node["versionEdges"].SetSequence();
         for (const auto& edge : snapshot.versionEdges)
         {
-            auto item = node["versionEdges"].append_child();
-            item |= ryml::MAP;
+            auto item = node["versionEdges"].Append();
+            item.SetMap();
             item["producer"] << edge.producer;
             item["consumer"] << edge.consumer;
             item["resource"] << edge.resource;
             item["version"] << edge.version;
             item["reason"] << static_cast<uint32_t>(edge.reason);
         }
-        node["dependencyWaves"] |= ryml::SEQ;
+        node["dependencyWaves"].SetSequence();
         for (const auto wave : snapshot.dependencyWaves)
         {
-            node["dependencyWaves"].append_child() << wave;
+            node["dependencyWaves"].Append() << wave;
         }
-        node["criticalPath"] |= ryml::SEQ;
+        node["criticalPath"].SetSequence();
         for (const auto index : snapshot.criticalPath)
         {
-            node["criticalPath"].append_child() << index;
+            node["criticalPath"].Append() << index;
         }
-        node["executeOrder"] |= ryml::SEQ;
-        for (auto index : snapshot.executeOrder) node["executeOrder"].append_child() << index;
-        node["resources"] |= ryml::SEQ;
+        node["executeOrder"].SetSequence();
+        for (auto index : snapshot.executeOrder) node["executeOrder"].Append() << index;
+        node["resources"].SetSequence();
         for (uint32_t i = 0; i < snapshot.resources.size(); ++i)
         {
             const auto& resource = snapshot.resources[i];
-            auto entry = node["resources"].append_child();
-            entry |= ryml::MAP;
+            auto entry = node["resources"].Append();
+            entry.SetMap();
             entry["id"] << i;
             entry["name"] << resource.name;
             entry["imported"] << resource.imported;
@@ -736,11 +733,11 @@ struct EnhancedPbrCapture
             entry["aliasGroup"] << resource.aliasGroup;
             entry["allocationBytes"] << resource.allocationBytes;
         }
-        node["passes"] |= ryml::SEQ;
+        node["passes"].SetSequence();
         for (const auto& pass : snapshot.passes)
         {
-            auto entry = node["passes"].append_child();
-            entry |= ryml::MAP;
+            auto entry = node["passes"].Append();
+            entry.SetMap();
             entry["name"] << pass.name;
             entry["authoredIndex"] << pass.authoredIndex;
             entry["compiledIndex"] << pass.compiledIndex;
@@ -749,17 +746,17 @@ struct EnhancedPbrCapture
             entry["recordCost"] << pass.recordCost;
             entry["maxSlices"] << pass.maxSlices;
             entry["repeatCount"] << pass.repeatCount;
-            entry["phases"] |= ryml::SEQ;
+            entry["phases"].SetSequence();
             for (const auto& phase : pass.phases)
             {
-                auto phaseEntry = entry["phases"].append_child();
-                phaseEntry |= ryml::MAP;
+                auto phaseEntry = entry["phases"].Append();
+                phaseEntry.SetMap();
                 phaseEntry["name"] << phase.name;
-                phaseEntry["usages"] |= ryml::SEQ;
+                phaseEntry["usages"].SetSequence();
                 for (const auto& usage : phase.usages)
                 {
-                    auto item = phaseEntry["usages"].append_child();
-                    item |= ryml::MAP;
+                    auto item = phaseEntry["usages"].Append();
+                    item.SetMap();
                     item["resource"] << usage.resource;
                     item["state"] << static_cast<uint32_t>(usage.state);
                     item["access"] << static_cast<uint32_t>(usage.access);
@@ -768,11 +765,11 @@ struct EnhancedPbrCapture
                 }
                 const auto appendPhaseBarriers = [&](const char* name, const auto& barriers)
                 {
-                    phaseEntry[name] |= ryml::SEQ;
+                    phaseEntry[name].SetSequence();
                     for (const auto& barrier : barriers)
                     {
-                        auto item = phaseEntry[name].append_child();
-                        item |= ryml::MAP;
+                        auto item = phaseEntry[name].Append();
+                        item.SetMap();
                         item["resource"] << barrier.resource;
                         item["before"] << static_cast<uint32_t>(barrier.before);
                         item["after"] << static_cast<uint32_t>(barrier.after);
@@ -783,11 +780,11 @@ struct EnhancedPbrCapture
                 appendPhaseBarriers("firstBarriers", phase.firstBarriers);
                 appendPhaseBarriers("repeatBarriers", phase.repeatBarriers);
             }
-            entry["usages"] |= ryml::SEQ;
+            entry["usages"].SetSequence();
             for (const auto& usage : pass.usages)
             {
-                auto item = entry["usages"].append_child();
-                item |= ryml::MAP;
+                auto item = entry["usages"].Append();
+                item.SetMap();
                 item["resource"] << usage.resource;
                 item["state"] << static_cast<uint32_t>(usage.state);
                 item["inferredWrite"] << usage.inferredWrite;
@@ -795,11 +792,11 @@ struct EnhancedPbrCapture
                 item["version"] << usage.version;
                 item["kind"] << static_cast<uint32_t>(usage.kind);
             }
-            entry["barriers"] |= ryml::SEQ;
+            entry["barriers"].SetSequence();
             for (const auto& barrier : pass.barriers)
             {
-                auto item = entry["barriers"].append_child();
-                item |= ryml::MAP;
+                auto item = entry["barriers"].Append();
+                item.SetMap();
                 item["resource"] << barrier.resource;
                 item["before"] << static_cast<uint32_t>(barrier.before);
                 item["after"] << static_cast<uint32_t>(barrier.after);
@@ -808,7 +805,7 @@ struct EnhancedPbrCapture
                 item["aliasing"] << barrier.aliasing;
             }
         }
-        root["measurement"] |= ryml::MAP;
+        root["measurement"].SetMap();
         // All timing/memory values below belong to this submitted real frame,
         // never to a generated presentation or a newer status snapshot.
         WriteTemporalProvenance(root["measurement"]);
@@ -818,7 +815,7 @@ struct EnhancedPbrCapture
         root["measurement"]["transientPrepareScope"] << "lifetime-discovery-allocation-cache-resource-creation";
         const auto heapMemory = graph.GetAliasHeapMemory();
         auto heaps = root["measurement"]["aliasHeapMemory"];
-        heaps |= ryml::MAP;
+        heaps.SetMap();
         heaps["scope"] << "unique-group-owned-native-heaps-not-resident";
         heaps["domainId"] << heapMemory.domainId;
         heaps["retainedBytes"] << heapMemory.retainedBytes;
@@ -840,7 +837,7 @@ struct EnhancedPbrCapture
 
     void RecordSubmissionCpu(double recordAndSubmitMs, double submissionMs)
     {
-        auto node = manifest.rootref()["measurement"];
+        auto node = manifest.Root()["measurement"];
         node["cpuRecordSubmitMs"] << recordAndSubmitMs;
         node["cpuSubmitMs"] << submissionMs;
         node["cpuRecordSubmitScope"] << "record-schedule-submit-frame-join";
@@ -848,8 +845,8 @@ struct EnhancedPbrCapture
 
     void RecordIblContract(uint32_t baseSamples, uint32_t reflectionSamples, const RHITextureInfo& info)
     {
-        auto node = manifest.rootref()["ibl"];
-        node |= ryml::MAP;
+        auto node = manifest.Root()["ibl"];
+        node.SetMap();
         node["baseSamples"] << baseSamples;
         node["reflectionSamples"] << reflectionSamples;
         node["proposalWidth"] << info.width;
@@ -858,8 +855,8 @@ struct EnhancedPbrCapture
 
     void RecordMemory(const RHIVideoMemoryInfo& memory)
     {
-        auto node = manifest.rootref()["measurement"]["memory"];
-        node |= ryml::MAP;
+        auto node = manifest.Root()["measurement"]["memory"];
+        node.SetMap();
         node["scope"] << "device-budget-snapshot-not-transient-peak";
         node["available"] << (memory.usageAvailable && memory.budgetAvailable);
         node["usageAvailable"] << memory.usageAvailable;
@@ -873,7 +870,7 @@ struct EnhancedPbrCapture
     void RecordGpuTiming(const std::vector<EnhancedLivePassTiming>& passes,
         const EnhancedLiveGpuSpan& span, double totalMs, const std::string& error)
     {
-        auto node = manifest.rootref()["measurement"];
+        auto node = manifest.Root()["measurement"];
         node["gpuStatus"] << (error.empty() ? "measured" : "failed");
         node["gpuReason"] << error;
         node["gpuTotalMs"] << totalMs;
@@ -889,11 +886,11 @@ struct EnhancedPbrCapture
         node["measuredOverlapMilliseconds"] << span.measuredOverlapMilliseconds;
         node["overlapClockErrorMilliseconds"] << span.overlapClockErrorMilliseconds;
         node["overlapScope"] << "calibrated-queue-local-pass-interval-intersection";
-        node["passes"] |= ryml::SEQ;
+        node["passes"].SetSequence();
         for (const auto& pass : passes)
         {
-            auto item = node["passes"].append_child();
-            item |= ryml::MAP;
+            auto item = node["passes"].Append();
+            item.SetMap();
             item["name"] << pass.name;
             item["milliseconds"] << pass.milliseconds;
             item["spanMilliseconds"] << pass.spanMilliseconds;
@@ -903,13 +900,13 @@ struct EnhancedPbrCapture
     void RecordRhiQuery(const std::string& name, uint64_t beginTicks, uint64_t endTicks, const char* clockDomain,
                         uint32_t passIndex, const RHICommandProvenance& provenance)
     {
-        auto measurement = manifest.rootref()["measurement"];
-        if (!measurement.has_child("queryIntervals"))
+        auto measurement = manifest.Root()["measurement"];
+        if (!measurement.Has("queryIntervals"))
         {
-            measurement["queryIntervals"] |= ryml::SEQ;
+            measurement["queryIntervals"].SetSequence();
         }
-        auto item = measurement["queryIntervals"].append_child();
-        item |= ryml::MAP;
+        auto item = measurement["queryIntervals"].Append();
+        item.SetMap();
         item["name"] << name;
         item["beginTicks"] << beginTicks;
         item["endTicks"] << endTicks;
@@ -1035,14 +1032,14 @@ struct EnhancedPbrCapture
         }
         try
         {
-            const auto root = std::filesystem::u8path(result.directory);
+            const auto root = std::filesystem::path(std::u8string(result.directory.begin(),result.directory.end()));
             constexpr const char* names[] = { "baseColor", "metalRough", "normal",
                 "emissive", "depth", "preToneHdr", "display", "temporalMotionRG",
                 "temporalReactive", "temporalTransparency", "temporalResponsive", "temporalDepth" };
-            auto rootNode = manifest.rootref();
+            auto rootNode = manifest.Root();
             rootNode["validationCount"] << validationCount;
             rootNode["validation"] << validation;
-            rootNode["attachments"] |= ryml::SEQ;
+            rootNode["attachments"].SetSequence();
             bool finite = true;
             const uint32_t count = motionValidation ? static_cast<uint32_t>(readbacks.size()) : 7;
             for (uint32_t i = 0; i < count; ++i)
@@ -1083,8 +1080,8 @@ struct EnhancedPbrCapture
                     static_cast<std::streamsize>(pixels.size() * sizeof(float)));
                 output.close();
                 if (!output) { error = "capture write failed: " + file; return false; }
-                auto attachment = rootNode["attachments"].append_child();
-                attachment |= ryml::MAP;
+                auto attachment = rootNode["attachments"].Append();
+                attachment.SetMap();
                 attachment["name"] << names[i];
                 attachment["file"] << file;
                 attachment["encoding"] << "float32-le-row-major";
@@ -1096,7 +1093,7 @@ struct EnhancedPbrCapture
                 attachment["generatedOrdinal"] << temporalProvenance.generatedOrdinal;
                 attachment["temporalProvenanceSchemaVersion"] << 2;
                 attachment["spatialMode"] << SpatialScalingModeName(temporalProvenance.spatialMode);
-                attachment["deepDvcApplied"] << c4::fmt::boolalpha(temporalProvenance.deepDvcApplied);
+                attachment["deepDvcApplied"] << (temporalProvenance.deepDvcApplied);
                 attachment["nonfinite"] << nonfinite;
                 attachment["min"] << minimum;
                 attachment["max"] << maximum;
@@ -1146,17 +1143,17 @@ struct EnhancedPbrCapture
                 finite &= nonfinite == 0;
             }
             rootNode["diagnosticStageReadbackCount"] << stageReadbacks.size();
-            rootNode["diagnosticStages"] |= ryml::SEQ;
+            rootNode["diagnosticStages"].SetSequence();
             for (const auto& stage : stages)
             {
                 const auto& readback = stageReadbacks[stage.readbackIndex];
                 const auto& image = stageImages[stage.readbackIndex];
-                auto item = rootNode["diagnosticStages"].append_child();
-                item |= ryml::MAP;
+                auto item = rootNode["diagnosticStages"].Append();
+                item.SetMap();
                 item["name"] << stage.name;
                 item["file"] << readback.name + ".f32";
                 item["readbackStage"] << readback.name;
-                item["sharedReadback"] << c4::fmt::boolalpha((stage.name != readback.name));
+                item["sharedReadback"] << ((stage.name != readback.name));
                 item["resource"] << readback.source.index;
                 item["version"] << readback.source.version;
                 item["kind"] << static_cast<uint32_t>(readback.source.kind);
@@ -1168,7 +1165,7 @@ struct EnhancedPbrCapture
                 item["nonfinite"] << image.nonfinite;
             }
             auto graphNode = rootNode["graph"];
-            graphNode |= ryml::MAP;
+            graphNode.SetMap();
             graphNode["declared"] << stats.passesDeclared;
             graphNode["culled"] << stats.passesCulled;
             graphNode["executed"] << stats.passesExecuted;
@@ -1181,7 +1178,7 @@ struct EnhancedPbrCapture
             graphNode["transientPrepareCpuMs"] << stats.transientPrepareCpuMs;
             rootNode["finite"] << (finite ? "true" : "false");
             std::ofstream output(root / "manifest.json", std::ios::trunc);
-            output << ryml::emitrs_json<std::string>(manifest) << '\n';
+            output << manifest.ToJson() << '\n';
             output.close();
             if (!output) { error = "capture manifest write failed"; return false; }
             if (!finite) { error = "capture contains nonfinite pixels"; return false; }

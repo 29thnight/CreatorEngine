@@ -36,10 +36,10 @@
 // 넘는 것은 int 하나이므로 컴파일러가 불일치를 잡아 주지 않는다. 한쪽을 고치면
 // 반드시 다른 쪽도 고칠 것 — 순서는 Component.h의 6단계 선언 순서를 따른다.
 //
-// ★ 틱은 여기 오지 않는다. NetworkFrameworkPlan N3-b가 신설하는 고정 축 훅
-//   OnSimulationTick(fixedDelta)은 **단계가 아니라 틱**이라 이 enum에 값을 더하지
-//   않는다 — 기존 PrePhysics/PostPhysics와 같이 ClrHost의 전용 진입점으로 간다
-//   (계획서 §4.4의 배선 6곳). 여기에 6번을 추가하려는 충동이 들면 그 표를 볼 것.
+// ★ 틱은 여기 오지 않는다. 2026-10-22 N3는 언어 독립 clock·tick 명령 경계다.
+//   C# 전용 Scope/OnSimulate는 OnTickSimulate 고정 틱으로 이관할 계획이며
+//   OnSimulationTick 저작 훅이나
+//   생명주기 enum 값을 추가하지 않는다(NetworkFrameworkPlan 최신 결정 절).
 enum class ScriptLifecyclePhase : int32_t
 {
     OnInitialized       = 0,

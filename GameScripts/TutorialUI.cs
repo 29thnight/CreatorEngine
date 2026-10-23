@@ -26,7 +26,7 @@ public sealed partial class TutorialUI : Component
     private RectTransformComponent? _rect;
     private ImageComponent? _image;
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         // 원본은 두 번째 조회 조건도 m_rect를 보고 있어서(if (nullptr == m_rect) m_image = ...),
         // RectTransform이 있는 정상적인 경우에 m_image가 끝내 null로 남았다.
@@ -37,7 +37,7 @@ public sealed partial class TutorialUI : Component
         if (_image is not null) _image.SetTexture(_type);
     }
 
-    public override void PostPhysics(float tick)
+    public void PostPhysics(float tick)
     {
         // 대상이 사라졌거나 UI 구성이 갖춰지지 않았으면 표식을 남겨 둘 이유가 없다.
         if (!_target.IsAlive || _rect is null || _image is null)

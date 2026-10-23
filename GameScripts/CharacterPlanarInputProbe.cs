@@ -10,7 +10,7 @@ public sealed partial class CharacterPlanarInputProbe : Component
     private bool _finished;
     private static CharacterMovementComponent? _retired;
 
-    public override void OnEndSimulation() => _retired = _character;
+    public void OnEndSimulation() => _retired = _character;
 
     [EngineCallable]
     public static string Retired()
@@ -22,7 +22,7 @@ public sealed partial class CharacterPlanarInputProbe : Component
             ? "retired" : "retargeted";
     }
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         _character = GetComponent<CharacterMovementComponent>();
         if (_character is null) throw new InvalidOperationException("character binding");
@@ -38,7 +38,7 @@ public sealed partial class CharacterPlanarInputProbe : Component
         ++_passed;
     }
 
-    public override void PostPhysics(float dt)
+    public void PostPhysics(float dt)
     {
         if (_finished) return;
 

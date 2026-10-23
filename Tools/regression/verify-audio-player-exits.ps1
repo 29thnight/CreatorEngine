@@ -1,9 +1,10 @@
-param(
+﻿param(
     [Parameter(Mandatory)][string]$PackageDirectory,
     [ValidateRange(1,100)][int]$Cycles = 100
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'RuntimeResults.ps1')
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $package = [IO.Path]::GetFullPath($PackageDirectory)
 $manifest = Get-Content -LiteralPath (Join-Path $package 'package-manifest.json') -Raw | ConvertFrom-Json
@@ -27,53 +28,32 @@ for ($cycle = 1; $cycle -le $Cycles; ++$cycle)
     New-Item -ItemType Directory -Path $temp | Out-Null
     $environment = @{ TEMP = $temp; TMP = $temp;
         PATH = "$package;$env:SystemRoot\System32;$env:SystemRoot" }
-    $process = Start-Process -FilePath $exe -ArgumentList '--smoke', '600',
-        '--smoke-promotions', '120', '--smoke-offscreen' -WorkingDirectory $package `
-        -WindowStyle Hidden -Environment $environment -RedirectStandardOutput ($stem + '.out') `
-        -RedirectStandardError ($stem + '.err') -PassThru
-    if (!$process.WaitForExit(600000))
-    {
-        $process.Kill()
-        throw "Player shutdown timeout cycle=$cycle"
-    }
-    $stdout = Get-Content -LiteralPath ($stem + '.out') -Raw
-    $combined = $stdout + (Get-Content -LiteralPath ($stem + '.err') -Raw)
-    $logRoot = Join-Path $temp ("CreatorEngine/Player/$($process.Id)/RuntimeData/Log")
-    if (Test-Path -LiteralPath $logRoot)
-    {
-        foreach ($logFile in Get-ChildItem -LiteralPath $logRoot -Recurse -File |
-            Where-Object { $_.Extension -in '.html', '.log', '.txt' })
-        {
-            $combined += "`n" + (Get-Content -LiteralPath $logFile.FullName -Raw)
+    $resultsPath = $stem + '.runtime.jsonl'
+    $process = Start-ResultProcess -Exe $exe -WorkingDirectory $package `
+        -Arguments @('--smoke', '600', '--smoke-promotions', '120', '--smoke-offscreen') `
+        -Environment $environment -Stdout ($stem + '.out') -Stderr ($stem + '.err') -Results $resultsPath
+    try {
+        if (!$process.WaitForExit(600000)) { throw "Player shutdown timeout cycle=$cycle" }
+        $process.Refresh()
+        if ($null -eq $process.ExitCode -or $process.ExitCode -ne 0 -or (Get-Item ($stem + '.err')).Length -ne 0) {
+            throw "Player exit failed cycle=$cycle exit=$($process.ExitCode)"
         }
+        $stdout = Get-Content -LiteralPath ($stem + '.out') -Raw -Encoding UTF8
+        $audio = Read-AudioAcceptance $stdout $process.Id
+        $ready = Read-PlayerSmoke $stdout $process.Id 600 120
+        Assert-PlayerRuntime (Read-RuntimeResults $resultsPath $process.Id)
     }
-    if ($process.ExitCode -ne 0 -or $stdout -notmatch
-        '\[AUDIO_CLR_PASS\] cycles=100 completions=100 GC=valueHandle scopes=World,Session attached=pass positioned=pass resident=50 stream=50 mp3=25 flac=25')
-    {
-        throw "Player exit or managed audio failed cycle=$cycle exit=$($process.ExitCode)"
-    }
-    $end = [regex]::Match($combined,
-        '\[SMOKE\]\s*frame limit reached[^\r\n]*\((\d+)\s+GT frames,\s*display frame\s+(\d+),\s*promotions\s+(\d+)\)')
-    $readyRows = @($stdout -split "`n" | Where-Object { $_.StartsWith('[player.smoke] ') })
-    if ($readyRows.Count -ne 1)
-    {
-        throw "Player readiness marker count failed cycle=$cycle"
-    }
-    $ready = $readyRows[0].Substring(15) | ConvertFrom-Json
-    if (!$end.Success -or [int]$end.Groups[1].Value -lt 600 -or [int]$end.Groups[3].Value -lt 120 -or
-        !$ready.ready -or $ready.frames -lt 600 -or $ready.displayPromotions -lt 120 -or
-        $ready.submittedGameFrames -le 0 -or
-        $combined -match '\[CRASH\]|\[SMOKE\].*FAILED|\[CLR\].*실패' -or
-        $stdout -notmatch '\[runtime\.text-parser\]\s*calls=0')
-    {
-        throw "Player runtime validation failed cycle=$cycle"
+    finally {
+        if (!$process.HasExited) { $process.Kill(); $process.WaitForExit() }
     }
     if (Get-Process -Id $process.Id -ErrorAction SilentlyContinue)
     {
         throw 'Exited Player process still exists.'
     }
     [pscustomobject]@{ cycle = $cycle; pid = $process.Id; exitCode = $process.ExitCode;
-        managedAudioCycles = 100; completions = 100; residentCycles = 50; streamCycles = 50; mp3Cycles = 25; flacCycles = 25; processRetired = $true;
+        managedAudioCycles = $audio.cycles; completions = $audio.completions;
+        residentCycles = $audio.resident; streamCycles = $audio.stream; mp3Cycles = $audio.mp3; flacCycles = $audio.flac;
+        processRetired = $true; runtimeResults = $resultsPath;
         engineBuildId = $manifest.engineBuildId } | ConvertTo-Json -Compress |
         Add-Content (Join-Path $root 'summary.jsonl')
     if ($cycle % 10 -eq 0)

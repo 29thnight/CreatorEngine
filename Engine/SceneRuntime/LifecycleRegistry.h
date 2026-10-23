@@ -41,9 +41,10 @@ namespace Lifecycle
     //   판단을 방해한다 — 전용 시스템의 조밀 배열이 무엇을 언제 도는지 전부
     //   말하므로(SystemSchedule.h 클래스 주석) 이 축은 되살아나지 않는다.
     //
-    //   자리(1u<<3~5)는 비워 둔다. NetworkFrameworkPlan N3-b가 신설하는 고정 축
-    //   훅 OnSimulationTick은 **관리 측 전용**이라(배선 6곳에 Component.h가 없다)
-    //   네이티브 비트를 요구하지 않는다. 네이티브 컴포넌트에도 고정 축 훅이
+    //   자리(1u<<3~5)는 비워 둔다. NetworkFrameworkPlan N3는 언어 독립 clock을
+    //   정의하며 C# 전용 Scope/OnSimulate는 OnTickSimulate 고정 틱으로 이관할 계획이다.
+    //   별도 OnSimulationTick이나
+    //   네이티브 비트를 추가하지 않는다. 네이티브 컴포넌트에도 고정 축 훅이
     //   필요해지면 그때 축을 드러내는 새 이름으로 이 자리를 받는다.
     enum PhaseBits : uint16_t
     {

@@ -194,6 +194,8 @@ namespace material_graph
         static bool BuildForScene(const EnhancedDrawItem& draw, const SurfaceView& view,
                                   const MeshSurfacePlanBudget& budget, own::shared_owner<const MeshSurfacePlan>& result,
                                   std::string& error);
+        // Retire session cache ownership; existing frame plans retain their owners.
+        static void ReleaseCachedScenePlans();
         std::span<const MeshSurfaceChunk> Chunks() const { return chunks_; }
         const own::shared_owner<const MeshSurfaceInput>& Source() const { return source_; }
         const MeshSurfacePlanCost& Cost() const { return cost_; }

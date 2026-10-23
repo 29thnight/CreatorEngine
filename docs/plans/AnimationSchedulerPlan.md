@@ -8,6 +8,10 @@
 
 ## 남은 작업과 완료 판정
 
+2026-10-23 master 통합 재점검: `a985ee7e1`의 상류 변경과 기존 작업을 통합한 실행·호출자 수정은 [동기화 수용 기록](../analysis/MasterSyncRecheck20261023.md)을 따른다. 이전 실행 기록의 지문은 보존하고 이번 통합 작업본의 제품 검증과 구분한다.
+
+> 2026-10-23 후속: 기존 CreatorRobot Walk의 새 패키지·Player 소비자 검증은 [쿠커 수정·수용 기록](../analysis/AnimationCookAcceptance20261023.md)을 따른다. Slang 소스 기능 계약·streaming generation 검사와 fixture 모델/Graph/layer를 현재 계약으로 이주했다. 실제69엔티티·54본·스킨 메시4개에서 Walk 진행을 확인했고, 정적 메시 분할 캐시의 파일 lease를 명시적인 종료 배선으로 회수한다. 기존 클립 소비 수용과 아래 AG0~AG5 신규 기능을 구분한다.
+
 - AG0~AG5: 불변 Graph 정의와 AnimInstance 상태를 분리하고 기존 AnimTaskList에 Clip/Blend/Layer/Slot 레시피를 연결한다. 기존 스케줄러·LOD·소켓·클립 이벤트는 재구현하지 않는다.
 - Graph 저장/cook/재바인딩, 100체 상태 격리, 세대 교체·DDOL·Player와 이벤트 동등성을 수용한다. VM·일반 IK·Root Motion·Notify 기능 구현은 AG5의 계약·산정 이후 별도 결정한다.
 

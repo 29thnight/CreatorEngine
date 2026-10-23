@@ -26,7 +26,8 @@ Copy-Item -LiteralPath (Join-Path $repo 'Dynamic_CPP/ProjectSetting') -Destinati
 New-Item -ItemType Directory -Path (Join-Path $assets 'Scenes'),(Join-Path $assets 'Script') -Force | Out-Null
 Copy-Item -LiteralPath (Join-Path $PSScriptRoot 'fixtures/AnimationPlayer.creator'),
     (Join-Path $PSScriptRoot 'fixtures/AnimationPlayer.creator.meta') -Destination (Join-Path $assets 'Scenes')
-Copy-Item -LiteralPath (Join-Path $repo 'GameScripts/PackageSmokeProbe.cs') -Destination (Join-Path $assets 'Script')
+Copy-Item -LiteralPath (Join-Path $repo 'GameScripts/PackageSmokeProbe.fs') -Destination (Join-Path $assets 'Script')
+Set-Content (Join-Path $assets 'Script/compile.order') 'PackageSmokeProbe.fs' -Encoding utf8
 
 $cooker = Join-Path $EngineDistribution 'Bin/x64-Release/Tools/AssetCooker/AssetCooker.exe'
 $buildTool = Join-Path $EngineDistribution 'Bin/x64-Release/Tools/CreatorBuildTool/CreatorBuildTool.exe'
@@ -41,6 +42,9 @@ foreach ($model in $models) {
     & $cooker --author-model-asset --asset-root $assets --output $generations --model $model.FullName
     if ($LASTEXITCODE -ne 0) { throw "Model authoring failed: $($model.FullName)" }
 }
+& (Join-Path $PSScriptRoot 'verify-animation-fixture.ps1') -AssetsRoot $assets `
+    -ScenePath (Join-Path $assets 'Scenes/AnimationPlayer.creator')
+
 & (Join-Path $repo 'Tools/build.ps1') -Config Release -Project $project -StageRoot (Join-Path $Work 'Staging') `
     -InputMode Project -StartupScene AnimationPlayer.creator -SmokeFrames 120 -SmokeTimeoutSec 300 `
     -EngineDistribution $EngineDistribution

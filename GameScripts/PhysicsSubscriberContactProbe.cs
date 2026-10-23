@@ -12,7 +12,7 @@ public sealed partial class PhysicsSubscriberContactProbe : Component
     private float _elapsed, _stageAt;
     private ulong _lastTick, _enableAfterTick, _seedTick;
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         _controller = Entity.Name == "ContactAttack";
         var owner = Entity.Find("ContactAttack");
@@ -37,7 +37,7 @@ public sealed partial class PhysicsSubscriberContactProbe : Component
         }
     }
 
-    public override void OnDisable()
+    public void OnDisable()
     {
         if (_pairs == null || _controller || _finished) return;
 
@@ -46,7 +46,7 @@ public sealed partial class PhysicsSubscriberContactProbe : Component
         _disabledCallbacks = _callbacks;
     }
 
-    public override void OnEnable()
+    public void OnEnable()
     {
         if (_pairs == null || _controller || _finished) return;
 
@@ -62,7 +62,7 @@ public sealed partial class PhysicsSubscriberContactProbe : Component
             throw new InvalidOperationException("Suspended observer retained contact history.");
     }
 
-    public override void PostPhysics(float dt)
+    public void PostPhysics(float dt)
     {
         if (_finished) return;
 

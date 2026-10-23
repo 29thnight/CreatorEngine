@@ -4422,8 +4422,11 @@
         }
       ],
       "requirements": [
-        "ND/N0~N10의 활성 범위: 고정 simulation tick·전용 managed hook, wire identity/schema·replication·bounded command/snapshot 교환을 loopback으로 검증한 뒤 transport를 붙인다.",
-        "이미 구현된 물리 fixed step·로컬 EntityHandle·ContactStream을 네트워크 simulation/replication 완료로 확대하지 않는다. EntityHandle/typeID를 wire ID로 사용하지 않고 reflgen 순회만 Archive 간 공유한다."
+        "2026-10-22: ND-a 계약 6종 v1·ID 원장·변경 절차·금지 타입/회귀 배선 canary를 수용했다. N3 공통 tick·OnUpdate/API43 명령·snapshot은 구현 완료. wire schema/권한/replication/transport 수용은 별도다.",
+        "이미 구현된 물리 fixed step·로컬 EntityHandle·ContactStream을 네트워크 simulation/replication 완료로 확대하지 않는다. EntityHandle/typeID를 wire ID로 사용하지 않고 reflgen 순회만 Archive 간 공유한다.",
+        "2026-10-22 ND-b: W4 위 로컬 엔티티 수명·일반 쓰기 관찰자와 DDOL 정체성 보존. ND-a 동결 wire 계약과 분리하며 N2/N5/transport·서버 제품 수용은 후속.",
+        "2026-10-22 N1: 진단 backend 누출 2곳 밀봉·기존 호출자 유지·production codec 및 경계 변이 회귀·새 cooked Player parser 0·실제 PBR 진단 소비 수용. 전체 parser unlink/서버 및 Motion fixture 잔여는 별도.",
+        "2026-10-23 N3 사내 수용 완료: 실제 30/60/144fps 목표(±5%)·CCT/강체 궤적·OnUpdate/SDK step·0틱/다중틱·자식 보간 및 0틱 GPU 소비. CCT 보간/이력/proxy 갱신 수정·native 4구성·새 primitive CCT cooked Player 회귀. wire schema/권한/transport·서버 제품은 별도."
       ],
       "previousPath": "docs/plans/NetworkFrameworkPlan.md"
     },
@@ -5636,9 +5639,10 @@
         }
       ],
       "requirements": [
-        "W3: InputAction의 이름뿐 아니라 타입/값을 managed 호출로 운반하는 통로와 오류/ABI/순서 검증을 닫는다.",
-        "W4/5: Inspector/Undo·스크립트 setter의 dirty publication부터 실제 render proxy 반영까지 같은 프레임/세대로 관측한다. 값 왕복만으로 배선 수용을 대신하지 않는다.",
-        "W6/8: native/managed lifecycle·field/message layout mirror와 훅 dispatch override 검증을 닫는다. W7의 옛 Transform/registry 문서 정리는 이번 계획 정리에서 완료 대상으로 제거한다."
+        "2026-10-22 CS-AUTH 구현·Windows 수용: C# 전용 코루틴 제거·C++ 계약 OnUpdate 고정 틱. 입력·dirty·미러·dispatch의 별도 잔여를 추적한다.",
+        "W6/8: native/managed lifecycle·field/message layout mirror와 훅 dispatch override 검증을 닫는다. W7의 옛 Transform/registry 문서 정리는 이번 계획 정리에서 완료 대상으로 제거한다.",
+        "2026-10-22 W4→ND-b: typed authoring transaction·변경 필드 통지·Undo/Redo·일반 쓰기와 엔티티/DDOL 로컬 관찰자 구현. 실제 수용 기록을 따른다. W5 렌더 소비/GPU는 별도 잔여.",
+        "2026-10-23 N3 제품 FPS/CCT/GPU 보간 수용은 N3PacingAcceptance20261023을 따른다. C# OnUpdate(fixedDelta) 기본 저작을 유지하며 PrSM 언어/adapter 계약은 후속이다."
       ],
       "previousPath": "docs/plans/ScriptSurfacePlan.md"
     },
@@ -5705,7 +5709,8 @@
       ],
       "requirements": [
         "D0~D6의 authoring/cooked 분리·ryml/reflgen 전환은 활성 계획에서 제거한다. asset identity는 UUIDv8/CEMF의 구현 방향을 따른다.",
-        "남은 I7/제품 패키지·typed Scene/Prefab bootstrap 및 실제 parser-free 소비 검증은 AssetDepot/BuildPipeline 소유로 연결한다. 과거 시작 씬 결함을 현재 미해결이라고 재선언하지 않고 현재 패키지로 확인한다."
+        "남은 I7/제품 패키지·typed Scene/Prefab bootstrap 및 실제 parser-free 소비 검증은 AssetDepot/BuildPipeline 소유로 연결한다. 과거 시작 씬 결함을 현재 미해결이라고 재선언하지 않고 현재 패키지로 확인한다.",
+        "2026-10-22 N1 후속: opaque 진단 writer·Authoring/CEDO 동일 schema와 malformed 입력 거부·새 cooked Player parser 0을 수용. 전체 runtime parser unlink·I7 전체·서버 제품과 구분한다."
       ],
       "previousPath": "docs/plans/SerializationPlan.md"
     },
@@ -5788,8 +5793,9 @@
       "excludedStoppedIds": [],
       "remainingIds": [],
       "requirements": [
-        "PrSM0~5와 효과 런타임: 폐쇄 효과 카탈로그·즉시 효과/중단 분리·Var<T>, routine cleanup/transaction 의미를 엔진 타깃 변환·등록·직렬화·build/reload/진단까지 연결한다.",
-        "현재 ContactStream·OnBeginSimulation/Scope와 생명주기 안정화는 기존 구현을 재사용한다. 별도 Job/PhysicsBehaviour 저작 방안을 되살리지 않고 PrSM 제품 도입 수용과 구분한다."
+        "2026-10-22: C# Verse식 계약 도입 중단. 기존 PrSM LLVM 저장소의 언어 명세·구현을 대조해 효과·중단·실패·트랜잭션 잔여와 엔진 통합을 진행.",
+        "현재 ContactStream·OnBeginSimulation/Scope와 생명주기 안정화는 기존 구현을 재사용한다. 별도 Job/PhysicsBehaviour 저작 방안을 되살리지 않고 PrSM 제품 도입 수용과 구분한다.",
+        "2026-10-23 N3 제품 FPS/CCT/GPU 보간 수용은 N3PacingAcceptance20261023을 따른다. C# OnUpdate(fixedDelta) 기본 저작을 유지하며 PrSM 언어/adapter 계약은 후속이다."
       ],
       "previousPath": "docs/plans/SimulationEffectContractPlan.md"
     },

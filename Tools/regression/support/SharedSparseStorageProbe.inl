@@ -10,7 +10,7 @@ void RunSharedSparseStorage(RecordingChangeDevice& device)
     using namespace shared_storage_probe;
     std::string error;
     const auto budgetBefore = device.GetPersistentMemoryBudgetStats();
-    auto pool = std::make_shared<RHISharedSparsePagePool>(device, 3);
+    auto pool = own::make_shared<RHISharedSparsePagePool>(device, 3);
     auto a = pool->Create(4 * RHISparseTileBytes, error);
     auto b = pool->Create(4 * RHISparseTileBytes, error);
     auto c = pool->Create(4 * RHISparseTileBytes, error);
@@ -84,10 +84,10 @@ void RunSharedSparseStorage(RecordingChangeDevice& device)
     // Real storage upload proofs: adjacent packed packets share one tile,
     // unchanged packets survive refinement, and an uncompleted upload is retried.
     MeshletSparseStorage storage(device);
-    storage.pool = std::make_shared<RHISharedSparsePagePool>(device, 3);
+    storage.pool = own::make_shared<RHISharedSparsePagePool>(device, 3);
     SparseClusterPayload payload;
     payload.virtualBytes = 3 * RHISparseTileBytes;
-    const auto packet = std::make_shared<const std::vector<std::byte>>(32, std::byte{0x42});
+    const auto packet = own::make_shared<const std::vector<std::byte>>(32, std::byte{0x42});
     payload.packets = {{uint32_t(RHISparseTileBytes), 1, packet}, {uint32_t(RHISparseTileBytes + 32), 0, packet}};
     Check(storage.Prepare(payload, 32, 1024, error), "Packed storage prepare");
     Check(storage.allocation->tiles.size() == 2 && storage.NeedsPacket(payload.packets[0]),

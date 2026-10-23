@@ -1,5 +1,6 @@
-﻿#include "App.h"
+#include "App.h"
 #include "TemporalMotionFixture.h"
+#include "../../Engine/Utility_Framework/RuntimeResults.h"
 #include "Resource.h"
 #include "ProgressSink.h"
 #include "ConsoleCommandSystem.h"
@@ -332,6 +333,7 @@ void Core::App::Finalize()
 	GpuDiagnostics::ReportLiveObjects();
 	std::printf("[SHUTDOWN] LogLiveObjectCensus 반환\n");
 	std::printf("[SHUTDOWN] Finalize 완료\n");
+    Diagnostics::RuntimeResults::Emit("editor.finalized");
 }
 
 // ★ SetWindow가 여기 있었다 (2026-08-10).
@@ -371,10 +373,11 @@ void Core::App::Load()
 /// 포그라운드 판정은 프로세스 단위다 — ImGui 멀티뷰포트 창도 에디터 창이다.
 static EnhancedLivePacing ResolveLivePacing(HWND mainWindow)
 {
-    if (SceneManagers->IsGameStart())
-        return { EnhancedLivePacingMode::Unlimited, 0 };
-
     const EditorPreferences& preferences = EditorSettingsStore::Get().Preferences();
+    if (SceneManagers->IsGameStart())
+        return preferences.GetPlayFrameRate()
+            ? EnhancedLivePacing{EnhancedLivePacingMode::FixedRate, preferences.GetPlayFrameRate()}
+            : EnhancedLivePacing{EnhancedLivePacingMode::Unlimited, 0};
     static const bool automation = EditorHasAutomationArgument();
     const uint32_t background = preferences.GetBackgroundFrameRate();
     if (0 != background && !automation)
@@ -689,6 +692,7 @@ void Core::App::Run(CoreWindow& window)
 		{
 			Debug::PrintLog(spdlog::level::debug, "[SHUTDOWN] CLI quit 요청 — 종료 시작");
 			std::printf("[SHUTDOWN] CLI quit received\n");
+            Diagnostics::RuntimeResults::Emit("editor.quit_requested", [](Diagnostics::Node data) { data["source"] << "cli"; });
 			m_windowClosed = true;
 			PostQuitMessage(0);
         }
@@ -701,6 +705,7 @@ LRESULT Core::App::Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam)
 	// 시작했나"를 몰라 한참 헤맸다 — WM_CLOSE 수신과 CLI quit을 구분한다.
 	Debug::PrintLog(spdlog::level::debug, "[SHUTDOWN] WM_CLOSE 수신 — 종료 시작");
 	std::printf("[SHUTDOWN] WM_CLOSE received\n");
+    Diagnostics::RuntimeResults::Emit("editor.quit_requested", [](Diagnostics::Node data) { data["source"] << "native"; });
 	m_windowClosed = true;
 	PostQuitMessage(0);
 	return 0;

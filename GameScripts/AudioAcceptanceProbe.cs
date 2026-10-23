@@ -69,39 +69,62 @@ public sealed partial class AudioAcceptanceProbe : Component
         return "SCOPES_STOPPED";
     }
 
-    public override async Task OnSimulate()
+    private int _cycle, _phase, _completions;
+    private PlaybackHandle _handle, _attached, _positioned;
+    public void OnTickSimulate(float dt)
     {
-        int completions = 0;
-        for (int cycle = 0; cycle < 100; ++cycle)
+        if (_cycle < 100)
         {
-            var handle = Audio.Play2D(Audio.World, Source, Settings);
-            Require(handle.IsValid && handle.IsPlaying, "Play " + cycle);
-            GC.Collect();
-            await Scope.Delay(0f);
-            Require(handle.IsPlaying, "GC value handle " + cycle);
-            handle.Pause();
-            Require(handle.State == AudioPlaybackState.Paused, "Pause " + cycle);
-            handle.Resume();
-            Require(handle.State == AudioPlaybackState.Playing, "Resume " + cycle);
-            handle.SetGainPitch(0.001f, 1f);
-            handle.Stop();
-            await Scope.Delay(0f);
-            while (Audio.TryDequeueCompletion(out var completion))
+            if (_phase == 0)
             {
-                if (completion.Playback == handle && completion.Reason == AudioPlaybackEndReason.Stopped)
-                {
-                    ++completions;
-                }
+                _handle = Audio.Play2D(Audio.World, Source, Settings);
+                Require(_handle.IsValid && _handle.IsPlaying, "Play " + _cycle);
+                GC.Collect();
+                _phase = 1;
             }
+            else if (_phase == 1)
+            {
+                Require(_handle.IsPlaying, "GC value handle " + _cycle);
+                _handle.Pause();
+                Require(_handle.State == AudioPlaybackState.Paused, "Pause " + _cycle);
+                _phase = 2;
+            }
+            else if (_phase == 2)
+            {
+                _handle.Resume();
+                Require(_handle.State == AudioPlaybackState.Playing, "Resume " + _cycle);
+                _handle.SetGainPitch(.001f, 1f);
+                _handle.Stop();
+                Require(_handle.State == AudioPlaybackState.Stopped, "Stop " + _cycle);
+                _phase = 3;
+            }
+            else
+            {
+                bool completed = false;
+                while (Audio.TryDequeueCompletion(out var completion))
+                    if (completion.Playback == _handle && completion.Reason == AudioPlaybackEndReason.Stopped)
+                    { ++_completions; completed = true; }
+                if (!completed) return; // Native audio completion is asynchronous, not an assumed next-frame result.
+                ++_cycle;
+                _phase = 0;
+            }
+            return;
         }
-        Require(completions == 100, "Completion count " + completions);
-        var mono = new AudioSource(AudioAssetId.Parse("276fc6b7-8304-4f68-a750-2672355e0867"));
-        var attached = Audio.PlayAttached(Audio.World, mono, Entity, Settings);
-        var positioned = Audio.PlayAt(Audio.Session, mono, default, Settings);
-        Require(attached.IsPlaying && positioned.IsPlaying, "Attached/positioned playback");
-        await Scope.Delay(0f);
-        attached.Stop();
-        positioned.Stop();
-        Console.WriteLine("[AUDIO_CLR_PASS] cycles=100 completions=100 GC=valueHandle scopes=World,Session attached=pass positioned=pass");
+        if (_phase == 0)
+        {
+            Require(_completions == 100, "Completion count " + _completions);
+            var mono = new AudioSource(AudioAssetId.Parse("276fc6b7-8304-4f68-a750-2672355e0867"));
+            _attached = Audio.PlayAttached(Audio.World, mono, Entity, Settings);
+            _positioned = Audio.PlayAt(Audio.Session, mono, default, Settings);
+            Require(_attached.IsPlaying && _positioned.IsPlaying, "Attached/positioned playback");
+            _phase = 1;
+        }
+        else if (_phase == 1)
+        {
+            _attached.Stop(); _positioned.Stop(); _phase = 2;
+            Console.WriteLine("[AUDIO_CLR_PASS] cycles=100 completions=100 GC=valueHandle scopes=World,Session attached=pass positioned=pass");
+        }
     }
+
+    public void OnEndSimulation() { _handle.Stop(); _attached.Stop(); _positioned.Stop(); }
 }

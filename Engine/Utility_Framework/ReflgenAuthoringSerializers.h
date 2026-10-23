@@ -197,6 +197,19 @@ namespace Meta::Typed
 				const std::string_view key = field.name;
 				const Authoring::ReadNode sub = reader.ValueOf(key);
 				if (!sub) return;
+                // Explicit editor replay restores empty value containers. Ordinary
+                // asset loading keeps its legacy null-means-preserve behavior.
+                using Value = typename Field::value_type;
+                if constexpr ((SerializedAsSequence<Value> || SerializedAsKeyedRange<Value>)
+                    && !PointerSequence<Value> && requires(Value& value) { value.clear(); })
+                {
+                    if (Meta::g_propertyChangeFilterOwner && sub.IsNull())
+                    {
+                        (owner.*Field::pointer).clear();
+                        if (nullptr != changed) changed(self, key);
+                        return;
+                    }
+                }
 				if (!SkipsMemberRead<typename Field::value_type>(sub))
 				{
 					reader.Seek(key);
@@ -249,7 +262,11 @@ namespace Meta::Typed
 			{
 				changed = [](void* self, std::string_view name)
 				{
-					static_cast<T*>(self)->OnPropertyChanged(name, Meta::CurrentPropertyChangeSource());
+                    if (!Meta::ShouldNotifyProperty(name, self)) return;
+					if constexpr (requires(T& value) { value.NotifyPropertyChanged(name, Meta::CurrentPropertyChangeSource()); })
+                        static_cast<T*>(self)->NotifyPropertyChanged(name, Meta::CurrentPropertyChangeSource());
+                    else
+                        static_cast<T*>(self)->OnPropertyChanged(name, Meta::CurrentPropertyChangeSource());
 				};
 			}
 			authoring->begin_object();

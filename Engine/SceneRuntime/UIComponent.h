@@ -40,7 +40,7 @@ public:
 		if (_layerorder != index)
 		{
 			_layerorder = index;
-			PublishRenderProxyDirty(ProxyDirty::Payload);
+			PublishRenderPropertyWrite(ProxyDirty::Payload);
 		}
 	}
 	int GetLayerOrder() const { return _layerorder; }

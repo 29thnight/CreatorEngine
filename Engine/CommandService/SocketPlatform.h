@@ -64,16 +64,20 @@ namespace CommandService
     SocketHandle AcceptWithTimeout(SocketHandle listener, int timeoutMs,
                                    bool& outTimedOut, std::string& outError);
 
-    /// 최대 `size` 바이트를 읽는다. 0 은 상대가 닫았다는 뜻이고, 음수는 오류다.
-    /// `timeoutMs` 를 넘기면 -2 를 돌려준다(유휴 연결 정리용 — §8 의 30초).
-    int Receive(SocketHandle socket, char* buffer, std::size_t size, int timeoutMs);
+    /// Read up to size bytes: 0 = peer closed, -1 = error, -2 = timeout,
+    /// -3 = cancellation. A stopping flag bounds poll waits without shortening
+    /// the request/idle deadline. Its owner must outlive this call.
+    int Receive(SocketHandle socket, char* buffer, std::size_t size, int timeoutMs,
+                const std::atomic<bool>* stopping = nullptr);
 
     /// 전부 보낼 때까지 반복한다. 실패하면 false.
     bool SendAll(SocketHandle socket, const char* data, std::size_t size);
 
     void CloseSocket(SocketHandle socket) noexcept;
 
-    /// 읽기/쓰기를 끊어 블로킹 중인 recv 를 즉시 깨운다. 핸들은 닫지 않는다.
+    /// Disable reads/writes without closing the worker-owned socket. Receive
+    /// also checks its cancellation flag because shutdown does not reliably
+    /// interrupt an already pending WSAPoll on Windows.
     ///
     /// ★ 종료 때 필요하다. 작업 스레드가 유휴 타임아웃(30초) 안에서 recv 로
     ///   막혀 있으면 에디터 종료가 그만큼 늦어진다. 소켓을 닫아 버리면 그

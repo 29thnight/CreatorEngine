@@ -5,13 +5,23 @@ namespace CreatorEngine;
 [Flags]
 public enum CharacterCollisionFlags : uint
 {
-    None = 0, Sides = 1, Above = 2, Below = 4, Simulating = 8, Forced = 16, JumpQueued = 32
+    None = 0,
+    Sides = 1,
+    Above = 2,
+    Below = 4,
+    Simulating = 8,
+    Forced = 16,
+    JumpQueued = 32
 }
 
 [StructLayout(LayoutKind.Sequential)]
 public struct CharacterMovementState
 {
-    public Float3 Position, FootPosition, ActualDisplacement, DesiredVelocity;
+    public Float3 Position;
+    public Float3 FootPosition;
+    public Float3 ActualDisplacement;
+    public Float3 DesiredVelocity;
+
     public float FallVelocity;
     public CharacterCollisionFlags Flags;
     public ulong Tick;
@@ -41,9 +51,15 @@ public sealed class CharacterMovementComponent : NativeComponent
     public static CharacterMovementComponent? Find(Entity owner, ulong componentId)
     {
         if (componentId == 0 || Native.CharacterRead(owner.Handle, componentId, out _) != PhysicsError.None)
+        {
             return null;
+        }
 
-        return new CharacterMovementComponent { OwnerHandle = owner.Handle, NativeInstance = componentId };
+        return new CharacterMovementComponent
+        {
+            OwnerHandle = owner.Handle,
+            NativeInstance = componentId
+        };
     }
 
     // Collision flags describe the last completed fixed movement, not a persistent ground probe.

@@ -10,6 +10,24 @@
 
 using namespace ce::physics;
 
+namespace
+{
+    // The simulation Transform can be unchanged while its presentation switches
+    // from an interpolated pose to the completed pose (disable/remove/no-op warp).
+    void InvalidateCharacterPresentation(Scene& scene, Entity* owner)
+    {
+        if(!owner)return;
+        std::vector<EntityHandle> pending{scene.HandleOf(owner->m_index)};
+        while(!pending.empty())
+        {
+            const auto handle=pending.back();pending.pop_back();
+            auto* entity=scene.Resolve(handle);if(!entity||entity->IsDestroyMark())continue;
+            scene.PublishRenderProxyDirty(handle,ProxyDirty::Transform);
+            for(const auto child:entity->GetChildrenIndices())pending.push_back(scene.HandleOf(child));
+        }
+    }
+}
+
 result<character_desc> CharacterMovementComponent::CaptureCapsule() const
 {
     if (!GetOwner())
@@ -113,6 +131,7 @@ void CharacterMovementComponent::OnRemovingFromScene()
         [&](const error& failure) { SceneManagers->ReportSimulationFailure(std::string(failure.message)); });
     if (!removed)
         throw std::runtime_error(std::string(removed.error().message));
+    InvalidateCharacterPresentation(*scene,GetOwner());
 }
 
 void CharacterMovementComponent::OnUninitializing()
@@ -130,7 +149,7 @@ void CharacterMovementComponent::ChangeEnabled(bool enabled)
         [&](bool value) { return m_scene->m_physicsSimulation.SetCharacterEnabled(m_binding, value); },
         [&](bool value) { Object::SetEnabled(value); },
         [&](const error& failure) { SceneManagers->ReportSimulationFailure(std::string(failure.message)); });
-    (void)changed;
+    if(changed)InvalidateCharacterPresentation(*m_scene,GetOwner());
 }
 
 void CharacterMovementComponent::OnEnable()
@@ -183,7 +202,10 @@ result<void> CharacterMovementComponent::Teleport(math::vector3 position)
         return std::unexpected(error{error_code::wrong_phase, 0, "Character is not attached"});
     auto moved = m_scene->m_physicsSimulation.TeleportCharacter(m_binding, position);
     if (moved)
+    {
         GetOwner()->Transform_().SetWorldPosition(position);
+        InvalidateCharacterPresentation(*m_scene,GetOwner());
+    }
     return moved;
 }
 

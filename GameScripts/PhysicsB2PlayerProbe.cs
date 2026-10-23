@@ -16,7 +16,7 @@ public sealed partial class PhysicsB2PlayerProbe : Component
         ++_passed;
     }
 
-    public override void PostPhysics(float delta)
+    public void PostPhysics(float delta)
     {
         if (_finished)
         {

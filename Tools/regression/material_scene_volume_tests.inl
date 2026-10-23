@@ -356,7 +356,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                 fixture != 6 && fixture != 10 ? textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).handle : RHITextureHandle{};
             Check(host.PrepareResidency(context, input, error), "Volume residency " + error);
 
-            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+            auto graph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
             if (workers)
             {
                 pool.BeginFrame(static_cast<unsigned>(context.frameId));
@@ -402,7 +402,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             Check(accepted && accepted->ObjectCount() == (fixture == 3 ? 2u : 1u), "Volume frame exists");
             budget.volumeBytes = 1;
              Check(!host.Prepare(context, input, environment, {}, {}, {}, budget, error, environment.IsValid() ? 1 : 0) &&
-                      host.VolumeFrame() == accepted,
+                      material_graph_test::SamePinnedObject(host.VolumeFrame(), accepted),
                   "Volume budget failure preserves accepted frame");
             ++failures;
             if (fixture == 0)
@@ -416,7 +416,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                                            invalid, error),
                       "Open boundary input remains structurally valid");
                  const bool prepared = host.Prepare(context, invalid, environment, {}, {}, {}, validBudget, error, 1);
-                Check(!prepared && error.find("closed") != std::string::npos && host.VolumeFrame() == accepted,
+                Check(!prepared && error.find("closed") != std::string::npos && material_graph_test::SamePinnedObject(host.VolumeFrame(), accepted),
                       "Open Volume boundary rejected without replacing accepted frame");
                 std::vector<std::array<float, 2>> many(11, {.2f, .6f});
                 auto excessive = VolumeBoxes(many, 9900, false);
@@ -425,7 +425,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
                                            {&excessive.draw, 1}, {}, invalid, error),
                       "Excessive Volume input seal");
                  const bool admitted = host.Prepare(context, invalid, environment, {}, {}, {}, validBudget, error, 1);
-                Check(!admitted && error.find("128-triangle") != std::string::npos && host.VolumeFrame() == accepted,
+                Check(!admitted && error.find("128-triangle") != std::string::npos && material_graph_test::SamePinnedObject(host.VolumeFrame(), accepted),
                       "Exact intersection limit rejects overflow without truncation");
             }
             gbuffer.Declare(*graph, context);

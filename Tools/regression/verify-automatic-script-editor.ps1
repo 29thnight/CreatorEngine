@@ -17,20 +17,24 @@ $managed = Join-Path $repo "Bin/x64-$Configuration/Managed/Scripts"
 $backup = Join-Path $root 'ScriptsBackup'
 Copy-Item -LiteralPath $managed -Destination $backup -Recurse
 $originalManaged = @((Get-ChildItem $managed -File).Name)
-$source = Join-Path $project 'Assets/Script/AutoScriptGate.cs'
+$source = Join-Path $project 'Assets/Script/AutoScriptGate.fs'
+$order = Join-Path $project 'Assets/Script/compile.order'
+Set-Content $order '' -Encoding utf8
 $text = @'
 namespace CreatorEngine.Scripts
-{
-    public sealed partial class AutoScriptGate : Component
-    {
-        [SerializeField] public int Kept = 5;
-        [EngineCallable]
-        public static int Version()
-        {
-            return 1;
-        }
-    }
-}
+
+open CreatorEngine
+
+type AutoScriptGate() as this =
+    inherit Component()
+
+    do this.Kept <- 5
+
+    [<DefaultValue; SerializeField>]
+    val mutable public Kept: int
+
+    [<EngineCallable>]
+    static member Version() = 1
 '@
 $script:checks = 0
 $process = $null
@@ -95,6 +99,7 @@ try {
     Call 'play.cursor' @('show') | Out-Null
     Call 'scene.new' @('AutomaticScriptGate') | Out-Null
     # File creation must compile and load without script.create or script.reload.
+    Set-Content $order 'AutoScriptGate.fs' -Encoding utf8
     [IO.File]::WriteAllText($source, $text)
     Wait-Version 1
     foreach ($name in @('ScriptA','ScriptB')) {
@@ -105,12 +110,12 @@ try {
         $field = @((Call 'script.fields' @([string]$component.instanceId)).data.fields | Where-Object name -EQ 'Kept')[0]
         Call 'script.set' @([string]$component.instanceId,[string]$field.index,'37') | Out-Null
     }
-    $v2 = $text.Replace('return 1;', 'return 2;')
+    $v2 = $text.Replace('static member Version() = 1', 'static member Version() = 2')
     [IO.File]::WriteAllText($source,$v2)
     Wait-Version 2
     Check-Fields
     $ids = @((Components).instanceId) -join ','
-    [IO.File]::WriteAllText($source,$v2 + "`nthis is invalid C#;")
+    [IO.File]::WriteAllText($source,$v2 + "`nlet broken =")
     $deadline = [DateTime]::UtcNow.AddSeconds(180)
     do {
         $status = Call 'script.creation'
@@ -121,42 +126,45 @@ try {
     Assert ((Call 'script.invoke' @('AutoScriptGate','Version')).data.returnValue -eq '2') 'Compiler failure must retain previous code'
     Assert ((@((Components).instanceId) -join ',') -eq $ids) 'Compiler failure must retain instance identity'
     Check-Fields
-    [IO.File]::WriteAllText($source,$text.Replace('return 1;', 'return 3;'))
+    [IO.File]::WriteAllText($source,$text.Replace('static member Version() = 1', 'static member Version() = 3'))
     Wait-Version 3
     Check-Fields
     Call 'play' | Out-Null
-    [IO.File]::WriteAllText($source,$text.Replace('return 1;', 'return 4;'))
+    [IO.File]::WriteAllText($source,$text.Replace('static member Version() = 1', 'static member Version() = 4'))
     Wait-Version 4
     Check-Fields
     Assert ((Call 'script.status').data.activeScripts -eq 2) 'Play reload must not duplicate script instances'
     Call 'stop' | Out-Null
     # Renaming and atomic replacement use the same watcher route.
-    $renamed = Join-Path (Split-Path $source) 'AutoScriptRenamed.cs'
+    $renamed = Join-Path (Split-Path $source) 'AutoScriptRenamed.fs'
     Move-Item -LiteralPath $source -Destination $renamed
-    [IO.File]::WriteAllText($renamed,$text.Replace('return 1;', 'return 5;'))
+    Set-Content $order 'AutoScriptRenamed.fs' -Encoding utf8
+    [IO.File]::WriteAllText($renamed,$text.Replace('static member Version() = 1', 'static member Version() = 5'))
     Wait-Version 5
     Check-Fields
-    $aux = Join-Path (Split-Path $renamed) 'AutoScriptAux.cs'
-    [IO.File]::WriteAllText($aux,$text.Replace('AutoScriptGate','AutoScriptAux').Replace('return 1;', 'return 9;'))
+    $aux = Join-Path (Split-Path $renamed) 'AutoScriptAux.fs'
+    Set-Content $order @('AutoScriptRenamed.fs','AutoScriptAux.fs') -Encoding utf8
+    [IO.File]::WriteAllText($aux,$text.Replace('AutoScriptGate','AutoScriptAux').Replace('static member Version() = 1', 'static member Version() = 9'))
     Wait-Version 9 'AutoScriptAux'
     Remove-Item -LiteralPath $aux
+    Set-Content $order 'AutoScriptRenamed.fs' -Encoding utf8
     $deadline = [DateTime]::UtcNow.AddSeconds(180)
     do {
         $removed = Call 'script.invoke' @('AutoScriptAux','Version') -Maybe
         if ($removed.status -ne 'succeeded') { break }
-        if ([DateTime]::UtcNow -ge $deadline) { throw 'Deleted C# source remained in the loaded assembly' }
+        if ([DateTime]::UtcNow -ge $deadline) { throw 'Deleted F# source remained in the loaded assembly' }
         Start-Sleep -Milliseconds 200
     } while ($true)
     Check-Fields
     $staging = $renamed + '.tmp'
-    [IO.File]::WriteAllText($staging,$text.Replace('return 1;', 'return 6;'))
+    [IO.File]::WriteAllText($staging,$text.Replace('static member Version() = 1', 'static member Version() = 6'))
     Move-Item -LiteralPath $staging -Destination $renamed -Force
     Wait-Version 6
     Check-Fields
     Call 'quit' | Out-Null
     Assert ($process.WaitForExit(60000)) 'Editor shutdown timed out'
     Assert ($process.ExitCode -eq 0) 'Editor exit failed'
-    [ordered]@{passed=$true;configuration=$Configuration;checks=$script:checks;root=$root;scope='Real C# watcher, creation/edit/rename/delete/atomic save, compiler failure and recovery, field preservation, two component reconnects, Play single instance';runtimeSha256=(Get-FileHash (Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll')).Hash} | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $root 'result.json') -Encoding utf8
+    [ordered]@{passed=$true;configuration=$Configuration;checks=$script:checks;root=$root;scope='Real F# watcher with explicit order updates, creation/edit/rename/delete/atomic save, compiler failure and recovery, field preservation, two component reconnects, Play single instance';runtimeSha256=(Get-FileHash (Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll')).Hash} | ConvertTo-Json -Depth 4 | Set-Content (Join-Path $root 'result.json') -Encoding utf8
     "AUTOMATIC_SCRIPT_EDITOR_OK checks=$script:checks root=$root"
 }
 finally {

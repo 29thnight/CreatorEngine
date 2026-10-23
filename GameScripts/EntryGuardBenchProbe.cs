@@ -12,7 +12,6 @@ namespace CreatorEngine.Scripts;
 /// 측정된 적이 없다</b>. 206곳에 기계적으로 넣었다는 사실만으로는 "싸다"고 말할 수
 /// 없다 — 프레임당 API 호출이 몇 번인지에 따라 달라지기 때문이다.
 ///
-/// LC7-b가 <c>SimulationScope.Tick</c>에 넣은 프레임 번호 읽기도 같은 처지다.
 /// 대기 목록이 비면 건너뛰도록 두었지만 그 가정도 재지 않았다.
 ///
 /// ── 무엇을 재는가 ──
@@ -61,7 +60,7 @@ public sealed partial class EntryGuardBenchProbe : Component
     /// <summary>합을 남겨 호출이 통째로 최적화돼 사라지지 않게 한다.</summary>
     private ulong _sink;
 
-    public override void PostPhysics(float tick)
+    public void PostPhysics(float tick)
     {
         ++_frames;
         if (_frames <= WarmupFrames) { Warm(); return; }

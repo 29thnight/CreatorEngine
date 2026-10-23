@@ -113,7 +113,7 @@ void RunObjectSpaceInstances(RecordingChangeDevice& device, ProbeRoots& roots, P
                 !coldGeometry->backing->rejectedBulk,"Skin rendering must not acquire CPU vertex/index arrays or full body");
             Check(device.BeginFrame(error),"Object begin");textures.BeginFrame(context.frameId);
             Check(host.PrepareResidency(context,input,error),"Object residency "+error);
-            auto graph=std::make_shared<EnhancedRenderGraph>(device,RGSchedulingMode::ExplicitVersioned,RGOrderPolicy::DependencyOrder);
+            auto graph=own::make_shared<EnhancedRenderGraph>(device,RGSchedulingMode::ExplicitVersioned,RGOrderPolicy::DependencyOrder);
             if(workers){pool.BeginFrame(unsigned(context.frameId));Check(graph->PrepareParallel(pool,error),"Object parallel "+error);}
             const auto transformsBefore=host.GeometryStats().transforms;
             Check(host.Prepare(context,input,{},{},{},{},{},error,0),"Object prepare "+error);

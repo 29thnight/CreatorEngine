@@ -414,6 +414,7 @@ $toGame = Invoke-EditorBatch @('wait 30', 'editor.viewport game', 'wait 30', 'ed
 $gameMode = $toGame.Data['editor.viewport']
 Assert ($gameMode.data.mode -eq 'game') "editor.viewport game did not switch the host mode (still $($gameMode.data.mode))"
 Assert ($gameMode.data.gameTarget -eq $true) 'Game mode does not demand the game target'
+Assert ($gameMode.data.editorTarget -eq $false -and $gameMode.data.suppressedEditorViews -gt 0) 'Game mode still renders the hidden editor camera'
 Assert ($gameMode.data.gameModeFrames -gt 0) 'No frame was published as game mode'
 Assert ($toGame.ExitCode -eq 0) "Mode switch batch exited $($toGame.ExitCode); see $($toGame.Stdout)"
 

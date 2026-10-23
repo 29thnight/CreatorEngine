@@ -42,6 +42,8 @@
     <ClInclude Include="AuthoringNodeView.h" />
     <ClInclude Include="AuthoringNodeViewAccess.h" />
     <ClInclude Include="AuthoringDocument.h" />
+    <ClInclude Include="DiagnosticDocument.h" />
+    <ClInclude Include="RuntimeResults.h" />
     <ClInclude Include="AuthoringDocumentAccess.h" />
     <ClInclude Include="AuthoringNodeEquality.h" />
     <ClInclude Include="SerializationProfiler.h" />
@@ -86,6 +88,7 @@
     <ClInclude Include="ReflectionRegister.h" />
     <ClInclude Include="ReflectionType.h" />
     <ClInclude Include="ReflectionYml.h" />
+    <ClInclude Include="PropertyChange.h" />
     <ClInclude Include="RingBuffer.h" />
     <ClInclude Include="SpinLock.h" />
     <ClInclude Include="StringHelper.h" />
@@ -133,6 +136,7 @@
     <ClCompile Include="AuthoringParsedDocument.cpp" />
     <ClCompile Include="AuthoringCookedDocument.cpp" />
     <ClCompile Include="AuthoringDocument.cpp" />
+    <ClCompile Include="DiagnosticDocument.cpp" />
     <ClCompile Include="AuthoringNodeEquality.cpp" />
     <ClCompile Include="SerializationProfiler.cpp" />
     <ClCompile Include="WindowsCoreWindow.cpp" />

@@ -142,17 +142,35 @@ namespace CommandService
         return static_cast<SocketHandle>(client);
     }
 
-    int Receive(SocketHandle socket, char* buffer, std::size_t size, int timeoutMs)
+    int Receive(SocketHandle socket, char* buffer, std::size_t size, int timeoutMs,
+                const std::atomic<bool>* stopping)
     {
-        WSAPOLLFD poll{};
-        poll.fd     = AsSocket(socket);
-        poll.events = POLLRDNORM;
+        const auto started = std::chrono::steady_clock::now();
+        while (true)
+        {
+            if (stopping && stopping->load(std::memory_order_acquire)) return -3;
 
-        const int ready = ::WSAPoll(&poll, 1, timeoutMs);
-        if (0 == ready)             return -2;   // 유휴 타임아웃
-        if (SOCKET_ERROR == ready)  return -1;
+            int waitMs = timeoutMs;
+            if (stopping)
+            {
+                const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                    std::chrono::steady_clock::now() - started).count();
+                const auto remainingMs = timeoutMs < 0 ? 100 : std::max<int64_t>(0, timeoutMs - elapsedMs);
+                waitMs = static_cast<int>(std::min<int64_t>(100, remainingMs));
+            }
 
-        return ::recv(AsSocket(socket), buffer, static_cast<int>(size), 0);
+            WSAPOLLFD poll{};
+            poll.fd = AsSocket(socket);
+            poll.events = POLLRDNORM;
+            const int ready = ::WSAPoll(&poll, 1, waitMs);
+            if (SOCKET_ERROR == ready) return -1;
+            if (ready > 0) return ::recv(AsSocket(socket), buffer, static_cast<int>(size), 0);
+
+            if (!stopping) return -2;
+            const auto elapsedMs = std::chrono::duration_cast<std::chrono::milliseconds>(
+                std::chrono::steady_clock::now() - started).count();
+            if (timeoutMs >= 0 && elapsedMs >= timeoutMs) return -2;
+        }
     }
 
     bool SendAll(SocketHandle socket, const char* data, std::size_t size)

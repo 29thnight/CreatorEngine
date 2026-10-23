@@ -14,7 +14,7 @@ public sealed partial class UiTextProbe : Component
     private int _passed;
     private int _failed;
 
-    public override void PostPhysics(float tick)
+    public void PostPhysics(float tick)
     {
         if (_checked || ++_frame < _checkAfterFrames) return;
         _checked = true;

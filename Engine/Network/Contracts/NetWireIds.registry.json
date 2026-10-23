@@ -1,0 +1,8 @@
+{
+  "schemaVersion": 1,
+  "history": [
+    { "contractVersion": 1, "action": "assign", "domain": "message", "id": 1, "name": "Handshake" }
+  ],
+  "active": { "message": { "1": "Handshake" }, "component": {}, "field": {} },
+  "tombstones": { "message": [], "component": [], "field": [] }
+}

@@ -159,7 +159,13 @@ internal static class EnginePublisher
             Tree(runtime, Path.Combine(privateDotnet, "shared/Microsoft.NETCore.App", Path.GetFileName(runtime)));
             Tree(Path.Combine(dotnetRoot, "host/fxr", Path.GetFileName(runtime)), Path.Combine(privateDotnet, "host/fxr", Path.GetFileName(runtime)));
             foreach (var name in new[] { "LICENSE.txt", "ThirdPartyNotices.txt" }) Copy(Path.Combine(dotnetRoot, name), Path.Combine(privateDotnet, name));
-            Tree(Path.Combine(sdk, "Roslyn/bincore"), Path.Combine(candidate, "Scripting/Compiler"));
+            Tree(Path.Combine(sdk, "FSharp"), Path.Combine(candidate, "Scripting/FSharp"));
+            var fsharpTools = Path.GetFullPath(Path.Combine(repository, "../FSharp_Tool_Pakage_for_CreatorEngine"));
+            await context.Run("dotnet", ["build", Path.Combine(fsharpTools, "src/CreatorEngine.FSharp.Generator/CreatorEngine.FSharp.Generator.fsproj"), "-c", config, "-m:1", "-nodeReuse:false"], fsharpTools);
+            Tree(Path.Combine(fsharpTools, $"src/CreatorEngine.FSharp.Generator/bin/{config}/net10.0"), Path.Combine(candidate, "Scripting/FSharpGenerator"));
+            Copy(Path.Combine(fsharpTools, $"src/CreatorEngine.FSharp.Generator/bin/{config}/net10.0/FSharp.Core.dll"), Path.Combine(candidate, "Scripting/FSharpReferences/FSharp.Core.dll"));
+            await context.Run("dotnet", ["build", Path.Combine(fsharpTools, "src/CreatorEngine.FSharp.Runtime/CreatorEngine.FSharp.Runtime.fsproj"), "-c", config, "-p:CreatorEngineRoot=" + repository, "-m:1", "-nodeReuse:false"], fsharpTools);
+            Copy(Path.Combine(fsharpTools, $"src/CreatorEngine.FSharp.Runtime/bin/{config}/net10.0/CreatorEngine.FSharp.Runtime.dll"), Path.Combine(candidate, "Scripting/FSharpRuntime/CreatorEngine.FSharp.Runtime.dll"));
             Tree(Path.Combine(references, "ref/net10.0"), Path.Combine(candidate, "Scripting/References"));
             Copy(Path.Combine(repository, $"Build/Tools/Managed/ScriptCore.Generators/{config}/netstandard2.0/ScriptCore.Generators.dll"), Path.Combine(candidate, "Scripting/ScriptCore.Generators.dll"));
             var toolSource = Path.Combine(binarySource, "Tools/CreatorBuildTool");

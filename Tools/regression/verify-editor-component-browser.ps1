@@ -10,9 +10,19 @@ $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $Exe = [IO.Path]::GetFullPath($Exe)
 $Work = [IO.Path]::GetFullPath($Work)
 if (Get-Process CreatorEditor -ErrorAction SilentlyContinue) { throw 'Close the editor before this isolated gate.' }
-$settings = Join-Path $repo 'Dynamic_CPP/ProjectSetting/EngineSettings.asset'
+
+# All authored files and project settings belong to this disposable fixture.
+$project = Join-Path $Work ('Project-' + [guid]::NewGuid().ToString('N'))
+New-Item -ItemType Directory -Force "$project/Assets/Script" | Out-Null
+Copy-Item "$repo/Dynamic_CPP/ProjectSetting" $project -Recurse
+Copy-Item "$repo/Dynamic_CPP/Assets/Shaders" "$project/Assets/Shaders" -Recurse
+Copy-Item "$repo/GameScripts/Bobber.fs" "$project/Assets/Script"
+Set-Content "$project/Assets/Script/compile.order" 'Bobber.fs' -Encoding utf8
+
+
+$settings = Join-Path $project 'ProjectSetting/EngineSettings.asset'
 $ini = Join-Path (Split-Path $Exe) 'Saved/Config/imgui.ini'
-$endpointPath = Join-Path $repo 'Dynamic_CPP/Library/CommandService/endpoint.json'
+$endpointPath = Join-Path $project 'Library/CommandService/endpoint.json'
 $settingsBytes = [IO.File]::ReadAllBytes($settings)
 $hadIni = Test-Path -LiteralPath $ini
 $iniBytes = if ($hadIni) { [IO.File]::ReadAllBytes($ini) } else { [byte[]]@() }
@@ -50,13 +60,19 @@ function Call([string]$command, [string[]]$arguments = @(), [string]$expectedCod
     return $result.data
 }
 $fixturePrefix = 'ComponentMenuProbe' + [Guid]::NewGuid().ToString('N').Substring(0,8)
-$sourceRoot = Join-Path $repo 'Dynamic_CPP/Assets/Script'
+$sourceRoot = Join-Path $project 'Assets/Script'
 $managedRoot = Join-Path (Split-Path (Split-Path $Exe)) 'Managed/Scripts'
 $managedBefore = Join-Path $Work 'managed-before'
 $fixtureArchive = Join-Path $Work 'fixture-files'
 New-Item -ItemType Directory -Force -Path $managedBefore,$fixtureArchive,$sourceRoot | Out-Null
 $managedFiles = @(Get-ChildItem -LiteralPath $managedRoot -Filter 'GameScripts.*' -File)
 foreach ($file in $managedFiles) { Copy-Item -LiteralPath $file.FullName -Destination $managedBefore -Force }
+
+$configuration = if ($Exe -match 'x64-Debug') { 'Debug' } else { 'Release' }
+& dotnet build "$repo/GameScripts/GameScripts.fsproj" -c $configuration `
+    "-p:CreatorScriptSourceRoot=$project/Assets/Script" -v:q *> "$Work/fsharp-build.log"
+if ($LASTEXITCODE) { throw "F# fixture build failed: $Work/fsharp-build.log" }
+
 function WaitCreation([bool]$success) {
     $timer = [Diagnostics.Stopwatch]::StartNew()
     do { Start-Sleep -Milliseconds 300; $state = Call 'script.creation' } while ($state.busy -and $timer.Elapsed.TotalSeconds -lt 150)
@@ -77,7 +93,7 @@ try {
     Check ([regex]::Matches($text,$pattern).Count -eq 1) 'render.backend setting unavailable'
     [IO.File]::WriteAllText($settings, [regex]::Replace($text,$pattern,'${1}dx12'), [Text.UTF8Encoding]::new($false))
     $owned = Start-Process -FilePath $Exe -WorkingDirectory (Split-Path $Exe) -WindowStyle Hidden -PassThru `
-        -ArgumentList @('--command-service') -RedirectStandardOutput (Join-Path $Work 'editor.out') -RedirectStandardError (Join-Path $Work 'editor.err')
+        -ArgumentList @('--development-project', ('"'+$project+'"'), '--command-service', '--allow-user-code', '--smoke-offscreen') -RedirectStandardOutput (Join-Path $Work 'editor.out') -RedirectStandardError (Join-Path $Work 'editor.err')
     $watch = [Diagnostics.Stopwatch]::StartNew()
     $firstFrame = $null
     while ($watch.Elapsed.TotalSeconds -lt 90) {
@@ -101,7 +117,7 @@ try {
     $null = Call 'scene.new' @('ComponentMenuFixture')
     $null = Call 'object.create' @('ScriptOwner')
     $null = Call 'object.create' @('OtherOwner')
-    foreach ($name in @('class','CON','../Escape','9Bad','Has Space')) {
+    foreach ($name in @('class','let','module','CON','../Escape','9Bad','Has Space')) {
         $null = Call 'script.create' @('ScriptOwner',$name) 'args.invalid'
     }
     $first = Call 'script.add' @('ScriptOwner','Bobber')
@@ -138,14 +154,18 @@ try {
     $null = Call 'script.create' @('ScriptOwner',$createdName) 'args.invalid'
     Check ((Get-FileHash -LiteralPath $state.source).Hash -eq $sourceHash) 'Duplicate class overwrote its source'
 
-    $invalidSource = Join-Path $sourceRoot ($fixturePrefix+'CompileError.cs')
-    [IO.File]::WriteAllText($invalidSource, 'this deliberately does not compile;', [Text.UTF8Encoding]::new($false))
+    $invalidSource = Join-Path $sourceRoot ($fixturePrefix+'CompileError.fs')
+    [IO.File]::WriteAllText($invalidSource, 'let deliberatelyBroken =', [Text.UTF8Encoding]::new($false))
+    Add-Content (Join-Path $sourceRoot 'compile.order') (Split-Path $invalidSource -Leaf) -Encoding utf8
     $null = Call 'script.create' @('ScriptOwner',($fixturePrefix+'Retry'))
     $failed = WaitCreation $false
     Check (@(Scripts 'ScriptOwner').Count -eq 3) 'Compilation failure left a component'
     Check (Test-Path -LiteralPath $failed.source) 'Compilation failure deleted the source'
     Copy-Item -LiteralPath $failed.log -Destination (Join-Path $Work 'expected-compile-error.log') -Force
     Move-Item -LiteralPath $invalidSource -Destination $fixtureArchive
+    $order = Join-Path $sourceRoot 'compile.order'
+    $remainingSources = @(Get-Content $order | Where-Object { $_ -ne (Split-Path $invalidSource -Leaf) })
+    Set-Content $order $remainingSources -Encoding utf8
     $null = Call 'script.create' @('--retry')
     $null = WaitCreation $true
     Check (@(Scripts 'ScriptOwner').Count -eq 4) 'Retry failed to attach exactly one script'
@@ -175,7 +195,7 @@ try {
         Check ((Get-FileHash -LiteralPath (Join-Path $managedBefore $file.Name)).Hash -eq (Get-FileHash -LiteralPath $file.FullName).Hash) 'Managed binary restore failed'
     }
     foreach ($file in @(Get-ChildItem -LiteralPath $sourceRoot -File | Where-Object Name -like ($fixturePrefix+'*'))) {
-        Move-Item -LiteralPath $file.FullName -Destination $fixtureArchive -Force
+        Copy-Item -LiteralPath $file.FullName -Destination $fixtureArchive -Force
     }
     [IO.File]::WriteAllBytes($settings,$settingsBytes)
     if ($hadIni) { [IO.File]::WriteAllBytes($ini,$iniBytes) }

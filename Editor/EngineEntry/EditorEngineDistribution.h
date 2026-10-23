@@ -47,7 +47,7 @@ struct EditorSourceCheckout
 };
 
 // An editor built in a source checkout (Bin/x64-<Config> under a repository with EngineVersion.json and
-// no engine.info) compiles scripts with the checkout's own GameScripts.csproj, as the editor build does.
+// no engine.info) compiles scripts with the checkout's own GameScripts.fsproj, as the editor build does.
 // A published distribution snapshot would compile against an older ScriptCore, try to replace the one
 // this process has loaded, and miss the checkout's GameScripts/*.cs.
 inline EditorSourceCheckout ResolveEditorSourceCheckout()
@@ -61,7 +61,7 @@ inline EditorSourceCheckout ResolveEditorSourceCheckout()
             if (std::filesystem::is_regular_file(candidate / L"engine.info")) return {};
         const auto folder = binaryRoot.filename().wstring();
         if (!folder.starts_with(L"x64-") || !std::filesystem::is_regular_file(repository / L"EngineVersion.json") ||
-            !std::filesystem::is_regular_file(repository / L"GameScripts/GameScripts.csproj")) return {};
+            !std::filesystem::is_regular_file(repository / L"GameScripts/GameScripts.fsproj")) return {};
         const auto configuration = folder.substr(4);
         if (configuration != L"Debug" && configuration != L"Release") return {};
         return { repository, configuration };

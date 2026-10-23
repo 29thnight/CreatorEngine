@@ -41,7 +41,7 @@ namespace
 		{ FileType::TerrainTexture, "TerrainTexture"	},
 		{ FileType::Shader,         "Shader"			},
 		{ FileType::CppScript,      "CppScript"			},
-		{ FileType::CSharpScript,   "CSharpScript"		},
+		{ FileType::FSharpScript,   "FSharpScript"		},
 		{ FileType::Prefab,         "Prefab"			},
 		{ FileType::Sound,          "Sound"				},
 		{ FileType::HDR,            "HDR"				},
@@ -1244,7 +1244,7 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
 	case FileType::CppScript:
 		color = IM_COL32(255, 0, 0, 255);
 		break;
-	case FileType::CSharpScript:
+	case FileType::FSharpScript:
 		color = IM_COL32(255, 0, 255, 255);
 		break;
 	case FileType::Prefab:

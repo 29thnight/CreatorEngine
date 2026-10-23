@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/design/SceneObservationContract.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SceneRuntime 저작·수명 관찰 계약</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#소유와-구독">소유와 구독</a></li><li><a href="#엔티티-수명">엔티티 수명</a></li><li><a href="#일반-쓰기와-w4">일반 쓰기와 W4</a></li><li><a href="#배달과-실패">배달과 실패</a></li><li><a href="#검증-진입점">검증 진입점</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/design/</span><a href="SceneObservationContract.md">원본 Markdown</a></nav>
+<p class="eyebrow">설계</p>
+<h1>SceneRuntime 저작·수명 관찰 계약</h1>
+<div class="meta"><p>2026-10-22 · W4 → ND-b · 로컬 어댑터 확장점</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
+<a class="map-row" href="#소유와-구독"><span class="ve-label">§00</span><span class="map-name">소유와 구독</span><span class="map-bar"><i style="width:51%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#엔티티-수명"><span class="ve-label">§01</span><span class="map-name">엔티티 수명</span><span class="map-bar"><i style="width:40.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#일반-쓰기와-w4"><span class="ve-label">§02</span><span class="map-name">일반 쓰기와 W4</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#배달과-실패"><span class="ve-label">§03</span><span class="map-name">배달과 실패</span><span class="map-bar"><i style="width:36.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#검증-진입점"><span class="ve-label">§04</span><span class="map-name">검증 진입점</span><span class="map-bar"><i style="width:37%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「일반 쓰기와 W4」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-소유와-구독">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="소유와-구독">소유와 구독</h2></div>
+<div class="prose"><p><code>SceneManagers-&gt;Observations()</code>가 <code>Runtime::ISceneEntityObserver</code>와 <code>Runtime::IComponentWriteObserver</code>를 받는다. SceneObservation.h는 렌더·Editor·저작 parser를 포함하지 않는 C++20 값/인터페이스 헤더다. ND-a의 동결 wire 헤더 6종과 별개이며 wire ABI를 변경하지 않는다.</p>
+<p>구독은 shared_ptr로 콜백 소유권을 보유하며 정수 토큰으로 해제한다. 같은 인터페이스 인스턴스 중복 구독은 같은 토큰을 반환한다. 슬롯 16개가 차거나 토큰 공간이 소진되면 0을 반환한다. 어댑터는 토큰을 보관하고 자신이 소유한 토큰만 해제한다. Play/Stop·씬 교체에서는 구독을 보존하고, SceneManager 종료 시 모든 엔티티의 retirement 뒤 Clear한다. Clear 이후 이전 토큰은 재사용하지 않는다.</p>
+<p>구독/해제/Drain은 SceneManager 소유 스레드에서 수행한다. 연결 시 해당 스레드에서 Drain 후 구독하고 GetScenes/Scene의 현재 엔티티를 열거해 초기 상태를 구성한다. 과거 이벤트는 재생하지 않는다. 콜백은 값 기록·dirty 누적만 수행하며 Scene/엔티티 구조 변경을 재진입 호출하지 않는다. 변경 요청은 엔진의 다음 안전 경계로 전달한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-엔티티-수명">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="엔티티-수명">엔티티 수명</h2></div>
+<div class="prose"><p>이벤트는 <code>instance</code>, 이전/다음 <code>{scene,index,generation}</code>, Created/Detached/Attached/Destroyed를 복사한다. Entity*를 보유하지 않는다. 이 숫자는 프로세스 로컬 정체성이며 네트워크 ID/권한/schema로 전송하지 않는다. N2의 NetEntityId 매핑은 네트워크 어댑터 소유다.</p>
+<p>Created는 슬롯 예약이 아닌 실제 생성/로드/트리 편입 완료에서 발행한다. 미완료 슬롯 rollback에는 생성 이벤트가 없다. Destroyed/Detached는 슬롯·선택·세대 정리가 끝난 뒤 발행한다. DDOL은 같은 instance의 Detached → Attached이며 Attached는 목적 씬 전체 계층 root remap 뒤 발행한다. 원 EntityHandle은 무효가 되지만 ScriptObjectHandle은 실제 파괴 시까지 유지한다. 씬 root의 retirement 및 분리 상태에서 직접 finalization되는 실패 정리도 terminal 이벤트를 한 번 발행한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-일반-쓰기와-w4">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="일반-쓰기와-w4">일반 쓰기와 W4</h2></div>
+<div class="prose"><p><code>NotifyPropertyChanged(name, source)</code>가 기존 가장 파생된 OnPropertyChanged를 호출하고 일반 쓰기 이벤트를 발행한다. 따라서 base hook을 부르지 않는 Transform/RectTransform도 관측된다. setter가 해당 hook 안에서 다시 발행하는 중복은 동일 컴포넌트 범위에서 억제한다. 렌더 전용 PublishRenderProxyDirty는 일반 쓰기 신호로 사용하지 않는다.</p>
+<p>Inspector scalar/custom drawer는 중앙 CommitProperty를 사용한다. enum/container/nested 값은 최상위 컴포넌트 필드의 단일 transaction으로 수집한다. 중첩 위젯의 임시 주소를 Undo closure에 남기지 않는다. Undo는 EntityReference와 컴포넌트 instance ID로 재탐색하므로 삭제/씬 교체 후 쓰지 않는다. 실제 변경한 필드만 통지하며 no-op 편집은 Undo/통지를 만들지 않는다. Inspector/Undo/Redo 출처를 구분한다. 명시적 저작 replay에서는 null로 저장된 빈 값 컨테이너를 비운다. 일반 파일 로더의 null-means-preserve 규칙과 포인터 원소 시퀀스의 건너뛰기 규칙은 보존한다. 전체 authoring 문서를 유지해 OnDeserialized의 기존 복원 입력을 보존하고, 통지 필터만 변경 필드로 제한한다.</p>
+<p>비렌더 컴포넌트의 reflection/Prefab도 같은 입구를 사용한다. native render 값 setter는 렌더 dirty와 일반 쓰기를 함께 발행한다. Component.Enabled·물리 shape의 검증된 SetShapes/ReplaceShapes 및 Transform의 accepted 단일/배치 writer(physics packed writer 포함)를 연결한다. Transform worker는 graph가 고정되고 job이 join되는 기존 쓰기 구간에서 값 이벤트만 enqueue한다. raw public C++ 필드 대입을 자동으로 가로채지는 않는다. 새 writer는 NotifyPropertyChanged 또는 PublishPropertyWrite를 호출해야 한다.</p>
+<p>쓰기 이벤트는 entity/component instance, owner location, 출처 및 최대 127바이트 필드 이름을 복사한다. 전체 갱신 또는 더 긴 이름은 allProperties=true다. 어댑터는 정확한 이름만 가정하지 말고 전체 재검사 신호를 처리한다. 필드별 관측은 변경 값 payload를 제공하지 않으며 어댑터가 안전한 스냅샷 경계에서 읽는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-배달과-실패">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="배달과-실패">배달과 실패</h2></div>
+<div class="prose"><p>작업 스레드는 256개 copied-event 큐에 넣고 owner에서만 콜백을 실행한다. owner의 publication은 즉시 Drain하며 작업 스레드 큐는 고정 틱 snapshot capture 앞과 EndOfFrame에서 비운다. 콜백은 mutex 밖에서 호출하며 snapshot의 shared_ptr가 실행 중 수명을 보장한다. 콜백 도중 해제한 구독은 다음 호출부터 제외한다.</p>
+<p>콜백 예외는 cleanup을 중단시키지 않고 failures를 증가시킨다. 큐 포화 및 무한 재진입 방지를 위한 Drain 256회 예산 초과는 lost로 계수한다. 어댑터는 Metrics의 lost/failures 변화 시 증분 상태를 신뢰하지 말고 전체 상태를 재구성해야 한다. 이 관찰자는 신뢰성 있는 transport나 무손실 replication journal이 아니다. 네트워크 송신은 성공 tick snapshot adapter와 결합해 구현한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-검증-진입점">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="검증-진입점">검증 진입점</h2></div>
+<div class="prose"><ul>
+<li><code>verify-scene-observation.ps1 -Configuration All</code>: 실제 헤더를 사용한 Debug/Release 구독·재진입·스레드·예외·포화 검사.</li>
+<li><code>verify-scene-gc.ps1 -Configuration Release -Iterations 2</code>: 실제 Editor의 typed authoring commit/Undo/Redo, native/Transform/비렌더 쓰기, 엔티티 세대와 DDOL 통합 검사.</li>
+<li><code>run-all.ps1 -Suite NetworkHandoff -Configuration All -Product -EditorExe &lt;Release Editor&gt; -CookedStage &lt;새 cooked 패키지&gt;</code>: ND-a·W4/ND-b·N1·N3·물리 ABI/identity·lifecycle 및 실제 N3 cadence/moving GPU 등록 회귀. W5 렌더 소비/GPU·실제 transport/서버 제품 gate는 별도다.</li>
+</ul>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="SceneObservationContract.md"><code>docs/design/SceneObservationContract.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

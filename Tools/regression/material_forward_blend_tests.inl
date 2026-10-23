@@ -119,7 +119,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
         Check(environment.IsValid(), "Alpha environment upload");
         Check(tiles.PrepareFrame(context, error) &&
                   host.PrepareResidency(context, input, error), "Mixed preparation " + error);
-        auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+        auto graph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
         const unsigned workers = fixture == 14 ? 1 : fixture == 5 || fixture == 6 || fixture == 11 || fixture == 13 ? 4 : 0;
         if (workers)
         {

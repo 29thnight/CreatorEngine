@@ -1,8 +1,8 @@
 #include "SharedSparseStorageProbe.inl"
-void RunClusterResidencyState(const std::shared_ptr<const assets::cluster::Archive>& source)
+void RunClusterResidencyState(const own::shared_owner<const assets::cluster::Archive>& source)
 {
     using namespace assets::cluster;
-    auto archive = std::make_shared<Archive>(*source);
+    auto archive = own::make_shared<Archive>(*source);
     archive->packets = {source->packets[0],source->packets[1],source->packets[0]};
     archive->packetSizes.clear(); archive->fileOffsets.clear(); archive->pageReader = {};
     const auto pageBytes = archive->packets[0].size();
@@ -24,7 +24,7 @@ void RunClusterResidencyState(const std::shared_ptr<const assets::cluster::Archi
     const auto switched = stream.Prepare(3,right,budget);
     Check(switched->groups[1] && !switched->groups[0] && switched->evictions == 1 && refined->groups[0] && refined->packets[0],
         "Eviction preserves the preceding submitted snapshot's immutable page owner");
-    Check(stream.Prepare(3,left,budget) == switched, "Second view shares the sealed same-recording residency cut");
+    Check(material_graph_test::SamePinnedObject(stream.Prepare(3,left,budget), switched), "Second view shares the sealed same-recording residency cut");
     stream.SubmitGpuRequests(left);
     const auto gpuPreferred = stream.Prepare(4,right,budget);
     Check(gpuPreferred->groups[0] && !gpuPreferred->groups[1] && stream.GpuFeedbackGroups() == 1,
@@ -33,7 +33,7 @@ void RunClusterResidencyState(const std::shared_ptr<const assets::cluster::Archi
     duplicates.Prepare(1, left, budget);
     const auto duplicateSealed = duplicates.Prepare(2, left, budget);
     const std::array<uint32_t, 5> repeatedViews{1, 1, 0, 1, 0};
-    Check(duplicates.Prepare(2, repeatedViews, budget) == duplicateSealed,
+    Check(material_graph_test::SamePinnedObject(duplicates.Prepare(2, repeatedViews, budget), duplicateSealed),
         "Repeated view requests keep the sealed current recording immutable");
     duplicates.SubmitGpuRequests(right);
     const auto duplicateFeedback = duplicates.Prepare(3, left, budget);
@@ -52,7 +52,7 @@ void RunClusterResidencyState(const std::shared_ptr<const assets::cluster::Archi
         rejected = true;
     }
     Check(rejected && switched->groups[2], "One byte below pinned root budget rejects without damaging the old snapshot");
-    auto split = std::make_shared<Archive>(*archive);
+    auto split = own::make_shared<Archive>(*archive);
     split->packets = {source->packets[0],source->packets[1],source->packets[0],source->packets[0]};
     auto splitGroups = groups; splitGroups[0].meshletCount = 2; splitGroups[1].firstMeshlet = 2; splitGroups[2].firstMeshlet = 3;
     Stream partial(split,splitGroups);
@@ -62,11 +62,11 @@ void RunClusterResidencyState(const std::shared_ptr<const assets::cluster::Archi
     Check(incomplete->packets[0] && !incomplete->packets[1] && !incomplete->groups[0] && incomplete->groups[2],
         "Partial replacement upload never publishes an incomplete child group");
     const auto complete = partial.Prepare(3,left,partialBudget);
-    Check(complete->groups[0] && complete->packets[0] == incomplete->packets[0] && complete->revision > incomplete->revision,
+    Check(complete->groups[0] && material_graph_test::SamePinnedObject(complete->packets[0], incomplete->packets[0]) && complete->revision > incomplete->revision,
         "Final page atomically makes the complete child group selectable");
-    auto asynchronous = std::make_shared<Archive>(*archive);
-    auto backing = std::make_shared<const std::vector<std::vector<std::byte>>>(archive->packets);
-    auto failure = std::make_shared<std::atomic<bool>>(true);
+    auto asynchronous = own::make_shared<Archive>(*archive);
+    auto backing = own::make_shared<const std::vector<std::vector<std::byte>>>(archive->packets);
+    auto failure = own::make_shared<std::atomic<bool>>(true);
     std::promise<void> release;
     const auto gate = release.get_future().share();
     struct ReleaseGate
@@ -108,7 +108,7 @@ void RunClusterResidencyState(const std::shared_ptr<const assets::cluster::Archi
     }
     Check(sawFailure, "Asynchronous read failure is observed while coverage stays at the pinned parent");
     failure->store(false); release.set_value();
-    std::shared_ptr<const ResidentSet> ready;
+    own::shared_owner<const ResidentSet> ready;
     deadline = std::chrono::steady_clock::now() + std::chrono::seconds(20);
     do
     {
@@ -228,7 +228,7 @@ void RunClusterStorage(RecordingChangeDevice& device, ProbeRoots& roots, ProbePi
     Check(kernel.Create(pipelines, desc, std::move(shader.description), error), "Cluster decoder pipeline " + error);
     uint64_t words{}, seamChecks{};
     unsigned cases{}, rejected{};
-    std::shared_ptr<const Archive> reference;
+    own::shared_owner<const Archive> reference;
     for (const auto mask : assets::kModelVertexMasks)
     {
         constexpr uint32_t count = 64;

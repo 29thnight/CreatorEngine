@@ -16,7 +16,7 @@ public sealed partial class DamageDealer : Component
     private float _timer;
     private bool _reported;
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         // 자기 오브젝트에서 찾기 — 가장 흔한 형태.
         _ownHealth = GetComponent<HealthComponent>();
@@ -24,7 +24,7 @@ public sealed partial class DamageDealer : Component
         Log($"[Damage] 자기 HealthComponent: {(_ownHealth is null ? "없음" : $"있음(체력 {_ownHealth.CurrentHp})")}");
     }
 
-    public override void PostPhysics(float tick)
+    public void PostPhysics(float tick)
     {
         _timer += tick;
         if (_timer < _interval) return;

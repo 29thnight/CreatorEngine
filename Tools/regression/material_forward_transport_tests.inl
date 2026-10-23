@@ -295,7 +295,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
             const bool versioned = true; // All Scene fixtures use the production RG2 wiring.
             const auto accessRead = versioned ? RGAccessMode::Read : RGAccessMode::LegacyState;
             const auto accessWrite = versioned ? RGAccessMode::Write : RGAccessMode::LegacyState;
-            auto graph = std::make_shared<EnhancedRenderGraph>(
+            auto graph = own::make_shared<EnhancedRenderGraph>(
                 device, RGSchedulingMode::ExplicitVersioned,
                 policy == 1 ? RGOrderPolicy::PreserveDeclarationOrder : RGOrderPolicy::DependencyOrder);
             const bool parallel = fixture == 4 || fixture == 10 || fixture == 20 || fixture == 22;

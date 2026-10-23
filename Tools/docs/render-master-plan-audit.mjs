@@ -55,9 +55,14 @@ function page(title, body) {
   return `<!doctype html>\n<html lang="ko" data-register="instrument"><head><title>${esc(title)}</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>${css}${fullMode ? 'h1,h2,h3,summary{overflow-wrap:anywhere}details{min-width:0;max-width:100%;overflow-x:auto}' : ''}</style></head><body><main>${body}</main></body></html>\n`;
 }
 const targets = [];
+// Preserve the frozen audit evidence while allowing a later decision in the
+// plan's Markdown to replace an obsolete generated headline.
+const currentPlanSummaries = new Map();
 for (const doc of data.documents) {
   let md = fs.readFileSync(doc.path, 'utf8').replace(/\r\n?/g,'\n').replaceAll('~','&#126;');
   const title = md.match(/^# (.*)$/m)[1];
+  const currentSummary = md.match(/<!-- plan-summary:\s*([\s\S]*?)\s*-->/)?.[1]?.replace(/\s+/g, ' ').trim();
+  if (currentSummary) currentPlanSummaries.set(doc.path, currentSummary);
   // Show remaining work first. The diagram records the implementation boundary.
   md = fullMode ? md.replace(/^# .*\n/,'').replaceAll(/<!-- master-doc-review:(?:start|end) -->/g,'') : md.slice(md.indexOf('## 남은 작업과 완료 판정'));
   let body = marked.parse(md).replaceAll(/href="([^"#]+)\.md(#[^"]*)?"/g, (match, target, fragment='') => {
@@ -89,12 +94,12 @@ for (const doc of data.documents) {
   const dashboard = path.relative(path.dirname(doc.html),'docs/RefactoringPlanDashboard.html').replaceAll('\\','/');
   const summary = path.relative(path.dirname(doc.html),summaryBase+'.html').replaceAll('\\','/');
   const caption = ['light', 'network'].includes(doc.group) ? '기존 로컬 기반에서 후속으로 연결할 경계다. 전체 경로의 구현 완료를 뜻하지 않는다.' : '현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.';
-  body = `<nav aria-label="문서 위치"><a href="${dashboard}">대시보드</a> · <a href="${summary}">전체 검증 원장</a> · <a href="${path.basename(doc.path)}">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/${data.master}/${doc.previousPath}">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · ${fullMode ? 'SOURCE CONTRACT' : 'REMAINING PLAN'}</p><h1>${esc(title)}</h1><p>${esc(doc.requirements[0])}</p><p class="audit-meta">2026-10-20 · master <code>${data.master.slice(0,12)}</code> · ${fullMode ? '현행 선언·원래 기록 분리' : doc.archived || doc.owner ? '종료/승계' : '잔여 구현·수용'}</p></header>${diagram(doc.group,caption)}${body}`;
+  body = `<nav aria-label="문서 위치"><a href="${dashboard}">대시보드</a> · <a href="${summary}">전체 검증 원장</a> · <a href="${path.basename(doc.path)}">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/${data.master}/${doc.previousPath}">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · ${fullMode ? 'SOURCE CONTRACT' : 'REMAINING PLAN'}</p><h1>${esc(title)}</h1><p>${esc(currentSummary ?? doc.requirements[0])}</p><p class="audit-meta">2026-10-20 · master <code>${data.master.slice(0,12)}</code> · ${fullMode ? '현행 선언·원래 기록 분리' : doc.archived || doc.owner ? '종료/승계' : '잔여 구현·수용'}</p></header>${diagram(doc.group,caption)}${body}`;
   targets.push([doc.html.replace(/\.html$/, '.src.html'), page(title, body)]);
 }
 if (!fullMode) {
 const conflictTable = data.conflicts.map(c => `<tr><td>${esc(c.old)}</td><td>${esc(c.decision)}</td><td><a href="${c.owner}.html">${esc(c.owner)}</a></td></tr>`).join('');
-const documentTable = data.documents.map(d => `<tr><td><a href="${path.relative('docs/plans',d.html).replaceAll('\\','/')}">${esc(path.basename(d.html,'.html'))}</a></td><td>${d.archived ? '종료/승계' : d.owner ? '단일 소유자로 인계' : '잔여 구현·수용'}</td><td>${d.owner ? `<a href="${d.owner}.html">${esc(d.owner)}</a>` : '자체 소유'}</td><td>${esc(d.requirements.join(' '))}</td></tr>`).join('');
+const documentTable = data.documents.map(d => `<tr><td><a href="${path.relative('docs/plans',d.html).replaceAll('\\','/')}">${esc(path.basename(d.html,'.html'))}</a></td><td>${d.archived ? '종료/승계' : d.owner ? '단일 소유자로 인계' : '잔여 구현·수용'}</td><td>${d.owner ? `<a href="${d.owner}.html">${esc(d.owner)}</a>` : '자체 소유'}</td><td>${esc(currentPlanSummaries.get(d.path) ?? d.requirements.join(' '))}</td></tr>`).join('');
 let summary = `<header><p class="eyebrow">CreatorEngine · 2026-10-20</p><h1>완료된 구현을 빼고 남은 수용을 분리했다</h1><p class="lead">master <code>${data.master}</code>의 배선을 기준으로 계획을 통일했다.</p><p><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.json">소스 해시·행 번호·문서 전수 원장</a></p></header>`;
 summary += `<figure><ve-bars unit="문서" max="${data.documents.length}" label="${data.documents.length}개 문서의 구현 기반과 잔여 요구를 대조했다"><ve-bar value="${data.documents.filter(d=>!d.archived).length}" hot>활성·인계</ve-bar><ve-bar value="${data.documents.filter(d=>d.archived).length}">종료·승계</ve-bar></ve-bars><figcaption>대시보드가 직접 연결한 계획과 계획 간 연결 문서를 모두 대조했다.</figcaption></figure>`;
 summary += `<section id="cancelled-srp"><h2>SRP 저작 전환은 취소했다</h2><p>${esc(data.cancelled.decision)}</p><p>구 SRP와 C# 저작 계획 파일·대시보드 15개 행을 제거했다. 활성 예정 공수 32일도 제외했다. 다른 대시보드 행과 상태는 보존했다. C++ Pass·그래프·슬롯 계약은 구현 정본을 유지한다.</p></section>`;

@@ -915,7 +915,52 @@ public:
 </tr>
 </tbody></table></div>
 <p>UE의 명령 분리 원칙을 현재 RHI 경계에 적용한다. UE의 allocator 구현, linked-list 저장 형식, task thread 배치, 모든 RDG 기능을 동일하게 복제하는 계약은 아니다. UE식 명령 목록 도입과 고정 프레임 지연 설정은 별도다.</p>
-</details>
+<h2>15. 노드 선언 직렬화와 CPU 저장소 재사용 — 2026-10-21 수정</h2>
+<p>제품 <code>LivePipelineDesc::DeclareAll</code>은 활성 노드를 등록 순서대로 한 번씩 선언한다. 노드별 분기 그래프, 입력 스냅샷, <code>Wait → Merge → Publish</code> 경로와 <code>RGSetupTaskGraph</code>를 제거했다. <code>parallelDeclare</code>, <code>setupDependencies</code>, <code>CreateDeclarationBranch</code>, <code>MergeDeclarationBranch</code>는 제공하지 않는다. 노드 선언 병렬화를 구현 완료로 표시하지 않는다. 소프트웨어 명령 목록의 기존 병렬 기록과 비동기 RHI 번역·제출은 유지한다.</p>
+<ul>
+<li>반복 패스 장벽 계획은 물리 원소를 유지하고 활성 개수만 초기화한다. 각 원소의 전환·UAV 배열 용량을 보존한다. graph <code>Reset</code>은 기존 queue/GPU 완료 계약을 따른다.</li>
+<li><code>IndirectMaterialBatchPool</code>은 준비 소유 스레드가 회수한다. 풀 외부의 공유 소유자가 하나라도 남으면 해당 묶음을 재사용하지 않는다. 작업자에게 전달하기 전에 객체를 확보한다. 기존 프레임·명령 callback 및 RHI/GPU 완료 수명은 유지한다.</li>
+<li>회수 시 이전 GPU 버퍼는 기존 <code>ReleaseSceneBuffer</code>와 지연 풀 경로로 반납한다. 버킷의 roots, 패킷의 scan/slice 배열과 객체 자체는 유지한다. 패킷 모드는 저장소 존재 여부와 별도로 초기화한다.</li>
+<li>기록 작업 그래프는 후보 노드, target/wave 묶음, 이전 target, 단위 역매핑, frontier, required 및 critical-path 배열을 재사용한다. 잘못된 입력은 기존 실행 그래프를 변경하지 않는다.</li>
+<li>검증과 측정 근거는 <code>Artifacts/container-reuse-20261021</code>에 기록했다. Debug 빌드, 기록 작업 그래프 24,550개 검사와 mutation 검사, GPU validation, CreatorRobot 전후·재로드 출력 비교가 통과했다. 출력 7개 attachment의 최대 차이는 0이다.</li>
+<li>동일 조건의 두 뷰 <code>RenderThreadFrame</code> 평균은 기록 ON·ETW 없음 48.008 → 31.186ms, ETW 포함 52.947 → 36.558ms다. 컨테이너 재사용과 노드 분기 제거의 합산 효과이며, Debug 120Hz의 8.333ms 예산에는 미달한다. 노드 선언은 RT TID 43792에서만 기록됐고 노드별 join·snapshot·publish 이벤트는 0개다.</li>
+</ul>
+<h2>16. 제품 RT/RHI 실행 경계 — 2026-10-21</h2>
+<p>이 절이 제품 실행 구조의 기준이다. §15의 선언 branch 실험을 SceneHost 전체로 확대하지 않는다. 의존성 그래프를 여러 작업 그래프로 복제·병합하는 것을 완료 조건으로 삼지 않는다.</p>
+<ol>
+<li>RT는 하나의 그래프에 의존성을 선언하고 Compile에서 컬링·실행 순서·배리어 계획을 확정한다.</li>
+<li>살아남은 패스의 software encoder callback을 기존 기록 계획에 따라 병렬 실행한다. GPU 선후 관계와 CPU 기록 작업의 독립성을 구분한다. 기록 callback은 네이티브 목록에 직접 기록하지 않는다.</li>
+<li>기록 writer를 합류하고 compiled order로 software batch를 봉인한다. 자원 표의 핸들 세대·네이티브 참조와 descriptor·upload lease를 고정한다.</li>
+<li>RHI 스레드가 backend translation을 수행하거나 번역 worker에 위임하고, 결과 목록을 정해진 순서로 제출한다. 즉시 업로드·복사·query resolve도 pending stream을 통해 RHI 스레드에서 기록·Close·제출한다.</li>
+</ol>
+<h3>16.1 구현 API</h3>
+<ul>
+<li><code>DX12DeviceResources::SetDeferredImmediateRecording</code>: 기본 live software RHI 경로의 즉시 명령을 pending 기록으로 전환한다. 프레임 admission 경계에서만 전환한다.</li>
+<li><code>GetDeferredImmediateEncoder</code> / <code>SealImmediateSoftware</code>: 즉시 RHI 명령을 software batch로 보관하고 native upload/copy 사이의 기록 순서를 유지한다.</li>
+<li><code>RecordImmediateNative</code> / <code>CopyPendingValues</code>: backend 작업과 임시 POD payload를 소유 저장소에 기록한다. 메시·텍스처 upload 및 fog neutral copy, query resolve가 소비한다.</li>
+<li><code>SubmitPendingImmediate</code>: RHI 작업을 enqueue한다. 네이티브 allocator/list의 Reset·생성·기록·Close·Execute·Signal은 RHI 스레드가 처리한다.</li>
+<li><code>DX12PendingCommands</code>: mimalloc RenderArena lease를 사용한다. 캡처 객체를 먼저 파괴한 뒤 아레나를 반환한다. 명령은 한 번만 실행하고 실행 후 추가 기록을 거부한다.</li>
+<li><code>RHISoftwareBatch::ReplaySerial</code>: 즉시 명령의 단일 target software batch를 이미 열린 native encoder로 번역한다.</li>
+<li><code>RecordingSnapshot</code>: texture/buffer의 세대·COM 참조·GPU 주소·sparse heap·allocation lease를 고정한다. 번역 중 live handle table의 슬롯 재사용을 따라가지 않는다. snapshot 컨테이너는 독점적으로 회수된 뒤 용량을 재사용한다.</li>
+<li><code>Write*View</code> / <code>CopyNativeDescriptors</code>: 병렬 기록 writer가 고정 descriptor 슬롯에 설명과 자원 참조를 저장하고 합류 후 RHI 스레드가 생성한다. 호출마다 동기 RHI 왕복을 하지 않는다.</li>
+<li>cold 자원 생성의 동기 RHI 서비스는 생성 결과와 작업 전달 결과를 분리한다. 예산·인자에 의한 할당 거절을 submission owner fault로 바꾸지 않는다.</li>
+</ul>
+<h3>16.2 수명과 대기</h3>
+<p>기록 producer는 합류까지 입력의 소유권을 유지한다. 봉인된 batch와 pending stream은 CPU 번역 완료만으로 자원을 반환하지 않는다. submission retirement의 GPU completion point가 descriptor·upload·자원 snapshot·명령 payload의 반환을 결정한다. 프레임 슬롯 allocator/list는 해당 슬롯의 CPU ticket과 GPU fence가 끝난 뒤 재사용한다.</p>
+<p>현재 <code>CaptureRecordingResources</code>는 RHI 서비스가 descriptor snapshot을 확정할 때 CPU ticket을 기다린다. 이것은 GPU 완료 대기와 별개이며 <code>RHITicketWait</code>와 ETW 상태로 측정한다. 이 경계를 비동기화했다고 표시하지 않는다.</p>
+<p>이번 제품 전환 대상은 CreatorRobot이 소비하는 기본 live DX12 software RHI graphics queue 경로다. 별도 owned-queue 실험 경로는 기존 queue recorder/translator를 사용하고 새 deferred immediate 모드를 켜지 않는다. native 직접 기록 대조 경로는 <code>CREATOR_RHI_DEFERRED_BACKEND=0</code>으로 선택한다. 기본값은 1이다.</p>
+<h3>16.3 검증 근거</h3>
+<p><code>Artifacts/rhi-rt-boundary-20261021</code>에 빌드, GPU 회귀 검사, CreatorRobot 기록 ON/OFF·ETW, 픽셀·재로드 비교와 실행 스레드 증거를 저장한다. 결과 확정은 <code>measurement.json</code>, 전체 계측 파일 목록은 <code>json/{before,after}/manifest.json</code>을 따른다. HTML은 로컬 표시용이다.</p>
+<h3>16.4 실행 검증 결과</h3>
+<ul>
+<li>Debug 빌드와 GPU 검증을 켠 전체 <code>dx12.rendergraph</code> 회귀를 통과했다. pending payload 원본 변경·단일 실행·아레나 주소 재사용·자원 슬롯 세대 재사용·할당 거절 후 정상 후속 제출을 검사했다.</li>
+<li>CreatorRobot Debug Play의 전후 controlled replay 픽셀 비교, 장면 재로드 비교와 정상 종료를 통과했다. 두 측정 모두 worker 8, Editor 전경, software RHI ON, 선언 branch OFF, 상세 binding 계측 OFF를 유지했다.</li>
+<li>ETW ON 구간에서 software 기록 callback의 실제 동시 Running은 최대 8개 스레드였고, 두 개 이상이 동시에 Running인 시간은 864.049ms였다. 즉시 native 실행 1,279건은 모두 RHI thread에서 실행됐다. backend 번역도 최대 8개 스레드가 동시에 Running이었다.</li>
+<li>성능 수용은 통과하지 않았다. ETW 없는 기록 ON의 RT 평균은 29.612→31.223ms였다. ETW ON 구간의 RT 평균은 32.969→32.972ms로 사실상 같았다. Running은 28.560→26.607ms로 줄었고 Waiting은 3.928→5.939ms로 늘었다. 120프레임 CPU 예산 8.333ms에 미달한다.</li>
+<li><code>CaptureRecordingResources</code>의 RHI 서비스 CPU ticket 대기가 남아 있다. backend 작업의 실행 위치 이동을 전체 프레임 성능 개선이나 완전한 무대기 handoff로 표시하지 않는다.</li>
+<li>native 이벤트·GPU 이벤트·counter의 JSON 복원, xperf 전체 export 행의 byte 복원을 검사했다. ETW 기록 손실은 0이다. xperf decoder 진단은 별도 JSON에 원문 보존하며 원본 ETL을 유지한다.</li>
+<li>근거: <code>Artifacts/rhi-rt-boundary-20261021/measurement.json</code>, <code>verification.json</code>, <code>json/manifest.json</code>. 로컬 보고서는 같은 폴더의 <code>index.html</code>, 전체 타임라인은 <code>timeline-gpu.html</code>이다.</details></li>
+</ul>
 <details><summary>이전 절 주소</summary><p>이전 절은 위 현행 대조와 펼친 원래 기록을 함께 읽는다.</p></details></main><script data-ve-kit>
 // Reader replies, shared by kit pages and plan pages: the note popover, the selection buttons, and sending one reply
 // to the agent. Kit pages turn on page replies with veReply.page(); plan.js builds its own response on the same parts.

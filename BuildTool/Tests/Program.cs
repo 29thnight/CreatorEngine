@@ -2,6 +2,13 @@ using System.Diagnostics;
 using System.Text.Json.Nodes;
 using CreatorBuildTool;
 
+if (args.Length == 3 && args[0] == "--validate-cooked")
+{
+    var cooked = AssetCooking.Validate(Path.GetFullPath(args[1]), int.Parse(args[2]));
+    Console.WriteLine($"COOKED_OUTPUT_OK artifacts={cooked.ArtifactCount} companions={cooked.CompanionCount} files={cooked.DerivedFileCount}");
+    return 0;
+}
+
 if (args.FirstOrDefault() == "--child") { await Task.Delay(60000); return 0; }
 if (args.FirstOrDefault() == "--parent")
 {
@@ -25,6 +32,23 @@ async Task RejectAsync(Func<Task> action, string message)
 using var context = new BuildContext(new Options(["help"]), CancellationToken.None);
 try
 {
+    Check(GameCompiler.ManagedFiles.Contains("Scripts/FSharp.Core.dll") && GameCompiler.ManagedFiles.Contains("Scripts/CreatorEngine.FSharp.Runtime.dll"), "F# private runtime closure omitted from package file list");
+    Check(GameCompiler.CoreFiles.Contains("CreatorEngine.ManagedRuntime.dll")
+        && GameCompiler.CoreFiles.Contains("CreatorEngine.ManagedRuntime.deps.json")
+        && GameCompiler.CoreFiles.Contains("FSharp.Core.dll"), "Process-resident F# engine runtime closure omitted from SDK/package");
+    var sourceRoot = Path.Combine(root, "FSharp sources with spaces"); Directory.CreateDirectory(sourceRoot);
+    File.WriteAllText(Path.Combine(sourceRoot, "A.fs"), "namespace A");
+    File.WriteAllText(Path.Combine(sourceRoot, "B.fs"), "namespace B");
+    var order = Path.Combine(sourceRoot, "compile.order");
+    File.WriteAllText(order, "B.fs\nA.fs\n");
+    var ordered = GameCompiler.ReadFSharpSources(sourceRoot.Replace('\\','/'));
+    Check(Path.GetFileName(ordered[0])=="B.fs" && Path.GetFileName(ordered[1])=="A.fs", "F# order must survive normalization and spaces");
+    foreach(var invalidOrder in new[]{"A.fs\nA.fs", "A.fs", "../outside.fs", "missing.fs", "A.cs"})
+    {
+        File.WriteAllText(order, invalidOrder);
+        Reject(()=>GameCompiler.ReadFSharpSources(sourceRoot), "Invalid F# source order accepted: "+invalidOrder);
+    }
+    Check(PackageInputs.Excluded("Assets/Script/A.fs") && PackageInputs.Excluded("Assets/Script/GameScripts.fsproj"), "F# source leaked into package payload");
     var previewBinary = Path.Combine(root, "preview-binary");
     Directory.CreateDirectory(Path.Combine(previewBinary, "Editor/EditorResources/Preview"));
     Check(EditorPreviewPackage.Entries(previewBinary).Length == 0, "Optional preview package became mandatory");
@@ -203,6 +227,66 @@ try
         Reject(() => AssetCooking.Validate(textureCook, 1), "Invalid model texture path accepted: " + relative);
         File.Delete(texture);
     }
+
+    // Current streamed generations have a variable companion closure. These
+    // fixtures test the packaging layout; the native cooker owns binary decoding.
+    var streamCook = Path.Combine(root, "stream-cook");
+    var streamModel = "Derived/Models/33/33333333-3333-8333-8333-333333333333/2/";
+    var cpuPayload = "Derived/CpuGeometry/" + new string('a', 64) + ".cecpu";
+    var geometryPayload = "Derived/Geometry/m" + new string('b', 64) + "/44444444-4444-8444-8444-444444444444.cege";
+    var streamCompanions = new[] { "sidecar.meta", "metadata.cemc", "streaming.cemf",
+        "Derived/model.cemd", "Derived/Skeleton.cesl", cpuPayload, geometryPayload };
+    void WriteCookFile(string relative, string content = "payload")
+    {
+        var path = Paths.Child(streamCook, relative);
+        Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+        File.WriteAllText(path, content);
+    }
+    WriteCookFile("Derived/asset-manifest.cemf");
+    WriteCookFile(streamModel + "generation.asset");
+    WriteCookFile(streamModel + "textures/55555555-5555-8555-8555-555555555555.cetex");
+    foreach (var companion in streamCompanions) WriteCookFile(streamModel + companion);
+    var acceptedStream = AssetCooking.Validate(streamCook, 2);
+    Check(acceptedStream.CompanionCount == 7 && acceptedStream.DerivedFileCount == 10,
+        "Streamed model companion inventory differs");
+    foreach (var companion in new[] { "sidecar.meta", "metadata.cemc", "streaming.cemf", "Derived/model.cemd" })
+    {
+        File.Delete(Paths.Child(streamCook, streamModel + companion));
+        Reject(() => AssetCooking.Validate(streamCook, 2), "Missing streamed companion accepted: " + companion);
+        WriteCookFile(streamModel + companion);
+    }
+    WriteCookFile(streamModel + "model.cemc");
+    Reject(() => AssetCooking.Validate(streamCook, 2), "Mixed monolithic/streamed metadata accepted");
+    File.Delete(Paths.Child(streamCook, streamModel + "model.cemc"));
+    foreach (var invalid in new[] { "Derived/CpuGeometry/not-a-digest.cecpu",
+        "Derived/Geometry/m" + new string('b', 64) + "/not-an-id.cege" })
+    {
+        WriteCookFile(streamModel + invalid);
+        Reject(() => AssetCooking.Validate(streamCook, 2), "Invalid streaming path accepted: " + invalid);
+        File.Delete(Paths.Child(streamCook, streamModel + invalid));
+    }
+    var orphan = "Derived/Models/66/66666666-6666-8666-8666-666666666666/1/metadata.cemc";
+    WriteCookFile(orphan);
+    Reject(() => AssetCooking.Validate(streamCook, 2), "Orphan model companion accepted");
+    File.Delete(Paths.Child(streamCook, orphan));
+
+    var mergedStream = Path.Combine(root, "merged-stream");
+    Paths.CopyTree(streamCook, mergedStream, CancellationToken.None);
+    AssetCooking.VerifyMerged(mergedStream, acceptedStream, AssetCooking.Validate(mergedStream, 2)); ++checks;
+    var mergedCpu = Paths.Child(mergedStream, streamModel + cpuPayload);
+    File.WriteAllText(mergedCpu, "PAYLOAD");
+    Reject(() => AssetCooking.VerifyMerged(mergedStream, acceptedStream, AssetCooking.Validate(mergedStream, 2)),
+        "Same-size streamed geometry corruption accepted after merge");
+    File.Delete(mergedCpu);
+    Reject(() => AssetCooking.VerifyMerged(mergedStream, acceptedStream, AssetCooking.Validate(mergedStream, 2)),
+        "Missing streamed geometry accepted after merge");
+
+    var legacyCook = Path.Combine(root, "legacy-cook");
+    Directory.CreateDirectory(Path.Combine(legacyCook, streamModel));
+    File.WriteAllText(Path.Combine(legacyCook, "Derived/asset-manifest.cemf"), "fixture");
+    foreach (var payload in new[] { "generation.asset", "model.cemc", "sidecar.meta" })
+        File.WriteAllText(Path.Combine(legacyCook, streamModel + payload), "payload");
+    Reject(() => AssetCooking.Validate(legacyCook, 1), "Retired monolithic model generation accepted");
 
     Reject(() => new Options(["compile-game", "--project", "x", "--project", "y"]), "Duplicate CLI option accepted");
     Reject(() => new Options(["package-game", "--skpi-verify"]), "Unknown CLI option accepted");

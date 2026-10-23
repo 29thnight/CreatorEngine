@@ -113,7 +113,7 @@ void RunSceneDecal(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                     const bool versioned = true; // All Scene fixtures use the production RG2 wiring.
                     const auto readAccess = versioned ? RGAccessMode::Read : RGAccessMode::LegacyState;
                     const auto writeAccess = versioned ? RGAccessMode::Write : RGAccessMode::LegacyState;
-                    auto graph = std::make_shared<EnhancedRenderGraph>(
+                    auto graph = own::make_shared<EnhancedRenderGraph>(
                         device, RGSchedulingMode::ExplicitVersioned,
                         policy == 1 ? RGOrderPolicy::PreserveDeclarationOrder : RGOrderPolicy::DependencyOrder);
                     if (workers)

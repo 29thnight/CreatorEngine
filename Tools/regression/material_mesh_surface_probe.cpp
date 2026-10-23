@@ -1,3 +1,4 @@
+#include "../../Engine/Utility_Framework/Ownership.h"
 #include "material_owner_checks.h"
 #include "MaterialGraphMeshSurface.h"
 #include "support/MaterialGraphScenePacket.h"
@@ -486,10 +487,10 @@ namespace
         Check(triangle == geometry.indices.size() / 3 && points == plan.Cost().points, "No lost or repeated triangles");
     }
 
-    std::shared_ptr<const MeshSurfacePlan> PartitionTests(const SurfaceView& view)
+    own::shared_owner<const MeshSurfacePlan> PartitionTests(const SurfaceView& view)
     {
         std::string error;
-        std::shared_ptr<const MeshSurfacePlan> large;
+        own::shared_owner<const MeshSurfacePlan> large;
         for (auto mask : assets::kModelVertexMasks)
         {
             auto geometry = LargeGeometry(mask);
@@ -500,7 +501,7 @@ namespace
                       large->Cost().sourceVertices == 8200 && large->Cost().duplicatedPoints > 0,
                   "Large fan splits at boundary and excludes only the unused vertex");
             const auto accepted = large;
-            std::shared_ptr<const MeshSurfacePlan> same;
+            own::shared_owner<const MeshSurfacePlan> same;
             Check(MeshSurfacePlan::Build(geometry.draw, view, geometry.lods, {}, same, error) && large->Matches(*same),
                   "Deterministic partition identity");
             const auto releasedIdentity = same->SceneTopologyIdentity();
@@ -508,7 +509,7 @@ namespace
             same.reset();
             Check(releasedIdentity.expired(), "A retained topology token does not keep uncached geometry alive");
             std::vector<float> sceneLods(geometry.lods.size(), 0.f);
-            std::shared_ptr<const MeshSurfacePlan> sceneFirst, sceneNext;
+            own::shared_owner<const MeshSurfacePlan> sceneFirst, sceneNext;
             const auto looseDraw = geometry.draw;
             Check(!MeshSurfacePlan::BuildForScene(looseDraw, view, sceneLods, {}, sceneFirst, error) && !sceneFirst,
                   "Scene admission rejects uncooked fixture topology");
@@ -529,8 +530,7 @@ namespace
                   "Temporal previous pose can reuse the same immutable topology after camera/object movement");
             const auto firstIdentity = sceneFirst->SceneTopologyIdentity();
             const auto nextIdentity = sceneNext->SceneTopologyIdentity();
-            Check(firstIdentity.lock() == nextIdentity.lock() && !firstIdentity.owner_before(nextIdentity) &&
-                      !nextIdentity.owner_before(firstIdentity),
+            Check(material_graph_test::SamePinnedObject(firstIdentity.lock(), nextIdentity.lock()),
                   "Static shadow identity follows immutable topology across current world and view rebinding");
             Check(sceneNext->Cost().points == sceneFirst->Cost().points &&
                       sceneNext->Chunks().size() == sceneFirst->Chunks().size() &&
@@ -544,7 +544,7 @@ namespace
                           sceneFirst->Chunks()[chunk].sourceVertices.data(),
                       "Scene cache hits share immutable remap storage");
             }
-            std::shared_ptr<const MeshSurfacePlan> rasterPlan;
+            own::shared_owner<const MeshSurfacePlan> rasterPlan;
             Check(MeshSurfacePlan::BuildForScene(movedDraw, nextView, {}, rasterPlan, error) &&
                       rasterPlan->Matches(*sceneNext),
                   "Raster zero LOD transport reuses the same validated mesh and current pose");
@@ -561,15 +561,30 @@ namespace
             Check(!rasterPlan->SharesSceneTopology(*sceneFirst),
                   "Temporal previous pose must rebuild when the chunk topology changes");
             const auto repartitionedIdentity = rasterPlan->SceneTopologyIdentity();
-            Check(firstIdentity.lock() != repartitionedIdentity.lock() &&
-                      (firstIdentity.owner_before(repartitionedIdentity) ||
-                       repartitionedIdentity.owner_before(firstIdentity)),
+            Check(!material_graph_test::SamePinnedObject(firstIdentity.lock(), repartitionedIdentity.lock()),
                   "A different partition cannot reuse shadow depth through the same asset identity");
             VerifyPartition(geometry, *rasterPlan, rasterBudget.maxChunkPoints);
             sceneFirst.reset();
             Check(!firstIdentity.expired(), "A current rebound plan still owns its immutable topology");
             sceneNext.reset();
             Check(firstIdentity.expired(), "An evicted partition expires after its last frame owner is released");
+
+            MeshSurfacePlan::ReleaseCachedScenePlans();
+            Check(!repartitionedIdentity.expired() && rasterPlan->Source()->SourceVertexCount() == 8200,
+                  "Session cache retirement preserves a plan still owned by a frame");
+            own::shared_owner<const MeshSurfacePlan> rebuilt;
+            Check(MeshSurfacePlan::BuildForScene(geometry.draw, view, rasterBudget, rebuilt, error) &&
+                      rebuilt->Matches(*rasterPlan) && !rebuilt->SharesSceneTopology(*rasterPlan),
+                  "A new session rebuilds equivalent topology without reusing a retired cache owner");
+            rasterPlan.reset();
+            Check(repartitionedIdentity.expired(), "Final frame release retires the old topology after cache shutdown");
+            const auto rebuiltIdentity = rebuilt->SceneTopologyIdentity();
+            rebuilt.reset();
+            Check(!rebuiltIdentity.expired(), "The new session cache owns its rebuilt plan");
+            MeshSurfacePlan::ReleaseCachedScenePlans();
+            MeshSurfacePlan::ReleaseCachedScenePlans();
+            Check(rebuiltIdentity.expired(), "Repeated session cache shutdown releases the last cached topology");
+
             Check(!MeshSurfacePlan::Build(geometry.draw, view, geometry.lods, rasterBudget, same, error),
                   "IBL batch retains its original compute point limit");
             geometry.lods = originalLods;
@@ -581,17 +596,17 @@ namespace
                   "Exact payload budget accepts");
             --budget.maxGpuPayloadBytes;
             Check(!MeshSurfacePlan::Build(geometry.draw, view, geometry.lods, budget, large, error) &&
-                      large == accepted,
+                      material_graph_test::SamePinnedObject(large, accepted),
                   "GPU payload overflow preserves entire accepted plan");
             budget = {};
             budget.maxCpuPayloadBytes = accepted->Cost().cpuPayloadBytes - 1;
             Check(!MeshSurfacePlan::Build(geometry.draw, view, geometry.lods, budget, large, error) &&
-                      large == accepted,
+                      material_graph_test::SamePinnedObject(large, accepted),
                   "CPU payload overflow preserves plan");
             budget = {};
             budget.maxChunks = 2;
             Check(!MeshSurfacePlan::Build(geometry.draw, view, geometry.lods, budget, large, error) &&
-                      large == accepted,
+                      material_graph_test::SamePinnedObject(large, accepted),
                   "Chunk overflow preserves plan");
             budget = {};
             budget.maxSourceVertices = 8199;
@@ -599,7 +614,7 @@ namespace
                   "Source budget rejects");
             const auto last = geometry.indices.back();
             geometry.indices.back() = 8200;
-            Check(!MeshSurfacePlan::Build(geometry.draw, view, geometry.lods, {}, large, error) && large == accepted,
+            Check(!MeshSurfacePlan::Build(geometry.draw, view, geometry.lods, {}, large, error) && material_graph_test::SamePinnedObject(large, accepted),
                   "Late invalid triangle preserves all earlier accepted chunks");
             geometry.indices.back() = last;
             auto changed = view;
@@ -770,7 +785,7 @@ namespace
             Check(device.CreateBufferReadback(chunk.input->Count() * sizeof(SurfacePoint), readback, error),
                   "Partition readback");
             Check(device.BeginFrame(error), "Partition begin");
-            std::shared_ptr<const MeshSurfaceBatch> result;
+            own::shared_owner<const MeshSurfaceBatch> result;
             Check(evaluator.Record(device, chunk.input, result, error), "Partition GPU transform " + error);
             auto& encoder = device.GetImmediateEncoder();
             const RHIBufferTransition before{result->Buffer(), RHIResourceState::ShaderResource,
@@ -804,16 +819,16 @@ namespace
     {
         auto geometry = GeometryFixture(assets::kCoreVertexAttributes, 0);
         const auto baseline = evaluator.CacheStats();
-        std::shared_ptr<const MeshSurfaceBatch> retained;
+        own::shared_owner<const MeshSurfaceBatch> retained;
         std::string error;
         for (unsigned entry = 0; entry < 260; ++entry)
         {
             geometry.draw.modelMeshView.handle.generation = 10000 + entry;
-            std::shared_ptr<const MeshSurfaceInput> input;
+            own::shared_owner<const MeshSurfaceInput> input;
             Check(MeshSurfaceInput::Seal(geometry.draw, view, geometry.lods, input, error), "Cache admission seal");
             Check(device.BeginFrame(error), "Cache admission begin");
             EnhancedRenderGraph graph(device);
-            std::shared_ptr<const MeshSurfaceBatch> batch;
+            own::shared_owner<const MeshSurfaceBatch> batch;
             Check(evaluator.Prepare(device, input, batch, error, true), "Cache admission prepare " + error);
             Check(batch->Indices().IsValid() && !batch->Indices().IsWritable(), "Cache admission stays resident");
             Check(batch->Declare(graph, error), "Cache admission declaration");
@@ -977,19 +992,19 @@ namespace
             }
             ++view.viewRevision;
             view.eye[0] += .1f;
-            std::shared_ptr<const MeshSurfacePlan> plan;
+            own::shared_owner<const MeshSurfacePlan> plan;
             Check(MeshSurfacePlan::BuildForScene(geometry.draw, view, geometry.lods, {}, plan, error), "Resident plan");
             Check(plan->Chunks().size() == 1, "Resident fixture has one partition");
             const auto& chunk = plan->Chunks().front();
             Check(device.BeginFrame(error), "Resident begin");
-            auto graphOwner = std::make_shared<EnhancedRenderGraph>(device);
+            auto graphOwner = own::make_shared<EnhancedRenderGraph>(device);
             auto& graph = *graphOwner;
             if (workerCounts[frame])
             {
                 pool.BeginFrame(frame);
                 Check(graph.PrepareParallel(pool, error), "Resident prepare parallel prefix");
             }
-            std::shared_ptr<const MeshSurfaceBatch> batch;
+            own::shared_owner<const MeshSurfaceBatch> batch;
             Check(evaluator.Prepare(device, chunk.input, batch, error, true), "Resident prepare " + error);
             Check(batch->Indices().IsValid() && !batch->Indices().IsWritable(), "Indices are GPU resident");
             if (frame == 1 || frame == 4)
@@ -1078,11 +1093,11 @@ namespace
               "Transform cache dispatches only changed geometry/pose/world");
 
         auto replacement = GeometryFixture(assets::kCoreVertexAttributes, 0);
-        std::shared_ptr<const MeshSurfaceInput> input;
+        own::shared_owner<const MeshSurfaceInput> input;
         Check(MeshSurfaceInput::Seal(replacement.draw, view, replacement.lods, input, error), "Replacement identity");
         const auto entries = evaluator.CacheStats().entries;
         Check(device.BeginFrame(error), "Resident abort begin");
-        std::shared_ptr<const MeshSurfaceBatch> discarded;
+        own::shared_owner<const MeshSurfaceBatch> discarded;
         Check(evaluator.Prepare(device, input, discarded, error, true), "Resident abort prepare");
         device.AbortFrame();
         Check(evaluator.CacheStats().entries == entries, "Aborted uploads cannot become resident cache hits");
@@ -1111,7 +1126,7 @@ namespace
             expected.push_back(SampleReference(geometry, request));
         }
         std::string error;
-        std::shared_ptr<const MeshSurfaceInput> input;
+        own::shared_owner<const MeshSurfaceInput> input;
         Check(MeshSurfaceInput::Seal(geometry.draw, view, geometry.lods, input, error), "Sample source seal");
         std::array<RHIReadback, 4> readbacks;
         for (unsigned i = 0; i < 2; ++i)
@@ -1134,9 +1149,9 @@ namespace
                                  cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{},
                                  error),
             1, cube};
-        std::shared_ptr<const MeshSurfaceBatch> vertices, sampled;
-        std::shared_ptr<const SurfaceBatch> surface;
-        std::shared_ptr<const IblBakeResult> bake;
+        own::shared_owner<const MeshSurfaceBatch> vertices, sampled;
+        own::shared_owner<const SurfaceBatch> surface;
+        own::shared_owner<const IblBakeResult> bake;
         Check(meshEvaluator.Record(device, input, vertices, error), "Sample vertex transform");
         Check(meshEvaluator.RecordSamples(device, vertices, requests, sampled, error), "Triangle sampling " + error);
         Check(!sampled->IsPreparedForGraph() && sampled->IsReadyForEvaluation(),
@@ -1146,18 +1161,18 @@ namespace
         const auto accepted = sampled;
         auto bad = requests;
         bad.back().triangle = geometry.draw.modelMeshView.indexCount / 3;
-        Check(!meshEvaluator.RecordSamples(device, vertices, bad, sampled, error) && sampled == accepted,
+        Check(!meshEvaluator.RecordSamples(device, vertices, bad, sampled, error) && material_graph_test::SamePinnedObject(sampled, accepted),
               "Invalid triangle sample preserves batch");
         bad = requests;
         bad.back().b = .9f;
         bad.back().c = .9f;
-        Check(!meshEvaluator.RecordSamples(device, vertices, bad, sampled, error) && sampled == accepted,
+        Check(!meshEvaluator.RecordSamples(device, vertices, bad, sampled, error) && material_graph_test::SamePinnedObject(sampled, accepted),
               "Invalid perspective weights preserve batch");
         bad = requests;
         bad.back().lod = -1;
-        Check(!meshEvaluator.RecordSamples(device, vertices, bad, sampled, error) && sampled == accepted,
+        Check(!meshEvaluator.RecordSamples(device, vertices, bad, sampled, error) && material_graph_test::SamePinnedObject(sampled, accepted),
               "Invalid explicit LOD preserves batch");
-        Check(!meshEvaluator.RecordSamples(device, sampled, requests, sampled, error) && sampled == accepted,
+        Check(!meshEvaluator.RecordSamples(device, sampled, requests, sampled, error) && material_graph_test::SamePinnedObject(sampled, accepted),
               "Sampled points cannot be reinterpreted as a mesh vertex array");
         Check(evaluator.RecordGpu(device, materialBindings, sampled, surface, error),
               "Interpolated frame -> graph " + error);
@@ -1526,7 +1541,7 @@ namespace
             Check(device.CreateBuffer(description, pooled, error), "Imported final-state fixture buffer");
             {
                 EnhancedRenderGraph variants(device, RGSchedulingMode::ExplicitVersioned);
-                std::array<std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule>,
+                std::array<own::shared_owner<const EnhancedRenderGraph::StructuralSchedule>,
                            EnhancedRenderGraph::MaxStructuralSchedules>
                     retained;
                 for (unsigned cycle = 0; cycle < 3; ++cycle)
@@ -1546,7 +1561,7 @@ namespace
                         {
                             retained[variant] = variants.SnapshotStructuralSchedule();
                         }
-                        Check(variants.SnapshotStructuralSchedule() == retained[variant],
+                        Check(material_graph_test::SamePinnedObject(variants.SnapshotStructuralSchedule(), retained[variant]),
                               "Variant reuse shares the original immutable schedule identity");
                         variants.Reset();
                     }
@@ -1559,7 +1574,7 @@ namespace
                     "Variants.5", {{output, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
                     [](const auto&) {}, true);
                 Check(inherited.Compile(error) && inherited.GetStats().structuralScheduleReused &&
-                          inherited.SnapshotStructuralSchedule() == retained[5],
+                          material_graph_test::SamePinnedObject(inherited.SnapshotStructuralSchedule(), retained[5]),
                       "Fresh slot inherits every retained variant");
                 inherited.Reset();
                 buffer = inherited.ImportBuffer(pooled, RHIResourceState::Common, "Variants.Buffer");
@@ -1650,11 +1665,11 @@ namespace
                     {
                         EnhancedRenderGraph next(device, mode);
                         auto metadata = cached.SnapshotStructuralSchedule();
-                        Check(metadata && metadata == cached.SnapshotStructuralSchedule(),
+                        Check(metadata && material_graph_test::SamePinnedObject(metadata, cached.SnapshotStructuralSchedule()),
                               "Structural snapshot publication shares the same immutable CPU plan");
                         cached.Reset(); // The submitted graph may retire before the next declaration.
                         next.InheritStructuralSchedule(metadata);
-                        Check(next.SnapshotStructuralSchedule() == metadata,
+                        Check(material_graph_test::SamePinnedObject(next.SnapshotStructuralSchedule(), metadata),
                               "Inheritance retains the frozen plan without copying metadata");
                         auto nextInput = next.ImportBuffer(pooled, RHIResourceState::ShaderResource, "Schedule.Buffer");
                         if (mode == RGSchedulingMode::ExplicitVersioned)
@@ -1690,7 +1705,7 @@ namespace
                           cached.GetStats().passesExecuted == 1,
                       "Imported writer reachability survives changed root flags without cache hit");
                 const auto changedSchedule = cached.SnapshotStructuralSchedule();
-                Check(changedSchedule && changedSchedule != originalSchedule,
+                Check(changedSchedule && !material_graph_test::SamePinnedObject(changedSchedule, originalSchedule),
                       "A changed declaration creates a new immutable plan");
                 {
                     EnhancedRenderGraph alternate(device, mode);
@@ -1707,7 +1722,7 @@ namespace
                                                                      : RGAccessMode::Write}},
                         [](const auto&) {}, true);
                     Check(alternate.Compile(error) && alternate.GetStats().structuralScheduleReused &&
-                              alternate.SnapshotStructuralSchedule() == originalSchedule,
+                              material_graph_test::SamePinnedObject(alternate.SnapshotStructuralSchedule(), originalSchedule),
                           "An exact alternate key reuses the original plan after another graph compiles a changed "
                           "contract");
                 }
@@ -1801,8 +1816,8 @@ namespace
             graph.Reset();
             for (unsigned kind = 0; kind < 2; ++kind)
             {
-                auto owner = std::make_shared<int>(7);
-                std::weak_ptr<int> released = owner;
+                auto owner = own::make_shared<int>(7);
+                own::weak_owner<int> released = owner;
                 if (kind == 0)
                 {
                     graph.AddRepeatedPass("old-repeated", {}, {}, 2, [owner](const auto&, auto, auto) {}, true, 47);
@@ -1846,7 +1861,7 @@ namespace
                 Check(device.CreateBuffer(bufferDescription, buffer, error), "CPU recording admission buffer");
             }
             const auto owner = std::this_thread::get_id();
-            std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule> inherited;
+            own::shared_owner<const EnhancedRenderGraph::StructuralSchedule> inherited;
             for (unsigned iteration = 0; iteration < 12; ++iteration)
             {
                 const unsigned policy = iteration % 6;
@@ -1854,7 +1869,7 @@ namespace
                 pool.BeginFrame(policy);
                 const auto mode =
                     policy == 5 ? RGSchedulingMode::ExplicitSingleWriter : RGSchedulingMode::ExplicitVersioned;
-                auto graph = std::make_shared<EnhancedRenderGraph>(device, mode);
+                auto graph = own::make_shared<EnhancedRenderGraph>(device, mode);
                 if (mode == RGSchedulingMode::ExplicitVersioned && inherited)
                 {
                     graph->InheritStructuralSchedule(inherited);
@@ -1946,7 +1961,7 @@ namespace
             {
                 Check(device.CreateBuffer(description, buffer, error), "Recording dependency buffer");
             }
-            std::array<std::shared_ptr<const EnhancedRenderGraph::StructuralSchedule>, 6> schedules;
+            std::array<own::shared_owner<const EnhancedRenderGraph::StructuralSchedule>, 6> schedules;
             for (unsigned iteration = 0; iteration < 12; ++iteration)
             {
                 const unsigned policy = iteration % static_cast<unsigned>(schedules.size());
@@ -1957,7 +1972,7 @@ namespace
                 const uint32_t requestedWorkers = transitive ? 2u : 4u;
                 Check(device.BeginFrame(error), "Recording dependency begin");
                 pool.BeginFrame(iteration);
-                auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+                auto graph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
                 // 연속 target 두 개로 A와 B→C를 분리해, 독립 B가 같은 target의
                 // 미선언 C에게 A의 CPU 완료를 대신 보장할 수 없음을 강제한다.
                 graph->SetRecordingWorkloadBalance(!transitive);
@@ -2234,7 +2249,7 @@ namespace
             rasterGeometry.draw.modelMeshView = cookedRaster.view;
             MeshSurfacePlanBudget rasterBudget;
             rasterBudget.maxChunkPoints = rasterBudget.maxSourceVertices;
-            std::shared_ptr<const MeshSurfacePlan> rasterPlan;
+            own::shared_owner<const MeshSurfacePlan> rasterPlan;
             Check(MeshSurfacePlan::BuildForScene(rasterGeometry.draw, view, rasterBudget, rasterPlan, error) &&
                       rasterPlan->Chunks().size() == 1,
                   "Large raster mesh prepares one draw");
@@ -2251,24 +2266,24 @@ namespace
                     view.viewRevision = frames + 1;
                     view.eye[0] = pose == 1 ? .4f : .1f;
                     auto geometry = GeometryFixture(mask, pose);
-                    std::shared_ptr<const MeshSurfaceInput> sealed;
+                    own::shared_owner<const MeshSurfaceInput> sealed;
                     Check(MeshSurfaceInput::Seal(geometry.draw, view, geometry.lods, sealed, error), "Seal " + error);
-                    std::shared_ptr<const MeshSurfaceInput> same;
+                    own::shared_owner<const MeshSurfaceInput> same;
                     Check(MeshSurfaceInput::Seal(geometry.draw, view, geometry.lods, same, error) &&
                               sealed->Matches(*same),
                           "Exact sealed identity");
                     auto accepted = sealed;
                     auto badDraw = geometry.draw;
                     badDraw.modelMeshView.vertexStride += 4;
-                    Check(!MeshSurfaceInput::Seal(badDraw, view, geometry.lods, sealed, error) && sealed == accepted,
+                    Check(!MeshSurfaceInput::Seal(badDraw, view, geometry.lods, sealed, error) && material_graph_test::SamePinnedObject(sealed, accepted),
                           "Wrong stride preserves source");
                     badDraw = geometry.draw;
                     badDraw.worldMatrix.m[0][3] = 1;
-                    Check(!MeshSurfaceInput::Seal(badDraw, view, geometry.lods, sealed, error) && sealed == accepted,
+                    Check(!MeshSurfaceInput::Seal(badDraw, view, geometry.lods, sealed, error) && material_graph_test::SamePinnedObject(sealed, accepted),
                           "Nonaffine transform preserves source");
                     auto badLods = geometry.lods;
                     badLods[0] = -1;
-                    Check(!MeshSurfaceInput::Seal(geometry.draw, view, badLods, sealed, error) && sealed == accepted,
+                    Check(!MeshSurfaceInput::Seal(geometry.draw, view, badLods, sealed, error) && material_graph_test::SamePinnedObject(sealed, accepted),
                           "Missing LOD preserves source");
                     badLods = geometry.lods;
                     badLods[0] = geometry.lods[0] == 0 ? 1.f : 0.f;
@@ -2336,10 +2351,10 @@ namespace
                              RHIResourceState::ShaderResource}};
                         encoder.ResourceBarriers({transitions});
                     }
-                    std::shared_ptr<const MeshSurfaceBatch> mesh;
-                    std::shared_ptr<const SurfaceBatch> surface;
-                    std::shared_ptr<const IblBakeResult> result;
-                    std::shared_ptr<const SceneMaterialPacket> packet;
+                    own::shared_owner<const MeshSurfaceBatch> mesh;
+                    own::shared_owner<const SurfaceBatch> surface;
+                    own::shared_owner<const IblBakeResult> result;
+                    own::shared_owner<const SceneMaterialPacket> packet;
                     Check(meshEvaluator.Record(device, sealed, mesh, error), "GPU skin/world " + error);
                     Check(evaluators[tier].RecordGpu(device, materialBindings, mesh, surface, error),
                           "GPU world -> graph " + error);
@@ -2360,11 +2375,11 @@ namespace
                     const auto acceptedPacket = packet;
                     auto wrongEvaluation = evaluation;
                     ++wrongEvaluation.viewRevision;
-                    Check(!preparePacket(wrongEvaluation) && packet == acceptedPacket,
+                    Check(!preparePacket(wrongEvaluation) && material_graph_test::SamePinnedObject(packet, acceptedPacket),
                           "Scene source identity mismatch preserves packet");
                     wrongEvaluation = evaluation;
                     wrongEvaluation.points.push_back({});
-                    Check(!preparePacket(wrongEvaluation) && packet == acceptedPacket,
+                    Check(!preparePacket(wrongEvaluation) && material_graph_test::SamePinnedObject(packet, acceptedPacket),
                           "Ambiguous CPU/GPU evaluation preserves packet");
                     result = packet->ibl;
                     Check(surface->Matches(*instances[tier], *mesh), "Exact GPU source identity");
@@ -2430,7 +2445,7 @@ namespace
                     Check(device.EndFrame(error), "Submit");
                     Check(GetRHISubmissionThread().DrainSubmissions(&device, error), "Native submit");
                     const RHICompletionPoint submitted{device.GetLastSignaledFenceValue()};
-                    Check(!slot.PublishSubmitted(recording, submitted, error) && slot.Active() == lastGood,
+                    Check(!slot.PublishSubmitted(recording, submitted, error) && material_graph_test::SamePinnedObject(slot.Active(), lastGood),
                           "Submission alone does not publish an unvalidated GPU evaluation");
                     device.WaitForGpu();
                     std::array<RHIReadbackImage, 5> mapped;
@@ -2445,7 +2460,7 @@ namespace
                           "Graph acceptance requires accepted geometry first");
                     Check(mesh->ValidateReadback({worldPoints, kPoints}, error), "Geometry acceptance " + error);
                     Check(surface->ValidateReadback({materialPoints, kPoints}, error), "Graph acceptance " + error);
-                    Check(slot.PublishSubmitted(recording, submitted, error) && slot.Active() == packet,
+                    Check(slot.PublishSubmitted(recording, submitted, error) && material_graph_test::SamePinnedObject(slot.Active(), packet),
                           "Completed accepted GPU evaluation publishes owning packet");
                     for (unsigned i = 0; i < kPoints; ++i)
                     {
@@ -2521,10 +2536,10 @@ namespace
                                  cube, environmentColors, table, view, tier, frames);
             }
             auto geometry = GeometryFixture(assets::kCoreVertexAttributes, 0);
-            std::shared_ptr<const MeshSurfaceInput> sealed;
+            own::shared_owner<const MeshSurfaceInput> sealed;
             Check(MeshSurfaceInput::Seal(geometry.draw, view, geometry.lods, sealed, error), "Abort source seal");
             Check(device.BeginFrame(error), "Mesh abort begin");
-            std::shared_ptr<const MeshSurfaceBatch> aborted;
+            own::shared_owner<const MeshSurfaceBatch> aborted;
             Check(meshEvaluator.Record(device, sealed, aborted, error), "Unsubmitted mesh transform");
             device.AbortFrame();
             Check(device.BeginFrame(error), "Mesh abort reuse begin");
@@ -2532,7 +2547,7 @@ namespace
             own::shared_owner<const RenderBindings> materialBindings;
             Check(bindings.Prepare(device, textures, instances[0], evaluators[0].Layout(), materialBindings, error),
                   "Abort material bindings");
-            std::shared_ptr<const SurfaceBatch> rejected;
+            own::shared_owner<const SurfaceBatch> rejected;
             Check(!evaluators[0].RecordGpu(device, materialBindings, aborted, rejected, error) && !rejected,
                   "Aborted unvalidated geometry cannot cross recordings");
             device.AbortFrame();
@@ -2550,7 +2565,7 @@ namespace
             textures.BeginFrame(++frames);
             Check(bindings.Prepare(device, textures, instances[0], evaluators[0].Layout(), materialBindings, error),
                   "Invalid frame material bindings");
-            std::shared_ptr<const MeshSurfaceBatch> collapsed;
+            own::shared_owner<const MeshSurfaceBatch> collapsed;
             Check(meshEvaluator.Record(device, sealed, collapsed, error), "Record eye-coincident transform");
             Check(evaluators[0].RecordGpu(device, materialBindings, collapsed, rejected, error),
                   "Record invalid frame graph candidate");
@@ -2566,7 +2581,7 @@ namespace
             RHIGraphicsPipelineDesc invalidPipeline;
             invalidPipeline.layout = sceneLayouts[0].material.handle;
             invalidPipeline.rtvFormats[0] = RHIFormat::RGBA32Float;
-            std::shared_ptr<const SceneMaterialPacket> invalidPacket;
+            own::shared_owner<const SceneMaterialPacket> invalidPacket;
             Check(slot.Prepare(textures, pipelines, bindings, baker, invalidEvaluation, environment, coverage,
                                sceneLayouts[0], invalidPipeline, RHIShaderBinary::Dxil,
                                {.coreForward = true, .layeredLookup = true}, {}, invalidPacket, error),
@@ -2596,16 +2611,16 @@ namespace
                   "GPU geometry failure identifies the vertex");
             Check(!rejected->ValidateReadback({mapped[1].Elements<IblBakePoint>(), kPoints}, error),
                   "Invalid source cannot be accepted downstream");
-            Check(!slot.PublishSubmitted(recording, submitted, error) && slot.Active() == lastGood,
+            Check(!slot.PublishSubmitted(recording, submitted, error) && material_graph_test::SamePinnedObject(slot.Active(), lastGood),
                   "Completed invalid geometry cannot replace the last good Scene packet");
             slot.RejectSubmitted(recording);
-            Check(slot.Active() == lastGood && slot.RetainedRecordingCount() == 0,
+            Check(material_graph_test::SamePinnedObject(slot.Active(), lastGood) && slot.RetainedRecordingCount() == 0,
                   "Rejected completed candidate releases submission owners");
             std::string messages;
             Check(device.DrainDebugMessages(messages) == 0, "GPU failure-path validation: " + messages);
             geometry = GeometryFixture(assets::kCoreVertexAttributes, 0);
             Check(MeshSurfaceInput::Seal(geometry.draw, view, geometry.lods, sealed, error), "Prefix source seal");
-            std::shared_ptr<const MeshSurfaceBatch> prefixMesh;
+            own::shared_owner<const MeshSurfaceBatch> prefixMesh;
             // Each allocation can submit the old recording. A failed candidate must
             // never enter that submitted prefix, even through a resource barrier.
             for (unsigned failure = 1; failure <= 6; ++failure)
@@ -2618,7 +2633,7 @@ namespace
                 device.flushUploadCountdown = failure <= 4 ? failure : 0;
                 device.flushOnBindings = failure == 5;
                 device.failBindings = failure == 6;
-                Check(!meshEvaluator.Record(device, sealed, prefixMesh, error) && prefixMesh == preservedMesh,
+                Check(!meshEvaluator.Record(device, sealed, prefixMesh, error) && material_graph_test::SamePinnedObject(prefixMesh, preservedMesh),
                       "Allocation failure preserves the previous mesh result");
                 Check(error.find("allocation changed recording/descriptors") != std::string::npos,
                       "Failed transform reports its allocation transaction");
@@ -2686,7 +2701,7 @@ namespace
                 device.failMaterialTable = failure == 0;
                 device.flushOnMaterialTable = failure == 1;
                 Check(!evaluators[0].RecordGpu(device, materialBindings, prefixMesh, prefixSurface, error) &&
-                          prefixSurface == preservedSurface,
+                          material_graph_test::SamePinnedObject(prefixSurface, preservedSurface),
                       "Surface table failure preserves the previous accepted result");
                 Check(error == (failure == 0 ? "LX bindless texture table allocation failed."
                                              : "LX bindless texture table allocation changed recording/descriptors."),
@@ -2808,7 +2823,7 @@ namespace
             auto bakeCandidate = preservedBake;
             device.flushOnUpload = true;
             Check(!baker.RecordGpu(device, environment, rejected, bakeCandidate, error) &&
-                      bakeCandidate == preservedBake,
+                      material_graph_test::SamePinnedObject(bakeCandidate, preservedBake),
                   "Allocation prefix submission cannot mix bake descriptor/upload recordings");
             device.AbortFrame();
             device.WaitForGpu();
@@ -2816,13 +2831,13 @@ namespace
             Check(device.BeginFrame(error), "Prefix sampling begin");
             Check(meshEvaluator.Record(device, sealed, prefixMesh, error), "Prefix sampling vertices");
             const auto requests = SampleRequests();
-            std::shared_ptr<const MeshSurfaceBatch> prefixSamples;
+            own::shared_owner<const MeshSurfaceBatch> prefixSamples;
             Check(meshEvaluator.RecordSamples(device, prefixMesh, requests, prefixSamples, error),
                   "Prefix retained samples");
             const auto preservedSamples = prefixSamples;
             device.flushOnUpload = true;
             Check(!meshEvaluator.RecordSamples(device, prefixMesh, requests, prefixSamples, error) &&
-                      prefixSamples == preservedSamples,
+                      material_graph_test::SamePinnedObject(prefixSamples, preservedSamples),
                   "Native prefix cannot mix triangle sampling upload/descriptor recordings");
             device.AbortFrame();
             device.WaitForGpu();

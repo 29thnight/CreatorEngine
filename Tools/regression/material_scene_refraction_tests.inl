@@ -238,7 +238,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             Check(host.PrepareResidency(context, input, error), "Refraction residency " + error);
             Check(tiles.PrepareFrame(context, error),
                   "Refraction Scene prepare " + error);
-            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+            auto graph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
             if (workers)
             {
                 pool.BeginFrame(static_cast<std::uint32_t>(context.frameId));
@@ -251,7 +251,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             Check(bool(accepted), "Refraction frame exists");
             budget.refractionBytes = 1;
              Check(!host.Prepare(context, input, environment, {}, {}, {}, budget, error, environment.IsValid() ? 1 : 0) &&
-                      host.RefractionFrame() == accepted,
+                      material_graph_test::SamePinnedObject(host.RefractionFrame(), accepted),
                   "Refraction budget failure preserves prior frame");
             ++failures;
             gbuffer.Declare(*graph, context);

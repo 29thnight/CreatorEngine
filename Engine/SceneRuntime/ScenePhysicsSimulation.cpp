@@ -1,4 +1,4 @@
-﻿#include "ScenePhysicsSimulation.h"
+#include "ScenePhysicsSimulation.h"
 #include "../Physics/PhysicsTestHooks.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include <stdint.h>
@@ -460,6 +460,7 @@ result<void> ScenePhysicsSimulation::Start(const scene_config& config)
         m_nextRender.clear();
         m_renderPrepared.clear();
         m_accumulator = m_dropped = 0;
+    m_externalAlpha = -1;
         return {};
     }
     catch (const std::bad_alloc&)
@@ -494,10 +495,22 @@ result<void> ScenePhysicsSimulation::Stop()
         m_changedCharacters.push_back({id, value.state});
     }
     m_accumulator = m_dropped = 0;
+    m_externalAlpha = -1;
     return {};
 }
 
 result<std::uint32_t> ScenePhysicsSimulation::Advance(double seconds)
+{
+    m_externalAlpha = -1;
+    return AdvanceInternal(seconds, false);
+}
+
+result<std::uint32_t> ScenePhysicsSimulation::Step()
+{
+    return AdvanceInternal(fixed_seconds, true);
+}
+
+result<std::uint32_t> ScenePhysicsSimulation::AdvanceInternal(double seconds, bool singleStep)
 {
     if (auto owner = RequireOwner(); !owner)
         return std::unexpected(owner.error());
@@ -508,12 +521,15 @@ result<std::uint32_t> ScenePhysicsSimulation::Advance(double seconds)
     m_changedCharacters.clear();
     if (!m_runtime || seconds == 0)
         return 0;
+    if (!singleStep)
+    {
     const auto budget = fixed_seconds * max_catchup_ticks;
     const auto accepted = (std::min)(seconds, budget - m_accumulator);
     m_accumulator += accepted;
     const auto discarded = seconds - accepted;
     m_dropped = discarded > (std::numeric_limits<double>::max)() - m_dropped ? (std::numeric_limits<double>::max)()
                                                                              : m_dropped + discarded;
+    }
     if (++m_publication == 0)
     {
         for (auto& value : m_entries | std::views::values)
@@ -521,7 +537,7 @@ result<std::uint32_t> ScenePhysicsSimulation::Advance(double seconds)
         m_publication = 1;
     }
     std::uint32_t ticks = 0;
-    while (m_accumulator + 1e-12 >= fixed_seconds && ticks < max_catchup_ticks)
+    while (singleStep ? ticks == 0 : (m_accumulator + 1e-12 >= fixed_seconds && ticks < max_catchup_ticks))
     {
         if (auto moved = MoveCharacters(); !moved)
             return std::unexpected(moved.error());
@@ -587,7 +603,7 @@ result<std::uint32_t> ScenePhysicsSimulation::Advance(double seconds)
         }
         prepare();
         ++ticks;
-        m_accumulator = (std::max)(0.0, m_accumulator - fixed_seconds);
+        if (!singleStep) m_accumulator = (std::max)(0.0, m_accumulator - fixed_seconds);
         const auto completedTick = m_runtime->status().last_tick.value;
 
         ce::profile_context_scope mergeContext{{m_runtime->status().identity.value, completedTick, 0}};
@@ -736,6 +752,7 @@ void ScenePhysicsSimulation::Reset(character_entry& value)
     value.handle = {};
     value.state = {};
     value.state.collision.position = value.definition.capsule.position;
+    value.previous = value.state.collision.position;
     value.state.collision.foot_position =
         value.definition.capsule.position -
         math::vector3{0,
@@ -848,6 +865,7 @@ result<void> ScenePhysicsSimulation::SetCharacterEnabled(binding_id id, bool ena
         }
     }
     value.enabled = enabled;
+    value.previous = value.state.collision.position;
     return {};
 }
 
@@ -929,6 +947,7 @@ result<void> ScenePhysicsSimulation::TeleportCharacter(binding_id id, math::vect
     if (!state)
         return std::unexpected(state.error());
     (*value)->state.collision = *state;
+    (*value)->previous = state->position; // Teleports never blend through old space.
     (*value)->state.fall_velocity = 0;
     (*value)->state.motion = {};
     return {};
@@ -979,6 +998,7 @@ result<void> ScenePhysicsSimulation::MoveCharacters()
             value.handle, {step->displacement, static_cast<float>(fixed_seconds), value.definition.minimum_distance});
         if (!moved)
             return std::unexpected(moved.error());
+        value.previous = value.state.collision.position;
         value.state.collision = *moved;
         value.state.motion = step->motion;
         value.state.fall_velocity =
@@ -1016,6 +1036,18 @@ result<void> ScenePhysicsSimulation::SetKinematicTarget(binding_id id, const pos
         return std::unexpected(body.error());
 
     return m_runtime->set_kinematic_target(*body, requested);
+}
+
+result<math::vector3> ScenePhysicsSimulation::RenderCharacterPosition(binding_id id) const
+{
+    if (auto owner = RequireOwner(); !owner) return std::unexpected(owner.error());
+    const auto found = m_characters.find(id);
+    if (found == m_characters.end())
+        return std::unexpected(error{error_code::stale_handle, 0, "Unknown character render binding"});
+    const auto& value = found->second;
+    const auto current = value.state.collision.position;
+    if (!m_runtime || !value.handle) return current;
+    return value.previous + (current - value.previous) * static_cast<float>(InterpolationAlpha());
 }
 
 result<pose> ScenePhysicsSimulation::RenderPose(binding_id id) const

@@ -1,4 +1,7 @@
 #pragma once
+#include "SimulationTick.h"
+#include "SimulationExchange.h"
+#include "SceneObservation.h"
 #include "Ownership.h"
 #include "SceneGC.h"
 #include "Object.h"
@@ -31,6 +34,11 @@ private:
     // Declared first: every root, callback and graph object is released before
     // the one shared GameThread domain is destroyed. DDOL never crosses domains.
     gc::domain m_gcDomain;
+    Runtime::SimulationTick m_simulationTick;
+    std::uint64_t m_simulationEpoch = 0;
+    Runtime::SimulationExchange m_simulationExchange;
+    Runtime::SceneObservation m_observation;
+    Runtime::LocalPositionValue m_tickPositionTarget{};
 
     friend class Singleton<SceneManager>;
     SceneManager();
@@ -79,6 +87,10 @@ public:
     void SetSimulationPhase(ScenePhase phase);
     void Initialization();
     void Physics(float deltaSecond);
+    Runtime::SceneObservation& Observations() noexcept { return m_observation; }
+    // Native transport adapter: concurrent Submit/Read, GT-only Bind/Reset.
+    Runtime::SimulationExchange& SimulationCommands() noexcept { return m_simulationExchange; }
+    void ResetSimulationCommands();
     void InputEvents(float deltaSecond);
     // ⚠ 기본 인자를 두지 않는다(E3-7). 예전에는 `= 0`이라 편집 모드 호출부가
     //   인자를 생략해 delta 0이 조용히 들어갔고, "delta 0은 일시정지에서만"이라는

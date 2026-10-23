@@ -22,7 +22,7 @@ public sealed partial class AnimatorProbe : Component
     private int _passed;
     private int _failed;
 
-    public override void OnInitialized()
+    public void OnInitialized()
     {
         _animator = GetComponent<Animator>();
 

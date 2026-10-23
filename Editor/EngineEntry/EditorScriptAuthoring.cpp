@@ -41,7 +41,7 @@ namespace EditorScriptAuthoring
             }
             for (const auto& entry : std::filesystem::recursive_directory_iterator(root))
             {
-                if (entry.is_regular_file() && _wcsicmp(entry.path().extension().c_str(), L".cs") == 0)
+                if (entry.is_regular_file() && (_wcsicmp(entry.path().extension().c_str(), L".fs") == 0 || entry.path().filename() == L"compile.order"))
                 {
                     std::ifstream input(entry.path(), std::ios::binary);
                     if (!input)
@@ -122,7 +122,7 @@ namespace EditorScriptAuthoring
                     return FailWork(work, "Compiling scripts in a source checkout requires the .NET SDK (dotnet.exe on PATH).");
                 program = dotnet.data();
                 workingDirectory = checkout.repository;
-                arguments = {L"build", (checkout.repository / L"GameScripts/GameScripts.csproj").wstring(), L"-c", checkout.configuration,
+                arguments = {L"build", (checkout.repository / L"GameScripts/GameScripts.fsproj").wstring(), L"-c", checkout.configuration,
                     L"--nologo", L"-v", L"quiet", L"-p:CreatorScriptSourceRoot=" + (projectRoot / L"Assets/Script").wstring(),
                     L"-flp:logfile=" + work.log.wstring() + L";verbosity=minimal"};
             }
@@ -230,8 +230,8 @@ namespace EditorScriptAuthoring
         if (!check.IsSuccess()) return check;
         if (name.empty() || name.size() > 100 || !(std::isalpha(static_cast<unsigned char>(name[0])) || name[0] == '_')
             || !std::ranges::all_of(name, [](unsigned char ch) { return ch < 128 && (std::isalnum(ch) || ch == '_'); }))
-            return CommandCore::InvalidArguments("Use a C# class name containing letters, numbers and underscores, starting with a letter or underscore.");
-        constexpr std::string_view keywords = "|abstract|as|base|bool|break|byte|case|catch|char|checked|class|const|continue|decimal|default|delegate|do|double|else|enum|event|explicit|extern|false|finally|fixed|float|for|foreach|goto|if|implicit|in|int|interface|internal|is|lock|long|namespace|new|null|object|operator|out|override|params|private|protected|public|readonly|ref|return|sbyte|sealed|short|sizeof|stackalloc|static|string|struct|switch|this|throw|true|try|typeof|uint|ulong|unchecked|unsafe|ushort|using|virtual|void|volatile|while|";
+            return CommandCore::InvalidArguments("Use an F# type name containing letters, numbers and underscores, starting with a letter or underscore.");
+        constexpr std::string_view keywords = "|let|do|match|with|type|module|member|inherit|interface|val|mutable|open|fun|function|use|yield|return|then|elif|in|of|rec|and|begin|end|abstract|as|base|bool|break|byte|case|catch|char|checked|class|const|continue|decimal|default|delegate|do|double|else|enum|event|explicit|extern|false|finally|fixed|float|for|foreach|goto|if|implicit|in|int|interface|internal|is|lock|long|namespace|new|null|object|operator|out|override|params|private|protected|public|readonly|ref|return|sbyte|sealed|short|sizeof|stackalloc|static|string|struct|switch|this|throw|true|try|typeof|uint|ulong|unchecked|unsafe|ushort|using|virtual|void|volatile|while|";
         const auto lower = editor::components::SearchKey(name);
         if (keywords.find("|" + name + "|") != std::string_view::npos || lower == "con" || lower == "prn" || lower == "aux" || lower == "nul"
             || (lower.size() == 4 && (lower.starts_with("com") || lower.starts_with("lpt")) && lower[3] >= '1' && lower[3] <= '9'))
@@ -243,15 +243,27 @@ namespace EditorScriptAuthoring
             return CommandCore::InvalidArguments("This script class already exists. Add it from Scripts or choose another name.");
         try
         {
-            const auto source = PathFinder::BaseProjectPath() / L"Assets/Script" / (name + ".cs");
+            const auto source = PathFinder::BaseProjectPath() / L"Assets/Script" / (name + ".fs");
             std::filesystem::create_directories(source.parent_path());
             HANDLE fileHandle = CreateFileW(source.c_str(), GENERIC_WRITE, 0, nullptr, CREATE_NEW, FILE_ATTRIBUTE_NORMAL, nullptr);
             if (fileHandle == INVALID_HANDLE_VALUE) return CommandCore::InvalidArguments("Cannot create this file. It may already exist or the folder may be read-only.");
-            const std::string text = "namespace CreatorEngine.Scripts;\n\npublic sealed partial class " + name + " : global::CreatorEngine.Component\n{\n    public override void OnBeginSimulation()\n    {\n    }\n}\n";
+            const std::string text =
+                "namespace CreatorEngine.Scripts\n\n"
+                "open CreatorEngine\n\n"
+                "type " + name + "() =\n"
+                "    inherit Component()\n";
             DWORD written = 0;
             const bool saved = WriteFile(fileHandle, text.data(), static_cast<DWORD>(text.size()), &written, nullptr) && written == text.size();
             CloseHandle(fileHandle);
             if (!saved) return CommandCore::Fail("script.write_failed", "Could not write the complete script file.");
+            const auto orderPath = source.parent_path() / L"compile.order";
+            bool separator = false;
+            { std::ifstream existing(orderPath, std::ios::binary | std::ios::ate);
+              if (existing && existing.tellg() > 0) { existing.seekg(-1, std::ios::end); separator = existing.get() != '\n'; } }
+            std::ofstream order(orderPath, std::ios::app | std::ios::binary);
+            if (separator) order << "\n";
+            order << source.filename().string() << "\n";
+            if (!order) return CommandCore::Fail("script.order_failed", "Could not append the F# compile order.");
             work.target = target;
             work.automatic = false;
             work.source = source;
@@ -300,6 +312,7 @@ namespace EditorScriptAuthoring
         std::lock_guard lock(work.mutex);
         work.pending = false;
         if (work.status.busy) FailWork(work, "Compilation cancelled. The script file is kept.");
+        work.status.type.clear();
     }
     void Tick()
     {
@@ -316,6 +329,12 @@ namespace EditorScriptAuthoring
         }
         if (!work.status.busy)
         {
+            // Preserve a failed explicit attachment until Retry or Cancel. A file
+            // watcher rebuild must not replace its original entity/type request.
+            if (!work.automatic && !work.status.succeeded && !work.status.type.empty())
+            {
+                return;
+            }
             if (!work.pending || std::chrono::steady_clock::now() - work.changedAt < std::chrono::milliseconds(650))
             {
                 return;
@@ -392,13 +411,13 @@ namespace EditorScriptAuthoring
         work.status.busy = false;
         work.status.succeeded = result.IsSuccess();
         work.status.message = result.IsSuccess()
-            ? (work.automatic ? "Changed C# scripts compiled and reconnected." : work.source.filename().string() + " compiled and added to the original entity.")
+            ? (work.automatic ? "Changed F# scripts compiled and reconnected." : work.source.filename().string() + " compiled and added to the original entity.")
             : result.message;
         Debug::PrintLog(result.IsSuccess() ? spdlog::level::info : spdlog::level::err, work.status.message);
     }
     void NotifySourceChanged(const std::filesystem::path& source)
     {
-        if (_wcsicmp(source.extension().c_str(), L".cs") != 0)
+        if (_wcsicmp(source.extension().c_str(), L".fs") != 0 && source.filename() != L"compile.order")
         {
             return;
         }

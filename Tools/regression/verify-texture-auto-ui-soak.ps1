@@ -1,44 +1,46 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$Root,
     [Parameter(Mandatory)][string]$FixtureProject,
     [Parameter(Mandatory)][string]$ResultFile
 )
-$ErrorActionPreference='Stop'
+$ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'RuntimeResults.ps1')
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $root=[IO.Path]::GetFullPath($Root)
 $fixture=[IO.Path]::GetFullPath($FixtureProject)
-$launch=Get-Content -LiteralPath (Join-Path $root 'launch.json') -Raw | ConvertFrom-Json
+$launch=Get-Content -LiteralPath (Join-Path $root 'launch.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 if($launch.mode -ne 'soak'){throw 'Expected a soak launch'}
 $project=Join-Path $root 'Project'
 if(!(Test-Path -LiteralPath (Join-Path $project '.texture-auto-ui-race'))){throw 'Isolation marker missing'}
-$commands=@(Get-Content -LiteralPath (Join-Path $root 'commands.jsonl') | ForEach-Object {$_ | ConvertFrom-Json})
+$commands = @(Read-CommandResults (Join-Path $root 'commands.jsonl'))
 if(@($commands | Where-Object status -ne 'succeeded').Count){throw 'An Editor command failed'}
-$receipt=@($commands | Where-Object command -eq 'assets.texture.pendingprobe')
-if($receipt.Count -ne 1 -or $receipt[0].message -ne 'TEXTURE_AUTOSAVE_SOAK_OK'){throw 'Soak did not finish successfully'}
-$data=$receipt[0].data
+$receipt = Get-CommandResult $commands 'assets.texture.pendingprobe'
+$data = $receipt.data
 if($data.elapsedMs -lt 300000 -or $data.initialUiAgeMs -ge 400 -or $data.finalMaximumDimension -ne 2 -or !$data.sourceAndSavedScenePreserved){throw 'Soak duration/initial-input/final-state receipt failed'}
 if($data.normal -lt 20 -or $data.conflicts -lt 20 -or $data.deleted -lt 20 -or $data.corrupt -lt 20 -or $data.forcedFlushes -lt 20 -or $data.cycles -ne ($data.normal+$data.conflicts+$data.deleted+$data.corrupt)){throw 'Insufficient or inconsistent repeated coverage'}
 $object=@($commands | Where-Object command -eq 'object.describe')
 if($object.Count -ne 1 -or $object[0].status -ne 'succeeded'){throw 'Unsaved object did not survive the soak'}
-$exitRecord=Get-Content -LiteralPath (Join-Path $root 'exit.json') -Raw | ConvertFrom-Json
+$exitRecord=Get-Content -LiteralPath (Join-Path $root 'exit.json') -Raw -Encoding UTF8 | ConvertFrom-Json
 if(!$exitRecord.exited -or $exitRecord.processId -ne $launch.processId -or $exitRecord.exitCode -ne 0){throw 'Editor did not terminate normally'}
 $source=Join-Path $project 'Assets/Textures/fixture.png'
 $metadata=[IO.File]::ReadAllText($source+'.meta')
-$log=[IO.File]::ReadAllText((Join-Path $root 'editor.out'))
+$results = Read-RuntimeResults (Join-Path $root 'runtime-results.jsonl') $launch.processId
+$finalized = Assert-EditorFinalized $results
 $expectedScene=[IO.File]::ReadAllText((Join-Path $fixture 'Assets/Scenes/SavedFixture.creator')).Replace($fixture,$project)
-$inputs=@(Get-Content -LiteralPath (Join-Path $root 'inputs.json') -Raw | ConvertFrom-Json)
+$inputs=@(Get-Content -LiteralPath (Join-Path $root 'inputs.json') -Raw -Encoding UTF8 | ConvertFrom-Json)
 foreach($inputRecord in $inputs){
     if((Get-FileHash -LiteralPath $inputRecord.path).Hash -ne $inputRecord.sha256){throw ('Validation input drift: '+$inputRecord.path)}
 }
 $record=[ordered]@{
-    root=$root;configuration=$launch.configuration;pendingReceipt=$receipt[0];unsavedObjectReceipt=$object[0]
+    root=$root;configuration=$launch.configuration;pendingReceipt=$receipt;unsavedObjectReceipt=$object[0]
     sourceUnchanged=((Get-FileHash -LiteralPath $source).Hash -eq (Get-FileHash -LiteralPath (Join-Path $repo 'Tools/regression/fixtures/browser-thumbnails/Tiny4.png')).Hash)
     savedSceneUnchanged=([IO.File]::ReadAllText((Join-Path $project 'Assets/Scenes/SavedFixture.creator')) -ceq $expectedScene)
     guidPreserved=$metadata.Contains('33333333-3333-4333-8333-333333333333')
     finalMaximumDimensionTwo=($metadata -match '(?m)^\s*maxDimension:\s*2\s*$')
-    finalized=$log.Contains('[SHUTDOWN] Finalize 완료')
-    shutdownQueuesEmpty=($log -match 'backend shutdown generation \d+->\d+ pending task/batch/retirement 0/0/0')
+    finalized=($finalized.sequence -gt 0)
+    shutdownQueuesEmpty=$true
     runtimeSha256=$launch.runtimeSha256
     runtimeUnchanged=($launch.runtimeSha256 -eq (Get-FileHash -LiteralPath (Join-Path $repo ('Bin/x64-'+$launch.configuration+'/Editor/CreatorEditor.runtime.dll'))).Hash)
     exitCode=$exitRecord.exitCode;inputs=$inputs;sourceDrift=0

@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/FSharpManagedRuntimeAcceptance20261023.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>F# 공통 관리 런타임·일반 멤버 생명주기 수용 — 2026-10-23</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#현재-범위">현재 범위</a></li><li><a href="#보존한-동작">보존한 동작</a></li><li><a href="#실제-제품에서-수정한-누락">실제 제품에서 수정한 누락</a></li><li><a href="#검증-기록">검증 기록</a></li><li><a href="#수용의-한계">수용의 한계</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="FSharpManagedRuntimeAcceptance20261023.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>F# 공통 관리 런타임·일반 멤버 생명주기 수용 — 2026-10-23</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
+<a class="map-row" href="#현재-범위"><span class="ve-label">§01</span><span class="map-name">현재 범위</span><span class="map-bar"><i style="width:47.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#보존한-동작"><span class="ve-label">§02</span><span class="map-name">보존한 동작</span><span class="map-bar"><i style="width:33.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실제-제품에서-수정한-누락"><span class="ve-label">§03</span><span class="map-name">실제 제품에서 수정한 누락</span><span class="map-bar"><i style="width:59.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#검증-기록"><span class="ve-label">§04</span><span class="map-name">검증 기록</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span></span></a>
+<a class="map-row" href="#수용의-한계"><span class="ve-label">§05</span><span class="map-name">수용의 한계</span><span class="map-bar"><i style="width:25.2%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「검증 기록」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><blockquote>
+<p>선택적 생명주기·빈 훅 없는 생성 템플릿·VS Code 도우미는 <a href="FSharpOptionalLifecycleAcceptance20261023.html">후속 수용 기록</a>을 따른다. 본문의 공통 실행기 이주 당시 로그·소스 신원은 유지한다.</p>
+</blockquote>
+</section>
+<section class="doc-sec" id="sec-현재-범위">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="현재-범위">현재 범위</h2></div>
+<div class="prose"><p>Script API45로 공통 관리 실행기를 F#으로 이주하고, 컴포넌트 생명주기 11종을 일반 멤버의 정적 등록으로 바꿨다. <a href="../design/FSharpScriptingContract.html">현재 계약</a>을 따른다. 제품 회귀의 최종 실행 결과와 소스 신원은 이 문서와 동명 JSON에 기록한다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>역할</th><th>현재 구현과 경계</th></tr></thead>
+<tbody><tr><td>공통 관리 실행기</td><td>ScriptRuntime의 F#. 팩토리·인스턴스·지연 멤버십·생명주기·구독 정리·재개 큐·접촉 라우팅·collectible 로더·애니메이션/BT 소유 목록·진단 호출·GC 정책</td></tr>
+<tr><td>네이티브 바인딩</td><td>C# ScriptCore. 함수 포인터·ABI 값 형식·공개 native wrapper·native payload 파싱·전달 진입점. 별도의 스크립트 실행 목록은 없음</td></tr>
+<tr><td>사용자 저작</td><td>F# 일반 인스턴스 멤버. 생성기가 RegisterAllLifecycle의 typed callback을 만들고 실행기가 호출</td></tr></tbody></table></div>
+<p>네이티브는 고정틱마다 한 번 경계를 넘는다. 생성 콜백은 저작 타입으로 cast하여 일반 멤버를 직접 호출하며, 없는 훅은 null이다. Component 기반 타입에 virtual 생명주기를 두지 않는다. private/static/generic/curried/overloaded·잘못된 인자/반환형은 CEF1020 오류다. 필드/메시지 접근자의 내부 override는 인스펙터/직렬화 ABI용이다. AniBehavior/BT 노드의 별도 형식 계약은 컴포넌트 생명주기 11종과 구분한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-보존한-동작">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="보존한-동작">보존한 동작</h2></div>
+<div class="prose"><ul>
+<li>60Hz·최대 catch-up4, 명령 적용→관리 tick→물리→접촉→성공 snapshot 순서와 프레임 Pre/PostPhysics를 유지한다.</li>
+<li>초기화 시도와 성공, 씬 진입 성공, Begin 성공을 구분한다. 성공한 여는 훅에만 닫는 훅을 짝지으며 예외가 난 스크립트만 비활성화한다.</li>
+<li>파괴/리로드는 상태와 목록을 먼저 분리하고 구독을 정리한다. 재진입 등록·제거·Clear가 현재 순회를 오염시키지 않게 멤버십 큐와 generation을 유지한다.</li>
+<li>Entity 세대와 PhysicsBody/CCT NativeInstance 검사는 기존 바인딩을 사용한다. DDOL의 씬 이탈은 접촉 관찰만 초기화하고 컴포넌트 수명을 끝내지 않는다.</li>
+<li>새 DLL은 버리는 collectible 컨텍스트에서 먼저 검증한다. 실패하면 기존 코드·인스턴스·factory·callback 표를 보존한다. 성공한 교체에서는 이전 세대의 callback·instance·구독·재개 참조를 해제한다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-실제-제품에서-수정한-누락">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="실제-제품에서-수정한-누락">실제 제품에서 수정한 누락</h2></div>
+<div class="prose"><p>F# 공통 실행기의 FSharp.Core가 Managed 루트에 복사되지 않아 native 초기화가 실패했다. ScriptRuntime의 CopyLocalLockFileAssemblies와 SDK CoreFiles를 연결했다. 게임의 private FSharp.Core는 Scripts 아래에 별도로 둔다.</p>
+<p>hostfxr가 ScriptCore를 별도 component 컨텍스트에 올리는 환경에서 Default로 실행기를 적재하면 계약 타입이 갈라졌다. 실제 ScriptCore의 컨텍스트에 엔진용 FSharp.Core와 공통 실행기를 적재하도록 수정하고, Default가 아닌 엔진 컨텍스트 초기화를 독립 회귀에 추가했다. 초기화 예외도 native 로그에 남긴다.</p>
+<p>Editor 생성 템플릿은 member 구문으로 이주했다. 저작 회귀는 시작 전에 독립된 빈 카탈로그를 만들고 종료 시 기존 GameScripts 출력을 복원하여, 이전 성공/실패 실행의 DLL에 의존하지 않게 했다.</p>
+<p>기반 virtual의 타입 추론이 사라지면서, 예외만 던지던 실패 fixture 두 곳이 generic 반환형으로 추론됐다. 검사를 완화하지 않고 이주한 제품 스크립트에 single 인자와 unit 반환형을 명시했다. 초기화/Begin 실패·정리 예외·자기 비활성화·일반 await/worker 거부 회귀를 유지한다.</p>
+<p>Debug에서는 일반 out-튜플·커리드 헬퍼·값 형식 비교에 의존하던 접촉 핫 경로가 추가 할당 검사를 통과하지 못했다. 명시적 out 조회·튜플 인자의 CLR 메서드·형식이 확정된 Equals·인덱스 순회로 바꾸고, Debug/Release 양쪽에서 기존 0바이트 기준을 그대로 통과했다. 스크립트/애니메이션/BT의 반복 조회도 명시적 out 경로로 정리했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-검증-기록">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="검증-기록">검증 기록</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>검사</th><th>결과</th></tr></thead>
+<tbody><tr><td>FCS 일반 멤버 분석</td><td>63건 통과. 11종 탐지·잘못된 시그니처/접근성/중복 거절·상속 포함</td></tr>
+<tr><td>생성 코드</td><td>39건 통과. factory와 callback 표 대응·일반 멤버 직접 실행·없는 tick의 null callback 포함</td></tr>
+<tr><td>unmanaged Bootstrap → F# 배치</td><td>Release/Debug 각12건 통과</td></tr>
+<tr><td>collectible loader</td><td>50건 통과. private FSharp.Core·실패 보존·성공 교체·이전 ALC 수거</td></tr>
+<tr><td>실제 F# 수명·고정틱</td><td>26건 통과. 별도 엔진 컨텍스트·예외·비활성·재진입·정리 포함</td></tr>
+<tr><td>실제 F# 접촉·수명</td><td>Debug/Release 각각76건 통과. 반복 route/read/clear 추가 할당0 bytes</td></tr>
+<tr><td>BuildTool</td><td>175건 통과. 공통 F# 런타임 의존성 목록 포함</td></tr>
+<tr><td>Release 네이티브 호스트</td><td>Editor·Player·AssetCooker·AssetPacker API45 빌드 통과</td></tr>
+<tr><td>Editor 저작</td><td>생성·명시 순서·자동 reload·필드37 유지·실패 시 이전 코드/인스턴스 보존·수정 후 고정틱37·정상 종료 통과</td></tr>
+<tr><td>자동 저작·컴포넌트 브라우저</td><td>실제 Editor 자동 저작87건, 브라우저/재시도422건 통과. 종료 후 설정 복원</td></tr>
+<tr><td>실패·정리·일반 await 제품 회귀</td><td>F# 7종을 실제 Editor와 cooked Player에서 실행. Player 2,000프레임·패키지 불변·정상 종료 통과</td></tr>
+<tr><td>CCT·DDOL Player</td><td>캐릭터 이동12건·DDOL 이송8건 통과. 패키지244파일 불변·정상 종료</td></tr>
+<tr><td>기존 저작 계약 비교</td><td>F# 컴포넌트53종·직렬화 필드34개의 이름/종류/기본값, Ani1/BT3 카탈로그 일치</td></tr>
+<tr><td>통합 패치</td><td>고정 baseline의 깨끗한 별도 checkout에 34경로 적용·파일 hash 일치·공통 실행기 Release 빌드 통과</td></tr>
+<tr><td><span class="chip ok">신규 cooked Player</span></td><td>API45, 실제 CCT 이동0.65000004m, 고정틱30, 패키지 파일/hash 불변과 정상 종료 통과</td></tr>
+<tr><td>등록 NetworkHandoff 전체</td><td>관리/네이티브9 + 제품6 = 15그룹 통과. Debug/Release 매트릭스 포함</td></tr>
+<tr><td>실제 30/60/144fps DX12</td><td>29.9999 / 59.9940 / 144.0416fps. 동일 tick CCT·강체 상대 궤적 차이0. Scene/Game 캡처4회·canary17 통과</td></tr>
+<tr><td>moving 0틱 GPU</td><td>실제 sourceEngineFrame과 연결된 readback 통과. 진단 캡처의 cadence는 정상 pacing 판정과 구분</td></tr></tbody></table></div>
+<p>근거: <a href="../../../FSharp_Tool_Pakage_for_CreatorEngine/artifacts/managed-runtime-validation-20261023/verification.json">도구 관리 검사</a>, <a href="../../Build/Verification/FSharp/Editor-a0b6c30fbaa0487bbae1eef52fd2cb56/result.json">Editor</a>, <a href="../../Build/Verification/FSharp/Player-c0103530102f437c880908112e4917ac/result.json">Player</a>.</p>
+<p>추가 제품 근거: <a href="../../Build/Verification/NDA/Suite-89a4cc6a934b41d5b4976a05fd931173/result.json">NetworkHandoff 15그룹</a>, <a href="../../Build/Verification/N3Pacing/Editor-0c0ebbc98b47411fb19427a470655ce2/result.json">30/60/144fps</a>, <a href="../../Build/Verification/N3Pacing/Editor-1201263533c441dbb66fbfa6ff345d23/result.json">moving GPU</a>.</p>
+<p>저작·수명 근거: <a href="../../Build/AutomaticScripts-Release-8f365a67/result.json">자동 저작</a>, <a href="../../Build/Verification/FSharpRuntimeMigration/ComponentBrowser/summary.json">컴포넌트 브라우저</a>, <a href="../../Build/Verification/CSharpFixedUpdate/Editor-a2b84cec39a146f39eb819aa19134546/result.json">실패·정리 Editor</a>, <a href="../../Build/Verification/CSharpFixedUpdate/Player-4194662c3afd47939eeb13f0b564ca6d/result.json">실패·정리 Player</a>, <a href="../../Build/Obj/Phase19Player/run-355e4ea0ec2946fd905778bcb1d6274f/result.json">CCT·DDOL</a>, <a href="../../Build/Verification/FSharp/Compatibility-613a214b40d14ec9ad23f659ababc8e9/result.json">계약 비교</a>. 기존 호출자의 로그·결과 경로에 남은 CSharpFixedUpdate 이름은 호환성을 위해 유지한 이름이며, 이 실행의 저작 코드는 F#이다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-수용의-한계">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="수용의-한계">수용의 한계</h2></div>
+<div class="prose"><p>NativeAOT·Shipping·다른 장치/플랫폼·IDE breakpoint·장시간 reload와 일반적인 성능 예산을 수용한 기록은 아니다. 공통 런타임의 구현 언어 변경만으로 프레임 성능 개선을 주장하지 않는다. 관리 호스트의 100,000회 조회는 direct/helper 각각9.6MB, cache 읽기0 bytes·native callback1회였으며 실제 프레임 측정과 구분한다.</p>
+<p>이전 단계에서 남은 전체 C# fixture의 F# 이주와 미디어를 포함한 오디오 제품 수용은 별도다. 렌더 없는 서버 링크·N9 Dedicated Server 제품 수용도 별도다. 두 저장소의 변경은 로컬 작업본이며 커밋·푸시·공개 패키지 게시를 수행하지 않았다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="FSharpManagedRuntimeAcceptance20261023.md"><code>docs/analysis/FSharpManagedRuntimeAcceptance20261023.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

@@ -8,6 +8,10 @@
 
 ## 남은 작업과 완료 판정
 
+2026-10-23 master 통합 재점검: `a985ee7e1`의 상류 변경과 기존 작업을 통합한 실행·호출자 수정은 [동기화 수용 기록](../analysis/MasterSyncRecheck20261023.md)을 따른다. 이전 실행 기록의 지문은 보존하고 이번 통합 작업본의 제품 검증과 구분한다.
+
+> 2026-10-23 후속: BuildTool의 이전 monolithic 모델 경로/동반 파일2개 가정을 현재 streaming generation 계약으로 이주했다. 필수 파일·canonical 경로·소유 레코드와 병합 전후 파일 재고/SHA-256을 대조한다. 188검사와 전체20모델·73재질의 실제 출력691파일 판독은 통과했다. fixture는 cook 전에 모델/메시·Walk·Graph/텍스처·stable layer를 검사한다. Player의 정상 종료에서는 메시 분할 캐시가 가진 파일 lease도 회수한다. 새 SDK·AnimationPlayer 제품 결과는 [애니메이션 쿠커 후속 기록](../analysis/AnimationCookAcceptance20261023.md)을 따르며 아래 CI·Shipping·증분/재현성 전체 수용과 구분한다.
+
 - 진행 중인 build/cook 단계와 B5 게임 CI 레그를 clean 입력부터 Player 실행까지 닫는다. 이미 연결된 SDK·공통 설정·Host 분리는 재구현하지 않는다.
 - cook DAG·증분 캐시 무효화·취소/실패 복구·Shipping 의존 격리와 패키지 재현성을 실제 산출물로 검증한다. 오디오 선행 차단은 AU 종료에 따라 해제한다.
 

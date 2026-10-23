@@ -1,16 +1,85 @@
 # 스크립트 표면 재설계 (PHASE 9.5)
 
+<!-- plan-summary: 2026-10-23: F# 단독 저작·공통 관리 런타임, 필요한 일반 멤버만 작성하고 생성기가 정적으로 등록한다. API45 OnTickSimulate(dt) 고정 틱과 수명·세대 핸들·실패 hot reload 보존을 유지한다. -->
+
+> 2026-10-23 최신 결정: 게임 저작과 공통 관리 실행기는 F#이다. 컴포넌트 생명주기는 **override 없는 일반 멤버 → 생성기의 정적 콜백 등록**, 고정 틱은 **OnTickSimulate(dt), Script API45**다. ScriptCore의 C# 코드는 네이티브 ABI·값 형식·바인딩 진입점으로 유지한다. 수명·세대 핸들·실패 reload 보존은 유지한다. [현재 계약](../design/FSharpScriptingContract.md)과 [API45 수용 기록](../analysis/FSharpManagedRuntimeAcceptance20261023.md)을 따른다. 아래 API43/44·C# 기본 저작 기록은 이전 단계이며 OnSimulate·Scope.Delay·simulation CE는 복원하지 않는다.
+
+
 > 2026-10-20 정리 · master `27de3f5a02aadde7456aab680db3184c36ee735e` · 잔여 구현·수용 계획
 
-판정 기준은 위 master의 커밋된 소스다. 작업 중인 로컬 코드 변경은 포함하지 않는다. 완료된 구현 단계·날짜별 실행 일지는 제거했다. 대시보드는 SRP 저작 전환 취소에 해당하는 항목만 제거하고, 나머지 상태·공수·링크를 보존한다.
+> 2026-10-22 사용자 결정 반영: C# Verse식 계약 도입 중단·기본 저작 유지. 고정 master의 구현 기록과 최신 계획 결정을 구분한다.
+
+기존 잔여 분류의 기준은 위 master의 커밋된 소스다. 2026-10-22 후속 구현·수용 절은 현재 로컬 작업 트리와 별도 수용 기록을 기준으로 한다. 기존 기준선에는 작업 중인 로컬 코드 변경을 소급 포함하지 않는다. 완료된 구현 단계·날짜별 실행 일지는 제거했다. 대시보드는 SRP 저작 전환 취소에 해당하는 항목만 제거하고, 나머지 상태·공수·링크를 보존한다.
 
 [전체 문서 대조·충돌 판정](MasterPlanAudit20261020.html) · [정리 전 원문](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/ScriptSurfacePlan.md)
 
 ## 남은 작업과 완료 판정
 
+2026-10-23 master 통합 재점검: `a985ee7e1`의 상류 변경과 기존 작업을 통합한 실행·호출자 수정은 [동기화 수용 기록](../analysis/MasterSyncRecheck20261023.md)을 따른다. 이전 실행 기록의 지문은 보존하고 이번 통합 작업본의 제품 검증과 구분한다.
+
+### F# 공통 관리 실행기·일반 멤버 등록 — 2026-10-23
+
+API45의 ScriptRuntime으로 생명주기·팩토리/인스턴스·지연 멤버십·구독/접촉·await 재개·collectible 로더와 애니메이션/BT 소유 목록·진단/GC 정책을 이주했다. C# ScriptCore는 기존 API/ABI 바인딩으로 소비한다. 생성기는 일반 멤버 11종을 정적으로 등록하며 Component의 virtual 생명주기는 제거했다. 틱은 single 인자, 반환은 unit으로 검사하고 없는 훅은 호출하지 않는다.
+
+세대 핸들/NativeInstance·초기화 성공 짝·예외 격리·DDOL·실패 reload 보존과 기존 고정틱/프레임 축을 유지한다. 상주 엔진 컨텍스트의 F# 실행기와 게임 collectible 세대의 FSharp.Core를 구분한다. SDK와 Editor 생성/감시·제품 fixture를 새 계약으로 연결했다. [수용 근거와 한계](../analysis/FSharpManagedRuntimeAcceptance20261023.md)를 따른다. 아래 C# 기본 저작 복귀 절은 2026-10-22의 이전 단계 기록이다.
+
+### 필요한 생명주기만 저작·VS Code 도우미 — 2026-10-23
+
+새 파일에는 빈 생명주기를 넣지 않는다. 기존 F# 66파일을 점검해 비어 있던 FailCleanupProbe의 고정틱을 제거했으며, 동작·수명 순서·실패/정리 관측을 수행하는 훅은 보존했다. 훅 0개와 고정틱만 가진 타입의 생성 콜백을 별도로 검사한다.
+
+도구 저장소의 VS Code 확장 0.1.0은 생명주기 자동완성과 선택 삽입을 제공한다. 현재 타입과 확인 가능한 같은 파일의 기반 타입에 있는 훅은 중복 생성하지 않는다. 취소·단일 Undo·single/unit 서명·실제 생성기 컴파일을 검증한다. 일반적인 F# IDE·다른 파일 상속 해석·디버깅 전체를 대신하지 않는다. [후속 검증 기록](../analysis/FSharpOptionalLifecycleAcceptance20261023.md)을 따른다. 런타임 ABI는 API45를 유지한다.
+
+PowerShell5의 종료 미수용은 명령 서비스의 연결 회수 순서·poll 취소와 검사 도구의 종료 코드 캐시를 수정하여 해소했다. PS5/7에서 전체 F# 저작·핫리로드·정상 종료를 다시 수용했다. [새 종료 근거](../analysis/PowerShell5EditorShutdownAcceptance20261023.md)를 따르며 생명주기·수명/핸들 계약은 바꾸지 않는다.
+
+F# 제품 probe의 생명주기·오디오 완료 관측은 PID를 포함한 JSON으로 제공한다. CLI 소비자는 해당 결과와 native 종료 이벤트를 읽으며, 프로젝트별 GameScripts와 패키지 리소스는 검증기 복사 과정에서도 보존한다. API45·OnTickSimulate·수명/핸들 계약은 유지한다. [소비자 후속 수용](../analysis/CliConsumerMigrationAcceptance20261023.md)은 별도의 100회 프로세스 종료·실제 Inspector 조작·일반 GUI 수용과 구분한다.
+
+애니메이션 패키지의 Slang 기능 계약·streaming generation 검사·fixture 이주와 기존 CreatorRobot Walk 소비자는 [별도 후속 기록](../analysis/AnimationCookAcceptance20261023.md)을 따른다. 정적 메시 분할 캐시의 종료 후 파일 lease도 명시적으로 회수한다. 이 수정은 F# 생성·생명주기·핫리로드 계약을 바꾸지 않는다. 패키지 smoke에서 스크립트 로드/등록을 확인하는 것과 이 씬에서 스크립트 생명주기 호출을 검증하는 것은 구분한다.
+
+
 - W3: InputAction의 이름뿐 아니라 타입/값을 managed 호출로 운반하는 통로와 오류/ABI/순서 검증을 닫는다.
-- W4/5: Inspector/Undo·스크립트 setter의 dirty publication부터 실제 render proxy 반영까지 같은 프레임/세대로 관측한다. 값 왕복만으로 배선 수용을 대신하지 않는다.
-- W6/8: native/managed lifecycle·field/message layout mirror와 훅 dispatch override 검증을 닫는다. W7의 옛 Transform/registry 문서 정리는 이번 계획 정리에서 완료 대상으로 제거한다.
+- W4: 저작 변경 통지·Undo/Redo·native/Transform 쓰기 경계와 ND-b 관찰자를 연결했다. 실제 Editor 회귀와 검증 범위는 아래 W4 수용 기록을 따른다.
+- W5: 렌더 소비 스레드의 실제 proxy 적용을 같은 프레임/세대로 관측한다. W4의 게임 스레드 dirty publication 수용을 GPU/렌더 소비 수용으로 확대하지 않는다.
+- W6/8: 컴포넌트 훅은 API45의 일반 멤버 정적 등록과 수명 회귀로 수용했다. 이후 native/managed field/message layout mirror 검증에는 현재 콜백 계약을 적용하며, 생명주기 override를 요구하지 않는다. W7의 옛 Transform/registry 문서 정리는 이번 계획 정리에서 완료 대상으로 제거한다.
+- 2026-10-22 최종 결정: C# Verse식 계약 도입을 중단하고 전용 저작환경도 제거한다. Scope.Delay, 공개 Scope 기반 대기/구독/cleanup 저작과 OnSimulate 전용 코루틴 경로를 정리하고 기본 C# 컴포넌트·메서드로 이주하며 OnSimulate는 C++ 계약의 OnUpdate(dt)로 대체한다. PrSM 계약 도입 전까지 OnUpdate는 고정 틱으로 구동한다. 실행기 수명 안전성은 엔진 내부에서 유지한다. W8은 N3 필수 선행이 아니다.
+
+## C# 기본 저작 복귀 — 2026-10-22
+
+- C#에 Verse식 효과 표지·전용 awaiter·실패 context/rollback·전용 코루틴 저작 구조를 제공하는 계획은 중단한다. 기존 API를 선택 기능으로 영구 보존한다는 직전 방침도 철회한다. 언어 계약은 PrSM 저장소가 소유한다.
+- 제거 대상은 Component.OnSimulate, Component.Scope와 SimulationScope의 공개 Delay/Subscribe/RegisterCleanup/Token 저작 표면, ScriptRegistry의 전용 본문 시작·대기 진행 경로다. 새 이름의 동등한 C# 프레임워크로 대체하지 않는다. 일반 Task/await를 엔진 전용 대기로 강제하지 않는다.
+- 기본 생명주기·일반 메서드/이벤트와 C++ 계약의 OnUpdate(dt)로 저작한다. OnUpdate는 PrSM 계약 도입 전까지 고정 틱마다 한 번 동기 호출하며 dt는 fixedDelta다. .NET Task/await와 CancellationToken·IDisposable 등 표준 수명 관리 방식을 사용하되 엔진 객체 접근은 게임 스레드·객체 생존·세대·권한 규칙을 지킨다. Task.Delay의 벽시계 의미를 게임 pause/고정 tick 대기로 보장하지 않는다.
+- 엔진 내부의 취소·구독 해제·접촉 route retirement·코드 세대 검증·게임 스레드 마셜링은 필요한 소비자를 추적해 보존한다. 공개 Scope 제거를 그 내부 책임의 삭제로 취급하지 않는다. 내부 취소를 임의의 .NET Task 강제 종료로 설명하지 않는다.
+- 고정 tick은 C# 저작 프레임워크와 독립적으로 엔진 clock·값 명령·조회 경계에서 제공한다. OnSimulationTick 저작 훅은 신설하지 않는다. OnUpdate가 기존 반복 갱신 저작의 고정 틱 진입점이다. [NetworkFrameworkPlan](NetworkFrameworkPlan.md)이 서버 계약을 소유한다.
+
+N3의 실제 렌더 FPS별 OnUpdate/물리 tick·CCT 궤적과 렌더 보간 제품 수용은 2026-10-23 완료했다. [N3 수용 기록](../analysis/N3PacingAcceptance20261023.md). C# 기본 저작 계약은 유지하며 PrSM 언어 계약과 wire replication은 별도다.
+
+### OnUpdate(dt) C++ 계약 — PrSM 계약 전의 고정 틱 저작
+
+- 사용자 최종 결정: C# OnSimulate 비동기 본문을 `OnUpdate(dt)` 동기 갱신으로 대체한다. C++ 계약을 정본으로 두고 C# 선언·디스패치가 같은 서명·의미를 따르게 한다. 별도 OnSimulationTick을 만들지 않는다. 현재 작업 트리에 전환을 구현했으며 Windows x64 Release 제품 수용을 완료했다. [구현·수용 기록](../analysis/CSharpFixedUpdateAcceptance20261022.md)을 따른다.
+- `dt`는 렌더 frameDelta가 아닌 엔진 고정 틱의 fixedDelta다. 한 프레임 0틱이면 0회, 여러 틱이면 틱마다 1회 호출한다. 물리 없는 씬에서도 같은 clock을 따른다. 렌더 FPS에 종속되지 않는 레거시 반복 갱신 저작을 제공한다.
+- 현재 C++ 공통 driver는 프레임 입력 뒤 고정 루프에서 lifecycle drain → bounded 틱 명령 적용 → C# OnUpdate(fixedDelta) → 물리 단일 스텝 → 접촉 게시 → snapshot capture → 성공 commit/복사 공개를 실행한다. API v43의 Simulation.GetStatus/Submit/ReadSnapshot과 native adapter 계약은 [N3 인계 계약](../design/SimulationTickExchangeContract.md)을 따른다. OnUpdate는 게임 스레드·물리 앞·SDK idle에서 실행한다. 현재 tick의 물리 결과는 다음 OnUpdate에서 읽고, 필요한 접촉 결과는 그때까지 보존한다.
+- 인스턴스 계약은 동기 void/float dt다. C++ ClrHost는 필수 OnUpdate 진입점을 int(__stdcall*)(float) 관리 배치로 바인딩하며 C# Bootstrap은 UnmanagedCallersOnly로 받는다. 배치는 활성 수 또는 실패 -1을 반환하고 스크립트 API v43으로 구형 호스트를 거절한다. Windows x64 수용 범위다. 생명주기 enum에 단계를 추가하지 않고 전용 갱신 배치 진입점으로 연결한다. 컴포넌트별 native↔managed 호출을 늘리지 않고 한 tick 배치에서 관리 목록을 순회한다.
+- 초기화/시뮬레이션 시작 성공·생존·Enabled·실행 세대를 확인한다. 재진입·자기 제거/비활성화·씬 전환·예외 격리를 검사하고 같은 tick의 중복 호출과 stale 대상 호출을 차단한다. 초기 시작·종료 생명주기를 매 tick 반복하지 않는다.
+- OnUpdate를 async void 또는 자동 코루틴으로 만들지 않는다. 일반 Task 사용은 가능하지만 외부 완료가 tick 실행을 보장하지 않는다. 엔진 상태 반영은 게임 스레드/tick 명령 경계로 돌아온다. Scope.Delay와 동등한 전용 C# 대기 구조는 만들지 않는다.
+- 기존 PrePhysics/PostPhysics 소비자는 표현 상태와 시뮬레이션 쓰기를 분류한다. 게임플레이 쓰기는 OnUpdate로 이주하고 표현 프레임 작업은 유지한다. 이주한 본문을 양쪽에서 중복 실행하지 않으며 애니메이션·렌더 데이터 처리 순서는 보존한다.
+- PrSM 계약의 실제 CreatorEngine 도입 전까지 이 계약을 사용한다. 언어 컴파일러의 일부 기능 구현만으로 C# OnUpdate를 자동 제거하지 않는다. PrSM 전환 시 C# 병행/이주 정책과 ABI 변경은 별도 결정한다.
+
+### C# 전용 저작 표면 제거 — 구현·수용 완료
+
+현재 작업 트리에서 CS-AUTH를 구현·수용했다. 위 master 고정 근거는 과거 기준선이며 아래는 2026-10-22 로컬 구현 결과다.
+
+- Component.OnSimulate/Scope와 SimulationScope 타입·대기 큐·자동 본문 시작을 제거했다. 추적 중인 ScriptCore/GameScripts/생성기/프로젝트 C#에서 제거 API 참조 0건을 확인했다.
+- 기존 호출자를 OnUpdate의 명시적 상태/시간 누산 또는 일반 Task·CancellationToken 소유권으로 이주했다. 오디오의 pause/resume은 서로 다른 고정 tick에서 검사한다. 전용 대기만 검증하던 delayarg/retention은 폐기 사유와 대체 게이트를 남겼다.
+- ContactStream/명시 역할 바인딩은 internal ComponentLifetime으로 종료 시 해제한다. 공개 timer/token/Subscribe 프레임워크를 새 이름으로 만들지 않았다. tick 읽기 버퍼와 프레임 읽기 버퍼를 분리하여 0틱 프레임·다중틱·기존 PostPhysics 소비를 보존했다.
+- ScriptRegistry는 시작 성공·생존·Enabled·종료 상태를 검사하고 재진입/리로드로 바뀐 배치를 중단한다. 정리 중 등록 거절이 ScriptFactory 인스턴스 참조를 남기지 않는 회귀도 포함한다. 일반 C# await의 게임 스레드 복귀와 API 진입 검사는 유지한다.
+- Release ScriptCore/GameScripts와 Editor/Player/Cooker/Packer 빌드, 계약 20단정·접촉 76단정, 실제 Editor와 신규 cooked Player, DDOL·리로드·CCT·오디오 100회 수용을 실행했다. 상세 바이너리/증거와 검증 한계는 [수용 기록](../analysis/CSharpFixedUpdateAcceptance20261022.md)을 따른다. W3~W6/W8 전체 완료 또는 PrSM/서버 전체 완료로 확대하지 않는다.
+
+## W4 → ND-b 저작·일반 쓰기 연결 — 2026-10-22
+
+실제 typed Inspector의 scalar/custom drawer와 enum/container/nested 편집을 중앙 authoring transaction으로 연결한다. 전체 문서 복원 입력은 보존하되 변경한 필드만 가장 파생된 OnPropertyChanged와 일반 쓰기 관찰자에 알린다. Inspector/Undo/Redo 출처, 잠금 거부·no-op·오래된 Undo 안전성을 유지한다. 컨테이너 내부 주소를 Undo에 보관하지 않는다.
+
+Component.NotifyPropertyChanged는 렌더 dirty와 일반 쓰기를 분리한다. 비렌더 reflection/Prefab, Component.Enabled, native render setter, Transform 단일/배치 writer를 연결한다. DDOL은 같은 정체성의 Detached → Attached이며 스크립트 핸들을 조기에 무효화하지 않는다. raw public C++ 필드 대입을 자동으로 포착하는 계약은 없으며 새 writer는 명시적으로 통지해야 한다. 전체 public 필드 private화는 이 수용 범위에 포함하지 않는다.
+
+[로컬 관찰 계약](../design/SceneObservationContract.md) · [구현·검증 기록](../analysis/SceneObservationAcceptance20261022.md). `verify-scene-observation.ps1`, 실제 Editor `verify-scene-gc.ps1`, NetworkHandoff 등록 회귀로 검증한다. W5 렌더 소비·GPU, N2 wire ID/schema·N5 replication·서버 제품은 별도 잔여다.
 
 ## 적용할 구조와 경계
 
@@ -22,8 +91,9 @@
 
 | 추적 ID | 소유 단위 (잔여 작업은 위 목록) | 대시보드 보존 상태 |
 |---|---|---|
+| `CS-AUTH` · PHASE 9.5 | 전용 코루틴 제거 · C++ 계약 OnUpdate 고정 틱 | done |
 | `W3` · PHASE 9.5 | 입력 액션 값 통로 — 이름만 넘고 값이 끊긴다 | todo |
-| `W4` · PHASE 9.5 | 저작 dirty 통로 — 인스펙터가 값만 대입하고 dirty를 모른다 | todo |
+| `W4` · PHASE 9.5 | 저작 변경 통지·Undo/Redo·일반 쓰기 관찰 | done |
 | `W5` · PHASE 9.5 | 렌더 델타 관측 하네스 — 헤드리스가 프록시 적용을 못 본다 | todo |
 | `W6` · PHASE 9.5 | 미러 커버리지 — 검사 없는 경계 계약 3종 + SerializeField 왕복 | todo |
 | `W8` · PHASE 9.5 | 디스패치 오버라이드 감지 | todo |
@@ -41,7 +111,7 @@
 
 ## 검증 경계
 
-이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.
+2026-10-20 고정 master의 문서 감사와 2026-10-22 현재 작업 트리의 구현·제품 수용은 별도다. 새로 실행한 빌드·Editor/신규 cooked Player와 코드 신원은 [수용 기록](../analysis/CSharpFixedUpdateAcceptance20261022.md)에 한정한다. 서버/PrSM 전체, 대표 성능·GPU 픽셀·Debug/Shipping·다른 OS 수용으로 확대하지 않는다.
 
 <details><summary>이전 절 링크 호환</summary>
 

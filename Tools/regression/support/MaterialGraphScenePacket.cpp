@@ -1,3 +1,4 @@
+#include "../../../Engine/Utility_Framework/Ownership.h"
 #include "MaterialGraphScenePacket.h"
 
 #include "../../../Engine/Utility_Framework/StandardLibrary.h"
@@ -55,7 +56,7 @@ namespace material_graph
         }
     } // namespace
 
-    bool BuildSceneSurfaceEvaluation(std::shared_ptr<const SurfaceBatch> gpu, SceneSurfaceEvaluation& result,
+    bool BuildSceneSurfaceEvaluation(own::shared_owner<const SurfaceBatch> gpu, SceneSurfaceEvaluation& result,
                                      std::string& error)
     {
         if (!gpu || !gpu->Material() || !gpu->Count())
@@ -133,7 +134,7 @@ namespace material_graph
                                     const EnhancedMaterialCoverage& coverage, const ScenePassLayout& layout,
                                     const RHIGraphicsPipelineDesc& pipeline, RHIShaderBinary backend,
                                     const Capabilities& capabilities, const Budget& budget,
-                                    std::shared_ptr<const SceneMaterialPacket>& result, std::string& error)
+                                    own::shared_owner<const SceneMaterialPacket>& result, std::string& error)
     {
         error.clear();
         const auto recordingId = device_ ? device_->GetCurrentUploadRecordingId() : 0;
@@ -163,7 +164,7 @@ namespace material_graph
         {
             return false;
         }
-        auto candidate = std::make_shared<SceneMaterialPacket>();
+        auto candidate = own::make_shared<SceneMaterialPacket>();
         std::vector<LX::LXMaterialDiagnostic> diagnostics;
         if (!SelectRoute(product.program, capabilities, budget, candidate->selection, diagnostics))
         {
@@ -199,7 +200,7 @@ namespace material_graph
         {
             return false;
         }
-        auto request = std::make_shared<LX::Runtime::GraphicsPipeline>();
+        auto request = own::make_shared<LX::Runtime::GraphicsPipeline>();
         LX::Runtime::GraphicsShaderDescription shader;
         if (!DescribeGraphicsShader(product, backend, {}, {}, shader, error) ||
             !request->Create(pipelines, description, std::move(shader), error))
@@ -334,7 +335,7 @@ namespace material_graph
         const auto found = recordings_.find(recordingId);
         if (found == recordings_.end() || !found->second.submissionAccepted || !completion.value ||
             found->second.completion != completion.value || !found->second.submitted ||
-            (found->second.publicationDecided && active_ != found->second.submitted) ||
+            (found->second.publicationDecided && !material_graph_test::SamePinnedObject(active_, found->second.submitted)) ||
             (active_ && found->second.submitted->serial < active_->serial))
         {
             return Fail(error,
@@ -422,7 +423,7 @@ namespace material_graph
         const auto found = recordings_.find(recordingId);
         if (found == recordings_.end() || found->second.submissionAccepted ||
             (found->second.submissionNotified && found->second.completion != completion.value) ||
-            (found->second.publicationDecided && found->second.submitted && active_ == found->second.submitted))
+            (found->second.publicationDecided && found->second.submitted && material_graph_test::SamePinnedObject(active_, found->second.submitted)))
         {
             return;
         }

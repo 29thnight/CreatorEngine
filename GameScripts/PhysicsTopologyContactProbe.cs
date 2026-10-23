@@ -15,7 +15,7 @@ public sealed partial class PhysicsTopologyContactProbe : Component
     private float _elapsed, _finishedAt;
     private bool _finished;
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         _body = GetComponent<PhysicsBodyComponent>() ?? throw new InvalidOperationException("Missing topology body.");
         if (_body.GetShape(1, out var original) != PhysicsError.None || original.ShapeId != 19 ||
@@ -29,7 +29,7 @@ public sealed partial class PhysicsTopologyContactProbe : Component
         PhysicsContactStreamProbe.Track(_targets);
     }
 
-    public override void PostPhysics(float dt)
+    public void PostPhysics(float dt)
     {
         if (_finished) return;
         try

@@ -6,12 +6,12 @@ public sealed partial class CollisionProbe : Component
     [SerializeField] private bool _logStay;
     private ContactStream? _contacts;
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         _contacts = Physics.ObserveContacts(Entity, ShapeRoles.Attack, ShapeRoles.Hurt, ContactPhases.All);
     }
 
-    public override void PostPhysics(float dt)
+    public void PostPhysics(float dt)
     {
         if (_contacts is null) return;
         foreach (ref readonly var contact in _contacts.Read())

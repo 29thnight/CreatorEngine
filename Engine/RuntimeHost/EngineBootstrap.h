@@ -18,6 +18,7 @@
 #include "EngineMode.h"
 #include "EngineLaunchConfig.h"
 #include "JobScheduler.h"
+#include "../Utility_Framework/RuntimeResults.h"
 
 #include <stdio.h>
 #include "../Utility_Framework/StandardLibrary.h"
@@ -323,6 +324,7 @@ namespace EngineBootstrap
         try
         {
             Log::Initialize(config.logSessionName);
+            Diagnostics::RuntimeResults::Initialize(PathFinder::LogPath());
         }
         catch (const std::exception& exception)
         {
@@ -406,6 +408,7 @@ namespace EngineBootstrap
         SHUTDOWN_STEP(ComponentFactory::Destroy());
         SHUTDOWN_STEP(SceneManager::Destroy());
         SHUTDOWN_STEP(ce::get_job_scheduler().shutdown());
+        Diagnostics::RuntimeResults::Emit("jobs.shutdown");
         SHUTDOWN_STEP(TagManager::Destroy());
         SHUTDOWN_STEP(InputManager::Destroy());
         SHUTDOWN_STEP(DataSystem::Destroy());
@@ -455,6 +458,7 @@ namespace EngineBootstrap
             {
                 ShutdownTrace("[4] FinalizeRuntime 시작");
                 FinalizeRuntime();
+                Diagnostics::RuntimeResults::Emit("runtime.finalized");
                 ShutdownTrace("[5] FinalizeRuntime 완료");
             }
         } runtimeGuard;

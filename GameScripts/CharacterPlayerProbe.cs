@@ -71,7 +71,7 @@ public sealed partial class CharacterPlayerProbe : Component
         _ => "physics.player"
     };
 
-    public override void OnAddedToScene()
+    public void OnAddedToScene()
     {
         ++_additions;
         if (_character is not null)
@@ -81,7 +81,7 @@ public sealed partial class CharacterPlayerProbe : Component
         }
     }
 
-    public override void OnRemovingFromScene() => ++_removals;
+    public void OnRemovingFromScene() => ++_removals;
 
     private void VerifyTransfer()
     {
@@ -128,7 +128,7 @@ public sealed partial class CharacterPlayerProbe : Component
         ++_passed;
     }
 
-    public override void PostPhysics(float tick)
+    public void PostPhysics(float tick)
     {
         if (_transferred)
         {

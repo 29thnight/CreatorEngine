@@ -219,7 +219,7 @@ void FoliageComponent::LoadFoliageAsset(FileGuid assetGuid)
         Meta::Deserialize(&instance, instanceNode);
         AddFoliageInstance(instance);
     }
-    PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+    PublishRenderPropertyWrite(ProxyDirty::Material | ProxyDirty::Payload);
 	Debug::PrintLog(spdlog::level::info, "Foliage asset loaded successfully: {}", assetPath.string());
 }
 
@@ -432,7 +432,7 @@ void FoliageComponent::PollAssetBindings()
         type.m_authoredMaterial.reset();
         binding.material = {};
         binding.status = Status::Ready;
-        PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+        PublishRenderPropertyWrite(ProxyDirty::Material | ProxyDirty::Payload);
     }
 }
 
@@ -456,7 +456,7 @@ void FoliageComponent::AddFoliageType(const FoliageType& type)
         throw;
     }
     RebindFoliageType(static_cast<uint32>(m_foliageTypes.size() - 1u));
-    PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+    PublishRenderPropertyWrite(ProxyDirty::Material | ProxyDirty::Payload);
 }
 
 void FoliageComponent::RemoveFoliageType(uint32 typeID)
@@ -477,7 +477,7 @@ void FoliageComponent::RemoveFoliageType(uint32 typeID)
                 --instance.m_foliageTypeID;
             }
         }
-        PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+        PublishRenderPropertyWrite(ProxyDirty::Material | ProxyDirty::Payload);
     }
 }
 
@@ -498,7 +498,7 @@ void FoliageComponent::AddFoliageInstance(const FoliageInstance& instance)
             1, std::memory_order_relaxed);
         sealed.RebuildWorldMatrix();
         m_foliageInstances.push_back(std::move(sealed));
-		PublishRenderProxyDirty(ProxyDirty::Payload);
+		PublishRenderPropertyWrite(ProxyDirty::Payload);
     }
 }
 
@@ -518,7 +518,7 @@ bool FoliageComponent::UpdateFoliageInstance(std::uint64_t identity,
     found->m_rotation = rotation;
     found->m_scale = scale;
     found->RebuildWorldMatrix();
-    PublishRenderProxyDirty(ProxyDirty::Payload);
+    PublishRenderPropertyWrite(ProxyDirty::Payload);
     return true;
 }
 
@@ -527,7 +527,7 @@ void FoliageComponent::RemoveFoliageInstance(size_t index)
     if(index < m_foliageInstances.size())
 	{
         m_foliageInstances.erase(m_foliageInstances.begin()+index);
-		PublishRenderProxyDirty(ProxyDirty::Payload);
+		PublishRenderPropertyWrite(ProxyDirty::Payload);
 	}
 }
 
@@ -586,7 +586,7 @@ void FoliageComponent::RemoveInstancesInBrush(TerrainComponent* terrain, const T
             return dx * dx + dz * dz <= brush.m_radius * brush.m_radius;
         }), m_foliageInstances.end());
 	if (m_foliageInstances.size() != previousSize)
-		PublishRenderProxyDirty(ProxyDirty::Payload);
+		PublishRenderPropertyWrite(ProxyDirty::Payload);
 }
 void FoliageComponent::UpdateFoliageCullingData(
     const std::optional<math::bounding_frustum>& cameraFrustum)

@@ -31,7 +31,7 @@ namespace sound_cook
         std::set<std::string>& artifactPaths, std::vector<Product>& products, std::string& error)
     {
         std::unordered_set<wave::ClipKey> clips;
-        std::unordered_map<wave::ClipKey, std::shared_ptr<const wave::SoundGraphProgram>> graphs;
+        std::unordered_map<wave::ClipKey, own::shared_owner<const wave::SoundGraphProgram>> graphs;
         std::vector<std::pair<experiment::AssetId, wave::SoundPreset>> presets;
         for (const auto& entry : manifest.entries)
         {

@@ -19,6 +19,29 @@ namespace material_graph
 {
     namespace
     {
+        struct ScenePlanCache
+        {
+            struct Entry
+            {
+                own::shared_owner<const MeshSurfacePlan> plan;
+                MeshSurfacePlanBudget budget;
+                const void* vertexData{};
+                const std::uint32_t* indexData{};
+            };
+            using Key = std::pair<assets::ModelMeshHandle, uint32_t>;
+
+            std::mutex mutex;
+            std::map<Key, Entry> entries;
+            std::deque<Key> insertionOrder;
+            std::uint64_t bytes{};
+        };
+
+        ScenePlanCache& GetScenePlanCache()
+        {
+            static ScenePlanCache cache;
+            return cache;
+        }
+
         bool Fail(std::string& error, std::string message)
         {
             error = std::move(message);
@@ -1291,24 +1314,33 @@ namespace material_graph
         return BuildSceneZeroLod(draw, view, {}, budget, result, error);
     }
 
+    void MeshSurfacePlan::ReleaseCachedScenePlans()
+    {
+        auto& state = GetScenePlanCache();
+        decltype(state.entries) retired;
+        {
+            std::lock_guard lock(state.mutex);
+            retired.swap(state.entries);
+            state.insertionOrder.clear();
+            state.bytes = 0;
+        }
+        // Stream readers close outside the cache mutex. Shared plans retained
+        // by active consumers continue to own their exact artifact leases.
+    }
+
     bool MeshSurfacePlan::BuildSceneZeroLod(const EnhancedDrawItem& draw, const SurfaceView& view,
                                             std::span<const float> lods, const MeshSurfacePlanBudget& budget,
                                             own::shared_owner<const MeshSurfacePlan>& result, std::string& error)
     {
         ce::profile_scope profile{ce::marker<"MaterialMeshPlanForScene">()};
 
-        struct Entry
-        {
-            own::shared_owner<const MeshSurfacePlan> plan;
-            MeshSurfacePlanBudget budget;
-            const void* vertexData{};
-            const std::uint32_t* indexData{};
-        };
-        static std::mutex cacheMutex;
-        using Key = std::pair<assets::ModelMeshHandle, uint32_t>;
-        static std::map<Key, Entry> cache;
-        static std::deque<Key> insertionOrder;
-        static std::uint64_t cachedBytes{};
+        auto& state = GetScenePlanCache();
+        auto& cacheMutex = state.mutex;
+        auto& cache = state.entries;
+        auto& insertionOrder = state.insertionOrder;
+        auto& cachedBytes = state.bytes;
+        using Key = ScenePlanCache::Key;
+        using Entry = ScenePlanCache::Entry;
         constexpr std::uint64_t maxCachedBytes = 128ull << 20;
         constexpr std::size_t maxEntries = 64;
 

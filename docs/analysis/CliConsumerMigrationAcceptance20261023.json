@@ -1,0 +1,1386 @@
+{
+  "schemaVersion": 1,
+  "result": "CLI_CONSUMERS_MIGRATED",
+  "head": "0847ceeb2ec99d1b4edbdfd9f7f8a94bd773f915",
+  "branch": "master",
+  "ratchet": {
+    "maximum": 0,
+    "observed": 0,
+    "unchangedGitBlob": "2bf3196cd01b21ec51385743d1dd0fd43fd81d08",
+    "log": "Build/cli-consumer-ratchet.log",
+    "powerShell5Log": "Build/cli-consumer-ratchet-ps5.log"
+  },
+  "readers": {
+    "PowerShell7": {
+      "path": "Build/Verification/CliConsumers/Readers-7e78abbc2b43445988f875004cbf087e/result.json",
+      "sha256": "6b4291be05e09a5b1644f646917ed8bb9f648d27e2bbee8bbdaa216cc6d18266",
+      "result": {
+        "schemaVersion": 1,
+        "checks": 82,
+        "cases": [
+          {
+            "name": "command input has no UTF8 BOM in either shell",
+            "rejected": false
+          },
+          {
+            "name": "command result sequence",
+            "rejected": false
+          },
+          {
+            "name": "wrong command result rejected",
+            "rejected": true
+          },
+          {
+            "name": "valid ordered native close / Unicode path",
+            "rejected": false
+          },
+          {
+            "name": "Windows path case and separator normalization",
+            "rejected": false
+          },
+          {
+            "name": "wrong process",
+            "rejected": true
+          },
+          {
+            "name": "missing file",
+            "rejected": true
+          },
+          {
+            "name": "missing session.started",
+            "rejected": true
+          },
+          {
+            "name": "missing editor.quit_requested",
+            "rejected": true
+          },
+          {
+            "name": "missing autosave.flush",
+            "rejected": true
+          },
+          {
+            "name": "missing autosave.completed",
+            "rejected": true
+          },
+          {
+            "name": "missing rhi.backend_shutdown",
+            "rejected": true
+          },
+          {
+            "name": "missing editor.finalized",
+            "rejected": true
+          },
+          {
+            "name": "missing jobs.shutdown",
+            "rejected": true
+          },
+          {
+            "name": "missing runtime.finalized",
+            "rejected": true
+          },
+          {
+            "name": "schema",
+            "rejected": true
+          },
+          {
+            "name": "reused journal",
+            "rejected": true
+          },
+          {
+            "name": "sequence gap",
+            "rejected": true
+          },
+          {
+            "name": "string sequence",
+            "rejected": true
+          },
+          {
+            "name": "wrong close source",
+            "rejected": true
+          },
+          {
+            "name": "save error",
+            "rejected": true
+          },
+          {
+            "name": "unexpected conflict",
+            "rejected": true
+          },
+          {
+            "name": "string boolean",
+            "rejected": true
+          },
+          {
+            "name": "late flush",
+            "rejected": true
+          },
+          {
+            "name": "negative age",
+            "rejected": true
+          },
+          {
+            "name": "wrong sidecar",
+            "rejected": true
+          },
+          {
+            "name": "dirty queue",
+            "rejected": true
+          },
+          {
+            "name": "negative queue",
+            "rejected": true
+          },
+          {
+            "name": "unclean backend",
+            "rejected": true
+          },
+          {
+            "name": "unknown backend",
+            "rejected": true
+          },
+          {
+            "name": "premature editor finalization",
+            "rejected": true
+          },
+          {
+            "name": "missing queue field",
+            "rejected": true
+          },
+          {
+            "name": "flush before request",
+            "rejected": true
+          },
+          {
+            "name": "premature runtime finalization",
+            "rejected": true
+          },
+          {
+            "name": "duplicate event",
+            "rejected": true
+          },
+          {
+            "name": "empty journal",
+            "rejected": true
+          },
+          {
+            "name": "malformed journal",
+            "rejected": true
+          },
+          {
+            "name": "valid smoke",
+            "rejected": false
+          },
+          {
+            "name": "duplicate smoke",
+            "rejected": true
+          },
+          {
+            "name": "human success cannot replace smoke",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke schemaVersion",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke processId",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke ready",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke scriptsLoaded",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke frames",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke displayPromotions",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke submittedGameFrames",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke modelGenerationFailures",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke meshResolveFailures",
+            "rejected": true
+          },
+          {
+            "name": "smoke modelGenerationFailures",
+            "rejected": true
+          },
+          {
+            "name": "smoke meshResolveFailures",
+            "rejected": true
+          },
+          {
+            "name": "managed load failure",
+            "rejected": true
+          },
+          {
+            "name": "valid audio",
+            "rejected": false
+          },
+          {
+            "name": "missing audio cycles",
+            "rejected": true
+          },
+          {
+            "name": "missing audio sessionScope",
+            "rejected": true
+          },
+          {
+            "name": "missing audio mp3",
+            "rejected": true
+          },
+          {
+            "name": "missing audio completions",
+            "rejected": true
+          },
+          {
+            "name": "missing audio processId",
+            "rejected": true
+          },
+          {
+            "name": "missing audio attached",
+            "rejected": true
+          },
+          {
+            "name": "missing audio flac",
+            "rejected": true
+          },
+          {
+            "name": "missing audio positioned",
+            "rejected": true
+          },
+          {
+            "name": "missing audio gcValueHandle",
+            "rejected": true
+          },
+          {
+            "name": "missing audio schemaVersion",
+            "rejected": true
+          },
+          {
+            "name": "missing audio resident",
+            "rejected": true
+          },
+          {
+            "name": "missing audio stream",
+            "rejected": true
+          },
+          {
+            "name": "missing audio worldScope",
+            "rejected": true
+          },
+          {
+            "name": "incomplete audio",
+            "rejected": true
+          },
+          {
+            "name": "human audio marker cannot replace result",
+            "rejected": true
+          },
+          {
+            "name": "receipt consumer deleteshutdown",
+            "rejected": false
+          },
+          {
+            "name": "receipt consumer rejects missing journal deleteshutdown",
+            "rejected": true
+          },
+          {
+            "name": "receipt consumer corruptshutdown",
+            "rejected": false
+          },
+          {
+            "name": "receipt consumer rejects missing journal corruptshutdown",
+            "rejected": true
+          },
+          {
+            "name": "receipt consumer conflictshutdown",
+            "rejected": false
+          },
+          {
+            "name": "receipt consumer rejects missing journal conflictshutdown",
+            "rejected": true
+          },
+          {
+            "name": "receipt consumer nativeclose",
+            "rejected": false
+          },
+          {
+            "name": "receipt consumer rejects missing journal nativeclose",
+            "rejected": true
+          },
+          {
+            "name": "receipt consumer conflictnativeclose",
+            "rejected": false
+          },
+          {
+            "name": "receipt consumer rejects missing journal conflictnativeclose",
+            "rejected": true
+          },
+          {
+            "name": "receipt consumer soak",
+            "rejected": false
+          },
+          {
+            "name": "receipt consumer rejects missing journal soak",
+            "rejected": true
+          },
+          {
+            "name": "cached process exit 0",
+            "rejected": false
+          },
+          {
+            "name": "cached process exit 23",
+            "rejected": false
+          }
+        ],
+        "shell": "7.6.5"
+      }
+    },
+    "PowerShell5": {
+      "path": "Build/Verification/CliConsumers/Readers-704a8c25132b433d9bb26ce6fd5f5924/result.json",
+      "sha256": "82883480f34545203398f95d1d645bd46bbe32dcd8c1e4083bd739689648ac4b",
+      "result": {
+        "schemaVersion": 1,
+        "checks": 82,
+        "cases": [
+          {
+            "name": "command input has no UTF8 BOM in either shell",
+            "rejected": false
+          },
+          {
+            "name": "command result sequence",
+            "rejected": false
+          },
+          {
+            "name": "wrong command result rejected",
+            "rejected": true
+          },
+          {
+            "name": "valid ordered native close / Unicode path",
+            "rejected": false
+          },
+          {
+            "name": "Windows path case and separator normalization",
+            "rejected": false
+          },
+          {
+            "name": "wrong process",
+            "rejected": true
+          },
+          {
+            "name": "missing file",
+            "rejected": true
+          },
+          {
+            "name": "missing session.started",
+            "rejected": true
+          },
+          {
+            "name": "missing editor.quit_requested",
+            "rejected": true
+          },
+          {
+            "name": "missing autosave.flush",
+            "rejected": true
+          },
+          {
+            "name": "missing autosave.completed",
+            "rejected": true
+          },
+          {
+            "name": "missing rhi.backend_shutdown",
+            "rejected": true
+          },
+          {
+            "name": "missing editor.finalized",
+            "rejected": true
+          },
+          {
+            "name": "missing jobs.shutdown",
+            "rejected": true
+          },
+          {
+            "name": "missing runtime.finalized",
+            "rejected": true
+          },
+          {
+            "name": "schema",
+            "rejected": true
+          },
+          {
+            "name": "reused journal",
+            "rejected": true
+          },
+          {
+            "name": "sequence gap",
+            "rejected": true
+          },
+          {
+            "name": "string sequence",
+            "rejected": true
+          },
+          {
+            "name": "wrong close source",
+            "rejected": true
+          },
+          {
+            "name": "save error",
+            "rejected": true
+          },
+          {
+            "name": "unexpected conflict",
+            "rejected": true
+          },
+          {
+            "name": "string boolean",
+            "rejected": true
+          },
+          {
+            "name": "late flush",
+            "rejected": true
+          },
+          {
+            "name": "negative age",
+            "rejected": true
+          },
+          {
+            "name": "wrong sidecar",
+            "rejected": true
+          },
+          {
+            "name": "dirty queue",
+            "rejected": true
+          },
+          {
+            "name": "negative queue",
+            "rejected": true
+          },
+          {
+            "name": "unclean backend",
+            "rejected": true
+          },
+          {
+            "name": "unknown backend",
+            "rejected": true
+          },
+          {
+            "name": "premature editor finalization",
+            "rejected": true
+          },
+          {
+            "name": "missing queue field",
+            "rejected": true
+          },
+          {
+            "name": "flush before request",
+            "rejected": true
+          },
+          {
+            "name": "premature runtime finalization",
+            "rejected": true
+          },
+          {
+            "name": "duplicate event",
+            "rejected": true
+          },
+          {
+            "name": "empty journal",
+            "rejected": true
+          },
+          {
+            "name": "malformed journal",
+            "rejected": true
+          },
+          {
+            "name": "valid smoke",
+            "rejected": false
+          },
+          {
+            "name": "duplicate smoke",
+            "rejected": true
+          },
+          {
+            "name": "human success cannot replace smoke",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke schemaVersion",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke processId",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke ready",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke scriptsLoaded",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke frames",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke displayPromotions",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke submittedGameFrames",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke modelGenerationFailures",
+            "rejected": true
+          },
+          {
+            "name": "missing smoke meshResolveFailures",
+            "rejected": true
+          },
+          {
+            "name": "smoke modelGenerationFailures",
+            "rejected": true
+          },
+          {
+            "name": "smoke meshResolveFailures",
+            "rejected": true
+          },
+          {
+            "name": "managed load failure",
+            "rejected": true
+          },
+          {
+            "name": "valid audio",
+            "rejected": false
+          },
+          {
+            "name": "missing audio stream",
+            "rejected": true
+          },
+          {
+            "name": "missing audio worldScope",
+            "rejected": true
+          },
+          {
+            "name": "missing audio attached",
+            "rejected": true
+          },
+          {
+            "name": "missing audio completions",
+            "rejected": true
+          },
+          {
+            "name": "missing audio sessionScope",
+            "rejected": true
+          },
+          {
+            "name": "missing audio flac",
+            "rejected": true
+          },
+          {
+            "name": "missing audio gcValueHandle",
+            "rejected": true
+          },
+          {
+            "name": "missing audio mp3",
+            "rejected": true
+          },
+          {
+            "name": "missing audio resident",
+            "rejected": true
+          },
+          {
+            "name": "missing audio schemaVersion",
+            "rejected": true
+          },
+          {
+            "name": "missing audio processId",
+            "rejected": true
+          },
+          {
+            "name": "missing audio positioned",
+            "rejected": true
+          },
+          {
+            "name": "missing audio cycles",
+            "rejected": true
+          },
+          {
+            "name": "incomplete audio",
+            "rejected": true
+          },
+          {
+            "name": "human audio marker cannot replace result",
+            "rejected": true
+          },
+          {
+            "name": "receipt consumer deleteshutdown",
+            "rejected": false
+          },
+          {
+            "name": "receipt consumer rejects missing journal deleteshutdown",
+            "rejected": true
+          },
+          {
+            "name": "receipt consumer corruptshutdown",
+            "rejected": false
+          },
+          {
+            "name": "receipt consumer rejects missing journal corruptshutdown",
+            "rejected": true
+          },
+          {
+            "name": "receipt consumer conflictshutdown",
+            "rejected": false
+          },
+          {
+            "name": "receipt consumer rejects missing journal conflictshutdown",
+            "rejected": true
+          },
+          {
+            "name": "receipt consumer nativeclose",
+            "rejected": false
+          },
+          {
+            "name": "receipt consumer rejects missing journal nativeclose",
+            "rejected": true
+          },
+          {
+            "name": "receipt consumer conflictnativeclose",
+            "rejected": false
+          },
+          {
+            "name": "receipt consumer rejects missing journal conflictnativeclose",
+            "rejected": true
+          },
+          {
+            "name": "receipt consumer soak",
+            "rejected": false
+          },
+          {
+            "name": "receipt consumer rejects missing journal soak",
+            "rejected": true
+          },
+          {
+            "name": "cached process exit 0",
+            "rejected": false
+          },
+          {
+            "name": "cached process exit 23",
+            "rejected": false
+          }
+        ],
+        "shell": "5.1.26100.9711"
+      }
+    }
+  },
+  "browser": {
+    "PowerShell7": {
+      "path": "Build/Verification/CliConsumers/Browser-661fd045faae4829abff9fed6d52e6f7/pwsh-cold/verification.json",
+      "sha256": "7607b7282d5f2cff62c84020e4a9d1e4a1f9cad66913e9ccc1a2ac74ff9f950d",
+      "result": {
+        "schemaVersion": 1,
+        "checks": 136,
+        "failures": [],
+        "runtime": true,
+        "projectSwitch": true,
+        "sourceSites": 15
+      },
+      "firstEverythingPending": 56,
+      "completedResultCount": 319
+    },
+    "PowerShell5": {
+      "path": "Build/Verification/CliConsumers/Browser-661fd045faae4829abff9fed6d52e6f7/powershell-nobom/verification.json",
+      "sha256": "083c5028a6413e89d9d3927d22a8e54ccbe9e33aeb0c070b02e93b7d230edec1",
+      "result": {
+        "schemaVersion": 1,
+        "checks": 136,
+        "failures": [],
+        "runtime": true,
+        "projectSwitch": true,
+        "sourceSites": 15
+      },
+      "firstEverythingPending": 56,
+      "completedResultCount": 319
+    }
+  },
+  "jobs": {
+    "PowerShell7": {
+      "path": "Build/Verification/CliConsumers/Jobs-0c723da310434ba1b03d84092357c260/verification.json",
+      "sha256": "ceeb5f35ed15a7187c491f9666ff0abf12121a1aa7f6458c55e97cd0f03d10c2",
+      "result": {
+        "fixture": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\CliConsumers\\Fixtures-278de4e4207d46b3b218bd5aa12b3815\\Jobs\\Staging\\Game-2cf51973273f4edfad012e504c9d1897",
+        "runs": [
+          {
+            "mode": "reload",
+            "runtimeResults": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\CliConsumers\\Jobs-0c723da310434ba1b03d84092357c260\\reload-stage-099477eb7788440282a66b284199cdce.runtime.jsonl",
+            "frameBefore": 0,
+            "exitCode": 0,
+            "frameAfter": 0
+          },
+          {
+            "mode": "normal-exit",
+            "runtimeResults": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\CliConsumers\\Jobs-0c723da310434ba1b03d84092357c260\\normal-exit-stage-099477eb7788440282a66b284199cdce.runtime.jsonl",
+            "frameBefore": 4,
+            "exitCode": 0,
+            "frameAfter": 13
+          }
+        ],
+        "binaries": [
+          {
+            "file": "brotlicommon.dll",
+            "sha256": "717D4854A5472D4DE7609C89D665AA5225165E8DC7A554B7225519E413766F99"
+          },
+          {
+            "file": "brotlidec.dll",
+            "sha256": "5255F6BF446E1B2134872E4C5D0367B6ADCBD2F120AD84F2C53E5C5090192645"
+          },
+          {
+            "file": "bz2.dll",
+            "sha256": "B878737902159B76893CF167EEE38C25D37AFAA2810A918FCD4BA09192C9BEB6"
+          },
+          {
+            "file": "CONCRT140.dll",
+            "sha256": "54716F0738AF891F283D213B5C8D11B25896BB8EE3097D301EAE718560CF974E"
+          },
+          {
+            "file": "DirectXTex.dll",
+            "sha256": "C3908780CFDD0FF37D45BBEB454EFB10BEDFB5C835D8BA5C254E9C1E296330F8"
+          },
+          {
+            "file": "dxcompiler.dll",
+            "sha256": "9A5100511E127C6A2FC78EDF984F95074A76D35B90C90C4D342430A5AE160E9B"
+          },
+          {
+            "file": "dxil.dll",
+            "sha256": "FEB57253EFF0A622561E29B44CEDBE86B89FC9A5BC8DC00FA2F98FAFD712C2D8"
+          },
+          {
+            "file": "enkiTS.dll",
+            "sha256": "6209773089D3A227F51B9BD174E273695CC946D61167CFCD42409EF10A827AE9"
+          },
+          {
+            "file": "fmod.dll",
+            "sha256": "2006813E35AFE4419A67D92928EBEB544510C8CBD0449A2B31BEA5B67463E712"
+          },
+          {
+            "file": "fmt.dll",
+            "sha256": "FF9FBFCCE5510400808D501900A3C70E175724FEC94EDA295ED8909BB921404D"
+          },
+          {
+            "file": "freetype.dll",
+            "sha256": "8C4481AD1E6823D462E2832EEE276CC823BBFA5D100CD93483B36022A7D822A7"
+          },
+          {
+            "file": "gcce.dll",
+            "sha256": "060A4D6558FED9B1D342EDCBFA2942CB3D5069CD9787AAAD54458D374B5B524A"
+          },
+          {
+            "file": "libpng16.dll",
+            "sha256": "BDF0FED4BB4B17B6929B180B5000961E4251D0C0E96AA73B0ED9DD9333EB4F44"
+          },
+          {
+            "file": "meshoptimizer.dll",
+            "sha256": "78643D41BB74C65EF6B42BA2C526C1525D39290A5C1260BB9A13611D4E823BB4"
+          },
+          {
+            "file": "Microsoft.WindowsAppRuntime.Bootstrap.dll",
+            "sha256": "3123AA647BF9CBF474A0AF2FAD8BE754C734D2BFDB12256BE83D43216B8CC72C"
+          },
+          {
+            "file": "MSVCP140_1.dll",
+            "sha256": "206C931BF90FDAD8816DE3B5E2EF80B2BCAA9406C89ECC05FE6FDDFFE251E982"
+          },
+          {
+            "file": "MSVCP140_2.dll",
+            "sha256": "D50D7883F20D1DC6191768D3746F52DD9CAC89C346FFAED5BE1F110C2F34A838"
+          },
+          {
+            "file": "MSVCP140_ATOMIC_WAIT.dll",
+            "sha256": "3D0CBFAA1BF3EECF5A3F4491D2960EE803CB994F30292C6ADC4A07C498F60E2B"
+          },
+          {
+            "file": "MSVCP140.dll",
+            "sha256": "7C26614E1D733892C2DEAC7E245CE115504B1D80592DD0A01B08E3E5A55F89CA"
+          },
+          {
+            "file": "nethost.dll",
+            "sha256": "0A6772C622650C09D64D98B5CE1CF101929163D5BB46C55D6F462A18637296BA"
+          },
+          {
+            "file": "PhysX_64.dll",
+            "sha256": "CF82EB604A3AF09EBAE4787B9FD19874CC8326EA7C650B3D1AC88B47D89F192B"
+          },
+          {
+            "file": "PhysXCommon_64.dll",
+            "sha256": "518DD402E9BB00495FDF78AF73C2AF3C7E61B5468E6DE0791B9216A3CB7BC57F"
+          },
+          {
+            "file": "PhysXCooking_64.dll",
+            "sha256": "C6194CE8694969A709AA5EF814FA1F682A470A22099302B5D93D7766FACA58C7"
+          },
+          {
+            "file": "PhysXDevice64.dll",
+            "sha256": "5C4343255F24DF885CFDB2845F3FEE4A4AD5D94031F397997098444897784B54"
+          },
+          {
+            "file": "PhysXFoundation_64.dll",
+            "sha256": "E6176F6A2F7E9EDBF1B529102793D28F281B05F40A859227F46783B441ED78B9"
+          },
+          {
+            "file": "PhysXGpu_64.dll",
+            "sha256": "9A3C355D6A8C1C0765BD5DC104833D45162660B28F023FC390FD01F235038DBF"
+          },
+          {
+            "file": "slang-compiler.dll",
+            "sha256": "BF277592ACAB648F8BD1777054A6703B6DF797B7F2FCA55ED6116777363986D7"
+          },
+          {
+            "file": "tbb12.dll",
+            "sha256": "D904099DFC7A3FBC607D454D91F13A7C6AB386292DA1250EF98C1DBD5D2FAE7A"
+          },
+          {
+            "file": "VCOMP140.DLL",
+            "sha256": "95D4CE4A6802D1E18B5E0E1722CC30EA72CA7E033F83828F05C0B7B993FE7CBF"
+          },
+          {
+            "file": "VCRUNTIME140_1.dll",
+            "sha256": "A7146C08F89FE5B04541AB507CDB59FF7B44534D4BA3C668A426C6450A03434E"
+          },
+          {
+            "file": "VCRUNTIME140.dll",
+            "sha256": "D1F4225DF2CD877DBF130D5668A021DCE3F94118455FF5EC952061C30AFC9CE7"
+          },
+          {
+            "file": "vulkan-1.dll",
+            "sha256": "025BB33C3FEC6FF21848A3C216CE30D97FE227A184A10681F20E657E37DDC710"
+          },
+          {
+            "file": "z.dll",
+            "sha256": "17E4EF3EC71EBE72C0143A198DD719EB92F509E074F3947640D10AA721BA8F90"
+          },
+          {
+            "file": "Player.exe",
+            "sha256": "EFFF5BB0D1AFBB4C7F48C99DBC15EE0BE68B02AF78AA57D46890C655305476E4"
+          },
+          {
+            "file": "Player.runtime.dll",
+            "sha256": "6D6448EF02CC69C181456822525A8A9B017F6A81C33D53BACA938AAFD78B4FD9"
+          }
+        ],
+        "configuration": "Release",
+        "stage": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\CliConsumers\\Jobs-0c723da310434ba1b03d84092357c260\\stage-099477eb7788440282a66b284199cdce",
+        "fixtureSha256": "34D4A0D6ECA262F1D45944917B9F6B6F1F502441FFDA45D0B960F6D0FBA61E93"
+      },
+      "journals": [
+        {
+          "path": "Build/Verification/CliConsumers/Jobs-0c723da310434ba1b03d84092357c260/reload-stage-099477eb7788440282a66b284199cdce.runtime.jsonl",
+          "sha256": "2e60360066a277c82a938baa822cec389362641528710223be094539ddcc934e"
+        },
+        {
+          "path": "Build/Verification/CliConsumers/Jobs-0c723da310434ba1b03d84092357c260/normal-exit-stage-099477eb7788440282a66b284199cdce.runtime.jsonl",
+          "sha256": "aad7cf6102f5bf3ada91031a32befa8e28eafe8123fd9948563e38fe580c5c63"
+        }
+      ]
+    },
+    "PowerShell5": {
+      "path": "Build/Verification/CliConsumers/JobsPS5-c8ce77947f7f494580a6add058a0b74e/verification.json",
+      "sha256": "bf342a14413a4d9aa0ec936250873be289571db96475dfbcbbe114e474c08985",
+      "result": {
+        "binaries": [
+          {
+            "sha256": "717D4854A5472D4DE7609C89D665AA5225165E8DC7A554B7225519E413766F99",
+            "file": "brotlicommon.dll"
+          },
+          {
+            "sha256": "5255F6BF446E1B2134872E4C5D0367B6ADCBD2F120AD84F2C53E5C5090192645",
+            "file": "brotlidec.dll"
+          },
+          {
+            "sha256": "B878737902159B76893CF167EEE38C25D37AFAA2810A918FCD4BA09192C9BEB6",
+            "file": "bz2.dll"
+          },
+          {
+            "sha256": "54716F0738AF891F283D213B5C8D11B25896BB8EE3097D301EAE718560CF974E",
+            "file": "CONCRT140.dll"
+          },
+          {
+            "sha256": "C3908780CFDD0FF37D45BBEB454EFB10BEDFB5C835D8BA5C254E9C1E296330F8",
+            "file": "DirectXTex.dll"
+          },
+          {
+            "sha256": "9A5100511E127C6A2FC78EDF984F95074A76D35B90C90C4D342430A5AE160E9B",
+            "file": "dxcompiler.dll"
+          },
+          {
+            "sha256": "FEB57253EFF0A622561E29B44CEDBE86B89FC9A5BC8DC00FA2F98FAFD712C2D8",
+            "file": "dxil.dll"
+          },
+          {
+            "sha256": "6209773089D3A227F51B9BD174E273695CC946D61167CFCD42409EF10A827AE9",
+            "file": "enkiTS.dll"
+          },
+          {
+            "sha256": "2006813E35AFE4419A67D92928EBEB544510C8CBD0449A2B31BEA5B67463E712",
+            "file": "fmod.dll"
+          },
+          {
+            "sha256": "FF9FBFCCE5510400808D501900A3C70E175724FEC94EDA295ED8909BB921404D",
+            "file": "fmt.dll"
+          },
+          {
+            "sha256": "8C4481AD1E6823D462E2832EEE276CC823BBFA5D100CD93483B36022A7D822A7",
+            "file": "freetype.dll"
+          },
+          {
+            "sha256": "060A4D6558FED9B1D342EDCBFA2942CB3D5069CD9787AAAD54458D374B5B524A",
+            "file": "gcce.dll"
+          },
+          {
+            "sha256": "BDF0FED4BB4B17B6929B180B5000961E4251D0C0E96AA73B0ED9DD9333EB4F44",
+            "file": "libpng16.dll"
+          },
+          {
+            "sha256": "78643D41BB74C65EF6B42BA2C526C1525D39290A5C1260BB9A13611D4E823BB4",
+            "file": "meshoptimizer.dll"
+          },
+          {
+            "sha256": "3123AA647BF9CBF474A0AF2FAD8BE754C734D2BFDB12256BE83D43216B8CC72C",
+            "file": "Microsoft.WindowsAppRuntime.Bootstrap.dll"
+          },
+          {
+            "sha256": "7C26614E1D733892C2DEAC7E245CE115504B1D80592DD0A01B08E3E5A55F89CA",
+            "file": "MSVCP140.dll"
+          },
+          {
+            "sha256": "206C931BF90FDAD8816DE3B5E2EF80B2BCAA9406C89ECC05FE6FDDFFE251E982",
+            "file": "MSVCP140_1.dll"
+          },
+          {
+            "sha256": "D50D7883F20D1DC6191768D3746F52DD9CAC89C346FFAED5BE1F110C2F34A838",
+            "file": "MSVCP140_2.dll"
+          },
+          {
+            "sha256": "3D0CBFAA1BF3EECF5A3F4491D2960EE803CB994F30292C6ADC4A07C498F60E2B",
+            "file": "MSVCP140_ATOMIC_WAIT.dll"
+          },
+          {
+            "sha256": "0A6772C622650C09D64D98B5CE1CF101929163D5BB46C55D6F462A18637296BA",
+            "file": "nethost.dll"
+          },
+          {
+            "sha256": "518DD402E9BB00495FDF78AF73C2AF3C7E61B5468E6DE0791B9216A3CB7BC57F",
+            "file": "PhysXCommon_64.dll"
+          },
+          {
+            "sha256": "C6194CE8694969A709AA5EF814FA1F682A470A22099302B5D93D7766FACA58C7",
+            "file": "PhysXCooking_64.dll"
+          },
+          {
+            "sha256": "5C4343255F24DF885CFDB2845F3FEE4A4AD5D94031F397997098444897784B54",
+            "file": "PhysXDevice64.dll"
+          },
+          {
+            "sha256": "E6176F6A2F7E9EDBF1B529102793D28F281B05F40A859227F46783B441ED78B9",
+            "file": "PhysXFoundation_64.dll"
+          },
+          {
+            "sha256": "9A3C355D6A8C1C0765BD5DC104833D45162660B28F023FC390FD01F235038DBF",
+            "file": "PhysXGpu_64.dll"
+          },
+          {
+            "sha256": "CF82EB604A3AF09EBAE4787B9FD19874CC8326EA7C650B3D1AC88B47D89F192B",
+            "file": "PhysX_64.dll"
+          },
+          {
+            "sha256": "BF277592ACAB648F8BD1777054A6703B6DF797B7F2FCA55ED6116777363986D7",
+            "file": "slang-compiler.dll"
+          },
+          {
+            "sha256": "D904099DFC7A3FBC607D454D91F13A7C6AB386292DA1250EF98C1DBD5D2FAE7A",
+            "file": "tbb12.dll"
+          },
+          {
+            "sha256": "95D4CE4A6802D1E18B5E0E1722CC30EA72CA7E033F83828F05C0B7B993FE7CBF",
+            "file": "VCOMP140.DLL"
+          },
+          {
+            "sha256": "D1F4225DF2CD877DBF130D5668A021DCE3F94118455FF5EC952061C30AFC9CE7",
+            "file": "VCRUNTIME140.dll"
+          },
+          {
+            "sha256": "A7146C08F89FE5B04541AB507CDB59FF7B44534D4BA3C668A426C6450A03434E",
+            "file": "VCRUNTIME140_1.dll"
+          },
+          {
+            "sha256": "025BB33C3FEC6FF21848A3C216CE30D97FE227A184A10681F20E657E37DDC710",
+            "file": "vulkan-1.dll"
+          },
+          {
+            "sha256": "17E4EF3EC71EBE72C0143A198DD719EB92F509E074F3947640D10AA721BA8F90",
+            "file": "z.dll"
+          },
+          {
+            "sha256": "EFFF5BB0D1AFBB4C7F48C99DBC15EE0BE68B02AF78AA57D46890C655305476E4",
+            "file": "Player.exe"
+          },
+          {
+            "sha256": "6D6448EF02CC69C181456822525A8A9B017F6A81C33D53BACA938AAFD78B4FD9",
+            "file": "Player.runtime.dll"
+          }
+        ],
+        "configuration": "Release",
+        "stage": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\CliConsumers\\JobsPS5-c8ce77947f7f494580a6add058a0b74e\\stage-2308e8deab2e4dda8172a97f8ad3084e",
+        "runs": [
+          {
+            "exitCode": 0,
+            "runtimeResults": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\CliConsumers\\JobsPS5-c8ce77947f7f494580a6add058a0b74e\\reload-stage-2308e8deab2e4dda8172a97f8ad3084e.runtime.jsonl",
+            "frameAfter": 0,
+            "mode": "reload",
+            "frameBefore": 0
+          },
+          {
+            "exitCode": 0,
+            "runtimeResults": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\CliConsumers\\JobsPS5-c8ce77947f7f494580a6add058a0b74e\\normal-exit-stage-2308e8deab2e4dda8172a97f8ad3084e.runtime.jsonl",
+            "frameAfter": 12,
+            "mode": "normal-exit",
+            "frameBefore": 4
+          }
+        ],
+        "fixture": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\CliConsumers\\Fixtures-278de4e4207d46b3b218bd5aa12b3815\\Jobs\\Staging\\Game-2cf51973273f4edfad012e504c9d1897",
+        "fixtureSha256": "34D4A0D6ECA262F1D45944917B9F6B6F1F502441FFDA45D0B960F6D0FBA61E93"
+      },
+      "journals": [
+        {
+          "path": "Build/Verification/CliConsumers/JobsPS5-c8ce77947f7f494580a6add058a0b74e/reload-stage-2308e8deab2e4dda8172a97f8ad3084e.runtime.jsonl",
+          "sha256": "3df7d7c8cab33a43513ef90138eafbd3f4870f2331f337ecc0c95e4b1979394c"
+        },
+        {
+          "path": "Build/Verification/CliConsumers/JobsPS5-c8ce77947f7f494580a6add058a0b74e/normal-exit-stage-2308e8deab2e4dda8172a97f8ad3084e.runtime.jsonl",
+          "sha256": "83220d207aecb479c6844781c9aaeb2e76d46d33e8c1bb950df418e43e62e818"
+        }
+      ]
+    }
+  },
+  "audio": {
+    "PowerShell7": {
+      "path": "Build/Validation/Phase22Closure/player-exits-d83a563227a842eb9397ccca73981dc1/summary.jsonl",
+      "sha256": "4d57ef8a3cbe3453104cd8677793492ba4079a97f714dcf8467738164700f459",
+      "processCycles": 1,
+      "results": [
+        {
+          "cycle": 1,
+          "pid": 26348,
+          "exitCode": 0,
+          "managedAudioCycles": 100,
+          "completions": 100,
+          "residentCycles": 50,
+          "streamCycles": 50,
+          "mp3Cycles": 25,
+          "flacCycles": 25,
+          "processRetired": true,
+          "runtimeResults": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Validation\\Phase22Closure\\player-exits-d83a563227a842eb9397ccca73981dc1\\001.runtime.jsonl",
+          "engineBuildId": "d106635e-3b56-4baf-b119-5b7979c89cfc"
+        }
+      ]
+    },
+    "PowerShell5": {
+      "path": "Build/Validation/Phase22Closure/player-exits-99252f8e9d1f496f8d97a662c5246ca3/summary.jsonl",
+      "sha256": "b0e71fc505fa675b1f9f023f39a14f136e04c3cf0bf2efd3e9144e1a8443a66f",
+      "processCycles": 1,
+      "results": [
+        {
+          "cycle": 1,
+          "pid": 21616,
+          "exitCode": 0,
+          "managedAudioCycles": 100,
+          "completions": 100,
+          "residentCycles": 50,
+          "streamCycles": 50,
+          "mp3Cycles": 25,
+          "flacCycles": 25,
+          "processRetired": true,
+          "runtimeResults": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Validation\\Phase22Closure\\player-exits-99252f8e9d1f496f8d97a662c5246ca3\\001.runtime.jsonl",
+          "engineBuildId": "d106635e-3b56-4baf-b119-5b7979c89cfc"
+        }
+      ]
+    }
+  },
+  "editorProducer": {
+    "path": "Build/Verification/CliConsumers/Editor-8be41a866c52426a83a06ca03f72acfe/result.json",
+    "sha256": "ac463e6d1638181a32c6d4b79b826c287e698538f9e0af71647f551270799ab9",
+    "result": {
+      "result": "CLI_CONSUMER_EDITOR_OK",
+      "path": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\CliConsumers\\Editor-8be41a866c52426a83a06ca03f72acfe",
+      "events": 8,
+      "saves": 1,
+      "conflicts": 0,
+      "processId": 14468
+    }
+  },
+  "textureProduct": {
+    "path": "Build/TextureReimportScene/result.json",
+    "sha256": "939eb2abfaf10376f4fd6600552431a4c8d8824baa107aeebb26f4fcf10d84c1",
+    "result": {
+      "receipts": [
+        {
+          "configuration": "Release",
+          "root": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\TRS-Release-ef0dd051",
+          "checks": 315,
+          "verdict": "TEXTURE_REIMPORT_SCENE_OK initial=4 published=2 automaticComponent=2 unsavedUi=retained reloadedComponent=2 cookFailure=retained reloadFailure=retained recovery=4 undo=retained prefab=autoApplyUndoRedo consumers=ImageComponent,SpriteRenderer",
+          "runtimeSha256": "5941B15CEA8C56BAFD3A3094478C4F909B8D1492BF7658EDB8B0184FE7053066",
+          "binarySha256": "03A424E40A1FB3C4F2DAE14B859FDFEC36A9CF04C6E3709ADEB1384E7B023528",
+          "sourceRestored": true
+        }
+      ],
+      "sources": [
+        {
+          "path": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Editor\\EngineEntry\\EditorAssetDatabase.cpp",
+          "sha256": "08C19533B9CE3E28020D603352ED76E0F325B90A9D2B6C7865485D12F2D89A68"
+        },
+        {
+          "path": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Editor\\EngineEntry\\Commands\\AssetAuthoringCommands.cpp",
+          "sha256": "03C26F1C1FCDE9D98FFC47949CF393B6CCC0373C473549768651FD9D841217AA"
+        },
+        {
+          "path": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Engine\\RuntimeHost\\CommandCore\\CommandDescriptorSeeds.cpp",
+          "sha256": "C93E63261546269758F1B3201556D9D75D9AA5AE2075B8417A87F149E35BDF78"
+        },
+        {
+          "path": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Engine\\SceneRuntime\\SceneManager.cpp",
+          "sha256": "C1BE4965D0203D41DDC4FB917866EC1B5D4120BFC4E8093FE58F01B52BF22E16"
+        },
+        {
+          "path": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Engine\\SceneRuntime\\ImageComponent.cpp",
+          "sha256": "D5493CDDB7192E1A7E267DDE1D19F6F47BF2C8902289588B33176FC90FF17F5F"
+        },
+        {
+          "path": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Engine\\SceneRuntime\\SpriteRenderer.cpp",
+          "sha256": "FFA0C42593E63D199C57438B6DF9D2705234276B35DA57A5BD888391A5F3C24A"
+        },
+        {
+          "path": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Engine\\RenderEngine\\AssetDepot\\TextureAssetRuntime.cpp",
+          "sha256": "1584CDE514B854C45D02D61DE416DE3329B209085064C33AFDB8C369F5792F71"
+        },
+        {
+          "path": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Tools\\regression\\texture_reimport_scene_probe.inl",
+          "sha256": "3216240B617660127E156C87457A7AEAF1371EE842EAAB2089CF1714F7F6E729"
+        },
+        {
+          "path": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Tools\\regression\\verify-texture-reimport-scene.ps1",
+          "sha256": "A317C9EEB14225BBEBEBCD30E8559471299EB76B388AD35782D63AC23E841B49"
+        }
+      ],
+      "sourceDrift": 0,
+      "scope": "Single Editor process, actual ImageComponent/SpriteRenderer, real sidecar watcher, automatic scene refresh, Undo/Redo and prefab automatic Apply"
+    }
+  },
+  "browserMutations": {
+    "path": "Build/Verification/CliConsumers/BrowserMutations-f0532db100bc4ebdaf058564aa50347e/result.json",
+    "sha256": "3f913a64d45afcc95f64c963c2d18f3cfe4a4d46ee9273c803c0dbee43359711",
+    "result": {
+      "count": 4,
+      "checks": [
+        {
+          "name": "decal folder check",
+          "exitCode": 1
+        },
+        {
+          "name": "sprite folder check",
+          "exitCode": 1
+        },
+        {
+          "name": "foliage identity",
+          "exitCode": 1
+        },
+        {
+          "name": "material graph path",
+          "exitCode": 1
+        }
+      ]
+    }
+  },
+  "archiveParser": {
+    "path": "Build/Verification/N1/Contracts-3ddf800de43a45a4949e27f9f51c0f86/result.json",
+    "sha256": "e36e726ef61731dbdfa41a29d4f205245f8045c0ef005d5ca8d0439054a1c9c9",
+    "result": {
+      "scope": "Runtime direct backend/API gates, neutral/Network transitive include closure, real authoring/cooked codec and diagnostic producer; packaged Player is a separate product gate",
+      "result": "ARCHIVE_PARSER_BOUNDARY_OK",
+      "configuration": "Release"
+    }
+  },
+  "textureSourceChecks": {
+    "count": 5,
+    "log": "Build/cli-consumer-texture-source.log"
+  },
+  "binaries": [
+    {
+      "path": "Bin/x64-Release/Editor/CreatorEditor.exe",
+      "sha256": "03a424e40a1fb3c4f2dae14b859fdfec36a9cf04c6e3709adeb1384e7b023528"
+    },
+    {
+      "path": "Bin/x64-Release/Editor/CreatorEditor.runtime.dll",
+      "sha256": "5941b15cea8c56bafd3a3094478c4f909b8d1492bf7658edb8b0184fe7053066"
+    },
+    {
+      "path": "Bin/x64-Release/Player/Player.exe",
+      "sha256": "efff5bb0d1afbb4c7f48c99dbc15ee0be68b02af78aa57d46890c655305476e4"
+    },
+    {
+      "path": "Bin/x64-Release/Player/Player.runtime.dll",
+      "sha256": "6d6448ef02cc69c181456822525a8a9b017f6a81c33d53baca938aafd78b4fd9"
+    }
+  ],
+  "sources": [
+    {
+      "path": "Engine/Utility_Framework/RuntimeResults.h",
+      "sha256": "c1f25f78b148333c98e7c74871a23f6a451b98041379cca7b09f993dcd4b3019"
+    },
+    {
+      "path": "Engine/Utility_Framework/DiagnosticDocument.h",
+      "sha256": "b9f2a4a058f31d7997c407f659534122e356a801929daadfcae312c79e307665"
+    },
+    {
+      "path": "Engine/RuntimeHost/EngineBootstrap.h",
+      "sha256": "4919abc68fae0a64175d38b96d721e275cd62271bcd4b423b4766830a5bff5f7"
+    },
+    {
+      "path": "Editor/EngineEntry/App.cpp",
+      "sha256": "bfd9d9c878a0401ccc4b82f842dbb166b3ea3e072c64925e8ae823139c9b73fa"
+    },
+    {
+      "path": "Editor/EngineEntry/EditorAssetDatabase.cpp",
+      "sha256": "08c19533b9ce3e28020d603352ed76e0f325b90a9d2b6c7865485d12f2d89a68"
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp",
+      "sha256": "d539902d73eb1c1c037af305a79c5e5335648df4d440f9bdb6ca9655108cebe4"
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/Vulkan/VulkanDeviceResources.cpp",
+      "sha256": "275463ad0d67ea9a70feca85e313cb4895a298db820b05e6526ed27c95e596ff"
+    },
+    {
+      "path": "Player/PlayerMain.cpp",
+      "sha256": "330375ef79f3d6e6d94690c6dba9e88ba6ec74714f6ac12c95719adc495f74f5"
+    },
+    {
+      "path": "Engine/SceneRuntime/ClrHost.h",
+      "sha256": "bb4cfc6ff135048256692e6177bfa52c6c4a2737f80b9d7e55123784f03e38a4"
+    },
+    {
+      "path": "Engine/SceneRuntime/ClrHost.cpp",
+      "sha256": "c1f06fb5608bfbdca2bbc6ffb11e6b732c1a46d8a5db4af387b47eb88379f9dd"
+    },
+    {
+      "path": "GameScripts/PackageSmokeProbe.fs",
+      "sha256": "4ff7e6b81d83a9d98b7d613c9809d36636d65abbd053f11dd799d72913d3b2a3"
+    },
+    {
+      "path": "Dynamic_CPP/Assets/Script/Phase22ProductAudioProbe.fs",
+      "sha256": "2047d4727d73f5c7108d81ad79b9417f9d5812f4c2dc44287a7de8dc91e1aada"
+    },
+    {
+      "path": "Tools/regression/RuntimeResults.ps1",
+      "sha256": "39381e41028d620197697346f44b8ead16918e16c6aeab41d50fc16f46f94783"
+    },
+    {
+      "path": "Tools/regression/CommandResults.ps1",
+      "sha256": "c498d0aad75910aa75cb381eb06c810b5e441f5e4665558f89e494e3ab00b34a"
+    },
+    {
+      "path": "Tools/regression/verify-runtime-result-consumers.ps1",
+      "sha256": "57dc5d3f2820ddae275ae6954105817b61b25864f0c838e9f7cfb4e27026dd36"
+    },
+    {
+      "path": "Tools/regression/verify-cli-consumer-contract.ps1",
+      "sha256": "b2d7c0e91fc627b0ec2b16b40aa9886ab2c80ec211b022cce9e9fd3bb7e6a147"
+    },
+    {
+      "path": "Tools/regression/verify-animation-player.ps1",
+      "sha256": "3499a008cb34baf0c826642c1ca758379f3c604d31d4276c71140ebd95c96642"
+    },
+    {
+      "path": "Tools/regression/verify-audio-player-exits.ps1",
+      "sha256": "f58af1d553f87861a497b10b682aaabf51d45fb945a969f065a4ed503c21af3f"
+    },
+    {
+      "path": "Tools/regression/verify-content-browser-navigation.ps1",
+      "sha256": "ae2a547a826e7f62d86cc93597cf9745646294abc3bdc3f3aee9570d9369bf74"
+    },
+    {
+      "path": "Tools/regression/verify-player-job-lifecycle.ps1",
+      "sha256": "9e53ef7a73d7014e955c7bfafde555ff1b193c69835af16ffe9728612a1e6014"
+    },
+    {
+      "path": "Tools/regression/verify-texture-auto-ui-shutdown.ps1",
+      "sha256": "e46885e35c038ab258ce0c65e27465359995a8433a1015612cbe3e3d80e517a9"
+    },
+    {
+      "path": "Tools/regression/verify-texture-auto-ui-soak.ps1",
+      "sha256": "72ba2f5202ccc6e3c188b8833fafa53edc1cb9325b6b63d81e01fa3330c1a8f1"
+    },
+    {
+      "path": "Tools/regression/verify-texture-pending-native-close.ps1",
+      "sha256": "b977f52247d1aeaeb935fc02b3d382c83b989a8b960ff31123ffb02957c41ed6"
+    },
+    {
+      "path": "Tools/regression/start-texture-auto-ui.ps1",
+      "sha256": "d551e5eb45dfc98eb92aa203e5f82a785e2b987b87cbd40de2ee908991a8b08b"
+    },
+    {
+      "path": "Tools/regression/build-cli-consumer-fixtures.ps1",
+      "sha256": "bd52c0ae54dffeaae3aa3c9d82d48ae4f6b64487a7369ad987a46f1bf1dce626"
+    },
+    {
+      "path": "Tools/regression/verify-texture-import-editor-source.py",
+      "sha256": "bc250547ade59b0fd436a2e6d17ec35bcf794ce5e60987fff047e8e545e56a5a"
+    },
+    {
+      "path": ".github/workflows/cli-consumer-contract.yml",
+      "sha256": "b196b0d4f344a6bd20679095390829d2ea4df57e8d4f00736443c64c85be6570"
+    }
+  ],
+  "remaining": {
+    "animationProduct": {
+      "status": "blocked_by_cooker",
+      "reason": "automatic Scene material compilation: Slang E41012 profile implicitly upgraded / spirv_1_3",
+      "logs": [
+        "Build/cli-consumer-animation-fixture.log",
+        "Build/cli-consumer-animation-dx12.log"
+      ]
+    },
+    "actualInspectorShutdownAndSoak": "not rerun; receipt consumers tested with synthetic inputs, normal autosave producer exercised in Editor",
+    "audioHundredProcessExits": "not run; one process per shell, 100 managed playback/completion cycles per process",
+    "remoteCI": "not run",
+    "other": "Debug/Shipping/GPU hardware quality/general manual GUI not certified"
+  },
+  "documentation": {
+    "log": "Build/cli-consumer-verify-docs.log",
+    "result": {
+      "pages": 679,
+      "scripts": 359,
+      "failures": 0
+    }
+  },
+  "scriptParsing": {
+    "filesPerShell": 13,
+    "powerShell5Log": "Build/cli-consumer-parse-ps5.log"
+  }
+}

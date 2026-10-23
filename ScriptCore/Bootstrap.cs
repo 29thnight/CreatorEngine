@@ -34,8 +34,10 @@ public static class Bootstrap
             Native.Log(1, "[ScriptCore] 초기화 완료");
             return 0;
         }
-        catch
+        catch (Exception error)
         {
+            try { Native.Log(3, $"[ScriptCore] Managed runtime initialization failed: {error}"); }
+            catch { /* Preserve the native initialization result even if logging fails. */ }
             Native.Unbind();
             return -2;
         }
@@ -74,6 +76,14 @@ public static class Bootstrap
     {
         try { ScriptRegistry.FlushRegistrations(); return ScriptRegistry.ActiveCount; }
         catch (Exception ex) { Report(ex, nameof(FlushRegistrations)); return -1; }
+    }
+
+    /// <summary>Required C++ OnTickSimulate(float fixedDelta) contract; one managed batch per fixed tick.</summary>
+    [UnmanagedCallersOnly]
+    public static int OnTickSimulate(float dt)
+    {
+        try { ScriptRegistry.UpdateTick(dt); return ScriptRegistry.ActiveCount; }
+        catch (Exception ex) { Report(ex, nameof(OnTickSimulate)); return -1; }
     }
 
     /// <summary>물리 스텝 앞의 틱 (설계 문서 §4 트랙 L5).</summary>

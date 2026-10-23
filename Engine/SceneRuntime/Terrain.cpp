@@ -614,7 +614,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	tmpHeightMap.clear();
 	tmpLayerHeightMap.clear();
 	tmpLayerDescs.clear();
-	PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+	PublishRenderPropertyWrite(ProxyDirty::Material | ProxyDirty::Payload);
 
 	file::path Path = filePath + L".meta";
 	if (file::exists(Path))
@@ -1022,7 +1022,7 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
         m_pTerrainMesh = std::move(mesh);
         m_pMaterial = std::move(material);
         m_terrainTargetPath = std::move(targetPath);
-        PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+        PublishRenderPropertyWrite(ProxyDirty::Material | ProxyDirty::Payload);
         return true;
     }
     catch (const std::exception& error)

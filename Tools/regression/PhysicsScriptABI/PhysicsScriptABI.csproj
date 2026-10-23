@@ -8,4 +8,5 @@
   <ItemGroup>
     <ProjectReference Include="../../../ScriptCore/ScriptCore.csproj" />
   </ItemGroup>
+  <ItemGroup><ProjectReference Include="../../../ScriptRuntime/ScriptRuntime.fsproj" /></ItemGroup>
 </Project>

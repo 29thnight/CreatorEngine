@@ -92,6 +92,14 @@
 // 콘솔 명령마다 스택에 만들어지는 검증용이라 상시 상태를 들 수 없고, 그렇다고
 // 별도 공개 클래스를 두면 "DX12 렌더러 = EnhancedSceneRenderer"라는 로드맵의
 // 명칭 체계가 흐려진다(실제로 그렇게 만들었다가 물렸다).
+namespace
+{
+    bool CaptureEnvironmentFlag(const char* name)
+    {
+        char value[2]{};
+        return GetEnvironmentVariableA(name,value,sizeof(value))==1 && value[0]=='1';
+    }
+}
 namespace EnhancedSceneRenderer
 {
     using LiveGraphSnapshot = own::shared_owner<const EnhancedRenderGraph::DiagnosticSnapshot>;
@@ -1978,7 +1986,7 @@ namespace
                 capture->RecordIblContract(EnhancedIBLGenerator::kImportanceSampleCount,
                     EnhancedIBLGenerator::kSceneReflectionSampleCount,
                     resources.DescribeTexture(ibl.GetImportanceMaps()[2]));
-                capture->manifest.rootref()["measurement"]["validationLayerEnabled"] << resources.IsValidationEnabled();
+                capture->manifest.Root()["measurement"]["validationLayerEnabled"] << resources.IsValidationEnabled();
                 const auto memory = resources.QueryVideoMemory();
                 capture->RecordMemory(memory);
                 std::vector<VulkanCaptureGpuProfiler::Timing> nativeTimings;
@@ -3463,8 +3471,7 @@ namespace
                 return false;
             }
             const auto traceBuild = [](const char* phase) {
-                const char* value = std::getenv("CE_RENDER_PROGRESS_TRACE");
-                if (value && std::string_view(value) == "1")
+                if (CaptureEnvironmentFlag("CE_RENDER_PROGRESS_TRACE"))
                 {
                     std::printf("[render.pipeline.progress] phase=%s\n", phase);
                     std::fflush(stdout);
@@ -7315,8 +7322,7 @@ namespace
             const uint64_t profileCpuBegin = GpuSpanSink().on_cpu_render ? ProfileCpuTick() : 0;
             static const bool queueEvidence = []
             {
-                const char* value = std::getenv("CREATOR_RG8_EVIDENCE");
-                return value && std::string_view(value) == "1";
+                return CaptureEnvironmentFlag("CREATOR_RG8_EVIDENCE");
             }();
             std::optional<LiveStopwatch> renderOnceWatch;
             if (queueEvidence)
@@ -7557,8 +7563,8 @@ namespace
                                               if (stageCaptureOk && node.name == "PostChain")
                                               {
                                                   auto& post = p.Execution().postChain;
-                                                  auto tuning = capture->manifest.rootref()["postTuning"];
-                                                  tuning |= ryml::MAP;
+                                                  auto tuning = capture->manifest.Root()["postTuning"];
+                                                  tuning.SetMap();
                                                   tuning["bloomEnabled"] << post.GetTuning().bloomEnabled;
                                                   tuning["bloomThreshold"] << post.GetTuning().bloomThreshold;
                                                   tuning["bloomKnee"] << post.GetTuning().bloomKnee;
@@ -9943,7 +9949,7 @@ bool EnhancedSceneRenderer::RequestLivePbrCapture(const std::string& directory,
         }
     }
     std::error_code error;
-    const auto path = std::filesystem::u8path(directory);
+    const auto path = std::filesystem::path(std::u8string(directory.begin(),directory.end()));
     if (!path.is_absolute() || !std::filesystem::create_directories(path, error) || error)
     { outError = "capture requires a new absolute directory: " + directory; return false; }
     state.pbrCapture = own::make_unique<EnhancedPbrCapture>(!observeTemporal && historyOrdinal == 0 && !expectedFixture.sdkQuality);
@@ -10163,7 +10169,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
         "frame.frameId > state.consumedFrameId && \"RenderFramePacket must be consumed exactly once in publication "
         "order\"");
     const auto traceProgress = [&](const char* phase) {
-        static const bool enabled = [] { const char* value = std::getenv("CE_RENDER_PROGRESS_TRACE"); return value && std::string_view(value) == "1"; }();
+        static const bool enabled = CaptureEnvironmentFlag("CE_RENDER_PROGRESS_TRACE");
         if (enabled && frame.frameId <= 3)
         {
             std::printf("[render.progress] frame=%llu phase=%s\n", static_cast<unsigned long long>(frame.frameId), phase);
@@ -11885,6 +11891,29 @@ void EnhancedSceneRenderer::ShutdownLive()
 
     state.dx12.ShutdownInterop();
 
+    // LiveState is process-static. Its final CPU snapshots can still pin exact
+    // model artifacts after SceneManager has released the scene. Drop borrows
+    // before their pin tables, only after both backends prove final consumption.
+    state.drawPool.clear();
+    state.shadowDraws.clear();
+    state.graphDraws.clear();
+    state.graphShadowEligible.clear();
+    state.graphViewRequired.clear();
+    state.graphViewInput.reset();
+    state.decals.clear();
+    state.spritePool.clear();
+    state.worldSprites.clear();
+    state.uiRects.clear();
+    state.uiProxyPointers.clear();
+    state.uiProxySnapshot.clear();
+    state.modelFramePins.reset();
+    state.geometryFramePins.entries.clear();
+    state.CancelGeometryDemands();
+    state.geometryDemandViews.clear();
+    state.graphFramePins.reset();
+    state.textureFramePins.reset();
+    material_graph::MeshSurfacePlan::ReleaseCachedScenePlans();
+
     if (state.runtimeInitialized)
     {
         state.skyEquirect.reset();
@@ -11894,10 +11923,6 @@ void EnhancedSceneRenderer::ShutdownLive()
         state.skyCookCachePath.clear();
         state.imageDemands.clear();
         state.imageBootstrapViews.reset();
-        if (state.textureFramePins)
-        {
-            state.textureFramePins->ReleaseImages();
-        }
         state.fogBlueNoise.reset();
         state.fogImagePreparation = own::make_shared<FogImagePreparation>();
         if (state.renderScene)

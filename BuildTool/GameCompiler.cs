@@ -6,8 +6,13 @@ namespace CreatorBuildTool;
 
 internal static class GameCompiler
 {
-    public static readonly string[] CoreFiles = ["ScriptCore.dll", "ScriptCore.deps.json", "ScriptCore.runtimeconfig.json"];
-    public static readonly string[] ManagedFiles = [.. CoreFiles, "Scripts/GameScripts.dll", "Scripts/GameScripts.deps.json", "Scripts/GameScripts.dll.engine.json"];
+    public static readonly string[] CoreFiles =
+    [
+        "ScriptCore.dll", "ScriptCore.deps.json", "ScriptCore.runtimeconfig.json",
+        "CreatorEngine.ManagedRuntime.dll", "CreatorEngine.ManagedRuntime.deps.json",
+        "FSharp.Core.dll"
+    ];
+    public static readonly string[] ManagedFiles = [.. CoreFiles, "Scripts/GameScripts.dll", "Scripts/GameScripts.deps.json", "Scripts/GameScripts.dll.engine.json", "Scripts/FSharp.Core.dll", "Scripts/CreatorEngine.FSharp.Runtime.dll"];
     // Keep both input identities open without write/delete sharing until the
     // exact copied bytes are checked. Never bless changed bytes with a new receipt.
     internal static string CopyPrebuiltAssembly(EngineDistribution engine, string prebuilt, string assembly)
@@ -45,6 +50,18 @@ internal static class GameCompiler
         return expected;
     }
 
+    internal static string[] ReadFSharpSources(string sourceRoot)
+    {
+        var order = Path.Combine(sourceRoot, "compile.order");
+        if (!File.Exists(order)) throw new BuildException("F# scripts require Assets/Script/compile.order.");
+        var sources = File.ReadAllLines(order).Where(line => !string.IsNullOrWhiteSpace(line)).Select(line => Paths.Child(sourceRoot, line.Trim())).ToArray();
+        if (sources.Distinct(Paths.Comparer).Count() != sources.Length || sources.Any(p => !p.EndsWith(".fs", StringComparison.OrdinalIgnoreCase) || !File.Exists(p)))
+            throw new BuildException("compile.order must list unique existing relative .fs paths.");
+        var allSources = Paths.Files(sourceRoot).Where(p => p.EndsWith(".fs", StringComparison.OrdinalIgnoreCase)).Select(Paths.Normal).ToHashSet(Paths.Comparer);
+        if (!allSources.SetEquals(sources)) throw new BuildException("compile.order must list every F# source exactly once.");
+        return sources;
+    }
+
     public static async Task Compile(BuildContext context, EngineDistribution engine, string project, string output, string configuration, string prebuilt)
     {
         project = Paths.Canonical(project, true); output = Paths.Canonical(output);
@@ -59,6 +76,7 @@ internal static class GameCompiler
         try
         {
             foreach (var name in CoreFiles) Paths.Copy(Path.Combine(engine.BinaryRoot, "Managed", name), Path.Combine(work, name));
+            Paths.Copy(Path.Combine(engine.Root, "Scripting/FSharpRuntime/CreatorEngine.FSharp.Runtime.dll"), Path.Combine(work, "Scripts/CreatorEngine.FSharp.Runtime.dll"));
             string? prebuiltHash = null;
             if (prebuilt.Length > 0)
             {
@@ -67,20 +85,30 @@ internal static class GameCompiler
             else
             {
                 var sourceRoot = Path.Combine(project, "Assets/Script");
-                var sources = Paths.Files(sourceRoot).Where(p => Path.GetExtension(p).Equals(".cs", StringComparison.OrdinalIgnoreCase)).Order(StringComparer.Ordinal).ToArray();
-                var globals = Path.Combine(work, "GlobalUsings.g.cs");
-                File.WriteAllText(globals, "global using System; global using System.Collections.Generic; global using System.IO; global using System.Linq; global using System.Net.Http; global using System.Threading; global using System.Threading.Tasks;");
-                static string Quote(string path) => '"' + path + '"';
-                var arguments = new List<string> { "/nologo", "/target:library", "/langversion:latest", "/nullable:enable", "/unsafe+", "/nostdlib+", "/deterministic+",
-                    "/out:" + Quote(assembly), "/reference:" + Quote(Path.Combine(work, "ScriptCore.dll")),
-                    "/analyzer:" + Quote(Path.Combine(engine.Root, "Scripting/ScriptCore.Generators.dll")),
-                    "/pathmap:" + Quote(project + "=/_/Project," + work + "=/_/Build") };
-                arguments.AddRange(configuration == "Debug" ? ["/define:DEBUG;TRACE", "/debug:portable", "/optimize-"] : ["/define:TRACE", "/optimize+"]);
-                arguments.AddRange(Paths.Files(Path.Combine(engine.Root, "Scripting/References")).Where(p => p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)).Order(StringComparer.Ordinal).Select(p => "/reference:" + Quote(p)));
-                arguments.Add(Quote(globals)); arguments.AddRange(sources.Select(Quote));
+                var sources = ReadFSharpSources(sourceRoot);
+                static string Quote(string path) => path;
+                var arguments = new List<string> { "--target:library", "--targetprofile:netcore", "--langversion:10.0", "--noframework", "--simpleresolution", "--deterministic+",
+                    "--out:" + Quote(assembly), "-r:" + Quote(Path.Combine(work, "ScriptCore.dll")),
+                    "-r:" + Quote(Path.Combine(work, "Scripts/CreatorEngine.FSharp.Runtime.dll")),
+                    "-r:" + Quote(Path.Combine(engine.Root, "Scripting/FSharpReferences/FSharp.Core.dll")),
+                    "--pathmap:" + Quote(project + "=/_/Project," + work + "=/_/Build") };
+                arguments.AddRange(configuration == "Debug" ? ["--define:DEBUG", "--define:TRACE", "--debug:portable", "--optimize-"] : ["--define:TRACE", "--optimize+"]);
+                arguments.AddRange(Paths.Files(Path.Combine(engine.Root, "Scripting/References")).Where(p => p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)).Order(StringComparer.Ordinal).Select(p => "-r:" + Quote(p)));
+                arguments.AddRange(sources.Select(Quote));
                 var response = Path.Combine(work, "compile.rsp"); File.WriteAllLines(response, arguments);
-                await context.Run(Path.Combine(engine.BinaryRoot, "Runtime/DotNet/dotnet.exe"), ["exec", Path.Combine(engine.Root, "Scripting/Compiler/csc.dll"), "@" + response]);
+                var projectFile = Path.Combine(work, "GameScripts.fsproj"); File.WriteAllText(projectFile, "<Project />");
+                var generated = Path.Combine(work, "ScriptRegistry.g.fs");
+                var host = Path.Combine(engine.BinaryRoot, "Runtime/DotNet/dotnet.exe");
+                await context.Run(host, ["exec", Path.Combine(engine.Root, "Scripting/FSharpGenerator/CreatorEngine.FSharp.Generator.dll"), "generate", "--project", projectFile, "--response", response, "--output", generated, "--manifest", Path.Combine(work, "script-metadata.json"), "--diagnostics", Path.Combine(work, "diagnostics.json")]);
+                File.AppendAllLines(response, [Quote(generated)]);
+                await context.Run(host, ["exec", Path.Combine(engine.Root, "Scripting/FSharp/fsc.dll"), "@" + response]);
+
             }
+            var fsharpCore = Path.Combine(engine.Root, "Scripting/FSharpReferences/FSharp.Core.dll");
+            var deployedCore = Path.Combine(work, "Scripts/FSharp.Core.dll");
+            if (!File.Exists(deployedCore)) Paths.Copy(fsharpCore, deployedCore);
+            else if (Metadata.Hash(deployedCore) != Metadata.Hash(fsharpCore))
+                throw new BuildException("Compiler copied an unexpected FSharp.Core identity.");
             Metadata.Write(assembly + ".engine.json", new { schemaVersion = 1, engineBuildId = engine.Manifest.Text("buildId"), scriptApi = engine.Manifest.Int("scriptApi"), sha256 = prebuiltHash ?? Metadata.Hash(assembly) });
             Metadata.Write(Path.Combine(work, "Scripts/GameScripts.deps.json"), new
             {

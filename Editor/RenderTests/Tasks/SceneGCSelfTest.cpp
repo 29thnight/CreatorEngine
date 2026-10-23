@@ -15,6 +15,8 @@
 #include "MeshRenderer.h"
 #include "FoliageComponent.h"
 #include "DecalComponent.h"
+#include "Animator.h"
+#include "../../EngineEntry/ReflectionPropertyEdit.h"
 
 #include "../../../Engine/Utility_Framework/StandardLibrary.h"
 
@@ -26,6 +28,80 @@ namespace
         {
             throw std::runtime_error(message);
         }
+    }
+
+    struct ObservationRecorder final : Runtime::ISceneEntityObserver, Runtime::IComponentWriteObserver
+    {
+        std::vector<Runtime::SceneEntityEvent> entities;
+        std::vector<Runtime::ComponentWriteEvent> writes;
+        void OnEntityChanged(const Runtime::SceneEntityEvent& event) override {entities.push_back(event);}
+        void OnComponentWritten(const Runtime::ComponentWriteEvent& event) override {writes.push_back(event);}
+    };
+    struct ObservationLease
+    {
+        Runtime::SceneObservation& bus;
+        std::shared_ptr<ObservationRecorder> recorder=std::make_shared<ObservationRecorder>();
+        uint64_t entity=bus.Subscribe(std::static_pointer_cast<Runtime::ISceneEntityObserver>(recorder));
+        uint64_t write=bus.Subscribe(std::static_pointer_cast<Runtime::IComponentWriteObserver>(recorder));
+        ~ObservationLease(){bus.Unsubscribe(write);bus.Unsubscribe(entity);}
+    };
+    void VerifyAuthoringWrites(ObservationRecorder& observation)
+    {
+        auto* scene=SceneManagers->GetActiveScene();
+        if(!scene)scene=SceneManagers->CreateScene("ObservationAuthoring");
+        Require(scene!=nullptr,"Missing authoring scene");
+        auto* entity=scene->CreateEntity("ObservationAuthoringProbe");
+        auto* light=entity->AddComponent<LightComponent>();
+        scene->CollectLightComponent(light);
+        const auto published=scene->GetRenderProxyCommitMetrics().publishCalls;
+        auto* undo=Meta::UndoManager::GetInstance();
+        const auto depth=undo->EditUndoDepth();
+        observation.writes.clear();
+        const auto old=light->m_intencity;
+        Require((Meta::TypedDraw::CommitMemberChange<LightComponent,float,&LightComponent::m_intencity>(light,old,old+2,"m_intencity")),"Typed scalar edit rejected");
+        Require(light->m_intencity==old+2&&observation.writes.size()==1
+            && observation.writes.back().source==Meta::PropertyChangeSource::Inspector
+            && std::string_view(observation.writes.back().property.data())=="m_intencity","Scalar notification fanout or origin incorrect");
+        Require(scene->GetRenderProxyCommitMetrics().pending>0 && scene->GetRenderProxyCommitMetrics().publishCalls>published,"Inspector edit did not publish render dirty");
+        undo->Undo();Require(light->m_intencity==old&&observation.writes.back().source==Meta::PropertyChangeSource::Undo,"Undo notification missing");
+        undo->Redo();Require(light->m_intencity==old+2&&observation.writes.back().source==Meta::PropertyChangeSource::Redo,"Redo notification missing");
+        Require(undo->EditUndoDepth()==depth+1,"Scalar produced duplicate Undo records");
+        observation.writes.clear();
+        { Meta::TypedDraw::ComplexMemberEdit edit(light,"m_lightType");light->m_lightType=LightType::PointLight;edit.Finish(); }
+        Require(observation.writes.size()==1&&observation.writes.back().source==Meta::PropertyChangeSource::Inspector,"Enum transaction notification missing");
+        undo->Undo();Require(light->m_lightType==LightType::DirectionalLight,"Enum Undo missing");
+        undo->Redo();Require(light->m_lightType==LightType::PointLight,"Enum Redo missing");
+        observation.writes.clear();
+        { Meta::TypedDraw::ComplexMemberEdit edit(light,"m_lightType");edit.Finish(); }
+        Require(observation.writes.empty(),"No-op gesture produced a write");
+        entity->m_editorLocked=true;
+        Require(!(Meta::TypedDraw::CommitMemberChange<LightComponent,float,&LightComponent::m_intencity>(light,old+2,91,"m_intencity")),"Locked authoring accepted");
+        Require(light->m_intencity==old+2&&observation.writes.empty(),"Locked authoring leaked a value/write");
+        entity->m_editorLocked=false;
+        auto* animator=entity->AddComponent<Animator>();
+        observation.writes.clear();
+        { Meta::TypedDraw::ComplexMemberEdit edit(animator,"m_TwoBoneIKConstraints");
+          animator->m_TwoBoneIKConstraints.push_back(TwoBoneIKConstraint{});
+          animator->m_TwoBoneIKConstraints.back().StartBone="root";edit.Finish(); }
+        Require(animator->m_TwoBoneIKConstraints.size()==1&&observation.writes.size()==1,"Container/nested transaction missing");
+        Authoring::WriteDocument legacyNull;
+        legacyNull.Root().Child("m_TwoBoneIKConstraints").SetNull();
+        Meta::Deserialize(animator,*Meta::Find(animator->GetTypeID()),legacyNull.Root().Read());
+        Require(animator->m_TwoBoneIKConstraints.size()==1,"Legacy null container load was changed");
+        undo->Undo();Require(animator->m_TwoBoneIKConstraints.empty(),"Container Undo missing");
+        undo->Redo();Require(animator->m_TwoBoneIKConstraints.size()==1&&animator->m_TwoBoneIKConstraints.front().StartBone=="root","Container nested Redo missing");
+        observation.writes.clear();
+        light->SetRange(27);Require(observation.writes.size()==1&&observation.writes.back().allProperties,"Native setter notification missing");
+        observation.writes.clear();
+        entity->Transform_().SetPosition({3,4,5},TransformWriteReason::Script);
+        Require(observation.writes.size()==1&&observation.writes.back().source==Meta::PropertyChangeSource::Script,"Transform Script writer notification missing");
+        observation.writes.clear();
+        entity->Transform_().NotifyPropertyChanged("position",Meta::PropertyChangeSource::Undo);
+        Require(observation.writes.size()==1&&observation.writes.back().source==Meta::PropertyChangeSource::Undo,"Transform virtual hook duplicated write/origin");
+        scene->UnCollectLightComponent(light);
+        entity->Destroy();scene->EndFramePass();
+        const auto writes=observation.writes.size();undo->Undo();undo->Redo();
+        Require(observation.writes.size()==writes,"Stale Undo wrote to a retired component");
     }
 
     template<class T>
@@ -257,6 +333,22 @@ namespace RenderTest
         try
         {
             Require(!SceneManagers->IsPlayCommitted(), "GC regression requires an idle host");
+            ObservationLease observation{SceneManagers->Observations()};
+            VerifyAuthoringWrites(*observation.recorder);
+            {
+                auto abandoned=Scene::CreateNewScene(domain,"AbandonedTransfer");
+                auto* entity=abandoned->CreateEntity("DetachedFinalization");
+                const auto identity=entity->GetInstanceID();
+                std::vector<DetachedEntityTransfer> pending;
+                abandoned->DetachEntityHierarchy(entity,pending);
+                entity->FinalizeManagedDestroy();
+                entity->FinalizeManagedDestroy();
+                pending.clear();abandoned->RetireManagedGraph();abandoned.reset();
+                std::vector<Runtime::EntityChange> events;
+                for(const auto& event:observation.recorder->entities)if(event.instance==identity)events.push_back(event.change);
+                Require(events==std::vector{Runtime::EntityChange::Created,Runtime::EntityChange::Detached,Runtime::EntityChange::Destroyed},"Abandoned DDOL transfer terminal notification incorrect");
+            }
+            observation.recorder->entities.clear();
             domain.collect_full();
             const auto baseline = domain.stats();
             Lifecycle::Registry::Register<CycleProbe>();
@@ -287,6 +379,9 @@ namespace RenderTest
 
             auto* firstProbe = first->AddComponent<CycleProbe>(results);
             auto* secondProbe = second->AddComponent<CycleProbe>(results);
+            observation.recorder->writes.clear();
+            firstProbe->NotifyPropertyChanged("peer",Meta::PropertyChangeSource::Reflection);
+            Require(observation.recorder->writes.size()==1 && observation.recorder->writes.back().component==firstProbe->GetInstanceID(),"Non-render component write missing");
             firstProbe->peer = secondProbe->root_from_this();
             secondProbe->peer = firstProbe->root_from_this();
             firstProbe->retainedScene = source;
@@ -297,6 +392,8 @@ namespace RenderTest
             secondProbe->scriptHandle = ScriptObjectRegistry::Get().Register(second);
             const auto firstScript = firstProbe->scriptHandle;
             const auto secondScript = secondProbe->scriptHandle;
+            const auto firstIdentity=first->GetInstanceID();
+            const auto secondIdentity=second->GetInstanceID();
             const auto staleFirst = source->HandleOf(first->m_index);
             const auto staleSecond = source->HandleOf(second->m_index);
             const auto weakFirst = first->weak_from_this();
@@ -390,6 +487,18 @@ namespace RenderTest
                 && !weakFirstProbe.lock() && !weakSecondProbe.lock()
                 && !weakSource.lock() && !weakDestination.lock(),
                 "Unreachable Scene/Entity/Component cycles were not reclaimed");
+            std::vector<Runtime::EntityChange> firstEvents, secondEvents;
+            for(const auto& event:observation.recorder->entities)
+            {
+                if(event.instance==firstIdentity)firstEvents.push_back(event.change);
+                if(event.instance==secondIdentity)secondEvents.push_back(event.change);
+                if(event.instance==secondIdentity&&event.change==Runtime::EntityChange::Attached)
+                    Require(event.before.scene==staleSecond.sceneId&&event.after.scene!=event.before.scene,"DDOL location was not rebound");
+            }
+            Require(firstEvents==std::vector{Runtime::EntityChange::Created,Runtime::EntityChange::Destroyed},"Entity create/destroy observation order incorrect");
+            Require(secondEvents==std::vector{Runtime::EntityChange::Created,Runtime::EntityChange::Detached,Runtime::EntityChange::Attached,Runtime::EntityChange::Destroyed},"DDOL observation duplicated destruction or identity");
+            Require(SceneManagers->Observations().Metrics().lost==0&&SceneManagers->Observations().Metrics().failures==0,"Observer delivery lost/failed");
+            std::printf("SCENE_OBSERVATION_PRODUCT_OK scalar=1 enum=1 container=1 locked=1 undoRedo=1 noOp=1 staleUndo=1 native=1 transform=1 nonRender=1 lifetime=1 ddol=1 abandoned=1\n");
             const auto final = domain.stats();
             Require(final.live_objects == baseline.live_objects && final.quarantined == baseline.quarantined,
                 "Regression leaked graph objects or unfinished cleanup obligations");

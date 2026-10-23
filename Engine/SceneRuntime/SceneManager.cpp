@@ -299,6 +299,7 @@ SceneManager::~SceneManager()
     {
         Decommissioning();
     }
+    m_observation.Clear();
     m_gcDomain.collect_full();
 }
 
@@ -429,6 +430,7 @@ void SceneManager::AdvanceSceneContextEpoch()
         throw std::overflow_error("Scene context identity space exhausted");
     }
     m_sceneContextEpoch.store(previous + 1u, std::memory_order_release);
+    ResetSimulationCommands();
 }
 
 void SceneManager::SetActiveScene(Scene* scene)
@@ -453,6 +455,7 @@ void SceneManager::SetCommittedSimulation(bool committed)
     {
         AdvanceSceneContextEpoch();
         m_isPlayCommitted = committed;
+        ResetSimulationCommands();
     }
 }
 
@@ -674,13 +677,116 @@ void SceneManager::Initialization()
     }
 }
 
+void SceneManager::ResetSimulationCommands()
+{
+    RequireSceneLoadOwner();
+    m_simulationTick = {};
+    m_simulationEpoch = SceneContextEpoch();
+    m_tickPositionTarget = {};
+    if (m_simulationExchange.Reset(IsPlayCommitted() && !IsDecommissioning()) != Runtime::TickResult::Ok)
+        ReportSimulationFailure("Simulation command epoch exhausted");
+}
+
 void SceneManager::Physics(float deltaSecond)
 {
-    if (!m_activeScene || !IsPlayCommitted() || IsGamePaused() || HasPendingSceneStructureChange()) return;
+    if (!m_activeScene || !IsPlayCommitted() || HasPendingSceneStructureChange())
     {
-        ce::profile_scope _profile{ ce::marker<"FixedUpdate">() };
-        m_activeScene.load()->FixedUpdate(deltaSecond);
+        m_simulationTick = {};
+        m_simulationEpoch = 0;
+        return;
     }
+    if (IsGamePaused()) return; // Freeze debt, rather than accumulating wall time.
+    const auto epoch = SceneContextEpoch();
+    if (m_simulationEpoch != epoch)
+    {
+        ResetSimulationCommands();
+    }
+    if (!m_simulationTick.Admit(deltaSecond))
+    {
+        ReportSimulationFailure("Invalid simulation frame duration");
+        return;
+    }
+    auto* scene = m_activeScene.load();
+    while (m_simulationTick.Ready())
+    {
+        if (HasPendingSceneStructureChange() || IsGamePaused() || SceneContextEpoch() != epoch) break;
+        // Newly spawned scripts get their normal lifecycle before the next fixed update.
+        scene->DrainPendingLifecycle();
+        if (HasPendingSceneStructureChange() || IsGamePaused() || SceneContextEpoch() != epoch) break;
+        const auto commandEpoch = m_simulationExchange.Status().epoch;
+        auto failTick = [this](const char* reason)
+        {
+            m_simulationExchange.Fail();
+            ReportSimulationFailure(reason);
+        };
+        if (m_simulationExchange.Begin(m_simulationTick.committed + 1, [this](const Runtime::TickCommand& command)
+        {
+            if (command.kind != 1 || command.bytes != sizeof(Runtime::LocalPositionValue)) return false;
+            Runtime::LocalPositionValue value;
+            std::memcpy(&value, command.payload.data(), sizeof(value));
+            if (!std::isfinite(value.x) || !std::isfinite(value.y) || !std::isfinite(value.z)) return false;
+            auto* target = ScriptObjectRegistry::Get().Resolve({value.index, value.generation});
+            if (!target || target->IsDestroyMark() || target->GetScene() != m_activeScene.load()
+                || !target->GetComponent<Transform>()) return false;
+            target->GetScene()->EnsureResolved(target->GetScene()->HandleOf(target->m_index));
+            target->Transform_().SetWorldPosition({value.x, value.y, value.z}, TransformWriteReason::Script);
+            m_tickPositionTarget = value;
+            return true;
+        }) != Runtime::TickResult::Ok)
+        {
+            failTick("Simulation command application failed");
+            return;
+        }
+        auto& clr = ClrHost::Get();
+        if (!clr.TickUpdate(static_cast<float>(Runtime::SimulationTick::seconds)))
+        {
+            failTick("Managed OnTickSimulate batch failed");
+            return;
+        }
+        // A pause requested by OnTickSimulate takes effect after this tick, avoiding a repeated update on resume.
+        if (HasPendingSceneStructureChange() || SceneContextEpoch() != epoch
+            || m_simulationExchange.Status().epoch != commandEpoch)
+        {
+            failTick("Simulation context changed during tick");
+            return;
+        }
+        scene->FixedUpdate(static_cast<float>(Runtime::SimulationTick::seconds), true);
+        if (HasPendingSceneStructureChange()) { m_simulationExchange.Fail(); return; }
+        clr.FlushPhysicsEvents(); // Publish this step before the next tick's OnTickSimulate reads it.
+        m_observation.Drain();
+        if (m_simulationExchange.Prepare([this](std::span<std::byte> output, std::uint32_t& bytes, std::uint32_t& schema)
+        {
+            Runtime::LocalPositionSnapshot snapshot{m_tickPositionTarget, 0};
+            auto* target = ScriptObjectRegistry::Get().Resolve({m_tickPositionTarget.index, m_tickPositionTarget.generation});
+            if (target && !target->IsDestroyMark() && target->GetScene() == m_activeScene.load() && target->GetComponent<Transform>())
+            {
+                target->GetScene()->EnsureResolved(target->GetScene()->HandleOf(target->m_index));
+                const auto position = target->Transform_().GetWorldPosition();
+                snapshot.value.x = position.x; snapshot.value.y = position.y; snapshot.value.z = position.z;
+                snapshot.alive = 1;
+            }
+            bytes = sizeof(snapshot); schema = 1;
+            std::memcpy(output.data(), &snapshot, bytes);
+            return true;
+        }) != Runtime::TickResult::Ok)
+        {
+            failTick("Simulation snapshot capture failed");
+            return;
+        }
+        if (HasPendingSceneStructureChange() || SceneContextEpoch() != epoch
+            || m_simulationExchange.Status().epoch != commandEpoch)
+        {
+            failTick("Simulation context changed before commit");
+            return;
+        }
+        m_simulationTick.Commit();
+        if (m_simulationExchange.Commit() != Runtime::TickResult::Ok)
+        {
+            failTick("Simulation snapshot commit failed");
+            return;
+        }
+    }
+    scene->SetSimulationInterpolation(m_simulationTick.Alpha());
 }
 
 void SceneManager::InputEvents(float deltaSecond)
@@ -733,6 +839,7 @@ void SceneManager::GUIRendering()
 
 void SceneManager::EndOfFrame()
 {
+    m_observation.Drain();
     {
         ce::profile_scope _profile{ ce::marker<"EndOfFrame">() };
         endOfFrameEvent.Broadcast();
@@ -849,6 +956,7 @@ void SceneManager::Decommissioning()
     resourceTrimEvent.Clear();
     AssetLoadEvent.Clear();
     resetSelectedObjectEvent.Clear();
+    m_observation.Clear();
     // Callback destruction can release external roots. Sweep those releases
     // while the input/animation/audio/CLR services are still available too.
     m_gcDomain.collect_full();
@@ -861,6 +969,8 @@ void SceneManager::Decommissioning()
 void SceneManager::SetDecommissioning()
 {
     m_exitCommand = true;
+    m_simulationExchange.Reset(false);
+    m_tickPositionTarget = {};
 }
 
 Scene* SceneManager::CreateScene(std::string_view name)
@@ -2755,6 +2865,7 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
 
 void SceneManager::ReportSimulationFailure(std::string reason)
 {
+    m_simulationExchange.Fail();
     Debug::PrintLog(spdlog::level::err, reason);
     NotePlayFailure(std::move(reason));
     SetGameStart(false);

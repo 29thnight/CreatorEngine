@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="ko" data-register="instrument"><head><title>PHASE 4.5 — 시간축 재구성 계층 · Temporal Upscaling과 Frame Generation</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="TemporalReconstructionPlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/TemporalReconstructionPlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>PHASE 4.5 — 시간축 재구성 계층 · Temporal Upscaling과 Frame Generation</h1><p>TR0/2/3·TU0~4: sealed 입력·모션 소유권·history reset·품질/AA·fallback을 전체 실제 material route와 SDK 품질 행렬에서 수용한다. TR1/TU5의 완료 구현을 다시 만들지 않는다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Camera</ve-node><ve-node id="n1" at="2 1">Frame input</ve-node><ve-node id="n2" at="3 1" key>SDK provider</ve-node><ve-node id="n3" at="3 2">History</ve-node><ve-node id="n4" at="2 2">Presenter</ve-node><ve-node id="n5" at="1 2">Provenance</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
 <ul>
-<li>TR0/2/3·TU0&#126;4: sealed 입력·모션 소유권·history reset·품질/AA·fallback을 전체 실제 material route와 SDK 품질 행렬에서 수용한다. TR1/TU5의 완료 구현을 다시 만들지 않는다.</li>
+<li>TR0·TU0&#126;4: sealed 입력·모션 소유권·history reset·품질/AA·fallback을 전체 실제 material route와 SDK 품질 행렬에서 수용한다. TR1/TU5의 완료 구현을 다시 만들지 않는다.</li>
 <li>FG/TFG9: 실제 Player generated output identity·물리 표시 cadence/latency·resize/device loss/teardown 및 장치별 비용을 검증한다. requested/configured/active count와 CPU Present 반환을 실제 생성/표시 증거로 바꾸지 않는다.</li>
 <li>현재 portable renderFeatures·startup precedence·camera cut revision·profiler provenance/continuous presenter 기록을 기준으로 persistence/cook·실패 복원·계측 무해화를 수용한다.</li>
 </ul>
@@ -24,8 +24,8 @@
 </tr>
 <tr>
 <td><code>TR2</code> · PHASE 4.5</td>
-<td>렌더 해상도 ≠ 표시 해상도 계약·jitter 시퀀스</td>
-<td>progress</td>
+<td>렌더 해상도 ≠ 표시 해상도 계약·jitter 시퀀스·멀티뷰 품질 수용</td>
+<td>done</td>
 </tr>
 <tr>
 <td><code>TU0</code> · PHASE 4.5</td>

@@ -10,7 +10,7 @@ public sealed partial class PhysicsContactFaultProbe : Component
     private static int FaultCalls, FaultDisables, Required;
     private static bool ReadRejected;
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         _faultOwner = Entity.Name == "ContactAttack";
         if (_faultOwner)
@@ -26,7 +26,7 @@ public sealed partial class PhysicsContactFaultProbe : Component
         PhysicsContactStreamProbe.Track(_contacts);
     }
 
-    public override void PostPhysics(float dt)
+    public void PostPhysics(float dt)
     {
         if (_finished) return;
         _elapsed += dt;
@@ -70,12 +70,12 @@ public sealed partial class PhysicsContactFaultProbe : Component
         }));
     }
 
-    public override void OnDisable()
+    public void OnDisable()
     {
         if (_faultOwner) ++FaultDisables;
     }
 
-    public override void OnEndSimulation()
+    public void OnEndSimulation()
     {
         bool disposed = false;
         try { _contacts!.Read(); }

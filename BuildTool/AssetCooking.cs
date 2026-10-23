@@ -6,6 +6,7 @@ internal sealed record GenerationResult(int Models, int Copied, int Authored);
 internal sealed record CookResult(int ArtifactCount, int CompanionCount, long ArtifactBytes, long ManifestBytes, string ManifestSha256,
     int DerivedFileCount, Dictionary<string, int> ByFolder)
 {
+    public FileEntry[] FileInventory { get; init; } = [];
     public int ModelCount { get; set; }
     public int LegacyTextureNameRefs { get; set; }
     public int LegacyModelCookCaches { get; set; }
@@ -65,19 +66,49 @@ internal static class AssetCooking
             bytes += new FileInfo(file).Length;
             var relative = Paths.Relative(derived, file); var folder = relative.Split('/')[0];
             if (!rules.TryGetValue(folder, out var extensions)) throw new BuildException($"Unexpected Derived folder: {relative}");
-            var pattern = folder == "Models" ? "^Models/([0-9a-f]{2})/" + guid + "/[0-9]+/(generation\\.asset|model\\.cemc|sidecar\\.meta|textures/" + guid + "\\.cetex)$"
+            var modelPayload = @"(?:generation\.asset|metadata\.cemc|sidecar\.meta|streaming\.cemf|"
+                + @"Derived/model\.cemd|Derived/Skeleton\.cesl|Derived/CpuGeometry/[0-9a-f]{64}\.cecpu|"
+                + "Derived/Geometry/m[0-9a-f]{64}/" + guid + @"\.cege|textures/" + guid + @"\.cetex)";
+            var pattern = folder == "Models" ? "^Models/([0-9a-f]{2})/" + guid + "/[1-9][0-9]*/(" + modelPayload + ")$"
                 : "^" + folder + "/([0-9a-f]{2})/" + guid + "\\.(" + extensions + ")$";
             var match = Regex.Match(relative, pattern);
             if (!match.Success || match.Groups[1].Value != match.Groups[2].Value[..2]) throw new BuildException($"Cook artifact violates GUID path contract: {relative}");
-            if (folder == "Models" && (relative.EndsWith("/model.cemc") || relative.EndsWith("/sidecar.meta"))) { ++companions; continue; }
-            if (relative.EndsWith("/generation.asset"))
-                foreach (var companion in new[] { "model.cemc", "sidecar.meta" })
-                    if (!File.Exists(Path.Combine(Path.GetDirectoryName(file)!, companion))) throw new BuildException($"Missing generation companion: {file}/{companion}");
+            if (folder == "Models")
+            {
+                var payload = match.Groups[3].Value;
+                var generationRoot = file[..^payload.Length];
+                if (payload == "generation.asset") ValidateGenerationCompanions(generationRoot);
+                else if (!payload.StartsWith("textures/", StringComparison.Ordinal))
+                {
+                    if (!File.Exists(Path.Combine(generationRoot, "generation.asset")))
+                        throw new BuildException($"Model companion has no generation record: {relative}");
+                    if (payload != "sidecar.meta" && !File.Exists(Path.Combine(generationRoot, "metadata.cemc")))
+                        throw new BuildException($"Streaming companion has no metadata: {relative}");
+                    ++companions;
+                    continue;
+                }
+            }
             ++artifacts; ++byFolder[folder];
         }
-        var generations = files.Count(f => Path.GetFileName(f) == "generation.asset");
-        if (artifacts != expected || companions != 2 * generations) throw new BuildException($"Cook artifact/companion count mismatch: {artifacts}/{expected}, companions={companions}, models={generations}");
-        return new(artifacts, companions, bytes, new FileInfo(manifest).Length, Metadata.Hash(manifest), files.Length, byFolder);
+        if (artifacts != expected) throw new BuildException($"Cook artifact count mismatch: {artifacts}/{expected}, companions={companions}");
+        return new(artifacts, companions, bytes, new FileInfo(manifest).Length, Metadata.Hash(manifest), files.Length, byFolder)
+        {
+            FileInventory = Metadata.Entries(output, files.Select(file => Paths.Relative(output, file)))
+        };
+    }
+
+    private static void ValidateGenerationCompanions(string root)
+    {
+        foreach (var companion in new[] { "sidecar.meta", "metadata.cemc", "streaming.cemf", "Derived/model.cemd" })
+            if (!File.Exists(Path.Combine(root, companion)))
+                throw new BuildException($"Missing generation companion: {Path.Combine(root, companion)}");
+    }
+
+    public static void VerifyMerged(string assets, CookResult cooked, CookResult merged, CancellationToken token = default)
+    {
+        if (!cooked.FileInventory.Select(file => file.Path).SequenceEqual(merged.FileInventory.Select(file => file.Path), StringComparer.Ordinal))
+            throw new BuildException("Merged cook file inventory changed.");
+        Metadata.Verify(assets, cooked.FileInventory, token);
     }
     public static async Task<CookResult> Cook(BuildContext context, string cooker, string assets, string output, string generations, string bootstrapAssetSets = "", string textureIdentityRoot = "")
     {

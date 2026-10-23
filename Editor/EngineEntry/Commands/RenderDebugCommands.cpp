@@ -345,13 +345,20 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_render_pacing(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        constexpr const char* kUsage = "render.pacing [status | display | unlimited | <fps> | background <fps>]";
+        constexpr const char* kUsage = "render.pacing [status | display | unlimited | <fps> | background <fps> | play <fps|off>]";
         EditorPreferences& preferences = EditorSettingsStore::Get().Preferences();
         const auto parseRate = [](const std::string& text, int& rate) {
             try { size_t used = 0; rate = std::stoi(text, &used); return used == text.size(); }
             catch (...) { return false; }
         };
-        if (ctx.parts.size() == 3 && ctx.parts[1] == "background")
+        if (ctx.parts.size() == 3 && ctx.parts[1] == "play")
+        {
+            int rate = 0;
+            if (ctx.parts[2] != "off" && (!parseRate(ctx.parts[2], rate) || rate < 10 || rate > 1000))
+                return InvalidArguments(kUsage);
+            preferences.SetPlayFrameRate(static_cast<std::uint32_t>(rate));
+        }
+        else if (ctx.parts.size() == 3 && ctx.parts[1] == "background")
         {
             int rate = 0;
             if (!parseRate(ctx.parts[2], rate) || rate < 0
@@ -375,7 +382,7 @@ namespace ConsoleCmd
         }
         else if (ctx.parts.size() > 2)
             return InvalidArguments(kUsage);
-        if (ctx.parts.size() > 1 && ctx.parts[1] != "status" && !EditorSettingsStore::Get().Save())
+        if (ctx.parts.size() > 1 && ctx.parts[1] != "status" && ctx.parts[1] != "play" && !EditorSettingsStore::Get().Save())
             return Fail("render.pacing_save_failed", "Pacing changed for this session but EngineSettings.asset was not written");
 
         const EditorFrameRateMode mode = preferences.GetFrameRateMode();
@@ -384,6 +391,7 @@ namespace ConsoleCmd
         data.Set("mode", CommandData::String(EditorFrameRateMode::Unlimited == mode ? "unlimited"
             : EditorFrameRateMode::Custom == mode ? "custom" : "display"));
         data.Set("customFps", CommandData::Int(preferences.GetCustomFrameRate()));
+        data.Set("playFps", CommandData::Int(preferences.GetPlayFrameRate()));
         data.Set("backgroundFps", CommandData::Int(preferences.GetBackgroundFrameRate()));
         // 지금 렌더 스레드에 걸린 값. 바꾼 직후에는 다음 프레임 발행 전이라 이전 값일 수 있다.
         data.Set("appliedMode", CommandData::String(EnhancedLivePacingMode::Unlimited == applied.mode ? "unlimited"

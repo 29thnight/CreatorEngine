@@ -292,13 +292,17 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<ObjectHandle, ulong, uint, byte*, int> Body_ShapeRole;
     // Append-only v41. Camera identity and cut revision remain independent.
     public delegate* unmanaged<ObjectHandle, void> Camera_NotifyCameraCut;
+    public delegate* unmanaged<SimulationStatus*, int> Simulation_Status;
+    public delegate* unmanaged<ulong, ulong, uint, byte*, int, ulong*, int> Simulation_Submit;
+    public delegate* unmanaged<ulong, ulong, SimulationSnapshot*, byte*, int, int> Simulation_Read;
 }
 
 /// <summary>엔진 API 접근점. 표를 정적으로 들고 있어 호출 비용을 최소화한다.</summary>
 internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
-    public const int ExpectedVersion = 41;
+    // v42 requires the fixed-tick OnTickSimulate bootstrap entry point (table layout unchanged).
+    public const int ExpectedVersion = 45;
 
     private static ScriptApiTable _api;
     private static bool _bound;
@@ -404,14 +408,15 @@ internal static unsafe class Native
         if (table->Version != ExpectedVersion) return false;
         if (table->StructSize != sizeof(ScriptApiTable)) return false;
         if (table->Asset_RequestTyped == null || table->Asset_TryAcquireTyped == null ||
-            table->Camera_NotifyCameraCut == null)
+            table->Camera_NotifyCameraCut == null || table->Simulation_Status == null ||
+            table->Simulation_Submit == null || table->Simulation_Read == null)
         {
             return false;
         }
 
         if (sizeof(AssetLinkABI) != 40 || sizeof(AssetToken) != 12
             || sizeof(TextureAssetVariantABI) != 12 || sizeof(AssetRequestSnapshotABI) != 16
-            || sizeof(TextureDescriptor) != 20)
+            || sizeof(TextureDescriptor) != 20 || sizeof(SimulationStatus) != 32 || sizeof(SimulationSnapshot) != 32)
         {
             return false;
         }
@@ -425,6 +430,64 @@ internal static unsafe class Native
     {
         _bound = false;
         _api = default;
+    }
+
+    internal static SimulationResult SimulationStatus(out SimulationStatus status)
+    {
+        status = default;
+
+        if (!Entered() || _api.Simulation_Status == null)
+        {
+            return SimulationResult.WrongThread;
+        }
+
+        fixed (SimulationStatus* statusPointer = &status)
+        {
+            return (SimulationResult)_api.Simulation_Status(statusPointer);
+        }
+    }
+
+    internal static SimulationResult SimulationSubmit(
+        ulong epoch,
+        ulong tick,
+        uint kind,
+        ReadOnlySpan<byte> payload,
+        out ulong sequence)
+    {
+        sequence = 0;
+
+        if (!Entered() || _api.Simulation_Submit == null)
+        {
+            return SimulationResult.WrongThread;
+        }
+
+        fixed (byte* payloadPointer = payload)
+        fixed (ulong* sequencePointer = &sequence)
+        {
+            return (SimulationResult)_api.Simulation_Submit(
+                epoch, tick, kind, payloadPointer, payload.Length, sequencePointer);
+        }
+    }
+
+    internal static SimulationResult SimulationRead(
+        ulong epoch,
+        ulong afterTick,
+        Span<byte> payload,
+        out SimulationSnapshot snapshot)
+    {
+        snapshot = default;
+
+        if (!Entered() || _api.Simulation_Read == null)
+        {
+            return SimulationResult.WrongThread;
+        }
+
+        fixed (byte* payloadPointer = payload)
+        fixed (SimulationSnapshot* snapshotPointer = &snapshot)
+        {
+            return (SimulationResult)_api.Simulation_Read(
+                epoch, afterTick, snapshotPointer, payloadPointer, payload.Length);
+        }
     }
 
     private static void CheckAssetResult(AssetBindingResult result)

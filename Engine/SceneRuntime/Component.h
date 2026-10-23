@@ -6,6 +6,7 @@
 #include "Reflection.hpp"
 #include "MetaPolymorphic.h"
 #include "RenderProxyDirty.h"
+#include "../Utility_Framework/PropertyChange.h"
 
 
 class Entity;
@@ -154,6 +155,13 @@ public:
 	virtual void OnPropertyChanged(std::string_view propertyName,
 		Meta::PropertyChangeSource source);
 	void PublishRenderProxyDirty(ProxyDirty dirty) const;
+    [[reflgen::ignore]]
+    void NotifyPropertyChanged(std::string_view propertyName, Meta::PropertyChangeSource source);
+    [[reflgen::ignore]]
+    void PublishPropertyWrite(std::string_view propertyName, Meta::PropertyChangeSource source = Meta::PropertyChangeSource::Native) const;
+    [[reflgen::ignore]]
+    void PublishRenderPropertyWrite(ProxyDirty dirty) const;
+
 
 	//template<typename T>
 	//T& GetComponent();

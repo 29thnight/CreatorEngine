@@ -1,0 +1,297 @@
+{
+  "result": "OPTIONAL_FSHARP_LIFECYCLE_AND_VSCODE_AUTHORING_ACCEPTED",
+  "date": "2026-10-23",
+  "scriptApi": 45,
+  "scriptAudit": {
+    "files": 66,
+    "emptyLifecycleRemoved": [
+      "FailCleanupProbe.OnTickSimulate"
+    ],
+    "emptyLifecycleRemaining": [],
+    "observationalAndFunctionalHooksPreserved": true
+  },
+  "engineRuntimeUnchanged": {
+    "files": 60,
+    "previousAcceptance": "FSharpManagedRuntimeAcceptance20261023.json"
+  },
+  "managed": {
+    "path": "C:\\Users\\idene\\source\\repos\\FSharp_Tool_Pakage_for_CreatorEngine\\artifacts\\optional-lifecycle-20261023\\verification.json",
+    "compiler": 63,
+    "generator": 43,
+    "runtimeChecksPerConfiguration": 12,
+    "loader": 50,
+    "workflows": 9
+  },
+  "vscode": {
+    "path": "C:\\Users\\idene\\source\\repos\\FSharp_Tool_Pakage_for_CreatorEngine\\artifacts\\vscode-authoring-acceptance\\verification.json",
+    "editor": "1.142.0",
+    "contextChecks": 26,
+    "hostGroups": 8,
+    "vsix": {
+      "path": "C:\\Users\\idene\\source\\repos\\FSharp_Tool_Pakage_for_CreatorEngine\\artifacts\\vscode-authoring-acceptance\\creatorengine-fsharp-authoring-0.1.0.vsix",
+      "sha256": "8e7ad7d4e6c1a7bb870cf6f83fba99f9547440852043bec0884ec8b695267cdf"
+    },
+    "compiledLifecycle": {
+      "Completed": [
+        "OnTickSimulate"
+      ],
+      "DataOnly": [],
+      "Empty": [
+        "OnInitialized",
+        "OnTickSimulate"
+      ]
+    }
+  },
+  "evidence": {
+    "editorAuthoring": {
+      "path": "Build/Verification/FSharp/Editor-400f675a56ca4d41bd27800c4efcd446/result.json",
+      "result": {
+        "create": "hook-free F# component attached and played + explicit order",
+        "ticks": 50,
+        "reload": "field retained",
+        "failure": "previous code and instance retained",
+        "source": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\FSharp\\Editor-400f675a56ca4d41bd27800c4efcd446\\Project\\Assets/Script\\FSharpAuthoringGate.fs",
+        "result": "FSHARP_EDITOR_AUTHORING_OK"
+      }
+    },
+    "fixedEditor": {
+      "path": "Build/Verification/CSharpFixedUpdate/Editor-edbaa2bf3b344d77ac94e710797bb234/result.json",
+      "result": {
+        "commands": 52,
+        "hostHash": "D87636261F8129A17F9FFA3B9C50E6380265DFDE9D7C8C99379D12A526C9C69E",
+        "sceneSha256": "612A8C51A1F408343A0331A467A7D28666D2A4EAC1F823CD5236424CAC494F36",
+        "cycles": [
+          {
+            "cycle": 1,
+            "state": {
+              "completed": 1,
+              "failures": 0,
+              "faultDisabled": 1,
+              "removedEnded": 1,
+              "ended": 4,
+              "driverUpdates": 40
+            }
+          },
+          {
+            "cycle": 2,
+            "state": {
+              "completed": 2,
+              "failures": 0,
+              "faultDisabled": 2,
+              "removedEnded": 2,
+              "ended": 8,
+              "driverUpdates": 84
+            }
+          }
+        ],
+        "scriptCoreHash": "8AF26965E6B65942E723AA3688F0AE4AE62BA87098D027803BB7DAEE95A3BF52",
+        "result": "CSHARP_FIXED_UPDATE_EDITOR_OK",
+        "scene": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\CSharpFixedUpdate\\Editor-edbaa2bf3b344d77ac94e710797bb234\\Project\\Assets\\Scenes\\FixedUpdate-Editor-edbaa2bf3b344d77ac94e710797bb234.creator"
+      }
+    },
+    "fixedPlayer": {
+      "path": "Build/Verification/CSharpFixedUpdate/Player-93e7085c744e4af1a6dcbf784b8a28ba/result.json",
+      "result": {
+        "stage": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\CSharpFixedUpdate\\Player-93e7085c744e4af1a6dcbf784b8a28ba\\Staging\\Game-1e0e9d22eb204bed9528bd10135f1b3a",
+        "playerHash": "973051DB5011913B932F0ABC5A8165113B24E53F5C1027EC135F046C7CC53181",
+        "editorResult": "Build/Verification/CSharpFixedUpdate/Editor-edbaa2bf3b344d77ac94e710797bb234/result.json",
+        "smoke": {
+          "schemaVersion": 1,
+          "ready": true,
+          "registeredScriptTypes": 7,
+          "frames": 2000,
+          "displayPromotions": 1947,
+          "submittedGameFrames": 4154,
+          "submittedGameFrameId": 1997
+        },
+        "packageImmutable": true,
+        "result": "CSHARP_FIXED_UPDATE_PLAYER_OK",
+        "exitCode": 0
+      }
+    },
+    "compatibility": {
+      "path": "Build/Verification/FSharp/Compatibility-be90ba56797b4efeb0690a94feed4abb/result.json",
+      "result": {
+        "result": "FSHARP_FIXTURE_COMPATIBILITY_OK",
+        "components": 53,
+        "animations": [
+          "AniStateProbe"
+        ],
+        "behaviorTreeNodes": {
+          "BTProbeAlwaysTrue": 2,
+          "BTProbeAuthoredValue": 2,
+          "BTProbeCountAction": 1
+        },
+        "fields": 34,
+        "scope": "Generated factory kinds, serialized labels, field kinds and constructor defaults; product hook behavior is verified separately."
+      }
+    },
+    "releaseContracts": {
+      "path": "Build/Verification/CSharpFixedUpdate/Contracts-af5bcbfa36be4874a34a28db7806acdf/result.json",
+      "result": {
+        "nativeClockTested": true,
+        "configuration": "Release",
+        "scope": "Native clock and real ScriptCore dispatch with a fake native API table; actual Editor/Player acceptance is separate",
+        "sourceHashes": {
+          "ScriptCore/ScriptFactory.cs": "C87B37EC1F5AAD91A2EEDCF61FE321FE834F0B55E4B3D6F1F9CF185E52E04F1C",
+          "ScriptRuntime/Runtime.fs": "9902A87C1BAC1E8AE64F60202A29E158DCE15533435085BE57AF318888396A84",
+          "Engine/SceneRuntime/ClrHost.cpp": "CD27B81ECAC37D3CF0B7851416350432E2D672C8D1C067B2F436098FD085182B",
+          "ScriptRuntime/Trees.fs": "E096532E97300333B64B4C5274A8F0B48486AAC81860DCFD19BE66417BDDC1BC",
+          "ScriptRuntime/Registry.fs": "8A3EC278D6113367E4D1CFF5A3D05CBB13A0D6A8F9D627836A419F10C48C13C2",
+          "Engine/SceneRuntime/ScenePhysicsSimulation.cpp": "57246F5C41E09A45634B7551D8AAD2A822202861D10623EB4539C42E659633FC",
+          "Engine/SceneRuntime/SimulationTick.h": "8C26FCD29EDD795835B8EB6DAC3C44703198ACD00F271D8DD33766DB0C2BD641",
+          "ScriptRuntime/Continuations.fs": "672B14AE5B4A13868F88D3A74760E5265AB3499E643196849FE5A10FBD9725AC",
+          "Engine/SceneRuntime/SceneManager.cpp": "C1BE4965D0203D41DDC4FB917866EC1B5D4120BFC4E8093FE58F01B52BF22E16",
+          "ScriptRuntime/Lifetime.fs": "4C47D459F82E88485727333D356FFD4F44B43C4D166B9FD5155304CE4E8D34D2",
+          "ScriptRuntime/Callable.fs": "09CCB3891A3FC481B80E8A7681F7B534F2DEBB8271C0882AB5FF9C2B75E41509",
+          "ScriptCore/ScriptRegistry.cs": "7229335B163E2147BDADEFC0D5089ED580941067C91844B24A381F18A628CA4C",
+          "ScriptRuntime/Loader.fs": "DA8601F981BB3EC0F5F1A8B18EE62D391090C33D7913E96BB056E45478421617",
+          "ScriptRuntime/Contacts.fs": "7B36D0B6005CF19C57DA8529626B27E9A6D7871F7FFA9381C94CCB96E5D11BDD",
+          "ScriptCore/Component.cs": "B8E72556F4D0BC403E393964E81B87663022ECD5F8ADA02EB1C4706B0192AD38",
+          "ScriptCore/ManagedRuntime.cs": "5E548190CDFB47B6EEA8A813E4D5C82E1C898952D8057E0069AC7F5B133CE722",
+          "ScriptRuntime/AuxiliaryFactories.fs": "41B002FEF82FEF271CDFE79EC51FD13F9F30FAC2A94C04FE882C73CB796BC29E",
+          "ScriptCore/ContactStream.cs": "64CA5966B9902C7326A82C286DCBB46815EE60B2299E0D414190AE7CE38F7A54",
+          "ScriptCore/Bootstrap.cs": "E4AF5558185767490BF6217C0D3AC51F86C16C15E7FD21B2316D5AE9E1B878CA",
+          "ScriptCore/ComponentLifetime.cs": "54B0125FECC1BD732FA45030B833288B5E9C48E907C32F576DB0943473961892",
+          "ScriptRuntime/GarbageCollection.fs": "82BE8C57357FAD0491EA1EC1E05B932A885B7DA189D22BAF283F0611EC959837"
+        },
+        "result": "CSHARP_FIXED_UPDATE_CONTRACTS_OK"
+      }
+    },
+    "debugContracts": {
+      "path": "Build/Verification/CSharpFixedUpdate/Contracts-a4bcfa07d603489082a51e1447562f22/result.json",
+      "result": {
+        "sourceHashes": {
+          "ScriptCore/Component.cs": "B8E72556F4D0BC403E393964E81B87663022ECD5F8ADA02EB1C4706B0192AD38",
+          "ScriptRuntime/Registry.fs": "8A3EC278D6113367E4D1CFF5A3D05CBB13A0D6A8F9D627836A419F10C48C13C2",
+          "Engine/SceneRuntime/ScenePhysicsSimulation.cpp": "57246F5C41E09A45634B7551D8AAD2A822202861D10623EB4539C42E659633FC",
+          "ScriptRuntime/AuxiliaryFactories.fs": "41B002FEF82FEF271CDFE79EC51FD13F9F30FAC2A94C04FE882C73CB796BC29E",
+          "Engine/SceneRuntime/SceneManager.cpp": "C1BE4965D0203D41DDC4FB917866EC1B5D4120BFC4E8093FE58F01B52BF22E16",
+          "ScriptCore/ContactStream.cs": "64CA5966B9902C7326A82C286DCBB46815EE60B2299E0D414190AE7CE38F7A54",
+          "ScriptRuntime/Loader.fs": "DA8601F981BB3EC0F5F1A8B18EE62D391090C33D7913E96BB056E45478421617",
+          "ScriptCore/ScriptFactory.cs": "C87B37EC1F5AAD91A2EEDCF61FE321FE834F0B55E4B3D6F1F9CF185E52E04F1C",
+          "ScriptRuntime/Runtime.fs": "9902A87C1BAC1E8AE64F60202A29E158DCE15533435085BE57AF318888396A84",
+          "ScriptCore/ComponentLifetime.cs": "54B0125FECC1BD732FA45030B833288B5E9C48E907C32F576DB0943473961892",
+          "Engine/SceneRuntime/ClrHost.cpp": "CD27B81ECAC37D3CF0B7851416350432E2D672C8D1C067B2F436098FD085182B",
+          "ScriptRuntime/Lifetime.fs": "4C47D459F82E88485727333D356FFD4F44B43C4D166B9FD5155304CE4E8D34D2",
+          "Engine/SceneRuntime/SimulationTick.h": "8C26FCD29EDD795835B8EB6DAC3C44703198ACD00F271D8DD33766DB0C2BD641",
+          "ScriptRuntime/GarbageCollection.fs": "82BE8C57357FAD0491EA1EC1E05B932A885B7DA189D22BAF283F0611EC959837",
+          "ScriptRuntime/Contacts.fs": "7B36D0B6005CF19C57DA8529626B27E9A6D7871F7FFA9381C94CCB96E5D11BDD",
+          "ScriptRuntime/Continuations.fs": "672B14AE5B4A13868F88D3A74760E5265AB3499E643196849FE5A10FBD9725AC",
+          "ScriptCore/ScriptRegistry.cs": "7229335B163E2147BDADEFC0D5089ED580941067C91844B24A381F18A628CA4C",
+          "ScriptRuntime/Callable.fs": "09CCB3891A3FC481B80E8A7681F7B534F2DEBB8271C0882AB5FF9C2B75E41509",
+          "ScriptCore/ManagedRuntime.cs": "5E548190CDFB47B6EEA8A813E4D5C82E1C898952D8057E0069AC7F5B133CE722",
+          "ScriptRuntime/Trees.fs": "E096532E97300333B64B4C5274A8F0B48486AAC81860DCFD19BE66417BDDC1BC",
+          "ScriptCore/Bootstrap.cs": "E4AF5558185767490BF6217C0D3AC51F86C16C15E7FD21B2316D5AE9E1B878CA"
+        },
+        "nativeClockTested": false,
+        "configuration": "Debug",
+        "scope": "Native clock and real ScriptCore dispatch with a fake native API table; actual Editor/Player acceptance is separate",
+        "result": "CSHARP_FIXED_UPDATE_CONTRACTS_OK"
+      }
+    },
+    "localInstall": {
+      "path": "Build/Verification/FSharpOptionalLifecycle/vscode-install.json",
+      "result": {
+        "result": "LOCAL_VSCODE_EXTENSION_INSTALLED",
+        "id": "29thnight.creatorengine-fsharp-authoring",
+        "version": "0.1.0",
+        "path": "C:\\Users\\idene\\.vscode\\extensions\\29thnight.creatorengine-fsharp-authoring-0.1.0",
+        "payloadSha256": {
+          "src/extension.js": "521b58fd94ed8e2d245ae682929bcdb0bd4af58e59fcd783d34d0b4a84b6ecbb",
+          "src/lifecycle.js": "b386f3c209d272065c3ec5a66d6dd8e41e4a8375095dd41b4ad6a02846909bee"
+        },
+        "publication": "not-published"
+      }
+    }
+  },
+  "executionShell": "PowerShell 7.6.5",
+  "failedEarlierRuns": [
+    "Windows PowerShell 5: Editor-ed3e518322584f13a0da821bd1f5db03 shutdown wait failed",
+    "Windows PowerShell 5: Editor-38baddd1454044b9a2e55a1b8c154c2b shutdown wait failed"
+  ],
+  "sourceSha256": {
+    "Dynamic_CPP/Assets/Script/FSharpNativeMover.fs": "571abc0ac48770e417e6ad1a376e3b8b7ea894d719d2a4d1e44c06078200d2c5",
+    "Dynamic_CPP/Assets/Script/Phase22ProductAudioProbe.fs": "d93def76acffe7a0c0b27b1e0b27b7099ad5bd7f06dd5103af29ee2d2506f9a7",
+    "GameScripts/AnimationPlaybackProbe.fs": "b02272fa856dc1e4475044486d180cd0547a7e67787306a8778a1f7c891b4344",
+    "GameScripts/AnimatorProbe.fs": "52a4e8a5b1363afa2ea8028c7674f7934c1f8640a9097660b0fca26921678c3b",
+    "GameScripts/AniStateProbe.fs": "3a70b6a511039e03c27c2a53d81b515654b9b8c41bcb12c2aaca332f7dd58fd5",
+    "GameScripts/AudioAcceptanceProbe.fs": "6668debcbf3d75f7536e0c64252a3ddb39d393afb33e17c04f1ce110deabe1f1",
+    "GameScripts/Bobber.fs": "9c442d17b30a86f2f2c92ad04346d14c9845a68e86fd83c8a3fe009de8edfd79",
+    "GameScripts/BTProbeNodes.fs": "435dfbcdcbcc19d22b3b6ecdaece72f63a785b3564e95f4e2efabe16d1bbf0d0",
+    "GameScripts/CameraScriptProbe.fs": "11f2f9b6fc63de7fe228893fa7b3ba99e160db342bb6117eea6eb3c14980aa56",
+    "GameScripts/CharacterMovementProbe.fs": "e4961783d4573c9eccec010784158bf810923c4aab43794eec89a9641bbbe1c9",
+    "GameScripts/CharacterPlanarInputProbe.fs": "e9d0449547e6055cc28426d114176c36850e7a7f17db6219dc3dc360144f1834",
+    "GameScripts/CharacterPlayerProbe.fs": "b9afebf64d287bff6cdd79d34945e7ab68b48c3a6def978b9999a7e0f969e690",
+    "GameScripts/CollisionProbe.fs": "9e9ebda58730420a8c23bcde8df4ee317cf10b01a31bf336a4a676216147676a",
+    "GameScripts/DamageDealer.fs": "855160480b890ed5bc598d7d9ebb084a09a05aada834a8b0804055ac73f89d56",
+    "GameScripts/DdolWaitProbe.fs": "8cf73127cc06f8e8e4435a060b9b2ac8680bbc996a8ac7b29f52d9d4ee593b37",
+    "GameScripts/DelayArgumentProbe.fs": "ef5f4b3ac6e3c12bfa315887044e79f13755d3ae16fe6dd362992cb640d8d2f9",
+    "GameScripts/DelayRetentionProbe.fs": "9329fb0b7c7f2d6f1464e4fe4f4e864d9e067dfa20a555560604fec397b35036",
+    "GameScripts/DisableInBeginProbe.fs": "a3ff307d6a6113626f9f727e2e52ae03cb7e2de0ad980d5b506bccfe7f062c78",
+    "GameScripts/DrainReentryProbe.fs": "e80e9ad2fbe0e2d4791b2078f65a1adc8b093196492a346945ba3cbeac845eb3",
+    "GameScripts/EnableByName.fs": "ac1eb777c73f9bc4e17816700b4bb01173e3cbca8052d250978679f2f7569251",
+    "GameScripts/EngineCallableProbe.fs": "2f3251d0be2334601c5121bf93ba743e18a466d4c46a0b2482cd648baf6281f3",
+    "GameScripts/ExternalAwaitProbe.fs": "4cd0c5123481f192708d60832e652d6915d7a8640979e174de55b817f902e2b5",
+    "GameScripts/FailBeginProbe.fs": "179d9e5cfb726d8617f3c327331c383e671955b7b09c54f266b8318e387bf0ac",
+    "GameScripts/FailCleanupProbe.fs": "b4c81a2aca36965952f23329e6541ee7fd5fc7a4a5f0f4c3dca2b050d85bcad0",
+    "GameScripts/FailInitializedProbe.fs": "7dd636681462a92e9f87bc59231435140072c475c19bbac5b4087ac53bf9183d",
+    "GameScripts/FailSimulateAsyncProbe.fs": "8951f77e6a8b086f6bd10faa69b8034dd7e16a70f4b0b3780f463041ced7adba",
+    "GameScripts/FailSimulateImmediateProbe.fs": "6132ea80121f6d0036f22b8b29685da6be8ed8227dd743ce4e8288c67b7b0d89",
+    "GameScripts/FailSimulateSyncProbe.fs": "9da5816097efd6da5aa3f9bca2489406ee954a08bed1a20ea3140622ed62fa77",
+    "GameScripts/FixedUpdateContractProbe.fs": "7645d5f1f7978f29fbe575020e6653f0ceb4b0526c51d5d777e19d1cf21cf623",
+    "GameScripts/FollowTarget.fs": "64524524833ebc90bdc8312d80dc97b9e9d753d53e2658488d4de08d0a7495c6",
+    "GameScripts/FSharpNativePlayerProbe.fs": "9faadee5f4cb830db948fb2acae288082b64850c439d54a97817aed14b45e123",
+    "GameScripts/GenerationProbe.fs": "5203eff34762b75293d26bafea28d4ecc4244c5e81f5c9679dc0b33ba2eb7398",
+    "GameScripts/HealthComponent.fs": "b237df76573d3247b2709208f7e942545d176634d0c4678fad2b08eb727ab46e",
+    "GameScripts/HierarchyProbe.fs": "25d915de3b6a01a97f90c1d2dc409989fc1a0f9e447743aa5411e106ca86adda",
+    "GameScripts/InputProbe.fs": "20c99242ddd921b1ab5d5c8a34e00652729e0012c287f7ee65c1f519ae74a392",
+    "GameScripts/LifecycleAxisProbe.fs": "a65b71743845a8b40e7e675d80d4a48b8061e01ee770f30ed06a895ad7a6c763",
+    "GameScripts/LifecycleProbe.fs": "bc6f3472ff45084834cc8385873ad12aee151e44d4d4608f4baebefd05c2444a",
+    "GameScripts/LightScriptProbe.fs": "a5b0ec6c732f6c4ce53ddcbe74ba844623bb94780301c7e554a21e65bb99708d",
+    "GameScripts/ManagedLogProbe.fs": "b1b12b42b122e48eb653cad6921fa159cda38cf5c0404ca6f5421579522422fc",
+    "GameScripts/N3PacingProbe.fs": "62560ba5a22e549baf2ebd865bc1a7834dbb9c721f28fffe2e3dadfb2fa3aaed",
+    "GameScripts/PackageSmokeProbe.fs": "a0b4f1fc9180ce7acfad3da6d7855ba08b29e0c51f333515e42a72e7dfa3bc53",
+    "GameScripts/PhysicsB2ShearProbe.fs": "fe16881fb5b5113f82848e16c30df39e018567b60cc974c07d99aa92c13328cb",
+    "GameScripts/PhysicsHierarchyContactProbe.fs": "70f71222c9b70c271fd1582057aa195e9614429aaeb787f6d4312ce841a7b6bf",
+    "GameScripts/PhysicsLayerProbe.fs": "eaf9a7a7790737d6c3192c87445ee6b9de254df35a1d4e8ed5e7bd261e3f23dc",
+    "GameScripts/PhysicsProbe.fs": "19d581987d3c205eb38bc22772787abd4a55a08f7bee0f6c2367726b148c581c",
+    "GameScripts/PhysicsSceneContactProbe.fs": "d4df64503ef022f8938b4db4a704dc6bfe28f81dd13483772c4dd4d7705506eb",
+    "GameScripts/ProbeSpawner.fs": "c9b719aca25872922d6e1ae092abe341ab1938d8b62d8dc4373addea28c491d5",
+    "GameScripts/ReentrantDestroyProbe.fs": "92ed4ba01238ec924e189975e38ccebf1976f2694396bd1573058637be2cd5b8",
+    "GameScripts/ReentrantDisableProbe.fs": "6dab0412880cd22613fe742c5c1139fa24ecd4c96e8a4347aec1c471f6fe0ab9",
+    "GameScripts/RigidBodyProbe.fs": "b10ff9385c605f07754322bd8e959445deed4bd8f85f3f35f6ba863d39a044e1",
+    "GameScripts/SelfDestroyInBeginProbe.fs": "97e2ed91eebcf58fd1cff55a567514cd46068bbe72ee70835362a90e657ad2ed",
+    "GameScripts/SelfDestroyInResumeProbe.fs": "0309dadd4800ea9ae4a746a4f89e50462b0a7cefd870c5555e6f54a638a584a2",
+    "GameScripts/SelfDestroyInTickProbe.fs": "f6aec284ce70198b3a69abaac91f5d3766f638d236be83530479837204e5041a",
+    "GameScripts/SimulationExchangeContractProbe.fs": "8706bd1e113da1793194b59ca85cbd68b82807c2d308bb40556ca2e862bbc304",
+    "GameScripts/SoundProbe.fs": "66d8bab6956043afd6edb3a98ad94fb9590f43025b175bb2d71d150b44c61fef",
+    "GameScripts/Spawner.fs": "b6745fb9166fbd122790b6add1d71a622e9f56255090614df02463cef3d63962",
+    "GameScripts/TransformProbe.fs": "6ec77cc687700cd45cee8f5f767982249da6c294daf7fe42df7bc04da9d3abc4",
+    "GameScripts/UiProbe.fs": "af3ec4cb040b478c3ed30dea98ddcf85bcd4ba969c210bfc118709feb8d1bafc",
+    "GameScripts/WorkerCallProbe.fs": "e5e874a3106d43395cf5a654b4638f31d397becf43c558153d485c06b4d7c1b6",
+    "../FSharp_Tool_Pakage_for_CreatorEngine/samples/CreatorEngine.FSharp.Samples/Bobber.fs": "90b6a7633171957f334af1db870a2f29e01a56d35c3f541dc46cbe3b3295e231",
+    "../FSharp_Tool_Pakage_for_CreatorEngine/samples/CreatorEngine.FSharp.Samples/DamageDealer.fs": "41fc2c198a96f7365da9fae420a53a41d3a6d2c6dcf7141b662ea2a563a60cfb",
+    "../FSharp_Tool_Pakage_for_CreatorEngine/samples/CreatorEngine.FSharp.Samples/FixedTickProbe.fs": "b1bd467e0688bd809f8f685b8914f142f36519d6553b3c98f6333430208b94f7",
+    "../FSharp_Tool_Pakage_for_CreatorEngine/samples/CreatorEngine.FSharp.Samples/FollowTarget.fs": "5865b506c3ee5a7185113f0f55b4fda7d1bd72ee78be03b787fb475a9446fabb",
+    "../FSharp_Tool_Pakage_for_CreatorEngine/samples/CreatorEngine.FSharp.Samples/HealthComponent.fs": "3569deebc97ea284bda1e7601386542a237b083dab4c7f695d8d8b1833e5dfec",
+    "../FSharp_Tool_Pakage_for_CreatorEngine/samples/CreatorEngine.FSharp.Samples/LifecycleAxisProbe.fs": "15d1eabebdfa8b34bbcc16f70a26ef0be9796b74e4309b51cb808d6fc2669b0b",
+    "../FSharp_Tool_Pakage_for_CreatorEngine/samples/CreatorEngine.FSharp.Samples/Spawner.fs": "9547df056c128ef2073ba334a6dd52a37998453829aeccaceb51f4f8be18b8b1",
+    "Editor/EngineEntry/EditorScriptAuthoring.cpp": "e9a102b68c6f2e9e2c4e56dab8c6c8703eb5f688059572ca46f62f8d9f8a6918",
+    "Tools/regression/verify-fsharp-editor-authoring.ps1": "09d8d38db6ce558e6913eb3afaca80d254e99565c58c14437d7e7e778d6bb6a7",
+    "../FSharp_Tool_Pakage_for_CreatorEngine/tests/Generator.Tests/Program.fs": "4b9ab7cabce9506143cee56903ba4f3d7820945c3c9b0a844cba9ffc8eb27a3c",
+    "../FSharp_Tool_Pakage_for_CreatorEngine/scripts/verify-vscode.py": "ad9c8773d46426277a78302018bac81af509d8d28f03f96f31f2352d21d767ad",
+    "../FSharp_Tool_Pakage_for_CreatorEngine/.github/workflows/managed.yml": "71afd7cc22654a137a989419911d572511f3dacad1f60a966cca09a0c4853354"
+  },
+  "binarySha256": {
+    "Bin/x64-Release/Editor/CreatorEditor.runtime.dll": "d87636261f8129a17f9ffa3b9c50e6380265dfde9d7c8c99379d12a526c9c69e",
+    "Bin/x64-Release/Managed/Scripts/GameScripts.dll": "2c614fa11e68f7facd2f7dd41cde44d98cf2d108dee78436b7d96ac1987f6a15"
+  },
+  "defaultManagedOutput": "Build/fsharp-optional-lifecycle-default-restored.log",
+  "limitations": [
+    "Complex/external-file inheritance editing is outside the conservative helper",
+    "PowerShell 5 shutdown gate not accepted; cause not established",
+    "No new GPU pacing, DDOL, server, debugger, other platform or soak acceptance",
+    "Remote CI not run; no Marketplace publication, commit or push"
+  ]
+}

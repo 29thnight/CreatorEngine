@@ -9,7 +9,7 @@ public sealed partial class PhysicsSolidContactProbe : Component
     private float _elapsed, _settled;
     private bool _finished;
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         _body = GetComponent<PhysicsBodyComponent>() ?? throw new InvalidOperationException("Missing solid body.");
         _pairs = Physics.ObserveContacts(Entity, ShapeRoles.Attack, ShapeRoles.Hurt, ContactPhases.All, 128);
@@ -18,7 +18,7 @@ public sealed partial class PhysicsSolidContactProbe : Component
         PhysicsContactStreamProbe.Track(_targets);
     }
 
-    public override void PostPhysics(float dt)
+    public void PostPhysics(float dt)
     {
         if (_finished) return;
 

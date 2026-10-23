@@ -28,7 +28,7 @@ public:
 		TerrainTexture,
 		Shader,
 		CppScript,
-		CSharpScript,
+		FSharpScript,
 		Prefab,
 		Sound,
 		HDR,

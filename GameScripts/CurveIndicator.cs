@@ -29,7 +29,7 @@ public sealed partial class CurveIndicator : Component
     private float _height;
     private bool _enabled;
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         foreach (Entity child in Entity.Children)
         {
@@ -50,7 +50,7 @@ public sealed partial class CurveIndicator : Component
         }
     }
 
-    public override void PostPhysics(float tick)
+    public void PostPhysics(float tick)
     {
         if (!_enabled) return;
 

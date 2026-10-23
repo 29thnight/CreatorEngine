@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [ValidateSet('Debug','Release')][string]$Configuration='Debug',
     [ValidateSet('manual','close','shutdown','conflict','conflictshutdown','delete','corrupt','deleteshutdown','corruptshutdown','soak','nativeclose','conflictnativeclose')][string]$Mode='manual',
@@ -6,6 +6,8 @@ param(
     [ValidateRange(0.8,1.5)][Nullable[double]]$UiScale = $null
 )
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'RuntimeResults.ps1')
+. (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $fixture=[IO.Path]::GetFullPath($FixtureProject)
 if(!(Test-Path -LiteralPath (Join-Path $fixture 'Assets/Scenes/SavedFixture.creator'))){throw 'Provide a completed isolated texture reimport fixture project'}
@@ -41,7 +43,7 @@ if ($null -ne $UiScale) { $lines += @('editor.theme','wait 2','editor.theme') }
 if($Mode -ne 'manual'){$lines+=('assets.texture.pendingprobe "'+$source+'" '+$Mode)}
 if($Mode -eq 'soak'){$lines+='object.describe UnsavedT0Texture'}
 if($Mode -in @('close','conflict','delete','corrupt','soak')){$lines+='wait 36000'}
-$lines | Set-Content -LiteralPath $setup -Encoding utf8
+Write-CommandScript $setup $lines
 $exe=Join-Path $repo ('Bin/x64-'+$Configuration+'/Editor/CreatorEditor.exe')
 $previousWorkspace=$env:CREATOR_EDITOR_WORKSPACE_DIR
 $previousLegacyIni=$env:CREATOR_EDITOR_LEGACY_INI
@@ -49,7 +51,12 @@ $env:CREATOR_EDITOR_WORKSPACE_DIR=Join-Path $root 'Workspace'
 $env:CREATOR_EDITOR_LEGACY_INI=Join-Path $root 'none.ini'
 try{
     $flag=if($Mode -eq 'manual'){'--script'}else{'--commandlet-script'}
-    $process=Start-Process -FilePath $exe -WorkingDirectory (Split-Path $exe) -WindowStyle Normal -PassThru -ArgumentList @('--development-project',('"'+$project+'"'),$flag,('"'+$setup+'"'),'--result-format','jsonl','--result-file',('"'+(Join-Path $root 'commands.jsonl')+'"')) -RedirectStandardOutput (Join-Path $root 'editor.out') -RedirectStandardError (Join-Path $root 'editor.err')
+    # This launcher waits for actual Inspector input; its window must stay visible.
+    $process = Start-ResultProcess -Exe $exe -WorkingDirectory (Split-Path $exe) -WindowStyle Normal `
+        -Arguments @('--development-project', ('"'+$project+'"'), $flag, ('"'+$setup+'"'),
+            '--result-format', 'jsonl', '--result-file', ('"'+(Join-Path $root 'commands.jsonl')+'"')) `
+        -Stdout (Join-Path $root 'editor.out') -Stderr (Join-Path $root 'editor.err') `
+        -Results (Join-Path $root 'runtime-results.jsonl')
 }finally{
     $env:CREATOR_EDITOR_WORKSPACE_DIR=$previousWorkspace
     $env:CREATOR_EDITOR_LEGACY_INI=$previousLegacyIni

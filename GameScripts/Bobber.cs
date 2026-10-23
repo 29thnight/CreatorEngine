@@ -18,18 +18,18 @@ public sealed partial class Bobber : Component
     private Float3 _origin;
     private float _elapsed;
 
-    public override void OnInitialized()
+    public void OnInitialized()
     {
         Log($"[Bobber] Initialized — {Entity.Name}");
     }
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         _origin = Transform.LocalPosition;
         Log($"[Bobber] BeginSimulation — 기준 위치 {_origin}");
     }
 
-    public override void PostPhysics(float tick)
+    public void PostPhysics(float tick)
     {
         _elapsed += tick;
 
@@ -40,7 +40,7 @@ public sealed partial class Bobber : Component
             : _origin + new Float3(0f, offset, 0f);
     }
 
-    public override void OnUninitializing()
+    public void OnUninitializing()
     {
         Log("[Bobber] Uninitializing");
     }

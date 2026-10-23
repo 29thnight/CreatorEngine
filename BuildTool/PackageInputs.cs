@@ -10,7 +10,7 @@ internal static class PackageInputs
     private static bool Generated(string relative) => relative.Equals("EngineSettings.asset", StringComparison.OrdinalIgnoreCase) || relative.EndsWith(".runtime.yml", StringComparison.OrdinalIgnoreCase);
     // Script identities belong to the managed assembly. Keeping their sidecars
     // in cook input would create CEMF entries for source files omitted from PAK.
-    private static bool ScriptSource(string relative) => relative.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) || relative.EndsWith(".cs.meta", StringComparison.OrdinalIgnoreCase);
+    private static bool ScriptSource(string relative) => relative.EndsWith(".cs", StringComparison.OrdinalIgnoreCase) || relative.EndsWith(".cs.meta", StringComparison.OrdinalIgnoreCase) || relative.EndsWith(".fs", StringComparison.OrdinalIgnoreCase) || relative.EndsWith(".fs.meta", StringComparison.OrdinalIgnoreCase) || relative.EndsWith("compile.order", StringComparison.OrdinalIgnoreCase);
     public static HashSet<string>? ReadAssetList(string project, string listFile, string startupScene)
     {
         if (listFile.Length == 0) return null;
@@ -253,7 +253,7 @@ internal static class PackageInputs
         if (Path.GetFileName(path).Equals("sidecar.meta", StringComparison.OrdinalIgnoreCase) &&
             path.Replace('\\', '/').Contains("/Assets/Derived/Models/", StringComparison.OrdinalIgnoreCase))
             return false;
-        return Path.GetExtension(path).ToLowerInvariant() is ".cpp" or ".h" or ".hpp" or ".cs" or ".meta" or ".json"
+        return Path.GetExtension(path).ToLowerInvariant() is ".cpp" or ".h" or ".hpp" or ".cs" or ".fs" or ".fsproj" or ".meta" or ".json"
             or ".wav" or ".mp3" or ".flac" or ".ogg" or ".soundgraph" or ".soundpreset";
     }
 }

@@ -11,9 +11,9 @@ public sealed partial class PhysicsHierarchyContactProbe : Component
     private int Runs;
     private static readonly List<ContactStream> Streams = new();
 
-    public override void OnAddedToScene() => ++_added;
+    public void OnAddedToScene() => ++_added;
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         _ready = false;
         ++Runs;
@@ -24,7 +24,7 @@ public sealed partial class PhysicsHierarchyContactProbe : Component
         Streams.Add(_contacts);
     }
 
-    public override void OnRemovingFromScene()
+    public void OnRemovingFromScene()
     {
         if (_contacts == null) return;
         // Final destruction has already cancelled Scope; DDOL leaves it alive and empty.
@@ -37,7 +37,7 @@ public sealed partial class PhysicsHierarchyContactProbe : Component
         _ready = false;
     }
 
-    public override void PostPhysics(float dt)
+    public void PostPhysics(float dt)
     {
         if (_ready) return;
         if (_body!.ReadState(out _) != PhysicsError.None)
@@ -63,7 +63,7 @@ public sealed partial class PhysicsHierarchyContactProbe : Component
         }
     }
 
-    public override void OnEndSimulation() => Console.WriteLine("[physics.contact.hierarchy.end] " + State());
+    public void OnEndSimulation() => Console.WriteLine("[physics.contact.hierarchy.end] " + State());
 
     private string InstanceState() => string.Create(System.Globalization.CultureInfo.InvariantCulture,
         $"{{\"name\":\"{Entity.Name}\",\"ready\":{(_ready ? "true" : "false")},\"added\":{_added},\"begins\":{_begins},\"persists\":{_persists},\"bodyComponent\":{_body?.ComponentId ?? 0},\"runs\":{Runs}}}");

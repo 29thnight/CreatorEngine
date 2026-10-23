@@ -11,9 +11,9 @@ public sealed partial class PhysicsSceneContactProbe : Component
     private static int Runs;
     private static readonly List<ContactStream> Streams = new();
 
-    public override void OnAddedToScene() => ++_added;
+    public void OnAddedToScene() => ++_added;
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         _ready = false;
         ++Runs;
@@ -24,7 +24,7 @@ public sealed partial class PhysicsSceneContactProbe : Component
         Streams.Add(_contacts);
     }
 
-    public override void OnRemovingFromScene()
+    public void OnRemovingFromScene()
     {
         if (_contacts == null) return;
         // Final destruction has already cancelled Scope; DDOL leaves it alive and empty.
@@ -37,7 +37,7 @@ public sealed partial class PhysicsSceneContactProbe : Component
         _ready = false;
     }
 
-    public override void PostPhysics(float dt)
+    public void PostPhysics(float dt)
     {
         if (_ready) return;
         if (_body!.ReadState(out _) != PhysicsError.None)
@@ -63,7 +63,7 @@ public sealed partial class PhysicsSceneContactProbe : Component
         }
     }
 
-    public override void OnEndSimulation() => Console.WriteLine("[physics.contact.scene.end] " + State());
+    public void OnEndSimulation() => Console.WriteLine("[physics.contact.scene.end] " + State());
 
     [EngineCallable]
     public static string State()

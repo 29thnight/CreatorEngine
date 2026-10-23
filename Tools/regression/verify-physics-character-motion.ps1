@@ -9,17 +9,19 @@ $configs=if($Configuration -eq 'All'){@('Debug','Release','Shipping','ASan')}els
 foreach($config in $configs){
     $out=Join-Path $repo "Build/Obj/Phase19C1Motion/$config"
     New-Item -ItemType Directory -Force $out|Out-Null
+    $assertions=if($config -eq 'Debug'){'true'}else{'false'}
+    "#pragma once`nnamespace ce::contract_detail { inline constexpr bool assertions_enabled = $assertions; }"|Set-Content (Join-Path $out 'CreatorContractConfig.h') -Encoding utf8
     $lib=if($config -eq 'Debug'){Join-Path $deps 'debug'}else{$deps}
     $flags=if($config -eq 'Debug'){'/MDd /Od /D_DEBUG'}elseif($config -eq 'ASan'){'/MD /Od /Zi /fsanitize=address /DNDEBUG'}else{'/MD /O2 /DNDEBUG'}
     $exe=Join-Path $out 'physics-character-motion.exe'
     $sources=@('Engine/Physics/PhysicsScene.cpp','Engine/SceneRuntime/ScenePhysicsSimulation.cpp','Tools/regression/physics_character_motion_probe.cpp')
-    $sources+=@('ProfileMarker','ProfileThreadStream','ProfileCapture','ProfileCaptureFile','ProfileAggregate','ProfileReader','ProfileService') | ForEach-Object {'Engine/EngineDiagnostics/'+$_+'.cpp'}
+    $sources+=@('ProfileMarker','ProfileThreadStream','ProfileCapture','ProfileCaptureFile','ProfileAggregate','ProfileReader','ProfileService','ProfileRecording') | ForEach-Object {'Engine/EngineDiagnostics/'+$_+'.cpp'}
     if($config -eq 'Shipping'){
         $sources=@('Engine/Physics/PhysicsScene.cpp','Engine/SceneRuntime/ScenePhysicsSimulation.cpp','Tools/regression/physics_character_motion_probe.cpp')
     }
     $sourceArgs=($sources | ForEach-Object {'"'+(Join-Path $repo $_)+'"'}) -join ' '
-    $cmd='call "'+$vcvars+'" >nul && cl /nologo /EHsc /std:c++latest /Zc:__cplusplus /utf-8 /W4 '+$flags+' /DCE_SHIPPING=0 /DCE_PHYSICS_TESTING=1 /I"'+$repo+'/ThirdParty/Mathematics/include" /external:I"'+$deps+'/include" /external:I"'+$deps+'/include/physx" /external:W0 /Fo"'+$out+'/" /Fd"'+$out+'/compiler.pdb" /FS /Fe"'+$exe+'" '+$sourceArgs+' /link /LIBPATH:"'+$lib+'/lib" PhysX_64.lib PhysXCommon_64.lib PhysXFoundation_64.lib PhysXCooking_64.lib PhysXCharacterKinematic_static_64.lib PhysXExtensions_static_64.lib PhysXPvdSDK_static_64.lib'
-    if($config -eq 'Shipping'){$cmd=$cmd.Replace('/DCE_SHIPPING=0 /DCE_PHYSICS_TESTING=1','/DCE_SHIPPING=1')}
+    $cmd='call "'+$vcvars+'" >nul && cl /nologo /EHsc /std:c++latest /Zc:__cplusplus /utf-8 /W4 '+$flags+' /DCE_CONTRACT_STANDALONE=1 /DCE_SHIPPING=0 /DCE_PHYSICS_TESTING=1 /I"'+$out+'" /I"'+$repo+'/ThirdParty/Mathematics/include" /external:I"'+$deps+'/include" /external:I"'+$deps+'/include/physx" /external:W0 /Fo"'+$out+'/" /Fd"'+$out+'/compiler.pdb" /FS /Fe"'+$exe+'" '+$sourceArgs+' /link /LIBPATH:"'+$lib+'/lib" PhysX_64.lib PhysXCommon_64.lib PhysXFoundation_64.lib PhysXCooking_64.lib PhysXCharacterKinematic_static_64.lib PhysXExtensions_static_64.lib PhysXPvdSDK_static_64.lib'
+    if($config -eq 'Shipping'){$cmd=$cmd.Replace('/DCE_CONTRACT_STANDALONE=1 /DCE_SHIPPING=0 /DCE_PHYSICS_TESTING=1','/DCE_CONTRACT_STANDALONE=1 /DCE_SHIPPING=1')}
     & $env:ComSpec /d /s /c $cmd *> "$out/build.log"
     if($LASTEXITCODE){Get-Content "$out/build.log" -Tail 30; throw "$config C1 compile failed"}
 

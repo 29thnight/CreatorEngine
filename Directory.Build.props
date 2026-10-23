@@ -133,6 +133,7 @@
       ScriptCore와 GameScripts의 최종 어셈블리는 각 csproj가 Bin\...\Managed를,
       컴파일 타임 전용 소스 제너레이터는 Build\Tools\Managed를 사용한다.
     -->
+    <BaseIntermediateOutputPath Condition="'$(MSBuildProjectExtension)' == '.fsproj'">$(MSBuildThisFileDirectory)Build\Obj\$(MSBuildProjectName)FSharp\</BaseIntermediateOutputPath>
     <BaseIntermediateOutputPath Condition="'$(MSBuildProjectExtension)' == '.csproj'">$(MSBuildThisFileDirectory)Build\Obj\$(MSBuildProjectName)\</BaseIntermediateOutputPath>
 
     <!--

@@ -17,7 +17,7 @@ public sealed partial class DaggerConvexPlayerProbe : Component
 
     private static float Speed(Float3 value) => MathF.Sqrt(value.X*value.X + value.Y*value.Y + value.Z*value.Z);
 
-    public override void PostPhysics(float delta)
+    public void PostPhysics(float delta)
     {
         if (_finished) return;
         try

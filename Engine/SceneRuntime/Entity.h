@@ -8,6 +8,7 @@
 #include "Transform.h"
 #include "GameObjectType.h"
 #include "GameObjectIndex.h"
+#include "EntityHandle.h"
 #include "PrefabOverride.h"
 #include "ScenePhase.h"
 #include "../Utility_Framework/LayerTypes.h"
@@ -190,6 +191,7 @@ public:
 	void SetStatic(bool isStatic) { m_isStatic = isStatic; }
 
 private:
+	friend class Component;
 	friend class Scene;
 	friend class SceneManager;
 
@@ -377,6 +379,8 @@ public:
 
 	[[reflgen::ignore]]
 	Scene* m_ownerScene{ nullptr };
+    [[reflgen::ignore]]
+    EntityHandle m_observationLocation{};
 
 	[[reflgen::ignore]]
 	Prefab* m_prefab{ nullptr };

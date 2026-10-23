@@ -23,7 +23,7 @@ public sealed partial class SoundProbe : Component
     private SoundComponent? _sound;
     private int _frame;
 
-    public override void OnInitialized()
+    public void OnInitialized()
     {
         _sound = GetComponent<SoundComponent>();
 
@@ -61,7 +61,7 @@ public sealed partial class SoundProbe : Component
         Log($"[SoundProbe] Play 직후 IsPlaying={_sound.IsPlaying()}");
     }
 
-    public override void PostPhysics(float tick)
+    public void PostPhysics(float tick)
     {
         if (_sound is null || _reportInterval <= 0) return;
 
@@ -71,7 +71,7 @@ public sealed partial class SoundProbe : Component
         }
     }
 
-    public override void OnUninitializing()
+    public void OnUninitializing()
     {
         // 래퍼는 핸들만 들고 있으므로, 오브젝트가 살아 있을 때만 만진다.
         if (_sound is not null && Entity.IsAlive) _sound.Stop();

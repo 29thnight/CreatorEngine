@@ -14,7 +14,7 @@ public sealed partial class EnableByName : Component
     private int _frame;
     private bool _done;
 
-    public override void PostPhysics(float tick)
+    public void PostPhysics(float tick)
     {
         if (_done || ++_frame < _afterFrames) return;
         _done = true;

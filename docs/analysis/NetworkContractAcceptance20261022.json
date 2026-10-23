@@ -1,0 +1,66 @@
+{
+  "result": "NDA_CONTRACT_ACCEPTANCE_OK",
+  "date": "2026-10-22",
+  "repositoryHead": "0847ceeb2ec99d1b4edbdfd9f7f8a94bd773f915",
+  "worktree": "uncommitted implementation, exact source hashes below",
+  "contractVersion": 1,
+  "protocolVersion": 1,
+  "sourceHashes": {
+    "Engine/Network/Contracts/INetChannelPolicy.h": "2D87A68967D5172C40FAA1A7F56D694B31F9475EF9ABAAE86CBDFF762D286A49",
+    "Engine/Network/Contracts/INetTelemetrySink.h": "F087568493D51C4098373FDCFDD48CE3331345380CABE69F97DCC13CFCF7EC74",
+    "Engine/Network/Contracts/INetworkEntityRegistry.h": "DF4F27154CFA9D87056D385D839FAF4F73CCB86A39D92692062DA2CBAA4DB79D",
+    "Engine/Network/Contracts/INetworkTransport.h": "FFEBD0103B642D18D0BA03D38037E739240A96156838E7F62154B2F5B5679693",
+    "Engine/Network/Contracts/net-contracts.lock.json": "90F20DD0CE271511349BA8F1D697FC2D7FAA1B94DC5762E2C74B223124392CB2",
+    "Engine/Network/Contracts/NetProtocolHeader.h": "0CEA441AD0B6D4F596F385DA7D164FCB28EC7B0C6F6C53D46F3DBC66E186A4B9",
+    "Engine/Network/Contracts/NetWireIds.h": "C1D5DD9F211393382B623AC12E78E51B6009EE558BB3391D12B6CADBC8D00895",
+    "Engine/Network/Contracts/NetWireIds.registry.json": "C890FD2472D11793EE9AE6734FDBFE737805B2625DF67D18A274708C1BF5603B",
+    "Tools/regression/net_wire_boundary.py": "E00D57D491D48B216A708E024BAFFB928D78977338272ED0D6FE769D9C37AADA",
+    "Tools/regression/net_wire_boundary_tests.py": "456307D7B0DD9C3D96133AE90B3D4FCCE7DBDC336903CB19DC041B983D3E0A83",
+    "Tools/regression/network_handoff_suite.py": "0E9AFF9CA4EFC637CA5EB32776DD4E5A2D2E82DBDA4FA4153941060AD219D993",
+    "Tools/regression/verify-net-wire-boundary.ps1": "6CBDEEC211ABDB9F445E8557D6EAC6AD5EEAF23A820437907A5806036D8F3D55",
+    "Tools/regression/verify-net-regression-wiring.ps1": "9D0170B5CBE43565B1E23933BC6EFD4293C579F8F3B258B20DF46C7C9B56AA39",
+    "Tools/regression/run-all.ps1": "66B46BCEB713ABB1FF6857521D650A689F49E01423D371D83108D0CC7931B9F2",
+    "Tools/regression/network-handoff.suite.json": "27A51074EE0C2F5EDA7894AD1DE4CF47D02DF2C4F6B8431F6DFC0DCF3BAA22A3",
+    "Tools/regression/NetContractProbe.cpp": "984E22928541F32AAAAC4465658C230DC531898CC59E77A4CE43936F7025856F",
+    "Tools/regression/verify-physics-body-identity.ps1": "DBE7A0E36C833FCF98250624A9F45CFBA1E6B813759EED45730F18CA9A958EC3",
+    "Tools/regression/PhysicsScriptABI/Program.cs": "A2E2CFF3DEBB5E4FCBBBCB8DB3CC2BAC6BE98648D2B457204950A52490415185",
+    ".github/workflows/network-contracts.yml": "CD205DA5D445C11785CB0FF51FBFB4722BCB1CDDE6286623852D1C5A4E978825"
+  },
+  "boundary": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\NDA\\Boundary-e6eca3590a5e43ec812db9d8319b026e",
+  "configurations": [
+    "Debug",
+    "Release"
+  ],
+  "standaloneHeaderCompiles": 12,
+  "nativeChecks": [
+    132,
+    132
+  ],
+  "sourceCanaryCases": 38,
+  "nativeEndianCanary": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\NDA\\Boundary-e6eca3590a5e43ec812db9d8319b026e/EndianMutant/failure.log",
+  "runnerCanaries": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\NDA\\Boundary-e6eca3590a5e43ec812db9d8319b026e/RunnerCanary/result.json",
+  "suite": "Build/Verification/NDA/Suite-6ab93396a0104f56a3d0fc6a2a17694d/result.json",
+  "suiteGroups": 8,
+  "editorRegressionLog": "Build/Verification/NDA/Suite-6ab93396a0104f56a3d0fc6a2a17694d/Product.log",
+  "changePolicy": "docs/design/NetworkContractChangePolicy.md",
+  "ci": {
+    "remoteExecuted": false,
+    "workflow": ".github/workflows/network-contracts.yml"
+  },
+  "limits": [
+    "Native transport/registry consumers are isolated contract fixtures, not production N2/N4 implementations",
+    "Eight executed groups cover the registered NetworkHandoff suite, not every engine/GPU/device/soak gate",
+    "ND-b/N1 and N3 actual render-FPS quality acceptance remain separate; N9 server target/2-client/drain not accepted"
+  ],
+  "documentationChecks": {
+    "pages": 664,
+    "inlineScripts": 344,
+    "sourceReceipts": 19,
+    "planVisuals": "NetworkFrameworkPlan and MasterPlanAudit20261020 passed",
+    "localLinks": 14,
+    "scopedDiff": "passed",
+    "powerShellSyntax": "passed",
+    "planSourceCheck": "passed",
+    "javascriptFailures": 0
+  }
+}

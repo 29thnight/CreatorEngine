@@ -1,4 +1,4 @@
-# Content Browser 탐색·신원·생성 경로 (PHASE 21 W2-B)
+﻿# Content Browser 탐색·신원·생성 경로 (PHASE 21 W2-B)
 #
 # 왜 필요한가
 # ───────────
@@ -75,6 +75,7 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+. (Join-Path $PSScriptRoot "CommandResults.ps1")
 
 $failures = New-Object System.Collections.Generic.List[string]
 $checks = 0
@@ -108,7 +109,8 @@ $expectedSites = @(
     'HierarchyWindow.cpp:Texture', 'HierarchyWindow.cpp:UI_TEXTURE',
     'ImGuiDrawHelperMeshRenderer.cpp:Texture', 'ImGuiDrawHelperTerrainComponent.cpp:Model',
     'InspectorWindow.cpp:HDR', 'InspectorWindow.cpp:(payloadType)', 'InspectorWindow.cpp:SceneRenderProfile',
-    'SceneViewWindow.cpp:HDR', 'SceneViewWindow.cpp:Model', 'SceneViewWindow.cpp:Prefab'
+    'SceneViewWindow.cpp:HDR', 'SceneViewWindow.cpp:Model', 'SceneViewWindow.cpp:Prefab',
+    'MaterialGraphWindow.cpp:Texture', 'MaterialGraphWindow.cpp:Texture'
 ) | Sort-Object
 
 $sites = New-Object System.Collections.Generic.List[string]
@@ -151,17 +153,20 @@ Assert (($slotTypes -join ',') -eq 'Texture,Texture,UI_TEXTURE') "13 DrawAssetSl
 
 # 14 — 이름만 저장하는 소비자. 데칼 세 칸은 한 람다(`slot`)를 지나고, 람다는 Textures 폴더 검사를
 # 통과한 경우에만 이름을 돌려준다. 칸마다 그 이름이 자기 Set*Texture 로 간다.
-Assert ($inspectorText -match '!dropped\.empty\(\)\s*&&\s*editor::asset_drag::lives_in\(\s*dropped\s*,\s*"Textures"\s*,\s*context\s*\)\s*\?\s*dropped\.filename\(\)\.string\(\)\s*:\s*std::string\(\)') "14 데칼 칸 람다가 Textures 폴더 검사를 통과할 때만 이름을 돌려주지 않는다"
+Assert ($inspectorText -match '!dropped\.empty\(\)\s*&&\s*editor::asset_drag::lives_in\(\s*dropped\s*,\s*"Textures"\s*,\s*context\s*\)\s*\?\s*dropped\.filename\(\)\.string\(\)\s*:\s*std::string\(\)') `
+    "14 데칼 칸 람다가 Textures 폴더 검사를 통과할 때만 이름을 돌려주지 않는다"
 foreach ($pair in @(@('Diffuse', 'Decal', 'GetDecalTexture'), @('Normal', 'Normal', 'GetNormalTexture'), @('ORM', 'ORM', 'GetORMTexture'))) {
-    $pattern = 'slot\(\s*"' + $pair[0] + '"\s*,\s*decalComponent->' + $pair[2] + '\(\)\s*,\s*"Decal ' + $pair[1] + ' texture drop"\s*\)\s*;\s*!name\.empty\(\)\s*\)\s*decalComponent->Set' + $pair[1] + 'Texture\(\s*name\.c_str\(\)\s*\)'
+    $pattern = 'slot\(\s*"' + $pair[0] + '"\s*,\s*decalComponent->' + $pair[2] + 'Shared\(\)\s*,\s*"Decal ' + $pair[1] + ' texture drop"\s*\)\s*;\s*!name\.empty\(\)\s*\)\s*\{\s*decalComponent->Set' + $pair[1] + 'Texture\(\s*name\.c_str\(\)\s*\)'
     Assert ($inspectorText -match $pattern) "14 데칼 $($pair[1]) 이 Textures 폴더 검사 뒤에만 이름을 넘기지 않는다"
 }
 $hierarchyText = [IO.File]::ReadAllText((Join-Path $SourceRoot "Editor\EngineGUIWindow\HierarchyWindow.cpp"))
-Assert ($hierarchyText -match '!editor::asset_drag::lives_in\(\s*filepath\s*,\s*"SpriteSheets"[^)]*\)\s*\)\s*\{[^}]*\}\s*else if \(selectedSceneObject\)') `
-    "14 하이어라키 스프라이트 시트가 SpriteSheets 폴더 검사로 막히지 않는다"
+Assert ($hierarchyText -match '(?s)if \(editor::asset_drag::lives_in\(path, "SpriteSheets", "Hierarchy sprite sheet drop"\)\)\s*\{\s*const auto target = selectedSceneObject.*?queue_hierarchy_edit\(scene, \[path, target\].*?sheet->LoadSpriteSheet\(path.string\(\)\)') `
+    "14 하이어라키 스프라이트 시트가 폴더 검사 뒤 같은 경로를 편집 큐로 넘기지 않는다"
 $terrainText = [IO.File]::ReadAllText((Join-Path $SourceRoot "Editor\EngineGUIWindow\ImGuiDrawHelperTerrainComponent.cpp"))
-Assert ($terrainText -match 'GetStemToGuid\(\s*filepath\.stem\(\)\.string\(\)\s*\)\s*!=\s*droppedGuid\s*\)\s*\{[^}]*\}\s*else if \(auto generation') `
-    "14 폴리지가 stem 이 끌어 온 파일로 돌아오는지 보지 않는다"
+# Foliage now persists the dropped stable ID. Equal filenames no longer need a
+# stem lookup: the exact dropped path supplies the identity retained by the type.
+Assert ($terrainText -match '(?s)const FileGuid droppedGuid = DataSystems->GetFileGuid\(filepath\);\s*if \(droppedGuid == nullFileGuid\).*?else\s*\{[^}]*type\.m_modelGuid = droppedGuid;\s*foliage->AddFoliageType\(type\)') `
+    "14 폴리지가 끌어 온 경로의 stable ID를 보존하지 않는다"
 
 # 15 — Scene Render Profile 생성
 $databaseText = [IO.File]::ReadAllText($databaseCpp)
@@ -215,6 +220,15 @@ if (-not $SkipRuntime) {
     Copy-Item -LiteralPath $seedRenderProfile.FullName -Destination (Join-Path $fixture 'Beta\Twin.renderprofile')
     for ($n = 0; $n -lt 120; $n++) {
         Copy-Item -LiteralPath $seedRenderProfile.FullName -Destination (Join-Path $fixture ('Many\Item_{0:D3}.renderprofile' -f $n))
+    }
+    # Progressive enumeration needs more uncached folders than the warm budget.
+    # A small isolated project can legitimately finish its entire tree at once.
+    for ($n = 0; $n -lt 64; $n++) {
+        # Tree rows inspect their immediate children even when collapsed. Keep
+        # another level below each row so these listings remain genuinely cold.
+        $folder = Join-Path $fixture ('Budget_{0:D3}\Cold' -f $n)
+        New-Item -ItemType Directory -Path $folder -Force | Out-Null
+        Copy-Item -LiteralPath $seedRenderProfile.FullName -Destination (Join-Path $folder 'Budget.renderprofile')
     }
     $profileCountBefore = @(Get-ChildItem -LiteralPath $profileDirectory -File).Count
 
@@ -297,7 +311,7 @@ if (-not $SkipRuntime) {
     $signalDir = Join-Path $fixture 'Gamma\Signal'
     $scriptPath = Join-Path $Work "browser.txt"
     $resultPath = Join-Path $Work "browser.jsonl"
-    Set-Content -LiteralPath $scriptPath -Encoding UTF8 -Value $lines
+    Write-CommandScript $scriptPath $lines
 
     $savedWorkspaceDir = $env:CREATOR_EDITOR_WORKSPACE_DIR
     $savedLegacyIni = $env:CREATOR_EDITOR_LEGACY_INI
@@ -307,9 +321,10 @@ if (-not $SkipRuntime) {
     $deletedAtMarker = $false
     try {
         $proc = Start-Process -FilePath $Exe -WorkingDirectory (Split-Path $Exe) -PassThru -WindowStyle Hidden `
-            -ArgumentList @('--script', ('"' + $scriptPath + '"'), '--result-format', 'jsonl',
+            -ArgumentList @('--development-project', ('"' + $ProjectRoot + '"'), '--script', ('"' + $scriptPath + '"'), '--result-format', 'jsonl',
                             '--result-file', ('"' + $resultPath + '"')) `
             -RedirectStandardOutput (Join-Path $Work 'stdout.txt') -RedirectStandardError (Join-Path $Work 'stderr.txt')
+        $null = $proc.Handle
         # 표지 폴더가 생기면 지운다 — 에디터는 그 뒤 `wait 400` 동안 기다리고 있다.
         $deadline = [DateTime]::UtcNow.AddMinutes(10)
         while (-not $proc.HasExited) {
@@ -345,7 +360,8 @@ if (-not $SkipRuntime) {
 
     Assert $deletedAtMarker "6 표지 스냅샷을 못 봐서 폴더를 지우지 못했다 — 6·7 은 자극되지 않았다"
     if (-not (Test-Path -LiteralPath $resultPath)) { throw "result file missing: $resultPath" }
-    $rows = @(Get-Content -LiteralPath $resultPath | Where-Object { $_.Trim() } | ForEach-Object { $_ | ConvertFrom-Json })
+    $rows = @(Read-CommandResults $resultPath)
+    Assert-CommandSequence $rows $lines
     # 결과 줄은 스크립트 줄과 1:1 이다. 인자 없는 호출만 표본으로 쓴다 — 인자 준 호출이
     # 돌려주는 게시본은 요청이 적용되기 전 것이다.
     Assert ($rows.Count -eq $lines.Count) "결과 줄 수 $($rows.Count) 가 스크립트 줄 수 $($lines.Count) 와 다르다"
@@ -479,6 +495,14 @@ if (-not $SkipRuntime -and -not $SkipProjectSwitch) {
     foreach ($dir in @("$projectA\Assets\SceneRenderProfile", "$projectA\Assets\OnlyA", "$projectB\Assets\SceneRenderProfile", "$projectB\Assets\OnlyB", $switchWorkspace)) {
         New-Item -ItemType Directory -Force -Path $dir | Out-Null
     }
+    # Modern project admission needs settings and a script source order, even for
+    # a browser-only fixture. Both isolated projects receive their own copies.
+    foreach ($project in @($projectA, $projectB)) {
+        Copy-Item -LiteralPath (Join-Path $ProjectRoot 'ProjectSetting') -Destination $project -Recurse
+        New-Item -ItemType Directory -Force -Path (Join-Path $project 'Assets/Script') | Out-Null
+        Set-Content -LiteralPath (Join-Path $project 'Assets/Script/compile.order') -Value '' -Encoding UTF8
+        Copy-Item -LiteralPath (Join-Path $ProjectRoot 'Assets/Shaders') -Destination (Join-Path $project 'Assets') -Recurse
+    }
     $recentsA = Join-Path $projectA 'Library\EditorState\ContentBrowserRecents.txt'
     $recentsB = Join-Path $projectB 'Library\EditorState\ContentBrowserRecents.txt'
 
@@ -486,7 +510,7 @@ if (-not $SkipRuntime -and -not $SkipProjectSwitch) {
         $scriptFile = Join-Path $switchRoot "$name.txt"
         $resultFile = Join-Path $switchRoot "$name.jsonl"
         $all = @('wait 240') + $commands + @('quit')
-        Set-Content -LiteralPath $scriptFile -Encoding UTF8 -Value $all
+        Write-CommandScript $scriptFile $all
         $priorWorkspace = $env:CREATOR_EDITOR_WORKSPACE_DIR
         $priorLegacy = $env:CREATOR_EDITOR_LEGACY_INI
         # ★ 세 회차가 **같은** 작업 공간을 쓴다 — 그것이 새는 통로 하나다.
@@ -497,6 +521,7 @@ if (-not $SkipRuntime -and -not $SkipProjectSwitch) {
                 -ArgumentList @('--development-project', ('"' + $project + '"'), '--script', ('"' + $scriptFile + '"'),
                                 '--result-format', 'jsonl', '--result-file', ('"' + $resultFile + '"')) `
                 -RedirectStandardOutput (Join-Path $switchRoot "$name.out") -RedirectStandardError (Join-Path $switchRoot "$name.err")
+            $null = $proc.Handle
             if (-not $proc.WaitForExit(600000)) { $proc.Kill(); throw "project run $name did not exit" }
         }
         finally {
@@ -507,7 +532,8 @@ if (-not $SkipRuntime -and -not $SkipProjectSwitch) {
         }
         Assert ($proc.ExitCode -eq 0) "17 $name 에디터 종료 코드가 $($proc.ExitCode) 다"
         if (-not (Test-Path -LiteralPath $resultFile)) { throw "project run $name wrote no result file" }
-        $rows = @(Get-Content -LiteralPath $resultFile | Where-Object { $_.Trim() } | ForEach-Object { $_ | ConvertFrom-Json })
+        $rows = @(Read-CommandResults $resultFile)
+        Assert-CommandSequence $rows $all
         Assert ($rows.Count -eq $all.Count) "17 $name 결과 줄 수 $($rows.Count) 가 스크립트 줄 수 $($all.Count) 와 다르다"
         $snapshots = @()
         for ($k = 0; $k -lt [Math]::Min($rows.Count, $all.Count); $k++) {
@@ -571,6 +597,16 @@ if (-not $SkipRuntime -and -not $SkipProjectSwitch) {
 }
 
 "Content Browser 탐색 검사: 단정 $checks · $runtimeSummary · $switchSummary · 받는 자리 $($sites.Count)"
+if ($Work) {
+    [ordered]@{
+        schemaVersion = 1
+        checks = $checks
+        failures = @($failures.ToArray())
+        runtime = !$SkipRuntime
+        projectSwitch = (!$SkipRuntime -and !$SkipProjectSwitch)
+        sourceSites = $sites.Count
+    } | ConvertTo-Json -Depth 5 | Set-Content -LiteralPath (Join-Path $Work 'verification.json') -Encoding UTF8
+}
 if ($failures.Count -gt 0) {
     $failures | ForEach-Object { "  FAIL $_" }
     throw "Content Browser 탐색 검사 실패 $($failures.Count) 건"

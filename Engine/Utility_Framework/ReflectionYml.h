@@ -18,43 +18,10 @@
 // 런타임 타입 창구(Meta::Find·TypeOf·TypeIDOf) — 템플릿 래퍼 3곳이 T 의 서술자를 등록소에서 찾는다.
 #include "ReflgenRuntime.h"
 #include "StandardLibrary.h"
+#include "PropertyChange.h"
 
 namespace Meta
 {
-	enum class PropertyChangeSource : std::uint8_t
-	{
-		Reflection,
-		Prefab
-	};
-
-	inline thread_local PropertyChangeSource g_propertyChangeSource =
-		PropertyChangeSource::Reflection;
-
-	class ScopedPropertyChangeSource
-	{
-	public:
-		explicit ScopedPropertyChangeSource(PropertyChangeSource source)
-			: m_previous(g_propertyChangeSource)
-		{
-			g_propertyChangeSource = source;
-		}
-
-		~ScopedPropertyChangeSource()
-		{
-			g_propertyChangeSource = m_previous;
-		}
-
-		ScopedPropertyChangeSource(const ScopedPropertyChangeSource&) = delete;
-		ScopedPropertyChangeSource& operator=(const ScopedPropertyChangeSource&) = delete;
-
-	private:
-		PropertyChangeSource m_previous;
-	};
-
-	inline PropertyChangeSource CurrentPropertyChangeSource()
-	{
-		return g_propertyChangeSource;
-	}
 
 	//FindTypeByInstance base IObject
 	inline const reflgen::type_descriptor* FindTypeByInstance(void* instance)

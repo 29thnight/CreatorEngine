@@ -455,6 +455,7 @@ void Scene::RetireManagedGraph()
         if (entity)
         {
             ScriptObjectRegistry::Get().Unregister(entity.get());
+            PublishEntityDeparture(*entity, false);
             entity->FinalizeManagedDestroy();
             entity.reset();
         }
@@ -550,6 +551,26 @@ void Scene::ResetTransformDiagnostics()
 	m_transformDiagnosticFrameCount = 0;
 }
 
+void Scene::PublishTransformObservation(EntityHandle handle, TransformWriteReason reason)
+{
+    if (!SceneManagers->Observations().HasWriteObservers()) return;
+    auto* entity = Resolve(handle);
+    if (!entity) return;
+    auto* transform = entity->GetComponent<Transform>();
+    if (!transform) return;
+    auto source = Meta::PropertyChangeSource::Native;
+    switch (reason)
+    {
+    case TransformWriteReason::Script: source=Meta::PropertyChangeSource::Script; break;
+    case TransformWriteReason::Inspector: case TransformWriteReason::Gizmo: source=Meta::PropertyChangeSource::Inspector; break;
+    case TransformWriteReason::Prefab: source=Meta::PropertyChangeSource::Prefab; break;
+    case TransformWriteReason::Physics: source=Meta::PropertyChangeSource::Physics; break;
+    case TransformWriteReason::Reflection: source=Meta::CurrentPropertyChangeSource(); break;
+    default: break;
+    }
+    transform->PublishPropertyWrite("*", source);
+}
+
 bool Scene::PublishLocalWrite(EntityHandle handle, TransformWriteReason reason)
 {
 	if (nullptr == Resolve(handle))
@@ -619,6 +640,7 @@ bool Scene::PublishLocalWrite(EntityHandle handle, TransformWriteReason reason)
 		m_transformPublishEpoch.fetch_add(1, std::memory_order_relaxed);
 		m_transformWriteReasonCounts[reasonIndex].fetch_add(1, std::memory_order_relaxed);
 	}
+	PublishTransformObservation(handle, reason);
 	return true;
 }
 
@@ -712,6 +734,7 @@ uint64_t Scene::PublishLocalWriteBatch(
 		if (rejected)
 			m_transformInvalidPublishCount.fetch_add(rejected, std::memory_order_relaxed);
 	}
+	for (const auto handle : handles) PublishTransformObservation(handle, reason);
 	return accepted;
 }
 
@@ -859,7 +882,28 @@ Entity::Index Scene::AllocateSlot()
     return index;
 }
 
-gc::root_ref<Entity> Scene::ReleaseSlot(Entity::Index index)
+void Scene::PublishEntityAdmission(Entity& entity)
+{
+    const auto before = entity.m_observationLocation;
+    const auto after = HandleOf(entity.m_index);
+    entity.m_observationLocation = after;
+    SceneManagers->Observations().Publish(Runtime::SceneEntityEvent{
+        static_cast<std::uint64_t>(entity.GetInstanceID()),
+        {before.sceneId,before.index,before.generation}, {after.sceneId,after.index,after.generation},
+        before.IsValid() ? Runtime::EntityChange::Attached : Runtime::EntityChange::Created});
+}
+void Scene::PublishEntityDeparture(Entity& entity, bool transfer)
+{
+    const auto before = entity.m_observationLocation;
+    if (!before.IsValid()) return; // uncommitted allocation rollback
+    if (!transfer) entity.m_observationLocation = {};
+    SceneManagers->Observations().Publish(Runtime::SceneEntityEvent{
+        static_cast<std::uint64_t>(entity.GetInstanceID()),
+        {before.sceneId,before.index,before.generation}, {},
+        transfer ? Runtime::EntityChange::Detached : Runtime::EntityChange::Destroyed});
+}
+
+gc::root_ref<Entity> Scene::ReleaseSlot(Entity::Index index, bool transfer)
 {
     // 루트(0)는 씬 자체가 서 있는 동안 절대 해제하지 않는다.
     if (index == 0) return {};
@@ -922,6 +966,7 @@ gc::root_ref<Entity> Scene::ReleaseSlot(Entity::Index index)
 	{
 		RecordTopologyDestroyed();
 	}
+    if (released) PublishEntityDeparture(*released, transfer);
 	return released;
 }
 
@@ -1620,6 +1665,7 @@ Entity* Scene::AddEntity(gc::root_ref<Entity> sceneObject)
     if (!added->SetLayer(added->GetLayer()))
         throw std::runtime_error("Invalid entity layer membership");
 
+    PublishEntityAdmission(*added);
     return added;
 }
 
@@ -1653,6 +1699,7 @@ void Scene::AddRootEntity(std::string_view name)
         throw std::runtime_error("Invalid root layer");
     if (Transform* transform = m_Entities[index]->GetComponent<Transform>())
         transform->FlushPendingLocalWrite();
+    PublishEntityAdmission(*m_Entities[index]);
 }
 
 void Scene::OnBeforeSerialize() const
@@ -1764,6 +1811,7 @@ Entity* Scene::CreateEntity(std::string_view name, GameObjectType type, Entity::
     if (!created->SetLayer(created->GetLayer()))
         throw std::runtime_error("Invalid entity layer membership");
 
+    PublishEntityAdmission(*created);
     return created;
 }
 
@@ -1819,6 +1867,7 @@ Entity* Scene::LoadEntity(size_t instanceID, std::string_view name, GameObjectTy
     if (!loaded->SetLayer(loaded->GetLayer()))
         throw std::runtime_error("Invalid loaded entity layer");
 
+    PublishEntityAdmission(*loaded);
     return loaded;
 }
 
@@ -1923,7 +1972,7 @@ void Scene::DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransf
 
         // 슬롯 해제 단일점(트랙 E1) — tombstone+세대 증가+free 리스트 등록을
         // DestroyEntities와 공유한다. 재부착은 AttachExistingEntity가
-		if (gc::root_ref<Entity> owned = ReleaseSlot(idx))
+		if (gc::root_ref<Entity> owned = ReleaseSlot(idx, true))
 		{
 			transfer.entity = std::move(owned);
 			detached.push_back(std::move(transfer));
@@ -2097,6 +2146,7 @@ Scene::AttachExistingEntityHierarchy(std::vector<DetachedEntityTransfer>& object
 		}
 		entity->SetRootIndex(newRoot);
 	}
+    for (const auto& transfer : objects) if (transfer.entity) PublishEntityAdmission(*transfer.entity);
 	objects.clear();
     return remap;
 }
@@ -2201,6 +2251,15 @@ void Scene::CommitRenderProxies()
                 continue;
 
             pending.push_back(HandleOf(found->second->GetOwner()->m_index));
+        }
+        // CCTs own no rigid-body render pose. Their meshes and descendants still
+        // need transform publication on zero-tick frames as alpha advances.
+        for (const auto& changed : m_physicsSimulation.ChangedCharacters())
+        {
+            const auto found = m_physicsCharacters.find(changed.binding);
+            if (found != m_physicsCharacters.end() && found->second && found->second->GetOwner()
+                && found->second->IsEnabled() && found->second->RuntimeHandle())
+                pending.push_back(HandleOf(found->second->GetOwner()->m_index));
         }
         while (!pending.empty())
         {
@@ -3184,7 +3243,7 @@ ce::physics::result<void> Scene::CommitPhysicsLayers()
     }
 }
 
-void Scene::FixedUpdate(float deltaSecond)
+void Scene::FixedUpdate(float deltaSecond, bool singleStep)
 {
     if (!m_physicsSimulation.IsRunning() || deltaSecond == 0) return;
 
@@ -3203,7 +3262,7 @@ void Scene::FixedUpdate(float deltaSecond)
         return;
     }
 
-    const auto advanced = m_physicsSimulation.Advance(deltaSecond);
+    const auto advanced = singleStep ? m_physicsSimulation.Step() : m_physicsSimulation.Advance(deltaSecond);
     if (!advanced)
     {
         SceneManagers->ReportSimulationFailure(std::string(advanced.error().message));
@@ -5701,16 +5760,24 @@ math::matrix4x4 Scene::PhysicsRenderMatrix(EntityHandle owner) const
     for (auto* ancestor = entity; ancestor; ancestor = ancestor->GetParentIndex() == ancestor->m_index
             ? nullptr : Resolve(HandleOf(ancestor->GetParentIndex())))
     {
-        auto* body = ancestor->GetComponent<PhysicsBodyComponent>();
-        if (!body || body->m_scene != this || !body->IsEnabled() || body->IsDestroyMark() || !body->RuntimeHandle())
-            continue;
-
-        const auto rendered = m_physicsSimulation.RenderPose(body->m_binding);
-        if (!rendered)
-            return world;
-
         const auto& transform = ancestor->Transform_();
-        const auto interpolated = math::compose(transform.GetWorldScale(), rendered->rotation, rendered->position);
+        math::matrix4x4 interpolated;
+        auto* body = ancestor->GetComponent<PhysicsBodyComponent>();
+        auto* character = ancestor->GetComponent<CharacterMovementComponent>();
+        if (body && body->m_scene == this && body->IsEnabled() && !body->IsDestroyMark() && body->RuntimeHandle())
+        {
+            const auto rendered = m_physicsSimulation.RenderPose(body->m_binding);
+            if (!rendered) return world;
+            interpolated = math::compose(transform.GetWorldScale(), rendered->rotation, rendered->position);
+        }
+        else if (character && character->m_scene == this && character->IsEnabled()
+            && !character->IsDestroyMark() && character->RuntimeHandle())
+        {
+            const auto rendered = m_physicsSimulation.RenderCharacterPosition(character->m_binding);
+            if (!rendered) return world;
+            interpolated = math::compose(transform.GetWorldScale(), transform.GetWorldQuaternion(), *rendered);
+        }
+        else continue;
         if (ancestor == entity)
             return interpolated;
 

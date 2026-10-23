@@ -44,7 +44,10 @@ class TextureImportEditorContracts(unittest.TestCase):
         self.assertIn("DataSystems->QueueAssetChange", importer)
         self.assertNotIn(".wait(", importer)
         self.assertNotIn("std::thread", importer)
-        self.assertNotIn("std::mutex", importer)
+        # Worker-side publication serializes rename/recovery legitimately. The
+        # game-thread admission path must not introduce its own queue mutex.
+        admission = importer.split("void CookTextureGeneration", 1)[0]
+        self.assertNotIn("std::mutex", admission)
 
     def test_old_work_is_superseded_and_publication_uses_existing_mount(self):
         database = source("Editor/EngineEntry/EditorAssetDatabase.cpp")

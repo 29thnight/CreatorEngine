@@ -75,7 +75,7 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
     {
         auto draw=geometry.draw;draw.modelMeshView=cooked;
         SurfaceView v{{0,0,-2,0},1,1,1};MeshSurfacePlanBudget b;b.maxChunkPoints=1u<<20;
-        std::shared_ptr<const MeshSurfacePlan> plan;
+        own::shared_owner<const MeshSurfacePlan> plan;
         Check(MeshSurfacePlan::BuildForScene(draw,v,b,plan,error),"DAG budget fixture "+error);
         Check(plan->Chunks().size()==1,"DAG budget fixture is a single chunk");
         uint64_t topology{};for(const auto& d:plan->Source()->Meshlets().descriptors)
@@ -161,7 +161,7 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             Check(device.BeginFrame(error),"Cluster begin");textures.BeginFrame(context.frameId);
             host.PollPrograms(context);
             Check(host.PrepareResidency(context,input,error),"Cluster residency "+error);
-            auto graph=std::make_shared<EnhancedRenderGraph>(device,RGSchedulingMode::ExplicitVersioned,RGOrderPolicy::DependencyOrder);
+            auto graph=own::make_shared<EnhancedRenderGraph>(device,RGSchedulingMode::ExplicitVersioned,RGOrderPolicy::DependencyOrder);
             const unsigned workers=chunkSize==64?4:0;
             if(workers){pool.BeginFrame(unsigned(context.frameId));Check(graph->PrepareParallel(pool,error),"Cluster parallel "+error);}
             EnhancedShadowData shadow;shadow.enabled=true;shadow.mapResolution=32;
@@ -317,8 +317,8 @@ void RunClusterLod(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
                 Check(device.CreateBufferReadback((f->MeshletOutputOffset(last)+table->geometry.back()->MeshletCount()*2+1)*4,shadowLists[cascade],error),"Shadow LOD readback");
                 graph->AddPass("Probe.Cluster.ShadowList",{{f->GraphVisibleIds(*graph),RHIResourceState::CopySource,RGAccessMode::Read}},[f,r=shadowLists[cascade]](const auto&e){e.encoder->CopyBufferToReadback(r,f->VisibleIdBuffer());},true);
             }
-            std::vector<std::pair<std::shared_ptr<const GpuGeometryVisibility::Frame>, RHIReadback>> queueReads;
-            const auto readQueue = [&](const std::shared_ptr<const GpuGeometryVisibility::Frame>& queueWork)
+            std::vector<std::pair<own::shared_owner<const GpuGeometryVisibility::Frame>, RHIReadback>> queueReads;
+            const auto readQueue = [&](const own::shared_owner<const GpuGeometryVisibility::Frame>& queueWork)
             {
                 Check(queueWork && queueWork->WorkQueueTaskCount() != 0, "Production queue has sealed work");
                 RHIReadback queueRead;

@@ -1,4 +1,5 @@
 #pragma once
+#include "SimulationTick.h"
 #include "../Physics/PhysicsScene.h"
 #include "ProjectLayerSettings.h"
 #include "CharacterMotionPolicy.h"
@@ -86,6 +87,7 @@ class ScenePhysicsSimulation final
     ce::physics::result<void> CancelCharacterForce(binding_id binding);
     ce::physics::result<void> TeleportCharacter(binding_id binding, math::vector3 position);
     ce::physics::result<character_motion_state> ReadCharacter(binding_id binding) const;
+    ce::physics::result<math::vector3> RenderCharacterPosition(binding_id binding) const;
     ce::physics::character_handle CharacterHandle(binding_id binding) const;
     ce::physics::result<void> Define(binding_id binding, ce::physics::body_definition definition);
     ce::physics::result<void> SetEnabled(binding_id binding, bool enabled);
@@ -97,6 +99,9 @@ class ScenePhysicsSimulation final
     ce::physics::result<void> Stop();
 
     ce::physics::result<std::uint32_t> Advance(double frame_seconds);
+    // Production clock lives in SceneManager; this entry never accumulates time.
+    ce::physics::result<std::uint32_t> Step();
+    void SetInterpolationAlpha(double alpha) noexcept { m_externalAlpha = std::clamp(alpha, 0.0, 1.0); }
 
     ce::physics::result<ce::physics::body_state> Read(binding_id binding) const;
     ce::physics::body_handle Handle(binding_id binding) const;
@@ -111,7 +116,7 @@ class ScenePhysicsSimulation final
     ce::physics::result<void> SetKinematicTarget(binding_id binding, const ce::physics::pose& value);
     ce::physics::result<ce::physics::pose> RenderPose(binding_id binding) const;
     std::span<const render_pose> RenderPoses() const noexcept { return m_render; }
-    double InterpolationAlpha() const noexcept { return std::clamp(m_accumulator / fixed_seconds, 0.0, 1.0); }
+    double InterpolationAlpha() const noexcept { return m_externalAlpha >= 0 ? m_externalAlpha : std::clamp(m_accumulator / fixed_seconds, 0.0, 1.0); }
 
     ce::physics::result<void> QueryBatch(std::span<const ce::physics::query_request> requests,
                                         std::span<ce::physics::result<ce::physics::query_result>> results);
@@ -122,8 +127,8 @@ class ScenePhysicsSimulation final
     ce::physics::PhysicsScene* Runtime() const noexcept { return m_runtime.get(); }
     double DroppedSeconds() const noexcept { return m_dropped; }
 
-    static constexpr double fixed_seconds = 1.0 / 60.0;
-    static constexpr std::uint32_t max_catchup_ticks = 4;
+    static constexpr double fixed_seconds = Runtime::SimulationTick::seconds;
+    static constexpr std::uint32_t max_catchup_ticks = Runtime::SimulationTick::max_catchup;
 
   private:
 #if defined(CE_PHYSICS_TESTING)
@@ -136,6 +141,7 @@ class ScenePhysicsSimulation final
         character_motion_state state{};
         ce::physics::character_handle handle{};
         bool enabled = true;
+        math::vector3 previous{};
     };
 
     struct entry
@@ -152,6 +158,7 @@ class ScenePhysicsSimulation final
         std::size_t render_index = 0;
     };
 
+    ce::physics::result<std::uint32_t> AdvanceInternal(double seconds, bool singleStep);
     ce::physics::result<void> RequireOwner() const;
     ce::physics::result<void> RetireContactBody(ce::physics::body_handle body, binding_id id);
     ce::physics::result<ce::physics::body_handle> RequireActiveBody(binding_id binding) const;
@@ -179,4 +186,5 @@ class ScenePhysicsSimulation final
     std::uint64_t m_publication = 0;
     std::uint64_t m_layerRevision = 0;
     double m_accumulator = 0, m_dropped = 0;
+    double m_externalAlpha = -1;
 };

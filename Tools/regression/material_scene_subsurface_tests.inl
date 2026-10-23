@@ -205,7 +205,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             const auto environment = fixture == 2 ? RHITextureHandle{} : textures.GetOrUpload((cube ? &*cube.borrow() : nullptr), cube ? cube->NonRehydratableImage() : own::shared_owner<const Texture::CodecImage>{}, error).handle;
             Check(host.PrepareResidency(context, input, error), "SSS residency " + error);
 
-            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+            auto graph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
             if (workers)
             {
                 RHIRecordedBatchDesc desc;
@@ -223,7 +223,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
             auto insufficient = budget;
             insufficient.subsurfaceBytes = 1;
              Check(!host.Prepare(context, input, environment, {}, {}, {}, insufficient, error, environment.IsValid() ? 1 : 0) &&
-                      host.SubsurfaceFrame() == accepted,
+                      material_graph_test::SamePinnedObject(host.SubsurfaceFrame(), accepted),
                   "SSS budget failure preserves accepted frame");
             gbuffer.Declare(*graph, context);
             auto outputs = gbuffer.GetOutputs();

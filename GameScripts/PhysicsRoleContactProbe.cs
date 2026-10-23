@@ -13,7 +13,7 @@ public sealed partial class PhysicsRoleContactProbe : Component
     private bool _finished;
     private float _elapsed, _settledAt;
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         _body = GetComponent<PhysicsBodyComponent>() ?? throw new InvalidOperationException("Missing role body.");
         CheckRole(ShapeRoles.Attack);
@@ -40,7 +40,7 @@ public sealed partial class PhysicsRoleContactProbe : Component
         return stream;
     }
 
-    public override void PostPhysics(float dt)
+    public void PostPhysics(float dt)
     {
         if (_finished) return;
 

@@ -157,7 +157,7 @@ void ShadowDecalPlane(Geometry& geometry, float u = .875f)
 }
 
 void SubmitShadowDecal(RecordingChangeDevice& device, ProbePool& pool,
-                       const std::shared_ptr<EnhancedRenderGraph>& graph, SceneHost& host, std::uint64_t frameId,
+                       const own::shared_owner<EnhancedRenderGraph>& graph, SceneHost& host, std::uint64_t frameId,
                        unsigned workers, bool publish)
 {
     std::string error;
@@ -368,7 +368,7 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             Check(device.BeginFrame(error), "Shadow begin");
             textures.BeginFrame(context.frameId);
             Check(host.PrepareResidency(context, input, error), "Shadow residency");
-            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+            auto graph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
             if (workers)
             {
                 pool.BeginFrame(static_cast<unsigned>(context.frameId));

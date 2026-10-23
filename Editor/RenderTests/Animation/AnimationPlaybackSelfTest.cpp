@@ -366,7 +366,7 @@ namespace RenderTest
                     && restored.m_TwoBoneIKConstraints[0].Weight == .6f,
                     "Authored two-bone IK settings survive scene serialization");
                 restored.m_AnimIndexChosen = 3;
-                restored.OnPropertyChanged("m_AnimIndexChosen", Meta::PropertyChangeSource::Reflection);
+                restored.NotifyPropertyChanged("m_AnimIndexChosen", Meta::PropertyChangeSource::Reflection);
                 require(restored.GetSelectedClipIndex() == 3,
                     "Reflected clip selection updates instance playback");
                 restored.SetSelectedClipIndex(4);

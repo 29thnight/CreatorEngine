@@ -8,6 +8,10 @@
 
 ## 남은 작업과 완료 판정
 
+2026-10-23 master 통합 재점검: `a985ee7e1`의 상류 변경과 기존 작업을 통합한 실행·호출자 수정은 [동기화 수용 기록](../analysis/MasterSyncRecheck20261023.md)을 따른다. 이전 실행 기록의 지문은 보존하고 이번 통합 작업본의 제품 검증과 구분한다.
+
+> 2026-10-23 후속: 자동 Scene cook의 Slang SPIR-V 소스 기능 계약 누락을 수정했다. Release 두 재질 등급의 반복 cook·실패6종 보존·실제 DX12 cooked 소비24프레임/114778검사를 수용했다. 메시 분할 캐시 종료를 연결해 스트리밍 파일 lease를 회수하며, 정점 형식8종의 수명40검사와 메시 GPU 회귀1264244검사를 통과했다. [쿠커 수정 근거](../analysis/AnimationCookAcceptance20261023.md)를 따르며 MAT-9의 전체 route·Blender 비교·성능·Vulkan 제품 동등성은 별도 잔여다.
+
 - LX-3의 Material 저작 제품 연결과 MAT-9 전체 재질/route 픽셀·성능 수용을 닫는다. MAT-0~8과 환경 쿠킹 기반은 다시 만들지 않는다.
 - 현재 live 제품의 graph-only 재질 경로와 compiled program·sealed frame을 기준으로 비교한다. 이전 Standard fallback이나 pending 시 옛 material instance를 복원하는 방안은 폐기한다.
 - Blender 비교는 동일 pre-tone 입력·BRDF/HDRI 설정으로 수렴/허용 오차를 고정한다. renderer 품질·환경 가중치와 Vulkan 동등성은 각각 소유 계획에 남긴다.

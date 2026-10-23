@@ -1,0 +1,31 @@
+<Project Sdk="Microsoft.NET.Sdk">
+ <Import Project="../EngineOutput.props" />
+ <PropertyGroup>
+  <TargetFramework>net10.0</TargetFramework><AssemblyName>GameScripts</AssemblyName><LangVersion>10.0</LangVersion><FSharpCoreImplicitPackageVersion>10.0.112</FSharpCoreImplicitPackageVersion>
+  <OutputPath>$(EngineManagedOutDir)Scripts/</OutputPath><AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+  <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+  <CreatorScriptSourceRoot Condition="'$(CreatorScriptSourceRoot)' == ''">$(MSBuildThisFileDirectory)../Dynamic_CPP/Assets/Script</CreatorScriptSourceRoot>
+  <CreatorFSharpToolsRoot Condition="'$(CreatorFSharpToolsRoot)' == ''">$(MSBuildThisFileDirectory)../../FSharp_Tool_Pakage_for_CreatorEngine</CreatorFSharpToolsRoot>
+  <CreatorEngineRoot>$(MSBuildThisFileDirectory)..</CreatorEngineRoot>
+ </PropertyGroup>
+ <ItemGroup>
+  <ProjectReference Include="../ScriptCore/ScriptCore.csproj" Private="false" />
+  <ProjectReference Include="../ScriptRuntime/ScriptRuntime.fsproj" ReferenceOutputAssembly="false" />
+  <ProjectReference Include="$(CreatorFSharpToolsRoot)/src/CreatorEngine.FSharp.Runtime/CreatorEngine.FSharp.Runtime.fsproj" />
+ </ItemGroup>
+ <Target Name="CreatorReadFSharpOrder" BeforeTargets="ResolveReferences">
+  <Error Condition="!Exists('$(CreatorScriptSourceRoot)/compile.order')" Text="F# authoring requires Assets/Script/compile.order with dependency-ordered relative .fs paths." />
+  <ReadLinesFromFile File="$(CreatorScriptSourceRoot)/compile.order"><Output TaskParameter="Lines" ItemName="_FSharpOrder" /></ReadLinesFromFile>
+  <RemoveDuplicates Inputs="@(_FSharpOrder)"><Output TaskParameter="Filtered" ItemName="_UniqueFSharpOrder" /></RemoveDuplicates>
+  <Error Condition="'@(_FSharpOrder->Count())' != '@(_UniqueFSharpOrder->Count())'" Text="Duplicate F# compile.order entry." />
+  <Error Condition="$([System.IO.Path]::IsPathRooted('%(_FSharpOrder.Identity)'))" Text="F# compile.order entries must be relative." />
+  <Error Condition="$([System.Text.RegularExpressions.Regex]::IsMatch('%(_FSharpOrder.Identity)', '(^|[\/])\.\.([\/]|$)'))" Text="F# compile.order must remain inside the source root." />
+  <ItemGroup><Compile Include="@(_FSharpOrder->'$(CreatorScriptSourceRoot)/%(Identity)')" /></ItemGroup>
+  <ItemGroup><_UnlistedFSharp Include="$(CreatorScriptSourceRoot)/**/*.fs" Exclude="@(Compile)" /></ItemGroup>
+  <Error Condition="'@(_UnlistedFSharp)' != ''" Text="F# compile.order has unlisted sources: @(_UnlistedFSharp)" />
+ </Target>
+ <Target Name="BuildCreatorFSharpGenerator" BeforeTargets="CreatorFSharpGenerate">
+  <MSBuild Projects="$(CreatorFSharpToolsRoot)/src/CreatorEngine.FSharp.Generator/CreatorEngine.FSharp.Generator.fsproj" Targets="Restore;Build" Properties="Configuration=$(Configuration)" />
+ </Target>
+ <Import Project="$(CreatorFSharpToolsRoot)/src/CreatorEngine.FSharp.Build/build/CreatorEngine.FSharp.Build.targets" />
+</Project>

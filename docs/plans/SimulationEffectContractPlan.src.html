@@ -1,12 +1,67 @@
 <!doctype html>
-<html lang="ko" data-register="instrument"><head><title>PrSM 기반 시뮬레이션 효과 계약 및 도입 계획 (PHASE 24)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="SimulationEffectContractPlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/SimulationEffectContractPlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>PrSM 기반 시뮬레이션 효과 계약 및 도입 계획 (PHASE 24)</h1><p>PrSM0~5와 효과 런타임: 폐쇄 효과 카탈로그·즉시 효과/중단 분리·Var&lt;T&gt;, routine cleanup/transaction 의미를 엔진 타깃 변환·등록·직렬화·build/reload/진단까지 연결한다.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Managed code</ve-node><ve-node id="n1" at="2 1">API handle</ve-node><ve-node id="n2" at="3 1" key>SceneRuntime</ve-node><ve-node id="n3" at="3 2">Component</ve-node><ve-node id="n4" at="2 2">Dirty delta</ve-node><ve-node id="n5" at="1 2">Proxy</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
+<html lang="ko" data-register="instrument"><head><title>PrSM 기반 시뮬레이션 효과 계약 및 도입 계획 (PHASE 24)</title><link rel="stylesheet" href="kit.css" data-ve-kit><style>main{display:block;max-width:76rem;margin:auto;padding:var(--s-6)}body{font-family:'IBM Plex Sans KR','Malgun Gothic',sans-serif}h1{font-size:var(--t-h2);max-width:48ch;margin-block:var(--s-3)}h2{margin-top:var(--s-7);margin-bottom:var(--s-4)}header{padding:0;margin:var(--s-4) 0}p,li{max-width:78ch;overflow-wrap:anywhere}p{margin-block:var(--s-3)}li{margin-bottom:var(--s-3)}a,code{overflow-wrap:anywhere}pre{overflow:auto}table{width:100%;border-collapse:collapse}td,th{padding:var(--s-3);text-align:left;vertical-align:top;border-bottom:1px solid var(--border)}figure{margin:var(--s-5) 0}details span[id]{display:block;scroll-margin-top:var(--s-6)}.table-scroll{overflow-x:auto}.audit-meta{display:block;font-size:var(--t-small);margin:var(--s-4) 0}@media(max-width:600px){main{padding:var(--s-4)}h1{font-size:var(--t-h2)}td,th{min-width:9rem}}</style></head><body><main><nav aria-label="문서 위치"><a href="../RefactoringPlanDashboard.html">대시보드</a> · <a href="MasterPlanAudit20261020.html">전체 검증 원장</a> · <a href="SimulationEffectContractPlan.md">Markdown</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/SimulationEffectContractPlan.md">정리 전 원문</a></nav><header><p class="eyebrow">MASTER · REMAINING PLAN</p><h1>PrSM 기반 시뮬레이션 효과 계약 및 도입 계획 (PHASE 24)</h1><p>2026-10-22: C# Verse식 계약 도입 중단. 기존 PrSM LLVM 저장소의 언어 명세·구현을 대조해 효과·중단·실패·트랜잭션 잔여와 엔진 통합을 진행.</p><p class="audit-meta">2026-10-20 · master <code>27de3f5a02aa</code> · 잔여 구현·수용</p></header><figure><ve-flow label="현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다."><ve-node id="n0" at="1 1">Managed code</ve-node><ve-node id="n1" at="2 1">API handle</ve-node><ve-node id="n2" at="3 1" key>SceneRuntime</ve-node><ve-node id="n3" at="3 2">Component</ve-node><ve-node id="n4" at="2 2">Dirty delta</ve-node><ve-node id="n5" at="1 2">Proxy</ve-node><ve-edge from="n0" to="n1" label="consumes"/><ve-edge from="n1" to="n2" label="consumes"/><ve-edge from="n2" to="n3" label="handoff"/><ve-edge from="n3" to="n4" label="consumes"/><ve-edge from="n4" to="n5" label="consumes"/></ve-flow><figcaption>현재 구현 기반의 소유권 경계를 유지하며 남은 구현·제품 수용을 진행한다.</figcaption></figure><h2>남은 작업과 완료 판정</h2>
 <ul>
-<li>PrSM0&#126;5와 효과 런타임: 폐쇄 효과 카탈로그·즉시 효과/중단 분리·Var<T>, routine cleanup/transaction 의미를 엔진 타깃 변환·등록·직렬화·build/reload/진단까지 연결한다.</li>
-<li>현재 ContactStream·OnBeginSimulation/Scope와 생명주기 안정화는 기존 구현을 재사용한다. 별도 Job/PhysicsBehaviour 저작 방안을 되살리지 않고 PrSM 제품 도입 수용과 구분한다.</li>
+<li>2026-10-22 결정: C# Verse식 효과·중단·실패·트랜잭션 저작 계약 도입은 중단한다. 언어 구문·타입/효과 검사·실행 의미의 소유자는 기존 PrSM LLVM 저장소다. C#은 일반 저작으로 복귀하고 Scope.Delay·공개 Scope·OnSimulate 전용 코루틴 저작 표면도 제거한다. C#은 C++ 계약 OnUpdate(dt)로 대체하고 PrSM 계약 도입 전까지 고정 틱으로 실행한다.</li>
+<li>PrSM의 기존 compiler/ABI/중단 실행을 재사용하고, 미지원 언어 계약과 CreatorEngine 제품 adapter를 구분해 구현·수용한다. 기존 C# OnSimulate/Scope 전용 저작 표면의 소비자 이주·제거는 ScriptSurfacePlan이 소유한다. 이를 PrSM용 C# 계약 구조로 재작성하지 않는다.</li>
 </ul>
 <h2>적용할 구조와 경계</h2>
-<p><code>managed component → native API table/handle → SceneRuntime → proxy publication</code></p>
-<p>위 경로는 소스에서 확인한 구현 기반이다. 아래 요구의 수용 결과를 뜻하지 않는다. 구현을 다시 만드는 항목과 제품 검증을 혼합하지 않는다.</p>
+<p><code>PrSM source → syntax/semantics/effect checks → LLVM → existing PrSM ABI → CreatorEngine host adapter</code></p>
+<p>C#은 기본 managed component/native API 경로로 복귀하고 공개 전용 coroutine/Scope 저작을 제거한다. 공통 tick·스레드·권한·수명 경계는 엔진이 소유하고 언어의 효과 검사와 구분한다. 고정 틱/서버 수용은 <a href="NetworkFrameworkPlan.html">NetworkFrameworkPlan</a>, C# 정책은 <a href="ScriptSurfacePlan.html">ScriptSurfacePlan</a>이 소유한다.</p>
+<h2>C# 이관 구현 — 2026-10-22</h2>
+<p>C# 전용 OnSimulate/Scope.Delay 저작은 제거했고 C++ 소유 OnUpdate 고정 틱으로 이주했다. 내부 접촉 구독 수명·일반 C# await 마셜링을 보존했으며 <a href="../analysis/CSharpFixedUpdateAcceptance20261022.html">Windows 수용 기록</a>을 남겼다. 이는 PrSM 저장소의 언어 구문·LLVM·효과/실패 계약 구현 또는 CreatorEngine PrSM adapter 완료가 아니다. PrSM 저장소는 이번 작업에서 변경하지 않았다.</p>
+<h2>PrSM 기존 작업 참조 — 2026-10-22</h2>
+<p>정본 저장소는 <a href="https://github.com/29thnight/PrSM">29thnight/PrSM</a>이다. 공개 웹 조회는 404였으며, origin이 같은 로컬 checkout의 HEAD <code>53ad8d7683d6b7f60ad86c15f0dd95691eb0d296</code>와 README·docs/implementation-status.md·docs/spec/v1-policy.md를 읽어 대조했다. 원격 최신 commit 확인 또는 이번 실행 검증을 뜻하지 않는다.</p>
+<ul>
+<li>기존 LLVM/GCCE PrSM은 contract fn, Component metadata, suspend coroutine, gather/first 일부, defer·협조적 취소, ORC/AOT·reload 모의 호스트 경로가 구현된 bounded profile로 기록돼 있다. 이를 새로 만드는 계획으로 세지 않는다.</li>
+<li>전체 effect inference·launch·일반 언어 기능과 CreatorEngine production 도입은 잔여 또는 미검증이다. contract fn의 엔진 훅 연결이 Verse식 실패/효과/트랜잭션 전체 구현을 뜻하지 않는다. 52개 정책 결정도 전체 언어 적합 구현과 구분한다.</li>
+<li>이 저장소는 PrSM for Unity와 별개다. 기존 v1 정책·진단·ABI·테스트 구조에서 확장하고 언어 명세를 CreatorEngine 문서에 복제하지 않는다. LLVM IR을 직접 저작하라는 요구가 아니라 PrSM 소스의 LLVM 변환 경로를 사용한다.</li>
+</ul>
+<h2>중단과 이관 범위</h2>
+<div class="ve-table table-scroll"><table>
+<thead>
+<tr>
+<th>기존 요구</th>
+<th>변경된 소유와 상태</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>C# 전용 awaiter/효과 카탈로그/정적 계약 검사/트랜잭션 저작 강제</td>
+<td>중단. C# 전용 Scope/OnSimulate 저작 API도 제거 대상으로 두고 내부 생명주기 안전성은 유지</td>
+</tr>
+<tr>
+<td>E0/E1 중단 원시와 재개 규칙</td>
+<td>PrSM 기존 suspend 구현 대조 후 v1 명세에서 잔여만 확정</td>
+</tr>
+<tr>
+<td>E2/E7 효과·실패 문맥과 정적 검사</td>
+<td>PrSM 언어 명세·의미 분석으로 이관. C# 분석기를 선행시키지 않음</td>
+</tr>
+<tr>
+<td>E3/E4/E5 기록·재생·오류·진단</td>
+<td>공통 엔진 관측과 PrSM 언어 진단을 구분해 연계</td>
+</tr>
+<tr>
+<td>E6 실행·할당 예산</td>
+<td>PrSM 실제 콘텐츠와 engine adapter에서 측정</td>
+</tr>
+<tr>
+<td>E8 트랜잭션/rollback</td>
+<td>PrSM의 실패 범위·허용 효과·외부 부작용 정책을 먼저 명세. C# Var<T> 구조 도입은 중단</td>
+</tr>
+<tr>
+<td>PrSM0&#126;5</td>
+<td>기존 compiler/ABI 성과를 대조해 잔여만 진행. 엔진 등록·build/reload·제품 수용은 별도</td>
+</tr>
+</tbody></table></div>
+<p>공통 N3 clock의 실제 FPS·CCT·GPU 보간 수용은 <a href="../analysis/N3PacingAcceptance20261023.html">2026-10-23 기록</a>을 따른다. C#에 Verse식 저작 구조를 되넣지 않으며 PrSM adapter와 언어 계약은 후속 소유다.</p>
+<h2>착수와 완료 기준</h2>
+<ol>
+<li>PrSM 저장소의 각 계약에 대해 명세/구현/테스트를 대응시킨다. 중단 가능한 호출, sync/suspend 효과 전파, 실패와 panic 구분, 취소/cleanup 순서를 명세하고 미지원 구문은 명확히 진단한다.</li>
+<li>Verse식 계약의 실제 구문은 PrSM의 기존 contract fn·suspend·expected/handler 등과 충돌 없이 언어 저장소에서 결정한다. 본 문서는 새 키워드/구문을 임의로 확정하지 않는다.</li>
+<li>트랜잭션은 되돌릴 수 있는 상태와 되돌릴 수 없는 엔진 부작용을 구분한다. 임의 C++ 호출·네트워크·오디오 같은 부작용이 자동 rollback된다고 보장하지 않는다.</li>
+<li>LLVM lowering·ORC/AOT, 중단 frame·GC root·취소·코드 세대/reload의 정상/실패 검사를 기존 하네스에 확장한다. 모의 호스트 통과와 실제 CreatorEngine 수용을 분리한다.</li>
+<li>production adapter·등록·직렬화·진단·빌드/리로드를 실제 Editor/cooked Player 콘텐츠로 검증한다. 공통 clock과 tick 명령 경계는 N3 계약을 따르고 C# Verse 런타임 완성을 기다리지 않는다.</li>
+</ol>
 <h2>master 소스 근거</h2>
 <p>모든 행의 파일·행 번호·Git blob은 고정 master에서 대조했다. 소스 존재·배선 확인과 실행 성공을 구분한다.</p>
 <ul>
@@ -16,7 +71,7 @@
 <li><a href="https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/ScriptCore/Component.cs#L22">ScriptCore/Component.cs:22</a> — <code>public abstract class Component</code></li>
 </ul>
 <h2>검증 경계</h2>
-<p>이번 정리는 master 소스·문서 전체의 소유권/충돌/링크/HTML 검증이다. 엔진 빌드·GPU 픽셀·SDK/장치·성능·실제 GUI 수용을 새로 실행한 결과가 아니다. 과거 통과는 해당 소스/바이너리 신원에만 유효하다. 남은 제품 수용은 위 요구를 실제 산출물로 닫아야 한다.</p>
+<p>2026-10-20 고정 master의 문서 감사와 2026-10-22 현재 작업 트리의 구현·제품 수용은 별도다. 새로 실행한 빌드·Editor/신규 cooked Player와 코드 신원은 <a href="../analysis/CSharpFixedUpdateAcceptance20261022.html">수용 기록</a>에 한정한다. 서버/PrSM 전체, 대표 성능·GPU 픽셀·Debug/Shipping·다른 OS 수용으로 확대하지 않는다.</p>
 <details><summary>이전 절 링크 호환</summary>
 
 <p>이전 절의 완료 이력·구안은 제거했다. 이 링크로 들어온 경우 위의 남은 작업과 단일 소유 계획을 따른다.</p>

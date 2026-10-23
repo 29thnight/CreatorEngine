@@ -123,8 +123,10 @@ namespace Meta
     // typed 인스펙터·에디터 UI의 활성 Undo 발행 경로. ReflectionFunction.h에
     // 있었지만 호출자가 전부 에디터 층이라 함께 이관했다(Core 리플렉션이
     // Undo를 아는 마지막 지점이었다).
+    inline thread_local unsigned g_inlinePropertyEditDepth = 0;
     inline void MakeCustomChangeCommand(std::function<void()> undoFunc, std::function<void()> redoFunc)
     {
+        if (g_inlinePropertyEditDepth) { redoFunc(); return; }
         UndoManager::GetInstance()->Execute(
             std::make_unique<CustomChangeCommand>(undoFunc, redoFunc)
         );

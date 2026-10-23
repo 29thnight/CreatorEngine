@@ -5,11 +5,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 0
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -33,11 +32,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 1
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -73,11 +71,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 2
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -117,11 +114,10 @@ m_Entities:
     m_isEnabled: false
     m_attachedSoketID: 0
     m_index: 3
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -142,35 +138,22 @@ m_Entities:
         m_isEnabled: false
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_Material:
-          m_name: Plane_Mat
-          m_baseColorTexName: Plane_Mat_BaseColor.png
-          m_normalTexName: ""
-          m_ORM_TexName: ""
-          m_AO_TexName: ""
-          m_EmissiveTexName: ""
-          m_materialInfo:
-            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
-            m_metallic: 0
-            m_roughness: 0.9
-            m_IOR: 1.5
-          m_flowInfo:
-            m_windVector: {x: 0, y: 0, z: 0, w: 0}
-            m_uvScroll: {x: 0, y: 0}
-          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
-          m_propertyValues:
-            - m_name: baseColorMap
-              m_numericValue: ~
-              m_integerValue: 0
-              m_boolValue: false
-              m_textureGuid: 524e9895-230d-4a3d-a187-06ec6df9d59e
-              m_textureUvSet: 0
-              m_textureUvOffset: {x: 0, y: 0}
-              m_textureUvScale: {x: 1, y: 1}
-              m_textureUvRotation: 0
-          m_keywordSelections: ~
-          m_fileGuid: 8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45
-          m_renderingMode: 0
-          m_doubleSided: false
+          lattice_material: 1
+          name: Plane_Mat
+          assetId: bded2162-3902-8f9b-9449-18c1566f261a
+          graphAssetId: e78cd2a3-18f3-89e3-a733-10be3a569fc9
+          doubleSided: false
+          blendMode: opaque
+          parameters:
+            - id: 1
+              color: [1, 1, 1, 1]
+            - id: 3
+              float: 0
+            - id: 4
+              float: 0.9
+          textures:
+            - id: 2
+              guid: 388a4211-7126-8e36-9341-634cd99fc6ff
         m_LightMapping:
           lightmapIndex: -1
           ligthmapResolution: 0
@@ -194,11 +177,10 @@ m_Entities:
     m_isEnabled: false
     m_attachedSoketID: 0
     m_index: 4
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -219,35 +201,22 @@ m_Entities:
         m_isEnabled: false
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_Material:
-          m_name: Cube_Mat
-          m_baseColorTexName: Cube_Mat_BaseColor.png
-          m_normalTexName: ""
-          m_ORM_TexName: ""
-          m_AO_TexName: ""
-          m_EmissiveTexName: ""
-          m_materialInfo:
-            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
-            m_metallic: 0
-            m_roughness: 0.55
-            m_IOR: 1.5
-          m_flowInfo:
-            m_windVector: {x: 0, y: 0, z: 0, w: 0}
-            m_uvScroll: {x: 0, y: 0}
-          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
-          m_propertyValues:
-            - m_name: baseColorMap
-              m_numericValue: ~
-              m_integerValue: 0
-              m_boolValue: false
-              m_textureGuid: eeadbf9a-d493-4ace-8a78-b5fb9711f1cf
-              m_textureUvSet: 0
-              m_textureUvOffset: {x: 0, y: 0}
-              m_textureUvScale: {x: 1, y: 1}
-              m_textureUvRotation: 0
-          m_keywordSelections: ~
-          m_fileGuid: 8a69bd42-f950-8265-9c0e-0ff597095141
-          m_renderingMode: 0
-          m_doubleSided: false
+          lattice_material: 1
+          name: Cube_Mat
+          assetId: 98add748-9405-8297-8089-bd7b664ac47a
+          graphAssetId: f1f18c9b-7eb7-8788-bd47-11c4cc8b24b7
+          doubleSided: false
+          blendMode: opaque
+          parameters:
+            - id: 1
+              color: [1, 1, 1, 1]
+            - id: 3
+              float: 0
+            - id: 4
+              float: 0.55
+          textures:
+            - id: 2
+              guid: b5a59f23-f1cd-8a13-8c71-31fcb6b7b6e6
         m_LightMapping:
           lightmapIndex: -1
           ligthmapResolution: 0
@@ -271,11 +240,10 @@ m_Entities:
     m_isEnabled: false
     m_attachedSoketID: 0
     m_index: 5
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -296,35 +264,22 @@ m_Entities:
         m_isEnabled: false
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_Material:
-          m_name: Sphere_Mat
-          m_baseColorTexName: Sphere_Mat_BaseColor.png
-          m_normalTexName: ""
-          m_ORM_TexName: ""
-          m_AO_TexName: ""
-          m_EmissiveTexName: ""
-          m_materialInfo:
-            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
-            m_metallic: 0
-            m_roughness: 0.3
-            m_IOR: 1.5
-          m_flowInfo:
-            m_windVector: {x: 0, y: 0, z: 0, w: 0}
-            m_uvScroll: {x: 0, y: 0}
-          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
-          m_propertyValues:
-            - m_name: baseColorMap
-              m_numericValue: ~
-              m_integerValue: 0
-              m_boolValue: false
-              m_textureGuid: 21b841d1-9443-4eb5-8f39-e6263f43b2f0
-              m_textureUvSet: 0
-              m_textureUvOffset: {x: 0, y: 0}
-              m_textureUvScale: {x: 1, y: 1}
-              m_textureUvRotation: 0
-          m_keywordSelections: ~
-          m_fileGuid: df464176-385d-8563-98b9-5b1d266415bd
-          m_renderingMode: 0
-          m_doubleSided: false
+          lattice_material: 1
+          name: Sphere_Mat
+          assetId: 5ddef1b8-956e-8da3-8d7b-47282507d33b
+          graphAssetId: fe23112a-afa0-8941-b4de-22a7197fe83f
+          doubleSided: false
+          blendMode: opaque
+          parameters:
+            - id: 1
+              color: [1, 1, 1, 1]
+            - id: 3
+              float: 0
+            - id: 4
+              float: 0.3
+          textures:
+            - id: 2
+              guid: 845b7933-3d01-825e-9883-b28afd29736a
         m_LightMapping:
           lightmapIndex: -1
           ligthmapResolution: 0
@@ -348,11 +303,10 @@ m_Entities:
     m_isEnabled: false
     m_attachedSoketID: 0
     m_index: 6
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -373,35 +327,22 @@ m_Entities:
         m_isEnabled: false
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_Material:
-          m_name: IcoSphere_Mat
-          m_baseColorTexName: IcoSphere_Mat_BaseColor.png
-          m_normalTexName: ""
-          m_ORM_TexName: ""
-          m_AO_TexName: ""
-          m_EmissiveTexName: ""
-          m_materialInfo:
-            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
-            m_metallic: 0
-            m_roughness: 0.65
-            m_IOR: 1.5
-          m_flowInfo:
-            m_windVector: {x: 0, y: 0, z: 0, w: 0}
-            m_uvScroll: {x: 0, y: 0}
-          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
-          m_propertyValues:
-            - m_name: baseColorMap
-              m_numericValue: ~
-              m_integerValue: 0
-              m_boolValue: false
-              m_textureGuid: d4a134d8-46ea-4640-bc43-d4241a803aa2
-              m_textureUvSet: 0
-              m_textureUvOffset: {x: 0, y: 0}
-              m_textureUvScale: {x: 1, y: 1}
-              m_textureUvRotation: 0
-          m_keywordSelections: ~
-          m_fileGuid: 63c7b8bc-3057-833b-86ae-870fa7a6aed7
-          m_renderingMode: 0
-          m_doubleSided: false
+          lattice_material: 1
+          name: IcoSphere_Mat
+          assetId: 768cf97b-1855-84f8-86f9-50ca838465ae
+          graphAssetId: c58ba041-1e10-82e0-9d6f-3b3ab64022c5
+          doubleSided: false
+          blendMode: opaque
+          parameters:
+            - id: 1
+              color: [1, 1, 1, 1]
+            - id: 3
+              float: 0
+            - id: 4
+              float: 0.65
+          textures:
+            - id: 2
+              guid: 98b2726b-d09b-87f2-83ad-829d4c998d5d
         m_LightMapping:
           lightmapIndex: -1
           ligthmapResolution: 0
@@ -425,11 +366,10 @@ m_Entities:
     m_isEnabled: false
     m_attachedSoketID: 0
     m_index: 7
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -450,35 +390,22 @@ m_Entities:
         m_isEnabled: false
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_Material:
-          m_name: Cylinder_Mat
-          m_baseColorTexName: Cylinder_Mat_BaseColor.png
-          m_normalTexName: ""
-          m_ORM_TexName: ""
-          m_AO_TexName: ""
-          m_EmissiveTexName: ""
-          m_materialInfo:
-            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
-            m_metallic: 1
-            m_roughness: 0.35
-            m_IOR: 1.5
-          m_flowInfo:
-            m_windVector: {x: 0, y: 0, z: 0, w: 0}
-            m_uvScroll: {x: 0, y: 0}
-          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
-          m_propertyValues:
-            - m_name: baseColorMap
-              m_numericValue: ~
-              m_integerValue: 0
-              m_boolValue: false
-              m_textureGuid: 24b956be-ba20-41b9-9b06-fc0221a28d0b
-              m_textureUvSet: 0
-              m_textureUvOffset: {x: 0, y: 0}
-              m_textureUvScale: {x: 1, y: 1}
-              m_textureUvRotation: 0
-          m_keywordSelections: ~
-          m_fileGuid: cdf2f89b-32f4-85d5-adc6-c652c61a071c
-          m_renderingMode: 0
-          m_doubleSided: false
+          lattice_material: 1
+          name: Cylinder_Mat
+          assetId: 44f1214b-dd15-8df0-b89e-64e760e8caee
+          graphAssetId: cd168382-d753-8ab0-b7f6-6fe0c18e4b21
+          doubleSided: false
+          blendMode: opaque
+          parameters:
+            - id: 1
+              color: [1, 1, 1, 1]
+            - id: 3
+              float: 1
+            - id: 4
+              float: 0.35
+          textures:
+            - id: 2
+              guid: c4261d3c-9839-8e82-9bd9-16549b76173d
         m_LightMapping:
           lightmapIndex: -1
           ligthmapResolution: 0
@@ -502,11 +429,10 @@ m_Entities:
     m_isEnabled: false
     m_attachedSoketID: 0
     m_index: 8
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -527,35 +453,22 @@ m_Entities:
         m_isEnabled: false
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_Material:
-          m_name: Cone_Mat
-          m_baseColorTexName: Cone_Mat_BaseColor.png
-          m_normalTexName: ""
-          m_ORM_TexName: ""
-          m_AO_TexName: ""
-          m_EmissiveTexName: ""
-          m_materialInfo:
-            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
-            m_metallic: 0
-            m_roughness: 0.8
-            m_IOR: 1.5
-          m_flowInfo:
-            m_windVector: {x: 0, y: 0, z: 0, w: 0}
-            m_uvScroll: {x: 0, y: 0}
-          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
-          m_propertyValues:
-            - m_name: baseColorMap
-              m_numericValue: ~
-              m_integerValue: 0
-              m_boolValue: false
-              m_textureGuid: 9444798b-d1e8-4fa3-960e-bb07327d67db
-              m_textureUvSet: 0
-              m_textureUvOffset: {x: 0, y: 0}
-              m_textureUvScale: {x: 1, y: 1}
-              m_textureUvRotation: 0
-          m_keywordSelections: ~
-          m_fileGuid: 9888e325-a6fb-8378-b297-aa1f10eca2dc
-          m_renderingMode: 0
-          m_doubleSided: false
+          lattice_material: 1
+          name: Cone_Mat
+          assetId: ba34f36c-f102-8981-a60d-1d1f5e9151f3
+          graphAssetId: d59f5e72-0e4e-8684-90a6-d42ba9453464
+          doubleSided: false
+          blendMode: opaque
+          parameters:
+            - id: 1
+              color: [1, 1, 1, 1]
+            - id: 3
+              float: 0
+            - id: 4
+              float: 0.8
+          textures:
+            - id: 2
+              guid: 428b8cb0-1c49-8e2d-b214-68e2d9ac6a63
         m_LightMapping:
           lightmapIndex: -1
           ligthmapResolution: 0
@@ -579,11 +492,10 @@ m_Entities:
     m_isEnabled: false
     m_attachedSoketID: 0
     m_index: 9
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -604,35 +516,22 @@ m_Entities:
         m_isEnabled: false
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_Material:
-          m_name: Torus_Mat
-          m_baseColorTexName: Torus_Mat_BaseColor.png
-          m_normalTexName: ""
-          m_ORM_TexName: ""
-          m_AO_TexName: ""
-          m_EmissiveTexName: ""
-          m_materialInfo:
-            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
-            m_metallic: 1
-            m_roughness: 0.15
-            m_IOR: 1.5
-          m_flowInfo:
-            m_windVector: {x: 0, y: 0, z: 0, w: 0}
-            m_uvScroll: {x: 0, y: 0}
-          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
-          m_propertyValues:
-            - m_name: baseColorMap
-              m_numericValue: ~
-              m_integerValue: 0
-              m_boolValue: false
-              m_textureGuid: 465fca74-0eea-4e7d-b4ca-526e56bce230
-              m_textureUvSet: 0
-              m_textureUvOffset: {x: 0, y: 0}
-              m_textureUvScale: {x: 1, y: 1}
-              m_textureUvRotation: 0
-          m_keywordSelections: ~
-          m_fileGuid: 17d1efaf-9c93-8adb-ab23-6f4a04810c46
-          m_renderingMode: 0
-          m_doubleSided: false
+          lattice_material: 1
+          name: Torus_Mat
+          assetId: e7752eda-3ebb-800f-a34b-4a1692b27a79
+          graphAssetId: b1b6ba29-3b83-8d96-80d4-1b4dc6673ff7
+          doubleSided: false
+          blendMode: opaque
+          parameters:
+            - id: 1
+              color: [1, 1, 1, 1]
+            - id: 3
+              float: 1
+            - id: 4
+              float: 0.15
+          textures:
+            - id: 2
+              guid: 76cad07c-b66d-8b44-8cff-69e630fc445d
         m_LightMapping:
           lightmapIndex: -1
           ligthmapResolution: 0
@@ -656,11 +555,10 @@ m_Entities:
     m_isEnabled: false
     m_attachedSoketID: 0
     m_index: 10
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -681,35 +579,22 @@ m_Entities:
         m_isEnabled: false
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_Material:
-          m_name: Suzanne_Mat
-          m_baseColorTexName: Suzanne_Mat_BaseColor.png
-          m_normalTexName: ""
-          m_ORM_TexName: ""
-          m_AO_TexName: ""
-          m_EmissiveTexName: ""
-          m_materialInfo:
-            m_baseColor: {r: 1, g: 1, b: 1, a: 1}
-            m_metallic: 0
-            m_roughness: 0.45
-            m_IOR: 1.5
-          m_flowInfo:
-            m_windVector: {x: 0, y: 0, z: 0, w: 0}
-            m_uvScroll: {x: 0, y: 0}
-          m_shaderMetaGuid: 00000000-0000-0000-0000-000000000000
-          m_propertyValues:
-            - m_name: baseColorMap
-              m_numericValue: ~
-              m_integerValue: 0
-              m_boolValue: false
-              m_textureGuid: 5a78bcdd-7eaf-4bf7-aee2-7cefc96272a2
-              m_textureUvSet: 0
-              m_textureUvOffset: {x: 0, y: 0}
-              m_textureUvScale: {x: 1, y: 1}
-              m_textureUvRotation: 0
-          m_keywordSelections: ~
-          m_fileGuid: 987a8d42-3964-8d46-9024-7f280c92f986
-          m_renderingMode: 0
-          m_doubleSided: false
+          lattice_material: 1
+          name: Suzanne_Mat
+          assetId: 1b148b33-0ca8-8bd0-972f-15d47193f001
+          graphAssetId: b6387818-7280-8977-9338-090103a98dda
+          doubleSided: false
+          blendMode: opaque
+          parameters:
+            - id: 1
+              color: [1, 1, 1, 1]
+            - id: 3
+              float: 0
+            - id: 4
+              float: 0.45
+          textures:
+            - id: 2
+              guid: ee5a1c8f-d3e5-841a-a0f4-5867cbae6ada
         m_LightMapping:
           lightmapIndex: -1
           ligthmapResolution: 0
@@ -733,11 +618,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 11
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -759,7 +643,7 @@ m_Entities:
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_AnimIndexChosen: 1
         m_AnimIndex: 0
-        m_Motion: 6c6d4501-1a95-8c70-b3ea-2818679968dd
+        m_Motion: d28617fe-5b6f-8d6c-b20c-d14ea1e5896f
         m_animationControllers: ~
         Parameters: ~
     m_isStatic: false
@@ -772,11 +656,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 12
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -797,38 +680,36 @@ m_Entities:
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_Material:
-          schema: 1
-          assetId: 3da9d174-3334-897b-8d93-a2361153701b
-          shaderAssetId: 7b5272ca-c391-4d2e-9656-533b97f60ffc
+          lattice_material: 1
           name: CreatorRobot_Arms_Mat
+          assetId: 1a2156ec-a7b6-8cc9-ba54-3c8e2260d4b3
+          graphAssetId: 6d7b614a-5161-8dbd-9d1a-01c157d6173d
+          doubleSided: true
           blendMode: opaque
-          properties:
-            - name: baseColor
-              float4: [1, 1, 1, 1]
-            - name: metallic
+          parameters:
+            - id: 1
+              color: [1, 1, 1, 1]
+            - id: 3
               float: 1
-            - name: roughness
+            - id: 4
               float: 1
-            - name: normalScale
+            - id: 7
               float: 1
-            - name: occlusionStrength
+            - id: 8
+              color: [0, 0, 0, 1]
+            - id: 9
               float: 1
-            - name: emissive
-              float3: [0, 0, 0]
-            - name: emissiveStrength
+            - id: 11
               float: 1
-            - name: baseColorMap
-              texture: {guid: 17fe402f-a438-87be-a39f-0c836e147b85, colorSpace: srgb, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
-            - name: normalMap
-              texture: {guid: d6804e50-d028-8d11-9f49-e7a6d62b1a17, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
-            - name: ormMap
-              texture: {guid: 84106e16-8a55-8b29-afea-bc496f9d1e6e, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
-            - name: aoMap
-              texture: {guid: 84106e16-8a55-8b29-afea-bc496f9d1e6e, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
-            - name: doubleSided
-              bool: true
-          keywords: []
-          keywordSelections: []
+          textures:
+            - id: 2
+              guid: 0d0668e1-f59c-881d-809f-0669affbc27f
+            - id: 5
+              guid: da763585-963a-8256-ad87-fefb135e86be
+            - id: 6
+              guid: 8ea83457-77ea-8989-ad71-3a487874a7a4
+            - id: 10
+              guid: da763585-963a-8256-ad87-fefb135e86be
         m_LightMapping:
           lightmapIndex: -1
           ligthmapResolution: 0
@@ -840,8 +721,8 @@ m_Entities:
         m_shadowRecive: true
         m_shadowCast: true
         m_isEnableLOD: false
-        m_modelGuid: 6c6d4501-1a95-8c70-b3ea-2818679968dd
-        m_meshAssetId: 9ad77a24-5de7-8fa3-933a-1a0a0289a47d
+        m_modelGuid: d28617fe-5b6f-8d6c-b20c-d14ea1e5896f
+        m_meshAssetId: 2034618b-b2e7-8c79-b661-161d503d31ea
     m_isStatic: false
     m_parentIndex: 11
     m_rootIndex: 0
@@ -852,11 +733,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 13
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -877,38 +757,36 @@ m_Entities:
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_Material:
-          schema: 1
-          assetId: bc5b3455-62ee-88ea-931a-80a5d0837cd4
-          shaderAssetId: 7b5272ca-c391-4d2e-9656-533b97f60ffc
+          lattice_material: 1
           name: CreatorRobot_LegsMat
+          assetId: 1af1c82a-3f4d-8256-97ed-ace4b509dc3c
+          graphAssetId: 16499e2b-fbda-83bb-8145-d7c5a182daca
+          doubleSided: true
           blendMode: opaque
-          properties:
-            - name: baseColor
-              float4: [1, 1, 1, 1]
-            - name: metallic
+          parameters:
+            - id: 1
+              color: [1, 1, 1, 1]
+            - id: 3
               float: 1
-            - name: roughness
+            - id: 4
               float: 1
-            - name: normalScale
+            - id: 7
               float: 1
-            - name: occlusionStrength
+            - id: 8
+              color: [0, 0, 0, 1]
+            - id: 9
               float: 1
-            - name: emissive
-              float3: [0, 0, 0]
-            - name: emissiveStrength
+            - id: 11
               float: 1
-            - name: baseColorMap
-              texture: {guid: a58128de-61bd-8d89-869b-9f7c6c6a936b, colorSpace: srgb, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
-            - name: normalMap
-              texture: {guid: 5bfaa19c-7e71-85a5-87ec-189a8adcf9aa, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
-            - name: ormMap
-              texture: {guid: d7ed0de9-dc20-86fb-b656-95dba104dc36, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
-            - name: aoMap
-              texture: {guid: d7ed0de9-dc20-86fb-b656-95dba104dc36, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
-            - name: doubleSided
-              bool: true
-          keywords: []
-          keywordSelections: []
+          textures:
+            - id: 2
+              guid: aafdeb7f-3e9e-82dc-ba31-f045100f114b
+            - id: 5
+              guid: f3ff3499-9390-8808-bf5c-c94d7796713d
+            - id: 6
+              guid: 8fcb12b2-ee08-88e1-895d-0ab628c6cb12
+            - id: 10
+              guid: f3ff3499-9390-8808-bf5c-c94d7796713d
         m_LightMapping:
           lightmapIndex: -1
           ligthmapResolution: 0
@@ -920,8 +798,8 @@ m_Entities:
         m_shadowRecive: true
         m_shadowCast: true
         m_isEnableLOD: false
-        m_modelGuid: 6c6d4501-1a95-8c70-b3ea-2818679968dd
-        m_meshAssetId: c20d30f6-9239-86cb-9439-2da5c91208fc
+        m_modelGuid: d28617fe-5b6f-8d6c-b20c-d14ea1e5896f
+        m_meshAssetId: 41b4d9e3-6c97-812a-bf63-3d41e14f33f2
     m_isStatic: false
     m_parentIndex: 12
     m_rootIndex: 0
@@ -932,11 +810,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 14
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -957,38 +834,36 @@ m_Entities:
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_Material:
-          schema: 1
-          assetId: 67f04bd1-60cc-892c-bfb8-b701d928c882
-          shaderAssetId: 7b5272ca-c391-4d2e-9656-533b97f60ffc
+          lattice_material: 1
           name: CreatorRobot_TorsoMat
+          assetId: 8a92a262-d80b-846b-b37b-dda551517fda
+          graphAssetId: 41582c39-a6fd-858b-81cd-029e4a65ff77
+          doubleSided: true
           blendMode: opaque
-          properties:
-            - name: baseColor
-              float4: [1, 1, 1, 1]
-            - name: metallic
+          parameters:
+            - id: 1
+              color: [1, 1, 1, 1]
+            - id: 3
               float: 1
-            - name: roughness
+            - id: 4
               float: 1
-            - name: normalScale
+            - id: 7
               float: 1
-            - name: occlusionStrength
+            - id: 8
+              color: [0, 0, 0, 1]
+            - id: 9
               float: 1
-            - name: emissive
-              float3: [0, 0, 0]
-            - name: emissiveStrength
+            - id: 11
               float: 1
-            - name: baseColorMap
-              texture: {guid: b7b9936f-75aa-8ffb-a75b-f06935f709af, colorSpace: srgb, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
-            - name: normalMap
-              texture: {guid: 4696481c-fb68-8445-99a7-db4038c1b22c, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
-            - name: ormMap
-              texture: {guid: 21dfcee7-0ca7-81bf-8690-d50c3a609c29, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
-            - name: aoMap
-              texture: {guid: 21dfcee7-0ca7-81bf-8690-d50c3a609c29, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
-            - name: doubleSided
-              bool: true
-          keywords: []
-          keywordSelections: []
+          textures:
+            - id: 2
+              guid: 53001d3a-6396-8262-b652-4ee151c46cd1
+            - id: 5
+              guid: 10d4d364-1a89-8b3d-b44d-f95a6e1df7f7
+            - id: 6
+              guid: 8baadfbc-0c8c-8188-9ed6-af978d817b75
+            - id: 10
+              guid: 10d4d364-1a89-8b3d-b44d-f95a6e1df7f7
         m_LightMapping:
           lightmapIndex: -1
           ligthmapResolution: 0
@@ -1000,8 +875,8 @@ m_Entities:
         m_shadowRecive: true
         m_shadowCast: true
         m_isEnableLOD: false
-        m_modelGuid: 6c6d4501-1a95-8c70-b3ea-2818679968dd
-        m_meshAssetId: 113354b6-1d54-8d61-9bff-3ebbab69787f
+        m_modelGuid: d28617fe-5b6f-8d6c-b20c-d14ea1e5896f
+        m_meshAssetId: eea0d415-a511-81cf-8edc-a8ba00c85516
     m_isStatic: false
     m_parentIndex: 13
     m_rootIndex: 0
@@ -1012,11 +887,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 15
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1037,38 +911,36 @@ m_Entities:
         m_isEnabled: true
         m_FileID: 00000000-0000-0000-0000-000000000000
         m_Material:
-          schema: 1
-          assetId: 6a96e44c-40e9-8453-8436-36295a392bc2
-          shaderAssetId: 7b5272ca-c391-4d2e-9656-533b97f60ffc
+          lattice_material: 1
           name: CreatorRobot_Head_Mat
+          assetId: cdf575ad-0d34-8376-88b9-81abe99ba9b0
+          graphAssetId: cc7977ab-aa6a-8fc0-b9b5-e8d0596d980d
+          doubleSided: true
           blendMode: opaque
-          properties:
-            - name: baseColor
-              float4: [1, 1, 1, 1]
-            - name: metallic
+          parameters:
+            - id: 1
+              color: [1, 1, 1, 1]
+            - id: 3
               float: 1
-            - name: roughness
+            - id: 4
               float: 1
-            - name: normalScale
+            - id: 7
               float: 1
-            - name: occlusionStrength
+            - id: 8
+              color: [0, 0, 0, 1]
+            - id: 9
               float: 1
-            - name: emissive
-              float3: [0, 0, 0]
-            - name: emissiveStrength
+            - id: 11
               float: 1
-            - name: baseColorMap
-              texture: {guid: 908afc9b-e23f-876e-a5c6-82bfd42ebbe2, colorSpace: srgb, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
-            - name: normalMap
-              texture: {guid: 2769c332-be12-80bb-8adc-80eff09fd7dd, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
-            - name: ormMap
-              texture: {guid: a291f48f-b922-80f2-b36f-715e0cd1c6f1, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
-            - name: aoMap
-              texture: {guid: a291f48f-b922-80f2-b36f-715e0cd1c6f1, colorSpace: linear, uvSet: 0, uvOffset: [0, 0], uvScale: [1, 1], uvRotation: 0}
-            - name: doubleSided
-              bool: true
-          keywords: []
-          keywordSelections: []
+          textures:
+            - id: 2
+              guid: 70105072-dc04-868b-812f-4f012b545b79
+            - id: 5
+              guid: 5e1d1cb2-88a1-8d33-917a-c7b8978cec2b
+            - id: 6
+              guid: 5251a956-6222-8627-be5e-023b03ad1a82
+            - id: 10
+              guid: 5e1d1cb2-88a1-8d33-917a-c7b8978cec2b
         m_LightMapping:
           lightmapIndex: -1
           ligthmapResolution: 0
@@ -1080,8 +952,8 @@ m_Entities:
         m_shadowRecive: true
         m_shadowCast: true
         m_isEnableLOD: false
-        m_modelGuid: 6c6d4501-1a95-8c70-b3ea-2818679968dd
-        m_meshAssetId: a4c8cc56-491e-8fbf-b6d6-e83209dee1ce
+        m_modelGuid: d28617fe-5b6f-8d6c-b20c-d14ea1e5896f
+        m_meshAssetId: cba854c8-600b-8d00-9f49-06afc173f6f2
     m_isStatic: false
     m_parentIndex: 14
     m_rootIndex: 0
@@ -1092,11 +964,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 16
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1126,11 +997,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 17
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1160,11 +1030,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 18
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1194,11 +1063,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 19
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1228,11 +1096,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 20
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1262,11 +1129,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 21
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1296,11 +1162,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 22
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1330,11 +1195,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 23
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1364,11 +1228,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 24
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1398,11 +1261,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 25
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1432,11 +1294,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 26
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1466,11 +1327,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 27
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1500,11 +1360,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 28
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1534,11 +1393,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 29
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1568,11 +1426,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 30
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1602,11 +1459,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 31
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1636,11 +1492,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 32
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1670,11 +1525,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 33
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1704,11 +1558,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 34
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1738,11 +1591,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 35
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1772,11 +1624,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 36
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1806,11 +1657,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 37
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1840,11 +1690,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 38
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1874,11 +1723,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 39
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1908,11 +1756,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 40
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1942,11 +1789,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 41
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -1976,11 +1822,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 42
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2010,11 +1855,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 43
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2044,11 +1888,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 44
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2078,11 +1921,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 45
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2112,11 +1954,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 46
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2146,11 +1987,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 47
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2180,11 +2020,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 48
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2214,11 +2053,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 49
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2248,11 +2086,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 50
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2282,11 +2119,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 51
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2316,11 +2152,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 52
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2350,11 +2185,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 53
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2384,11 +2218,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 54
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2418,11 +2251,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 55
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2452,11 +2284,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 56
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2486,11 +2317,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 57
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2520,11 +2350,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 58
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2554,11 +2383,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 59
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2588,11 +2416,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 60
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2622,11 +2449,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 61
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2656,11 +2482,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 62
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2690,11 +2515,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 63
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2724,11 +2548,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 64
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2758,11 +2581,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 65
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2792,11 +2614,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 66
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2826,11 +2647,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 67
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:
@@ -2860,11 +2680,10 @@ m_Entities:
     m_isEnabled: true
     m_attachedSoketID: 0
     m_index: 68
-    m_collisionType: 0
     m_prefabFileGuid: 00000000-0000-0000-0000-000000000000
     m_prefabOverrides: ~
     m_tag: Untagged
-    m_layer: Default
+    m_layerId: 1
     m_editorIcon: ""
     m_editorLocked: false
     m_components:

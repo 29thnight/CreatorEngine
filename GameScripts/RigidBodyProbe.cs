@@ -5,7 +5,7 @@ public sealed partial class RigidBodyProbe : Component
 {
     private bool _checked;
 
-    public override void PostPhysics(float tick)
+    public void PostPhysics(float tick)
     {
         if (_checked) return;
         _checked = true;

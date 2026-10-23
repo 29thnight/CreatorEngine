@@ -45,6 +45,58 @@ RWStructuredBuffer<float4> Output : register(u5,space0);
   auto spirv=Verify(options,RHIShaderBinary::SpirV);if(!AreShaderReflectionsEquivalent(dx.reflection,spirv.reflection,error)) { std::cerr << "PARITY_DETAIL " << error << "\n"; for(const auto& r:dx.reflection.resources) std::cerr << "DX " << r.name << " bytes=" << r.byteSize << " index=" << r.registerIndex << " space=" << r.registerSpace << "\n";for(const auto& r:spirv.reflection.resources) std::cerr << "SP " << r.name << " bytes=" << r.byteSize << " index=" << r.registerIndex << " space=" << r.registerSpace << "\n";} Check(error.empty(),"real DXIL SPIR-V layout parity");
   for(const auto& [name,shader]:{std::pair{"dxil",dx},std::pair{"spirv",spirv}}){std::vector<std::uint8_t> data;Check(rhi_shader_verified_cache::Encode(shader.bytecode,shader.reflection,data),"expected encode");std::ofstream f(work/(std::string(name)+".expected"),std::ios::binary);f.write(reinterpret_cast<const char*>(data.data()),data.size());Write(work/(std::string(name)+".identity"),shader.dependencyIdentity);}
  }
+ else if(mode=="capabilities")
+ {
+  // NonUniformResourceIndex's HLSL contract carries cross-target capabilities.
+  // A bare SPIR-V version is not the source shader-model feature contract.
+  Write(root/"CapabilityProbe.slang", R"(
+Texture2D<float4> textures[4] : register(t0);
+RWStructuredBuffer<float4> values : register(u0);
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void ReadIndexed(uint3 id : SV_DispatchThreadID)
+{
+    const uint index = NonUniformResourceIndex(id.x & 3u);
+    uint width, height;
+    textures[index].GetDimensions(width, height);
+    values[id.x] = textures[index].Load(int3(0, 0, 0)) + float4(width, height, 0, 0);
+}
+)");
+  RHIShaderCompiler::VerifiedShader dxil, spirv;
+  std::string error;
+  for (const auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
+  {
+   auto& result = backend == RHIShaderBinary::Dxil ? dxil : spirv;
+   if (!RHIShaderCompiler::VerifyFile("CapabilityProbe.slang", "ReadIndexed", "cs_6_0",
+       backend, {}, result, error)) throw std::runtime_error(error);
+  }
+  Check(AreShaderReflectionsEquivalent(dxil.reflection, spirv.reflection, error),
+      "nonuniform descriptor DXIL/SPIR-V layout parity");
+  Check(spirv.bytecode.Size() >= 20, "SPIR-V header exists");
+  std::uint32_t version{};
+  std::memcpy(&version, static_cast<const std::uint8_t*>(spirv.bytecode.Data()) + 4, sizeof(version));
+  Check(version == 0x00010300u, "shader-model semantics preserve SPIR-V 1.3 output");
+
+  Write(root/"RequiredCapabilityProbe.slang", R"(
+[require(spvRayQueryKHR)]
+void RequiresRayQuery() {}
+
+[shader("compute")]
+[numthreads(1, 1, 1)]
+void RequiresExtraCapability(uint3 id : SV_DispatchThreadID)
+{
+    RequiresRayQuery();
+}
+)");
+  auto previous = spirv;
+  error.clear();
+  Check(!RHIShaderCompiler::VerifyFile("RequiredCapabilityProbe.slang", "RequiresExtraCapability", "cs_6_0",
+      RHIShaderBinary::SpirV, {}, previous, error),
+      "source contract rejects a declared capability outside SM 6.0");
+  Check(error.find("E41012") != std::string::npos && Same(previous, spirv),
+      "capability error remains fatal and preserves verified output");
+
+ }
  else if(mode=="restart")
  {
   for(const auto& [name,backend]:{std::pair{"dxil",RHIShaderBinary::Dxil},std::pair{"spirv",RHIShaderBinary::SpirV}}){auto shader=Verify(options,backend);std::vector<std::uint8_t> data;Check(rhi_shader_verified_cache::Encode(shader.bytecode,shader.reflection,data),"hit encode");const auto expected=Read(work/(std::string(name)+".expected"));Check(expected.size()==data.size()&&!std::memcmp(expected.data(),data.data(),data.size())&&Read(work/(std::string(name)+".identity"))==shader.dependencyIdentity,"restart identical bytecode reflection identity");}

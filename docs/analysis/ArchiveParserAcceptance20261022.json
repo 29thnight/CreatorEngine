@@ -1,0 +1,489 @@
+{
+  "date": "2026-10-22",
+  "result": "N1_ARCHIVE_PARSER_ACCEPTED",
+  "scope": "Local Archive/Parser boundary and registered regression/product consumers; full parser unlink and server product separate",
+  "suite": {
+    "evidence": "Build/Verification/NDA/Suite-54fb57db264041989367e7f5274c39b4",
+    "result": {
+      "manifestHash": "7B0CED38B8ECF71B88B0F4EE5387C75A40F334B75DA26C364B80C891C8249677",
+      "product": true,
+      "failures": [],
+      "suite": "NetworkHandoff",
+      "scope": "All registered NetworkHandoff gates; not all engine/GPU/device/soak tests",
+      "result": "NETWORK_HANDOFF_REGRESSIONS_OK",
+      "passed": [
+        "ND-a-All",
+        "W4-ND-b-All",
+        "N1-All",
+        "N3-Debug",
+        "N3-Release",
+        "PhysicsABI-All",
+        "PhysicsIdentity-Debug",
+        "PhysicsIdentity-Release",
+        "LifecycleEnums-None",
+        "N3Product",
+        "W4NDBProduct",
+        "N1Product",
+        "N1DiagnosticProduct"
+      ],
+      "configuration": [
+        "Debug",
+        "Release"
+      ]
+    }
+  },
+  "contracts": {
+    "evidence": "Build/Verification/N1/Contracts-6d039bf4a5794eb5933216e2c88fa6bb",
+    "checksPerConfiguration": 226,
+    "configurations": [
+      "Debug",
+      "Release"
+    ],
+    "runtimeSources": 860,
+    "visitedRoleFiles": 1014,
+    "negativeCases": 35,
+    "neutralRoots": [
+      "Engine/Utility_Framework/DiagnosticDocument.h",
+      "Engine/Utility_Framework/AuthoringDocument.h",
+      "Engine/Utility_Framework/AuthoringNodeView.h",
+      "Engine/Utility_Framework/TypeTrait.h",
+      "Engine/SceneRuntime/ComponentFactory.h",
+      "Engine/SceneRuntime/SceneObservation.h",
+      "Tools/regression/ArchiveSchemaFixture.h"
+    ],
+    "runtimeFacadeCallers": [
+      {
+        "file": "Engine/RenderEngine/DataSystem.cpp",
+        "line": 1646,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/DataSystem.cpp",
+        "line": 1772,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/RenderEngine/DataSystem.cpp",
+        "line": 2193,
+        "api": "ParseCooked"
+      },
+      {
+        "file": "Engine/RenderEngine/DataSystem.cpp",
+        "line": 2840,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/RenderEngine/DataSystem.cpp",
+        "line": 3545,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/RenderEngine/DataSystem.cpp",
+        "line": 5488,
+        "api": "ParseCooked"
+      },
+      {
+        "file": "Engine/RenderEngine/DataSystem.cpp",
+        "line": 5660,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/RenderEngine/DataSystem.cpp",
+        "line": 5790,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/RenderEngine/DataSystem.cpp",
+        "line": 7650,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/RenderEngine/MaterialGraphShaderMeta.cpp",
+        "line": 341,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/ShaderMeta.cpp",
+        "line": 650,
+        "api": "ParseFilePath"
+      },
+      {
+        "file": "Engine/RenderEngine/ShaderMeta.cpp",
+        "line": 689,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/ShaderMeta.cpp",
+        "line": 806,
+        "api": "ParseCooked"
+      },
+      {
+        "file": "Engine/RenderEngine/ShaderMeta.cpp",
+        "line": 820,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/ShaderMeta.cpp",
+        "line": 830,
+        "api": "ParseCooked"
+      },
+      {
+        "file": "Engine/SceneRuntime/BehaviorTreeComponent.cpp",
+        "line": 160,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/SceneRuntime/BlackBoard.cpp",
+        "line": 295,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/SceneRuntime/FoliageComponent.cpp",
+        "line": 194,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/SceneRuntime/InputActionManager.cpp",
+        "line": 198,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/SceneRuntime/MeshRenderer.cpp",
+        "line": 671,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/SceneRuntime/MeshRenderer.cpp",
+        "line": 1137,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/SceneRuntime/PrefabUtility.cpp",
+        "line": 390,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/SceneRuntime/PrefabUtility.cpp",
+        "line": 831,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/SceneRuntime/SceneManager.cpp",
+        "line": 97,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/SceneRuntime/SceneRenderProfileComponent.cpp",
+        "line": 20,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/SceneRuntime/SceneRenderProfileComponent.cpp",
+        "line": 58,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/SceneRuntime/TagManager.cpp",
+        "line": 72,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/SceneRuntime/Terrain.cpp",
+        "line": 447,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/SceneRuntime/Terrain.cpp",
+        "line": 623,
+        "api": "ParseFile"
+      },
+      {
+        "file": "Engine/SceneRuntime/Audio/AudioCatalog.cpp",
+        "line": 156,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/SceneRuntime/Audio/SoundAssetSerialization.cpp",
+        "line": 371,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/SceneRuntime/Audio/SoundAssetSerialization.cpp",
+        "line": 386,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/SceneRuntime/Audio/SoundAssetSerialization.cpp",
+        "line": 463,
+        "api": "ParseCooked"
+      },
+      {
+        "file": "Engine/SceneRuntime/Audio/SoundAssetSerialization.cpp",
+        "line": 480,
+        "api": "ParseCooked"
+      },
+      {
+        "file": "Engine/RenderEngine/Assets/AssetIdentityEpoch.cpp",
+        "line": 136,
+        "api": "ParseCooked"
+      },
+      {
+        "file": "Engine/RenderEngine/Assets/AssetIdentityEpoch.cpp",
+        "line": 137,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Assets/ModelAssetAuthoringTransaction.cpp",
+        "line": 249,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Assets/ModelAssetAuthoringTransaction.cpp",
+        "line": 426,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Assets/ModelAssetAuthoringTransaction.cpp",
+        "line": 701,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Assets/ModelAssetAuthoringTransaction.cpp",
+        "line": 1012,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Assets/ModelAssetAuthoringTransaction.cpp",
+        "line": 1090,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Assets/ModelAssetGeneration.cpp",
+        "line": 140,
+        "api": "ParseCooked"
+      },
+      {
+        "file": "Engine/RenderEngine/Assets/ModelAssetGeneration.cpp",
+        "line": 141,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Assets/ModelMaterialGraph.cpp",
+        "line": 260,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Assets/ModelSidecarV2.cpp",
+        "line": 210,
+        "api": "ParseCooked"
+      },
+      {
+        "file": "Engine/RenderEngine/Assets/ModelSidecarV2.cpp",
+        "line": 211,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Assets/ModelSidecarV2.cpp",
+        "line": 323,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Assets/ModelSourcePreparation.cpp",
+        "line": 13,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/CookedCodeMaterial.cpp",
+        "line": 619,
+        "api": "ParseCooked"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/CookSupport.cpp",
+        "line": 75,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/MaterialAssetSetCodec.cpp",
+        "line": 280,
+        "api": "ParseCooked"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/MaterialAssetSetProducer.cpp",
+        "line": 34,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/MaterialAssetSetProducer.cpp",
+        "line": 395,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/MaterialAssetSetProducer.cpp",
+        "line": 403,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/MaterialAssetSetProducer.cpp",
+        "line": 563,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/MaterialAssetSetProducer.cpp",
+        "line": 630,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/MaterialCookProducer.cpp",
+        "line": 85,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/ModelCookIdentity.cpp",
+        "line": 61,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/ModelGenerationExportProducer.cpp",
+        "line": 208,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/ModelGenerationExportProducer.cpp",
+        "line": 233,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/SceneCookProducer.cpp",
+        "line": 180,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/SceneCookProducer.cpp",
+        "line": 259,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/SceneCookProducer.cpp",
+        "line": 564,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/SceneCookProducer.cpp",
+        "line": 701,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/ShaderMetaCookProducer.cpp",
+        "line": 92,
+        "api": "ParseText"
+      },
+      {
+        "file": "Engine/RenderEngine/Experiment/Cooked/TextureImportSettings.cpp",
+        "line": 95,
+        "api": "ParseText"
+      }
+    ]
+  },
+  "player": {
+    "evidence": "Build/Verification/N1/Player-9d8e1dd932f4497cb55b965e1570042b",
+    "result": {
+      "result": "N1_PARSER_FREE_PLAYER_OK",
+      "packageImmutable": true,
+      "scope": "Actual fresh cooked Player bootstrap and CEDO runtime documents; parser library unlinking and server product remain separate",
+      "directBackendReferences": 0,
+      "runtimeHash": "C69413E74C40F3E021CCA4A67728B3E4306F85B9965C2EFFFC1DE7DA3226AAB4",
+      "stage": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\N1\\Cooked-20a84dd3049a4d7b8bc195e23aa27113\\Staging\\Game-d1036691b03f4642acccd465c25e8d8f",
+      "textParserCalls": 0,
+      "configuration": "Release"
+    }
+  },
+  "pbr": {
+    "evidence": "Build/Verification/N1/Diagnostic-43307fbe1b0c4f26a2cde22039266063",
+    "result": {
+      "oracle": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\N1\\Diagnostic-43307fbe1b0c4f26a2cde22039266063/consumer.json",
+      "configuration": "Release",
+      "result": "N1_DIAGNOSTIC_PRODUCT_OK",
+      "motionFixture": false,
+      "runtimeHash": "D06A92517BD07ADF7352A967028E9F1474308E3A17A769992FB7E25694A7472F",
+      "scope": "Actual selected diagnostic producer and manifest/attachment consumer. Full motion/SDK quality/performance are separate"
+    },
+    "consumer": {
+      "result": "N1_PBR_MANIFEST_CONSUMER_OK",
+      "frameId": 140,
+      "manifestHash": "67BFD2B4429F95CBC06DF2750F00EB2DC26382256B2C6D1FF19E10213484E861",
+      "attachments": 7
+    }
+  },
+  "wiring": "Build/Verification/N1/Wiring/RunnerCanary/result.json",
+  "buildLogs": [
+    "Build/n1-editor-final.log",
+    "Build/n1-Player-build.log",
+    "Build/n1-AssetCooker-build.log",
+    "Build/n1-AssetPacker-build.log",
+    "Build/n1-engine-publish.log"
+  ],
+  "limitations": [
+    {
+      "gate": "Temporal Motion",
+      "status": "failed-existing-baseline",
+      "current": "Build/Verification/N1/Diagnostic-9a3e5a8037934d5e84cc7e1bf41ad23a/commands.jsonl",
+      "prechangeSdk": "Build/Verification/N1/Diagnostic-c54e8edbd9e94c4796275157b9bc25f9/commands.jsonl",
+      "detail": "Fixture preparation failed in current and previous SDK; no motion quality acceptance claimed."
+    },
+    {
+      "gate": "Broader temporal native evidence",
+      "status": "failed",
+      "evidence": "Build/Verification/N1/Temporal/closure-native-Release-motion-3e650888c4af4cb09d64133e327cf079",
+      "detail": "Missing Prim_Cone/model and unavailable SDK history gates remain outside N1 PBR acceptance."
+    },
+    {
+      "gate": "Remote CI / server product / full runtime parser library unlink",
+      "status": "not-executed"
+    },
+    {
+      "gate": "Full documentation index",
+      "status": "existing-drift",
+      "detail": "RHISoftwareCommandListSpecification.src.html existing drift; targeted N1/plan render checked separately."
+    }
+  ],
+  "sourceSha256": {
+    "Engine/Utility_Framework/DiagnosticDocument.h": "b9f2a4a058f31d7997c407f659534122e356a801929daadfcae312c79e307665",
+    "Engine/Utility_Framework/DiagnosticDocument.cpp": "4524b5151a5cd763985b9c89173d91ca64c9fef6165e1dc297b7115f65a07b72",
+    "Engine/Utility_Framework/Utility_Framework.vcxproj": "e72ab4fb04c6040f47076ef38c365c8cc7d8f79a1112aa64fa0635441423bf99",
+    "Engine/SceneRuntime/TemporalMotionFixture.cpp": "9725a5aeee7b9441e950f3e334b0db5ea8cf6acce6a61939192515c74e338c07",
+    "Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h": "547455d2fc12ef77b66089bd999bb77ea5de2d4caa79a17236646c47acfdd1eb",
+    "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp": "6ad945bd8c6a8629931840ce6371286d28e7c3ebf5539e244647dac9c3d5efef",
+    "Tools/regression/ArchiveSchemaFixture.h": "54b4812de0ad44c6a3ee6a47dd6ebba1e64ad24e0a08b9270d6a39edf25c2ca9",
+    "Tools/regression/ArchiveParserProbe.cpp": "ba8e3b7115fd81465f4a51ad014f50a7c0fe8a9d6e59bbc1aac4d7f1df5600c3",
+    "Tools/regression/archive_parser_boundary.py": "a9fbffd5ee99d2da517a3ab73604a998f43c5a65248dce9141092c4b7b75b1cd",
+    "Tools/regression/archive_parser_boundary_tests.py": "9a01d9a837abee42257ba169d10cbd2cec63d918641e6c342c6f22e28ddb3728",
+    "Tools/regression/verify-archive-parser-boundary.ps1": "51e107aac86a961855428f74ab231f60a351cd5d3d9a75b89044c9d5e8e55f9b",
+    "Tools/regression/verify-archive-parser-product.ps1": "b522a40a2e2b594587225d911b65d21fa8a0db65bd5ae19eace504d66c46b132",
+    "Tools/regression/verify-n1-diagnostic-product.ps1": "85e30cac11e3de767251e504b3c20ad7ac47452b4c81eead48af93023a12cdea",
+    "Tools/regression/run-all.ps1": "879294a33e4b88e8a3ae2e329f16518f44cb7696e4c27ad976b8d2390d70a1b1",
+    "Tools/regression/network-handoff.suite.json": "7b0ced38b8ecf71b88b0f4ee5387c75a40f334b75da26c364b80c891c8249677",
+    "Tools/regression/network_handoff_suite.py": "f502d198ffb419a3c2ce016f12d20fcbd5a55ff5894c2dfae05b08885ad6d374",
+    "Tools/regression/verify-net-regression-wiring.ps1": "ea9429a7cac5c4ebf8333c2eaec261e1faf2e7b6259698bd1dee7922faf2a63a",
+    ".github/workflows/network-contracts.yml": "f827b4907c62116853acf3c2d06b4b71b77d8fba8aba34a46394f3cca4b2cc38"
+  },
+  "documents": {
+    "targetedPages": [
+      "docs/design/ArchiveParserBoundaryContract.html",
+      "docs/design/SceneObservationContract.html",
+      "docs/analysis/ArchiveParserAcceptance20261022.html",
+      "docs/plans/NetworkFrameworkPlan.html",
+      "docs/plans/SerializationPlan.html",
+      "docs/plans/MasterPlanAudit20261020.html"
+    ],
+    "localLinkChecks": 134,
+    "missingLocalLinks": 0,
+    "inlineScripts": {
+      "pages": 668,
+      "scripts": 348,
+      "failures": 0
+    },
+    "planRenderReceipt": "Build/n1-plans-final.json",
+    "visual": "Network plan sheet inspected; generated renderer visual checks passed at 390/1280",
+    "scopedDiffCheck": "passed"
+  }
+}

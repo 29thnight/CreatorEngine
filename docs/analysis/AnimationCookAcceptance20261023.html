@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/AnimationCookAcceptance20261023.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>애니메이션 패키지 쿠커 수정·Player 소비자 수용</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#원인과-수정">원인과 수정</a></li><li><a href="#기존-호출자와-회귀-배선">기존 호출자와 회귀 배선</a></li><li><a href="#실행-결과">실행 결과</a></li><li><a href="#수용-경계와-남은-작업">수용 경계와 남은 작업</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="AnimationCookAcceptance20261023.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>애니메이션 패키지 쿠커 수정·Player 소비자 수용</h1>
+<div class="meta"><p>2026-10-23 로컬 작업본의 후속 검증이다. <a href="CliConsumerMigrationAcceptance20261023.html">이전 CLI 소비자 수용</a>에서 남긴 AnimationPlayer의 cook 실패를 추적한다. 정확한 소스·바이너리·SDK·패키지 신원과 실행 경로는 <a href="AnimationCookAcceptance20261023.json">동명 JSON</a>에 기록한다.</p>
+<p>이 기록은 master 동기화 전 <code>0847ceeb2</code> 작업본의 실행 증거다. 이후 <code>a985ee7e1</code> 통합과 재점검은 <a href="MasterSyncRecheck20261023.html">별도 동기화 수용 기록</a>을 따른다. 아래 수치와 JSON 지문은 과거 실행의 신원으로 보존한다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
+<a class="map-row" href="#원인과-수정"><span class="ve-label">§00</span><span class="map-name">원인과 수정</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#기존-호출자와-회귀-배선"><span class="ve-label">§01</span><span class="map-name">기존 호출자와 회귀 배선</span><span class="map-bar"><i style="width:57.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실행-결과"><span class="ve-label">§02</span><span class="map-name">실행 결과</span><span class="map-bar"><i style="width:68.5%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">2</span></span></a>
+<a class="map-row" href="#수용-경계와-남은-작업"><span class="ve-label">§03</span><span class="map-name">수용 경계와 남은 작업</span><span class="map-bar"><i style="width:10.5%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「원인과 수정」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-원인과-수정">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="원인과-수정">원인과 수정</h2></div>
+<div class="prose"><p>실패는 애니메이션 클립 해석 전, 자동 Scene 재질 프로그램의 SPIR-V 컴파일에서 발생했다. 쿠커는 DX12 패키지도 DXIL·SPIR-V 양쪽의 완전한 stage set을 검증하므로 <code>-RenderBackend dx12</code>만 지정해도 실패가 사라지지 않았다.</p>
+<p>공통 <code>RHIShaderCompiler</code>는 DXIL에 SM 6.x 소스 계약을 지정하지만 SPIR-V에는 출력 버전인 <code>spirv_1_3</code> 또는 <code>spirv_1_5</code>와 일부 기능만 지정했다. Slang 2026.14의 <code>NonUniformResourceIndex</code>는 교차 대상 기능 계약을 요구한다. 재질의 텍스처 테이블 접근에서 이 요구가 암묵적인 profile 확장 경고 <code>E41012</code>를 만들었고, 기존 <code>warnings-as-errors all</code>에 따라 cook이 중단됐다. 같은 호출과 텍스처 크기 조회를 쓰는 작은 셰이더로 수정 전 실패를 재현했다.</p>
+<p>SPIR-V에도 엔진의 기본 소스 계약인 <code>-capability sm_6_0</code>을 전달한다. 출력 버전 선택, mesh·64비트 atomic·미분·quad 옵션은 기존 배선을 유지한다. 컴파일러 캐시 신원을 v13에서 v14로 바꿔 이전 결과의 재사용을 차단했다. 경고의 오류 처리와 양쪽 백엔드 검증은 유지한다. SM 6.6 전체를 SPIR-V 기본 계약으로 올리지 않는다.</p>
+<p>근거는 고정한 Slang 버전의 <a href="https://github.com/shader-slang/slang/blob/v2026.14/source/slang/slang-capabilities.capdef">기능 별칭 정의</a>, <a href="https://github.com/shader-slang/slang/blob/v2026.14/source/slang/hlsl.meta.slang">HLSL intrinsic 요구</a>, <a href="https://docs.shader-slang.org/en/stable/external/slang/docs/command-line-slangc-reference.html">명령 인자 계약</a>이다. 기능 별칭을 컴파일러에 전달하는 것과 Vulkan 장치의 모든 선택 기능을 활성화하는 것은 별도다. 이번 수정은 장치 기능 협상을 바꾸지 않는다.</p>
+<p>셰이더 단계가 열린 뒤 전체 패키지는 두 번째 경계인 의존성 밀봉에서 거부됐다. AnimationPlayer fixture가 현재 CreatorRobot 모델·메시 신원 대신 이전 GUID를 유지하고 있었다. 모델 참조5곳과 메시 참조4곳을 현재 sidecar의 <code>CreatorRobot_Body_0</code>~`CreatorRobot_Body_3`에 맞춰 갱신했다. Animator의 모델 기반 Motion 참조와 Walk 선택 인덱스1은 유지한다. 누락된 의존성을 무시하거나 빈 모델로 대체하지 않는다.</p>
+<p>이후 쿠커의 전체20모델·73재질 생성과 밀봉은 성공했지만 BuildTool의 검사에서 중단됐다. 검사기가 이미 런타임에서 은퇴한 <code>model.cemc</code>와 generation당 동반 파일2개를 가정했다. 현재 런타임이 요구하는 <code>metadata.cemc</code>·<code>streaming.cemf</code>·<code>Derived/model.cemd</code>와 지오메트리/CPU/선택적 스켈레톤 경로로 검사기를 이주했다. generation의 필수 파일, canonical GUID/지문 경로와 소유 레코드를 검사하며, 은퇴한 monolithic 형식은 거부한다. 병합 때는 전체 파일 재고와 SHA-256을 원래 cook 결과와 대조하여 같은 크기의 변조도 잡는다. 바이너리 형식 판독과 의미 검증은 네이티브 쿠커·런타임이 계속 담당한다.</p>
+<p>PAK 생성 후 실제 Player 시작에서도 fixture의 이전 재질 연결이 발견됐다. CreatorRobot 재질4개가 Code 형식과 사라진 텍스처 GUID를 유지하여 필수 인라인 재질 준비가 실패했다. 실패 종료가 임시 로그를 회수하므로 별도 진단 실행에서 해당 프로세스의 로그를 종료 전에 복사해 원인을 확인했다. 현재 모델의 Material Graph 인스턴스4개로 이주하고 기존 색·스칼라·양면·블렌드 설정과 기본 UV 변환을 보존했다. 텍스처는 동일 부위/용도의 현재 모델 신원에 연결했다. 없는 텍스처를 무시하거나 빈 재질을 수용하지 않는다.</p>
+<p>비활성 Primitive8개도 레거시 재질이었고, 씬 준비는 이 의존성도 검사했다. 이들 역시 현재 모델 Graph로 이주해 전체12개 메시의 연결을 유지했다. 기존 색·metallic·roughness·양면 설정을 보존했고 IOR/flow/UV가 기본값인지 검사했다. Primitive8개의 기존 원본 텍스처와 모델에 포함된 텍스처의 SHA-256이 모두 동일함을 확인했다.</p>
+<p>재질 준비 뒤의 <code>view_inactive</code>는 엔티티69개의 이전 <code>m_layer</code>/<code>m_collisionType</code> 필드가 stable layer 스키마에서 거부된 결과였다. 카메라 설정을 바꿔 우회하지 않고 기존 Default 의미를 <code>m_layerId: 1</code>로 이주했다. 현재 CameraSystem은 primary가 없는 경우에도 유효한 fallback 카메라를 선택하므로 기존 카메라 설정은 유지한다. 빈 씬 상태로 화면 제출을 충족하지 못한 실행은 실패로 보존했다.</p>
+<p>실제 소비자에서69엔티티·Walk·포즈 진행을 확인한 뒤 정상 종료가 exit5로 실패했다. 실패 시점의 진단에서 CreatorRobot의 스트리밍 <code>.cege</code> 파일에 읽기 lease가 남아 있음을 확인했다. 프로세스 정적 메시 분할 캐시가 스트림의 파일 읽기 함수를 보관했고 명시적인 세션 종료 절차가 없었다. 마지막 프레임의 핀만 해제한 중간 수정도 실패했다.</p>
+<p><code>MeshSurfacePlan::ReleaseCachedScenePlans</code>로 캐시 소유권을 명시적으로 회수한다. 기존 프레임이 보유한 계획은 독립적인 shared owner로 계속 유효하고 다음 세션은 같은 내용을 다시 생성한다. <code>ShutdownLive</code>는 양쪽 백엔드의 최종 소비가 확인된 뒤 draw의 차용 주소·핀 테이블·정적 캐시를 순서대로 해제한다. GPU 종료 증명이 실패하면 기존 소유권 보존 분기로 돌아간다. 파일 공유 제한을 낮추거나 임시 디렉터리 회수 실패를 무시하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-기존-호출자와-회귀-배선">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="기존-호출자와-회귀-배선">기존 호출자와 회귀 배선</h2></div>
+<div class="prose"><p>자동 Scene cook과 런타임 재질 stage는 <code>MaterialGraphProduct::VerifyProduct</code>를 통해 공통 컴파일러를 소비한다. Editor 재질 저작·기본 렌더 pass·환경 생성기도 같은 컴파일러를 사용한다. 호출자별 우회나 DX12 전용 cook 분기는 추가하지 않았다. AssetCooker·Player·Editor의 Release 산출물과 새 로컬 SDK로 후속 제품 검증을 수행한다.</p>
+<p>BuildTool의 <code>GamePackager</code>는 cook·병합 후 검사·전체 파일 지문 대조로 이어진다. <code>RuntimeBootstrap</code>도 같은 cook 함수를 사용하며, 모델을 만들지 않는 bootstrap 분기와 별도 문서 생성 계약은 유지한다. 실제 AnimationPlayer 패키지는 이 공통 <code>GamePackager</code> 경로로 검증했다.</p>
+<p><code>verify-shader-verified-cache.ps1</code>에 기능 계약 회귀를 추가했다. DXIL/SPIR-V reflection 동등성, SPIR-V 1.3 헤더, 기본 계약 밖의 ray-query 기능 요구가 <code>E41012</code>로 거부되는지와 실패 시 기존 verified 결과 보존을 검사한다. 기존 메모리/디스크 hit·재시작·include/profile/옵션/permutation 무효화·손상 복구·동시 요청 회귀도 함께 실행한다. standalone probe는 현재의 명시적인 고전 헤더 계약을 사용하도록 <code>CE_CONTRACT_STANDALONE=1</code>을 지정한다.</p>
+<p>애니메이션 소비자는 기존 smoke·HTTP 판정을 유지하고 실행 PID와 smoke 원문 자료를 <code>verification.json</code>에 남긴다. F# fixture GameScripts·공통 관리 런타임·수명/핸들 계약은 유지한다.</p>
+<p>소비자 회귀는 씬69엔티티, Walk의 프레임·클립 시간·본 팔레트 지문 변화에 더해 정상 종료0·stderr0·RHI/작업 큐 drain과 해당 PID의 런타임 디렉터리 제거까지 요구한다. smoke의 준비 성공만으로 서비스의 수명 검증을 대신하지 않는다.</p>
+<p>fixture 빌더에는 <code>verify-animation-fixture.ps1</code>을 연결해 모델 저작 후, 긴 cook 전에 씬의 모델9개·메시 참조12개 소유 관계, Walk 제공 여부, 재질 Graph12개와 텍스처의 현재 소유 신원을 검사한다. 모델 저작이 끝난 Assets 경로를 명시적으로 받는다. 이 검사는 해당 fixture의 사전 점검이며 범용 씬 파서를 대체하지 않는다. 최종 의존성 밀봉은 계속 쿠커가 책임진다.</p>
+<p>종료 호출자는 Player의 정상/부분 초기화 정리와 Editor 종료 경로에서 공통 <code>ShutdownLive</code>로 이어진다. 현재·이전 포즈의 Scene 입력은 모두 같은 메시 분할 캐시를 소비한다. 캐시 회수 회귀는 정점 형식8종에서 기존 프레임의 유효성, 새 세션 재생성, 마지막 프레임 소유권 해제와 반복 종료를 검사한다.</p>
+<p>Tools·엔진·Editor·ScriptCore/F# 실행 소스와 Dynamic_CPP의 씬/Prefab에서 위 이전5개 GUID의 추가 참조가 없음을 확인했다. 과거 실패 입력과 로그는 Build 아래 별도 증거로 보존한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-실행-결과">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="실행-결과">실행 결과</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>실행</th><th>결과</th></tr></thead>
+<tbody><tr><td>수정 전 canary</td><td>실제 Scene cook과 작은 비균일 텍스처 접근 셰이더에서 <code>E41012</code> 재현</td></tr>
+<tr><td>컴파일러/캐시</td><td>codec 회귀·프로브 <strong>44검사</strong>, 별도 두 프로세스의 동시 요청과 재시작 통과. 새로운 기능 계약 검사 5건 포함</td></tr>
+<tr><td><span class="chip ok">실제 자동 Scene cook</span></td><td>Release 두 재질 등급, 산출물5개·반복 바이트 동일. 잘못된 입력6종 거부·기존 출력 보존</td></tr>
+<tr><td>실제 cooked 재질 GPU 소비</td><td>암호화 PAK/loose 일치, DXIL/SPIR-V stage set 읽기. DX12 <strong>24프레임·114778검사</strong>, GPU 비교 성분12501·런타임 Scene 컴파일0·validation 오류0. Debug Layer/GPU Validation 활성. 소스838파일 drift0</td></tr>
+<tr><td>메시 분할/캐시 수명과 GPU</td><td>Release <strong>1264244검사·GPU 비교 성분594828</strong>, 정점 형식8종·포즈3종. 캐시 종료/재생성/프레임 보존40검사 포함. Debug Layer/GPU Validation 활성</td></tr>
+<tr><td>빌드/SDK</td><td>Release AssetCooker·Player·Editor 빌드, Script API45 새 로컬 SDK 생성. Player/Editor는 Windows SDK <code>10.0.26100.0</code>을 명시</td></tr>
+<tr><td>fixture PS5/7</td><td>양 셸에서 현재 입력 통과, 이전 GUID·없는 메시·다른 모델의 메시·Walk 없는 Motion·이전 Code 재질·이전 텍스처·잘못된 Graph·이전 layer 필드인 변이8종씩 모두 거부. 모델 저작 후 Assets에서69엔티티·12Graph를 점검</td></tr>
+<tr><td>BuildTool</td><td><strong>188검사</strong> 통과. 필수 동반 파일 누락·잘못된 지문/GUID 경로·고아 동반 파일·은퇴/혼합 형식·병합 중 동일 크기 변조/누락 거부 포함</td></tr>
+<tr><td><span class="chip ok">전체 cook의 실제 출력 재판독</span></td><td>20모델·73재질, 산출물269개·동반 파일421개·전체691개를 수정한 검사기로 수용</td></tr>
+<tr><td>최종 애니메이션 패키지</td><td>새 SDK <code>6565e208-d463-421f-8008-c8e6a8faacf2</code>의 일반 <code>package-game</code> 절차 통과. 9모델·14재질 프로그램·산출물97개, CEMF121항목/208원본 신원. smoke284프레임·화면 승격2회·실제 Game 화면 제출5회·파서 호출0</td></tr>
+<tr><td>실제 애니메이션 소비자 PS5/7</td><td>각 독립 smoke와 HTTP 서비스 통과. 씬69엔티티·Walk·54본·스킨 메시4개, 프레임/시간/팔레트 지문 진행. 각 정상 종료0·stderr0·RHI/작업 큐 drain·자기 PID의 런타임 디렉터리 회수 통과. 실행한 Player 바이너리가 최종 패키지와 일치하는지 대조</td></tr>
+<tr><td>CLI 소비자 PS5/7</td><td>각82검사, 합164. 래칫 상한0·관측0 유지</td></tr></tbody></table></div>
+<p>최초 재시도는 긴 SDK 경로에서의 .NET 파일 매핑 오류와 기존 프로젝트의 이전 SDK pin 불일치로 패키징을 시작하지 못했다. 짧은 독립 SDK 경로를 사용하고 기존 <code>select-engine</code> 절차로 fixture pin을 갱신했다. 새 SDK를 선택한 실제 cook 결과를 위 제품 수용의 기준으로 삼는다.</p>
+<p>전체 cook 증거와 최종 Player 실행 입력을 구분한다. 전체20모델·73재질의 성공 출력은 별도 보존했고, 최종 Player 패키지는 기존 <code>--asset-list</code>로 동일 씬이 참조하는9모델·12메시와 필요한 입력을 선택한다. 선택 목록·패키지 manifest·SDK 신원은 동명 JSON에 남긴다. 기존 씬의 엔티티·골격·Walk 선택과 애니메이션 판정 기준은 유지한다.</p>
+<p>최종 패키지와 두 셸의 실행은 F# 어셈블리 로드·등록도 확인했다. fixture에는 이 스크립트를 붙인 컴포넌트가 없으므로 해당 스크립트의 생명주기 실행을 수용했다고 주장하지 않는다. 패키지 smoke의 화면 제출과 본 팔레트 진행은 실제 소비 증거이며 포즈의 픽셀 비교나 일정한 프레임률 측정은 아니다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-수용-경계와-남은-작업">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="수용-경계와-남은-작업">수용 경계와 남은 작업</h2></div>
+<div class="prose"><p>이 검증은 기존 CreatorRobot 클립 소비 경로에 한정한다. Animation Graph AG0~AG5, 100체 상태 격리, Root Motion·IK·Notify 신규 기능, 성능 개선의 수용으로 확대하지 않는다.</p>
+<p>LC9의 실제 Inspector pending 종료/native close/5분 soak, 일반 GUI Undo/Redo, 전체 서비스/Shipping 수용은 별도 잔여다. 오디오 100회 프로세스 종료도 이번 범위가 아니다. 원격 CI, 커밋·푸시·공개 SDK 게시는 수행하지 않는다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="AnimationCookAcceptance20261023.md"><code>docs/analysis/AnimationCookAcceptance20261023.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

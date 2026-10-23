@@ -1,3 +1,4 @@
+#include "../../Engine/Utility_Framework/Ownership.h"
 #include "../../Engine/Utility_Framework/DynamicBitset.h"
 #include "Assets/QuantizedGeometry.h"
 #include "Assets/ModelCpuGeometry.h"
@@ -859,7 +860,7 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
                    MeshSurfaceEvaluator& meshEvaluator, RenderBindingCache& bindings, RasterSurfaceCollector& collector,
                    SurfaceEvaluator& evaluator, IblBaker& baker, own::shared_owner<const Instance> instance,
                    own::shared_owner<const Texture> cube, const RasterSurfaceRequest& request,
-                   std::span<const std::shared_ptr<const MeshSurfaceBatch>> sources,
+                   std::span<const own::shared_owner<const MeshSurfaceBatch>> sources,
                    std::span<const SurfacePoint> expectedGeometry, std::span<const IblBakePoint> expectedSurface,
                    std::span<const IblBakeSample> expectedBake, unsigned workers,
                    RGSchedulingMode scheduling = RGSchedulingMode::DeclarationOrder,
@@ -868,12 +869,12 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
     std::string error;
     const auto count = request.width * request.height;
     own::shared_owner<const RenderBindings> material;
-    std::shared_ptr<const RasterSurfaceBatch> raster;
-    std::shared_ptr<const SurfaceBatch> surface;
-    std::shared_ptr<const IblBakeResult> baked;
-    std::vector<std::shared_ptr<const MeshSurfaceBatch>> currentSources;
+    own::shared_owner<const RasterSurfaceBatch> raster;
+    own::shared_owner<const SurfaceBatch> surface;
+    own::shared_owner<const IblBakeResult> baked;
+    std::vector<own::shared_owner<const MeshSurfaceBatch>> currentSources;
     std::vector<RHIReadback> meshReadbacks(sources.size());
-    auto graph = std::make_shared<EnhancedRenderGraph>(device, scheduling, order);
+    auto graph = own::make_shared<EnhancedRenderGraph>(device, scheduling, order);
     const auto read = scheduling == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Read;
     std::array<RHIReadback, 3> readbacks;
     Check(device.CreateBufferReadback(expectedGeometry.size_bytes(), readbacks[0], error), "Graph geometry readback");
@@ -902,7 +903,7 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
     }
     for (const auto& source : sources)
     {
-        std::shared_ptr<const MeshSurfaceBatch> current;
+        own::shared_owner<const MeshSurfaceBatch> current;
         Check(meshEvaluator.Prepare(device, source->Input(), current, error), "Current mesh preparation " + error);
         Check(!current->IsReadyForEvaluation() && !current->IsValidated(),
               "Preparation is not mesh recording/acceptance");
@@ -913,7 +914,7 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
     Check(evaluator.PrepareGpu(device, material, raster, surface, error), "Graph surface preparation " + error);
     Check(baker.PrepareGpu(device, environment, surface, baked, error), "Graph bake preparation " + error);
     auto retainedBake = baked;
-    Check(!baker.RecordGpu(device, environment, surface, baked, error) && baked == retainedBake,
+    Check(!baker.RecordGpu(device, environment, surface, baked, error) && material_graph_test::SamePinnedObject(baked, retainedBake),
           "An unrecorded surface cannot become an immediate IBL source");
     retainedBake.reset();
     Check(!surface->Declare(*graph, error) && !baked->Declare(*graph, error), "Consumers reject missing producers");
@@ -926,7 +927,7 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
     }
     Check(raster->Declare(*graph, error), "Graph raster declaration " + error);
     EnhancedRenderGraph wrongGraph(device);
-    std::shared_ptr<const RasterSurfaceBatch> wrongRaster;
+    own::shared_owner<const RasterSurfaceBatch> wrongRaster;
     Check(collector.Prepare(device, request, currentSources, wrongRaster, error) &&
               !wrongRaster->Declare(wrongGraph, error),
           "Current geometry cannot cross producer graph owners");
@@ -997,7 +998,7 @@ void RunGraphChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTextures
     }
     Check(raster->IsReadyForEvaluation() && surface->IsReadyForBake() && baked->IsReady(),
           "All graph callbacks recorded");
-    std::weak_ptr<const IblBakeResult> ownedByGraph = baked;
+    own::weak_owner<const IblBakeResult> ownedByGraph = baked;
     if (workers)
     {
         // The submission token, rather than caller-local owners, keeps the graph
@@ -1268,10 +1269,10 @@ void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2
             break;
         }
         case 13:
-            invalid.materialSnapshot = std::make_shared<EnhancedMaterialDrawSnapshot>();
+            invalid.materialSnapshot = own::make_shared<EnhancedMaterialDrawSnapshot>();
             break;
         case 14:
-            invalid.forwardMaterialSnapshot = std::make_shared<EnhancedForwardMaterialDrawSnapshot>();
+            invalid.forwardMaterialSnapshot = own::make_shared<EnhancedForwardMaterialDrawSnapshot>();
             break;
         case 15:
             invalid.coverage.flags = 0;
@@ -1466,7 +1467,7 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
     Check(sceneInput->Draws().size() == 2 && sceneInput->Cost().chunks == 2,
           "Selected Scene view retains both material partitions");
     const auto view = sceneInput->Surface();
-    std::array<std::shared_ptr<const MeshSurfaceInput>, 2> inputs;
+    std::array<own::shared_owner<const MeshSurfaceInput>, 2> inputs;
     for (unsigned i = 0; i < inputs.size(); ++i)
     {
         inputs[i] = sceneInput->Draws()[i].geometry->Chunks()[0].input;
@@ -1506,14 +1507,14 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
         Check(device.CreateReadback(request.width, request.height, RHIFormat::D32Float, 1, readback, error),
               "Shared depth readback " + error);
     }
-    auto graph = std::make_shared<EnhancedRenderGraph>(device, scheduling, order);
+    auto graph = own::make_shared<EnhancedRenderGraph>(device, scheduling, order);
     const auto read = scheduling == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState : RGAccessMode::Read;
-    std::array<std::shared_ptr<const MeshSurfaceBatch>, 2> meshes;
-    std::array<std::shared_ptr<const RasterSurfaceBatch>, 2> raster;
-    std::array<std::shared_ptr<const SurfaceBatch>, 2> surface;
-    std::array<std::shared_ptr<const IblBakeResult>, 2> bake;
+    std::array<own::shared_owner<const MeshSurfaceBatch>, 2> meshes;
+    std::array<own::shared_owner<const RasterSurfaceBatch>, 2> raster;
+    std::array<own::shared_owner<const SurfaceBatch>, 2> surface;
+    std::array<own::shared_owner<const IblBakeResult>, 2> bake;
     std::array<own::shared_owner<const RenderBindings>, 2> material;
-    std::shared_ptr<const RasterSurfaceBatch> depth;
+    own::shared_owner<const RasterSurfaceBatch> depth;
     std::array materialRequests{request, request};
     materialRequests[0].texture.bias = 0;
     Drain drain{device};
@@ -1550,25 +1551,25 @@ void RunSharedDepthChain(RecordingChangeDevice& device, ProbePool& pool, ProbeTe
     }
     const auto accepted = raster[0];
     Check(!collector.PrepareSharedDepth(device, request, {&meshes[0], 1}, {}, raster[0], error) &&
-              raster[0] == accepted,
+              material_graph_test::SamePinnedObject(raster[0], accepted),
           "Missing shared owner preserves prior capture");
-    std::shared_ptr<const MeshSurfaceBatch> foreignMesh;
+    own::shared_owner<const MeshSurfaceBatch> foreignMesh;
     Check(meshEvaluator.Prepare(device, inputs[0], foreignMesh, error), "Foreign mesh preparation");
     Check(!collector.PrepareSharedDepth(device, request, {&foreignMesh, 1}, depth, raster[0], error) &&
-              raster[0] == accepted,
+              material_graph_test::SamePinnedObject(raster[0], accepted),
           "A different mesh owner cannot borrow another draw's shared coverage");
     auto wrong = request;
     wrong.viewProjection.m[3][0] += .1f;
     Check(!collector.PrepareSharedDepth(device, wrong, {&meshes[0], 1}, depth, raster[0], error) &&
-              raster[0] == accepted,
+              material_graph_test::SamePinnedObject(raster[0], accepted),
           "Shared camera mismatch preserves prior capture");
     wrong = request;
     ++wrong.width;
     Check(!collector.PrepareSharedDepth(device, wrong, {&meshes[0], 1}, depth, raster[0], error) &&
-              raster[0] == accepted,
+              material_graph_test::SamePinnedObject(raster[0], accepted),
           "Shared viewport mismatch preserves prior capture");
     Check(!collector.PrepareSharedDepth(device, request, {&meshes[0], 1}, raster[1], raster[0], error) &&
-              raster[0] == accepted,
+              material_graph_test::SamePinnedObject(raster[0], accepted),
           "Shared depth cannot chain through a partial capture");
     Check(!raster[0]->Declare(*graph, error), "Missing opaque producer is rejected before mutation");
     for (const auto& mesh : meshes)
@@ -1743,7 +1744,7 @@ void RunCurrentMeshFailures(RecordingChangeDevice& device, ProbePool& pool, Mesh
     geometry.draw.modelMeshView.indexData = geometry.indices.data();
     const std::array<float, 6> lods{};
     const SurfaceView view{{0, 0, 2, 0}, 1, 900, 900};
-    std::shared_ptr<const MeshSurfaceInput> input;
+    own::shared_owner<const MeshSurfaceInput> input;
     std::string error;
     Check(MeshSurfaceInput::Seal(geometry.draw, view, lods, input, error), "Mesh failure input");
     for (unsigned failure = 0; failure < 3; ++failure)
@@ -1753,7 +1754,7 @@ void RunCurrentMeshFailures(RecordingChangeDevice& device, ProbePool& pool, Mesh
         EnhancedRenderGraph graph(device);
         pool.BeginFrame(failure);
         Check(graph.PrepareParallel(pool, error), "Mesh failure prefix preparation");
-        std::shared_ptr<const MeshSurfaceBatch> mesh;
+        own::shared_owner<const MeshSurfaceBatch> mesh;
         Check(evaluator.Prepare(device, input, mesh, error), "Mesh failure packet preparation");
         Check(!mesh->ValidateReadback(geometry.points, error) && !mesh->IsValidated(),
               "Unrecorded geometry cannot pass plausible readback acceptance");
@@ -1784,7 +1785,7 @@ void RunCurrentMeshFailures(RecordingChangeDevice& device, ProbePool& pool, Mesh
         Check(device.BeginFrame(error), "Graph address reuse frame");
         std::optional<EnhancedRenderGraph> graph;
         graph.emplace(device);
-        std::shared_ptr<const MeshSurfaceBatch> mesh;
+        own::shared_owner<const MeshSurfaceBatch> mesh;
         Check(evaluator.Prepare(device, input, mesh, error) && mesh->Declare(*graph, error),
               "Original graph mesh producer");
         const auto oldAddress = &*graph;
@@ -2029,17 +2030,17 @@ void RunGraphFailureCases(RecordingChangeDevice& device, ProbePool& pool, ProbeT
                           RenderBindingCache& bindings, RasterSurfaceCollector& collector, SurfaceEvaluator& evaluator,
                           IblBaker& baker, own::shared_owner<const Instance> instance, own::shared_owner<const Texture> cube,
                           const RasterSurfaceRequest& request,
-                          std::span<const std::shared_ptr<const MeshSurfaceBatch>> sources)
+                          std::span<const own::shared_owner<const MeshSurfaceBatch>> sources)
 {
     VerifySceneReadNormalization(device);
     for (unsigned failure = 0; failure < 6; ++failure)
     {
         std::string error;
         own::shared_owner<const RenderBindings> material;
-        std::shared_ptr<const RasterSurfaceBatch> raster;
-        std::shared_ptr<const SurfaceBatch> surface;
-        std::shared_ptr<const IblBakeResult> baked;
-        auto graph = std::make_shared<EnhancedRenderGraph>(device);
+        own::shared_owner<const RasterSurfaceBatch> raster;
+        own::shared_owner<const SurfaceBatch> surface;
+        own::shared_owner<const IblBakeResult> baked;
+        auto graph = own::make_shared<EnhancedRenderGraph>(device);
         Drain drain{device};
         Check(device.BeginFrame(error), "Failure graph begin");
         textures.BeginFrame(200 + failure);
@@ -2058,13 +2059,13 @@ void RunGraphFailureCases(RecordingChangeDevice& device, ProbePool& pool, ProbeT
         if (failure == 0)
         {
             device.flushOnUpload = true;
-            Check(!evaluator.PrepareGpu(device, material, raster, surface, error) && surface == acceptedSurface,
+            Check(!evaluator.PrepareGpu(device, material, raster, surface, error) && material_graph_test::SamePinnedObject(surface, acceptedSurface),
                   "Surface allocation prefix preserves previous owner");
         }
         else if (failure == 1)
         {
             device.flushOnUpload = true;
-            Check(!baker.PrepareGpu(device, environment, surface, baked, error) && baked == acceptedBake,
+            Check(!baker.PrepareGpu(device, environment, surface, baked, error) && material_graph_test::SamePinnedObject(baked, acceptedBake),
                   "IBL allocation prefix preserves previous owner");
         }
         if (failure < 2)
@@ -2185,7 +2186,7 @@ struct SceneWorkerGate
     {
         std::atomic<bool> entered{}, release{};
     };
-    std::shared_ptr<State> state = std::make_shared<State>();
+    own::shared_owner<State> state = own::make_shared<State>();
     job_handle job;
     explicit SceneWorkerGate(job_scheduler& scheduler)
     {
@@ -2206,7 +2207,7 @@ struct SceneWorkerGate
 
 struct SceneSubmissionGate
 {
-    std::shared_ptr<SceneWorkerGate::State> state = std::make_shared<SceneWorkerGate::State>();
+    own::shared_owner<SceneWorkerGate::State> state = own::make_shared<SceneWorkerGate::State>();
     RHISubmissionTicket ticket;
     explicit SceneSubmissionGate(RecordingChangeDevice& device)
     {
@@ -2792,7 +2793,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
 
             const auto resident = host.PrepareResidency(context, input, error);
             Check(resident, "Scene texture residency " + error);
-            auto graph = std::make_shared<EnhancedRenderGraph>(device,
+            auto graph = own::make_shared<EnhancedRenderGraph>(device,
                 currentFrameDepth ? RGSchedulingMode::ExplicitVersioned : RGSchedulingMode::DeclarationOrder);
             if (workers)
             {
@@ -3414,7 +3415,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     record.identity.primitiveCount == source.geometry->Source()->SourcePrimitiveCount(),
                     "Full geometry identity survives frame-local table indexing");
                 Check(record.chunkIndex < source.geometry->Chunks().size() &&
-                    frameGeometry->geometry[recordIndex]->Input() == source.geometry->Chunks()[record.chunkIndex].input,
+                    material_graph_test::SamePinnedObject(frameGeometry->geometry[recordIndex]->Input(), source.geometry->Chunks()[record.chunkIndex].input),
                     "Frame table pins exact posed chunk and cooked topology");
             }
             std::array<RHIReadbackImage, 6> mapped;
@@ -4440,7 +4441,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
             builder.addFile("Assets/" + entry.artifactPath, cookedRoot / entry.artifactPath);
         }
         builder.finish();
-        auto archive = std::make_shared<const Pak::Archive>(pakFile, Pak::OpenOptions{.key = builder.key()});
+        auto archive = own::make_shared<const Pak::Archive>(pakFile, Pak::OpenOptions{.key = builder.key()});
         const ck::PakAudioClipByteSource mounted(archive);
         for (unsigned tier = 0; tier < 2; ++tier)
         {
@@ -4753,13 +4754,13 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         }
         SurfaceView view{{.1f, .2f, 2, 0}, 1, frame + 1, frame + 1};
         std::array<float, 6> lods{};
-        std::shared_ptr<const MeshSurfaceInput> input;
-        std::shared_ptr<const MeshSurfaceBatch> mesh;
-        std::shared_ptr<const MeshSurfaceInput> secondInput;
-        std::shared_ptr<const MeshSurfaceBatch> secondMesh;
-        std::shared_ptr<const RasterSurfaceBatch> raster;
-        std::shared_ptr<const SurfaceBatch> surface;
-        std::shared_ptr<const IblBakeResult> baked;
+        own::shared_owner<const MeshSurfaceInput> input;
+        own::shared_owner<const MeshSurfaceBatch> mesh;
+        own::shared_owner<const MeshSurfaceInput> secondInput;
+        own::shared_owner<const MeshSurfaceBatch> secondMesh;
+        own::shared_owner<const RasterSurfaceBatch> raster;
+        own::shared_owner<const SurfaceBatch> surface;
+        own::shared_owner<const IblBakeResult> baked;
         Check(MeshSurfaceInput::Seal(geometry.draw, view, lods, input, error), "Raster geometry seal " + error);
         if (split)
         {
@@ -4802,7 +4803,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
             encoder.ResourceBarriers({transitions});
         }
         Check(meshEvaluator.Record(device, input, mesh, error), "World frame " + error);
-        std::vector<std::shared_ptr<const MeshSurfaceBatch>> sources{mesh};
+        std::vector<own::shared_owner<const MeshSurfaceBatch>> sources{mesh};
         if (split)
         {
             Check(meshEvaluator.Record(device, secondInput, secondMesh, error), "Second chunk world frame " + error);
@@ -4813,18 +4814,18 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         const auto accepted = raster;
         auto badRequest = request;
         badRequest.width = 4097;
-        Check(!collector.Prepare(device, badRequest, {&mesh, 1}, raster, error) && raster == accepted,
+        Check(!collector.Prepare(device, badRequest, {&mesh, 1}, raster, error) && material_graph_test::SamePinnedObject(raster, accepted),
               "Viewport budget preserves batch");
         badRequest = request;
         badRequest.texture.mipLevels = 33;
-        Check(!collector.Prepare(device, badRequest, {&mesh, 1}, raster, error) && raster == accepted,
+        Check(!collector.Prepare(device, badRequest, {&mesh, 1}, raster, error) && material_graph_test::SamePinnedObject(raster, accepted),
               "Footprint mismatch preserves batch");
         const std::array duplicate{mesh, mesh};
-        Check(!collector.Prepare(device, request, duplicate, raster, error) && raster == accepted,
+        Check(!collector.Prepare(device, request, duplicate, raster, error) && material_graph_test::SamePinnedObject(raster, accepted),
               "Duplicate source rejects inconsistent graph state tracking");
         badRequest = request;
         std::memset(&badRequest.viewProjection, 0, sizeof(badRequest.viewProjection));
-        Check(!collector.Prepare(device, badRequest, {&mesh, 1}, raster, error) && raster == accepted,
+        Check(!collector.Prepare(device, badRequest, {&mesh, 1}, raster, error) && material_graph_test::SamePinnedObject(raster, accepted),
               "Singular camera preserves accepted batch");
         Check(!evaluators[tier].RecordGpu(device, materialBindings, raster, surface, error) && !surface,
               "An unrecorded raster cannot become a material input");
@@ -5026,9 +5027,9 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         geometry.draw.modelMeshView.indexData = geometry.indices.data();
         std::array<float, 6> lods{};
         const SurfaceView view{{0, 0, 2, 0}, 1, 99, 99};
-        std::shared_ptr<const MeshSurfaceInput> input;
-        std::shared_ptr<const MeshSurfaceBatch> mesh;
-        std::shared_ptr<const RasterSurfaceBatch> batch;
+        own::shared_owner<const MeshSurfaceInput> input;
+        own::shared_owner<const MeshSurfaceBatch> mesh;
+        own::shared_owner<const RasterSurfaceBatch> batch;
         Drain drain{device};
         Check(MeshSurfaceInput::Seal(geometry.draw, view, lods, input, error), "Abort seal");
         Check(device.BeginFrame(error), "Abort prepare begin");
@@ -5040,7 +5041,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         Check(collectors[0].Prepare(device, request, {&mesh, 1}, batch, error), "Abort raster");
         const auto previous = batch;
         device.flushOnUpload = true;
-        Check(!collectors[0].Prepare(device, request, {&mesh, 1}, batch, error) && batch == previous,
+        Check(!collectors[0].Prepare(device, request, {&mesh, 1}, batch, error) && material_graph_test::SamePinnedObject(batch, previous),
               "Native prefix during preparation preserves prior batch");
         EnhancedRenderGraph staleGraph(device);
         Check(!batch->Declare(staleGraph, error), "Native prefix invalidates prepared descriptors");
@@ -5114,16 +5115,16 @@ namespace
                   first->values[2] == std::array<uint32_t, 4>{3, 10, 600, 0},
               "Packet plan zero/clamped bucket ranges changed");
         Check(first->selectors.back() == std::array<uint32_t, 4>{2, 8, 576, 0}, "Packet plan slice selector changed");
-        Check(cache.Acquire(600, 8, 64, capacities, error) == first && cache.Hits() == 1,
+        Check(material_graph_test::SamePinnedObject(cache.Acquire(600, 8, 64, capacities, error), first) && cache.Hits() == 1,
               "Identical packet shape did not reuse its immutable plan");
         auto changed = capacities;
         changed[1] = 66;
-        Check(cache.Acquire(600, 8, 64, changed, error) != first &&
-                  cache.Acquire(601, 8, 64, capacities, error) != first &&
-                  cache.Acquire(600, 9, 64, capacities, error) != first &&
-                  cache.Acquire(600, 8, 63, capacities, error) != first,
+        Check(!material_graph_test::SamePinnedObject(cache.Acquire(600, 8, 64, changed, error), first) &&
+                  !material_graph_test::SamePinnedObject(cache.Acquire(601, 8, 64, capacities, error), first) &&
+                  !material_graph_test::SamePinnedObject(cache.Acquire(600, 9, 64, capacities, error), first) &&
+                  !material_graph_test::SamePinnedObject(cache.Acquire(600, 8, 63, capacities, error), first),
               "Packet shape/capability change reused an incompatible plan");
-        Check(cache.Acquire(600, 8, 64, capacities, error, false) != first, "Uncached control reused a cached plan");
+        Check(!material_graph_test::SamePinnedObject(cache.Acquire(600, 8, 64, capacities, error, false), first), "Uncached control reused a cached plan");
         Check(!cache.Acquire(0, 8, 64, capacities, error) && !cache.Acquire(600, 0, 64, capacities, error) &&
                   !cache.Acquire(600, 8, 0, capacities, error),
               "Invalid packet plan accepted");
@@ -5141,7 +5142,7 @@ namespace
                   first->selectors.back() == std::array<uint32_t, 4>{2, 8, 576, 0},
               "Plan eviction invalidated a retained frame owner");
         const auto rebuilt = cache.Acquire(600, 8, 64, capacities, error);
-        Check(rebuilt != first && rebuilt->values == first->values && rebuilt->selectors == first->selectors,
+        Check(!material_graph_test::SamePinnedObject(rebuilt, first) && rebuilt->values == first->values && rebuilt->selectors == first->selectors,
               "Evicted packet plan rebuilt with different content");
         std::cout << "LX_PACKET_PLAN_OK hits=" << cache.Hits() << " builds=" << cache.Builds()
                   << " bytes=" << cache.Bytes() << " multilevel=3 retained=1 invalidation=4\n";

@@ -122,7 +122,7 @@ namespace
                 if (!cameraOwner || cameraOwner->IsDestroyMark()
                     || cameraOwner->GetScene() != scene) continue;
                 found->second.push_back({ component,
-                    component->CaptureFrameSnapshot(), component->TryGetFrustum(),
+                    component->CaptureFrameSnapshot(), component->TryGetRenderFrustum(),
                     component->GetCamera()->m_viewWidth,
                     component->GetCamera()->m_viewHeight });
             }

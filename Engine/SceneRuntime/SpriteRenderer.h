@@ -31,13 +31,13 @@ public:
 
 
    const own::shared_owner<const Texture>& GetSprite() const { return m_Sprite; }
-   void SetBillboardType(BillboardType type) { m_billboardType = type; PublishRenderProxyDirty(ProxyDirty::Payload); }
+   void SetBillboardType(BillboardType type) { m_billboardType = type; PublishRenderPropertyWrite(ProxyDirty::Payload); }
    BillboardType GetBillboardType() const noexcept { return m_billboardType; }
-   void SetBillboardAxis(const math::vector3& axis) { m_billboardAxis = axis; PublishRenderProxyDirty(ProxyDirty::Payload); }
+   void SetBillboardAxis(const math::vector3& axis) { m_billboardAxis = axis; PublishRenderPropertyWrite(ProxyDirty::Payload); }
    const math::vector3& GetBillboardAxis() const noexcept { return m_billboardAxis; }
 
    bool IsEnableDepth() const { return m_enableDepth; }
-   void SetEnableDepth(bool enable) { m_enableDepth = enable; PublishRenderProxyDirty(ProxyDirty::Visibility); }
+   void SetEnableDepth(bool enable) { m_enableDepth = enable; PublishRenderPropertyWrite(ProxyDirty::Visibility); }
    int GetOrderInLayer() const { return m_orderInLayer; }
 
 private:

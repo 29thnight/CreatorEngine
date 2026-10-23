@@ -215,6 +215,44 @@ void policy(execution_preference execution)
     check(!prepare_character_motion(invalid, memory, {}, 0, 0, .1), "invalid authored acceleration refused");
 }
 } // namespace
+void character_render_history()
+{
+    ScenePhysicsSimulation scene;
+    ScenePhysicsSimulation::character_definition definition;
+    definition.capsule.position = {0,20,0}; definition.gravity = 0;
+    definition.initial_velocity = {6,0,0};
+    auto character=scene.RegisterCharacter(definition,true);
+    check(bool(character) && bool(scene.Start()), "CCT interpolation session");
+    auto previous=scene.ReadCharacter(*character)->collision.position;
+    check(scene.Step().value()==1,"CCT single production step");
+    auto current=scene.ReadCharacter(*character)->collision.position;
+    check(current.x>previous.x,"CCT render sample moves");
+    for(double alpha : {0.,.25,.5,.75,1.}) {
+        scene.SetInterpolationAlpha(alpha);
+        const auto rendered=scene.RenderCharacterPosition(*character).value();
+        const auto expected=previous+(current-previous)*static_cast<float>(alpha);
+        check(math::length(rendered-expected)<1e-5f,"CCT previous/current interpolation");
+        check(scene.ReadCharacter(*character)->collision.position==current,"render interpolation never writes simulation");
+    }
+    check(scene.Advance(0).value()==0,"zero tick presentation frame");
+    scene.SetInterpolationAlpha(.25);const auto first=scene.RenderCharacterPosition(*character).value();
+    scene.SetInterpolationAlpha(.75);check(scene.RenderCharacterPosition(*character)->x>first.x,"CCT interpolation advances without physics tick");
+    check(bool(scene.TeleportCharacter(*character,{100,30,0})),"CCT teleport discontinuity");
+    for(double alpha : {0.,.5,1.}) {scene.SetInterpolationAlpha(alpha);check(scene.RenderCharacterPosition(*character).value()==math::vector3{100,30,0},"teleport resets render history");}
+    check(scene.Step().value()==1,"post teleport step");
+    current=scene.ReadCharacter(*character)->collision.position;
+    check(bool(scene.SetCharacterEnabled(*character,false)),"disable render owner");
+    scene.SetInterpolationAlpha(0);
+    check(scene.RenderCharacterPosition(*character).value()==current,"disabled CCT cannot replay old render history");
+    check(bool(scene.SetCharacterEnabled(*character,true)),"reenable render owner");
+    check(scene.RenderCharacterPosition(*character).value()==current,"reenable resets history");
+    bool rejected=false;std::thread worker([&]{rejected=!scene.RenderCharacterPosition(*character);});worker.join();
+    check(rejected,"CCT render read owner thread guard");
+    check(bool(scene.Stop()),"render history stop");
+    check(scene.RenderCharacterPosition(*character).value()==scene.ReadCharacter(*character)->collision.position,"stop render state is completed state");
+    check(bool(scene.UnregisterCharacter(*character)) && !scene.RenderCharacterPosition(*character),"stale render binding rejected");
+}
+
 int main(int argc, char** argv)
 {
 #if !CE_SHIPPING
@@ -223,6 +261,7 @@ int main(int argc, char** argv)
     profiler.register_thread("PhysicsC1Probe", ce::track_kind::game_thread);
     profiler.record(1);
 #endif
+    character_render_history();
     policy(execution_preference::cpu);
     policy(execution_preference::prefer_gpu);
     exercise(execution_preference::cpu);

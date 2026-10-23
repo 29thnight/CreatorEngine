@@ -1,0 +1,449 @@
+{
+  "date": "2026-10-23",
+  "result": "FSHARP_FIXED_TICK_AND_HIGH_FPS_ACCEPTED_FIXTURE_MIGRATION_IN_PROGRESS",
+  "api": 44,
+  "hook": "OnTickSimulate(single fixedDelta)",
+  "authoring": "F# sole primary; ScriptCore C# remains internal",
+  "managedToolchain": "../FSharp_Tool_Pakage_for_CreatorEngine/artifacts/readable-contract-20261023/verification.json",
+  "managedCounts": {
+    "compiler": 47,
+    "generator": 36,
+    "runtimeRelease": 11,
+    "runtimeDebug": 11,
+    "loader": 50,
+    "workflow": 9,
+    "localNugetPackages": 3
+  },
+  "buildToolChecks": 174,
+  "networkNativeSuite": "Build/Verification/NDA/Suite-fb0b271fe72e40878f090dfa8d14202a/result.json",
+  "editor": {
+    "source": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\FSharp\\Editor-7f22602157d14902b6888773f5ad809f\\Project\\Assets/Script\\FSharpAuthoringGate.fs",
+    "failure": "previous code and instance retained",
+    "create": "F# + explicit order",
+    "result": "FSHARP_EDITOR_AUTHORING_OK",
+    "ticks": 38,
+    "reload": "field retained"
+  },
+  "player": {
+    "result": "FSHARP_PLAYER_PRODUCT_OK",
+    "stage": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\FSharp\\Player-fc249bf2aff6449e9674043b657cf7d7\\Staging\\Game-e0e1bfb7f93c47deabcfed8eb4847ee7",
+    "scope": "Release primitive CCT cooked Player; F# sole primary, fixed tick/native query/read/write",
+    "evidence": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\FSharp\\Player-fc249bf2aff6449e9674043b657cf7d7",
+    "marker": [
+      "[FSHARP_PLAYER_OK] ticks=30 dt=0.016666668 moved=0.65000004 api=44"
+    ]
+  },
+  "sdk": "Build/V/FSharpReadable/local-0.0.0.0-win-x64-Release-e2de6901-c280-4d19-98ea-225e346647bd",
+  "pacing30And60": {
+    "result": "N3_PACING_PRODUCT_OK",
+    "runtimeHash": "65959A74EA706D00E69E1F8C3EA28FF4B3A8BE19E615D69AD723068D38DF9936",
+    "matrix": [
+      {
+        "fps": 30,
+        "measuredFps": 30.002924749396552,
+        "frameP95ms": 37.62007499999995,
+        "frames": 62,
+        "zeroTickFrames": 0,
+        "multiTickFrames": 59,
+        "movingZeroTickFrames": 0,
+        "maxCctInterpolationError": 1.1460446280864289E-07,
+        "maxRigidInterpolationError": 5.4120118386791205E-08,
+        "maxCameraInterpolationError": 6.168659316685421E-07,
+        "quality": [
+          {
+            "color": "green",
+            "pixels": 72,
+            "maxBoundsErrorPx": 0.2858951144406774
+          },
+          {
+            "color": "red",
+            "pixels": 48,
+            "maxBoundsErrorPx": 0.2138382612197347
+          }
+        ],
+        "movingGpuZeroTick": false,
+        "lifetime": []
+      },
+      {
+        "fps": 60,
+        "measuredFps": 60.006900793591264,
+        "frameP95ms": 17.343060000000005,
+        "frames": 122,
+        "zeroTickFrames": 0,
+        "multiTickFrames": 0,
+        "movingZeroTickFrames": 0,
+        "maxCctInterpolationError": 1.1845127367848818E-07,
+        "maxRigidInterpolationError": 5.989761597824383E-08,
+        "maxCameraInterpolationError": 5.708070913712504E-07,
+        "quality": [
+          {
+            "color": "green",
+            "pixels": 72,
+            "maxBoundsErrorPx": 0.2858951144406774
+          },
+          {
+            "color": "red",
+            "pixels": 48,
+            "maxBoundsErrorPx": 0.2887393225219341
+          }
+        ],
+        "movingGpuZeroTick": false,
+        "lifetime": []
+      }
+    ],
+    "comparisons": [
+      {
+        "fps": 60,
+        "cctMaxDelta": 0.0,
+        "rigidRelativeMaxDelta": 0.0
+      }
+    ],
+    "scope": "Actual DX12 Editor cadence/CCT fixed ticks/render matrix and GPU silhouettes; server/transport and other GPU devices separate"
+  },
+  "highFpsComparison": [
+    {
+      "evidence": "Build/Verification/N3Pacing/Editor-4ba81a1d63004915914000026432a25b",
+      "csharpControl": false,
+      "measuredFps": 123.54614280687996,
+      "runtimeHash": "65959A74EA706D00E69E1F8C3EA28FF4B3A8BE19E615D69AD723068D38DF9936",
+      "accepted": false
+    },
+    {
+      "evidence": "Build/Verification/N3Pacing/Editor-aca79d7b318e43c0ac890923d3698cfb",
+      "csharpControl": true,
+      "measuredFps": 124.18809368771107,
+      "runtimeHash": "65959A74EA706D00E69E1F8C3EA28FF4B3A8BE19E615D69AD723068D38DF9936",
+      "accepted": false
+    }
+  ],
+  "performance": {
+    "scope": "controlled native callbacks in real ScriptCore; not frame performance",
+    "iterations": 100000,
+    "directQueryAllocatedBytes": 12800000,
+    "fsharpHelperQueryAllocatedBytes": 12800000,
+    "cachedReadAllocatedBytes": 0,
+    "nativeReadCallsPerCachedRead": 1,
+    "extraExistsCallsPerCachedRead": 0
+  },
+  "limitations": [
+    "19 original C# files lack F# counterparts; product callers not all migrated",
+    "Audio media execution pending",
+    "Latest command metadata and authoring retry fixes are newer than recorded cooked SDK",
+    "No IDE, AOT, Shipping, other-device, soak or remote CI acceptance",
+    "Local uncommitted work; no push"
+  ],
+  "hashNormalization": "utf8-lf",
+  "sourceSha256": {
+    "BuildTool/EnginePublisher.cs": "fd8d5bdc73d929feec422154bfb316666d342f9e193bd8842f0cbaf3c442c495",
+    "BuildTool/GameCompiler.cs": "f9f8fe2e96e11faad22b292c8e914bd78e16eecb8c5c6dadf4a25f03d6101ba1",
+    "BuildTool/PackageInputs.cs": "095a756fa059302db39b70ef225d40bd51070e20463fa85960b43c7ae28a2e24",
+    "Directory.Build.props": "592e953acba1536ea7bb2ab9d9e24f638fb0edb14f5c1c6e857bfe2120c539ea",
+    "Dynamic_CPP/Assets/Script/compile.order": "62a8bb5d1a4cf9582cfdf32fd05051df8d7c3a71613310233de3cb3b779e14fd",
+    "Dynamic_CPP/Assets/Script/FSharpNativeMover.fs": "a781a6d0015ff02986c372a74116939fccc5169564517ffc7413823a685b5257",
+    "Dynamic_CPP/Assets/Script/Phase22ProductAudioProbe.fs": "7c5b0a7ca0ade4b51cd02ef579b477f4fea8b6fb2abe910d67805defba77961f",
+    "Editor/CreatorEditor.vcxproj": "20db803761891c96f0470f117c9f9db2f0e21b49b9bc8ee38743eb42f21a84fa",
+    "Editor/EngineEntry/Commands/N3PacingCapture.h": "abfc2a0183c8ec5b0134dabe73acf7bbd5643f9e5016981a5c907c4726b0f8f4",
+    "Editor/EngineEntry/EditorAssetDatabase.cpp": "4dccfa3e6385925fe385af0ba77371a6d5570fbec81e7293a04b1f960bbb5af8",
+    "Editor/EngineEntry/EditorAssetPresentation.cpp": "8f76786850583ab8ea2733a19714e79ef1f7cd42ae0abffaf900bc33963fea13",
+    "Editor/EngineEntry/EditorAssetPresentation.h": "ddbcb8062112432cfc3eafae1100ba65cefbcfe0dbadc46dd8a8a61e6195dd44",
+    "Editor/EngineEntry/EditorEngineDistribution.h": "bd70ceb82df819b17cbb8d2b9e9244566f6e5297894b49a7da00ad210f4ae67e",
+    "Editor/EngineEntry/EditorScriptAuthoring.cpp": "9555b593d4fe14e6332cacf6ed2ff0428007ea376e750fe375d8f7fb8c6af9aa",
+    "Editor/EngineGUIWindow/ContentsBrowserWindow.cpp": "eea7311eea28bed2056a2ef79928bc651257e4f96e07b34c2b9fcbef8953d347",
+    "Editor/EngineGUIWindow/EditorAssetDragPayload.cpp": "205060b179880673d7870b2ff8bbe931e7b786fdc1e2835636a4ac3deef02a0c",
+    "Editor/EngineGUIWindow/ViewportHostWindow.cpp": "08f8d6f7cfc2a76fa9f81b984bb90a5b7aa73ecfc636726ee068428e78432135",
+    "Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp": "5117e18705ce43013903fe942bd9356d9e08868fdcbac3e1579800bbb9263003",
+    "Engine/SceneRuntime/ClrHost.cpp": "f9a564d202c18adb97952b43963b64d634df1e776e31f3ff9f1b6ade746b54a5",
+    "Engine/SceneRuntime/ClrHost.h": "e7792d7e481f84b5f7a82b8a5778a693d239143ef20672d854eeab83383941f9",
+    "Engine/SceneRuntime/SceneManager.cpp": "b687cb1e6929c473fca44e756357f557d3d14855328e0a1aae18442c61d93888",
+    "Engine/Utility_Framework/ScriptApiVersion.h": "3d3252d295db8823d165dfceafe4ac184faf21d2afcaf268aa8b57125a8c535f",
+    "GameScripts/AnimationPlaybackProbe.fs": "3f2fa28579d2de900f7f0443aab1efd0efd5ab8bea7c00a0526a37ae303caa9b",
+    "GameScripts/AnimatorProbe.fs": "40ef0d3d6f2e61059839ffdd284b3c1794a7117ba01191a2971951d9f303946f",
+    "GameScripts/AniStateProbe.fs": "945a3ff709ae58a8fe0fd362cc1d1fa0fe4856b41986637cd23543fbeae64f70",
+    "GameScripts/AudioAcceptanceProbe.fs": "20d1515ba308804d7d81028d9585dda42828cd112c0458efdda583dde85de912",
+    "GameScripts/Bobber.fs": "5bd264cc71b5399a471acefb8a98de58a9c1a0ff08e0efe6f6c9c49d2c1d3197",
+    "GameScripts/BTProbeNodes.fs": "c093fbce1f2e91463c7f5a5c38f665e2977197a901804d5c22d4bebce66ed3ca",
+    "GameScripts/CameraScriptProbe.fs": "238138367c0ff74217732df5caaae21f70a86e3695b50596549ac14c800b243d",
+    "GameScripts/CharacterMovementProbe.fs": "cfec0b9d0c6e3c8f0e67b59173331aa62fd22ac95f7dc399dcc901170a70acf8",
+    "GameScripts/CharacterPlanarInputProbe.fs": "aff8f77d7c5eadbd887da1093b4ca4806e362b9a95958e832eb81c5ce0d8a60b",
+    "GameScripts/CharacterPlayerProbe.fs": "d282f7eb98d6bf899b8cdc76acb32754c23c6f7c19f96d1c7c636be7d537a1cd",
+    "GameScripts/CollisionProbe.fs": "0c59f32db93075a0c336b3245781578fae0f2120befe01a550e8c8c64f5649af",
+    "GameScripts/DamageDealer.fs": "c41a254fccda781b3bdeb8aaf542b5c9a4ccbdc324e06e9fcce2a12047e926a7",
+    "GameScripts/DdolWaitProbe.fs": "17f6af1f0bc327e17d85726e03f143dac8da344eaf68cbed54662f5b0b3dfe88",
+    "GameScripts/DelayArgumentProbe.fs": "cba7781fefb55612ca5f646af0f8181028cc3dd7cfc2eb396ddb0ff003d28c01",
+    "GameScripts/DelayRetentionProbe.fs": "d31a28c3fa58114a5e049d98a29c6beda3a799f3c6096e18c658cfc3ee3be72f",
+    "GameScripts/DisableInBeginProbe.fs": "77460c3a7b8aa7f2036d84b3c8d5ef0664742c18176247635957d7fed4756210",
+    "GameScripts/DrainReentryProbe.fs": "7916b99ef4acce4ef9e3f20c3cdd3cff66bab985dfccf5626c5119617a4737da",
+    "GameScripts/EnableByName.fs": "66110581e2bc6283e3468d3e48920c41d164fc239f1c91f0b1eaf651aae4d0ff",
+    "GameScripts/EngineCallableProbe.fs": "9424714509030d1864fe5665a27e9074b28414978cc1c98827f6bffc264cce1f",
+    "GameScripts/ExternalAwaitProbe.fs": "a45a05175b6d28c9e5c5eb84b1351bd801500838ce67d7f45e021451a7f76f21",
+    "GameScripts/FailBeginProbe.fs": "1e950a984f97c319ef1c3845d658927286033b44a874f32c3c57d7b2a843b932",
+    "GameScripts/FailCleanupProbe.fs": "9076311e7a3afe97ac3a073c059e534b238a00219e111de43a9c0973597e1382",
+    "GameScripts/FailInitializedProbe.fs": "b41f1486debc32b14ecb02b88ae8912386c4b3c86c20f75e49c9e060ee7d1f1f",
+    "GameScripts/FailSimulateAsyncProbe.fs": "77fe65cd98df1082bbb2e33156ecc6c4f61c60d70a9eddf8a7c9e81df5ac66c0",
+    "GameScripts/FailSimulateImmediateProbe.fs": "8afa2f0664de652c5f72c9badb905fd51286519bbd3279ad84d4b96187e0a3ac",
+    "GameScripts/FailSimulateSyncProbe.fs": "f240cb1e62ba862df2acc0cb6a17a9f67dd2849e9e57ecf6620ab79f2cbd7e18",
+    "GameScripts/FixedUpdateContractProbe.fs": "512a76d996d0995e4b6fad248655976d09675435d04078bb6c4a4ed1ca73d857",
+    "GameScripts/FollowTarget.fs": "c14fa8f46710a17901d2f40f0e254c09f752c46e494b19a27452b533e853edd2",
+    "GameScripts/FSharpNativePlayerProbe.fs": "c23c70f857b3cd910c9cc1060b041b4edd97edd3f1aa6779f73ced613c8eef3d",
+    "GameScripts/GameScripts.fsproj": "ff7ebd8ae2fc9e7fb29a77277ba1371fd22cad09278515a4c58f1419e4009f0a",
+    "GameScripts/GenerationProbe.fs": "6b25db82ed387eb0a6cf5c32039b74c48a772109431df38356391762a9857586",
+    "GameScripts/HealthComponent.fs": "90de394c61b335caf73fae1ee7be3d9d09e4235e989e71d49c6e4ee685aa7984",
+    "GameScripts/HierarchyProbe.fs": "f64d900d12d6ef849530e796f6fc7f8731330b62af10627acc26971cd07320f7",
+    "GameScripts/InputProbe.fs": "a5f423e1d0751d9af72b3fe817253a850460427061aec8277cee580eea8082ab",
+    "GameScripts/LifecycleAxisProbe.fs": "9e9aed54e15510467a3323168feea48662edff33d7ef472a0f7a174e7e9a1f24",
+    "GameScripts/LifecycleProbe.fs": "4c0fa9bda21f4f5248837acae8dba2f4659cd86fe0c396d7776e0abb37eede8d",
+    "GameScripts/LightScriptProbe.fs": "ab3439f05f3be8d7601c77e08eee38a64b705d80072aabd3263e7f222cd4548f",
+    "GameScripts/ManagedLogProbe.fs": "a0fe08c669d4fe223018e43328e2a713d7559adffedf41d4b66ab0be946c77a9",
+    "GameScripts/N3PacingProbe.fs": "e969845e5c433b3d94663e90978c3796f43f40f45c77ebadb962a3e2e780db83",
+    "GameScripts/PackageSmokeProbe.fs": "5a16924f89a41adb2f8b1f78a9fc3d9f1c769b312344d848cb4f6c5b6814a471",
+    "GameScripts/PhysicsB2ShearProbe.fs": "506491e553a77481eb561241c849d518a5b3ccba34bb7e61b54e355243dccd6a",
+    "GameScripts/PhysicsHierarchyContactProbe.fs": "9beff3f5ed11354c8e53c62a13276017e456f19faa9822c2bf250c757bb150e6",
+    "GameScripts/PhysicsLayerProbe.fs": "2a86cf22565b306315b05b849ba5b2bb49917291604fd519998affa612ade901",
+    "GameScripts/PhysicsProbe.fs": "a2b71a079597eef68bd23d4b2f733c2af494ea4af0cfe3be50072d1e11eb6041",
+    "GameScripts/PhysicsSceneContactProbe.fs": "8b3dfd91b7e0d8bba0a85a3e0881f4a87ab580eeff139a303cbafc6c46e8b5c0",
+    "GameScripts/ProbeSpawner.fs": "fa7d7a8d938127cb14be235efc999241252824955dbccc7284d65bf68026b5ce",
+    "GameScripts/ReentrantDestroyProbe.fs": "55cc498773e5655d7f95b9c26e86131f7846b7686ceffcb87a829050df72aa17",
+    "GameScripts/ReentrantDisableProbe.fs": "29ce00841fb9fcc6752520866e2d291a736c368853ace8e6294dbb2ba92b522a",
+    "GameScripts/RigidBodyProbe.fs": "4d26fc27dd555202ef3e416ba1ac7d5c3926a924beace400c20603da23728ef4",
+    "GameScripts/SelfDestroyInBeginProbe.fs": "439fcadf66e5041110d525118c07746e43f789d6fd66810b9094147753ddfad2",
+    "GameScripts/SelfDestroyInResumeProbe.fs": "c1d8508c730267e2a6e919b527b90b55e7f6c7b457028cb1530f6458522d16db",
+    "GameScripts/SelfDestroyInTickProbe.fs": "b75979eaa8b3ff17cb77064f8ba41c03c6514b1116d3b20f17761b639dd8053e",
+    "GameScripts/SimulationExchangeContractProbe.fs": "2ef12803ccfdfe2b92ccc7d4c904aba1134862458c309d0bf18c5c6555072f9d",
+    "GameScripts/SoundProbe.fs": "59657e306752d865e74173f7bd9aed07b800987b4ffceabe6513da718e758f6e",
+    "GameScripts/Spawner.fs": "67cf93b800a0cc3ef5b6ce430dd05945f75d3d953853f6f9da61b7ed8ea6012e",
+    "GameScripts/TransformProbe.fs": "24e174553d64d4522f0b5a32c1fc861ec0129315240442d1178aed33a26f0505",
+    "GameScripts/UiProbe.fs": "bb3fd6d415f853353ea8d35daaacfdde48c2fa12a810bef985a0593a520455b5",
+    "GameScripts/WorkerCallProbe.fs": "8ffb0856cc49cf06c9bab1df28b241072073fbfa20b7d457baff143c614fd780",
+    "ScriptCore.Generators/IsExternalInit.cs": "652e29ed89b3abe81d1597a36cefe848a1b339eb4b36fe1065f1b761a63f58d4",
+    "ScriptCore.Generators/ScriptGenerator.cs": "d047d676f89dab07c911e4e5c4d98c407aad5961fc41704ef7fb8c5ac45c13ce",
+    "ScriptCore/AniBehavior.cs": "cb5e939cd43de9ea2603f6306e6c12ea77ab1f1b9cfd3b80748ae7b7eccaacc7",
+    "ScriptCore/AniBehaviorFactory.cs": "5fcf8c05a531c6460f69ae14d0b6097963fde042e6d9306e8a114d38541b4c3d",
+    "ScriptCore/Animator.cs": "778ee12beb4149341b1616d6b5d78ea77560aafedaec82051cb4262b6ab389c3",
+    "ScriptCore/AssemblyInfo.cs": "25e0c82f3914f19487acbb041a06f354dc6b055ce9bac5f3a14a44b7f94a27d1",
+    "ScriptCore/Assets.cs": "5c70f944e6db32d9e9664a36c12e45d2390525d7d37fe4752bfc7b6bd78137ba",
+    "ScriptCore/Audio.cs": "11b9fc29431451149abc4ff8fa73ae3e74feeca29ccf08b7d57a6f3077d97514",
+    "ScriptCore/AudioListenerComponent.cs": "bd7ea17b0864e4ef13cdd930380e31b9803b59c9cfc563b0d74714239b08b15c",
+    "ScriptCore/BehaviorTree.cs": "32a5a094f87ae2a7c9c852e8085b543884d2f46099d1b4965500a402c569d7eb",
+    "ScriptCore/BehaviorTreeRegistry.cs": "de06de7a139093ebcd001908c51ce264a5a7593e70ee5a508e8ac04051a419d1",
+    "ScriptCore/BlackBoard.cs": "0f72b10dcbe10366b994c1df0ddb95f28857c6bbb3b49c77f4abcb57b81b4d11",
+    "ScriptCore/Bootstrap.cs": "7b5a4d00895a8ec8ff07c94bcfc2f1fb3aa01eb960dc06f50c7f26b4cb799d44",
+    "ScriptCore/BTGraphBuilder.cs": "8e909c20a9d48360901009c45928c02bb05f148977886db19f98dd9aa8528990",
+    "ScriptCore/BTNodeFactory.cs": "dc21451f25acc51e65535e3b404a52edc6f4ba04ddff501f188826c9d3021ffb",
+    "ScriptCore/Camera.cs": "b1f472c669ae5d83ce3fe49443c91de669c440fb111e49b198e68e68abd552d9",
+    "ScriptCore/CameraComponent.cs": "c2aea71ffe793a347b3571c6cada30654161de38f266bb121ab85759244cabb1",
+    "ScriptCore/CharacterMovementComponent.cs": "e407c9805bdde06f6e3afd328480569f5b534498202edd73bd78d9d13fc90daf",
+    "ScriptCore/Collision.cs": "60f383ba15b9ba01d6d7f3304b97284f63dff00038dfad65cb2b8612ce21fc2e",
+    "ScriptCore/Component.cs": "acbfda10a20819d1700a4ff4740d139e74b409ebd30624483f0d3ece8e55b8d1",
+    "ScriptCore/ComponentLifetime.cs": "c9e6377688802d7276efff6ea710938e553fb6b9edb0b0d5dbd4f339baec9e98",
+    "ScriptCore/ContactStream.cs": "0e0a92f18feff4f7d92481d17df37761f0373fd04aeee2b4e3b119b38218e408",
+    "ScriptCore/Debug.cs": "4bb419ca6874fd21382c5a859ede737e2d2197de3ed78e601bbbf784675ccd8e",
+    "ScriptCore/EngineCallable.cs": "42c00f66ad0bc2fe5af4fa1bba6652041763ee3d9b3441021a836908b3bbc27c",
+    "ScriptCore/EngineCallableInvoker.cs": "af4be67b9bf5db4aaf833aeec80f7c54834574f9c640fa712c44100abb4daa41",
+    "ScriptCore/Entity.cs": "12eb24f6488410c66032794d86f26ad61f3be42daf30feac4f35d2339010d68c",
+    "ScriptCore/GameThreadSynchronizationContext.cs": "8b42dddfb450ca143b26c954dfca1f26bb304d231a829a5ad73918509d702b93",
+    "ScriptCore/GcControl.cs": "3b83b6342228dfd6b0ee6c1c2508ca2d65ba9abe28c346b2700971d8f2e05679",
+    "ScriptCore/Input.cs": "dee8642c9c0df4ecbb27e8f8a0eef38f7a02259d412ba735cace894372f84f59",
+    "ScriptCore/KeyCode.cs": "b8d2a21e6e8c008207648958896e30f81411b99b3f8a9f767c0c7a70b233923b",
+    "ScriptCore/LightComponent.cs": "0ce9c512a1318a3f84c92437ba71db558d1d6513d8f0048e35112fdbea03a562",
+    "ScriptCore/MeshRenderer.cs": "3af169f120c9ccf43dd0222536d2886552d06c9bc989433c8f3ad6c9d9a03f06",
+    "ScriptCore/Native.cs": "42d1340606ee322edd5e136487e8a0bcbefccb80a7de7d98105b9d7ec00b0ac0",
+    "ScriptCore/NativeComponent.cs": "03ef24c9e4597315f2ef51fde6e06ae26000226c31a32291836da8d5ce47e8a1",
+    "ScriptCore/ObjectHandle.cs": "eb8276d7709b1c62c3c6418cf08d30849c50aadd73b6daaffd3e8c9714c6188b",
+    "ScriptCore/Physics.cs": "a3d58640bb1af8535c0890ad634b84d5c863fce2c052c2298a3d37b200dd5de3",
+    "ScriptCore/PhysicsBodyComponent.cs": "42644d73f64aeba518419d5931e9992979ed1e5b380cc38c411581d51f5a0213",
+    "ScriptCore/Prefab.cs": "21d536194b3b72cdae1e80931ab3172ec3d74848e5f55fe3b6a8adcd163c0c38",
+    "ScriptCore/ProfilerMarker.cs": "b3b85180219dda35014c10b0e19c7bb707605df8a5bf28e51af7336e9da8807b",
+    "ScriptCore/Quaternion.cs": "53afe4df00a2c101c24f4f8f2b9aa6d659a194e4ebb3f412053d7cb81a11a1bf",
+    "ScriptCore/ScriptAssemblyLoader.cs": "5ec33373beeeefa7eeea21c65cd4a0feb13edec83b26469f34e928706474e75c",
+    "ScriptCore/ScriptFactory.cs": "98e39c6062940e3d9d854b36b5aad189ae1b42e2c8d45bdfe7db682941562848",
+    "ScriptCore/ScriptMessage.cs": "5a139ff09ebb8cac767dbecfd0534f3683651ad5249ce3b66bb9eb832ca5deda",
+    "ScriptCore/ScriptRegistry.cs": "660fdc29be379585c2d37791587a438efc8b1d33b1dcc55ae17b5dc7244d5c6c",
+    "ScriptCore/SerializeField.cs": "2b6d7fe595bd4714e1f99aba5041487e1dcbc535c7fe1dbd542f68185991a6bb",
+    "ScriptCore/Simulation.cs": "379d904dac9e94e5b3923c94bace79ff8224de0c8967b98d34c7f369df144599",
+    "ScriptCore/SoundComponent.cs": "3ed6a8a3e0a7acead0ca4ba61206e7458580c33dc92e6cfbc45c03b7c96e4400",
+    "ScriptCore/Transform.cs": "eea9179504ee5a445ea6633d2ba58a51b3964f8e80992f51e0475d29dc4a0eeb",
+    "ScriptCore/UIComponents.cs": "a45fb2e44ab7736c9ee3d2907d1f7c30750b0d847f92fffcb261210530b43846",
+    "Tools/regression/verify-editor-component-browser.ps1": "847e406a89eb4073a49cb452b61a07e1fa9e3a39998772a4a69a8acb07bb2a78",
+    "Tools/regression/verify-fsharp-editor-authoring.ps1": "f6f90a8ce2a78d9b120b3402288059d03c817180eb3ed05e3a916885e39fb36a",
+    "Tools/regression/verify-fsharp-fixture-compatibility.ps1": "4ebaac2745ecfe9258f9fde76763454bcd7257a856a57215f74e2cbf1c25dd51",
+    "Tools/regression/verify-fsharp-player.ps1": "aa4dd8cb6fe9c18804ac91fae62b818f90be574d16cea0145b264c5e889cc668",
+    "Tools/regression/verify-n3-pacing-product.ps1": "b60776284ff9b2c9248e8dbf1b0ac5b1477075cead430989cdf40883e4d4ffe4"
+  },
+  "networkFullSuite": "Build/Verification/NDA/Suite-4e86efd52e394c0599e8174c63b8d063/result.json",
+  "pacing30And60And144": {
+    "result": "N3_PACING_PRODUCT_OK",
+    "runtimeHash": "28DEA88A75D9555F2D80F65AD65A01B1E3723BA3D22A32FD4E7541CC883BCDF0",
+    "matrix": [
+      {
+        "fps": 30,
+        "measuredFps": 29.993564471739433,
+        "frameP95ms": 33.98825000000004,
+        "frames": 61,
+        "zeroTickFrames": 0,
+        "multiTickFrames": 60,
+        "movingZeroTickFrames": 0,
+        "maxCctInterpolationError": 1.1659026455390631E-07,
+        "maxRigidInterpolationError": 5.954422710452434E-08,
+        "maxCameraInterpolationError": 3.43500857091783E-07,
+        "quality": [
+          {
+            "color": "green",
+            "pixels": 72,
+            "maxBoundsErrorPx": 0.2858951144406774
+          },
+          {
+            "color": "red",
+            "pixels": 54,
+            "maxBoundsErrorPx": 0.3671307857040347
+          }
+        ],
+        "movingGpuZeroTick": false,
+        "lifetime": []
+      },
+      {
+        "fps": 60,
+        "measuredFps": 60.009514722879004,
+        "frameP95ms": 17.18465500000006,
+        "frames": 122,
+        "zeroTickFrames": 0,
+        "multiTickFrames": 0,
+        "movingZeroTickFrames": 0,
+        "maxCctInterpolationError": 1.1723220483261798E-07,
+        "maxRigidInterpolationError": 5.927091373258975E-08,
+        "maxCameraInterpolationError": 5.393337128012377E-07,
+        "quality": [
+          {
+            "color": "green",
+            "pixels": 72,
+            "maxBoundsErrorPx": 0.2858951144406774
+          },
+          {
+            "color": "red",
+            "pixels": 48,
+            "maxBoundsErrorPx": 0.29274435112816377
+          }
+        ],
+        "movingGpuZeroTick": false,
+        "lifetime": []
+      },
+      {
+        "fps": 144,
+        "measuredFps": 144.4394438431168,
+        "frameP95ms": 7.757050000000043,
+        "frames": 290,
+        "zeroTickFrames": 166,
+        "multiTickFrames": 0,
+        "movingZeroTickFrames": 166,
+        "maxCctInterpolationError": 1.2085478617862577E-07,
+        "maxRigidInterpolationError": 5.967136718076915E-08,
+        "maxCameraInterpolationError": 5.738349733164227E-07,
+        "quality": [
+          {
+            "color": "green",
+            "pixels": 72,
+            "maxBoundsErrorPx": 0.2858951144406774
+          },
+          {
+            "color": "red",
+            "pixels": 54,
+            "maxBoundsErrorPx": 0.41796523061987045
+          }
+        ],
+        "movingGpuZeroTick": false,
+        "lifetime": [
+          {
+            "transition": "prepare",
+            "pixels": 72,
+            "boundsErrorPx": 0.2858951144406774
+          },
+          {
+            "transition": "remove",
+            "pixels": 72,
+            "boundsErrorPx": 0.2858951144406774
+          }
+        ]
+      }
+    ],
+    "comparisons": [
+      {
+        "fps": 60,
+        "cctMaxDelta": 0.0,
+        "rigidRelativeMaxDelta": 0.0
+      },
+      {
+        "fps": 144,
+        "cctMaxDelta": 0.0,
+        "rigidRelativeMaxDelta": 0.0
+      }
+    ],
+    "scope": "Actual DX12 Editor cadence/CCT fixed ticks/render matrix and GPU silhouettes; server/transport and other GPU devices separate"
+  },
+  "movingGpu": {
+    "result": "N3_PACING_PRODUCT_OK",
+    "runtimeHash": "9F093B1D9C3021DA4F11DFA84309E32E76E5E2177F7CF2AC80421EEA21ED16F9",
+    "matrix": [
+      {
+        "fps": 144,
+        "measuredFps": 119.95683473258983,
+        "frameP95ms": 9.683779999999942,
+        "frames": 242,
+        "zeroTickFrames": 121,
+        "multiTickFrames": 1,
+        "movingZeroTickFrames": 120,
+        "maxCctInterpolationError": 1.22192240770147E-07,
+        "maxRigidInterpolationError": 5.846105866069706E-08,
+        "maxCameraInterpolationError": 6.298217174460774E-07,
+        "quality": [
+          {
+            "color": "green",
+            "pixels": 72,
+            "maxBoundsErrorPx": 0.2858951144406774
+          },
+          {
+            "color": "red",
+            "pixels": 42,
+            "maxBoundsErrorPx": 0.13418711934770755
+          }
+        ],
+        "movingGpuZeroTick": true,
+        "lifetime": [
+          {
+            "transition": "disable",
+            "pixels": 72,
+            "boundsErrorPx": 0.2858951144406774
+          },
+          {
+            "transition": "enable",
+            "pixels": 72,
+            "boundsErrorPx": 0.2858951144406774
+          },
+          {
+            "transition": "prepare",
+            "pixels": 72,
+            "boundsErrorPx": 0.2858951144406774
+          },
+          {
+            "transition": "warp",
+            "pixels": 72,
+            "boundsErrorPx": 0.2858951144406774
+          }
+        ]
+      }
+    ],
+    "comparisons": [],
+    "scope": "Actual DX12 Editor cadence/CCT fixed ticks/render matrix and GPU silhouettes; server/transport and other GPU devices separate"
+  },
+  "highFpsComparisonScope": "Historical failed pre-fix comparison; hidden Scene rendering and diagnostic readback acquisition fixed in new matrix",
+  "fixtureCompatibility": "Build/Verification/FSharp/Compatibility-03cc2e799f93490f99c05ef86eae6887/result.json",
+  "readability": {
+    "changes": [
+      "Named validation phases and playback states",
+      "Explicit ABI fields, constructor assignments and pointer guards",
+      "Script-named generated accessors and separate factories",
+      "Formatted authored F#"
+    ],
+    "componentBrowser": "Build/Verification/FSharp/ComponentBrowser-retry-fixed",
+    "fixedTickProduct": "Build/Verification/CSharpFixedUpdate/Editor-90d0fd1049224899a7f3945ee076347f/result.json",
+    "componentBrowserChecks": 418
+  }
+}

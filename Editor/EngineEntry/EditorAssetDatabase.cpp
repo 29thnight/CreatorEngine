@@ -1,4 +1,5 @@
 #include "../../Engine/Utility_Framework/Ownership.h"
+#include "../../Engine/Utility_Framework/RuntimeResults.h"
 #include "../../Engine/Utility_Framework/StandardLibrary.h"
 #include "CollisionGeometryAuthoring.h"
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
@@ -1152,6 +1153,12 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
                         const auto age = std::chrono::duration_cast<std::chrono::milliseconds>(now - it->second.changedAt);
                         std::printf("[AUTOSAVE_FLUSH] ageMs=%lld path=%s\n",
                             static_cast<long long>(age.count()), it->first.string().c_str());
+                        Diagnostics::RuntimeResults::Emit("autosave.flush", [&](Diagnostics::Node data)
+                        {
+                            data["ageMs"] << age.count();
+                            const auto utf8 = it->first.u8string();
+                            data["path"] << std::string(utf8.begin(), utf8.end());
+                        });
                     }
                     ready.emplace(it->first, std::move(it->second));
                     it = m_automaticSaves.erase(it);
@@ -1165,7 +1172,18 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         for (auto& [path, save] : ready)
         {
             std::string error;
-            if (ReadModelRecoveryText(path) != save.expectedDisk)
+            const bool conflict = ReadModelRecoveryText(path) != save.expectedDisk;
+            const auto recordSave = [&](bool succeeded)
+            {
+                Diagnostics::RuntimeResults::Emit("autosave.completed", [&](Diagnostics::Node data)
+                {
+                    const auto utf8 = path.u8string();
+                    data["path"] << std::string(utf8.begin(), utf8.end());
+                    data["succeeded"] << succeeded;
+                    data["conflict"] << conflict;
+                });
+            };
+            if (conflict)
             {
                 error = "The source changed on disk; pending edits were not written.";
                 std::printf("[AUTOSAVE_CONFLICT] pending edit rejected path=%s\n", path.string().c_str());
@@ -1176,6 +1194,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
                 {
                     if (save.write(save.expectedDisk, error))
                     {
+                        recordSave(true);
                         continue;
                     }
                 }
@@ -1184,6 +1203,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
                     error = failure.what();
                 }
             }
+            recordSave(false);
             {
                 std::lock_guard lock(m_automaticSaveMutex);
                 m_automaticSaveErrors[path] = error;
@@ -3993,7 +4013,7 @@ private:
 
 	void HandleCreated(const file::path& filepath)
 	{
-        if (ToLower(filepath.extension().string()) == ".cs")
+        if (ToLower(filepath.extension().string()) == ".fs")
         {
             HandleModified(filepath);
         }
@@ -4026,11 +4046,11 @@ private:
 	{
 		const file::path oldPath = directory / std::u8string(oldName.begin(), oldName.end());
 		const file::path newPath = directory / std::u8string(newName.begin(), newName.end());
-        if (ToLower(oldPath.extension().string()) == ".cs")
+        if (ToLower(oldPath.extension().string()) == ".fs")
         {
             HandleModified(oldPath);
         }
-        if (ToLower(newPath.extension().string()) == ".cs")
+        if (ToLower(newPath.extension().string()) == ".fs")
         {
             HandleModified(newPath);
         }
@@ -4120,7 +4140,7 @@ private:
 
 	void HandleDeleted(const file::path& deletedPath)
 	{
-        if (ToLower(deletedPath.extension().string()) == ".cs")
+        if (ToLower(deletedPath.extension().string()) == ".fs")
         {
             HandleModified(deletedPath);
         }
@@ -4197,7 +4217,7 @@ private:
 
 	void ProcessModified(const file::path& filepath)
 	{
-        if (ToLower(filepath.extension().string()) == ".cs")
+        if (ToLower(filepath.extension().string()) == ".fs")
         {
             EditorScriptAuthoring::NotifySourceChanged(filepath);
             return;
@@ -4308,7 +4328,7 @@ private:
 	const std::unordered_set<std::string> m_registeredFiles{
 		".fbx", ".gltf", ".obj", ".glb",
 		".png", ".dds", ".jpg", ".jpeg", ".hdr",
-		".hlsl", ".slang", ".shadermeta", ".shader", ".shadergraph", ".cpp", ".cs",
+		".hlsl", ".slang", ".shadermeta", ".shader", ".shadergraph", ".cpp", ".fs",
 		".wav", ".mp3", ".flac", ".soundgraph", ".soundpreset", ".spritefont", ".ttf", ".otf",
 		".terrain", ".bt", ".blackboard", ".prefab", ".renderprofile", ".cegeometry",
 		// ★ `.creator`(씬)가 빠져 있었다. `.prefab` 은 있는데 씬만 없어서

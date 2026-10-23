@@ -7,7 +7,7 @@ if(!$OutputRoot){$OutputRoot=Join-Path $repo 'Build/Obj/ShaderVerifiedCacheProbe
 $output=[IO.Path]::GetFullPath($OutputRoot)
 New-Item -ItemType Directory -Force -Path $output|Out-Null
 $vcvars=Join-Path $VisualStudioInstallation 'VC/Auxiliary/Build/vcvars64.bat'
-$flags='/nologo /MP2 /EHsc /std:c++latest /O2 /W4 /utf-8 /DNOMINMAX /DWIN32_LEAN_AND_MEAN /I"'+(Join-Path $repo 'Engine/RenderEngine/RHI')+'" /I"'+(Join-Path $repo 'Engine/Utility_Framework')+'" /I"'+(Join-Path $repo 'ThirdParty/Slang/include')+'" /Fo:"'+$output+'/" '
+$flags='/nologo /MP2 /EHsc /std:c++latest /O2 /W4 /utf-8 /DCE_CONTRACT_STANDALONE=1 /DNOMINMAX /DWIN32_LEAN_AND_MEAN /I"'+(Join-Path $repo 'Engine/RenderEngine/RHI')+'" /I"'+(Join-Path $repo 'Engine/Utility_Framework')+'" /I"'+(Join-Path $repo 'ThirdParty/Slang/include')+'" /Fo:"'+$output+'/" '
 foreach($test in @('codec','probe')){
  $sources=if($test -eq 'codec'){@('Tools/regression/shader_verified_cache_tests.cpp')}else{@('Tools/regression/shader_verified_cache_probe.cpp','Engine/RenderEngine/RHI/RHIShaderCompiler.cpp','Engine/RenderEngine/RHI/RHIShaderSource.cpp','Engine/RenderEngine/RHI/RHIShaderPermutation.cpp','Engine/RenderEngine/RHI/RHIShaderReflection.cpp')}
  $quoted=($sources|ForEach-Object {'"'+(Join-Path $repo $_)+'"'}) -join ' '
@@ -25,7 +25,7 @@ $oldLocal=$env:LOCALAPPDATA
 try{
  $env:LOCALAPPDATA=Join-Path $work 'AppData'
  $probe=Join-Path $output 'cache-probe.exe'
- foreach($mode in @('populate','restart','invalidation','corruption')){
+ foreach($mode in @('populate','restart','invalidation','corruption','capabilities')){
   $result=@(& $probe $repo $work $mode 2>&1);$code=$LASTEXITCODE
   $result|Set-Content (Join-Path $work "$mode.log") -Encoding utf8
   if($code -ne 0){throw "Cache $mode checks failed: $($result -join "`n")"}

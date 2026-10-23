@@ -54,7 +54,7 @@ void RunMeshletHzb(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
     const auto depthPso = pipelines.GetOrCreate(depthDesc, error);
     Check(depthPso.IsValid(), "HZB depth fixture pipeline " + error);
     GpuGeometryOcclusion occlusion;
-    std::shared_ptr<const GpuGeometryOcclusion::Pyramid> previous;
+    own::shared_owner<const GpuGeometryOcclusion::Pyramid> previous;
     std::set<std::uint32_t> historyTextures;
     unsigned reusedHistoryTextures{};
     const std::array<std::set<uint32_t>, 8> expected{{{1,2,3,5}, {0,1,2,3,5}, {0,1,2,3,5,6},
@@ -82,7 +82,7 @@ void RunMeshletHzb(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             try { previous->RequireView(view); } catch (const std::runtime_error&) { rejected = true; }
             Check(rejected, "HZB rejects previous recording");
         }
-        std::shared_ptr<const GpuGeometryOcclusion::Pyramid> pyramid;
+        own::shared_owner<const GpuGeometryOcclusion::Pyramid> pyramid;
         Check(temporal ? occlusion.PrepareHistory(context, matrix, 1, 1, pyramid, error) :
             occlusion.Prepare(context, matrix, pyramid, error), "HZB prepare " + error);
         if (temporal)
@@ -106,13 +106,13 @@ void RunMeshletHzb(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             {
                 auto changed = context;
                 changed.width += 1u + entry % 3u;
-                std::shared_ptr<const GpuGeometryOcclusion::Pyramid> other;
+                own::shared_owner<const GpuGeometryOcclusion::Pyramid> other;
                 Check(occlusion.Prepare(changed, matrix, other, error,
                     "HZB.LayoutEviction." + std::to_string(entry)),
                     "HZB layout cache replacement preserves retained prepared owners: " + error);
             }
         }
-        std::shared_ptr<const GpuGeometryOcclusion::Pyramid> history;
+        own::shared_owner<const GpuGeometryOcclusion::Pyramid> history;
         if (temporal && previous) {
             const auto accepted = previous->HistoryOwner()->completion;
             previous->HistoryOwner()->completion = 0;
@@ -247,7 +247,7 @@ void RunMeshletHzb(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipeli
             LX::Runtime::CompiledCompute coldShader; RHIShaderCompileOptions options; options.strictMath = true;
             Check(LX::Runtime::CompileCompute(RHIShaderSource::Resolve("GeometryVisibility.slang").string(),
                 "ShadowMeshletCullCS", {}, options, coldShader, error), "Temporal cold kernel");
-            auto cold = std::make_shared<LX::Runtime::ComputePipeline>();
+            auto cold = own::make_shared<LX::Runtime::ComputePipeline>();
             RHIComputePipelineDesc coldDesc; coldDesc.layout = baseLayout;
             coldDesc.csBytecode = coldShader.stage.bytecode.Data(); coldDesc.csSize = coldShader.stage.bytecode.Size();
             Check(cold->Create(pipelines, coldDesc, std::move(coldShader.description), error), "Temporal cold pipeline");

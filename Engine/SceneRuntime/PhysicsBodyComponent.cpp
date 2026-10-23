@@ -162,6 +162,8 @@ result<void> PhysicsBodyComponent::SetShapes(std::vector<PhysicsShapeDefinition>
         return std::unexpected(built.error());
 
     m_shapes.swap(shapes);
+    const auto source=Meta::CurrentPropertyChangeSource();
+    PublishPropertyWrite("m_shapes", source==Meta::PropertyChangeSource::Reflection ? Meta::PropertyChangeSource::Native : source);
     return {};
 }
 
@@ -183,6 +185,8 @@ result<void> PhysicsBodyComponent::ReplaceShapes(std::vector<PhysicsShapeDefinit
         return replaced;
 
     m_shapes.swap(shapes);
+    const auto source=Meta::CurrentPropertyChangeSource();
+    PublishPropertyWrite("m_shapes", source==Meta::PropertyChangeSource::Reflection ? Meta::PropertyChangeSource::Native : source);
     return {};
 }
 

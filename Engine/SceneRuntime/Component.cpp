@@ -1,6 +1,7 @@
 #include "Component.h"
 #include "Entity.h"
 #include "Scene.h"
+#include "SceneManager.h"
 
 void Component::SetOwner(Entity* owner)
 {
@@ -74,6 +75,7 @@ void Component::SetEnabled(bool able)
 	else      OnDisable();
 
 	PublishRenderProxyDirty(ProxyDirty::Visibility);
+    PublishPropertyWrite("m_isEnabled");
 }
 
 void Component::OnPropertyChanged(
@@ -98,6 +100,36 @@ void Component::OnPropertyChanged(
 	}
 
 	PublishRenderProxyDirty(dirty);
+}
+
+void Component::NotifyPropertyChanged(std::string_view name, Meta::PropertyChangeSource source)
+{
+    struct Guard { const void* previous{Meta::g_propertyNotificationOwner};
+        Guard(const void* owner) { Meta::g_propertyNotificationOwner=owner; }
+        ~Guard() { Meta::g_propertyNotificationOwner=previous; } };
+    { Guard guard(this); OnPropertyChanged(name, source); }
+    PublishPropertyWrite(name, source);
+}
+void Component::PublishPropertyWrite(std::string_view name, Meta::PropertyChangeSource source) const
+{
+    if (Meta::g_propertyWriteSuppression || Meta::g_propertyNotificationOwner == this) return;
+    auto& observation = SceneManagers->Observations();
+    if (!observation.HasWriteObservers() || !m_pOwner || IsDestroyMark()) return;
+    auto* scene = m_pOwner->GetScene();
+    if (!scene || m_pOwner->IsDestroyMark()) return;
+    const auto handle = scene->HandleOf(m_pOwner->m_index);
+    if (!handle.IsValid() || !(m_pOwner->m_observationLocation == handle)) return;
+    Runtime::ComponentWriteEvent event{};
+    event.entity = m_pOwner->GetInstanceID(); event.component = GetInstanceID();
+    event.owner = {handle.sceneId,handle.index,handle.generation}; event.source = source;
+    event.allProperties = name == "*" || name.size() >= event.property.size();
+    if (!event.allProperties) std::memcpy(event.property.data(), name.data(), name.size());
+    observation.Publish(event);
+}
+void Component::PublishRenderPropertyWrite(ProxyDirty dirty) const
+{
+    PublishRenderProxyDirty(dirty);
+    PublishPropertyWrite("*");
 }
 
 void Component::PublishRenderProxyDirty(ProxyDirty dirty) const

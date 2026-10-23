@@ -602,7 +602,7 @@ function Invoke-Gpu {
     if ($null -eq $singleGame -or $null -eq $gameDemand -or
         $singleGame.data.display.game.ready -ne $true -or
         $gameDemand.data.mode -ne 'game' -or
-        -not $singleGameHasScene -or -not $singleGameActive) {
+        $singleGameHasScene -or -not $singleGameActive) {
         $failures.Add("Game 모드의 뷰 수요/GPU 렌더 타깃 검증 실패")
     }
     if (-not $multiSceneDemand -or -not $multiGameDemand) {

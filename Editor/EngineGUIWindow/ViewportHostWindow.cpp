@@ -125,12 +125,11 @@ namespace editor::windows
         std::lock_guard lock(demandMutex);
         published.hostPresent = hostDrewThisFrame;
         published.mode = currentMode;
-        // ★ 에디터 타깃은 **대칭으로 끄지 않는다.** Game 모드일 때 씬 뷰가
-        //   보이지 않는 것은 맞지만, 그 타깃을 프레임마다 세웠다 무너뜨리는
-        //   것은 타깃의 생성·회수를 두 백엔드에서 검증한 뒤에야 안전하다
-        //   (계획서가 extent 기반 resize 를 그 뒤로 미룬 것과 같은 이유다).
-        //   지금 거두는 것은 비싼 쪽 하나 — 게임 카메라의 전체 씬이다.
-        published.editorTarget = true;
+        // Game mode does not display the editor camera. Keep its existing
+        // display resources/leases in the renderer, but stop submitting hidden
+        // scene work. Returning to Scene resumes the same target normally.
+        // An absent host still follows App's explicit unknown-demand fallback.
+        published.editorTarget = hostDrewThisFrame && viewport_mode::scene == currentMode;
         published.gameTarget = (hostDrewThisFrame && viewport_mode::game == currentMode) ||
                                previewDrewThisFrame;
         ++published.publishedFrames;

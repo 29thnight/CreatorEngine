@@ -1,6 +1,7 @@
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$EngineDistribution, [ValidateSet('Debug','Release')][string]$Configuration='Debug', [string]$Work='', [switch]$Shipping, [switch]$Hierarchy, [switch]$Mesh, [switch]$Geometry, [switch]$Transition, [switch]$PlanarInput)
+param([Parameter(Mandatory)][string]$EngineDistribution, [ValidateSet('Debug','Release')][string]$Configuration='Debug', [string]$Work='', [switch]$Shipping, [switch]$Hierarchy, [switch]$Mesh, [switch]$Geometry, [switch]$Transition, [switch]$PlanarInput, [switch]$NoUnusedModel)
 $ErrorActionPreference='Stop'
+if($NoUnusedModel -and ($Mesh -or $Geometry -or $Transition)){throw 'NoUnusedModel is for primitive CCT-only acceptance'}
 if($PlanarInput -and ($Hierarchy -or $Mesh -or $Geometry -or $Transition)){throw 'PlanarInput requires the isolated primitive character fixture'}
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if(!$Work){$Work=Join-Path $repo ('Build/Obj/PhysicsCharacterPlayer-'+[guid]::NewGuid().ToString('N'))}
@@ -18,9 +19,11 @@ $startup=if($Hierarchy){'PhysicsCharacterHierarchy.creator'}elseif($Transition){
 foreach($file in @('PhysicsCharacterHierarchy.creator','PhysicsCharacterHierarchy.creator.meta','PhysicsCharacterPlayer.creator','PhysicsCharacterPlayer.creator.meta','PhysicsCharacterDestination.creator','PhysicsCharacterDestination.creator.meta')){
     Copy-Item -LiteralPath (Join-Path $PSScriptRoot "fixtures/$file") -Destination (Join-Path $assets 'Scenes')
 }
-Copy-Item -LiteralPath (Join-Path $repo 'GameScripts/CharacterPlayerProbe.cs') -Destination (Join-Path $assets 'Script')
+Copy-Item -LiteralPath (Join-Path $repo 'GameScripts/CharacterPlayerProbe.fs') -Destination (Join-Path $assets 'Script')
+Set-Content (Join-Path $assets 'Script/compile.order') 'CharacterPlayerProbe.fs' -Encoding utf8
 if($PlanarInput){
-    Copy-Item -LiteralPath (Join-Path $repo 'GameScripts/CharacterPlanarInputProbe.cs') -Destination (Join-Path $assets 'Script')
+    Copy-Item -LiteralPath (Join-Path $repo 'GameScripts/CharacterPlanarInputProbe.fs') -Destination (Join-Path $assets 'Script')
+    Add-Content (Join-Path $assets 'Script/compile.order') 'CharacterPlanarInputProbe.fs' -Encoding utf8
     $scenePath=Join-Path $assets 'Scenes/PhysicsCharacterPlayer.creator'
     $sceneText=[IO.File]::ReadAllText($scenePath).Replace('m_scriptType: CharacterPlayerProbe','m_scriptType: CharacterPlanarInputProbe')
     [IO.File]::WriteAllText($scenePath,$sceneText,[Text.UTF8Encoding]::new($false))
@@ -41,9 +44,12 @@ if($Geometry){
         Copy-Item -LiteralPath (Join-Path $PSScriptRoot "fixtures/$file") -Destination $assets
     }
 }
-# The package requires a model corpus; this small embedded GLB is not instantiated in the physics Scene.
+# Legacy model-cook coverage is optional for a primitive-only CCT package.
+# The small GLB is not instantiated by this scene.
+if(!$NoUnusedModel){
 foreach($file in @('Prim_Cube.glb','Prim_Cube.glb.meta')){
     Copy-Item -LiteralPath (Join-Path $repo "Dynamic_CPP/Assets/Models/$file") -Destination (Join-Path $assets 'Models')
+}
 }
 $tool=Join-Path $EngineDistribution "Bin/x64-$Configuration/Tools/CreatorBuildTool/CreatorBuildTool.exe"
 & $tool select-engine --engine-distribution $EngineDistribution --project $project
@@ -54,5 +60,5 @@ if($LASTEXITCODE){throw 'Character Player packaging failed'}
 $pointer=Get-Content (Join-Path $Work 'Staging/Project.current.json') -Raw | ConvertFrom-Json
 if($pointer.verification -ne 'passed'){throw 'Package smoke did not pass'}
 $stage=Join-Path $Work ('Staging/'+$pointer.releaseDirectory)
-@{stage=$stage;distribution=$EngineDistribution;configuration=$Configuration;shipping=[bool]$Shipping;hierarchy=[bool]$Hierarchy;mesh=[bool]$Mesh;geometry=[bool]$Geometry;transition=[bool]$Transition;planarInput=[bool]$PlanarInput} | ConvertTo-Json | Set-Content (Join-Path $Work 'fixture.json') -Encoding utf8
+@{stage=$stage;distribution=$EngineDistribution;configuration=$Configuration;shipping=[bool]$Shipping;hierarchy=[bool]$Hierarchy;mesh=[bool]$Mesh;geometry=[bool]$Geometry;transition=[bool]$Transition;planarInput=[bool]$PlanarInput;noUnusedModel=[bool]$NoUnusedModel} | ConvertTo-Json | Set-Content (Join-Path $Work 'fixture.json') -Encoding utf8
 Write-Output "PHYSICS_CHARACTER_PLAYER_STAGE $stage"

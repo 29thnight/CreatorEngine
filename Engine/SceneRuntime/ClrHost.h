@@ -24,6 +24,7 @@ public:
 	void Shutdown();
 
 	bool IsReady() const { return m_ready; }
+    bool AreScriptsLoaded() const { return m_scriptsLoaded; }
 
 	// ── 틱 진입점 (게임 스레드에서만 호출할 것) ──
 	// 관리 코드 호출은 게임 스레드로 한정한다. CoreCLR GC가 스레드를 정지시키므로
@@ -32,6 +33,8 @@ public:
 	// 틱 축은 물리 기준 두 지점이다(설계 문서 §4 트랙 L5). 옛 FixedUpdate/Update/
 	// LateUpdate 셋을 대체한다 — 셋 다 실제로는 물리 뒤였고, 이름이 그 사실을
 	// 감추고 있었다. 프레임 루프(EditorMain)가 이 둘을 물리 앞뒤로 나눠 부른다.
+	// Required synchronous C# OnTickSimulate(float fixedDelta), game thread / before physics.
+	bool TickUpdate(float fixedDelta);
 	void TickPrePhysics(float deltaTime);
 	void TickPostPhysics(float deltaTime);
 
@@ -477,6 +480,7 @@ private:
 	bool BindEntryPoints(const file::path& assemblyPath);
 
 	bool m_ready{ false };
+    bool m_scriptsLoaded{ false };
 	int  m_lastActiveCount{ 0 };
 
 	// 관리 진입점 함수 포인터 (UnmanagedCallersOnly라 마샬링 스텁이 없다)
@@ -502,6 +506,7 @@ private:
 	InitializeFn m_fnInitialize{ nullptr };
 	ShutdownFn   m_fnShutdown{ nullptr };
 	NoArgumentFn m_fnFlushRegistrations{ nullptr };
+	TickFn       m_fnUpdate{ nullptr };
 	TickFn       m_fnPrePhysicsTick{ nullptr };
 	TickFn       m_fnPostPhysicsTick{ nullptr };
 	NoArgumentFn m_fnSceneUnload{ nullptr };

@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "ImGui.h"
 #include "imgui_stdlib.h"
 #include "EditorNavContract.h"
@@ -9,7 +9,7 @@ struct PhysicsShapeDefinition;
 #include <mathematics/vector4.hpp>
 #include "EditorObjectOperations.h"
 #include "Component.h"
-#include "ReflectionUndo.h" // MakeCustomChangeCommand — 에디터 층 Undo(E1-6 이관)
+#include "ReflectionPropertyEdit.h"
 // 인스펙터 typed Draw (PHASE 18 CT6-c).
 //
 // 레거시 DrawProperties(프로퍼티당 정수 비교 선형 체인 + function/any 접근)를
@@ -122,32 +122,6 @@ static_assert(Meta::TypedDraw::ObjectFieldMarked<creator::debug_only>("m_instanc
 namespace Meta::TypedDraw
 {
     // DrawFn·Registry·FindDraw는 ReflectionImGuiHelper.h(디스패치 지점)에 있다.
-
-    // 멤버 변경을 언두 스택에 싣는다 — 레거시 MakePropChangeCommand 등가.
-    template<class Owner, class MemberT, auto MP>
-    inline void CommitMemberChange(Owner* obj, const MemberT& prevValue, const MemberT& newValue, const char* field)
-    {
-        // Shape drafts can move or disappear on Add/Remove/Reload. Never
-        // retain their addresses in Undo; Apply Shapes publishes the list.
-        if constexpr (std::is_same_v<Owner, PhysicsShapeDefinition>)
-            return;
-
-        if constexpr (std::is_base_of_v<Component, Owner>)
-        {
-            const auto* type = Meta::Find(obj->GetTypeID());
-            if (obj->GetOwner() && type)
-            {
-                obj->*MP = prevValue;
-                auto before = Meta::SerializeDocument(obj, *type);
-                obj->*MP = newValue;
-                EditorObjectOperations::CommitProperty(*obj, field, std::move(before));
-                return;
-            }
-        }
-        Meta::MakeCustomChangeCommand(
-            [obj, prevValue]() { obj->*MP = prevValue; },
-            [obj, newValue]() { obj->*MP = newValue; });
-    }
 
     // 컨테이너의 접힘 머리. 명령은 클릭할 수 없으므로 `editor.inspector expand on` 이
     // 켜져 있으면 연다 — 켜지 않으면 안쪽 줄은 어떤 검사에도 자극되지 않는다.
@@ -543,6 +517,15 @@ namespace Meta::TypedDraw
         }
 
         MemberT& value = obj.*MP;
+        Component* complexOwner=nullptr;
+        if constexpr (std::is_base_of_v<Component,Owner> &&
+            !std::remove_cvref_t<MI>::template has_attribute<reflgen::readonly>() &&
+            !editor::inspector::HasInspectorDrawer<MemberT> &&
+            (std::is_enum_v<MemberT> || meta::container::SequenceRange<MemberT>
+             || meta::container::KeyedRange<MemberT> || reflgen::reflectable<MemberT>))
+            complexOwner=&obj;
+        ComplexMemberEdit complexEdit(complexOwner,name);
+
 
         // 넓은 줄은 두 갈래로 정해진다 — 필드에 붙은 `creator::wide` 와 값
         // 타입의 드로어가 선언한 `kWideMode`. s&box 의 `[WideMode]` 와
@@ -596,8 +579,7 @@ namespace Meta::TypedDraw
             ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
             if (editor::inspector::InspectorDrawer<MemberT>::Draw(kValueId, v))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
-                value = v;
+                (void)CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
             }
             ImGui::PopID();
         }
@@ -611,8 +593,7 @@ namespace Meta::TypedDraw
                 : ImGui::DragInt(kValueId, &v);
             if (changed)
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
-                value = v;
+                (void)CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
             }
             ImGui::PopID();
         }
@@ -623,8 +604,7 @@ namespace Meta::TypedDraw
             ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
             if (ImGui::DragScalar(kValueId, ImGuiDataType_U32, &v))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
-                value = v;
+                (void)CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
             }
             ImGui::PopID();
         }
@@ -635,8 +615,7 @@ namespace Meta::TypedDraw
             ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
             if (ImGui::DragScalar(kValueId, ImGuiDataType_S64, &v))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
-                value = v;
+                (void)CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
             }
             ImGui::PopID();
         }
@@ -656,8 +635,7 @@ namespace Meta::TypedDraw
 
             if (changed)
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
-                value = v;
+                (void)CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
             }
             ImGui::PopID();
         }
@@ -668,8 +646,7 @@ namespace Meta::TypedDraw
             editor::widgets::begin_property_line(label, layout);
             if (ImGui::Checkbox(kValueId, &v))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
-                value = v;
+                (void)CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
             }
             ImGui::PopID();
         }
@@ -684,8 +661,7 @@ namespace Meta::TypedDraw
             {
                 if (InputManagement->IsKeyPressed(VK_RETURN))
                 {
-                    CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
-                    value = v;
+                    (void)CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 }
             }
             ImGui::PopID();
@@ -714,8 +690,7 @@ namespace Meta::TypedDraw
                 if (InputManagement->IsKeyPressed(VK_RETURN) && !buffer.empty())
                 {
                     HashingString committed(std::string_view{ buffer });
-                    CommitMemberChange<Owner, MemberT, MP>(&obj, value, committed, name);
-                    value = committed;
+                    (void)CommitMemberChange<Owner, MemberT, MP>(&obj, value, committed, name);
                 }
             }
             ImGui::PopID();
@@ -727,8 +702,7 @@ namespace Meta::TypedDraw
             ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
             if (editor::widgets::drag_property_floats(kValueId, &v.x, 2))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
-                value = v;
+                (void)CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
             }
             ImGui::PopID();
         }
@@ -740,8 +714,7 @@ namespace Meta::TypedDraw
             ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
             if (editor::widgets::drag_property_floats(kValueId, &v.x, 4, 0.1f))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
-                value = v;
+                (void)CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
             }
             ImGui::PopID();
         }
@@ -752,8 +725,7 @@ namespace Meta::TypedDraw
             ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
             if (ImGui::ColorEdit4(kValueId, &v.r))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
-                value = v;
+                (void)CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
             }
             ImGui::PopID();
         }
@@ -764,8 +736,7 @@ namespace Meta::TypedDraw
             ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
             if (editor::widgets::drag_property_floats(kValueId, &v.x, 4))
             {
-                CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
-                value = v;
+                (void)CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
             }
             ImGui::PopID();
         }
@@ -955,6 +926,7 @@ namespace Meta::TypedDraw
             // 레거시 파리티: 어느 분기에도 없던 타입은 조용히 넘어갔다
             // (double·미등록 구조체 등). 같은 침묵을 유지한다.
         }
+        complexEdit.Finish();
     }
 
     // 서술 프레임 하나 — 레거시 DrawObject의 PushID(type.name)·부모 우선·

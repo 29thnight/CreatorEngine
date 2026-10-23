@@ -16,12 +16,12 @@ public sealed partial class FollowTarget : Component
 
     private bool _warnedMissing;
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         Log($"[FollowTarget] '{_label}' 시작 — 대상 {(_target.IsAlive ? _target.Name : "없음")}");
     }
 
-    public override void PostPhysics(float tick)
+    public void PostPhysics(float tick)
     {
         if (!_target.IsAlive)
         {

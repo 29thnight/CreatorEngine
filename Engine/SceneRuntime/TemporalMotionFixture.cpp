@@ -1,4 +1,5 @@
 #include "../Utility_Framework/Ownership.h"
+#include "DiagnosticDocument.h"
 #include "TemporalMotionFixture.h"
 #if CE_DEVELOPMENT && !CE_SHIPPING
 #include "TemporalMotionFixtureAssets.h"
@@ -30,17 +31,14 @@
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "Render/Temporal/TemporalRuntimeControl.h"
 #include "RHI/RHIShaderCompiler.h"
-#include "AuthoringRymlErrorPolicy.h"
-#include <ryml/ryml.hpp>
-#include <ryml/ryml_std.hpp>
-#include <c4/yml/emit.hpp>
-#include <c4/format.hpp>
 #include <mathematics/transform.hpp>
 #include <stdio.h>
 #include "../Utility_Framework/StandardLibrary.h"
 
 namespace
 {
+    std::filesystem::path MotionFixturePath(std::string_view text)
+    { return std::filesystem::path(std::u8string(text.begin(),text.end())); }
     namespace ck = experiment::cooked;
     constexpr std::array<const char*, 7> kRoutes{
         "static", "skinned", "instanced", "decal", "alpha", "sprite", "meshlet" };
@@ -98,7 +96,7 @@ namespace
         AssetDepot::AssetRequest<assets::ModelSkeletonPayload> skeleton;
         AssetDepot::AssetRequest<Material> opaqueMaterial, alphaMaterial, receiverMaterial;
         AssetDepot::AssetRequest<Texture> opaqueTexture, alphaTexture;
-        ryml::Tree manifest;
+        Diagnostics::Document manifest;
         std::vector<std::pair<std::string, std::string>> inputAssets;
         std::string inputHash;
         std::string assetSourceIdentity;
@@ -140,9 +138,9 @@ namespace
         return Hash(bytes);
     }
 
-    std::string WriteJson(const std::filesystem::path& path, const ryml::Tree& tree)
+    std::string WriteJson(const std::filesystem::path& path, const Diagnostics::Document& tree)
     {
-        const auto bytes = ryml::emitrs_json<std::string>(tree);
+        const auto bytes = tree.ToJson();
         return WriteBytes(path, std::as_bytes(std::span(bytes.data(), bytes.size())));
     }
 
@@ -184,12 +182,12 @@ namespace
         return Hash(std::as_bytes(std::span(key.data(), key.size())));
     }
 
-    void Vector(ryml::NodeRef node, const math::vector3& value)
+    void Vector(Diagnostics::Node node, const math::vector3& value)
     {
-        node |= ryml::SEQ;
-        node.append_child() << value.x;
-        node.append_child() << value.y;
-        node.append_child() << value.z;
+        node.SetSequence();
+        node.Append() << value.x;
+        node.Append() << value.y;
+        node.Append() << value.z;
     }
 
     template<class T>
@@ -547,7 +545,7 @@ namespace
     {
         std::string error;
         bool busy{};
-        const auto directory = std::filesystem::u8path(session.status.directory) / kRoutes[session.route] / name;
+        const auto directory = MotionFixturePath(session.status.directory) / kRoutes[session.route] / name;
         const auto encoded = directory.u8string();
         const std::string utf8(encoded.begin(), encoded.end());
         if (!EnhancedSceneRenderer::RequestLivePbrCapture(utf8, EnhancedLiveDisplayTarget::Game,
@@ -563,9 +561,9 @@ namespace
         return true;
     }
 
-    void DescribeCamera(ryml::NodeRef node, bool sdkQuality = false)
+    void DescribeCamera(Diagnostics::Node node, bool sdkQuality = false)
     {
-        node |= ryml::MAP;
+        node.SetMap();
         node["projection"] << (sdkQuality ? "perspective" : "orthographic");
         if (sdkQuality) node["verticalFovDegrees"] << 90;
         Vector(node["position"], {});
@@ -576,98 +574,98 @@ namespace
         node["depthConvention"] << "forward-z";
     }
 
-    void DescribeInputs(ryml::NodeRef root, const Session& session)
+    void DescribeInputs(Diagnostics::Node root, const Session& session)
     {
-        root["extent"] |= ryml::SEQ;
-        root["extent"].append_child() << session.width;
-        root["extent"].append_child() << session.height;
+        root["extent"].SetSequence();
+        root["extent"].Append() << session.width;
+        root["extent"].Append() << session.height;
         DescribeCamera(root["camera"], session.sdkQuality || session.sdkRoutes);
         if (session.sdkRoutes)
         {
-            root["displayExtent"] |= ryml::SEQ;
-            root["displayExtent"].append_child() << session.displayWidth;
-            root["displayExtent"].append_child() << session.displayHeight;
+            root["displayExtent"].SetSequence();
+            root["displayExtent"].Append() << session.displayWidth;
+            root["displayExtent"].Append() << session.displayHeight;
             root["camera"]["aspectRatio"] << double(session.displayWidth) / session.displayHeight;
-            root["companionView"] << c4::fmt::boolalpha(session.companionView);
+            root["companionView"] << (session.companionView);
             root["provider"] << TemporalMeasuredProviderName(session.sdkProvider);
             root["quality"] << static_cast<unsigned>(session.sdkQualitySetting);
             root["exactWarmupSubmissions"] << 34;
             root["historyStart"] << "fresh-sdk-context-per-route";
         }
         root["assetSourceSha256"] << session.assetSourceIdentity;
-        root["assetPreparationCacheHit"] << c4::fmt::boolalpha(session.assetCacheHit);
+        root["assetPreparationCacheHit"] << (session.assetCacheHit);
         auto assets = root["inputAssets"];
-        assets |= ryml::SEQ;
+        assets.SetSequence();
         for (const auto& [path, hash] : session.inputAssets)
         {
-            auto asset = assets.append_child();
-            asset |= ryml::MAP;
+            auto asset = assets.Append();
+            asset.SetMap();
             asset["path"] << path;
             asset["sha256"] << hash;
         }
     }
 
-    void DescribeCase(ryml::NodeRef node, const Session& session)
+    void DescribeCase(Diagnostics::Node node, const Session& session)
     {
-        node |= ryml::MAP;
+        node.SetMap();
         node["name"] << kRoutes[session.route];
         node["route"] << kRoutes[session.route];
-        node["allowMeshlets"] << c4::fmt::boolalpha(true);
+        node["allowMeshlets"] << (true);
         node["sessionId"] << session.id;
         node["baselineStepId"] << session.route * 3 + 1;
         node["currentStepId"] << session.route * 3 + 2;
         node["controlStepId"] << session.route * 3 + 3;
         auto geometry = node["geometry"];
-        geometry |= ryml::MAP;
-        geometry["vertices"] |= ryml::SEQ;
+        geometry.SetMap();
+        geometry["vertices"].SetSequence();
         const std::array<math::vector3, 4> positions{
             math::vector3{ -1.f, -1.f, 0.f }, { 1.f, -1.f, 0.f },
             { 1.f, 1.f, 0.f }, { -1.f, 1.f, 0.f } };
         for (std::size_t index = 0; index < positions.size(); ++index)
         {
-            auto vertex = geometry["vertices"].append_child();
-            vertex |= ryml::MAP;
+            auto vertex = geometry["vertices"].Append();
+            vertex.SetMap();
             Vector(vertex["position"], positions[index]);
-            vertex["uv"] |= ryml::SEQ;
-            vertex["uv"].append_child() << (index == 1 || index == 2 ? 1 : 0);
-            vertex["uv"].append_child() << (index < 2 ? 1 : 0);
+            vertex["uv"].SetSequence();
+            vertex["uv"].Append() << (index == 1 || index == 2 ? 1 : 0);
+            vertex["uv"].Append() << (index < 2 ? 1 : 0);
             if (session.route == 1)
             {
-                vertex["weights"] |= ryml::SEQ;
-                vertex["weights"].append_child() << (index < 2 ? .9 : .1);
-                vertex["weights"].append_child() << (index < 2 ? .1 : .9);
+                vertex["weights"].SetSequence();
+                vertex["weights"].Append() << (index < 2 ? .9 : .1);
+                vertex["weights"].Append() << (index < 2 ? .1 : .9);
             }
         }
-        geometry["indices"] |= ryml::SEQ;
+        geometry["indices"].SetSequence();
         for (const auto index : { 0, 2, 1, 0, 3, 2 })
         {
-            geometry["indices"].append_child() << index;
+            geometry["indices"].Append() << index;
         }
         for (const bool current : { false, true })
         {
             auto endpoint = node[current ? "current" : "previous"];
-            endpoint |= ryml::MAP;
+            endpoint.SetMap();
             Vector(endpoint["worldTranslation"], session.route == 2 ? math::vector3{}
                 : kPosition + (current ? kDisplacements[session.route] : math::vector3{}));
             if (session.route == 1)
             {
-                endpoint["boneTranslations"] |= ryml::SEQ;
-                Vector(endpoint["boneTranslations"].append_child(),
+                endpoint["boneTranslations"].SetSequence();
+                Vector(endpoint["boneTranslations"].Append(),
                     current ? math::vector3{ .125f, -.0625f, 0.f } : math::vector3{});
-                Vector(endpoint["boneTranslations"].append_child(),
+                Vector(endpoint["boneTranslations"].Append(),
                     current ? math::vector3{ .625f, -.3125f, 0.f } : math::vector3{});
             }
             if (session.route == 2)
             {
-                endpoint["instanceTranslations"] |= ryml::SEQ;
-                Vector(endpoint["instanceTranslations"].append_child(), math::vector3{ -1.5f, 0.f, 4.f }
+                endpoint["instanceTranslations"].SetSequence();
+                Vector(endpoint["instanceTranslations"].Append(), math::vector3{ -1.5f, 0.f, 4.f }
                     + (current ? math::vector3{ -.375f, .1875f, 0.f } : math::vector3{}));
-                Vector(endpoint["instanceTranslations"].append_child(), math::vector3{ 1.5f, 0.f, 4.f }
+                Vector(endpoint["instanceTranslations"].Append(), math::vector3{ 1.5f, 0.f, 4.f }
                     + (current ? math::vector3{ .25f, -.125f, 0.f } : math::vector3{}));
             }
         }
         auto ownership = node["ownership"];
-        ownership |= ryml::MAP;
+        ownership.SetMap();
         ownership["attachment"] << (session.route == 5 ? "postSpriteHdr" : "baseColor");
         Vector(ownership["expectedColor"], session.route == 3
             ? math::vector3{ 1.f, 1.f, 1.f } : math::vector3{ .75f, .125f, .25f });
@@ -680,7 +678,7 @@ namespace
             {
                 if (path.find("alpha.cetex") != std::string::npos)
                 {
-                    ownership["alphaTexture"] |= ryml::MAP;
+                    ownership["alphaTexture"].SetMap();
                     ownership["alphaTexture"]["path"] << path;
                     ownership["alphaTexture"]["sha256"] << hash;
                 }
@@ -690,25 +688,25 @@ namespace
 
     void SealCaseInput(Session& session)
     {
-        ryml::Tree input;
-        auto root = input.rootref();
-        root |= ryml::MAP;
+        Diagnostics::Document input;
+        auto root = input.Root();
+        root.SetMap();
         DescribeInputs(root, session);
         DescribeCase(root, session);
         const auto relative = std::string("input-assets/") + kRoutes[session.route] + "-case.json";
-        session.inputHash = WriteJson(std::filesystem::u8path(session.status.directory) / relative, input);
-        auto node = session.manifest.rootref()["cases"].append_child();
+        session.inputHash = WriteJson(MotionFixturePath(session.status.directory) / relative, input);
+        auto node = session.manifest.Root()["cases"].Append();
         DescribeCase(node, session);
-        node["input"] |= ryml::MAP;
+        node["input"].SetMap();
         node["input"]["path"] << relative;
         node["input"]["sha256"] << session.inputHash;
-        node["captures"] |= ryml::MAP;
+        node["captures"].SetMap();
     }
 
     void SealSdkInput(Session& session)
     {
-        ryml::Tree input;
-        auto root = input.rootref(); root |= ryml::MAP;
+        Diagnostics::Document input;
+        auto root = input.Root(); root.SetMap();
         DescribeInputs(root, session);
         auto camera = root["camera"];
         camera["projection"] << "perspective";
@@ -722,32 +720,32 @@ namespace
         root["exactWarmupSubmissions"] << (session.sdkStartup ? 1 : 34);
         root["warmupSource"] << "render-thread-submission-ledger";
         root["historyObservationMode"] << (session.sdkStartup ? "first-observed-non-reset" : "warmed");
-        root["steps"] |= ryml::SEQ;
+        root["steps"].SetSequence();
         for (unsigned step = 0; step <= 17; ++step)
         {
-            auto node = root["steps"].append_child(); node |= ryml::MAP;
+            auto node = root["steps"].Append(); node.SetMap();
             node["stepId"] << step + 1;
-            node["visible"] << c4::fmt::boolalpha(step <= 9);
+            node["visible"] << (step <= 9);
             const auto pose = step == 0 ? 0u : std::min(step - 1, 8u);
             Vector(node["position"], {-2.f + .5f * float(pose), 0.f, 4.f});
         }
-        const auto path = std::filesystem::u8path(session.status.directory);
+        const auto path = MotionFixturePath(session.status.directory);
         session.inputHash = WriteJson(path / "input-assets/sdk-sequence.json", input);
-        auto out = session.manifest.rootref();
-        out["input"] |= ryml::MAP;
+        auto out = session.manifest.Root();
+        out["input"].SetMap();
         out["input"]["path"] << "input-assets/sdk-sequence.json";
         out["input"]["sha256"] << session.inputHash;
         out["sessionId"] << session.id;
-        out["captures"] |= ryml::SEQ;
+        out["captures"].SetSequence();
     }
 
     void RecordCapture(Session& session, const char* name)
     {
         const auto relative = std::string(kRoutes[session.route]) + "/" + name;
-        auto node = session.manifest.rootref()["cases"][session.route]["captures"][name];
-        node |= ryml::MAP;
+        auto node = session.manifest.Root()["cases"][session.route]["captures"][name];
+        node.SetMap();
         node["path"] << relative;
-        node["manifestSha256"] << HashFile(std::filesystem::u8path(session.status.directory) / relative / "manifest.json");
+        node["manifestSha256"] << HashFile(MotionFixturePath(session.status.directory) / relative / "manifest.json");
     }
 
     void Mount(Session& session)
@@ -827,13 +825,13 @@ namespace
         camera->GetCamera()->m_nearPlane = .1f;
         camera->GetCamera()->m_farPlane = 20.f;
         camera->NotifyCameraCut();
-        auto root = session.manifest.rootref();
-        root |= ryml::MAP;
+        auto root = session.manifest.Root();
+        root.SetMap();
         root["schema"] << (session.sdkRoutes ? "temporal.resolution.routes.v1" : session.sdkStartup ? "temporal.sdk.startup.v1" : session.sdkQuality ? "temporal.sdk.sequence.v2" : "temporal.motion.executed-fixture.v3");
         root["acceptance"] << "unverified-requires-independent-oracle";
         root["singleSubmissionPerMeasuredStep"] << true;
         DescribeInputs(root, session);
-        root["cases"] |= ryml::SEQ;
+        root["cases"].SetSequence();
         session.status.state = TemporalMotionFixtureState::Running;
         StartRoute(session);
     }
@@ -868,7 +866,7 @@ bool TemporalMotionFixture::Begin(const std::string& directory, std::string& err
     std::filesystem::path destination;
     try
     {
-        destination = std::filesystem::u8path(directory);
+        destination = MotionFixturePath(directory);
     }
     catch (const std::exception& exception)
     {
@@ -935,7 +933,6 @@ bool TemporalMotionFixture::Begin(const std::string& directory, std::string& err
             error = "Fixture output directory was created by another writer";
             return false;
         }
-        Authoring::EnsureRymlErrorPolicy();
         TemporalMotionFixtureAssetOptions options;
         options.targetPlatform = "win-x64";
         options.targetAbi = CreatorContentAbi::Token;
@@ -1191,15 +1188,15 @@ void TemporalMotionFixture::TickAfterAnimation()
         }
         if (session.phase == Phase::SdkBaselineCapture)
         {
-            auto root = session.manifest.rootref();
-            auto baseline = root["baseline"]; baseline |= ryml::MAP;
+            auto root = session.manifest.Root();
+            auto baseline = root["baseline"]; baseline.SetMap();
             baseline["path"] << "static/baseline";
-            baseline["manifestSha256"] << HashFile(std::filesystem::u8path(session.status.directory) / "static/baseline/manifest.json");
+            baseline["manifestSha256"] << HashFile(MotionFixturePath(session.status.directory) / "static/baseline/manifest.json");
             baseline["stepId"] << 2;
-            root["warmup"] |= ryml::SEQ;
+            root["warmup"].SetSequence();
             for (const auto& submitted : session.sdkWarmup)
             {
-                auto node = root["warmup"].append_child(); node |= ryml::MAP;
+                auto node = root["warmup"].Append(); node.SetMap();
                 node["realFrameId"] << submitted.realFrameId;
                 node["sourceFrameId"] << submitted.sourceFrameId;
                 node["viewId"] << submitted.viewId;
@@ -1213,11 +1210,11 @@ void TemporalMotionFixture::TickAfterAnimation()
         if (session.phase == Phase::SdkCapture)
         {
             const auto relative = "static/frame-" + std::to_string(session.sdkStep);
-            auto node = session.manifest.rootref()["captures"].append_child(); node |= ryml::MAP;
-            node["path"] << relative; node["manifestSha256"] << HashFile(std::filesystem::u8path(session.status.directory) / relative / "manifest.json");
+            auto node = session.manifest.Root()["captures"].Append(); node.SetMap();
+            node["path"] << relative; node["manifestSha256"] << HashFile(MotionFixturePath(session.status.directory) / relative / "manifest.json");
             node["stepId"] << session.sdkStep + 2;
             if (++session.sdkStep <= 16) { session.phase = Phase::SdkArm; return; }
-            WriteJson(std::filesystem::u8path(session.status.directory) / "fixture.json", session.manifest);
+            WriteJson(MotionFixturePath(session.status.directory) / "fixture.json", session.manifest);
             session.pendingTerminal = TemporalMotionFixtureState::Complete;
             if (Cleanup(session)) session.status.state = session.pendingTerminal;
             return;
@@ -1234,16 +1231,16 @@ void TemporalMotionFixture::TickAfterAnimation()
             {
                 throw std::runtime_error("Companion view did not submit its independent SDK history");
             }
-            auto group = session.manifest.rootref()["cases"][session.route]["companion"];
-            group |= ryml::MAP;
+            auto group = session.manifest.Root()["cases"][session.route]["companion"];
+            group.SetMap();
             auto proof = group[session.phase == Phase::Current ? "current" : "control"];
-            proof |= ryml::MAP;
+            proof.SetMap();
             proof["viewId"] << other.viewId;
             proof["realFrameId"] << other.realFrameId;
             proof["previousRealFrameId"] << other.predecessorRealFrameId;
             proof["historyGeneration"] << other.historyGeneration;
             proof["stepId"] << other.stamp.stepId;
-            proof["sourceVerified"] << c4::fmt::boolalpha(other.sourceVerified);
+            proof["sourceVerified"] << (other.sourceVerified);
         }
         if (session.phase == Phase::Current)
         {
@@ -1266,7 +1263,7 @@ void TemporalMotionFixture::TickAfterAnimation()
             StartRoute(session);
             return;
         }
-        WriteJson(std::filesystem::u8path(session.status.directory) / "fixture.json", session.manifest);
+        WriteJson(MotionFixturePath(session.status.directory) / "fixture.json", session.manifest);
         session.pendingTerminal = TemporalMotionFixtureState::Complete;
         if (Cleanup(session))
         {

@@ -6,7 +6,7 @@ public sealed partial class UiProbe : Component
     private int _passed;
     private int _failed;
 
-    public override void OnInitialized()
+    public void OnInitialized()
     {
         CheckRect();
         CheckImage();

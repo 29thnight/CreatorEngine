@@ -14,7 +14,7 @@ public sealed partial class PhysicsSensorTransitionProbe : Component
     private float _elapsed, _settledAt;
     private bool _finished;
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         _body = GetComponent<PhysicsBodyComponent>() ?? throw new InvalidOperationException("Missing transition body.");
         CheckFlags(true);
@@ -25,7 +25,7 @@ public sealed partial class PhysicsSensorTransitionProbe : Component
         PhysicsContactStreamProbe.Track(_targets);
     }
 
-    public override void PostPhysics(float dt)
+    public void PostPhysics(float dt)
     {
         if (_finished) return;
         try

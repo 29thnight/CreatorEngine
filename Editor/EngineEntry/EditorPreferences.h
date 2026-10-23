@@ -20,6 +20,9 @@ struct EditorPreferences
     static constexpr std::uint32_t kMaxCustomFrameRate = 1000;
     static constexpr std::uint32_t kMaxBackgroundFrameRate = 60;
 
+    // Session-only development cap; default preserves unrestricted Play pacing.
+    std::uint32_t GetPlayFrameRate() const noexcept { return playFrameRate; }
+    void SetPlayFrameRate(std::uint32_t rate) noexcept { playFrameRate = rate; }
     EditorFrameRateMode GetFrameRateMode() const noexcept { return frameRateMode; }
     void SetFrameRateMode(EditorFrameRateMode value) noexcept { frameRateMode = value; }
     std::uint32_t GetCustomFrameRate() const noexcept { return customFrameRate; }
@@ -38,6 +41,7 @@ struct EditorPreferences
 private:
     float imguiScale{ 0.8f };
     float contentTreeWidth{ 220.f }; // logical pixels; resize clamping is transient
+    std::uint32_t playFrameRate{0};
     EditorFrameRateMode frameRateMode{ EditorFrameRateMode::Display };
     std::uint32_t customFrameRate{ 120 };
     // 고도 에디터의 배경 기본값(초당 10)과 같다. 언리얼은 3.

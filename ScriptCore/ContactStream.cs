@@ -68,7 +68,7 @@ public readonly struct Contact
     }
 }
 
-/// <summary>Scope-owned, owner-thread contact buffer. Read does not search or allocate.
+/// <summary>Engine-lifetime-owned, owner-thread contact buffer. Read does not search or allocate.
 /// The borrowed span expires when PostPhysics completes. Catch-up ticks retain their tick IDs.</summary>
 public sealed class ContactStream : IDisposable
 {
@@ -77,7 +77,9 @@ public sealed class ContactStream : IDisposable
     internal readonly ShapeRole SelfRole, OtherRole;
     internal readonly ContactPhases Phases;
     private readonly int _thread = Environment.CurrentManagedThreadId;
-    private readonly Contact[] _buffer;
+    private readonly Contact[] _buffer, _tickBuffer;
+    private int _tickCount, _tickRequired;
+    private bool _tickOverflow;
     private readonly record struct SensorPair(ObjectHandle First, ulong FirstComponent, uint FirstShape, uint FirstGeneration, uint FirstSlot,
         ObjectHandle Second, ulong SecondComponent, uint SecondShape, uint SecondGeneration, uint SecondSlot);
     private readonly HashSet<SensorPair> _sensorPairs;
@@ -86,8 +88,10 @@ public sealed class ContactStream : IDisposable
     private readonly Dictionary<ObjectHandle, TargetState> _targets;
     private int _count;
     internal bool Disposed, Touched;
-    public bool Overflowed { get; private set; }
-    public int RequiredCapacity { get; private set; }
+    private bool _overflow;
+    private int _required;
+    public bool Overflowed => ScriptRegistry.InFixedUpdate ? _tickOverflow : _overflow;
+    public int RequiredCapacity => ScriptRegistry.InFixedUpdate ? _tickRequired : _required;
 
     internal ContactStream(Component subscriber, ObjectHandle owner, ShapeRole self, ShapeRole other,
         ContactPhases phases, int capacity, ContactGrouping grouping = ContactGrouping.ShapePairs)
@@ -98,6 +102,7 @@ public sealed class ContactStream : IDisposable
         OtherRole = other;
         Phases = phases;
         _buffer = new Contact[capacity];
+        _tickBuffer = new Contact[capacity];
         _sensorPairs = new(capacity);
         _grouping = grouping;
         _targets = new(capacity);
@@ -108,22 +113,27 @@ public sealed class ContactStream : IDisposable
         RequireThread();
         ObjectDisposedException.ThrowIf(Disposed, this);
         if (Overflowed) throw new InvalidOperationException("Contact stream capacity exceeded; partial gameplay results are unavailable.");
-        return _buffer.AsSpan(0, _count);
+        return ScriptRegistry.InFixedUpdate ? _tickBuffer.AsSpan(0, _tickCount) : _buffer.AsSpan(0, _count);
     }
 
     internal void Append(in Contact contact)
     {
-        ++RequiredCapacity;
-        if (_count == _buffer.Length) { Overflowed = true; return; }
-        _buffer[_count++] = contact;
+        ++_required;
+        ++_tickRequired;
+        if (_count == _buffer.Length) _overflow = true;
+        else _buffer[_count++] = contact;
+        if (_tickCount == _tickBuffer.Length) _tickOverflow = true;
+        else _tickBuffer[_tickCount++] = contact;
     }
 
-    internal void Clear() { _count = RequiredCapacity = 0; Overflowed = Touched = false; }
+    internal void Clear() { _count = _required = 0; _overflow = Touched = false; }
+    internal void ClearTick() { _tickCount = _tickRequired = 0; _tickOverflow = false; }
 
     internal void ResetObservation()
     {
         _sensorPairs.Clear();
         _targets.Clear();
+        ClearTick();
         Clear();
     }
 
@@ -159,8 +169,8 @@ public sealed class ContactStream : IDisposable
             {
                 if (_sensorPairs.Count == _buffer.Length)
                 {
-                    Overflowed = true;
-                    ++RequiredCapacity;
+                    _overflow = _tickOverflow = true;
+                    ++_required; ++_tickRequired;
                     return 0;
                 }
 
@@ -205,112 +215,28 @@ public sealed class ContactStream : IDisposable
         Disposed = true;
         _sensorPairs.Clear();
         _targets.Clear();
+        ClearTick();
         Clear();
     }
 }
 
+// ABI/value-buffer facade; F# owns routing indices and subscription membership.
 internal static class ContactRouter
 {
-    [ThreadStatic]
-    internal static Component? Current;
-    private readonly record struct EndpointKey(ObjectHandle Owner, ulong Component, uint Shape);
-    private readonly record struct RouteKey(ObjectHandle Owner, ShapeRole Self, ShapeRole Other, ContactPhases Phase);
-    private static readonly Dictionary<EndpointKey, ShapeRole> Roles = new();
-    private static readonly Dictionary<RouteKey, List<ContactStream>> Routes = new();
-    private static readonly List<ContactStream> Touched = new();
-    private static readonly Dictionary<Component, List<ContactStream>> Subscribers = new(ReferenceEqualityComparer.Instance);
-
-    internal static void Suspend(Component subscriber)
+    internal static Component? Current
     {
-        if (!Subscribers.TryGetValue(subscriber, out var streams)) return;
-
-        foreach (var stream in streams)
-        {
-            Touched.Remove(stream);
-            stream.ResetObservation();
-        }
+        get => ManagedRuntime.Current.Contacts.Current;
+        set => ManagedRuntime.Current.Contacts.Current = value;
     }
 
-    internal static void BindRole(ObjectHandle owner, ulong component, uint shape, ShapeRole role, SimulationScope scope)
-    {
-        var key = new EndpointKey(owner, component, shape);
-        if (!Roles.TryAdd(key, role)) throw new InvalidOperationException("Shape already has a contact role binding.");
-        scope.RegisterCleanup(() => Roles.Remove(key));
-    }
-
+    internal static void Suspend(Component subscriber) => ManagedRuntime.Current.Contacts.Suspend(subscriber);
+    internal static void BindRole(ObjectHandle owner, ulong body, uint shape, ShapeRole role, ComponentLifetime lifetime)
+        => ManagedRuntime.Current.Contacts.BindRole(owner, body, shape, role, lifetime);
     internal static ContactStream Observe(Component subscriber, ObjectHandle owner, ShapeRole self, ShapeRole other,
         ContactPhases phases, int capacity, ContactGrouping grouping = ContactGrouping.ShapePairs)
-    {
-        if (!owner.IsValid || self.Id == Guid.Empty || other.Id == Guid.Empty || phases == 0 ||
-            (phases & ~ContactPhases.All) != 0 || capacity <= 0 || capacity > 65536 ||
-            !Enum.IsDefined(grouping))
-            throw new ArgumentException("Invalid contact subscription.");
-        var stream = new ContactStream(subscriber, owner, self, other, phases, capacity, grouping);
-        foreach (var phase in new[] { ContactPhases.Begin, ContactPhases.Persist, ContactPhases.End })
-        {
-            // Track sensor pair transitions even for Begin-only/End-only subscriptions.
-            var key = new RouteKey(owner, self, other, phase);
-            if (!Routes.TryGetValue(key, out var list)) Routes.Add(key, list = new());
-            list.Add(stream);
-        }
-        if (!Subscribers.TryGetValue(subscriber, out var owned)) Subscribers.Add(subscriber, owned = new());
-        owned.Add(stream);
-
-        subscriber.Scope.RegisterCleanup(stream.Dispose);
-        return stream;
-    }
-
-    internal static void Remove(ContactStream stream)
-    {
-        Touched.Remove(stream);
-        if (Subscribers.TryGetValue(stream.Subscriber, out var owned))
-        {
-            owned.Remove(stream);
-            if (owned.Count == 0) Subscribers.Remove(stream.Subscriber);
-        }
-
-        foreach (var phase in new[] { ContactPhases.Begin, ContactPhases.Persist, ContactPhases.End })
-        {
-            var key = new RouteKey(stream.Owner, stream.SelfRole, stream.OtherRole, phase);
-            if (!Routes.TryGetValue(key, out var list)) continue;
-            list.Remove(stream);
-            if (list.Count == 0) Routes.Remove(key);
-        }
-    }
-
-    internal static void Route(in NativeContact value)
-    {
-        var phase = value.Kind switch { 0 or 3 => ContactPhases.Begin, 1 or 5 => ContactPhases.Persist,
-            2 or 4 => ContactPhases.End, _ => throw new ArgumentException("Unknown contact phase.") };
-        var first = ResolveRole(value.First);
-        var second = ResolveRole(value.Second);
-        if (first.Id == Guid.Empty || second.Id == Guid.Empty) return;
-        Deliver(new(value.First.Owner, first, second, phase), value, false, phase);
-        Deliver(new(value.Second.Owner, second, first, phase), value, true, phase);
-    }
-
-    private static ShapeRole ResolveRole(in ContactEndpoint endpoint)
-    {
-        if (endpoint.Role != Guid.Empty) return new(endpoint.Role);
-        return Roles.TryGetValue(new(endpoint.Owner, endpoint.Component, endpoint.Shape), out var role) ? role : default;
-    }
-
-    private static void Deliver(RouteKey key, in NativeContact value, bool reverse, ContactPhases phase)
-    {
-        if (!Routes.TryGetValue(key, out var streams)) return;
-        foreach (var stream in streams)
-        {
-            if (stream.Disposed || !stream.Subscriber.Enabled || !stream.Subscriber.BeginSucceeded) continue;
-            var observed = stream.ObservePhase(value, phase, reverse);
-            if (observed == 0 && !stream.Overflowed) continue;
-            if (!stream.Touched) { Touched.Add(stream); stream.Touched = true; }
-            if (observed != 0) stream.Append(new Contact(value, reverse, observed));
-        }
-    }
-
-    internal static void EndFrame()
-    {
-        foreach (var stream in Touched) stream.Clear();
-        Touched.Clear();
-    }
+        => ManagedRuntime.Current.Contacts.Observe(subscriber, owner, self, other, phases, capacity, grouping);
+    internal static void Remove(ContactStream stream) => ManagedRuntime.Current.Contacts.Remove(stream);
+    internal static void Route(in NativeContact value) => ManagedRuntime.Current.Contacts.Route(value);
+    internal static void EndUpdate() => ManagedRuntime.Current.Contacts.EndUpdate();
+    internal static void EndFrame() => ManagedRuntime.Current.Contacts.EndFrame();
 }

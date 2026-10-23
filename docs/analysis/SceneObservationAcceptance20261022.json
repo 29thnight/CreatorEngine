@@ -1,0 +1,1561 @@
+{
+  "result": "W4_NDB_ACCEPTANCE_OK",
+  "date": "2026-10-22",
+  "platform": "Windows x64",
+  "head": "0847ceeb2ec99d1b4edbdfd9f7f8a94bd773f915",
+  "sourceScope": "Current dirty worktree; no commit or push",
+  "sourceHashes": {
+    "Engine/SceneRuntime/SceneObservation.h": "e489e3cfc8e49b0dcf4d66fb5c2fe58931167e9d9c98c3469a3194164f9fd661",
+    "Engine/SceneRuntime/Component.h": "07106935e355ea5b55d8c8f068712effafc086e12e0e85d68add9d52e652dab8",
+    "Engine/SceneRuntime/Component.cpp": "f387a9d6710aca359d7173d745f9400c2433fef397db1ecce0f987df522e0799",
+    "Engine/SceneRuntime/Entity.h": "25795e9bc73297b5d32bf1eb22755ddb3216507523c6be149c5fa489ed16ed69",
+    "Engine/SceneRuntime/Entity.cpp": "2a3906f65d4cf26be79f4766e4339dbba5c613dbac27467f6a5c8c193cf518ef",
+    "Engine/SceneRuntime/Scene.h": "c476bb5b79eb1d4676cfdea918e2d9dc91c20cbb4d82a4692ad4c78ac7e733fa",
+    "Engine/SceneRuntime/Scene.cpp": "2f480404e4290c7793e6a951ea622c80e7c6a1d8a8049b9a3b7ec692d347b44d",
+    "Engine/SceneRuntime/SceneManager.h": "5598203d99913da36d20f7390cf95c6477551937ac3d03b8f17cc3efb5957af9",
+    "Engine/SceneRuntime/SceneManager.cpp": "aeb0f4109fbafe8880b51088867ee47b8828f65e6a89e283e226d16e82ba5224",
+    "Engine/SceneRuntime/LightComponent.h": "55fdf8f75e10ab801a472da323bf8b6ae361f3bc58d5a5db4bbd2c832ba5e1a6",
+    "Engine/SceneRuntime/MeshRenderer.h": "9e14bbc9ca60acd50977a5708f4318599e3cb8f7313dbba2cea69207c2ae61b8",
+    "Engine/SceneRuntime/MeshRenderer.cpp": "16e494a2aaa58cdc5782e6effb83ac72c3dcef3c236f693b7ee3fe92fcb6efc0",
+    "Engine/SceneRuntime/SpriteRenderer.h": "bf3651e0fb2cddc3d75ba8689e199b870d5a51420765a01db860812590b034ad",
+    "Engine/SceneRuntime/SpriteRenderer.cpp": "ffa0c42593e63d199c57438b6df9d2705234276b35da57a5bd888391a5f3c24a",
+    "Engine/SceneRuntime/DecalComponent.cpp": "75e7f92e31d55f1c5f7d587afa8a2fe8bde6a7697521d46524117b0fcc79bc77",
+    "Engine/SceneRuntime/FoliageComponent.cpp": "daf2ac8aac041ebdd4560a7aa4c7d064e9a5f4866d28247a1b3c0f94ebff84e1",
+    "Engine/SceneRuntime/ImageComponent.cpp": "d5493cddb7192e1a7e267dde1d19f6f47bf2c8902289588b33176fc90ff17f5f",
+    "Engine/SceneRuntime/SpriteSheetComponent.cpp": "e3eac2a7dc02eba06fd30b0f12547536aee933184aa60376f985faf852843303",
+    "Engine/SceneRuntime/Terrain.cpp": "1558189d9146b5bb11945430adfb89c19d5f6634ede959657f9f71733f84e12d",
+    "Engine/SceneRuntime/TextComponent.cpp": "ca982ae7f18db8059faffd4f7049dd785d7342efb6f8139b25ea91acb97e5620",
+    "Engine/SceneRuntime/UIComponent.h": "aa89168759592a77f681143891385b07e1295adaf446057808b854685a184721",
+    "Engine/SceneRuntime/PhysicsBodyComponent.cpp": "e5fd22321d78ab3b7205f1efc7c3b0eac8d4bc9072c0107bb87d91c09a7f601e",
+    "Engine/SceneRuntime/SceneRuntime.vcxproj": "67c8e91fa345557d5f979b231ab9520e454b8c82110ba600dbae70885c0c6e79",
+    "Engine/Utility_Framework/PropertyChange.h": "fcfa62d13cf23832513181d6e9a9ee1000fac2f6106e2cb03c030e3258a0a462",
+    "Engine/Utility_Framework/ReflectionYml.h": "88e8a51261cafdf4df47d1414fb40329a6f661bda0cb49bbb3012bf83d9466d4",
+    "Engine/Utility_Framework/ReflgenAuthoringSerializers.h": "bca2ddd0c5b020c83ef9ac90bf69dd745ca132cbd4964923a65d16eb233bf330",
+    "Engine/Utility_Framework/Utility_Framework.vcxproj": "008b9edefa5ef4853675507002aefa162bcbf1de0b082568d458716103d1720a",
+    "Editor/EngineEntry/ReflectionPropertyEdit.h": "33624c3c6078e4eab3979bf6898f277a0ebf7d93a295483dcb3c96ad03a57fce",
+    "Editor/EngineEntry/ReflectionUndo.h": "de7d22ef5a304d16002d170841e56d4e525f4ef4ae9e423d0e14df42d4f18c79",
+    "Editor/EngineEntry/EditorObjectOperations.cpp": "82137378da42d0e6c50cfd41fe4e78381bceb4595be3a04d4a7da5bd12dfbd60",
+    "Editor/EngineGUIWindow/ReflectionTypedDraw.h": "9236d200a3767119eb354f1e3f5ea00acf057cb030ce3951be0866186b269498",
+    "Editor/RenderTests/Tasks/SceneGCSelfTest.cpp": "1e7d1c09445a23d22a9463c040cfcfae71ef254ab71f2be7007926c135aa5a66",
+    "Editor/RenderTests/Animation/AnimationPlaybackSelfTest.cpp": "95c0d8b08ca4f08e38c000f30755f4f46038d99cc62a060b40f41b2ebcf288cd",
+    "Editor/RenderTests/RenderTests.vcxproj": "9ace0754a95ef1c4e718000f781e6e567672ab2ceb73d1319fd0647ba455b017",
+    ".github/workflows/network-contracts.yml": "1f7859340349e802dc325b5f9edc0b9803eac6071541b268ae1cc368b63fa535",
+    "Tools/regression/SceneObservationProbe.cpp": "fc39812cf1a1c4a5e94e3ebe981e3e1550a7675cf4b3baa3b6de636c4ceee1ee",
+    "Tools/regression/verify-scene-observation.ps1": "e15fe0730ab10450176a817a19033d4204eb889d16660fea0a90ed7f15bb6934",
+    "Tools/regression/verify-scene-gc.ps1": "477d35c645f3e61b284a4b8d794e7c483f4357a1ad0d8ce379ed205e601f9eb0",
+    "Tools/regression/run-all.ps1": "f2c00c9d560054fb4b96b9143ee86fdf2f8549ea9ae04fc9e2ac26b208f16421",
+    "Tools/regression/network_handoff_suite.py": "8cbed414a281eaa7b9f42b2aca5975e819ea64668d24ef1f0ff0ba3a635c76e9",
+    "Tools/regression/network-handoff.suite.json": "198dc1ec42b8dd804c4130294139b2722f9f3354698a5ac4e9c473e2a6626c1c",
+    "Tools/regression/verify-net-regression-wiring.ps1": "178cc86b06ee5864c4aa1fc8d146ba7e4f8cd4dff2f8ff23a2f22927e2507abe",
+    "Editor/Editor.vcxproj": "94d307bb226013f4222564f3c87f87f6a2d27530a6651ef05e76f459b218b979"
+  },
+  "evidence": [
+    "Build/Verification/NDA/Suite-bfe132510e284f1b98c5de7dd2b5c645/result.json",
+    "Artifacts/scene-gc/Release/result.json",
+    "Build/Obj/Phase19C0/http-624e76a6716143679f0d2c06b704d97f/result.json",
+    "Build/Verification/W4NDB/Wiring/RunnerCanary/result.json"
+  ],
+  "results": {
+    "Build/Verification/NDA/Suite-bfe132510e284f1b98c5de7dd2b5c645/result.json": {
+      "suite": "NetworkHandoff",
+      "scope": "All registered NetworkHandoff gates; not all engine/GPU/device/soak tests",
+      "passed": [
+        "ND-a-All",
+        "W4-ND-b-All",
+        "N3-Debug",
+        "N3-Release",
+        "PhysicsABI-All",
+        "PhysicsIdentity-Debug",
+        "PhysicsIdentity-Release",
+        "LifecycleEnums-None",
+        "N3Product",
+        "W4NDBProduct"
+      ],
+      "product": true,
+      "manifestHash": "198DC1EC42B8DD804C4130294139B2722F9F3354698A5AC4E9C473E2A6626C1C",
+      "configuration": [
+        "Debug",
+        "Release"
+      ],
+      "failures": [],
+      "result": "NETWORK_HANDOFF_REGRESSIONS_OK"
+    },
+    "Artifacts/scene-gc/Release/result.json": {
+      "runtimeHash": "3CB30A4148BA2189E92B596D8B4301999C8E91C75C21C8D8748741CB695500E2",
+      "exitCode": 0,
+      "editor": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Bin\\x64-Release\\Editor\\CreatorEditor.exe",
+      "observationIterations": 2,
+      "renderRegistrationIterations": 2,
+      "result": "SCENE_OBSERVATION_PRODUCT_OK",
+      "scope": "Actual Editor authoring transaction and local observation/lifetime/DDOL; render publication only, not GPU/proxy-consumption acceptance",
+      "configuration": "Release",
+      "iterations": 2
+    },
+    "Build/Obj/Phase19C0/http-624e76a6716143679f0d2c06b704d97f/result.json": {
+      "stepEvidence": null,
+      "scriptProbe": true,
+      "terrainEvidence": [],
+      "probe": {
+        "completed": 1,
+        "passed": 18,
+        "failed": 0
+      },
+      "moved": {
+        "componentId": "#1044209264",
+        "position": [
+          0.375,
+          2.1,
+          0
+        ],
+        "footPosition": [
+          0.375,
+          1.78814e-07,
+          0
+        ],
+        "actualDisplacement": [
+          0.0166667,
+          0,
+          0
+        ],
+        "desiredVelocity": [
+          1,
+          0,
+          0
+        ],
+        "movementVelocity": [
+          1,
+          0,
+          0
+        ],
+        "forcedRemaining": 0,
+        "forced": false,
+        "jumpQueued": false,
+        "fallVelocity": 0,
+        "sides": false,
+        "above": false,
+        "below": true,
+        "tick": "28",
+        "simulating": true
+      },
+      "ddolEvidence": {
+        "before": {
+          "componentId": "#1044209264",
+          "position": [
+            0.518333,
+            2.1,
+            0
+          ],
+          "footPosition": [
+            0.518333,
+            -9.48785e-08,
+            0
+          ],
+          "actualDisplacement": [
+            0.05,
+            0,
+            0
+          ],
+          "desiredVelocity": [
+            1.25,
+            0,
+            0
+          ],
+          "movementVelocity": [
+            0.2,
+            0,
+            0
+          ],
+          "forcedRemaining": 9.98333,
+          "forced": true,
+          "jumpQueued": false,
+          "fallVelocity": 0,
+          "sides": false,
+          "above": false,
+          "below": true,
+          "tick": "141",
+          "simulating": true
+        },
+        "disabledBefore": {
+          "componentId": "#1044209264",
+          "position": [
+            2.53917,
+            0.28515,
+            0
+          ],
+          "footPosition": [
+            2.53917,
+            -1.81485,
+            0
+          ],
+          "actualDisplacement": [
+            0.0208333,
+            -0.0981,
+            0
+          ],
+          "desiredVelocity": [
+            1.25,
+            0,
+            0
+          ],
+          "movementVelocity": [
+            1.25,
+            0,
+            0
+          ],
+          "forcedRemaining": 0,
+          "forced": false,
+          "jumpQueued": false,
+          "fallVelocity": -5.886,
+          "sides": false,
+          "above": false,
+          "below": false,
+          "tick": "36",
+          "simulating": false
+        },
+        "continued": {
+          "componentId": "#1044209264",
+          "position": [
+            2.51833,
+            0.38325,
+            0
+          ],
+          "footPosition": [
+            2.51833,
+            -1.71675,
+            0
+          ],
+          "actualDisplacement": [
+            0.05,
+            -0.095375,
+            0
+          ],
+          "desiredVelocity": [
+            1.25,
+            0,
+            0
+          ],
+          "movementVelocity": [
+            1.25,
+            0,
+            0
+          ],
+          "forcedRemaining": 9.31667,
+          "forced": true,
+          "jumpQueued": false,
+          "fallVelocity": -5.7225,
+          "sides": false,
+          "above": false,
+          "below": false,
+          "tick": "35",
+          "simulating": true
+        },
+        "disabledAfter": {
+          "componentId": "#1044209264",
+          "position": [
+            2.53917,
+            0.28515,
+            0
+          ],
+          "footPosition": [
+            2.53917,
+            -1.81485,
+            0
+          ],
+          "actualDisplacement": [
+            0,
+            0,
+            0
+          ],
+          "desiredVelocity": [
+            1.25,
+            0,
+            0
+          ],
+          "movementVelocity": [
+            1.25,
+            0,
+            0
+          ],
+          "forcedRemaining": 0,
+          "forced": false,
+          "jumpQueued": false,
+          "fallVelocity": -5.886,
+          "sides": false,
+          "above": false,
+          "below": false,
+          "tick": "0",
+          "simulating": false
+        },
+        "after": {
+          "componentId": "#1044209264",
+          "position": [
+            1.51833,
+            1.773,
+            0
+          ],
+          "footPosition": [
+            1.51833,
+            -0.327,
+            0
+          ],
+          "actualDisplacement": [
+            0.05,
+            -0.0408751,
+            0
+          ],
+          "desiredVelocity": [
+            1.25,
+            0,
+            0
+          ],
+          "movementVelocity": [
+            1.25,
+            0,
+            0
+          ],
+          "forcedRemaining": 9.65,
+          "forced": true,
+          "jumpQueued": false,
+          "fallVelocity": -2.4525,
+          "sides": false,
+          "above": false,
+          "below": false,
+          "tick": "15",
+          "simulating": true
+        },
+        "afterOwner": {
+          "id": "@7:3:1",
+          "name": "CharacterGateActor",
+          "layerId": "1",
+          "layer": "Default",
+          "layerSlot": 0,
+          "editorIcon": "",
+          "editorLocked": false,
+          "enabled": true,
+          "editBlocked": false,
+          "sceneId": 7,
+          "index": 3,
+          "generation": 1,
+          "parent": "@7:2:1",
+          "position": [
+            -0.596244,
+            0.906937,
+            -1.49894
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "rotation": [
+            0,
+            2.5332e-07,
+            0,
+            1
+          ],
+          "children": [],
+          "components": [
+            {
+              "id": "#3175903558",
+              "type": "Transform",
+              "enabled": true
+            },
+            {
+              "id": "#1044209264",
+              "type": "CharacterMovementComponent",
+              "enabled": true
+            },
+            {
+              "id": "#3087085854",
+              "type": "ScriptComponent",
+              "enabled": true
+            }
+          ]
+        },
+        "destination": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Dynamic_CPP\\Assets\\Scenes\\PhysicsCharacterDestination-624e76a6716143679f0d2c06b704d97f.creator",
+        "beforeOwner": {
+          "id": "@6:2:1",
+          "name": "CharacterGateActor",
+          "layerId": "1",
+          "layer": "Default",
+          "layerSlot": 0,
+          "editorIcon": "",
+          "editorLocked": false,
+          "enabled": true,
+          "editBlocked": false,
+          "sceneId": 6,
+          "index": 2,
+          "generation": 1,
+          "parent": "@6:3:1",
+          "position": [
+            -1.02998,
+            1.05,
+            -1.74936
+          ],
+          "scale": [
+            1,
+            1,
+            1
+          ],
+          "rotation": [
+            0,
+            2.83122e-07,
+            0,
+            1
+          ],
+          "children": [],
+          "components": [
+            {
+              "id": "#3175903558",
+              "type": "Transform",
+              "enabled": true
+            },
+            {
+              "id": "#1044209264",
+              "type": "CharacterMovementComponent",
+              "enabled": true
+            },
+            {
+              "id": "#3087085854",
+              "type": "ScriptComponent",
+              "enabled": true
+            }
+          ]
+        }
+      },
+      "motionEvidence": {
+        "landed": {
+          "componentId": "#1044209264",
+          "position": [
+            0,
+            2.1,
+            0
+          ],
+          "footPosition": [
+            0,
+            4.66825e-08,
+            0
+          ],
+          "actualDisplacement": [
+            0,
+            0,
+            0
+          ],
+          "desiredVelocity": [
+            0,
+            0,
+            0
+          ],
+          "movementVelocity": [
+            0,
+            0,
+            0
+          ],
+          "forcedRemaining": 0,
+          "forced": false,
+          "jumpQueued": false,
+          "fallVelocity": 0,
+          "sides": false,
+          "above": false,
+          "below": true,
+          "tick": "126",
+          "simulating": true
+        },
+        "airborne": {
+          "componentId": "#1044209264",
+          "position": [
+            0,
+            2.54277,
+            0
+          ],
+          "footPosition": [
+            0,
+            0.442775,
+            0
+          ],
+          "actualDisplacement": [
+            0,
+            0.0669832,
+            0
+          ],
+          "desiredVelocity": [
+            0,
+            0,
+            0
+          ],
+          "movementVelocity": [
+            0,
+            0,
+            0
+          ],
+          "forcedRemaining": 0,
+          "forced": false,
+          "jumpQueued": false,
+          "fallVelocity": 4.019,
+          "sides": false,
+          "above": false,
+          "below": false,
+          "tick": "68",
+          "simulating": true
+        },
+        "expired": {
+          "componentId": "#1044209264",
+          "position": [
+            0.466667,
+            2.1,
+            0
+          ],
+          "footPosition": [
+            0.466667,
+            -9.48785e-08,
+            0
+          ],
+          "actualDisplacement": [
+            0,
+            0,
+            0
+          ],
+          "desiredVelocity": [
+            0,
+            0,
+            0
+          ],
+          "movementVelocity": [
+            0,
+            0,
+            0
+          ],
+          "forcedRemaining": 0,
+          "forced": false,
+          "jumpQueued": false,
+          "fallVelocity": 0,
+          "sides": false,
+          "above": false,
+          "below": true,
+          "tick": "138",
+          "simulating": true
+        }
+      },
+      "hierarchyProbe": true,
+      "ddolProbe": true,
+      "scene": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Dynamic_CPP\\Assets\\Scenes\\PhysicsCharacterGate-624e76a6716143679f0d2c06b704d97f.creator",
+      "transitionFailureProbe": true,
+      "hierarchyEvidence": {
+        "before": {
+          "PersistentDisabledCharacter": {
+            "id": "@6:5:1",
+            "name": "PersistentDisabledCharacter",
+            "layerId": "11",
+            "layer": "Enemy",
+            "layerSlot": 10,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": false,
+            "editBlocked": false,
+            "sceneId": 6,
+            "index": 5,
+            "generation": 1,
+            "parent": "@6:4:1",
+            "position": [
+              10,
+              5,
+              2
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "children": [],
+            "components": [
+              {
+                "id": "#3667681818",
+                "type": "Transform",
+                "enabled": false
+              },
+              {
+                "id": "#1119000546",
+                "type": "CharacterMovementComponent",
+                "enabled": false
+              }
+            ]
+          },
+          "PersistentBranch": {
+            "id": "@6:4:1",
+            "name": "PersistentBranch",
+            "layerId": "1",
+            "layer": "Default",
+            "layerSlot": 0,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": true,
+            "editBlocked": false,
+            "sceneId": 6,
+            "index": 4,
+            "generation": 1,
+            "parent": "@6:3:1",
+            "position": [
+              7,
+              0,
+              2
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "children": [
+              "@6:5:1",
+              "@6:6:1"
+            ],
+            "components": [
+              {
+                "id": "#1602807092",
+                "type": "Transform",
+                "enabled": true
+              }
+            ]
+          },
+          "PersistentDisabledBody": {
+            "id": "@6:6:1",
+            "name": "PersistentDisabledBody",
+            "layerId": "16",
+            "layer": "Ground",
+            "layerSlot": 15,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": false,
+            "editBlocked": false,
+            "sceneId": 6,
+            "index": 6,
+            "generation": 1,
+            "parent": "@6:4:1",
+            "position": [
+              13,
+              5,
+              2
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "children": [],
+            "components": [
+              {
+                "id": "#1496338863",
+                "type": "Transform",
+                "enabled": false
+              },
+              {
+                "id": "#4098470618",
+                "type": "PhysicsBodyComponent",
+                "enabled": false
+              }
+            ]
+          },
+          "PersistentParent": {
+            "id": "@6:3:1",
+            "name": "PersistentParent",
+            "layerId": "1",
+            "layer": "Default",
+            "layerSlot": 0,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": true,
+            "editBlocked": false,
+            "sceneId": 6,
+            "index": 3,
+            "generation": 1,
+            "parent": "@6:0:1",
+            "position": [
+              4,
+              0,
+              2
+            ],
+            "scale": [
+              2,
+              2,
+              2
+            ],
+            "rotation": [
+              0,
+              0.258819,
+              0,
+              0.965926
+            ],
+            "children": [
+              "@6:2:1",
+              "@6:4:1"
+            ],
+            "components": [
+              {
+                "id": "#615050054",
+                "type": "Transform",
+                "enabled": true
+              }
+            ]
+          }
+        },
+        "disabledCharacterAfter": {
+          "componentId": "#1119000546",
+          "position": [
+            37.4449,
+            10,
+            -8.0718
+          ],
+          "footPosition": [
+            37.4449,
+            7.9,
+            -8.0718
+          ],
+          "actualDisplacement": [
+            0,
+            0,
+            0
+          ],
+          "desiredVelocity": [
+            2,
+            0,
+            0
+          ],
+          "movementVelocity": [
+            0,
+            0,
+            0
+          ],
+          "forcedRemaining": 0,
+          "forced": false,
+          "jumpQueued": false,
+          "fallVelocity": 0,
+          "sides": false,
+          "above": false,
+          "below": false,
+          "tick": "0",
+          "simulating": false
+        },
+        "after": {
+          "PersistentDisabledCharacter": {
+            "id": "@7:5:1",
+            "name": "PersistentDisabledCharacter",
+            "layerId": "11",
+            "layer": "Enemy",
+            "layerSlot": 10,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": false,
+            "editBlocked": false,
+            "sceneId": 7,
+            "index": 5,
+            "generation": 1,
+            "parent": "@7:4:1",
+            "position": [
+              10,
+              5,
+              2
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "children": [],
+            "components": [
+              {
+                "id": "#3667681818",
+                "type": "Transform",
+                "enabled": false
+              },
+              {
+                "id": "#1119000546",
+                "type": "CharacterMovementComponent",
+                "enabled": false
+              }
+            ]
+          },
+          "PersistentBranch": {
+            "id": "@7:4:1",
+            "name": "PersistentBranch",
+            "layerId": "1",
+            "layer": "Default",
+            "layerSlot": 0,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": true,
+            "editBlocked": false,
+            "sceneId": 7,
+            "index": 4,
+            "generation": 1,
+            "parent": "@7:2:1",
+            "position": [
+              7,
+              0,
+              2
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "children": [
+              "@7:5:1",
+              "@7:6:1"
+            ],
+            "components": [
+              {
+                "id": "#1602807092",
+                "type": "Transform",
+                "enabled": true
+              }
+            ]
+          },
+          "PersistentDisabledBody": {
+            "id": "@7:6:1",
+            "name": "PersistentDisabledBody",
+            "layerId": "16",
+            "layer": "Ground",
+            "layerSlot": 15,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": false,
+            "editBlocked": false,
+            "sceneId": 7,
+            "index": 6,
+            "generation": 1,
+            "parent": "@7:4:1",
+            "position": [
+              13,
+              5,
+              2
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "children": [],
+            "components": [
+              {
+                "id": "#1496338863",
+                "type": "Transform",
+                "enabled": false
+              },
+              {
+                "id": "#4098470618",
+                "type": "PhysicsBodyComponent",
+                "enabled": false
+              }
+            ]
+          },
+          "PersistentParent": {
+            "id": "@7:2:1",
+            "name": "PersistentParent",
+            "layerId": "1",
+            "layer": "Default",
+            "layerSlot": 0,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": true,
+            "editBlocked": false,
+            "sceneId": 7,
+            "index": 2,
+            "generation": 1,
+            "parent": "@7:0:1",
+            "position": [
+              4,
+              0,
+              2
+            ],
+            "scale": [
+              2,
+              2,
+              2
+            ],
+            "rotation": [
+              0,
+              0.258819,
+              0,
+              0.965926
+            ],
+            "children": [
+              "@7:3:1",
+              "@7:4:1"
+            ],
+            "components": [
+              {
+                "id": "#615050054",
+                "type": "Transform",
+                "enabled": true
+              }
+            ]
+          }
+        },
+        "restored": {
+          "PersistentDisabledCharacter": {
+            "id": "@8:2:2",
+            "name": "PersistentDisabledCharacter",
+            "layerId": "11",
+            "layer": "Enemy",
+            "layerSlot": 10,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": false,
+            "editBlocked": false,
+            "sceneId": 8,
+            "index": 2,
+            "generation": 2,
+            "parent": "@8:3:2",
+            "position": [
+              10,
+              5,
+              2
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "children": [],
+            "components": [
+              {
+                "id": "#3667681818",
+                "type": "Transform",
+                "enabled": false
+              },
+              {
+                "id": "#1119000546",
+                "type": "CharacterMovementComponent",
+                "enabled": false
+              }
+            ]
+          },
+          "PersistentBranch": {
+            "id": "@8:3:2",
+            "name": "PersistentBranch",
+            "layerId": "1",
+            "layer": "Default",
+            "layerSlot": 0,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": true,
+            "editBlocked": false,
+            "sceneId": 8,
+            "index": 3,
+            "generation": 2,
+            "parent": "@8:4:2",
+            "position": [
+              7,
+              0,
+              2
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "children": [
+              "@8:2:2",
+              "@8:1:2"
+            ],
+            "components": [
+              {
+                "id": "#1602807092",
+                "type": "Transform",
+                "enabled": true
+              }
+            ]
+          },
+          "PersistentDisabledBody": {
+            "id": "@8:1:2",
+            "name": "PersistentDisabledBody",
+            "layerId": "16",
+            "layer": "Ground",
+            "layerSlot": 15,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": false,
+            "editBlocked": false,
+            "sceneId": 8,
+            "index": 1,
+            "generation": 2,
+            "parent": "@8:3:2",
+            "position": [
+              13,
+              5,
+              2
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "children": [],
+            "components": [
+              {
+                "id": "#1496338863",
+                "type": "Transform",
+                "enabled": false
+              },
+              {
+                "id": "#4098470618",
+                "type": "PhysicsBodyComponent",
+                "enabled": false
+              }
+            ]
+          },
+          "PersistentParent": {
+            "id": "@8:4:2",
+            "name": "PersistentParent",
+            "layerId": "1",
+            "layer": "Default",
+            "layerSlot": 0,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": true,
+            "editBlocked": false,
+            "sceneId": 8,
+            "index": 4,
+            "generation": 2,
+            "parent": "@8:0:1",
+            "position": [
+              4,
+              0,
+              2
+            ],
+            "scale": [
+              2,
+              2,
+              2
+            ],
+            "rotation": [
+              0,
+              0.258819,
+              0,
+              0.965926
+            ],
+            "children": [
+              "@8:5:2",
+              "@8:3:2"
+            ],
+            "components": [
+              {
+                "id": "#615050054",
+                "type": "Transform",
+                "enabled": true
+              }
+            ]
+          }
+        },
+        "disabledCharacterBefore": {
+          "componentId": "#1119000546",
+          "position": [
+            37.4449,
+            10,
+            -8.0718
+          ],
+          "footPosition": [
+            37.4449,
+            7.9,
+            -8.0718
+          ],
+          "actualDisplacement": [
+            0,
+            0,
+            0
+          ],
+          "desiredVelocity": [
+            2,
+            0,
+            0
+          ],
+          "movementVelocity": [
+            0,
+            0,
+            0
+          ],
+          "forcedRemaining": 0,
+          "forced": false,
+          "jumpQueued": false,
+          "fallVelocity": 0,
+          "sides": false,
+          "above": false,
+          "below": false,
+          "tick": "0",
+          "simulating": false
+        }
+      },
+      "transitionFailureEvidence": {
+        "failure": {
+          "gameStart": false,
+          "paused": false,
+          "editorSceneLoaded": false,
+          "pending": false,
+          "entities": 8,
+          "committed": false,
+          "state": "Stopped",
+          "inputOwner": "editor",
+          "viewportTarget": "scene",
+          "gameTargetReady": false,
+          "foreground": true,
+          "foregroundOverride": 1,
+          "uiTextInput": false,
+          "cursorHidden": false,
+          "cursorHideRequested": false,
+          "failureCount": 1,
+          "lastFailure": "Physics Transform contains unsupported shear",
+          "controllerTicks": 3457
+        },
+        "restored": {
+          "PersistentDisabledBody": {
+            "id": "@9:2:2",
+            "name": "PersistentDisabledBody",
+            "layerId": "16",
+            "layer": "Ground",
+            "layerSlot": 15,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": false,
+            "editBlocked": false,
+            "sceneId": 9,
+            "index": 2,
+            "generation": 2,
+            "parent": "@9:4:2",
+            "position": [
+              13,
+              5,
+              2
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "children": [],
+            "components": [
+              {
+                "id": "#1496338863",
+                "type": "Transform",
+                "enabled": false
+              },
+              {
+                "id": "#4098470618",
+                "type": "PhysicsBodyComponent",
+                "enabled": false
+              }
+            ]
+          },
+          "PersistentDisabledCharacter": {
+            "id": "@9:3:2",
+            "name": "PersistentDisabledCharacter",
+            "layerId": "11",
+            "layer": "Enemy",
+            "layerSlot": 10,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": false,
+            "editBlocked": false,
+            "sceneId": 9,
+            "index": 3,
+            "generation": 2,
+            "parent": "@9:4:2",
+            "position": [
+              10,
+              5,
+              2
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "children": [],
+            "components": [
+              {
+                "id": "#3667681818",
+                "type": "Transform",
+                "enabled": false
+              },
+              {
+                "id": "#1119000546",
+                "type": "CharacterMovementComponent",
+                "enabled": false
+              }
+            ]
+          },
+          "CharacterGateActor": {
+            "id": "@9:6:2",
+            "name": "CharacterGateActor",
+            "layerId": "1",
+            "layer": "Default",
+            "layerSlot": 0,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": true,
+            "editBlocked": false,
+            "sceneId": 9,
+            "index": 6,
+            "generation": 2,
+            "parent": "@9:5:2",
+            "position": [
+              0,
+              3,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "children": [],
+            "components": [
+              {
+                "id": "#3175903558",
+                "type": "Transform",
+                "enabled": true
+              },
+              {
+                "id": "#1044209264",
+                "type": "CharacterMovementComponent",
+                "enabled": true
+              },
+              {
+                "id": "#3087085854",
+                "type": "ScriptComponent",
+                "enabled": true
+              }
+            ]
+          },
+          "CharacterGateFloor": {
+            "id": "@9:7:2",
+            "name": "CharacterGateFloor",
+            "layerId": "1",
+            "layer": "Default",
+            "layerSlot": 0,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": true,
+            "editBlocked": false,
+            "sceneId": 9,
+            "index": 7,
+            "generation": 2,
+            "parent": "@9:0:1",
+            "position": [
+              0,
+              -0.5,
+              0
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "children": [],
+            "components": [
+              {
+                "id": "#2163630710",
+                "type": "Transform",
+                "enabled": true
+              },
+              {
+                "id": "#3766387318",
+                "type": "PhysicsBodyComponent",
+                "enabled": true
+              }
+            ]
+          },
+          "PersistentParent": {
+            "id": "@9:5:2",
+            "name": "PersistentParent",
+            "layerId": "1",
+            "layer": "Default",
+            "layerSlot": 0,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": true,
+            "editBlocked": false,
+            "sceneId": 9,
+            "index": 5,
+            "generation": 2,
+            "parent": "@9:0:1",
+            "position": [
+              4,
+              0,
+              2
+            ],
+            "scale": [
+              2,
+              2,
+              2
+            ],
+            "rotation": [
+              0,
+              0.258819,
+              0,
+              0.965926
+            ],
+            "children": [
+              "@9:6:2",
+              "@9:4:2"
+            ],
+            "components": [
+              {
+                "id": "#615050054",
+                "type": "Transform",
+                "enabled": true
+              }
+            ]
+          },
+          "PersistentBranch": {
+            "id": "@9:4:2",
+            "name": "PersistentBranch",
+            "layerId": "1",
+            "layer": "Default",
+            "layerSlot": 0,
+            "editorIcon": "",
+            "editorLocked": false,
+            "enabled": true,
+            "editBlocked": false,
+            "sceneId": 9,
+            "index": 4,
+            "generation": 2,
+            "parent": "@9:5:2",
+            "position": [
+              7,
+              0,
+              2
+            ],
+            "scale": [
+              1,
+              1,
+              1
+            ],
+            "rotation": [
+              0,
+              0,
+              0,
+              1
+            ],
+            "children": [
+              "@9:3:2",
+              "@9:2:2"
+            ],
+            "components": [
+              {
+                "id": "#1602807092",
+                "type": "Transform",
+                "enabled": true
+              }
+            ]
+          }
+        },
+        "sourceState": {
+          "componentId": "#1044209264",
+          "position": [
+            0.326667,
+            2.42775,
+            0
+          ],
+          "footPosition": [
+            0.326667,
+            0.32775,
+            0
+          ],
+          "actualDisplacement": [
+            0.05,
+            -0.0544999,
+            0
+          ],
+          "desiredVelocity": [
+            1.25,
+            0,
+            0
+          ],
+          "movementVelocity": [
+            1.25,
+            0,
+            0
+          ],
+          "forcedRemaining": 9.96667,
+          "forced": true,
+          "jumpQueued": false,
+          "fallVelocity": -3.27,
+          "sides": false,
+          "above": false,
+          "below": false,
+          "tick": "21",
+          "simulating": true
+        },
+        "transferredPersistent": 5,
+        "replay": {
+          "componentId": "#1044209264",
+          "position": [
+            0.208333,
+            2.58308,
+            0
+          ],
+          "footPosition": [
+            0.208333,
+            0.483075,
+            0
+          ],
+          "actualDisplacement": [
+            0.0166667,
+            -0.0463247,
+            0
+          ],
+          "desiredVelocity": [
+            1,
+            0,
+            0
+          ],
+          "movementVelocity": [
+            1,
+            0,
+            0
+          ],
+          "forcedRemaining": 0,
+          "forced": false,
+          "jumpQueued": false,
+          "fallVelocity": -2.7795,
+          "sides": false,
+          "above": false,
+          "below": false,
+          "tick": "18",
+          "simulating": true
+        },
+        "destination": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Dynamic_CPP\\Assets\\Scenes\\PhysicsRejectedDestination-624e76a6716143679f0d2c06b704d97f.creator",
+        "lifecycleBefore": {
+          "added": 5,
+          "removed": 4
+        },
+        "authoredFilesImmutable": true,
+        "lifecycleAfter": {
+          "added": 6,
+          "removed": 6
+        }
+      },
+      "commands": 205,
+      "initial": [
+        0,
+        3,
+        0
+      ],
+      "restored": [
+        0,
+        3,
+        0
+      ],
+      "motionProbe": true,
+      "terrainProbe": false,
+      "stepProbe": false,
+      "result": "PHYSICS_CHARACTER_HTTP_OK"
+    },
+    "Build/Verification/W4NDB/Wiring/RunnerCanary/result.json": {
+      "removedObservationGateRejected": true,
+      "productionSourcesChanged": false,
+      "result": "NET_REGRESSION_WIRING_CANARIES_OK",
+      "removedGateRejected": true,
+      "failurePropagated": true,
+      "failedGateExit": 37
+    }
+  },
+  "binaries": {
+    "Bin/x64-Release/Editor/CreatorEditor.runtime.dll": "3cb30a4148ba2189e92b596d8b4301999c8e91c75c21c8d8748741cb695500e2",
+    "Bin/x64-Release/Player/Player.runtime.dll": "20f857f70b9686685ff124d9a8126c73666e486775ca663d619d32c09429b4e2"
+  },
+  "managedDDOL": {
+    "result": "PASS",
+    "log": "Build/Verification/W4NDB/CallerRegression/ddol.log",
+    "fixture": "W4NDBDdol-26823949dca4495f8068a48c7005ba87",
+    "onUpdateStarts": 1,
+    "transferAdded": 1,
+    "transferRemoving": 1,
+    "resumedAfterTransfer": 1
+  },
+  "limits": [
+    "W5 proxy consumption/GPU not accepted",
+    "Player built; no new cooked Player acceptance in this gate",
+    "Wire IDs/schema/authority/replication/transport and Dedicated Server/2-client/soak remain separate",
+    "Remote CI not run",
+    "Raw public C++ field stores require explicit notification",
+    "Ancillary full-document index precheck failed on existing RHISoftwareCommandListSpecification.src.html source drift; requested plan visuals and document script checks passed"
+  ]
+}

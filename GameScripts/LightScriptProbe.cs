@@ -27,7 +27,7 @@ public sealed partial class LightScriptProbe : Component
     private static int _passed;
     private static int _failed;
 
-    public override void OnInitialized()
+    public void OnInitialized()
     {
         LightComponent? light = Entity.GetComponent<LightComponent>();
         if (light is null)

@@ -1,4 +1,5 @@
 #include "../../../Utility_Framework/Ownership.h"
+#include "RuntimeResults.h"
 #include "../Temporal/XeSSUpscaler.h"
 #include "../../Render/Temporal/TemporalRuntimeControl.h"
 #include <stdint.h>
@@ -1731,6 +1732,17 @@ bool VulkanDeviceResources::DrainForLifecycle(RHILifecycleCommand command,
         m_lastLifecycleResult.pendingTasks,
         m_lastLifecycleResult.pendingBatches,
         m_lastLifecycleResult.pendingRetirements);
+    if (command == RHILifecycleCommand::BackendShutdown)
+    {
+        Diagnostics::RuntimeResults::Emit("rhi.backend_shutdown", [&](Diagnostics::Node data)
+        {
+            data["backend"] << "Vulkan";
+            data["clean"] << m_lastLifecycleResult.IsClean();
+            data["pendingTasks"] << m_lastLifecycleResult.pendingTasks;
+            data["pendingBatches"] << m_lastLifecycleResult.pendingBatches;
+            data["pendingRetirements"] << m_lastLifecycleResult.pendingRetirements;
+        });
+    }
     return m_lastLifecycleResult.IsClean();
 }
 

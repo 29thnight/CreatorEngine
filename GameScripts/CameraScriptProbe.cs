@@ -25,7 +25,7 @@ public sealed partial class CameraScriptProbe : Component
     private static int _passed;
     private static int _failed;
 
-    public override void OnInitialized()
+    public void OnInitialized()
     {
         CameraComponent? camera = Entity.GetComponent<CameraComponent>();
         if (camera is null)

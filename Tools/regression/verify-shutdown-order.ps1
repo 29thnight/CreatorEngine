@@ -1,4 +1,4 @@
-# 종료 순서 회귀 (층 2).
+﻿# 종료 순서 회귀 (층 2).
 #
 # 첫 프레임이 만들어지기 전에 종료를 걸어, Dx11Main::Finalize가 렌더 스레드를
 # 세운 뒤에야 렌더 씬을 해체하는지 확인한다.
@@ -12,7 +12,8 @@
 param(
     [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
     [string]$Work = $env:TEMP,
-    [int]$Runs = 6
+    [int]$Runs = 6,
+    [string]$ProjectRoot = ''
 )
 
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
@@ -23,12 +24,18 @@ $script = Join-Path $PSScriptRoot "immediate_quit.txt"
 if (-not (Test-Path $script)) { "시나리오가 없다: $script"; exit 1 }
 
 $failures = @()
+$receipts = @()
+New-Item -ItemType Directory -Force -Path $Work | Out-Null
+$arguments = @('--commandlet-script', ('"' + $script + '"'))
+if ($ProjectRoot) { $arguments += @('--development-project', ('"' + [IO.Path]::GetFullPath($ProjectRoot) + '"')) }
 
 for ($i = 1; $i -le $Runs; $i++) {
-    $proc = Start-Process -FilePath $Exe -ArgumentList "--commandlet-script", $script `
-        -WorkingDirectory $exeDir `
+    $proc = Start-Process -FilePath $Exe -ArgumentList $arguments `
+        -WorkingDirectory $exeDir -WindowStyle Hidden `
         -RedirectStandardOutput (Join-Path $Work "shutdown_order_$i.out") `
         -RedirectStandardError (Join-Path $Work "shutdown_order_$i.err") -PassThru
+    # Acquire the handle before exit so Windows PowerShell 5 retains ExitCode.
+    $null = $proc.Handle
     $proc.WaitForExit(120000) | Out-Null
 
     if (-not $proc.HasExited) {
@@ -40,7 +47,12 @@ for ($i = 1; $i -le $Runs; $i++) {
     if ($proc.ExitCode -ne 0) {
         $failures += "{0}회차: 종료 코드 0x{1:X8}" -f $i, $proc.ExitCode
     }
+    $receipts += @{ run = $i; pid = $proc.Id; exitCode = $proc.ExitCode }
 }
+
+@{ result = $(if ($failures.Count) { 'SHUTDOWN_ORDER_FAILED' } else { 'SHUTDOWN_ORDER_OK' });
+   shell = $PSVersionTable.PSVersion.ToString(); runs = $receipts; failures = $failures; project = $ProjectRoot } |
+    ConvertTo-Json -Depth 6 | Set-Content -LiteralPath (Join-Path $Work 'result.json') -Encoding utf8
 
 if ($failures.Count -gt 0) {
     "실패 $($failures.Count) / $Runs"

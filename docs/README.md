@@ -148,3 +148,11 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
   이 저장소의 관례이며, 실제로 그 기록이 재실수를 막았다.
 
 </details>
+
+## CLI 소비자 후속 수용
+
+[래칫7파일 이주·실제 회귀와 미수용 범위](analysis/CliConsumerMigrationAcceptance20261023.md) · [구조화된 결과 계약](design/RuntimeResultConsumerContract.md) · [애니메이션 쿠커 수정·제품 후속 검증](analysis/AnimationCookAcceptance20261023.md). 상한0/위반0을 유지하며 일반 GUI·Inspector 종료/soak 잔여와 구분한다.
+
+## master 통합 재점검
+
+[2026-10-23 동기화와 현재 작업본의 제품 재검증](analysis/MasterSyncRecheck20261023.md). 이전 수용 지문과 현재 SDK·실행 바이너리를 구분하여 기록한다.

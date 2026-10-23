@@ -1,4 +1,6 @@
 #pragma once
+#include "../material_owner_checks.h"
+#include "../../../Engine/Utility_Framework/Ownership.h"
 
 #include "../../../Engine/RenderEngine/MaterialGraphSceneCoverage.h"
 #include "../../../Engine/RenderEngine/MaterialGraphIblBake.h"
@@ -18,10 +20,10 @@ namespace material_graph
         std::uint64_t geometryRevision{};
         std::vector<IblBakePoint> points;
         // Exactly one input transport: CPU points or an owning GPU evaluation.
-        std::shared_ptr<const SurfaceBatch> gpu;
+        own::shared_owner<const SurfaceBatch> gpu;
     };
 
-    bool BuildSceneSurfaceEvaluation(std::shared_ptr<const SurfaceBatch> gpu, SceneSurfaceEvaluation& result,
+    bool BuildSceneSurfaceEvaluation(own::shared_owner<const SurfaceBatch> gpu, SceneSurfaceEvaluation& result,
                                      std::string& error);
 
     struct ScenePassLayout
@@ -44,7 +46,7 @@ namespace material_graph
         own::local_view<const Instance> instance;
         std::uint64_t sceneEpoch{}, viewRevision{}, geometryRevision{};
         std::vector<IblBakePoint> points;
-        std::shared_ptr<const SurfaceBatch> gpu;
+        own::shared_owner<const SurfaceBatch> gpu;
     };
 
     struct SceneMaterialPacket
@@ -58,8 +60,8 @@ namespace material_graph
         SceneSurfaceSnapshot evaluation;
         IblEnvironment environment;
         own::shared_owner<const RenderBindings> bindings;
-        std::shared_ptr<const LX::Runtime::GraphicsPipeline> pipeline;
-        std::shared_ptr<const IblBakeResult> ibl;
+        own::shared_owner<const LX::Runtime::GraphicsPipeline> pipeline;
+        own::shared_owner<const IblBakeResult> ibl;
         std::uint32_t iblSlot{};
     };
 
@@ -87,7 +89,7 @@ namespace material_graph
                      IblBaker& baker, const SceneSurfaceEvaluation& evaluation, const IblEnvironment& environment,
                      const EnhancedMaterialCoverage& coverage, const ScenePassLayout& layout,
                      const RHIGraphicsPipelineDesc& pipeline, RHIShaderBinary backend, const Capabilities& capabilities,
-                     const Budget& budget, std::shared_ptr<const SceneMaterialPacket>& result, std::string& error);
+                     const Budget& budget, own::shared_owner<const SceneMaterialPacket>& result, std::string& error);
 
         bool Bind(RHIEncoder& encoder, const SceneMaterialPacket& packet, std::string& error) const;
         // GPU-evaluated packets additionally need completed submission and accepted
@@ -95,7 +97,7 @@ namespace material_graph
         bool PublishSubmitted(std::uint64_t recordingId, RHICompletionPoint completion, std::string& error);
         // A rejected publication still retains submitted GPU resources to completion.
         void RejectSubmitted(std::uint64_t recordingId);
-        const std::shared_ptr<const SceneMaterialPacket>& Active() const { return active_; }
+        const own::shared_owner<const SceneMaterialPacket>& Active() const { return active_; }
         std::size_t RetainedRecordingCount() const { return recordings_.size(); }
 
         // Required after device idle and before device/cache destruction. External
@@ -106,9 +108,9 @@ namespace material_graph
         struct Recording
         {
             own::shared_owner<InstanceFramePins> instancePins;
-            std::vector<std::shared_ptr<const SceneMaterialPacket>> owners;
-            std::shared_ptr<const SceneMaterialPacket> accepted;
-            std::shared_ptr<const SceneMaterialPacket> submitted;
+            std::vector<own::shared_owner<const SceneMaterialPacket>> owners;
+            own::shared_owner<const SceneMaterialPacket> accepted;
+            own::shared_owner<const SceneMaterialPacket> submitted;
             std::uint64_t completion{};
             bool submissionNotified{}, submissionAccepted{};
             bool publicationDecided{};
@@ -123,7 +125,7 @@ namespace material_graph
         IRenderDeviceServices* device_{};
         std::uint64_t serial_{};
         std::uint64_t completed_{};
-        std::shared_ptr<const SceneMaterialPacket> active_;
+        own::shared_owner<const SceneMaterialPacket> active_;
         std::map<std::uint64_t, Recording> recordings_;
     };
 } // namespace material_graph

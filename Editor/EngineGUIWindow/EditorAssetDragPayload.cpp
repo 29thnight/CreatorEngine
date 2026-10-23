@@ -17,7 +17,7 @@ namespace
     // `set_payload` 가 싣기를 **거부하고 이유를 남긴다** — 조용히 어긋나지 않는다.
     constexpr std::string_view kPathPayloadTypes[] = {
         "Unknown", "Model", "Texture", "MaterialTexture", "TerrainTexture",
-        "Shader", "CppScript", "CSharpScript", "Prefab", "Sound", "HDR",
+        "Shader", "CppScript", "FSharpScript", "Prefab", "Sound", "HDR",
         "SceneRenderProfile", "Font", "SPRITESHEET", "UI_TEXTURE",
     };
 

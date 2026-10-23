@@ -9,7 +9,7 @@ public sealed partial class HealthComponent : Component
 
     public int CurrentHp { get; private set; }
 
-    public override void OnInitialized()
+    public void OnInitialized()
     {
         CurrentHp = _maxHp;
     }

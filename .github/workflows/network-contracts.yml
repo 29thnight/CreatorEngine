@@ -1,0 +1,119 @@
+name: Network handoff contracts
+
+on:
+  pull_request:
+    paths:
+      - 'Engine/Network/**'
+      - 'Engine/SceneRuntime/**'
+      - 'Editor/EngineEntry/App.cpp'
+      - 'Editor/EngineEntry/EditorPreferences.h'
+      - 'Editor/EngineEntry/Commands/N3PacingCapture.h'
+      - 'Editor/EngineEntry/Commands/RenderDebugCommands.cpp'
+      - 'Editor/EngineEntry/Commands/RenderTestCommands.cpp'
+      - 'GameScripts/N3PacingProbe.cs'
+      - 'Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h'
+      - 'Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp'
+      - 'Engine/Utility_Framework/DiagnosticDocument.*'
+      - 'Engine/Utility_Framework/Authoring*'
+      - 'ports/reflgen/**'
+      - 'vcpkg.json'
+      - 'Engine/Utility_Framework/ScriptApiVersion.h'
+      - 'Engine/Utility_Framework/PropertyChange.h'
+      - 'Engine/Utility_Framework/ReflectionYml.h'
+      - 'Engine/Utility_Framework/ReflgenAuthoringSerializers.h'
+      - 'Editor/EngineEntry/EditorObjectOperations.cpp'
+      - 'Editor/EngineEntry/ReflectionPropertyEdit.h'
+      - 'Editor/EngineEntry/ReflectionUndo.h'
+      - 'Editor/EngineGUIWindow/ReflectionTypedDraw.h'
+      - 'Editor/RenderTests/Tasks/SceneGCSelfTest.cpp'
+      - 'ScriptCore/**'
+      - 'ScriptCore.Generators/**'
+      - 'ScriptRuntime/**'
+      - 'GameScripts/N3PacingProbe.fs'
+      - 'GameScripts/GameScripts.fsproj'
+      - 'Tools/regression/**'
+      - '.github/workflows/network-contracts.yml'
+  push:
+    branches: [master]
+    paths:
+      - 'Engine/Network/**'
+      - 'Engine/SceneRuntime/**'
+      - 'Editor/EngineEntry/App.cpp'
+      - 'Editor/EngineEntry/EditorPreferences.h'
+      - 'Editor/EngineEntry/Commands/N3PacingCapture.h'
+      - 'Editor/EngineEntry/Commands/RenderDebugCommands.cpp'
+      - 'Editor/EngineEntry/Commands/RenderTestCommands.cpp'
+      - 'GameScripts/N3PacingProbe.cs'
+      - 'Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h'
+      - 'Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp'
+      - 'Engine/Utility_Framework/DiagnosticDocument.*'
+      - 'Engine/Utility_Framework/Authoring*'
+      - 'ports/reflgen/**'
+      - 'vcpkg.json'
+      - 'Engine/Utility_Framework/ScriptApiVersion.h'
+      - 'Engine/Utility_Framework/PropertyChange.h'
+      - 'Engine/Utility_Framework/ReflectionYml.h'
+      - 'Engine/Utility_Framework/ReflgenAuthoringSerializers.h'
+      - 'Editor/EngineEntry/EditorObjectOperations.cpp'
+      - 'Editor/EngineEntry/ReflectionPropertyEdit.h'
+      - 'Editor/EngineEntry/ReflectionUndo.h'
+      - 'Editor/EngineGUIWindow/ReflectionTypedDraw.h'
+      - 'Editor/RenderTests/Tasks/SceneGCSelfTest.cpp'
+      - 'ScriptCore/**'
+      - 'ScriptCore.Generators/**'
+      - 'ScriptRuntime/**'
+      - 'GameScripts/N3PacingProbe.fs'
+      - 'GameScripts/GameScripts.fsproj'
+      - 'Tools/regression/**'
+      - '.github/workflows/network-contracts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  network-handoff:
+    runs-on: windows-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install isolated N1 archive probe dependencies
+        shell: pwsh
+        run: |
+          $ErrorActionPreference='Stop'
+          $manifest=Join-Path $PWD 'Build/CI/N1Manifest'
+          $install=Join-Path $PWD 'Build/CI/N1Dependencies'
+          New-Item -ItemType Directory -Force $manifest|Out-Null
+          $baseline=(Get-Content vcpkg.json -Raw|ConvertFrom-Json).'builtin-baseline'
+          @{name='creator-n1-probes';'version-string'='1';'builtin-baseline'=$baseline;dependencies=@('ryml','reflgen')}|ConvertTo-Json|Set-Content "$manifest/vcpkg.json" -Encoding utf8
+          vcpkg install --triplet x64-windows --x-manifest-root=$manifest --x-install-root=$install --overlay-ports="$PWD/ports"
+          if($LASTEXITCODE){throw 'N1 dependency installation failed'}
+          "CREATOR_N1_DEPENDENCIES=$install/x64-windows"|Out-File $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Run every registered network handoff gate
+        shell: pwsh
+        env:
+          CREATOR_NET_CONTRACT_BASE: ${{ github.event.pull_request.base.sha || github.event.before || 'HEAD^' }}
+        run: ./Tools/regression/run-all.ps1 -Suite NetworkHandoff -Configuration All
+      - name: Verify N3 product runner failure propagation
+        shell: pwsh
+        run: ./Tools/regression/verify-n3-pacing-wiring.ps1
+      - name: Preserve results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: network-handoff-results
+          path: |
+            Build/Verification/NDA/**
+            Build/Verification/N3Exchange/**
+            Build/Verification/W4NDB/**
+            Build/Verification/N1/**
+            Build/Verification/N3Pacing/**
+            Build/Obj/Phase19M0Script/*.log

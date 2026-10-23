@@ -72,7 +72,7 @@ void SpriteRenderer::SetSprite(const own::shared_owner<const Texture>& ptr)
     // Resolve before replacing the owner so a rejected cooked reference preserves it.
     m_Sprite = ptr;
     m_SpritePath = std::move(reference);
-	PublishRenderProxyDirty(ProxyDirty::Material);
+	PublishRenderPropertyWrite(ProxyDirty::Material);
 }
 
 

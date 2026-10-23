@@ -216,84 +216,12 @@ public abstract class Component
     internal bool TeardownDelivered { get; private set; }
     internal void MarkTeardownDelivered() => TeardownDelivered = true;
 
-    // ── 씬 그래프 6단계 생명주기 (SceneGraphRedesignPlan §4 트랙 L) ──
-    //
-    // 기준점이 오브젝트가 아니라 컴포넌트다 — 옛 Awake는 "오브젝트가 태어남"이었지만
-    // OnInitialized는 "이 컴포넌트가 초기화됨"이다. 네이티브 Component.h와 같은 매핑을
-    // 쓴다. 디스패치는 ScriptRegistry가 한다.
-    //
-    // ★ L3 — 옛 Awake/Start/OnDestroy와 그 브리지를 걷어냈다.
-    //   전환기에는 기본 구현이 옛 훅을 불러 주었지만(`OnInitialized() => Awake()`),
-    //   살아있는 소비자를 전부 새 이름으로 옮겼으므로 다리를 치운다.
-    //   네이티브와 같은 회차에 같은 근거로 정리했다 — 자세한 것은 Component.h 주석.
-    public virtual void OnInitialized() { }
-    public virtual void OnAddedToScene() { }
-    public virtual void OnBeginSimulation() { }
-    public virtual void OnEndSimulation() { }
-    public virtual void OnRemovingFromScene() { }
-    public virtual void OnUninitializing() { }
+    // Lifecycle members belong to authored types. The generator supplies typed
+    // callbacks; this binding base has no virtual lifecycle methods.
+    internal ScriptLifecycle Lifecycle { get; set; } = ScriptLifecycle.Empty;
 
-    // ── 활성/비활성 축 (6단계와 직교) ──
-    // 씬 페이즈와 무관하게 "지금 켜져 있는가"를 다룬다 — 대응물이 없어 남는다.
-    public virtual void OnEnable() { }
-    public virtual void OnDisable() { }
-
-    // ── 틱 축 ──
-    // ── 틱 축 (설계 문서 §4 트랙 L5) ──
-    //
-    // 옛 FixedUpdate/Update/LateUpdate 셋을 **물리 기준 두 지점**으로 대체했다.
-    // 프레임에서 무엇이 언제 도는지가 이름에 드러나야 한다는 것이 요지다 —
-    // "Update가 물리 앞인가 뒤인가"는 옛 이름으로는 알 수 없었고, 실제로는
-    // 셋 다 물리 뒤였다(EditorMain의 프레임 루프).
-    //
-    // 은퇴 시점 실측: FixedUpdate 오버라이드 0곳 · Update 17곳 · LateUpdate 1곳,
-    // 그리고 **Update와 LateUpdate를 함께 쓰는 파일 0개** — 둘을 PostPhysics 하나로
-    // 합쳐도 잃는 순서가 없다.
-
-    /// <summary>물리 스텝 **앞**. 이번 프레임의 물리에 영향을 주려면 여기서 한다.</summary>
-    public virtual void PrePhysics(float tick) { }
-
-    /// <summary>물리 스텝 **뒤**. 물리 결과를 보고 판단하는 대부분의 게임 로직 자리다.</summary>
-    public virtual void PostPhysics(float tick) { }
-
-    /// <summary>
-    /// 시뮬레이션 본문 (설계 문서 §4 트랙 L5). <see cref="OnBeginSimulation"/> 직후
-    /// 한 번 시작하고, 엔티티가 제거될 때 <see cref="Scope"/> 취소가 이것을 **먼저**
-    /// 끊는다(취소 → OnEndSimulation → OnRemovingFromScene).
-    ///
-    /// AI 시퀀스·애니메이션 시퀀스·대기·비동기 상호작용처럼 **여러 프레임에 걸친
-    /// 흐름**을 상태 머신 대신 직선으로 쓰는 자리다:
-    /// <code>
-    /// public override async Task OnSimulate()
-    /// {
-    ///     await Scope.Delay(1f);
-    ///     Play("charge");
-    ///     await Scope.Delay(0.5f);
-    ///     Fire();
-    /// }
-    /// </code>
-    ///
-    /// ── 반드시 지킬 것 ──
-    ///
-    /// <b>await 대상은 <see cref="Scope"/>의 것이어야 한다.</b> Scope.Delay는
-    /// 엔진 dt로 흐르고 완료 콜백이 게임 스레드에서 <b>동기로</b> 재개된다
-    /// (SimulationScope.Tick이 TaskCompletionSource를 그 자리에서 완료시킨다).
-    /// Task.Delay나 임의의 라이브러리 Task를 await하면 재개가 스레드풀로 넘어가
-    /// 그 뒤 코드가 게임 스레드 밖에서 엔진 API를 만진다 — 관리 코드 호출 규약
-    /// 위반이고, 증상은 산발적 크래시다.
-    ///
-    /// 취소는 협조적이다(.NET은 태스크를 강제 종료할 수 없다). Scope.Delay를
-    /// await하고 있으면 그 대기가 취소되며 OperationCanceledException으로 풀린다.
-    /// 긴 동기 루프를 도는 본문은 <see cref="SimulationScope.Token"/>을 스스로 봐야 한다.
-    /// </summary>
-    public virtual Task OnSimulate() => Task.CompletedTask;
-
-    /// <summary>
-    /// 이 컴포넌트의 시뮬레이션 스코프. OnBeginSimulation에서 시작한 태스크·이벤트
-    /// 구독은 여기 걸어 두면 OnEndSimulation 직전에 <see cref="ScriptRegistry"/>가
-    /// 일괄 취소한다(Verse spawn/suspends의 C# 대응물, 설계 문서 §4 트랙 L2).
-    /// </summary>
-    public SimulationScope Scope { get; } = new();
+    // Engine subscriptions only. User code owns ordinary IDisposable/CancellationToken lifetimes.
+    internal ComponentLifetime Lifetime { get; } = new();
 
     /// <summary>
     /// 이름으로 부르는 콜백(애니메이션 키프레임 이벤트·입력 액션)의 진입점.

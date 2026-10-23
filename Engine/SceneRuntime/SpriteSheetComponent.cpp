@@ -15,7 +15,7 @@ void SpriteSheetComponent::ReplaceTextureOwner(const Texture* previous,
     {
         m_spriteSheetTexture = replacement;
         uiinfo.size = replacement->GetImageSize();
-        PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+        PublishRenderPropertyWrite(ProxyDirty::Material | ProxyDirty::Payload);
     }
 }
 
@@ -25,7 +25,7 @@ void SpriteSheetComponent::LoadSpriteSheet(const file::path& path)
 	m_spriteSheetTexture = DataSystems->LoadSharedTexture(m_spriteSheetPath,
 		DataSystem::TextureFileType::SpriteSheet);
 	uiinfo.size = m_spriteSheetTexture->GetImageSize();
-	PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+	PublishRenderPropertyWrite(ProxyDirty::Material | ProxyDirty::Payload);
 
 	//origin = { uiinfo.size.x / 2, uiinfo.size.y / 2 };
 }

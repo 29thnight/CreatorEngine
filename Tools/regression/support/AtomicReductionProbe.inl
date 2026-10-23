@@ -102,7 +102,7 @@ void RunAtomicReduction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
         RHIBufferDesc d;d.bytes=17*8;d.allowUnorderedAccess=true;RHIBufferHandle buffer;
         Check(device.CreateBuffer(d,buffer,error),"Atomic buffer");
         RHIReadback readback;Check(device.CreateBufferReadback(d.bytes,readback,error),"Atomic readback");
-        auto graphOwner=std::make_shared<EnhancedRenderGraph>(device,RGSchedulingMode::ExplicitVersioned);
+        auto graphOwner=own::make_shared<EnhancedRenderGraph>(device,RGSchedulingMode::ExplicitVersioned);
         auto& graph=*graphOwner;
         if(workers) {pool.BeginFrame(workers*2+reverse);Check(graph.PrepareParallel(pool,error),"Atomic parallel preparation");}
         std::array<RHIBufferSlice,2> constants;

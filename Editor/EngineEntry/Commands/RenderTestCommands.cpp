@@ -148,6 +148,8 @@
 #include "../../Engine/SceneRuntime/MeshRenderer.h"
 #include "../../Engine/RenderEngine/Material.h"
 
+#include "N3PacingCapture.h"
+
 namespace ConsoleCmd
 {
     static CommandCore::CommandResult Cmd_scene_gc_selftest(const ConsoleCommandContext& ctx)
@@ -1142,6 +1144,8 @@ namespace ConsoleCmd
         reg.Result({ "render.pbr.normalpair" }, &Cmd_render_pbr_normalpair);
         reg.Result({ "render.pbr.sealstatus" }, &Cmd_render_pbr_sealstatus);
         reg.Result({ "render.pbr.capture" }, &Cmd_render_pbr_capture, SceneAccess::OwnedState);
+        reg.Result({ "simulation.pacing.transition" }, &N3Pacing::Transition, SceneAccess::BorrowLiveState);
+        reg.Result({ "simulation.pacing.capture" }, &N3Pacing::Capture, SceneAccess::BorrowLiveState);
         reg.Result({ "render.temporal.motion.fixture" }, &Cmd_render_temporal_motion_fixture, SceneAccess::BorrowLiveState);
         reg.Result({ "render.temporal.history.capture" }, &Cmd_render_temporal_history_capture, SceneAccess::OwnedState);
         reg.Result({ "render.live.capture" }, &Cmd_render_pbr_capture, SceneAccess::OwnedState);

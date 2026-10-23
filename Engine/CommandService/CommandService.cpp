@@ -137,14 +137,12 @@ namespace CommandService
         m_stopping.store(true, std::memory_order_release);
         if (m_thread.joinable()) m_thread.join();
 
-        // 작업 스레드가 소켓과 this 를 만지므로 리스너를 닫기 전에 전부 회수한다.
-        //
-        // ★ 먼저 **깨운다.** 유휴 타임아웃 안에서 recv 로 막힌 스레드를 그냥
-        //   기다리면 에디터 종료가 최대 30초 늦어진다. shutdown 은 recv 를
-        //   즉시 반환시키고, 핸들을 닫는 것은 그 스레드가 한다.
+        // AcceptLoop has stopped adding workers. Interrupt every connection
+        // before joining any worker; otherwise an idle keep-alive can hold the
+        // whole shutdown until its receive timeout. The worker alone closes it.
         {
             std::lock_guard<std::mutex> guard(m_workerMutex);
-            for (Worker& worker : m_workers) ShutdownSocket(worker.client);
+            for (Worker& worker : m_workers) worker.connection->Interrupt();
         }
         JoinAllWorkers();
 
@@ -199,13 +197,12 @@ namespace CommandService
             //   인증 이전 단계라 토큰도 필요 없는 서비스 정지였다.
             ReapFinishedWorkers();
 
-            auto finished = std::make_shared<std::atomic<bool>>(false);
+            auto connection = std::make_shared<Worker::Connection>(client);
             m_connections.fetch_add(1, std::memory_order_relaxed);
 
             Worker worker;
-            worker.finished = finished;
-            worker.client   = client;
-            worker.thread   = std::thread([this, client, finished]
+            worker.connection = connection;
+            worker.thread = std::thread([this, client, connection]
             {
                 // ★ 예외가 스레드를 빠져나가면 `std::terminate` 다 — 요청 하나가
                 //   에디터 전체를 죽인다. 경계를 여기 둔다.
@@ -216,15 +213,14 @@ namespace CommandService
                 catch (const std::exception& error)
                 {
                     Audit(0, "-", "-", 500, 0.0, std::string("exception: ") + error.what());
-                    CloseSocket(client);
                 }
                 catch (...)
                 {
                     Audit(0, "-", "-", 500, 0.0, "unknown exception");
-                    CloseSocket(client);
                 }
+                connection->Close();
                 m_connections.fetch_sub(1, std::memory_order_relaxed);
-                finished->store(true, std::memory_order_release);
+                connection->finished.store(true, std::memory_order_release);
             });
 
             {
@@ -233,7 +229,21 @@ namespace CommandService
             }
         }
 
-        JoinAllWorkers();
+        // Stop owns worker interruption and joining. Waiting for workers here
+        // would make Stop's socket interruption unreachable until they exit.
+    }
+
+    void Service::Worker::Connection::Interrupt() noexcept
+    {
+        std::lock_guard<std::mutex> guard(socketMutex);
+        ShutdownSocket(client);
+    }
+
+    void Service::Worker::Connection::Close() noexcept
+    {
+        std::lock_guard<std::mutex> guard(socketMutex);
+        CloseSocket(client);
+        client = InvalidSocket();
     }
 
     void Service::ReapFinishedWorkers()
@@ -241,7 +251,7 @@ namespace CommandService
         std::lock_guard<std::mutex> guard(m_workerMutex);
         for (auto it = m_workers.begin(); it != m_workers.end();)
         {
-            if (it->finished->load(std::memory_order_acquire))
+            if (it->connection->finished.load(std::memory_order_acquire))
             {
                 if (it->thread.joinable()) it->thread.join();
                 it = m_workers.erase(it);
@@ -292,7 +302,6 @@ namespace CommandService
                     const std::string response = BuildHttpResponse(408, kJsonContentType, body, false);
                     SendAll(client, response.data(), response.size());
                     Audit(peerPort, "-", "-", 408, 0.0, "request deadline");
-                    CloseSocket(client);
                     return;
                 }
 
@@ -307,11 +316,11 @@ namespace CommandService
                 }
 
                 char chunk[4096];
-                const int got = Receive(client, chunk, sizeof(chunk), waitMs);
+                const int got = Receive(client, chunk, sizeof(chunk), waitMs, &m_stopping);
                 if (got <= 0)
                 {
-                    // 0 = 상대가 닫음, -1 = 오류, -2 = 유휴 타임아웃. 셋 다 종료다.
-                    CloseSocket(client);
+                    // Peer closure, error, timeout and service cancellation all
+                    // end this worker; its Connection performs the final close.
                     return;
                 }
                 firstByteSeen = true;
@@ -323,7 +332,6 @@ namespace CommandService
                     const std::string response = BuildHttpResponse(413, kJsonContentType, body, false);
                     SendAll(client, response.data(), response.size());
                     Audit(peerPort, "-", "-", 413, 0.0, "oversize");
-                    CloseSocket(client);
                     return;
                 }
                 parsed = ParseHttpRequest(buffer, m_config.limits);
@@ -338,7 +346,6 @@ namespace CommandService
                 const std::string response = BuildHttpResponse(status, kJsonContentType, body, false);
                 SendAll(client, response.data(), response.size());
                 Audit(peerPort, "-", "-", status, 0.0, parsed.error);
-                CloseSocket(client);
                 return;
             }
 
@@ -350,7 +357,6 @@ namespace CommandService
 
             if (!SendAll(client, response.data(), response.size()))
             {
-                CloseSocket(client);
                 return;
             }
 
@@ -358,7 +364,7 @@ namespace CommandService
             buffer.erase(0, parsed.consumed);
         }
 
-        CloseSocket(client);
+        // The worker closes its Connection on both success and exception paths.
     }
 
     bool Service::Authorized(const HttpRequest& request) const

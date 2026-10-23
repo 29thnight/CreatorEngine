@@ -50,14 +50,22 @@ public sealed class PhysicsBodyComponent : NativeComponent
     public static PhysicsBodyComponent? Find(Entity owner, ulong componentId)
     {
         if (componentId == 0 || Native.BodyRead(owner.Handle, componentId, out _) != PhysicsError.None)
+        {
             return null;
+        }
 
-        return new PhysicsBodyComponent { OwnerHandle = owner.Handle, NativeInstance = componentId };
+        return new PhysicsBodyComponent
+        {
+            OwnerHandle = owner.Handle,
+            NativeInstance = componentId
+        };
     }
 
 
-    /// <summary>Mark this exact native component for removal at the frame boundary.
-    /// Its owner Entity survives; subsequent calls on this wrapper return StaleHandle.</summary>
+    /// <summary>
+    /// Mark this exact native component for removal at the frame boundary.
+    /// Its owner Entity survives; subsequent calls on this wrapper return StaleHandle.
+    /// </summary>
     public PhysicsError Remove() => Native.BodyRemove(OwnerHandle, NativeInstance);
 
     public PhysicsError ReadState(out PhysicsBodyState state)

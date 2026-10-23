@@ -1,0 +1,4301 @@
+{
+  "schemaVersion": 1,
+  "status": "passed-Release-DX12",
+  "date": "2026-10-23",
+  "revision": "0847ceeb2ec99d1b4edbdfd9f7f8a94bd773f915",
+  "dirty": true,
+  "compilerPolicy": "v14; SPIR-V binary profile plus SM 6.0 source capability; warnings-as-errors all",
+  "hostBuild": {
+    "windowsSdk": "10.0.26100.0",
+    "platform": "x64",
+    "configuration": "Release"
+  },
+  "sourceHashes": [
+    {
+      "sha256": "4F4CE4259ABB9F013556F63C5FECEB24708D2E99A3E866A4EE95FCFDBCDFC902",
+      "path": "Engine/RenderEngine/RHI/RHIShaderCompiler.cpp"
+    },
+    {
+      "sha256": "BFB863CD6C1C09017AB1A430160C44BFC7741EA341DBB82024241F7CFCD40008",
+      "path": "Engine/RenderEngine/RHI/RHIShaderCompiler.h"
+    },
+    {
+      "sha256": "2061E62DEA8DF374DA6A72407B967A07949A8FC10E25F6CB5E9561396F9A92ED",
+      "path": "Engine/RenderEngine/MaterialGraphSceneCompiler.cpp"
+    },
+    {
+      "sha256": "1DBA1C47202F98F1E009078BE39DFEB8C0F1728AD7D496A8054277E804076EE3",
+      "path": "Engine/RenderEngine/MaterialGraphProduct.cpp"
+    },
+    {
+      "sha256": "8AF96E69274B6462598024D59B2F0763B0C56B03392CC99C850D3688969BC639",
+      "path": "Engine/RenderEngine/MaterialGraphMeshSurface.cpp"
+    },
+    {
+      "sha256": "D3AFD044C4EC557769081123E8E6D03FC15E74C6C95E6509BB2B669F49829ECF",
+      "path": "Engine/RenderEngine/MaterialGraphMeshSurface.h"
+    },
+    {
+      "sha256": "77764A5CCD1A989CD0B3D47734F00C90304F0F5ACB0DF1EE2ABE09FF046EE0AA",
+      "path": "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp"
+    },
+    {
+      "sha256": "30A6231C7E82B9EBF645A136F99D65A813AB7461BC097B606E1F58EAAE930FB1",
+      "path": "Engine/Utility_Framework/PakHelper.h"
+    },
+    {
+      "sha256": "B6139F61BBE6B865F1693694304A5EEAAEAB173FE6A5502B0E6EE9AA2AB2C62C",
+      "path": "BuildTool/AssetCooking.cs"
+    },
+    {
+      "sha256": "BFAB4E52368CB3CD25CC5903CDDBB209410E0DB02CA25D5A348A2FA83C27AC26",
+      "path": "BuildTool/GamePackager.cs"
+    },
+    {
+      "sha256": "E5E561EEC7AEF8754145D1761DD8753841CA5A91B73397FA8321C4E8ADC98A20",
+      "path": "BuildTool/Tests/Program.cs"
+    },
+    {
+      "sha256": "986538852C73C87A9E801F5D51A20A895D078D024A78B5DCFEBEDB3FDD219814",
+      "path": "Tools/regression/shader_verified_cache_probe.cpp"
+    },
+    {
+      "sha256": "6E2445BF46727C5217BAAB45B7DBD12B09DF7364970921CA9D3CD9A101336B27",
+      "path": "Tools/regression/verify-shader-verified-cache.ps1"
+    },
+    {
+      "sha256": "A1B5688191B6C0E6DD4FEB4E328C18E1E317B6C15B9118F0AEFEDB044029E2A1",
+      "path": "Tools/regression/verify-material-scene-cook.ps1"
+    },
+    {
+      "sha256": "D5AEFE434C2F3F2CBCCA26F14D8FF4BBADFD36304D5E78FC3FD8B3810DF06B48",
+      "path": "Tools/regression/material_raster_surface_probe.cpp"
+    },
+    {
+      "sha256": "FE1C25478DFB63E423646A82BC3335633D88B96DB9A8421E505CE2B066B5DAB1",
+      "path": "Tools/regression/material_mesh_surface_probe.cpp"
+    },
+    {
+      "sha256": "BB5F03C11C62AF7D321BC43EA0479B982B8C8FE71AD69D8F89A1FDDE1743E003",
+      "path": "Tools/regression/verify-material-mesh-surface.ps1"
+    },
+    {
+      "sha256": "7F7D76DD66389110D848DF527DCD346EF7D33A894980854E02E21152F29D8C9A",
+      "path": "Tools/regression/verify-animation-player.ps1"
+    },
+    {
+      "sha256": "C5AA71786972241B8FF862BC17C933E2B603B4D3ED98EE82D10F5BF73EB7C024",
+      "path": "Tools/regression/build-animation-player-fixture.ps1"
+    },
+    {
+      "sha256": "97E109441B3753AD45E3DAABEB30003792FC5E8413B126553A55BEA7FB92E397",
+      "path": "Tools/regression/verify-animation-fixture.ps1"
+    },
+    {
+      "sha256": "664957ECB2EABA9A428DEE38397C5B124543D0EEABD1379DC7F4A28725492F83",
+      "path": "Tools/regression/fixtures/AnimationPlayer.creator"
+    },
+    {
+      "sha256": "6F92FD9B1938250290BC49E8E9F69C1D75178A83E12142693439A0BC4F4FC2E1",
+      "path": "Dynamic_CPP/Assets/Models/CreatorRobot.glb.meta"
+    },
+    {
+      "sha256": "39381E41028D620197697346F44B8EAD16918E16C6AEAB41D50FC16F46F94783",
+      "path": "Tools/regression/RuntimeResults.ps1"
+    },
+    {
+      "sha256": "4FF7E6B81D83A9D98B7D613C9809D36636D65ABBD053F11DD799D72913D3B2A3",
+      "path": "GameScripts/PackageSmokeProbe.fs"
+    }
+  ],
+  "binaryHashes": [
+    {
+      "sha256": "7B35736D07E6D3CA02473030C260F300A3F811B9A118EC8E35B9D4FE21B16975",
+      "path": "Bin/x64-Release/Tools/AssetCooker/AssetCooker.exe"
+    },
+    {
+      "sha256": "B029854FA75FDA8BA4E19EFEECBC101F7F2B4C437F0218AB3E8BBB389A85BF54",
+      "path": "Bin/x64-Release/Tools/AssetCooker/AssetCooker.runtime.dll"
+    },
+    {
+      "sha256": "EFFF5BB0D1AFBB4C7F48C99DBC15EE0BE68B02AF78AA57D46890C655305476E4",
+      "path": "Bin/x64-Release/Player/Player.exe"
+    },
+    {
+      "sha256": "B7E565B8A65264B53F3F11879161F0B63FDAAEC4AA83F4CAFFF9F86D5E7895FF",
+      "path": "Bin/x64-Release/Player/Player.runtime.dll"
+    },
+    {
+      "sha256": "03A424E40A1FB3C4F2DAE14B859FDFEC36A9CF04C6E3709ADEB1384E7B023528",
+      "path": "Bin/x64-Release/Editor/CreatorEditor.exe"
+    },
+    {
+      "sha256": "35850462D8D609C702CEF10736A81371956829C60D11433678FB62D7AE16A305",
+      "path": "Bin/x64-Release/Editor/CreatorEditor.runtime.dll"
+    },
+    {
+      "sha256": "BF277592ACAB648F8BD1777054A6703B6DF797B7F2FCA55ED6116777363986D7",
+      "path": "Bin/x64-Release/Runtime/Common/slang-compiler.dll"
+    },
+    {
+      "sha256": "5156A89323B5750F7A781FF2A1062C9366349787E4F0AED541812BF536BC0C7A",
+      "path": "Bin/x64-Release/Tools/CreatorBuildTool/CreatorBuildTool.dll"
+    },
+    {
+      "sha256": "A692787B18209D36F23D6BCC3703E083EA245D59B73C27BD76053F2D29FC87CC",
+      "path": "Build/Verification/AnimationShaderBefore/cache-probe.exe"
+    },
+    {
+      "sha256": "3B03166F6166FBB281055511827D7359FBA12EE5F570490D4BF817037202D626",
+      "path": "Build/Verification/AnimationShaderFinal/cache-probe.exe"
+    }
+  ],
+  "engine": {
+    "scriptApi": 45,
+    "root": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\AnimationEngine\\local-0.0.0.0-win-x64-Release-6565e208-d463-421f-8008-c8e6a8faacf2",
+    "payloadDigest": "9cf95761a232b90a85c63110e5d1b1ce25cbe01960716d52ab272cf1a845ef0e",
+    "manifest": {
+      "sha256": "99336D862444C162FD75DD27833E71E83FBC038E78F8D9B7365650462DA06899",
+      "path": "Build/Verification/AnimationEngine/local-0.0.0.0-win-x64-Release-6565e208-d463-421f-8008-c8e6a8faacf2/engine.manifest.json"
+    },
+    "buildId": "6565e208-d463-421f-8008-c8e6a8faacf2"
+  },
+  "package": {
+    "identity": {
+      "sha256": "D167F45DBC8EA91ED35FB992C6F4ECDA5436A24D7C94CDF6680BE372040322F9",
+      "path": "Build/Verification/AnimationAcceptance20261023/Staging/Game-444464d49e4a4a9291e503cb9c6b8d61/package-manifest.json"
+    },
+    "root": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\AnimationAcceptance20261023\\Staging\\Game-444464d49e4a4a9291e503cb9c6b8d61",
+    "playerBinariesMatchConsumers": true,
+    "manifest": {
+      "schemaVersion": 2,
+      "workspaceHead": "0847ceeb2ec99d1b4edbdfd9f7f8a94bd773f915",
+      "workspaceDirty": true,
+      "packageInputRevision": "WORKTREE",
+      "nativeSource": "ENGINE_DISTRIBUTION",
+      "engineVersion": "0.0.0.0",
+      "engineBuildId": "6565e208-d463-421f-8008-c8e6a8faacf2",
+      "nativeBuildRequested": false,
+      "config": "Release",
+      "shipping": false,
+      "developmentBuild": true,
+      "inputMode": "Project",
+      "contentMode": "Legacy",
+      "selectedAssetPaths": [
+        "AnimatorController/0908girl.json",
+        "AnimatorController/123.json",
+        "AnimatorController/Asis.json",
+        "AnimatorController/BossAAA.json",
+        "AnimatorController/BossAnuControll.json",
+        "AnimatorController/LastBossAniControll.json",
+        "AnimatorController/MonstarA.json",
+        "AnimatorController/MonsterA.json",
+        "AnimatorController/MonsterB.json",
+        "AnimatorController/MonsterC.json",
+        "AnimatorController/NewControllers.json",
+        "AnimatorController/NewControllers123.json",
+        "AnimatorController/PlayerBoy.json",
+        "AnimatorController/PlayerGirl.json",
+        "AnimatorController/PlayerGirl2.json",
+        "AnimatorController/TBoss.json",
+        "AnimatorController/laterBoss.json",
+        "BehaviorTree/BTProbe.blackboard",
+        "BehaviorTree/BTProbe.blackboard.meta",
+        "BehaviorTree/BTProbe.bt",
+        "BehaviorTree/BTProbe.bt.meta",
+        "CSV/EventDesign_Template.csv",
+        "CSV/ItemEnhancementSetting.csv",
+        "CSV/SoundName.csv",
+        "Cloud/Cloud.png",
+        "Cloud/Cloud.png.meta",
+        "ColorGrading/LUT_3.png",
+        "ColorGrading/LUT_3.png.meta",
+        "HDR/Malibu_Overlook_3k.hdr",
+        "HDR/Malibu_Overlook_3k.hdr.meta",
+        "HDR/autumn_field_puresky_1k.hdr",
+        "HDR/autumn_field_puresky_1k.hdr.meta",
+        "HDR/kloofendal_38d_partly_cloudy_puresky_4k.hdr",
+        "HDR/kloofendal_38d_partly_cloudy_puresky_4k.hdr.meta",
+        "HDR/kloofendal_43d_clear_puresky_4k.hdr",
+        "HDR/kloofendal_43d_clear_puresky_4k.hdr.meta",
+        "HDR/kloofendal_48d_partly_cloudy_puresky_4k.hdr",
+        "HDR/kloofendal_48d_partly_cloudy_puresky_4k.hdr.meta",
+        "HDR/rosendal_park_sunset_puresky_4k.hdr",
+        "HDR/rosendal_park_sunset_puresky_4k.hdr.meta",
+        "INI/SceneBindSettings.ini",
+        "InputMap/ControllCamera.inputmap",
+        "InputMap/Player.inputmap",
+        "InputMap/PlayerKeyBoard.inputmap",
+        "InputMap/PlayerMenuKey.inputmap",
+        "InputMap/PlayerPerchase.inputmap",
+        "InputMap/PlayerSelect.inputmap",
+        "Materials/Cone_Mat_BaseColor.png",
+        "Materials/Cone_Mat_BaseColor.png.meta",
+        "Materials/Cube_Mat_BaseColor.png",
+        "Materials/Cube_Mat_BaseColor.png.meta",
+        "Materials/Cylinder_Mat_BaseColor.png",
+        "Materials/Cylinder_Mat_BaseColor.png.meta",
+        "Materials/ForwardWater.asset",
+        "Materials/ForwardWater.asset.meta",
+        "Materials/ForwardWind.asset",
+        "Materials/ForwardWind.asset.meta",
+        "Materials/IcoSphere_Mat_BaseColor.png",
+        "Materials/IcoSphere_Mat_BaseColor.png.meta",
+        "Materials/MatGrid_R0_C0_Mat_BaseColor.png",
+        "Materials/MatGrid_R0_C0_Mat_BaseColor.png.meta",
+        "Materials/MatGrid_R0_C1_Mat_BaseColor.png",
+        "Materials/MatGrid_R0_C1_Mat_BaseColor.png.meta",
+        "Materials/MatGrid_R0_C2_Mat_BaseColor.png",
+        "Materials/MatGrid_R0_C2_Mat_BaseColor.png.meta",
+        "Materials/MatGrid_R0_C3_Mat_BaseColor.png",
+        "Materials/MatGrid_R0_C3_Mat_BaseColor.png.meta",
+        "Materials/MatGrid_R0_C4_Mat_BaseColor.png",
+        "Materials/MatGrid_R0_C4_Mat_BaseColor.png.meta",
+        "Materials/MatGrid_R1_C0_Mat_BaseColor.png",
+        "Materials/MatGrid_R1_C0_Mat_BaseColor.png.meta",
+        "Materials/MatGrid_R1_C1_Mat_BaseColor.png",
+        "Materials/MatGrid_R1_C1_Mat_BaseColor.png.meta",
+        "Materials/MatGrid_R1_C2_Mat_BaseColor.png",
+        "Materials/MatGrid_R1_C2_Mat_BaseColor.png.meta",
+        "Materials/MatGrid_R1_C3_Mat_BaseColor.png",
+        "Materials/MatGrid_R1_C3_Mat_BaseColor.png.meta",
+        "Materials/MatGrid_R1_C4_Mat_BaseColor.png",
+        "Materials/MatGrid_R1_C4_Mat_BaseColor.png.meta",
+        "Materials/Models/17d1efaf-9c93-8adb-ab23-6f4a04810c46/e7752eda-3ebb-800f-a34b-4a1692b27a79.shadergraph",
+        "Materials/Models/17d1efaf-9c93-8adb-ab23-6f4a04810c46/e7752eda-3ebb-800f-a34b-4a1692b27a79.shadergraph.meta",
+        "Materials/Models/63c7b8bc-3057-833b-86ae-870fa7a6aed7/768cf97b-1855-84f8-86f9-50ca838465ae.shadergraph",
+        "Materials/Models/63c7b8bc-3057-833b-86ae-870fa7a6aed7/768cf97b-1855-84f8-86f9-50ca838465ae.shadergraph.meta",
+        "Materials/Models/8a69bd42-f950-8265-9c0e-0ff597095141/98add748-9405-8297-8089-bd7b664ac47a.shadergraph",
+        "Materials/Models/8a69bd42-f950-8265-9c0e-0ff597095141/98add748-9405-8297-8089-bd7b664ac47a.shadergraph.meta",
+        "Materials/Models/8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45/bded2162-3902-8f9b-9449-18c1566f261a.shadergraph",
+        "Materials/Models/8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45/bded2162-3902-8f9b-9449-18c1566f261a.shadergraph.meta",
+        "Materials/Models/987a8d42-3964-8d46-9024-7f280c92f986/1b148b33-0ca8-8bd0-972f-15d47193f001.shadergraph",
+        "Materials/Models/987a8d42-3964-8d46-9024-7f280c92f986/1b148b33-0ca8-8bd0-972f-15d47193f001.shadergraph.meta",
+        "Materials/Models/9888e325-a6fb-8378-b297-aa1f10eca2dc/ba34f36c-f102-8981-a60d-1d1f5e9151f3.shadergraph",
+        "Materials/Models/9888e325-a6fb-8378-b297-aa1f10eca2dc/ba34f36c-f102-8981-a60d-1d1f5e9151f3.shadergraph.meta",
+        "Materials/Models/cdf2f89b-32f4-85d5-adc6-c652c61a071c/44f1214b-dd15-8df0-b89e-64e760e8caee.shadergraph",
+        "Materials/Models/cdf2f89b-32f4-85d5-adc6-c652c61a071c/44f1214b-dd15-8df0-b89e-64e760e8caee.shadergraph.meta",
+        "Materials/Models/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/1a2156ec-a7b6-8cc9-ba54-3c8e2260d4b3.shadergraph",
+        "Materials/Models/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/1a2156ec-a7b6-8cc9-ba54-3c8e2260d4b3.shadergraph.meta",
+        "Materials/Models/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/1af1c82a-3f4d-8256-97ed-ace4b509dc3c.shadergraph",
+        "Materials/Models/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/1af1c82a-3f4d-8256-97ed-ace4b509dc3c.shadergraph.meta",
+        "Materials/Models/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/8a92a262-d80b-846b-b37b-dda551517fda.shadergraph",
+        "Materials/Models/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/8a92a262-d80b-846b-b37b-dda551517fda.shadergraph.meta",
+        "Materials/Models/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/cdf575ad-0d34-8376-88b9-81abe99ba9b0.shadergraph",
+        "Materials/Models/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/cdf575ad-0d34-8376-88b9-81abe99ba9b0.shadergraph.meta",
+        "Materials/Models/df464176-385d-8563-98b9-5b1d266415bd/5ddef1b8-956e-8da3-8d7b-47282507d33b.shadergraph",
+        "Materials/Models/df464176-385d-8563-98b9-5b1d266415bd/5ddef1b8-956e-8da3-8d7b-47282507d33b.shadergraph.meta",
+        "Materials/Mon_Infinian_001_A_D.png",
+        "Materials/Mon_Infinian_001_A_D.png.meta",
+        "Materials/Mon_Infinian_001_A_M.png",
+        "Materials/Mon_Infinian_001_A_M.png.meta",
+        "Materials/Mon_Infinian_001_A_N.png",
+        "Materials/Mon_Infinian_001_A_N.png.meta",
+        "Materials/Mon_Infinian_001_B_D.png",
+        "Materials/Mon_Infinian_001_B_D.png.meta",
+        "Materials/Mon_Infinian_001_B_M.png",
+        "Materials/Mon_Infinian_001_B_M.png.meta",
+        "Materials/Mon_Infinian_001_B_N.png",
+        "Materials/Mon_Infinian_001_B_N.png.meta",
+        "Materials/Plane_Mat_BaseColor.png",
+        "Materials/Plane_Mat_BaseColor.png.meta",
+        "Materials/Recovered_0223a5fb-09e3-4dbc-b75d-f6ae6d68bef9.shadergraph",
+        "Materials/Recovered_0223a5fb-09e3-4dbc-b75d-f6ae6d68bef9.shadergraph.meta",
+        "Materials/Recovered_48388e24-7116-414f-b204-a604fca67e07.shadergraph",
+        "Materials/Recovered_48388e24-7116-414f-b204-a604fca67e07.shadergraph.meta",
+        "Materials/Sphere_Mat_BaseColor.png",
+        "Materials/Sphere_Mat_BaseColor.png.meta",
+        "Materials/Suzanne_Mat_BaseColor.png",
+        "Materials/Suzanne_Mat_BaseColor.png.meta",
+        "Materials/Torus_Mat_BaseColor.png",
+        "Materials/Torus_Mat_BaseColor.png.meta",
+        "Materials/ceiling_plaster_01_Metalness-ceiling_plaster_01_Roughness.png",
+        "Materials/ceiling_plaster_01_Metalness-ceiling_plaster_01_Roughness.png.meta",
+        "Materials/column_head_2ndfloor_03_BaseColor.png",
+        "Materials/column_head_2ndfloor_03_BaseColor.png.meta",
+        "Materials/column_head_2ndfloor_03_Metalness-column_head_2ndfloor_03_Roughness.png",
+        "Materials/column_head_2ndfloor_03_Metalness-column_head_2ndfloor_03_Roughness.png.meta",
+        "Materials/lionhead_01_BaseColor.png",
+        "Materials/lionhead_01_BaseColor.png.meta",
+        "Materials/lionhead_01_Metalness-lionhead_01_Roughness.png",
+        "Materials/lionhead_01_Metalness-lionhead_01_Roughness.png.meta",
+        "Materials/metal_door_01_BaseColor.png",
+        "Materials/metal_door_01_BaseColor.png.meta",
+        "Materials/roof_tiles_01_Metalness-roof_tiles_01_Roughness.png",
+        "Materials/roof_tiles_01_Metalness-roof_tiles_01_Roughness.png.meta",
+        "Materials/wood_door_01_BaseColor.png",
+        "Materials/wood_door_01_BaseColor.png.meta",
+        "Materials/wood_door_01_Metalness-wood_door_01_Roughness.png",
+        "Materials/wood_door_01_Metalness-wood_door_01_Roughness.png.meta",
+        "Materials/wood_tile_01_Metalness-wood_tile_01_Roughness.png",
+        "Materials/wood_tile_01_Metalness-wood_tile_01_Roughness.png.meta",
+        "Models/CreatorRobot.glb",
+        "Models/CreatorRobot.glb.meta",
+        "Models/Prim_Cone.glb",
+        "Models/Prim_Cone.glb.meta",
+        "Models/Prim_Cube.glb",
+        "Models/Prim_Cube.glb.meta",
+        "Models/Prim_Cylinder.glb",
+        "Models/Prim_Cylinder.glb.meta",
+        "Models/Prim_IcoSphere.glb",
+        "Models/Prim_IcoSphere.glb.meta",
+        "Models/Prim_Plane.glb",
+        "Models/Prim_Plane.glb.meta",
+        "Models/Prim_Sphere.glb",
+        "Models/Prim_Sphere.glb.meta",
+        "Models/Prim_Suzanne.glb",
+        "Models/Prim_Suzanne.glb.meta",
+        "Models/Prim_Torus.glb",
+        "Models/Prim_Torus.glb.meta",
+        "NodeEditor/1PLower.json",
+        "NodeEditor/1PUpper.json",
+        "NodeEditor/2PLower.json",
+        "NodeEditor/2PUpper.json",
+        "NodeEditor/Main Layer.json",
+        "NodeEditor/Main.json",
+        "NodeEditor/MonsterB0.json",
+        "NodeEditor/MonsterC.json",
+        "NodeEditor/NewLayer0.json",
+        "NodeEditor/NewLayer1.json",
+        "NodeEditor/P1Lower.json",
+        "NodeEditor/P1Upper.json",
+        "NodeEditor/lower.json",
+        "NodeEditor/upper.json",
+        "PhysicsDaggerConvex.cegeometry",
+        "PhysicsDaggerConvex.cegeometry.meta",
+        "PhysicsPlayerConvex.cegeometry",
+        "PhysicsPlayerConvex.cegeometry.meta",
+        "PhysicsPlayerFloor.cegeometry",
+        "PhysicsPlayerFloor.cegeometry.meta",
+        "PhysicsPlayerHeightfield.cegeometry",
+        "PhysicsPlayerHeightfield.cegeometry.meta",
+        "SceneRenderProfile/DemoSceneRenderProfile.renderprofile",
+        "SceneRenderProfile/DemoSceneRenderProfile.renderprofile.meta",
+        "SceneRenderProfile/LoadingSceneProfile.renderprofile",
+        "SceneRenderProfile/LoadingSceneProfile.renderprofile.meta",
+        "SceneRenderProfile/NewSceneRenderProfile.renderprofile",
+        "SceneRenderProfile/NewSceneRenderProfile.renderprofile.meta",
+        "SceneRenderProfile/PBR_Mat_Rough.renderprofile",
+        "SceneRenderProfile/PBR_Mat_Rough.renderprofile.meta",
+        "SceneRenderProfile/Stage1Profile.renderprofile",
+        "SceneRenderProfile/Stage1Profile.renderprofile.meta",
+        "SceneRenderProfile/Stage1_Boss.renderprofile",
+        "SceneRenderProfile/Stage1_Boss.renderprofile.meta",
+        "SceneRenderProfile/Stage1_art.renderprofile",
+        "SceneRenderProfile/Stage1_art.renderprofile.meta",
+        "Scenes/AnimationPlayer.creator",
+        "Scenes/AnimationPlayer.creator.meta",
+        "Script/PackageSmokeProbe.fs",
+        "Script/compile.order",
+        "Shaders/DefaultPassShader/Decal.slang",
+        "Shaders/DefaultPassShader/Decal.slang.meta",
+        "Shaders/DefaultPassShader/FogAccumulate.slang",
+        "Shaders/DefaultPassShader/FogAccumulate.slang.meta",
+        "Shaders/DefaultPassShader/FogComposite.slang",
+        "Shaders/DefaultPassShader/FogComposite.slang.meta",
+        "Shaders/DefaultPassShader/FogScatter.slang",
+        "Shaders/DefaultPassShader/FogScatter.slang.meta",
+        "Shaders/DefaultPassShader/Forward.shadermeta",
+        "Shaders/DefaultPassShader/Forward.shadermeta.meta",
+        "Shaders/DefaultPassShader/ForwardCull.slang",
+        "Shaders/DefaultPassShader/ForwardCull.slang.meta",
+        "Shaders/DefaultPassShader/ForwardShade.slang",
+        "Shaders/DefaultPassShader/ForwardShade.slang.meta",
+        "Shaders/DefaultPassShader/ForwardWater.shadermeta",
+        "Shaders/DefaultPassShader/ForwardWater.shadermeta.meta",
+        "Shaders/DefaultPassShader/ForwardWater.slang",
+        "Shaders/DefaultPassShader/ForwardWater.slang.meta",
+        "Shaders/DefaultPassShader/ForwardWind.shadermeta",
+        "Shaders/DefaultPassShader/ForwardWind.shadermeta.meta",
+        "Shaders/DefaultPassShader/ForwardWind.slang",
+        "Shaders/DefaultPassShader/ForwardWind.slang.meta",
+        "Shaders/DefaultPassShader/GeometryOcclusion.slang",
+        "Shaders/DefaultPassShader/GeometryOcclusion.slang.meta",
+        "Shaders/DefaultPassShader/GeometryOcclusionBuild.slang",
+        "Shaders/DefaultPassShader/GeometryOcclusionBuild.slang.meta",
+        "Shaders/DefaultPassShader/GeometryVisibility.slang",
+        "Shaders/DefaultPassShader/GeometryVisibility.slang.meta",
+        "Shaders/DefaultPassShader/GizmoIcon.slang",
+        "Shaders/DefaultPassShader/GizmoIcon.slang.meta",
+        "Shaders/DefaultPassShader/GizmoLine.slang",
+        "Shaders/DefaultPassShader/GizmoLine.slang.meta",
+        "Shaders/DefaultPassShader/Grid.slang",
+        "Shaders/DefaultPassShader/Grid.slang.meta",
+        "Shaders/DefaultPassShader/IblBrdf.slang",
+        "Shaders/DefaultPassShader/IblBrdf.slang.meta",
+        "Shaders/DefaultPassShader/IblCubeDownsample.slang",
+        "Shaders/DefaultPassShader/IblCubeDownsample.slang.meta",
+        "Shaders/DefaultPassShader/IblFace.slang",
+        "Shaders/DefaultPassShader/IblFace.slang.meta",
+        "Shaders/DefaultPassShader/IblFullscreen.slang",
+        "Shaders/DefaultPassShader/IblFullscreen.slang.meta",
+        "Shaders/DefaultPassShader/IblImportanceMarginal.slang",
+        "Shaders/DefaultPassShader/IblImportanceMarginal.slang.meta",
+        "Shaders/DefaultPassShader/IblImportanceRows.slang",
+        "Shaders/DefaultPassShader/IblImportanceRows.slang.meta",
+        "Shaders/DefaultPassShader/IblImportanceSamples.slang",
+        "Shaders/DefaultPassShader/IblImportanceSamples.slang.meta",
+        "Shaders/DefaultPassShader/IblIrradiance.slang",
+        "Shaders/DefaultPassShader/IblIrradiance.slang.meta",
+        "Shaders/DefaultPassShader/IblPrefilter.slang",
+        "Shaders/DefaultPassShader/IblPrefilter.slang.meta",
+        "Shaders/DefaultPassShader/IblRectToCube.slang",
+        "Shaders/DefaultPassShader/IblRectToCube.slang.meta",
+        "Shaders/DefaultPassShader/IblSceneImportance.slang",
+        "Shaders/DefaultPassShader/IblSceneImportance.slang.meta",
+        "Shaders/DefaultPassShader/IblSourceCopy.slang",
+        "Shaders/DefaultPassShader/IblSourceCopy.slang.meta",
+        "Shaders/DefaultPassShader/Includes/Brdf.slang",
+        "Shaders/DefaultPassShader/Includes/Brdf.slang.meta",
+        "Shaders/DefaultPassShader/Includes/CascadedShadow.slang",
+        "Shaders/DefaultPassShader/Includes/CascadedShadow.slang.meta",
+        "Shaders/DefaultPassShader/Includes/FogCommon.slang",
+        "Shaders/DefaultPassShader/Includes/FogCommon.slang.meta",
+        "Shaders/DefaultPassShader/Includes/GeometryInstanceBounds.slang",
+        "Shaders/DefaultPassShader/Includes/GeometryInstanceBounds.slang.meta",
+        "Shaders/DefaultPassShader/Includes/GgxEnergyTables.slang",
+        "Shaders/DefaultPassShader/Includes/GgxEnergyTables.slang.meta",
+        "Shaders/DefaultPassShader/Includes/Ibl.slang",
+        "Shaders/DefaultPassShader/Includes/Ibl.slang.meta",
+        "Shaders/DefaultPassShader/Includes/IblImportance.slang",
+        "Shaders/DefaultPassShader/Includes/IblImportance.slang.meta",
+        "Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang",
+        "Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialCoordinates.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialCoordinates.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialEvaluation.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialEvaluation.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphForwardVolume.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphForwardVolume.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphPacketScan.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphPacketScan.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphPrimitiveCacheTypes.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphPrimitiveCacheTypes.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphRefractionTransport.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphRefractionTransport.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeEffectContract.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeEffectContract.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeSpecial.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeSpecial.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSceneRecord.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSceneRecord.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSceneRefraction.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSceneRefraction.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSceneSubsurface.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSceneSubsurface.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolume.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolume.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeCoefficients.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeCoefficients.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeLighting.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeLighting.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeTypes.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeTypes.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSurfaceHost.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSurfaceHost.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang",
+        "Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang",
+        "Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang.meta",
+        "Shaders/DefaultPassShader/Includes/MeteorVisibilityContract.slang",
+        "Shaders/DefaultPassShader/Includes/MeteorVisibilityContract.slang.meta",
+        "Shaders/DefaultPassShader/Includes/PackedBones.slang",
+        "Shaders/DefaultPassShader/Includes/PackedBones.slang.meta",
+        "Shaders/DefaultPassShader/Includes/PbrCoverage.slang",
+        "Shaders/DefaultPassShader/Includes/PbrCoverage.slang.meta",
+        "Shaders/DefaultPassShader/Includes/PbrSurface.slang",
+        "Shaders/DefaultPassShader/Includes/PbrSurface.slang.meta",
+        "Shaders/DefaultPassShader/Includes/PostChainCommon.slang",
+        "Shaders/DefaultPassShader/Includes/PostChainCommon.slang.meta",
+        "Shaders/DefaultPassShader/Includes/PrincipledBrdf.slang",
+        "Shaders/DefaultPassShader/Includes/PrincipledBrdf.slang.meta",
+        "Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang",
+        "Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang.meta",
+        "Shaders/DefaultPassShader/Includes/PrincipledIblLookup.slang",
+        "Shaders/DefaultPassShader/Includes/PrincipledIblLookup.slang.meta",
+        "Shaders/DefaultPassShader/Includes/PrincipledLayered.slang",
+        "Shaders/DefaultPassShader/Includes/PrincipledLayered.slang.meta",
+        "Shaders/DefaultPassShader/Includes/PrincipledRuntimeIbl.slang",
+        "Shaders/DefaultPassShader/Includes/PrincipledRuntimeIbl.slang.meta",
+        "Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang",
+        "Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang.meta",
+        "Shaders/DefaultPassShader/Includes/PrincipledSurface.slang",
+        "Shaders/DefaultPassShader/Includes/PrincipledSurface.slang.meta",
+        "Shaders/DefaultPassShader/Includes/PrincipledThinFilm.slang",
+        "Shaders/DefaultPassShader/Includes/PrincipledThinFilm.slang.meta",
+        "Shaders/DefaultPassShader/Includes/PrincipledThinFilmSensitivity.slang",
+        "Shaders/DefaultPassShader/Includes/PrincipledThinFilmSensitivity.slang.meta",
+        "Shaders/DefaultPassShader/Includes/PrincipledVolume.slang",
+        "Shaders/DefaultPassShader/Includes/PrincipledVolume.slang.meta",
+        "Shaders/DefaultPassShader/Includes/QuantizedGeometry.slang",
+        "Shaders/DefaultPassShader/Includes/QuantizedGeometry.slang.meta",
+        "Shaders/DefaultPassShader/Includes/Radiance.slang",
+        "Shaders/DefaultPassShader/Includes/Radiance.slang.meta",
+        "Shaders/DefaultPassShader/Includes/SheenLtc.slang",
+        "Shaders/DefaultPassShader/Includes/SheenLtc.slang.meta",
+        "Shaders/DefaultPassShader/Includes/SpecialForwardSurface.slang",
+        "Shaders/DefaultPassShader/Includes/SpecialForwardSurface.slang.meta",
+        "Shaders/DefaultPassShader/Includes/SpecialMaterialRoute.slang",
+        "Shaders/DefaultPassShader/Includes/SpecialMaterialRoute.slang.meta",
+        "Shaders/DefaultPassShader/Includes/SsaoCommon.slang",
+        "Shaders/DefaultPassShader/Includes/SsaoCommon.slang.meta",
+        "Shaders/DefaultPassShader/Includes/StandardMaterialRoute.slang",
+        "Shaders/DefaultPassShader/Includes/StandardMaterialRoute.slang.meta",
+        "Shaders/DefaultPassShader/Includes/TangentFrame.slang",
+        "Shaders/DefaultPassShader/Includes/TangentFrame.slang.meta",
+        "Shaders/DefaultPassShader/Includes/TextureCoordinates.slang",
+        "Shaders/DefaultPassShader/Includes/TextureCoordinates.slang.meta",
+        "Shaders/DefaultPassShader/MaterialGraphIndirect.slang",
+        "Shaders/DefaultPassShader/MaterialGraphIndirect.slang.meta",
+        "Shaders/DefaultPassShader/MaterialGraphMeshSurface.slang",
+        "Shaders/DefaultPassShader/MaterialGraphMeshSurface.slang.meta",
+        "Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang",
+        "Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang.meta",
+        "Shaders/DefaultPassShader/MaterialGraphRasterSurface.slang",
+        "Shaders/DefaultPassShader/MaterialGraphRasterSurface.slang.meta",
+        "Shaders/DefaultPassShader/MaterialGraphSceneLookup.slang",
+        "Shaders/DefaultPassShader/MaterialGraphSceneLookup.slang.meta",
+        "Shaders/DefaultPassShader/MaterialGraphSceneRefractionBake.slang",
+        "Shaders/DefaultPassShader/MaterialGraphSceneRefractionBake.slang.meta",
+        "Shaders/DefaultPassShader/MaterialGraphSceneRuntimeEffects.slang",
+        "Shaders/DefaultPassShader/MaterialGraphSceneRuntimeEffects.slang.meta",
+        "Shaders/DefaultPassShader/MaterialGraphSceneSubsurfaceBake.slang",
+        "Shaders/DefaultPassShader/MaterialGraphSceneSubsurfaceBake.slang.meta",
+        "Shaders/DefaultPassShader/MaterialGraphSceneSubsurfaceFilter.slang",
+        "Shaders/DefaultPassShader/MaterialGraphSceneSubsurfaceFilter.slang.meta",
+        "Shaders/DefaultPassShader/MaterialGraphSceneVolumeBake.slang",
+        "Shaders/DefaultPassShader/MaterialGraphSceneVolumeBake.slang.meta",
+        "Shaders/DefaultPassShader/MaterialGraphWork.slang",
+        "Shaders/DefaultPassShader/MaterialGraphWork.slang.meta",
+        "Shaders/DefaultPassShader/MeteorHybridVisibility.slang",
+        "Shaders/DefaultPassShader/MeteorHybridVisibility.slang.meta",
+        "Shaders/DefaultPassShader/MeteorShadowDepth.slang",
+        "Shaders/DefaultPassShader/MeteorShadowDepth.slang.meta",
+        "Shaders/DefaultPassShader/OverlayDepth.slang",
+        "Shaders/DefaultPassShader/OverlayDepth.slang.meta",
+        "Shaders/DefaultPassShader/PlayerPresentation.slang",
+        "Shaders/DefaultPassShader/PlayerPresentation.slang.meta",
+        "Shaders/DefaultPassShader/PostChainDownsample.slang",
+        "Shaders/DefaultPassShader/PostChainDownsample.slang.meta",
+        "Shaders/DefaultPassShader/PostChainFxaa.slang",
+        "Shaders/DefaultPassShader/PostChainFxaa.slang.meta",
+        "Shaders/DefaultPassShader/PostChainThreshold.slang",
+        "Shaders/DefaultPassShader/PostChainThreshold.slang.meta",
+        "Shaders/DefaultPassShader/PostChainUber.slang",
+        "Shaders/DefaultPassShader/PostChainUber.slang.meta",
+        "Shaders/DefaultPassShader/PostChainUberHDR.slang",
+        "Shaders/DefaultPassShader/PostChainUberHDR.slang.meta",
+        "Shaders/DefaultPassShader/PostChainUpsample.slang",
+        "Shaders/DefaultPassShader/PostChainUpsample.slang.meta",
+        "Shaders/DefaultPassShader/PrincipledIblBake.slang",
+        "Shaders/DefaultPassShader/PrincipledIblBake.slang.meta",
+        "Shaders/DefaultPassShader/SelfTest/FogScene.slang",
+        "Shaders/DefaultPassShader/SelfTest/FogScene.slang.meta",
+        "Shaders/DefaultPassShader/SelfTest/PostChainScene.slang",
+        "Shaders/DefaultPassShader/SelfTest/PostChainScene.slang.meta",
+        "Shaders/DefaultPassShader/SelfTest/QueueRg8.slang",
+        "Shaders/DefaultPassShader/SelfTest/QueueRg8.slang.meta",
+        "Shaders/DefaultPassShader/SelfTest/ShaderMetaFixture.shadermeta",
+        "Shaders/DefaultPassShader/SelfTest/ShaderMetaFixture.shadermeta.meta",
+        "Shaders/DefaultPassShader/SelfTest/ShaderMetaFixture.slang",
+        "Shaders/DefaultPassShader/SelfTest/ShaderMetaFixture.slang.meta",
+        "Shaders/DefaultPassShader/SelfTest/SsaoScene.slang",
+        "Shaders/DefaultPassShader/SelfTest/SsaoScene.slang.meta",
+        "Shaders/DefaultPassShader/SelfTest/SsgiRhiScene.slang",
+        "Shaders/DefaultPassShader/SelfTest/SsgiRhiScene.slang.meta",
+        "Shaders/DefaultPassShader/SelfTest/SsgiTestDepth.slang",
+        "Shaders/DefaultPassShader/SelfTest/SsgiTestDepth.slang.meta",
+        "Shaders/DefaultPassShader/SelfTest/SsrScene.slang",
+        "Shaders/DefaultPassShader/SelfTest/SsrScene.slang.meta",
+        "Shaders/DefaultPassShader/SelfTest/SssScene.slang",
+        "Shaders/DefaultPassShader/SelfTest/SssScene.slang.meta",
+        "Shaders/DefaultPassShader/SelfTest/StandardMaterialProbe.shadermeta",
+        "Shaders/DefaultPassShader/SelfTest/StandardMaterialProbe.shadermeta.meta",
+        "Shaders/DefaultPassShader/SelfTest/StandardMaterialProbe.slang",
+        "Shaders/DefaultPassShader/SelfTest/StandardMaterialProbe.slang.meta",
+        "Shaders/DefaultPassShader/SelfTest/Triangle.slang",
+        "Shaders/DefaultPassShader/SelfTest/Triangle.slang.meta",
+        "Shaders/DefaultPassShader/SkyBox.slang",
+        "Shaders/DefaultPassShader/SkyBox.slang.meta",
+        "Shaders/DefaultPassShader/SsaoAO.slang",
+        "Shaders/DefaultPassShader/SsaoAO.slang.meta",
+        "Shaders/DefaultPassShader/SsaoFilter.slang",
+        "Shaders/DefaultPassShader/SsaoFilter.slang.meta",
+        "Shaders/DefaultPassShader/SsgiComposite.slang",
+        "Shaders/DefaultPassShader/SsgiComposite.slang.meta",
+        "Shaders/DefaultPassShader/SsgiFilter.slang",
+        "Shaders/DefaultPassShader/SsgiFilter.slang.meta",
+        "Shaders/DefaultPassShader/SsgiHiZBuild.slang",
+        "Shaders/DefaultPassShader/SsgiHiZBuild.slang.meta",
+        "Shaders/DefaultPassShader/SsgiResolve.slang",
+        "Shaders/DefaultPassShader/SsgiResolve.slang.meta",
+        "Shaders/DefaultPassShader/SsgiTrace.slang",
+        "Shaders/DefaultPassShader/SsgiTrace.slang.meta",
+        "Shaders/DefaultPassShader/Ssr.slang",
+        "Shaders/DefaultPassShader/Ssr.slang.meta",
+        "Shaders/DefaultPassShader/Sss.slang",
+        "Shaders/DefaultPassShader/Sss.slang.meta",
+        "Shaders/DefaultPassShader/TemporalInputs.slang",
+        "Shaders/DefaultPassShader/TemporalInputs.slang.meta",
+        "Shaders/DefaultPassShader/Tests/IblGgxProbe.slang",
+        "Shaders/DefaultPassShader/Tests/IblGgxProbe.slang.meta",
+        "Shaders/DefaultPassShader/UI.slang",
+        "Shaders/DefaultPassShader/UI.slang.meta",
+        "Shaders/DefaultPassShader/WireFrame.slang",
+        "Shaders/DefaultPassShader/WireFrame.slang.meta",
+        "Shaders/DefaultPassShader/WorldSprite.slang",
+        "Shaders/DefaultPassShader/WorldSprite.slang.meta",
+        "VolumetricFog/blueNoise.dds",
+        "VolumetricFog/blueNoise.dds.meta"
+      ],
+      "baseFileCount": 470,
+      "generatedFileCount": 160,
+      "entryCount": 340,
+      "contentDigest": "ab4f6b8b76cd1add14aaf8cc51d2d85876da6baed160c1d6b94d411aa4deb55c",
+      "assetSetManifests": [],
+      "assetSetAbi": "",
+      "contentAbiVersion": null,
+      "bootstrap": null,
+      "runtimeDocuments": {
+        "documentCount": 19,
+        "documentBytes": 39334,
+        "format": "CEDO1+TRBN2"
+      },
+      "settingsTemplateSha256": "52ac0e61866a9db10c5fe19cf97eeebb2570ec431b4d19f3d0e157afe3ceb46a",
+      "runtimeSettingsSha256": "a6089227f58ce9af95936d8ab4f0322102616d0200234956a5f7edcda5d76605",
+      "authoringRuntimeSettingsSha256": "7a940990d9017faf100b1a76d64f9409de59b2a492739dc70637f99deaad628c",
+      "startupScene": "AnimationPlayer.creator",
+      "renderBackend": "dx12",
+      "startupSceneSha256": "664957ecb2eaba9a428dee38397c5b124543d0eeabd1379dc7f4a28725492f83",
+      "startupSceneScriptComponentCount": 0,
+      "managedLifecycleRequired": false,
+      "distributionPolicy": "bundled-runtime",
+      "runtimePrerequisites": [
+        {
+          "name": ".NET 10 x64 runtime",
+          "bundled": true
+        },
+        {
+          "name": "Microsoft Visual C++ Redistributable x64",
+          "bundled": true
+        }
+      ],
+      "runtimeEntryCount": 242,
+      "runtimeDigest": "a5077206543edf416092b9e9ae7e12f4f2ef35750e731c3c9591f7b89739d8f6",
+      "distributionDigest": "a7f3bbc4081d9c380091c932f3ca8e33a9a75b9c50df5607d251f6c775b29b61",
+      "runtimeEntries": [
+        {
+          "path": "Managed/CreatorEngine.ManagedRuntime.deps.json",
+          "bytes": 2867,
+          "sha256": "fcd4005b0e345db90575253f46ef81e8f949478ee72c59363fd62c746d5166f5"
+        },
+        {
+          "path": "Managed/CreatorEngine.ManagedRuntime.dll",
+          "bytes": 62976,
+          "sha256": "aa7a6c1d2ab5973e45dfb8824fc8046c606a520551374fd364a64090a92f7104"
+        },
+        {
+          "path": "Managed/FSharp.Core.dll",
+          "bytes": 2392872,
+          "sha256": "d6ed710d6d0823ed083c297ff94454469b9fa538e1b9554f884224e1863bac18"
+        },
+        {
+          "path": "Managed/ScriptCore.deps.json",
+          "bytes": 424,
+          "sha256": "98b7884be769eafbc5513bbd56407c62ff55bf068658958acd2c8aad03dc0741"
+        },
+        {
+          "path": "Managed/ScriptCore.dll",
+          "bytes": 152576,
+          "sha256": "8af26965e6b65942e723aa3688f0ae4ae62ba87098d027803bb7daee95a3bf52"
+        },
+        {
+          "path": "Managed/ScriptCore.runtimeconfig.json",
+          "bytes": 342,
+          "sha256": "c230a317a54dd960bcbeb5f347f52e18dc665a26f7efda2159fced9a5ac7e097"
+        },
+        {
+          "path": "Managed/Scripts/CreatorEngine.FSharp.Runtime.dll",
+          "bytes": 8192,
+          "sha256": "0afc88f92cf8d5b750d55da9bb8d9c2ce9f0a0353457ef5b895fc4b3b5554d8a"
+        },
+        {
+          "path": "Managed/Scripts/FSharp.Core.dll",
+          "bytes": 2392872,
+          "sha256": "d6ed710d6d0823ed083c297ff94454469b9fa538e1b9554f884224e1863bac18"
+        },
+        {
+          "path": "Managed/Scripts/GameScripts.deps.json",
+          "bytes": 428,
+          "sha256": "dec6b2dd6c902b1dccaf947f31cae5eb420d06767495a07500ef400261c8b3cf"
+        },
+        {
+          "path": "Managed/Scripts/GameScripts.dll",
+          "bytes": 10752,
+          "sha256": "4956d04a694224c46ebafefd12e3eb5a418e89bdc6a2827e5b258e8bc277c632"
+        },
+        {
+          "path": "Managed/Scripts/GameScripts.dll.engine.json",
+          "bytes": 188,
+          "sha256": "add257bf6e005a77b38bcd6d042b4e06ad743f5985dd8f122d277553730f1b01"
+        },
+        {
+          "path": "Player.exe",
+          "bytes": 1347072,
+          "sha256": "efff5bb0d1afbb4c7f48c99dbc15ee0be68b02af78aa57d46890c655305476e4"
+        },
+        {
+          "path": "Player.runtime.dll",
+          "bytes": 10589696,
+          "sha256": "b7e565b8a65264b53f3f11879161f0b63fdaaec4aa83f4cafff9f86d5e7895ff"
+        },
+        {
+          "path": "Player.runtime.pdb",
+          "bytes": 116264960,
+          "sha256": "8e6716b0f1fc8b0193508a264de9f49eb0871fed2cffdee8055741c41d3c8a89"
+        },
+        {
+          "path": "Resources/Environment/LICENSE-forest.txt",
+          "bytes": 722,
+          "sha256": "4204632a37d1b173fd5db97a2c245d004c6b55860585352ff05c3ca1e89b76fe"
+        },
+        {
+          "path": "Resources/Environment/README.md",
+          "bytes": 3085,
+          "sha256": "b9e1d6dcdcb9c49aacd05962aed63ec52044133208804ec3b9e14c57ab3bcc50"
+        },
+        {
+          "path": "Resources/Environment/forest.ceibl",
+          "bytes": 103159928,
+          "sha256": "a59cdd4ea3a4fd04650bd13df61ab8c8a75970e3fb1943ac800eb6ca9b65aff4"
+        },
+        {
+          "path": "Resources/Environment/forest.cook.json",
+          "bytes": 1242,
+          "sha256": "0b7bdccc04c0eb463ede63c613bf7f6e81e218a631c2f75bf7c37f731de6c8ec"
+        },
+        {
+          "path": "Resources/Fonts/Runtime/Inter-Regular.ttf",
+          "bytes": 411640,
+          "sha256": "40d692fce188e4471e2b3cba937be967878f631ad3ebbbdcd587687c7ebe0c82"
+        },
+        {
+          "path": "Resources/Fonts/Runtime/LICENSE-Inter.txt",
+          "bytes": 4472,
+          "sha256": "b3195af0fb14368d1b3b10fb9d3fe503b7163ea083859d2ee553bc74da07c320"
+        },
+        {
+          "path": "Resources/Fonts/Runtime/LICENSE-NanumGothic.txt",
+          "bytes": 4630,
+          "sha256": "6bca0c1a8c713fa5e703c5427a273ea736181c558312962569c28b4cb390fee3"
+        },
+        {
+          "path": "Resources/Fonts/Runtime/NanumGothic-Regular.ttf",
+          "bytes": 2054744,
+          "sha256": "76f45ef4a6bcff344c837c95a7dcc26e017e38b5846d5ae0cdcb5b86be2e2d31"
+        },
+        {
+          "path": "Resources/Fonts/Runtime/README.md",
+          "bytes": 3545,
+          "sha256": "652484a7b53880ee343cba2b27b57f532484a388a944fd4eb6b26bd0eca8e53a"
+        },
+        {
+          "path": "Resources/Fonts/Runtime/provenance.json",
+          "bytes": 1980,
+          "sha256": "796c413d811b80dbafbc817ade8f63075a27c2ac2457ad069298d7edb4dae366"
+        },
+        {
+          "path": "Resources/VolumetricFog/blueNoise.cetex",
+          "bytes": 22256,
+          "sha256": "babc0ff402fee7fce601765285116257c2ff4f48beb1dd201dae4402bc918db8"
+        },
+        {
+          "path": "Runtime/Common/CONCRT140.dll",
+          "bytes": 374200,
+          "sha256": "54716f0738af891f283d213b5c8d11b25896bb8ee3097d301eae718560cf974e"
+        },
+        {
+          "path": "Runtime/Common/MSVCP140.dll",
+          "bytes": 643512,
+          "sha256": "7c26614e1d733892c2deac7e245ce115504b1d80592dd0a01b08e3e5a55f89ca"
+        },
+        {
+          "path": "Runtime/Common/MSVCP140_2.dll",
+          "bytes": 274872,
+          "sha256": "d50d7883f20d1dc6191768d3746f52dd9cac89c346ffaed5be1f110c2f34a838"
+        },
+        {
+          "path": "Runtime/Common/MSVCP140_ATOMIC_WAIT.dll",
+          "bytes": 57792,
+          "sha256": "3d0cbfaa1bf3eecf5a3f4491d2960ee803cb994f30292c6adc4a07c498f60e2b"
+        },
+        {
+          "path": "Runtime/Common/Microsoft.WindowsAppRuntime.Bootstrap.dll",
+          "bytes": 396320,
+          "sha256": "3123aa647bf9cbf474a0af2fad8be754c734d2bfdb12256be83d43216b8cc72c"
+        },
+        {
+          "path": "Runtime/Common/PhysXCommon_64.dll",
+          "bytes": 2370048,
+          "sha256": "518dd402e9bb00495fdf78af73c2af3c7e61b5468e6de0791b9216a3cb7bc57f"
+        },
+        {
+          "path": "Runtime/Common/PhysXCooking_64.dll",
+          "bytes": 23040,
+          "sha256": "c6194ce8694969a709aa5ef814fa1f682a470a22099302b5d93d7766faca58c7"
+        },
+        {
+          "path": "Runtime/Common/PhysXDevice64.dll",
+          "bytes": 712744,
+          "sha256": "5c4343255f24df885cfdb2845f3fee4a4ad5d94031f397997098444897784b54"
+        },
+        {
+          "path": "Runtime/Common/PhysXFoundation_64.dll",
+          "bytes": 58368,
+          "sha256": "e6176f6a2f7e9edbf1b529102793d28f281b05f40a859227f46783b441ed78b9"
+        },
+        {
+          "path": "Runtime/Common/PhysXGpu_64.dll",
+          "bytes": 249445400,
+          "sha256": "9a3c355d6a8c1c0765bd5dc104833d45162660b28f023fc390fd01f235038dbf"
+        },
+        {
+          "path": "Runtime/Common/PhysX_64.dll",
+          "bytes": 2050560,
+          "sha256": "cf82eb604a3af09ebae4787b9fd19874cc8326ea7c650b3d1ac88b47d89f192b"
+        },
+        {
+          "path": "Runtime/Common/VCRUNTIME140.dll",
+          "bytes": 178616,
+          "sha256": "d1f4225df2cd877dbf130d5668a021dce3f94118455ff5ec952061c30afc9ce7"
+        },
+        {
+          "path": "Runtime/Common/VCRUNTIME140_1.dll",
+          "bytes": 50112,
+          "sha256": "a7146c08f89fe5b04541ab507cdb59ff7b44534d4ba3c668a426c6450a03434e"
+        },
+        {
+          "path": "Runtime/Common/dxcompiler.dll",
+          "bytes": 28079968,
+          "sha256": "9a5100511e127c6a2fc78edf984f95074a76d35b90c90c4d342430a5ae160e9b"
+        },
+        {
+          "path": "Runtime/Common/dxil.dll",
+          "bytes": 3831600,
+          "sha256": "feb57253eff0a622561e29b44cedbe86b89fc9a5bc8dc00fa2f98fafd712c2d8"
+        },
+        {
+          "path": "Runtime/Common/enkiTS.dll",
+          "bytes": 34816,
+          "sha256": "6209773089d3a227f51b9bd174e273695cc946d61167cfcd42409ef10a827ae9"
+        },
+        {
+          "path": "Runtime/Common/fmt.dll",
+          "bytes": 129024,
+          "sha256": "ff9fbfcce5510400808d501900a3c70e175724fec94eda295ed8909bb921404d"
+        },
+        {
+          "path": "Runtime/Common/gcce.dll",
+          "bytes": 72704,
+          "sha256": "060a4d6558fed9b1d342edcbfa2942cb3d5069cd9787aaad54458d374b5b524a"
+        },
+        {
+          "path": "Runtime/Common/meshoptimizer.dll",
+          "bytes": 187904,
+          "sha256": "78643d41bb74c65ef6b42ba2c526c1525d39290a5c1260bb9a13611d4e823bb4"
+        },
+        {
+          "path": "Runtime/Common/nethost.dll",
+          "bytes": 121640,
+          "sha256": "0a6772c622650c09d64d98b5ce1cf101929163d5bb46c55d6f462a18637296ba"
+        },
+        {
+          "path": "Runtime/Common/slang-compiler.dll",
+          "bytes": 25310208,
+          "sha256": "bf277592acab648f8bd1777054a6703b6df797b7f2fca55ed6116777363986d7"
+        },
+        {
+          "path": "Runtime/DotNet/LICENSE.txt",
+          "bytes": 9519,
+          "sha256": "7f6839a61ce892b79c6549e2dc5a81fdbd240a0b260f8881216b45b7fda8b45d"
+        },
+        {
+          "path": "Runtime/DotNet/ThirdPartyNotices.txt",
+          "bytes": 78887,
+          "sha256": "deb4427a295e1ed474b0d81c5a0d972c1b550b9a715cda939cdfa9236b1b418f"
+        },
+        {
+          "path": "Runtime/DotNet/dotnet.exe",
+          "bytes": 167208,
+          "sha256": "abce6623a6729059cf39bb0f728c4a7804f625895099c88c17e6e704661e09eb"
+        },
+        {
+          "path": "Runtime/DotNet/host/fxr/10.0.13/hostfxr.dll",
+          "bytes": 379728,
+          "sha256": "2e6bf792d54303a54467102fd873a7d7a993f828e8d19c040e13e428e5f2d9c8"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/.version",
+          "bytes": 51,
+          "sha256": "829c837b3e9bb9fa4e20d7bc365f5c36b5f078d194509ed5947e79dd5f247d57"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/Microsoft.CSharp.dll",
+          "bytes": 980776,
+          "sha256": "50e834db03a33fc1056742ad39850bfa4e0169bba810a95df5f2ac17ee2fde1f"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/Microsoft.DiaSymReader.Native.amd64.dll",
+          "bytes": 2377016,
+          "sha256": "70e4b89978ce57ef87b28f4921f3140c383b04aa96e7f3bdb3c4ebb898fd8a72"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/Microsoft.NETCore.App.deps.json",
+          "bytes": 29720,
+          "sha256": "4fefc30f6b8fbf008fd280122ff06144b4278bd0d5b324f91d429e1766bd2460"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/Microsoft.NETCore.App.runtimeconfig.json",
+          "bytes": 54,
+          "sha256": "31c8ce517cddc0deaceb26b5dff6ba5df55ac4e06e9afd0026e51faca23dc8a4"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/Microsoft.VisualBasic.Core.dll",
+          "bytes": 1193768,
+          "sha256": "4579f78dffc991340317264ee67934c8e4b5d9d1456192b59e55974dc9c9511f"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/Microsoft.VisualBasic.dll",
+          "bytes": 17232,
+          "sha256": "10d93e64fced1cd163d2cea75575d23f4fa98550d1b8a67ffd80780c12fa08d8"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/Microsoft.Win32.Primitives.dll",
+          "bytes": 15656,
+          "sha256": "56b957b1db34e280cfdbaa9097776934286c79f8c1e07ba3449c3dca75862325"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/Microsoft.Win32.Registry.dll",
+          "bytes": 116560,
+          "sha256": "be7fdc5568ecb28e23b31115017cfd05d236d28983fca712c3ebc47ed6132b8d"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.AppContext.dll",
+          "bytes": 15184,
+          "sha256": "614f3bc1601cf115e6ce5c4fb451eb3b1895eabb8d40702bdaf206f52f767559"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Buffers.dll",
+          "bytes": 15144,
+          "sha256": "ea79e667c14c6a9b8d3c2945c81f5589cfdeb444492787100f99cd74abe85fa9"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Collections.Concurrent.dll",
+          "bytes": 231248,
+          "sha256": "a94b9fc813235087390540793e0d92dcd86362c26768144cd1ef8aa37b34c66a"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Collections.Immutable.dll",
+          "bytes": 976720,
+          "sha256": "0326faaae1cc3dc8f8e47337df7cad81cb844e5e5988e24e405e2316edea040f"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Collections.NonGeneric.dll",
+          "bytes": 104272,
+          "sha256": "a13e2d330938c175d92bf7ef09a39c669c3dff4629319b4366ca71a52ed0dc8b"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Collections.Specialized.dll",
+          "bytes": 104232,
+          "sha256": "1b19d86241bb7a033f30946d4556440258d2d88793a26465bccced7d2b44b93c"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Collections.dll",
+          "bytes": 296784,
+          "sha256": "ccf9ec3d536d6241c54a874833bf7d2329b9ecc5b8d4298c27af271f0e91b223"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.ComponentModel.Annotations.dll",
+          "bytes": 198440,
+          "sha256": "10519351ed44c8519ef28fd57d7668bfb67f771905dd8216706cdcbc8abc93d0"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.ComponentModel.DataAnnotations.dll",
+          "bytes": 16720,
+          "sha256": "6c90452506439ba7587afeb2c648eeec5b80c131e16c2f5b2c70a18c3e2bae12"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.ComponentModel.EventBasedAsync.dll",
+          "bytes": 46888,
+          "sha256": "52b6d020341114450dc3cfa0d5218f8cf841d40e0f729ffc5d5d0164832b0350"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.ComponentModel.Primitives.dll",
+          "bytes": 79656,
+          "sha256": "079cf4a6a2c9ec77b9e03f0222740f9eaf9f5e7359a16fbf3450ad7bc44de321"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.ComponentModel.TypeConverter.dll",
+          "bytes": 767824,
+          "sha256": "dc3ec71d1711a23f54a6457ee471693db1d39c400f9f2b2b7d82595d70936dd9"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.ComponentModel.dll",
+          "bytes": 30544,
+          "sha256": "98646c7833634bf7ed89cfb44c05701b2965461db8494f46ff7ab6cfaa731763"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Configuration.dll",
+          "bytes": 19240,
+          "sha256": "fc9b3fff09b6dccbbc07fe8225a0cf9df94fceab50b54731caa27969cc9c2e72"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Console.dll",
+          "bytes": 169768,
+          "sha256": "85aa55649526c8b5bec2fe5811d98e33fdf595a69c0fc87d8396626ec33aede7"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Core.dll",
+          "bytes": 23336,
+          "sha256": "6758af6c57fe08ab2ef3426ab4fb7510c5a7c13948aaedf81339a33d8ee54250"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Data.Common.dll",
+          "bytes": 2770728,
+          "sha256": "bdf5cbb6fa51d4f892685c9027b81d9084130cef2067b8ea887c73e40a731bfb"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Data.DataSetExtensions.dll",
+          "bytes": 15656,
+          "sha256": "82d72011785a898bc122642d7bae6a6828baef73d47b8acb52d169ffe395f543"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Data.dll",
+          "bytes": 25384,
+          "sha256": "1be17f4c6bd354f1a5654d9dd30b52a11965d4ac42208d173c73cf9aecb3d8c5"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Diagnostics.Contracts.dll",
+          "bytes": 16168,
+          "sha256": "9ee7cddce1f941d0c57ac48d35935c86de1b2044f46f9538fc3e3642d43c8f6b"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Diagnostics.Debug.dll",
+          "bytes": 15656,
+          "sha256": "c2cb62b25d91119705029c8e7adbac2aad4ec4123c0c31799c44faab51daeb2c"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Diagnostics.DiagnosticSource.dll",
+          "bytes": 501584,
+          "sha256": "00fcb56efba898ec0ddbba14cd7e618486c0e5b09467995d4205bda24184fb9e"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Diagnostics.FileVersionInfo.dll",
+          "bytes": 46888,
+          "sha256": "e47370216983b427527b39aaf786b509c29953779ff90a574cce5d3b9542842b"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Diagnostics.Process.dll",
+          "bytes": 329552,
+          "sha256": "0a616a3b22f0ec2e8c1ccf6e42ff6acc6f91dbd2cfa5274f0b230d04f1363d5c"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Diagnostics.StackTrace.dll",
+          "bytes": 46888,
+          "sha256": "3fc3b6f82e193945970717a8ca0e354fd785962bbf7390b93e72e450a4c724ee"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Diagnostics.TextWriterTraceListener.dll",
+          "bytes": 67408,
+          "sha256": "dd793b20b2c574b4b5b8062c278df04b2d91fb86bc577c839e648030b46bb9e7"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Diagnostics.Tools.dll",
+          "bytes": 15184,
+          "sha256": "2d638b02eaccdaef5f5af49a93cb368b3c4bd4eaa93f7034d99a2fbfb8268dfc"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Diagnostics.TraceSource.dll",
+          "bytes": 141096,
+          "sha256": "644956324add90895e75e0f6874beeac35713c62beb0bb5c0abb31d4cde7dc76"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Diagnostics.Tracing.dll",
+          "bytes": 16168,
+          "sha256": "3f0056355c53a020cb7bc342fa87992f4973e863ef3f0117bfc2c94213b2af06"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Drawing.Primitives.dll",
+          "bytes": 132904,
+          "sha256": "4e50080f27ef47fec351e69a013c352bd0807a84e7fe4e069e2cd9d7b55d8ad1"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Drawing.dll",
+          "bytes": 20264,
+          "sha256": "22a80405468bf2060942deadb320c366c439983a9672b847f51d586efa7d4d60"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Dynamic.Runtime.dll",
+          "bytes": 16168,
+          "sha256": "302df5b559287ce390e1a066e58627ee22a32df5b4e9f286c375deb7c31bff8e"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Formats.Asn1.dll",
+          "bytes": 239400,
+          "sha256": "0ad1db4be167f3c0ddc187a2a046f0ed83e70d5cf772550fecbdc82f650a9ee4"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Formats.Tar.dll",
+          "bytes": 288552,
+          "sha256": "69273eaaeba4bc115883d9d840290d49cfcfad718d7aed55ed72ed1c7b29839c"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Globalization.Calendars.dll",
+          "bytes": 15696,
+          "sha256": "c5f326ab1a865e38adf4a6cfdda89f66d931aa82a0a5d8355199ccf675d60414"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Globalization.Extensions.dll",
+          "bytes": 15144,
+          "sha256": "ba52fca9b1f3ee501daa106c144b3861b6e8b743ffc4af4bf8ec47aa347c8f91"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Globalization.dll",
+          "bytes": 15696,
+          "sha256": "323015a8cfc179b48ca65d855b8c8b7c05d917c761d0c448d91486d8215a3890"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.Compression.Brotli.dll",
+          "bytes": 83792,
+          "sha256": "cc054657eaf168f02f84eae65ff7c241a1622a21039ff9fe2f154ced76d9a8ce"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.Compression.FileSystem.dll",
+          "bytes": 15184,
+          "sha256": "fffd597ded2176df766705b5982fa837d532e6cc78525965bda74b93d292e620"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.Compression.Native.dll",
+          "bytes": 937256,
+          "sha256": "da1d5ffb0852b92587a3f8e6c82295b14d1de0944bf963d4b755f86616be1fc0"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.Compression.ZipFile.dll",
+          "bytes": 100136,
+          "sha256": "fd44eb82ba8bcf8a5f97094970595771c6e11108fc0d1dcaf41d94a3a1935d50"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.Compression.dll",
+          "bytes": 419624,
+          "sha256": "ca5125c284ebdab1a4959c8f70d1a4fef5b98f1922fcb3b5024874fddf953a1b"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.FileSystem.AccessControl.dll",
+          "bytes": 104232,
+          "sha256": "a87455a818254627457395e85ab4970cc844edf07254456da624a37c99e9a23f"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.FileSystem.DriveInfo.dll",
+          "bytes": 55120,
+          "sha256": "8dd143cf52229ce0d2d7192028e9f0e17cc2b5937e445a0fb38df42feef09108"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.FileSystem.Primitives.dll",
+          "bytes": 15184,
+          "sha256": "74f3416713e3f607884504d5a5e018e4e49e1e10a81fe71e7ab19327fc6a110d"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.FileSystem.Watcher.dll",
+          "bytes": 87848,
+          "sha256": "71f003318bef13d6bb42f3472de8d7f48258af0d147f08f556cc07b570803b29"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.FileSystem.dll",
+          "bytes": 15656,
+          "sha256": "0a24eb1c36225504ee6afdea82e28b5818c9145287305bf093f1fb24d44dc267"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.IsolatedStorage.dll",
+          "bytes": 87888,
+          "sha256": "e56218766dd0903aeab3da681740673d896a02af536c8c3fbb05de3fdb925e9a"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.MemoryMappedFiles.dll",
+          "bytes": 83792,
+          "sha256": "79c1d75fb558c6de834b23b9f6067e380fb7d17c32e16561ebff3ae5ab135ab4"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.Pipelines.dll",
+          "bytes": 190288,
+          "sha256": "7875941c62c402cbb1f3505883bf87ed74088f18171ff3a66d8c8fa06e511836"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.Pipes.AccessControl.dll",
+          "bytes": 15656,
+          "sha256": "37d52473aac237534f3882a2569e347fcc890acf9c3e57f22543d84d8fd5df4f"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.Pipes.dll",
+          "bytes": 165672,
+          "sha256": "9fa574f006f09ff3864023e0d791e1965a843f734018276bd9ddeb8d1abb6069"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.UnmanagedMemoryStream.dll",
+          "bytes": 15656,
+          "sha256": "6f9d3af10c7b3f51b4af66bbf6dcd20d9842e66ece169468e9ce029c9e84df4c"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.IO.dll",
+          "bytes": 15656,
+          "sha256": "c6374a8aa93d7b5937c54e26b7a0dbfa39c7756673c5c0aa0abdf415c4d3a010"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Linq.AsyncEnumerable.dll",
+          "bytes": 1292072,
+          "sha256": "743910e92ed832d96d003461df578633245755cd92dc4859feccf10b03794be7"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Linq.Expressions.dll",
+          "bytes": 3639080,
+          "sha256": "c9bb446522fbef51debf26cf2a9159eb80d5635cce1501a79d0ec9d378a9b782"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Linq.Parallel.dll",
+          "bytes": 776016,
+          "sha256": "97373df914325969d116253b271d58971dbbdd3816940dbd6a540f8775130e62"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Linq.Queryable.dll",
+          "bytes": 182056,
+          "sha256": "17e157aacc2c749ea27ef5cd6668ba270e5438587013e77d9c87837d9659914a"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Linq.dll",
+          "bytes": 698152,
+          "sha256": "079e0935f903f9e2076225d7bad46518c5b47ac5c0def9643273575d0062f2bd"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Memory.dll",
+          "bytes": 161576,
+          "sha256": "5316822e28d6269071aa58e752c8b12f242b2abed0bbc0d0d2e63af6935fcd87"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.Http.Json.dll",
+          "bytes": 128808,
+          "sha256": "e5fc7ac1cf74fae190148cedaab199acdf7be023f9ccd5ada7c74a33acf94c8c"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.Http.dll",
+          "bytes": 1746728,
+          "sha256": "127361ac77186c2322e2fa5d75aac441c25eab9bd28ccb7799dfc0b06897db59"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.HttpListener.dll",
+          "bytes": 534312,
+          "sha256": "87a4c7afdeba525560ba0d63e53d25ca04e7d3b7f8d92d1ff0be93b7826948a9"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.Mail.dll",
+          "bytes": 481064,
+          "sha256": "65b6559e00e3acaf44374a1ac44bb56ab556e6d7e469817cdd9624636c8d3b55"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.NameResolution.dll",
+          "bytes": 124712,
+          "sha256": "daa4ae56e568ad5901678a8997d6ff1584b99b0892981c4ca069cb24058ffb22"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.NetworkInformation.dll",
+          "bytes": 157480,
+          "sha256": "9d77279b5c96db317ebc190bddb6d2c6aab99e7ebf8c620c76c1ffb6df122a00"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.Ping.dll",
+          "bytes": 91944,
+          "sha256": "de1d264c5f39df89d22c2c21033f7b52e23e7ab6add587e7505b7383f330f2cf"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.Primitives.dll",
+          "bytes": 210728,
+          "sha256": "fb9f4515c2731f94694ba47517a5df344c233b1ceb6dbeefd373aeb032e78ede"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.Quic.dll",
+          "bytes": 358224,
+          "sha256": "d3806a24e04e9e7a080d985be674b5650748a13cb032f609ecbc0c6b17835c0c"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.Requests.dll",
+          "bytes": 374568,
+          "sha256": "657761ddb1d4169b958cd83e1bbdbc6481c0a5d20bf91b5f4832500fc7e0d04d"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.Security.dll",
+          "bytes": 665384,
+          "sha256": "464900194cc2d5c405dba28b1b0ab02174fe224c2ea86ddf6ed4e48cea814e72"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.ServerSentEvents.dll",
+          "bytes": 83792,
+          "sha256": "bb98698413fd83ccf898fff8d7d5763380f176914657dbe5ab2338716e500ef5"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.ServicePoint.dll",
+          "bytes": 15144,
+          "sha256": "3a021dda4d96ab8a5cd22b456083d889f18cd332630760a6bc854d69e312041a"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.Sockets.dll",
+          "bytes": 530216,
+          "sha256": "1f097ff565059147be68fdac148db435eaf9c2dd0a6f8248369e818f2cada590"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.WebClient.dll",
+          "bytes": 165672,
+          "sha256": "1222dcfa31f149796cc0bdc73004e29e3b57dd7eaa11133e5e214eac606bfc9a"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.WebHeaderCollection.dll",
+          "bytes": 63272,
+          "sha256": "441ba7f9eaa01d69dcfc3ba13ae8a23d76586387d5d19e30ce0b607404b365b4"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.WebProxy.dll",
+          "bytes": 42792,
+          "sha256": "49e23f3f467e1eeebb9c26be7737679bdb7678816226e7938553aa684a5d6e9a"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.WebSockets.Client.dll",
+          "bytes": 104232,
+          "sha256": "1e321f049426f4e1a2d27c742d2a7b335f1dd041793b87011a6e0161c0728d88"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.WebSockets.dll",
+          "bytes": 243496,
+          "sha256": "a82af566588f39ffb9f59303f537462fe7ab3e4e0557ec7ec375a18651bd833f"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Net.dll",
+          "bytes": 17192,
+          "sha256": "88766fb8832084e01c60c416aff66baa5fc246f5f9931ed33b498345d8e50d22"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Numerics.Vectors.dll",
+          "bytes": 15656,
+          "sha256": "6a672aafaa521341b1f0897fd82c596a2a77da3f93d06f1d723be7506b18a829"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Numerics.dll",
+          "bytes": 15144,
+          "sha256": "c3bafd992b680b545c0ad7fb62cf9b91899783d78d8e2b6da4628a202303c9e6"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.ObjectModel.dll",
+          "bytes": 79656,
+          "sha256": "99c6aa46d55e7387aa666d875a1f7137afff2d61d0cb5d8e58e4ebb2223849bb"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Private.CoreLib.dll",
+          "bytes": 16033576,
+          "sha256": "0a175cdd09067c52f8b2477cfcebf894b2f926d7302e55ae76fc921529662c7b"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Private.DataContractSerialization.dll",
+          "bytes": 2062120,
+          "sha256": "30580397c3641a15468cd3347258c5b13c548ac151ba904b6b31ef703b9c3a0a"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Private.Uri.dll",
+          "bytes": 255824,
+          "sha256": "de8a09a693727e8b326103bca2f6b3dd70e13a0ca0ef954aa2d9e060ec4952e0"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Private.Xml.Linq.dll",
+          "bytes": 390992,
+          "sha256": "7a3d2f61956c9e25f886e1e05662cbd2325738cc778ed82dfab76a3e18ea3b56"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Private.Xml.dll",
+          "bytes": 7788368,
+          "sha256": "724bf135d0c0fdeefcbc01e8a38bc74e8532bf87a5dbbd67e57faeb666d9aa9a"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Reflection.DispatchProxy.dll",
+          "bytes": 75560,
+          "sha256": "532f8921e2200f2d3ea13549e71ff85e5c2d6f292f44c40ac6e1bec760928b15"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Reflection.Emit.ILGeneration.dll",
+          "bytes": 15656,
+          "sha256": "43d006580a2a67f00d608e09685c25b93b471f6adafe925eeb0662e5449bb3ca"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Reflection.Emit.Lightweight.dll",
+          "bytes": 15656,
+          "sha256": "9f3116a7e4bdcc0ef134da1699eb03458802dd22bbe79a15c3095e2658b30c27"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Reflection.Emit.dll",
+          "bytes": 309032,
+          "sha256": "d6e69a63e28c69e47b7e16479d2868fc12bed28e027045149393a0d528ccbb2b"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Reflection.Extensions.dll",
+          "bytes": 15184,
+          "sha256": "cd552fd8bb3f8a313627677568cbd2e1e251e39e3d8ef04995de285af596257b"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Reflection.Metadata.dll",
+          "bytes": 1156904,
+          "sha256": "4901b7f15d30d6463f08ed4221feb4c3330112240c35d7553490ba99da70c860"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Reflection.Primitives.dll",
+          "bytes": 15696,
+          "sha256": "dc7c8ce0276371cc4b8ffd7b819a43aa45ae7d624a113af2c68c430980fa1ba4"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Reflection.TypeExtensions.dll",
+          "bytes": 42792,
+          "sha256": "21e9db02782d569548e1ef988b50220ed5912de210681a34130bedda72399e5d"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Reflection.dll",
+          "bytes": 16168,
+          "sha256": "604f110f2c183925535db2d21eeb9d0e14b02ec3e2ca492acf1a00681d8671d5"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Resources.Reader.dll",
+          "bytes": 15144,
+          "sha256": "2dead871c83fa2668e18ce6f61e76734390115f37789e10c8182a98ca3d3acaa"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Resources.ResourceManager.dll",
+          "bytes": 15656,
+          "sha256": "2e91f4000254ef1f34d7c4ef650a67e2521e381d5a4fa389bd1cbb38aab3ae28"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Resources.Writer.dll",
+          "bytes": 50984,
+          "sha256": "384b3ed914fa9f6055e394d08008ae83735dea2c01c2a15a0e48fb0cf0c7b568"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Runtime.CompilerServices.Unsafe.dll",
+          "bytes": 15184,
+          "sha256": "00204d3071f863624d6e7ed323579aadac44191e2fdf7dc5bfe1896a59f48d68"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Runtime.CompilerServices.VisualC.dll",
+          "bytes": 30544,
+          "sha256": "5ff614d288b708b70e43e4774a66982e17531fee96c758397cfd1627a06d7ca6"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Runtime.Extensions.dll",
+          "bytes": 17704,
+          "sha256": "2acb1faf01e3061bbf84cf60b4de8116a821084d480e568fcbf337cddad44946"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Runtime.Handles.dll",
+          "bytes": 15696,
+          "sha256": "3a12926c9543ca46c4287a8e99be2788275ae58672367af7aff60d52859ded6f"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Runtime.InteropServices.JavaScript.dll",
+          "bytes": 51024,
+          "sha256": "d0991a67f0a35c033064806b24223672ac0b418570099e334bb9b8f405f98b9f"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Runtime.InteropServices.RuntimeInformation.dll",
+          "bytes": 15696,
+          "sha256": "5b10a7935d44f9a279df162da405714d4667d044cfa25cdc88dded1fdb0f1d53"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Runtime.InteropServices.dll",
+          "bytes": 112424,
+          "sha256": "664d77cc2163f40e80ac0e1ee4ed84b3a5c21c580a277dd63fdd4e448e55a3f7"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Runtime.Intrinsics.dll",
+          "bytes": 17192,
+          "sha256": "911598f98b4dd471549f7f6cb4ab3344a41369ceb40db8add049e20c0e31d5b7"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Runtime.Loader.dll",
+          "bytes": 15656,
+          "sha256": "20d4d8620db219098a552524303ecf32d0f24ab342e691886c2ddf2d72691114"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Runtime.Numerics.dll",
+          "bytes": 354088,
+          "sha256": "47f6d55917ccaafa28480e692bf27e9dd95b5762b2c85398d575f65993bd2293"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Runtime.Serialization.Formatters.dll",
+          "bytes": 124712,
+          "sha256": "c05cf601d384d10051e81b1b14c9c8e921f5acfc9373db19f2d2164b0391f872"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Runtime.Serialization.Json.dll",
+          "bytes": 15696,
+          "sha256": "9864b302bf9e2efe92cd1e67398312905a4e96ca6eee4fccf3b5ff27fdf93c1f"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Runtime.Serialization.Primitives.dll",
+          "bytes": 38696,
+          "sha256": "d2677e25b164af13d28032b03fd6eb30a4fcc3d9ced4771eaab11cd7d8721216"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Runtime.Serialization.Xml.dll",
+          "bytes": 16680,
+          "sha256": "9f6dd0efbc87ccd8592b34d4f3e834f20661574e8eead3beb73b351feaeed0e6"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Runtime.Serialization.dll",
+          "bytes": 17192,
+          "sha256": "4097d9d333fca666495541a3aa106ef96a2e2c0141c1ae13ae9b18d029a21d82"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Runtime.dll",
+          "bytes": 44840,
+          "sha256": "dc17d00429e6c256e6eeb0140fa9294d819fb6e13c24542fb01c2c3b424dff63"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Security.AccessControl.dll",
+          "bytes": 227112,
+          "sha256": "1d6691eee72ab1bd3924d8bc2ece16ff4f7aa1c2cc946d9b01344b55bff9538a"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Security.Claims.dll",
+          "bytes": 100136,
+          "sha256": "8c5825424df7ef61430d11292346349ae8d8a238febebe40b5c93a440efc4b83"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Security.Cryptography.Algorithms.dll",
+          "bytes": 17192,
+          "sha256": "0d32e472ebcf3df90731a8e0c0f2556d54a0dbc6b793ac2a6a252a4da65a31c2"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Security.Cryptography.Cng.dll",
+          "bytes": 16168,
+          "sha256": "5764df594cdfaf851e24c82cb0e416556f308b27b5a7c4a19ba43edf9068f1e9"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Security.Cryptography.Csp.dll",
+          "bytes": 16208,
+          "sha256": "35fdeda39d810a2c1c1728b6bbaa93ddb4593093de4a80e247d03349f3b56d76"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Security.Cryptography.Encoding.dll",
+          "bytes": 15656,
+          "sha256": "ad4110ccffde277e12208bcf7809a2bd4ab7964141dd66eb2fa72b22cdd6c4c3"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Security.Cryptography.OpenSsl.dll",
+          "bytes": 15656,
+          "sha256": "dbcbd42868c37c0406d31f2b09f8922220c1d1cd48a3f952c7d4629a984ddb01"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Security.Cryptography.Primitives.dll",
+          "bytes": 15656,
+          "sha256": "57354fd66966f66086e04473d35fab0669b09bef7d096fcaf34d8354fe76cd32"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Security.Cryptography.X509Certificates.dll",
+          "bytes": 16680,
+          "sha256": "df29ce12b35fb73bfc1d995c4ac239d581edbab0a29407c7e342392ffdf8cc56"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Security.Cryptography.dll",
+          "bytes": 2549584,
+          "sha256": "39516be3623de208b270c3dd7982ef3b2f56c047c0c0f34466e64b06d4683d80"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Security.Principal.Windows.dll",
+          "bytes": 178000,
+          "sha256": "b1982ec754b81e7a114adae32378c943f6eec1cd87f0571f84f8acb94069a49d"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Security.Principal.dll",
+          "bytes": 15144,
+          "sha256": "8e3d5d135ace4195c0ef7a74ebf3788748d23417aee0496712c02b99daa4be97"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Security.SecureString.dll",
+          "bytes": 15696,
+          "sha256": "e060eea5223c0c65d2ba658c21ba45fcac7631546da4c6339e67b42c74b2e840"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Security.dll",
+          "bytes": 18256,
+          "sha256": "30fc328a0ed390d32270515626c8fbce8fbc4dfb98510fbab473fbc64a101dba"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.ServiceModel.Web.dll",
+          "bytes": 16720,
+          "sha256": "8040bdd3eb52f073e935dd701fb63970b78264136b8c0861f070a398ed406586"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.ServiceProcess.dll",
+          "bytes": 15696,
+          "sha256": "b4b2182496065356838aa3e2b35f610f851b38af182566d6220c1100cfad1e2c"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Text.Encoding.CodePages.dll",
+          "bytes": 861992,
+          "sha256": "fef946f87f73715f86eb3096cc642252425d791c21cf4f3b8f1cfa6e8b0d6d1a"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Text.Encoding.Extensions.dll",
+          "bytes": 15696,
+          "sha256": "3ad82156d0ea9fccc99d4d1e66c6cc1b76521e2b0cce5bebe1da103a5b295d47"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Text.Encoding.dll",
+          "bytes": 15656,
+          "sha256": "d2b782ea81f033c69e337bd1a94f6c6e43a7beeb3436538a21ff77b1de9fcfed"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Text.Encodings.Web.dll",
+          "bytes": 124712,
+          "sha256": "a2c7ef05abc665de9c07dcb600914889d501c8cfa13973bbe3c60c45367bc291"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Text.Json.dll",
+          "bytes": 1890088,
+          "sha256": "9f4fd55056a3ccd6aa5f204933f9b8e3da412b060238cbeb8bb2be2fe4046f2a"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Text.RegularExpressions.dll",
+          "bytes": 1034024,
+          "sha256": "320fd9a1cc67028d9e736661764680be4c8fedc4157395a02b4ec02765de0e5b"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Threading.AccessControl.dll",
+          "bytes": 75560,
+          "sha256": "db5d7e9fe38e71f9689b7791d52abc443c76a35130ff32cae44bd138a1ac922c"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Threading.Channels.dll",
+          "bytes": 157480,
+          "sha256": "538b69cc037ccab32129f3983113f80bed9d4903dc2fdddc134df0c3432b46fb"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Threading.Overlapped.dll",
+          "bytes": 15656,
+          "sha256": "f33abaf654c04273ff14a54253b5fee66334432318ebbe2cd6a8c97817cfbb84"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Threading.Tasks.Dataflow.dll",
+          "bytes": 472912,
+          "sha256": "61807fddfe725fad18e1197fb8fe6580d8cba5ba92317cd07bf5e0ac99a98f62"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Threading.Tasks.Extensions.dll",
+          "bytes": 15656,
+          "sha256": "e7b0ac7fc7af5c4f11ff7327a6c82263eb8908ea62ff86cb93b0313286c4470c"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Threading.Tasks.Parallel.dll",
+          "bytes": 132944,
+          "sha256": "ec96829afef77eeba80bc65c8b6539697d39b68c8114e1a738bec5df17249bcc"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Threading.Tasks.dll",
+          "bytes": 16680,
+          "sha256": "91e8c5ff79baa8a063287e5efcc1029d5e72cd09fedae9e7f03cc636f0e8c551"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Threading.Thread.dll",
+          "bytes": 15696,
+          "sha256": "96e44539c17ff7578083b2e54a9c735374b0da4341b770b5808655a777668024"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Threading.ThreadPool.dll",
+          "bytes": 15656,
+          "sha256": "9ec37cb7c00b2aa3b6ff51c5b0bbf9cc3c8efc4236a0e8cd859a76c52b8f2037"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Threading.Timer.dll",
+          "bytes": 15184,
+          "sha256": "9980f15602e3d865e4da3085599c89cf9e5dd01d4fdf83220632af24bf8b072e"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Threading.dll",
+          "bytes": 83752,
+          "sha256": "3bb4d100413ff281ea8a70a22216d8d17d4bcb21610be258d948de4ce6b1a8e5"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Transactions.Local.dll",
+          "bytes": 640808,
+          "sha256": "26ebbeb0d587640174ff81307086ae19fe494d6cc56c47e5f5f1c53f319c47c1"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Transactions.dll",
+          "bytes": 16680,
+          "sha256": "a134ba152e1041b84fc3dbe2a2c193fdc1fd2775f4122b91133d2d12e1746121"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.ValueTuple.dll",
+          "bytes": 15656,
+          "sha256": "d7de7fc8780a35d3cfbba6e2f32a50569628d9088d11e32195ca361a3e142296"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Web.HttpUtility.dll",
+          "bytes": 63272,
+          "sha256": "58915664ac9ba8dec29d74a9d12c8ee5c4501c305afab59e6fd0a0593b235a1c"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Web.dll",
+          "bytes": 15144,
+          "sha256": "4b1d439f543040f01a240f9f8ea011a6a5311442ab3f2c7364a9c5fde073eb66"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Windows.dll",
+          "bytes": 15656,
+          "sha256": "93573613b9fe6493c173844480aa60e8007293246021e3dc40bdd25d782d845f"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Xml.Linq.dll",
+          "bytes": 15696,
+          "sha256": "b0a5b461bf71412df3cf98fa49afe230859ac7e7f8872525821bdeccc44fff89"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Xml.ReaderWriter.dll",
+          "bytes": 21800,
+          "sha256": "14ed0e4a1832a085eb655a6725f2dc841b53a08396979609f0814578896857d7"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Xml.Serialization.dll",
+          "bytes": 16168,
+          "sha256": "8cae84633102182c4b3484ba5b456f63d06bc5d67f4ec9caee9b271edf449b04"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Xml.XDocument.dll",
+          "bytes": 15656,
+          "sha256": "53dd8fe7a0122362586ca9682f14991e3264e397adbad37ce1535e3f56303047"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Xml.XPath.XDocument.dll",
+          "bytes": 30544,
+          "sha256": "08f0924b7a65b472b019af1ab9551c129dff8594ef22cbc8c435ab292e8b8d19"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Xml.XPath.dll",
+          "bytes": 15656,
+          "sha256": "e0c2dac51f5f403812f0be7af11a5553ecbf822fee45b516910877df800ff5fa"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Xml.XmlDocument.dll",
+          "bytes": 15656,
+          "sha256": "bf18c4a123b6344cd11afb199b5013456a99ca216f99ce5be905139dc7cb4319"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Xml.XmlSerializer.dll",
+          "bytes": 17744,
+          "sha256": "99561eff9bae4d95416d791cae17406d77a16c18a43f378c5f1dbb3b021cd235"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.Xml.dll",
+          "bytes": 23336,
+          "sha256": "7b811308ee61840ccc69b447845446030d29c1c66bdb9842ba5a59a1c62a60cb"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/System.dll",
+          "bytes": 50512,
+          "sha256": "ed7acc3741a65f68452c1dc958d522b4ab80863b21df79b46a03943fa51b77ee"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/WindowsBase.dll",
+          "bytes": 16168,
+          "sha256": "ed60cbca325489cdc1ed615f5f8f63aa213b5ed9fcfda39c58e985a12d12c9fb"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/clretwrc.dll",
+          "bytes": 317776,
+          "sha256": "dc153acb6c0ae6dd205e4d7f4555dfb67ba45d25af39f8a1475121f6002f2f93"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/clrgc.dll",
+          "bytes": 674088,
+          "sha256": "a882ba84e9628a2ad09508c31bf6f53494892126cd014099d440180a61db086a"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/clrgcexp.dll",
+          "bytes": 711464,
+          "sha256": "46129052ba8a920ded5688f63eec3472675efe7fb76004991211280cb3fae36b"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/clrjit.dll",
+          "bytes": 2095912,
+          "sha256": "2a2332c3c0cb023e71deb356b5fb85ce9045fb8434734dcfe9a7529e427dc858"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/coreclr.dll",
+          "bytes": 4613416,
+          "sha256": "18eed8c40d05fc455be95d12cc77eacf379265063b15ca84bd7a11cf29078a22"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/createdump.exe",
+          "bytes": 71512,
+          "sha256": "363b481c110ed2657d93211d52199955098d46655f50ca09473cc04a546f175f"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/hostpolicy.dll",
+          "bytes": 378704,
+          "sha256": "90f9826f48e6416902199dee0fa1954536fe4c5191f5fd44b1bc6de623eb99c8"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/mscordaccore.dll",
+          "bytes": 1356120,
+          "sha256": "4e2109c88298f0a614aac82b23310b13835673a8e192a6a8b75c25459e591169"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/mscordaccore_amd64_amd64_10.0.1326.50504.dll",
+          "bytes": 1356120,
+          "sha256": "4e2109c88298f0a614aac82b23310b13835673a8e192a6a8b75c25459e591169"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/mscordbi.dll",
+          "bytes": 1237336,
+          "sha256": "0109e6b251ab56b80f6c02a51a92f03f44a9b1ad410f2cf3cf6b7dd6543139a9"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/mscorlib.dll",
+          "bytes": 59688,
+          "sha256": "f696efe065247cff43d01a2b3e77f89c9c8193fae8ae8a0d198e8dbc7d4afce3"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/mscorrc.dll",
+          "bytes": 133928,
+          "sha256": "e57104b778364b49b380d0d7246b523ef63e62d8c8a50a9ec76bdcc874934c66"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/msquic.dll",
+          "bytes": 537400,
+          "sha256": "7b32a336b638570bff7b2f4782ebdc05b8c70fac76fdb412f3e8a3c181c32a61"
+        },
+        {
+          "path": "Runtime/DotNet/shared/Microsoft.NETCore.App/10.0.13/netstandard.dll",
+          "bytes": 100648,
+          "sha256": "4f517955d84669b6c02c83fa5e20e5f9c80d58a0aa1f16967af45db5ccafbfdb"
+        },
+        {
+          "path": "Runtime/layout.version",
+          "bytes": 2,
+          "sha256": "4355a46b19d348dc2f57c046f8ef63d4538ebb936000f3c9ee954a27460dd865"
+        },
+        {
+          "path": "engine.runtime.info",
+          "bytes": 259,
+          "sha256": "7c177247233f7240d00248534045596a1cfa53b946200c4e5241af5da1fc9e71"
+        },
+        {
+          "path": "engine.runtime.json",
+          "bytes": 480,
+          "sha256": "a8f90fd24014090778794e6d646b08565335120a84894e9027c8829440520075"
+        }
+      ],
+      "cook": {
+        "schemaVersion": 1,
+        "producer": "AssetCooker",
+        "source": "package-base/Assets",
+        "artifactRoot": "Assets/Derived",
+        "modelCount": 9,
+        "artifactCount": 97,
+        "artifactBytes": 1173452845,
+        "manifestBytes": 36259,
+        "manifestSha256": "b3c373c16c15ed9f1cc4a125904d5a8162b17246ab90d70ffe8939e47e8269d1",
+        "derivedFileCount": 159,
+        "byFolder": {
+          "Models": 29,
+          "Textures": 42,
+          "ShaderMeta": 5,
+          "Materials": 2,
+          "MaterialPrograms": 14,
+          "Scenes": 1,
+          "Prefabs": 0,
+          "CollisionGeometry": 4,
+          "Audio": 0,
+          "SoundGraphs": 0,
+          "SoundPresets": 0
+        },
+        "sourceCounts": {
+          "--model": 9,
+          "--texture": 42,
+          "--shadermeta": 5,
+          "--shadergraph": 14,
+          "--material": 2,
+          "--scene": 1,
+          "audio-clips": 0,
+          "sound-graphs": 0,
+          "sound-presets": 0,
+          "fonts": 0
+        },
+        "legacyTextureNameRefs": 0,
+        "legacyModelCookCaches": 0,
+        "modelGenerationsCopied": 9,
+        "modelGenerationsAuthored": 0,
+        "runtimeDocumentCount": 19,
+        "runtimeDocumentBytes": 39334,
+        "runtimeDocumentFormat": "CEDO1+TRBN2"
+      },
+      "verification": "passed",
+      "entries": [
+        {
+          "path": "Assets/BehaviorTree/BTProbe.blackboard",
+          "bytes": 2275,
+          "sha256": "abbadf30bbe4ce00346264fda2940647fbe129cdcc153d1842db4cb5d334d748"
+        },
+        {
+          "path": "Assets/BehaviorTree/BTProbe.bt",
+          "bytes": 1561,
+          "sha256": "9056e458056078ad00e218265d13dd1d3c38b084f93e261d6fbaea54b231f446"
+        },
+        {
+          "path": "Assets/CSV/EventDesign_Template.csv",
+          "bytes": 1678,
+          "sha256": "39f03d4edf52294d7f5f2b4935446ff0a367887e3cbf1867b317c501154fc736"
+        },
+        {
+          "path": "Assets/CSV/ItemEnhancementSetting.csv",
+          "bytes": 740,
+          "sha256": "759495ea3f01d2303dab66386b38db4c4582d8ddaafbc90934a45e2e7bbb8521"
+        },
+        {
+          "path": "Assets/CSV/SoundName.csv",
+          "bytes": 3736,
+          "sha256": "fd83e10547d9b12aca43988dd87983e838f830103302511c63835e555d23cc0c"
+        },
+        {
+          "path": "Assets/Derived/CollisionGeometry/3f/3f04cb53-b4dc-4375-b993-e17871aa6e6a.cepg",
+          "bytes": 552,
+          "sha256": "a75d9f39c89b0baae8ebdd7f7a85a48d643ece2d90465df3373d3ae6af62b52a"
+        },
+        {
+          "path": "Assets/Derived/CollisionGeometry/57/578cd3b3-bd67-450c-a1d1-786ee613f24f.cepg",
+          "bytes": 440,
+          "sha256": "d96fcf961c4cef34441e08e60cb37af5724d4f398da203cef8aa637ae4700252"
+        },
+        {
+          "path": "Assets/Derived/CollisionGeometry/a1/a1a9f72d-f2ac-4bb4-b18d-56f0e85470e9.cepg",
+          "bytes": 170,
+          "sha256": "f105f6db5a1101e2384872e6636ce1d297f76ee3a96624851d7935d7549ebdad"
+        },
+        {
+          "path": "Assets/Derived/CollisionGeometry/d0/d0f01397-566b-41cd-b1cc-78bfb0075459.cepg",
+          "bytes": 6098,
+          "sha256": "6f382a4360707e7b0eb211b1426017c911dcba3b2ca779a372c3c481144b4e9c"
+        },
+        {
+          "path": "Assets/Derived/MaterialPrograms/02/0223a5fb-09e3-4dbc-b75d-f6ae6d68bef9.lxmaterial",
+          "bytes": 2208975,
+          "sha256": "45a874fafeb47762abfca9b1a1647c3c48c22ac463b01eb6ed9fb19bac3805da"
+        },
+        {
+          "path": "Assets/Derived/MaterialPrograms/16/16499e2b-fbda-83bb-8145-d7c5a182daca.lxmaterial",
+          "bytes": 2500771,
+          "sha256": "cce29c3cc329c4ff1e8aa4e52c0312fa5d7d2af73749a060100d058e4f09d5a5"
+        },
+        {
+          "path": "Assets/Derived/MaterialPrograms/41/41582c39-a6fd-858b-81cd-029e4a65ff77.lxmaterial",
+          "bytes": 2500771,
+          "sha256": "afe1df7b4380446a61a85d8754525b4513129fefbb92fe3230dfc27d801a0cd5"
+        },
+        {
+          "path": "Assets/Derived/MaterialPrograms/48/48388e24-7116-414f-b204-a604fca67e07.lxmaterial",
+          "bytes": 2208975,
+          "sha256": "020cd5e7a20ae489853fe7a37f361fe473df4818b56dfe6b5c78e74cf7c76b3e"
+        },
+        {
+          "path": "Assets/Derived/MaterialPrograms/6d/6d7b614a-5161-8dbd-9d1a-01c157d6173d.lxmaterial",
+          "bytes": 2500771,
+          "sha256": "17043a5c8f9fa72b928c2908ffd6b9d0b1244b57463f77ee2cd147808c54d517"
+        },
+        {
+          "path": "Assets/Derived/MaterialPrograms/b1/b1b6ba29-3b83-8d96-80d4-1b4dc6673ff7.lxmaterial",
+          "bytes": 2345169,
+          "sha256": "a6a7fb2dc60e2a8c53ca2dfc21d04b1e5218dd9b63bca716021fa573c7584d32"
+        },
+        {
+          "path": "Assets/Derived/MaterialPrograms/b6/b6387818-7280-8977-9338-090103a98dda.lxmaterial",
+          "bytes": 2345153,
+          "sha256": "c94a915a10e6130a9ba57d7bdb6f68f6c0e22a771913b47abf525ef1b6d1a522"
+        },
+        {
+          "path": "Assets/Derived/MaterialPrograms/c5/c58ba041-1e10-82e0-9d6f-3b3ab64022c5.lxmaterial",
+          "bytes": 2345169,
+          "sha256": "c4dcf4cd79fa0a07e8dd7a9c5e6a77213715da994855a19fb5f47ba3f72c6f5d"
+        },
+        {
+          "path": "Assets/Derived/MaterialPrograms/cc/cc7977ab-aa6a-8fc0-b9b5-e8d0596d980d.lxmaterial",
+          "bytes": 2500771,
+          "sha256": "753954c4e06fa52791b5deffc5040d8ee2914110bf2e292f9c8d8ce2d180927d"
+        },
+        {
+          "path": "Assets/Derived/MaterialPrograms/cd/cd168382-d753-8ab0-b7f6-6fe0c18e4b21.lxmaterial",
+          "bytes": 2345153,
+          "sha256": "6a4bb0ee8886963c3349a509d2e2ab8fb0ee41738edbde37be3218b446f15daa"
+        },
+        {
+          "path": "Assets/Derived/MaterialPrograms/d5/d59f5e72-0e4e-8684-90a6-d42ba9453464.lxmaterial",
+          "bytes": 2345025,
+          "sha256": "763194565a7711f2c8d7c0dedfa6bf1eed064a3cc97752ae6fecd6aa74eb3cca"
+        },
+        {
+          "path": "Assets/Derived/MaterialPrograms/e7/e78cd2a3-18f3-89e3-a733-10be3a569fc9.lxmaterial",
+          "bytes": 2345153,
+          "sha256": "827b6c4a8ad0d78d468eb020ae59111f0f9d6a57154deb19ff739aa9eacda5c9"
+        },
+        {
+          "path": "Assets/Derived/MaterialPrograms/f1/f1f18c9b-7eb7-8788-bd47-11c4cc8b24b7.lxmaterial",
+          "bytes": 2345169,
+          "sha256": "8769aed625d1ab7666ec4f5328da89d70bc781a4bda777597441b83643700863"
+        },
+        {
+          "path": "Assets/Derived/MaterialPrograms/fe/fe23112a-afa0-8941-b4de-22a7197fe83f.lxmaterial",
+          "bytes": 2345153,
+          "sha256": "7f5f04d7894eaada11a39298b2ddeeb49a5e720d66c3ea674e5217e31b92023b"
+        },
+        {
+          "path": "Assets/Derived/Materials/78/78ba3771-cd61-41f4-ad34-779781c89282.asset",
+          "bytes": 3463,
+          "sha256": "0f0ce40c76c0de1dab8c18a2d785fc3ede75d4641e6185f214d53721dbbf5087"
+        },
+        {
+          "path": "Assets/Derived/Materials/bb/bbb12414-7991-4de2-8d15-36f8ec299312.asset",
+          "bytes": 3467,
+          "sha256": "6aa025edce8c6a9bf480f633b734f44757e5e29a83837c9e14d15bc0f48d6c80"
+        },
+        {
+          "path": "Assets/Derived/Models/17/17d1efaf-9c93-8adb-ab23-6f4a04810c46/11/Derived/CpuGeometry/922b82fdf0ba82de7265036e96b1a0b1eef1f33d8e1c21fb5a9da281ac3c804a.cecpu",
+          "bytes": 59304,
+          "sha256": "922b82fdf0ba82de7265036e96b1a0b1eef1f33d8e1c21fb5a9da281ac3c804a"
+        },
+        {
+          "path": "Assets/Derived/Models/17/17d1efaf-9c93-8adb-ab23-6f4a04810c46/11/Derived/Geometry/me34e6995a04c028feda2194fc0f1ad9bc0ed7a5c09e58fd5207761955d3dcb44/66033d4e-bc68-84d2-b140-553da730cc1e.cege",
+          "bytes": 183988,
+          "sha256": "fdb085ff922d191d9b09ce2841f6ceefaf9a57114fd5377d31621cd152f6ef42"
+        },
+        {
+          "path": "Assets/Derived/Models/17/17d1efaf-9c93-8adb-ab23-6f4a04810c46/11/Derived/model.cemd",
+          "bytes": 298,
+          "sha256": "03c485484f617b89b8e2ad739de6341228b6f0f1bfae0e9aefb473140f0eac64"
+        },
+        {
+          "path": "Assets/Derived/Models/17/17d1efaf-9c93-8adb-ab23-6f4a04810c46/11/generation.asset",
+          "bytes": 1497,
+          "sha256": "88a8d387cc50b636a72f1c2e132ba76613ccce2a810b928655e59857a7706c89"
+        },
+        {
+          "path": "Assets/Derived/Models/17/17d1efaf-9c93-8adb-ab23-6f4a04810c46/11/metadata.cemc",
+          "bytes": 1344,
+          "sha256": "2e3534a63608128e22e53c2c717d24cbbfbb251e3a63f0600b31ed6fcc424b13"
+        },
+        {
+          "path": "Assets/Derived/Models/17/17d1efaf-9c93-8adb-ab23-6f4a04810c46/11/sidecar.meta",
+          "bytes": 1709,
+          "sha256": "5759711fa8b74be5b53c97875ffc41b5a49fc8db0b8ca5a8640788f1f25b63a2"
+        },
+        {
+          "path": "Assets/Derived/Models/17/17d1efaf-9c93-8adb-ab23-6f4a04810c46/11/streaming.cemf",
+          "bytes": 808,
+          "sha256": "0fb3c533190cd1c80e705be2779c2b5d013f7f58f3f1c6bf4d86646311efa449"
+        },
+        {
+          "path": "Assets/Derived/Models/17/17d1efaf-9c93-8adb-ab23-6f4a04810c46/11/textures/76cad07c-b66d-8b44-8cff-69e630fc445d.cetex",
+          "bytes": 1398564,
+          "sha256": "4262e146ea2a5af448fb2a119d41e023cd0783e7a7689eb083bca954ebe144c7"
+        },
+        {
+          "path": "Assets/Derived/Models/63/63c7b8bc-3057-833b-86ae-870fa7a6aed7/11/Derived/CpuGeometry/b5cb4624bb57bca4f5c6352dbdcceef8a9a903c1772d541da9230abf37f868ff.cecpu",
+          "bytes": 6696,
+          "sha256": "b5cb4624bb57bca4f5c6352dbdcceef8a9a903c1772d541da9230abf37f868ff"
+        },
+        {
+          "path": "Assets/Derived/Models/63/63c7b8bc-3057-833b-86ae-870fa7a6aed7/11/Derived/Geometry/m36fcf4b17a8321bfa5dec58c8e9e66e9b957a0cb2f2802d8924b7c8492706c3c/d84fc43c-dfb6-8803-bcc5-7cb2d510a9cd.cege",
+          "bytes": 33488,
+          "sha256": "e8a5575d94d78bc239e0fa29fab47af0cf276e2328cab972ede4219be7373fe3"
+        },
+        {
+          "path": "Assets/Derived/Models/63/63c7b8bc-3057-833b-86ae-870fa7a6aed7/11/Derived/model.cemd",
+          "bytes": 314,
+          "sha256": "4e4a431edf0c095612b3a47e6e68719def2e41736b09049cff447c61212bb710"
+        },
+        {
+          "path": "Assets/Derived/Models/63/63c7b8bc-3057-833b-86ae-870fa7a6aed7/11/generation.asset",
+          "bytes": 1509,
+          "sha256": "688cea4d139081b460755bf4ba72b953aa2de0cd207fedde112a8dfe2a670d9d"
+        },
+        {
+          "path": "Assets/Derived/Models/63/63c7b8bc-3057-833b-86ae-870fa7a6aed7/11/metadata.cemc",
+          "bytes": 1360,
+          "sha256": "473f3c8eee731142d724228ed18cd3161d0bde6ca64403bdf796a322994b4a80"
+        },
+        {
+          "path": "Assets/Derived/Models/63/63c7b8bc-3057-833b-86ae-870fa7a6aed7/11/sidecar.meta",
+          "bytes": 1733,
+          "sha256": "bde4032597fd2d75662f8d1ed7e85d5728bf91ef7aed68f4b73a02a1762e91ec"
+        },
+        {
+          "path": "Assets/Derived/Models/63/63c7b8bc-3057-833b-86ae-870fa7a6aed7/11/streaming.cemf",
+          "bytes": 808,
+          "sha256": "69ea56c7eeaed0a2083fd1dec45de1b866bc6e0993598aecf24a290e248be6f3"
+        },
+        {
+          "path": "Assets/Derived/Models/63/63c7b8bc-3057-833b-86ae-870fa7a6aed7/11/textures/98b2726b-d09b-87f2-83ad-829d4c998d5d.cetex",
+          "bytes": 1398564,
+          "sha256": "4262e146ea2a5af448fb2a119d41e023cd0783e7a7689eb083bca954ebe144c7"
+        },
+        {
+          "path": "Assets/Derived/Models/8a/8a69bd42-f950-8265-9c0e-0ff597095141/11/Derived/CpuGeometry/0ad2a5c31976dd7fccfed9eddbc40b026b3cabb66a43e11bdd42f9db3322e56d.cecpu",
+          "bytes": 456,
+          "sha256": "0ad2a5c31976dd7fccfed9eddbc40b026b3cabb66a43e11bdd42f9db3322e56d"
+        },
+        {
+          "path": "Assets/Derived/Models/8a/8a69bd42-f950-8265-9c0e-0ff597095141/11/Derived/Geometry/m566c1f6e90528ee822eea475b57563d69399090808d6adb99692ac655ce4e78e/a4aa6c26-0466-8374-b0d8-e63626e3fbc7.cege",
+          "bytes": 1532,
+          "sha256": "da63564c84eb83ddddcc890dc495ced63b8d3805fb01bdd2cfb4e077eb552ebf"
+        },
+        {
+          "path": "Assets/Derived/Models/8a/8a69bd42-f950-8265-9c0e-0ff597095141/11/Derived/model.cemd",
+          "bytes": 294,
+          "sha256": "4eeda4657580fbd034a90e377a7fd47e4cc4fea03f05f757601dfde7df8c7ed0"
+        },
+        {
+          "path": "Assets/Derived/Models/8a/8a69bd42-f950-8265-9c0e-0ff597095141/11/generation.asset",
+          "bytes": 1494,
+          "sha256": "5a7d14403ac768bfb8b7ac01c554c65c598b3f794653dcea79202c213934704c"
+        },
+        {
+          "path": "Assets/Derived/Models/8a/8a69bd42-f950-8265-9c0e-0ff597095141/11/metadata.cemc",
+          "bytes": 1344,
+          "sha256": "83e4ea478eccd508d92faebf305217701866636929b6a43fdf9f4a213cf5a566"
+        },
+        {
+          "path": "Assets/Derived/Models/8a/8a69bd42-f950-8265-9c0e-0ff597095141/11/sidecar.meta",
+          "bytes": 1703,
+          "sha256": "ec62b6bc44bb016f8bad8f74fd009fb1258b335d82aca010c17cebe3907f37fa"
+        },
+        {
+          "path": "Assets/Derived/Models/8a/8a69bd42-f950-8265-9c0e-0ff597095141/11/streaming.cemf",
+          "bytes": 808,
+          "sha256": "65ac705df1deb5785e992d404b0fbd5bf5badaff7340ceffeb936ee1b2dd169e"
+        },
+        {
+          "path": "Assets/Derived/Models/8a/8a69bd42-f950-8265-9c0e-0ff597095141/11/textures/b5a59f23-f1cd-8a13-8c71-31fcb6b7b6e6.cetex",
+          "bytes": 1398564,
+          "sha256": "4262e146ea2a5af448fb2a119d41e023cd0783e7a7689eb083bca954ebe144c7"
+        },
+        {
+          "path": "Assets/Derived/Models/8c/8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45/11/Derived/CpuGeometry/5fdaa13479b3740e9587da3c92b923a3191dbd9d79e07011f3d6277437ae3fb6.cecpu",
+          "bytes": 96,
+          "sha256": "5fdaa13479b3740e9587da3c92b923a3191dbd9d79e07011f3d6277437ae3fb6"
+        },
+        {
+          "path": "Assets/Derived/Models/8c/8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45/11/Derived/Geometry/m4d3030441a4a56203385d97e990c210fccb17ecc4aa1125636fc2b0afe02465b/178dd85b-7088-8e3e-af23-a2c983ca1e7e.cege",
+          "bytes": 844,
+          "sha256": "a27bed16748d722a0f0d14041a3c62c28ee4c7f4e1fb0abcc72750e37dc4e746"
+        },
+        {
+          "path": "Assets/Derived/Models/8c/8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45/11/Derived/model.cemd",
+          "bytes": 298,
+          "sha256": "4b451e46e511de24a24f6bdd8d3ab9c83d25f993fd69794967a0f06688f21dc9"
+        },
+        {
+          "path": "Assets/Derived/Models/8c/8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45/11/generation.asset",
+          "bytes": 1497,
+          "sha256": "cee122a80dd8475a0a46ef1b0d436f849be953a2615c61dea17e736ba6171e46"
+        },
+        {
+          "path": "Assets/Derived/Models/8c/8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45/11/metadata.cemc",
+          "bytes": 1344,
+          "sha256": "523b13b0dfd926d4d09e88eb2b9221269e8131adc13d231d7b0bb9d231740714"
+        },
+        {
+          "path": "Assets/Derived/Models/8c/8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45/11/sidecar.meta",
+          "bytes": 1709,
+          "sha256": "1af1678e91341a35b9503e4fe4a697f524df4c64c008b4990acec888ab520290"
+        },
+        {
+          "path": "Assets/Derived/Models/8c/8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45/11/streaming.cemf",
+          "bytes": 808,
+          "sha256": "276bc8038d345b478d13dad16ecf128cac3e55e1de01fbd95e7368d706ccb5ff"
+        },
+        {
+          "path": "Assets/Derived/Models/8c/8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45/11/textures/388a4211-7126-8e36-9341-634cd99fc6ff.cetex",
+          "bytes": 1398564,
+          "sha256": "4262e146ea2a5af448fb2a119d41e023cd0783e7a7689eb083bca954ebe144c7"
+        },
+        {
+          "path": "Assets/Derived/Models/98/987a8d42-3964-8d46-9024-7f280c92f986/16/Derived/CpuGeometry/4a31eece12122c7611c5c13bb852d9258ce9d9298479272c77ca388355132153.cecpu",
+          "bytes": 24432,
+          "sha256": "4a31eece12122c7611c5c13bb852d9258ce9d9298479272c77ca388355132153"
+        },
+        {
+          "path": "Assets/Derived/Models/98/987a8d42-3964-8d46-9024-7f280c92f986/16/Derived/Geometry/md0cad13da047db1b2f7a7b338a472928397896ff89fff57ab46423b8da6184b0/fd45a171-ae8b-8c74-b129-0ee00371b7ad.cege",
+          "bytes": 146824,
+          "sha256": "218cd8ffc3924746df9229375eca099b1d843ae17a2264e955a210248208dd8e"
+        },
+        {
+          "path": "Assets/Derived/Models/98/987a8d42-3964-8d46-9024-7f280c92f986/16/Derived/model.cemd",
+          "bytes": 306,
+          "sha256": "2651c0d1580d3af6076102f82e9f93b5aabf0bc2a7a4842437d08a7bf7a718af"
+        },
+        {
+          "path": "Assets/Derived/Models/98/987a8d42-3964-8d46-9024-7f280c92f986/16/generation.asset",
+          "bytes": 1503,
+          "sha256": "7b6af82d3815c32b44e3b71352b73a67de79e1dd7703168cfdf5c81e9729b45b"
+        },
+        {
+          "path": "Assets/Derived/Models/98/987a8d42-3964-8d46-9024-7f280c92f986/16/metadata.cemc",
+          "bytes": 1360,
+          "sha256": "f4740c115353c2aac033863a0fa33d6f5643d99f92d6072f663b336bfd20d596"
+        },
+        {
+          "path": "Assets/Derived/Models/98/987a8d42-3964-8d46-9024-7f280c92f986/16/sidecar.meta",
+          "bytes": 1721,
+          "sha256": "47475c111f79c6434c0eca5cbf65a9da0e4c9421dc72e78182a96d90554f78ea"
+        },
+        {
+          "path": "Assets/Derived/Models/98/987a8d42-3964-8d46-9024-7f280c92f986/16/streaming.cemf",
+          "bytes": 808,
+          "sha256": "5af49ae5e202bb15fafe1927c70b857af111d9d7f8f2a6d1e572d2b4bae82dd3"
+        },
+        {
+          "path": "Assets/Derived/Models/98/987a8d42-3964-8d46-9024-7f280c92f986/16/textures/ee5a1c8f-d3e5-841a-a0f4-5867cbae6ada.cetex",
+          "bytes": 1398564,
+          "sha256": "4262e146ea2a5af448fb2a119d41e023cd0783e7a7689eb083bca954ebe144c7"
+        },
+        {
+          "path": "Assets/Derived/Models/98/9888e325-a6fb-8378-b297-aa1f10eca2dc/12/Derived/CpuGeometry/9bfd4cf70a088b5239798ccf51c3e652ba5762a1b37ae38ff6fe69cfffb3b03a.cecpu",
+          "bytes": 2376,
+          "sha256": "9bfd4cf70a088b5239798ccf51c3e652ba5762a1b37ae38ff6fe69cfffb3b03a"
+        },
+        {
+          "path": "Assets/Derived/Models/98/9888e325-a6fb-8378-b297-aa1f10eca2dc/12/Derived/Geometry/mb46f2035bfd24d1f155cffc83ec00e141b492f7e70cd4b8a0960f9867aa13484/0ad356ee-71ab-8104-a008-b5c4e31b91f3.cege",
+          "bytes": 6556,
+          "sha256": "c91a561ac5c5d9f3861964bb6efe9a00d4911268b961b9ccc94fb6d001777b8b"
+        },
+        {
+          "path": "Assets/Derived/Models/98/9888e325-a6fb-8378-b297-aa1f10eca2dc/12/Derived/model.cemd",
+          "bytes": 294,
+          "sha256": "d6b666165a43091954559ee57193311dac467960c33bce349c526a91107313d8"
+        },
+        {
+          "path": "Assets/Derived/Models/98/9888e325-a6fb-8378-b297-aa1f10eca2dc/12/generation.asset",
+          "bytes": 1494,
+          "sha256": "b6dd24ddf8d1397969f061367caba8db05ab3fe29147d1e577c5180e39e5d636"
+        },
+        {
+          "path": "Assets/Derived/Models/98/9888e325-a6fb-8378-b297-aa1f10eca2dc/12/metadata.cemc",
+          "bytes": 1344,
+          "sha256": "6b5564d82d12d3a712a420d64480f65edc7699ed4df488777ee378d5d93c0973"
+        },
+        {
+          "path": "Assets/Derived/Models/98/9888e325-a6fb-8378-b297-aa1f10eca2dc/12/sidecar.meta",
+          "bytes": 1703,
+          "sha256": "93c704dbfc7838ad9ea48169b850f432bda36d3ad60eb7bb65351e7eec9ee352"
+        },
+        {
+          "path": "Assets/Derived/Models/98/9888e325-a6fb-8378-b297-aa1f10eca2dc/12/streaming.cemf",
+          "bytes": 808,
+          "sha256": "916833ca11254b7acca6a6a67e6ca2932abd9aad19185970b80ac8dcb25b6784"
+        },
+        {
+          "path": "Assets/Derived/Models/98/9888e325-a6fb-8378-b297-aa1f10eca2dc/12/textures/428b8cb0-1c49-8e2d-b214-68e2d9ac6a63.cetex",
+          "bytes": 1398564,
+          "sha256": "4262e146ea2a5af448fb2a119d41e023cd0783e7a7689eb083bca954ebe144c7"
+        },
+        {
+          "path": "Assets/Derived/Models/cd/cdf2f89b-32f4-85d5-adc6-c652c61a071c/11/Derived/CpuGeometry/3c18e1d5eb9b6b0dd3cd7fb3d3cc7c71508017881fb6e3ac178cd81ff811a4b8.cecpu",
+          "bytes": 4680,
+          "sha256": "3c18e1d5eb9b6b0dd3cd7fb3d3cc7c71508017881fb6e3ac178cd81ff811a4b8"
+        },
+        {
+          "path": "Assets/Derived/Models/cd/cdf2f89b-32f4-85d5-adc6-c652c61a071c/11/Derived/Geometry/m4935f503ee5cfa2fe9cffcb8f47cd69241b5ec387500910b6d1975152cf09265/fd816a99-62d5-8926-b72f-c582fd705ab1.cege",
+          "bytes": 19848,
+          "sha256": "7423bc7b2b93d31b232ea0b9ccdddd42298248fa1ad263f464773e1238ea5026"
+        },
+        {
+          "path": "Assets/Derived/Models/cd/cdf2f89b-32f4-85d5-adc6-c652c61a071c/11/Derived/model.cemd",
+          "bytes": 310,
+          "sha256": "9814d4417d40edc2760eaa5d0f91297707c3fd697a14aef4de97409421f8a83f"
+        },
+        {
+          "path": "Assets/Derived/Models/cd/cdf2f89b-32f4-85d5-adc6-c652c61a071c/11/generation.asset",
+          "bytes": 1506,
+          "sha256": "40c4462b5462050e6c62a8ebc8a6dec88c9105c51fd29d7119d7a1a01ce881d5"
+        },
+        {
+          "path": "Assets/Derived/Models/cd/cdf2f89b-32f4-85d5-adc6-c652c61a071c/11/metadata.cemc",
+          "bytes": 1360,
+          "sha256": "6ced63ab4964d8dac433d12027382bf842a3fa3c208167c88cf1bf712739084c"
+        },
+        {
+          "path": "Assets/Derived/Models/cd/cdf2f89b-32f4-85d5-adc6-c652c61a071c/11/sidecar.meta",
+          "bytes": 1727,
+          "sha256": "0d3ef20efd75a1b51e5ae7b3e76dc424246f17a93e104e751d7613a6112e5654"
+        },
+        {
+          "path": "Assets/Derived/Models/cd/cdf2f89b-32f4-85d5-adc6-c652c61a071c/11/streaming.cemf",
+          "bytes": 808,
+          "sha256": "71cc713538a8f4c7afa8e07dc1dfd83b7a6ed0e745349460f53abda045d36c79"
+        },
+        {
+          "path": "Assets/Derived/Models/cd/cdf2f89b-32f4-85d5-adc6-c652c61a071c/11/textures/c4261d3c-9839-8e82-9bd9-16549b76173d.cetex",
+          "bytes": 1398564,
+          "sha256": "4262e146ea2a5af448fb2a119d41e023cd0783e7a7689eb083bca954ebe144c7"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/Derived/CpuGeometry/18399b15ef6de07e3b8eeb7a898f9c5a83fb0c0d64317a54d8cd165efea67d17.cecpu",
+          "bytes": 403080,
+          "sha256": "18399b15ef6de07e3b8eeb7a898f9c5a83fb0c0d64317a54d8cd165efea67d17"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/Derived/CpuGeometry/3d57cea1b29011ceab5d83afe7c846eebf88c44dc0785d2cc6e7fd2d78213bc9.cecpu",
+          "bytes": 742932,
+          "sha256": "3d57cea1b29011ceab5d83afe7c846eebf88c44dc0785d2cc6e7fd2d78213bc9"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/Derived/CpuGeometry/d0c0f51d4386fa325f4ffb3d696bfcff94a156e7e4a288d1fd6ddff1b7ec7e72.cecpu",
+          "bytes": 430872,
+          "sha256": "d0c0f51d4386fa325f4ffb3d696bfcff94a156e7e4a288d1fd6ddff1b7ec7e72"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/Derived/CpuGeometry/ee6890a38f741f2b61e28687c04f765e85d192d0941a11771d09f239eaca9695.cecpu",
+          "bytes": 84456,
+          "sha256": "ee6890a38f741f2b61e28687c04f765e85d192d0941a11771d09f239eaca9695"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/Derived/Geometry/m1ccd221b0985020efed7306908c76f08b61f0bb541619c0588fefc1f24773cbe/41b4d9e3-6c97-812a-bf63-3d41e14f33f2.cege",
+          "bytes": 770148,
+          "sha256": "ced8825fc9c68fb69cd27e504701116a56e523ca7b92281e7a0e0383492f49dd"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/Derived/Geometry/m4cc0f69a251c5e15a17b9bda77920981b23427d86a1766dc666fcf173a511afc/eea0d415-a511-81cf-8edc-a8ba00c85516.cege",
+          "bytes": 859320,
+          "sha256": "0e47dcafc12b13d6cd07bc9f297649d97ee3afe8cbab9235a6e7d720acab8187"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/Derived/Geometry/m6e14e2ac1ce69d6a4225b2dd8efa4ed09b588fa98571b9ca362d44824189ed4a/cba854c8-600b-8d00-9f49-06afc173f6f2.cege",
+          "bytes": 144420,
+          "sha256": "8f01e124f6367cbd9399b5ad0322fbeae3fdd5b4e7a7b4eaf41392bab0b94b04"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/Derived/Geometry/mcedf7f23daa83eb4145e28e3b099ad905f43131e692febfcbf566673206cb097/2034618b-b2e7-8c79-b661-161d503d31ea.cege",
+          "bytes": 1520556,
+          "sha256": "68370e1312d65725027b047683bcb19d5e038aa4f0adbf65a85b290f820aa2a8"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/Derived/Skeleton.cesl",
+          "bytes": 4557,
+          "sha256": "31af735cb357d592071fb5f7be3ee3b1bdb59e6f8aa75a1f090f110240d7878f"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/Derived/model.cemd",
+          "bytes": 5386,
+          "sha256": "5ef6ec663af9c208700bc8e08f905c9bc018642ad20afa424bfee1e791b4e5fb"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/generation.asset",
+          "bytes": 7327,
+          "sha256": "5d6dc7cea38802a1290c0b5ae5a6a82029c3e3933fa71dd2b2e1c340ca55dbf8"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/metadata.cemc",
+          "bytes": 725936,
+          "sha256": "49f7fdc2f331a09b6ca22428895c08660ce821715fb182758988cc48ead340e0"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/sidecar.meta",
+          "bytes": 9600,
+          "sha256": "6ac703015f3d9bc7cd132f57b3128b4e8a7cc96dbf57421619a55b69e3ef9de7"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/streaming.cemf",
+          "bytes": 2665,
+          "sha256": "13d38ca7396f37fd6f887106c53641766788db1f692b0c86a27fd1fe08c9595d"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/textures/0d0668e1-f59c-881d-809f-0669affbc27f.cetex",
+          "bytes": 22370164,
+          "sha256": "340c1f24db63e81d4f5beec520424f3ea9f9f877ffc5f70374587ed840cf1744"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/textures/10d4d364-1a89-8b3d-b44d-f95a6e1df7f7.cetex",
+          "bytes": 22370164,
+          "sha256": "e9997612fabc30a4cd0cb1f2926115bd1fb5bf073e7417cbbeb04df8c05f517f"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/textures/5251a956-6222-8627-be5e-023b03ad1a82.cetex",
+          "bytes": 22370164,
+          "sha256": "b7686f49f275ad4e3ac5a9914aeb46628d1595b44c5af52cb0b7a3f8162dfde2"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/textures/53001d3a-6396-8262-b652-4ee151c46cd1.cetex",
+          "bytes": 22370164,
+          "sha256": "5ffd2db28dec92609de3002681ec6c5f3f54e9c4f7cb8791cdc6fe98ad5e74d1"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/textures/5e1d1cb2-88a1-8d33-917a-c7b8978cec2b.cetex",
+          "bytes": 22370164,
+          "sha256": "4e4bf14fb3d3cc660e5ff4e66d043d0c74d88a87ea92db3335945049a8b71eb3"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/textures/70105072-dc04-868b-812f-4f012b545b79.cetex",
+          "bytes": 22370164,
+          "sha256": "7a5f294bf99b99aa523aa7d224bd5fa3a76b8c121f629ec36d3655c8fc888c54"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/textures/8baadfbc-0c8c-8188-9ed6-af978d817b75.cetex",
+          "bytes": 22370164,
+          "sha256": "abec87385b34295235bfcb47096aecd83e6430ca1dc9e312d1e846daffae8378"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/textures/8ea83457-77ea-8989-ad71-3a487874a7a4.cetex",
+          "bytes": 22370164,
+          "sha256": "80aecc1bc9ae5a5de05a60fd893dfa027d91227fe4910d1380822d2526b26f60"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/textures/8fcb12b2-ee08-88e1-895d-0ab628c6cb12.cetex",
+          "bytes": 22370164,
+          "sha256": "11ed9373d6935a41ac3b8f7e7a9193781126a88d2f103c2f2fbf4de9ac17180b"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/textures/aafdeb7f-3e9e-82dc-ba31-f045100f114b.cetex",
+          "bytes": 22370164,
+          "sha256": "c49013497bf8bef127b61cc5f6e32081f605ad410a2e8353abe21b69164407ba"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/textures/da763585-963a-8256-ad87-fefb135e86be.cetex",
+          "bytes": 22370164,
+          "sha256": "132dfc9e1f64a6d10e75235a9588aae17e00bfc2c745ece811c10bf2157dc10d"
+        },
+        {
+          "path": "Assets/Derived/Models/d2/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/2/textures/f3ff3499-9390-8808-bf5c-c94d7796713d.cetex",
+          "bytes": 22370164,
+          "sha256": "70c44585de8bc35c7c0ab3ce458302f7099fea181722c55a8037eb03e2830357"
+        },
+        {
+          "path": "Assets/Derived/Models/df/df464176-385d-8563-98b9-5b1d266415bd/11/Derived/CpuGeometry/540d66c551b4d40748873cef23c2b31fd3833b8b90796c82fe8c955c56d77458.cecpu",
+          "bytes": 41724,
+          "sha256": "540d66c551b4d40748873cef23c2b31fd3833b8b90796c82fe8c955c56d77458"
+        },
+        {
+          "path": "Assets/Derived/Models/df/df464176-385d-8563-98b9-5b1d266415bd/11/Derived/Geometry/mecda814a116569f99173c5803bbcec3f437db34639df5331aed0800be6a0e0bc/10939add-54b9-87f3-bccf-775d715274ae.cege",
+          "bytes": 136528,
+          "sha256": "39952d7a4ade2d735e31538a177f8039efe380bfbbf92f029a251782599fe968"
+        },
+        {
+          "path": "Assets/Derived/Models/df/df464176-385d-8563-98b9-5b1d266415bd/11/Derived/model.cemd",
+          "bytes": 302,
+          "sha256": "4bc3ba27bd2dcb79b6e0a94d622101357378c9e3f3a4fd0319c8c2ada3406429"
+        },
+        {
+          "path": "Assets/Derived/Models/df/df464176-385d-8563-98b9-5b1d266415bd/11/generation.asset",
+          "bytes": 1500,
+          "sha256": "3c266ecf450ef0b9f254ef4cd4cc35f66dfe34b20c495067dabc16767a95bdc6"
+        },
+        {
+          "path": "Assets/Derived/Models/df/df464176-385d-8563-98b9-5b1d266415bd/11/metadata.cemc",
+          "bytes": 1360,
+          "sha256": "24510a18926c9457172dbf831da19ffa1df56b75a902b1afa333adf960f1244f"
+        },
+        {
+          "path": "Assets/Derived/Models/df/df464176-385d-8563-98b9-5b1d266415bd/11/sidecar.meta",
+          "bytes": 1715,
+          "sha256": "2d322428bb1b7f49c07295c9ba6e697ebd1c6c721826c4f7d11062a607cf3446"
+        },
+        {
+          "path": "Assets/Derived/Models/df/df464176-385d-8563-98b9-5b1d266415bd/11/streaming.cemf",
+          "bytes": 808,
+          "sha256": "516c468fe9b3a96ed7a98f55d0b65cf45fede6dbda827bd8a88609b78a4b1787"
+        },
+        {
+          "path": "Assets/Derived/Models/df/df464176-385d-8563-98b9-5b1d266415bd/11/textures/845b7933-3d01-825e-9883-b28afd29736a.cetex",
+          "bytes": 1398564,
+          "sha256": "4262e146ea2a5af448fb2a119d41e023cd0783e7a7689eb083bca954ebe144c7"
+        },
+        {
+          "path": "Assets/Derived/Scenes/9e/9e2b0ce3-8e26-4b74-8c46-64693d915c7a.creator",
+          "bytes": 125021,
+          "sha256": "0dcc5f0642442160a734833dad399c96ccb53758879e556910af731d65add959"
+        },
+        {
+          "path": "Assets/Derived/ShaderMeta/01/011b57e4-184e-419e-9a4a-c1924405f2e7.shadermeta",
+          "bytes": 3279,
+          "sha256": "c4ce967037b255958f6c1602bac899b6f1f9148b3f4a866df6f1c1e31c7811c6"
+        },
+        {
+          "path": "Assets/Derived/ShaderMeta/14/148fcbf7-2683-4605-9c7d-076fb97a8ec5.shadermeta",
+          "bytes": 2758,
+          "sha256": "a6ae4208dbcbe575472e636e8e85a56a66f0a2cd050a6e9d4ca552ff8924ab78"
+        },
+        {
+          "path": "Assets/Derived/ShaderMeta/75/759d0c45-0d43-46f4-b419-3b681d5db8d2.shadermeta",
+          "bytes": 3297,
+          "sha256": "c2613f15d232064bc77eb08ece2fef9c3962e3a6656f54dcf69c70248d970fb9"
+        },
+        {
+          "path": "Assets/Derived/ShaderMeta/d1/d189a969-5c33-4bb6-aa67-de13b21b26e6.shadermeta",
+          "bytes": 1578,
+          "sha256": "d0139e1e3c4b1dc6b39035cbca45091babf682e10592cc919ea0212231f73e8d"
+        },
+        {
+          "path": "Assets/Derived/ShaderMeta/d7/d7873cd5-80ce-4495-9b21-878fbac35655.shadermeta",
+          "bytes": 1093,
+          "sha256": "532a74a445c648d022e3bc76841b2ffd6549d3c39a458799c95c68a753b61c08"
+        },
+        {
+          "path": "Assets/Derived/Textures/04/046e0f4f-019c-4071-a976-4778d8d7aece.cetex",
+          "bytes": 1128,
+          "sha256": "5c6b5acf9dd994f0a5e598f8534219b1c908dad1214f51e7016431d4e028dfb1"
+        },
+        {
+          "path": "Assets/Derived/Textures/09/09a2ff2a-0cc6-4a87-857a-96977a3ac2e3.cetex",
+          "bytes": 4194408,
+          "sha256": "0a47fff1440e5bb54ee6a4a0b0c05f1020de1c60e313a5961306eb23c4736f04"
+        },
+        {
+          "path": "Assets/Derived/Textures/0b/0b87650a-6626-49bd-8654-eeb035fceaf2.cetex",
+          "bytes": 1128,
+          "sha256": "5c6b5acf9dd994f0a5e598f8534219b1c908dad1214f51e7016431d4e028dfb1"
+        },
+        {
+          "path": "Assets/Derived/Textures/0e/0e4c00c8-9e92-4f42-8c4a-e7f2b9aef300.cetex",
+          "bytes": 16777320,
+          "sha256": "d0eaac99d370a39fe8e118cd59c8453d516352ae0d2d9e9ad7f2c4c99bca1476"
+        },
+        {
+          "path": "Assets/Derived/Textures/11/119750e7-b1ae-4f94-b3f3-af08e95a4911.cetex",
+          "bytes": 134217832,
+          "sha256": "1f8b52360286fe23ff455704ef9c39f0351509ce5af3ccbb2cb591958420c95f"
+        },
+        {
+          "path": "Assets/Derived/Textures/14/14bc6256-e845-4119-b130-04bc53175ebb.cetex",
+          "bytes": 16488,
+          "sha256": "87e0de548162b9e5cef753e9f54a66ef7df643550137521679d558bd34a78d13"
+        },
+        {
+          "path": "Assets/Derived/Textures/1a/1aeff771-75a3-4d82-b4ae-57f653756c1c.cetex",
+          "bytes": 1128,
+          "sha256": "5c6b5acf9dd994f0a5e598f8534219b1c908dad1214f51e7016431d4e028dfb1"
+        },
+        {
+          "path": "Assets/Derived/Textures/21/21b841d1-9443-4eb5-8f39-e6263f43b2f0.cetex",
+          "bytes": 1048680,
+          "sha256": "653cdfb2b91610150882c35e8b722f0d97ac7f4c25805791c0d9412ac018d296"
+        },
+        {
+          "path": "Assets/Derived/Textures/22/2224ec59-ae08-4daa-80fa-2188637176d7.cetex",
+          "bytes": 16777320,
+          "sha256": "39e2cb73330f53f45d7c2a86ffe5a36bd011117c15c5a14d0c93a4fc6b8f62b0"
+        },
+        {
+          "path": "Assets/Derived/Textures/24/24b956be-ba20-41b9-9b06-fc0221a28d0b.cetex",
+          "bytes": 1048680,
+          "sha256": "653cdfb2b91610150882c35e8b722f0d97ac7f4c25805791c0d9412ac018d296"
+        },
+        {
+          "path": "Assets/Derived/Textures/2b/2bbad6fc-1b6d-48ea-829c-be2667e29d9f.cetex",
+          "bytes": 16777320,
+          "sha256": "900cf2e39775dfa43a3a52c9908b232dac1008ac158c3ae86a50987d50c770c3"
+        },
+        {
+          "path": "Assets/Derived/Textures/2d/2d812b51-9a7d-47ae-a881-e0dfaf849635.cetex",
+          "bytes": 1128,
+          "sha256": "5c6b5acf9dd994f0a5e598f8534219b1c908dad1214f51e7016431d4e028dfb1"
+        },
+        {
+          "path": "Assets/Derived/Textures/38/38fe1bc0-40fe-4b7d-ac3f-48ea5c3e038d.cetex",
+          "bytes": 16777320,
+          "sha256": "9d54f21a667cd8ac5c081b7146742d55780103e6372989ea45cc7a4fae068dcd"
+        },
+        {
+          "path": "Assets/Derived/Textures/3d/3d96e283-653f-4111-8017-d142d7db78ee.cetex",
+          "bytes": 134217832,
+          "sha256": "558fd1b5238cf5f4edab85e05ae63df9e53a9df53a1d47c6a944f10204759318"
+        },
+        {
+          "path": "Assets/Derived/Textures/42/4226032d-ecb0-446d-a1ab-fe79c2b0a40b.cetex",
+          "bytes": 134217832,
+          "sha256": "78028bcb62cd7d240f709b16cbf8994d71c025dff388c245ca1951266a90609f"
+        },
+        {
+          "path": "Assets/Derived/Textures/46/465fca74-0eea-4e7d-b4ca-526e56bce230.cetex",
+          "bytes": 1048680,
+          "sha256": "653cdfb2b91610150882c35e8b722f0d97ac7f4c25805791c0d9412ac018d296"
+        },
+        {
+          "path": "Assets/Derived/Textures/52/524e9895-230d-4a3d-a187-06ec6df9d59e.cetex",
+          "bytes": 1048680,
+          "sha256": "653cdfb2b91610150882c35e8b722f0d97ac7f4c25805791c0d9412ac018d296"
+        },
+        {
+          "path": "Assets/Derived/Textures/5a/5a5a85f5-63c4-4453-b194-08f98e6c5373.cetex",
+          "bytes": 16777320,
+          "sha256": "adccacf112d0f2bfaa63f078198e51dc7933ba61214eb666aa68e6e265803578"
+        },
+        {
+          "path": "Assets/Derived/Textures/5a/5a78bcdd-7eaf-4bf7-aee2-7cefc96272a2.cetex",
+          "bytes": 1048680,
+          "sha256": "653cdfb2b91610150882c35e8b722f0d97ac7f4c25805791c0d9412ac018d296"
+        },
+        {
+          "path": "Assets/Derived/Textures/60/6053b7f0-af33-4bc7-8752-dbf7f0c72591.cetex",
+          "bytes": 16777320,
+          "sha256": "0452313f4f9c00cfc842a6255bf087cb257df5b1f7c63072cf9539dc92dedaf3"
+        },
+        {
+          "path": "Assets/Derived/Textures/6a/6a18fb32-ff53-428f-90f5-f422e0e3d06b.cetex",
+          "bytes": 16777320,
+          "sha256": "6445e8ec112898f981a1286dc0a23306cee230481cdfec7d7117548744dbc33d"
+        },
+        {
+          "path": "Assets/Derived/Textures/6e/6e6055ea-2e34-49c4-892b-1aae958eb52d.cetex",
+          "bytes": 134217832,
+          "sha256": "720a0ef26e9acbec183cf528a5888f54f9716c12549e8629b6e5e54e056f5295"
+        },
+        {
+          "path": "Assets/Derived/Textures/70/7055d63d-eb79-4d1b-974d-1a1f445ff6b3.cetex",
+          "bytes": 16777320,
+          "sha256": "71e61fee1408f3e6eb49110209ddcb080a8f86aba0e9b647f3132ce9181575ce"
+        },
+        {
+          "path": "Assets/Derived/Textures/71/71d8a6c7-166b-452f-9b3d-0894df5bb23d.cetex",
+          "bytes": 1128,
+          "sha256": "5c6b5acf9dd994f0a5e598f8534219b1c908dad1214f51e7016431d4e028dfb1"
+        },
+        {
+          "path": "Assets/Derived/Textures/78/7858597e-7685-44f2-8e11-651e8ef7f403.cetex",
+          "bytes": 81920104,
+          "sha256": "c72f17db2017b8f1392ef564d921b446965a65838423568398296b6ab234116c"
+        },
+        {
+          "path": "Assets/Derived/Textures/83/83d9b264-a455-416d-a3f6-207bb9fc2b91.cetex",
+          "bytes": 16777320,
+          "sha256": "22c55b3e48f869ac500573f3421a85c3aebe3aa0f74e55bd6ab97f93c8a69802"
+        },
+        {
+          "path": "Assets/Derived/Textures/94/9444798b-d1e8-4fa3-960e-bb07327d67db.cetex",
+          "bytes": 1048680,
+          "sha256": "653cdfb2b91610150882c35e8b722f0d97ac7f4c25805791c0d9412ac018d296"
+        },
+        {
+          "path": "Assets/Derived/Textures/a3/a35d7538-50fd-4a48-ae16-e9fe7e7a2a0c.cetex",
+          "bytes": 16777320,
+          "sha256": "259bd42ca682ca6438ce413228204bbfcb2da76a70a8c316226261e0c3316c95"
+        },
+        {
+          "path": "Assets/Derived/Textures/a4/a4804da9-f6fb-4035-9684-44c743b9ff30.cetex",
+          "bytes": 4194408,
+          "sha256": "e3df830ab94a179e2f505a881bf03dbd4601fe98e14bd00a927b450bd673645c"
+        },
+        {
+          "path": "Assets/Derived/Textures/a8/a80817f3-54c3-47e2-9033-8ef9a204ea93.cetex",
+          "bytes": 1128,
+          "sha256": "5c6b5acf9dd994f0a5e598f8534219b1c908dad1214f51e7016431d4e028dfb1"
+        },
+        {
+          "path": "Assets/Derived/Textures/ad/ad79f122-6673-44fe-8835-1309414954d6.cetex",
+          "bytes": 4194408,
+          "sha256": "365f11f1d95d69ea7604fea2d63760b772ac006f612cf708cfc77368cbd25a7a"
+        },
+        {
+          "path": "Assets/Derived/Textures/b8/b8e113bf-d66b-42b1-b13d-869c3e2ff6a2.cetex",
+          "bytes": 1128,
+          "sha256": "5c6b5acf9dd994f0a5e598f8534219b1c908dad1214f51e7016431d4e028dfb1"
+        },
+        {
+          "path": "Assets/Derived/Textures/bc/bcf286d2-17cc-47ec-b874-89d508008ce7.cetex",
+          "bytes": 16777320,
+          "sha256": "727e1ed0e8f378e569d28ffa58699298a96fbd8d8c5e7fd20ebaad9fb6ef8f0c"
+        },
+        {
+          "path": "Assets/Derived/Textures/c6/c661a3cb-299a-4e80-b8fc-c264c613b43a.cetex",
+          "bytes": 16777320,
+          "sha256": "c53e3ab103220f63100bfe4194b705e83c0317823be9f65292435989abe971d8"
+        },
+        {
+          "path": "Assets/Derived/Textures/ca/ca10ab0c-27f4-4bbf-91aa-37c93f59b04f.cetex",
+          "bytes": 360104,
+          "sha256": "7bf90fa1be1da6977e6e15a23dc4115ee7bde24cf276f04efad3b32f91cd59f5"
+        },
+        {
+          "path": "Assets/Derived/Textures/ca/caa2db6e-79ee-4a51-bc19-e159515d9f5e.cetex",
+          "bytes": 8388712,
+          "sha256": "d60b857d8df656802396eb1174fc261a32898d22c0ccafac125684d1928def24"
+        },
+        {
+          "path": "Assets/Derived/Textures/d4/d4a134d8-46ea-4640-bc43-d4241a803aa2.cetex",
+          "bytes": 1048680,
+          "sha256": "653cdfb2b91610150882c35e8b722f0d97ac7f4c25805791c0d9412ac018d296"
+        },
+        {
+          "path": "Assets/Derived/Textures/d8/d8d6634e-eb8a-4238-a074-0bd5c5a99ccc.cetex",
+          "bytes": 1128,
+          "sha256": "5c6b5acf9dd994f0a5e598f8534219b1c908dad1214f51e7016431d4e028dfb1"
+        },
+        {
+          "path": "Assets/Derived/Textures/dc/dc06cd61-43f8-4c1f-8296-30461d20efc7.cetex",
+          "bytes": 1128,
+          "sha256": "5c6b5acf9dd994f0a5e598f8534219b1c908dad1214f51e7016431d4e028dfb1"
+        },
+        {
+          "path": "Assets/Derived/Textures/ee/eeadbf9a-d493-4ace-8a78-b5fb9711f1cf.cetex",
+          "bytes": 1048680,
+          "sha256": "653cdfb2b91610150882c35e8b722f0d97ac7f4c25805791c0d9412ac018d296"
+        },
+        {
+          "path": "Assets/Derived/Textures/f2/f2b1b777-eae9-420b-9d53-559a139c7571.cetex",
+          "bytes": 4194408,
+          "sha256": "34085fcc7a4aa15ae6b122a3df159283a083124225348c50828d4ac8e8783ff4"
+        },
+        {
+          "path": "Assets/Derived/Textures/f6/f6543177-3d40-4a3b-8267-ba8f0be78123.cetex",
+          "bytes": 1128,
+          "sha256": "5c6b5acf9dd994f0a5e598f8534219b1c908dad1214f51e7016431d4e028dfb1"
+        },
+        {
+          "path": "Assets/Derived/asset-manifest.cemf",
+          "bytes": 36259,
+          "sha256": "b3c373c16c15ed9f1cc4a125904d5a8162b17246ab90d70ffe8939e47e8269d1"
+        },
+        {
+          "path": "Assets/INI/SceneBindSettings.ini",
+          "bytes": 212,
+          "sha256": "148a9e4368363c078cdd071f54c7d5dab032e1a57ad05c166fc2b80a4f9068f1"
+        },
+        {
+          "path": "Assets/InputMap/ControllCamera.inputmap",
+          "bytes": 1053,
+          "sha256": "59b5d16fdbeeca2c215a970061a4584bb7837209b1510c794f2284bee692bff3"
+        },
+        {
+          "path": "Assets/InputMap/Player.inputmap",
+          "bytes": 2542,
+          "sha256": "25a95d91f226e0869fae0ebf1181d6c7642a79de3fe40172fb2d9ee5ef9ef133"
+        },
+        {
+          "path": "Assets/InputMap/PlayerKeyBoard.inputmap",
+          "bytes": 2594,
+          "sha256": "66223000f4e159be1b03d2c214548a465831234fdb906a916db89e89966d9f43"
+        },
+        {
+          "path": "Assets/InputMap/PlayerMenuKey.inputmap",
+          "bytes": 437,
+          "sha256": "5643a6d7e5676d748ae8c66e4f2ed7a999d6c95c8b0a891dac885573592847bc"
+        },
+        {
+          "path": "Assets/InputMap/PlayerPerchase.inputmap",
+          "bytes": 736,
+          "sha256": "cc659db781c7e01bbfd366249e343d68e3def2ae8602ab05a888650c5cfb38b8"
+        },
+        {
+          "path": "Assets/InputMap/PlayerSelect.inputmap",
+          "bytes": 1441,
+          "sha256": "843e645620d7df79f709ff0241fae3df955198dacd1e8dd8da9a88217f4d12fe"
+        },
+        {
+          "path": "Assets/Materials/ForwardWater.asset",
+          "bytes": 2178,
+          "sha256": "3eb95fcf051d5ef5028485d4158bf06f2d16837439afe52ba115ea73a4108c7b"
+        },
+        {
+          "path": "Assets/Materials/ForwardWind.asset",
+          "bytes": 2174,
+          "sha256": "be0051849f1bd358f246cf71a2a82a74426b2ab4cc661862b5d45feb756e2e42"
+        },
+        {
+          "path": "Assets/Materials/Models/17d1efaf-9c93-8adb-ab23-6f4a04810c46/e7752eda-3ebb-800f-a34b-4a1692b27a79.shadergraph",
+          "bytes": 18634,
+          "sha256": "3fb85d9342e5d3578f51d8bf12e951bfc45376060978ba5aab9c29e0d6e6d403"
+        },
+        {
+          "path": "Assets/Materials/Models/63c7b8bc-3057-833b-86ae-870fa7a6aed7/768cf97b-1855-84f8-86f9-50ca838465ae.shadergraph",
+          "bytes": 18634,
+          "sha256": "8d4fef921be8f667aa3296e1ef4d042d6d99a82bc37d2f78764480b5e548d6f1"
+        },
+        {
+          "path": "Assets/Materials/Models/8a69bd42-f950-8265-9c0e-0ff597095141/98add748-9405-8297-8089-bd7b664ac47a.shadergraph",
+          "bytes": 18634,
+          "sha256": "430bb69fd2d9e809413af35cd9bf968cb57cc8994bc8576b184de15a812c725f"
+        },
+        {
+          "path": "Assets/Materials/Models/8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45/bded2162-3902-8f9b-9449-18c1566f261a.shadergraph",
+          "bytes": 18634,
+          "sha256": "486d3cc632a9b3b5c84ca1fcccc96200b52f2965b832a1732a183c585d1b1905"
+        },
+        {
+          "path": "Assets/Materials/Models/987a8d42-3964-8d46-9024-7f280c92f986/1b148b33-0ca8-8bd0-972f-15d47193f001.shadergraph",
+          "bytes": 18634,
+          "sha256": "37e97bd9d0aa76de46e3cf42b6e0cba618a03b1e65c9657fb44be44c08b2d0dd"
+        },
+        {
+          "path": "Assets/Materials/Models/9888e325-a6fb-8378-b297-aa1f10eca2dc/ba34f36c-f102-8981-a60d-1d1f5e9151f3.shadergraph",
+          "bytes": 18634,
+          "sha256": "a8222de2a54b151ca15109004261c4e2d577e001dbb402fe6394a93488c30738"
+        },
+        {
+          "path": "Assets/Materials/Models/cdf2f89b-32f4-85d5-adc6-c652c61a071c/44f1214b-dd15-8df0-b89e-64e760e8caee.shadergraph",
+          "bytes": 18634,
+          "sha256": "758256a263c5d8a38c10d6bf31c5180244a00f138eef1cb0ff3cf7e68b718003"
+        },
+        {
+          "path": "Assets/Materials/Models/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/1a2156ec-a7b6-8cc9-ba54-3c8e2260d4b3.shadergraph",
+          "bytes": 32409,
+          "sha256": "90bdbf622a0cf00bcd6e4195c4d468a95f1be1239ad826e36d8ace26446b9b00"
+        },
+        {
+          "path": "Assets/Materials/Models/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/1af1c82a-3f4d-8256-97ed-ace4b509dc3c.shadergraph",
+          "bytes": 32409,
+          "sha256": "7f8d4e564e1058f25be70e903dee257f350cf00436f60a9d5dd8422ea909f750"
+        },
+        {
+          "path": "Assets/Materials/Models/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/8a92a262-d80b-846b-b37b-dda551517fda.shadergraph",
+          "bytes": 32409,
+          "sha256": "4ae2ec4895274c72859622d1eeec1cd7890bb667f3f05465ab4315d387abd7ef"
+        },
+        {
+          "path": "Assets/Materials/Models/d28617fe-5b6f-8d6c-b20c-d14ea1e5896f/cdf575ad-0d34-8376-88b9-81abe99ba9b0.shadergraph",
+          "bytes": 32409,
+          "sha256": "13068a64ccdb2f1c826c73c405ce7d648a8fa9de54971d2997ec5ddd09d87c24"
+        },
+        {
+          "path": "Assets/Materials/Models/df464176-385d-8563-98b9-5b1d266415bd/5ddef1b8-956e-8da3-8d7b-47282507d33b.shadergraph",
+          "bytes": 18634,
+          "sha256": "a7d37247da414d88ac2bd744045a8bbd422d059dcefec5da347f11a1964dcdcd"
+        },
+        {
+          "path": "Assets/Materials/Recovered_0223a5fb-09e3-4dbc-b75d-f6ae6d68bef9.shadergraph",
+          "bytes": 10339,
+          "sha256": "7bfb68d9ea405fcd410f1382efc0de8971c0a591cd62869259f287098d740cca"
+        },
+        {
+          "path": "Assets/Materials/Recovered_48388e24-7116-414f-b204-a604fca67e07.shadergraph",
+          "bytes": 10339,
+          "sha256": "7bfb68d9ea405fcd410f1382efc0de8971c0a591cd62869259f287098d740cca"
+        },
+        {
+          "path": "Assets/Models/CreatorRobot.glb",
+          "bytes": 43445868,
+          "sha256": "58d779afde1a7fbd13332999c8b11890fb7e10ff2036ca6ae3645d14bedba402"
+        },
+        {
+          "path": "Assets/Models/Prim_Cone.glb",
+          "bytes": 65532,
+          "sha256": "ff8bb90e14e887cc91b2ae86b4c54cb4c578231f3b3f1e780d8de0fd027c1677"
+        },
+        {
+          "path": "Assets/Models/Prim_Cube.glb",
+          "bytes": 63056,
+          "sha256": "eed6b4e1846cc46cb574e6c2b99743e4352b41bc4d51ba32acc6d5dacf9d350e"
+        },
+        {
+          "path": "Assets/Models/Prim_Cylinder.glb",
+          "bytes": 69232,
+          "sha256": "04d186784b81f86f7dc57796f448788dba0a651aa2b14fb9d781628e3dc63723"
+        },
+        {
+          "path": "Assets/Models/Prim_IcoSphere.glb",
+          "bytes": 75164,
+          "sha256": "4c598783d932db61eaf5c98e9c41bfee62cd7a1d9948af4f33bd28188b462b2c"
+        },
+        {
+          "path": "Assets/Models/Prim_Plane.glb",
+          "bytes": 62020,
+          "sha256": "8fad178c35795dcacdf7c4cc8cc9366a03c01c539fbdd4ae2d3902e7e04905d5"
+        },
+        {
+          "path": "Assets/Models/Prim_Sphere.glb",
+          "bytes": 135996,
+          "sha256": "91cc87c32fbd1d559582a38edbce177d8418f4f405b4993a1f66159ac0d44408"
+        },
+        {
+          "path": "Assets/Models/Prim_Suzanne.glb",
+          "bytes": 118892,
+          "sha256": "2c707817bd157e63623570d366a6f149e3001a3e5ddcf000cbfe43f1be907575"
+        },
+        {
+          "path": "Assets/Models/Prim_Torus.glb",
+          "bytes": 170040,
+          "sha256": "d5e77f53c4d840fbe7edf861d46479fa8777d818325875452bfabc113c6965b2"
+        },
+        {
+          "path": "Assets/SceneRenderProfile/DemoSceneRenderProfile.renderprofile",
+          "bytes": 2593,
+          "sha256": "4b44aa97f2c605014af2a5fafda80d5c0518c8bfeabb271c94eb7508d3d066ed"
+        },
+        {
+          "path": "Assets/SceneRenderProfile/LoadingSceneProfile.renderprofile",
+          "bytes": 2030,
+          "sha256": "18d1725acdb13b0bb97da76138698d2ba1761d04e222deeb2375a3e58e71e85f"
+        },
+        {
+          "path": "Assets/SceneRenderProfile/NewSceneRenderProfile.renderprofile",
+          "bytes": 1917,
+          "sha256": "94cc8646518c897555ed8c02a2c1a8770312091db95fad6cfa694c0173fc4514"
+        },
+        {
+          "path": "Assets/SceneRenderProfile/PBR_Mat_Rough.renderprofile",
+          "bytes": 2061,
+          "sha256": "733ebf1068eb7ca88fc39664682eb8185212c564d19df3c9a3f6ec364c117dcc"
+        },
+        {
+          "path": "Assets/SceneRenderProfile/Stage1Profile.renderprofile",
+          "bytes": 2029,
+          "sha256": "9f1a188e5c1fe4d7d21215ee6491e3013216d2bcae5e9bef31e337dacefad26a"
+        },
+        {
+          "path": "Assets/SceneRenderProfile/Stage1_Boss.renderprofile",
+          "bytes": 3519,
+          "sha256": "ab7126935af1452f883a3bd1a1774df2790c83d77897b996555920e853851b5c"
+        },
+        {
+          "path": "Assets/SceneRenderProfile/Stage1_art.renderprofile",
+          "bytes": 2048,
+          "sha256": "a5588b06e2b136942ad6c9f71577ff6ba0fb8ac17244ee7e5a5e2c52e713f156"
+        },
+        {
+          "path": "Assets/Scenes/AnimationPlayer.creator",
+          "bytes": 91078,
+          "sha256": "664957ecb2eaba9a428dee38397c5b124543d0eeabd1379dc7f4a28725492f83"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Decal.slang",
+          "bytes": 8112,
+          "sha256": "b6ff5fc1d6976bf25e08fd6896f2acefaac5d0fd4759eea6bdf8eca03c81bed3"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/FogAccumulate.slang",
+          "bytes": 1737,
+          "sha256": "535834ed90658bf5d0589db148836fcff4cb07bf42f7fb0dd27f4b38a0751f54"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/FogComposite.slang",
+          "bytes": 1981,
+          "sha256": "c1e514a8fff6fa7075e5dd54242f964536afeaa01ea963d9d08d819c080d8990"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/FogScatter.slang",
+          "bytes": 8449,
+          "sha256": "b70d3b97f91aa7b708779106d27dda2131d844af9eba630a191e952e4ee9fb62"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Forward.shadermeta",
+          "bytes": 1483,
+          "sha256": "78f977cb0749b066c587e0ee103c7663e443a60ba43dd7679e1aa1bd2d7e6e03"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/ForwardCull.slang",
+          "bytes": 7014,
+          "sha256": "627370b1b22bb379c2e68563f86b368bfe3ea4877de9a32346109a4d8005f268"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/ForwardShade.slang",
+          "bytes": 20675,
+          "sha256": "48de77c56af397025c25feb06e0bd9677a139f2039d2123d26b2f40ea8a759be"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/ForwardWater.shadermeta",
+          "bytes": 1794,
+          "sha256": "6c574346afe6b7b1f00808446ef9f31aa42af73a78ae563e2c1a8450f05c0f07"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/ForwardWater.slang",
+          "bytes": 65,
+          "sha256": "6f227441d472c9ef9941d528274833a6492f7142d9b7b411d72362b247a505fc"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/ForwardWind.shadermeta",
+          "bytes": 1776,
+          "sha256": "483b57958eda4084349c05f74c7839d367c45a7890dcddf89741b656c433db06"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/ForwardWind.slang",
+          "bytes": 108,
+          "sha256": "c9a12dc241ed27087ebc93d1b3cb1879ba30585bd569136256ae064e09e42f42"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/GeometryOcclusion.slang",
+          "bytes": 6719,
+          "sha256": "9380d89fff60bc417d7acb66c33cadfb99ba0cccf05b8c1d151a8ae8289f0e85"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/GeometryOcclusionBuild.slang",
+          "bytes": 1427,
+          "sha256": "021e6720999b87c1de60c0497c46b6fb04e2ba2dc2b3aa9a55a3adda537b8907"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/GeometryVisibility.slang",
+          "bytes": 55780,
+          "sha256": "363b32b7dfa2a25bb92de44616ee7dd2627349eda8703b762c82c6a645da0a87"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/GizmoIcon.slang",
+          "bytes": 1658,
+          "sha256": "ab9dad3583d2987fb2f78de3f260e0987028ae407b81a0d6ea8385010f03e613"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/GizmoLine.slang",
+          "bytes": 530,
+          "sha256": "5748405b4cb2afb0aa1ec7d1f6c1c1b6ff6f363ddcc54adb8626360716dc57a0"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Grid.slang",
+          "bytes": 3150,
+          "sha256": "3ff79826f177d1efab62a30ea9de9c64f589160e9f4f5bb2b0e2c8b3ce881d45"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/IblBrdf.slang",
+          "bytes": 1122,
+          "sha256": "3b6e068f6ee8f519feab8cfa8ed6f981ce00df9d3111a6bc5f738e3aad60f310"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/IblCubeDownsample.slang",
+          "bytes": 2737,
+          "sha256": "a9d0a98c8975258b3015ad2c82a8d30fa2a9e67e13e3755a9e5b8d98c543d3d2"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/IblFace.slang",
+          "bytes": 576,
+          "sha256": "50619af0a67b693e4ee603c0ecec28c2fa1b5f5a00c272928e435d401999d7fd"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/IblFullscreen.slang",
+          "bytes": 342,
+          "sha256": "88b16b2a0a602b57d58f490a0943750daed5a0fbc78b49a681800f887203cc25"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/IblImportanceMarginal.slang",
+          "bytes": 452,
+          "sha256": "d22bb3ebf87bcb00d19d31e82af3bc8ce381f5c114fb45a53ae4f0d81e35387f"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/IblImportanceRows.slang",
+          "bytes": 960,
+          "sha256": "f61a2516bf4dda6cd803e8b9e02c0176fa633a541e3d66ffe62f2f112825a103"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/IblImportanceSamples.slang",
+          "bytes": 2643,
+          "sha256": "588599f2e5e3482548be622a566bd746073967777c6960e599348e1889ae84dc"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/IblIrradiance.slang",
+          "bytes": 1721,
+          "sha256": "4d4f07d079ae3cc0fab35f6279ec5a7d12ddc7954b2cb92d7229ff679fcf7ecd"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/IblPrefilter.slang",
+          "bytes": 2233,
+          "sha256": "fd9cdce7c1c765295888d62c4422e70ee20349fa637f08555eb14cb4839ec001"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/IblRectToCube.slang",
+          "bytes": 1401,
+          "sha256": "3045359f1db93264d7b64452b6d2717673c8da43d21ef6111f6baa563cad7d8f"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/IblSceneImportance.slang",
+          "bytes": 1040,
+          "sha256": "353df721f350e54efec5d535b4434c7e86e85795e3e397cf259c0d8f3ff582a8"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/IblSourceCopy.slang",
+          "bytes": 311,
+          "sha256": "a2f4f9bc6dc10ab8e0be99092eec350afa6fa3ca146a2d1dda35df62b5d3dcb9"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/Brdf.slang",
+          "bytes": 3039,
+          "sha256": "2a4d8a1c305ccf5dd327617fe5648f4353279960c0ecee7453cd3c6f974170bc"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/CascadedShadow.slang",
+          "bytes": 16844,
+          "sha256": "265381a15b36028bdf82b0292fe27f10b15db117776d740960acfa7e268d499c"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/FogCommon.slang",
+          "bytes": 1914,
+          "sha256": "5c31dcfe65b4d6d87d07efc8c2db2b0a8756f50436b1144f33b23b77f2536002"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/GeometryInstanceBounds.slang",
+          "bytes": 4497,
+          "sha256": "f126f3dec180e706402a4d99c18ed726e9d01373656b9c16ba69e63966cf1493"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/GgxEnergyTables.slang",
+          "bytes": 55138,
+          "sha256": "2efb5107cbbe7a518b911325863b2b7400d8eed193659298a3bbe5be17d2c333"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/Ibl.slang",
+          "bytes": 7373,
+          "sha256": "709674909945b2bcbd99907d8844662b22f85d7b4f56c6691b8d8c075f6a4286"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/IblImportance.slang",
+          "bytes": 2843,
+          "sha256": "a4280a9c8a62f90c7bdb8ed231100d344cc50d458e07eb888b1ab068a284a58f"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/LxMeshletGpuContract.slang",
+          "bytes": 4488,
+          "sha256": "5ac5053c1cb31149be29b140ee24410870394140146716ed00144791f2f1a34d"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialCoordinates.slang",
+          "bytes": 544,
+          "sha256": "e3cd76f2760c6a58f1fc965816c94cb50bf182d445da2d41d924eed66fef3c4d"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialEvaluation.slang",
+          "bytes": 3961,
+          "sha256": "289ad84e9887e26908f7659a6b93ee3817dbda50b7bf458a9e00a936d98be742"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphForwardVolume.slang",
+          "bytes": 1021,
+          "sha256": "a24743810db9b1472d0c81d841d9ed20b0aab031465bfa40ed1103d24227a3c1"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphPacketScan.slang",
+          "bytes": 3341,
+          "sha256": "d7752d9688f414e9f91ee45b52d90c2102e13416346e53ecb34c85be979a6f16"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphPrimitiveCacheTypes.slang",
+          "bytes": 2543,
+          "sha256": "6705283eb4f267f3ed39a4185874f04ef04c1cfc82257ca7ae4e193afc773814"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRefractionTransport.slang",
+          "bytes": 7638,
+          "sha256": "ea354a2b323d3f5a65605f10095fcfb7bde9267e75e450103a69579cec619cbf"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeEffectContract.slang",
+          "bytes": 892,
+          "sha256": "6b2608d1820f5d5f7744e586c171bae571d460f878dadc4c1a532e643c6726a1"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphRuntimeSpecial.slang",
+          "bytes": 10100,
+          "sha256": "273c2e4cccf34cc494be6f3076740e6f4cc00eaaa2713db8d0d638e354f275e8"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang",
+          "bytes": 67717,
+          "sha256": "f746a7bc8f359b080843b02099ef429004238df5740f109e2fc77990f8d34c93"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneRecord.slang",
+          "bytes": 571,
+          "sha256": "a1f67b75339d51597133827190608237923c811ee9c653979459bdc3ca9c676a"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneRefraction.slang",
+          "bytes": 145,
+          "sha256": "7e82ac991c05986f1116e92c640ecbe272b945a1aa4ff244c8704f8e348a5b7d"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneSubsurface.slang",
+          "bytes": 248,
+          "sha256": "defcd88fbc7d25d9d0cef532fbfa1ecbcf5abd3d2769aacc5244097a958aa9bf"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolume.slang",
+          "bytes": 6259,
+          "sha256": "40bbaafdcd02bb65ae3bafea18a5976f9dcfbe9bd4c7e846a23c3223036bc6ea"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeCoefficients.slang",
+          "bytes": 1024,
+          "sha256": "10bc3440b0705c11188a84862a28ea871e20f70c79e47ffd0150d294bf985660"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeLighting.slang",
+          "bytes": 8097,
+          "sha256": "07ad9e1fd9278cd53d3553164b47bf927a30d46084aadf0489eb3a9dd590443a"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneVolumeTypes.slang",
+          "bytes": 112,
+          "sha256": "590d0586b5d8f2f55a4b5a74dddf7ce48249bb03f5205f1d57e4077990099acf"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfaceHost.slang",
+          "bytes": 5106,
+          "sha256": "cb4052a085c64dd6cdd6808ef7bc94e3bd21bf60f648b82833523340a4110961"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSurfacePoint.slang",
+          "bytes": 1140,
+          "sha256": "5ccec5da654e4afdac8cfc505ac6c344ead67357c971f03ab25cb04ab2c68e21"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MaterialGraphTextureSample.slang",
+          "bytes": 1446,
+          "sha256": "9b2513d47afae0c943fac017778b5cbf60444355114490b485eec2407e87bef3"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang",
+          "bytes": 6943,
+          "sha256": "d093faee9cd5af6c55cb0379842cf9772e0d0418554c67bcb3f22d5e4d124bfc"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/MeteorVisibilityContract.slang",
+          "bytes": 1598,
+          "sha256": "b476cbcdefe47c3fd423465e3223965f2d4d7410f6a09d344f4f0956bc97df02"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/PackedBones.slang",
+          "bytes": 373,
+          "sha256": "fa7654cf0f78cb3607f73bb4a476f69be5f78f3983d81ffb86f24d2d726b8114"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/PbrCoverage.slang",
+          "bytes": 939,
+          "sha256": "8b9926d062f60e827b2de6a353c2b3abba2cd61e7dca0b00d7f73d5007ba8d9d"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/PbrSurface.slang",
+          "bytes": 4377,
+          "sha256": "1c7db8b83ee36f0c5ad9228a05981eb17f258637573d6cb04775b5260e6c1e3f"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/PostChainCommon.slang",
+          "bytes": 1845,
+          "sha256": "d4da3533f2bbc65b99d6a3e2587af4bd467ff80d6e28286af05ae633dc73810c"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/PrincipledBrdf.slang",
+          "bytes": 8503,
+          "sha256": "6d96c0d0dfb518adb6e20cc1d850b64eb1846c69b9ae170eba432e8476eec81d"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/PrincipledEnvironmentBake.slang",
+          "bytes": 10625,
+          "sha256": "ad18b70e5b554e695ec3f3a31efb7d324489887edcd7a90d3366e7d058f1b67b"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/PrincipledIblLookup.slang",
+          "bytes": 5876,
+          "sha256": "d6c7136e68a2c6c63b52b31bb4684073a31e967405ad5a93d70c3c83c1859e41"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/PrincipledLayered.slang",
+          "bytes": 20903,
+          "sha256": "ccabe41024d6a77a8430902a75a512cd07e19f32e7a9e9977c8387b6e94d5558"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/PrincipledRuntimeIbl.slang",
+          "bytes": 4303,
+          "sha256": "faac14ce7140db0b2612caf19fd291b12a1c10540f99fe7cbc3b52e38c71621e"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/PrincipledSubsurface.slang",
+          "bytes": 3525,
+          "sha256": "86fb7e0d11395b68b695f134e9af5f30a07ab48b16fa79616723caf10ccda5e7"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/PrincipledSurface.slang",
+          "bytes": 12361,
+          "sha256": "ee8a98641985930e3c3867da894f447d92e8ae7dd6d487a5391cca5d9f2b7135"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/PrincipledThinFilm.slang",
+          "bytes": 7140,
+          "sha256": "00068bf3c16142a35397789bed29700f7eaa769676c04596ab982d046c2e1ed6"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/PrincipledThinFilmSensitivity.slang",
+          "bytes": 67419,
+          "sha256": "9ddc9fd5a0976e9dfb80ade073d8d615efc08e8ca6d345b708bf8e14fdfcf9d4"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/PrincipledVolume.slang",
+          "bytes": 3119,
+          "sha256": "7002f8852f71363ac9146847c1acee0594ec0ca4a79892aefd889da851bc2c26"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/QuantizedGeometry.slang",
+          "bytes": 1921,
+          "sha256": "9bf398ca6692c0a81dc1c2120be270b4fbf6073cddd32da2408ed176d85b3c74"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/Radiance.slang",
+          "bytes": 2740,
+          "sha256": "d348ec9a7632251772dbce03169597886d1ed81254b75a2bf9ab3bbadc61baff"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/SheenLtc.slang",
+          "bytes": 42168,
+          "sha256": "f1f269a5fda345fee1be23b74fdffcb3797de38789865d4b6f7cfe4673c0b64b"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/SpecialForwardSurface.slang",
+          "bytes": 13904,
+          "sha256": "7e1ce5f6ec5f7cbb092d4ae24eb13b07a3af72121f823ada6ec84cd033b63747"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/SpecialMaterialRoute.slang",
+          "bytes": 504,
+          "sha256": "14c11c9d97cfab8cf6a23a7c502b1323c6a74c6e39d3f4a8e3b80cc10d4cc7ea"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/SsaoCommon.slang",
+          "bytes": 1263,
+          "sha256": "004d5b139189606209604eecfd54384b3dc34c94662d4234b5fb83d1aee353cc"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/StandardMaterialRoute.slang",
+          "bytes": 698,
+          "sha256": "2da647d5c590d28308b93b87906ec5816de7c055c455d004c91631c018b31101"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/TangentFrame.slang",
+          "bytes": 3319,
+          "sha256": "eb116404d8f69dcf31e2a90b3b8e670436547f4c34b6c47803b165dd23a1fa09"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Includes/TextureCoordinates.slang",
+          "bytes": 325,
+          "sha256": "431ac4c01740c3aba3e8241bdab23648af3b6c157ca16c1d4849d176c4b2d8dc"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/MaterialGraphIndirect.slang",
+          "bytes": 2534,
+          "sha256": "25d56285df338afeca32e465d283b0d8880dd0d018dc3cb48ae6407cfe130cd9"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/MaterialGraphMeshSurface.slang",
+          "bytes": 6162,
+          "sha256": "84e61dcd30188a113e6b55e41b0f4a1f225b795ac3625c6531f8b720582785e6"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/MaterialGraphPrimitiveCache.slang",
+          "bytes": 5356,
+          "sha256": "b8e213fcbc1e8e54470127d65486f052c815f03a162dc8beb90f10a40f409412"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/MaterialGraphRasterSurface.slang",
+          "bytes": 4498,
+          "sha256": "35f2d9837135d65f82b60eccf90a2e02771c9374a29405306bae9646484b78c3"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/MaterialGraphSceneLookup.slang",
+          "bytes": 9824,
+          "sha256": "8d3935c6bf6cf3d64a7c8af74a6fdd5b1ad1667ec33cddda1f91ba0707267548"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/MaterialGraphSceneRefractionBake.slang",
+          "bytes": 5142,
+          "sha256": "d3e35d856fe907dc38acbcebba9d25fade0c4555e724b7e025c1bc21640b13a9"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/MaterialGraphSceneRuntimeEffects.slang",
+          "bytes": 725,
+          "sha256": "0680d33da8d019ac4acaf8fd00371ea4a8d0ca54a10ea77687f2736c782ba745"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/MaterialGraphSceneSubsurfaceBake.slang",
+          "bytes": 4379,
+          "sha256": "aae003a46f68702c2cde32387fe30ac521b92441c160b36aa5d7545ec027d108"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/MaterialGraphSceneSubsurfaceFilter.slang",
+          "bytes": 3871,
+          "sha256": "dce3d8c59974ae8a346a0300a180dfce8d3cf1fafe39ec02f3c1d065ff607d6a"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/MaterialGraphSceneVolumeBake.slang",
+          "bytes": 1925,
+          "sha256": "8a5c1254ded02d409fc826423a1bf292fae9251473eac80a0ced773a3d62212d"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/MaterialGraphWork.slang",
+          "bytes": 2464,
+          "sha256": "486e5e1a94d3b993dc36d333ef9ab47dc40d12f09737012ee188ec73839554f7"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/MeteorHybridVisibility.slang",
+          "bytes": 11373,
+          "sha256": "c1ce1b8f9c08c41c977ee60dc59b6983a32991311f41016e99c284449d79b297"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/MeteorShadowDepth.slang",
+          "bytes": 581,
+          "sha256": "08d4f65e063925608600dd84d7fe48369e7902f9b58c98e01f096a1713e49bcd"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/OverlayDepth.slang",
+          "bytes": 764,
+          "sha256": "c3e8e95cd77fe161c6b817df0d7b56f1dfe2e74b01b928cbf3c9cd7b16cb78b9"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/PlayerPresentation.slang",
+          "bytes": 897,
+          "sha256": "cfd8d0407bafc09f5384116d0d3ac8a8cd835f2561c61f19149deeb7e1383b50"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/PostChainDownsample.slang",
+          "bytes": 1565,
+          "sha256": "8ce6ba5ac6ed325e9e3dfcc4d48b11fb7808bae8f5f47a3af2e1c9e5ad23e1ce"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/PostChainFxaa.slang",
+          "bytes": 2986,
+          "sha256": "26099ddd07e18e5a9f1599adec97c73365deb6bc96880054f5aa2c90ab3c209f"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/PostChainThreshold.slang",
+          "bytes": 1389,
+          "sha256": "35ac719d4b22011c43d06f95c29edd3a0841caecb695f5f224411569a442cac5"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/PostChainUber.slang",
+          "bytes": 5537,
+          "sha256": "0a8137d76258e8edc1202f1b55d2d0e0e11bc0db8435a97729cf9bd726a2c58e"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/PostChainUberHDR.slang",
+          "bytes": 63,
+          "sha256": "f11afc771b3c515a7be9c66e1fca83d77e19dc6d60f71f2375bff25e9664c9e2"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/PostChainUpsample.slang",
+          "bytes": 1175,
+          "sha256": "c616dc44fda46e6afea55024be56dbaf864d656d89a6ffc72e609b8fdc207371"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/PrincipledIblBake.slang",
+          "bytes": 2461,
+          "sha256": "4565e89b593848d050c0824630cb20390ab9951e73c1e27eae49509fd5ce727d"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SelfTest/FogScene.slang",
+          "bytes": 1023,
+          "sha256": "cd5570cd5af75973e4a560cf84c73ac8d2a8268d11e4e617c5abe97bd671de13"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SelfTest/PostChainScene.slang",
+          "bytes": 2968,
+          "sha256": "3b228c9a434df3e8d1988c2f13c5581ec6c023a81c1faba435809ec1fe7c33f3"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SelfTest/QueueRg8.slang",
+          "bytes": 629,
+          "sha256": "444a18420d24f2fb40e908ba1e3f0e8c29643d2ee0c4eefff72655de421d9a83"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SelfTest/ShaderMetaFixture.shadermeta",
+          "bytes": 580,
+          "sha256": "965d05ba38c3ec696e9dc7dd2517ce36df7615bca12597279eaab52196f0129d"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SelfTest/ShaderMetaFixture.slang",
+          "bytes": 838,
+          "sha256": "990e5cdd41b4e50f10aa4907a46cbcc59ec791e5ef1b46aa1436528b293f49c4"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SelfTest/SsaoScene.slang",
+          "bytes": 1816,
+          "sha256": "eb1b71e969723c525df7dd03068bb2c60db87a2f842c2f646a43084a468a2e0d"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SelfTest/SsgiRhiScene.slang",
+          "bytes": 2968,
+          "sha256": "2d7fc9ac1f28d80b5f2df3024a23eda9bffb7a7c6657987ead1a550edf34e02e"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SelfTest/SsgiTestDepth.slang",
+          "bytes": 3190,
+          "sha256": "0100a42b5a9bb1fbc717f8a9244f4ff67244e434e5d767abaf9de06e0f31856e"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SelfTest/SsrScene.slang",
+          "bytes": 1259,
+          "sha256": "81c35f5ccf4f135128c27e8f30e00a4923a32ea846e4aa4daf87bd77806ae315"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SelfTest/SssScene.slang",
+          "bytes": 718,
+          "sha256": "36a3aedce66fc4886a0988a4299d7d20e95296afdb37eb81ec7ed206a3769fc4"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SelfTest/StandardMaterialProbe.shadermeta",
+          "bytes": 858,
+          "sha256": "0f61df9369b6361e67a37c80a7e233cef0955c42e488feee6c7b3a258efaeaad"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SelfTest/StandardMaterialProbe.slang",
+          "bytes": 2857,
+          "sha256": "c537873db80894ecc386564ecbe3f16ac2c68c8e4abbf8ceb002d30cee50eacf"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SelfTest/Triangle.slang",
+          "bytes": 1792,
+          "sha256": "c64ff22cff1a6716a713356e61315f61819b6c3d2700bb2671c526a70906b8e0"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SkyBox.slang",
+          "bytes": 1625,
+          "sha256": "521eb58238b4b9dcd76bb0784c4fc1a0be8fa14ffa5b2460a61d913f293dae0d"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SsaoAO.slang",
+          "bytes": 5501,
+          "sha256": "507a467cca71f32b47be11f0033576ef250a246d4bbc28442f0a3ab14ddc8f7d"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SsaoFilter.slang",
+          "bytes": 1431,
+          "sha256": "1f177a6b55eb277975738ac3d224dd02be21713bdf0bd9baba0d23ff370a5603"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SsgiComposite.slang",
+          "bytes": 3619,
+          "sha256": "2e88addfb9a4041a2a0a6f09a3307cb3c0661b7e02d0353f6d265d5a3cab524d"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SsgiFilter.slang",
+          "bytes": 1958,
+          "sha256": "c7f085b5f88a1fdf4bd2da2e0321248496218aa9ad0e11ca779f1391bfdc4e1b"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SsgiHiZBuild.slang",
+          "bytes": 1134,
+          "sha256": "f9cf25265af0821ef0d945abbb92dff17584f38aec9f2b5f651eacbd5f957ad3"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SsgiResolve.slang",
+          "bytes": 3895,
+          "sha256": "7853465e021a1defb61865a78f73590040a868636e7783954292617028b1173d"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/SsgiTrace.slang",
+          "bytes": 10521,
+          "sha256": "adec0ef20bf87cb4a761ae84a9179f2cc13d42b5755968451e12ad512f220844"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Ssr.slang",
+          "bytes": 4521,
+          "sha256": "1af2a43ac044de4f4f39a49d75ee64efb39fd0df92da01aa76b6eb876b3c30e6"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Sss.slang",
+          "bytes": 3825,
+          "sha256": "d30aeb368675e2cd1951f67a3b69e7dbb13c2035c90413e8e297d153db98fbc6"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/TemporalInputs.slang",
+          "bytes": 1592,
+          "sha256": "73480ebbc7269d284ea4d7902f8f1794e0490833b54cfffd9a451c74f7a7274b"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/Tests/IblGgxProbe.slang",
+          "bytes": 436,
+          "sha256": "501cb043267f39fec3a6cd3759e3bf84d255ced69aa0fe39409846bfda8f94f0"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/UI.slang",
+          "bytes": 2501,
+          "sha256": "7cd6c3da5a7ba06ebce8334e0d09f89bc5fae17718b6e20dfe85a5df72a53d75"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/WireFrame.slang",
+          "bytes": 2415,
+          "sha256": "b17904d24048e378164848958229b793d29f273c184d3b3efcb33b2988b4e965"
+        },
+        {
+          "path": "Assets/Shaders/DefaultPassShader/WorldSprite.slang",
+          "bytes": 5205,
+          "sha256": "f7b987e66fb7ed524be31164b8071395d6cb32f216d3f35732774ee2ed177b78"
+        },
+        {
+          "path": "ProjectSetting/AssetIdentity.asset",
+          "bytes": 304,
+          "sha256": "2fd3ec3ea1ec12e0547ddeb052678154fde7346287d394a3c146309d29c124a0"
+        },
+        {
+          "path": "ProjectSetting/CollisionMatrix.asset",
+          "bytes": 5526,
+          "sha256": "8277e1a26648292b079c4a201325759a6afc08e2f88e036bd7ba67cf15eb52e5"
+        },
+        {
+          "path": "ProjectSetting/EngineSettings.asset",
+          "bytes": 4081,
+          "sha256": "a6089227f58ce9af95936d8ab4f0322102616d0200234956a5f7edcda5d76605"
+        },
+        {
+          "path": "ProjectSetting/Layers.celayers",
+          "bytes": 1376,
+          "sha256": "3c979e98145a5a74e050eb9ee29097f481c1d3c6d6510e7fef2c442a2bf1ee0a"
+        },
+        {
+          "path": "ProjectSetting/TagManager.asset",
+          "bytes": 587,
+          "sha256": "7637ea8904f934591bc71ce5ed102740b79c043620bf1ee66bce8abcded57490"
+        }
+      ],
+      "pakFileSha256": "7f39fbd689ec540dc4994acf2ae7fcadbb2a9f954e3fc67873dda589007f344f",
+      "smoke": {
+        "exitCode": 0,
+        "gameThreadFrames": 284,
+        "displayFrame": 276,
+        "promotions": 2,
+        "submittedGameFrames": 5,
+        "submittedGameFrameId": 276,
+        "registeredScripts": 1,
+        "managedLifecycle": false,
+        "catalogSource": "cemf",
+        "metaParsed": 0,
+        "sourceIdentities": 208,
+        "cookedEntries": 121,
+        "cookedSceneDocuments": 1,
+        "textParserCalls": 0
+      }
+    },
+    "pak": {
+      "sha256": "7F39FBD689EC540DC4994ACF2AE7FCADBB2A9F954E3FC67873DDA589007F344F",
+      "path": "Build/Verification/AnimationAcceptance20261023/Staging/Game-444464d49e4a4a9291e503cb9c6b8d61/GameAssets.pak"
+    }
+  },
+  "players": {
+    "ps5": {
+      "fixture": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\AnimationAcceptance20261023\\Staging\\Game-444464d49e4a4a9291e503cb9c6b8d61",
+      "gameStart": true,
+      "servicePid": 16476,
+      "smokeExit": 0,
+      "pakSha256": "7F39FBD689EC540DC4994ACF2AE7FCADBB2A9F954E3FC67873DDA589007F344F",
+      "sceneData": {
+        "name": "AnimationPlayer",
+        "objects": 69,
+        "simulating": true,
+        "editorSceneLoaded": false,
+        "hasAuthoringSnapshot": false
+      },
+      "samples": [
+        {
+          "skinnedMeshes": 4,
+          "frame": 13,
+          "clip": "Walk",
+          "bones": 54,
+          "paletteDigest": "91fb68baf5e4c088",
+          "time": 18.9765
+        },
+        {
+          "skinnedMeshes": 4,
+          "frame": 19,
+          "clip": "Walk",
+          "bones": 54,
+          "paletteDigest": "e16571bff3c4800f",
+          "time": 2.58674
+        }
+      ],
+      "binaries": [
+        {
+          "sha256": "EFFF5BB0D1AFBB4C7F48C99DBC15EE0BE68B02AF78AA57D46890C655305476E4",
+          "file": "Player.exe"
+        },
+        {
+          "sha256": "B7E565B8A65264B53F3F11879161F0B63FDAAEC4AA83F4CAFFF9F86D5E7895FF",
+          "file": "Player.runtime.dll"
+        }
+      ],
+      "smokePid": 14544,
+      "runtimeTreeRemoved": true,
+      "smoke": {
+        "schemaVersion": 1,
+        "processId": 14544,
+        "ready": true,
+        "scriptsLoaded": true,
+        "registeredScriptTypes": 1,
+        "frames": 300,
+        "displayPromotions": 2,
+        "submittedGameFrames": 3,
+        "submittedGameFrameId": 293,
+        "modelGenerationFailures": 0,
+        "meshResolveFailures": 0,
+        "reloadRequested": false,
+        "reloadActivated": false,
+        "gameStart": true,
+        "scenePending": false,
+        "compositionSubmittedAfterActivation": false
+      },
+      "schemaVersion": 1,
+      "serviceExit": 0,
+      "scene": "AnimationPlayer"
+    },
+    "ps7": {
+      "smokePid": 2556,
+      "servicePid": 5844,
+      "gameStart": true,
+      "smokeExit": 0,
+      "smoke": {
+        "schemaVersion": 1,
+        "processId": 2556,
+        "ready": true,
+        "scriptsLoaded": true,
+        "registeredScriptTypes": 1,
+        "frames": 338,
+        "displayPromotions": 2,
+        "submittedGameFrames": 5,
+        "submittedGameFrameId": 330,
+        "modelGenerationFailures": 0,
+        "meshResolveFailures": 0,
+        "reloadRequested": false,
+        "reloadActivated": false,
+        "gameStart": true,
+        "scenePending": false,
+        "compositionSubmittedAfterActivation": false
+      },
+      "schemaVersion": 1,
+      "samples": [
+        {
+          "paletteDigest": "ff7b05d80a3c8e7a",
+          "time": 5.96109,
+          "bones": 54,
+          "skinnedMeshes": 4,
+          "frame": 6,
+          "clip": "Walk"
+        },
+        {
+          "paletteDigest": "e5620068f6f2cb9c",
+          "time": 17.1062,
+          "bones": 54,
+          "skinnedMeshes": 4,
+          "frame": 12,
+          "clip": "Walk"
+        }
+      ],
+      "runtimeTreeRemoved": true,
+      "scene": "AnimationPlayer",
+      "fixture": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\AnimationAcceptance20261023\\Staging\\Game-444464d49e4a4a9291e503cb9c6b8d61",
+      "serviceExit": 0,
+      "binaries": [
+        {
+          "file": "Player.exe",
+          "sha256": "EFFF5BB0D1AFBB4C7F48C99DBC15EE0BE68B02AF78AA57D46890C655305476E4"
+        },
+        {
+          "file": "Player.runtime.dll",
+          "sha256": "B7E565B8A65264B53F3F11879161F0B63FDAAEC4AA83F4CAFFF9F86D5E7895FF"
+        }
+      ],
+      "sceneData": {
+        "name": "AnimationPlayer",
+        "objects": 69,
+        "simulating": true,
+        "editorSceneLoaded": false,
+        "hasAuthoringSnapshot": false
+      },
+      "pakSha256": "7F39FBD689EC540DC4994ACF2AE7FCADBB2A9F954E3FC67873DDA589007F344F"
+    }
+  },
+  "teardown": {
+    "cause": "Process-static scene partition cache retained exact streamed geometry file readers",
+    "framePinsOnlyService": {
+      "sha256": "1A287C83A411F9062299726A17473C7CDD81DF738FC7BE2715C9136F82C69E95",
+      "path": "Build/Verification/AnimationAcceptance20261023/Player-lifetime-probe/service.err"
+    },
+    "cacheRebuilt": true,
+    "meshGpuComponents": 594828,
+    "frameOwnerPreserved": true,
+    "preliminaryPass": {
+      "smokePid": 2256,
+      "pakSha256": "7DF712AF645850428FA868B7BFFA603B6ABC319A7A5AA7ECC567922358E08940",
+      "serviceExit": 0,
+      "gameStart": true,
+      "schemaVersion": 1,
+      "scene": "AnimationPlayer",
+      "servicePid": 13104,
+      "binaries": [
+        {
+          "sha256": "EFFF5BB0D1AFBB4C7F48C99DBC15EE0BE68B02AF78AA57D46890C655305476E4",
+          "file": "Player.exe"
+        },
+        {
+          "sha256": "B7E565B8A65264B53F3F11879161F0B63FDAAEC4AA83F4CAFFF9F86D5E7895FF",
+          "file": "Player.runtime.dll"
+        }
+      ],
+      "smoke": {
+        "schemaVersion": 1,
+        "processId": 2256,
+        "ready": true,
+        "scriptsLoaded": true,
+        "registeredScriptTypes": 1,
+        "frames": 318,
+        "displayPromotions": 2,
+        "submittedGameFrames": 4,
+        "submittedGameFrameId": 310,
+        "modelGenerationFailures": 0,
+        "meshResolveFailures": 0,
+        "reloadRequested": false,
+        "reloadActivated": false,
+        "gameStart": true,
+        "scenePending": false,
+        "compositionSubmittedAfterActivation": false
+      },
+      "sceneData": {
+        "name": "AnimationPlayer",
+        "objects": 69,
+        "simulating": true,
+        "editorSceneLoaded": false,
+        "hasAuthoringSnapshot": false
+      },
+      "runtimeTreeRemoved": true,
+      "smokeExit": 0,
+      "samples": [
+        {
+          "clip": "Walk",
+          "paletteDigest": "5749c3aab90849e7",
+          "frame": 8,
+          "bones": 54,
+          "skinnedMeshes": 4,
+          "time": 9.2104
+        },
+        {
+          "clip": "Walk",
+          "paletteDigest": "6f8e131f33b8c756",
+          "frame": 14,
+          "bones": 54,
+          "skinnedMeshes": 4,
+          "time": 20.1524
+        }
+      ],
+      "fixture": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\AnimationAcceptance20261023\\Staging\\Game-d9b7c8ea493b402b91bf6120bb0af726"
+    },
+    "meshSurfaceChecks": 1264244,
+    "preFixService": {
+      "sha256": "2274D4E6A9AF0358F052A748ABD2A441C28A2FF445D0030A7DD44B820263591C",
+      "path": "Build/Verification/AnimationAcceptance20261023/Player-cleanup-diagnosis/service.err"
+    },
+    "repeatedShutdownSafe": true,
+    "cacheLifetimeChecks": 40,
+    "meshRuntime": {
+      "sha256": "8D4B50566FE86DE3A9F66E264DDA42344533B56246D38CC2111CFD86B68C67D9",
+      "path": "Build/Obj/MaterialProductProbe/mesh-surface-Release.log"
+    }
+  },
+  "fixtureMutations": [
+    {
+      "case": "stale-model",
+      "shell": "pwsh",
+      "rejected": true,
+      "exitCode": 1
+    },
+    {
+      "case": "stale-model",
+      "shell": "powershell",
+      "rejected": true,
+      "exitCode": 1
+    },
+    {
+      "case": "missing-mesh",
+      "shell": "pwsh",
+      "rejected": true,
+      "exitCode": 1
+    },
+    {
+      "case": "missing-mesh",
+      "shell": "powershell",
+      "rejected": true,
+      "exitCode": 1
+    },
+    {
+      "case": "wrong-owner",
+      "shell": "pwsh",
+      "rejected": true,
+      "exitCode": 1
+    },
+    {
+      "case": "wrong-owner",
+      "shell": "powershell",
+      "rejected": true,
+      "exitCode": 1
+    },
+    {
+      "case": "wrong-motion",
+      "shell": "pwsh",
+      "rejected": true,
+      "exitCode": 1
+    },
+    {
+      "case": "wrong-motion",
+      "shell": "powershell",
+      "rejected": true,
+      "exitCode": 1
+    },
+    {
+      "case": "obsolete-material",
+      "shell": "pwsh",
+      "rejected": true,
+      "exitCode": 1
+    },
+    {
+      "case": "obsolete-material",
+      "shell": "powershell",
+      "rejected": true,
+      "exitCode": 1
+    },
+    {
+      "case": "stale-texture",
+      "shell": "pwsh",
+      "rejected": true,
+      "exitCode": 1
+    },
+    {
+      "case": "stale-texture",
+      "shell": "powershell",
+      "rejected": true,
+      "exitCode": 1
+    },
+    {
+      "case": "wrong-graph",
+      "shell": "pwsh",
+      "rejected": true,
+      "exitCode": 1
+    },
+    {
+      "case": "wrong-graph",
+      "shell": "powershell",
+      "rejected": true,
+      "exitCode": 1
+    },
+    {
+      "case": "legacy-layer",
+      "shell": "pwsh",
+      "rejected": true,
+      "exitCode": 1
+    },
+    {
+      "case": "legacy-layer",
+      "shell": "powershell",
+      "rejected": true,
+      "exitCode": 1
+    }
+  ],
+  "fixtureReferenceAudit": {
+    "roots": [
+      "Tools",
+      "GameScripts",
+      "Editor",
+      "Engine",
+      "ScriptCore",
+      "Dynamic_CPP/Assets/Scenes",
+      "Dynamic_CPP/Assets/Prefabs"
+    ],
+    "oldIdentities": [
+      "6c6d4501-1a95-8c70-b3ea-2818679968dd",
+      "9ad77a24-5de7-8fa3-933a-1a0a0289a47d",
+      "c20d30f6-9239-86cb-9439-2da5c91208fc",
+      "113354b6-1d54-8d61-9bff-3ebbab69787f",
+      "a4c8cc56-491e-8fbf-b6d6-e83209dee1ce"
+    ],
+    "files": 2525,
+    "remainingReferences": 0
+  },
+  "materialMigration": [
+    {
+      "propertiesPreserved": 12,
+      "name": "CreatorRobot_Arms_Mat",
+      "materialId": "1a2156ec-a7b6-8cc9-ba54-3c8e2260d4b3",
+      "graphId": "6d7b614a-5161-8dbd-9d1a-01c157d6173d"
+    },
+    {
+      "propertiesPreserved": 12,
+      "name": "CreatorRobot_LegsMat",
+      "materialId": "1af1c82a-3f4d-8256-97ed-ace4b509dc3c",
+      "graphId": "16499e2b-fbda-83bb-8145-d7c5a182daca"
+    },
+    {
+      "propertiesPreserved": 12,
+      "name": "CreatorRobot_TorsoMat",
+      "materialId": "8a92a262-d80b-846b-b37b-dda551517fda",
+      "graphId": "41582c39-a6fd-858b-81cd-029e4a65ff77"
+    },
+    {
+      "propertiesPreserved": 12,
+      "name": "CreatorRobot_Head_Mat",
+      "materialId": "cdf575ad-0d34-8376-88b9-81abe99ba9b0",
+      "graphId": "cc7977ab-aa6a-8fc0-b9b5-e8d0596d980d"
+    }
+  ],
+  "primitiveMaterialMigration": [
+    {
+      "graphId": "e78cd2a3-18f3-89e3-a733-10be3a569fc9",
+      "materialId": "bded2162-3902-8f9b-9449-18c1566f261a",
+      "sourceTextureBytesPreserved": true,
+      "modelId": "8c05d8c6-f8bb-8ebb-8b1d-90e2d3b66e45",
+      "name": "Plane_Mat"
+    },
+    {
+      "graphId": "f1f18c9b-7eb7-8788-bd47-11c4cc8b24b7",
+      "materialId": "98add748-9405-8297-8089-bd7b664ac47a",
+      "sourceTextureBytesPreserved": true,
+      "modelId": "8a69bd42-f950-8265-9c0e-0ff597095141",
+      "name": "Cube_Mat"
+    },
+    {
+      "graphId": "fe23112a-afa0-8941-b4de-22a7197fe83f",
+      "materialId": "5ddef1b8-956e-8da3-8d7b-47282507d33b",
+      "sourceTextureBytesPreserved": true,
+      "modelId": "df464176-385d-8563-98b9-5b1d266415bd",
+      "name": "Sphere_Mat"
+    },
+    {
+      "graphId": "c58ba041-1e10-82e0-9d6f-3b3ab64022c5",
+      "materialId": "768cf97b-1855-84f8-86f9-50ca838465ae",
+      "sourceTextureBytesPreserved": true,
+      "modelId": "63c7b8bc-3057-833b-86ae-870fa7a6aed7",
+      "name": "IcoSphere_Mat"
+    },
+    {
+      "graphId": "cd168382-d753-8ab0-b7f6-6fe0c18e4b21",
+      "materialId": "44f1214b-dd15-8df0-b89e-64e760e8caee",
+      "sourceTextureBytesPreserved": true,
+      "modelId": "cdf2f89b-32f4-85d5-adc6-c652c61a071c",
+      "name": "Cylinder_Mat"
+    },
+    {
+      "graphId": "d59f5e72-0e4e-8684-90a6-d42ba9453464",
+      "materialId": "ba34f36c-f102-8981-a60d-1d1f5e9151f3",
+      "sourceTextureBytesPreserved": true,
+      "modelId": "9888e325-a6fb-8378-b297-aa1f10eca2dc",
+      "name": "Cone_Mat"
+    },
+    {
+      "graphId": "b1b6ba29-3b83-8d96-80d4-1b4dc6673ff7",
+      "materialId": "e7752eda-3ebb-800f-a34b-4a1692b27a79",
+      "sourceTextureBytesPreserved": true,
+      "modelId": "17d1efaf-9c93-8adb-ab23-6f4a04810c46",
+      "name": "Torus_Mat"
+    },
+    {
+      "graphId": "b6387818-7280-8977-9338-090103a98dda",
+      "materialId": "1b148b33-0ca8-8bd0-972f-15d47193f001",
+      "sourceTextureBytesPreserved": true,
+      "modelId": "987a8d42-3964-8d46-9024-7f280c92f986",
+      "name": "Suzanne_Mat"
+    }
+  ],
+  "layerMigration": {
+    "defaultLayerId": 1,
+    "entities": 69,
+    "legacyFieldsRemoved": 138
+  },
+  "startupDiagnosis": {
+    "result": {
+      "copies": 11,
+      "logRoot": "C:\\Users\\idene\\AppData\\Local\\Temp\\CreatorEngine\\Player\\26932\\RuntimeData\\Log",
+      "pid": 26932,
+      "exitCode": 3
+    },
+    "logs": [
+      {
+        "sha256": "068E593FEAF72A4448F9641DDFEA6739C5CD00D2C8D741C34B030C8ABE33C451",
+        "path": "Build/Verification/AnimationAcceptance20261023/StartupDiagnosis/Game_20261023_184138.html"
+      }
+    ]
+  },
+  "selectedAssets": {
+    "models": [
+      "Models/CreatorRobot.glb",
+      "Models/Prim_Cone.glb",
+      "Models/Prim_Cube.glb",
+      "Models/Prim_Cylinder.glb",
+      "Models/Prim_IcoSphere.glb",
+      "Models/Prim_Plane.glb",
+      "Models/Prim_Sphere.glb",
+      "Models/Prim_Suzanne.glb",
+      "Models/Prim_Torus.glb"
+    ],
+    "list": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\AnimationAcceptance20261023\\AnimationAssets.txt",
+    "modelCount": 9,
+    "sha256": "9271C81DB1EA0565448A26C21A4F9FD3F7ECA1AE27E37F6FB8A2592899453E17",
+    "graphCount": 14,
+    "inputFiles": 469
+  },
+  "completeCook": {
+    "root": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\AnimationAcceptance20261023\\Staging\\.cfa1894273b5436798bfa2f99183b114.candidate\\.package-input\\Generated\\Assets",
+    "artifacts": 269,
+    "models": 20,
+    "files": 691,
+    "materialPrograms": 73,
+    "companions": 421
+  },
+  "materialScene": {
+    "debugLayer": true,
+    "sceneCompiles": 0,
+    "configuration": "Release",
+    "rejectedInputs": 6,
+    "sourceSnapshot": {
+      "sha256": "D8B4B3A8B4C530EE50FF71D1BEEA4CDB76840BEE0ECF879FBD38192AC3F8AA2F",
+      "path": "Build/Verification/AnimationAcceptance20261023/material-source-hashes.json"
+    },
+    "gpuValidation": true,
+    "checks": 114778,
+    "gpuComponents": 12501,
+    "frames": 24,
+    "repeatedBytesIdentical": true,
+    "sourceFiles": 838,
+    "validationErrors": 0,
+    "root": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Obj\\MaterialProductProbe\\SceneCook-Release-64b06d28208c4773a09b5a97696f6e51"
+  },
+  "regressions": {
+    "ratchetIdentity": {
+      "sha256": "FCE8DD182C7FC263900BCB70BFE85BC7E2AC7CE979317950FA03CA76CC468308",
+      "path": "Tools/regression/cli_consumer.ratchet.json"
+    },
+    "readerChecksPerShell": 82,
+    "ratchetObserved": 0,
+    "shaderChecks": 44,
+    "buildToolChecks": 188,
+    "documentVerification": {
+      "sha256": "00F409E6CCA39DC1D1BE0B81C9D94FD7D83BC486A8E25BAFB84CAD4BF761E947",
+      "path": "Build/full-docs-script-verification.json"
+    },
+    "documentFailures": 0,
+    "documentPages": 680,
+    "ratchetCap": 0,
+    "documentScripts": 360
+  },
+  "logs": [
+    {
+      "sha256": "DB3EEC30F44FCF711E3395536951CE81613362027D76290A41BD4A4186633B6D",
+      "path": "Build/animation-shader-before.log"
+    },
+    {
+      "sha256": "71E3D29C129CB9E2EC42BF8B81F40FA14A695421E757215A73EA1A5B9B03B124",
+      "path": "Build/animation-shader-final.log"
+    },
+    {
+      "sha256": "BAAB27BBDDD81F94783896DDA0E43ADBB6775F4645B0D2FE0D25683CA5405379",
+      "path": "Build/animation-material-scene.log"
+    },
+    {
+      "sha256": "C2E7C6F65BCA9E115232B3500E719F7C2A4196F4A86B53CAD5F8E0D8F2EBD743",
+      "path": "Build/animation-cooker-build.log"
+    },
+    {
+      "sha256": "1D997074AA931FE7A4EBE49673B3C16BFEB4B0CB4A9558022C67A7CB9765BA22",
+      "path": "Build/animation-player-build.log"
+    },
+    {
+      "sha256": "DD69BCBBB87DA998A18279C63920AE411F487849E945C1BF69F9E452CAF73FF9",
+      "path": "Build/animation-editor-build.log"
+    },
+    {
+      "sha256": "3F59585A661019A2547556BCFB2DD791E438322EA344246C07F9D70B92F282CE",
+      "path": "Build/animation-player-cache-lifetime-build.log"
+    },
+    {
+      "sha256": "8ED2407883C3FB4B545E0367EB6E6FE21F0EE3E0F18F4F29524CB5C594E2560B",
+      "path": "Build/animation-editor-cache-lifetime-build.log"
+    },
+    {
+      "sha256": "05E4C4BD0BC83152E834AAFA10499836061CA2E51E2854DF734C4F2773067378",
+      "path": "Build/animation-publish-engine-accepted.log"
+    },
+    {
+      "sha256": "D879DFF0EE7605C24E83B407046D39FE55131DBC385E520F2AFC9219AF92C30A",
+      "path": "Build/animation-select-engine-accepted.log"
+    },
+    {
+      "sha256": "9BE3389ED0115240F78C9BA411ECA688965D02B5429591CFB6350F16DE88C316",
+      "path": "Build/animation-package-accepted.log"
+    },
+    {
+      "sha256": "FF4AA5AA17C220C2A766268E263D5FA69F96E0B2E1EAD178D33591BD8B9E1117",
+      "path": "Build/animation-package-generation-companion.log"
+    },
+    {
+      "sha256": "34902EFA9E0823F0F65C1D49C741D859B556644F80BA94F595E47A47E946720E",
+      "path": "Build/animation-buildtool-build.log"
+    },
+    {
+      "sha256": "906B870D364E0CD52E00B2529E11E011B3AF909AB7E9151E77EDB4ED9F0E8EB6",
+      "path": "Build/animation-buildtool-tests.log"
+    },
+    {
+      "sha256": "82F8329E25D6F3E0B82A22A1D4F7F824F132C71858E39B8EDD314DD5567D7E9A",
+      "path": "Build/animation-buildtool-real-cook.log"
+    },
+    {
+      "sha256": "BA6D9B6F32750B9784B021FB57E10BEDF27595D4337A957709335895536130A7",
+      "path": "Build/animation-package-player-startup.log"
+    },
+    {
+      "sha256": "509349042FA35C2A636A352BC8B2351AB44C906951266A970E749C668F306857",
+      "path": "Build/animation-package-graph-startup.log"
+    },
+    {
+      "sha256": "195CEF5852C691901ADCFB9DEB2D75F176616AB054635B583566DD62F71DB32C",
+      "path": "Build/animation-package-inactive-view.log"
+    },
+    {
+      "sha256": "36414847D02F224CFE46053F456F2A65E6623FD2AA3B344CB2FC37120B73700B",
+      "path": "Build/animation-package-unresolved-dependency.log"
+    },
+    {
+      "sha256": "D9DFC732D8BE0A46710F1756EE2AD1213985D537DC4B11D5B732A7FC1931A919",
+      "path": "Build/animation-fixture-ps7.log"
+    },
+    {
+      "sha256": "D9DFC732D8BE0A46710F1756EE2AD1213985D537DC4B11D5B732A7FC1931A919",
+      "path": "Build/animation-fixture-ps5.log"
+    },
+    {
+      "sha256": "3D7FE93B2736FE878E9C645C83F257326FBDA069502FB204FAE83F02F390BC31",
+      "path": "Build/animation-fixture-authored.log"
+    },
+    {
+      "sha256": "1CFAD2C649A825B82C5F6FF9DC449D75D1F758E7B55DBB0052663BE2021A2196",
+      "path": "Build/animation-player-ps7-final.log"
+    },
+    {
+      "sha256": "55857163959EEB7D114700E27AB1304CC0DCD4D9464B921F9D85F89B3A50A67C",
+      "path": "Build/animation-player-ps5-final.log"
+    },
+    {
+      "sha256": "0974B9DA00BA7EA27414E7088806E0548BBE5F0FEA24FE8C846F3B5A0B4021E3",
+      "path": "Build/animation-material-mesh-lifetime.log"
+    },
+    {
+      "sha256": "BAAB27BBDDD81F94783896DDA0E43ADBB6775F4645B0D2FE0D25683CA5405379",
+      "path": "Build/animation-material-scene-final.log"
+    },
+    {
+      "sha256": "619CCC6562F77F986485BEC7827B588FB627E8378436E601A5A6682D0434B1FB",
+      "path": "Build/animation-cli-contract-final-ps7.log"
+    },
+    {
+      "sha256": "619CCC6562F77F986485BEC7827B588FB627E8378436E601A5A6682D0434B1FB",
+      "path": "Build/animation-cli-contract-final-ps5.log"
+    },
+    {
+      "sha256": "2237759BAC137D863074937DBC7EDA144CAD817F1C1616D06947A7591348605A",
+      "path": "Build/animation-readers-final-ps7.log"
+    },
+    {
+      "sha256": "09ED8E711AB166C167560EE517E0D9625CF4C358FBEA188E8A0ADB5E8248DC76",
+      "path": "Build/animation-readers-final-ps5.log"
+    }
+  ],
+  "limits": [
+    "Release DX12 product only",
+    "No pose-pixel comparison or performance claim",
+    "No Animation Graph AG0-AG5 acceptance",
+    "Inspector shutdown/soak, GUI, Shipping remain separate"
+  ]
+}

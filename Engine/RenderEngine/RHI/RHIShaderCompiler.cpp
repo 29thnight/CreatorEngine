@@ -22,7 +22,7 @@ namespace
     constexpr std::uint32_t kCacheSchema = 10u;
     constexpr std::uint64_t kMaxCachedShaderBytes = 64ull * 1024ull * 1024ull;
     constexpr std::string_view kCompilerCacheIdentity =
-        "CreatorEngine.RHIShaderCompiler.v13.Slang.O3.column-major.dx-layout."
+        "CreatorEngine.RHIShaderCompiler.v14.Slang.O3.column-major.dx-layout.sm6-source."
         "verified-layout-v1.include-paths.permutation-key";
 
     struct Hash128
@@ -1676,6 +1676,18 @@ namespace
             addArgument(RHIShaderBinary::Dxil == request.output
                 ? (request.options.bufferInt64Atomics ? "sm_6_6" : meshStage ? "sm_6_5" : "sm_6_0")
                 : (meshStage ? "spirv_1_5" : "spirv_1_3"));
+
+            if (request.output == RHIShaderBinary::SpirV)
+            {
+                // SPIR-V profiles describe the binary version. Slang also needs
+                // the engine's SM 6.0 source contract for HLSL operations such as
+                // NonUniformResourceIndex and texture dimension queries.
+                // Keep optional device features explicit below; SM 6.6 would
+                // implicitly raise the SPIR-V version and admit extra features.
+                addArgument("-capability");
+                addArgument("sm_6_0");
+            }
+
             if (request.options.bufferInt64Atomics && request.output == RHIShaderBinary::SpirV)
             {
                 addArgument("-capability"); addArgument("spvInt64Atomics");

@@ -11,9 +11,9 @@ public sealed partial class CharacterMovementProbe : Component
     public static string Lifecycle() => FormattableString.Invariant(
         $"{{\"added\":{_sceneAdditions},\"removed\":{_sceneRemovals}}}");
 
-    public override void OnAddedToScene() => ++_sceneAdditions;
+    public void OnAddedToScene() => ++_sceneAdditions;
 
-    public override void OnRemovingFromScene() => ++_sceneRemovals;
+    public void OnRemovingFromScene() => ++_sceneRemovals;
 
     [EngineCallable]
     public static string Results() => FormattableString.Invariant(
@@ -41,7 +41,7 @@ public sealed partial class CharacterMovementProbe : Component
     [EngineCallable]
     public static string JumpGrounded() => _captured is null ? "missing" : _captured.Jump().ToString();
 
-    public override void PostPhysics(float tick)
+    public void PostPhysics(float tick)
     {
         if (_checked) return;
         var character = GetComponent<CharacterMovementComponent>();

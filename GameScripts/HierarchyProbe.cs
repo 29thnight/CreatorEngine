@@ -6,7 +6,7 @@ public sealed partial class HierarchyProbe : Component
     private int _passed;
     private int _failed;
 
-    public override void OnInitialized()
+    public void OnInitialized()
     {
         int childCount = Entity.ChildCount;
         Log($"[HierarchyProbe] {Entity.Name} (index={Entity.Index}) 자식 {childCount}개");

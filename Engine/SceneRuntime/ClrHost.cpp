@@ -395,8 +395,37 @@ namespace
         int (__stdcall* Body_ShapeRole)(ScriptObjectHandle owner, std::uint64_t instance, unsigned int shape, const char* role);
         // Append-only v41: explicit same-camera discontinuities.
         void (__stdcall* Camera_NotifyCameraCut)(ScriptObjectHandle handle);
+        int (__stdcall* Simulation_Status)(Runtime::TickStatus* status);
+        int (__stdcall* Simulation_Submit)(std::uint64_t epoch, std::uint64_t tick, std::uint32_t kind, const std::byte* payload, int bytes, std::uint64_t* sequence);
+        int (__stdcall* Simulation_Read)(std::uint64_t epoch, std::uint64_t after, Runtime::TickSnapshotHeader* header, std::byte* payload, int capacity);
 
 	};
+
+    static_assert(offsetof(ScriptApiTable, Simulation_Status)
+        == offsetof(ScriptApiTable, Camera_NotifyCameraCut) + sizeof(decltype(ScriptApiTable::Camera_NotifyCameraCut)));
+    int __stdcall Api_Simulation_Status(Runtime::TickStatus* status)
+    {
+        if (!status) return static_cast<int>(Runtime::TickResult::InvalidArgument);
+        *status = {};
+        try { *status = SceneManagers->SimulationCommands().Status(); return static_cast<int>(Runtime::TickResult::Ok); }
+        catch (...) { return static_cast<int>(Runtime::TickResult::Failed); }
+    }
+    int __stdcall Api_Simulation_Submit(std::uint64_t epoch, std::uint64_t tick, std::uint32_t kind,
+        const std::byte* payload, int bytes, std::uint64_t* sequence)
+    {
+        if (sequence) *sequence = 0;
+        if (!sequence || bytes < 0 || bytes > 64 || (bytes && !payload)) return static_cast<int>(Runtime::TickResult::InvalidArgument);
+        try { return static_cast<int>(SceneManagers->SimulationCommands().Submit(epoch, tick, kind, {payload, static_cast<std::size_t>(bytes)}, *sequence)); }
+        catch (...) { return static_cast<int>(Runtime::TickResult::Failed); }
+    }
+    int __stdcall Api_Simulation_Read(std::uint64_t epoch, std::uint64_t after, Runtime::TickSnapshotHeader* header,
+        std::byte* payload, int capacity)
+    {
+        if (header) *header = {};
+        if (!header || capacity < 0 || (capacity && !payload)) return static_cast<int>(Runtime::TickResult::InvalidArgument);
+        try { return static_cast<int>(SceneManagers->SimulationCommands().Read(epoch, after, *header, {payload, static_cast<std::size_t>(capacity)})); }
+        catch (...) { return static_cast<int>(Runtime::TickResult::Failed); }
+    }
 
     static_assert(offsetof(ScriptApiTable, Asset_RequestTyped)
         == offsetof(ScriptApiTable, Asset_ListRoots) + sizeof(decltype(ScriptApiTable::Asset_ListRoots)));
@@ -409,7 +438,7 @@ namespace
     static_assert(offsetof(ScriptApiTable, Camera_NotifyCameraCut)
         == offsetof(ScriptApiTable, Body_ShapeRole) + sizeof(decltype(ScriptApiTable::Body_ShapeRole)));
     static_assert(sizeof(ScriptApiTable)
-        == offsetof(ScriptApiTable, Camera_NotifyCameraCut) + sizeof(decltype(ScriptApiTable::Camera_NotifyCameraCut)));
+        == offsetof(ScriptApiTable, Simulation_Read) + sizeof(decltype(ScriptApiTable::Simulation_Read)));
 
 	ScriptApiTable g_apiTable{};
 
@@ -2908,7 +2937,10 @@ namespace
 		g_apiTable.Transform_Exists            = &Api_Transform_Exists;
 		g_apiTable.Transform_GetLocalPosition  = &Api_Transform_GetLocalPosition;
 		g_apiTable.Transform_SetLocalPosition  = &Api_Transform_SetLocalPosition;
-		g_apiTable.Transform_GetWorldPosition  = &Api_Transform_GetWorldPosition;
+		g_apiTable.Simulation_Status = &Api_Simulation_Status;
+        g_apiTable.Simulation_Submit = &Api_Simulation_Submit;
+        g_apiTable.Simulation_Read = &Api_Simulation_Read;
+        g_apiTable.Transform_GetWorldPosition  = &Api_Transform_GetWorldPosition;
 		g_apiTable.Transform_GetLocalRotation  = &Api_Transform_GetLocalRotation;
 		g_apiTable.Transform_SetLocalRotation  = &Api_Transform_SetLocalRotation;
 		g_apiTable.Transform_GetLocalScale     = &Api_Transform_GetLocalScale;
@@ -3206,6 +3238,7 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	if (!bind(L"Initialize", &fn))       return false;  m_fnInitialize = reinterpret_cast<InitializeFn>(fn);
 	if (!bind(L"Shutdown", &fn))         return false;  m_fnShutdown = reinterpret_cast<ShutdownFn>(fn);
 	if (!bind(L"FlushRegistrations", &fn)) return false;  m_fnFlushRegistrations = reinterpret_cast<NoArgumentFn>(fn);
+	if (!bind(L"OnTickSimulate", &fn)) return false; m_fnUpdate = reinterpret_cast<TickFn>(fn);
 	if (!bind(L"PrePhysicsTick", &fn))   return false;  m_fnPrePhysicsTick = reinterpret_cast<TickFn>(fn);
 	if (!bind(L"PostPhysicsTick", &fn))  return false;  m_fnPostPhysicsTick = reinterpret_cast<TickFn>(fn);
 	if (!bind(L"OnSceneUnload", &fn))    return false;  m_fnSceneUnload = reinterpret_cast<NoArgumentFn>(fn);
@@ -3344,7 +3377,8 @@ bool ClrHost::Initialize()
 	{
 		const auto pathUtf8 = scriptsPath.u8string();
 		const std::string utf8(pathUtf8.begin(), pathUtf8.end());
-		if (0 != m_fnLoadScripts(utf8.c_str()))
+		m_scriptsLoaded = m_fnLoadScripts(utf8.c_str()) == 0;
+        if (!m_scriptsLoaded)
 		{
 			Debug::PrintLog(spdlog::level::warn, "[CLR] 게임 스크립트 어셈블리 로드 실패");
 		}
@@ -3363,11 +3397,14 @@ ClrHost::ReloadOutcome ClrHost::ReloadScripts()
 {
 	if (!m_ready || nullptr == m_fnReloadScripts) return ReloadOutcome::Faulted;
 
+    // Invalidate old script-produced values before unload callbacks can run.
+    SceneManagers->ResetSimulationCommands();
+
 	switch (m_fnReloadScripts())
 	{
-	case 0:  return ReloadOutcome::Reloaded;
+	case 0:  m_scriptsLoaded = true; return ReloadOutcome::Reloaded;
 	case 1:  return ReloadOutcome::PreviousKept;
-	case 2:  return ReloadOutcome::PreviousLost;
+	case 2:  m_scriptsLoaded = false; return ReloadOutcome::PreviousLost;
 	default: return ReloadOutcome::Faulted;   // -2: 관리 측 예외(Bootstrap.Report 가 기록)
 	}
 }
@@ -3483,6 +3520,7 @@ void ClrHost::Shutdown()
     ScriptObjectRegistry::Get().EndAssetSession();
 
 	m_ready = false;
+    m_scriptsLoaded = false;
 	ScriptObjectRegistry::Get().Clear();
 
 	// hostfxr는 언로드하지 않는다. CoreCLR은 프로세스당 한 번만 올릴 수 있고,
@@ -3568,6 +3606,16 @@ void ClrHost::FlushPhysicsEvents()
 void ClrHost::FlushRegistrations()
 {
 	if (m_ready && nullptr != m_fnFlushRegistrations) m_lastActiveCount = m_fnFlushRegistrations();
+}
+
+bool ClrHost::TickUpdate(float fixedDelta)
+{
+    if (!m_ready) return true;
+    if (!m_fnUpdate) return false;
+    const int count = m_fnUpdate(fixedDelta);
+    if (count < 0) return false;
+    m_lastActiveCount = count;
+    return true;
 }
 
 void ClrHost::TickPrePhysics(float deltaTime)

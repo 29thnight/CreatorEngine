@@ -1,0 +1,82 @@
+{
+  "result": "N3_EXCHANGE_ACCEPTANCE_OK",
+  "date": "2026-10-22",
+  "platform": "Windows x64 Release DX12",
+  "scriptApi": 43,
+  "repositoryHead": "0847ceeb2ec99d1b4edbdfd9f7f8a94bd773f915",
+  "worktree": "uncommitted implementation; source hashes authoritative",
+  "sourceHashes": {
+    "Engine/SceneRuntime/SimulationExchange.h": "C841B84D13495A6FE02219BB672C4C39CCBB8D6FF24B04A71D0F92E7BA8A30CB",
+    "Engine/SceneRuntime/SimulationTick.h": "4CBC22DB0C5152EDDBC70D2875646B0FFC1ADE5E3CE39DDA2B8E374FCDB16DA5",
+    "Engine/SceneRuntime/SceneManager.h": "5122CB237B5DFF5B524AAE3771550E13FA9E1D89A9C5AC9A989D71992667C247",
+    "Engine/SceneRuntime/SceneManager.cpp": "952AF1598961756DB73332EA0919203B45DE61D0BB57DEAF62D39FCEC8B67D9E",
+    "Engine/SceneRuntime/ClrHost.cpp": "B60A0D9BD258B144909B511E4764BC7787C5C0D4BC55A2C66177E1515E677D38",
+    "Engine/SceneRuntime/SceneRuntime.vcxproj": "47A08603BEE5B730FAF87313D1D9B73BCF7B5B8B4043B96EEEC820B4A9389EF9",
+    "Engine/Utility_Framework/ScriptApiVersion.h": "477067D2A78A800A8883C580749950EAE1B6146449AA435B11EA844010606624",
+    "ScriptCore/Simulation.cs": "4F8912EF0CFB3BE76473C75D8FB7F8B8C6E2513F5AB1A1D3CFBB2E10D65544DD",
+    "ScriptCore/Native.cs": "22776C84FE2F36C2A663B3E4B3E0B1BC58509B09FD839C62FDBEC2FA08C187CC",
+    "GameScripts/SimulationExchangeContractProbe.cs": "4FB0AA06CDAAAED607D40D7AFB67F860CC583A149412FAAD09070C4F8D062098",
+    "Tools/regression/SimulationExchangeProbe.cpp": "0EB9513B91BAC90C98AD258D9F4CA0B2F066514392067BB15E615823B9310AFF",
+    "Tools/regression/FixedUpdateProbe/Program.cs": "A958704440FC27E449F21D93096673A8F50BAE49AB9A6D9C9BD1CC0185D66DCE",
+    "Tools/regression/PhysicsBodyIdentityProbe/Program.cs": "65B2EF70690C1EE99D8CD6AD2DF8660C0F363E4FC357D8687ED4EBEE4AF894C0",
+    "Tools/regression/asset_depot_managed_kind_fixture.cs": "926D001CCFEA0C4D9489137477107FED4EC886FB147A6318539590E134429A89",
+    "Tools/regression/verify-simulation-exchange.ps1": "D6D2A37D0AD4FED9CC96E26F08B8130B03991AC0179ACCE887EDB53A54E3A3B3",
+    "Tools/regression/verify-simulation-exchange-http.ps1": "F3FB915DDD02B2F1305BEBF5561F1910C7C9A4C1BEC7B02CC591A9C9D5A8F945",
+    "Tools/regression/verify-simulation-exchange-player.ps1": "8D37B3A0C5B4ADA88E9316F1C893CEB7DB64C79F9D2BB5BC2F85037DCB60F4CE"
+  },
+  "editor": "Build/Verification/N3Exchange/Editor-19198f83af4b4bb9a778317081c0acfe/result.json",
+  "editorHostSha256": "94EC867AB9069C3BB30D08DA8AA3D1D9A99CACC745C5FF63B269DC5E4B86ED83",
+  "scriptCoreSha256": "90203F9F7DA934FFF29A3786FBDF9150483755ABD940EE5075950736328F72E2",
+  "player": "Build/Verification/N3Exchange/Player-0c81627d8cba4d08a92f17bd00a2e4fb/result.json",
+  "playerHostSha256": "C8E93AEF51CDBA2DD80F7ACF683BCE8F2EC7CBB274E762FA2D00028A6E81B4D8",
+  "playerSmoke": {
+    "schemaVersion": 1,
+    "ready": true,
+    "registeredScriptTypes": 1,
+    "frames": 2000,
+    "displayPromotions": 1946,
+    "submittedGameFrames": 4218,
+    "submittedGameFrameId": 1997
+  },
+  "packageImmutable": true,
+  "sdk": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\N3Exchange\\Engine-30c73506f845410f911bc986fe105048\\local-0.0.0.0-win-x64-Release-b028ef02-2908-4519-b210-c774d52c1dd0",
+  "sdkScriptCoreMatchesEditor": true,
+  "tests": {
+    "contracts": "Build/Verification/N3Exchange/Contracts-aa052ee8df2048829ac83ea510001092/result.json",
+    "nativeChecks": 2831,
+    "managedChecks": 23,
+    "contactChecks": 76,
+    "physicsIdentity": "Build/n3-body-identity.log",
+    "fixedUpdateEditor": "Build/Verification/CSharpFixedUpdate/Editor-5ba467c381bb401ea0c10f896f6b2960/result.json",
+    "contactEditor": "Build/Verification/ContactStream/Product-c06497c5417f4125bed86d5ac9dd67db/result.json",
+    "cct": "Build/Obj/Phase19C0/http-821dd6d1816d481a8c555a80a3c3d83a/result.json",
+    "ddol": "Build/n3-ddol.log",
+    "builds": [
+      "Build/n3-managed-final.log",
+      "Build/n3-editor-accepted.log",
+      "Build/n3-player-accepted.log",
+      "Build/n3-cooker-accepted.log",
+      "Build/n3-packer-accepted.log"
+    ],
+    "sdkPublication": "Build/n3-sdk.log"
+  },
+  "contract": "docs/design/SimulationTickExchangeContract.md",
+  "limits": [
+    "Native adapter failure paths use the production exchange in a standalone native harness; no actual network transport is implemented",
+    "Default schema 1 samples one local target; N5 full world snapshot remains separate",
+    "Synthetic frame cadence is not actual render FPS CCT/interpolation quality acceptance",
+    "N2/N4/N5/N9 and actual dedicated target/2-client/drain, representative performance and other configurations remain unaccepted"
+  ],
+  "documentationChecks": {
+    "inlineScripts": {
+      "failures": 0,
+      "scripts": 342,
+      "pages": 662
+    },
+    "powerShellSyntax": "passed",
+    "planVisuals": "NetworkFrameworkPlan, ScriptSurfacePlan, MasterPlanAudit20261020 passed",
+    "sourceReceipts": 17,
+    "scopedDiff": "passed",
+    "localLinks": 24
+  }
+}

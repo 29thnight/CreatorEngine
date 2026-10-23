@@ -40,7 +40,7 @@ namespace
         case Type::TerrainTexture: return EditorIcon::Terrain;
         case Type::Shader: return EditorIcon::Shader;
         case Type::CppScript:
-        case Type::CSharpScript: return EditorIcon::Script;
+        case Type::FSharpScript: return EditorIcon::Script;
         case Type::Prefab: return EditorIcon::Prefab;
         case Type::Sound: return EditorIcon::Audio;
         case Type::HDR: return EditorIcon::HDR;
@@ -268,7 +268,7 @@ void EditorAssetPresentation::LoadPresentationResources()
 		{ ".slang", FileType::Shader },
 		{ ".shadermeta", FileType::Shader }, { ".shader", FileType::Shader },
 		{ ".cpp", FileType::CppScript }, { ".h", FileType::CppScript },
-		{ ".cs", FileType::CSharpScript }, { ".wav", FileType::Sound },
+		{ ".fs", FileType::FSharpScript }, { ".wav", FileType::Sound },
 		{ ".mp3", FileType::Sound }, { ".flac", FileType::Sound },
         { ".soundgraph", FileType::Sound }, { ".soundpreset", FileType::Sound },
         { ".terrain", FileType::TerrainTexture },

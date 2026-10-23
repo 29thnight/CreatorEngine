@@ -1,5 +1,9 @@
 # Editor 명령 / Commandlet 경계
 
+> 2026-10-23 소비자 후속 이주: 기존 래칫 위반7파일을 구조화된 명령·런타임 결과로 연결했다. 상한0을 바꾸지 않고 실제 위반0을 확인했다. [소비자 수용과 미수용 범위](../analysis/CliConsumerMigrationAcceptance20261023.md), [결과 계약](../design/RuntimeResultConsumerContract.md)을 따른다.
+
+> 2026-10-23 후속 수용: Keep-Alive 연결의 종료 순서·WSAPoll 취소와 PowerShell5 종료 코드 누락을 수정했다. Release Editor/Player의 PS5/7 반복 종료와 전체 F# 저작 gate를 통과했다. [종료 수정 근거](../analysis/PowerShell5EditorShutdownAcceptance20261023.md)는 현재 로컬 작업본 기준이며 아래 고정 master의 기록과 구분한다.
+
 > 2026-10-20 정리 · master `27de3f5a02aadde7456aab680db3184c36ee735e` · 잔여 구현·수용 계획
 
 판정 기준은 위 master의 커밋된 소스다. 작업 중인 로컬 코드 변경은 포함하지 않는다. 완료된 구현 단계·날짜별 실행 일지는 제거했다. 대시보드는 SRP 저작 전환 취소에 해당하는 항목만 제거하고, 나머지 상태·공수·링크를 보존한다.
@@ -8,8 +12,12 @@
 
 ## 남은 작업과 완료 판정
 
+2026-10-23 master 통합 재점검: `a985ee7e1`의 상류 변경과 기존 작업을 통합한 실행·호출자 수정은 [동기화 수용 기록](../analysis/MasterSyncRecheck20261023.md)을 따른다. 이전 실행 기록의 지문은 보존하고 이번 통합 작업본의 제품 검증과 구분한다.
+
 - LC9의 GUI 수동 Undo/Redo 경로를 기존 Phase14_5ManualGuiChecklist의 미확인 항목까지 확인한다. HTTP/Commandlet·공통 편집 API와 Shipping 격리는 이미 구현된 기반이다.
-- LC5 drain·LC8 Player 서비스 검증기의 과거 잘못된 가정을 현재 계약에 맞게 검증한다. 검증기 수정과 제품 오류를 구분하고 전체 회귀 통과로 확대하지 않는다.
+- LC5의 나머지 큐 drain·LC8 Player 전체 서비스 검증기의 과거 가정을 현재 계약에 맞게 검증한다. 아래 연결 회수의 수용을 전체 서비스 회귀 통과로 확대하지 않는다.
+- LC4/LC5/LC8의 연결 회수는 후속 종료 수용으로 닫았다. 수락 스레드 종료→연결 중단→작업자 join→endpoint 제거를 유지하며, 연결 수신 대기는 기존 제한 시간 안에서 종료 신호를 확인한다.
+- LC9 소비자 래칫7파일은 구조화된 결과로 이주했고 상한0/위반0이다. 두 셸의 판독·거부 회귀, Release Editor와 Player 재로드/종료·오디오 소비자는 [소비자 수용 기록](../analysis/CliConsumerMigrationAcceptance20261023.md)을 따른다. 애니메이션은 쿠커/fixture/파일 lease 종료를 수정하고 새 SDK 패키지의 PS5/7 실제 Walk 진행·정상 종료·런타임 디렉터리 회수를 수용했다. [애니메이션 후속 기록](../analysis/AnimationCookAcceptance20261023.md)에 근거를 남긴다. 실제 Inspector 입력이 필요한 종료/soak·일반 GUI·전체 서비스/Shipping 수용은 별도 잔여다.
 
 ## 적용할 구조와 경계
 

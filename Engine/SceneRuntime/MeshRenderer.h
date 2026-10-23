@@ -51,14 +51,14 @@ public:
    void SetSkinnedMesh(bool isSkinned)
    {
 	   m_isSkinnedMesh = isSkinned;
-	   PublishRenderProxyDirty(ProxyDirty::Payload);
+	   PublishRenderPropertyWrite(ProxyDirty::Payload);
    }
    bool IsSkinnedMesh() const { return m_isSkinnedMesh; }
 
 	void SetMaterial(own::shared_owner<Material> material)
 	{
 		m_Material = std::move(material);
-		PublishRenderProxyDirty(ProxyDirty::Material);
+		PublishRenderPropertyWrite(ProxyDirty::Material);
 	}
 
     // A reference owns the accepted base used to identify instance edits. Keep
@@ -79,7 +79,7 @@ public:
 	void SetLODEnabled(bool enabled)
 	{
 		m_isEnableLOD = enabled;
-		PublishRenderProxyDirty(ProxyDirty::LOD);
+		PublishRenderPropertyWrite(ProxyDirty::LOD);
 	}
 
     [[nodiscard]] math::aabb GetBoundingBox() const;

@@ -27,7 +27,7 @@ public sealed partial class PhysicsContactStreamProbe : Component
     private static readonly List<ContactStream> RetiredStreams = new();
     private static int Started, Frames;
 
-    public override void OnBeginSimulation()
+    public void OnBeginSimulation()
     {
         ++Started;
         if (_removeBodyOnly)
@@ -65,7 +65,7 @@ public sealed partial class PhysicsContactStreamProbe : Component
         }
     }
 
-    public override void PostPhysics(float dt)
+    public void PostPhysics(float dt)
     {
         ++Frames;
         if (_finished) return;

@@ -1,5 +1,7 @@
 # 데디케이티드 서버 작업자 인계 설계
 
+> 2026-10-23 동기화 후 적용 기준: 이 문서의 본문은 2026-10-21 설계 제안을 보존한다. 최신 구현·인계 상태는 [NetworkFrameworkPlan](../plans/NetworkFrameworkPlan.md)과 [최종 인계 점검](../analysis/NetworkWorkerHandoff20261023.md)을 우선한다. 현재 고정 틱은 F# 일반 멤버 `OnTickSimulate(dt)`/Script API45이며 ND-a·ND-b·N1·N3의 사내 수용은 완료했다. 아래의 "누산기/observer 없음"과 C# 전용 저작 전제는 현행 코드에 적용하지 않는다. 렌더 없는 SceneRuntime 링크·구동과 실제 Dedicated Server 제품 수용은 여전히 별도다.
+
 작성: 2026-10-21. 상태: 인터페이스 설계안. 아래 API 이름은 신규 제안이다.
 정본 계획: [NetworkFrameworkPlan](../plans/NetworkFrameworkPlan.md) §6.
 이 문서는 해당 계획의 ND-a / N3-b / ND-b와 N9를 담당자에게 넘길 구체 계약으로 풀어 쓴다.

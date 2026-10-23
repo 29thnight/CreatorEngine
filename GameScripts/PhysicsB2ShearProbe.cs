@@ -5,7 +5,7 @@ public sealed partial class PhysicsB2ShearProbe : Component
     private float _elapsed;
     private bool _requested;
 
-    public override void PostPhysics(float delta)
+    public void PostPhysics(float delta)
     {
         if (_requested || Environment.GetEnvironmentVariable("CE_PHYSICS_B2_SHEAR") != "1") return;
 

@@ -123,6 +123,12 @@ void Entity::FinalizeManagedDestroy()
     {
         return;
     }
+    if (m_observationLocation.IsValid())
+    {
+        const auto before=m_observationLocation; m_observationLocation={};
+        SceneManagers->Observations().Publish(Runtime::SceneEntityEvent{
+            GetInstanceID(), {before.sceneId,before.index,before.generation}, {}, Runtime::EntityChange::Destroyed});
+    }
     gc::advance_lifecycle(self, gc::lifecycle_state::destroy_requested);
     gc::advance_lifecycle(self, gc::lifecycle_state::destroying);
     for (const auto& component : m_components)

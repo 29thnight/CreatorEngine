@@ -44,9 +44,22 @@ staging/package/distribution 복사본과 `Build/ValidationArchive/RuntimeDistri
 상시 회귀 검사는 재사용할 계약이 있을 때만 이 디렉터리에 두고, 일회성 실행은 임시 폴더를 쓴다.
 현재 Commandlet은 개별 검사 또는 `Invoke-Dx12Suite.ps1`의 런타임 discovery가 소비하므로 유지한다.
 
+## ND-a 네트워크 인계 등록 회귀 (2026-10-22)
+
+`pwsh Tools/regression/run-all.ps1 -Suite NetworkHandoff -Configuration All`은
+새로 등록한 네트워크 인계 세트 전부를 실행한다. 아래에서 폐지한 무범위 전역
+세트와 구분하며 `-Suite`를 반드시 지정한다. ND-a 금지 타입/동결 검사·native
+Debug/Release 계약 소비자·변이, N3 명령/snapshot, physics ABI/identity,
+lifecycle enum이 필수다. 누락된 ND-a 등록이나 gate 실패는 성공으로 처리하지 않는다.
+`-Product -EditorExe <명시한 실행 파일> -CookedStage <새 cooked 패키지>`는 N3·W4/ND-b 실제 Editor와 N1 Player/PBR 소비자 수용을 추가한다. 새 Release Editor와 현재 runtime hash가 같은 cooked 패키지가 필요하다.
+
+`verify-net-wire-boundary.ps1 -Configuration All -BaseRef HEAD`를 단독 실행할 수도
+있다. 계약 정본과 변경 절차는 `docs/design/NetworkContractChangePolicy.md`다.
+`.github/workflows/network-contracts.yml`도 같은 등록 세트를 호출한다. 그 결과는
+모든 GPU/장치/soak 회귀나 N2/N4 생산 구현의 완료를 뜻하지 않는다.
 ## 실행 정책 — 전체 세트는 없다 (2026-09-16 폐지)
 
-`run-all.ps1` 은 폐지했다. 전체 세트를 한 번에 돌리지 않는다. 폐지한 이유:
+기존 무범위 `run-all.ps1`은 폐지했다. 위 NetworkHandoff 등록 세트와 구분하며, 엔진 전체 검사를 한 번에 돌리지 않는다. 폐지한 이유:
 
 - 초록인 기준선이 한 번도 없었다. 선행 실패가 늘 섞여 있어서, 세트 결과로는 내 변경이
   무엇을 깼는지 가를 수 없었다.
@@ -279,3 +292,45 @@ scene만 빨개지고 prefab은 통과했고, 그래서 prefab 쪽 분기가 추
 게임 스레드에서 `DirectX::CaptureTexture`가 죽어(0x0000087A) 보류했다 —
 렌더 루프의 안전 지점에서 실행해야 한다. 그때까지 UI 렌더 좌표는 숫자
 대조와 수식 동등성으로만 검증된다.
+
+## W4 / ND-b 로컬 관찰 회귀
+
+`verify-scene-observation.ps1 -Configuration All`은 실제 SceneObservation 헤더의 Debug/Release 35검사를 실행한다. `verify-scene-gc.ps1 -Configuration Release -Iterations 2`는 Editor의 typed 편집/enum/container/nested·잠금 거부·no-op·Undo/Redo·stale Undo·render dirty publication, native/Transform/비렌더 일반 쓰기와 실제 entity/DDOL/분리 실패 정리를 검사한다. `SCENE_OBSERVATION_PRODUCT_OK`가 없으면 실패한다.
+
+NetworkHandoff 등록 suite는 ND-a 다음 W4-ND-b를 필수 실행하며 Product 옵션은 N3와 W4/ND-b 실제 Editor 및 N1 Player/PBR gate를 모두 실행한다. 제품 gate용 Editor는 먼저 새로 빌드해야 한다. 렌더 queue CPU 회귀 `verify-render-proxy-commit.py`는 별도이며 GPU/렌더 소비 값 수용을 뜻하지 않는다. 계약은 [SceneObservationContract](../../docs/design/SceneObservationContract.md)를 따른다.
+
+## N1 Archive·Parser 경계 회귀
+
+`verify-archive-parser-boundary.ps1 -Configuration All`은 production codec·진단 writer Debug/Release 각 226검사, 독립 JSON 자료형 검사, runtime/중립/Network 역할별 전이 include 게이트와 격리 변이 35건을 실행한다. 의존 경로는 기본 vcpkg 설치 또는 `CREATOR_N1_DEPENDENCIES`로 명시한다. 없으면 실패한다.
+
+NetworkHandoff는 N1을 필수 등록한다. Product 사용 시 `-CookedStage`도 필수이며 `verify-archive-parser-product.ps1`은 실제 새 cooked Player parser 호출 0·backend 직접 참조 0·패키지 불변을 확인한다. `verify-n1-diagnostic-product.ps1`은 실제 Editor PBR manifest/첨부/자료형·유한값·GPU validation을 검사한다. 선택 `-MotionFixture`는 별도 temporal fixture 진단이며 기본 수용에 포함하지 않는다. [경계 정본](../../docs/design/ArchiveParserBoundaryContract.md).
+
+## N3 실제 FPS·CCT·렌더 보간 회귀
+
+`verify-n3-pacing-product.ps1 -Configuration Release`는 세션 한정 Play pacing으로 실제 30/60/144fps를 제어한다. 목표값과 실측 ±5%를 대조하고 production clock·F# OnTickSimulate·SDK step·같은 tick의 CCT/강체 궤적·0틱/다중틱·자식·부착 카메라 보간 행렬, AI frustum 보존과 실제 GPU 실루엣을 검사한다. 새 Editor 및 managed probe 빌드가 필요하다. 격리 640×480 창의 작은 장면이며 큰 장면의 성능 수용으로 확대하지 않는다.
+
+`-Rates 144 -MovingQuality`는 별도 readback 실행에서 0틱 프레임의 실제 GPU draw/픽셀을 sourceEngineFrame으로 연결한다. readback 비용을 정상 cadence에 합치지 않는다. `n3_pacing_oracle_tests.py --work <통과 기록>`은 실제 산출물의 격리 변이 15건을 검증한다.
+
+`verify-physics-character-motion.ps1 -Configuration All -RequireGpu`는 CCT previous/current·0틱·텔레포트·disable/enable·stop·stale/thread 경계를 기존 실제 SDK CCT 운동과 함께 Debug/Release/Shipping/ASan에서 검사한다. standalone probe는 production과 같은 assertion 정책의 격리 config 헤더를 생성한다.
+
+NetworkHandoff Product는 N3 cadence/moving GPU를 포함한 15그룹을 필수 실행한다. [N3 수용 계약](../../docs/design/SimulationPacingAcceptanceContract.md)을 따른다.
+
+`verify-n3-pacing-wiring.ps1`은 제품을 실행하는 검사가 아니라 격리 stub runner 검사다. 15개 필수 그룹 실행과 cadence/moving 두 제품 게이트의 exit37 실패 전파를 확인한다. CI에도 별도 배선하며 실제 GPU 제품 수용과 구분한다. primitive CCT Player fixture는 `-NoUnusedModel`로 미사용 모델 쿠킹을 제외할 수 있고 메시/geometry fixture에는 적용하지 않는다.
+
+
+## CLI 소비자 결과 계약
+
+`verify-cli-consumer-contract.ps1`은 기존 상한0을 유지한다. `verify-runtime-result-consumers.ps1`을 PowerShell5/7에서 각각 실행하며, PID·순번·자료형·누락/중복·실패/종료 순서 거부와 세 텍스처 receipt 소비자의 합성 자료 배선을 검사한다. 합성 자료는 실제 Inspector/GPU 실행을 뜻하지 않는다. `cli-consumer-contract.yml`은 이 세 검사를 필수 실행한다.
+
+`RuntimeResults.ps1`의 공통 판독기와 `RuntimeResults.h`의 JSONL 이벤트가 종료·저장·RHI drain을 연결한다. 기존 명령은 `CommandResults.ps1`의 JSON 계약을 사용한다. [계약](../../docs/design/RuntimeResultConsumerContract.md)과 [실제 수용/미수용](../../docs/analysis/CliConsumerMigrationAcceptance20261023.md)을 따른다.
+
+`build-cli-consumer-fixtures.ps1 -EngineDistribution <SDK> -FormatFixtures <mono-media-folder>`는 프로젝트별 F# Job/Audio 패키지를 만든다. 미디어 폴더에는 mono `sine.wav`, `silent.mp3`, `silent.flac`이 필요하며 파일명과 무관하게 유효한 해당 형식이어야 한다. 출력 `stages.json`을 다음 기존 호출자의 입력으로 사용한다.
+
+```powershell
+pwsh -File Tools/regression/verify-player-job-lifecycle.ps1 -CookedFixture <Jobs-stage> -Work <new-work>
+powershell -File Tools/regression/verify-player-job-lifecycle.ps1 -CookedFixture <Jobs-stage> -Work <new-work>
+pwsh -File Tools/regression/verify-audio-player-exits.ps1 -PackageDirectory <Audio-stage> -Cycles 1
+powershell -File Tools/regression/verify-audio-player-exits.ps1 -PackageDirectory <Audio-stage> -Cycles 1
+```
+
+오디오의 `-Cycles`는 프로세스 반복 수다. 한 프로세스 안의 실제 재생/완료100회와 구분하며 기본값100은 유지한다. 애니메이션 소비자는 기존 `-CookedStage`, 텍스처 소비자 셋은 기존 launch/command/exit receipt 인자를 유지한다. 새 텍스처 실행은 갱신된 `start-texture-auto-ui.ps1`로 시작해야 런타임 결과 파일이 함께 남는다. 예전 stdout만 있는 기록은 새 결과를 대체하지 못한다.

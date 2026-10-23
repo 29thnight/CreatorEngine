@@ -1,14 +1,15 @@
 using CreatorEngine;
 using System.Runtime.InteropServices;
 
+ContactProbeHost.Bind();
 int checks = 0;
 void Check(bool test, string name) { ++checks; if (!test) throw new Exception(name); }
 void Reject(Action action, string name) { bool failed = false; try { action(); } catch { failed = true; } Check(failed, name); }
 var source = new ObjectHandle(1, 1);
 var target = new ObjectHandle(2, 1);
-var component = new Component();
-ContactRouter.BindRole(source, 11, 1, ShapeRoles.Attack, component.Scope);
-ContactRouter.BindRole(target, 22, 2, ShapeRoles.Hurt, component.Scope);
+var component = new ProbeComponent();
+ContactRouter.BindRole(source, 11, 1, ShapeRoles.Attack, component.Lifetime);
+ContactRouter.BindRole(target, 22, 2, ShapeRoles.Hurt, component.Lifetime);
 var stream = ContactRouter.Observe(component, source, ShapeRoles.Attack, ShapeRoles.Hurt, ContactPhases.All, 4);
 var reverse = ContactRouter.Observe(component, target, ShapeRoles.Hurt, ShapeRoles.Attack, ContactPhases.Begin, 4);
 var unrelated = ContactRouter.Observe(component, new(3, 1), ShapeRoles.Attack, ShapeRoles.Hurt, ContactPhases.All, 4);
@@ -45,14 +46,15 @@ for(int i=0;i<10;i++){ContactRouter.Route(value); ContactRouter.EndFrame();}
 long before=GC.GetAllocatedBytesForCurrentThread();
 for(int i=0;i<10000;i++){ContactRouter.Route(value); var contacts=stream.Read(); if(contacts.Length!=1) throw new Exception("lost contact"); ContactRouter.EndFrame();}
 long bytes=GC.GetAllocatedBytesForCurrentThread()-before;
+if (bytes != 0) Console.WriteLine($"CONTACT_ROUTE_ALLOCATION bytes={bytes} iterations=10000");
 Check(bytes==0,"steady routing/read/clear allocation zero");
-component.Scope.Cancel();
+component.Lifetime.End();
 Reject(()=>{stream.Read();},"scope disposes stream");
 ContactRouter.Route(value);
 ContactRouter.EndFrame();
 Reject(()=>ContactRouter.Observe(component,source,default,ShapeRoles.Hurt,ContactPhases.All,4),"invalid role");
 Check(Marshal.OffsetOf<NativeContact>(nameof(NativeContact.Tick)).ToInt32()==96,"native tick offset");
-var authoredComponent = new Component();
+var authoredComponent = new ProbeComponent();
 var authoredStream = ContactRouter.Observe(authoredComponent, source, ShapeRoles.Attack, ShapeRoles.Hurt, ContactPhases.All, 4);
 value.First.Role = ShapeRoles.Attack.Id;
 value.Second.Role = ShapeRoles.Hurt.Id;
@@ -71,9 +73,9 @@ value.First.Role = ShapeRoles.Hurt.Id;
 ContactRouter.Route(value);
 Check(authoredStream.Read().IsEmpty, "changed stored role isolates previous subscription");
 ContactRouter.EndFrame();
-authoredComponent.Scope.Cancel();
+authoredComponent.Lifetime.End();
 Reject(() => { authoredStream.Read(); }, "stored role stream scope cleanup");
-var lateComponent = new Component();
+var lateComponent = new ProbeComponent();
 var late = ContactRouter.Observe(lateComponent, source, ShapeRoles.Attack, ShapeRoles.Hurt, ContactPhases.All, 4);
 var beginOnly = ContactRouter.Observe(lateComponent, source, ShapeRoles.Attack, ShapeRoles.Hurt, ContactPhases.Begin, 4);
 value.First.Role = ShapeRoles.Attack.Id;
@@ -106,8 +108,8 @@ value.First.BodySlot++;
 ContactRouter.Route(value);
 Check(beginOnly.Read().Length == 1, "sensor same generation different body slot isolation");
 ContactRouter.EndFrame();
-lateComponent.Scope.Cancel();
-var groupedComponent = new Component();
+lateComponent.Lifetime.End();
+var groupedComponent = new ProbeComponent();
 var grouped = ContactRouter.Observe(groupedComponent, source, ShapeRoles.Attack, ShapeRoles.Hurt,
     ContactPhases.All, 4, ContactGrouping.SensorTargets);
 value.Kind = 3;
@@ -178,14 +180,14 @@ Reject(() => { grouped.Read(); }, "grouped overflow rejects partial results");
 ContactRouter.EndFrame();
 Reject(() => ContactRouter.Observe(groupedComponent, source, ShapeRoles.Attack, ShapeRoles.Hurt,
     ContactPhases.All, 4, (ContactGrouping)99), "invalid grouping rejected");
-groupedComponent.Scope.Cancel();
+groupedComponent.Lifetime.End();
 Reject(() => { grouped.Read(); }, "grouped scope cleanup");
-var suspendedComponent = new Component();
+var suspendedComponent = new ProbeComponent();
 var suspended = ContactRouter.Observe(suspendedComponent, source, ShapeRoles.Attack, ShapeRoles.Hurt, ContactPhases.All, 4);
 var suspendedTargets = ContactRouter.Observe(suspendedComponent, source, ShapeRoles.Attack, ShapeRoles.Hurt,
     ContactPhases.All, 4, ContactGrouping.SensorTargets);
 var suspendedBegin = ContactRouter.Observe(suspendedComponent, source, ShapeRoles.Attack, ShapeRoles.Hurt, ContactPhases.Begin, 4);
-var independentComponent = new Component();
+var independentComponent = new ProbeComponent();
 var independent = ContactRouter.Observe(independentComponent, source, ShapeRoles.Attack, ShapeRoles.Hurt, ContactPhases.All, 4);
 value.Kind = 3;
 value.Second.Shape = 2;
@@ -229,14 +231,14 @@ Check(suspended.Read().IsEmpty, "same-frame reset leaves no touched replay");
 suspended.Dispose();
 suspendedComponent.Enabled = false;
 suspendedComponent.Enabled = true;
-suspendedComponent.Scope.Cancel();
+suspendedComponent.Lifetime.End();
 Reject(() => { suspendedTargets.Read(); }, "disable preserves Scope until actual cancellation");
-independentComponent.Scope.Cancel();
+independentComponent.Lifetime.End();
 ContactRouter.EndFrame();
 
 // DDOL scene boundaries preserve subscription/role ownership while retiring observations.
-var transferred = new Component();
-ContactRouter.BindRole(source, 11, 1, ShapeRoles.Attack, transferred.Scope);
+var transferred = new ProbeComponent();
+ContactRouter.BindRole(source, 11, 1, ShapeRoles.Attack, transferred.Lifetime);
 var acrossScene = ContactRouter.Observe(transferred, source, ShapeRoles.Attack, ShapeRoles.Hurt, ContactPhases.All, 1);
 var acrossTargets = ContactRouter.Observe(transferred, source, ShapeRoles.Attack, ShapeRoles.Hurt, ContactPhases.All, 1, ContactGrouping.SensorTargets);
 value.First.Owner = source; value.First.Component = 11; value.First.Shape = 1;
@@ -264,13 +266,13 @@ for (int epoch = 3; epoch < 100; ++epoch)
     ContactRouter.EndFrame();
 }
 Check(!acrossScene.Overflowed && !acrossTargets.Overflowed, "repeated scene boundaries reuse bounded capacity");
-transferred.Scope.Cancel();
+transferred.Lifetime.End();
 Reject(() => { acrossScene.Read(); }, "final destruction disposes retained DDOL stream");
 Reject(() => { acrossTargets.Read(); }, "final destruction disposes retained target stream");
 ContactRouter.EndFrame();
 
 // Solid manifolds retain shape-pair identity even in a sensor-target subscription.
-var solidComponent = new Component();
+var solidComponent = new ProbeComponent();
 var solidPairs = ContactRouter.Observe(solidComponent, source, ShapeRoles.Attack, ShapeRoles.Hurt, ContactPhases.All, 8);
 var mixedTargets = ContactRouter.Observe(solidComponent, source, ShapeRoles.Attack, ShapeRoles.Hurt,
     ContactPhases.All, 8, ContactGrouping.SensorTargets);
@@ -325,7 +327,29 @@ Check(mixedTargets.Read().Length == 1 && mixedTargets.Read()[0].SelfShapeId == 2
     "last solid separation preserves final shape identity");
 ContactRouter.EndFrame();
 Check(mixedTargets.Read().IsEmpty, "solid no-step frame does not replay contacts");
-solidComponent.Scope.Cancel();
+solidComponent.Lifetime.End();
 Reject(() => { mixedTargets.Read(); }, "solid stream disposed by Scope");
 
+// A zero-step frame must clear presentation events without consuming the next update's results.
+var tickOwner = new ProbeComponent();
+var tickStream = ContactRouter.Observe(tickOwner, source, ShapeRoles.Attack, ShapeRoles.Hurt, ContactPhases.All, 4);
+value.First.Role = ShapeRoles.Attack.Id; value.Second.Role = ShapeRoles.Hurt.Id;
+value.First.Owner = source; value.Second.Owner = target; value.Kind = 0; ++value.Tick;
+ContactRouter.Route(value);
+ContactRouter.EndFrame();
+Check(tickStream.Read().IsEmpty, "presentation does not replay on zero-step frame");
+ContactProbeHost.FixedTick(() =>
+    Check(tickStream.Read().Length == 1, "next fixed update retains previous tick across frame clear"));
+ContactProbeHost.FixedTick(() =>
+    Check(tickStream.Read().IsEmpty, "previous tick consumed once by OnTickSimulate"));
+value.Kind = 1;
+++value.Tick;
+ContactRouter.Route(value);
+ContactProbeHost.FixedTick(() =>
+    Check(tickStream.Read().Length == 1 && tickStream.Read()[0].Tick == value.Tick,
+        "catchup next update reads exactly preceding tick"));
+Check(tickStream.Read().Length == 1, "fixed consumption preserves current presentation buffer");
+
+tickOwner.Lifetime.End();
+Reject(() => { tickStream.Read(); }, "internal lifetime retires both buffers");
 Console.WriteLine($"CONTACT_STREAM_OK checks={checks} steadyAllocatedBytes={bytes}");

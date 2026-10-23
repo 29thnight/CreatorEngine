@@ -1,0 +1,556 @@
+{
+  "date": "2026-10-23",
+  "result": "POWERSHELL_5_AND_7_COMMAND_SERVICE_SHUTDOWN_ACCEPTED",
+  "scriptApi": 45,
+  "causes": [
+    "AcceptLoop joined workers before Stop could interrupt their sockets",
+    "WSAPoll did not wake promptly on socket shutdown; Receive needed bounded cancellation checks",
+    "Uncached redirected Start-Process in PowerShell 5 returned null ExitCode for exited native children"
+  ],
+  "reproduction": {
+    "stacks": "Build/Verification/PowerShell5Shutdown/stacks.txt",
+    "oldEditorShutdown": "Build/Verification/FSharp/Editor-8cb02c794f3f4e44888443da5da366f7/shutdown.json",
+    "clientAudit": {
+      "oldPowerShell5": {
+        "requests": 285,
+        "distinctPeerPorts": 1
+      },
+      "oldPowerShell7": {
+        "requests": 295,
+        "distinctPeerPorts": 295
+      }
+    }
+  },
+  "contracts": {
+    "Release": {
+      "path": "Build/Verification/CommandServiceShutdown/Contracts-a9d4d35190084ef28a070502f69082cc/result.json",
+      "result": {
+        "result": "COMMAND_SERVICE_SHUTDOWN_OK",
+        "cases": [
+          {
+            "elapsedMs": 108.704,
+            "name": "keep-alive"
+          },
+          {
+            "elapsedMs": 108.932,
+            "name": "no-request"
+          },
+          {
+            "elapsedMs": 108.657,
+            "name": "partial-request"
+          },
+          {
+            "elapsedMs": 139.417,
+            "name": "slow-request"
+          },
+          {
+            "elapsedMs": 92.616,
+            "name": "closed-worker"
+          },
+          {
+            "elapsedMs": 93.004,
+            "name": "bad-request"
+          },
+          {
+            "elapsedMs": 93.291,
+            "name": "gateway-exception"
+          },
+          {
+            "elapsedMs": 109.704,
+            "name": "blocked-send"
+          },
+          {
+            "elapsedMs": 93.525,
+            "name": "pending-stream"
+          },
+          {
+            "elapsedMs": 109.144,
+            "name": "restart"
+          },
+          {
+            "elapsedMs": 109.282,
+            "name": "restart"
+          },
+          {
+            "elapsedMs": 107.898,
+            "name": "restart"
+          },
+          {
+            "elapsedMs": 109.831,
+            "name": "restart"
+          },
+          {
+            "elapsedMs": 93.836,
+            "name": "restart"
+          },
+          {
+            "elapsedMs": 107.323,
+            "name": "restart"
+          },
+          {
+            "elapsedMs": 92.646,
+            "name": "restart"
+          },
+          {
+            "elapsedMs": 109.437,
+            "name": "restart"
+          }
+        ],
+        "canary": {
+          "result": "PRE_FIX_KEEPALIVE_SHUTDOWN_REJECTED",
+          "exitCode": 2,
+          "log": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\CommandServiceShutdown\\Contracts-a9d4d35190084ef28a070502f69082cc\\baseline\\binary/run.log"
+        },
+        "scope": "Real Winsock/HTTP CommandService with a controlled gateway; Editor/Player acceptance is separate",
+        "sourceHashes": {
+          "Engine/CommandService/SocketPlatform_Win32.cpp": "34690E8F7188F493DA44B5A6A441391A292701C2A67D818FA661859D011435DF",
+          "Tools/regression/CommandServiceShutdownProbe.cpp": "D722C9BD9191C5E9CBFBC6D9F3536B43B8B723035711FDBF046CD1AB698DD011",
+          "Engine/CommandService/CommandService.cpp": "0190C576798CB057A06F299D6D4088D4EEA4C773639EE2804E9567FCD9C648FD",
+          "Engine/CommandService/CommandService.h": "96A1453F081229348570F55EC2D41460AC49D89C5205C6C6334922D637956042",
+          "Engine/CommandService/SocketPlatform.h": "91B577833ADEE0CEE4FFF2CA6F01DE101802EB369405344BA87CC3BD488C9DEA"
+        },
+        "configuration": "Release"
+      }
+    },
+    "Debug": {
+      "path": "Build/Verification/CommandServiceShutdown/Contracts-899775ef16934f2b8d733bcfc4cf2d16/result.json",
+      "result": {
+        "sourceHashes": {
+          "Engine/CommandService/SocketPlatform.h": "91B577833ADEE0CEE4FFF2CA6F01DE101802EB369405344BA87CC3BD488C9DEA",
+          "Engine/CommandService/CommandService.cpp": "0190C576798CB057A06F299D6D4088D4EEA4C773639EE2804E9567FCD9C648FD",
+          "Tools/regression/CommandServiceShutdownProbe.cpp": "D722C9BD9191C5E9CBFBC6D9F3536B43B8B723035711FDBF046CD1AB698DD011",
+          "Engine/CommandService/SocketPlatform_Win32.cpp": "34690E8F7188F493DA44B5A6A441391A292701C2A67D818FA661859D011435DF",
+          "Engine/CommandService/CommandService.h": "96A1453F081229348570F55EC2D41460AC49D89C5205C6C6334922D637956042"
+        },
+        "scope": "Real Winsock/HTTP CommandService with a controlled gateway; Editor/Player acceptance is separate",
+        "canary": {
+          "result": "PRE_FIX_KEEPALIVE_SHUTDOWN_REJECTED",
+          "revision": "0847ceeb2ec99d1b4edbdfd9f7f8a94bd773f915",
+          "exitCode": 2,
+          "log": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\CommandServiceShutdown\\Contracts-899775ef16934f2b8d733bcfc4cf2d16\\baseline\\binary/run.log"
+        },
+        "configuration": "Debug",
+        "cases": [
+          {
+            "name": "keep-alive",
+            "elapsedMs": 110.268
+          },
+          {
+            "name": "no-request",
+            "elapsedMs": 107.221
+          },
+          {
+            "name": "partial-request",
+            "elapsedMs": 92.653
+          },
+          {
+            "name": "slow-request",
+            "elapsedMs": 140.581
+          },
+          {
+            "name": "closed-worker",
+            "elapsedMs": 92.878
+          },
+          {
+            "name": "bad-request",
+            "elapsedMs": 92.492
+          },
+          {
+            "name": "gateway-exception",
+            "elapsedMs": 92.897
+          },
+          {
+            "name": "blocked-send",
+            "elapsedMs": 108.86
+          },
+          {
+            "name": "pending-stream",
+            "elapsedMs": 93.72
+          },
+          {
+            "name": "restart",
+            "elapsedMs": 116.182
+          },
+          {
+            "name": "restart",
+            "elapsedMs": 94.598
+          },
+          {
+            "name": "restart",
+            "elapsedMs": 111.737
+          },
+          {
+            "name": "restart",
+            "elapsedMs": 94.68
+          },
+          {
+            "name": "restart",
+            "elapsedMs": 109.854
+          },
+          {
+            "name": "restart",
+            "elapsedMs": 109.141
+          },
+          {
+            "name": "restart",
+            "elapsedMs": 108.828
+          },
+          {
+            "name": "restart",
+            "elapsedMs": 111.026
+          }
+        ],
+        "probe": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\CommandServiceShutdown\\Contracts-899775ef16934f2b8d733bcfc4cf2d16\\current/probe.exe",
+        "result": "COMMAND_SERVICE_SHUTDOWN_OK"
+      }
+    }
+  },
+  "products": {
+    "Editor5": {
+      "path": "Build/Verification/CommandServiceShutdown/Editor-05c2bcc85a5e4e79b034de6e877db261/result.json",
+      "result": {
+        "packageImmutable": false,
+        "shell": "5.1.26100.9711",
+        "runs": [
+          {
+            "endpointRemoved": true,
+            "partialClients": 1,
+            "idleClients": 1,
+            "run": 1,
+            "elapsedMs": 2303.2342000000003,
+            "keepAliveClients": 3,
+            "pid": 10496,
+            "nativeFinalization": true,
+            "exitCode": 0
+          },
+          {
+            "endpointRemoved": true,
+            "partialClients": 1,
+            "idleClients": 1,
+            "run": 2,
+            "elapsedMs": 2353.3666000000003,
+            "keepAliveClients": 3,
+            "pid": 368,
+            "nativeFinalization": true,
+            "exitCode": 0
+          }
+        ],
+        "result": "COMMAND_SERVICE_SHUTDOWN_PRODUCT_OK",
+        "role": "Editor",
+        "hostHash": "67D9AAF880806A2506746ECA8D778CAF297C0CF6C5AD9B9FA94462FC9EE2BB28"
+      }
+    },
+    "Editor7": {
+      "path": "Build/Verification/CommandServiceShutdown/Editor-77383e2783c24d8f95e73b6d3227cf0b/result.json",
+      "result": {
+        "result": "COMMAND_SERVICE_SHUTDOWN_PRODUCT_OK",
+        "shell": "7.6.5",
+        "packageImmutable": false,
+        "runs": [
+          {
+            "endpointRemoved": true,
+            "idleClients": 1,
+            "run": 1,
+            "exitCode": 0,
+            "keepAliveClients": 3,
+            "elapsedMs": 2229.0113,
+            "pid": 17000,
+            "nativeFinalization": true,
+            "partialClients": 1
+          },
+          {
+            "endpointRemoved": true,
+            "idleClients": 1,
+            "run": 2,
+            "exitCode": 0,
+            "keepAliveClients": 3,
+            "elapsedMs": 2306.7836,
+            "pid": 8152,
+            "nativeFinalization": true,
+            "partialClients": 1
+          }
+        ],
+        "role": "Editor",
+        "hostHash": "67D9AAF880806A2506746ECA8D778CAF297C0CF6C5AD9B9FA94462FC9EE2BB28"
+      }
+    },
+    "Player5": {
+      "path": "Build/Verification/CommandServiceShutdown/Player-41aed15c754243df978b4fc598be0e8e/result.json",
+      "result": {
+        "packageImmutable": true,
+        "shell": "5.1.26100.9711",
+        "runs": [
+          {
+            "endpointRemoved": true,
+            "partialClients": 1,
+            "idleClients": 1,
+            "run": 1,
+            "elapsedMs": 1725.1027000000001,
+            "keepAliveClients": 3,
+            "pid": 6808,
+            "nativeFinalization": true,
+            "exitCode": 0
+          },
+          {
+            "endpointRemoved": true,
+            "partialClients": 1,
+            "idleClients": 1,
+            "run": 2,
+            "elapsedMs": 1867.4206000000001,
+            "keepAliveClients": 3,
+            "pid": 21344,
+            "nativeFinalization": true,
+            "exitCode": 0
+          }
+        ],
+        "result": "COMMAND_SERVICE_SHUTDOWN_PRODUCT_OK",
+        "role": "Player",
+        "hostHash": "AF91ED18A03075E8DAA5D3D329D4FABFBA4C93BA047C7A7F41D1976D55999500"
+      }
+    },
+    "Player7": {
+      "path": "Build/Verification/CommandServiceShutdown/Player-8e221651270345a5aa14bb6105aa78a5/result.json",
+      "result": {
+        "packageImmutable": true,
+        "runs": [
+          {
+            "pid": 11712,
+            "nativeFinalization": true,
+            "exitCode": 0,
+            "keepAliveClients": 3,
+            "endpointRemoved": true,
+            "idleClients": 1,
+            "run": 1,
+            "elapsedMs": 1801.7376,
+            "partialClients": 1
+          },
+          {
+            "pid": 21352,
+            "nativeFinalization": true,
+            "exitCode": 0,
+            "keepAliveClients": 3,
+            "endpointRemoved": true,
+            "idleClients": 1,
+            "run": 2,
+            "elapsedMs": 1842.4495,
+            "partialClients": 1
+          }
+        ],
+        "role": "Player",
+        "result": "COMMAND_SERVICE_SHUTDOWN_PRODUCT_OK",
+        "shell": "7.6.5",
+        "hostHash": "AF91ED18A03075E8DAA5D3D329D4FABFBA4C93BA047C7A7F41D1976D55999500"
+      }
+    }
+  },
+  "authoring": {
+    "PowerShell5": {
+      "path": "Build/Verification/FSharp/Editor-d603cfb8109e4cc29b7f95f4179fd2ca/result.json",
+      "result": {
+        "failure": "previous code and instance retained",
+        "source": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\FSharp\\Editor-d603cfb8109e4cc29b7f95f4179fd2ca\\Project\\Assets/Script\\FSharpAuthoringGate.fs",
+        "ticks": 51,
+        "create": "hook-free F# component attached and played + explicit order",
+        "result": "FSHARP_EDITOR_AUTHORING_OK",
+        "reload": "field retained"
+      },
+      "shutdown": {
+        "exited": true,
+        "pid": 13692,
+        "shell": "5.1.26100.9711",
+        "exitCode": 0,
+        "elapsedMs": 423.2475
+      }
+    },
+    "PowerShell7": {
+      "path": "Build/Verification/FSharp/Editor-e8b281525eec4130bba5b036eecd4e6a/result.json",
+      "result": {
+        "reload": "field retained",
+        "ticks": 50,
+        "result": "FSHARP_EDITOR_AUTHORING_OK",
+        "source": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\FSharp\\Editor-e8b281525eec4130bba5b036eecd4e6a\\Project\\Assets/Script\\FSharpAuthoringGate.fs",
+        "failure": "previous code and instance retained",
+        "create": "hook-free F# component attached and played + explicit order"
+      },
+      "shutdown": {
+        "shell": "7.6.5",
+        "exitCode": 0,
+        "elapsedMs": 500.6278,
+        "pid": 5192,
+        "exited": true
+      }
+    }
+  },
+  "earlyShutdown": {
+    "Early5": {
+      "result": "SHUTDOWN_ORDER_OK",
+      "project": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\CommandServiceShutdown\\Editor-05c2bcc85a5e4e79b034de6e877db261\\Run-1\\Project",
+      "runs": [
+        {
+          "run": 1,
+          "pid": 23444,
+          "exitCode": 0
+        },
+        {
+          "run": 2,
+          "pid": 19492,
+          "exitCode": 0
+        },
+        {
+          "run": 3,
+          "pid": 6820,
+          "exitCode": 0
+        }
+      ],
+      "shell": "5.1.26100.9711",
+      "failures": []
+    },
+    "Early7": {
+      "shell": "7.6.5",
+      "failures": [],
+      "runs": [
+        {
+          "exitCode": 0,
+          "pid": 26364,
+          "run": 1
+        },
+        {
+          "exitCode": 0,
+          "pid": 22820,
+          "run": 2
+        },
+        {
+          "exitCode": 0,
+          "pid": 11840,
+          "run": 3
+        }
+      ],
+      "project": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Build\\Verification\\CommandServiceShutdown\\Editor-05c2bcc85a5e4e79b034de6e877db261\\Run-1\\Project",
+      "result": "SHUTDOWN_ORDER_OK"
+    }
+  },
+  "exitCodes": {
+    "Exit5Uncached": {
+      "handleCached": false,
+      "result": "UNCACHED_PROCESS_EXIT_CODE_OBSERVED",
+      "cases": [
+        {
+          "expected": 0,
+          "exited": true,
+          "actual": null
+        },
+        {
+          "expected": 23,
+          "exited": true,
+          "actual": null
+        }
+      ],
+      "shell": "5.1.26100.9711"
+    },
+    "Exit5Cached": {
+      "handleCached": true,
+      "result": "PROCESS_EXIT_CODE_OK",
+      "cases": [
+        {
+          "expected": 0,
+          "exited": true,
+          "actual": 0
+        },
+        {
+          "expected": 23,
+          "exited": true,
+          "actual": 23
+        }
+      ],
+      "shell": "5.1.26100.9711"
+    },
+    "Exit7Cached": {
+      "shell": "7.6.5",
+      "result": "PROCESS_EXIT_CODE_OK",
+      "cases": [
+        {
+          "actual": 0,
+          "expected": 0,
+          "exited": true
+        },
+        {
+          "actual": 23,
+          "expected": 23,
+          "exited": true
+        }
+      ],
+      "handleCached": true
+    }
+  },
+  "nativeMaximumStopMs": 140.581,
+  "productMaximumShutdownMs": 2353.3666000000003,
+  "productRuns": 8,
+  "otherGate": {
+    "result": "PRE_EXISTING_CLI_CONSUMER_RATCHET_FAILURE",
+    "count": 7,
+    "limit": 0,
+    "authOrder": "passed",
+    "log": "Build/powershell5-shutdown-cli-consumer.log",
+    "offenders": [
+      {
+        "path": "Tools/regression/verify-animation-player.ps1",
+        "sameAsHEAD": true,
+        "gitBlob": "bab8af8846b2412f9682e923526aed94b85cd305"
+      },
+      {
+        "path": "Tools/regression/verify-audio-player-exits.ps1",
+        "sameAsHEAD": true,
+        "gitBlob": "d848e6dc94fdd93a7964e6ca569c0de55fe68366"
+      },
+      {
+        "path": "Tools/regression/verify-content-browser-navigation.ps1",
+        "sameAsHEAD": true,
+        "gitBlob": "97d1ab91a5e5bf7d002796a23a07de8f82834fd3"
+      },
+      {
+        "path": "Tools/regression/verify-player-job-lifecycle.ps1",
+        "sameAsHEAD": true,
+        "gitBlob": "9a6b724a20417eee62e78e6b46651e7da3c663b8"
+      },
+      {
+        "path": "Tools/regression/verify-texture-auto-ui-shutdown.ps1",
+        "sameAsHEAD": true,
+        "gitBlob": "a4ccb91d3cac77c8bfbdc711771df5579ecefe7b"
+      },
+      {
+        "path": "Tools/regression/verify-texture-auto-ui-soak.ps1",
+        "sameAsHEAD": true,
+        "gitBlob": "586d6f0fe7d7d836213ee7fd556be3f1923a2a8f"
+      },
+      {
+        "path": "Tools/regression/verify-texture-pending-native-close.ps1",
+        "sameAsHEAD": true,
+        "gitBlob": "3fc085c9ba74bb7a7b274fc2e544a30685d3cfed"
+      }
+    ]
+  },
+  "sourceSha256": {
+    "Engine/CommandService/CommandService.cpp": "0190c576798cb057a06f299d6d4088d4eea4c773639ee2804e9567fcd9c648fd",
+    "Engine/CommandService/CommandService.h": "96a1453f081229348570f55ec2d41460ac49d89c5205c6c6334922d637956042",
+    "Engine/CommandService/SocketPlatform.h": "91b577833adee0cee4fff2ca6f01de101802eb369405344ba87cc3bd488c9dea",
+    "Engine/CommandService/SocketPlatform_Win32.cpp": "34690e8f7188f493da44b5a6a441391a292701c2a67d818fa661859d011435df",
+    "Tools/regression/CommandServiceShutdownProbe.cpp": "d722c9bd9191c5e9cbfbc6d9f3536b43b8b723035711fdbf046cd1ab698dd011",
+    "Tools/regression/verify-command-service-shutdown.ps1": "e4f1d5a4bcbcf58462810a070feaaaa4ee3d38366ff0f532846d69ca99c0b32d",
+    "Tools/regression/verify-command-service-shutdown-product.ps1": "cf855fa97daeb70f46c2f98bfa5d11a4cb92bfc8da9820e757dcca745cb21d4d",
+    "Tools/regression/verify-process-exit-code.ps1": "46a62ca09b7003bcf703f545f1cb263622e9819a7e4a518eda1cfd1daee8ec1c",
+    "Tools/regression/verify-fsharp-editor-authoring.ps1": "6a21886d9c0e59340d88840a811e11ff51b1bd95da59d7321314939f9b141d85",
+    "Tools/regression/verify-shutdown-order.ps1": "b1873cfc830f736b408ecbbbb6d42a8fe4fcd96f2de88345a9df1f725c3dfb1e",
+    ".github/workflows/command-service-shutdown.yml": "12f47338bddb3b00b96dc588bfaed0a5781f750c5ec5a6374a318aa63f33ebfb"
+  },
+  "binarySha256": {
+    "Bin/x64-Release/Editor/CreatorEditor.runtime.dll": "67d9aaf880806a2506746eca8d778caf297c0cf6c5ad9b9fa94462fc9ee2bb28",
+    "Bin/x64-Release/Player/Player.runtime.dll": "af91ed18a03075e8daa5d3d329d4fabfba4c93ba047c7a7f41d1976d55999500"
+  },
+  "remoteCI": "wired but not run",
+  "publication": "no commit or push",
+  "limitations": [
+    "Release Editor/Player on this Windows DX12 device; Debug service contracts are standalone",
+    "General CLI/GUI, Shipping, other devices/platforms, pacing and soak are separate acceptance",
+    "Existing LC9 consumer ratchet failure remains separate; threshold was not raised"
+  ]
+}

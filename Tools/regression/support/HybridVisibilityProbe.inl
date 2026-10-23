@@ -158,7 +158,7 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             textures.BeginFrame(context.frameId);
             meshes.BeginFrame(uint32_t(context.frameId));
             Check(host.PrepareResidency(context, input, error), "Hybrid residency " + error);
-            auto graph = std::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned,
+            auto graph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned,
                                                                RGOrderPolicy::DependencyOrder);
             if (workers)
             {
@@ -237,7 +237,7 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
             const auto occluderDepth = meteorOccluderDepth;
             const auto table = host.FrameGeometry();
             Check(bool(hybrid), "Hybrid prepared owner");
-            Check(occluder && occluder->depthOnly && occluderDepth.IsValid() && occluder->visible != hybrid->visible,
+            Check(occluder && occluder->depthOnly && occluderDepth.IsValid() && !material_graph_test::SamePinnedObject(occluder->visible, hybrid->visible),
                   "Occluder stage owns its first list and depth-only resolve");
             const bool historyFirstStage = host.CameraDepthMeshletWork()->UsesHistory();
             historyFrames += historyFirstStage;

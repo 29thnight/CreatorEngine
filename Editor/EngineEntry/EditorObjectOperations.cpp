@@ -763,20 +763,25 @@ namespace EditorObjectOperations
             Meta::EntityReference reference(object);
             const std::string componentId = edit.component;
             auto beforeOverrides = object->m_prefabOverrides;
-            const auto apply = [reference, componentId, fields, type](const Authoring::WriteDocument& source) {
+            const auto apply = [reference, componentId, fields, type](const Authoring::WriteDocument& source, Meta::PropertyChangeSource origin) {
                 if (auto* object = reference.Resolve())
                     if (auto* component = FindComponent(object, componentId))
                     {
                         auto current = Meta::SerializeDocument(component, *type);
                         for (const auto& field : fields) current.Root().Child(field).Assign(source.Root()[field.c_str()]);
+                        Meta::ScopedPropertyChangeSource sourceScope(origin);
+                        Meta::ScopedPropertyChangeFields changedFields(fields, Meta::MostDerived(component));
                         Meta::Deserialize(component, *type, current.Root().Read());
                     }
             };
-            if (IsEditLocked(object, true)) { apply(*before); continue; }
+            if (IsEditLocked(object, true)) { Meta::ScopedPropertyWriteSuppression rejected; apply(*before, Meta::PropertyChangeSource::Inspector); continue; }
+            auto firstApply = std::make_shared<bool>(true);
             actions.push_back({[=] {
-                apply(*before); if (auto* object = reference.Resolve()) object->m_prefabOverrides = beforeOverrides;
+                apply(*before, Meta::PropertyChangeSource::Undo); if (auto* object = reference.Resolve()) object->m_prefabOverrides = beforeOverrides;
             }, [=] {
-                apply(*after); if (auto* object = reference.Resolve())
+                apply(*after, *firstApply ? Meta::PropertyChangeSource::Inspector : Meta::PropertyChangeSource::Redo);
+                *firstApply = false;
+                if (auto* object = reference.Resolve())
                     if (auto* component = FindComponent(object, componentId))
                         for (const auto& field : fields) PrefabUtility::RecordPropertyOverride(*object, *component, field);
             }});
@@ -895,7 +900,7 @@ namespace EditorObjectOperations
                     if (Matches(item)) m_beforeOverride = item;
             }
 
-            void Undo() override { Apply(m_before, m_afterDocument, m_beforeOverride); }
+            void Undo() override { Apply(m_before, m_afterDocument, m_beforeOverride, Meta::PropertyChangeSource::Undo); }
             void Redo() override
             {
                 std::optional<PrefabOverride> override;
@@ -907,7 +912,8 @@ namespace EditorObjectOperations
                     override->m_propertyName = "m_shapes";
                     override->m_valueYaml = m_afterDocument.Root().Read().Dump();
                 }
-                Apply(m_after, m_beforeDocument, override);
+                Apply(m_after, m_beforeDocument, override, m_firstApply ? Meta::PropertyChangeSource::Inspector : Meta::PropertyChangeSource::Redo);
+                m_firstApply=false;
             }
 
           private:
@@ -916,7 +922,7 @@ namespace EditorObjectOperations
                 return item.m_componentType == m_type && item.m_componentSlot == m_slot && item.m_propertyName == "m_shapes";
             }
             void Apply(const std::vector<PhysicsShapeDefinition>& shapes, const Authoring::WriteDocument& expected,
-                       const std::optional<PrefabOverride>& override)
+                       const std::optional<PrefabOverride>& override, Meta::PropertyChangeSource source)
             {
                 auto* owner = m_owner.Resolve();
                 const auto project = m_project.lock();
@@ -932,6 +938,7 @@ namespace EditorObjectOperations
                 auto preparedOverrides = owner->m_prefabOverrides;
                 std::erase_if(preparedOverrides, [&](const auto& item) { return Matches(item); });
                 if (override) preparedOverrides.push_back(*override);
+                Meta::ScopedPropertyChangeSource origin(source);
                 if (auto changed = body->SetShapes(std::move(preparedShapes)); !changed)
                     throw std::runtime_error(std::string(changed.error().message));
 
@@ -945,6 +952,7 @@ namespace EditorObjectOperations
             int m_slot;
             std::string m_type;
             std::optional<PrefabOverride> m_beforeOverride;
+            bool m_firstApply=true;
         };
     }
 

@@ -103,6 +103,7 @@
     <ClInclude Include="EngineEntry\GizmoRenderer.h" />
     <ClInclude Include="EngineEntry\PrefabEditor.h" />
     <ClInclude Include="EngineEntry\ReflectionUndo.h" />
+    <ClInclude Include="EngineEntry\ReflectionPropertyEdit.h" />
     <ClInclude Include="EngineEntry\WinProcProxy.h" />
     <ClInclude Include="EditorMenu\EditorMenuSurface.h" />
     <ClInclude Include="EditorMenu\EditorMenuSchema.h" />

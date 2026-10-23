@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/CliConsumerMigrationAcceptance20261023.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CLI 소비자 래칫 7파일 이주 수용</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#변경한-소비자">변경한 소비자</a></li><li><a href="#기존-호출자에서-확인한-수정">기존 호출자에서 확인한 수정</a></li><li><a href="#실행한-회귀">실행한 회귀</a></li><li><a href="#남은-제품-수용과-경계">남은 제품 수용과 경계</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="CliConsumerMigrationAcceptance20261023.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>CLI 소비자 래칫 7파일 이주 수용</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
+<a class="map-row" href="#변경한-소비자"><span class="ve-label">§01</span><span class="map-name">변경한 소비자</span><span class="map-bar"><i style="width:71.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#기존-호출자에서-확인한-수정"><span class="ve-label">§02</span><span class="map-name">기존 호출자에서 확인한 수정</span><span class="map-bar"><i style="width:55%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실행한-회귀"><span class="ve-label">§03</span><span class="map-name">실행한 회귀</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span></span></a>
+<a class="map-row" href="#남은-제품-수용과-경계"><span class="ve-label">§04</span><span class="map-name">남은 제품 수용과 경계</span><span class="map-bar"><i style="width:46.2%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「실행한 회귀」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><blockquote>
+<p>후속: 아래 실행 당시 남긴 애니메이션 쿠커 차단의 원인·수정과 새 제품 실행은 <a href="AnimationCookAcceptance20261023.html">AnimationCookAcceptance20261023</a>을 따른다. 이 문서의 이전 실행 결과와 동명 JSON의 신원은 당시 기록으로 보존한다.</p>
+</blockquote>
+<p>2026-10-23 로컬 작업본 기준. <code>cli_consumer.ratchet.json</code>을 바꾸지 않고 <strong>상한0 / 관측0</strong>을 확인했다. 이전 종료 수용에서 관측한 <code>7 &gt; 0</code>의 후속 작업이다. 전체 LC9 완료로 승격하지 않으며 일반 GUI·서비스/Shipping 잔여와 구분한다.</p>
+<p>정확한 소스·바이너리 해시, 실행별 PID/결과/로그 경로는 <a href="CliConsumerMigrationAcceptance20261023.json">동명 JSON</a>에 기록했다. <a href="../design/RuntimeResultConsumerContract.html">결과 계약</a>이 현재 생산자·소비자 경계다.</p>
+</section>
+<section class="doc-sec" id="sec-변경한-소비자">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="변경한-소비자">변경한 소비자</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>소비자</th><th>현재 판정</th></tr></thead>
+<tbody><tr><td><code>verify-animation-player.ps1</code></td><td>Player smoke JSON과 모델 generation/메시 해석 실패 계수, runtime 종료·파서 이벤트. 기존 HTTP 애니메이션 표본 판정 보존</td></tr>
+<tr><td><code>verify-audio-player-exits.ps1</code></td><td>F# 오디오 JSON의 실제 재생/완료·형식별 수치와 scope/GC/공간 재생 결과, Player smoke와 종료 이벤트. 요약에 고정 수치를 대신 적지 않음</td></tr>
+<tr><td><code>verify-content-browser-navigation.ps1</code></td><td>기존 명령 JSON을 공통 판독기로 읽고 입력 명령 이름/순서를 대조. 이 파일의 래칫 적발은 소스 검사와 같은 줄에 있던 한국어 진단 문장의 오탐도 포함했으며, 소스 단정은 보존</td></tr>
+<tr><td><code>verify-player-job-lifecycle.ps1</code></td><td>작업자/runtime 종료 이벤트, 목적 씬 활성화·시뮬레이션·렌더 제출 smoke JSON, F# Begin JSON 두 건</td></tr>
+<tr><td><code>verify-texture-auto-ui-shutdown.ps1</code></td><td>명령 receipt와 PID/순번 이벤트의 요청→flush→충돌 거부→Finalize, 기존 디스크 보존 검사</td></tr>
+<tr><td><code>verify-texture-pending-native-close.ps1</code></td><td>native 종료 원인과 flush/쓰기 결과/종료 순서, 기존 디스크·GUID·씬 보존 검사</td></tr>
+<tr><td><code>verify-texture-auto-ui-soak.ps1</code></td><td>기존 누적 횟수·시간·최종 상태 자료와 Editor/작업자/runtime 종료 및 RHI 큐 정리 이벤트</td></tr></tbody></table></div>
+<p>사람용 stdout을 다른 언어의 문자열 매칭으로 바꾸지 않았다. Editor 저장 결과, 실제 DX12/Vulkan drain, 공통 작업자 종료를 JSONL 생산자에 연결했다. 기존 사람용 표식과 명령 인자는 유지한다. Script API45·OnTickSimulate·생명주기/핸들 소유 계약은 바꾸지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-기존-호출자에서-확인한-수정">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="기존-호출자에서-확인한-수정">기존 호출자에서 확인한 수정</h2></div>
+<div class="prose"><ul>
+<li>Player 작업자 검증기는 패키지의 <code>Resources/Environment</code>를 빠뜨려 실제 렌더 준비가 실패했고, 현재 기본 프로젝트의 GameScripts로 fixture 스크립트를 덮었다. 전체 패키지 closure와 fixture별 Scripts를 보존한 뒤 재로드/정상 종료를 통과했다. 현재 native/common 관리 런타임 overlay는 유지하며 새 패키지 인증으로 확대하지 않는다.</li>
+<li>브라우저의 isolated A/B 프로젝트에 설정·셰이더·F# 소스 순서가 없어 프로젝트 수용이 실패했다. 각 프로젝트에 필요한 입력을 복사했다. 작은 프로젝트에서도 점진 열거를 실제 자극하도록 트리의 즉시 자식보다 한 단계 아래에 미방문 폴더를 둔다.</li>
+<li>PowerShell5가 UTF-8 명령 파일에 넣은 BOM 때문에 첫 <code>wait</code>가 <code>command.unknown</code>으로 실패했다. 공통 writer로 BOM 없는 UTF-8을 만들고 행 수·명령 이름/순서를 대조한다. 자식 프로세스 핸들 캐시와 종료 코드 null 거부도 유지한다.</li>
+<li>브라우저의 Material Graph 수신부·shared texture getter·큐 기반 sprite 편집·폴리지 stable ID 보존을 현재 소스에 맞춰 검사한다. 기존 worker publication mutex를 GT 큐 mutex로 잘못 읽던 별도 텍스처 소스 검사는 admission 범위를 정확히 검사하도록 고쳤다. 제품 잠금은 제거하지 않았다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-실행한-회귀">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="실행한-회귀">실행한 회귀</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>실행</th><th>결과</th></tr></thead>
+<tbody><tr><td>CLI 래칫 PS5/7</td><td>모두0파일/상한0. ratchet Git blob이 HEAD와 동일. 인증이 라우트보다 먼저인 기존 검사도 통과</td></tr>
+<tr><td>결과 판독 PS5/7</td><td><strong>각82검사</strong>, 합164. 필수 자료 누락·중복·잘못된 PID/schema/자료형/순서·남은 큐·저장 오류·모델/스크립트 실패·BOM·명령 불일치·자식 exit0/23 포함</td></tr>
+<tr><td>텍스처 receipt 소비자 셋</td><td>위 회귀에 포함. shutdown3모드/native close2모드/soak1모드의 합성 자료를 실제 소비자에 전달하고, JSONL이 없으면 각각 거부. stdout 파일 없이 실행하여 로그 fallback 부재 확인</td></tr>
+<tr><td>Release 브라우저 PS5/7</td><td><strong>각136단정</strong>, 표본23·A/B/A 프로젝트 전환3회·드롭 수신15곳. 새 프로젝트·최근 항목·이력 격리와 점진 열거를 함께 수용</td></tr>
+<tr><td>브라우저 소스 변이</td><td>폴더 검사·sprite 경로·폴리지 ID·Material Graph 경로를 깨뜨린4건 모두 거부</td></tr>
+<tr><td>Release Player 작업자 PS5/7</td><td>셸별 재로드/정상 종료, 합4프로세스 exit0. 목적 씬 composition 제출·Begin 두 번·scheduler/runtime 종료·큐0·파서0·정상 runtime 디렉터리 회수 확인</td></tr>
+<tr><td>Release 오디오 Player PS5/7</td><td>셸별1프로세스, 합2프로세스 exit0. 각각 재생/완료100회·resident50/stream50·MP3 25/FLAC25·scope/GC/부착/위치 재생 JSON 수용. 새로 생성한 유효 mono WAV/MP3/FLAC fixture 사용</td></tr>
+<tr><td>Release Editor 저장 생산자</td><td>실제 텍스처 재가져오기 <strong>315검사</strong> 통과. 정상 자동 저장·RHI drain·Editor/작업자/runtime 종료 이벤트 확인. 기존 Image/Sprite·Undo/Redo·prefab·실패 보존 경로 포함</td></tr>
+<tr><td>N1 경계 회귀</td><td>codec/진단226검사, runtime860파일/전이 include1015, 변이35 통과. 런타임 결과 writer 추가가 Archive/Parser 경계를 새지 않음</td></tr>
+<tr><td>텍스처 소스 보조 회귀</td><td><span class="chip ok">5검사 통과</span></td></tr>
+<tr><td>스크립트/문서</td><td>공유 스크립트13개 양 셸 구문 분석 통과. HTML679페이지·스크립트359개·오류0</td></tr>
+<tr><td>빌드/패키지</td><td>Release Editor·Player 빌드, F# Job/Audio fixture의 SDK 컴파일·cook·PAK·smoke 통과</td></tr></tbody></table></div>
+<p><code>cli-consumer-contract.yml</code>에 상한0 검사와 두 셸의 판독 회귀를 필수 연결했다. 원격 CI는 실행하지 않았다. 기본 프로젝트 GameScripts 출력은 F# 두 컴포넌트 상태이며 fixture 빌드는 별도의 SDK/프로젝트 출력으로 수행했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-남은-제품-수용과-경계">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="남은-제품-수용과-경계">남은 제품 수용과 경계</h2></div>
+<div class="prose"><p>애니메이션 소비자의 코드는 이주했지만 새 AnimationPlayer 패키지를 만드는 단계에서 <code>automatic Scene material compilation</code>의 Slang <code>E41012</code> / <code>spirv_1_3</code> capability 오류가 발생했다. 기본·명시 DX12 패키지 시도 모두 cook에서 멈췄다. 실제 애니메이션 소비자 제품 재수용은 완료로 기록하지 않는다. 이 작업에서 쿠커/셰이더의 규칙이나 실패 기준은 낮추지 않았다.</p>
+<p>실제 Inspector 입력 뒤의 pending shutdown/native close/5분 soak는 이번에 다시 실행하지 않았다. 합성 receipt 소비자 회귀와 Editor 정상 저장 생산자 수용을 그 실행으로 대신하지 않는다. 오디오도 프로세스별 재생/완료100회이며 <strong>100회 프로세스 반복 종료</strong> 수용은 아니다. 오디오 소비자의 기본 <code>-Cycles 100</code>은 유지한다.</p>
+<p>Debug/Shipping·Vulkan 제품 실행·오디오 장치/청감 품질·일반 GUI 수동 Undo/Redo·성능 개선을 새로 수용한 기록이 아니다. LC9는 이 잔여를 포함하여 <code>progress</code>를 유지한다. 변경은 로컬 작업본이며 커밋·푸시·공개 패키지 게시를 수행하지 않았다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="CliConsumerMigrationAcceptance20261023.md"><code>docs/analysis/CliConsumerMigrationAcceptance20261023.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

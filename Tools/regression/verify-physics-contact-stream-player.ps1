@@ -31,7 +31,7 @@ if($editor.latePrefab){
 }
 # Debug cooker validates a model corpus even for physics-only scenes.
 # This small packaging input is not instantiated in the contact test scene.
-if(!(Get-ChildItem "$project/Assets" -Recurse -File -Filter '*.glb' | Select-Object -First 1)) {
+if($Configuration -eq 'Debug' -and !(Get-ChildItem "$project/Assets" -Recurse -File -Filter '*.glb' | Select-Object -First 1)) {
     New-Item -ItemType Directory -Force "$project/Assets/Models" | Out-Null
     Copy-Item "$repo/Dynamic_CPP/Assets/Models/Prim_Cube.glb","$repo/Dynamic_CPP/Assets/Models/Prim_Cube.glb.meta" "$project/Assets/Models"
 }
@@ -39,7 +39,7 @@ $tool=Join-Path $EngineDistribution "Bin/x64-$Configuration/Tools/CreatorBuildTo
 & $tool select-engine --engine-distribution $EngineDistribution --project $project *> "$work/select.log"
 if($LASTEXITCODE){throw 'Engine selection failed'}
 [string[]]$packageMode=if($Shipping){@('--shipping')}else{@()}
-& $tool package-game @packageMode --repository $repo --engine-distribution $EngineDistribution --project $project --config $Configuration --stage-root "$work/Staging" --startup-scene ContactStream.creator --smoke-frames 120 --smoke-timeout-sec 300 *> "$work/package.log"
+& $tool package-game @packageMode --repository $repo --engine-distribution $EngineDistribution --project $project --config $Configuration --stage-root "$work/Staging" --startup-scene ContactStream.creator --render-backend dx12 --smoke-frames 120 --smoke-timeout-sec 300 *> "$work/package.log"
 if($LASTEXITCODE){throw "Contact package failed: $work/package.log"}
 } else {
     if(!(Test-Path -LiteralPath "$work/Staging/Project.current.json") -or

@@ -41,7 +41,7 @@ bool ImageComponent::ReplaceTextureOwner(const Texture* previous,
             m_curtexture = replacement;
             uiinfo.size = replacement->GetImageSize();
         }
-        PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+        PublishRenderPropertyWrite(ProxyDirty::Material | ProxyDirty::Payload);
     }
     return changed;
 }
@@ -55,7 +55,7 @@ void ImageComponent::SetTexture(int index)
 	m_curtexture = textures[curindex];
     uiinfo.size = textures[curindex]->GetImageSize();
 	origin = { uiinfo.size.x * 0.5f, uiinfo.size.y * 0.5f };
-	PublishRenderProxyDirty(ProxyDirty::Material | ProxyDirty::Payload);
+	PublishRenderPropertyWrite(ProxyDirty::Material | ProxyDirty::Payload);
 }
 
 void ImageComponent::SetNativeSize()
@@ -73,7 +73,7 @@ void ImageComponent::SetNativeSize()
 	{
 		rect->SetSizeDelta({ uiinfo.size.x, uiinfo.size.y });
 	}
-	PublishRenderProxyDirty(ProxyDirty::Transform);
+	PublishRenderPropertyWrite(ProxyDirty::Transform);
 }
 
 bool ImageComponent::isThisTextureExist(std::string_view path) const

@@ -1,28 +1,54 @@
-namespace CreatorEngine;
+using CreatorEngine;
+using System.Runtime.InteropServices;
 
-public readonly record struct ObjectHandle(uint Index, uint Generation) { public bool IsValid => Generation != 0; }
-public readonly record struct Entity(ObjectHandle Handle);
-public struct Float3 { public float X, Y, Z; }
-public sealed class Component
+// Controlled native ABI only. The component lifetime, router, buffer and tick
+// execution below are the real product implementations, including the F# runtime.
+internal sealed class ProbeComponent : Component
 {
-    private bool _enabled = true;
-    public bool Enabled
+    internal ProbeComponent()
     {
-        get => _enabled;
-        set
+        MarkInitialized();
+        MarkInitializeSucceeded();
+        MarkBeginSucceeded();
+    }
+}
+
+internal static unsafe class ContactProbeHost
+{
+    private static int next;
+    [UnmanagedCallersOnly] private static int IsAlive(ObjectHandle owner) => 1;
+    [UnmanagedCallersOnly] private static int Asset(AssetLinkABI* link, uint kind, TextureAssetVariantABI* variant, AssetToken* token) => -1;
+    [UnmanagedCallersOnly] private static void Cut(ObjectHandle owner) { }
+    [UnmanagedCallersOnly] private static int Status(SimulationStatus* status) { *status = default; return 0; }
+    [UnmanagedCallersOnly] private static int Submit(ulong epoch, ulong tick, uint kind, byte* payload, int count, ulong* sequence) => 1;
+    [UnmanagedCallersOnly] private static int Read(ulong epoch, ulong tick, SimulationSnapshot* snapshot, byte* payload, int count) => 7;
+
+    internal static void Bind()
+    {
+        var api = new ScriptApiTable
         {
-            if (_enabled == value) return;
-            _enabled = value;
-            if (!value) ContactRouter.Suspend(this);
-        }
+            Version = Native.ExpectedVersion,
+            StructSize = sizeof(ScriptApiTable),
+            Entity_IsAlive = &IsAlive,
+            Asset_RequestTyped = &Asset,
+            Asset_TryAcquireTyped = &Asset,
+            Camera_NotifyCameraCut = &Cut,
+            Simulation_Status = &Status,
+            Simulation_Submit = &Submit,
+            Simulation_Read = &Read
+        };
+        if (!Native.Bind(&api)) throw new Exception("Native contact probe contract did not bind.");
+        ScriptFactory.Initialize();
     }
 
-    public bool BeginSucceeded = true;
-    public SimulationScope Scope { get; } = new();
-}
-public sealed class SimulationScope
-{
-    private readonly List<Action> _cleanup = new();
-    public void RegisterCleanup(Action cleanup) => _cleanup.Add(cleanup);
-    public void Cancel() { foreach (var action in _cleanup) action(); _cleanup.Clear(); }
+    internal static void FixedTick(Action read)
+    {
+        string name = "ContactTickDriver" + ++next;
+        ScriptFactory.Register(name, () => new ProbeComponent());
+        ScriptFactory.RegisterLifecycle(name, new ScriptLifecycle { OnTickSimulate = (_, _) => read() });
+        int id = ScriptFactory.Create(new ObjectHandle((uint)next, 1), name);
+        ScriptRegistry.UpdateTick(1f / 60);
+        ScriptFactory.Destroy(id);
+        ScriptRegistry.FlushRegistrations();
+    }
 }

@@ -480,9 +480,9 @@
      <div class="doc"><a href="plans/BackendParityPlan.html">BackendParityPlan.md</a><span class="tie">PHASE 4.9 · 미착수</span>
        <div class="why">PHASE 4가 DX12로 좁히며 미룬 교차 백엔드 판정을 한자리에 모은다.</div></div>
     <div class="doc"><a href="plans/EditorAutomationCLIPlan.html">EditorAutomationCLIPlan.md</a><span class="tie">PHASE 14.5 · LC0~LC9</span>
-      <div class="why">라이브 HTTP/JSON 명령·실행 중 Player 제어와 Commandlet 분리. 종결 검증 잔여, MCP 보류.</div></div>
+      <div class="why">라이브 HTTP/JSON 명령·실행 중 Player 제어와 Commandlet 분리. <a href="analysis/PowerShell5EditorShutdownAcceptance20261023.html">PS5/7 연결 종료 수용</a>. 소비자7파일 이주·상한0/관측0. <a href="analysis/AnimationCookAcceptance20261023.html">애니메이션 쿠커 수정·제품 후속 검증</a>. Inspector/일반 GUI 종결은 잔여, MCP 보류.</div></div>
     <div class="doc"><a href="plans/ScriptSurfacePlan.html">ScriptSurfacePlan.md</a><span class="tie">PHASE 9.5</span>
-      <div class="why">현재 네이티브 계약에 맞춘 C# 스크립트 표면 재설계.</div></div>
+      <div class="why">F# 저작·공통 관리 실행기 · 필요한 일반 멤버만 정적 등록(API45). 빈 훅 없는 템플릿·VS Code 작성 도우미. <a href="design/FSharpScriptingContract.html">현재 계약</a> · <a href="analysis/FSharpOptionalLifecycleAcceptance20261023.html">선택적 저작 수용</a></div></div>
     <div class="doc"><a href="plans/EnginePackagingPlan.html">EnginePackagingPlan.md</a><span class="tie">PHASE 10·11 등</span>
       <div class="why">EffectSystem·Terrain의 의존 역전과 패키지 경계. 잔여 작업 유지.</div></div>
     <div class="doc"><a href="plans/ModelGeometryTextureImprovementPlan.html">ModelGeometryTextureImprovementPlan.md</a><span class="tie">비동기 배치 완료 · G2 텍스처 캐시 경로 키 완료 · 나머지 구조 개선 제안</span>
@@ -522,8 +522,8 @@
   <div class="doc-grid">
     <div class="doc is-ref"><a href="plans/RenderGraphDependencySchedulingPlan.html#rg8-f">RG8-F · RenderGraph 성능 후속</a><span class="tie">미래 계획 · 현재 공수 제외</span><div class="why">제품 pass의 명시적 async 적용·RG7 조합 검증·전체 프레임 p50/p95 개선. 현행 RG8 제품 수용 완료, 기본 OFF 유지.</div></div>
 
-    <div class="doc is-ref"><a href="plans/SimulationEffectContractPlan.html">SimulationEffectContractPlan.md</a><span class="tie">PHASE 24 · 보류 · 구현 미착수</span>
-      <div class="why">PrSM과 효과 계약 도입. 현행 스크립트 안정화 완료와 구분하며 현재 실행 공수에 포함하지 않는다.</div></div>
+    <div class="doc is-ref"><a href="plans/SimulationEffectContractPlan.html">SimulationEffectContractPlan.md</a><span class="tie">PHASE 24 · C# 계약 중단 · PrSM 기존 작업 연계</span>
+      <div class="why">F# 단독 저작·공통 관리 런타임과 C++ 계약 OnTickSimulate 고정 틱 유지. OnSimulate·Scope.Delay는 복원하지 않는다. Verse식 계약은 기존 PrSM LLVM 언어 명세·컴파일러로 이관한다. PrSM 기존 구현과 CreatorEngine 제품 통합 잔여를 구분하며 미래 공수는 현재 집계에 포함하지 않는다.</div></div>
     <div class="doc is-ref"><a href="plans/NativeObjectMemoryPolicyPlan.html">NativeObjectMemoryPolicyPlan.md</a><span class="tie">PHASE 25 · 미래 계획 · 구현 미착수</span>
       <div class="why">Scene·Entity·Component 네이티브 GC와 C# GC 병행. 에셋은 스마트 포인터 유지 또는 ownership_cpp 단계 적용. SGCL v18/MSVC 채택 게이트와 분리하며 현재 실행 공수에 포함하지 않는다.</div></div>
   </div>
@@ -1104,16 +1104,16 @@
       <li class="done-item">✔ 저작분 있는 미노출 컴포넌트 0 — <code>LightComponent</code> 30건 · <code>CameraComponent</code> 20건 노출
         <span style="color:var(--text-dim)">— W2. 나머지 11종은 저작 0건이라 착수 대상이 아니다</span></li>
       <li>스크립트가 입력 액션 <b>값</b>을 받는다 — <code>PlayerInputComponent</code>를 붙인 씬과 액션 맵 저작분 위에서 회귀가 돈다</li>
-      <li>인스펙터 저작 경로가 렌더 프록시까지 닿는다 — <code>LightComponent</code> 값 필드를 <code>private</code>으로 내려도 저작이 멈추지 않는다</li>
+      <li class="done-item">✔ W4 저작 변경·Undo/Redo가 렌더 dirty와 일반 쓰기를 발행한다 — scalar·enum·container·nested·잠금/no-op/stale Undo 실제 Editor 회귀. 렌더 소비와 전체 필드 private화는 별도 범위다</li>
       <li>렌더 델타 적용을 관측하는 하네스가 있다 — Light 게이트의 ② 축이 누계가 아니라 프록시 <b>값</b>을 대조하고, dirty 제거 변이에 붉어진다</li>
       <li>손으로 맞춘 경계 계약에 게이트 0건이 없다 — <code>ScriptLifecyclePhase</code> · <code>ScriptFieldType</code> · <code>ScriptMessage</code> 배치 + <code>SerializeField</code> 7종 실자산 왕복</li>
       <li><code>ScriptApiMigrationPlan.html</code> §11 등급표에 폐기 표시와 승계 문서 포인터가 박혀 있다</li>
     </ul>
   </div>
-  <div class="risknote"><b>착수 순서.</b> <b>W5 → W4 → W3 → W6 → W7</b>을 권한다.
-  W5(관측 하네스)가 먼저 서야 W4(저작 dirty)의 &quot;고쳤다&quot;가 관측 가능해지고,
+  <div class="risknote"><b>착수 순서.</b> <b>W4 → ND-b 구현 후 W5 · W3 · W6 · W8 잔여</b>를 추적한다.
+  W4의 게임 스레드 통지/dirty 수용과 W5의 렌더 소비 수용을 구분하며,
   W3의 값 통로 결정(<code>ScriptMessage</code> 확장이냐 질의 API냐)이 W6의 미러 계약을 정하므로 W6보다 앞서야 한다.
-  W7은 언제든 가능하다.
+  W7 문서 청산은 완료 대상으로 제거했다.
   <br><br>
   <b>W3의 정면 과제는 배선이 아니라 소비자다.</b> 어느 씬에도 <code>PlayerInputComponent</code>가 <b>0건</b>이라 그 경로는 지금 한 번도 돌지 않는다 —
   액션 맵 자산과 컴포넌트를 붙인 씬을 함께 저작하지 않으면 검증이 성립하지 않는다.
@@ -1415,14 +1415,15 @@
 <!-- ===== PHASE 20 ===== -->
 <section class="phase" id="phase-20">
   <h2 class="sec"><span class="no">PHASE 20</span>네트워크 준비형 런타임 · Replication 기반 <span class="phase-pct" data-phase-pct="20"></span></h2>
-  <div class="phase-meta">신설: 2026-08-22 · 기준선 재실측 2026-09-04 · 설계 문서: <a href="plans/NetworkFrameworkPlan.html">NetworkFrameworkPlan.md</a> · 선행: PHASE 17 archive/parser 경계 <b>완료</b>, SceneGraph E1·H3·L5 <b>완료</b> · 초기 공수는 대시보드 추정치이며 N0 실측 뒤 갱신 · <b>소유권 분할은 설계 문서 §6</b></div>
+  <div class="phase-meta">갱신: 2026-10-23 · ND-a·W4·ND-b·N1 수용 · N3 API45/F# 일반 멤버·고정틱·GPU 수용 · 설계 문서: <a href="plans/NetworkFrameworkPlan.html">NetworkFrameworkPlan.md</a> · 선행: PHASE 17 archive/parser 경계(N1) <b>완료</b>, SceneGraph E1·H3·L5 <b>완료</b> · 초기 공수는 대시보드 추정치이며 N0 실측 뒤 갱신 · <b>소유권 분할은 설계 문서 §6</b></div>
   <div class="phase-goal"><b>목표:</b> 서버 권위 replication을 실제 fixed Simulation Tick과 값 기반 thread boundary 위에 세운다.
   Authoring YAML/JSON DOM, process-local EntityHandle, live Scene/Entity pointer를 wire에서 배제하고, Loopback correctness를 닫은 뒤 실제 transport와 선택적 prediction/headless server를 판정한다.</div>
-  <div class="risknote"><div class="vt">이양 경계 (2026-09-04 · 설계 문서 §6 2판)</div>
-  <b>목표는 분업이 아니라 완전 이양이다.</b> 1판은 슬라이스를 A/B/C 세 구간으로 갈랐는데, C(계약은 사내·알고리즘만 위임)가 있는 한 담당자가 매번 사내 작업을 기다린다. 2판은 구간을 둘로 줄였다 — <b>사내가 한 번 세우는 것</b>과 <b>담당자가 전부 소유하는 것</b>.
-  가능케 하는 것은 인터페이스가 아니라 <b>확장점</b>이다. 인터페이스는 담당자가 엔진을 부르고, 확장점은 엔진이 담당자를 부른다 — 후자가 없으면 담당자는 결국 <code>Scene.cpp</code>에 자기 호출을 심는다.
-  <b>실측: 확장점 3종의 자리가 이미 다 있다</b> — 슬롯 수명은 <code>Scene::AllocateSlot/ReleaseSlot</code>(호출부 13건 전부 Scene 내부), tick 경계는 <code>Runtime::TickSimulationFrame</code>(92줄 단일 정본), 쓰기 dirty는 <code>Component::OnPropertyChanged</code>의 X8 writer boundary(소비자 39건).
-  <b>N3는 PHASE 20 위임 범위 밖</b> — 고정 틱은 네트워크 요구가 아니라 엔진 기반이고 PHASE 19·14도 같은 clock을 기다린다. 사내가 먼저 닫으며, 작업량의 본체는 누산기가 아니라 CCT 등 <b>스텝당 단위 저작값 재보정</b>과 <b>렌더 보간 신설</b>(현재 배관 0건)이다. 관리 측은 고정 축 전용 훅 <code>OnSimulationTick</code>을 신설하고(§4.4 2판) 기존 <code>PrePhysics</code>/<code>PostPhysics</code>는 프레임 축에 남긴다 — 통째로 옮기면 <code>FlushAniEvents</code>가 <code>AnimatorSystem</code> 결과에 거는 의존이 깨진다.<br><b>이 페이즈 밖 선행 둘 — PHASE 9.5가 소유한다.</b> <b>W8</b>(디스패치 오버라이드 감지)이 N3의 선행이고, <b>W4</b>(저작 dirty 통로)가 <b>ND-b의 선행</b>이다 — 2026-09-04 재실측 결과 <code>OnPropertyChanged</code>를 부르는 곳은 <code>ReflectionTypedYml</code>(직렬화)뿐이고 <code>ReflectionTypedDraw</code>(인스펙터)에는 0건이라 저작 축에 통로 자체가 없다. <b>전량 이양 시점이 W4에 묶여 있으므로</b> 이양 일정은 PHASE 9.5 진행과 함께 본다.</div>
+  <div class="risknote"><div class="vt">사내 선행 수용 — 2026-10-22</div>
+  <b>ND-a·W4·ND-b 완료.</b> 계약 6종 동결·변경 절차·금지 타입 검사 위에 저작 변경·Undo/Redo와 로컬 엔티티 수명/일반 쓰기 관찰자를 연결했다.
+  DDOL은 같은 정체성의 Detached→Attached이며 ScriptObjectHandle을 유지한다. 큐 예외/포화 metrics와 전체 재구성 규칙을 포함한다.
+  <a href="analysis/SceneObservationAcceptance20261022.html">실제 Editor·등록 회귀 10개 그룹 수용 기록</a>을 따른다.
+  <b>N3는 사내 소유.</b> F# 공통 관리 실행기와 일반 멤버 OnTickSimulate(dt)를 정적으로 등록해 고정 틱을 실행한다. ScriptCore의 C# 코드는 API/ABI 바인딩이다. Scope.Delay·공개 Scope·OnSimulate 전용 구조는 제거했으며 별도 OnSimulationTick은 없다. PrSM 언어 계약은 장기 보류한다. 현재 30/60/144fps·moving GPU 0틱·Editor·cooked Player와 등록 인계 회귀 15그룹을 수용했다. 전체 C# fixture의 F# 이주는 진행 중이다.
+  <b>전량 인계·서버 제품 완료와 구분한다.</b> N2 wire ID/schema·N5 replication·transport 및 N9 cooked 서버 startup·2-client·정상 종료는 별도다. W5 렌더 소비 수용도 남는다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="20"><!-- JS 생성 --></table></div>
 </section>
 
@@ -2147,14 +2148,14 @@ const TASKS = [
     detail: "PlayerInputComponent가 액션 발화를 스크립트에 알릴 때 함수 이름만 넘긴다. ActionMap이 계산한 v2Value를 스크립트가 받을 통로를 연다. 착수 전에 방식을 정해야 한다 — ScriptMessage에 값 필드를 더할 것인가, 질의 API를 따로 둘 것인가.",
     refs: "ScriptSurfacePlan.md §2 W3 · ActionMap.cpp:317,327 · ClrHost.h:130", priority: "P1", days: 4, status: "todo",
     note: "값이 두 곳에서 끊긴다. ① ActionMap.cpp:317,327의 valueAction(action->value.v2Value)이 주석 처리돼 있다 — 바로 위에서 키보드 4방향/게임패드 스틱으로 v2Value를 채워 놓고 onFired(funName)만 부르므로 계산된 값이 그 자리에서 버려진다. ② ScriptMessage가 {int instanceId; char name[64]}뿐이라 ①을 살려도 실을 곳이 없다. 안 A(ScriptMessage에 값 필드): 구조체 배치가 바뀌어 kApiVersion 상승 + 모든 메시지가 안 쓰는 값 필드를 든다. 안 B(Input_GetActionValue 질의 API): 발화와 질의 사이에 값이 바뀔 수 있다(틱 경계라 실제로는 안전하나 계약이 약해진다). ★ 소비자도 함께 저작해야 한다 — 어느 씬에도 PlayerInputComponent가 0건이라 이 경로는 지금 한 번도 돌지 않는다. 액션 맵 자산과 컴포넌트를 붙인 씬 없이는 고쳤다를 증명할 수 없다. 이 결정이 W6의 ScriptMessage 미러 계약을 정하므로 W6보다 앞서야 한다." },
-  { phase: 9.5, id: "W4", title: "저작 dirty 통로 — 인스펙터가 값만 대입하고 dirty를 모른다",
-    detail: "ReflectionTypedDraw가 컴포넌트 필드를 직접 쓰면서 PublishRenderProxyDirty를 내지 않는다. 리플렉션 draw에 값 변경 통지 훅을 두고, 렌더 프록시를 쓰는 컴포넌트가 그 훅에서 dirty를 발행하게 한다.",
-    refs: "ScriptSurfacePlan.md §2 W4 · ReflectionTypedDraw.h", priority: "P1", days: 3, status: "todo",
-    note: "ReflectionTypedDraw.h에 ProxyDirty 언급이 0건이다. 그래서 인스펙터에서 라이트 색·세기를 바꾸면 컴포넌트 필드는 바뀌지만 LightRenderProxy는 낡은 채 남는다. ★ W2가 세운 게이트의 변이 상태가 정확히 지금의 인스펙터 경로다 — LightComponent setter의 PublishRenderProxyDirty 6줄을 지우면 값 왕복 15건은 그대로 통과하고 dirty 사슬 축만 붉어진다. W2는 setter 신설에서 멈췄다: 필드가 여전히 public이라 우회할 수 있는데, 지금 private으로 내리면 저작 경로가 멈춘다(인스펙터가 그 필드를 직접 쓴다). 순서는 훅 신설 → 컴포넌트가 훅에서 발행 → 그 뒤에야 필드를 private으로. 완료 증명이 W5에 걸린다." },
+  { phase: 9.5, id: "W4", title: "저작 변경 통지 · Undo/Redo · 일반 쓰기 경계",
+    detail: "typed scalar/custom·enum/container/nested 편집을 중앙 transaction으로 연결. 변경 필드만 가장 파생된 hook과 일반 관찰자에 통지. 렌더 dirty publication 보존.",
+    refs: "ScriptSurfacePlan.md · SceneObservationAcceptance20261022.md", priority: "P1", days: 3, status: "done",
+    note: "2026-10-22 구현: 출처·no-op·잠금 거부·stale Undo·native/Transform/비렌더 쓰기 회귀. W5 실제 렌더 소비/GPU와 public 필드 전체 private화는 별도 범위." },
   { phase: 9.5, id: "W5", title: "렌더 델타 관측 하네스 — 헤드리스가 프록시 적용을 못 본다",
     detail: "--script 헤드리스는 렌더 프레임이 거의 돌지 않아 프록시 값을 관측할 수 없다. 렌더 프레임을 N회 강제로 도는 CLI 또는 게임 스레드에서 델타를 동기 적용하는 검사 전용 진입점을 세운다.",
     refs: "ScriptSurfacePlan.md §2 W5 · verify-light-script.ps1", priority: "P2", days: 3, status: "todo",
-    note: "실측(2026-09-04, 기본 씬 라이트에 스크립트로 8회 쓰기): 기준선 publish=1 committed=1 queued=3 applied=2 → 이후 publish=9 committed=2 queued=4 applied=2. 게임 스레드 쪽은 전부 정상이고 applied만 멈춰 있다. RenderScene::UpdateCommand는 프록시에 쓰지 않고 ProxyCommandQueue에 델타를 넣을 뿐이며 그것을 적용하는 ExecuteBatch는 렌더 소비 스레드 전용이다. 같은 실행의 종료 로그가 publish 64 / consume 3 / latest-wins 61 / overflow 61. ★ 이 한계를 제품 결함으로 오진한 적이 있다 — scene.switch로 씬을 열면 그 씬의 광원이 프록시에 안 잡히고 옛 씬 값이 남는 것을 씬 전환 시 광원 미등록으로 보고했는데, 새 광원의 RegisterCommand도 옛 광원의 UnregisterCommand도 같은 큐로 가므로 같은 한계의 두 얼굴이었다. 갈라 준 것은 enqueued/applied 한 쌍이다. 그래서 W2의 Light 게이트는 게임 스레드 쪽 사슬까지만 재고 마지막 한 칸을 파일 머리에 실측치와 함께 적어 뒀다. 이것이 서야 W4의 고쳤다가 관측 가능해진다." },
+    note: "W4의 실제 Editor 회귀는 저작 통지·게임 스레드 render dirty publication까지 수용했다. W5는 렌더 소비 스레드가 적용한 proxy 값과 프레임/세대를 비교하고 dirty 제거 변이의 실패를 입증하는 별도 잔여다. 과거 headless 큐 누계를 실제 GPU 소비 수용으로 확대하지 않는다." },
   { phase: 9.5, id: "W6", title: "미러 커버리지 — 검사 없는 경계 계약 3종 + SerializeField 왕복",
     detail: "ScriptLifecyclePhase · ScriptFieldType · ScriptMessage 배치는 C++와 C#이 손으로 맞춘 미러인데 게이트가 0건이다. 각각 대조를 세우고 변이로 이빨을 증명한다. SerializeField 7종 왕복도 실자산 저작본으로 게이트를 세운다.",
     refs: "ScriptSurfacePlan.md §2 W6 · ClrHost.h", priority: "P2", days: 2, status: "todo",
@@ -2166,7 +2167,7 @@ const TASKS = [
   { phase: 9.5, id: "W8", title: "디스패치 오버라이드 감지",
     detail: "ScriptRegistry가 훅마다 _active 전체를 도는 구조를 마스크 기반으로 바꾼다. 네이티브 Lifecycle::MaskOfType<T>()가 선례이고, 관리 측은 타입당 1회 계산해 캐시하거나 ScriptGenerator가 마스크를 생성한다.",
     refs: "ScriptSurfacePlan W8", priority: "P1", days: 1, status: "todo",
-    note: "지금도 낭비다 — override void PrePhysics는 0건인데 Component 파생 42개를 매 프레임 순회한다. 6단계 훅은 이미 static 람다인데 틱 훅만 dt를 캡처해 할당까지 붙는다. ★ NetworkFrameworkPlan N3의 선행: tick당 도는 OnSimulationTick을 감지 없이 더하면 30fps에서 프레임당 42→84회가 된다. ScriptRegistry.cs를 이 페이즈가 일관되게 소유하도록 PHASE 20에서 이관했다(2026-09-04)." },
+    note: "지금도 낭비다 — override void PrePhysics는 0건인데 Component 파생 42개를 매 프레임 순회한다. 6단계 훅은 이미 static 람다인데 틱 훅만 dt를 캡처해 할당까지 붙는다. 2026-10-22: 새 저작 훅 없이 언어 독립 clock으로 결정하여 N3 필수 선행에서 제외한다. 기존 프레임 훅의 override 감지 검증으로 유지한다." },
 
   // ---------- PHASE 10: 파티클·이펙트 백지 재작성 (최후순위) ----------
   //
@@ -2509,7 +2510,7 @@ const TASKS = [
   { phase: 14.5, id: "LC4", title: "로컬 HTTP/JSON 서비스",
     detail: "명시적 활성화, loopback, 토큰, 요청 크기·형식 검증과 감사 경로를 제공한다.",
     refs: "EditorAutomationCLIPlan.md · analysis/Phase14_5Closure.md", priority: "P1", days: 3, status: "done",
-    note: "모든 라우트가 인증 검사 뒤에 있다. 최신 서비스 실행 결과는 docs/analysis/Phase14_5Closure.md." },
+    note: "모든 라우트가 인증 검사 뒤에 있다. Keep-Alive 종료의 join 순서·WSAPoll 취소·재사용 소켓 보호를 수정했다. Debug/Release 각17조건, PS5/7 Editor·Player 총8회 종료/endpoint 회수 통과. PowerShell5EditorShutdownAcceptance20261023 참조. 후속 CLI 소비자7파일 이주로 상한0/위반0을 확인했다. CliConsumerMigrationAcceptance20261023 참조." },
   { phase: 14.5, id: "LC5", title: "프레임 예산·operation·지연 검증",
     detail: "큐를 시간·개수 예산으로 drain하고 긴 작업의 operation·취소·포화 상태를 제공한다.",
     refs: "EditorAutomationCLIPlan.md · analysis/Phase14_5Closure.md", priority: "P1", days: 2.5, status: "done",
@@ -2525,11 +2526,11 @@ const TASKS = [
   { phase: 14.5, id: "LC8", title: "Development Player와 Shipping 격리",
     detail: "Player 전용 제품 registry를 제공하며 Shipping 바이너리에서 서비스·소켓을 제외한다.",
     refs: "EditorAutomationCLIPlan.md · analysis/Phase14_5Closure.md", priority: "P1", days: 3, status: "done",
-    note: "최신 Debug Development/Shipping 빌드와 import/심볼 격리 통과. runtime discovery와 staged smoke 결과는 종결 검토에 기록한다." },
+    note: "기존 Debug Development/Shipping import·심볼 격리 수용은 종결 검토를 따른다. 후속 Release cooked Player의 PS5/7 연결 유지 종료·endpoint 회수·렌더 drain·입력 불변을 각2회 수용했다. PowerShell5EditorShutdownAcceptance20261023 참조. 새 Shipping 재수용은 별도." },
   { phase: 14.5, id: "LC9", title: "소비자 이관과 최종 계약 검증",
     detail: "사람용 verdict와 소스 기반 명령 존재 판정을 제거하고 JSON 결과와 현재 실행 증거로 판정한다.",
-    refs: "EditorAutomationCLIPlan.md · analysis/Phase14_5Closure.md", priority: "P1", days: 2.5, status: "progress",
-    note: "제품 결과 이행·한국어 verdict 13→0·명령 소스 존재 6→0·미보고 어댑터 제거 및 자동 계약 검증 완료. 통합 전 Debug 281/Release 280, HTTP 재질 포함 236단정 통과. master 병합 후보 재검증은 analysis/Phase14_5MergePreparation.md. 지연 100회 p50/p95/p99=3.84/4.74/5.02ms. ★ <b>2026-09-15 종결 조건 재정의</b> — 9-06 판정이 든 보류 사유 둘 중 <b>canonical 성능은 이 페이즈 소유가 아니었다</b>(같은 문서가 &quot;서비스 지연과 도메인 렌더링 성능은 별개&quot;라고 써 놓고 그것으로 종결을 막고 있었다). 게다가 그 축을 재던 <code>verify-model-cutover-budget.ps1</code>과 기준 <code>mbc11_perf_archive.json</code>은 <code>0ec60573</code>(9-12 Commandlet 68개 은퇴)에서 회귀 스크립트 27개·fixture 10개와 함께 삭제됐다 — 조건이 가리키던 대상이 저장소에 없다. 그래서 <b>남는 조건은 둘</b>: ① 14.5 소유 게이트 13칸(LC0~LC9 · Player 둘 포함)의 <b>현재 HEAD 재실행</b> — 기존 증거는 통합 전·병합 준비 트리의 것이다, ② GUI 수동 조작(LC6 Undo 선언 21개). <b>빼되 소유를 옮겼다</b>: canonical 성능 예산 → 3.75(감시 끊김을 MBC11에 기록), 전체 run-all 완주 → 어느 페이즈의 조건도 아님(HEAD부터 초록 기준선 없음), dx12.selftest material authoring round trip → 렌더 도메인·<b>추적자 미정</b>(그 이름 아래 검사가 지금 없다 — 고쳐서 통과한 것이 아니다). ★ <b>2026-09-15 조건 ① 닫음</b> — HEAD <code>575ab79b</code> 에서 Editor Debug 재빌드 뒤 13칸 재실행: <b>초록 11 · 붉음 2</b>. 붉은 둘은 제품 축이 아니다. ⑥ LC5 drain 은 제품이 <code>status</code>·<code>timing</code> 을 <code>state==Completed</code> 에서만 내는데(설계) 게이트가 그것을 <b>판정문이 아니라 출력문</b>에서 무방비로 읽어 StrictMode 에 죽는다 — 실패가 &quot;state=running&quot; 이 아니라 PowerShell 속성 오류로 위장되고, async 완료를 고정 800ms 만 기다려 부하에 갈린다. ⑬ LC8 Player 서비스는 <code>abbad0f6</code>(9-13 런처 전환)이 <code>Runtime/layout.version</code> 을 요구하게 바꿨는데 게이트가 스테이지 사본에 exe·dll 만 덮어 <b>9-13 부터 조용히 붉었다</b>(게이트는 9-06 이후 무변경, 스테이지는 8-25 것). 두 게이트 다 사유를 모아 마지막에 출력하는데 그 전에 throw 가 나 <b>진짜 사유가 로그에서 사라진다</b>. 그 근거로 제품 표면 초록으로 판정하고 조건 ①을 닫았다(사용자 결정) — 검사를 지우거나 붉음을 통과로 바꾸지 않았고 게이트 수정은 별도 과제다. ⑦ 이 초록인 것도 누락이 아니다: <code>lifecycle.stress</code> 는 seed 의 <code>commandlet=true</code> 라 제품 명령 표에 오르지 않으며, 은퇴 직전 seed·골든과 대조해 <code>584d1ed4</code> 가 원상복구임을 확인했다. <b>남은 조건은 ②(GUI 수동) 하나</b>라 status 는 progress 를 유지한다. 상세 증거와 재정의 근거: docs/analysis/Phase14_5Closure.md." },
+    refs: "EditorAutomationCLIPlan.md · analysis/Phase14_5Closure.md · analysis/CliConsumerMigrationAcceptance20261023.md · analysis/AnimationCookAcceptance20261023.md · analysis/MasterSyncRecheck20261023.md", priority: "P1", days: 2.5, status: "progress",
+    note: "제품 결과 이행·한국어 verdict 13→0·명령 소스 존재 6→0·미보고 어댑터 제거 및 자동 계약 검증 완료. 통합 전 Debug 281/Release 280, HTTP 재질 포함 236단정 통과. master 병합 후보 재검증은 analysis/Phase14_5MergePreparation.md. 지연 100회 p50/p95/p99=3.84/4.74/5.02ms. ★ <b>2026-09-15 종결 조건 재정의</b> — 9-06 판정이 든 보류 사유 둘 중 <b>canonical 성능은 이 페이즈 소유가 아니었다</b>(같은 문서가 &quot;서비스 지연과 도메인 렌더링 성능은 별개&quot;라고 써 놓고 그것으로 종결을 막고 있었다). 게다가 그 축을 재던 <code>verify-model-cutover-budget.ps1</code>과 기준 <code>mbc11_perf_archive.json</code>은 <code>0ec60573</code>(9-12 Commandlet 68개 은퇴)에서 회귀 스크립트 27개·fixture 10개와 함께 삭제됐다 — 조건이 가리키던 대상이 저장소에 없다. 그래서 <b>남는 조건은 둘</b>: ① 14.5 소유 게이트 13칸(LC0~LC9 · Player 둘 포함)의 <b>현재 HEAD 재실행</b> — 기존 증거는 통합 전·병합 준비 트리의 것이다, ② GUI 수동 조작(LC6 Undo 선언 21개). <b>빼되 소유를 옮겼다</b>: canonical 성능 예산 → 3.75(감시 끊김을 MBC11에 기록), 전체 run-all 완주 → 어느 페이즈의 조건도 아님(HEAD부터 초록 기준선 없음), dx12.selftest material authoring round trip → 렌더 도메인·<b>추적자 미정</b>(그 이름 아래 검사가 지금 없다 — 고쳐서 통과한 것이 아니다). ★ <b>2026-09-15 조건 ① 닫음</b> — HEAD <code>575ab79b</code> 에서 Editor Debug 재빌드 뒤 13칸 재실행: <b>초록 11 · 붉음 2</b>. 붉은 둘은 제품 축이 아니다. ⑥ LC5 drain 은 제품이 <code>status</code>·<code>timing</code> 을 <code>state==Completed</code> 에서만 내는데(설계) 게이트가 그것을 <b>판정문이 아니라 출력문</b>에서 무방비로 읽어 StrictMode 에 죽는다 — 실패가 &quot;state=running&quot; 이 아니라 PowerShell 속성 오류로 위장되고, async 완료를 고정 800ms 만 기다려 부하에 갈린다. ⑬ LC8 Player 서비스는 <code>abbad0f6</code>(9-13 런처 전환)이 <code>Runtime/layout.version</code> 을 요구하게 바꿨는데 게이트가 스테이지 사본에 exe·dll 만 덮어 <b>9-13 부터 조용히 붉었다</b>(게이트는 9-06 이후 무변경, 스테이지는 8-25 것). 두 게이트 다 사유를 모아 마지막에 출력하는데 그 전에 throw 가 나 <b>진짜 사유가 로그에서 사라진다</b>. 그 근거로 제품 표면 초록으로 판정하고 조건 ①을 닫았다(사용자 결정) — 검사를 지우거나 붉음을 통과로 바꾸지 않았고 게이트 수정은 별도 과제다. ⑦ 이 초록인 것도 누락이 아니다: <code>lifecycle.stress</code> 는 seed 의 <code>commandlet=true</code> 라 제품 명령 표에 오르지 않으며, 은퇴 직전 seed·골든과 대조해 <code>584d1ed4</code> 가 원상복구임을 확인했다. <b>남은 조건은 ②(GUI 수동) 하나</b>라 status 는 progress 를 유지한다. 상세 증거와 재정의 근거: docs/analysis/Phase14_5Closure.md. ★ 2026-10-23 후속: 래칫 위반7파일→0, 상한0 불변. PID/순번 JSONL 종료·저장·RHI drain 및 F# probe JSON 소비. PS5/7 판독 회귀 각82, Release Player 재로드/정상 종료와 오디오 각100재생/완료 수용. 기존 복사기의 환경 리소스 누락·프로젝트 스크립트 덮어쓰기 수정. Slang 소스 계약·streaming generation 검사·fixture Graph/layer 이주와 정적 메시 분할 캐시의 파일 lease 종료 수정. 새 SDK 패키지의 PS5/7 실제69엔티티·54본·스킨 메시4개 Walk 진행·정상 종료0·런타임 디렉터리 회수 수용. 후속 제품 결과는 analysis/AnimationCookAcceptance20261023 참조. a985ee7e1 동기화 후 새 SDK의 PS5/7 실제 Walk·정상 종료와 소유권 API 소비자를 재검증했다. analysis/MasterSyncRecheck20261023 참조. 실제 Inspector 종료/soak·일반 GUI/Shipping은 별도. analysis/CliConsumerMigrationAcceptance20261023 이전 기록 보존." },
 
   // ---------- PHASE 15: 유틸리티 프레임워크 현대화 ----------
   // 신설(2026-08-14). 설계: UtilityFrameworkModernizationPlan.md. 공수는 계획 추정치.
@@ -2716,28 +2717,40 @@ const TASKS = [
   // 개발 루프이므로 담당자가 만든다 — 사내는 SceneRuntime이 렌더 없이 서는지만 본다.
   { phase: 20, id: "ND-a", title: "계약 헤더 6종 동결 · 변경 절차 · 경계 게이트",
     detail: "NetWireIds·INetworkTransport·NetProtocolHeader·INetChannelPolicy·INetTelemetrySink·INetworkEntityRegistry를 동결하고 wire ID tombstone 규율을 문서로 고정한다. 사내가 소유하는 유일한 게이트 verify-net-wire-boundary(금지 타입 canary 포함)를 변이로 증명해 run-all에 배선한다.",
-    refs: "NetworkFrameworkPlan §6.4·§6.6", priority: "P0", days: 2, status: "todo",
-    note: "사내 1회 — N4 발주를 여는 열쇠다. quantizer·snapshot 배치·backpressure 임계(헤더 8·9·10)는 N0 계측 전에 정하지 않는다 — 추정을 계약으로 굳히지 않는다. 공수 근거: 기존 인터페이스·정책 헤더가 19~429줄(중앙값 ~160)이고 절반 이상이 주석이다. 추정치이며 착수 뒤 실측으로 갱신한다." },
-  { phase: 20, id: "ND-b", title: "확장점 2종 — 엔티티 수명 · 쓰기 dirty",
-    detail: "ISceneEntityObserver를 Scene::AllocateSlot/ReleaseSlot과 DDOL 이송 경로에, IComponentWriteObserver를 Component::OnPropertyChanged의 X8 writer boundary에 붙인다. 담당자가 Scene.cpp를 한 번도 열지 않고 N2·N5·N6를 끝낼 수 있게 만드는 것이 판정 기준이다.",
-    refs: "NetworkFrameworkPlan §6.3·§6.6", priority: "P0", days: 2.5, status: "todo",
-    note: "사내 1회 — 이것이 서면 C 구간이 사라지고 전량 이양이 닫힌다. ★ 선행 PHASE 9.5 W4(저작 dirty 통로): 2026-09-04 재실측 결과 OnPropertyChanged를 부르는 곳은 ReflectionTypedYml(직렬화)뿐이고 ReflectionTypedDraw(인스펙터)에는 0건이라 저작 축에 통로 자체가 없다. W4가 통로를 세워야 그 위에 관찰자를 분기할 수 있다. 엔티티 수명 쪽 자리는 실측 확인됨(슬롯 호출부 13건 전부 Scene 내부)." },
+    refs: "NetworkFrameworkPlan §6.4·§6.6", priority: "P0", days: 2, status: "done",
+    note: "2026-10-22 완료: 계약 헤더 6종 v1·36바이트 LE codec·ID 원장/tombstone·기준 커밋 대비 변경 절차 동결. 금지 타입/별칭/include/버전/ID canary·endian 실패·필수 회귀 등록 제거와 실패 전파 수용. Debug/Release NetworkHandoff 등록 회귀와 Editor 소비자 통과. NetworkContractAcceptance20261022 참조. N0/N4 제한 착수 가능, 후속 ND-b/N1/N3도 연결 수용 기록에 따라 완료. 실제 transport/server 수용은 별도." },
+  { phase: 20, id: "ND-b", title: "로컬 엔티티 수명 · 컴포넌트 쓰기 관찰자",
+    detail: "실제 편입 완료/세대 해제/root retirement·DDOL Detached→Attached와 비렌더 포함 일반 쓰기를 copied 값으로 통지. shared-owner/token·worker queue·실패 metrics 제공.",
+    refs: "NetworkFrameworkPlan.md · SceneObservationContract.md", priority: "P0", days: 2.5, status: "done",
+    note: "W4 위에 연결. DDOL ScriptObjectHandle 보존·목적 계층 remap 후 Attached. NetworkHandoff 필수 native 및 선택 Product 회귀 등록. N2 wire ID/schema·N5 replication·transport·서버 수용은 후속." },
   { phase: 20, id: "N0", title: "기준선·금지 타입·telemetry 실패 게이트",
     detail: "frame/physics tick, Entity/Component 변화량을 계측하고 EntityHandle·HashedGuid·YAML/JSON Node의 wire 유입을 실패시킨다. packet/encode/alloc/queue/drop 공통 telemetry를 먼저 세운다.",
     refs: "NetworkFrameworkPlan N0", priority: "P0", days: 1.5, status: "todo",
     note: "담당자 전량 — telemetry 값 타입과 계측이라 값 경계에서 닫힌다. 여기서 나온 실측으로 사내가 헤더 8·9·10(quantizer·snapshot 배치·backpressure 임계)을 동결한다." },
   { phase: 20, id: "N1", title: "Archive·Parser 경계 밀봉",
-    detail: "format-neutral schema 위에 Authoring/Cooked archive를 분리하고 Runtime/NetCore 후보 헤더의 yaml-cpp·nlohmann 의존을 제거한다. 남은 것은 이 판정을 회귀 세트에 배선해 되돌아가지 않게 만드는 일이다.",
-    refs: "NetworkFrameworkPlan N1", priority: "P0", days: 0.5, status: "progress",
-    note: "사내 — 2026-09-04 재실측으로 판정 조건이 이미 참이다. PHASE 17 D3/D4가 닫았다: yaml-cpp include 0, nlohmann 0, SceneRuntime의 ryml include 0, ComponentFactory 인자는 Authoring::NodeView. 구현 슬라이스가 아니므로 공수를 4일→0.5일로 낮췄다(게이트 배선분)." },
+    detail: "공통 schema의 Authoring/CEDO codec 경계와 opaque 진단 writer. runtime 직접 backend 누출 및 Network 전이 의존을 필수 회귀로 차단한다.",
+    refs: "NetworkFrameworkPlan N1 · ArchiveParserAcceptance20261022", priority: "P0", days: 0.5, status: "done",
+    note: "2026-10-22 — 진단 backend 누출 2곳과 기존 호출자 이주. Debug/Release 각 226검사·소스 860/역할별 전이 1014·변이 35건. 새 cooked Player parser 0·패키지 불변 및 실제 PBR 첨부 7개 수용. Motion fixture 준비 실패는 변경 전 SDK도 동일하며 잔여 보존. 전체 parser unlink/서버 제품은 별도." },
   { phase: 20, id: "N2", title: "Network ID와 schema 정본",
     detail: "NetworkObjectId·고정폭 type/field ID·tombstone registry와 replicated schema validation을 만든다. DDOL/scene transfer/destroy의 Bind·Rebind·Unbind 순서를 검증한다.",
     refs: "NetworkFrameworkPlan N2", priority: "P0", days: 4, status: "todo",
     note: "담당자 전량 — ND-b의 ISceneEntityObserver 위에서 구현하므로 Scene.cpp를 열지 않는다(1판에서는 이 항목이 C 구간이었다). ComponentTypeUUID::kTable 32종이 리네임 불변 규율을 이미 갖고 있어 새로 만들지 말고 재료로 쓴다." },
-  { phase: 20, id: "N3", title: "Fixed Simulation Clock + OnSimulationTick",
-    detail: "render clock과 simulation clock을 분리하고 §4.4의 루프 안/밖 배치를 구현한다. 고정 축 전용 관리 훅 OnSimulationTick(fixedDelta)을 배선 6곳으로 신설하고, Scope.Tick을 고정 축으로 옮기며, OnTickCommitted 확장점을 같은 파일에서 함께 심는다.",
-    refs: "NetworkFrameworkPlan N3 · §4.4", priority: "P0", days: 4, status: "todo",
-    note: "사내 · PHASE 20 위임 범위 밖 · ★ 선행 PHASE 9.5 W8(디스패치 오버라이드 감지) — 고정 틱은 네트워크 요구가 아니라 엔진 기반이고 PHASE 19·14도 같은 clock을 기다린다. ★ 2026-09-04 생명주기 실측으로 1판 설계를 정정했다: Initialization은 비동기 씬 활성화를 폴링하고 GameLogic은 UpdateRenderData로 끝나므로 둘 다 tick 루프에 못 들어간다. 기존 PrePhysics/PostPhysics도 프레임 축에 남긴다 — FlushAniEvents가 AnimatorSystem 결과에 의존하기 때문이다. override void PostPhysics 17건은 필요한 것부터 점진 이주하며 이주는 완료 조건이 아니다. ★ 작업량의 본체는 누산기가 아니라 CCT 등 스텝당 단위 저작값 재보정과 렌더 보간 신설(배관 0건)이다." },
+  { phase: 9.5, id: "CS-AUTH", title: "C# Scope 제거·C++ 계약 OnUpdate 고정 틱",
+    detail: "Scope.Delay·공개 Scope·OnSimulate 전용 코루틴 경로와 호출자를 이주·제거했다. C++ 계약 OnUpdate(fixedDelta)·기본 C# 생명주기로 복귀하고 내부 접촉 구독·정리·세대·게임 스레드 안전성을 보존했다.",
+    refs: "ScriptSurfacePlan C# 기본 저작 복귀 · 2026-10-22", priority: "P0", days: null, status: "done", earnedDays: 0,
+    note: "2026-10-22 구현·수용: API v42·고정 60Hz OnUpdate·Scope 제거·내부 수명 정리. 계약 20/접촉 76단정, Editor 두 Play/Stop·pause·실패/정리/일반 await·신규 cooked Player 2000프레임, 접촉/역할·CCT·DDOL·리로드·오디오100회 확인. CSharpFixedUpdateAcceptance20261022 참조. W3~W6/W8·PrSM·서버 전체 완료와 구분. 공수 미산정." },
+  { phase: 9.5, id: "FS-RUNTIME", title: "F# 공통 관리 실행기·일반 멤버 생명주기",
+    detail: "생명주기 11종을 override 없는 일반 멤버로 저작하고 생성기가 typed callback을 등록한다. 팩토리·지연 멤버십·수명/접촉·재개 큐·collectible 로더·애니메이션/BT 소유 목록·진단/GC 정책을 F#으로 이주했다.",
+    refs: "FSharpScriptingContract · FSharpManagedRuntimeAcceptance20261023", priority: "P0", days: null, status: "done", earnedDays: 0,
+    note: "API45. hostfxr의 실제 상주 컨텍스트와 게임 private FSharp.Core를 분리한다. 기존 세대/NativeInstance·DDOL·실패 reload 보존. 관리 분석63/생성39/실행12×2/loader50, 수명26·접촉76×2(0B), 실제 Editor·Player·등록 인계15 통과. C# API/ABI 바인딩 유지, IDE/AOT/서버 제품 및 전체 fixture 이주는 별도. 공수 미산정." },
+  { phase: 9.5, id: "FS-AUTHORING", title: "필요한 생명주기만 저작·VS Code 메서드 도우미",
+    detail: "기본 템플릿은 Component 상속만 생성한다. 기존 F# 66파일을 점검해 빈 고정틱1개를 제거하고 동작·수명 관측 훅은 보존했다. VS Code 자동완성·선택 삽입은 누락된 일반 멤버만 single/unit 서명으로 만든다.",
+    refs: "FSharpOptionalLifecycleAcceptance20261023 · ScriptSurfacePlan", priority: "P0", days: null, status: "done", earnedDays: 0,
+    note: "API45 유지. 편집 문맥26·VS Code 호스트8그룹·삽입 코드 FCS 컴파일·생성기43 통과. 로컬 확장0.1.0 설치. 후속 PS5/7 전체 저작·필드 보존·실패 reload 보존·exit0 재수용. PowerShell5EditorShutdownAcceptance20261023 참조. 다른 파일 상속 편집·IDE 디버깅 전체·공개 게시는 별도. 공수 미산정." },
+  { phase: 20, id: "N3", title: "Fixed Simulation Clock + C++ 계약 OnTickSimulate",
+    detail: "API45/F# 일반 멤버·공통 관리 실행기, Editor·신규 cooked Player·30/60/144fps·moving 0틱 GPU 및 등록 NetworkHandoff 15그룹 수용. 전체 fixture 이주는 별도.",
+    refs: "NetworkFrameworkPlan N3 · FSharpManagedRuntimeAcceptance20261023 · analysis/MasterSyncRecheck20261023.md", priority: "P0", days: 4, status: "done",
+    note: "2026-10-23 숨은 Scene 뷰 중복 제출과 moving readback 제어권 경합 수정. 30.000/59.994/144.042fps, 동일 tick CCT/강체 궤적 차이 0, Scene/Game GPU 전환 4회·canary17 통과. API45/F# 공통 실행기에서 등록 인계 15그룹 재검증. 새 SDK·실제 Player 수용. master a985ee7e1 통합 후 30.0042/59.9864/144.0422fps·동일 tick 궤적 차이0·moving 0틱 GPU 재수용. 이번 인계 CPU 회귀는7게이트이며 이전15그룹 기록과 구분한다. 미이주 fixture·렌더 없는 서버 링크와 N9는 별도." },
   { phase: 20, id: "N4", title: "Loopback Transport와 메시지 프레이밍",
     detail: "message-oriented INetworkTransport, bounded reader/writer, handshake와 loss/reorder/duplicate/corruption simulator를 실제 socket 없이 완결한다.",
     refs: "NetworkFrameworkPlan N4", priority: "P0", days: 4, status: "todo",

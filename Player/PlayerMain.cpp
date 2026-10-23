@@ -2,6 +2,7 @@
 #include "ProjectLayerSettingsIO.h"
 #include "../Engine/Utility_Framework/WindowsApartment.h"
 #include "PlayerMain.h"
+#include "ModelConsumptionDiagnostics.h"
 #include "PlayerDdolProbe.h"
 
 // PHASE 14.5 LC8 — Player 명령 계층. Shipping 에서는 서비스 본문이 비고 lib 이
@@ -81,6 +82,10 @@ namespace
         return;
 
     const Authoring::TextParseTelemetrySnapshot parseTelemetry = Authoring::GetTextParseTelemetry();
+    Diagnostics::RuntimeResults::Emit("player.text_parser", [&](Diagnostics::Node data)
+    {
+        data["calls"] << parseTelemetry.calls;
+    });
     std::printf("[runtime.text-parser] calls=%llu\n", static_cast<unsigned long long>(parseTelemetry.calls));
 		for (const std::string& context : parseTelemetry.contexts)
 			std::printf("[runtime.text-parser.call] source=%s\n", context.c_str());
@@ -1043,14 +1048,27 @@ void Player::PlayerMain::Update()
                                                   std::to_string(Time->GetFrameCount()) + " GT frames, display frame " +
                                                   std::to_string(gameDisplay.completedFrameId) + ", promotions " +
                                                   std::to_string(gameDisplay.promotionCount) + ")");
-        std::printf("[player.smoke] "
-                    "{\"schemaVersion\":1,\"ready\":%s,\"registeredScriptTypes\":%zu,\"frames\":%llu,"
-                    "\"displayPromotions\":%llu,\"submittedGameFrames\":%llu,\"submittedGameFrameId\":%llu}\n",
-            ClrHost::Get().IsReady() ? "true" : "false", ClrHost::Get().GetComponentTypeNames().size(),
-                    static_cast<unsigned long long>(Time->GetFrameCount()),
-                    static_cast<unsigned long long>(gameDisplay.promotionCount),
-                    static_cast<unsigned long long>(m_presentation->GetSubmittedGameFrames()),
-                    static_cast<unsigned long long>(m_submittedGameFrameId.load(std::memory_order_acquire)));
+        Diagnostics::Document smokeResult;
+        auto result = smokeResult.Root();
+        result["schemaVersion"] << 1;
+        result["processId"] << GetCurrentProcessId();
+        result["ready"] << ClrHost::Get().IsReady();
+        result["scriptsLoaded"] << ClrHost::Get().AreScriptsLoaded();
+        result["registeredScriptTypes"] << ClrHost::Get().GetComponentTypeNames().size();
+        result["frames"] << Time->GetFrameCount();
+        result["displayPromotions"] << gameDisplay.promotionCount;
+        result["submittedGameFrames"] << m_presentation->GetSubmittedGameFrames();
+        result["submittedGameFrameId"] << m_submittedGameFrameId.load(std::memory_order_acquire);
+        result["modelGenerationFailures"] << DataSystem::GetInstance()->SnapshotModelGenerationSources().failed;
+        result["meshResolveFailures"] << ModelConsumptionDiagnostics::Snapshot().meshResolveFailed;
+        result["reloadRequested"] << Player::g_smoke.reloadScene;
+        result["reloadActivated"] << m_smokeReloadActivated;
+        result["gameStart"] << SceneManagers->IsGameStart();
+        result["scenePending"] << SceneManagers->IsSceneLoading();
+        result["compositionSubmittedAfterActivation"] << (m_smokeReloadActivated &&
+            gameDisplay.completedFrameId > m_smokeReloadPublishedFrame &&
+            m_submittedGameFrameId.load(std::memory_order_acquire) > m_smokeReloadPublishedFrame);
+        std::printf("[player.smoke] %s\n", smokeResult.ToJson().c_str());
         // Hidden/occluded windows can submit game composition without compositor acceptance.
         // Normal Finalize still requires the native consumer GPU drain before exit 0.
 		EmitTextParseTelemetry();

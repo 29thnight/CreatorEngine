@@ -40,7 +40,7 @@ public:
 
 	FrameCameraSnapshot CaptureFrameSnapshot(float aspectRatio = 0.f) const
 	{
-		return ResolveCamera().CaptureFrameSnapshot(aspectRatio);
+		return ResolveCamera(true).CaptureFrameSnapshot(aspectRatio);
 	}
 
 	std::optional<math::bounding_frustum> TryGetFrustum(
@@ -49,9 +49,16 @@ public:
 		return ResolveCamera().TryGetFrustum(aspectRatio);
 	}
 
+    // Render consumers use the presentation frustum; gameplay/AI retains the
+    // existing TryGetFrustum simulation pose and cannot read interpolation back.
+    std::optional<math::bounding_frustum> TryGetRenderFrustum(float aspectRatio = 0.f) const
+    {
+        return ResolveCamera(true).TryGetFrustum(aspectRatio);
+    }
+
 	float CalculateLODDistance(math::vector3 worldPosition) const
 	{
-		return ResolveCamera().CalculateLODDistance(worldPosition);
+		return ResolveCamera(true).CalculateLODDistance(worldPosition);
 	}
 
 	math::aabb GetEditorBoundingBox() const
@@ -63,14 +70,17 @@ public:
 	}
 
 private:
-	Camera ResolveCamera() const
+	Camera ResolveCamera(bool presentation = false) const
 	{
 		Camera resolved = m_Camera;
 		if (nullptr == m_pOwner) return resolved;
 
-		resolved.m_eyePosition = m_pOwner->Transform_().GetWorldPosition();
+		// Select pose at the consumer boundary; never feed render alpha into AI.
+		resolved.m_eyePosition = presentation ? m_pOwner->Transform_().GetRenderWorldPosition()
+            : m_pOwner->Transform_().GetWorldPosition();
 		const math::quaternion rotation = math::normalize(
-			m_pOwner->Transform_().GetWorldQuaternion());
+			presentation ? m_pOwner->Transform_().GetRenderWorldQuaternion()
+            : m_pOwner->Transform_().GetWorldQuaternion());
 		resolved.m_forward = math::normalize(math::rotate(Camera::kForward, rotation));
 		resolved.m_up = math::normalize(math::rotate(Camera::kUp, rotation));
 		resolved.m_right = math::normalize(math::rotate(Camera::kRight, rotation));

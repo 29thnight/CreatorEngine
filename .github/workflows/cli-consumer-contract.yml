@@ -1,0 +1,46 @@
+name: CLI consumer contracts
+
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'Tools/regression/**'
+      - 'Engine/CommandService/**'
+      - 'Engine/Utility_Framework/RuntimeResults.h'
+      - 'Engine/RuntimeHost/EngineBootstrap.h'
+      - 'Player/PlayerMain.cpp'
+      - 'Editor/EngineEntry/**'
+      - '.github/workflows/cli-consumer-contract.yml'
+  pull_request:
+    paths:
+      - 'Tools/regression/**'
+      - 'Engine/CommandService/**'
+      - 'Engine/Utility_Framework/RuntimeResults.h'
+      - 'Engine/RuntimeHost/EngineBootstrap.h'
+      - 'Player/PlayerMain.cpp'
+      - 'Editor/EngineEntry/**'
+      - '.github/workflows/cli-consumer-contract.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  readers:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: Keep the existing zero consumer-parser cap
+        shell: pwsh
+        run: ./Tools/regression/verify-cli-consumer-contract.ps1
+      - name: Result reader and exit-code regressions (PowerShell 7)
+        shell: pwsh
+        run: ./Tools/regression/verify-runtime-result-consumers.ps1
+      - name: Result reader and exit-code regressions (Windows PowerShell 5)
+        shell: powershell
+        run: ./Tools/regression/verify-runtime-result-consumers.ps1
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: cli-consumer-reader-results
+          path: Build/Verification/CliConsumers/Readers-*/result.json

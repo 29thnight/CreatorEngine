@@ -1,10 +1,11 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param(
     [Parameter(Mandatory)][string]$CookedStage,
     [string]$Work = ''
 )
 Set-StrictMode -Version Latest
 $ErrorActionPreference = 'Stop'
+. (Join-Path $PSScriptRoot 'RuntimeResults.ps1')
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $CookedStage = [IO.Path]::GetFullPath($CookedStage)
 if (-not $Work) { $Work = Join-Path $repo 'Build/Obj/Phase13S3l/PlayerGate' }
@@ -28,36 +29,28 @@ $binaries = @('Player.exe','Player.runtime.dll') | ForEach-Object {
 
 $smokeOut = Join-Path $Work 'smoke.out'
 $smokeErr = Join-Path $Work 'smoke.err'
-$smoke = Start-Process -FilePath "$stage/Player.exe" -WorkingDirectory $stage -WindowStyle Hidden `
-    -ArgumentList @('--smoke','120') -RedirectStandardOutput $smokeOut -RedirectStandardError $smokeErr -PassThru
+$smokeResults = Join-Path $Work 'smoke.runtime.jsonl'
+$smoke = Start-ResultProcess -Exe "$stage/Player.exe" -WorkingDirectory $stage `
+    -Arguments @('--smoke','120') -Stdout $smokeOut -Stderr $smokeErr -Results $smokeResults
 try {
     if (-not $smoke.WaitForExit(300000)) { throw 'Player smoke timed out' }
     $smoke.Refresh()
-    $smokeText = Get-Content $smokeOut -Raw
-    $smokeMatch = [regex]::Match($smokeText, '(?m)^\[player\.smoke\] (\{[^\r\n]+\})')
-    if ($smoke.ExitCode -ne 0 -or (Get-Item $smokeErr).Length -ne 0 -or -not $smokeMatch.Success) {
+    $smokeText = Get-Content $smokeOut -Raw -Encoding UTF8
+    if ($null -eq $smoke.ExitCode -or $smoke.ExitCode -ne 0 -or (Get-Item $smokeErr).Length -ne 0) {
         throw "Player smoke failed: exit=$($smoke.ExitCode)"
     }
-    $smokeData = $smokeMatch.Groups[1].Value | ConvertFrom-Json
-    if ($smokeData.displayPromotions -lt 2) { throw 'Player did not present two completed frames' }
-    if ($smokeText -notmatch '\[runtime\.text-parser\] calls=0') {
-        throw 'Player used an authoring text parser'
-    }
-    $logRoot = Join-Path $env:TEMP "CreatorEngine/Player/$($smoke.Id)/RuntimeData/Log"
-    $runtimeLog = (Get-ChildItem -LiteralPath $logRoot -Recurse -File -ErrorAction Stop |
-        Where-Object { $_.Extension -in '.html','.log','.txt' } |
-        Get-Content -Raw) -join "`n"
-    if ($runtimeLog -match '\[model\.generation\].*게시 전 검증 실패|MeshRenderer 모델 generation 해석 실패') {
-        throw 'Player rejected a cooked model generation'
-    }
+    $smokeData = Read-PlayerSmoke $smokeText $smoke.Id 120 2
+    $runtimeResults = Read-RuntimeResults $smokeResults $smoke.Id
+    Assert-PlayerRuntime $runtimeResults
 } finally {
     if (-not $smoke.HasExited) { $smoke.Kill(); $smoke.WaitForExit() }
 }
 
 $serviceOut = Join-Path $Work 'service.out'
 $serviceErr = Join-Path $Work 'service.err'
-$player = Start-Process -FilePath "$stage/Player.exe" -WorkingDirectory $stage -WindowStyle Hidden `
-    -ArgumentList '--command-service' -RedirectStandardOutput $serviceOut -RedirectStandardError $serviceErr -PassThru
+$serviceResults = Join-Path $Work 'service.runtime.jsonl'
+$player = Start-ResultProcess -Exe "$stage/Player.exe" -WorkingDirectory $stage `
+    -Arguments @('--command-service') -Stdout $serviceOut -Stderr $serviceErr -Results $serviceResults
 $samples = @()
 try {
     $endpoint = Join-Path $env:TEMP "CreatorEngine/Player/$($player.Id)/RuntimeData/Library/CommandService/endpoint.json"
@@ -76,7 +69,9 @@ try {
     }
     $scene = Send 'player.scene'
     $status = Send 'player.status'
+    Assert-ResultInteger $scene.data.objects 'scene.objects'
     if ($scene.status -ne 'succeeded' -or $scene.data.name -ne 'AnimationPlayer' -or
+        $scene.data.objects -ne 69 -or
         $status.status -ne 'succeeded' -or -not $status.data.gameStart) {
         throw 'AnimationPlayer scene did not begin simulation'
     }
@@ -89,7 +84,7 @@ try {
         if ($data.clip -ne 'Walk' -or $data.bones -lt 1 -or $data.skinnedMeshes -lt 1) {
             throw "CreatorRobot binding invalid: clip=$($data.clip) bones=$($data.bones) meshes=$($data.skinnedMeshes)"
         }
-        $samples += @{ frame=$health.frame; time=$data.time; paletteDigest=$data.paletteDigest;
+        $samples += @{ frame=$health.frame; clip=$data.clip; time=$data.time; paletteDigest=$data.paletteDigest;
             bones=$data.bones; skinnedMeshes=$data.skinnedMeshes }
         $frames = @($samples | ForEach-Object frame | Select-Object -Unique)
         $times = @($samples | ForEach-Object time | Select-Object -Unique)
@@ -104,11 +99,30 @@ try {
     if ($quit.status -ne 'succeeded') { throw 'Player quit failed' }
     if (-not $player.WaitForExit(180000)) { throw 'Player normal exit timed out' }
     $player.Refresh()
-    if ($player.ExitCode -ne 0 -or (Get-Item $serviceErr).Length -ne 0) {
+    if ($null -eq $player.ExitCode -or $player.ExitCode -ne 0 -or (Get-Item $serviceErr).Length -ne 0) {
         throw "Player service failed: exit=$($player.ExitCode)"
     }
-    @{ fixture=$CookedStage; pakSha256=(Get-FileHash "$stage/GameAssets.pak").Hash;
-        binaries=$binaries; samples=$samples; smokeExit=$smoke.ExitCode; serviceExit=$player.ExitCode } |
+    Assert-PlayerRuntime (Read-RuntimeResults $serviceResults $player.Id)
+    $runtimeRoot = Join-Path $env:TEMP "CreatorEngine/Player/$($player.Id)"
+    if (Test-Path -LiteralPath $runtimeRoot) {
+        throw 'Player retained its owned runtime tree after normal shutdown'
+    }
+    @{
+        schemaVersion = 1
+        fixture = $CookedStage
+        pakSha256 = (Get-FileHash "$stage/GameAssets.pak").Hash
+        binaries = $binaries
+        smokePid = $smoke.Id
+        servicePid = $player.Id
+        smoke = $smokeData
+        scene = $scene.data.name
+        sceneData = $scene.data
+        gameStart = $status.data.gameStart
+        samples = $samples
+        smokeExit = $smoke.ExitCode
+        serviceExit = $player.ExitCode
+        runtimeTreeRemoved = $true
+    } |
         ConvertTo-Json -Depth 8 | Set-Content -LiteralPath (Join-Path $Work 'verification.json') -Encoding utf8
     Write-Output "ANIMATION_PLAYER_OK samples=$($samples.Count) work=$Work"
 } finally {

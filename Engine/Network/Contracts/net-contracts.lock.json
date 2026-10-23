@@ -1,0 +1,321 @@
+{
+  "schemaVersion": 1,
+  "contractVersion": 1,
+  "protocolVersion": 1,
+  "headers": {
+    "NetWireIds.h": "c1d5dd9f211393382b623ac12e78e51b6009ee558bb3391d12b6cadbc8d00895",
+    "INetworkTransport.h": "ffebd0103b642d18d0ba03d38037e739240a96156838e7f62154b2f5b5679693",
+    "NetProtocolHeader.h": "0cea441ad0b6d4f596f385da7d164fcb28ec7b0c6f6c53d46f3dbc66e186a4b9",
+    "INetChannelPolicy.h": "2d87a68967d5172c40faa1a7f56d694b31f9475ef9abaae86cbdff762d286a49",
+    "INetTelemetrySink.h": "f087568493d51c4098373fdcfdd48ce3331345380cabe69f97dcc13cfcf7ec74",
+    "INetworkEntityRegistry.h": "df4f27154cfa9d87056d385d839faf4f73ccb86a39d92692062da2cbaa4db79d"
+  },
+  "registrySha256": "c890fd2472d11793ee9ae6734fdbfe737805b2625df67d18a274708c1bf5603b",
+  "records": {
+    "NetworkObjectId": {
+      "header": "NetWireIds.h",
+      "wire": true,
+      "fields": [
+        [
+          "std::uint64_t",
+          "value"
+        ]
+      ]
+    },
+    "NetPeerId": {
+      "header": "NetWireIds.h",
+      "wire": true,
+      "fields": [
+        [
+          "std::uint64_t",
+          "value"
+        ]
+      ]
+    },
+    "NetSessionId": {
+      "header": "NetWireIds.h",
+      "wire": true,
+      "fields": [
+        [
+          "std::uint64_t",
+          "value"
+        ]
+      ]
+    },
+    "NetComponentTypeId": {
+      "header": "NetWireIds.h",
+      "wire": true,
+      "fields": [
+        [
+          "std::uint32_t",
+          "value"
+        ]
+      ]
+    },
+    "NetMessageTypeId": {
+      "header": "NetWireIds.h",
+      "wire": true,
+      "fields": [
+        [
+          "std::uint16_t",
+          "value"
+        ]
+      ]
+    },
+    "NetFieldId": {
+      "header": "NetWireIds.h",
+      "wire": true,
+      "fields": [
+        [
+          "std::uint16_t",
+          "value"
+        ]
+      ]
+    },
+    "NetTick": {
+      "header": "NetWireIds.h",
+      "wire": true,
+      "fields": [
+        [
+          "std::uint64_t",
+          "value"
+        ]
+      ]
+    },
+    "NetEndpoint": {
+      "header": "INetworkTransport.h",
+      "wire": false,
+      "fields": [
+        [
+          "std::uint64_t",
+          "address_high"
+        ],
+        [
+          "std::uint64_t",
+          "address_low"
+        ],
+        [
+          "std::uint16_t",
+          "port"
+        ],
+        [
+          "NetAddressFamily",
+          "family"
+        ]
+      ]
+    },
+    "NetReceivedMessage": {
+      "header": "INetworkTransport.h",
+      "wire": false,
+      "fields": [
+        [
+          "NetPeerId",
+          "peer"
+        ],
+        [
+          "NetLane",
+          "lane"
+        ],
+        [
+          "NetDelivery",
+          "delivery"
+        ],
+        [
+          "std::uint32_t",
+          "bytes"
+        ]
+      ]
+    },
+    "NetTransportStatistics": {
+      "header": "INetworkTransport.h",
+      "wire": false,
+      "fields": [
+        [
+          "std::uint64_t",
+          "sent_messages"
+        ],
+        [
+          "std::uint64_t",
+          "received_messages"
+        ],
+        [
+          "std::uint64_t",
+          "sent_bytes"
+        ],
+        [
+          "std::uint64_t",
+          "received_bytes"
+        ],
+        [
+          "std::uint64_t",
+          "pending_messages"
+        ],
+        [
+          "std::uint64_t",
+          "pending_bytes"
+        ],
+        [
+          "std::uint64_t",
+          "dropped_messages"
+        ]
+      ]
+    },
+    "NetProtocolHeader": {
+      "header": "NetProtocolHeader.h",
+      "wire": true,
+      "fields": [
+        [
+          "std::uint32_t",
+          "magic"
+        ],
+        [
+          "std::uint16_t",
+          "version"
+        ],
+        [
+          "NetMessageTypeId",
+          "message"
+        ],
+        [
+          "std::uint64_t",
+          "compatibility"
+        ],
+        [
+          "NetTick",
+          "server_tick"
+        ],
+        [
+          "NetTick",
+          "baseline_tick"
+        ],
+        [
+          "std::uint32_t",
+          "payload_bits"
+        ]
+      ]
+    },
+    "NetChannelRule": {
+      "header": "INetChannelPolicy.h",
+      "wire": false,
+      "fields": [
+        [
+          "NetLane",
+          "lane"
+        ],
+        [
+          "NetDelivery",
+          "delivery"
+        ],
+        [
+          "std::uint8_t",
+          "priority"
+        ],
+        [
+          "std::uint8_t",
+          "allowed"
+        ]
+      ]
+    },
+    "NetTelemetryEvent": {
+      "header": "INetTelemetrySink.h",
+      "wire": false,
+      "fields": [
+        [
+          "NetTick",
+          "tick"
+        ],
+        [
+          "NetPeerId",
+          "peer"
+        ],
+        [
+          "std::uint64_t",
+          "value"
+        ],
+        [
+          "std::uint32_t",
+          "reason"
+        ],
+        [
+          "NetTelemetryKind",
+          "kind"
+        ]
+      ]
+    },
+    "NetEntityToken": {
+      "header": "INetworkEntityRegistry.h",
+      "wire": false,
+      "fields": [
+        [
+          "std::uint64_t",
+          "value"
+        ]
+      ]
+    },
+    "NetSceneToken": {
+      "header": "INetworkEntityRegistry.h",
+      "wire": false,
+      "fields": [
+        [
+          "std::uint64_t",
+          "value"
+        ]
+      ]
+    },
+    "NetEntityBinding": {
+      "header": "INetworkEntityRegistry.h",
+      "wire": false,
+      "fields": [
+        [
+          "NetworkObjectId",
+          "object"
+        ],
+        [
+          "NetEntityToken",
+          "entity"
+        ],
+        [
+          "NetSceneToken",
+          "scene"
+        ],
+        [
+          "std::uint64_t",
+          "revision"
+        ]
+      ]
+    }
+  },
+  "enums": {
+    "NetLane": "std::uint8_t",
+    "NetDelivery": "std::uint8_t",
+    "NetConnectionState": "std::uint8_t",
+    "NetTransportResult": "std::uint8_t",
+    "NetAddressFamily": "std::uint8_t",
+    "NetDecodeResult": "std::uint8_t",
+    "NetMessageClass": "std::uint8_t",
+    "NetTelemetryKind": "std::uint8_t",
+    "NetRegistryResult": "std::uint8_t"
+  },
+  "classes": [
+    "INetworkTransport",
+    "NetWriter",
+    "NetReader",
+    "INetChannelPolicy",
+    "INetTelemetrySink",
+    "INetworkEntityRegistry"
+  ],
+  "changes": [
+    {
+      "version": 1,
+      "protocolVersion": 1,
+      "reason": "Initial ND-a freeze: six interfaces, fixed-width IDs, 36-byte little-endian header; concrete adapters and N2 schema remain separate."
+    }
+  ],
+  "idConstants": {
+    "handshake_message": {
+      "domain": "message",
+      "id": 1,
+      "name": "Handshake"
+    }
+  }
+}

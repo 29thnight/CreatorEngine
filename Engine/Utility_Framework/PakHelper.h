@@ -443,6 +443,30 @@ namespace
         {
             RuntimeCleanupError("Failed to delete runtime tree '" + PathToUtf8(absoluteRoot) +
                 "': " + ec.message());
+#if defined(_WIN32)
+            // Report the blocking leaf while its process is still alive. The
+            // runtime tree and its no-reparse boundary were validated above.
+            std::error_code diagnosticError;
+            for (fs::recursive_directory_iterator entry(absoluteRoot, diagnosticError), end;
+                entry != end && !diagnosticError; entry.increment(diagnosticError))
+            {
+                if (!entry->is_regular_file(diagnosticError)) continue;
+                const HANDLE handle = CreateFileW(entry->path().c_str(), DELETE,
+                    FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr,
+                    OPEN_EXISTING, FILE_FLAG_OPEN_REPARSE_POINT, nullptr);
+                if (handle != INVALID_HANDLE_VALUE)
+                {
+                    CloseHandle(handle);
+                    continue;
+                }
+                const auto code = GetLastError();
+                if (code == ERROR_SHARING_VIOLATION)
+                {
+                    RuntimeCleanupError("Runtime file still leased: " + PathToUtf8(entry->path()));
+                    break;
+                }
+            }
+#endif
             return false;
         }
         return !fs::exists(absoluteRoot, ec) && !ec;

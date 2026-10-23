@@ -534,7 +534,10 @@ private:
     // 슬롯 해제 단일점. tombstone(reset)+세대 증가+free 리스트 등록을 한 곳에서
     // 한다 — DestroyEntities·DetachEntityHierarchy가 공유한다. 루트(0)는
     // 여기로 오면 안 된다(호출부가 먼저 걸러야 하지만 방어적으로 한 번 더 막는다).
-    gc::root_ref<Entity> ReleaseSlot(Entity::Index index);
+    gc::root_ref<Entity> ReleaseSlot(Entity::Index index, bool transfer = false);
+    void PublishTransformObservation(EntityHandle handle, TransformWriteReason reason);
+    void PublishEntityAdmission(Entity& entity);
+    void PublishEntityDeparture(Entity& entity, bool transfer);
 	// H3 저장 어댑터: Entity node에 Store 정본을 기존 계층 키로 쓴다.
 	// Entity::OnAfterSerialize만 호출하며 detached/비점유 Entity에는 쓰지 않는다.
 	void SerializeEntityHierarchy(const Entity& entity, const Authoring::MutableNodeView& node) const;
@@ -737,7 +740,9 @@ public:
     void DrainPendingLifecycle();
 
     //Physics
-    void FixedUpdate(float deltaSecond);
+    void FixedUpdate(float deltaSecond, bool singleStep = false);
+    double SimulationInterpolation() const noexcept { return m_physicsSimulation.InterpolationAlpha(); }
+    void SetSimulationInterpolation(double alpha) { m_physicsSimulation.SetInterpolationAlpha(alpha); }
     math::matrix4x4 PhysicsRenderMatrix(EntityHandle owner) const;
     ce::physics::result<void> StartPhysicsSimulation();
     ce::physics::result<void> StopPhysicsSimulation();

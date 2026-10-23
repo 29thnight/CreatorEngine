@@ -45,7 +45,7 @@ public sealed partial class Spawner : Component
         }
     }
 
-    public override void PostPhysics(float tick)
+    public void PostPhysics(float tick)
     {
         EnsurePrefab();
         if (!_prefab.IsValid) return;
@@ -93,7 +93,7 @@ public sealed partial class Spawner : Component
         }
     }
 
-    public override void OnUninitializing()
+    public void OnUninitializing()
     {
         // 스포너가 사라지면 자기가 만든 것도 함께 치운다.
         while (_spawned.Count > 0)

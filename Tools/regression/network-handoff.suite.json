@@ -1,0 +1,41 @@
+{
+  "schemaVersion": 1,
+  "suite": "NetworkHandoff",
+  "gates": [
+    {
+      "id": "ND-a",
+      "script": "Tools/regression/verify-net-wire-boundary.ps1",
+      "configuration": "all"
+    },
+    {
+      "id": "W4-ND-b",
+      "script": "Tools/regression/verify-scene-observation.ps1",
+      "configuration": "all"
+    },
+    {
+      "id": "N1",
+      "script": "Tools/regression/verify-archive-parser-boundary.ps1",
+      "configuration": "all"
+    },
+    {
+      "id": "N3",
+      "script": "Tools/regression/verify-simulation-exchange.ps1",
+      "configuration": "matrix"
+    },
+    {
+      "id": "PhysicsABI",
+      "script": "Tools/regression/verify-physics-script-abi.ps1",
+      "configuration": "all"
+    },
+    {
+      "id": "PhysicsIdentity",
+      "script": "Tools/regression/verify-physics-body-identity.ps1",
+      "configuration": "matrix"
+    },
+    {
+      "id": "LifecycleEnums",
+      "script": "ScriptCore/check-lifecycle-enums.ps1",
+      "configuration": "none"
+    }
+  ]
+}
