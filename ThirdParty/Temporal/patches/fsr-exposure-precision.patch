@@ -1,0 +1,14 @@
+diff --git a/sdk/include/FidelityFX/gpu/fsr3upscaler/ffx_fsr3upscaler_luma_pyramid.h b/sdk/include/FidelityFX/gpu/fsr3upscaler/ffx_fsr3upscaler_luma_pyramid.h
+index 41c5dc7..95f1cdf 100644
+--- a/sdk/include/FidelityFX/gpu/fsr3upscaler/ffx_fsr3upscaler_luma_pyramid.h
++++ b/sdk/include/FidelityFX/gpu/fsr3upscaler/ffx_fsr3upscaler_luma_pyramid.h
+@@ -92,7 +92,8 @@ void SpdStore(FfxInt32x2 pix, FfxFloat32x4 outValue, FfxUInt32 index, FfxUInt32
+             FfxFloat32x4 frameInfo          = LoadFrameInfo();
+             const FfxFloat32 fSceneAvgLuma  = outValue[LUMA];
+             const FfxFloat32 fPrevLogLuma   = frameInfo[FRAME_INFO_LOG_LUMA];
+-            FfxFloat32 fLogLuma             = outValue[LOG_LUMA];
++            // Preserve the exposure recurrence arithmetic across shader optimization paths.
++            precise FfxFloat32 fLogLuma     = outValue[LOG_LUMA];
+ 
+             if (fPrevLogLuma < resetAutoExposureAverageSmoothing) // Compare Lavg, so small or negative values
+             {

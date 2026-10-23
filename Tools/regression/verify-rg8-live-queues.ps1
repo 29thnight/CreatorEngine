@@ -19,18 +19,19 @@ if (Test-Path -LiteralPath $out)
 $native = Get-Content (Join-Path $NativeEvidence 'execution-result.json') -Raw | ConvertFrom-Json
 $exe = Join-Path $repo "Bin/x64-$Configuration/Editor/CreatorEditor.exe"
 $runtime = Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll'
-if ($native.schemaVersion -ne 2 -or $native.acceptanceSchema -ne 3 -or
-    $native.checks -ne 428 -or $native.scheduleChecks -ne 121 -or
+if ($native.schemaVersion -ne 2 -or $native.acceptanceSchema -ne 5 -or
+    $native.checks -ne 441 -or $native.scheduleChecks -ne 82 -or
     !$native.passed -or !$native.fullRegression -or !$native.nativeQueueExecutionTested -or
     !$native.positiveOverlapExecutionTested -or !$native.negativeFallbackExecutionTested -or
     !$native.declarationOrderTested -or !$native.readReadOwnershipTested -or !$native.frameRetirementTested -or
-    !$native.reorderedFailureTested -or !$native.calibratedIntervalsTested -or !$native.parallelRecordingTested -or
-    !$native.sharedGraphicsReadsTested -or !$native.readerEpochJoinTested -or !$native.sideEffectsTested -or
+    !$native.authoredFailureTested -or !$native.calibratedIntervalsTested -or !$native.parallelRecordingTested -or
+    !$native.authoredAsyncTested -or !$native.timingIndependentTested -or
+    !$native.primaryPreparationTested -or !$native.primaryGraphicsRouteTested -or
     !$native.fallbackReasonsTested -or !$native.measurementDomainsTested -or $native.exitCode -ne 0 -or
     $native.binary.head -ne (git -C $repo rev-parse HEAD) -or
     $native.binary.exe -ne (Get-FileHash $exe).Hash -or $native.binary.runtime -ne (Get-FileHash $runtime).Hash)
 {
-    throw 'Native evidence must include the exact current schema-3 full regression, calibrated intervals, parallel recording, measurement domains and explicit fallback coverage.'
+    throw 'Native evidence must include the exact current schema-5 full regression, calibrated intervals, parallel recording, measurement domains and explicit fallback coverage.'
 }
 if ($AsyncCompute -and !$WorkloadEvidence)
 {
@@ -175,7 +176,7 @@ try
     {
         throw 'Live queue output must match exactly; tolerance-only comparison is insufficient.'
     }
-    @{schemaVersion=2;acceptanceSchema=3;passed=$true;evidenceValid=$true;phaseComplete=$false;
+    @{schemaVersion=2;acceptanceSchema=5;passed=$true;evidenceValid=$true;phaseComplete=$false;
         adoptionEstablished=$false;performanceValidated=$false;performanceClaim='none';
         evidencePurpose='capture-correctness-gpu-validation';outputEquivalent=$true;
         sameProcessOffOn=@{established=$false;reason='Separate correctness processes do not establish a same-process normal timing comparison'};

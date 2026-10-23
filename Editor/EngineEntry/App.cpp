@@ -1,4 +1,5 @@
 ﻿#include "App.h"
+#include "TemporalMotionFixture.h"
 #include "Resource.h"
 #include "ProgressSink.h"
 #include "ConsoleCommandSystem.h"
@@ -457,6 +458,24 @@ uint32_t Core::App::PublishRenderFrame()
 	// M6-P2d-d: 실제 Scene component가 소유한 Material에서 pass별
 	if (viewCount < EnhancedSceneRenderer::kMaxLiveCameraViews &&
 		::editor::material_editing::CapturePreviewRequest(views[viewCount])) ++viewCount;
+    EnhancedLiveViewRequest companion{};
+    if (TemporalMotionFixture::CaptureCompanionView(companion))
+    {
+        bool replaced = false;
+        for (uint32_t index = 0; index < viewCount; ++index)
+        {
+            if (views[index].displayTarget == EnhancedLiveDisplayTarget::Editor)
+            {
+                views[index] = companion;
+                replaced = true;
+                break;
+            }
+        }
+        if (!replaced && viewCount < EnhancedSceneRenderer::kMaxLiveCameraViews)
+        {
+            views[viewCount++] = companion;
+        }
+    }
 	// ShaderMeta GUID를 선언한다. DataSystem cache에 없는 복제/런타임
 	// Material도 이 owner snapshot에 포함되며 RenderEngine은 Water/Wind
 	// 같은 대표 파일 이름을 알 필요가 없다.

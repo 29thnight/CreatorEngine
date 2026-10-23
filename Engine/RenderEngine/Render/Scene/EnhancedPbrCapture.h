@@ -109,6 +109,13 @@ struct EnhancedPbrCapture
             return false;
         }
         const auto name = "hdr-" + std::to_string(stages.size()) + "-" + node.name;
+        return DeclareStageTexture(resources, graph, handle, name, width, height, error);
+    }
+
+    // Reuse the stage readback and version-identity contract for RGBA16F intermediates.
+    bool DeclareStageTexture(IRenderDeviceServices& resources, EnhancedRenderGraph& graph,
+        RGHandle handle, const std::string& name, uint32_t width, uint32_t height, std::string& error)
+    {
         // Disabled stages may forward the same image without modifying it. A
         // versioned handle proves image identity; legacy handles do not, because
         // later writes may retain version zero. Keep every named association.
@@ -132,7 +139,7 @@ struct EnhancedPbrCapture
         }
         stages.push_back({name, stageReadbacks.size()});
         stageReadbacks.push_back({name, handle, readback});
-        graph.AddPass("PBR.Stage." + node.name, { { handle, RHIResourceState::CopySource,
+        graph.AddPass("PBR.Stage." + name, { { handle, RHIResourceState::CopySource,
                 graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder
                     ? RGAccessMode::Read : RGAccessMode::LegacyState } },
             [handle, readback](const EnhancedRenderGraph::ExecuteContext& context)
@@ -212,6 +219,7 @@ struct EnhancedPbrCapture
             root["fixturePredecessorStepId"] << frame.temporalFixture.predecessorStepId;
             root["fixtureInputSha256"] << frame.temporalFixture.inputSha256;
             root["fixturePredecessorInputSha256"] << frame.temporalFixture.predecessorInputSha256;
+            root["fixtureAllowMeshlets"] << c4::fmt::boolalpha(frame.temporalFixture.allowMeshlets);
             root["fixtureCoalesced"] << c4::fmt::boolalpha(frame.temporalFixtureCoalesced);
         }
         root["sceneEpoch"] << frame.sceneEpoch;
@@ -389,6 +397,7 @@ struct EnhancedPbrCapture
         auto node = manifest.rootref()["temporalMotion"];
         node |= ryml::MAP;
         node["schemaVersion"] << 2;
+        node["fixtureAllowMeshlets"] << c4::fmt::boolalpha(expectedFixture.allowMeshlets);
         node["sdkQuality"] << c4::fmt::boolalpha(expectedFixture.sdkQuality);
         node["sdkFrameMilliseconds"] << frame.frameTimeMilliseconds;
         node["upscaleQuality"] << static_cast<uint32_t>(quality);
@@ -408,6 +417,7 @@ struct EnhancedPbrCapture
         node["fixturePredecessorStepId"] << expectedFixture.predecessorStepId;
         node["fixtureInputSha256"] << expectedFixture.inputSha256;
         node["fixturePredecessorInputSha256"] << expectedFixture.predecessorInputSha256;
+        node["previousSubmittedFixtureAllowMeshlets"] << c4::fmt::boolalpha(previousFixtureSubmission.stamp.allowMeshlets);
         node["previousSubmittedFixtureSessionId"] << previousFixtureSubmission.stamp.sessionId;
         node["previousSubmittedFixtureStepId"] << previousFixtureSubmission.stamp.stepId;
         node["previousSubmittedFixtureInputSha256"] << previousFixtureSubmission.stamp.inputSha256;
@@ -437,6 +447,7 @@ struct EnhancedPbrCapture
         node |= ryml::MAP;
         node["valid"] << c4::fmt::boolalpha(submitted.valid);
         node["sourceVerified"] << c4::fmt::boolalpha(submitted.sourceVerified);
+        node["allowMeshlets"] << c4::fmt::boolalpha(submitted.stamp.allowMeshlets);
         node["sessionId"] << submitted.stamp.sessionId;
         node["stepId"] << submitted.stamp.stepId;
         node["requestedPredecessorStepId"] << submitted.stamp.predecessorStepId;
@@ -565,7 +576,8 @@ struct EnhancedPbrCapture
         }
     }
 
-    bool RecordCompiledGraph(const EnhancedRenderGraph& graph, double recordMs, double compileMs)
+    bool RecordCompiledGraph(const EnhancedRenderGraph& graph, double recordMs, double compileMs,
+        bool primaryEnqueued = false)
     {
         EnhancedRenderGraph::DiagnosticSnapshot snapshot;
         if (!graph.CaptureDiagnosticSnapshot(snapshot)) return false;
@@ -621,6 +633,9 @@ struct EnhancedPbrCapture
         execution["completed"] << diagnostics.execution.completed;
         auto schedule = queue["schedule"];
         schedule |= ryml::MAP;
+        queue["executionPath"] << (diagnostics.effectiveExecutionMode == 0 ? "primary-graphics" : "owned-queues");
+        queue["primaryEnqueued"] << primaryEnqueued;
+        schedule["placement"] << "authored";
         schedule["compileGeneration"] << diagnostics.schedule.compileGeneration;
         schedule["usesCompute"] << diagnostics.schedule.usesCompute;
         schedule["predictionComplete"] << diagnostics.schedule.predictionComplete;

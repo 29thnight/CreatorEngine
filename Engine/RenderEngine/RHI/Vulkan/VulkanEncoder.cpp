@@ -894,6 +894,10 @@ void VulkanEncoder::ResourceBarriers(const RHIBarrierBatch& batch)
 
     for (const RHITransition& transition : batch.textureTransitions)
     {
+        if (transition.phase != RHITransitionPhase::Full)
+        {
+            throw std::invalid_argument("Vulkan requires compiler full-transition fallback");
+        }
         const VulkanImageEntry entry = ResolveResource(transition.texture);
         if (!entry.IsValid()) continue;
 
@@ -922,6 +926,10 @@ void VulkanEncoder::ResourceBarriers(const RHIBarrierBatch& batch)
 
     for (const RHIBufferTransition& transition : batch.bufferTransitions)
     {
+        if (transition.phase != RHITransitionPhase::Full)
+        {
+            throw std::invalid_argument("Vulkan requires compiler full-transition fallback");
+        }
         const VulkanBufferEntry entry = ResolveResource(transition.buffer);
         if (!entry.IsValid()) continue;
 

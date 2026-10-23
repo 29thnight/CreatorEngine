@@ -184,6 +184,36 @@ namespace
         }
     }
 
+    template<class G>
+    constexpr bool HasAuthoredQueuePlacement = requires(G& graph, RGPassId pass)
+    {
+        graph.DeclareAsyncCompute(pass);
+    };
+
+    template<class G>
+    void DeclareQueueCandidate(G& graph, RGPassId pass)
+    {
+        if constexpr (HasAuthoredQueuePlacement<G>)
+        {
+            graph.DeclareAsyncCompute(pass);
+        }
+        else
+        {
+            graph.DeclareComputeCompatible(pass);
+        }
+    }
+
+    template<class G>
+    void ConfigureLegacyPlacement(G& graph, bool alternate)
+    {
+        if constexpr (!HasAuthoredQueuePlacement<G>)
+        {
+            typename G::QueueCostModel model;
+            model.placement = static_cast<decltype(model.placement)>(alternate ? 1 : 0);
+            graph.SetQueueCostModel(model);
+        }
+    }
+
     void MeasureQueuePlanning(Measurement& threshold, Measurement& overlap)
     {
         Services services;
@@ -203,18 +233,20 @@ namespace
                 "Read", {{input, RHIResourceState::ShaderResource, RGAccessMode::Read}}, [](const auto&) {}, true);
             if (i % 2)
             {
-                graph.DeclareComputeCompatible(pass);
+                DeclareQueueCandidate(graph, pass);
             }
             hints.push_back({pass, i % 2 != 0, 1000000});
         }
         Require(graph.Compile(error), error);
         Graph::QueueSchedule schedule;
-        for (const auto placement : {RGQueuePlacement::Threshold, RGQueuePlacement::Overlap})
+        const std::vector<Graph::QueueHint> noHints;
+        for (const bool alternate : {false, true})
         {
-            graph.SetQueueCostModel({placement});
+            ConfigureLegacyPlacement(graph, alternate);
+            const auto& planningHints = HasAuthoredQueuePlacement<Graph> && alternate ? noHints : hints;
             const auto plan = [&]
-            { Require(graph.BuildQueueSchedule({true, true, false, true}, hints, 1, schedule, error), error); };
-            auto& measurement = placement == RGQueuePlacement::Threshold ? threshold : overlap;
+            { Require(graph.BuildQueueSchedule({true, true, false, true}, planningHints, 1, schedule, error), error); };
+            auto& measurement = !alternate ? threshold : overlap;
             for (uint32_t iteration = 0; iteration < kWarmups + kIterations; ++iteration)
             {
                 if (iteration < kWarmups)
@@ -261,7 +293,7 @@ namespace
                     "Read", {{input, RHIResourceState::ShaderResource, RGAccessMode::Read}}, [](const auto&) {}, true);
                 if (i % 2)
                 {
-                    graph->DeclareComputeCompatible(pass);
+                    DeclareQueueCandidate(*graph.operator->(), pass);
                 }
                 hints.push_back({pass, i % 2 != 0, 1000000});
             }
@@ -320,9 +352,9 @@ int main()
         std::cout << ',';
         Print("alias_compile", aliasCompile);
         std::cout << ',';
-        Print("queue_threshold", threshold);
+        Print(HasAuthoredQueuePlacement<Graph> ? "queue_authored_with_hints" : "queue_threshold", threshold);
         std::cout << ',';
-        Print("queue_overlap", overlap);
+        Print(HasAuthoredQueuePlacement<Graph> ? "queue_authored_without_hints" : "queue_overlap", overlap);
         std::cout << ',';
         Print("queue_submit_graphics_excluding_native_mock", graphicsSubmit);
         std::cout << ',';

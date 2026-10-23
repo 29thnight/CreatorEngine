@@ -1,0 +1,46 @@
+{
+  "installed": "2026-10-23",
+  "fsr": {
+    "revision": "c6efa6bf7f2027b3ec94f28578bb5965eabb9e55",
+    "tag": "v1.1.4",
+    "patches": [
+      {
+        "path": "patches/fsr-exposure-precision.patch",
+        "sha256": "2653518e407fbc5672d304b4fdbb3a4903cfadd3bef8147da42a0797658b7cf2",
+        "source": "sdk/include/FidelityFX/gpu/fsr3upscaler/ffx_fsr3upscaler_luma_pyramid.h",
+        "originalNormalizedSha256": "fa6eeaf8197b214ee1853d73da3c66cd0c8fc24444a65237b0023bd68f10d887",
+        "patchedNormalizedSha256": "7c739cee2555501ba84e4be9dbd0e699a68e3179d40ee27be021f927d1bf699d",
+        "purpose": "Preserve luma reduction and exposure recurrence precision; independently repeated Editor pixels are compared at 1e-6."
+      }
+    ]
+  },
+  "streamline": {
+    "revision": "2122257e0fce486f91b385aa63b9a09b0a34b363",
+    "archiveSha256": "92C4D954631A1710DA86CA3FA8D5034F2B9503838C95FC4AE977AE149319781B",
+    "tag": "v2.14.1"
+  },
+  "xess": {
+    "revision": "8fe81bdbbaf00b3c1b733fd0d830c333dc84e6f0",
+    "tag": "v3.0.2"
+  },
+  "runtimeFiles": [
+    {
+      "path": "ThirdParty/Temporal/StreamlineRuntime/bin/x64/sl.interposer.dll",
+      "fileVersion": "2,14,1,0",
+      "sha256": "8C87C9499461DA561EDD529AA9BF7831D67D7B94EBB1C1A5ED54EF4934E1EA4C",
+      "bytes": 652928
+    },
+    {
+      "path": "ThirdParty/Temporal/StreamlineRuntime/bin/x64/nvngx_dlss.dll",
+      "fileVersion": "310,9,1,0",
+      "sha256": "3975567B8943C53ACCE397F2B72380092F84F162D00B0D2C7D08A1025C563983",
+      "bytes": 58956912
+    },
+    {
+      "path": "ThirdParty/Temporal/XeSS/bin/libxess.dll",
+      "fileVersion": "2.0.2.68",
+      "sha256": "251659DD84A3E84DE67C886A4186E01F3ECA49B00641906FE38BB6B807E5D5B7",
+      "bytes": 77795704
+    }
+  ]
+}

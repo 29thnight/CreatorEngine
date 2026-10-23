@@ -1,10 +1,12 @@
-#Requires -Version 7.0
+﻿#Requires -Version 7.0
 param(
     [Parameter(Mandatory)][string]$OutputDirectory,
     [ValidateSet('Debug','Release')][string]$Configuration='Release',
     [ValidateRange(4,32)][int]$Samples=4,
     [ValidateRange(16,256)][int]$WarmupFrames=16,
     [ValidateRange(32,512)][int]$NormalCandidates=64,
+    # Record the complete render-thread frame as well as the per-view telemetry.
+    [ValidateRange(0,60)][int]$ProfileSeconds=0,
     [switch]$TimingOnly,
     [switch]$ValidateGpu,
     # Bounded supplemental workload proof; never substitutes for the full matrix.
@@ -64,13 +66,21 @@ $context=@{schemaVersion=2;acceptanceSchema=3;configuration=$Configuration;scene
     cpuMetric='renderOnceMilliseconds';
     cpuComponentScope='record-schedule-submit-frame-retirement-enqueue';
     cpuScopeExcludes='main-thread-scene-generation;presentation;GPU-completion-wait';
-    gpuSpanScope='graph-prologue-through-epilogue';
+    gpuSpanScope='primary:timed-pass-envelope;owned:queue-prologue-through-epilogue';
     overlapScope='calibrated-independent-pass-interval-intersection-above-clock-error';
-    normalWarmup='ordinary-dx12.live-only;complete-cost-history-checked-after-identity-join';
+    normalWarmup='ordinary-dx12.live-only;authored-placement-does-not-require-cost-history';
     captureTimingPurpose='correctness-diagnostics-only';
     performanceValidated=$false;adoptionEstablished=$false;
     performanceClaim='none';
-    note='Collection alone cannot establish speedup or performance adoption; placement cost constants remain uncalibrated'}
+    wholeFrameProfileSeconds=$ProfileSeconds;
+    cpuExecutor='native-parallel';
+    gpuTimingInterval=8;
+    viewScheduling=@{scene='automatic-fixed-60hz';game='automatic-continuous-if-visible';
+        materialPreview='automatic-on-demand-if-visible';gpuCredits=2;
+        schedulerSha256=(Get-FileHash "$repo/Engine/RenderEngine/Render/Scene/LiveViewScheduling.h").Hash;
+        workspaceSha256=(Get-FileHash "$repo/Dynamic_CPP/Saved/Editor/Editor/Workspaces/active.workspace").Hash;
+        policy='same policy and workspace in every mode; actual rendered group counts accompany whole-frame results'};
+    note='Authored placement; collection alone cannot establish speedup or performance adoption'}
 $context | ConvertTo-Json -Depth 10 | Set-Content "$out/measurement-context.json"
 
 function Test-NormalSnapshot($live)
@@ -160,18 +170,21 @@ function Export-NormalSamples($telemetry,$candidates,[int]$mode,[string]$directo
             {
                 if(!$execution -or $execution.measurementDomain -cne 'normal' -or
                     $execution.captureGeneration -ne 0 -or $execution.requestedExecutionMode -ne $mode -or
-                    !$execution.execution.completed -or $execution.execution.recoveryRequired)
+                    $execution.execution.recoveryRequired -or
+                    ($execution.executionPath -ceq 'primary-graphics' -and (!$execution.primaryEnqueued -or
+                        $execution.execution.completed -or $execution.execution.submissionAttempted)) -or
+                    ($execution.executionPath -cne 'primary-graphics' -and !$execution.execution.completed))
                 {
                     $reason='missing-or-incomplete-normal-execution'
                 }
-                elseif(!$execution.schedule.predictionComplete -or
+                elseif($execution.schedule.placement -cne 'authored' -and (!$execution.schedule.predictionComplete -or
                     $execution.schedule.missingMeasurementPasses -ne 0 -or
-                    $execution.schedule.measuredPasses -ne @($execution.schedule.entries).Count)
+                    $execution.schedule.measuredPasses -ne @($execution.schedule.entries).Count))
                 {
                     $reason='incomplete-warm-normal-cost-history'
                 }
                 elseif($execution.fallbackReason -cne $execution.schedule.fallbackReason -or
-                    $execution.fallbackReason -cnotin @('none','disabled','unsupported','unsupported-state','insufficient-gain') -or
+                    $execution.fallbackReason -cnotin @('none','disabled','unsupported','unsupported-state','insufficient-gain','no-async-passes') -or
                     ($execution.execution.computeBatches -gt 0 -and $execution.fallbackReason -cne 'none') -or
                     ($mode -eq 2 -and $execution.execution.computeBatches -eq 0 -and $execution.fallbackReason -ceq 'none'))
                 {
@@ -241,6 +254,8 @@ foreach($order in $orders)
         $start.Environment['CREATOR_DEEPDVC']='0'
         $start.Environment['CREATOR_RENDERGRAPH_QUEUE_EXECUTION']="$($group.modes[0])"
         $start.Environment['CREATOR_RG8_EVIDENCE']='1'
+        $start.Environment['CREATOR_RHI_SOFTWARE_COMMANDS']='0'
+        $start.Environment['CREATOR_RENDER_GPU_TIMING_INTERVAL']='8'
         $start.Environment['CREATOR_RENDERGRAPH_ALIASING']='0'
         $start.Environment['CREATOR_RENDERGRAPH_EXTEND_LIFETIMES']='0'
         $start.Environment['CREATOR_EDITOR_WORKSPACE_DIR']="$processCase/workspace"
@@ -288,17 +303,26 @@ foreach($order in $orders)
                 @{command=$name;arguments=$arguments;result=$result} | ConvertTo-Json -Depth 70 -Compress | Add-Content "$case/commands.jsonl"
                 if($name -eq 'quit'){return $result}
                 if($allowPreparing -and $result.message -eq 'METEOR Scene requested material program is still preparing.'){return $null}
+                if($name -eq 'scene.load.status' -and $result.status -eq 'failed' -and
+                    $result.message -eq 'Scene asset preparation was cancelled or superseded.')
+                {
+                    return @{complete=$true;startupSuperseded=$true}
+                }
                 if($result.status -ne 'succeeded'){throw "$name failed: $($result.message)"}
                 return $result.data
             }
-            $load=Cmd 'scene.switch' @($ScenePath)
             $deadline=[DateTime]::UtcNow.AddSeconds(180)
             do
             {
-                $state=Cmd 'scene.load.status' @("$($load.requestId)")
-                if([DateTime]::UtcNow -gt $deadline){throw 'Scene load timeout'}
-                Start-Sleep -Milliseconds 100
-            }until($state.complete)
+                $load=Cmd 'scene.switch' @($ScenePath)
+                do
+                {
+                    $state=Cmd 'scene.load.status' @("$($load.requestId)")
+                    if([DateTime]::UtcNow -gt $deadline){throw 'Scene load timeout'}
+                    Start-Sleep -Milliseconds 100
+                }until($state.complete)
+            }while($state.startupSuperseded)
+            $state | ConvertTo-Json -Depth 10 | Set-Content "$processCase/scene-ready.json"
             Cmd 'editor.viewport' @('scene') | Out-Null
             Cmd 'editor.renderscale' @('auto') | Out-Null
             Cmd 'window.resize' @("$WindowWidth","$WindowHeight") | Out-Null
@@ -319,6 +343,7 @@ foreach($order in $orders)
             {
                 $case="$out/$order-$mode"
                 New-Item -ItemType Directory $case -Force | Out-Null
+                Cmd 'render.pacing' @('status') | ConvertTo-Json -Depth 10 | Set-Content "$case/pacing-status.json"
                 $appliedFrame=0L
                 if($sameProcessRequested)
                 {
@@ -381,6 +406,36 @@ foreach($order in $orders)
                         Start-Sleep -Milliseconds 100
                     }
                     Write-Output "RG8_NORMAL_CANDIDATES order=$order mode=$mode frames=$($candidates.Count)"
+                    if($ProfileSeconds -gt 0)
+                    {
+                        # A recorder session gives GPU queries a nonzero capture
+                        # generation. Keep normal telemetry and recorded frames
+                        # in separate windows rather than weakening identity gates.
+                        Cmd 'profile.record' | Out-Null
+                        $profileStarted=[DateTime]::UtcNow
+                        while(([DateTime]::UtcNow-$profileStarted).TotalSeconds -lt $ProfileSeconds)
+                        {
+                            Start-Sleep -Milliseconds 250
+                        }
+                        Cmd 'profile.pause' | Out-Null
+                        $profileDeadline=[DateTime]::UtcNow.AddSeconds(90)
+                        do
+                        {
+                            Start-Sleep -Milliseconds 250
+                            $profileState=Cmd 'profile.stats'
+                            if([DateTime]::UtcNow -gt $profileDeadline){throw 'Whole-frame recording finalization timeout'}
+                        }until($profileState.recording.state -eq 'finalized')
+                        $profileState | ConvertTo-Json -Depth 20 | Set-Content "$case/profile-finalized.json"
+                        Cmd 'profile.save' @("$case/whole-frame.ceprof") | Out-Null
+                        do
+                        {
+                            Start-Sleep -Milliseconds 250
+                            $profileSave=Cmd 'profile.save' @('status')
+                            if([DateTime]::UtcNow -gt $profileDeadline){throw 'Whole-frame recording save timeout'}
+                        }until($profileSave.saveState -eq 'saved')
+                        if(!$profileSave.complete){throw 'Whole-frame recording has an incomplete stream tail'}
+                        $profileSave | ConvertTo-Json -Depth 20 | Set-Content "$case/profile-saved.json"
+                    }
                 }
                 else
                 {

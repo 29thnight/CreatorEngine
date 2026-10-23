@@ -1870,6 +1870,10 @@ void VulkanDeviceResources::TransitionResources(std::span<const RHITransition> t
 
     for (const RHITransition& transition : transitions)
     {
+        if (transition.phase != RHITransitionPhase::Full)
+        {
+            throw std::invalid_argument("Vulkan requires compiler full-transition fallback");
+        }
         const VulkanImageEntry entry = m_resourceTable.Resolve(transition.texture);
         if (!entry.IsValid()) continue;
 
@@ -1930,6 +1934,10 @@ void VulkanDeviceResources::TransitionBuffers(
     barriers.reserve(transitions.size());
     for (const RHIBufferTransition& transition : transitions)
     {
+        if (transition.phase != RHITransitionPhase::Full)
+        {
+            throw std::invalid_argument("Vulkan requires compiler full-transition fallback");
+        }
         const VulkanBufferEntry entry = m_resourceTable.Resolve(transition.buffer);
         if (!entry.IsValid()) continue;
 

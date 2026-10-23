@@ -260,6 +260,8 @@ namespace RenderTest
                 check.Check(!experiment::cooked::ExpandModelGeometryPages(old, decoded, error), "METEOR rejects prior cooked geometry version");
                 artifact.mesh.meshlets = {};
                 check.Check(!experiment::cooked::WriteModelGeometryArtifact(artifact, encoded, error), "METEOR cooker rejects indexed-only geometry");
+                check.Check(error == "METEOR geometry requires cooked meshlets; force reimport/recook.",
+                    "METEOR rejection retains the diagnostic after its string storage changes");
                 material_graph::SceneGeometryIdentity identity{0x1122334455667788ull, 11, 12, 13, 14, 3, 330};
                 check.Check(identity.geometryKey == 0x1122334455667788ull && identity.materialSlot == 14 &&
                     identity.instanceId == 13 && identity.lodIndex == 3 && sizeof(identity) == 64, "METEOR geometry/instance/material/LOD scalar ABI");

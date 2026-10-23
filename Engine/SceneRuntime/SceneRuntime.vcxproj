@@ -161,6 +161,11 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <!-- Register generated reflection before unity input discovery, including incremental builds. -->
+    <ClCompile Include="$(IntDir)reflgen/reflgen_SceneRuntime.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="TemporalMotionFixture.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="TemporalMotionFixtureAssets.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClInclude Include="TemporalMotionFixture.h" />

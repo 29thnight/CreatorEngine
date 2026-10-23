@@ -82,6 +82,7 @@ namespace DX12Test
     bool RunRenderGraphTest(std::string& outLog, bool replayExtensions = false);
     bool RunTransientAliasingTest(std::string& outLog);
     bool RunQueueExecutionTest(std::string& outLog);
+    bool RunRg9SubresourceTest(std::string& outLog);
     bool RunQueueScheduleTest(std::string& outLog);
     bool RunQueueContractTest(std::string& outLog);
     bool RunQueueNativeTest(std::string& outLog);

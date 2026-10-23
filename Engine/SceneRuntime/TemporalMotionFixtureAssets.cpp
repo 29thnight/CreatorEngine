@@ -81,7 +81,7 @@ namespace
         return { asset, kind, cooked::AssetDependencyScope::Internal };
     }
 
-    bool MakeQuad(bool skinned, bool meshlets, const cooked::SkeletonArtifact& skeleton,
+    bool MakeQuad(bool skinned, const cooked::SkeletonArtifact& skeleton,
         cooked::ModelGeometryArtifact& result, std::string& failure)
     {
         const auto attributes = skinned ? experiment::kV2VertexAttributes : experiment::kCoreVertexAttributes;
@@ -128,7 +128,8 @@ namespace
                 return false;
             }
         }
-        if (meshlets)
+        // Current CEGE requires topology for every mesh; the sealed fixture stamp
+        // independently selects the indexed or mesh shader recording route.
         {
             if (!experiment::importer::BuildMeshlets(result.mesh, result.mesh.meshlets, failure))
             {
@@ -262,6 +263,7 @@ bool TemporalMotionFixtureAssets::Build(const TemporalMotionFixtureAssetOptions&
         failure = "Temporal motion fixture needs host platform, ABI, shader directory and compiler cache directory.";
         return false;
     }
+    const char* stage = "identity";
     try
     {
         TemporalMotionFixtureAssets result;
@@ -293,11 +295,37 @@ bool TemporalMotionFixtureAssets::Build(const TemporalMotionFixtureAssetOptions&
             blob.schemaVersion = schema;
             blob.targetPlatform = options.targetPlatform;
             blob.targetAbi = options.targetAbi;
+            if (asset.kind == cooked::CookedAssetKind::Mesh && representation == cooked::kModelGeometryRepresentation)
+            {
+                cooked::Sha256Digest metadataDigest{};
+                if (!cooked::ModelGeometryStreamMetadataDigest(bytes, metadataDigest, failure))
+                {
+                    return false;
+                }
+                const auto separator = path.find_last_of('/');
+                path.insert(separator == std::string::npos ? 0u : separator + 1u,
+                    cooked::ModelGeometryStreamDirectory(metadataDigest) + "/");
+            }
             blob.artifactPath = path;
             blob.byteSize = bytes.size();
             if (!cooked::ComputeSha256(bytes, blob.contentSha256, failure))
             {
+                failure = std::string(stage) + ": " + failure;
                 return false;
+            }
+            const auto existing = std::ranges::find_if(manifest.blobs, [&](const cooked::AssetBlobRecord& stored)
+            {
+                return stored.kind == blob.kind && stored.representation == blob.representation &&
+                    stored.schemaVersion == blob.schemaVersion && stored.targetPlatform == blob.targetPlatform &&
+                    stored.targetAbi == blob.targetAbi && stored.byteSize == blob.byteSize &&
+                    stored.contentSha256 == blob.contentSha256;
+            });
+            if (existing != manifest.blobs.end())
+            {
+                manifest.entries.push_back({asset, static_cast<std::uint32_t>(existing - manifest.blobs.begin()),
+                    std::move(dependencies)});
+                manifest.roots.push_back(asset);
+                return true;
             }
             manifest.entries.push_back({ asset, static_cast<std::uint32_t>(manifest.blobs.size()),
                 std::move(dependencies) });
@@ -306,6 +334,7 @@ bool TemporalMotionFixtureAssets::Build(const TemporalMotionFixtureAssetOptions&
             files.emplace(std::move(path), std::move(bytes));
             return true;
         };
+        stage = "skeleton";
         cooked::SkeletonArtifact skeleton;
         skeleton.skeleton.rootBone = experiment::BoneIndex(0u);
         skeleton.skeleton.bones = {
@@ -317,8 +346,10 @@ bool TemporalMotionFixtureAssets::Build(const TemporalMotionFixtureAssetOptions&
             || !add(result.skeleton.ToReference(), "Derived/TemporalMotionFixture/skeleton.cesl",
                 std::move(bytes), cooked::kSkeletonRepresentation, cooked::kSkeletonArtifactVersion, {}))
         {
+            failure = std::string(stage) + ": " + failure;
             return false;
         }
+        stage = "animation";
         cooked::AnimationClipArtifact clip;
         clip.skeletonAssetId = result.skeleton.identity.assetId;
         clip.requiredBoneLayoutSha256 = skeleton.boneLayoutSha256;
@@ -341,14 +372,16 @@ bool TemporalMotionFixtureAssets::Build(const TemporalMotionFixtureAssetOptions&
                 std::move(bytes), cooked::kAnimationClipRepresentation, cooked::kAnimationClipArtifactVersion,
                 { hardSkeleton }))
         {
+            failure = std::string(stage) + ": " + failure;
             return false;
         }
+        stage = "geometry";
         cooked::ModelGeometryArtifact staticGeometry;
         cooked::ModelGeometryArtifact skinnedGeometry;
         cooked::ModelGeometryArtifact meshletGeometry;
-        if (!MakeQuad(false, false, skeleton, staticGeometry, failure)
-            || !MakeQuad(true, false, skeleton, skinnedGeometry, failure)
-            || !MakeQuad(false, true, skeleton, meshletGeometry, failure)
+        if (!MakeQuad(false, skeleton, staticGeometry, failure)
+            || !MakeQuad(true, skeleton, skinnedGeometry, failure)
+            || !MakeQuad(false, skeleton, meshletGeometry, failure)
             || !cooked::WriteModelGeometryArtifact(staticGeometry, bytes, failure)
             || !add(result.staticMesh.ToReference(), "Derived/TemporalMotionFixture/static.cege",
                 std::move(bytes), cooked::kModelGeometryRepresentation, cooked::kModelGeometryArtifactVersion, {})
@@ -360,8 +393,10 @@ bool TemporalMotionFixtureAssets::Build(const TemporalMotionFixtureAssetOptions&
             || !add(result.meshletMesh.ToReference(), "Derived/TemporalMotionFixture/meshlet.cege",
                 std::move(bytes), cooked::kModelGeometryRepresentation, cooked::kModelGeometryArtifactVersion, {}))
         {
+            failure = std::string(stage) + ": " + failure;
             return false;
         }
+        stage = "texture";
         if (!MakeTexture(false, bytes, failure)
             || !add(result.opaqueTexture.ToReference(), "Derived/TemporalMotionFixture/opaque.cetex",
                 std::move(bytes), cooked::kCookedTextureRepresentationVersion, cooked::kCookedTextureSchemaVersion, {})
@@ -369,8 +404,10 @@ bool TemporalMotionFixtureAssets::Build(const TemporalMotionFixtureAssetOptions&
             || !add(result.alphaTexture.ToReference(), "Derived/TemporalMotionFixture/alpha.cetex",
                 std::move(bytes), cooked::kCookedTextureRepresentationVersion, cooked::kCookedTextureSchemaVersion, {}))
         {
+            failure = std::string(stage) + ": " + failure;
             return false;
         }
+        stage = "material";
         const auto temporaryDirectory = options.cacheDirectory / "TemporalMotionFixture"
             / FileGuid::CreateRandomV4().ToString();
         std::filesystem::create_directories(temporaryDirectory);
@@ -396,6 +433,7 @@ bool TemporalMotionFixtureAssets::Build(const TemporalMotionFixtureAssetOptions&
             if (!MakeMaterial(options, temporaryDirectory, materialId, FixtureId(receiver ? 15u : masked ? 12u : 11u),
                 textureId, masked, receiver, material, program, failure))
             {
+                failure = std::string(stage) + ": " + failure;
                 return false;
             }
             const std::string stem = receiver ? "receiver" : masked ? "masked" : "opaque";
@@ -406,6 +444,7 @@ bool TemporalMotionFixtureAssets::Build(const TemporalMotionFixtureAssetOptions&
                     std::move(material.artifactBytes), material.representation, material.schemaVersion,
                     std::move(material.dependencies)))
             {
+                failure = std::string(stage) + ": " + failure;
                 return false;
             }
         }
@@ -452,13 +491,16 @@ bool TemporalMotionFixtureAssets::Build(const TemporalMotionFixtureAssetOptions&
                 std::move(bytes), cooked::kModelDescriptorRepresentation, cooked::kModelDescriptorVersion,
                 modelDependencies))
         {
+            failure = std::string(stage) + ": " + failure;
             return false;
         }
+        stage = "manifest";
         auto encoded = cooked::WriteAssetSetManifest(manifest);
         if (!encoded.Succeeded())
         {
             failure = encoded.issues.empty() ? "Temporal motion fixture manifest encoding failed."
                 : encoded.issues.front().context + ": " + encoded.issues.front().message;
+            failure = std::string(stage) + ": " + failure;
             return false;
         }
         result.manifest = std::move(encoded.bytes);
@@ -470,7 +512,7 @@ bool TemporalMotionFixtureAssets::Build(const TemporalMotionFixtureAssetOptions&
     }
     catch (const std::exception& exception)
     {
-        failure = exception.what();
+        failure = std::string(stage) + ": " + exception.what();
         return false;
     }
 }

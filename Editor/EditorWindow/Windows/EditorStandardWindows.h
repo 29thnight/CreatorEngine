@@ -121,6 +121,8 @@ struct editor_tool_windows
         return window_set(
             panel<&windows::draw_render_pass>(
                 EditorWindowName::kRenderPass, EditorWindowName::kRenderPassLabel)
+                .initial_size(1920.f, 1280.f)
+                .min_size(480.f, 360.f)
                 .traits(window_trait::always_vertical_scrollbar |
                         window_trait::no_collapse)
                 .open_by_default(false),

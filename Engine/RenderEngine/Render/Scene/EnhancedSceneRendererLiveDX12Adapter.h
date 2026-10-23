@@ -70,6 +70,8 @@ public:
     bool WaitForLastFrameSubmission(std::string& outError);
     RHISubmissionTicket GetLastFrameSubmissionTicket() const;
     bool UsesOwnedQueueExecution() const;
+    bool SelectGraphExecution(EnhancedRenderGraph& graph, std::string& outError);
+    void TraceGraphExecution(const EnhancedRenderGraph& graph, bool primaryEnqueued = false) const;
     uint32_t GetQueueExecutionMode() const;
     // Producer-thread override, applied by the next BeginFrame without rebuilding
     // the pipeline. An unset override reads the environment at each frame boundary.

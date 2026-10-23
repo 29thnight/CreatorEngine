@@ -1,4 +1,4 @@
-#include "EnhancedSSGIPass.h"
+﻿#include "EnhancedSSGIPass.h"
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
 #include "../../../RHI/DX12/DX12RootSignatureCache.h"
@@ -371,6 +371,7 @@ bool EnhancedSSGIPass::PrepareFrame(const EnhancedFrameContext& context, std::st
 
 void EnhancedSSGIPass::ResetHistory()
 {
+    ++m_historyGeneration;
     m_historyValid = false;
     m_hasPreviousFrame = false;
     m_historyIndex = 0;
@@ -429,8 +430,15 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         ? context.camera->view * context.camera->projection : math::matrix4x4{};
     const uint32_t writeIndex = (m_historyIndex + 1) % kHistoryCount;
     const uint32_t sampleFrame = m_frameIndex + 1;
-    m_resourceRetirement.WatchRecording({}, [this, hasCamera, viewProjection, writeIndex, sampleFrame]
+    const auto historyGeneration = m_historyGeneration;
+    m_resourceRetirement.WatchRecording({}, [this, hasCamera, viewProjection, writeIndex, sampleFrame, historyGeneration]
     {
+        // A reset may retire this logical history before asynchronous admission.
+        // Its accepted GPU work must not revive the retired camera/sample ring.
+        if (historyGeneration != m_historyGeneration)
+        {
+            return;
+        }
         if (hasCamera)
         {
             m_previousViewProjection = viewProjection;

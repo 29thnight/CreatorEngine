@@ -1,0 +1,13 @@
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <CreatorEnableFsrDx12>true</CreatorEnableFsrDx12>
+    <CreatorEnableDlssStreamline>true</CreatorEnableDlssStreamline>
+    <CreatorEnableXeSS>true</CreatorEnableXeSS>
+    <CreatorDeployTemporalRuntime>true</CreatorDeployTemporalRuntime>
+    <CreatorFsrRoot>$(MSBuildThisFileDirectory)FidelityFX-SDK</CreatorFsrRoot>
+    <CreatorStreamlineRoot>$(MSBuildThisFileDirectory)StreamlineRuntime</CreatorStreamlineRoot>
+    <CreatorXeSSRoot>$(MSBuildThisFileDirectory)XeSS</CreatorXeSSRoot>
+    <_TemporalFsrDebugSuffix Condition="'$(Configuration)' == 'Debug'">d</_TemporalFsrDebugSuffix>
+    <CreatorFsrLibraries>$(CreatorFsrRoot)/sdk/bin/ffx_sdk/ffx_fsr3upscaler_x64$(_TemporalFsrDebugSuffix).lib;$(CreatorFsrRoot)/sdk/bin/ffx_sdk/ffx_opticalflow_x64$(_TemporalFsrDebugSuffix).lib;$(CreatorFsrRoot)/sdk/bin/ffx_sdk/ffx_frameinterpolation_x64$(_TemporalFsrDebugSuffix).lib;$(CreatorFsrRoot)/sdk/bin/ffx_sdk/ffx_backend_dx12_x64$(_TemporalFsrDebugSuffix).lib;$(CreatorFsrRoot)/sdk/libs/pix/bin/x64/WinPixEventRuntime.lib</CreatorFsrLibraries>
+  </PropertyGroup>
+</Project>

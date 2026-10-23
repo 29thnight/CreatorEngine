@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory)][string]$EditorExecutable,
     [Parameter(Mandatory)][string]$ProjectPath,
     [Parameter(Mandatory)][string]$RuntimeDirectory,
@@ -20,7 +20,7 @@ $savedValidation = $env:CREATOR_DX12_VALIDATION
 $process = $null
 $result = [ordered]@{
     passed = $false
-    scope = 'Procedural DX12 SSGI GPU history after abort, shared cut/resize reset and extent-only recreation; not live camera routing, SDK quality or device loss.'
+    scope = 'DX12 per-view temporal lifetime and procedural SSGI pixels: abort/reset admission, two-view isolation, cut/resize and recreation.'
     executable = $exe
     binarySha256 = (Get-FileHash -LiteralPath (Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll')).Hash
     processStopped = $false
@@ -55,8 +55,8 @@ try {
     }
     $matches = [regex]::Matches($ssgi[0].data.log,
         'SSGI abort recovery stage=(\d+) samples=(\d+) maxError=([0-9.eE+\-]+) passed=(\d+)')
-    if ($matches.Count -ne 3) { throw 'Expected three GPU recovery comparisons.' }
-    for ($stage = 0; $stage -lt 3; ++$stage) {
+    if ($matches.Count -ne 4) { throw 'Expected four GPU recovery comparisons.' }
+    for ($stage = 0; $stage -lt 4; ++$stage) {
         $m = $matches[$stage]
         $errorValue = [double]::Parse($m.Groups[3].Value, [Globalization.CultureInfo]::InvariantCulture)
         if ([int]$m.Groups[1].Value -ne $stage -or [int]$m.Groups[2].Value -ne 65536 -or
@@ -64,6 +64,19 @@ try {
             throw "Invalid GPU comparison for stage $stage."
         }
         $result.cases += @{ stage = $stage; samples = 65536; maxError = $errorValue }
+    }
+    if ($ssgi[0].data.log -notmatch 'TR3 view history checks=21 passed=1') { throw 'TR3 view history checks missing.' }
+    $viewMatches = [regex]::Matches($ssgi[0].data.log, 'TR3 multiview reset=(\d+) view=(\d+) samples=(\d+) maxError=([0-9.eE+\-]+) passed=(\d+)')
+    if ($viewMatches.Count -ne 4) { throw 'TR3 multiview pixel checks missing.' }
+    $result.multiview = @()
+    for ($i = 0; $i -lt 4; ++$i) {
+        $m = $viewMatches[$i]
+        $errorValue = [double]::Parse($m.Groups[4].Value, [Globalization.CultureInfo]::InvariantCulture)
+        if ([int]$m.Groups[1].Value -ne [int][Math]::Floor($i / 2) -or [int]$m.Groups[2].Value -ne ($i % 2) -or [int]$m.Groups[3].Value -ne 65536 -or
+            ![double]::IsFinite($errorValue) -or $errorValue -gt 0.000001 -or [int]$m.Groups[5].Value -ne 1) {
+            throw 'TR3 multiview pixel comparison failed.'
+        }
+        $result.multiview += @{ resetOther = ($i -ge 2); view = ($i % 2); samples = 65536; maxError = $errorValue }
     }
     $resetMatches = [regex]::Matches($ssgi[0].data.log,
         'SSGI reset recovery case=([a-z-]+) frame=(\d+) extent=(\d+)x(\d+) samples=(\d+) maxError=([0-9.eE+\-]+) surfaces=(\d+) accumulation=([0-9.eE+\-]+) passed=(\d+)')

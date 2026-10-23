@@ -205,8 +205,10 @@ bool WriteModelGeometryArtifact(const ModelGeometryArtifact& value, std::vector<
     return Checked([&] {
         GeometryBase(value);
         std::string diagnostic;
-        Require(importer::ValidateMeshlets(value.mesh, value.mesh.meshlets, diagnostic), diagnostic.c_str());
-        Require(importer::ValidateMeshLods(value.mesh, value.mesh.coarseLods, diagnostic), diagnostic.c_str());
+        const bool meshletsValid = importer::ValidateMeshlets(value.mesh, value.mesh.meshlets, diagnostic);
+        Require(meshletsValid, diagnostic.c_str());
+        const bool lodsValid = importer::ValidateMeshLods(value.mesh, value.mesh.coarseLods, diagnostic);
+        Require(lodsValid, diagnostic.c_str());
         const auto attributes = GeometryClusterArchive(value.mesh);
         const auto pages = GeometryTopologyPages(value, *attributes);
         const auto metadata = GeometryStreamMetadata(value, *attributes, pages);

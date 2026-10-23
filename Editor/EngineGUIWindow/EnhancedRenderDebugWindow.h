@@ -1,6 +1,7 @@
 #pragma once
 #include "ImGui.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
+#include "CompiledGraphViewerModel.h"
 
 namespace editor
 {
@@ -30,6 +31,13 @@ private:
     double m_graphLastRefresh{-1.0};
     ImGuiTextFilter m_graphFilter;
     own::shared_owner<const EnhancedRenderGraph::DiagnosticSnapshot> m_graphSnapshot;
+    editor::compiled_graph::ViewModel m_graphModel;
+    std::vector<uint32_t> m_graphColumns, m_graphResources;
+    uint32_t m_graphSelectedPass{UINT32_MAX}, m_graphSelectedResource{UINT32_MAX};
+    bool m_graphFrozen{false}, m_graphShowCulled{false};
+    bool m_graphModelDirty{true};
+    bool m_graphRefreshPending{false};
+    uint64_t m_graphRefreshAfterFrame{0};
 
 	// 편집 중인 파라미터. 매 프레임 라이브 값으로 덮지 않는 이유는 적용이
 	// 한 프레임 늦기 때문이다 — 덮으면 슬라이더를 끄는 동안 값이 계속

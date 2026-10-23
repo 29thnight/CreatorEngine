@@ -1,4 +1,4 @@
-param(
+﻿param(
     [Parameter(Mandatory)][string]$EndpointFile,
     [Parameter(Mandatory)][string]$OutputDirectory,
     [string]$CameraTarget = 'Camera',
@@ -30,6 +30,15 @@ function Capture([string]$name, [int]$ordinal, [string]$action, [string[]]$argum
     $captureArgs = @($directory, [string]$ordinal)
     if ($Provider -ne 'none') { $captureArgs += 'fixed-sdk-clock' }
     Command 'render.temporal.history.capture' $captureArgs | Out-Null
+    $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+    do {
+        $armed = Command 'render.temporal.history.capture' @('status')
+        if ($armed.directory -ne $directory -or $armed.failed -or $armed.complete) { throw 'History capture arming failed.' }
+        if ($armed.ready) { break }
+        if ([DateTime]::UtcNow -ge $deadline) { throw 'History capture arming timed out.' }
+        Start-Sleep -Milliseconds 100
+    } while ($true)
+    $before = Command 'temporal.status'
     $receipt = Command $action $arguments
     $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
     do {
@@ -77,8 +86,28 @@ try {
     }
     foreach ($size in @(@(960,640),@(1280,720))) {
         foreach ($ordinal in @(1,8)) {
-            Command 'window.resize' @([string]$original.hostClientWidth,[string]$original.hostClientHeight) | Out-Null
-            Start-Sleep -Milliseconds 500
+            # The starting host can already equal this target. Establish a
+            # different extent so every resize capture has a real reset trigger.
+            $baselineWidth = [int]$original.hostClientWidth
+            $baselineHeight = [int]$original.hostClientHeight
+            if ($baselineWidth -eq $size[0] -and $baselineHeight -eq $size[1]) {
+                $baselineWidth += 64
+                $baselineHeight += 64
+            }
+            $baselineBefore = Command 'temporal.status'
+            $hostBefore = Command 'window.info'
+            $expectChange = $hostBefore.hostClientWidth -ne $baselineWidth -or $hostBefore.hostClientHeight -ne $baselineHeight
+            Command 'window.resize' @([string]$baselineWidth,[string]$baselineHeight) | Out-Null
+            $deadline = [DateTime]::UtcNow.AddSeconds($TimeoutSeconds)
+            do {
+                $baseline = Command 'temporal.status'
+                $extentChanged = $baseline.displayExtent.width -ne $baselineBefore.displayExtent.width -or
+                    $baseline.displayExtent.height -ne $baselineBefore.displayExtent.height
+                if ([uint64]$baseline.lastRealFrameId -gt [uint64]$baselineBefore.lastRealFrameId + 2 -and
+                    !$baseline.reset -and (!$expectChange -or $extentChanged)) { break }
+                if ([DateTime]::UtcNow -ge $deadline) { throw 'Baseline resize did not reach a submitted view.' }
+                Start-Sleep -Milliseconds 100
+            } while ($true)
             $label = "resize-$($size[0])-$ordinal"
             Capture $label $ordinal 'window.resize' @([string]$size[0],[string]$size[1])
             Capture "$label-reference" $ordinal 'camera.cut' @($CameraTarget)

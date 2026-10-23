@@ -216,7 +216,8 @@ namespace
 
     RGTransientPool::AllocationKey TransientAllocationKey(const RHITransientResourceDesc& desc)
     {
-        // Graph descriptions normalize dimension, mip count and creation state.
+        // Graph descriptions normalize dimension and creation state. Mip count
+        // remains part of allocation size and placed-resource identity.
         // Clear values affect placed-resource identity, but not allocation size.
         const auto& texture = desc.textureDesc;
         const auto& buffer = desc.bufferDesc;
@@ -225,7 +226,7 @@ namespace
             desc.buffer ? 0ull : static_cast<uint64_t>(texture.format),
             desc.buffer ? uint64_t(buffer.allowUnorderedAccess) | (uint64_t(buffer.allowIndirectArguments) << 1) :
                 uint64_t(texture.allowRenderTarget) | (uint64_t(texture.allowDepthStencil) << 1) |
-                (uint64_t(texture.allowUnorderedAccess) << 2)};
+                (uint64_t(texture.allowUnorderedAccess) << 2), desc.buffer ? 0ull : texture.mipLevels};
     }
 
     bool SamePlacedDescription(const RHITransientResourceDesc& left, const RHITransientResourceDesc& right)
@@ -305,7 +306,7 @@ struct EnhancedRenderGraph::QueuePlanningScratch
             subtotal += std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
         }
     };
-    double dependencyMilliseconds{0}, simulationMilliseconds{0};
+    double dependencyMilliseconds{0};
     struct ReadEpoch
     {
         std::vector<uint16_t> frontier, before;
@@ -317,15 +318,8 @@ struct EnhancedRenderGraph::QueuePlanningScratch
     std::vector<ReadEpoch> resources;
     ce::dynamic_bitset sharedReadTextures;
     std::vector<const QueueHint*> byPass;
-    std::vector<uint64_t> costs;
-    std::vector<uint16_t> candidates, order, candidateOrder, component, members, stack;
-    ce::dynamic_bitset candidatePasses;
-    std::vector<std::vector<uint16_t>> predecessors, successors, trialPredecessors, trialSuccessors;
-    std::vector<RHIQueueKind> serial, queues, trial;
-    std::vector<uint32_t> position, remaining;
-    std::vector<uint64_t> earliest, finish;
-    std::vector<uint8_t> feedsCompute;
-    std::array<std::vector<uint16_t>, 2> ready, future;
+    std::vector<std::vector<uint16_t>> predecessors, successors;
+    std::vector<RHIQueueKind> queues;
 };
 
 void EnhancedRenderGraph::JoinDeclarationPackets()
@@ -550,6 +544,7 @@ void EnhancedRenderGraph::ClearResourceMetadata(Resource& resource)
     // declaration can borrow an equal name without allocating or copying it.
     resource.desc.width = resource.desc.height = 0;
     resource.desc.arraySize = 1;
+    resource.desc.mipLevels = 1;
     resource.desc.format = RHIFormat::RGBA8Unorm;
     resource.desc.allowRenderTarget = false;
     resource.desc.allowDepthStencil = false;
@@ -818,7 +813,6 @@ void EnhancedRenderGraph::Reset()
     ResetImportedIndices(m_importedBuffers);
     m_atomicResources.clear();
     m_activeStructuralSchedule.reset();
-    m_executeOrderOverridden = false;
     for (auto& pass : m_passes)
     {
         ClearPassMetadata(pass);
@@ -882,6 +876,7 @@ bool EnhancedRenderGraph::DescribeResource(RGHandle handle, RGResourceDescriptio
         description.width = native.width;
         description.height = native.height;
         description.arraySize = native.depthOrArraySize;
+        description.mipLevels = native.mipLevels;
     }
     else
     {
@@ -889,6 +884,7 @@ bool EnhancedRenderGraph::DescribeResource(RGHandle handle, RGResourceDescriptio
         description.width = resource.desc.width;
         description.height = resource.desc.height;
         description.arraySize = resource.desc.arraySize;
+        description.mipLevels = resource.desc.mipLevels;
     }
     return true;
 }
@@ -1076,6 +1072,11 @@ RGHandle EnhancedRenderGraph::CreateTexture(const RGTextureDesc& desc)
     {
         return {};
     }
+    if (desc.mipLevels == 0 || desc.mipLevels > std::bit_width((std::max)(desc.width, desc.height)))
+    {
+        m_declarationError = "RenderGraph transient texture has invalid mip count: " + desc.name;
+        return {};
+    }
     auto& entry = AppendResource();
     if (m_collectingDeclarationPackets)
     {
@@ -1083,6 +1084,7 @@ RGHandle EnhancedRenderGraph::CreateTexture(const RGTextureDesc& desc)
         entry.desc.width = desc.width;
         entry.desc.height = desc.height;
         entry.desc.arraySize = desc.arraySize;
+        entry.desc.mipLevels = desc.mipLevels;
         entry.desc.format = desc.format;
         entry.desc.allowRenderTarget = desc.allowRenderTarget;
         entry.desc.allowDepthStencil = desc.allowDepthStencil;
@@ -1387,6 +1389,7 @@ void EnhancedRenderGraph::ClearPassMetadata(Pass& pass)
     pass.hasSideEffect = false;
     pass.culled = false;
     pass.computeCompatible = false;
+    pass.asyncCompute = false;
     pass.recordingSideEffect = false;
     pass.recordingIndependent = false;
     pass.repeatCount = 1;
@@ -2361,7 +2364,7 @@ RHITransientResourceDesc EnhancedRenderGraph::TransientDescription(const Resourc
     result.textureDesc.width = resource.desc.width;
     result.textureDesc.height = resource.desc.height;
     result.textureDesc.depthOrArraySize = (std::max)(1u, resource.desc.arraySize);
-    result.textureDesc.mipLevels = 1;
+    result.textureDesc.mipLevels = resource.desc.mipLevels;
     result.textureDesc.format = resource.desc.format;
     result.textureDesc.allowRenderTarget = resource.desc.allowRenderTarget;
     result.textureDesc.allowDepthStencil = resource.desc.allowDepthStencil;
@@ -2686,7 +2689,7 @@ bool EnhancedRenderGraph::CreateAliasedTransients(std::string& outError)
 
 void EnhancedRenderGraph::UpdateResourceUses()
 {
-    if (m_activeStructuralSchedule && !m_executeOrderOverridden)
+    if (m_activeStructuralSchedule)
     {
         // The exact authored contracts and execution order were matched before
         // binding this template. Only index lifetimes survive; storage ownership
@@ -2763,6 +2766,7 @@ bool EnhancedRenderGraph::CreateTransients(std::string& outError)
             mix(resource.desc.width);
             mix(resource.desc.height);
             mix((std::max)(1u, resource.desc.arraySize));
+            mix(resource.desc.mipLevels);
             mix(static_cast<uint64_t>(resource.desc.format));
             mix((resource.desc.allowRenderTarget ? 1u : 0u)
                 | (resource.desc.allowDepthStencil ? 2u : 0u)
@@ -2804,7 +2808,7 @@ bool EnhancedRenderGraph::CreateTransients(std::string& outError)
         create.width = resource.desc.width;
         create.height = resource.desc.height;
         create.depthOrArraySize = (std::max)(1u, resource.desc.arraySize);
-        create.mipLevels = 1;
+        create.mipLevels = resource.desc.mipLevels;
         create.format = resource.desc.format;
         create.allowRenderTarget = resource.desc.allowRenderTarget;
         create.allowDepthStencil = resource.desc.allowDepthStencil;
@@ -3070,8 +3074,8 @@ bool EnhancedRenderGraph::ValidateRepeatedPasses(std::string& outError) const
             }
         }
     }
-    // 진단 카운터의 표현 한계도 선언 단계에서 닫는다. 실제 배리어 수는
-    // 접근 수 이하이므로 이 상한 안에서는 반복 통계가 잘리거나 감기지 않는다.
+    // Split transitions can emit two barriers per repeated-phase access.
+    // Bound both halves before narrowing repeated diagnostics to uint32_t.
     uint64_t maximumBarriers = m_finalStateRequirements.size();
     for (const auto& pass : m_passes)
     {
@@ -3083,7 +3087,7 @@ bool EnhancedRenderGraph::ValidateRepeatedPasses(std::string& outError) const
         {
             for (const auto& phase : std::span{pass.phases})
             {
-                maximumBarriers += uint64_t(phase.usages.size()) * pass.repeatCount;
+                maximumBarriers += 2 * uint64_t(phase.usages.size()) * pass.repeatCount;
             }
         }
         else
@@ -3342,6 +3346,7 @@ void EnhancedRenderGraph::PlanBarriers(const ce::dynamic_bitset* batchEnds, Phas
         if (pass.repeated)
         {
             PlanRepeatedBarriers(pass, previousWrite);
+            PlanRepeatedSplitBarriers(pass);
             std::fill(previousAtomicVersion.begin(), previousAtomicVersion.end(), RGHandle::kInvalid);
         }
         else
@@ -3551,6 +3556,8 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
         const auto& pass = m_passes[i];
         DiagnosticPass copy{pass.name, i, -1, pass.culled, pass.hasSideEffect,
             pass.recordCost, pass.maxSlices, {}, {}};
+        copy.computeCompatible = pass.computeCompatible;
+        copy.asyncCompute = pass.asyncCompute;
         const auto position = std::find(executeOrder.begin(), executeOrder.end(), i);
         if (position != executeOrder.end())
         {
@@ -3579,12 +3586,12 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
         for (const auto& barrier : pass.transitions)
         {
             copy.barriers.push_back(
-                {textureIndex(barrier.texture), barrier.before, barrier.after, false, false, false, barrier.range});
+                {textureIndex(barrier.texture), barrier.before, barrier.after, false, false, false, barrier.range, {}, barrier.phase});
         }
         for (const auto& barrier : pass.bufferTransitions)
         {
             copy.barriers.push_back(
-                {bufferIndex(barrier.buffer), barrier.before, barrier.after, false, false, false, {}, barrier.range});
+                {bufferIndex(barrier.buffer), barrier.before, barrier.after, false, false, false, {}, barrier.range, barrier.phase});
         }
         for (const auto handle : pass.uavBarriers)
         {
@@ -3599,12 +3606,12 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
         for (const auto& barrier : pass.finalTransitions)
         {
             copy.barriers.push_back(
-                {textureIndex(barrier.texture), barrier.before, barrier.after, false, true, false, barrier.range});
+                {textureIndex(barrier.texture), barrier.before, barrier.after, false, true, false, barrier.range, {}, barrier.phase});
         }
         for (const auto& barrier : pass.finalBufferTransitions)
         {
             copy.barriers.push_back(
-                {bufferIndex(barrier.buffer), barrier.before, barrier.after, false, true, false, {}, barrier.range});
+                {bufferIndex(barrier.buffer), barrier.before, barrier.after, false, true, false, {}, barrier.range, barrier.phase});
         }
         copy.repeatCount = pass.repeatCount;
         for (size_t phaseIndex = 0; phaseIndex < pass.phases.size(); ++phaseIndex)
@@ -3622,7 +3629,7 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
                 for (const auto& barrier : plan.transitions)
                 {
                     barriers.push_back({textureIndex(barrier.texture), barrier.before, barrier.after, false, false,
-                                        false, barrier.range});
+                                        false, barrier.range, {}, barrier.phase});
                 }
                 for (const auto& barrier : plan.bufferTransitions)
                 {
@@ -3633,7 +3640,8 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
                                         false,
                                         false,
                                         {},
-                                        barrier.range});
+                                        barrier.range,
+                                        barrier.phase});
                 }
                 for (const auto handle : plan.uavBarriers)
                 {
@@ -3835,7 +3843,7 @@ void EnhancedRenderGraph::BuildDependencyWaves()
 
 const std::vector<uint16_t>& EnhancedRenderGraph::GetExecuteOrder() const
 {
-    return m_activeStructuralSchedule && !m_executeOrderOverridden ?
+    return m_activeStructuralSchedule ?
         m_activeStructuralSchedule->order : m_executeOrder;
 }
 
@@ -3950,8 +3958,7 @@ bool EnhancedRenderGraph::MatchesStructuralSchedule(const StructuralSchedule& sc
         const auto& current = m_passes[index];
         const auto& cached = schedule.passes[index];
         if (current.name != cached.name || current.hasSideEffect != cached.hasSideEffect ||
-            current.computeCompatible != cached.computeCompatible ||
-            current.recordingSideEffect != cached.recordingSideEffect ||
+            current.computeCompatible != cached.computeCompatible || current.asyncCompute != cached.asyncCompute || current.recordingSideEffect != cached.recordingSideEffect ||
             current.recordingIndependent != cached.recordingIndependent || current.maxSlices != cached.maxSlices ||
             current.repeatCount != cached.repeatCount || bool(current.execute) != cached.execute ||
             bool(current.splitExecute) != cached.splitExecute || current.repeated != cached.repeated ||
@@ -4045,6 +4052,7 @@ void EnhancedRenderGraph::CaptureStructuralDeclarations(StructuralSchedule& sche
         declaration.repeatCount = pass.repeatCount;
         declaration.hasSideEffect = pass.hasSideEffect;
         declaration.computeCompatible = pass.computeCompatible;
+        declaration.asyncCompute = pass.asyncCompute;
         declaration.recordingSideEffect = pass.recordingSideEffect;
         declaration.recordingIndependent = pass.recordingIndependent;
         declaration.execute = bool(pass.execute);
@@ -4358,6 +4366,7 @@ bool EnhancedRenderGraph::BindProgram(const own::shared_owner<const GraphProgram
         pass.recordCost = binding.recordCost;
         pass.repeatCount = declaration.repeatCount;
         pass.computeCompatible = declaration.computeCompatible;
+        pass.asyncCompute = declaration.asyncCompute;
         pass.recordingIndependent = declaration.recordingIndependent;
         pass.recordingSideEffect = declaration.recordingSideEffect;
         pass.repeated = declaration.repeated;
@@ -4417,7 +4426,6 @@ bool EnhancedRenderGraph::Compile(std::string& outError)
     m_stats.programUsageCopiesAvoided = m_programUsageCopiesAvoided;
     m_timingSignature.reset();
     m_activeStructuralSchedule.reset();
-    m_executeOrderOverridden = false;
     if (!m_transientHeaps.empty())
     {
         outError = "An aliased graph must be Reset after GPU completion before recompilation";
@@ -4648,6 +4656,12 @@ void EnhancedRenderGraph::DeclareComputeCompatible(RGPassId pass)
     m_passes[pass.index].computeCompatible = true;
 }
 
+void EnhancedRenderGraph::DeclareAsyncCompute(RGPassId pass)
+{
+    DeclareComputeCompatible(pass);
+    m_passes[pass.index].asyncCompute = true;
+}
+
 void EnhancedRenderGraph::DeclareRecordingSideEffect(RGPassId pass)
 {
     RequireQueueIdle();
@@ -4748,7 +4762,7 @@ void EnhancedRenderGraph::BuildTimingSignature()
         }
         else
         {
-            numbers({resource.desc.width, resource.desc.height, resource.desc.arraySize,
+            numbers({resource.desc.width, resource.desc.height, resource.desc.arraySize, resource.desc.mipLevels,
                 static_cast<uint64_t>(resource.desc.format), uint64_t(resource.desc.allowRenderTarget),
                 uint64_t(resource.desc.allowDepthStencil), uint64_t(resource.desc.allowUnorderedAccess)});
             for (const float component : resource.desc.clearColor)
@@ -4767,7 +4781,7 @@ void EnhancedRenderGraph::BuildTimingSignature()
     {
         name(pass.name);
         m_signatureCulledOffsets.push_back(signature.size());
-        numbers({uint64_t(pass.culled), uint64_t(pass.hasSideEffect), uint64_t(pass.computeCompatible),
+        numbers({uint64_t(pass.culled), uint64_t(pass.hasSideEffect), uint64_t(pass.computeCompatible), uint64_t(pass.asyncCompute),
             uint64_t(pass.recordingSideEffect), pass.maxSlices, pass.recordCost,
             uint64_t(static_cast<bool>(pass.splitExecute)), uint64_t(pass.repeated), pass.repeatCount,
             uint64_t(pass.recordingIndependent), uint64_t(static_cast<bool>(pass.execute)),
@@ -4924,17 +4938,22 @@ bool EnhancedRenderGraph::CanShareTextureReads(uint16_t index) const
 }
 
 void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>& queues, QueuePlanningScratch& scratch,
-    std::vector<std::vector<uint16_t>>& predecessors,
-    std::vector<std::vector<uint16_t>>& successors) const
+                                                 std::vector<std::vector<uint16_t>>& predecessors,
+                                                 std::vector<std::vector<uint16_t>>& successors) const
 {
     const auto& executeOrder = GetExecuteOrder();
     QueuePlanningScratch::Timer timer{scratch.dependencyMilliseconds};
-    // Trials change queue ownership, not the pass count. Preserve each adjacency
-    // list's storage instead of allocating the entire DAG for every trial.
+    // Reuse adjacency storage for the one authored queue assignment.
     predecessors.resize(m_passes.size());
     successors.resize(m_passes.size());
-    for (auto& list : std::span{predecessors.data(), predecessors.size()}) list.clear();
-    for (auto& list : std::span{successors.data(), successors.size()}) list.clear();
+    for (auto& list : std::span{predecessors.data(), predecessors.size()})
+    {
+        list.clear();
+    }
+    for (auto& list : std::span{successors.data(), successors.size()})
+    {
+        list.clear();
+    }
     const auto add = [&](uint16_t producer, uint16_t consumer)
     {
         if (producer == consumer || m_passes[producer].culled || m_passes[consumer].culled)
@@ -4969,9 +4988,8 @@ void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>
                 continue;
             }
             auto& epoch = resources[usage.handle.index];
-            const bool immutableRead = usage.access == RGAccessMode::Read &&
-                usage.state != RHIResourceState::Common && !IsWriteState(usage.state) &&
-                !m_passes[pass].repeated;
+            const bool immutableRead = usage.access == RGAccessMode::Read && usage.state != RHIResourceState::Common &&
+                                       !IsWriteState(usage.state) && !m_passes[pass].repeated;
             // Legacy DX12 maps graphics SRV to PIXEL|NON_PIXEL and compute SRV
             // to NON_PIXEL. Equal RHI enums do not prove cross-queue compatibility.
             // Same-queue readers share one immutable state epoch: that queue owns
@@ -5014,192 +5032,37 @@ void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>
             }
         }
     }
+
 }
 
-uint64_t EnhancedRenderGraph::SimulateQueues(const std::vector<RHIQueueKind>& queues,
-    const std::vector<uint64_t>& costs, const std::vector<std::vector<uint16_t>>& predecessors,
-    const std::vector<std::vector<uint16_t>>& successors, bool reorder, std::vector<uint16_t>* order,
-    QueuePlanningScratch& scratch) const
+bool EnhancedRenderGraph::SelectExecutionQueues(const RHIQueueCapabilities& capabilities, std::string& outError)
 {
-    QueuePlanningScratch::Timer timer{scratch.simulationMilliseconds};
-    const auto baseline = SimulateQueueOrder(queues, costs, predecessors, successors, reorder, order, scratch, false);
-    if (!reorder) return baseline;
-    auto& candidateOrder = scratch.candidateOrder;
-    const auto candidate = SimulateQueueOrder(queues, costs, predecessors, successors, true,
-        order ? &candidateOrder : nullptr, scratch, true);
-    if (candidate < baseline)
+    RequireQueueIdle();
+    if (!m_compiled || m_queueExecutionAttempted || m_recordedRecording != 0 || m_statesCommitted)
     {
-        if (order)
-        {
-            order->swap(candidateOrder);
-        }
-        return candidate;
+        outError = "Queue selection requires a compiled, unrecorded graph";
+        return false;
     }
-    return baseline;
-}
-
-uint64_t EnhancedRenderGraph::SimulateQueueOrder(const std::vector<RHIQueueKind>& queues,
-    const std::vector<uint64_t>& costs, const std::vector<std::vector<uint16_t>>& predecessors,
-    const std::vector<std::vector<uint16_t>>& successors, bool reorder, std::vector<uint16_t>* order,
-    QueuePlanningScratch& scratch, bool prioritizeComputeInputs) const
-{
-    const auto& executeOrder = GetExecuteOrder();
-    const uint64_t handoff = m_queueCostModel.handoffNanoseconds;
-    const auto addTime = [](uint64_t left, uint64_t right)
+    ResetQueueDiagnostics();
+    m_queueDiagnostics.requestedExecutionMode = m_queueExecutionMode;
+    m_queueDiagnostics.measurementDomain = m_measurementDomain;
+    if (m_queueExecutionMode == 0)
     {
-        return right > UINT64_MAX - left ? UINT64_MAX : left + right;
-    };
-    auto& position = scratch.position;
-    const auto compiled = std::span{executeOrder.data(), executeOrder.size()};
-    position.assign(m_passes.size(), UINT32_MAX);
-    for (uint32_t index = 0; index < compiled.size(); ++index)
-    {
-        position[compiled[index]] = index;
+        m_queueDiagnostics.schedule.fallbackReason = RGQueueFallbackReason::Disabled;
+        outError.clear();
+        return true;
     }
-    // Ancestors of compute work go first among equally ready graphics passes so
-    // compute starts early; everything else keeps compiled order on ties.
-    auto& feedsCompute = scratch.feedsCompute;
-    feedsCompute.assign(m_passes.size(), false);
-    bool usesCompute = false;
-    for (size_t index = compiled.size(); index-- > 0;)
+    if (!BuildQueueSchedule(capabilities, {}, m_queueExecutionMode == 2,
+            m_queueDiagnostics.schedule, outError))
     {
-        const auto pass = compiled[index];
-        usesCompute = usesCompute || queues[pass] == RHIQueueKind::Compute;
-        const auto& nextPasses = successors[pass];
-        for (const auto next : std::span{nextPasses.data(), nextPasses.size()})
-        {
-            if (queues[next] == RHIQueueKind::Compute || feedsCompute[next])
-            {
-                feedsCompute[pass] = true;
-                break;
-            }
-        }
+        return false;
     }
-    auto& remaining = scratch.remaining;
-    auto& earliest = scratch.earliest;
-    auto& finish = scratch.finish;
-    auto& ready = scratch.ready;
-    auto& future = scratch.future;
-    remaining.assign(m_passes.size(), 0);
-    earliest.assign(m_passes.size(), 0);
-    finish.assign(m_passes.size(), 0);
-    // The first compute batch always waits for the graphics prologue, even
-    // without a resource edge. It cannot start before this modeled handoff.
-    uint64_t queueFree[2]{0, usesCompute ? handoff : 0};
-    const auto slot = [&](uint16_t pass) { return queues[pass] == RHIQueueKind::Compute ? 1 : 0; };
-    const auto start = [&](uint16_t pass) { return (std::max)(earliest[pass], queueFree[slot(pass)]); };
-    const auto rank = [&](uint16_t pass)
-    {
-        return position[pass] + (reorder && !feedsCompute[pass] ? static_cast<uint32_t>(executeOrder.size()) : 0u);
-    };
-    const auto readyLater = [&](uint16_t left, uint16_t right) { return rank(left) > rank(right); };
-    const auto deferred = [&](uint16_t pass)
-    {
-        return prioritizeComputeInputs && !feedsCompute[pass] && queues[pass] != RHIQueueKind::Compute;
-    };
-    const auto better = [&](uint16_t left, uint16_t right)
-    {
-        return std::tuple{deferred(left), reorder ? start(left) : 0, rank(left)} <
-            std::tuple{deferred(right), reorder ? start(right) : 0, rank(right)};
-    };
-    const auto futureLater = [&](uint16_t left, uint16_t right)
-    {
-        if (deferred(left) != deferred(right)) return deferred(left) > deferred(right);
-        return earliest[left] > earliest[right] || (earliest[left] == earliest[right] && readyLater(left, right));
-    };
-    for (uint32_t queue = 0; queue < 2; ++queue)
-    {
-        ready[queue].clear();
-        future[queue].clear();
-        ready[queue].reserve(executeOrder.size());
-        future[queue].reserve(executeOrder.size());
-    }
-    const auto enqueue = [&](uint16_t pass)
-    {
-        const auto queue = slot(pass);
-        if (!reorder || earliest[pass] <= queueFree[queue])
-        {
-            ready[queue].push_back(pass);
-            std::push_heap(ready[queue].data(), ready[queue].data() + ready[queue].size(), readyLater);
-        }
-        else
-        {
-            future[queue].push_back(pass);
-            std::push_heap(future[queue].data(), future[queue].data() + future[queue].size(), futureLater);
-        }
-    };
-    for (const auto pass : compiled)
-    {
-        remaining[pass] = static_cast<uint32_t>(predecessors[pass].size());
-        if (remaining[pass] == 0) enqueue(pass);
-    }
-    if (order)
-    {
-        order->clear();
-        order->reserve(executeOrder.size());
-    }
-    // Each queue has two heaps. Future work is ordered by immutable dependency
-    // readiness. Once the queue clock catches up, all those starts are clamped
-    // to queueFree and must instead be ordered by ancestor/compiled-position rank.
-    // Compare only the two queue heads: same list policy, O(P log P + E) rather
-    // than rescanning a potentially wide frontier for every dispatched pass.
-    while (!ready[0].empty() || !ready[1].empty() || !future[0].empty() || !future[1].empty())
-    {
-        uint16_t heads[2]{RGPassId::kInvalid, RGPassId::kInvalid};
-        for (uint32_t queue = 0; queue < 2; ++queue)
-        {
-            while (!future[queue].empty() && earliest[future[queue].front()] <= queueFree[queue])
-            {
-                const auto pass = future[queue].front();
-                std::pop_heap(future[queue].data(), future[queue].data() + future[queue].size(), futureLater);
-                future[queue].pop_back();
-                enqueue(pass);
-            }
-            if (!ready[queue].empty()) heads[queue] = ready[queue].front();
-            else if (!future[queue].empty()) heads[queue] = future[queue].front();
-            if (!ready[queue].empty() && !future[queue].empty() &&
-                better(future[queue].front(), heads[queue])) heads[queue] = future[queue].front();
-        }
-        auto pass = heads[0];
-        if (pass == RGPassId::kInvalid) pass = heads[1];
-        else if (heads[1] != RGPassId::kInvalid)
-        {
-            if (better(heads[1], pass)) pass = heads[1];
-        }
-        const auto queue = slot(pass);
-        if (!ready[queue].empty() && ready[queue].front() == pass)
-        {
-            std::pop_heap(ready[queue].data(), ready[queue].data() + ready[queue].size(), readyLater);
-            ready[queue].pop_back();
-        }
-        else
-        {
-            std::pop_heap(future[queue].data(), future[queue].data() + future[queue].size(), futureLater);
-            future[queue].pop_back();
-        }
-        finish[pass] = addTime(start(pass), costs[pass]);
-        queueFree[slot(pass)] = finish[pass];
-        if (order)
-        {
-            order->push_back(pass);
-        }
-        const auto& nextPasses = successors[pass];
-        for (const auto next : std::span{nextPasses.data(), nextPasses.size()})
-        {
-            const uint64_t available = addTime(finish[pass], queues[next] != queues[pass] ? handoff : 0);
-            earliest[next] = (std::max)(earliest[next], available);
-            if (--remaining[next] == 0)
-            {
-                enqueue(next);
-            }
-        }
-    }
-    // The graphics epilogue joins the last compute completion.
-    return (std::max)(queueFree[0], usesCompute ? addTime(queueFree[1], handoff) : 0);
+    m_queueDiagnostics.effectiveExecutionMode = m_queueDiagnostics.schedule.usesCompute ? 2u : 0u;
+    return true;
 }
 
 bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabilities,
-    const std::vector<QueueHint>& hints, uint64_t minimumGpuNanoseconds,
+    const std::vector<QueueHint>& hints, bool enableAsyncCompute,
     QueueSchedule& output, std::string& outError) const
 {
     std::lock_guard planningLock{m_queuePlanningMutex};
@@ -5208,7 +5071,7 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
         m_queuePlanningScratch = own::make_unique<QueuePlanningScratch>();
     }
     auto& scratch = *m_queuePlanningScratch;
-    scratch.dependencyMilliseconds = scratch.simulationMilliseconds = 0;
+    scratch.dependencyMilliseconds = 0;
     const auto& executeOrder = GetExecuteOrder();
     output.Reset();
     outError.clear();
@@ -5216,11 +5079,6 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
     {
         outError = "Queue planning requires a compiled graph and graphics capability";
         return false;
-    }
-    scratch.sharedReadTextures.assign(m_resources.size(), false);
-    for (uint16_t resource = 0; resource < m_resources.size(); ++resource)
-    {
-        scratch.sharedReadTextures.set(resource, CanShareTextureReads(resource));
     }
     auto& byPass = scratch.byPass;
     byPass.assign(m_passes.size(), nullptr);
@@ -5235,11 +5093,10 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
     }
     auto& plan = output;
     plan.compileGeneration = m_compileGeneration;
-    // Placed allocations have already proved all-use happens-before on the
-    // dependency DAG. Every queue placement preserves those edges.
-    const bool allowCompute = capabilities.compute && capabilities.crossQueueTimeline && minimumGpuNanoseconds > 0 &&
-                              m_scheduling == RGSchedulingMode::ExplicitVersioned;
-    if (minimumGpuNanoseconds == 0)
+    // Authored placement only. Timings are diagnostic input, never queue policy.
+    const bool allowCompute = enableAsyncCompute && capabilities.compute && capabilities.crossQueueTimeline &&
+        m_scheduling == RGSchedulingMode::ExplicitVersioned;
+    if (!enableAsyncCompute)
     {
         plan.fallbackReason = RGQueueFallbackReason::Disabled;
     }
@@ -5247,175 +5104,44 @@ bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabil
     {
         plan.fallbackReason = RGQueueFallbackReason::Unsupported;
     }
-    const bool overlap = m_queueCostModel.placement == RGQueuePlacement::Overlap;
-    auto& costs = scratch.costs;
-    costs.assign(m_passes.size(), 0);
-    auto& candidates = scratch.candidates;
-    candidates.clear();
-    plan.predictionComplete = true;
+    auto& queues = scratch.queues;
+    queues.assign(m_passes.size(), RHIQueueKind::Graphics);
     for (const auto pass : std::span{executeOrder})
     {
         const auto* hint = byPass[pass];
         const bool measured = hint && hint->hasGpuMeasurement;
-        costs[pass] = measured ? hint->measuredGpuNanoseconds : 0;
         plan.measuredPasses += measured ? 1u : 0u;
         plan.missingMeasurementPasses += measured ? 0u : 1u;
-        plan.predictionComplete = plan.predictionComplete && measured;
-        plan.predictedSerialNanoseconds = costs[pass] > UINT64_MAX - plan.predictedSerialNanoseconds
-            ? UINT64_MAX : plan.predictedSerialNanoseconds + costs[pass];
-        const bool declared = hint && hint->computeCompatible &&
-            (!overlap || m_passes[pass].computeCompatible);
+        const bool declared = m_passes[pass].asyncCompute;
         const bool legal = !declared || IsComputeStateCompatible(pass);
         plan.rejectedStatePasses += declared && !legal ? 1u : 0u;
-        if (allowCompute && declared && legal && measured &&
-            hint->measuredGpuNanoseconds >= minimumGpuNanoseconds)
-        {
-            candidates.push_back(pass);
-        }
-    }
-    plan.eligibleComputePasses = static_cast<uint32_t>(candidates.size());
-    plan.predictionComplete = plan.predictionComplete && plan.predictedSerialNanoseconds != UINT64_MAX;
-    // Partial sums are not a prediction. A measured empty scope is valid zero;
-    // missing scopes never receive a synthetic positive cost to force placement.
-    if (!plan.predictionComplete)
-    {
-        plan.predictedSerialNanoseconds = 0;
-    }
-    plan.predictedNanoseconds = plan.predictedSerialNanoseconds;
-    if (allowCompute && overlap && !plan.predictionComplete)
-    {
-        plan.fallbackReason = RGQueueFallbackReason::MissingMeasurement;
-    }
-    else if (allowCompute && candidates.empty())
-    {
-        plan.fallbackReason = plan.rejectedStatePasses != 0 ? RGQueueFallbackReason::UnsupportedState :
-            RGQueueFallbackReason::InsufficientGain;
-    }
-    // Leave the normal serial order and barriers alone on every early fallback.
-    if (candidates.empty() || (overlap && !plan.predictionComplete))
-    {
-        for (const auto pass : std::span{executeOrder})
-        {
-            plan.entries.push_back({pass, RHIQueueKind::Graphics});
-        }
-        return true;
-    }
-    auto& predecessors = scratch.predecessors;
-    auto& successors = scratch.successors;
-    auto& serial = scratch.serial;
-    serial.assign(m_passes.size(), RHIQueueKind::Graphics);
-    auto& queues = scratch.queues;
-    queues = serial;
-    // The graph retains scratch capacities. Each invocation rebuilds values;
-    // neither measurements nor ownership epochs survive as valid plan inputs.
-    BuildQueueDependencies(queues, scratch, predecessors, successors);
-    auto& order = scratch.order;
-    order = executeOrder;
-    if (!overlap)
-    {
-        for (const auto pass : candidates)
+        plan.eligibleComputePasses += declared && legal ? 1u : 0u;
+        if (allowCompute && declared && legal)
         {
             queues[pass] = RHIQueueKind::Compute;
+            plan.usesCompute = true;
         }
-        BuildQueueDependencies(queues, scratch, predecessors, successors);
-        if (plan.predictionComplete)
-        {
-            plan.predictedNanoseconds = SimulateQueues(queues, costs, predecessors, successors, false, nullptr, scratch);
-        }
-    }
-    // Missing samples and saturated arithmetic are not evidence of a benefit.
-    // Retain the original graphics order until the entire executed graph is timed.
-    else if (!candidates.empty() && plan.predictionComplete)
-    {
-        const bool reorder = m_orderPolicy == RGOrderPolicy::DependencyOrder;
-        uint64_t best = plan.predictedSerialNanoseconds;
-        auto& trialPredecessors = scratch.trialPredecessors;
-        auto& trialSuccessors = scratch.trialSuccessors;
-        auto& trial = scratch.trial;
-        const auto attempt = [&](std::span<const uint16_t> passes)
-        {
-            ++plan.placementTrials;
-            trial = queues;
-            for (const auto pass : passes)
-            {
-                trial[pass] = trial[pass] == RHIQueueKind::Compute ? RHIQueueKind::Graphics : RHIQueueKind::Compute;
-            }
-            BuildQueueDependencies(trial, scratch, trialPredecessors, trialSuccessors);
-            const auto span = SimulateQueues(trial, costs, trialPredecessors, trialSuccessors, reorder, nullptr, scratch);
-            if (span < best)
-            {
-                best = span;
-                queues = trial;
-            }
-        };
-        // A dependent chain of candidates (SSAO raw -> filter) only pays off as a
-        // unit: moving one member alone adds two handoffs. Try chains first, then
-        // single toggles to drop members that do not help.
-        auto& component = scratch.component;
-        component.assign(m_passes.size(), RGPassId::kInvalid);
-        auto& candidatePasses = scratch.candidatePasses;
-        candidatePasses.assign(m_passes.size(), false);
-        for (const auto pass : candidates)
-        {
-            candidatePasses.set(pass, true);
-        }
-        for (const auto root : candidates)
-        {
-            if (component[root] != RGPassId::kInvalid)
-            {
-                continue;
-            }
-            auto& members = scratch.members;
-            auto& stack = scratch.stack;
-            members.assign(1, root);
-            stack.assign(1, root);
-            component[root] = root;
-            while (!stack.empty())
-            {
-                const auto pass = stack.back();
-                stack.pop_back();
-                for (const auto* neighbours : {&predecessors[pass], &successors[pass]})
-                {
-                    for (const auto next : *neighbours)
-                    {
-                        if (candidatePasses.test(next) && component[next] == RGPassId::kInvalid)
-                        {
-                            component[next] = root;
-                            members.push_back(next);
-                            stack.push_back(next);
-                        }
-                    }
-                }
-            }
-            attempt(members);
-        }
-        for (const auto pass : candidates)
-        {
-            attempt(std::span<const uint16_t>{&pass, 1});
-        }
-        if (plan.predictedSerialNanoseconds - best >= m_queueCostModel.minimumGainNanoseconds)
-        {
-            BuildQueueDependencies(queues, scratch, predecessors, successors);
-            plan.predictedNanoseconds = SimulateQueues(queues, costs, predecessors, successors, reorder, &order, scratch);
-        }
-        else
-        {
-            queues = serial; // No predicted benefit: keep the single-queue plan.
-            plan.fallbackReason = RGQueueFallbackReason::InsufficientGain;
-        }
-    }
-    BuildQueueDependencies(queues, scratch, predecessors, successors);
-    plan.dependencyMilliseconds = scratch.dependencyMilliseconds;
-    plan.simulationMilliseconds = scratch.simulationMilliseconds;
-    for (const auto pass : order)
-    {
-        plan.usesCompute = plan.usesCompute || queues[pass] == RHIQueueKind::Compute;
         plan.entries.push_back({pass, queues[pass]});
     }
+    if (allowCompute && !plan.usesCompute)
+    {
+        plan.fallbackReason = plan.rejectedStatePasses ? RGQueueFallbackReason::UnsupportedState :
+            RGQueueFallbackReason::NoAsyncPasses;
+    }
+    // Legacy prediction fields stay zero for saved diagnostic schema readers.
     if (!plan.usesCompute)
     {
         return true;
     }
+    scratch.sharedReadTextures.assign(m_resources.size(), false);
+    for (uint16_t resource = 0; resource < m_resources.size(); ++resource)
+    {
+        scratch.sharedReadTextures.set(resource, CanShareTextureReads(resource));
+    }
+    auto& predecessors = scratch.predecessors;
+    auto& successors = scratch.successors;
+    BuildQueueDependencies(queues, scratch, predecessors, successors);
+    plan.dependencyMilliseconds = scratch.dependencyMilliseconds;
     for (const auto pass : std::span{executeOrder})
     {
         for (const auto producer : predecessors[pass])

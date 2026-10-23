@@ -1122,6 +1122,7 @@ namespace ConsoleCmd
                 item.Set("after", CommandData::Int(static_cast<int>(barrier.after)));
                 item.Set("uav", CommandData::Bool(barrier.uav));
                 item.Set("afterPass", CommandData::Bool(barrier.afterPass));
+                item.Set("transitionPhase", CommandData::Int(static_cast<int>(barrier.phase)));
                 item.Set("aliasing", CommandData::Bool(barrier.aliasing));
                 if (barrier.resource < snapshot->resources.size())
                 {

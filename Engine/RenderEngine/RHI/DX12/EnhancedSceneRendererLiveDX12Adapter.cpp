@@ -269,9 +269,17 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
         gpuMeasurements.Store(submission->domain, std::move(sample));
     }
 
+    bool ownedQueueFrame{false};
     bool ConfigureQueueExecution(uint32_t mode, std::string& error)
     {
-        if (mode != 0 && !graphics.queue)
+        ownedQueueExecution = mode != 0;
+        asyncCompute = mode == 2;
+        error.clear();
+        return true;
+    }
+    bool EnsureOwnedQueues(std::string& error)
+    {
+        if (!graphics.queue)
         {
             if (!resources.GetPrimaryGraphicsQueue(graphics.queue, error))
             {
@@ -280,7 +288,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
             graphics.profiler = &profiler;
             std::printf("[rg8.live] enabled=true profilerQueue=graphics primary=true\n");
         }
-        if (mode == 2 && !computeProfiler.IsInitialized())
+        if (asyncCompute && !computeProfiler.IsInitialized())
         {
             if (!compute.queue && !resources.CreateQueue(RHIQueueKind::Compute, compute.queue, error))
             {
@@ -296,10 +304,8 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
                 return false;
             }
             compute.profiler = &computeProfiler;
-            std::printf("[rg8.compute] enabled=true clocks=per-queue minimumNs=1000\n");
+            std::printf("[rg8.compute] enabled=true clocks=per-queue placement=authored\n");
         }
-        ownedQueueExecution = mode != 0;
-        asyncCompute = mode == 2;
         return true;
     }
 
@@ -493,7 +499,7 @@ void EnhancedSceneRendererLiveDX12Adapter::ShutdownPipeline()
             static_cast<unsigned long long>(impl.queueSubmissions), static_cast<unsigned long long>(impl.queueBatches));
         std::printf("[rg8.barriers] total=%llu last=%u\n",
             static_cast<unsigned long long>(impl.queueBarriers), impl.lastQueueBarriers);
-        std::printf("[rg8.schedule] placement=overlap computeSubmittedFrames=%llu measuredOverlapSubmissions=%llu predictedGainNs=%llu predictionCalibrated=false\n",
+        std::printf("[rg8.schedule] placement=authored computeSubmittedFrames=%llu measuredOverlapSubmissions=%llu predictedGainNs=%llu predictionCalibrated=false\n",
             static_cast<unsigned long long>(impl.computeSubmittedFrames),
             static_cast<unsigned long long>(impl.measuredOverlapSubmissions),
             static_cast<unsigned long long>(impl.predictedGainNanoseconds));
@@ -581,6 +587,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::BeginFrame(std::string& outError)
 {
     Impl& impl = *m_impl;
     impl.currentProfilerToken = {};
+    impl.ownedQueueFrame = false;
     // Apply mode changes at frame admission, never to an in-flight submission.
     // Environment changes and the explicit override both retain warm caches.
     if (!impl.ConfigureQueueExecution(impl.queueExecutionModeOverride.value_or(LiveDx12RequestedQueueExecutionMode()), outError))
@@ -604,7 +611,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::BeginFrame(std::string& outError)
         std::free(value);
         return enabled;
     }();
-    impl.resources.SetDeferredImmediateRecording(deferredBackend && UsesSoftwareRecording() && !impl.ownedQueueExecution);
+    impl.resources.SetDeferredImmediateRecording(deferredBackend && UsesSoftwareRecording());
     if (!impl.resources.BeginFrame(outError)) return false;
     impl.commandPool.BeginFrame(impl.commandPoolFrame);
     return true;
@@ -639,7 +646,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::EndFrame(std::string& outError)
 
 bool EnhancedSceneRendererLiveDX12Adapter::UsesOwnedQueueExecution() const
 {
-    return m_impl->ownedQueueExecution;
+    return m_impl->ownedQueueFrame;
 }
 
 uint32_t EnhancedSceneRendererLiveDX12Adapter::GetQueueExecutionMode() const
@@ -659,9 +666,28 @@ bool EnhancedSceneRendererLiveDX12Adapter::SetQueueExecutionMode(uint32_t mode, 
     return true;
 }
 
+bool EnhancedSceneRendererLiveDX12Adapter::SelectGraphExecution(EnhancedRenderGraph& graph, std::string& outError)
+{
+    if (!graph.SelectExecutionQueues({true, true, false, true}, outError))
+    {
+        return false;
+    }
+    if (!graph.GetQueueDiagnostics().schedule.usesCompute)
+    {
+        return true;
+    }
+    return BeginOwnedQueueRecording(outError);
+}
+
 bool EnhancedSceneRendererLiveDX12Adapter::BeginOwnedQueueRecording(std::string& outError)
 {
-    return m_impl->resources.BeginQueueFrame(m_impl->graphics.queue, outError);
+    auto& impl = *m_impl;
+    if (!impl.EnsureOwnedQueues(outError) || !impl.resources.BeginQueueFrame(impl.graphics.queue, outError))
+    {
+        return false;
+    }
+    impl.ownedQueueFrame = true;
+    return true;
 }
 
 bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(const own::shared_owner<EnhancedRenderGraph>& graph,
@@ -716,7 +742,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(const own::shared_ow
         impl.profiler.Calibration().cpuTicksPerSecond);
     bool checkedSignature = false;
     bool signatureMatches = false;
-    const auto hints = graph->MeasuredQueueHints([&](const GpuPassTimingIdentity& identity) -> std::optional<uint64_t>
+    const auto hints = impl.evidenceTelemetry ? graph->MeasuredQueueHints([&](const GpuPassTimingIdentity& identity) -> std::optional<uint64_t>
     {
         if (!view || !identity.IsValid())
         {
@@ -754,10 +780,10 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(const own::shared_ow
         }
         const auto& costs = view->nanoseconds;
         return signatureMatches && identity.passIndex < costs.size() ? costs[identity.passIndex] : std::nullopt;
-    });
+    }) : std::vector<EnhancedRenderGraph::QueueHint>{};
     const bool submitted =
         graph->SubmitQueues(graph, *recorder, graphics, impl.asyncCompute ? &compute : nullptr, hints,
-                            impl.asyncCompute ? 1000 : 0, std::move(owner), execution, outError);
+                            impl.asyncCompute, std::move(owner), execution, outError);
     // A partially accepted transaction has already issued real native signals.
     // Preserve their next values even when a later translation or submit fails.
     impl.graphics.nextSignal = graphics.nextSignal;
@@ -779,19 +805,31 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(const own::shared_ow
         ++impl.computeSubmittedFrames;
         impl.predictedGainNanoseconds += execution.predictedSerialNanoseconds - execution.predictedNanoseconds;
     }
+    TraceGraphExecution(*graph);
+    return impl.resources.JoinQueueFrame(execution.completion, outError);
+}
+
+void EnhancedSceneRendererLiveDX12Adapter::TraceGraphExecution(const EnhancedRenderGraph& graph, bool primaryEnqueued) const
+{
+    const auto& impl = *m_impl;
+    if (GetQueueExecutionMode() == 0)
+    {
+        return;
+    }
+    const auto domain = graph.GetMeasurementDomain();
     if (impl.evidenceTelemetry)
     {
-        const auto& diagnostics = graph->GetQueueDiagnostics();
+        const auto& diagnostics = graph.GetQueueDiagnostics();
         const auto& token = impl.currentProfilerToken;
         std::ostringstream line;
         line.precision(17);
         line << std::boolalpha << "[rg8.execution] {\"schemaVersion\":2,\"mode\":" << GetQueueExecutionMode()
              << ",\"requestedExecutionMode\":" << diagnostics.requestedExecutionMode
+             << ",\"executionPath\":\"" << (primaryEnqueued ? "primary-graphics" : "owned-queues") << '"'
+             << ",\"primaryEnqueued\":" << primaryEnqueued
              << ",\"effectiveExecutionMode\":" << diagnostics.effectiveExecutionMode
              << ",\"measurementDomain\":\"" << RGMeasurementDomainName(domain) << '"'
              << ",\"fallbackReason\":\"" << RGQueueFallbackReasonName(diagnostics.schedule.fallbackReason) << '"'
-             << ",\"measurementHistory\":\"" << (!view ? "missing-or-stale" :
-                 !signatureMatches ? "signature-mismatch" : "signature-matched") << '"'
              << ",\"backendGeneration\":" << GetBackendGeneration()
              << ",\"frameId\":" << token.engineFrameId << ",\"viewId\":" << token.renderViewId
              << ",\"submissionId\":" << token.submissionId << ",\"captureGeneration\":" << token.captureGeneration
@@ -800,10 +838,10 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(const own::shared_ow
         line << ",\"recordingMilliseconds\":" << diagnostics.execution.recordingMilliseconds;
         line << ",\"submissionMilliseconds\":" << diagnostics.execution.submissionMilliseconds;
         line << ",\"totalMilliseconds\":" << diagnostics.execution.totalMilliseconds;
-        line << ",\"recordedLists\":" << graph->GetStats().recordedLists;
-        line << ",\"recordWorkers\":" << graph->GetStats().recordWorkers;
-        line << ",\"recordUnits\":" << graph->GetStats().recordUnits;
-        line << ",\"recordingWaveCount\":" << graph->GetStats().recordingWaveCount;
+        line << ",\"recordedLists\":" << graph.GetStats().recordedLists;
+        line << ",\"recordWorkers\":" << graph.GetStats().recordWorkers;
+        line << ",\"recordUnits\":" << graph.GetStats().recordUnits;
+        line << ",\"recordingWaveCount\":" << graph.GetStats().recordingWaveCount;
         line << ",\"plannedBatches\":" << diagnostics.execution.plannedBatches;
         line << ",\"plannedComputeBatches\":" << diagnostics.execution.plannedComputeBatches;
         line << ",\"plannedWaits\":" << diagnostics.execution.plannedWaits;
@@ -819,6 +857,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(const own::shared_ow
         line << ",\"recoveryRequired\":" << diagnostics.execution.recoveryRequired;
         line << ",\"completed\":" << diagnostics.execution.completed;
         line << "},\"schedule\":{\"compileGeneration\":" << diagnostics.schedule.compileGeneration
+             << ",\"placement\":\"authored\""
              << ",\"usesCompute\":" << diagnostics.schedule.usesCompute
              << ",\"predictionComplete\":" << diagnostics.schedule.predictionComplete
              << ",\"predictionCalibrated\":" << diagnostics.schedule.predictionCalibrated
@@ -873,7 +912,6 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(const own::shared_ow
         line << "]}";
         std::printf("%s\n", line.str().c_str());
     }
-    return impl.resources.JoinQueueFrame(execution.completion, outError);
 }
 
 IRHIParallelCommandPool& EnhancedSceneRendererLiveDX12Adapter::CommandPool()
@@ -1471,7 +1509,7 @@ GpuFrameToken EnhancedSceneRendererLiveDX12Adapter::BeginProfilerFrame(
     // both paths must opt out together. A capture always keeps complete queries.
     collectTimings = collectTimings || diagnosticCapture || captureGeneration != 0;
     m_impl->graphics.profiler = collectTimings ? &m_impl->profiler : nullptr;
-    m_impl->compute.profiler = collectTimings ? &m_impl->computeProfiler : nullptr;
+    m_impl->compute.profiler = collectTimings && m_impl->ownedQueueFrame ? &m_impl->computeProfiler : nullptr;
     if (!collectTimings)
     {
         auto& token = m_impl->currentProfilerToken;
@@ -1484,7 +1522,7 @@ GpuFrameToken EnhancedSceneRendererLiveDX12Adapter::BeginProfilerFrame(
         return token;
     }
     GpuFrameToken computeToken;
-    if (m_impl->asyncCompute)
+    if (m_impl->ownedQueueFrame && m_impl->asyncCompute)
     {
         computeToken = m_impl->computeProfiler.BeginFrame(engineFrameId, submissionId, renderViewId, captureGeneration);
     }

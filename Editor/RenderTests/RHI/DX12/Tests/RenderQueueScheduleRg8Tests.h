@@ -1,9 +1,8 @@
 #include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
 #include "Render/Graph/EnhancedRenderGraph.h"
-#include "Render/Graph/EnhancedGpuMeasurementHistory.h"
 #include "RHI/DX12/DX12DeviceResources.h"
-#include <stdint.h>
+#include "Render/Graph/EnhancedGpuMeasurementHistory.h"
 #include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
 
 bool DX12Test::RunQueueScheduleTest(std::string& outLog)
@@ -22,469 +21,145 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
         DX12DeviceResources device;
         std::string error;
         require(device.Initialize(32, 32, error), error);
+        const RHIQueueCapabilities caps{true, true, true, true};
         EnhancedRenderGraph graph(device, RGSchedulingMode::ExplicitVersioned);
         EnhancedRenderGraph::QueueSchedule plan;
-        const RHIQueueCapabilities caps{true, true, true, true};
-        require(!graph.BuildQueueSchedule(caps, {}, 100, plan, error) && plan.entries.empty(), "Uncompiled graph admitted.");
-        auto buffer = graph.CreateBuffer({256, true, false, "shared"});
-        auto written = graph.Write(buffer);
+        require(!graph.BuildQueueSchedule(caps, {}, true, plan, error) && plan.entries.empty(), "Uncompiled graph admitted.");
         uint32_t callbacks = 0;
-        auto body = [&](const EnhancedRenderGraph::ExecuteContext&) { ++callbacks; };
-        auto producer = graph.AddPass("producer", {{written, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, body);
-        auto compute = graph.AddPass("compute-reader", {{written, RHIResourceState::ShaderResource, RGAccessMode::Read}}, body, true);
-        auto reader = graph.AddPass("graphics-reader", {{written, RHIResourceState::CopySource, RGAccessMode::Read}}, body, true);
-        auto independent = graph.AddPass("independent", {}, body, true);
-        auto culled = graph.AddPass("culled", {}, body);
+        const auto body = [&](const EnhancedRenderGraph::ExecuteContext&) { ++callbacks; };
+        const auto resource = graph.CreateBuffer({256, true, false, "shared"});
+        const auto version = graph.Write(resource);
+        const auto producer = graph.AddPass("producer", {{version, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, body);
+        const auto compute = graph.AddPass("authored-async", {{version, RHIResourceState::ShaderResource, RGAccessMode::Read}}, body, true);
+        const auto graphics = graph.AddPass("graphics-reader", {{version, RHIResourceState::CopySource, RGAccessMode::Read}}, body, true);
+        const auto compatible = graph.AddPass("compatible-only", {}, body, true);
+        const auto culled = graph.AddPass("culled-async", {}, body);
+        graph.DeclareAsyncCompute(compute);
+        graph.DeclareAsyncCompute(culled);
+        graph.DeclareComputeCompatible(compatible);
         require(graph.Compile(error), error);
-        std::vector<EnhancedRenderGraph::QueueHint> hints{{compute, true, 100}, {culled, true, 1000}};
-        require(graph.BuildQueueSchedule(caps, hints, 100, plan, error), error);
-        require(plan.entries.size() == 4 && plan.usesCompute && plan.compileGeneration != 0, "Live pass plan mismatch.");
-        require(callbacks == 0, "Planning executed a callback.");
-        require(plan.entries[1].pass == compute.index && plan.entries[1].queue == RHIQueueKind::Compute, "Eligible compute pass misplaced.");
+        graph.SetQueueExecutionMode(2);
+        require(graph.SelectExecutionQueues(caps, error), error);
+        require(graph.GetQueueDiagnostics().effectiveExecutionMode == 2 &&
+            graph.GetQueueDiagnostics().schedule.usesCompute && !graph.GetQueueDiagnostics().specialized,
+            "Explicit async graph did not select owned queues before recording.");
+        graph.SetQueueExecutionMode(1);
+        require(graph.SelectExecutionQueues(caps, error) && graph.GetQueueDiagnostics().effectiveExecutionMode == 0 &&
+            !graph.GetQueueDiagnostics().schedule.usesCompute, "Graphics-only mode did not reuse primary execution.");
+        graph.SetQueueExecutionMode(0);
+        require(graph.SelectExecutionQueues(caps, error) && graph.GetQueueDiagnostics().requestedExecutionMode == 0 &&
+            graph.GetQueueDiagnostics().effectiveExecutionMode == 0, "OFF did not retain primary execution.");
+        const auto order = graph.GetExecuteOrder();
+        const auto sameOrder = [&]()
+        {
+            return plan.entries.size() == order.size() && std::equal(plan.entries.begin(), plan.entries.end(), order.begin(),
+                [](const auto& entry, auto pass) { return entry.pass == pass; });
+        };
+        const auto onCompute = [&](RGPassId id)
+        {
+            return std::any_of(plan.entries.begin(), plan.entries.end(), [&](const auto& entry)
+            {
+                return entry.pass == id.index && entry.queue == RHIQueueKind::Compute;
+            });
+        };
         const auto hasWait = [&](RGPassId from, RGPassId to)
         {
             return std::any_of(plan.waits.begin(), plan.waits.end(), [&](const auto& wait)
             {
-                return wait.producer == from.index && wait.consumer == to.index && wait.resource == buffer.index;
+                return wait.producer == from.index && wait.consumer == to.index && wait.resource == resource.index;
             });
         };
-        require(hasWait(producer, compute), "RAW queue wait missing.");
-        require(hasWait(compute, reader), "Read/read physical ownership wait missing.");
-        require(plan.waits.size() == 2, "Duplicate or unnecessary queue wait.");
-        require(plan.entries.back().pass == independent.index, "Independent graphics pass removed.");
+        require(graph.BuildQueueSchedule(caps, {}, true, plan, error), error);
+        require(plan.usesCompute && onCompute(compute), "Explicit async request requires no timing history.");
+        require(!onCompute(compatible), "Compatibility alone requested async execution.");
+        require(!onCompute(culled) && plan.entries.size() == 4, "Culled async pass was scheduled.");
+        require(sameOrder(), "Authored placement changed compiled order.");
+        require(hasWait(producer, compute), "RAW fork wait missing.");
+        require(hasWait(compute, graphics), "Physical read ownership join missing.");
+        require(plan.waits.size() == 2, "Duplicate queue waits.");
+        require(plan.eligibleComputePasses == 1 && plan.fallbackReason == RGQueueFallbackReason::None, "Authored pass count mismatch.");
+        require(plan.placementTrials == 0 && plan.simulationMilliseconds == 0 && plan.predictedNanoseconds == 0 &&
+            plan.predictedSerialNanoseconds == 0 && !plan.predictionComplete, "Cost search or prediction survived.");
+        const auto expectedWaits = plan.waits;
+        EnhancedRenderGraph::DiagnosticSnapshot snapshot;
+        require(graph.CaptureDiagnosticSnapshot(snapshot) && snapshot.passes[compute.index].asyncCompute &&
+            snapshot.passes[compatible.index].computeCompatible && !snapshot.passes[compatible.index].asyncCompute,
+            "Viewer snapshot lost author intent.");
+        // Contradictory compatibility hints and saturated timings cannot change authored placement.
+        std::vector<EnhancedRenderGraph::QueueHint> hints{{compute, false, 0, true}, {compatible, true, UINT64_MAX, true}};
+        require(graph.BuildQueueSchedule(caps, hints, true, plan, error), error);
+        require(onCompute(compute) && !onCompute(compatible) && sameOrder(), "Timing or compatibility hint overrode author intent.");
+        require(plan.waits.size() == expectedWaits.size() && plan.measuredPasses == 2, "Diagnostic samples changed waits.");
+        require(graph.BuildQueueSchedule(caps, hints, false, plan, error) && !plan.usesCompute && plan.waits.empty() && sameOrder() &&
+            plan.fallbackReason == RGQueueFallbackReason::Disabled, "Disabled async did not preserve graphics execution.");
         auto unsupported = caps;
         unsupported.compute = false;
-        require(graph.BuildQueueSchedule(unsupported, hints, 100, plan, error) && !plan.usesCompute && plan.waits.empty(), "Compute fallback failed.");
-        require(plan.fallbackReason == RGQueueFallbackReason::Unsupported,
-            "Unavailable queue capability did not report unsupported fallback.");
+        require(graph.BuildQueueSchedule(unsupported, {}, true, plan, error) && !plan.usesCompute && plan.waits.empty() &&
+            plan.fallbackReason == RGQueueFallbackReason::Unsupported, "Missing compute queue fallback failed.");
         unsupported = caps;
         unsupported.crossQueueTimeline = false;
-        require(graph.BuildQueueSchedule(unsupported, hints, 100, plan, error) && !plan.usesCompute, "Timeline fallback failed.");
-        require(graph.BuildQueueSchedule(caps, hints, 101, plan, error) && !plan.usesCompute, "Below-cost pass promoted.");
-        require(graph.BuildQueueSchedule(caps, hints, 0, plan, error) && !plan.usesCompute, "Unmeasured threshold admitted.");
-        hints[0].computeCompatible = false;
-        require(graph.BuildQueueSchedule(caps, hints, 100, plan, error) && !plan.usesCompute, "Incompatible callback promoted.");
-        hints[0].computeCompatible = true;
-        hints.push_back(hints.front());
-        require(!graph.BuildQueueSchedule(caps, hints, 100, plan, error) && plan.entries.empty(), "Duplicate hint admitted or stale output retained.");
-        hints = {{{RGPassId::kInvalid}, true, 100}};
-        require(!graph.BuildQueueSchedule(caps, hints, 100, plan, error), "Invalid pass admitted.");
-        unsupported.graphics = false;
-        require(!graph.BuildQueueSchedule(unsupported, {}, 100, plan, error), "Missing graphics capability admitted.");
-        EnhancedRenderGraph legacy(device);
-        auto legacyPass = legacy.AddPass("legacy", {}, body, true);
-        require(legacy.Compile(error) && legacy.BuildQueueSchedule(caps, {{legacyPass, true, 100}}, 100, plan, error) && !plan.usesCompute, "Legacy ordering was moved to compute.");
-        if (!device.BeginFrame(error))
+        require(graph.BuildQueueSchedule(unsupported, {}, true, plan, error) && !plan.usesCompute &&
+            plan.fallbackReason == RGQueueFallbackReason::Unsupported, "Missing cross-queue timeline fallback failed.");
+        require(!graph.BuildQueueSchedule(caps, {{compute, true, 1}, {compute, true, 2}}, true, plan, error) &&
+            plan.entries.empty(), "Duplicate hint accepted.");
+        require(!graph.BuildQueueSchedule(caps, {{RGPassId{}, true, 1}}, true, plan, error), "Invalid hint accepted.");
+        bool rejected = false;
+        try
         {
-            throw std::runtime_error(error);
+            graph.DeclareAsyncCompute(compatible);
         }
-        EnhancedRenderGraph aliased(device, RGSchedulingMode::ExplicitVersioned);
-        aliased.SetTransientAliasing(true);
-        auto aliasedPass = aliased.AddPass("alias-fallback", {}, body, true);
-        require(aliased.Compile(error) && aliased.BuildQueueSchedule(caps, {{aliasedPass, true, 100}}, 100, plan, error) && !plan.usesCompute, "Single-order alias lifetime was overlapped.");
+        catch (const std::logic_error&)
+        {
+            rejected = true;
+        }
+        require(rejected, "Compiled graph author intent was mutable.");
+        require(callbacks == 0, "Planning invoked pass callbacks.");
+        require(device.BeginFrame(error), error);
+        graph.SetTransientAliasing(true);
+        require(graph.Compile(error), error);
+        require(graph.BuildQueueSchedule(caps, {}, true, plan, error) && plan.usesCompute,
+            "DAG-proven alias lifetime rejected authored queue placement.");
         device.AbortFrame();
-        require(graph.BuildQueueSchedule(caps, {}, 100, plan, error), error);
-        require(plan.entries.size() == graph.GetExecuteOrder().size() && std::equal(plan.entries.begin(), plan.entries.end(), graph.GetExecuteOrder().begin(), [](const auto& entry, auto pass)
-        {
-            return entry.pass == pass && entry.queue == RHIQueueKind::Graphics;
-        }), "Fallback changed compiled DAG order.");
         graph.Reset();
-        require(!graph.BuildQueueSchedule(caps, {}, 100, plan, error) && plan.entries.empty() && plan.compileGeneration == 0, "Reset graph retained a valid queue plan.");
-        struct SharedInput
-        {
-            DX12DeviceResources& device;
-            RHIBufferHandle buffer;
-            ~SharedInput() { device.ReleaseBuffer(buffer); }
-        } sharedInput{device};
-        RHIBufferDesc sharedDesc{};
-        sharedDesc.bytes = 256;
-        // This fixture only compiles plans; the imported read state below is
-        // hypothetical. D3D12 default-heap buffers are created in COMMON.
-        sharedDesc.initialState = RHIResourceState::Common;
-        require(device.CreateBuffer(sharedDesc, sharedInput.buffer, error), error);
-        // Overlap placement on an SSAO-shaped graph. Costs (ns) are chosen so the
-        // expected spans can be derived by hand with a 20 us handoff:
-        // serial 400+500+200+200+300 = 1600 us. With shadows behind the compute
-        // chain: GBuffer 0-500, Shadow 500-900, AO 520-920 (compute), Deferred
-        // waits 940 -> 1240 us. Without shadows nothing overlaps (1240 > 1200).
-        struct OverlapGraph
-        {
-            own::unique_owner<EnhancedRenderGraph> graph;
-            RGPassId shadow, gbuffer, raw, filter, lxColor;
-            uint32_t depthResource{0}, filteredResource{0};
-            std::vector<EnhancedRenderGraph::QueueHint> hints;
-        };
-        const auto buildOverlap = [&](bool withShadow, bool declare, const EnhancedRenderGraph::QueueCostModel* model,
-            RGOrderPolicy orderPolicy = RGOrderPolicy::DependencyOrder,
-            RHIResourceState shadowInputState = RHIResourceState::ShaderResource,
-            bool recordingSideEffect = false)
-        {
-            OverlapGraph result;
-            result.graph = own::make_unique<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned,
-                orderPolicy);
-            auto& g = *result.graph;
-            if (model)
-            {
-                g.SetQueueCostModel(*model);
-            }
-            const auto depthBuffer = g.CreateBuffer({256, true, false, "depth"});
-            const auto rawBuffer = g.CreateBuffer({256, true, false, "ao-raw"});
-            const auto filteredBuffer = g.CreateBuffer({256, true, false, "ao-filtered"});
-            const auto colorBuffer = g.CreateBuffer({256, true, false, "color"});
-            // Real render producers share geometry/material inputs. Identical
-            // immutable graphics reads must not recreate declaration-order edges.
-            const auto shared = g.ImportBuffer(sharedInput.buffer, RHIResourceState::ShaderResource,
-                "shared-immutable-scene-input");
-            result.depthResource = depthBuffer.index;
-            result.filteredResource = filteredBuffer.index;
-            const auto depth = g.Write(depthBuffer);
-            const auto raw = g.Write(rawBuffer);
-            const auto filtered = g.Write(filteredBuffer);
-            const auto color = g.Write(colorBuffer);
-            RGHandle shadowMap{};
-            if (withShadow)
-            {
-                // Authored first: the scheduler must move it behind GBuffer to overlap AO.
-                shadowMap = g.Write(g.CreateBuffer({256, true, false, "shadow"}));
-                result.shadow = g.AddPass("shadow", {
-                    {shared, shadowInputState, RGAccessMode::Read},
-                    {shadowMap, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, body);
-                if (recordingSideEffect)
-                {
-                    g.DeclareRecordingSideEffect(result.shadow);
-                }
-            }
-            result.gbuffer = g.AddPass("gbuffer", {
-                {shared, RHIResourceState::ShaderResource, RGAccessMode::Read},
-                {depth, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, body);
-            result.raw = g.AddPass("ao-raw", {
-                {depth, RHIResourceState::ShaderResource, RGAccessMode::Read},
-                {raw, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, body);
-            result.filter = g.AddPass("ao-filter", {
-                {raw, RHIResourceState::ShaderResource, RGAccessMode::Read},
-                {filtered, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, body);
-            std::vector<EnhancedRenderGraph::RGPassUsage> lxColorUsages{
-                {depth, RHIResourceState::ShaderResource, RGAccessMode::Read},
-                {filtered, RHIResourceState::ShaderResource, RGAccessMode::Read},
-                {color, RHIResourceState::UnorderedAccess, RGAccessMode::Write}};
-            if (withShadow)
-            {
-                lxColorUsages.push_back({shadowMap, RHIResourceState::ShaderResource, RGAccessMode::Read});
-            }
-            result.lxColor = g.AddPass("METEOR.Scene.Color", lxColorUsages, body, true);
-            if (declare)
-            {
-                g.DeclareComputeCompatible(result.raw);
-                g.DeclareComputeCompatible(result.filter);
-            }
-            require(g.Compile(error), error);
-            if (withShadow)
-            {
-                result.hints.push_back({result.shadow, false, 400'000});
-            }
-            result.hints.push_back({result.gbuffer, false, 500'000});
-            result.hints.push_back({result.raw, true, 200'000});
-            result.hints.push_back({result.filter, true, 200'000});
-            result.hints.push_back({result.lxColor, false, 300'000});
-            return result;
-        };
-        const auto positionOf = [](const EnhancedRenderGraph::QueueSchedule& schedule, RGPassId pass)
-        {
-            for (size_t index = 0; index < schedule.entries.size(); ++index)
-            {
-                if (schedule.entries[index].pass == pass.index)
-                {
-                    return index;
-                }
-            }
-            return schedule.entries.size();
-        };
-        const auto queueOf = [&](const EnhancedRenderGraph::QueueSchedule& schedule, RGPassId pass)
-        {
-            return schedule.entries[positionOf(schedule, pass)].queue;
-        };
-        const auto keepsCompiledOrder = [](const EnhancedRenderGraph::QueueSchedule& schedule, const EnhancedRenderGraph& g)
-        {
-            return schedule.entries.size() == g.GetExecuteOrder().size() &&
-                std::equal(schedule.entries.begin(), schedule.entries.end(), g.GetExecuteOrder().begin(),
-                    [](const auto& entry, auto pass) { return entry.pass == pass && entry.queue == RHIQueueKind::Graphics; });
-        };
-        EnhancedRenderGraph::QueueCostModel overlapModel;
-        overlapModel.placement = RGQueuePlacement::Overlap;
-        overlapModel.handoffNanoseconds = 20'000;
-        overlapModel.minimumGainNanoseconds = 50'000;
-        const uint32_t callbacksBeforeOverlap = callbacks;
-        {
-            // A wide graphics frontier must keep declaration ties even when its
-            // compute ancestor is authored last and hoisted to the front. Expected
-            // spans are hand-derived: 6920 us serial, 6420 us with 500 us hidden.
-            EnhancedRenderGraph wide(device, RGSchedulingMode::ExplicitVersioned,
-                RGOrderPolicy::DependencyOrder);
-            wide.SetQueueCostModel(overlapModel);
-            std::vector<EnhancedRenderGraph::QueueHint> wideHints;
-            std::vector<RGPassId> graphics;
-            for (uint32_t index = 0; index < 64; ++index)
-            {
-                graphics.push_back(wide.AddPass("independent", {}, body, true));
-                wideHints.push_back({graphics.back(), false, 100'000});
-            }
-            auto input = wide.Write(wide.CreateBuffer({256, true, false, "wide-input"}));
-            auto output = wide.Write(wide.CreateBuffer({256, true, false, "wide-output"}));
-            auto root = wide.AddPass("root", {{input, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, body);
-            auto work = wide.AddPass("work", {
-                {input, RHIResourceState::ShaderResource, RGAccessMode::Read},
-                {output, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, body);
-            wide.DeclareComputeCompatible(work);
-            auto join = wide.AddPass("join", {{output, RHIResourceState::ShaderResource, RGAccessMode::Read}}, body, true);
-            wideHints.insert(wideHints.end(), {{root, false, 10'000}, {work, true, 500'000}, {join, false, 10'000}});
-            require(wide.Compile(error) && wide.BuildQueueSchedule(caps, wideHints, 1000, plan, error), error);
-            require(plan.usesCompute && plan.entries.size() == 67 && plan.predictedSerialNanoseconds == 6'920'000 &&
-                plan.predictedNanoseconds == 6'420'000, "Wide frontier overlap prediction mismatch.");
-            bool ordered = plan.entries[0].pass == root.index && plan.entries[1].pass == graphics[0].index &&
-                plan.entries[2].pass == work.index && plan.entries.back().pass == join.index;
-            for (size_t index = 1; index < graphics.size(); ++index)
-                ordered = ordered && plan.entries[index + 2].pass == graphics[index].index;
-            require(ordered, "Wide ready frontier lost ancestor priority or compiled-position ties.");
-            const auto expected = plan;
-            wideHints[65].measuredGpuNanoseconds = 0;
-            EnhancedRenderGraph::QueueSchedule fallback, restored;
-            const bool fallbackBuilt = wide.BuildQueueSchedule(caps, wideHints, 1000, fallback, error);
-            wideHints[65].measuredGpuNanoseconds = 500'000;
-            const bool restoredBuilt = wide.BuildQueueSchedule(caps, wideHints, 1000, restored, error);
-            require(fallbackBuilt && !fallback.usesCompute && fallback.waits.empty() && keepsCompiledOrder(fallback, wide) &&
-                restoredBuilt &&
-                restored.predictedNanoseconds == expected.predictedNanoseconds &&
-                std::equal(restored.entries.begin(), restored.entries.end(), expected.entries.begin(), expected.entries.end(),
-                    [](const auto& a, const auto& b) { return a.pass == b.pass && a.queue == b.queue; }) &&
-                std::equal(restored.waits.begin(), restored.waits.end(), expected.waits.begin(), expected.waits.end(),
-                    [](const auto& a, const auto& b) { return a.producer == b.producer && a.consumer == b.consumer && a.resource == b.resource; }),
-                "Changing measurements retained stale frontier/ownership state.");
-        }
-        {
-            auto subject = buildOverlap(true, true, &overlapModel);
-            require(subject.graph->GetExecuteOrder().front() == subject.shadow.index, "Fixture compiled order changed.");
-            require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, plan, error), error);
-            require(plan.usesCompute && plan.predictedSerialNanoseconds == 1'600'000 &&
-                plan.predictedNanoseconds == 1'240'000 && plan.fallbackReason == RGQueueFallbackReason::None &&
-                plan.eligibleComputePasses == 2 && plan.measuredPasses == 5 && plan.missingMeasurementPasses == 0,
-                "Overlap prediction or eligibility diagnostics mismatch.");
-            require(plan.entries.front().pass == subject.gbuffer.index &&
-                positionOf(plan, subject.shadow) < positionOf(plan, subject.lxColor),
-                "Compute ancestor was not hoisted ahead of independent graphics work.");
-            require(queueOf(plan, subject.raw) == RHIQueueKind::Compute &&
-                queueOf(plan, subject.filter) == RHIQueueKind::Compute &&
-                queueOf(plan, subject.shadow) == RHIQueueKind::Graphics &&
-                queueOf(plan, subject.lxColor) == RHIQueueKind::Graphics, "Overlap queue placement mismatch.");
-            require(positionOf(plan, subject.gbuffer) < positionOf(plan, subject.raw) &&
-                positionOf(plan, subject.raw) < positionOf(plan, subject.lxColor),
-                "Physical resource use order changed.");
-            const auto waits = [&](RGPassId from, RGPassId to, uint32_t resource)
-            {
-                return std::any_of(plan.waits.begin(), plan.waits.end(), [&](const auto& wait)
-                {
-                    return wait.producer == from.index && wait.consumer == to.index && wait.resource == resource;
-                });
-            };
-            require(waits(subject.gbuffer, subject.raw, subject.depthResource) &&
-                waits(subject.filter, subject.lxColor, subject.filteredResource) &&
-                std::all_of(plan.waits.begin(), plan.waits.end(), [&](const auto& wait)
-                {
-                    return positionOf(plan, RGPassId{wait.producer}) < positionOf(plan, RGPassId{wait.consumer});
-                }), "Cross-queue waits missing or not topological.");
-            require(waits(subject.raw, subject.lxColor, subject.depthResource),
-                "Same-state read/read physical ownership wait missing.");
-            EnhancedRenderGraph::QueueSchedule repeated;
-            require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, repeated, error) &&
-                repeated.compileGeneration == plan.compileGeneration &&
-                repeated.predictedNanoseconds == plan.predictedNanoseconds &&
-                repeated.entries.size() == plan.entries.size() && repeated.waits.size() == plan.waits.size() &&
-                std::equal(repeated.entries.begin(), repeated.entries.end(), plan.entries.begin(),
-                    [](const auto& a, const auto& b) { return a.pass == b.pass && a.queue == b.queue; }) &&
-                std::equal(repeated.waits.begin(), repeated.waits.end(), plan.waits.begin(),
-                    [](const auto& a, const auto& b)
-                    {
-                        return a.producer == b.producer && a.consumer == b.consumer && a.resource == b.resource;
-                    }), "Repeated overlap planning changed the schedule.");
-            // Threshold placement on the same graph moves AO without anything to overlap.
-            EnhancedRenderGraph::QueueCostModel thresholdModel = overlapModel;
-            thresholdModel.placement = RGQueuePlacement::Threshold;
-            subject.graph->SetQueueCostModel(thresholdModel);
-            require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, plan, error), error);
-            require(plan.usesCompute && plan.entries.front().pass == subject.shadow.index &&
-                plan.predictedNanoseconds == 1'640'000 && plan.predictedNanoseconds > plan.predictedSerialNanoseconds,
-                "Threshold placement prediction mismatch.");
-        }
-        {
-            auto subject = buildOverlap(false, true, &overlapModel);
-            require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, plan, error), error);
-            require(!plan.usesCompute && plan.waits.empty() && keepsCompiledOrder(plan, *subject.graph) &&
-                plan.predictedNanoseconds == plan.predictedSerialNanoseconds &&
-                plan.fallbackReason == RGQueueFallbackReason::InsufficientGain,
-                "Compute chain without independent graphics work was moved.");
-        }
-        {
-            auto strict = overlapModel;
-            strict.minimumGainNanoseconds = 400'000;
-            auto subject = buildOverlap(true, true, &strict);
-            require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, plan, error), error);
-            require(!plan.usesCompute && keepsCompiledOrder(plan, *subject.graph), "Gain below minimum admitted.");
-        }
-        {
-            auto expensive = overlapModel;
-            expensive.handoffNanoseconds = 1'000'000;
-            auto subject = buildOverlap(true, true, &expensive);
-            require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, plan, error), error);
-            require(!plan.usesCompute && keepsCompiledOrder(plan, *subject.graph), "Handoff cost was ignored.");
-        }
-        {
-            auto subject = buildOverlap(true, false, &overlapModel);
-            require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, plan, error), error);
-            require(!plan.usesCompute && keepsCompiledOrder(plan, *subject.graph), "Undeclared pass moved by hint alone.");
-            auto unsupportedOverlap = caps;
-            unsupportedOverlap.compute = false;
-            auto declared = buildOverlap(true, true, &overlapModel);
-            require(declared.graph->BuildQueueSchedule(unsupportedOverlap, declared.hints, 1000, plan, error) &&
-                !plan.usesCompute && keepsCompiledOrder(plan, *declared.graph), "Overlap ignored missing compute queue.");
-        }
-        {
-            auto subject = buildOverlap(true, true, &overlapModel, RGOrderPolicy::PreserveDeclarationOrder);
-            require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, plan, error), error);
-            require(!plan.usesCompute && plan.waits.empty() && keepsCompiledOrder(plan, *subject.graph) &&
-                plan.predictedNanoseconds == plan.predictedSerialNanoseconds,
-                "Preserved declaration order admitted a non-beneficial compute move.");
-        }
-        {
-            auto subject = buildOverlap(true, true, &overlapModel, RGOrderPolicy::DependencyOrder,
-                RHIResourceState::CopySource);
-            require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, plan, error) &&
-                !plan.usesCompute && keepsCompiledOrder(plan, *subject.graph),
-                "Incompatible immutable-read states were reordered without a state transition dependency.");
-        }
-        {
-            auto subject = buildOverlap(true, true, &overlapModel, RGOrderPolicy::DependencyOrder,
-                RHIResourceState::ShaderResource, true);
-            require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, plan, error) &&
-                !plan.usesCompute && keepsCompiledOrder(plan, *subject.graph),
-                "Explicit CPU recording side effects were treated as reorderable culling roots.");
-        }
-        // Every reader belongs to the read epoch, not just the final authored
-        // reader. A later overwrite must join both queues even if the last reader
-        // happens to be on the writer's own queue.
-        for (const bool modify : {false, true})
-        {
-            EnhancedRenderGraph readers(device, RGSchedulingMode::ExplicitVersioned);
-            const auto first = readers.Write(readers.CreateBuffer({256, true, false, "reader-epoch"}));
-            const auto next = modify ? readers.Modify(first) : readers.Write(first);
-            const auto produce = readers.AddPass("epoch-producer",
-                {{first, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}, body);
-            const auto earlyReader = readers.AddPass("early-compute-reader",
-                {{first, RHIResourceState::CopySource, RGAccessMode::Read}}, body, true);
-            const auto lateReader = readers.AddPass("late-graphics-reader",
-                {{first, RHIResourceState::CopySource, RGAccessMode::Read}}, body, true);
-            const auto overwrite = readers.AddPass("epoch-overwrite",
-                {{next, RHIResourceState::UnorderedAccess, modify ? RGAccessMode::ReadWrite : RGAccessMode::Write}},
-                body, true);
-            readers.DeclareComputeCompatible(earlyReader);
-            require(readers.Compile(error), error);
-            require(readers.BuildQueueSchedule(caps, {{produce, false, 100}, {earlyReader, true, 100},
-                {lateReader, false, 100}, {overwrite, false, 100}}, 100, plan, error), error);
-            require(plan.usesCompute && positionOf(plan, earlyReader) < positionOf(plan, overwrite) &&
-                positionOf(plan, lateReader) < positionOf(plan, overwrite) &&
-                std::any_of(plan.waits.begin(), plan.waits.end(), [&](const auto& wait)
-                {
-                    return wait.producer == earlyReader.index && wait.consumer == overwrite.index &&
-                        wait.resource == first.index;
-                }), "Writer failed to join the complete immutable reader epoch.");
-        }
-        {
-            auto subject = buildOverlap(true, true, &overlapModel);
-            auto noTimeline = caps;
-            noTimeline.crossQueueTimeline = false;
-            require(subject.graph->BuildQueueSchedule(noTimeline, subject.hints, 1000, plan, error) &&
-                !plan.usesCompute && plan.waits.empty() && keepsCompiledOrder(plan, *subject.graph),
-                "Overlap ignored missing cross-queue timeline.");
-            require(subject.graph->BuildQueueSchedule(caps, subject.hints, 0, plan, error) &&
-                !plan.usesCompute && plan.waits.empty() && keepsCompiledOrder(plan, *subject.graph),
-                "Overlap accepted an unmeasured threshold.");
-        }
-        {
-            auto subject = buildOverlap(true, true, &overlapModel);
-            const auto completeHints = subject.hints;
-            subject.hints.erase(subject.hints.begin());
-            require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, plan, error) &&
-                !plan.predictionComplete && !plan.usesCompute && keepsCompiledOrder(plan, *subject.graph) &&
-                plan.fallbackReason == RGQueueFallbackReason::MissingMeasurement &&
-                plan.measuredPasses == 4 && plan.missingMeasurementPasses == 1,
-                "A missing independent-work sample was treated as an overlap benefit.");
-            subject.hints = completeHints;
-            subject.hints.front().measuredGpuNanoseconds = 0;
-            subject.hints.front().hasGpuMeasurement = false;
-            require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, plan, error) &&
-                !plan.predictionComplete && !plan.usesCompute && keepsCompiledOrder(plan, *subject.graph),
-                "An unknown zero-valued sample was treated as an overlap benefit.");
-            subject.hints = completeHints;
-            subject.hints.back().measuredGpuNanoseconds = 0;
-            require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, plan, error) &&
-                plan.predictionComplete && plan.usesCompute && plan.predictedSerialNanoseconds == 1'300'000 &&
-                plan.predictedNanoseconds == 940'000,
-                "A measured zero-length pass forced fallback despite known independent GPU work.");
-            subject.hints = completeHints;
-            for (auto& hint : subject.hints)
-            {
-                hint.measuredGpuNanoseconds = UINT64_MAX / 2;
-            }
-            require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, plan, error) &&
-                plan.predictedSerialNanoseconds == 0 && plan.predictedNanoseconds == 0 &&
-                !plan.predictionComplete && !plan.usesCompute && keepsCompiledOrder(plan, *subject.graph),
-                "Saturated pass costs were published as valid predicted durations.");
-            subject.hints = completeHints;
-            auto saturatedHandoff = overlapModel;
-            saturatedHandoff.handoffNanoseconds = UINT64_MAX;
-            subject.graph->SetQueueCostModel(saturatedHandoff);
-            require(subject.graph->BuildQueueSchedule(caps, subject.hints, 1000, plan, error) &&
-                plan.predictionComplete && !plan.predictionCalibrated && !plan.usesCompute &&
-                plan.predictedNanoseconds == plan.predictedSerialNanoseconds && keepsCompiledOrder(plan, *subject.graph),
-                "Saturated handoff arithmetic wrapped into a false overlap benefit.");
-        }
-        {
-            EnhancedRenderGraph prefix(device, RGSchedulingMode::ExplicitVersioned);
-            auto prefixModel = overlapModel;
-            prefixModel.handoffNanoseconds = 75'000;
-            prefixModel.minimumGainNanoseconds = 0;
-            prefix.SetQueueCostModel(prefixModel);
-            const auto graphicsPass = prefix.AddPass("prefix-graphics", {}, body, true);
-            const auto computePass = prefix.AddPass("prefix-compute", {}, body, true);
-            prefix.DeclareComputeCompatible(computePass);
-            require(prefix.Compile(error), error);
-            require(prefix.BuildQueueSchedule(caps, {{graphicsPass, false, 100'000}, {computePass, true, 100'000}},
-                1000, plan, error) && plan.predictionComplete && !plan.usesCompute && plan.waits.empty() &&
-                plan.predictedSerialNanoseconds == 200'000 && plan.predictedNanoseconds == 200'000,
-                "Independent compute omitted the mandatory prologue wait or final graphics join.");
-        }
-        {
-            EnhancedRenderGraph unsupportedState(device, RGSchedulingMode::ExplicitVersioned);
-            RGTextureDesc texture{};
-            texture.width = texture.height = 8;
-            texture.allowRenderTarget = true;
-            const auto color = unsupportedState.Write(unsupportedState.CreateTexture(texture));
-            const auto graphicsOnly = unsupportedState.AddPass("declared-but-graphics-state",
-                {{color, RHIResourceState::RenderTarget, RGAccessMode::Write}}, body, true);
-            unsupportedState.DeclareComputeCompatible(graphicsOnly);
-            require(unsupportedState.Compile(error), error);
-            require(unsupportedState.BuildQueueSchedule(caps, {{graphicsOnly, true, 100}}, 100, plan, error) &&
-                !plan.usesCompute && plan.waits.empty() && plan.rejectedStatePasses == 1 &&
-                plan.fallbackReason == RGQueueFallbackReason::UnsupportedState,
-                "An author declaration bypassed native queue-state compatibility.");
-        }
-        {
-            EnhancedRenderGraph uncompiled(device, RGSchedulingMode::ExplicitVersioned);
-            uint32_t measurements = 0;
-            require(uncompiled.MeasuredQueueHints([&](const GpuPassTimingIdentity&)
-            {
-                ++measurements;
-                return uint64_t{100};
-            }).empty() && measurements == 0, "Uncompiled graph exposed a timing identity.");
-        }
+        require(!graph.BuildQueueSchedule(caps, {}, true, plan, error) && plan.entries.empty(), "Reset retained a schedule.");
+        graph.SetTransientAliasing(false);
+        require(!graph.SelectExecutionQueues(caps, error), "Uncompiled graph selected an execution path.");
+        const auto plain = graph.AddPass("compatible-only", {}, body, true);
+        graph.DeclareComputeCompatible(plain);
+        require(graph.Compile(error), error);
+        require(graph.BuildQueueSchedule(caps, {{plain, true, UINT64_MAX}}, true, plan, error) && !plan.usesCompute &&
+            plan.fallbackReason == RGQueueFallbackReason::NoAsyncPasses, "No explicit request did not report no-async-passes.");
+        graph.SetQueueExecutionMode(2);
+        require(graph.SelectExecutionQueues(caps, error) && graph.GetQueueDiagnostics().effectiveExecutionMode == 0 &&
+            graph.GetQueueDiagnostics().schedule.fallbackReason == RGQueueFallbackReason::NoAsyncPasses,
+            "Async mode without an authored pass did not select primary graphics.");
+        EnhancedRenderGraph illegal(device, RGSchedulingMode::ExplicitVersioned);
+        RGTextureDesc textureDesc{};
+        textureDesc.width = textureDesc.height = 8;
+        textureDesc.allowRenderTarget = true;
+        const auto texture = illegal.Write(illegal.CreateTexture(textureDesc));
+        const auto raster = illegal.AddPass("illegal-async-raster", {{texture, RHIResourceState::RenderTarget, RGAccessMode::Write}}, body, true);
+        illegal.DeclareAsyncCompute(raster);
+        require(illegal.Compile(error), error);
+        require(illegal.BuildQueueSchedule(caps, {}, true, plan, error) && !plan.usesCompute &&
+            plan.rejectedStatePasses == 1 && plan.fallbackReason == RGQueueFallbackReason::UnsupportedState,
+            "Graphics-only resource state entered compute queue.");
+        // Structural template matching includes author intent, including reused pass slots.
+        EnhancedRenderGraph first(device, RGSchedulingMode::ExplicitVersioned);
+        const auto firstPass = first.AddPass("same-name", {}, body, true);
+        first.DeclareComputeCompatible(firstPass);
+        require(first.Compile(error), error);
+        EnhancedRenderGraph second(device, RGSchedulingMode::ExplicitVersioned);
+        second.InheritStructuralSchedule(first);
+        const auto secondPass = second.AddPass("same-name", {}, body, true);
+        second.DeclareAsyncCompute(secondPass);
+        require(second.Compile(error), error);
+        require(second.BuildQueueSchedule(caps, {}, true, plan, error) && onCompute(secondPass), "Inherited template lost async intent.");
+        second.Reset();
+        second.AddPass("same-name", {}, body, true);
+        require(second.Compile(error), error);
+        require(second.BuildQueueSchedule(caps, {}, true, plan, error) && !plan.usesCompute, "Reused pass retained async intent.");
+        require(callbacks == 0, "Plan and template probes invoked callbacks.");
         struct TimingFixture
         {
             own::unique_owner<EnhancedRenderGraph> graph;
@@ -643,8 +318,10 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
                 !history.FindFresh(RGMeasurementDomain::Normal, token(33,7,33,2010),1000,
                     own::make_shared<const std::string>("unknown")), "Variant lookup bypassed domain, age or signature guards.");
             for(uint64_t i=0;i<5;++i)
+            {
                 history.Store(RGMeasurementDomain::Normal, {own::make_shared<const std::string>("variant-"+std::to_string(i)),
                     {i},token(40+i,7,40+i,2100+i)});
+            }
             require(!history.FindFresh(RGMeasurementDomain::Normal,token(45,7,45,2110),1000,
                     own::make_shared<const std::string>("variant-0")) &&
                 history.FindFresh(RGMeasurementDomain::Normal,token(45,7,45,2110),1000,
@@ -658,68 +335,15 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
                 !history.FindFresh(RGMeasurementDomain::Normal,token(48,7,48,2220),1000,alternate),
                 "Recovery resurrected pre-failure variants.");
         }
-        // No render-pass names: a delayed graphics producer competes with
-        // independent graphics work. Trying both orders avoids the 2500 us
-        // earliest-start-only local optimum (serial is 2900 us).
-        for (const bool reverse : {false, true})
-        {
-            EnhancedRenderGraph subject(device, RGSchedulingMode::ExplicitVersioned);
-            subject.SetQueueCostModel(overlapModel);
-            std::array<RGHandle, 7> outputs;
-            std::array<RGPassId, 7> passes;
-            const std::array<uint64_t, 7> costs{200'000, 700'000, 200'000, 300'000, 500'000, 700'000, 300'000};
-            const std::array<std::vector<uint32_t>, 7> inputs{{{}, {0}, {}, {1}, {3}, {}, {2, 4, 5}}};
-            for (uint32_t index = 0; index < outputs.size(); ++index)
-            {
-                outputs[index] = subject.Write(subject.CreateBuffer({256, true, false, "order-fixture"}));
-            }
-            for (uint32_t ordinal = 0; ordinal < passes.size(); ++ordinal)
-            {
-                const uint32_t index = reverse ? 6 - ordinal : ordinal;
-                std::vector<EnhancedRenderGraph::RGPassUsage> usages;
-                for (const auto input : inputs[index])
-                {
-                    usages.push_back({outputs[input], RHIResourceState::ShaderResource, RGAccessMode::Read});
-                }
-                usages.push_back({outputs[index], RHIResourceState::UnorderedAccess, RGAccessMode::Write});
-                passes[index] = subject.AddPass((reverse ? "renamed-" : "node-") + std::to_string(index), usages, body, index == 6);
-                if (index == 0 || index == 2 || index == 3)
-                {
-                    subject.DeclareComputeCompatible(passes[index]);
-                }
-            }
-            std::vector<EnhancedRenderGraph::QueueHint> measured;
-            for (uint32_t index = 0; index < passes.size(); ++index)
-            {
-                measured.push_back({passes[index], index == 0 || index == 2 || index == 3, costs[index]});
-            }
-            require(subject.Compile(error), error);
-            require(subject.BuildQueueSchedule(caps, measured, 1000, plan, error), error);
-            require(plan.usesCompute && plan.predictedNanoseconds <= 2'400'000,
-                "Alternative order search retained the earliest-start local optimum.");
-            bool topological = true;
-            for (uint32_t index = 0; index < passes.size(); ++index)
-            {
-                for (const auto input : inputs[index])
-                {
-                    topological = topological && positionOf(plan, passes[input]) < positionOf(plan, passes[index]);
-                }
-            }
-            require(topological, "Alternative order violated a producer dependency.");
-        }
-        require(callbacks == callbacksBeforeOverlap, "Overlap planning executed a callback.");
-        std::string validationMessages;
-        if (device.DrainDebugMessages(validationMessages) != 0)
-        {
-            throw std::runtime_error("Queue planning GPU validation: " + validationMessages);
-        }
-        constexpr uint32_t kExpectedChecks = 129;
+        std::string validation;
+        require(device.DrainDebugMessages(validation) == 0, validation);
+        constexpr uint32_t kExpectedChecks = 82;
         if (checks != kExpectedChecks)
         {
-            throw std::runtime_error("Queue schedule acceptance check count changed.");
+            throw std::runtime_error("Queue schedule check count actual=" + std::to_string(checks));
         }
-        outLog = "RG8_QUEUE_SCHEDULE_OK schema=3 checks=" + std::to_string(checks) +
-            " scope=compiled-plan nativeExecution=false overlap=true declarationOrder=true readRead=true sharedGraphicsReads=true readerEpochJoin=true sideEffects=true fallbackReasons=true modelGuards=true timingIdentity=true measurementDomains=true\n";
+        outLog = "RG8_QUEUE_SCHEDULE_OK schema=5 checks=" + std::to_string(checks) +
+            " scope=compiled-plan nativeExecution=false authoredAsync=true declarationOrder=true readRead=true fallbackReasons=true timingIndependent=true structuralIntent=true primaryGraphics=true\n";
         return true;
     }
     catch (const std::exception& exception)

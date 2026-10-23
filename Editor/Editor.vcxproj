@@ -519,4 +519,22 @@
   <ItemGroup>
     <ClInclude Include="EngineEntry\LegacyProjectLayerImport.h" />
   </ItemGroup>
+  <!-- Librarian inputs are captured before late generator targets run. Keep the
+       registration source in the evaluated project as well as in generator input. -->
+  <ItemGroup>
+    <ClCompile Include="$(_ReflgenModuleSource)">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+  </ItemGroup>
+  <Target Name="DeduplicateEditorReflectionRegistration" AfterTargets="_ReflgenComputeInputs"
+          Condition="'$(DesignTimeBuild)' != 'true'">
+    <RemoveDuplicates Inputs="@(ClCompile)">
+      <Output TaskParameter="Filtered" ItemName="_EditorUniqueCompile" />
+    </RemoveDuplicates>
+    <ItemGroup>
+      <ClCompile Remove="@(ClCompile)" />
+      <ClCompile Include="@(_EditorUniqueCompile)" />
+    </ItemGroup>
+  </Target>
 </Project>

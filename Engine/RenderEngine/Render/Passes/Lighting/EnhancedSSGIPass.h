@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "../../Core/PassResourceRetirement.h"
 #include "../../../RHI/RHIFormat.h"
 #include "../../../../Utility_Framework/StandardLibrary.h"
@@ -245,6 +245,7 @@ private:
     uint32_t m_giHeight{ 0 };
 
     uint32_t m_frameIndex{ 0 };
+    uint64_t m_historyGeneration{ 0 };
 
     RHIPipelineHandle m_hiZBuildPSO;
     RHIPipelineHandle m_tracePSO;

@@ -1,7 +1,17 @@
 #pragma once
-#include "../RHISubresourceRange.h"
+#include "../RHIResourceState.h"
 #include "../../../Utility_Framework/StandardLibrary.h"
 #include <d3d12.h>
+
+inline D3D12_RESOURCE_BARRIER_FLAGS DX12TransitionFlags(RHITransitionPhase phase)
+{
+    switch (phase)
+    {
+    case RHITransitionPhase::Begin: return D3D12_RESOURCE_BARRIER_FLAG_BEGIN_ONLY;
+    case RHITransitionPhase::End: return D3D12_RESOURCE_BARRIER_FLAG_END_ONLY;
+    default: return D3D12_RESOURCE_BARRIER_FLAG_NONE;
+    }
+}
 
 inline RHITextureAspect DX12TextureAspects(const D3D12_RESOURCE_DESC& description)
 {
@@ -23,7 +33,8 @@ inline RHITextureAspect DX12TextureAspects(const D3D12_RESOURCE_DESC& descriptio
 
 inline void AppendDX12TextureTransitions(ID3D12Resource& resource, D3D12_RESOURCE_STATES before,
                                          D3D12_RESOURCE_STATES after, const RHITextureSubresourceRange& range,
-                                         std::vector<D3D12_RESOURCE_BARRIER>& barriers)
+                                         std::vector<D3D12_RESOURCE_BARRIER>& barriers,
+                                         D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE)
 {
     const D3D12_RESOURCE_DESC description = resource.GetDesc();
     const uint32_t layers = description.Dimension == D3D12_RESOURCE_DIMENSION_TEXTURE3D
@@ -41,6 +52,7 @@ inline void AppendDX12TextureTransitions(ID3D12Resource& resource, D3D12_RESOURC
     }
     D3D12_RESOURCE_BARRIER barrier{};
     barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+    barrier.Flags = flags;
     barrier.Transition.pResource = &resource;
     barrier.Transition.StateBefore = before;
     barrier.Transition.StateAfter = after;

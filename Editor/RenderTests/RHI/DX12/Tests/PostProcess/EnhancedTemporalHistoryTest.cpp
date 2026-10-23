@@ -1,4 +1,4 @@
-#include "RHI/DX12/Tests/DX12SelfTest.h"
+﻿#include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "Render/Scene/EnhancedTemporalViewState.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
@@ -138,6 +138,69 @@ bool DX12Test::RunTemporalHistoryTest(std::string& outLog)
             expect(state.frame.renderExtent == display, "SDK native-AA is exactly 1:1");
             expect(state.upscaler.Shutdown().IsSuccess(), "SDK context shutdown retires owner");
             expect(state.spatialPost.Shutdown().IsSuccess(), "spatial context shutdown");
+        }
+    }
+    // Independent view clocks share controls, never jitter cursors or extents.
+    for (const auto provider : {TemporalProvider::Fsr, TemporalProvider::XeSS, TemporalProvider::Dlss})
+    {
+        for (const auto extent : {TemporalExtent{321, 197}, TemporalExtent{640, 360}, TemporalExtent{961, 541}})
+        {
+            for (const auto quality : {TemporalQuality::NativeAA, TemporalQuality::Quality, TemporalQuality::Balanced,
+                     TemporalQuality::Performance, TemporalQuality::UltraPerformance})
+            {
+                EnhancedTemporalViewState views[3];
+                TemporalRuntimeSnapshot control;
+                control.settings = TemporalRuntimeControl::Get().Snapshot().settings;
+                control.settings.requestedUpscaler = provider;
+                control.settings.quality = quality;
+                control.settings.enabled = true;
+                Camera camera;
+                auto sealed = camera.CaptureFrameSnapshot(float(extent.width) / extent.height);
+                const auto prepare = [&](unsigned view, uint64_t frame, const FrameCameraSnapshot& input)
+                {
+                    const auto result = views[view].Begin(resources, TemporalBackend::DX12, control, input,
+                        frame, 100 + view, 7, 1, extent, 1.f / 60.f, float(frame) / 60.f, view == 2, true);
+                    expect(result.IsSuccess(), "TR2 multi-view configuration succeeds");
+                    return result.IsSuccess();
+                };
+                for (unsigned step = 0; step < 2; ++step)
+                {
+                    for (unsigned view = 0; view < 3; ++view)
+                    {
+                        if (!prepare(view, 1 + view * 100 + step, sealed))
+                        {
+                            continue;
+                        }
+                        const auto& state = views[view];
+                        expect(state.frame.displayExtent == extent && state.frame.renderExtent.IsValid() &&
+                            state.frame.renderExtent.width <= extent.width && state.frame.renderExtent.height <= extent.height,
+                            "TR2 per-view render/display bounds");
+                        expect(state.upscaler.Provider() == (view == 2 ? TemporalProvider::None : provider),
+                            "TR2 active reconstruction and native-only preview remain independent");
+                        expect(close(state.frame.jitterX, view == 2 ? 0.f : jitterX[step]) &&
+                            close(state.frame.jitterY, view == 2 ? 0.f : jitterY[step]), "TR2 interleaving preserves independent Halton phase");
+                        expect((quality == TemporalQuality::NativeAA || view == 2)
+                            ? state.frame.renderExtent == extent
+                            : state.frame.renderExtent.width < extent.width && state.frame.renderExtent.height < extent.height,
+                            "TR2 reconstruction quality uses separate input extent");
+                        views[view].Commit({});
+                    }
+                }
+                auto cut = sealed;
+                ++cut.cameraCutRevision;
+                prepare(0, 3, cut);
+                expect(views[0].frame.reset && close(views[0].frame.jitterY, jitterY[0]), "TR2 one view resets its cursor");
+                views[0].Commit({});
+                prepare(1, 103, sealed);
+                expect(!views[1].frame.reset && close(views[1].frame.jitterX, jitterX[2]) &&
+                    close(views[1].frame.jitterY, jitterY[2]), "TR2 other view continues after independent reset");
+                views[1].Commit({});
+                for (auto& state : views)
+                {
+                    expect(state.upscaler.Shutdown().IsSuccess() && state.spatialPost.Shutdown().IsSuccess(),
+                        "TR2 multi-view SDK retirement");
+                }
+            }
         }
     }
     // A delayed readback cannot insert duplicate measured poses between steps.

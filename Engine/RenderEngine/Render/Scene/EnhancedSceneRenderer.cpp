@@ -952,8 +952,7 @@ namespace
     template <typename PipelineT, typename CommandPoolT>
     bool PrepareSceneRecording(PipelineT& pipeline, EnhancedRenderGraph& graph,
         CommandPoolT& commandPool, RHIShaderBinary output, bool& preparationDeferred,
-        EnhancedPbrCapture* capture, std::string& error,
-        const std::function<bool(std::string&)>& prepareBoundary = {})
+        EnhancedPbrCapture* capture, std::string& error)
     {
         graph.SetRecordingWorkloadBalance(kLiveGraphScheduling == RGSchedulingMode::ExplicitVersioned);
         graph.RetainDeclaration<own::shared_owner<const LivePreparedView>>(pipeline.Execution().prepared);
@@ -963,7 +962,7 @@ namespace
         {
             return false;
         }
-        if (!prepareBoundary && !graph.PrepareParallel(commandPool, error))
+        if (!graph.PrepareParallel(commandPool, error))
         {
             return false;
         }
@@ -1001,12 +1000,6 @@ namespace
             capture->RecordLatticeInput(pipeline.Execution().graphInput);
         }
         pipeline.Execution().graphMaterials.EnableGeometryRouteAudit(capture != nullptr);
-        // Owned queues preserve the recording reservation, so defer queue-frame
-        // admission until asynchronous material preparation has succeeded.
-        if (prepareBoundary && !prepareBoundary(error))
-        {
-            return false;
-        }
         return true;
     }
 
@@ -6546,12 +6539,29 @@ namespace
                 viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview;
             const uint64_t realFrame = viewPacket.displayTarget == EnhancedLiveDisplayTarget::Game &&
                 packet.temporalRealFrameId ? packet.temporalRealFrameId : packet.frameId;
-            // Start a sealed SDK diagnostic at a known jitter/history boundary.
-            // No ordinary view or later measured step is reset by this rendezvous.
+            // Start each sealed SDK baseline at a known jitter/history boundary.
+            // StartRoute's camera cut can submit before its bindings are ready;
+            // that unsealed reset frame must not seed the measured SDK history.
             if (packet.temporalFixture.IsValid() && packet.temporalFixture.sdkQuality &&
-                viewPacket.displayTarget == EnhancedLiveDisplayTarget::Game &&
-                PreviousTemporalFixtureSubmission(viewPacket.displayTarget).stamp.sessionId != packet.temporalFixture.sessionId)
-                view.temporal.Invalidate();
+                viewPacket.displayTarget == EnhancedLiveDisplayTarget::Game)
+            {
+                const auto previousFixture = PreviousTemporalFixtureSubmission(viewPacket.displayTarget);
+                const bool newSession = previousFixture.stamp.sessionId != packet.temporalFixture.sessionId;
+                if (packet.temporalFixture.predecessorStepId == 0 &&
+                    (newSession || previousFixture.stamp.stepId != packet.temporalFixture.stepId))
+                {
+                    // Each route is an independent SDK comparison. Bindings may
+                    // become ready after unsealed frames have already rendered;
+                    // seed the complete SDK state at this sealed baseline.
+                    const auto restarted = view.temporal.upscaler.Shutdown();
+                    if (!restarted.IsSuccess())
+                    {
+                        lastError = "Temporal fixture SDK restart failed";
+                        return false;
+                    }
+                    view.temporal.Invalidate();
+                }
+            }
             const auto configure = [&](IRHIDeviceResources& resources, TemporalBackend backend)
             {
                 return view.temporal.Begin(
@@ -7476,22 +7486,13 @@ namespace
             EnhancedRenderGraph& graph = *slot.graph;
             graph.SetQueueExecutionMode(dx12.GetQueueExecutionMode());
             graph.SetMeasurementDomain(capture ? RGMeasurementDomain::Capture : RGMeasurementDomain::Normal);
-            const bool ownedQueueExecution = dx12.UsesOwnedQueueExecution();
             graph.SetProfiler(nullptr);
             graph.SetTransientPool(&p.transientPool);
             graph.SetTransientAliasing(ReadLivePostFlag("CREATOR_RENDERGRAPH_ALIASING", false),
                 ReadLivePostFlag("CREATOR_RENDERGRAPH_EXTEND_LIFETIMES", false));
-            // Owned queues use compute only when measured independent graphics work
-            // can hide it. Cost constants are uncalibrated estimates (QueueCostModel).
-            EnhancedRenderGraph::QueueCostModel queueCosts;
-            queueCosts.placement = RGQueuePlacement::Overlap;
-            graph.SetQueueCostModel(queueCosts);
-            const std::function<bool(std::string&)> queueBoundary = ownedQueueExecution
-                ? std::function<bool(std::string&)>{[this](std::string& error) { return dx12.BeginOwnedQueueRecording(error); }}
-                : std::function<bool(std::string&)>{};
             graph.BeginProgramBinding();
             if (!PrepareSceneRecording(p, graph, dx12.CommandPool(), RHIShaderBinary::Dxil,
-                    preparationDeferred, capture, outError, queueBoundary))
+                    preparationDeferred, capture, outError))
             {
                 return false;
             }
@@ -7508,12 +7509,7 @@ namespace
             const auto timingInterval = LiveGpuTimingInterval();
             const auto viewSubmission = view.gpuTimingSubmissions++;
             const bool collectTimings = capture != nullptr || profilerToken.captureGeneration != 0 ||
-                (timingInterval != 0 && (dx12.GetQueueExecutionMode() == 2 || viewSubmission % timingInterval == 0));
-            profilerToken = dx12.BeginProfilerFrame(sourceFrameId, frameCounter++,
-                view.key.viewId, profilerToken.captureGeneration, capture != nullptr, collectTimings);
-            profilerToken.sourceEngineFrame = sourceEngineFrame;
-            profilerToken.sourceEngineFrameAvailable = sourceEngineFrameAvailable;
-            graph.SetProfiler(collectTimings ? dx12.Profiler() : nullptr);
+                (timingInterval != 0 && viewSubmission % timingInterval == 0);
             // ── 조립은 노드 목록이 정한다(PHASE 3-10 슬라이스 1) ──
             //
             // 예전에는 여기 200줄이 "무엇을 어떤 순서로 잇는가"를 직접 적었다.
@@ -7558,6 +7554,44 @@ namespace
                                                                             ? p.Execution().frameContext.displayHeight
                                                                             : p.Execution().frameContext.height,
                                                                         outError);
+                                              if (stageCaptureOk && node.name == "PostChain")
+                                              {
+                                                  auto& post = p.Execution().postChain;
+                                                  auto tuning = capture->manifest.rootref()["postTuning"];
+                                                  tuning |= ryml::MAP;
+                                                  tuning["bloomEnabled"] << post.GetTuning().bloomEnabled;
+                                                  tuning["bloomThreshold"] << post.GetTuning().bloomThreshold;
+                                                  tuning["bloomKnee"] << post.GetTuning().bloomKnee;
+                                                  tuning["bloomIntensity"] << post.GetTuning().bloomIntensity;
+                                                  tuning["toneMapEnabled"] << post.GetTuning().toneMapEnabled;
+                                                  tuning["exposure"] << post.GetTuning().exposure;
+                                                  tuning["vignetteEnabled"] << post.GetTuning().vignetteEnabled;
+                                                  tuning["vignetteRadius"] << post.GetTuning().vignetteRadius;
+                                                  tuning["vignetteSoftness"] << post.GetTuning().vignetteSoftness;
+                                                  tuning["vignetteIntensity"] << post.GetTuning().vignetteIntensity;
+                                                  tuning["gradingEnabled"] << post.GetTuning().gradingEnabled;
+                                                  tuning["saturation"] << post.GetTuning().saturation;
+                                                  tuning["contrast"] << post.GetTuning().contrast;
+                                                  tuning["fxaaEnabled"] << post.GetTuning().fxaaEnabled;
+                                                  tuning["toneMapper"] << static_cast<uint32_t>(post.GetTuning().toneMapper);
+                                                  if (post.GetBloomOutput().IsValid())
+                                                  {
+                                                      RGResourceDescription bloomDescription{};
+                                                      if (!graph.DescribeResource(post.GetBloomOutput(), bloomDescription) ||
+                                                          bloomDescription.kind != RGResourceKind::Texture ||
+                                                          bloomDescription.format != RHIFormat::RGBA16Float)
+                                                      {
+                                                          outError = "Post-chain bloom capture requires an RGBA16F texture";
+                                                          stageCaptureOk = false;
+                                                      }
+                                                      else
+                                                      {
+                                                          stageCaptureOk = capture->DeclareStageTexture(dx12.Resources(), graph,
+                                                              post.GetBloomOutput(), "post-bloom", bloomDescription.width,
+                                                              bloomDescription.height, outError);
+                                                      }
+                                                  }
+                                              }
                                           }
                                       });
                 }
@@ -7598,6 +7632,16 @@ namespace
                 compileMs = compileWatch.ElapsedMs();
             }
 
+            if (!dx12.SelectGraphExecution(graph, outError))
+            {
+                return false;
+            }
+            const bool ownedQueueExecution = dx12.UsesOwnedQueueExecution();
+            profilerToken = dx12.BeginProfilerFrame(sourceFrameId, frameCounter++,
+                view.key.viewId, profilerToken.captureGeneration, capture != nullptr, collectTimings);
+            profilerToken.sourceEngineFrame = sourceEngineFrame;
+            profilerToken.sourceEngineFrameAvailable = sourceEngineFrameAvailable;
+            graph.SetProfiler(collectTimings ? dx12.Profiler() : nullptr);
             RHIRecordedBatchDesc batchDesc{};
             p.Execution().program = reuseStructuralSchedule ? graph.SnapshotProgram() : nullptr;
             {
@@ -7701,6 +7745,7 @@ namespace
                     {
                         return false;
                     }
+                    dx12.TraceGraphExecution(graph, true);
                     const auto graphCompletion = batchTicket.GetIdentity().completion;
                     retainSubmittedSlot(graphCompletion.value);
                     slot.submissionTicket = batchTicket;
@@ -7725,7 +7770,7 @@ namespace
             {
                 ce::profile_scope diagnostics{ce::marker<"RenderPostSubmitDiagnostics">()};
                 viewShadowStats[targetIndex] = CaptureShadowStats(p);
-                if (capture && !capture->RecordCompiledGraph(graph, p.lastNativeRecordMs, compileMs))
+                if (capture && !capture->RecordCompiledGraph(graph, p.lastNativeRecordMs, compileMs, !ownedQueueExecution))
                 {
                     outError = "capture graph is not compiled";
                     return false;
@@ -11754,7 +11799,7 @@ EnhancedLiveDebugSnapshot EnhancedSceneRenderer::GetLiveDebugSnapshot()
 }
 
 own::shared_owner<const EnhancedRenderGraph::DiagnosticSnapshot>
-EnhancedSceneRenderer::GetLiveGraphSnapshot(EnhancedLiveDisplayTarget target)
+EnhancedSceneRenderer::GetLiveGraphSnapshot(EnhancedLiveDisplayTarget target, bool requestFresh)
 {
     LiveState& state = GetLiveState();
     const uint32_t index = static_cast<uint32_t>(target);
@@ -11766,7 +11811,7 @@ EnhancedSceneRenderer::GetLiveGraphSnapshot(EnhancedLiveDisplayTarget target)
     std::lock_guard<std::mutex> lock(state.debugMutex);
     // Completed previews reuse their image. Sample once when the retained graph
     // is absent or stale, then preserve both the image and its CPU snapshot.
-    if (target != EnhancedLiveDisplayTarget::MaterialPreview || !state.graphSnapshots[index] ||
+    if (requestFresh || target != EnhancedLiveDisplayTarget::MaterialPreview || !state.graphSnapshots[index] ||
         !EnhancedGraphSnapshotMatchesView(*state.graphSnapshots[index], display.Get(target)))
     {
         state.graphSnapshotRequests[index] = true;

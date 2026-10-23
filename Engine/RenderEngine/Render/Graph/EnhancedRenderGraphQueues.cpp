@@ -40,7 +40,7 @@ void EnhancedRenderGraph::ResetQueueDiagnostics()
 
 bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGraph>& self,
     IRHIQueueRecorder& recorder, QueueEndpoint& graphics, QueueEndpoint* compute,
-    const std::vector<QueueHint>& hints, uint64_t minimumGpuNanoseconds,
+    const std::vector<QueueHint>& hints, bool enableAsyncCompute,
     ce::lifetime_token owner, QueueExecution& output, std::string& outError)
 {
     output = {};
@@ -88,8 +88,10 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
         }
     } cpu{output};
     if (!self || self.operator->() != this || !owner || !m_queueLease.expired() || m_queueExecutionAttempted ||
-        m_statesCommitted || m_recordedRecording != 0 || m_preparedPool ||
-        (m_profiler && compute && (!graphics.profiler || !compute->profiler)) ||
+        m_statesCommitted || m_recordedRecording != 0 ||
+        (m_preparedPool && (m_preparedRecordingConsumed ||
+            m_preparedRecording != m_deviceServices->GetCurrentUploadRecordingId() ||
+            m_preparedDescriptors != m_deviceServices->GetDescriptorVersionToken())) || (m_profiler && compute && (!graphics.profiler || !compute->profiler)) ||
         m_scheduling != RGSchedulingMode::ExplicitVersioned || &recorder.DeviceServices() != m_deviceServices ||
         !graphics.queue || graphics.queue->GetIdentity().kind != RHIQueueKind::Graphics)
     {
@@ -135,7 +137,7 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
     auto* arena = &scratch.arena;
     auto& plan = scratch.schedule;
     if (!BuildQueueSchedule({true, compute != nullptr, false, compute != nullptr}, hints,
-        minimumGpuNanoseconds, plan, outError))
+        enableAsyncCompute, plan, outError))
     {
         return false;
     }
@@ -195,6 +197,12 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
     // Specialization consumes this compiled graph even on recording rejection.
     // Reset is required before retry: Execute must never use a queue-specialized
     // pass plan without its prologue and epilogue.
+    // A common upload preparation can precede either primary or async execution.
+    // BeginQueueFrame preserves that recording; consume its unused pool reservation.
+    m_preparedPool = nullptr;
+    m_preparedRecordingConsumed = true;
+    m_preparedRecording = 0;
+    m_preparedDescriptors = 0;
     m_queueExecutionAttempted = true;
     auto& prologue = scratch.prologue;
     auto& epilogue = scratch.epilogue;
@@ -202,15 +210,6 @@ bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGra
     epilogue.clear();
     if (plan.usesCompute)
     {
-        // Queue placement may reorder the shared structural schedule. Materialize
-        // only this specialized order; the cached DAG remains immutable.
-        m_executeOrder.resize(plan.entries.size());
-        for (size_t index = 0; index < plan.entries.size(); ++index)
-        {
-            m_executeOrder[index] = plan.entries[index].pass;
-        }
-        m_executeOrderOverridden = true;
-        UpdateResourceUses();
         auto& retainedGraphicsTextures = scratch.retainedGraphicsTextures;
         auto& sharedReadTextures = scratch.sharedReadTextures;
         retainedGraphicsTextures.assign(m_resources.size(), false);

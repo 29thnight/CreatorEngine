@@ -8,6 +8,7 @@
 #include "RHIQueueOwnershipTests.h"
 #include "RenderQueueScheduleRg8Tests.h"
 #include "RenderQueueExecutionRg8Tests.h"
+#include "RenderSubresourceRg9Tests.h"
 #include "RHI/ShaderReflectionSelfTest.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
@@ -518,7 +519,20 @@ passes:
             std::span<const RHITextureHandle>, const RHIDepthTargetDesc*) override { return {}; }
         RHIRenderTargetBinding CreateRenderTargets(
             std::span<const RHIColorTargetDesc>, const RHIDepthTargetDesc*) override { return {}; }
-        RHITextureInfo DescribeTexture(RHITextureHandle) const override { return {}; }
+        // The fixture owns history handles 123/124 and every resource it creates.
+        // Unknown or released handles remain invalid under graph import validation.
+        std::unordered_map<uint32_t, RHITextureInfo> textures{{123, {4, 4, 1, 1, RHIFormat::RGBA8Unorm}}};
+        std::unordered_map<uint32_t, RHIBufferInfo> buffers{{124, {256}}};
+        RHITextureInfo DescribeTexture(RHITextureHandle handle) const override
+        {
+            const auto found = textures.find(handle.id);
+            return found != textures.end() ? found->second : RHITextureInfo{};
+        }
+        RHIBufferInfo DescribeBuffer(RHIBufferHandle handle) const override
+        {
+            const auto found = buffers.find(handle.id);
+            return found != buffers.end() ? found->second : RHIBufferInfo{};
+        }
         void ReleaseTexture(RHITextureHandle handle) override
         {
             if (textureReleaseFailures)
@@ -527,22 +541,29 @@ passes:
                 throw 1;
             }
             releasedTextures.push_back(handle);
+            textures.erase(handle.id);
         }
-        void ReleaseBuffer(RHIBufferHandle handle) override { releasedBuffers.push_back(handle); }
+        void ReleaseBuffer(RHIBufferHandle handle) override
+        {
+            releasedBuffers.push_back(handle);
+            buffers.erase(handle.id);
+        }
         void TransitionResources(std::span<const RHITransition>) override {}
         void TransitionBuffers(std::span<const RHIBufferTransition>) override {}
 
-        bool CreateBuffer(const RHIBufferDesc&, RHIBufferHandle& outHandle,
+        bool CreateBuffer(const RHIBufferDesc& desc, RHIBufferHandle& outHandle,
             std::string&) override
         {
             outHandle = RHIBufferHandle{ RHIHandleBits::Encode(nextHandle++, 1) };
+            buffers[outHandle.id] = {desc.bytes};
             return true;
         }
 
-        bool CreateTexture(const RHITextureDesc&, RHITextureHandle& outHandle,
+        bool CreateTexture(const RHITextureDesc& desc, RHITextureHandle& outHandle,
             std::string&) override
         {
             outHandle = RHITextureHandle{ RHIHandleBits::Encode(nextHandle++, 1) };
+            textures[outHandle.id] = {desc.width, desc.height, desc.depthOrArraySize, desc.mipLevels, desc.format};
             return true;
         }
 
@@ -2511,6 +2532,8 @@ passes:
 
         const RHITextureHandle texture{ RHIHandleBits::Encode(10, 3) };
         const RHIBufferHandle buffer{ RHIHandleBits::Encode(11, 4) };
+        services.textures.emplace(texture.id, RHITextureInfo{8, 4, 3, 4, RHIFormat::RGBA8Unorm});
+        services.buffers.emplace(buffer.id, RHIBufferInfo{128});
         RHIResourceState textureFinal = RHIResourceState::Common;
         RHIResourceState bufferFinal = RHIResourceState::Common;
         const RGHandle graphTexture = graph.ImportTexture(texture, RHIResourceState::Common,
@@ -5092,11 +5115,11 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
     // ── [4/7] 중립 buffer transition/UAV 배리어 유도 ──
     {
         // DX12 구체 생성자가 아닌 중립 서비스 생성자로도 ImportBuffer와 계획이
-        // 같아야 한다. native handle을 풀지 않는 compile-only 계약 검사다.
-        IRenderDeviceServices& neutralServices = resources;
+        // 같아야 한다. 대역이 소유한 유효한 handle로 compile-only 계약을 검사한다.
+        R6bFakeReadbackServices neutralServices;
         EnhancedRenderGraph graph(neutralServices);
         RHIResourceState finalState = RHIResourceState::Common;
-        const RHIBufferHandle buffer{ RHIHandleBits::Encode(7, 1) };
+        const RHIBufferHandle buffer{124};
         const RGHandle tracked = graph.ImportBuffer(buffer, RHIResourceState::Common,
             "neutral.buffer", &finalState);
 

@@ -1,4 +1,4 @@
-// LC6 (PHASE 14.5) — RenderTest 도메인 명령.
+﻿// LC6 (PHASE 14.5) — RenderTest 도메인 명령.
 //
 // `dx12.*` · `vk.*` · `render.*` · `rhi.*` · `pipeline.*` 64 개. 전부 렌더러의
 // 관측/격리 검사라 GUI 의미가 없다(§9 의 Test/diagnostic probe).
@@ -539,15 +539,18 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_render_temporal_motion_fixture(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
+        const bool sdkRoutes = ctx.parts.size() == 3 &&
+            (ctx.parts[2] == "sdk-routes" || ctx.parts[2] == "sdk-routes-solo");
+        const bool companionView = ctx.parts.size() != 3 || ctx.parts[2] != "sdk-routes-solo";
         const bool sdkStartup = ctx.parts.size() == 3 && ctx.parts[2] == "sdk-startup";
         const bool sdkQuality = sdkStartup || (ctx.parts.size() == 3 && ctx.parts[2] == "sdk-sequence");
-        if (ctx.parts.size() != 2 && !sdkQuality)
+        if (ctx.parts.size() != 2 && !sdkQuality && !sdkRoutes)
         {
-            return InvalidArguments("render.temporal.motion.fixture <new-absolute-directory> [sdk-sequence|sdk-startup]");
+            return InvalidArguments("render.temporal.motion.fixture <new-absolute-directory> [sdk-sequence|sdk-startup|sdk-routes]");
         }
         std::string error;
         bool busy = false;
-        bool admitted = TemporalMotionFixture::Begin(ctx.parts[1], error, &busy, sdkQuality, sdkStartup);
+        bool admitted = TemporalMotionFixture::Begin(ctx.parts[1], error, &busy, sdkQuality, sdkStartup, sdkRoutes, companionView);
         if (!admitted && !busy)
         {
             return Fail("render.temporal.motion.fixture.rejected", error);
@@ -555,7 +558,7 @@ namespace ConsoleCmd
         // GT must never wait on the render mutex. Retry transient contention on
         // later ticks, while retaining the original scene and a bounded deadline.
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(5);
-        ctx.system.WaitForResult([directory = ctx.parts[1], admitted, sdkQuality, sdkStartup,
+        ctx.system.WaitForResult([directory = ctx.parts[1], admitted, sdkQuality, sdkStartup, sdkRoutes, companionView,
             sceneEpoch = SceneManagers->SceneContextEpoch(), deadline]() mutable -> std::optional<CommandResult>
         {
             if (!admitted)
@@ -566,7 +569,7 @@ namespace ConsoleCmd
                     return Fail("render.temporal.motion.fixture.rejected", "Renderer remained busy during fixture admission");
                 std::string error;
                 bool busy = false;
-                admitted = TemporalMotionFixture::Begin(directory, error, &busy, sdkQuality, sdkStartup);
+                admitted = TemporalMotionFixture::Begin(directory, error, &busy, sdkQuality, sdkStartup, sdkRoutes, companionView);
                 if (!admitted)
                 {
                     if (busy) return std::nullopt;
@@ -978,13 +981,15 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_dx12_rendergraph(const ConsoleCommandContext& ctx)
     {
-        if (ctx.parts.size() > 2 || (ctx.parts.size() == 2 && ctx.parts[1] != "replay-extensions" && ctx.parts[1] != "transient" && ctx.parts[1] != "queue-contract" && ctx.parts[1] != "queue-native" && ctx.parts[1] != "queue-ownership" && ctx.parts[1] != "queue-schedule" && ctx.parts[1] != "queue-execution"))
+        if (ctx.parts.size() > 2 || (ctx.parts.size() == 2 && ctx.parts[1] != "replay-extensions" && ctx.parts[1] != "transient" && ctx.parts[1] != "queue-contract" && ctx.parts[1] != "queue-native" && ctx.parts[1] != "queue-ownership" && ctx.parts[1] != "queue-schedule" && ctx.parts[1] != "queue-execution" && ctx.parts[1] != "subresources"))
         {
-            return CommandCore::InvalidArguments("dx12.rendergraph [replay-extensions|transient|queue-contract|queue-native|queue-ownership|queue-schedule|queue-execution]");
+            return CommandCore::InvalidArguments("dx12.rendergraph [replay-extensions|transient|queue-contract|queue-native|queue-ownership|queue-schedule|queue-execution|subresources]");
         }
         // 렌더 그래프 자가 검증(PHASE 3-5).
         std::string log;
-        const bool passed = ctx.parts.size() == 2 && ctx.parts[1] == "queue-execution"
+        const bool passed = ctx.parts.size() == 2 && ctx.parts[1] == "subresources"
+            ? DX12Test::RunRg9SubresourceTest(log)
+            : ctx.parts.size() == 2 && ctx.parts[1] == "queue-execution"
             ? DX12Test::RunQueueExecutionTest(log)
             : ctx.parts.size() == 2 && ctx.parts[1] == "queue-schedule"
             ? DX12Test::RunQueueScheduleTest(log)

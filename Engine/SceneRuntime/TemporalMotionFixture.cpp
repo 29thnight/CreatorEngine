@@ -29,6 +29,7 @@
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "Render/Temporal/TemporalRuntimeControl.h"
+#include "RHI/RHIShaderCompiler.h"
 #include "AuthoringRymlErrorPolicy.h"
 #include <ryml/ryml.hpp>
 #include <ryml/ryml_std.hpp>
@@ -67,10 +68,12 @@ namespace
         Phase phase{ Phase::Assets };
         std::uint64_t id{}, sceneEpoch{};
         std::size_t route{};
-        std::uint32_t width{}, height{};
+        std::uint32_t width{}, height{}, displayWidth{}, displayHeight{};
         bool serializationGuard{};
         bool sdkQuality{};
         bool sdkStartup{};
+        bool sdkRoutes{};
+        bool companionView{};
         TemporalProvider sdkProvider{TemporalProvider::None};
         TemporalQuality sdkQualitySetting{TemporalQuality::Quality};
         unsigned sdkStep{1};
@@ -98,6 +101,8 @@ namespace
         ryml::Tree manifest;
         std::vector<std::pair<std::string, std::string>> inputAssets;
         std::string inputHash;
+        std::string assetSourceIdentity;
+        bool assetCacheHit{};
         EnhancedTemporalFixtureStamp armedCapture;
         std::chrono::steady_clock::time_point deadline;
     };
@@ -150,6 +155,33 @@ namespace
         }
         const std::string bytes{ std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>() };
         return Hash(std::as_bytes(std::span(bytes.data(), bytes.size())));
+    }
+
+    std::string FixtureAssetSourceIdentity(const TemporalMotionFixtureAssetOptions& options)
+    {
+        std::string key;
+        std::string error;
+        if (!RHIShaderCompiler::GetCompilerIdentity(key, error))
+        {
+            throw std::runtime_error(error);
+        }
+        key += "|" + options.targetPlatform + "|" + options.targetAbi + "|" + options.shaderDirectory.string();
+        std::vector<std::filesystem::path> sources;
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(options.shaderDirectory))
+        {
+            const auto extension = entry.path().extension();
+            if (entry.is_regular_file() && (extension == ".slang" || extension == ".hlsl" ||
+                extension == ".hlsli" || extension == ".h"))
+            {
+                sources.push_back(entry.path());
+            }
+        }
+        std::ranges::sort(sources);
+        for (const auto& source : sources)
+        {
+            key += "|" + source.lexically_relative(options.shaderDirectory).generic_string() + ":" + HashFile(source);
+        }
+        return Hash(std::as_bytes(std::span(key.data(), key.size())));
     }
 
     void Vector(ryml::NodeRef node, const math::vector3& value)
@@ -267,6 +299,8 @@ namespace
 
     void Fail(Session& session, std::string error)
     {
+        std::fprintf(stderr, "[TemporalMotionFixture] phase=%u route=%zu error=%s\n",
+            static_cast<unsigned>(session.phase), session.route, error.c_str());
         session.status.error = std::move(error);
         session.pendingTerminal = TemporalMotionFixtureState::Failed;
         try
@@ -320,8 +354,9 @@ namespace
         stamp.predecessorStepId = offset == 0 ? 0 : baseline + offset - 1;
         stamp.inputSha256 = session.inputHash;
         stamp.predecessorInputSha256 = offset == 0 ? std::string{} : session.inputHash;
-        stamp.sdkQuality = session.sdkQuality;
-        stamp.sdkWarmupSubmissions = session.sdkQuality ? (session.sdkStartup ? 1u : 34u) : 0u;
+        stamp.sdkQuality = session.sdkQuality || session.sdkRoutes;
+        stamp.allowMeshlets = true;
+        stamp.sdkWarmupSubmissions = (session.sdkQuality || session.sdkRoutes) ? (session.sdkStartup ? 1u : 34u) : 0u;
         return stamp;
     }
 
@@ -367,6 +402,10 @@ namespace
     void StartRoute(Session& session)
     {
         session.status.route = kRoutes[session.route];
+        if (session.sdkRoutes)
+        {
+            session.camera->NotifyCameraCut();
+        }
         session.moving = Create(session, "__TemporalMotionRoute",
             session.route == 5 ? GameObjectType::Canvas : GameObjectType::Empty)->root_from_this();
         session.mesh = nullptr;
@@ -429,7 +468,13 @@ namespace
             rect->SetSizeDelta({ 2.f, 2.f });
             session.spriteRect = rect->root_from_this();
             auto* image = imageEntity->AddComponent<ImageComponent>();
-            image->Load(session.opaqueTexture.Snapshot().asset);
+            // Transient cooked assets have no authoring path to serialize.
+            // Reuse the runtime owner-binding API under the fixture save barrier.
+            image->DeserializeTexture(session.opaqueTexture.Snapshot().asset);
+            if (!image->m_curtexture)
+            {
+                throw std::runtime_error("Cannot bind fixture world-space image texture");
+            }
             image->color = { .75f, .125f, .25f, 1.f };
             canvas->AddUIObject(imageEntity);
             rect->UpdateLayout(canvasRect->GetWorldRect());
@@ -536,7 +581,21 @@ namespace
         root["extent"] |= ryml::SEQ;
         root["extent"].append_child() << session.width;
         root["extent"].append_child() << session.height;
-        DescribeCamera(root["camera"], session.sdkQuality);
+        DescribeCamera(root["camera"], session.sdkQuality || session.sdkRoutes);
+        if (session.sdkRoutes)
+        {
+            root["displayExtent"] |= ryml::SEQ;
+            root["displayExtent"].append_child() << session.displayWidth;
+            root["displayExtent"].append_child() << session.displayHeight;
+            root["camera"]["aspectRatio"] << double(session.displayWidth) / session.displayHeight;
+            root["companionView"] << c4::fmt::boolalpha(session.companionView);
+            root["provider"] << TemporalMeasuredProviderName(session.sdkProvider);
+            root["quality"] << static_cast<unsigned>(session.sdkQualitySetting);
+            root["exactWarmupSubmissions"] << 34;
+            root["historyStart"] << "fresh-sdk-context-per-route";
+        }
+        root["assetSourceSha256"] << session.assetSourceIdentity;
+        root["assetPreparationCacheHit"] << c4::fmt::boolalpha(session.assetCacheHit);
         auto assets = root["inputAssets"];
         assets |= ryml::SEQ;
         for (const auto& [path, hash] : session.inputAssets)
@@ -553,6 +612,7 @@ namespace
         node |= ryml::MAP;
         node["name"] << kRoutes[session.route];
         node["route"] << kRoutes[session.route];
+        node["allowMeshlets"] << c4::fmt::boolalpha(true);
         node["sessionId"] << session.id;
         node["baselineStepId"] << session.route * 3 + 1;
         node["currentStepId"] << session.route * 3 + 2;
@@ -760,7 +820,7 @@ namespace
         auto* camera = cameraEntity->AddComponent<CameraComponent>();
         session.camera = camera->root_from_this();
         camera->SetPrimary(true);
-        camera->GetCamera()->m_isOrthographic = !session.sdkQuality;
+        camera->GetCamera()->m_isOrthographic = !(session.sdkQuality || session.sdkRoutes);
         camera->GetCamera()->m_fov = 90.f;
         camera->GetCamera()->m_viewWidth = 8.f;
         camera->GetCamera()->m_viewHeight = 8.f;
@@ -769,7 +829,7 @@ namespace
         camera->NotifyCameraCut();
         auto root = session.manifest.rootref();
         root |= ryml::MAP;
-        root["schema"] << (session.sdkStartup ? "temporal.sdk.startup.v1" : session.sdkQuality ? "temporal.sdk.sequence.v2" : "temporal.motion.executed-fixture.v2");
+        root["schema"] << (session.sdkRoutes ? "temporal.resolution.routes.v1" : session.sdkStartup ? "temporal.sdk.startup.v1" : session.sdkQuality ? "temporal.sdk.sequence.v2" : "temporal.motion.executed-fixture.v3");
         root["acceptance"] << "unverified-requires-independent-oracle";
         root["singleSubmissionPerMeasuredStep"] << true;
         DescribeInputs(root, session);
@@ -779,7 +839,7 @@ namespace
     }
 }
 
-bool TemporalMotionFixture::Begin(const std::string& directory, std::string& error, bool* busy, bool sdkQuality, bool sdkStartup)
+bool TemporalMotionFixture::Begin(const std::string& directory, std::string& error, bool* busy, bool sdkQuality, bool sdkStartup, bool sdkRoutes, bool companionView)
 {
     if (busy) *busy = false;
     if (g_session && Active(*g_session))
@@ -836,20 +896,38 @@ bool TemporalMotionFixture::Begin(const std::string& directory, std::string& err
         session->sceneEpoch = SceneManagers->SceneContextEpoch();
         session->width = display.completedWidth;
         session->height = display.completedHeight;
+        session->displayWidth = display.completedWidth;
+        session->displayHeight = display.completedHeight;
         session->status = { TemporalMotionFixtureState::Preparing, directory, {}, {} };
         session->deadline = std::chrono::steady_clock::now() + std::chrono::minutes(5);
         session->sdkQuality = sdkQuality;
         session->sdkStartup = sdkStartup;
+        session->sdkRoutes = sdkRoutes;
+        session->companionView = sdkRoutes && companionView;
         if (sdkStartup && !sdkQuality)
             throw std::runtime_error("SDK startup requires SDK diagnostic mode");
         const auto temporal = TemporalRuntimeControl::Get().Snapshot();
         session->sdkProvider = temporal.settings.requestedUpscaler;
         session->sdkQualitySetting = temporal.settings.quality;
-        if (sdkQuality && (!temporal.settings.enabled || temporal.nativeCaptureExclusionActive ||
+        if ((sdkQuality || sdkRoutes) && (!temporal.settings.enabled || temporal.nativeCaptureExclusionActive ||
             (session->sdkProvider != TemporalProvider::Fsr && session->sdkProvider != TemporalProvider::XeSS &&
                 session->sdkProvider != TemporalProvider::Dlss)))
             throw std::runtime_error("SDK sequence requires enabled FSR/DLSS/XeSS without native capture exclusion");
-        if (!sdkQuality) session->exclusion.emplace();
+        if (sdkRoutes)
+        {
+            if (temporal.activeUpscaler != session->sdkProvider || !temporal.temporalAaApplied ||
+                temporal.frame.displayExtent.width != session->displayWidth ||
+                temporal.frame.displayExtent.height != session->displayHeight)
+            {
+                throw std::runtime_error("SDK routes require a submitted matching provider/display extent");
+            }
+            session->width = temporal.frame.renderExtent.width;
+            session->height = temporal.frame.renderExtent.height;
+        }
+        if (!sdkQuality && !sdkRoutes)
+        {
+            session->exclusion.emplace();
+        }
         session->build = own::make_shared<BuildResult>();
         std::filesystem::create_directories(destination.parent_path());
         if (!std::filesystem::create_directory(destination))
@@ -863,10 +941,27 @@ bool TemporalMotionFixture::Begin(const std::string& directory, std::string& err
         options.targetAbi = CreatorContentAbi::Token;
         options.shaderDirectory = PathFinder::ShaderPath() / "DefaultPassShader";
         options.cacheDirectory = destination / "compiler-cache";
-        const auto result = session->build;
-        session->buildJob = ce::get_job_scheduler().submit([result, options, destination]
+        session->assetSourceIdentity = FixtureAssetSourceIdentity(options);
+        own::shared_owner<BuildResult> preparedAssets;
+        if (g_session && g_session->status.state == TemporalMotionFixtureState::Complete &&
+            g_session->assetSourceIdentity == session->assetSourceIdentity && g_session->build &&
+            g_session->buildJob.is_complete() && g_session->build->succeeded)
         {
-            result->succeeded = TemporalMotionFixtureAssets::Build(options, result->assets, result->error);
+            preparedAssets = g_session->build;
+            session->assetCacheHit = true;
+        }
+        const auto result = session->build;
+        session->buildJob = ce::get_job_scheduler().submit([result, preparedAssets, options, destination]
+        {
+            if (preparedAssets)
+            {
+                result->assets = preparedAssets->assets;
+                result->succeeded = true;
+            }
+            else
+            {
+                result->succeeded = TemporalMotionFixtureAssets::Build(options, result->assets, result->error);
+            }
             if (!result->succeeded)
             {
                 return;
@@ -895,6 +990,23 @@ bool TemporalMotionFixture::Begin(const std::string& directory, std::string& err
         error = exception.what();
         return false;
     }
+}
+
+bool TemporalMotionFixture::CaptureCompanionView(EnhancedLiveViewRequest& view)
+{
+    if (!g_session || !Active(*g_session) || !g_session->companionView || !g_session->camera ||
+        g_session->camera->IsDestroyMark())
+    {
+        return false;
+    }
+    view.key = {kEnhancedEditorViewId, static_cast<uint64_t>(g_session->camera->GetInstanceID())};
+    view.camera = g_session->camera->CaptureFrameSnapshot();
+    view.camera.eyePosition.x += .25f;
+    view.camera.view.m[3][0] -= .25f;
+    view.camera.inverseView = math::inverse(view.camera.view);
+    view.displayTarget = EnhancedLiveDisplayTarget::Editor;
+    view.viewFlags = EnhancedLiveViewFlags::CanvasPreview;
+    return true;
 }
 
 bool TemporalMotionFixture::RequiresSceneWriteBoundary() noexcept
@@ -936,7 +1048,7 @@ void TemporalMotionFixture::TickAfterAnimation()
         // the image at this GT seam. Exact submission/capture proofs guard the
         // camera and native extent; a real nonzero resize still invalidates input.
         if (display.completedWidth && display.completedHeight &&
-            (display.completedWidth != session.width || display.completedHeight != session.height))
+            (display.completedWidth != session.displayWidth || display.completedHeight != session.displayHeight))
         {
             throw std::runtime_error("Game view extent changed during motion fixture: "
                 + std::to_string(session.width) + "x" + std::to_string(session.height) + " -> "
@@ -956,7 +1068,7 @@ void TemporalMotionFixture::TickAfterAnimation()
         {
             throw std::runtime_error("Fixture content was modified while its capture was pending");
         }
-        if (session.sdkQuality)
+        if (session.sdkQuality || session.sdkRoutes)
         {
             const auto temporal = TemporalRuntimeControl::Get().Snapshot();
             if (!temporal.settings.enabled || temporal.settings.requestedUpscaler != session.sdkProvider ||
@@ -973,6 +1085,7 @@ void TemporalMotionFixture::TickAfterAnimation()
             session.buildJob.wait();
             if (!session.build->succeeded)
             {
+                std::fprintf(stderr, "[TemporalMotionFixture] asset build rejected: %s\n", session.build->error.c_str());
                 throw std::runtime_error(session.build->error);
             }
             if (!session.mount.IsValid())
@@ -987,6 +1100,9 @@ void TemporalMotionFixture::TickAfterAnimation()
                 return;
             }
             Isolate(session);
+            // Asset cooking and exact GPU submissions have separate bounded
+            // budgets. A cold material compile must not consume capture time.
+            session.deadline = std::chrono::steady_clock::now() + std::chrono::minutes(5);
         }
         if (session.phase == Phase::Bindings)
         {
@@ -1019,6 +1135,14 @@ void TemporalMotionFixture::TickAfterAnimation()
                 EnhancedSceneRenderer::PublishTemporalFixtureStep(Stamp(session, 1));
                 session.phase = Phase::SdkBaselineCapture;
                 return;
+            }
+            if (session.sdkRoutes)
+            {
+                session.sdkWarmup = EnhancedSceneRenderer::GetTemporalFixtureWarmup(EnhancedLiveDisplayTarget::Game);
+                if (session.sdkWarmup.size() != 34 || submitted.baselineSubmissions != 34)
+                {
+                    return;
+                }
             }
             if (!Capture(session, "current", 1))
             {
@@ -1098,6 +1222,29 @@ void TemporalMotionFixture::TickAfterAnimation()
             if (Cleanup(session)) session.status.state = session.pendingTerminal;
             return;
         }
+        if (session.sdkRoutes && session.companionView)
+        {
+            const auto other = EnhancedSceneRenderer::GetTemporalFixtureSubmission(EnhancedLiveDisplayTarget::Editor);
+            if (other.stamp != session.armedCapture)
+            {
+                return;
+            }
+            if (!other.valid || !other.sourceVerified || other.viewId != kEnhancedEditorViewId ||
+                other.historyReset || other.predecessorRealFrameId >= other.realFrameId)
+            {
+                throw std::runtime_error("Companion view did not submit its independent SDK history");
+            }
+            auto group = session.manifest.rootref()["cases"][session.route]["companion"];
+            group |= ryml::MAP;
+            auto proof = group[session.phase == Phase::Current ? "current" : "control"];
+            proof |= ryml::MAP;
+            proof["viewId"] << other.viewId;
+            proof["realFrameId"] << other.realFrameId;
+            proof["previousRealFrameId"] << other.predecessorRealFrameId;
+            proof["historyGeneration"] << other.historyGeneration;
+            proof["stepId"] << other.stamp.stepId;
+            proof["sourceVerified"] << c4::fmt::boolalpha(other.sourceVerified);
+        }
         if (session.phase == Phase::Current)
         {
             RecordCapture(session, "current");
@@ -1128,6 +1275,7 @@ void TemporalMotionFixture::TickAfterAnimation()
     }
     catch (const std::exception& exception)
     {
+        std::fprintf(stderr, "[TemporalMotionFixture] exception type=%s\n", typeid(exception).name());
         Fail(session, exception.what());
     }
 }
@@ -1175,12 +1323,16 @@ void TemporalMotionFixture::ShutdownAfterRenderJoin() noexcept
     g_session.reset();
 }
 #else
+bool TemporalMotionFixture::CaptureCompanionView(EnhancedLiveViewRequest&)
+{
+    return false;
+}
 bool TemporalMotionFixture::RequiresSceneWriteBoundary() noexcept
 {
     return false;
 }
 
-bool TemporalMotionFixture::Begin(const std::string&, std::string& error, bool* busy, bool, bool)
+bool TemporalMotionFixture::Begin(const std::string&, std::string& error, bool* busy, bool, bool, bool, bool)
 {
     if (busy) *busy = false;
     error = "Temporal motion fixtures require a non-shipping development Editor";

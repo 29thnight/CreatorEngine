@@ -1099,6 +1099,10 @@ namespace
         hash.Add(&request.options.fineDerivatives, sizeof(request.options.fineDerivatives));
         if (request.output == RHIShaderBinary::SpirV && request.options.quadOperations)
             hash.Add("spvGroupNonUniformQuad");
+        if (request.output == RHIShaderBinary::SpirV && request.options.descriptorHeapTextures)
+        {
+            hash.Add("descriptor-heap-textures-v1");
+        }
         for (const auto& directory : request.options.includeDirectories)
             hash.Add(PathUtf8(directory));
         for (const SourceUnit& unit : units)
@@ -1690,6 +1694,18 @@ namespace
             {
                 addArgument("-capability");
                 addArgument("spvGroupNonUniformQuad");
+            }
+            if (request.output == RHIShaderBinary::SpirV && request.options.descriptorHeapTextures)
+            {
+                constexpr const char* capabilities[]{
+                    "SPV_KHR_non_semantic_info", "SPV_GOOGLE_user_type", "spvImageQuery",
+                    "spvImageGatherExtended", "spvSparseResidency", "spvMinLod",
+                    "spvFragmentFullyCoveredEXT", "spvShaderNonUniformEXT"};
+                for (const auto* capability : capabilities)
+                {
+                    addArgument("-capability");
+                    addArgument(capability);
+                }
             }
             // 소스 언어는 확장자가 정한다. Slang은 HLSL의 상위집합이라 둘을
             // 한 세션 설정으로 묶고 싶어지지만, front-end 규칙이 갈린다 —

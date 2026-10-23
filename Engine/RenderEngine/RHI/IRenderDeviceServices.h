@@ -326,6 +326,9 @@ public:
 
     virtual RHIAtomicCapabilities GetAtomicCapabilities() const { return {}; }
     virtual RHISubresourceCapabilities GetSubresourceCapabilities() const { return {}; }
+    // Matched BEGIN/END barriers on the same encoder. Unsupported devices
+    // receive a full transition at the consumer, never an unmatched half.
+    virtual bool SupportsSplitTransitions() const { return false; }
     virtual bool SupportsConcurrentTextureShaderReads() const { return false; }
     virtual RHIBufferInfo DescribeBuffer(RHIBufferHandle) const { return {}; }
     // Validate imported storage, including stale handles, UAV flags and 8-byte extent.

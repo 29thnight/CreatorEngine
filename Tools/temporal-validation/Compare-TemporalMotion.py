@@ -13,6 +13,21 @@ import math
 from pathlib import Path
 import struct
 
+try:
+    import numpy as _np
+except ImportError:
+    _np = None
+
+def finite_float_pixels(payload, reason):
+    if _np is not None:
+        values = _np.frombuffer(payload, dtype="<f4")
+        require(bool(_np.isfinite(values).all()), reason)
+        # Preserve Python float arithmetic in the independent scalar oracle.
+        return values.tolist()
+    values = [value[0] for value in struct.iter_unpack("<f", payload)]
+    require(all(math.isfinite(value) for value in values), reason)
+    return values
+
 
 def vector(value, length=3):
     if not isinstance(value, list) or len(value) != length:
@@ -52,7 +67,7 @@ def project(point, camera, extent):
         if z <= 0:
             raise ValueError("fixture point is behind the pinhole")
         tangent = math.tan(math.radians(float(camera["verticalFovDegrees"])) / 2)
-        ndc_x = x / (z * tangent * width / height)
+        ndc_x = x / (z * tangent * float(camera.get("aspectRatio", width / height)))
         ndc_y = y / (z * tangent)
     else:
         raise ValueError("unknown fixture projection")
@@ -88,8 +103,7 @@ def load_attachment(root, manifest, name, channels, extent):
     require(path.parent == root, "capture attachment escapes capture directory")
     payload = path.read_bytes()
     require(len(payload) == extent[0] * extent[1] * channels * 4, f"wrong {name} byte count")
-    values = [value[0] for value in struct.iter_unpack("<f", payload)]
-    require(all(math.isfinite(value) for value in values), f"nonfinite {name} bytes")
+    values = finite_float_pixels(payload, f"nonfinite {name} bytes")
     return values, hashlib.sha256(payload).hexdigest()
 
 
@@ -166,7 +180,7 @@ class MissingProof(ValueError):
 
 
 ROUTES = {"static", "skinned", "instanced", "meshlet", "alpha", "decal", "sprite"}
-PRODUCT_SCHEMA = "temporal.motion.executed-fixture.v2"
+PRODUCT_SCHEMA = "temporal.motion.executed-fixture.v3"
 
 
 def artifact(base, reference):
@@ -217,8 +231,7 @@ def load_sprite_stage(root, manifest, extent):
     require(path.parent == root, "Sprite readback escapes capture directory")
     payload = path.read_bytes()
     require(len(payload) == extent[0] * extent[1] * 16, "wrong post-Sprite byte count")
-    pixels = [v[0] for v in struct.iter_unpack("<f", payload)]
-    require(all(math.isfinite(v) for v in pixels), "nonfinite post-Sprite bytes")
+    pixels = finite_float_pixels(payload, "nonfinite post-Sprite bytes")
     return pixels, hashlib.sha256(payload).hexdigest()
 
 
@@ -300,7 +313,7 @@ def submission_proof(manifest, case, step, predecessor):
             t["fixtureInputSha256"] == t["fixturePredecessorInputSha256"] ==
             t["previousSubmittedFixtureInputSha256"] == digest,
             "submitted pose is not bound to the authored input bytes")
-    allow_meshlets = case["route"] == "meshlet"
+    allow_meshlets = True
     for flag in (case["allowMeshlets"], manifest["fixtureAllowMeshlets"], t["fixtureAllowMeshlets"],
                  t["previousSubmittedFixtureAllowMeshlets"], s["allowMeshlets"]):
         require(flag is allow_meshlets, "sealed meshlet route choice differs from authored case")
@@ -339,10 +352,10 @@ def weighted(values, weights):
     return [sum(w * value[a] for w, value in zip(weights, values)) for a in range(len(values[0]))]
 
 
-def geometry_probes(case, camera, extent):
+def geometry_probes(case, camera, extent, jitter=(0, 0), allow_perspective=False):
     # Pixel selection comes only from authored triangles, never GPU motion/color.
     # Orthographic affine interpolation is exact; unsupported projection stays open.
-    require(camera["projection"] == "orthographic", "product fixture requires orthographic camera")
+    require(camera["projection"] == "orthographic" or (allow_perspective and camera["projection"] == "perspective"), "product fixture requires orthographic camera")
     require(camera["depthConvention"] == "forward-z", "unsupported fixture depth convention")
     near, far = float(camera["near"]), float(camera["far"])
     require(math.isfinite(near) and math.isfinite(far) and 0 < near < far,
@@ -369,7 +382,7 @@ def geometry_probes(case, camera, extent):
         previous = posed_vertices(case, "previous", instance)
         for start in range(0, len(indices), 3):
             tri = indices[start:start + 3]
-            screen = [project(current[i], camera, extent) for i in tri]
+            screen = [[v + jitter[a] for a, v in enumerate(project(current[i], camera, extent))] for i in tri]
             seeds = ((.6, .2, .2), (.2, .6, .2), (.2, .2, .6))
             if case["route"] == "alpha":
                 seeds = [(u / 10, v / 10, 1 - (u + v) / 10)
@@ -386,9 +399,11 @@ def geometry_probes(case, camera, extent):
                 point = weighted([current[i] for i in tri], weights)
                 previous_point = weighted([previous[i] for i in tri], weights)
                 old = project(previous_point, camera, extent)
-                depth = (point[2] - vector(camera["position"])[2] - near) / (far - near)
+                z = point[2] - vector(camera["position"])[2]
+                depth = ((z - near) / (far - near) if camera["projection"] == "orthographic"
+                         else far / (far - near) - near * far / ((far - near) * z))
                 require(0 < depth < 1, "fixture geometry outside depth range")
-                motion = [old[a] - center[a] for a in range(2)]
+                motion = [old[a] - (center[a] - jitter[a]) for a in range(2)]
                 require(max(abs(v) for v in motion) >= 1, "motion does not distinguish camera-only zero fallback")
                 result.append({"pixel": [x, y], "instance": instance, "expectedPixels": motion,
                                "expectedDepth": depth, "triangle": tri, "weights": weights})
@@ -403,7 +418,27 @@ def geometry_probes(case, camera, extent):
     return result
 
 
-def alpha_coverage(base, case, probes, assets):
+def segment_distance(origin, a, b):
+    delta = [b[i] - a[i] for i in range(2)]
+    length = sum(v * v for v in delta)
+    t = max(0., min(1., sum((origin[i] - a[i]) * delta[i] for i in range(2)) / length)) if length else 0.
+    return math.hypot(*(origin[i] - a[i] - t * delta[i] for i in range(2)))
+
+
+def alpha_coverage_distance(probe, boundaries):
+    uv = probe['uv']
+    dx = [probe['uvDx'][i] - uv[i] for i in range(2)]
+    dy = [probe['uvDy'][i] - uv[i] for i in range(2)]
+    determinant = dx[0] * dy[1] - dy[0] * dx[1]
+    require(abs(determinant) > 1e-12, 'degenerate alpha UV footprint')
+    def screen(point):
+        u, v = point[0] - uv[0], point[1] - uv[1]
+        return [(dy[1] * u - dy[0] * v) / determinant,
+                (-dx[1] * u + dx[0] * v) / determinant]
+    return min((segment_distance([0, 0], screen(a), screen(b)) for a, b in boundaries), default=float('inf'))
+
+
+def alpha_coverage(base, case, probes, assets, quality_boundaries=False):
     reference = case["ownership"]["alphaTexture"]
     require(reference in assets, "alpha texture is not one of the hashed mounted inputs")
     payload, _ = artifact(base, reference)
@@ -425,6 +460,15 @@ def alpha_coverage(base, case, probes, assets):
             first = payload[start:start + size]
         cursor += size
     require(cursor == len(payload), "trailing alpha texture bytes")
+    boundaries = []
+    if quality_boundaries:
+        opaque = lambda x, y: first[4 * (y * width + x) + 3] == 255
+        for y in range(height):
+            for x in range(width):
+                if x + 1 < width and opaque(x, y) != opaque(x + 1, y):
+                    boundaries.append(([(x + 1) / width, y / height], [(x + 1) / width, (y + 1) / height]))
+                if y + 1 < height and opaque(x, y) != opaque(x, y + 1):
+                    boundaries.append(([x / width, (y + 1) / height], [(x + 1) / width, (y + 1) / height]))
     covered = set()
     for probe in probes:
         uv = probe["uv"]
@@ -443,6 +487,8 @@ def alpha_coverage(base, case, probes, assets):
         require(list(texel[:3]) == [255, 255, 255] and texel[3] in (0, 255),
                 "fixture alpha proof requires binary white source texels")
         probe["covered"] = texel[3] == 255
+        if quality_boundaries:
+            probe['alphaCoverageMarginPixels'] = alpha_coverage_distance(probe, boundaries)
         covered.add(probe["covered"])
     require(covered == {False, True}, "alpha case needs independently located opaque and hole probes")
     return [p for p in probes if not p.get("skipCoverageBoundary", False)]
@@ -521,7 +567,7 @@ def geometry_route_proof(current, control, case):
     for manifest in (current, control):
         routes = manifest["geometryRoutes"]
         require(routes["source"] == "joined-command-recording-after-native-submission" and
-                routes["pass"] == "LX.Scene.GBuffer" and
+                routes["pass"] == "METEOR.Scene.GBuffer" and
                 routes["sourceFrameId"] == manifest["frameId"] and
                 routes["viewId"] == manifest["viewId"] and
                 routes["sceneEpoch"] == manifest["sceneEpoch"],
@@ -542,17 +588,23 @@ def geometry_route_proof(current, control, case):
         require(all(positive_integer(instance) for _, instance in identities) and
                 len(identities) == len(case["current"]["instanceTranslations"]),
                 "independent instance identities were collapsed or lost")
-    if route == "meshlet":
-        audit = current["geometryRoutes"]
-        if audit["recordedMeshletDispatchCount"] == 0:
-            raise MissingProof("actual meshlet dispatch unavailable; raster fallback cannot cover meshlets")
-        require(audit["emptyScene"] is False and audit["recordedMeshletBatchCount"] > 0 and
-                control["geometryRoutes"]["recordedMeshletDispatchCount"] == 0 and
-                all(e["meshShader"] is True and e["meshletCount"] > 0 for e in selected),
-                "meshlet selection does not agree with isolated dispatch/control")
+    audit = current["geometryRoutes"]
+    other = control["geometryRoutes"]
+    if route == "sprite":
+        require(audit["recordedMeshletDispatchCount"] == other["recordedMeshletDispatchCount"] == 0,
+                "sprite fixture substituted an opaque meshlet dispatch")
     else:
-        require(not any(e["meshShader"] is True for e in selected + absent),
-                "indexed fixture unexpectedly used a mesh-shader route")
+        if audit["recordedMeshletDispatchCount"] == 0:
+            raise MissingProof("METEOR opaque routes require actual meshlet dispatches")
+        require(audit["emptyScene"] is False and audit["recordedMeshletBatchCount"] > 0 and
+                all(e["meshShader"] is True and e["meshletCount"] > 0 for e in selected + absent),
+                "METEOR route did not record its required mesh shaders")
+        if route == "decal":
+            require(other["recordedMeshletDispatchCount"] > 0,
+                    "decal-disabled control lost its meshlet receiver")
+        else:
+            require(other["recordedMeshletDispatchCount"] == 0,
+                    "disabled route still dispatched meshlets")
 
 
 def compare_product(capture, fixture_path, fixture):

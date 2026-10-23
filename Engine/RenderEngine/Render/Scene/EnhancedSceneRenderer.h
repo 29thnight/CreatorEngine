@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "Ownership.h"
 #include "../Core/EnhancedLivePipelineDesc.h"
 #include "LiveViewScheduling.h"
@@ -84,6 +84,7 @@ struct EnhancedTemporalFixtureStamp
     std::string inputSha256;
     std::string predecessorInputSha256;
     bool sdkQuality{ false }; // Explicit perspective SDK diagnostic; never native golden.
+    bool allowMeshlets{ true }; // Sealed fixture route permission, also checked against recorded commands.
     uint32_t sdkWarmupSubmissions{}; // Bounded RT submissions, independent of GT polling.
 
     bool IsValid() const
@@ -1219,7 +1220,7 @@ namespace EnhancedSceneRenderer
     /// Request a snapshot on the next submitted frame and read the last requested
     /// immutable graph. No GPU resources are owned by this diagnostic value.
     own::shared_owner<const EnhancedRenderGraph::DiagnosticSnapshot> GetLiveGraphSnapshot(
-        EnhancedLiveDisplayTarget target);
+        EnhancedLiveDisplayTarget target, bool requestFresh = false);
 
     /// 현재 패스 파라미터. 파이프라인이 아직 없으면 기본값을 돌려준다.
     /// GetLiveDebugSnapshot과 같은 스레드 규약(락으로 복사)이다.

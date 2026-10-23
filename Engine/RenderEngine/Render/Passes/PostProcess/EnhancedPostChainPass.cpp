@@ -60,9 +60,13 @@ namespace
     bool CompilePostShader(const char* file,
         RHIShaderBlob& outBlob, std::string& outError)
     {
+        RHIShaderCompileOptions options{};
+        // Preserve tone-map arithmetic before its final display quantization.
+        options.strictMath = std::string_view{ file } == PostChainShaders::kUberFile ||
+            std::string_view{ file } == PostChainShaders::kUberHDRFile;
         // 공통 조각은 셰이더가 #include "PostChainCommon.hlsli" 로 직접 당긴다.
         return RHIShaderCompiler::CompileFile(
-            file, "CSMain", "cs_5_0", outBlob, outError);
+            file, "CSMain", "cs_5_0", outBlob, outError, options);
     }
 }
 

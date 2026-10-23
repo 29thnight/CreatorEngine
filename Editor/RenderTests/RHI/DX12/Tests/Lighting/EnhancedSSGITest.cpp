@@ -1,5 +1,6 @@
-// SSGI 자가 검증 (E5에서 EnhancedSSGIPass.cpp 말미에서 분리 — 위와 같은 역결합).
+﻿// SSGI 자가 검증 (E5에서 EnhancedSSGIPass.cpp 말미에서 분리 — 위와 같은 역결합).
 #include "Render/Passes/Lighting/EnhancedSSGIPass.h"
+#include "Render/Scene/EnhancedTemporalViewState.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
@@ -88,6 +89,89 @@ bool DX12Test::RunSSGITest(std::string& outLog)
     camera.farPlane = 100.f;
 
     frameContext.camera = &camera;
+
+    // Exercise the same per-view state used by Scene/Game/MaterialPreview.
+    {
+        EnhancedTemporalViewState views[3];
+        TemporalRuntimeSnapshot control{};
+        uint64_t checks = 0;
+        const auto check = [&](bool value)
+        {
+            ++checks;
+            if (!value)
+            {
+                outLog += "TR3 view history check failed=" + std::to_string(checks) + "\n";
+            }
+            return value;
+        };
+        const auto begin = [&](unsigned slot, FrameCameraSnapshot input, uint64_t frame,
+            uint64_t id, uint64_t scene, uint64_t revision)
+        {
+            return views[slot].Begin(resources, TemporalBackend::DX12, control, input,
+                frame, id, scene, revision, {kWidth, kHeight}, 1.f / 60.f,
+                float(frame) / 60.f, true, true).IsSuccess();
+        };
+        bool ok = true;
+        for (unsigned slot = 0; slot < 3; ++slot)
+        {
+            ok = check(begin(slot, camera, 1, slot + 1, 1, 1) && views[slot].frame.reset) && ok;
+            views[slot].Commit({});
+            ok = check(views[slot].submittedFrame == 1 && views[slot].committedHistoryGeneration == 1) && ok;
+        }
+        auto moving = camera;
+        moving.view.m[3][0] += 0.2f;
+        moving.inverseView = math::inverse(moving.view);
+        ok = check(begin(0, moving, 2, 1, 1, 1) && !views[0].frame.reset) && ok;
+        // Abandon this valid preparation: committed camera/jitter must stay put.
+        ok = check(views[0].submittedFrame == 1 && views[0].jitterIndex == 1 &&
+            views[0].previousHistoryCamera.view == camera.view) && ok;
+        auto invalid = camera;
+        invalid.projection = {};
+        ok = check(!begin(0, invalid, 3, 1, 1, 1) && views[0].submittedFrame == 1 &&
+            views[0].jitterIndex == 1 && views[0].committedHistoryGeneration == 1) && ok;
+        ok = check(begin(0, moving, 4, 1, 1, 1) && !views[0].frame.reset) && ok;
+        views[0].Commit({});
+        const auto reset = [&](FrameCameraSnapshot input, uint64_t frame, uint64_t id, uint64_t scene, uint64_t revision)
+        {
+            const auto generation = views[0].committedHistoryGeneration;
+            bool result = begin(0, input, frame, id, scene, revision) && views[0].frame.reset;
+            // A failed/abandoned reset must remain pending on retry.
+            result = result && begin(0, input, frame + 1, id, scene, revision) && views[0].frame.reset &&
+                views[0].committedHistoryGeneration == generation;
+            views[0].Commit({});
+            return check(result && views[0].committedHistoryGeneration == generation + 1 && views[0].jitterIndex == 1);
+        };
+        auto lens = moving;
+        lens.fov += 5.f;
+        ok = reset(lens, 5, 1, 1, 1) && ok;
+        lens.projection.m[0][0] *= 0.9f;
+        lens.inverseProjection = math::inverse(lens.projection);
+        ok = reset(lens, 7, 1, 1, 1) && ok;
+        lens.isOrthographic = true;
+        lens.projection = math::orthographic_lh(10.f, 10.f, lens.nearPlane, lens.farPlane);
+        lens.inverseProjection = math::inverse(lens.projection);
+        ok = reset(lens, 9, 1, 1, 1) && ok;
+        ++lens.cameraCutRevision;
+        ok = reset(lens, 11, 1, 1, 1) && ok;
+        ok = reset(lens, 13, 1, 2, 1) && ok;
+        ok = reset(lens, 15, 1, 2, 2) && ok;
+        ok = reset(lens, 17, 4, 2, 2) && ok;
+        ++control.historyResetGeneration;
+        ok = reset(lens, 19, 4, 2, 2) && ok;
+        views[0].Invalidate();
+        ok = reset(lens, 21, 4, 2, 2) && ok;
+        ok = reset(lens, 1, 4, 2, 2) && ok;
+        ok = check(views[1].submittedFrame == 1 && views[2].submittedFrame == 1 &&
+            views[1].committedHistoryGeneration == 1 && views[2].committedHistoryGeneration == 1 &&
+            views[1].previousHistoryCamera.view == camera.view && views[2].previousHistoryCamera.view == camera.view) && ok;
+        outLog += "TR3 view history checks=" + std::to_string(checks) + " passed=" + (ok ? "1\n" : "0\n");
+        if (!ok)
+        {
+            resources.Shutdown();
+            return false;
+        }
+    }
+
 
     // ── [1/3] 셰이더 컴파일과 PSO 생성 ──
     EnhancedSSGIPass ssgi;
@@ -470,50 +554,104 @@ bool DX12Test::RunSSGITest(std::string& outLog)
         // RGBA history whether each is preceded by an abandoned preparation,
         // declaration or fully recorded graph. The abandoned camera differs,
         // so accidental previous-camera promotion is observable as well.
-        const auto sequence = [&](int abortStage, std::vector<float>& pixels) {
-            ssgi.ResetHistory();
-            for (unsigned frame = 0; frame < kTestFrames; ++frame)
+        const auto sequence = [&](int abortStage, std::vector<float>& pixels, EnhancedSSGIPass* selected = nullptr, EnhancedSSGIPass* other = nullptr, RHIReadback* otherReadback = nullptr, unsigned frameCount = 8, bool resetOther = false) {
+            auto& pass = selected ? *selected : ssgi;
+            pass.ResetHistory();
+            for (unsigned frame = 0; frame < frameCount; ++frame)
             {
-                if (abortStage >= 0)
+                if (abortStage >= 0 && (abortStage != 3 || frame == 0))
                 {
                     const auto savedCamera = camera;
                     camera.view.m[3][0] += 0.2f;
                     camera.inverseView = math::inverse(camera.view);
                     if (!resources.BeginFrame(error)) return false;
-                    bool ok = ssgi.PrepareFrame(frameContext, error);
+                    bool ok = pass.PrepareFrame(frameContext, error);
                     if (ok && abortStage >= 1)
                     {
                         EnhancedRenderGraph abandoned(resources);
                         EnhancedSSGIPass::Inputs input{};
                         input.depth = abandoned.ImportTexture(depthRegistration.Handle(), RHIResourceState::ShaderResource, "Abort.Depth");
                         input.normal = abandoned.ImportTexture(normalRegistration.Handle(), RHIResourceState::ShaderResource, "Abort.Normal");
-                        ssgi.SetInputs(input);
-                        ssgi.Declare(abandoned, frameContext);
-                        abandoned.AddPass("Abort.Readback", {{ssgi.GetResolvedResult(),RHIResourceState::CopySource}},
+                        pass.SetInputs(input);
+                        pass.Declare(abandoned, frameContext);
+                        abandoned.AddPass("Abort.Readback", {{pass.GetResolvedResult(),RHIResourceState::CopySource}},
                             [&](const EnhancedRenderGraph::ExecuteContext& execution) {
-                                execution.encoder->CopyToReadback(readback, execution.ResolveHandle(ssgi.GetResolvedResult()));
+                                execution.encoder->CopyToReadback(readback, execution.ResolveHandle(pass.GetResolvedResult()));
                             }, true);
                         ok = abandoned.Compile(error);
-                        if (ok && abortStage == 2) ok = abandoned.Execute(error);
-                        // No queue admission: recorded commands and history writes
-                        // are abandoned while their graph is still alive.
-                        resources.AbortFrame();
+                        if (ok && abortStage >= 2)
+                        {
+                            ok = abandoned.Execute(error);
+                        }
+                        // Stages 0-2 abandon recording; stage 3 resets before
+                        // admitting the old recording, then starts a new history.
+                        if (ok && abortStage == 3)
+                        {
+                            pass.ResetHistory();
+                            ok = resources.EndFrame(error);
+                            resources.WaitForGpu();
+                        }
+                        else
+                        {
+                            resources.AbortFrame();
+                        }
                     }
                     else resources.AbortFrame();
                     camera = savedCamera;
                     if (!ok) return false;
                 }
+                if (other)
+                {
+                    if (resetOther && frame == kTestFrames / 2)
+                    {
+                        other->ResetHistory();
+                    }
+                    const auto savedCamera = camera;
+                    camera.view.m[3][0] += 0.35f;
+                    camera.inverseView = math::inverse(camera.view);
+                    if (!resources.BeginFrame(error))
+                    {
+                        return false;
+                    }
+                    EnhancedRenderGraph interleaved(resources);
+                    bool ok = other->PrepareFrame(frameContext, error);
+                    EnhancedSSGIPass::Inputs input{};
+                    input.depth = interleaved.ImportTexture(depthRegistration.Handle(), RHIResourceState::ShaderResource, "Other.Depth");
+                    input.normal = interleaved.ImportTexture(normalRegistration.Handle(), RHIResourceState::ShaderResource, "Other.Normal");
+                    other->SetInputs(input);
+                    other->Declare(interleaved, frameContext);
+                    interleaved.AddPass("Other.Readback", {{other->GetResolvedResult(), RHIResourceState::CopySource}},
+                        [&](const EnhancedRenderGraph::ExecuteContext& execution)
+                        {
+                            execution.encoder->CopyToReadback(*otherReadback, execution.ResolveHandle(other->GetResolvedResult()));
+                        }, true);
+                    ok = ok && interleaved.Compile(error) && interleaved.Execute(error);
+                    if (ok)
+                    {
+                        ok = resources.EndFrame(error);
+                        resources.WaitForGpu();
+                    }
+                    else
+                    {
+                        resources.AbortFrame();
+                    }
+                    camera = savedCamera;
+                    if (!ok)
+                    {
+                        return false;
+                    }
+                }
                 if (!resources.BeginFrame(error)) return false;
-                if (!ssgi.PrepareFrame(frameContext, error)) { resources.AbortFrame(); return false; }
+                if (!pass.PrepareFrame(frameContext, error)) { resources.AbortFrame(); return false; }
                 EnhancedRenderGraph accepted(resources);
                 EnhancedSSGIPass::Inputs input{};
                 input.depth = accepted.ImportTexture(depthRegistration.Handle(),RHIResourceState::ShaderResource,"Accepted.Depth");
                 input.normal = accepted.ImportTexture(normalRegistration.Handle(),RHIResourceState::ShaderResource,"Accepted.Normal");
-                ssgi.SetInputs(input);
-                ssgi.Declare(accepted,frameContext);
-                accepted.AddPass("Accepted.Readback", {{ssgi.GetResolvedResult(),RHIResourceState::CopySource}},
+                pass.SetInputs(input);
+                pass.Declare(accepted,frameContext);
+                accepted.AddPass("Accepted.Readback", {{pass.GetResolvedResult(),RHIResourceState::CopySource}},
                     [&](const EnhancedRenderGraph::ExecuteContext& execution) {
-                        execution.encoder->CopyToReadback(readback,execution.ResolveHandle(ssgi.GetResolvedResult()));
+                        execution.encoder->CopyToReadback(readback,execution.ResolveHandle(pass.GetResolvedResult()));
                     },true);
                 if (!accepted.Compile(error) || !accepted.Execute(error)) { resources.AbortFrame(); return false; }
                 if (!resources.EndFrame(error)) return false;
@@ -531,7 +669,7 @@ bool DX12Test::RunSSGITest(std::string& outLog)
         {
             std::vector<float> reference;
             passed = sequence(-1,reference);
-            for (int abortStage=0;abortStage<3 && passed;++abortStage)
+            for (int abortStage=0;abortStage<4 && passed;++abortStage)
             {
                 std::vector<float> recovered;
                 passed = sequence(abortStage,recovered);
@@ -550,6 +688,83 @@ bool DX12Test::RunSSGITest(std::string& outLog)
                 outLog += line;
             }
             if (!passed) outLog += "SSGI aborted recording changed accepted history: " + error + "\n";
+        }
+
+        if (passed)
+        {
+            EnhancedSSGIPass other;
+            auto otherTuning = other.GetTuning();
+            otherTuning.traceDistance = 2.f;
+            other.SetTuning(otherTuning);
+            RHIReadback otherReadback{};
+            bool ok = other.Initialize(frameContext, error) &&
+                resources.CreateReadback(giW, giH, EnhancedSSGIPass::kGIFormat, 1, otherReadback, error);
+            std::vector<float> isolatedA, isolatedB, interleavedA, interleavedB;
+            ok = ok && sequence(-1, isolatedA);
+            const auto savedCamera = camera;
+            camera.view.m[3][0] += 0.35f;
+            camera.inverseView = math::inverse(camera.view);
+            ok = ok && sequence(-1, isolatedB, &other);
+            camera = savedCamera;
+            bool distinctViews = false;
+            for (size_t i = 0; i < isolatedA.size() && i < isolatedB.size(); ++i)
+            {
+                if (i % 4 != 3 && std::abs(isolatedA[i] - isolatedB[i]) > 0.000001f)
+                {
+                    distinctViews = true;
+                }
+            }
+            ok = ok && distinctViews;
+            for (unsigned resetCase = 0; resetCase < 2 && ok; ++resetCase)
+            {
+                if (resetCase)
+                {
+                    const auto saved = camera;
+                    camera.view.m[3][0] += 0.35f;
+                    camera.inverseView = math::inverse(camera.view);
+                    ok = sequence(-1, isolatedB, &other, nullptr, nullptr, kTestFrames / 2);
+                    camera = saved;
+                }
+                interleavedA.clear();
+                interleavedB.clear();
+                other.ResetHistory();
+                ok = ok && sequence(-1, interleavedA, nullptr, &other, &otherReadback, kTestFrames, resetCase != 0);
+                RHIReadbackImage image{};
+                ok = ok && resources.MapReadback(otherReadback, image, error) && image.IsValid();
+                if (ok)
+                {
+                    for (uint32_t y = 0; y < giH; ++y)
+                    {
+                        for (uint32_t x = 0; x < giW; ++x)
+                        {
+                            for (uint32_t c = 0; c < 4; ++c)
+                            {
+                                interleavedB.push_back(image.At(x, y, c));
+                            }
+                        }
+                    }
+                }
+                for (unsigned view = 0; view < 2; ++view)
+                {
+                    const auto& actual = view ? interleavedB : interleavedA;
+                    const auto& expected = view ? isolatedB : isolatedA;
+                    float maxError = 0.f;
+                    ok = ok && actual.size() == size_t(giW) * giH * 4 && actual.size() == expected.size();
+                    for (size_t i = 0; i < actual.size() && ok; ++i)
+                    {
+                        ok = std::isfinite(actual[i]) && std::isfinite(expected[i]);
+                        maxError = (std::max)(maxError, std::abs(actual[i] - expected[i]));
+                    }
+                    ok = ok && maxError <= 0.000001f;
+                    char line[192]{};
+                    std::snprintf(line, sizeof(line), "TR3 multiview reset=%u view=%u samples=%zu maxError=%.9g passed=%d\n",
+                        resetCase, view, actual.size(), maxError, ok ? 1 : 0);
+                    outLog += line;
+                }
+            }
+            resources.ReleaseReadback(otherReadback);
+            other.Shutdown();
+            passed = ok;
         }
 
         // Compare warmed reset/resize histories against a newly initialized

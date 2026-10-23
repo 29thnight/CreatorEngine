@@ -86,12 +86,18 @@ enum class RHIResourceState
 ///   추적하려면 표가 상태를 들어야 하고, 그러면 그래프의 상태 추적과 두 벌이
 ///   되어 어긋날 자리가 생긴다. 아는 쪽이 말한다 — 그래프는 writeback 으로
 ///   알고, 그래프 밖은 방금 자기가 만든 상태를 안다.
+// Begin and End carry identical resource/range/before/after values. The resource
+// cannot be accessed between them. Graph pairs stay inside one repeated pass,
+// on the same encoder, never across submission or queue boundaries.
+enum class RHITransitionPhase : uint8_t { Full, Begin, End };
+
 struct RHITransition
 {
     RHITextureHandle texture;
     RHIResourceState before{ RHIResourceState::Common };
     RHIResourceState after{ RHIResourceState::Common };
     RHITextureSubresourceRange range{};
+    RHITransitionPhase phase{RHITransitionPhase::Full};
 };
 
 /// 버퍼 전이. 상태 어휘는 텍스처와 같지만 핸들 타입을 섞지 않는다.
@@ -103,6 +109,7 @@ struct RHIBufferTransition
     RHIResourceState before{ RHIResourceState::Common };
     RHIResourceState after{ RHIResourceState::Common };
     RHIBufferSubresourceRange range{};
+    RHITransitionPhase phase{RHITransitionPhase::Full};
 };
 
 /// 한 pass 앞에서 함께 제출할 resource barrier 묶음.

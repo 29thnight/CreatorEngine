@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 #include "../../MaterialGraphSceneInput.h"
 #include "../Temporal/TemporalUpscalerHost.h"
 #include "../Temporal/TemporalMeasurementProvenance.h"
@@ -44,6 +44,12 @@ struct EnhancedTemporalViewState
         uint64_t realFrame, uint64_t logicalView, uint64_t scene, uint64_t history,
         TemporalExtent display, float deltaSeconds, float totalSeconds, bool nativeOnly, bool toneMappedSdr)
     {
+        const auto current = camera.view * camera.projection;
+        const auto currentInverse = math::try_inverse(current);
+        if (!currentInverse || !display.IsValid() || !logicalView)
+        {
+            return { TemporalStatus::InvalidInput };
+        }
         auto settings = control.settings;
         if (nativeOnly)
         {
@@ -89,9 +95,6 @@ struct EnhancedTemporalViewState
         frame.frameTimeMilliseconds = 1000.f * std::clamp(reset ? deltaSeconds : totalSeconds - previousSeconds, 0.0001f, 1.f);
         frame.cameraNear = camera.nearPlane; frame.cameraFar = camera.farPlane;
         frame.cameraVerticalFov = math::radians(camera.fov);
-        const auto current = camera.view * camera.projection;
-        const auto currentInverse = math::try_inverse(current);
-        if (!currentInverse) return {TemporalStatus::InvalidInput};
         const auto previous = reset ? current : previousViewProjection;
         const auto previousInverse = math::try_inverse(previous);
         if (!previousInverse) return {TemporalStatus::InvalidInput};

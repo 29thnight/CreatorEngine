@@ -15,6 +15,29 @@ ORACLE = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(ORACLE)
 
 
+class FloatDecodeTests(unittest.TestCase):
+    def test_vectorized_and_scalar_decoding_match(self):
+        backend = ORACLE._np
+        payload = struct.pack('<8f', 0., -0., 1e-38, -1e-38, 1e30, -1e30, .1, -.1)
+        try:
+            accelerated = ORACLE.finite_float_pixels(payload, 'invalid')
+            ORACLE._np = None
+            self.assertEqual(accelerated, ORACLE.finite_float_pixels(payload, 'invalid'))
+        finally:
+            ORACLE._np = backend
+
+    def test_nonfinite_rejected_in_each_decoder(self):
+        backend = ORACLE._np
+        try:
+            for decoder in (None, backend):
+                ORACLE._np = decoder
+                for value in (float('nan'), float('inf'), -float('inf')):
+                    with self.assertRaisesRegex(ValueError, 'nonfinite'):
+                        ORACLE.finite_float_pixels(struct.pack('<f', value), 'nonfinite')
+        finally:
+            ORACLE._np = backend
+
+
 class MeasuredStepContinuityTests(unittest.TestCase):
     def test_exact_measured_predecessor_is_accepted(self):
         ORACLE.measured_step_continuity({"realFrameId": 20},
@@ -146,12 +169,12 @@ class ProductOwnershipOracleTests(unittest.TestCase):
 
     def submission(self):
         digest = "a" * 64
-        case = {"sessionId": 7, "route": "static", "allowMeshlets": False, "input": {"sha256": digest}}
+        case = {"sessionId": 7, "route": "static", "allowMeshlets": True, "input": {"sha256": digest}}
         manifest = {"realFrameId": 109, "frameId": 209, "viewId": 3, "sceneEpoch": 4,
                     "historyRevision": 6, "fixtureSessionId": 7, "fixtureStepId": 2,
                     "fixturePredecessorStepId": 1, "fixtureInputSha256": digest,
                     "fixturePredecessorInputSha256": digest, "fixtureCoalesced": False,
-                    "fixtureAllowMeshlets": False,
+                    "fixtureAllowMeshlets": True,
                     "temporalMotion": {"fixtureSessionId": 7, "fixtureStepId": 2,
                         "fixturePredecessorStepId": 1, "previousSubmittedFixtureSessionId": 7,
                         "previousSubmittedFixtureStepId": 1, "previousSubmittedRealFrameId": 106,
@@ -161,7 +184,7 @@ class ProductOwnershipOracleTests(unittest.TestCase):
                         "fixtureInputSha256": digest, "fixturePredecessorInputSha256": digest,
                         "previousSubmittedFixtureInputSha256": digest,
                         "previousSubmittedFixtureSourceVerified": True,
-                        "fixtureAllowMeshlets": False, "previousSubmittedFixtureAllowMeshlets": False},
+                        "fixtureAllowMeshlets": True, "previousSubmittedFixtureAllowMeshlets": True},
                     "fixtureSubmission": {"valid": True, "sourceVerified": True,
                         "submissionProof": "native-submit-succeeded-and-temporal-history-committed",
                         "historyReset": False, "coalesced": False, "sessionId": 7, "stepId": 2,
@@ -170,7 +193,7 @@ class ProductOwnershipOracleTests(unittest.TestCase):
                         "predecessorSourceFrameId": 206, "viewId": 3, "sceneEpoch": 4,
                         "historyGeneration": 8, "historyRevision": 6, "inputSha256": digest,
                         "predecessorInputSha256": digest, "requestedPredecessorInputSha256": digest,
-                        "allowMeshlets": False}}
+                        "allowMeshlets": True}}
         return manifest, case
 
     def test_exact_submitted_predecessor_need_not_be_adjacent(self):
@@ -228,9 +251,11 @@ class ProductOwnershipOracleTests(unittest.TestCase):
         def manifest(frame, entries):
             return {"frameId": frame, "viewId": 3, "sceneEpoch": 4, "geometryRoutes": {
                 "source": "joined-command-recording-after-native-submission", "pass": "METEOR.Scene.GBuffer",
-                "sourceFrameId": frame, "viewId": 3, "sceneEpoch": 4, "selected": entries}}
+                "sourceFrameId": frame, "viewId": 3, "sceneEpoch": 4, "selected": entries,
+                "recordedMeshletDispatchCount": int(bool(entries)), "recordedMeshletBatchCount": int(bool(entries)),
+                "emptyScene": not entries}}
         entry = {"geometryKey": 10, "temporalObjectId": 20, "temporalInstanceId": 30,
-                 "meshShader": False}
+                 "meshShader": True, "meshletCount": 1}
         self.case["route"] = "instanced"
         self.case["current"]["instanceTranslations"] = [[-1, 0, 4], [1, 0, 4]]
         with self.assertRaises(ValueError):
@@ -238,13 +263,30 @@ class ProductOwnershipOracleTests(unittest.TestCase):
         second = dict(entry, temporalInstanceId=31)
         ORACLE.geometry_route_proof(manifest(100, [entry, second]), manifest(102, []), self.case)
 
+    def test_static_indexed_substitute_is_rejected(self):
+        def manifest(frame, selected):
+            return {"frameId": frame, "viewId": 3, "sceneEpoch": 4, "geometryRoutes": {
+                "source": "joined-command-recording-after-native-submission", "pass": "METEOR.Scene.GBuffer",
+                "sourceFrameId": frame, "viewId": 3, "sceneEpoch": 4, "selected": selected,
+                "recordedMeshletDispatchCount": int(bool(selected)), "recordedMeshletBatchCount": int(bool(selected)),
+                "emptyScene": not selected}}
+        entry = {"geometryKey": 10, "temporalObjectId": 20, "temporalInstanceId": 0,
+                 "meshShader": True, "meshletCount": 1}
+        self.case["route"] = "static"
+        positive, control = manifest(100, [entry]), manifest(102, [])
+        ORACLE.geometry_route_proof(positive, control, self.case)
+        entry["meshShader"] = False
+        with self.assertRaises(ValueError):
+            ORACLE.geometry_route_proof(positive, control, self.case)
+
     def test_decal_control_must_keep_same_receiver(self):
         def manifest(frame, object_id):
             return {"frameId": frame, "viewId": 3, "sceneEpoch": 4, "geometryRoutes": {
                 "source": "joined-command-recording-after-native-submission", "pass": "METEOR.Scene.GBuffer",
-                "sourceFrameId": frame, "viewId": 3, "sceneEpoch": 4, "selected": [
+                "sourceFrameId": frame, "viewId": 3, "sceneEpoch": 4,
+                "recordedMeshletDispatchCount": 1, "recordedMeshletBatchCount": 1, "emptyScene": False, "selected": [
                     {"geometryKey": 10, "temporalObjectId": object_id, "temporalInstanceId": 0,
-                     "meshShader": False}]}}
+                     "meshShader": True, "meshletCount": 1}]}}
         self.case["route"] = "decal"
         ORACLE.geometry_route_proof(manifest(100, 20), manifest(102, 20), self.case)
         with self.assertRaises(ValueError):
@@ -262,7 +304,7 @@ class ProductOwnershipOracleTests(unittest.TestCase):
 
     def test_sealed_meshlet_choice_cannot_be_substituted(self):
         manifest, case = self.submission()
-        manifest["fixtureSubmission"]["allowMeshlets"] = True
+        manifest["fixtureSubmission"]["allowMeshlets"] = False
         with self.assertRaises(ValueError):
             ORACLE.submission_proof(manifest, case, 2, 1)
 

@@ -9,10 +9,10 @@ param(
 )
 $ErrorActionPreference = 'Stop'
 Set-StrictMode -Version Latest
-$expectedChecks = 434
-$expectedLog = 'RG8_QUEUE_EXECUTION_OK schema=3 checks=434 payloadError=0 validationErrors=0 modes=2 overlapCases=7 positiveOverlapExecution=true negativeFallbackExecution=true declarationOrder=true readRead=true reorderedFailure=true delayedLifetime=true quarantineReleased=true frameRetirement=true parallelRecording=true calibratedIntervals=true measuredGain=false' + "`n"
-$expectedScheduleChecks = 129
-$expectedScheduleLog = 'RG8_QUEUE_SCHEDULE_OK schema=3 checks=129 scope=compiled-plan nativeExecution=false overlap=true declarationOrder=true readRead=true sharedGraphicsReads=true readerEpochJoin=true sideEffects=true fallbackReasons=true modelGuards=true timingIdentity=true measurementDomains=true' + "`n"
+$expectedChecks = 441
+$expectedLog = 'RG8_QUEUE_EXECUTION_OK schema=4 checks=441 payloadError=0 validationErrors=0 modes=2 overlapCases=7 positiveOverlapExecution=true negativeFallbackExecution=true declarationOrder=true readRead=true authoredFailure=true primaryPreparation=true delayedLifetime=true quarantineReleased=true frameRetirement=true parallelRecording=true calibratedIntervals=true measuredGain=false' + "`n"
+$expectedScheduleChecks = 82
+$expectedScheduleLog = 'RG8_QUEUE_SCHEDULE_OK schema=5 checks=82 scope=compiled-plan nativeExecution=false authoredAsync=true declarationOrder=true readRead=true fallbackReasons=true timingIndependent=true structuralIntent=true primaryGraphics=true' + "`n"
 . (Join-Path $PSScriptRoot 'CommandResults.ps1')
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $out = [IO.Path]::GetFullPath($OutputDirectory)
@@ -47,7 +47,7 @@ $start.Environment.Remove('CREATOR_RENDERGRAPH_ALIASING') | Out-Null
 $binary = [ordered]@{configuration=$Configuration; head=(git -C $repo rev-parse HEAD);
     exe=(Get-FileHash $exe).Hash;
     runtime=(Get-FileHash (Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll')).Hash;
-    acceptanceSchema=3; expectedChecks=$expectedChecks; expectedLog=$expectedLog;
+    acceptanceSchema=5; expectedChecks=$expectedChecks; expectedLog=$expectedLog;
     expectedScheduleChecks=$expectedScheduleChecks; expectedScheduleLog=$expectedScheduleLog;
     wrapper=(Get-FileHash $PSCommandPath).Hash;
     scheduleWrapper=(Get-FileHash (Join-Path $PSScriptRoot 'verify-rg8-queue-plan.ps1')).Hash;
@@ -212,16 +212,16 @@ try
             }
         }
     }
-    [ordered]@{schemaVersion=2; passed=$true; phaseComplete=$false; acceptanceSchema=3; checks=$expectedChecks;
+    [ordered]@{schemaVersion=2; passed=$true; phaseComplete=$false; acceptanceSchema=5; checks=$expectedChecks;
         scope='Native queue execution in existing offscreen Editor'; fullRegression=[bool]$FullRegression;
         scheduleChecks=$(if ($FullRegression) { $expectedScheduleChecks } else { 0 });
-        nativeQueueExecutionTested=$true; frameRetirementTested=$true; positiveOverlapExecutionTested=$true;
+        primaryPreparationTested=$true; primaryGraphicsRouteTested=[bool]$FullRegression; authoredAsyncTested=$true; timingIndependentTested=[bool]$FullRegression; nativeQueueExecutionTested=$true; frameRetirementTested=$true; positiveOverlapExecutionTested=$true;
         negativeFallbackExecutionTested=$true; declarationOrderTested=$true; readReadOwnershipTested=$true;
-        reorderedFailureTested=$true; parallelRecordingTested=$true; calibratedIntervalsTested=$true;
+        authoredFailureTested=$true; reorderedFailureTested=$false; parallelRecordingTested=$true; calibratedIntervalsTested=$true;
         measuredOverlapRequired=[bool]$RequireMeasuredOverlap; measuredOverlapEstablished=$measuredOverlap;
         intervalEvidence="$out/native-intervals.json"; performanceValidated=$false; adoptionEstablished=$false;
-        sharedGraphicsReadsTested=[bool]$FullRegression; readerEpochJoinTested=[bool]$FullRegression;
-        sideEffectsTested=[bool]$FullRegression; fallbackReasonsTested=[bool]$FullRegression;
+        sharedGraphicsReadsTested=$false; readerEpochJoinTested=$false;
+        sideEffectsTested=$false; fallbackReasonsTested=[bool]$FullRegression;
         measurementDomainsTested=[bool]$FullRegression;
         liveSceneQueueCutover=$false; binary=$binary; exitCode=$process.ExitCode} |
         ConvertTo-Json -Depth 10 | Set-Content "$out/execution-result.json" -Encoding utf8

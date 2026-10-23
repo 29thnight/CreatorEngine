@@ -1,4 +1,4 @@
-﻿#include "MaterialGraphSceneCompiler.h"
+#include "MaterialGraphSceneCompiler.h"
 #include "MaterialGraphShaderMeta.h"
 
 #include "../Utility_Framework/StandardLibrary.h"
@@ -208,6 +208,7 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
     options.strictMath = true;
     options.fineDerivatives = true;
     options.quadOperations = true;
+    options.descriptorHeapTextures = true;
     options.bufferInt64Atomics = true;
     options.includeDirectories.push_back(shaderDirectory / "Includes");
     Capabilities capabilities;

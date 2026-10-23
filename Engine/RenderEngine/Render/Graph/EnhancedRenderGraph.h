@@ -87,7 +87,8 @@ enum class RGQueueFallbackReason : uint8_t
     Unsupported,
     MissingMeasurement,
     UnsupportedState,
-    InsufficientGain,
+    InsufficientGain, // Historical diagnostic value; no longer emitted.
+    NoAsyncPasses,
 };
 
 inline const char* RGMeasurementDomainName(RGMeasurementDomain domain)
@@ -104,20 +105,10 @@ inline const char* RGQueueFallbackReasonName(RGQueueFallbackReason reason)
     case RGQueueFallbackReason::MissingMeasurement: return "missing-measurement";
     case RGQueueFallbackReason::UnsupportedState: return "unsupported-state";
     case RGQueueFallbackReason::InsufficientGain: return "insufficient-gain";
+    case RGQueueFallbackReason::NoAsyncPasses: return "no-async-passes";
     default: return "unknown";
     }
 }
-
-// How BuildQueueSchedule assigns compute-compatible passes to the compute queue.
-enum class RGQueuePlacement : uint8_t
-{
-    // Every eligible measured pass moves and compiled order is kept. Deterministic
-    // placement for queue execution contract tests; ignores whether work can overlap.
-    Threshold,
-    // Two-queue list schedule over the dependency DAG. Compute is used only when the
-    // predicted span after cross-queue handoff costs improves by minimumGainNanoseconds.
-    Overlap,
-};
 
 // 그래프가 만들 리소스의 설명. transient(그래프 소유)만 이 설명을 쓴다.
 struct RGTextureDesc
@@ -126,9 +117,8 @@ struct RGTextureDesc
     uint32_t    height{ 0 };
 
     // 배열 슬라이스. 캐스케이드 그림자맵처럼 같은 규격이 여러 장 필요할 때 쓴다.
-    // 텍스처를 여러 개 만드는 것보다 낫다 — 리소스가 하나라 배리어도 하나고
-    // (전이는 전체 서브리소스 단위라 슬라이스가 늘어도 배리어 수가 그대로다),
-    // 셰이더에서 슬라이스 번호가 좌표의 일부라 분기 없이 고를 수 있다.
+    // 전체 범위 선언은 하나의 리소스로 추적한다. 좁은 범위를 선언하면
+    // mip/layer/aspect별 전이를 계획한다. 셰이더는 슬라이스 좌표로 접근한다.
     uint32_t    arraySize{ 1 };
 
     RHIFormat   format{ RHIFormat::RGBA8Unorm };
@@ -141,6 +131,8 @@ struct RGTextureDesc
     bool        allowDepthStencil{ false };
     bool        allowUnorderedAccess{ false };
     std::string name;
+    // Includes mip 0; cannot exceed the complete width/height chain.
+    uint32_t mipLevels{1};
 };
 
 struct RGBufferDesc
@@ -158,6 +150,7 @@ struct RGResourceDescription
     RHIFormat format{RHIFormat::Unknown};
     uint32_t width{}, height{}, arraySize{};
     uint64_t bytes{};
+    uint32_t mipLevels{};
 };
 
 // transient 리소스 풀 (PHASE 3-9, 상시 러너의 프레임당 생성 비용 제거).
@@ -217,7 +210,7 @@ public:
         own::shared_owner<AliasHeapAccounting> m_accounting;
         bool m_cached{false};
     };
-    using AllocationKey = std::array<uint64_t, 6>;
+    using AllocationKey = std::array<uint64_t, 7>;
     struct AllocationKeyHash
     {
         size_t operator()(const AllocationKey& key) const noexcept
@@ -711,16 +704,16 @@ public:
         std::vector<Entry> entries; // Submission order; a topological order of the DAG.
         std::vector<Wait> waits;
         uint64_t compileGeneration{0};
-        // Analytical estimates; missing timing samples disable Overlap placement.
+        // Historical prediction schema fields; authored placement leaves these zero.
         uint64_t predictedSerialNanoseconds{0};
         uint64_t predictedNanoseconds{0};
         bool usesCompute{false};
-        bool predictionComplete{false}; // Every executed pass has a valid timing sample.
+        bool predictionComplete{false}; // Historical prediction flag; authored placement leaves false.
         bool predictionCalibrated{false}; // No measured overhead/contention calibration yet.
         RGQueueFallbackReason fallbackReason{RGQueueFallbackReason::None};
         uint32_t eligibleComputePasses{0}, rejectedStatePasses{0};
         uint32_t measuredPasses{0}, missingMeasurementPasses{0};
-        // CPU planning subtotals; these are not GPU costs or calibrated predictions.
+        // dependencyMilliseconds measures the single dependency build. Legacy trial/simulation fields stay zero.
         uint32_t placementTrials{0};
         double dependencyMilliseconds{0}, simulationMilliseconds{0};
 
@@ -738,26 +731,19 @@ public:
             dependencyMilliseconds = simulationMilliseconds = 0;
         }
     };
-    struct QueueCostModel
-    {
-        RGQueuePlacement placement{RGQueuePlacement::Threshold};
-        // Approximate cross-queue handoff penalty, not a calibrated measurement.
-        // It does not fully price every extra batch, boundary transition or GPU
-        // contention effect. predictionCalibrated must remain false until measured.
-        uint64_t handoffNanoseconds{20'000};
-        uint64_t minimumGainNanoseconds{50'000};
-    };
-    void SetQueueCostModel(const QueueCostModel& model) { RequireQueueIdle(); m_queueCostModel = model; }
-    // minimumGpuNanoseconds is the per-pass measured time a compute candidate needs.
-    // Overlap placement may reorder compatible same-queue immutable reads.
-    // Writers and state/ownership changes join every reader, not the last declared
-    // reader. Cross-queue reads remain ordered unless the backend and resource
-    // support the explicit shared texture state established by graphics fanout/fanin.
+    // Preserve compiled order. Only DeclareAsyncCompute selects a compute queue;
+    // queue support and legal resource states gate that request. Timings never gate it.
     bool BuildQueueSchedule(const RHIQueueCapabilities& capabilities,
-        const std::vector<QueueHint>& hints, uint64_t minimumGpuNanoseconds,
+        const std::vector<QueueHint>& hints, bool enableAsyncCompute,
         QueueSchedule& output, std::string& outError) const;
 
+    // Select after Compile, before recording. Graphics-only plans reuse the primary
+    // recording/submission path; only an actual compute assignment needs owned queues.
+    bool SelectExecutionQueues(const RHIQueueCapabilities& capabilities, std::string& outError);
     void DeclareComputeCompatible(RGPassId pass);
+    // Explicit execution request; includes the compute-compatible callback contract.
+    // Falls back to graphics when async queues are disabled or unavailable.
+    void DeclareAsyncCompute(RGPassId pass);
     // 작성자 계약: 이 패스의 모든 콜백과 분할 조각은 준비가 끝난 불변 CPU 입력만 읽고,
     // 다른 콜백의 CPU 출력을 소비하지 않는다. 관측값은 콜백/조각별 전용 저장소나
     // atomic에 쓰며 전체 기록 합류 뒤에만 읽는다. 분할 자체는 이 계약을 뜻하지 않는다.
@@ -842,7 +828,7 @@ public:
     // All callbacks are recorded before any submission. Retained batches pin self.
     bool SubmitQueues(const own::shared_owner<EnhancedRenderGraph>& self,
         IRHIQueueRecorder& recorder, QueueEndpoint& graphics, QueueEndpoint* compute,
-        const std::vector<QueueHint>& hints, uint64_t minimumGpuNanoseconds,
+        const std::vector<QueueHint>& hints, bool enableAsyncCompute,
         ce::lifetime_token owner, QueueExecution& output, std::string& outError);
 
     // Compile이 정한 순서대로 배리어를 넣고 패스를 기록한다.
@@ -881,6 +867,7 @@ public:
         bool aliasing{false};
         RHITextureSubresourceRange textureRange{};
         RHIBufferSubresourceRange bufferRange{};
+        RHITransitionPhase phase{RHITransitionPhase::Full};
     };
     struct DiagnosticPass
     {
@@ -899,6 +886,7 @@ public:
         };
         uint32_t repeatCount{1};
         std::vector<Phase> phases;
+        bool computeCompatible{false}, asyncCompute{false};
     };
     struct DiagnosticResource
     {
@@ -1143,6 +1131,7 @@ private:
         bool                     hasSideEffect{ false };
         bool                     culled{ false };
         bool                     computeCompatible{ false };
+        bool                     asyncCompute{ false };
         bool                     recordingSideEffect{ false };
         bool                     recordingIndependent{ false };
         // ★ 이 패스 직전에 한 번에 낸다. 계획 단계는 네 중립 배열만 만들고,
@@ -1274,6 +1263,7 @@ private:
     bool ValidateFinalStates(std::string& outError) const;
     bool ValidateRepeatedPasses(std::string& outError) const;
     void PlanRepeatedBarriers(Pass& pass, ce::dynamic_bitset& previousWrite);
+    void PlanRepeatedSplitBarriers(Pass& pass);
 
     /// 계획한 네 부류를 인코더가 감싼 command target에 한 batch로 기록한다.
     /// 순차·병렬과 DX12·Vulkan이 모두 이 경로를 공유한다(G-2).
@@ -1317,7 +1307,6 @@ private:
     std::span<Pass> m_passes;
     std::vector<FinalStateRequirement> m_finalStateRequirements;
     std::vector<uint16_t> m_executeOrder;
-    bool m_executeOrderOverridden{false}; // Queue specialization owns a mutable copy only when it reorders.
     own::shared_owner<const std::string> m_timingSignature;
     // Byte offset of each pass's culled field inside m_timingSignature.
     ce::render_vector<size_t> m_signatureCulledOffsets;
@@ -1336,8 +1325,9 @@ private:
     void BuildDependencyWaves();
     std::vector<int32_t> m_dependencyWaves;
     std::vector<uint16_t> m_criticalPath;
-    // Queue assignment is part of state compatibility. Whole-resource access is
-    // conservative for all subresources until declarations expose a narrower range.
+    // Queue state ownership remains conservative at whole-resource granularity.
+    // Range declarations refine hazards and native barriers; queue planning may
+    // add waits for disjoint ranges when backend state ownership requires it.
     struct QueuePlanningScratch;
     mutable own::unique_owner<QueuePlanningScratch> m_queuePlanningScratch;
     mutable std::mutex m_queuePlanningMutex;
@@ -1345,18 +1335,7 @@ private:
         std::vector<std::vector<uint16_t>>& predecessors,
         std::vector<std::vector<uint16_t>>& successors) const;
     bool IsComputeStateCompatible(uint16_t pass) const;
-    // Two-queue list simulation. Returns the predicted span and, if requested,
-    // the submission order. reorder=false keeps the compiled order.
-    uint64_t SimulateQueues(const std::vector<RHIQueueKind>& queues, const std::vector<uint64_t>& costs,
-        const std::vector<std::vector<uint16_t>>& predecessors,
-        const std::vector<std::vector<uint16_t>>& successors,
-        bool reorder, std::vector<uint16_t>* order, QueuePlanningScratch& scratch) const;
-    uint64_t SimulateQueueOrder(const std::vector<RHIQueueKind>& queues,
-        const std::vector<uint64_t>& costs, const std::vector<std::vector<uint16_t>>& predecessors,
-        const std::vector<std::vector<uint16_t>>& successors, bool reorder,
-        std::vector<uint16_t>* order, QueuePlanningScratch& scratch, bool prioritizeComputeInputs) const;
     void UpdateResourceUses();
-    QueueCostModel m_queueCostModel;
     RGMeasurementDomain m_measurementDomain{RGMeasurementDomain::Normal};
     uint32_t m_queueExecutionMode{0};
     RGHandle VersionHandle(uint16_t index, uint16_t version) const;
@@ -1390,7 +1369,7 @@ public:
             std::vector<RGPassUsage> usages;
             std::vector<RepeatedPhase> phases;
             uint32_t maxSlices{1}, recordCost{0}, repeatCount{1};
-            bool hasSideEffect{false}, computeCompatible{false};
+            bool hasSideEffect{false}, computeCompatible{false}, asyncCompute{false};
             bool recordingSideEffect{false}, recordingIndependent{false};
             bool execute{false}, splitExecute{false}, repeated{false}, repeatedExecute{false};
         };

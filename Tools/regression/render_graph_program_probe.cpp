@@ -202,6 +202,188 @@ namespace
         }
     }
 
+    void CheckTransientMips()
+    {
+        ce::regression::PortableRenderServices services;
+        services.subresourceCapabilities = {true, true, true};
+        RGTransientPool pool;
+        Graph graph{services, RGSchedulingMode::ExplicitVersioned};
+        graph.SetTransientPool(&pool);
+        RGTextureDesc desc{};
+        desc.width = desc.height = 16;
+        desc.arraySize = 2;
+        desc.allowRenderTarget = true;
+        desc.name = "mip pool";
+        std::string error;
+        RHITextureHandle firstNative;
+        own::shared_owner<const Graph::GraphProgram> previous;
+        for (const uint32_t mips : {1u, 2u, 1u})
+        {
+            graph.Reset();
+            if (previous)
+            {
+                graph.InheritProgram(previous);
+                graph.BeginProgramBinding();
+            }
+            desc.mipLevels = mips;
+            const auto texture = graph.Write(graph.CreateTexture(desc));
+            graph.AddPass("last mip", {{texture, RHIResourceState::RenderTarget, RGAccessMode::Write,
+                          {mips - 1, 1, 1, 1}}}, [](const auto&) {}, true);
+            if (previous)
+            {
+                Require(graph.FinishProgramBinding(error), error);
+            }
+            Require(graph.Compile(error), error);
+            RGResourceDescription description;
+            Require(graph.DescribeResource(texture, description) && description.mipLevels == mips,
+                    "Logical resource description preserves transient mip count");
+            const auto native = Graph::ExecuteContext{&graph}.ResolveHandle(texture);
+            Require(services.DescribeTexture(native).mipLevels == mips,
+                    "Native transient storage preserves declared mip count");
+            if (!previous)
+            {
+                firstNative = native;
+            }
+            else
+            {
+                Require(!graph.GetStats().programBindingReused, "Mip changes invalidate retained graph program");
+                Require((native == firstNative) == (mips == 1), "Pool key separates mip counts and reuses exact match");
+            }
+            previous = graph.SnapshotProgram();
+            Require(graph.Execute(error), error);
+        }
+        graph.Reset();
+        desc.mipLevels = 6;
+        Require(!graph.CreateTexture(desc).IsValid() && !graph.Compile(error) &&
+                error.find("invalid mip count") != std::string::npos, "Mip chain cannot exceed dimensions");
+        graph.Reset();
+        desc.mipLevels = 0;
+        Require(!graph.CreateTexture(desc).IsValid() && !graph.Compile(error), "Zero mip count is rejected");
+    }
+
+    void CheckRg9SplitAndRecovery()
+    {
+        class SplitServices final : public ce::regression::PortableRenderServices
+        {
+          public:
+            bool enabled{true};
+            bool SupportsSplitTransitions() const override { return enabled; }
+        } services;
+        services.subresourceCapabilities = {true, true, true};
+        std::string error;
+        for (const bool narrow : {false, true})
+        {
+            for (const bool enabled : {false, true})
+            {
+                services.enabled = enabled;
+                Graph graph{services, RGSchedulingMode::ExplicitVersioned};
+                RGTextureDesc desc{};
+                desc.width = desc.height = 8;
+                desc.arraySize = 2;
+                desc.allowRenderTarget = true;
+                auto texture = graph.Write(graph.CreateTexture(desc));
+                auto buffer = graph.Write(graph.CreateBuffer({256, true, false, "split buffer"}));
+                auto independent = graph.Write(graph.CreateBuffer({256, true, false, "independent"}));
+                const RHITextureSubresourceRange range = narrow ? RHITextureSubresourceRange{0, 1, 0, 1}
+                                                               : RHITextureSubresourceRange{};
+                const Graph::RGPassUsage textureWrite{texture, RHIResourceState::RenderTarget, RGAccessMode::Write, range};
+                const Graph::RGPassUsage textureRead{texture, RHIResourceState::CopySource, RGAccessMode::Read, range};
+                const Graph::RGPassUsage bufferWrite{buffer, RHIResourceState::UnorderedAccess, RGAccessMode::Write};
+                const Graph::RGPassUsage bufferRead{buffer, RHIResourceState::CopySource, RGAccessMode::Read};
+                const Graph::RGPassUsage independentWrite{independent, RHIResourceState::UnorderedAccess, RGAccessMode::Write};
+                graph.AddRepeatedPass("split phases", {textureWrite, bufferWrite, independentWrite},
+                    {{"write", {textureWrite, bufferWrite}}, {"independent", {independentWrite}}, {"read", {textureRead, bufferRead}}}, 3,
+                    [&](const auto&, uint32_t, uint32_t phase)
+                    {
+                        if (!enabled)
+                        {
+                            return;
+                        }
+                        const auto contains = [&](const auto& transitions, RHITransitionPhase expected)
+                        {
+                            return std::ranges::any_of(transitions, [&](const auto& transition)
+                            { return transition.phase == expected; });
+                        };
+                        if (phase == 1)
+                        {
+                            Require(contains(services.encoder.textureTransitions, RHITransitionPhase::Begin) &&
+                                    contains(services.encoder.bufferTransitions, RHITransitionPhase::Begin),
+                                    "Split begins precede independent phase");
+                        }
+                        if (phase == 2)
+                        {
+                            Require(contains(services.encoder.textureTransitions, RHITransitionPhase::End) &&
+                                    contains(services.encoder.bufferTransitions, RHITransitionPhase::End),
+                                    "Split ends precede consumer phase");
+                        }
+                    }, true);
+                Require(graph.Compile(error), error);
+                Graph::DiagnosticSnapshot snapshot;
+                Require(graph.CaptureDiagnosticSnapshot(snapshot), "RG9 snapshot");
+                const auto& phases = snapshot.passes.front().phases;
+                for (const bool first : {true, false})
+                {
+                    const auto& begin = first ? phases[1].firstBarriers : phases[1].repeatBarriers;
+                    const auto& end = first ? phases[2].firstBarriers : phases[2].repeatBarriers;
+                    Require(std::ranges::count_if(begin, [](const auto& t) { return t.phase == RHITransitionPhase::Begin; }) == (enabled ? 2 : 0) && end.size() == 2, "Split/full fallback count");
+                    for (const auto& value : end)
+                    {
+                        Require(value.phase == (enabled ? RHITransitionPhase::End : RHITransitionPhase::Full),
+                                "Backend fallback emits complete consumer transition");
+                        if (enabled)
+                        {
+                            const auto match = std::ranges::find_if(begin, [&](const auto& other)
+                            { return other.resource == value.resource; });
+                            Require(match != begin.end() && match->phase == RHITransitionPhase::Begin &&
+                                    match->before == value.before && match->after == value.after &&
+                                    match->textureRange == value.textureRange && match->bufferRange == value.bufferRange,
+                                    "Split pair resource, state and range match exactly");
+                        }
+                    }
+                }
+                services.encoder.Reset();
+                Require(graph.Execute(error), error);
+                const auto splitCount = [](const auto& transitions)
+                { return std::ranges::count_if(transitions, [](const auto& t) { return t.phase == RHITransitionPhase::Begin; }); };
+                Require(splitCount(services.encoder.textureTransitions) == (enabled ? 3 : 0) &&
+                        splitCount(services.encoder.bufferTransitions) == (enabled ? 3 : 0),
+                        "Repeated execution emits one pair per iteration");
+                graph.Reset();
+                Require(!graph.CaptureDiagnosticSnapshot(snapshot), "Reset invalidates snapshot capture");
+            }
+        }
+        services.enabled = true;
+        Graph adjacent{services, RGSchedulingMode::ExplicitVersioned};
+        auto buffer = adjacent.Write(adjacent.CreateBuffer({64, true, false, "adjacent"}));
+        const Graph::RGPassUsage write{buffer, RHIResourceState::UnorderedAccess, RGAccessMode::Write};
+        const Graph::RGPassUsage read{buffer, RHIResourceState::CopySource, RGAccessMode::Read};
+        adjacent.AddRepeatedPass("no independent interval", {write},
+            {{"write", {write}}, {"last write", {write}}, {"read", {read}}}, 2,
+            [](const auto&, uint32_t, uint32_t) {}, true);
+        Require(adjacent.Compile(error), error);
+        Graph::DiagnosticSnapshot adjacentSnapshot;
+        Require(adjacent.CaptureDiagnosticSnapshot(adjacentSnapshot), "Adjacent phases snapshot");
+        for (const auto& phase : adjacentSnapshot.passes[0].phases)
+        {
+            Require(std::ranges::all_of(phase.firstBarriers, [](const auto& t)
+                    { return t.phase == RHITransitionPhase::Full; }) &&
+                    std::ranges::all_of(phase.repeatBarriers, [](const auto& t)
+                    { return t.phase == RHITransitionPhase::Full; }),
+                    "Intervening access prevents splitting, preserving UAV barriers");
+        }
+        Graph invalid{services, RGSchedulingMode::ExplicitVersioned};
+        RGTextureDesc desc{};
+        desc.width = desc.height = 8;
+        auto target = invalid.Write(invalid.CreateTexture(desc));
+        invalid.AddPass("bad range", {{target, RHIResourceState::CopyDest, RGAccessMode::Write, {0, 0, 0, 1}}},
+                        [](const auto&) {}, true);
+        Require(!invalid.Compile(error), "Zero range rejects compile");
+        invalid.Reset();
+        target = invalid.Write(invalid.CreateTexture(desc));
+        invalid.AddPass("recovered", {{target, RHIResourceState::CopyDest, RGAccessMode::Write}}, [](const auto&) {}, true);
+        Require(invalid.Compile(error) && invalid.Execute(error), "Failed range compilation recovers after Reset");
+    }
+
     void CheckSubresources(ce::regression::PortableRenderServices& services)
     {
         services.subresourceCapabilities = {true, true, true};
@@ -360,6 +542,37 @@ namespace
                 "Pathological Cartesian subresource partitions fail before unbounded compiler allocation");
     }
 
+    void CheckAuthoredProgram()
+    {
+        ce::regression::PortableRenderServices services;
+        Graph graph{services, RGSchedulingMode::ExplicitVersioned};
+        std::string error;
+        auto pass = graph.AddPass("Authored async", {}, [](const auto&) {}, true);
+        graph.DeclareAsyncCompute(pass);
+        Require(graph.Compile(error), error);
+        const auto program = graph.SnapshotProgram();
+        Graph::FrameBindings bindings;
+        bindings.owner = own::make_shared<int>(1);
+        bindings.passes.resize(1);
+        bindings.passes[0].execute = [](const auto&) {};
+        Graph direct{services, RGSchedulingMode::ExplicitVersioned};
+        Require(direct.BindProgram(program, bindings, error) && direct.Compile(error), error);
+        direct.SetQueueExecutionMode(2);
+        Require(direct.SelectExecutionQueues({true, true, false, true}, error), error);
+        Require(direct.GetQueueDiagnostics().schedule.usesCompute,
+                "Direct program binding preserves authored async without timing history");
+        graph.Reset();
+        pass = graph.AddPass("Authored async", {}, [](const auto&) {}, true);
+        graph.DeclareComputeCompatible(pass);
+        Require(graph.Compile(error), error);
+        Require(!graph.GetStats().programBindingReused,
+                "Changing authored async intent rejects structural reuse");
+        graph.SetQueueExecutionMode(2);
+        Require(graph.SelectExecutionQueues({true, true, false, true}, error), error);
+        Require(!graph.GetQueueDiagnostics().schedule.usesCompute,
+                "Compute compatibility alone does not select async");
+    }
+
     void CheckQueues()
     {
         using namespace ce::regression;
@@ -380,7 +593,7 @@ namespace
             "Graphics read", {{input, RHIResourceState::ShaderResource, RGAccessMode::Read}}, [](const auto&) {}, true);
         const auto computePass = graph->AddPass(
             "Compute read", {{input, RHIResourceState::ShaderResource, RGAccessMode::Read}}, [](const auto&) {}, true);
-        graph->DeclareComputeCompatible(computePass);
+        graph->DeclareAsyncCompute(computePass);
         Require(graph->Compile(error), error);
         const std::vector<Graph::QueueHint> hints{{graphicsPass, false, 1000000}, {computePass, true, 1000000}};
         Graph::QueueSchedule schedule;
@@ -457,8 +670,8 @@ namespace
                                       [](const auto&) {});
         const auto d = graph->AddPass(
             "D", {{next, RHIResourceState::ShaderResource, RGAccessMode::Read}}, [](const auto&) {}, true);
-        graph->DeclareComputeCompatible(a);
-        graph->DeclareComputeCompatible(c);
+        graph->DeclareAsyncCompute(a);
+        graph->DeclareAsyncCompute(c);
         Require(graph->Compile(error), error);
         Graph::DiagnosticSnapshot snapshot;
         Require(graph->CaptureDiagnosticSnapshot(snapshot) && snapshot.resources[0].aliasGroup != UINT32_MAX &&
@@ -508,7 +721,7 @@ namespace
         PortableQueueRecorder recorder{services};
         auto graph = own::make_shared<Graph>(services, RGSchedulingMode::ExplicitVersioned);
         const auto pass = graph->AddPass("Accepted compute", {}, [](const auto&) {}, true);
-        graph->DeclareComputeCompatible(pass);
+        graph->DeclareAsyncCompute(pass);
         std::string error;
         Require(graph->Compile(error), error);
         int ownerDestroyed = 0;
@@ -551,7 +764,7 @@ namespace
         recorder.rejectPreparationAt = 1;
         auto graph = own::make_shared<Graph>(services, RGSchedulingMode::ExplicitVersioned);
         const auto pass = graph->AddPass("Pre-submit translation", {}, [](const auto&) {}, true);
-        graph->DeclareComputeCompatible(pass);
+        graph->DeclareAsyncCompute(pass);
         std::string error;
         Require(graph->Compile(error), error);
         int ownerDestroyed = 0;
@@ -602,8 +815,8 @@ namespace
                 graph->AddPass("Full display copy", {{output, RHIResourceState::CopyDest, RGAccessMode::Write, range}},
                                [](const auto&) {});
             const auto work = graph->AddPass("Independent compute", {}, [](const auto&) {}, true);
-            graph->DeclareComputeCompatible(present);
-            graph->DeclareComputeCompatible(work);
+            graph->DeclareAsyncCompute(present);
+            graph->DeclareAsyncCompute(work);
             graph->RequireImportedFinalState(output, RHIResourceState::ExternalShared);
             Require(graph->Compile(error), error);
             Graph::QueueExecution execution;
@@ -772,6 +985,10 @@ int main()
         CheckQueuePlanReset();
         CheckOwnedSubmissionScratch();
         CheckSubresources(services);
+        CheckRg9SplitAndRecovery();
+        CheckTransientMips();
+        std::cout << "RG9_CPU_OK texture/buffer whole/range split/full adjacent/UAV reset/recovery\n";
+        CheckAuthoredProgram();
         CheckQueues();
         CheckPartialSubmission();
         CheckPreparationFailure();

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include "../Utility_Framework/StandardLibrary.h"
 
@@ -19,14 +19,17 @@ struct TemporalMotionFixtureStatus
 // Native routes own exclusion through baseline, positive and control captures;
 // SDK routes observe actual non-reset SDK submissions without native exclusion.
 // Complete means artifacts were recorded, never acceptance PASS.
+struct EnhancedLiveViewRequest;
+
 class TemporalMotionFixture
 {
 public:
     // busy reports transient renderer-lock contention, not another active capture.
     // sdkStartup reduces the observed baseline minimum from 32 to 1; it does
     // not capture the reset submission or guarantee the first frame of appearance.
-    static bool Begin(const std::string& directory, std::string& error, bool* busy = nullptr, bool sdkQuality = false, bool sdkStartup = false);
+    static bool Begin(const std::string& directory, std::string& error, bool* busy = nullptr, bool sdkQuality = false, bool sdkStartup = false, bool sdkRoutes = false, bool companionView = true);
     static void TickAfterAnimation();
+    static bool CaptureCompanionView(EnhancedLiveViewRequest& view);
     // The Editor must exclude presentation-side scene readers while ticking an
     // active fixture: preparation and cleanup change the entity hierarchy.
     // Game-thread query; includes pending cleanup, and does not copy status text.

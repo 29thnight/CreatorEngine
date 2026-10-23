@@ -1,4 +1,4 @@
-﻿#include "DX12Encoder.h"
+#include "DX12Encoder.h"
 #include "DX12DeviceResources.h"
 #include "DX12SubresourceRange.h"
 
@@ -747,7 +747,7 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
 
         const D3D12_RESOURCE_STATES before = stateForQueue(transition.before);
         const D3D12_RESOURCE_STATES after = stateForQueue(transition.after);
-        AppendDX12TextureTransitions(*resource, before, after, transition.range, barriers);
+        AppendDX12TextureTransitions(*resource, before, after, transition.range, barriers, DX12TransitionFlags(transition.phase));
     }
 
     for (const RHIBufferTransition& transition : batch.bufferTransitions)
@@ -773,6 +773,7 @@ void DX12Encoder::ResourceBarriers(const RHIBarrierBatch& batch)
 
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Flags = DX12TransitionFlags(transition.phase);
         barrier.Transition.pResource = resource;
         barrier.Transition.StateBefore = before;
         barrier.Transition.StateAfter = after;

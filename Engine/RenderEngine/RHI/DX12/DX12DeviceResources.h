@@ -520,6 +520,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     }
     RHIAtomicCapabilities GetAtomicCapabilities() const override { return m_atomicCapabilities; }
     RHISubresourceCapabilities GetSubresourceCapabilities() const override { return {true, false, true}; }
+    bool SupportsSplitTransitions() const override { return true; }
     bool SupportsConcurrentTextureShaderReads() const override { return true; }
     RHIBufferInfo DescribeBuffer(RHIBufferHandle handle) const override
     {

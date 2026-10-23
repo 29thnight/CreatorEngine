@@ -1,3 +1,4 @@
+#include "RHI/DX12/DX12CommandListPool.h"
 #include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
 #include "Render/Graph/EnhancedRenderGraph.h"
@@ -224,7 +225,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                     context.encoder->SetBindings(RHIBindPoint::Compute, 1, bindings);
                     context.encoder->Dispatch(1, 1, 1);
                 });
-            graph->DeclareComputeCompatible(transform);
+            graph->DeclareAsyncCompute(transform);
             graph->AddPass("independent-after-compute", {}, nullptr, true);
             graph->AddPass("readback", {{second, RHIResourceState::CopySource, RGAccessMode::Read}},
                 [second, storage](const auto& context)
@@ -257,11 +258,11 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                     [](const auto& hint) { return hint.computeCompatible; }) == 1,
                 "Author compute declaration did not produce measured hint.");
             compute.profiler = &graphicsProfiler;
-            require(!graph->SubmitQueues(graph, recorder, graphics, &compute, measuredHints, 100, storage, execution, error) &&
+            require(!graph->SubmitQueues(graph, recorder, graphics, &compute, measuredHints, true, storage, execution, error) &&
                 !execution.submissionAttempted, "Shared graphics/compute clock was accepted.");
             compute.profiler = &computeProfiler;
             require(graph->SubmitQueues(graph, recorder, graphics, mode ? &compute : nullptr,
-                measuredHints, 100, storage, execution, error), error);
+                measuredHints, true, storage, execution, error), error);
             require(execution.plannedBarriers == (mode ? 14u : 8u) &&
                 graph->GetPassBarrierCount(produce) == (mode ? 4u : 3u),
                 "Repeated UAV ordering or batch-local state retention was lost.");
@@ -299,7 +300,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             require(resetRejected, "Pending graph storage was reset.");
             EnhancedRenderGraph::QueueExecution duplicate;
             require(!graph->SubmitQueues(graph, recorder, graphics, mode ? &compute : nullptr,
-                {}, 100, storage, duplicate, error) && !duplicate.submissionAttempted, "Pending graph was submitted twice.");
+                {}, true, storage, duplicate, error) && !duplicate.submissionAttempted, "Pending graph was submitted twice.");
             own::weak_owner<EnhancedRenderGraph> graphWeak = graph;
             graph.reset();
             require(graphics.queue->CollectCompleted() == 0 && compute.queue->CollectCompleted() == 0 &&
@@ -374,13 +375,13 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             storage.reset();
             device.AbortFrame();
         }
-        // Analytical costs select a deterministic plan. Exact readbacks remain
+        // Authored queue declarations select a deterministic plan. Exact readbacks remain
         // correctness evidence; calibrated independent pass intervals are emitted
         // separately. Their presence never establishes a measured speedup.
         enum class OverlapCase
         {
             GraphicsReference,
-            Reordered,
+            AuthoredAsync,
             NoBenefit,
             PreserveDeclarationOrder,
             RecordingFailure,
@@ -392,12 +393,12 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
         overlapEvidence << std::setprecision(17);
         overlapEvidence << "{\"schemaVersion\":1,\"scope\":\"native-correctness\",\"cases\":[";
         bool firstOverlapEvidence = true;
-        for (const auto mode : {OverlapCase::GraphicsReference, OverlapCase::Reordered, OverlapCase::NoBenefit,
+        for (const auto mode : {OverlapCase::GraphicsReference, OverlapCase::AuthoredAsync, OverlapCase::NoBenefit,
             OverlapCase::PreserveDeclarationOrder, OverlapCase::RecordingFailure,
             OverlapCase::WaitFailure, OverlapCase::UnfencedSubmission})
         {
             const bool withShadow = mode != OverlapCase::NoBenefit;
-            const bool moved = mode == OverlapCase::Reordered || mode == OverlapCase::RecordingFailure ||
+            const bool moved = mode == OverlapCase::AuthoredAsync || mode == OverlapCase::RecordingFailure ||
                 mode == OverlapCase::WaitFailure || mode == OverlapCase::UnfencedSubmission;
             const bool recordingFailure = mode == OverlapCase::RecordingFailure;
             const bool submissionFailure = mode == OverlapCase::WaitFailure || mode == OverlapCase::UnfencedSubmission;
@@ -449,11 +450,6 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             auto graph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned,
                 mode == OverlapCase::PreserveDeclarationOrder ? RGOrderPolicy::PreserveDeclarationOrder :
                     RGOrderPolicy::DependencyOrder);
-            EnhancedRenderGraph::QueueCostModel model;
-            model.placement = RGQueuePlacement::Overlap;
-            model.handoffNanoseconds = 20'000;
-            model.minimumGainNanoseconds = 50'000;
-            graph->SetQueueCostModel(model);
             const auto depth = graph->Write(graph->ImportBuffer(storage->prefixBuffer, RHIResourceState::Common,
                 "overlap-depth"));
             const auto finalTexture = graph->Write(graph->ImportTexture(storage->texture, storage->state,
@@ -504,22 +500,6 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             RGPassId shadowPass{};
             std::vector<EnhancedRenderGraph::QueueHint> hints;
             std::vector<uint16_t> callbacks;
-            if (withShadow)
-            {
-                shadow = graph->Write(graph->CreateBuffer({256, true, false, "overlap-shadow"}));
-                shadowPass = graph->AddPass("overlap-shadow",
-                    {{shadow, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
-                     {finalTexture, RHIResourceState::RenderTarget, RGAccessMode::Write}},
-                    [&, shadow](const auto& context)
-                    {
-                        callbacks.push_back(shadowPass.index);
-                        // Test-only long-enough native work. UAV ordering keeps
-                        // repeated writes defined while the final output is exact.
-                        dispatch(context, producerPipeline, {}, shadow, 256);
-                        clearFinalTexture(context);
-                    });
-                hints.push_back({shadowPass, false, 400'000});
-            }
             RGPassId gbuffer, rawPass, filterPass, deferred, readback;
             std::vector<EnhancedRenderGraph::RGPassUsage> gbufferUsages{
                 {depth, RHIResourceState::UnorderedAccess, RGAccessMode::Write}};
@@ -537,6 +517,22 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                         clearFinalTexture(context);
                     }
                 });
+            if (withShadow)
+            {
+                shadow = graph->Write(graph->CreateBuffer({256, true, false, "overlap-shadow"}));
+                shadowPass = graph->AddPass("overlap-shadow",
+                    {{shadow, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
+                     {finalTexture, RHIResourceState::RenderTarget, RGAccessMode::Write}},
+                    [&, shadow](const auto& context)
+                    {
+                        callbacks.push_back(shadowPass.index);
+                        // Test-only long-enough native work. UAV ordering keeps
+                        // repeated writes defined while the final output is exact.
+                        dispatch(context, producerPipeline, {}, shadow, 256);
+                        clearFinalTexture(context);
+                    });
+                hints.push_back({shadowPass, false, 400'000});
+            }
             rawPass = graph->AddPass("overlap-raw", {
                 {depth, RHIResourceState::ShaderResource, RGAccessMode::Read},
                 {raw, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
@@ -590,17 +586,25 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                     context.encoder->CopyBufferToReadback(storage->readReadback,
                         context.graph->ResolveBufferHandle(readRead));
                 }, true);
-            graph->DeclareComputeCompatible(rawPass);
-            graph->DeclareComputeCompatible(filterPass);
+            if (moved)
+            {
+                graph->DeclareAsyncCompute(rawPass);
+                graph->DeclareAsyncCompute(filterPass);
+            }
+            else
+            {
+                graph->DeclareComputeCompatible(rawPass);
+                graph->DeclareComputeCompatible(filterPass);
+            }
             graph->RequireImportedFinalState(finalTexture, RHIResourceState::RenderTarget);
             hints.insert(hints.end(), {{gbuffer, false, 500'000}, {rawPass, true, 200'000},
                 {filterPass, true, 200'000}, {deferred, false, 300'000}, {readback, false, 1000}});
             require(graph->Compile(error), error);
             EnhancedRenderGraph::QueueSchedule planned;
             require(graph->BuildQueueSchedule({true, mode != OverlapCase::GraphicsReference, false,
-                mode != OverlapCase::GraphicsReference}, hints, 1000, planned, error), error);
+                mode != OverlapCase::GraphicsReference}, hints, true, planned, error), error);
             const auto compiledOrder = graph->GetExecuteOrder();
-            require(compiledOrder.front() == (withShadow ? shadowPass.index : gbuffer.index),
+            require(compiledOrder.front() == gbuffer.index,
                 "Overlap fixture did not preserve its authored independent-first order.");
             Microsoft::WRL::ComPtr<ID3D12Fence> gate;
             require(SUCCEEDED(device.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gate))),
@@ -614,11 +618,11 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             EnhancedRenderGraph::QueueExecution execution;
             const bool accepted = graph->SubmitQueues(graph, overlapRecorder, overlapGraphics,
                 mode == OverlapCase::GraphicsReference ? nullptr : &overlapCompute,
-                hints, 1000, storage, execution, error);
+                hints, true, storage, execution, error);
             require(accepted == !failureExpected, "Overlap submission returned the wrong outcome: " + error);
             const auto diagnostics = graph->GetQueueDiagnostics();
             const auto& schedule = diagnostics.schedule;
-            require(schedule.usesCompute == moved && schedule.predictionComplete &&
+            require(schedule.usesCompute == moved && !schedule.predictionComplete &&
                 !schedule.predictionCalibrated && schedule.entries.size() == compiledOrder.size(),
                 "Overlap execution did not expose its complete uncalibrated plan.");
             std::vector<uint16_t> scheduledOrder;
@@ -627,11 +631,10 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                 scheduledOrder.push_back(entry.pass);
             }
             require(graph->GetExecuteOrder() == scheduledOrder &&
-                (moved ? scheduledOrder.front() == gbuffer.index && scheduledOrder != compiledOrder :
-                    scheduledOrder == compiledOrder), "Executed barrier order differs from the selected schedule.");
-            require(schedule.predictedSerialNanoseconds == (withShadow ? 1'601'000u : 1'201'000u) &&
-                schedule.predictedNanoseconds == (moved ? 1'241'000u : schedule.predictedSerialNanoseconds),
-                "Overlap execution prediction differs from the analytical fixture.");
+                scheduledOrder == compiledOrder, "Executed barrier order differs from the selected schedule.");
+            require(schedule.predictedSerialNanoseconds == 0 && schedule.predictedNanoseconds == 0 &&
+                schedule.placementTrials == 0 && schedule.simulationMilliseconds == 0,
+                "Authored async execution ran a placement search or published a cost prediction.");
             if (recordingFailure)
             {
                 require(!execution.submissionAttempted && !execution.completed && !execution.recoveryRequired &&
@@ -902,7 +905,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                     }
                     completedSlices.fetch_add(1);
                 }, 4, false, 1);
-            graph->DeclareComputeCompatible(produce);
+            graph->DeclareAsyncCompute(produce);
             const auto readback = graph->AddPass("parallel-queue-readback",
                 {{output, RHIResourceState::CopySource, RGAccessMode::Read}},
                 [&](const auto& context)
@@ -927,7 +930,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             EnhancedRenderGraph::QueueExecution execution;
             const bool accepted = graph->SubmitQueues(graph, parallelRecorder, graphics, &compute,
                 {{produce, true, 100}, {readback, false, 100}, {independent, false, 0, true}},
-                100, storage, execution, error);
+                true, storage, execution, error);
             require(accepted == !recordingFailure, "Parallel queue recording returned the wrong result: " + error);
             const auto stats = graph->GetStats();
             require(stats.recordWorkers == wantedSlices && stats.recordUnits == wantedSlices + 2 &&
@@ -977,14 +980,14 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
         }, true);
         require(failure->Compile(error), error);
         EnhancedRenderGraph::QueueExecution rejected;
-        require(!failure->SubmitQueues(failure, recorder, graphics, &compute, {}, 100, owner, rejected, error) &&
+        require(!failure->SubmitQueues(failure, recorder, graphics, &compute, {}, true, owner, rejected, error) &&
             !rejected.submissionAttempted && graphics.queue->GetPendingBatchCount() == 0, "Recording failure submitted work.");
         require(!failure->Execute(error), "Queue-specialized plan was accepted by the ordinary executor after failure.");
         failure->Reset();
         failure->AddPass("quarantined-submit", {}, nullptr, true);
         require(failure->Compile(error), error);
         service.RejectNextTestSubmission(true);
-        require(!failure->SubmitQueues(failure, recorder, graphics, &compute, {}, 100, owner, rejected, error) &&
+        require(!failure->SubmitQueues(failure, recorder, graphics, &compute, {}, true, owner, rejected, error) &&
             rejected.submissionAttempted && rejected.recoveryRequired && !rejected.completion.IsValid(), "Unfenced submit failure was accepted.");
         own::weak_owner<EnhancedRenderGraph> failedWeak = failure;
         failure.reset();
@@ -1030,6 +1033,8 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
         require(device.EnqueueQueueTestGate(frameGraphics.queue, frameGate.Get(), 1, error), error);
         std::vector<own::shared_owner<Storage>> frameStorage;
         std::vector<own::weak_owner<EnhancedRenderGraph>> frameGraphs;
+        DX12CommandListPool framePreparation;
+        require(framePreparation.Initialize(device, 2, 3, error), error);
         uint64_t firstFrameFence = 0;
         for (uint32_t frame = 0; frame < 3; ++frame)
         {
@@ -1038,6 +1043,8 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             storage->device = &device;
             require(device.CreateBufferReadback(256, storage->readback, error), error);
             auto graph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
+            framePreparation.BeginFrame(frame);
+            require(graph->PrepareParallel(framePreparation, error), error);
             RHIBufferDesc prefixDesc{};
             prefixDesc.bytes = 256;
             prefixDesc.allowUnorderedAccess = true;
@@ -1060,6 +1067,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                     context.encoder->SetBindings(RHIBindPoint::Compute, 2, bindings);
                     context.encoder->Dispatch(1, 1, 1);
                 });
+            graph->DeclareAsyncCompute(pass);
             graph->AddPass("frame-readback", {{output, RHIResourceState::CopySource, RGAccessMode::Read}},
                 [output, storage](const auto& context)
                 {
@@ -1097,7 +1105,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                 "Unjoined queue frame allowed retirement/reset.");
             EnhancedRenderGraph::QueueExecution execution;
             require(graph->SubmitQueues(graph, recorder, frameGraphics, &frameCompute,
-                {{pass, true, 100}}, 100, storage, execution, error), error);
+                {{pass, true, 100}}, true, storage, execution, error), error);
             require(!device.JoinQueueFrame(foreignCompletion, error), "Foreign service completion joined a frame.");
             require(device.JoinQueueFrame(execution.completion, error) && device.EndFrame(error), error);
             if (frame == 0)
@@ -1147,7 +1155,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
         require(abortGraph->Compile(error), error);
         EnhancedRenderGraph::QueueExecution abortExecution;
         require(abortGraph->SubmitQueues(abortGraph, recorder, frameGraphics, &frameCompute,
-            {}, 100, owner, abortExecution, error), error);
+            {}, true, owner, abortExecution, error), error);
         own::weak_owner<EnhancedRenderGraph> abortWeak = abortGraph;
         abortGraph.reset();
         gateOpened.store(false);
@@ -1165,15 +1173,18 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
         device.AbortFrame();
         std::string validation;
         require(device.DrainDebugMessages(validation) == 0, validation);
-        constexpr uint32_t kExpectedChecks = 434;
+        // ResetSoftwareSegment contributes one assertion in each of the three
+        // frame-slot reuse iterations above.
+        constexpr uint32_t kExpectedChecks = 441;
         if (checks != kExpectedChecks)
         {
-            throw std::runtime_error("Queue execution acceptance check count changed.");
+            throw std::runtime_error("Queue execution acceptance check count changed: actual=" +
+                std::to_string(checks) + " expected=" + std::to_string(kExpectedChecks));
         }
         overlapEvidence << "]}";
-        outLog = "RG8_QUEUE_EXECUTION_OK schema=3 checks=" + std::to_string(checks) +
+        outLog = "RG8_QUEUE_EXECUTION_OK schema=4 checks=" + std::to_string(checks) +
             " payloadError=0 validationErrors=0 modes=2 overlapCases=7 positiveOverlapExecution=true" +
-            " negativeFallbackExecution=true declarationOrder=true readRead=true reorderedFailure=true" +
+            " negativeFallbackExecution=true declarationOrder=true readRead=true authoredFailure=true primaryPreparation=true" +
             " delayedLifetime=true quarantineReleased=true frameRetirement=true parallelRecording=true calibratedIntervals=true measuredGain=false\n" +
             "RG8_QUEUE_INTERVALS " + overlapEvidence.str() + "\n";
         return true;

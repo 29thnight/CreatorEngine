@@ -562,6 +562,7 @@ namespace EnhancedRenderDebugUi
         case Reason::RAW: return "RAW";
         case Reason::WAR: return "WAR";
         case Reason::WAW: return "WAW";
+        case Reason::RecordingSideEffect: return "Recording side effect";
         default: return "Unknown";
         }
     }
@@ -736,6 +737,8 @@ namespace EnhancedRenderDebugUi
         ImGui::EndTabBar();
     }
 }
+
+#include "CompiledGraphViewer.inl"
 
 using namespace EnhancedRenderDebugUi;
 
@@ -1007,20 +1010,72 @@ void EnhancedRenderDebugWindow::Draw()
         m_graphTarget = requested;
         m_graphSnapshot.reset();
         m_graphLastRefresh = -1.0;
+        m_graphSelectedPass = m_graphSelectedResource = UINT32_MAX;
+        m_graphRefreshPending = false;
     }
     ImGui::TextUnformatted("RenderPass - compiled graph");
     constexpr const char* targets[]{"Scene", "Game", "Material Preview"};
+    ImGui::SetNextItemWidth(ImGui::GetFontSize() * 10.f);
     if (ImGui::Combo("View", &m_graphTarget, targets, 3))
     {
         m_graphSnapshot.reset();
         m_graphLastRefresh = -1.0;
+        m_graphSelectedPass = m_graphSelectedResource = UINT32_MAX;
+        m_graphRefreshPending = false;
     }
+    ImGui::SameLine();
+    ImGui::Checkbox("Freeze snapshot", &m_graphFrozen);
+    ImGui::SameLine();
+    const bool refreshGraph = ImGui::Button("Refresh snapshot");
     graphViewerTarget.store(static_cast<uint32_t>(m_graphTarget));
     const double now = ImGui::GetTime();
-    if (m_graphLastRefresh < 0.0 || now - m_graphLastRefresh >= kRefreshIntervalSeconds)
+    if (refreshGraph || m_graphLastRefresh < 0.0 ||
+        ((!m_graphFrozen || m_graphRefreshPending) && now - m_graphLastRefresh >= kRefreshIntervalSeconds))
     {
-        m_graphSnapshot = EnhancedSceneRenderer::GetLiveGraphSnapshot(
-            static_cast<EnhancedLiveDisplayTarget>(m_graphTarget));
+        auto next = EnhancedSceneRenderer::GetLiveGraphSnapshot(static_cast<EnhancedLiveDisplayTarget>(m_graphTarget),
+                                                                refreshGraph);
+        if (refreshGraph)
+        {
+            // The getter queues capture and returns the previously published frame.
+            // Frozen readers must poll until that asynchronous request publishes.
+            m_graphRefreshAfterFrame = next ? next->frameId : 0;
+            m_graphRefreshPending = true;
+        }
+        const bool refreshReady =
+            !m_graphRefreshPending ||
+            (next && next->frameId > m_graphRefreshAfterFrame &&
+             EnhancedGraphSnapshotMatchesView(*next, EnhancedSceneRenderer::GetLiveDisplaySnapshot().Get(
+                                                         static_cast<EnhancedLiveDisplayTarget>(m_graphTarget))));
+        const bool snapshotChanged =
+            bool(next) != bool(m_graphSnapshot) ||
+            (next && m_graphSnapshot &&
+             (next->frameId != m_graphSnapshot->frameId || next->viewId != m_graphSnapshot->viewId ||
+              next->sceneEpoch != m_graphSnapshot->sceneEpoch || next->graphEpoch != m_graphSnapshot->graphEpoch ||
+              next->generation != m_graphSnapshot->generation));
+        if (refreshReady && snapshotChanged)
+        {
+            const bool sameView = next && m_graphSnapshot && next->viewId == m_graphSnapshot->viewId &&
+                                  next->sceneEpoch == m_graphSnapshot->sceneEpoch;
+            if (!sameView || m_graphSelectedPass >= next->passes.size() ||
+                m_graphSelectedPass >= m_graphSnapshot->passes.size() ||
+                next->passes[m_graphSelectedPass].name != m_graphSnapshot->passes[m_graphSelectedPass].name)
+            {
+                m_graphSelectedPass = next && !next->executeOrder.empty() ? next->executeOrder.front() : UINT32_MAX;
+            }
+            if (!sameView || m_graphSelectedResource >= next->resources.size() ||
+                m_graphSelectedResource >= m_graphSnapshot->resources.size() ||
+                next->resources[m_graphSelectedResource].name !=
+                    m_graphSnapshot->resources[m_graphSelectedResource].name)
+            {
+                m_graphSelectedResource = UINT32_MAX;
+            }
+            m_graphSnapshot = std::move(next);
+            m_graphModelDirty = true;
+        }
+        if (refreshReady)
+        {
+            m_graphRefreshPending = false;
+        }
         m_graphLastRefresh = now;
     }
     if (ImGui::Button("Graphics settings"))
@@ -1033,6 +1088,11 @@ void EnhancedRenderDebugWindow::Draw()
         editor::OpenRenderLiveDiagnostics();
     }
     ImGui::Separator();
+    if (m_graphRefreshPending)
+    {
+        ImGui::TextDisabled("Refresh pending: waiting for a submitted frame newer than %llu",
+                            static_cast<unsigned long long>(m_graphRefreshAfterFrame));
+    }
     if (!m_graphSnapshot)
     {
         ImGui::TextDisabled("Waiting for a compiled frame for this view.");
@@ -1045,11 +1105,12 @@ void EnhancedRenderDebugWindow::Draw()
     }
     const auto& snapshot = *m_graphSnapshot;
     const auto display = EnhancedSceneRenderer::GetLiveDisplaySnapshot();
-    if (!EnhancedGraphSnapshotMatchesView(snapshot,
-        display.Get(static_cast<EnhancedLiveDisplayTarget>(m_graphTarget))))
+    if ((!m_graphFrozen || m_graphModelDirty) &&
+        !EnhancedGraphSnapshotMatchesView(snapshot, display.Get(static_cast<EnhancedLiveDisplayTarget>(m_graphTarget))))
     {
         ++graphViewerStaleFrames;
-        ImGui::TextDisabled("Previous graph belongs to an inactive or changed view. Waiting for a matching compiled frame.");
+        ImGui::TextDisabled(
+            "Previous graph belongs to an inactive or changed view. Waiting for a matching compiled frame.");
         m_graphSnapshot.reset();
         m_graphLastRefresh = -1.0;
         return;
@@ -1074,9 +1135,104 @@ void EnhancedRenderDebugWindow::Draw()
     ImGui::TextDisabled("Native C++ source | %s | %s | read-only compiled snapshot",
         snapshot.scheduling == RGSchedulingMode::ExplicitVersioned ? "versioned" : "legacy/single writer",
         snapshot.orderPolicy == RGOrderPolicy::DependencyOrder ? "dependency order" : "authored order");
-    ImGui::TextDisabled("Sampled submitted frame | alias / queue / subresource ranges: not implemented");
-    m_graphFilter.Draw("Filter passes/resources");
-    DrawCompiledGraph(snapshot, m_graphFilter);
+    ImGui::TextDisabled("%s | compiled pass order, not GPU duration | subresource ranges: whole-resource only",
+        m_graphFrozen ? "Frozen sampled frame" : "Sampled submitted frame");
+    bool rebuildGraphFilter = m_graphModelDirty;
+    if (m_graphModelDirty)
+    {
+        m_graphModel.Build(snapshot, GraphAccessBits);
+        m_graphModelDirty = false;
+    }
+    rebuildGraphFilter |= m_graphFilter.Draw("Filter passes/resources", ImGui::GetFontSize() * 12.f);
+    ImGui::SameLine();
+    rebuildGraphFilter |= ImGui::Checkbox("Show culled", &m_graphShowCulled);
+    if (rebuildGraphFilter)
+    {
+        m_graphColumns.clear();
+        m_graphResources.clear();
+        for (const auto pass : m_graphModel.columns)
+        {
+            if (snapshot.passes[pass].culled && !m_graphShowCulled)
+            {
+                continue;
+            }
+            bool matches = m_graphFilter.PassFilter(snapshot.passes[pass].name.c_str());
+            if (!matches)
+            {
+                for (const auto& cell : m_graphModel.cells)
+                {
+                    if (cell.pass == pass && m_graphFilter.PassFilter(snapshot.resources[cell.resource].name.c_str()))
+                    {
+                        matches = true;
+                        break;
+                    }
+                }
+            }
+            if (matches)
+            {
+                m_graphColumns.push_back(pass);
+            }
+        }
+        for (uint32_t resource = 0; resource < snapshot.resources.size(); ++resource)
+        {
+            bool matches = m_graphFilter.PassFilter(snapshot.resources[resource].name.c_str());
+            if (!matches)
+            {
+                for (uint32_t cell = m_graphModel.resourceOffsets[resource];
+                     cell < m_graphModel.resourceOffsets[resource + 1]; ++cell)
+                {
+                    const auto pass = m_graphModel.cells[cell].pass;
+                    if ((!snapshot.passes[pass].culled || m_graphShowCulled) &&
+                        m_graphFilter.PassFilter(snapshot.passes[pass].name.c_str()))
+                    {
+                        matches = true;
+                        break;
+                    }
+                }
+            }
+            if (matches)
+            {
+                m_graphResources.push_back(resource);
+            }
+        }
+    }
+    if (ImGui::BeginTabBar("CompiledGraphViews"))
+    {
+        if (ImGui::BeginTabItem("Matrix"))
+        {
+            const float height = (std::max)(180.f, ImGui::GetContentRegionAvail().y - ImGui::GetTextLineHeightWithSpacing());
+            if (ImGui::BeginTable("MatrixAndInspector", 2, ImGuiTableFlags_Resizable))
+            {
+                ImGui::TableSetupColumn("Matrix", ImGuiTableColumnFlags_WidthStretch, 3.f);
+                ImGui::TableSetupColumn("Inspector", ImGuiTableColumnFlags_WidthStretch, 1.f);
+                ImGui::TableNextColumn();
+                DrawGraphMatrix(snapshot, m_graphModel, m_graphColumns, m_graphResources,
+                    m_graphSelectedPass, m_graphSelectedResource, height);
+                ImGui::TableNextColumn();
+                ImGui::BeginChild("GraphInspector", ImVec2(0, height), true);
+                DrawGraphInspector(snapshot, m_graphModel, m_graphSelectedPass, m_graphSelectedResource);
+                ImGui::EndChild();
+                ImGui::EndTable();
+            }
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Queue"))
+        {
+            DrawGraphQueues(snapshot, m_graphSelectedPass);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Selected Pass DAG"))
+        {
+            DrawGraphDag(snapshot, m_graphModel, m_graphSelectedPass, m_graphSelectedResource);
+            ImGui::EndTabItem();
+        }
+        if (ImGui::BeginTabItem("Text details"))
+        {
+            DrawCompiledGraph(snapshot, m_graphFilter);
+            ImGui::EndTabItem();
+        }
+        ImGui::EndTabBar();
+    }
 }
 
 void editor::windows::draw_preferences()

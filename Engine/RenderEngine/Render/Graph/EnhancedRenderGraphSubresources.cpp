@@ -72,7 +72,7 @@ bool EnhancedRenderGraph::ValidateSubresources(std::string& outError)
         {
             schema.texture = resource.imported ? m_deviceServices->DescribeTexture(resource.handle)
                                                : RHITextureInfo{resource.desc.width,     resource.desc.height,
-                                                                resource.desc.arraySize, 1,
+                                                                resource.desc.arraySize, resource.desc.mipLevels,
                                                                 resource.desc.format,    false};
             if (!schema.texture.IsValid())
             {
@@ -792,6 +792,7 @@ void EnhancedRenderGraph::PlanSubresourceBarriers(const ce::dynamic_bitset* batc
                     countPlan(plans[phase], iteration == 0 ? 1 : pass.repeatCount - 1);
                 }
             }
+            PlanRepeatedSplitBarriers(pass);
         }
         else
         {
@@ -848,5 +849,74 @@ void EnhancedRenderGraph::PlanSubresourceBarriers(const ce::dynamic_bitset* batc
         }
         countPlan(*prologue);
         countPlan(*epilogue);
+    }
+}
+
+// Repeated phases share one encoder and command list even in parallel recording.
+// Start only after the last declaration of the entire resource. Keeping pairs
+// inside that unit also makes a callback failure discard both halves together.
+void EnhancedRenderGraph::PlanRepeatedSplitBarriers(Pass& pass)
+{
+    if (!pass.repeated || !m_deviceServices->SupportsSplitTransitions())
+    {
+        return;
+    }
+    const auto split = [&](auto& plans, uint32_t repetitions)
+    {
+        for (size_t phase = 2; phase < plans.size(); ++phase)
+        {
+            const auto moveBegins = [&](auto& transitions, auto select)
+            {
+                for (auto& end : transitions)
+                {
+                    if (end.phase != RHITransitionPhase::Full || end.before == RHIResourceState::Common ||
+                        end.before == RHIResourceState::ExternalShared || end.after == RHIResourceState::ExternalShared ||
+                        end.before == RHIResourceState::SharedShaderResource || end.after == RHIResourceState::SharedShaderResource)
+                    {
+                        continue;
+                    }
+                    size_t previous = phase;
+                    for (size_t candidate = phase; candidate-- > 0;)
+                    {
+                        if (std::ranges::any_of(pass.phases[candidate].usages, [&](const auto& usage)
+                        {
+                            const auto& resource = m_resources[usage.handle.index];
+                            if constexpr (std::is_same_v<std::remove_cvref_t<decltype(end)>, RHITransition>)
+                            {
+                                return !resource.IsBuffer() && resource.handle == end.texture;
+                            }
+                            else
+                            {
+                                return resource.IsBuffer() && resource.buffer == end.buffer;
+                            }
+                        }))
+                        {
+                            previous = candidate;
+                            break;
+                        }
+                    }
+                    if (previous + 1 >= phase)
+                    {
+                        continue;
+                    }
+                    auto& beginPlan = plans[previous + 1];
+                    const bool empty = beginPlan.transitions.empty() && beginPlan.bufferTransitions.empty() &&
+                                       beginPlan.uavBarriers.empty() && beginPlan.uavBufferBarriers.empty();
+                    auto begin = end;
+                    begin.phase = RHITransitionPhase::Begin;
+                    select(beginPlan).push_back(begin);
+                    end.phase = RHITransitionPhase::End;
+                    m_stats.barriersEmitted += repetitions;
+                    m_stats.barrierBatches += empty ? repetitions : 0;
+                }
+            };
+            moveBegins(plans[phase].transitions, [](auto& plan) -> auto& { return plan.transitions; });
+            moveBegins(plans[phase].bufferTransitions, [](auto& plan) -> auto& { return plan.bufferTransitions; });
+        }
+    };
+    split(pass.firstPhaseBarriers, 1);
+    if (pass.repeatCount > 1)
+    {
+        split(pass.repeatPhaseBarriers, pass.repeatCount - 1);
     }
 }

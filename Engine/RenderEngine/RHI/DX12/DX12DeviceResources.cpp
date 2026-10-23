@@ -2457,7 +2457,7 @@ void DX12DeviceResources::TransitionResources(std::span<const RHITransition> tra
 
         const D3D12_RESOURCE_STATES before = ToD3D12(transition.before);
         const D3D12_RESOURCE_STATES after = ToD3D12(transition.after);
-        AppendDX12TextureTransitions(*resource, before, after, transition.range, barriers);
+        AppendDX12TextureTransitions(*resource, before, after, transition.range, barriers, DX12TransitionFlags(transition.phase));
     }
 
     if (barriers.empty())
@@ -2502,6 +2502,7 @@ void DX12DeviceResources::TransitionBuffers(std::span<const RHIBufferTransition>
 
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
+        barrier.Flags = DX12TransitionFlags(transition.phase);
         barrier.Transition.pResource = resource;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         barrier.Transition.StateBefore = before;

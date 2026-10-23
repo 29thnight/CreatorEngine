@@ -79,6 +79,31 @@ def verify_schedule(diagnostics, mode, graph=None):
     check(diagnostics["schemaVersion"] == 2, "Stale schedule evidence schema")
     execution, schedule = diagnostics["execution"], diagnostics["schedule"]
     batches, waits = diagnostics["batches"], diagnostics["waits"]
+    if diagnostics.get("executionPath") == "primary-graphics":
+        primary_accepted = diagnostics.get("primaryEnqueued") is True or (
+            diagnostics["measurementDomain"] == "capture" and type(diagnostics.get("primaryEnqueued")) is int and
+            diagnostics["primaryEnqueued"] == 1)
+        check(primary_accepted and not diagnostics["specialized"] and
+              diagnostics["requestedExecutionMode"] == mode and diagnostics["effectiveExecutionMode"] == 0 and
+              diagnostics["measurementDomain"] in ("normal", "capture"), "Invalid primary graphics admission")
+        check(not execution["completed"] and not execution["submissionAttempted"] and
+              not execution["recoveryRequired"] and not batches and not waits and
+              execution["computeBatches"] == execution["submittedBatches"] == execution["plannedBatches"] ==
+              execution["submittedWaits"] == execution["plannedWaits"] == 0,
+              "Primary enqueue must not fabricate owned native completion or batches")
+        check(schedule.get("placement") == "authored" and not schedule["usesCompute"] and not schedule["waits"] and
+              all(e["queue"] == 0 for e in schedule["entries"]) and
+              diagnostics["fallbackReason"] == schedule["fallbackReason"] and schedule["fallbackReason"] in
+              ("disabled", "no-async-passes", "unsupported", "unsupported-state"), "Invalid primary fallback schedule")
+        check(schedule["compileGeneration"] > 0 and
+              len(schedule["entries"]) == len({e["pass"] for e in schedule["entries"]}) and
+              not schedule["predictionComplete"] and not schedule["predictionCalibrated"] and
+              execution["predictedNanoseconds"] == execution["predictedSerialNanoseconds"] == 0,
+              "Primary schedule has duplicate passes or fabricated model predictions")
+        if graph is not None:
+            check({e["pass"] for e in schedule["entries"]} ==
+                  {p["authoredIndex"] for p in graph["passes"] if not p["culled"]}, "Primary graph pass mismatch")
+        return execution
     check(execution["completed"] and execution["submissionAttempted"] and not execution["recoveryRequired"],
           "Incomplete/failed queue execution")
     check(batches and execution["plannedBatches"] == execution["submittedBatches"] == len(batches),
@@ -93,11 +118,16 @@ def verify_schedule(diagnostics, mode, graph=None):
           "Requested mode and effective queue placement were conflated")
     check(diagnostics["measurementDomain"] in ("normal", "capture"), "Missing measurement-domain provenance")
     reason = schedule["fallbackReason"]
-    check(reason in ("none", "disabled", "unsupported", "missing-measurement", "unsupported-state", "insufficient-gain") and
+    check(reason in ("none", "disabled", "unsupported", "missing-measurement", "unsupported-state", "insufficient-gain", "no-async-passes") and
           diagnostics["fallbackReason"] == reason and (reason == "none") == (compute > 0),
           "Missing/inconsistent effective fallback reason")
-    check(not schedule["predictionCalibrated"] and (compute == 0 or schedule["predictionComplete"]),
-          "Compute placement requires complete costs; model calibration remains unproven")
+    if schedule.get("placement") == "authored":
+        check(not schedule["predictionCalibrated"] and not schedule["predictionComplete"] and
+              execution["predictedNanoseconds"] == execution["predictedSerialNanoseconds"] == 0,
+              "Authored placement must not publish a model prediction")
+    else:
+        check(not schedule["predictionCalibrated"] and (compute == 0 or schedule["predictionComplete"]),
+              "Historical overlap placement requires complete costs")
     check(execution["plannedWaits"] == execution["submittedWaits"] == len(waits), "Wait accounting mismatch")
     check(execution["plannedBarriers"] == sum(b["barriers"] for b in batches), "Barrier accounting mismatch")
     check(execution["prologueBarriers"] == batches[0]["barriers"] and
@@ -172,10 +202,13 @@ def verify_timing(timing, diagnostics=None):
               "Collection was attributed to a different mode/domain than submission")
         entries = {(e["pass"], e["queue"]) for e in diagnostics["schedule"]["entries"]}
         boundaries = [s for s in slices if s["passIndex"] == 0xFFFFFFFF]
-        check(len(boundaries) == 2 and {s["name"] for s in boundaries} ==
-              {"RenderGraph.QueuePrologue", "RenderGraph.QueueEpilogue"} and
-              all(s["queue"] == 0 for s in boundaries),
-              "Full graph span requires exactly the two designated graphics boundary scopes")
+        if diagnostics.get("executionPath") == "primary-graphics":
+            check(not boundaries, "Primary pass-envelope timing fabricated owned queue boundary scopes")
+        else:
+            check(len(boundaries) == 2 and {s["name"] for s in boundaries} ==
+                  {"RenderGraph.QueuePrologue", "RenderGraph.QueueEpilogue"} and
+                  all(s["queue"] == 0 for s in boundaries),
+                  "Owned graph span requires exactly the two graphics boundary scopes")
         check({(s["passIndex"], s["queue"]) for s in slices if s["passIndex"] != 0xFFFFFFFF} == entries,
               "Measured pass identities/queues differ from actual schedule")
     lanes = [interval_union((s["beginCpuTick"], s["endCpuTick"]) for s in slices if s["queue"] == q)
@@ -198,16 +231,19 @@ def verify_timing(timing, diagnostics=None):
 def verify_native(path, binary):
     native = read(path)
     same_binary(native["binary"], binary)
-    check(native["schemaVersion"] == 2 and native["acceptanceSchema"] == 3 and
-          native["checks"] == 428 and native["scheduleChecks"] == 121 and native["passed"] and native["fullRegression"] and
+    check(native["schemaVersion"] == 2 and (native["acceptanceSchema"], native["checks"], native["scheduleChecks"]) in
+          ((3, 428, 121), (3, 437, 131), (4, 437, 76), (5, 441, 82)) and native["passed"] and native["fullRegression"] and
           native["nativeQueueExecutionTested"] and native["frameRetirementTested"] and
           native["positiveOverlapExecutionTested"] and native["negativeFallbackExecutionTested"] and
           native["declarationOrderTested"] and native["readReadOwnershipTested"] and
-          native["reorderedFailureTested"] and native["parallelRecordingTested"] and native["calibratedIntervalsTested"] and
-          native["sharedGraphicsReadsTested"] and native["readerEpochJoinTested"] and
-          native["sideEffectsTested"] and native["fallbackReasonsTested"] and
+          (native.get("authoredFailureTested", False) if native["acceptanceSchema"] >= 4 else native["reorderedFailureTested"]) and native["parallelRecordingTested"] and native["calibratedIntervalsTested"] and
+          (native.get("authoredAsyncTested", False) and native.get("timingIndependentTested", False) if native["acceptanceSchema"] >= 4 else
+           native["sharedGraphicsReadsTested"] and native["readerEpochJoinTested"] and native["sideEffectsTested"]) and native["fallbackReasonsTested"] and
           native["measurementDomainsTested"] and native["exitCode"] == 0,
           "Current full native overlap-path, retirement and fallback coverage required")
+    if native["acceptanceSchema"] >= 5:
+        check(native.get("primaryPreparationTested") and native.get("primaryGraphicsRouteTested"),
+              "Prepared async and primary route regression coverage required")
     return native
 
 
@@ -254,8 +290,9 @@ def verify_workloads(path, binary):
                   "Workload proof must use ordinary mode-2 submissions")
             execution = verify_schedule(diagnostics, 2)
             schedule = diagnostics["schedule"]
-            check(schedule["predictionComplete"] and schedule["missingMeasurementPasses"] == 0 and
-                  schedule["eligibleComputePasses"] > 0,
+            check((schedule.get("placement") == "authored" or
+                   (schedule["predictionComplete"] and schedule["missingMeasurementPasses"] == 0 and
+                    schedule["eligibleComputePasses"] > 0)),
                   "Warm complete-cost eligible workload required; missing history is not negative-fallback proof")
             overlap = verify_timing(timing, diagnostics)
             if kind == "positive-overlap":
@@ -263,7 +300,8 @@ def verify_workloads(path, binary):
                       "Positive real workload has no overlap above measured clock drift")
             else:
                 check(execution["computeBatches"] == timing["computeSliceCount"] == overlap == 0 and
-                      schedule["fallbackReason"] == "insufficient-gain",
+                      schedule["fallbackReason"] in (("no-async-passes", "unsupported", "unsupported-state", "disabled")
+                          if schedule.get("placement") == "authored" else ("insufficient-gain",)),
                       "Negative workload did not select graphics-only fallback")
             overlaps.append(overlap)
             reasons.add(schedule["fallbackReason"])
@@ -275,7 +313,13 @@ def verify_workloads(path, binary):
 
 
 def verify_counters(log, executions):
-    executions = [e for e in executions if e["mode"] != 0]
+    primary = [e for e in executions if e.get("executionPath") == "primary-graphics"]
+    for entry in primary:
+        verify_schedule(entry, entry["mode"])
+    executions = [e for e in executions if e["mode"] != 0 and e.get("executionPath") != "primary-graphics"]
+    if not executions:
+        check(primary, "Missing primary/owned execution evidence")
+        return {"graphs": len(primary), "ownedGraphs": 0, "batches": 0, "computeBatches": 0}
     pools = [tuple(map(int, r)) for r in re.findall(r"\[rg8.pool\] created=(\d+) reused=(\d+) leased=(\d+) cached=(\d+)", log)]
     totals = [tuple(map(int, r)) for r in re.findall(r"\[rg8.live\] submissions=(\d+) batches=(\d+) profilerQueue=graphics", log)]
     barriers = [tuple(map(int, r)) for r in re.findall(r"\[rg8.barriers\] total=(\d+) last=(\d+)", log)]
@@ -294,7 +338,7 @@ def verify_counters(log, executions):
     compute = sum(e["execution"]["computeBatches"] for e in executions)
     check(compute == sum(map(int, re.findall(r"\[rg8.compute\] submissions=(\d+)", log))), "Compute counter mismatch")
     schedules = [tuple(map(int, r)) for r in re.findall(
-        r"\[rg8.schedule\] placement=overlap computeSubmittedFrames=(\d+) measuredOverlapSubmissions=(\d+) predictedGainNs=\d+ predictionCalibrated=false", log)]
+        r"\[rg8.schedule\] placement=(?:overlap|authored) computeSubmittedFrames=(\d+) measuredOverlapSubmissions=(\d+) predictedGainNs=\d+ predictionCalibrated=false", log)]
     check(schedules and sum(r[0] for r in schedules) == sum(e["execution"]["computeBatches"] > 0 for e in executions),
           "Compute-submission counter is not actual placement")
     return {"createdPairs": created, "reusedPairs": reused, "graphs": len(executions), "batches": batch_count,
@@ -348,7 +392,13 @@ def verify_capture(manifest, mode):
     if mode:
         check(diagnostics["measurementDomain"] == "capture", "Controlled capture contaminated normal measurement domain")
         execution = verify_schedule(diagnostics, mode, manifest["compiledGraph"])
-        check(manifest["graph"]["barriers"] == execution["plannedBarriers"], "Capture barrier count mismatch")
+        if diagnostics.get("executionPath") == "primary-graphics":
+            barrier_count = sum(len(p["barriers"]) + sum(
+                len(phase["firstBarriers"]) + max(0, p["repeatCount"] - 1) * len(phase["repeatBarriers"])
+                for phase in p["phases"]) for p in manifest["compiledGraph"]["passes"] if not p["culled"])
+            check(manifest["graph"]["barriers"] == barrier_count, "Primary compiled barrier count mismatch")
+        else:
+            check(manifest["graph"]["barriers"] == execution["plannedBarriers"], "Capture barrier count mismatch")
         check((measurement["computeSliceCount"] > 0) == (execution["computeBatches"] > 0),
               "Capture slices differ from actual queue placement")
     else:
@@ -538,7 +588,8 @@ def main():
             submit_costs.append(cpu["submissionMilliseconds"])
             if run["mode"]:
                 submission = executions[key]
-                check(submission["measurementDomain"] == "normal" and submission["schedule"]["predictionComplete"],
+                check(submission["measurementDomain"] == "normal" and (submission["schedule"].get("placement") == "authored" or
+                       submission["schedule"]["predictionComplete"]),
                       "Normal samples contain capture scheduling costs or unwarmed timing history")
                 planning = submission["schedule"]
                 check(all(isinstance(planning.get(k), (int, float)) and not isinstance(planning[k], bool) and
