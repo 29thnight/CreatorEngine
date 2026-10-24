@@ -32,7 +32,7 @@ type Mover() =
 
 ## 사람이 읽는 저작 코드와 생성 코드
 
-[VS Code 작성 도우미](../../../FSharp_Tool_Pakage_for_CreatorEngine/vscode/README.md)는 현재 컴포넌트의 멤버 위치에서 `On…` 자동완성과 **생명주기 추가** 선택 메뉴를 제공한다. 선택한 일반 멤버만 single/unit 서명으로 삽입하며 기존 훅은 제외한다. 주석·문자열·메서드 본문에는 제안하지 않는다. 파일 저장·빌드·compile.order 변경은 수행하지 않는다. 다른 파일의 기반 타입과 복잡한 F# 구문은 편집 도우미가 추측하지 않으며 최종 검사는 FCS 생성기가 담당한다. [선택적 저작 수용 기록](../analysis/FSharpOptionalLifecycleAcceptance20261023.md)을 따른다.
+[VS Code 작성 도우미](https://github.com/29thnight/FSharp_Tool_Pakage_for_CreatorEngine/blob/3351cbc80d7216eb10110c4c8b30dce98aef1d1f/vscode/README.md)는 현재 컴포넌트의 멤버 위치에서 `On…` 자동완성과 **생명주기 추가** 선택 메뉴를 제공한다. 선택한 일반 멤버만 single/unit 서명으로 삽입하며 기존 훅은 제외한다. 주석·문자열·메서드 본문에는 제안하지 않는다. 파일 저장·빌드·compile.order 변경은 수행하지 않는다. 다른 파일의 기반 타입과 복잡한 F# 구문은 편집 도우미가 추측하지 않으며 최종 검사는 FCS 생성기가 담당한다. [선택적 저작 수용 기록](../analysis/FSharpOptionalLifecycleAcceptance20261023.md)을 따른다.
 
 F# 스크립트와 내부 C# 바인딩은 사람이 수정·검토하는 코드다. 공백만 늘리는 대신 다음 기준을 적용한다.
 

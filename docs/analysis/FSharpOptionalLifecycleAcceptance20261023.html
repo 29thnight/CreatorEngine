@@ -162,6 +162,7 @@
   .map-row:hover .map-bar i { background: var(--accent); }
   .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
   @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
 </style>
 </head>
 <body>
@@ -177,10 +178,10 @@
 
 <figure>
 <div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
-<a class="map-row" href="#적용한-저작-방식"><span class="ve-label">§00</span><span class="map-name">적용한 저작 방식</span><span class="map-bar"><i style="width:43.3%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#vs-code-사용"><span class="ve-label">§01</span><span class="map-name">VS Code 사용</span><span class="map-bar"><i style="width:57.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#적용한-저작-방식"><span class="ve-label">§00</span><span class="map-name">적용한 저작 방식</span><span class="map-bar"><i style="width:23.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#vs-code-사용"><span class="ve-label">§01</span><span class="map-name">VS Code 사용</span><span class="map-bar"><i style="width:31.2%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#검증"><span class="ve-label">§02</span><span class="map-name">검증</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#실행-환경과-수용-경계"><span class="ve-label">§03</span><span class="map-name">실행 환경과 수용 경계</span><span class="map-bar"><i style="width:41.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실행-환경과-수용-경계"><span class="ve-label">§03</span><span class="map-name">실행 환경과 수용 경계</span><span class="map-bar"><i style="width:22.6%"></i></span><span class="map-marks"></span></a>
 </div>
 <figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「검증」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
 </figure>
@@ -195,7 +196,7 @@
 </section>
 <section class="doc-sec" id="sec-vs-code-사용">
 <div class="sec-head"><p class="ve-label">§01</p><h2 id="vs-code-사용">VS Code 사용</h2></div>
-<div class="prose"><p>로컬 VS Code에 <code>29thnight.creatorengine-fsharp-authoring@0.1.0</code>을 설치했다. <a href="../../../FSharp_Tool_Pakage_for_CreatorEngine/vscode/README.md">확장 설명</a>을 따른다.</p>
+<div class="prose"><p>로컬 VS Code에 <code>29thnight.creatorengine-fsharp-authoring@0.1.0</code>을 설치했다. <a href="https://github.com/29thnight/FSharp_Tool_Pakage_for_CreatorEngine/blob/3351cbc80d7216eb10110c4c8b30dce98aef1d1f/vscode/README.md">확장 설명</a>을 따른다.</p>
 <ol>
 <li>F# 컴포넌트 안의 멤버 위치에서 <code>On</code>을 입력하고 <code>Ctrl+Space</code>를 누른다. <code>member this.On</code>으로 시작할 수도 있다.</li>
 <li>여러 메서드는 명령 팔레트나 우클릭의 **CreatorEngine F#: 생명주기 추가 (Add Lifecycle Methods)**에서 선택한다.</li>
@@ -218,9 +219,9 @@
 <tr><td>Release Editor</td><td>새 네이티브 템플릿 빌드 통과. 훅 없는 타입 생성/부착/Play/Stop, 명시적 compile.order, 이후 고정틱50회 실행, 필드37 보존·실패 reload 보존·수정 복구·exit0 통과</td></tr>
 <tr><td>수명·접촉 회귀</td><td>Debug/Release 각각 수명26건·접촉76건. 접촉 추가 할당0 bytes. 네이티브 고정 클록도 통과</td></tr>
 <tr><td>기존 제품 fixture</td><td>실제 Editor52명령·Play2회에서 실패0. cooked Player2,000프레임·표시 승격8회 이상·패키지 불변·exit0. F#53종·직렬화 필드34개의 기존 계약 일치</td></tr></tbody></table></div>
-<p>관리 도구의 검증 보고서는 <a href="../../../FSharp_Tool_Pakage_for_CreatorEngine/artifacts/optional-lifecycle-20261023/verification.json">optional-lifecycle-20261023</a>, 확장 패키지·개발 호스트·생성기 컴파일 보고서는 <a href="../../../FSharp_Tool_Pakage_for_CreatorEngine/artifacts/vscode-authoring-acceptance/verification.json">vscode-authoring-acceptance</a>다. 패키지는 동 디렉터리의 creatorengine-fsharp-authoring-0.1.0.vsix이며 공개 게시하지 않았다.</p>
-<p>Editor 생성/핫리로드 근거: <a href="../../Build/Verification/FSharp/Editor-400f675a56ca4d41bd27800c4efcd446/result.json">Editor-400f675a56ca4d41bd27800c4efcd446</a>. 설치 근거: <a href="../../Build/Verification/FSharpOptionalLifecycle/vscode-install.json">로컬 확장 payload</a>.</p>
-<p>수명·정리 제품 근거: <a href="../../Build/Verification/CSharpFixedUpdate/Editor-edbaa2bf3b344d77ac94e710797bb234/result.json">Editor</a>, <a href="../../Build/Verification/CSharpFixedUpdate/Player-93e7085c744e4af1a6dcbf784b8a28ba/result.json">cooked Player</a>, <a href="../../Build/Verification/FSharp/Compatibility-be90ba56797b4efeb0690a94feed4abb/result.json">카탈로그/직렬화 비교</a>, <a href="../../Build/Verification/CSharpFixedUpdate/Contracts-af5bcbfa36be4874a34a28db7806acdf/result.json">Release 계약</a>, <a href="../../Build/Verification/CSharpFixedUpdate/Contracts-a4bcfa07d603489082a51e1447562f22/result.json">Debug 계약</a>. CSharpFixedUpdate는 기존 호출자가 사용하는 회귀 이름이며, 이 실행의 저작 코드는 F#이다.</p>
+<p>관리 도구의 검증 보고서는 optional-lifecycle-20261023 · 로컬 기록, 사이트 미포함 (<code>../FSharp_Tool_Pakage_for_CreatorEngine/artifacts/optional-lifecycle-20261023/verification.json</code>), 확장 패키지·개발 호스트·생성기 컴파일 보고서는 vscode-authoring-acceptance · 로컬 기록, 사이트 미포함 (<code>../FSharp_Tool_Pakage_for_CreatorEngine/artifacts/vscode-authoring-acceptance/verification.json</code>)다. 패키지는 동 디렉터리의 creatorengine-fsharp-authoring-0.1.0.vsix이며 공개 게시하지 않았다.</p>
+<p>Editor 생성/핫리로드 근거: Editor-400f675a56ca4d41bd27800c4efcd446 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/FSharp/Editor-400f675a56ca4d41bd27800c4efcd446/result.json</code>). 설치 근거: 로컬 확장 payload · 로컬 기록, 사이트 미포함 (<code>Build/Verification/FSharpOptionalLifecycle/vscode-install.json</code>).</p>
+<p>수명·정리 제품 근거: Editor · 로컬 기록, 사이트 미포함 (<code>Build/Verification/CSharpFixedUpdate/Editor-edbaa2bf3b344d77ac94e710797bb234/result.json</code>), cooked Player · 로컬 기록, 사이트 미포함 (<code>Build/Verification/CSharpFixedUpdate/Player-93e7085c744e4af1a6dcbf784b8a28ba/result.json</code>), 카탈로그/직렬화 비교 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/FSharp/Compatibility-be90ba56797b4efeb0690a94feed4abb/result.json</code>), Release 계약 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/CSharpFixedUpdate/Contracts-af5bcbfa36be4874a34a28db7806acdf/result.json</code>), Debug 계약 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/CSharpFixedUpdate/Contracts-a4bcfa07d603489082a51e1447562f22/result.json</code>). CSharpFixedUpdate는 기존 호출자가 사용하는 회귀 이름이며, 이 실행의 저작 코드는 F#이다.</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-실행-환경과-수용-경계">
@@ -231,7 +232,7 @@
 </section>
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="FSharpOptionalLifecycleAcceptance20261023.md"><code>docs/analysis/FSharpOptionalLifecycleAcceptance20261023.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+<p><a href="FSharpOptionalLifecycleAcceptance20261023.md"><code>docs/analysis/FSharpOptionalLifecycleAcceptance20261023.md</code></a> · 마지막 커밋 2026-10-23 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
 </section>
 </main>
 </div>

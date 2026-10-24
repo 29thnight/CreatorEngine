@@ -54,7 +54,7 @@ N2와 N4의 독립 설계·하네스는 N0 뒤 병행할 수 있다. N5 통합�
 필수 회귀 삭제·누락·하위 gate 실패는 전체 실패다. 제품 옵션 없는 실행은 Editor/Player/GPU 수용을 대체하지 않는다. transport/서버가 추가되면 그 제품 gate를 별도로 등록한다.
 
 - 이번 재실행: wire 경계 PASS(6 headers/16 records/8 wire records, v1), Archive/Parser PASS(runtime 860 / role closure 1014), 필수 회귀 등록 PASS(7 등록 항목이 Debug/Release에서 9그룹으로 확장).
-- N3 수용 JSON의 sourceSha256 31개와 현재 파일 일치(불일치 0). 실제 실행 당시 전체 인계 gate 15그룹(기본 9 + 제품 6) PASS, failures 0. [전체 회귀 결과](../../Build/Verification/NDA/Suite-9883ae0a29ce4ae3897c4788716cdd3a/result.json).
+- N3 수용 JSON의 sourceSha256 31개와 현재 파일 일치(불일치 0). 실제 실행 당시 전체 인계 gate 15그룹(기본 9 + 제품 6) PASS, failures 0. 전체 회귀 결과 · 로컬 기록, 사이트 미포함 (`Build/Verification/NDA/Suite-9883ae0a29ce4ae3897c4788716cdd3a/result.json`).
 - 실제 FPS 30.0047 / 59.5147 / 143.1011. 동일 tick CCT/강체 궤적·0틱 GPU 보간을 수용한 작은 DX12 fixture 결과이며 대표 해상도 성능이나 다른 기기/서버/TAA·FSR·DLSS 수용이 아니다. [N3 기록](N3PacingAcceptance20261023.md).
 - Engine/Network의 현재 파일은 계약 6종과 원장/lock이다. 실제 transport·replication·서버 제품 구현으로 판정하지 않는다. 원격 CI는 배선됐지만 실행 수용 기록은 없다.
 

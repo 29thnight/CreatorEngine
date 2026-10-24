@@ -162,6 +162,7 @@
   .map-row:hover .map-bar i { background: var(--accent); }
   .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
   @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
 </style>
 </head>
 <body>
@@ -177,12 +178,12 @@
 
 <figure>
 <div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
-<a class="map-row" href="#판정"><span class="ve-label">§01</span><span class="map-name">판정</span><span class="map-bar"><i style="width:22.4%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#구현"><span class="ve-label">§02</span><span class="map-name">구현</span><span class="map-bar"><i style="width:79.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#판정"><span class="ve-label">§01</span><span class="map-name">판정</span><span class="map-bar"><i style="width:15%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#구현"><span class="ve-label">§02</span><span class="map-name">구현</span><span class="map-bar"><i style="width:53.1%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#실제-실행"><span class="ve-label">§03</span><span class="map-name">실제 실행</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#성능-판정"><span class="ve-label">§04</span><span class="map-name">성능 판정</span><span class="map-bar"><i style="width:78.1%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#가독성과-이주-범위"><span class="ve-label">§05</span><span class="map-name">가독성과 이주 범위</span><span class="map-bar"><i style="width:39.9%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#남는-범위"><span class="ve-label">§06</span><span class="map-name">남는 범위</span><span class="map-bar"><i style="width:35.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#성능-판정"><span class="ve-label">§04</span><span class="map-name">성능 판정</span><span class="map-bar"><i style="width:52.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#가독성과-이주-범위"><span class="ve-label">§05</span><span class="map-name">가독성과 이주 범위</span><span class="map-bar"><i style="width:26.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#남는-범위"><span class="ve-label">§06</span><span class="map-name">남는 범위</span><span class="map-bar"><i style="width:23.7%"></i></span><span class="map-marks"></span></a>
 </div>
 <figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「실제 실행」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
 </figure>
@@ -193,7 +194,7 @@
 <section class="doc-sec" id="sec-판정">
 <div class="sec-head"><p class="ve-label">§01</p><h2 id="판정">판정</h2></div>
 <div class="prose"><p><strong>F# 단독 저작·고정 tick, 실제 30/60/144fps와 moving 0틱 GPU gate를 수용했다. 기존 C# 전체 fixture의 F# 이주는 진행 중이다.</strong> ScriptCore는 엔진 내부 C# 바인딩이며 사용자 저작·Editor 생성/감시·배포 컴파일러는 F# 경로다. 이전 OnUpdate 이름을 제거하고 OnTickSimulate(dt), Script API44로 바꿨다. 구형 호스트와 혼합할 수 없다.</p>
-<p><a href="../design/FSharpScriptingContract.html">계약</a> · <a href="FSharpScriptingAcceptance20261023.json">기계 판정·소스 hash</a> · <a href="../../../FSharp_Tool_Pakage_for_CreatorEngine/README.md">도구 저장소 작업본</a></p>
+<p><a href="../design/FSharpScriptingContract.html">계약</a> · <a href="FSharpScriptingAcceptance20261023.json">기계 판정·소스 hash</a> · <a href="https://github.com/29thnight/FSharp_Tool_Pakage_for_CreatorEngine/blob/3351cbc80d7216eb10110c4c8b30dce98aef1d1f/README.md">도구 저장소 작업본</a></p>
 </div>
 </section>
 <section class="doc-sec" id="sec-구현">
@@ -227,7 +228,7 @@
 <tr><td>F# fixture 비교</td><td>컴포넌트 53종·직렬화 필드 34개의 이름·형식·초기값, Ani 1종·BT 3종 카탈로그 일치</td></tr>
 <tr><td>자동 저작 회귀</td><td>F# 생성·수정·이름 변경·삭제·실패 복구 87건 통과</td></tr>
 <tr><td>컴포넌트 브라우저</td><td>418건 통과. 실패한 명시 부착 요청을 파일 감시가 덮어쓰던 재시도 경합 수정 포함</td></tr></tbody></table></div>
-<p>제품 기록: <a href="../../Build/Verification/FSharp/Editor-7f22602157d14902b6888773f5ad809f/result.json">Editor</a>, <a href="../../Build/Verification/FSharp/Player-fc249bf2aff6449e9674043b657cf7d7/result.json">Player</a>, <a href="../../Build/Verification/N3Pacing/Editor-3224fde089564552b106a4cc990f35e7/result.json">30/60/144fps</a>, <a href="../../Build/Verification/N3Pacing/Editor-35205d8791914dbc842fde39538aa4eb/result.json">moving GPU</a>, <a href="../../Build/Verification/NDA/Suite-4e86efd52e394c0599e8174c63b8d063/result.json">NetworkHandoff 15그룹</a>, <a href="../../Build/Verification/FSharp/Compatibility-03cc2e799f93490f99c05ef86eae6887/result.json">카탈로그 비교</a>. 각 결과는 해당 실행 당시 바이너리 신원을 기록한다.</p>
+<p>제품 기록: Editor · 로컬 기록, 사이트 미포함 (<code>Build/Verification/FSharp/Editor-7f22602157d14902b6888773f5ad809f/result.json</code>), Player · 로컬 기록, 사이트 미포함 (<code>Build/Verification/FSharp/Player-fc249bf2aff6449e9674043b657cf7d7/result.json</code>), 30/60/144fps · 로컬 기록, 사이트 미포함 (<code>Build/Verification/N3Pacing/Editor-3224fde089564552b106a4cc990f35e7/result.json</code>), moving GPU · 로컬 기록, 사이트 미포함 (<code>Build/Verification/N3Pacing/Editor-35205d8791914dbc842fde39538aa4eb/result.json</code>), NetworkHandoff 15그룹 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/NDA/Suite-4e86efd52e394c0599e8174c63b8d063/result.json</code>), 카탈로그 비교 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/FSharp/Compatibility-03cc2e799f93490f99c05ef86eae6887/result.json</code>). 각 결과는 해당 실행 당시 바이너리 신원을 기록한다.</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-성능-판정">
@@ -252,7 +253,7 @@
 </section>
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="FSharpScriptingAcceptance20261023.md"><code>docs/analysis/FSharpScriptingAcceptance20261023.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+<p><a href="FSharpScriptingAcceptance20261023.md"><code>docs/analysis/FSharpScriptingAcceptance20261023.md</code></a> · 마지막 커밋 2026-10-23 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
 </section>
 </main>
 </div>

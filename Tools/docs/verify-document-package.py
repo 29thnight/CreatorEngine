@@ -22,12 +22,14 @@ for path in DIST.rglob('*.html'):
   if uri.scheme or href.startswith('//') or not uri.path:continue
   target=DIST/unquote(uri.path).lstrip('/') if uri.path.startswith('/') else path.parent/unquote(uri.path)
   links+=1
-  if not target.exists():failures.append('Broken deployed link: '+path.relative_to(DIST).as_posix()+' -> '+href)
+  if not target.resolve().is_relative_to(DIST.resolve()):failures.append('Escaping deployed link: '+path.relative_to(DIST).as_posix()+' -> '+href)
+  elif not target.exists():failures.append('Broken deployed link: '+path.relative_to(DIST).as_posix()+' -> '+href)
 for path in DIST.rglob('*'):
  if path.is_file() and re.search(r'\.sheet(?:-\d+)?\.png$|\.html\.\d+\.tmp$',path.name):failures.append('Inspection-only file deployed: '+str(path))
 for name in ('CSharpRenderPipelinePlan','ScriptableRenderPipelinePlan'):
  for suffix in ('.md','.html','.src.html'):
   if (DIST/'plans'/(name+suffix)).exists():failures.append('Cancelled SRP plan deployed: '+name+suffix)
 report={'filesCompared':count,'deployedLocalLinksInspected':links,'status':'PASS' if not failures else 'FAIL','problems':failures}
+(ROOT/'Build').mkdir(parents=True,exist_ok=True)
 (ROOT/'Build/full-docs-package-verification.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
 print(json.dumps(report,ensure_ascii=False));raise SystemExit(bool(failures))

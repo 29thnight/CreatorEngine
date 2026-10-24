@@ -12,7 +12,7 @@ Windows PowerShell5.1.26100.9711과 PowerShell7.6.5에서 Release Editor/Player�
 
 재현 프로세스의 스택에서 메인 스레드는 `Service::Stop`의 accept 스레드 join을 기다렸다. accept 스레드는 종료 직전 `JoinAllWorkers`를 호출했고, 연결 작업자는 `WSAPoll`에서 유휴 제한 시간까지 기다리고 있었다. Stop의 `ShutdownSocket`은 첫 join 뒤에 있어 실행할 수 없었다.
 
-원래 PowerShell5 실행의 감사 로그는285요청이 동일한 클라이언트 포트1개를 재사용했다. 비교한 PowerShell7 실행은295요청·295포트였다. 따라서 PowerShell5의 HTTP 연결 유지 방식이 엔진의 종료 순서 결함을 드러냈다. 동일한 Keep-Alive 연결을 강제로 유지한 회귀는 두 셸에 모두 적용한다. [수집한 대기 스택](../../Build/Verification/PowerShell5Shutdown/stacks.txt)과 [기존 종료 결과](../../Build/Verification/FSharp/Editor-8cb02c794f3f4e44888443da5da366f7/shutdown.json)를 보존했다.
+원래 PowerShell5 실행의 감사 로그는285요청이 동일한 클라이언트 포트1개를 재사용했다. 비교한 PowerShell7 실행은295요청·295포트였다. 따라서 PowerShell5의 HTTP 연결 유지 방식이 엔진의 종료 순서 결함을 드러냈다. 동일한 Keep-Alive 연결을 강제로 유지한 회귀는 두 셸에 모두 적용한다. 수집한 대기 스택 · 로컬 기록, 사이트 미포함 (`Build/Verification/PowerShell5Shutdown/stacks.txt`)과 기존 종료 결과 · 로컬 기록, 사이트 미포함 (`Build/Verification/FSharp/Editor-8cb02c794f3f4e44888443da5da366f7/shutdown.json`)를 보존했다.
 
 순서만 수정한 중간 probe에서도 5초 수신 제한의 약4.90초를 기다렸다. 이 환경에서 `shutdown`만으로 이미 대기 중인 WSAPoll이 즉시 풀리지 않았기 때문이다. 수신 루프가 종료 신호를 확인하도록 함께 바꿔야 했다. 최초의 출력 리다이렉션 가설은 대기 스택과 일치하지 않았다.
 
@@ -48,13 +48,13 @@ Windows PowerShell5.1.26100.9711과 PowerShell7.6.5에서 Release Editor/Player�
 
 기계 판정·파일 해시는 [동명 JSON](PowerShell5EditorShutdownAcceptance20261023.json)을 따른다.
 
-주요 제품 근거: [Editor/PS5](../../Build/Verification/CommandServiceShutdown/Editor-05c2bcc85a5e4e79b034de6e877db261/result.json), [Editor/PS7](../../Build/Verification/CommandServiceShutdown/Editor-77383e2783c24d8f95e73b6d3227cf0b/result.json), [Player/PS5](../../Build/Verification/CommandServiceShutdown/Player-41aed15c754243df978b4fc598be0e8e/result.json), [Player/PS7](../../Build/Verification/CommandServiceShutdown/Player-8e221651270345a5aa14bb6105aa78a5/result.json), [저작/PS5](../../Build/Verification/FSharp/Editor-d603cfb8109e4cc29b7f95f4179fd2ca/result.json), [저작/PS7](../../Build/Verification/FSharp/Editor-e8b281525eec4130bba5b036eecd4e6a/result.json).
+주요 제품 근거: Editor/PS5 · 로컬 기록, 사이트 미포함 (`Build/Verification/CommandServiceShutdown/Editor-05c2bcc85a5e4e79b034de6e877db261/result.json`), Editor/PS7 · 로컬 기록, 사이트 미포함 (`Build/Verification/CommandServiceShutdown/Editor-77383e2783c24d8f95e73b6d3227cf0b/result.json`), Player/PS5 · 로컬 기록, 사이트 미포함 (`Build/Verification/CommandServiceShutdown/Player-41aed15c754243df978b4fc598be0e8e/result.json`), Player/PS7 · 로컬 기록, 사이트 미포함 (`Build/Verification/CommandServiceShutdown/Player-8e221651270345a5aa14bb6105aa78a5/result.json`), 저작/PS5 · 로컬 기록, 사이트 미포함 (`Build/Verification/FSharp/Editor-d603cfb8109e4cc29b7f95f4179fd2ca/result.json`), 저작/PS7 · 로컬 기록, 사이트 미포함 (`Build/Verification/FSharp/Editor-e8b281525eec4130bba5b036eecd4e6a/result.json`).
 
 ## 배선과 남은 범위
 
 `verify-command-service-shutdown.ps1`은 실제 소켓 회귀와 수정 전 canary를 제공하고, `verify-command-service-shutdown-product.ps1`은 격리한 Editor 또는 cooked Player 사본을 검증한다. 기존 F# 저작 gate와 조기 종료 gate도 그대로 사용할 수 있다. 새 command-service-shutdown workflow에 Debug/Release 서비스 회귀·PowerShell5/7 종료 코드·검증기 구문 검사를 연결했다. 원격 CI는 아직 실행하지 않았다.
 
-기존 `verify-cli-consumer-contract.ps1`은 사람용 판정 문자열을 읽는 기존7파일 때문에 `7 > 0`으로 실패했다. 해당7파일은 모두 HEAD와 동일하며 이번 변경 파일이 아니다. 인증이 모든 라우트보다 앞서는 검사는 통과했다. 래칫 상한은 올리지 않았고 기존 소비자의 이주는 LC9 잔여로 유지한다. [실행 로그](../../Build/powershell5-shutdown-cli-consumer.log)를 보존했다.
+기존 `verify-cli-consumer-contract.ps1`은 사람용 판정 문자열을 읽는 기존7파일 때문에 `7 > 0`으로 실패했다. 해당7파일은 모두 HEAD와 동일하며 이번 변경 파일이 아니다. 인증이 모든 라우트보다 앞서는 검사는 통과했다. 래칫 상한은 올리지 않았고 기존 소비자의 이주는 LC9 잔여로 유지한다. 실행 로그 · 로컬 기록, 사이트 미포함 (`Build/powershell5-shutdown-cli-consumer.log`)를 보존했다.
 
 Debug 제품 호스트·Shipping·다른 GPU/플랫폼·일반 GUI·장시간 반복·실제 30/60/144fps 품질의 새 수용을 뜻하지 않는다. 프레임 성능 개선도 주장하지 않는다. 변경은 로컬 작업본이며 커밋·푸시·패키지 공개 게시를 수행하지 않았다.
 

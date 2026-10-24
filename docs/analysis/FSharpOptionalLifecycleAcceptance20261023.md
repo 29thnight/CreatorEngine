@@ -15,7 +15,7 @@ GameScripts 57개·기본 프로젝트 2개·도구 샘플 7개, 총 F# 66파일
 
 ## VS Code 사용
 
-로컬 VS Code에 `29thnight.creatorengine-fsharp-authoring@0.1.0`을 설치했다. [확장 설명](../../../FSharp_Tool_Pakage_for_CreatorEngine/vscode/README.md)을 따른다.
+로컬 VS Code에 `29thnight.creatorengine-fsharp-authoring@0.1.0`을 설치했다. [확장 설명](https://github.com/29thnight/FSharp_Tool_Pakage_for_CreatorEngine/blob/3351cbc80d7216eb10110c4c8b30dce98aef1d1f/vscode/README.md)을 따른다.
 
 1. F# 컴포넌트 안의 멤버 위치에서 `On`을 입력하고 `Ctrl+Space`를 누른다. `member this.On`으로 시작할 수도 있다.
 2. 여러 메서드는 명령 팔레트나 우클릭의 **CreatorEngine F#: 생명주기 추가 (Add Lifecycle Methods)**에서 선택한다.
@@ -39,11 +39,11 @@ GameScripts 57개·기본 프로젝트 2개·도구 샘플 7개, 총 F# 66파일
 | 수명·접촉 회귀 | Debug/Release 각각 수명26건·접촉76건. 접촉 추가 할당0 bytes. 네이티브 고정 클록도 통과 |
 | 기존 제품 fixture | 실제 Editor52명령·Play2회에서 실패0. cooked Player2,000프레임·표시 승격8회 이상·패키지 불변·exit0. F#53종·직렬화 필드34개의 기존 계약 일치 |
 
-관리 도구의 검증 보고서는 [optional-lifecycle-20261023](../../../FSharp_Tool_Pakage_for_CreatorEngine/artifacts/optional-lifecycle-20261023/verification.json), 확장 패키지·개발 호스트·생성기 컴파일 보고서는 [vscode-authoring-acceptance](../../../FSharp_Tool_Pakage_for_CreatorEngine/artifacts/vscode-authoring-acceptance/verification.json)다. 패키지는 동 디렉터리의 creatorengine-fsharp-authoring-0.1.0.vsix이며 공개 게시하지 않았다.
+관리 도구의 검증 보고서는 optional-lifecycle-20261023 · 로컬 기록, 사이트 미포함 (`../FSharp_Tool_Pakage_for_CreatorEngine/artifacts/optional-lifecycle-20261023/verification.json`), 확장 패키지·개발 호스트·생성기 컴파일 보고서는 vscode-authoring-acceptance · 로컬 기록, 사이트 미포함 (`../FSharp_Tool_Pakage_for_CreatorEngine/artifacts/vscode-authoring-acceptance/verification.json`)다. 패키지는 동 디렉터리의 creatorengine-fsharp-authoring-0.1.0.vsix이며 공개 게시하지 않았다.
 
-Editor 생성/핫리로드 근거: [Editor-400f675a56ca4d41bd27800c4efcd446](../../Build/Verification/FSharp/Editor-400f675a56ca4d41bd27800c4efcd446/result.json). 설치 근거: [로컬 확장 payload](../../Build/Verification/FSharpOptionalLifecycle/vscode-install.json).
+Editor 생성/핫리로드 근거: Editor-400f675a56ca4d41bd27800c4efcd446 · 로컬 기록, 사이트 미포함 (`Build/Verification/FSharp/Editor-400f675a56ca4d41bd27800c4efcd446/result.json`). 설치 근거: 로컬 확장 payload · 로컬 기록, 사이트 미포함 (`Build/Verification/FSharpOptionalLifecycle/vscode-install.json`).
 
-수명·정리 제품 근거: [Editor](../../Build/Verification/CSharpFixedUpdate/Editor-edbaa2bf3b344d77ac94e710797bb234/result.json), [cooked Player](../../Build/Verification/CSharpFixedUpdate/Player-93e7085c744e4af1a6dcbf784b8a28ba/result.json), [카탈로그/직렬화 비교](../../Build/Verification/FSharp/Compatibility-be90ba56797b4efeb0690a94feed4abb/result.json), [Release 계약](../../Build/Verification/CSharpFixedUpdate/Contracts-af5bcbfa36be4874a34a28db7806acdf/result.json), [Debug 계약](../../Build/Verification/CSharpFixedUpdate/Contracts-a4bcfa07d603489082a51e1447562f22/result.json). CSharpFixedUpdate는 기존 호출자가 사용하는 회귀 이름이며, 이 실행의 저작 코드는 F#이다.
+수명·정리 제품 근거: Editor · 로컬 기록, 사이트 미포함 (`Build/Verification/CSharpFixedUpdate/Editor-edbaa2bf3b344d77ac94e710797bb234/result.json`), cooked Player · 로컬 기록, 사이트 미포함 (`Build/Verification/CSharpFixedUpdate/Player-93e7085c744e4af1a6dcbf784b8a28ba/result.json`), 카탈로그/직렬화 비교 · 로컬 기록, 사이트 미포함 (`Build/Verification/FSharp/Compatibility-be90ba56797b4efeb0690a94feed4abb/result.json`), Release 계약 · 로컬 기록, 사이트 미포함 (`Build/Verification/CSharpFixedUpdate/Contracts-af5bcbfa36be4874a34a28db7806acdf/result.json`), Debug 계약 · 로컬 기록, 사이트 미포함 (`Build/Verification/CSharpFixedUpdate/Contracts-a4bcfa07d603489082a51e1447562f22/result.json`). CSharpFixedUpdate는 기존 호출자가 사용하는 회귀 이름이며, 이 실행의 저작 코드는 F#이다.
 
 ## 실행 환경과 수용 경계
 

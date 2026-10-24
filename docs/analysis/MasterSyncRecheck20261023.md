@@ -46,7 +46,7 @@
 
 별도 moving-quality 실행에서는 실제 `sourceEngineFrame`과 연결된 이동 중 0틱 GPU readback을 수용했다. 비활성화·재활성화·워프 전환의 실루엣도 통과했다. 이 캡처 실행의 측정은141.8559fps이며, 위 정상 pacing 실행과 구분한다.
 
-실행 근거: [30/60/144fps](../../Build/Verification/N3Pacing/Editor-5d96511b93194bfc86a43e0783f9b706/result.json), [moving GPU](../../Build/Verification/N3Pacing/Editor-49724de945a24f9bbcc3f49d4a81543b/result.json), [PS7 애니메이션](../../Build/Verification/MasterSyncAnimation/Player-ps7/verification.json), [PS5 애니메이션](../../Build/Verification/MasterSyncAnimation/Player-ps5/verification.json).
+실행 근거: 30/60/144fps · 로컬 기록, 사이트 미포함 (`Build/Verification/N3Pacing/Editor-5d96511b93194bfc86a43e0783f9b706/result.json`), moving GPU · 로컬 기록, 사이트 미포함 (`Build/Verification/N3Pacing/Editor-49724de945a24f9bbcc3f49d4a81543b/result.json`), PS7 애니메이션 · 로컬 기록, 사이트 미포함 (`Build/Verification/MasterSyncAnimation/Player-ps7/verification.json`), PS5 애니메이션 · 로컬 기록, 사이트 미포함 (`Build/Verification/MasterSyncAnimation/Player-ps5/verification.json`).
 
 이 수치는 해당 장치·fixture·짧은 측정 구간의 pacing 수용 결과다. 전체 게임의 성능 예산이나 이전 바이너리 대비 성능 향상을 뜻하지 않는다.
 

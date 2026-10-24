@@ -162,6 +162,7 @@
   .map-row:hover .map-bar i { background: var(--accent); }
   .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
   @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
 </style>
 </head>
 <body>
@@ -177,11 +178,11 @@
 
 <figure>
 <div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
-<a class="map-row" href="#현재-범위"><span class="ve-label">§01</span><span class="map-name">현재 범위</span><span class="map-bar"><i style="width:47.9%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#보존한-동작"><span class="ve-label">§02</span><span class="map-name">보존한 동작</span><span class="map-bar"><i style="width:33.4%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#실제-제품에서-수정한-누락"><span class="ve-label">§03</span><span class="map-name">실제 제품에서 수정한 누락</span><span class="map-bar"><i style="width:59.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#현재-범위"><span class="ve-label">§01</span><span class="map-name">현재 범위</span><span class="map-bar"><i style="width:26.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#보존한-동작"><span class="ve-label">§02</span><span class="map-name">보존한 동작</span><span class="map-bar"><i style="width:18.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실제-제품에서-수정한-누락"><span class="ve-label">§03</span><span class="map-name">실제 제품에서 수정한 누락</span><span class="map-bar"><i style="width:33.1%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#검증-기록"><span class="ve-label">§04</span><span class="map-name">검증 기록</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span></span></a>
-<a class="map-row" href="#수용의-한계"><span class="ve-label">§05</span><span class="map-name">수용의 한계</span><span class="map-bar"><i style="width:25.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#수용의-한계"><span class="ve-label">§05</span><span class="map-name">수용의 한계</span><span class="map-bar"><i style="width:13.9%"></i></span><span class="map-marks"></span></a>
 </div>
 <figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「검증 기록」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
 </figure>
@@ -242,9 +243,9 @@
 <tr><td>등록 NetworkHandoff 전체</td><td>관리/네이티브9 + 제품6 = 15그룹 통과. Debug/Release 매트릭스 포함</td></tr>
 <tr><td>실제 30/60/144fps DX12</td><td>29.9999 / 59.9940 / 144.0416fps. 동일 tick CCT·강체 상대 궤적 차이0. Scene/Game 캡처4회·canary17 통과</td></tr>
 <tr><td>moving 0틱 GPU</td><td>실제 sourceEngineFrame과 연결된 readback 통과. 진단 캡처의 cadence는 정상 pacing 판정과 구분</td></tr></tbody></table></div>
-<p>근거: <a href="../../../FSharp_Tool_Pakage_for_CreatorEngine/artifacts/managed-runtime-validation-20261023/verification.json">도구 관리 검사</a>, <a href="../../Build/Verification/FSharp/Editor-a0b6c30fbaa0487bbae1eef52fd2cb56/result.json">Editor</a>, <a href="../../Build/Verification/FSharp/Player-c0103530102f437c880908112e4917ac/result.json">Player</a>.</p>
-<p>추가 제품 근거: <a href="../../Build/Verification/NDA/Suite-89a4cc6a934b41d5b4976a05fd931173/result.json">NetworkHandoff 15그룹</a>, <a href="../../Build/Verification/N3Pacing/Editor-0c0ebbc98b47411fb19427a470655ce2/result.json">30/60/144fps</a>, <a href="../../Build/Verification/N3Pacing/Editor-1201263533c441dbb66fbfa6ff345d23/result.json">moving GPU</a>.</p>
-<p>저작·수명 근거: <a href="../../Build/AutomaticScripts-Release-8f365a67/result.json">자동 저작</a>, <a href="../../Build/Verification/FSharpRuntimeMigration/ComponentBrowser/summary.json">컴포넌트 브라우저</a>, <a href="../../Build/Verification/CSharpFixedUpdate/Editor-a2b84cec39a146f39eb819aa19134546/result.json">실패·정리 Editor</a>, <a href="../../Build/Verification/CSharpFixedUpdate/Player-4194662c3afd47939eeb13f0b564ca6d/result.json">실패·정리 Player</a>, <a href="../../Build/Obj/Phase19Player/run-355e4ea0ec2946fd905778bcb1d6274f/result.json">CCT·DDOL</a>, <a href="../../Build/Verification/FSharp/Compatibility-613a214b40d14ec9ad23f659ababc8e9/result.json">계약 비교</a>. 기존 호출자의 로그·결과 경로에 남은 CSharpFixedUpdate 이름은 호환성을 위해 유지한 이름이며, 이 실행의 저작 코드는 F#이다.</p>
+<p>근거: 도구 관리 검사 · 로컬 기록, 사이트 미포함 (<code>../FSharp_Tool_Pakage_for_CreatorEngine/artifacts/managed-runtime-validation-20261023/verification.json</code>), Editor · 로컬 기록, 사이트 미포함 (<code>Build/Verification/FSharp/Editor-a0b6c30fbaa0487bbae1eef52fd2cb56/result.json</code>), Player · 로컬 기록, 사이트 미포함 (<code>Build/Verification/FSharp/Player-c0103530102f437c880908112e4917ac/result.json</code>).</p>
+<p>추가 제품 근거: NetworkHandoff 15그룹 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/NDA/Suite-89a4cc6a934b41d5b4976a05fd931173/result.json</code>), 30/60/144fps · 로컬 기록, 사이트 미포함 (<code>Build/Verification/N3Pacing/Editor-0c0ebbc98b47411fb19427a470655ce2/result.json</code>), moving GPU · 로컬 기록, 사이트 미포함 (<code>Build/Verification/N3Pacing/Editor-1201263533c441dbb66fbfa6ff345d23/result.json</code>).</p>
+<p>저작·수명 근거: 자동 저작 · 로컬 기록, 사이트 미포함 (<code>Build/AutomaticScripts-Release-8f365a67/result.json</code>), 컴포넌트 브라우저 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/FSharpRuntimeMigration/ComponentBrowser/summary.json</code>), 실패·정리 Editor · 로컬 기록, 사이트 미포함 (<code>Build/Verification/CSharpFixedUpdate/Editor-a2b84cec39a146f39eb819aa19134546/result.json</code>), 실패·정리 Player · 로컬 기록, 사이트 미포함 (<code>Build/Verification/CSharpFixedUpdate/Player-4194662c3afd47939eeb13f0b564ca6d/result.json</code>), CCT·DDOL · 로컬 기록, 사이트 미포함 (<code>Build/Obj/Phase19Player/run-355e4ea0ec2946fd905778bcb1d6274f/result.json</code>), 계약 비교 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/FSharp/Compatibility-613a214b40d14ec9ad23f659ababc8e9/result.json</code>). 기존 호출자의 로그·결과 경로에 남은 CSharpFixedUpdate 이름은 호환성을 위해 유지한 이름이며, 이 실행의 저작 코드는 F#이다.</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-수용의-한계">
@@ -255,7 +256,7 @@
 </section>
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="FSharpManagedRuntimeAcceptance20261023.md"><code>docs/analysis/FSharpManagedRuntimeAcceptance20261023.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+<p><a href="FSharpManagedRuntimeAcceptance20261023.md"><code>docs/analysis/FSharpManagedRuntimeAcceptance20261023.md</code></a> · 마지막 커밋 2026-10-23 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
 </section>
 </main>
 </div>

@@ -162,6 +162,7 @@
   .map-row:hover .map-bar i { background: var(--accent); }
   .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
   @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
 </style>
 </head>
 <body>
@@ -179,11 +180,11 @@
 <span class="legend"><span class="chip ok">완료·통과 4</span></span></div></div>
 <figure>
 <div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
-<a class="map-row" href="#판정"><span class="ve-label">§00</span><span class="map-name">판정</span><span class="map-bar"><i style="width:28%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#확인한-원인"><span class="ve-label">§01</span><span class="map-name">확인한 원인</span><span class="map-bar"><i style="width:85.9%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#수정"><span class="ve-label">§02</span><span class="map-name">수정</span><span class="map-bar"><i style="width:58.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#판정"><span class="ve-label">§00</span><span class="map-name">판정</span><span class="map-bar"><i style="width:17.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#확인한-원인"><span class="ve-label">§01</span><span class="map-name">확인한 원인</span><span class="map-bar"><i style="width:63%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#수정"><span class="ve-label">§02</span><span class="map-name">수정</span><span class="map-bar"><i style="width:36.4%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#검증"><span class="ve-label">§03</span><span class="map-name">검증</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">4</span></span></a>
-<a class="map-row" href="#배선과-남은-범위"><span class="ve-label">§04</span><span class="map-name">배선과 남은 범위</span><span class="map-bar"><i style="width:71%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#배선과-남은-범위"><span class="ve-label">§04</span><span class="map-name">배선과 남은 범위</span><span class="map-bar"><i style="width:47.6%"></i></span><span class="map-marks"></span></a>
 </div>
 <figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「검증」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
 </figure>
@@ -197,7 +198,7 @@
 <div class="sec-head"><p class="ve-label">§01</p><h2 id="확인한-원인">확인한 원인</h2></div>
 <div class="prose"><h3 id="연결을-깨우기-전에-기다리던-종료-순서">연결을 깨우기 전에 기다리던 종료 순서</h3>
 <p>재현 프로세스의 스택에서 메인 스레드는 <code>Service::Stop</code>의 accept 스레드 join을 기다렸다. accept 스레드는 종료 직전 <code>JoinAllWorkers</code>를 호출했고, 연결 작업자는 <code>WSAPoll</code>에서 유휴 제한 시간까지 기다리고 있었다. Stop의 <code>ShutdownSocket</code>은 첫 join 뒤에 있어 실행할 수 없었다.</p>
-<p>원래 PowerShell5 실행의 감사 로그는285요청이 동일한 클라이언트 포트1개를 재사용했다. 비교한 PowerShell7 실행은295요청·295포트였다. 따라서 PowerShell5의 HTTP 연결 유지 방식이 엔진의 종료 순서 결함을 드러냈다. 동일한 Keep-Alive 연결을 강제로 유지한 회귀는 두 셸에 모두 적용한다. <a href="../../Build/Verification/PowerShell5Shutdown/stacks.txt">수집한 대기 스택</a>과 <a href="../../Build/Verification/FSharp/Editor-8cb02c794f3f4e44888443da5da366f7/shutdown.json">기존 종료 결과</a>를 보존했다.</p>
+<p>원래 PowerShell5 실행의 감사 로그는285요청이 동일한 클라이언트 포트1개를 재사용했다. 비교한 PowerShell7 실행은295요청·295포트였다. 따라서 PowerShell5의 HTTP 연결 유지 방식이 엔진의 종료 순서 결함을 드러냈다. 동일한 Keep-Alive 연결을 강제로 유지한 회귀는 두 셸에 모두 적용한다. 수집한 대기 스택 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/PowerShell5Shutdown/stacks.txt</code>)과 기존 종료 결과 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/FSharp/Editor-8cb02c794f3f4e44888443da5da366f7/shutdown.json</code>)를 보존했다.</p>
 <p>순서만 수정한 중간 probe에서도 5초 수신 제한의 약4.90초를 기다렸다. 이 환경에서 <code>shutdown</code>만으로 이미 대기 중인 WSAPoll이 즉시 풀리지 않았기 때문이다. 수신 루프가 종료 신호를 확인하도록 함께 바꿔야 했다. 최초의 출력 리다이렉션 가설은 대기 스택과 일치하지 않았다.</p>
 <h3 id="종료한-프로세스의-exitcode가-null">종료한 프로세스의 ExitCode가 null</h3>
 <p>진단 실행의 대기를120초로 늘렸을 때 Editor는 실제 종료해 최종 추적 <code>[9]</code>까지 남겼지만, PowerShell5의 Process.ExitCode는 null이었다. 독립 네이티브 프로그램을 종료 코드0과23으로 실행해도 핸들을 캐시하지 않으면 둘 다 null로 재현됐다. 같은 호출에서 핸들을 미리 확보하면 양쪽 셸 모두0과23을 정확히 구분했다.</p>
@@ -231,20 +232,20 @@
 <tr><td>검증기 구문</td><td>공유 PowerShell 스크립트5개를 두 셸에서 구문 분석 통과</td></tr>
 <tr><td>빌드</td><td>Release Editor·Player와 기본 F# GameScripts 출력 복원 빌드 통과</td></tr></tbody></table></div>
 <p>기계 판정·파일 해시는 <a href="PowerShell5EditorShutdownAcceptance20261023.json">동명 JSON</a>을 따른다.</p>
-<p>주요 제품 근거: <a href="../../Build/Verification/CommandServiceShutdown/Editor-05c2bcc85a5e4e79b034de6e877db261/result.json">Editor/PS5</a>, <a href="../../Build/Verification/CommandServiceShutdown/Editor-77383e2783c24d8f95e73b6d3227cf0b/result.json">Editor/PS7</a>, <a href="../../Build/Verification/CommandServiceShutdown/Player-41aed15c754243df978b4fc598be0e8e/result.json">Player/PS5</a>, <a href="../../Build/Verification/CommandServiceShutdown/Player-8e221651270345a5aa14bb6105aa78a5/result.json">Player/PS7</a>, <a href="../../Build/Verification/FSharp/Editor-d603cfb8109e4cc29b7f95f4179fd2ca/result.json">저작/PS5</a>, <a href="../../Build/Verification/FSharp/Editor-e8b281525eec4130bba5b036eecd4e6a/result.json">저작/PS7</a>.</p>
+<p>주요 제품 근거: Editor/PS5 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/CommandServiceShutdown/Editor-05c2bcc85a5e4e79b034de6e877db261/result.json</code>), Editor/PS7 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/CommandServiceShutdown/Editor-77383e2783c24d8f95e73b6d3227cf0b/result.json</code>), Player/PS5 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/CommandServiceShutdown/Player-41aed15c754243df978b4fc598be0e8e/result.json</code>), Player/PS7 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/CommandServiceShutdown/Player-8e221651270345a5aa14bb6105aa78a5/result.json</code>), 저작/PS5 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/FSharp/Editor-d603cfb8109e4cc29b7f95f4179fd2ca/result.json</code>), 저작/PS7 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/FSharp/Editor-e8b281525eec4130bba5b036eecd4e6a/result.json</code>).</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-배선과-남은-범위">
 <div class="sec-head"><p class="ve-label">§04</p><h2 id="배선과-남은-범위">배선과 남은 범위</h2></div>
 <div class="prose"><p><code>verify-command-service-shutdown.ps1</code>은 실제 소켓 회귀와 수정 전 canary를 제공하고, <code>verify-command-service-shutdown-product.ps1</code>은 격리한 Editor 또는 cooked Player 사본을 검증한다. 기존 F# 저작 gate와 조기 종료 gate도 그대로 사용할 수 있다. 새 command-service-shutdown workflow에 Debug/Release 서비스 회귀·PowerShell5/7 종료 코드·검증기 구문 검사를 연결했다. 원격 CI는 아직 실행하지 않았다.</p>
-<p>기존 <code>verify-cli-consumer-contract.ps1</code>은 사람용 판정 문자열을 읽는 기존7파일 때문에 <code>7 &gt; 0</code>으로 실패했다. 해당7파일은 모두 HEAD와 동일하며 이번 변경 파일이 아니다. 인증이 모든 라우트보다 앞서는 검사는 통과했다. 래칫 상한은 올리지 않았고 기존 소비자의 이주는 LC9 잔여로 유지한다. <a href="../../Build/powershell5-shutdown-cli-consumer.log">실행 로그</a>를 보존했다.</p>
+<p>기존 <code>verify-cli-consumer-contract.ps1</code>은 사람용 판정 문자열을 읽는 기존7파일 때문에 <code>7 &gt; 0</code>으로 실패했다. 해당7파일은 모두 HEAD와 동일하며 이번 변경 파일이 아니다. 인증이 모든 라우트보다 앞서는 검사는 통과했다. 래칫 상한은 올리지 않았고 기존 소비자의 이주는 LC9 잔여로 유지한다. 실행 로그 · 로컬 기록, 사이트 미포함 (<code>Build/powershell5-shutdown-cli-consumer.log</code>)를 보존했다.</p>
 <p>Debug 제품 호스트·Shipping·다른 GPU/플랫폼·일반 GUI·장시간 반복·실제 30/60/144fps 품질의 새 수용을 뜻하지 않는다. 프레임 성능 개선도 주장하지 않는다. 변경은 로컬 작업본이며 커밋·푸시·패키지 공개 게시를 수행하지 않았다.</p>
 <p>후속: 위 <code>7 &gt; 0</code>은 이 종료 수용 당시의 관측이다. 이후 <a href="CliConsumerMigrationAcceptance20261023.html">CLI 소비자 이주 기록</a>에서 상한0을 유지하고 위반0을 확인했다. 이 문서의 당시 로그·해시는 소급 변경하지 않는다.</p>
 </div>
 </section>
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="PowerShell5EditorShutdownAcceptance20261023.md"><code>docs/analysis/PowerShell5EditorShutdownAcceptance20261023.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+<p><a href="PowerShell5EditorShutdownAcceptance20261023.md"><code>docs/analysis/PowerShell5EditorShutdownAcceptance20261023.md</code></a> · 마지막 커밋 2026-10-23 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
 </section>
 </main>
 </div>

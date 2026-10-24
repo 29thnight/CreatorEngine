@@ -4,7 +4,9 @@
   "version": "1.0.0",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
-    "build": "vite build",
+    "build": "npm run docs:links:test && vite build && npm run docs:verify",
+    "docs:links:test": "node --test Tools/docs/document-links.test.mjs",
+    "docs:verify": "python Tools/docs/verify-document-package.py",
     "preview": "vite preview",
     "docs:render": "node Tools/docs/render-markdown-docs.mjs"
   },

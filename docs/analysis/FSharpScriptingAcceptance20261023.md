@@ -5,7 +5,7 @@
 
 **F# 단독 저작·고정 tick, 실제 30/60/144fps와 moving 0틱 GPU gate를 수용했다. 기존 C# 전체 fixture의 F# 이주는 진행 중이다.** ScriptCore는 엔진 내부 C# 바인딩이며 사용자 저작·Editor 생성/감시·배포 컴파일러는 F# 경로다. 이전 OnUpdate 이름을 제거하고 OnTickSimulate(dt), Script API44로 바꿨다. 구형 호스트와 혼합할 수 없다.
 
-[계약](../design/FSharpScriptingContract.md) · [기계 판정·소스 hash](FSharpScriptingAcceptance20261023.json) · [도구 저장소 작업본](../../../FSharp_Tool_Pakage_for_CreatorEngine/README.md)
+[계약](../design/FSharpScriptingContract.md) · [기계 판정·소스 hash](FSharpScriptingAcceptance20261023.json) · [도구 저장소 작업본](https://github.com/29thnight/FSharp_Tool_Pakage_for_CreatorEngine/blob/3351cbc80d7216eb10110c4c8b30dce98aef1d1f/README.md)
 
 ## 구현
 
@@ -36,7 +36,7 @@
 | 자동 저작 회귀 | F# 생성·수정·이름 변경·삭제·실패 복구 87건 통과 |
 | 컴포넌트 브라우저 | 418건 통과. 실패한 명시 부착 요청을 파일 감시가 덮어쓰던 재시도 경합 수정 포함 |
 
-제품 기록: [Editor](../../Build/Verification/FSharp/Editor-7f22602157d14902b6888773f5ad809f/result.json), [Player](../../Build/Verification/FSharp/Player-fc249bf2aff6449e9674043b657cf7d7/result.json), [30/60/144fps](../../Build/Verification/N3Pacing/Editor-3224fde089564552b106a4cc990f35e7/result.json), [moving GPU](../../Build/Verification/N3Pacing/Editor-35205d8791914dbc842fde39538aa4eb/result.json), [NetworkHandoff 15그룹](../../Build/Verification/NDA/Suite-4e86efd52e394c0599e8174c63b8d063/result.json), [카탈로그 비교](../../Build/Verification/FSharp/Compatibility-03cc2e799f93490f99c05ef86eae6887/result.json). 각 결과는 해당 실행 당시 바이너리 신원을 기록한다.
+제품 기록: Editor · 로컬 기록, 사이트 미포함 (`Build/Verification/FSharp/Editor-7f22602157d14902b6888773f5ad809f/result.json`), Player · 로컬 기록, 사이트 미포함 (`Build/Verification/FSharp/Player-fc249bf2aff6449e9674043b657cf7d7/result.json`), 30/60/144fps · 로컬 기록, 사이트 미포함 (`Build/Verification/N3Pacing/Editor-3224fde089564552b106a4cc990f35e7/result.json`), moving GPU · 로컬 기록, 사이트 미포함 (`Build/Verification/N3Pacing/Editor-35205d8791914dbc842fde39538aa4eb/result.json`), NetworkHandoff 15그룹 · 로컬 기록, 사이트 미포함 (`Build/Verification/NDA/Suite-4e86efd52e394c0599e8174c63b8d063/result.json`), 카탈로그 비교 · 로컬 기록, 사이트 미포함 (`Build/Verification/FSharp/Compatibility-03cc2e799f93490f99c05ef86eae6887/result.json`). 각 결과는 해당 실행 당시 바이너리 신원을 기록한다.
 
 ## 성능 판정
 

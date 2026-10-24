@@ -162,6 +162,7 @@
   .map-row:hover .map-bar i { background: var(--accent); }
   .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
   @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
 </style>
 </head>
 <body>
@@ -275,7 +276,7 @@
 <li class="task"><input type="checkbox" disabled> Deferred/Forward·alpha/transmission 전체 route 대조</li>
 <li class="task"><input type="checkbox" disabled> 모델·혼합 transport·scratch·cold/warm 전체 프레임 비용</li>
 </ul>
-<p>근거: <a href="../../docs/analysis/MAT9HdriConvergence.html">docs/analysis/MAT9HdriConvergence.md</a> · <a href="../../docs/analysis/MAT9SpecialProfileCorrection.html">docs/analysis/MAT9SpecialProfileCorrection.md</a> · <a href="../../docs/analysis/MAT7ForwardTransportComposition.html">docs/analysis/MAT7ForwardTransportComposition.md</a>.</p>
+<p>근거: <a href="MAT9HdriConvergence.html">docs/analysis/MAT9HdriConvergence.md</a> · <a href="MAT9SpecialProfileCorrection.html">docs/analysis/MAT9SpecialProfileCorrection.md</a> · <a href="MAT7ForwardTransportComposition.html">docs/analysis/MAT7ForwardTransportComposition.md</a>.</p>
 <h3 id="rg8--명시적-async-compute다중-큐-제품-수용">RG8 — 명시적 async compute·다중 큐 제품 수용</h3>
 <p>작업 진척 5/5 · 기존 산정 16인일 · 제품 수용 16인일.</p>
 <ul>
@@ -306,7 +307,7 @@
 <li class="task"><input type="checkbox" disabled> 물리 cadence·latency·frame pacing</li>
 <li class="task"><input type="checkbox" disabled> resize/device loss/teardown 전체 제품 수용</li>
 </ul>
-<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerTemporalDX12.cpp">Player/PlayerTemporalDX12.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerDX12Presentation.cpp">Player/PlayerDX12Presentation.cpp</a> · <a href="../../docs/analysis/TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a>.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerTemporalDX12.cpp">Player/PlayerTemporalDX12.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerDX12Presentation.cpp">Player/PlayerDX12Presentation.cpp</a> · <a href="TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a>.</p>
 <h3 id="fg1--player-simulationpresent-latency-marker와-물리-측정">FG1 — Player simulation·present latency marker와 물리 측정</h3>
 <p>작업 진척 2/4 · 기존 산정 4인일 · 제품 수용 0인일.</p>
 <ul>
@@ -315,7 +316,7 @@
 <li class="task"><input type="checkbox" disabled> provider별 지연 기능·실장치 지원 수용</li>
 <li class="task"><input type="checkbox" disabled> 외부 물리 latency·계측 비용 수용</li>
 </ul>
-<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerTemporalDX12.cpp">Player/PlayerTemporalDX12.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerDX12Presentation.cpp">Player/PlayerDX12Presentation.cpp</a> · <a href="../../docs/analysis/TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerMain.cpp">Player/PlayerMain.cpp</a>.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerTemporalDX12.cpp">Player/PlayerTemporalDX12.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerDX12Presentation.cpp">Player/PlayerDX12Presentation.cpp</a> · <a href="TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerMain.cpp">Player/PlayerMain.cpp</a>.</p>
 <h3 id="fg2--fsr-fg-proxy입력-연결-이후-실제-출력-수용">FG2 — FSR FG proxy·입력 연결 이후 실제 출력 수용</h3>
 <p>작업 진척 2/4 · 기존 산정 6인일 · 제품 수용 0인일.</p>
 <ul>
@@ -324,7 +325,7 @@
 <li class="task"><input type="checkbox" disabled> 실제 generated identity·HUD·실패 복구</li>
 <li class="task"><input type="checkbox" disabled> 물리 pacing·장치별 품질/비용 수용</li>
 </ul>
-<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerTemporalDX12.cpp">Player/PlayerTemporalDX12.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerDX12Presentation.cpp">Player/PlayerDX12Presentation.cpp</a> · <a href="../../docs/analysis/TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/RHI/Temporal/Fsr/FsrBackendDX12.cpp">Engine/RenderEngine/RHI/Temporal/Fsr/FsrBackendDX12.cpp</a>.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerTemporalDX12.cpp">Player/PlayerTemporalDX12.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerDX12Presentation.cpp">Player/PlayerDX12Presentation.cpp</a> · <a href="TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/RHI/Temporal/Fsr/FsrBackendDX12.cpp">Engine/RenderEngine/RHI/Temporal/Fsr/FsrBackendDX12.cpp</a>.</p>
 <h3 id="fg3--dlss-fg-tokenpresent-연결-이후-지원-장치-수용">FG3 — DLSS FG token·present 연결 이후 지원 장치 수용</h3>
 <p>작업 진척 2/4 · 기존 산정 4인일 · 제품 수용 0인일.</p>
 <ul>
@@ -333,7 +334,7 @@
 <li class="task"><input type="checkbox" disabled> FG 지원 GPU에서 actual generated 출력 수용</li>
 <li class="task"><input type="checkbox" disabled> 장치별 MFG·latency/pacing·실패 복구 수용</li>
 </ul>
-<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerTemporalDX12.cpp">Player/PlayerTemporalDX12.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerDX12Presentation.cpp">Player/PlayerDX12Presentation.cpp</a> · <a href="../../docs/analysis/TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp">Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp</a>.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerTemporalDX12.cpp">Player/PlayerTemporalDX12.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerDX12Presentation.cpp">Player/PlayerDX12Presentation.cpp</a> · <a href="TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp">Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp</a>.</p>
 <h3 id="fg4--hud-less-입력editor-금지-이후-합성-출력-수용">FG4 — HUD-less 입력·Editor 금지 이후 합성 출력 수용</h3>
 <p>작업 진척 2/4 · 기존 산정 4인일 · 제품 수용 0인일.</p>
 <ul>
@@ -342,7 +343,7 @@
 <li class="task"><input type="checkbox" disabled> 실제 생성 프레임 HUD 합성·최종 소비 수용</li>
 <li class="task"><input type="checkbox" disabled> resize·device loss·복구 픽셀 수용</li>
 </ul>
-<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerTemporalDX12.cpp">Player/PlayerTemporalDX12.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerDX12Presentation.cpp">Player/PlayerDX12Presentation.cpp</a> · <a href="../../docs/analysis/TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a>.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerTemporalDX12.cpp">Player/PlayerTemporalDX12.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Player/PlayerDX12Presentation.cpp">Player/PlayerDX12Presentation.cpp</a> · <a href="TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a>.</p>
 <h3 id="tfg9--지원-행렬generated-신원whole-frame-최종-판정">TFG9 — 지원 행렬·generated 신원·whole-frame 최종 판정</h3>
 <p>작업 진척 1/4 · 기존 산정 4인일 · 제품 수용 0인일.</p>
 <ul>
@@ -351,7 +352,7 @@
 <li class="task"><input type="checkbox" disabled> FG actual generated·실패·물리 latency/pacing</li>
 <li class="task"><input type="checkbox" disabled> 동조건 master 전체 프레임 성능·최종 수용</li>
 </ul>
-<p>근거: <a href="../../docs/analysis/TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="../../docs/analysis/TemporalPhase45Closure20261011.html">docs/analysis/TemporalPhase45Closure20261011.md</a>.</p>
+<p>근거: <a href="TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="TemporalPhase45Closure20261011.html">docs/analysis/TemporalPhase45Closure20261011.md</a>.</p>
 <h3 id="tr0--측정-provenance-연결-이후-전체-소비자예산-수용">TR0 — 측정 provenance 연결 이후 전체 소비자·예산 수용</h3>
 <p>작업 진척 3/5 · 기존 산정 3인일 · 제품 수용 0인일.</p>
 <ul>
@@ -361,7 +362,7 @@
 <li class="task"><input type="checkbox" disabled> 진단 UI·기존 소비자 전수 및 제품 budget 정책</li>
 <li class="task"><input type="checkbox" disabled> actual generated identity·외부 물리 표시 계측</li>
 </ul>
-<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Temporal/TemporalMeasurementProvenance.h">Engine/RenderEngine/Render/Temporal/TemporalMeasurementProvenance.h</a> · <a href="../../docs/analysis/TemporalMeasurementSurfaces20261011.html">docs/analysis/TemporalMeasurementSurfaces20261011.md</a> · <a href="../../docs/analysis/TemporalMeasurementConsumers20261010.html">docs/analysis/TemporalMeasurementConsumers20261010.md</a>.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Temporal/TemporalMeasurementProvenance.h">Engine/RenderEngine/Render/Temporal/TemporalMeasurementProvenance.h</a> · <a href="TemporalMeasurementSurfaces20261011.html">docs/analysis/TemporalMeasurementSurfaces20261011.md</a> · <a href="TemporalMeasurementConsumers20261010.html">docs/analysis/TemporalMeasurementConsumers20261010.md</a>.</p>
 <h3 id="tr2--renderdisplayjitter-구현-이후-다중-view-품질">TR2 — render/display·jitter 구현 이후 다중 view 품질</h3>
 <p>작업 진척 4/4 · 기존 산정 5인일 · 제품 수용 5인일.</p>
 <ul>
@@ -370,7 +371,7 @@
 <li class="task"><input type="checkbox" disabled checked> DLSS 5품질·resize/lens D/R 비교 기록</li>
 <li class="task"><input type="checkbox" disabled checked> 멀티뷰·전체 route/해상도 품질 수용</li>
 </ul>
-<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp">Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h">Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h</a> · <a href="../../docs/analysis/TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="../../docs/analysis/TemporalDlssLens20261011.html">docs/analysis/TemporalDlssLens20261011.md</a>.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp">Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h">Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h</a> · <a href="TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="TemporalDlssLens20261011.html">docs/analysis/TemporalDlssLens20261011.md</a>.</p>
 <p>2026-10-23: <a href="TemporalTr2Resolution20261023.html">TR2 구현·Debug/Release 전체 행렬 수용</a>. 2,632캡처·14,168개 전체 이미지 비교의 최대 차이는 0이다.</p>
 <h3 id="tr3--제출-확정-history-이후-전체-수명ssgi-정책">TR3 — 제출 확정 history 이후 전체 수명·SSGI 정책</h3>
 <p>작업 진척 5/5 · 기존 산정 5인일 · 제품 수용 5인일.</p>
@@ -381,7 +382,7 @@
 <li class="task"><input type="checkbox" disabled checked> 멀티뷰·투영 전환 전체 수명 수용</li>
 <li class="task"><input type="checkbox" disabled checked> SSGI history 공용 정책 최종 수용</li>
 </ul>
-<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp">Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h">Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h</a> · <a href="../../docs/analysis/TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a>.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp">Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h">Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h</a> · <a href="TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a>.</p>
 <p>2026-10-23: <a href="TemporalTr3History20261023.html">TR3 구현·D/R 픽셀 수용</a>. SDK 전체 품질은 TR2/TU 소유 항목에서 추적한다.</p>
 <h3 id="tu0--provider-질의폴백-구현-이후-제품-배포-수용">TU0 — provider 질의·폴백 구현 이후 제품 배포 수용</h3>
 <p>작업 진척 3/4 · 기존 산정 3인일 · 제품 수용 0인일.</p>
@@ -391,7 +392,7 @@
 <li class="task"><input type="checkbox" disabled checked> 12방향 전환·6오류 복구 D/R 기록</li>
 <li class="task"><input type="checkbox" disabled> optional SDK 배포·전체 제품 행렬 수용</li>
 </ul>
-<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp">Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h">Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h</a> · <a href="../../docs/analysis/TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="../../docs/analysis/TemporalPhase45Closure20261011.html">docs/analysis/TemporalPhase45Closure20261011.md</a>.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp">Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h">Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h</a> · <a href="TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="TemporalPhase45Closure20261011.html">docs/analysis/TemporalPhase45Closure20261011.md</a>.</p>
 <h3 id="tu1--native-대조-경로의-전체-입력품질-수용">TU1 — native 대조 경로의 전체 입력·품질 수용</h3>
 <p>작업 진척 2/3 · 기존 산정 2인일 · 제품 수용 0인일.</p>
 <ul>
@@ -399,7 +400,7 @@
 <li class="task"><input type="checkbox" disabled checked> native 강제·A/B fixture 비교 기록</li>
 <li class="task"><input type="checkbox" disabled> 독립 대조 입력·전체 route/제품 수용</li>
 </ul>
-<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp">Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h">Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h</a> · <a href="../../docs/analysis/TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a>.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp">Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h">Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h</a> · <a href="TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a>.</p>
 <h3 id="tu2--fsr-adapter실행-연결-이후-전체-품질-수용">TU2 — FSR adapter·실행 연결 이후 전체 품질 수용</h3>
 <p>작업 진척 2/3 · 기존 산정 5인일 · 제품 수용 0인일.</p>
 <ul>
@@ -407,7 +408,7 @@
 <li class="task"><input type="checkbox" disabled checked> host 선택·실패 복구와 D/R 부분 실행 기록</li>
 <li class="task"><input type="checkbox" disabled> 전체 품질·해상도·장면·비용 수용</li>
 </ul>
-<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp">Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h">Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h</a> · <a href="../../docs/analysis/TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/RHI/Temporal/Fsr/FsrBackendDX12.cpp">Engine/RenderEngine/RHI/Temporal/Fsr/FsrBackendDX12.cpp</a>.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp">Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h">Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h</a> · <a href="TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/RHI/Temporal/Fsr/FsrBackendDX12.cpp">Engine/RenderEngine/RHI/Temporal/Fsr/FsrBackendDX12.cpp</a>.</p>
 <h3 id="tu3--dlss-sr-구현5품질-기록-이후-제품-품질-수용">TU3 — DLSS SR 구현·5품질 기록 이후 제품 품질 수용</h3>
 <p>작업 진척 3/4 · 기존 산정 3인일 · 제품 수용 0인일.</p>
 <ul>
@@ -416,7 +417,7 @@
 <li class="task"><input type="checkbox" disabled checked> 5품질 warmed·startup·lens D/R 비교 기록</li>
 <li class="task"><input type="checkbox" disabled> 실제 모델·가변 시간·전체 route/해상도·비용 수용</li>
 </ul>
-<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp">Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h">Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h</a> · <a href="../../docs/analysis/TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp">Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp</a> · <a href="../../docs/analysis/TemporalDlssFinalBuild20261011.html">docs/analysis/TemporalDlssFinalBuild20261011.md</a>.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp">Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h">Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h</a> · <a href="TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp">Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp</a> · <a href="TemporalDlssFinalBuild20261011.html">docs/analysis/TemporalDlssFinalBuild20261011.md</a>.</p>
 <h3 id="tu4--xess-adapter실행-연결-이후-전체-품질-수용">TU4 — XeSS adapter·실행 연결 이후 전체 품질 수용</h3>
 <p>작업 진척 2/3 · 기존 산정 3인일 · 제품 수용 0인일.</p>
 <ul>
@@ -424,49 +425,49 @@
 <li class="task"><input type="checkbox" disabled checked> host 선택·실패 복구와 D/R 부분 실행 기록</li>
 <li class="task"><input type="checkbox" disabled> 전체 품질·해상도·장면·비용 수용</li>
 </ul>
-<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp">Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h">Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h</a> · <a href="../../docs/analysis/TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/RHI/Temporal/XeSSUpscaler.cpp">Engine/RenderEngine/RHI/Temporal/XeSSUpscaler.cpp</a>.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp">Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h">Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h</a> · <a href="TemporalClosureCheckpoint20261010.html">docs/analysis/TemporalClosureCheckpoint20261010.md</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/RHI/Temporal/XeSSUpscaler.cpp">Engine/RenderEngine/RHI/Temporal/XeSSUpscaler.cpp</a>.</p>
 <h3 id="l1--uv1-언랩--xatlas-벤더링">L1 — UV1 언랩 — xatlas 벤더링</h3>
 <p>작업 진척 0/1 · 기존 산정 5인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 라이트맵은 non-overlapping UV 언랩이 전제인데 현 자산에 UV1 이 하나도 없다. xatlas 는 언랩과 아틀라스 패킹을 함께 해결하므로 삭제분의 패킹 문제 3종(Shelf FF · 오름차순 정렬 · 표면적 무관 렉트 크기)을 한 번에 닫는다. ThirdParty 원본 무수정 벤더링(fastgltf·ufbx·mikktspace 와 같은 규약).</li>
 </ul>
-<p>근거: <a href="../../docs/plans/LightmapBakerPlan.html">docs/plans/LightmapBakerPlan.md</a>.</p>
+<p>근거: <a href="../plans/LightmapBakerPlan.html">docs/plans/LightmapBakerPlan.md</a>.</p>
 <h3 id="l2--bvh-재작성--sah--nth_element--off-by-one-수정">L2 — BVH 재작성 — SAH + nth_element · off-by-one 수정</h3>
 <p>작업 진척 0/1 · 기존 산정 4인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 삭제분은 median split + 축 라운드로빈(axis = depth % 3)이라 SAH 도 최장축도 아니고, 분할마다 std::sort 를 돌려 O(N log²N)이다(nth_element 면 O(N log N)). 비교자가 데이터를 쓰기까지 한다(t2.tempColor = ... — std::sort Compare 요구 위반).</li>
 </ul>
-<p>근거: <a href="../../docs/plans/LightmapBakerPlan.html">docs/plans/LightmapBakerPlan.md</a>.</p>
+<p>근거: <a href="../plans/LightmapBakerPlan.html">docs/plans/LightmapBakerPlan.md</a>.</p>
 <h3 id="l3--직접광-패스--dx12-rhi-재작성--디스패치-낭비-제거">L3 — 직접광 패스 — DX12 RHI 재작성 · 디스패치 낭비 제거</h3>
 <p>작업 진척 0/1 · 기존 산정 6인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> ★ 이 슬라이스의 본체는 디스패치를 렉트 크기로 바꾸는 것이다. 삭제분은 렉트마다 전체 캔버스를 디스패치하고 셰이더가 Offset/Size 밖에서 return 한다 — canvasSize=1024·rectSize=400 이면 유효 스레드가 15.6%, 84%가 스케줄되어 즉시 반환한다(렉트가 작을수록 악화, 128²면 98.5% 낭비). 렉트 표를 StructuredBuffer 로 올려 배치 디스패치 1회로 만들면 Dispatch N→1 이 되고 상태 변경도 사라진다. 라이트 루프를 MAX_LIGHTS(20) 고정에서 lightSize 로 바꾼다.</li>
 </ul>
-<p>근거: <a href="../../docs/plans/LightmapBakerPlan.html">docs/plans/LightmapBakerPlan.md</a>.</p>
+<p>근거: <a href="../plans/LightmapBakerPlan.html">docs/plans/LightmapBakerPlan.md</a>.</p>
 <h3 id="l4--백그라운드-베이킹--에디터를-막지-않는다">L4 — 백그라운드 베이킹 — 에디터를 막지 않는다</h3>
 <p>작업 진척 0/1 · 기존 산정 7인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> L4-a 별도 COMPUTE 큐 + 큐 간 펜스(현재 CreateCommandQueue 는 TYPE_DIRECT 하나뿐이고 AsyncCompute 코드 0건 — 같은 DIRECT 큐에 베이크를 넣으면 에디터 프레임과 직렬화된다). L4-b GPU 타임슬라이스(디스패치를 렉트·샘플 단위로 쪼개 프레임당 예산 안에). L4-c 씬 밀봉 스냅샷 + 편집 시 무효화. 진행률·취소·재개를 명시적 체크포인트로 — 코루틴 프레임에 상태를 숨기지 않는다.</li>
 </ul>
-<p>근거: <a href="../../docs/plans/LightmapBakerPlan.html">docs/plans/LightmapBakerPlan.md</a>.</p>
+<p>근거: <a href="../plans/LightmapBakerPlan.html">docs/plans/LightmapBakerPlan.md</a>.</p>
 <h3 id="l5--간접광--progressive-누적">L5 — 간접광 — progressive 누적</h3>
 <p>작업 진척 0/1 · 기존 산정 5인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 샘플을 분할 디스패치로 쪼개 누적한다(indirectSampleCount 512 · indirectCount 2). numthreads occupancy 측정 후 조정 — 현재 32×32 = 1024 스레드/그룹으로 API 한계치인데 스레드마다 uint stack[64] BVH 스택을 들어 레지스터·스크래치 압박이 크다. 바운스마다 CreateTexture2D 로 텍스처 배열을 재생성하는 것도 제거(누수 의심).</li>
 </ul>
-<p>근거: <a href="../../docs/plans/LightmapBakerPlan.html">docs/plans/LightmapBakerPlan.md</a>.</p>
+<p>근거: <a href="../plans/LightmapBakerPlan.html">docs/plans/LightmapBakerPlan.md</a>.</p>
 <h3 id="l6--dilateseam-처리--padding-원인-수정">L6 — dilate·seam 처리 — padding 원인 수정</h3>
 <p>작업 진척 0/1 · 기존 산정 3인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 삭제분에서 주석 처리돼 있던 DilateLightMap 복원. ★ padding 계산을 고친다 — rect.y = nextPoint.h + padding 인데 shelf 증가는 maxHeight + padding 이라 의도한 padding 이 실제로 확보되지 않고 이웃 차트가 블리딩한다. MSAA 블러를 4회 도는 것이 이 증상을 뭉개고 있을 가능성이 크다.</li>
 </ul>
-<p>근거: <a href="../../docs/plans/LightmapBakerPlan.html">docs/plans/LightmapBakerPlan.md</a>.</p>
+<p>근거: <a href="../plans/LightmapBakerPlan.html">docs/plans/LightmapBakerPlan.md</a>.</p>
 <h3 id="l7--병렬화-판정--재고-나서-연다">L7 — 병렬화 판정 — 재고 나서 연다</h3>
 <p>작업 진척 0/1 · 기존 산정 3인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> L3(디스패치 낭비 제거)·L4(페이싱 제거)·L2(BVH)를 끝낸 뒤 재측정하고, 남은 병렬 축(async compute 겹침 · CPU 병렬 BVH 또는 GPU LBVH · 메시별 삼각형 수집)이 실제로 이득인지 판정한다.</li>
 </ul>
-<p>근거: <a href="../../docs/plans/LightmapBakerPlan.html">docs/plans/LightmapBakerPlan.md</a>.</p>
+<p>근거: <a href="../plans/LightmapBakerPlan.html">docs/plans/LightmapBakerPlan.md</a>.</p>
 <h3 id="rnd-1--기존-specular-ao-위에-local-probe-제품-추가">RND-1 — 기존 specular AO 위에 local probe 제품 추가</h3>
 <p>작업 진척 1/4 · 기존 산정 5인일 · 제품 수용 0인일.</p>
 <ul>
@@ -475,7 +476,7 @@
 <li class="task"><input type="checkbox" disabled> probe 우선순위·바인딩·제품 연결</li>
 <li class="task"><input type="checkbox" disabled> 독립 golden·비용 수용</li>
 </ul>
-<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Ibl.slang">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Ibl.slang</a> · <a href="../../docs/plans/RendererQualityPlan.html">docs/plans/RendererQualityPlan.md</a>.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Ibl.slang">Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/Ibl.slang</a> · <a href="../plans/RendererQualityPlan.html">docs/plans/RendererQualityPlan.md</a>.</p>
 <h3 id="rnd-2--방향광-cascade-기반-위에-local-atlas품질-단계">RND-2 — 방향광 cascade 기반 위에 local atlas·품질 단계</h3>
 <p>작업 진척 2/5 · 기존 산정 8인일 · 제품 수용 0인일.</p>
 <ul>
@@ -485,7 +486,7 @@
 <li class="task"><input type="checkbox" disabled> normal offset·far fade·3/4 cascade·quality tier 완결</li>
 <li class="task"><input type="checkbox" disabled> 전체 shadow 품질·비용 수용</li>
 </ul>
-<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h">Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/MaterialGraphSceneShadowStage.inl">Engine/RenderEngine/MaterialGraphSceneShadowStage.inl</a> · <a href="../../docs/analysis/LxShadowCases20261012.html">docs/analysis/LxShadowCases20261012.md</a>.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h">Engine/RenderEngine/Render/Passes/Geometry/EnhancedShadowPass.h</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/MaterialGraphSceneShadowStage.inl">Engine/RenderEngine/MaterialGraphSceneShadowStage.inl</a> · <a href="LxShadowCases20261012.html">docs/analysis/LxShadowCases20261012.md</a>.</p>
 <h3 id="rnd-3--기존-agxbloom-이후-자동-노출display-수용">RND-3 — 기존 AgX·bloom 이후 자동 노출·display 수용</h3>
 <p>작업 진척 2/4 · 기존 산정 5인일 · 제품 수용 0인일.</p>
 <ul>
@@ -503,7 +504,7 @@
 <li class="task"><input type="checkbox" disabled> 배경 색/세기·diffuse/specular 독립 weight 전 route</li>
 <li class="task"><input type="checkbox" disabled> 캐시/PSO 불변·Editor override 격리·cook·cold/warm 수용</li>
 </ul>
-<p>근거: <a href="../../docs/plans/EnvironmentRenderingPlan.html">docs/plans/EnvironmentRenderingPlan.md</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Assets/CookedEnvironment.cpp">Engine/RenderEngine/Assets/CookedEnvironment.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp</a>.</p>
+<p>근거: <a href="../plans/EnvironmentRenderingPlan.html">docs/plans/EnvironmentRenderingPlan.md</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Assets/CookedEnvironment.cpp">Engine/RenderEngine/Assets/CookedEnvironment.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp">Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp</a>.</p>
 <h3 id="gpu-1--gpu-driven-설계raster-구현-이후-geometry-수용">GPU-1 — GPU-driven 설계·raster 구현 이후 geometry 수용</h3>
 <p>작업 진척 3/5 · 기존 산정 3인일 · 제품 수용 0인일.</p>
 <ul>
@@ -513,14 +514,14 @@
 <li class="task"><input type="checkbox" disabled> CPU 정답 가시 집합·용량 초과·cut/resize·전 route</li>
 <li class="task"><input type="checkbox" disabled> Release whole-frame 비용·VRAM·최종 geometry 수용</li>
 </ul>
-<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/GpuGeometryVisibility.cpp">Engine/RenderEngine/GpuGeometryVisibility.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/GpuGeometryOcclusion.cpp">Engine/RenderEngine/GpuGeometryOcclusion.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/MaterialGraphPrimitiveCache.h">Engine/RenderEngine/MaterialGraphPrimitiveCache.h</a> · <a href="../../docs/analysis/REACPipelineImplementation20261019.html">docs/analysis/REACPipelineImplementation20261019.md</a> · <a href="../../docs/plans/GpuDrivenGeometryImplementationPlan.html">docs/plans/GpuDrivenGeometryImplementationPlan.md</a>.</p>
+<p>근거: <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/GpuGeometryVisibility.cpp">Engine/RenderEngine/GpuGeometryVisibility.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/GpuGeometryOcclusion.cpp">Engine/RenderEngine/GpuGeometryOcclusion.cpp</a> · <a href="https://github.com/29thnight/CreatorEngine/blob/ea87639ece7b6068456940ddddd83a9d23f86c58/Engine/RenderEngine/MaterialGraphPrimitiveCache.h">Engine/RenderEngine/MaterialGraphPrimitiveCache.h</a> · <a href="REACPipelineImplementation20261019.html">docs/analysis/REACPipelineImplementation20261019.md</a> · <a href="../plans/GpuDrivenGeometryImplementationPlan.html">docs/plans/GpuDrivenGeometryImplementationPlan.md</a>.</p>
 <h3 id="gpu-2--stochastic-tile-based-lighting-계약실험-설계">GPU-2 — Stochastic Tile-Based Lighting 계약·실험 설계</h3>
 <p>작업 진척 0/2 · 기존 산정 2인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> sampling·reservoir·noise/denoise 계약</li>
 <li class="task"><input type="checkbox" disabled> 수직 슬라이스·지원/fallback·비용/품질 예산</li>
 </ul>
-<p>근거: <a href="../../docs/plans/GpuFeaturePlanningPlan.html">docs/plans/GpuFeaturePlanningPlan.md</a>.</p>
+<p>근거: <a href="../plans/GpuFeaturePlanningPlan.html">docs/plans/GpuFeaturePlanningPlan.md</a>.</p>
 <h3 id="gpu-3--rtpthybrid-설계-이후-실제-지원예산-확정">GPU-3 — RT/PT/Hybrid 설계 이후 실제 지원·예산 확정</h3>
 <p>작업 진척 2/4 · 기존 산정 2인일 · 제품 수용 0인일.</p>
 <ul>
@@ -529,7 +530,7 @@
 <li class="task"><input type="checkbox" disabled> 장치 capability probe·현재 코드 기준 상세 계약</li>
 <li class="task"><input type="checkbox" disabled> 실험별 자원/품질/whole-frame 예산 확정</li>
 </ul>
-<p>근거: <a href="../../docs/plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a> · <a href="../../docs/plans/DxrShaderTraversalExperimentPlan.html">docs/plans/DxrShaderTraversalExperimentPlan.md</a> · <a href="../../docs/plans/GpuFeaturePlanningPlan.html">docs/plans/GpuFeaturePlanningPlan.md</a>.</p>
+<p>근거: <a href="../plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a> · <a href="../plans/DxrShaderTraversalExperimentPlan.html">docs/plans/DxrShaderTraversalExperimentPlan.md</a> · <a href="../plans/GpuFeaturePlanningPlan.html">docs/plans/GpuFeaturePlanningPlan.md</a>.</p>
 <h3 id="gpu-9--세-gpu-축-의존-관계-이후-수직-슬라이스재견적">GPU-9 — 세 GPU 축 의존 관계 이후 수직 슬라이스·재견적</h3>
 <p>작업 진척 1/4 · 기존 산정 2인일 · 제품 수용 0인일.</p>
 <ul>
@@ -538,127 +539,127 @@
 <li class="task"><input type="checkbox" disabled> 현행 구현에서 잔여 공수·예산 재견적</li>
 <li class="task"><input type="checkbox" disabled> 채택·지원 행렬 최종 설계 감사</li>
 </ul>
-<p>근거: <a href="../../docs/plans/GpuFeaturePlanningPlan.html">docs/plans/GpuFeaturePlanningPlan.md</a> · <a href="../../docs/plans/GpuDrivenGeometryImplementationPlan.html">docs/plans/GpuDrivenGeometryImplementationPlan.md</a> · <a href="../../docs/plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
+<p>근거: <a href="../plans/GpuFeaturePlanningPlan.html">docs/plans/GpuFeaturePlanningPlan.md</a> · <a href="../plans/GpuDrivenGeometryImplementationPlan.html">docs/plans/GpuDrivenGeometryImplementationPlan.md</a> · <a href="../plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
 <h3 id="rtp-0--현재-call-path장치-지원세-모드-계약baseline예산연구코드-출처-봉인">RTP-0 — 현재 call path·장치 지원·세 모드 계약·baseline/예산·연구/코드 출처 봉인</h3>
 <p>작업 진척 0/1 · 기존 산정 5인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 선행: GPU-3 상세 계약, 현재 코드. 수용: source/dirty diff/shader/asset/binary/driver manifest, fixture/tolerance·CPU/GPU/VRAM 예산, 지원·fallback 행렬</li>
 </ul>
-<p>근거: <a href="../../docs/plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
+<p>근거: <a href="../plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
 <h3 id="rtp-1--rt-rhi정적-blastlastablegraph-as-의존수명">RTP-1 — RT RHI·정적 BLAS/TLAS·table·graph AS 의존/수명</h3>
 <p>작업 진척 0/1 · 기존 산정 18인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 선행: RTP-0, GD0의 필요한 중립 계약, 제품 설치는 RG6. 수용: CPU ray-triangle oracle, instance remap, cold/warm/transform 갱신, abort/retirement·validation 0</li>
 </ul>
-<p>근거: <a href="../../docs/plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
+<p>근거: <a href="../plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
 <h3 id="rtp-10--cage-rt-변형ray-변환수명두-모드-통합-평가">RTP-10 — cage RT 변형·ray 변환·수명·두 모드 통합 평가</h3>
 <p>작업 진척 0/1 · 기존 산정 18인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 선행: RTP-2/9, 기존 BLAS deformation reference. 수용: shared static geometry와 instance별 cage, hit/normal/t/alpha 의미, 기존 변형 대비 정확도·전체 비용/메모리</li>
 </ul>
-<p>근거: <a href="../../docs/plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
+<p>근거: <a href="../plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
 <h3 id="rtp-11--rasterhybridpathtracing-설정진단프로파일">RTP-11 — Raster/Hybrid/PathTracing 설정·진단·프로파일</h3>
 <p>작업 진척 0/1 · 기존 산정 6인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 선행: RTP-4/7, 선택 가능한 RTP-5/8/10 결과. 수용: frame seal에서 모드 확정, unsupported 이유·fallback 표시, sample/bounce/history/예산·저장/재로드</li>
 </ul>
-<p>근거: <a href="../../docs/plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
+<p>근거: <a href="../plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
 <h3 id="rtp-12--세-모드-제품-회귀스트레스계측-수용">RTP-12 — 세 모드 제품 회귀·스트레스·계측 수용</h3>
 <p>작업 진척 0/1 · 기존 산정 18인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 선행: RTP-4/7/11, 통합 대상 연구 결과. 수용: Mesh×RT, 두 view/in-flight, reload/resize/abort/device loss, D/R 실제 Editor/Player·validation 0·정상 종료</li>
 </ul>
-<p>근거: <a href="../../docs/plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
+<p>근거: <a href="../plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
 <h3 id="rtp-13--효과연구별-채택-판정과-최종-페이즈-감사">RTP-13 — 효과·연구별 채택 판정과 최종 페이즈 감사</h3>
 <p>작업 진척 0/1 · 기존 산정 5인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 선행: RTP-5/8/10/12의 결과 또는 사유 있는 보류/기각 기록. 수용: 공통 RT·Hybrid·기본 PT 제품 수용, 두 연구의 재현/평가/통합 판정, 지원 행렬·raw evidence·잔여 범위/공수</li>
 </ul>
-<p>근거: <a href="../../docs/plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
+<p>근거: <a href="../plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
 <h3 id="rtp-2--rt-hit-materialbsdflightenvironment-공통-evaluator">RTP-2 — RT hit material·BSDF/light/environment 공통 evaluator</h3>
 <p>작업 진척 0/1 · 기존 산정 20인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 선행: RTP-1, MAT 공통 산출물. 수용: Graph→paired output→RT hit 소비, sampling/PDF·재질 의미·invalid generation 거부</li>
 </ul>
-<p>근거: <a href="../../docs/plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
+<p>근거: <a href="../plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
 <h3 id="rtp-3--rtpt-accumulation재투영denoising-입출력history">RTP-3 — RT/PT accumulation·재투영·denoising 입출력·history</h3>
 <p>작업 진척 0/1 · 기존 산정 16인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 선행: RTP-2, 필요한 TR motion/view 계약. 수용: raw/accumulated/denoised 분리, 움직임·disocclusion·cut/resize/reload reset, 두 view 독립성</li>
 </ul>
-<p>근거: <a href="../../docs/plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
+<p>근거: <a href="../plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
 <h3 id="rtp-4--hybrid-첫-directional-hard-shadow">RTP-4 — Hybrid 첫 directional hard shadow</h3>
 <p>작업 진척 0/1 · 기존 산정 6인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 선행: RTP-1/2, RG6. 수용: direct-only 적용, off-camera caster, light 단위 raster fallback, 기존 RT1 기준</li>
 </ul>
-<p>근거: <a href="../../docs/plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
+<p>근거: <a href="../plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
 <h3 id="rtp-5--hybrid-효과별-반사gi굴절volume-경계fog-visibility-평가통합">RTP-5 — Hybrid 효과별 반사/GI·굴절·volume 경계·fog visibility 평가/통합</h3>
 <p>작업 진척 0/1 · 기존 산정 28인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 선행: RTP-2/3/4, 관련 EXP 결과. 수용: 효과별 oracle/예산/합성·fallback, screen-space/RT/hybrid 비교 및 채택 기록</li>
 </ul>
-<p>근거: <a href="../../docs/plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
+<p>근거: <a href="../plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
 <h3 id="rtp-6--기본-offscreen-progressive-path-tracerreference">RTP-6 — 기본 offscreen progressive Path Tracer·reference</h3>
 <p>작업 진척 0/1 · 기존 산정 12인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 선행: RTP-1/2. 수용: camera ray·다중 bounce·next-event estimation/MIS·Russian roulette, 고정 seed, 고샘플 수렴·에너지/PDF 검증</li>
 </ul>
-<p>근거: <a href="../../docs/plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
+<p>근거: <a href="../plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
 <h3 id="rtp-7--interactive-pathtracing-제품-grapheditor-scenegameplayer">RTP-7 — interactive PathTracing 제품 graph·Editor Scene/Game·Player</h3>
 <p>작업 진척 0/1 · 기존 산정 10인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 선행: RTP-3/6, RG6. 수용: 저샘플 trace→denoise→HDR/post/display, 지원 재질 범위, 예산·전환·실제 view 실행</li>
 </ul>
-<p>근거: <a href="../../docs/plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
+<p>근거: <a href="../plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
 <h3 id="rtp-8--restir-pt-기본-reservoir-계약-및-enhanced-개선-구현평가">RTP-8 — ReSTIR PT 기본 reservoir 계약 및 Enhanced 개선 구현/평가</h3>
 <p>작업 진척 0/1 · 기존 산정 28인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 선행: RTP-3/6/7, 출처·라이선스 기록. 수용: reuse off/base PT/ReSTIR PT/Enhanced 비교, temporal/spatial validity·편향/상관·오차/총비용 판정</li>
 </ul>
-<p>근거: <a href="../../docs/plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
+<p>근거: <a href="../plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
 <h3 id="rtp-9--tetrahedral-cage-자산-전처리cooklodreference">RTP-9 — tetrahedral cage 자산 전처리·cook/LOD·reference</h3>
 <p>작업 진척 0/1 · 기존 산정 18인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 선행: RTP-0/1, 기존 deformation/cook 조사. 수용: cage·piece/remap·정적 mini-BLAS 입력, cook 재현성, 변형/경계/LOD 오차와 기존 자산 보존</li>
 </ul>
-<p>근거: <a href="../../docs/plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
+<p>근거: <a href="../plans/PathTracingHybridPipelinePlan.html">docs/plans/PathTracingHybridPipelinePlan.md</a>.</p>
 <h3 id="bp-0--비교-입력시간축지원-행렬-고정">BP-0 — 비교 입력·시간축·지원 행렬 고정</h3>
 <p>작업 진척 0/1 · 기존 산정 3인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> scene/asset/material/카메라/광원/seed/노출/해상도/히스토리 프레임열과 binary·driver 신원 고정</li>
 </ul>
-<p>근거: <a href="../../docs/plans/BackendParityPlan.html">docs/plans/BackendParityPlan.md</a>.</p>
+<p>근거: <a href="../plans/BackendParityPlan.html">docs/plans/BackendParityPlan.md</a>.</p>
 <h3 id="bp-1--renderdoc-양-backend-실제-프레임-캡처">BP-1 — RenderDoc 양 backend 실제 프레임 캡처</h3>
 <p>작업 진척 0/1 · 기존 산정 3인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> DX12/Vulkan 별도 프로세스의 .rdc와 event/Pass 대응표, 캡처 재생 성공 및 반복 캡처</li>
 </ul>
-<p>근거: <a href="../../docs/plans/BackendParityPlan.html">docs/plans/BackendParityPlan.md</a>.</p>
+<p>근거: <a href="../plans/BackendParityPlan.html">docs/plans/BackendParityPlan.md</a>.</p>
 <h3 id="bp-2--pass별-입력출력-리소스와-바인딩-대조">BP-2 — Pass별 입력·출력 리소스와 바인딩 대조</h3>
 <p>작업 진척 0/1 · 기존 산정 5인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> format/extent/mip/layer/채널/상수/descriptor/sampler/PSO/depth·blend·cull/수명 확인, 최초 불일치 event 특정</li>
 </ul>
-<p>근거: <a href="../../docs/plans/BackendParityPlan.html">docs/plans/BackendParityPlan.md</a>.</p>
+<p>근거: <a href="../plans/BackendParityPlan.html">docs/plans/BackendParityPlan.md</a>.</p>
 <h3 id="bp-3--선형-리소스-추출픽셀별-수치-비교">BP-3 — 선형 리소스 추출·픽셀별 수치 비교</h3>
 <p>작업 진척 0/1 · 기존 산정 4인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> GBuffer/depth/HDR/history/final의 RMSE·최대 오차·초과 좌표·차영상, NaN/Inf와 alpha 별도 검사</li>
 </ul>
-<p>근거: <a href="../../docs/plans/BackendParityPlan.html">docs/plans/BackendParityPlan.md</a>.</p>
+<p>근거: <a href="../plans/BackendParityPlan.html">docs/plans/BackendParityPlan.md</a>.</p>
 <h3 id="bp-4--불일치-원인-수정과-renderdoc-재캡처">BP-4 — 불일치 원인 수정과 RenderDoc 재캡처</h3>
 <p>작업 진척 0/1 · 기존 산정 5인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> 확인된 backend/binding/state/history 결함 수정 후 같은 입력으로 재캡처, 기존 DX12 기준선 회귀 확인</li>
 </ul>
-<p>근거: <a href="../../docs/plans/BackendParityPlan.html">docs/plans/BackendParityPlan.md</a>.</p>
+<p>근거: <a href="../plans/BackendParityPlan.html">docs/plans/BackendParityPlan.md</a>.</p>
 <h3 id="bp-5--반복실패-변이회귀-패키지와-수용-보고서">BP-5 — 반복·실패 변이·회귀 패키지와 수용 보고서</h3>
 <p>작업 진척 0/1 · 기존 산정 2인일 · 제품 수용 0인일.</p>
 <ul>
 <li class="task"><input type="checkbox" disabled> Debug/Release·지원 장치별 결과, 누락/손상/다른 입력 거부, 미지원과 미통과 분리, .rdc/리소스/비교 결과 보존</li>
 </ul>
-<p>근거: <a href="../../docs/plans/BackendParityPlan.html">docs/plans/BackendParityPlan.md</a>.</p>
+<p>근거: <a href="../plans/BackendParityPlan.html">docs/plans/BackendParityPlan.md</a>.</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-재계산-자료">
@@ -668,7 +669,7 @@
 </section>
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="Phase4Progress20261022.md"><code>docs/analysis/Phase4Progress20261022.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+<p><a href="Phase4Progress20261022.md"><code>docs/analysis/Phase4Progress20261022.md</code></a> · 마지막 커밋 2026-10-23 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
 </section>
 </main>
 </div>

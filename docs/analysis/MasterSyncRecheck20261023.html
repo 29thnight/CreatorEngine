@@ -162,6 +162,7 @@
   .map-row:hover .map-bar i { background: var(--accent); }
   .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
   @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
 </style>
 </head>
 <body>
@@ -183,7 +184,7 @@
 <a class="map-row" href="#보존과-충돌-해결"><span class="ve-label">§00</span><span class="map-name">보존과 충돌 해결</span><span class="map-bar"><i style="width:59.2%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#통합-후-발견한-문제와-수정"><span class="ve-label">§01</span><span class="map-name">통합 후 발견한 문제와 수정</span><span class="map-bar"><i style="width:87.4%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#현재-통합-작업본에서-실행한-검사"><span class="ve-label">§02</span><span class="map-name">현재 통합 작업본에서 실행한 검사</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">3</span></span></a>
-<a class="map-row" href="#고정-틱과-렌더-보간의-제품-재검증"><span class="ve-label">§03</span><span class="map-name">고정 틱과 렌더 보간의 제품 재검증</span><span class="map-bar"><i style="width:55.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#고정-틱과-렌더-보간의-제품-재검증"><span class="ve-label">§03</span><span class="map-name">고정 틱과 렌더 보간의 제품 재검증</span><span class="map-bar"><i style="width:94.4%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#계획과-생성-문서-점검"><span class="ve-label">§04</span><span class="map-name">계획과 생성 문서 점검</span><span class="map-bar"><i style="width:58.9%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#수용-범위"><span class="ve-label">§05</span><span class="map-name">수용 범위</span><span class="map-bar"><i style="width:41.8%"></i></span><span class="map-marks"></span></a>
 </div>
@@ -228,7 +229,7 @@
 <div class="sec-head"><p class="ve-label">§03</p><h2 id="고정-틱과-렌더-보간의-제품-재검증">고정 틱과 렌더 보간의 제품 재검증</h2></div>
 <div class="prose"><p>상류의 프레임 정책 변경을 반영한 동일 Editor 바이너리로 실제 DX12 제품 검사를 실행했다. 목표30/60/144fps에서 각각30.0042/59.9864/144.0422fps를 기록했다. 동일 tick의 CCT·강체 상대 궤적 차이는 모두0이며, CCT·강체·카메라 보간 행렬과 GPU 실루엣 검사를 통과했다. Scene/Game 대상 왕복4회와 독립 oracle의 canary17개도 통과했다.</p>
 <p>별도 moving-quality 실행에서는 실제 <code>sourceEngineFrame</code>과 연결된 이동 중 0틱 GPU readback을 수용했다. 비활성화·재활성화·워프 전환의 실루엣도 통과했다. 이 캡처 실행의 측정은141.8559fps이며, 위 정상 pacing 실행과 구분한다.</p>
-<p>실행 근거: <a href="../../Build/Verification/N3Pacing/Editor-5d96511b93194bfc86a43e0783f9b706/result.json">30/60/144fps</a>, <a href="../../Build/Verification/N3Pacing/Editor-49724de945a24f9bbcc3f49d4a81543b/result.json">moving GPU</a>, <a href="../../Build/Verification/MasterSyncAnimation/Player-ps7/verification.json">PS7 애니메이션</a>, <a href="../../Build/Verification/MasterSyncAnimation/Player-ps5/verification.json">PS5 애니메이션</a>.</p>
+<p>실행 근거: 30/60/144fps · 로컬 기록, 사이트 미포함 (<code>Build/Verification/N3Pacing/Editor-5d96511b93194bfc86a43e0783f9b706/result.json</code>), moving GPU · 로컬 기록, 사이트 미포함 (<code>Build/Verification/N3Pacing/Editor-49724de945a24f9bbcc3f49d4a81543b/result.json</code>), PS7 애니메이션 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/MasterSyncAnimation/Player-ps7/verification.json</code>), PS5 애니메이션 · 로컬 기록, 사이트 미포함 (<code>Build/Verification/MasterSyncAnimation/Player-ps5/verification.json</code>).</p>
 <p>이 수치는 해당 장치·fixture·짧은 측정 구간의 pacing 수용 결과다. 전체 게임의 성능 예산이나 이전 바이너리 대비 성능 향상을 뜻하지 않는다.</p>
 </div>
 </section>
@@ -247,7 +248,7 @@
 </section>
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="MasterSyncRecheck20261023.md"><code>docs/analysis/MasterSyncRecheck20261023.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+<p><a href="MasterSyncRecheck20261023.md"><code>docs/analysis/MasterSyncRecheck20261023.md</code></a> · 마지막 커밋 2026-10-23 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
 </section>
 </main>
 </div>

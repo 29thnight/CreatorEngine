@@ -1,0 +1,291 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/RenderRg8Overlap20261022.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>RG8 제품 장면 overlap·전체 프레임 비용 — 2026-10-22</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#판정">판정</a></li><li><a href="#현재-코드와-원인">현재 코드와 원인</a></li><li><a href="#적용한-수정">적용한 수정</a></li><li><a href="#비교-조건">비교 조건</a></li><li><a href="#측정-결과">측정 결과</a></li><li><a href="#검증과-남은-작업">검증과 남은 작업</a></li><li><a href="#증거">증거</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="RenderRg8Overlap20261022.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>RG8 제품 장면 overlap·전체 프레임 비용 — 2026-10-22</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 7개의 분량 막대">
+<a class="map-row" href="#판정"><span class="ve-label">§00</span><span class="map-name">판정</span><span class="map-bar"><i style="width:40.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#현재-코드와-원인"><span class="ve-label">§01</span><span class="map-name">현재 코드와 원인</span><span class="map-bar"><i style="width:90.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#적용한-수정"><span class="ve-label">§02</span><span class="map-name">적용한 수정</span><span class="map-bar"><i style="width:81.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#비교-조건"><span class="ve-label">§03</span><span class="map-name">비교 조건</span><span class="map-bar"><i style="width:97.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#측정-결과"><span class="ve-label">§04</span><span class="map-name">측정 결과</span><span class="map-bar"><i style="width:93.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#검증과-남은-작업"><span class="ve-label">§05</span><span class="map-name">검증과 남은 작업</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#증거"><span class="ve-label">§06</span><span class="map-name">증거</span><span class="map-bar"><i style="width:39.5%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 7개 가운데 「검증과 남은 작업」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-판정">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="판정">판정</h2></div>
+<div class="prose"><p><strong>TestShadow에서 compute 실행과 실제 overlap은 발생한다. 전체 프레임 비용은 OFF가 작으므로 기본 OFF를 유지한다.</strong> RG8 상태는 progress, 제품 수용 기성은 0으로 유지한다.</p>
+<p><code>insufficient-gain</code>을 본 직전 viewer 검증 대상은 빈 SampleScene이었다. 이번 초기 진단 snapshot은 후보 23개, 측정 누락 0, state 거부 0이었다. 따라서 이 snapshot은 후보 시간 문턱이 아니라 최종 예상 이득 문턱에서 탈락했다. 제품 장면 로드·워밍업 후의 TestShadow에서는 두 수집 순서 모두 mode 2의 32/32 샘플이 compute를 제출했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-현재-코드와-원인">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="현재-코드와-원인">현재 코드와 원인</h2></div>
+<div class="prose"><ul>
+<li><code>EnhancedSceneRendererLiveDX12Adapter.cpp</code>는 mode 2의 후보 문턱으로 <strong>1µs</strong>를 전달한다.</li>
+<li><code>BuildQueueSchedule</code>은 선언된 compute 호환성, 지원 state, 명시적 버전 graph, 측정 이력을 검사한다. <code>QueueCostModel</code> 기본값은 handoff <strong>20µs</strong>, 최소 예상 이득 <strong>50µs</strong>다.</li>
+<li><code>insufficient-gain</code>은 후보가 없을 때와 탐색 결과의 예상 이득이 50µs보다 작을 때 사용된다. 이번 초기 snapshot의 후보 23개는 후자에 해당한다.</li>
+<li>모델은 측정된 pass 시간과 고정 handoff 비용으로 두 큐를 시뮬레이션한다. CPU 기록·native 제출 비용과 batch/전이 비용을 별도 보정한 모델은 구현돼 있지 않다. <code>predictionCalibrated=false</code>를 유지한다.</li>
+<li>수정 후 TestShadow의 mode 1은 중앙값 <strong>3 batch / 0 wait / 547 barrier</strong>, mode 2는 <strong>48 batch / 23 wait / 약 1,968 barrier</strong>였다. native 제출 CPU 중앙값은 mode 1의 <strong>0.20~0.26ms</strong>에서 mode 2의 <strong>1.67~1.91ms</strong>로 증가했다.</li>
+<li>mode 2의 예상 GPU 이득 중앙값은 <strong>0.53~0.54ms</strong>, 실제 overlap 중앙값은 <strong>0.20~0.21ms</strong>였다. GPU graph span에서 측정된 pass가 덮지 않은 구간은 약 <strong>2.0ms</strong>였고 mode 1은 약 <strong>0.04ms</strong>였다. 이 미사용 구간을 개별 queue wait 시간으로 합산하지 않았다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-적용한-수정">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="적용한-수정">적용한 수정</h2></div>
+<div class="prose"><p><code>BuildQueueDependencies</code>가 같은 compiled 구조·큐 배치의 CPU hazard topology를 재사용한다. owner-thread TLS 캐시는 최대 128개, pass 256개 이하·edge 4,096개 이하로 제한한다. 공유 compiled 구조의 소유권과 모든 queue assignment가 일치해야 사용하며, 큐 실행용 순서로 바뀐 graph는 제외한다. planning scratch와 adjacency 저장 공간도 재사용한다.</p>
+<p>GPU 측정값과 placement 판단은 매번 다시 계산한다. native handle·callback·GPU owner는 캐시에 보관하지 않는다. 배리어 생성, COMMON release/acquire, reader join, 큐 제출·retirement는 기존 실행 경로에서 처리한다. 측정 비용을 0으로 바꿨다가 복원하면 같은 graph에서 fallback과 compute 채택이 다시 결정되는 검사를 추가했다.</p>
+<p>기존 native 검사 개수 오류도 수정했다. <code>1162d4f9a</code>의 <code>ResetSoftwareSegment</code> 검사가 3프레임 루프에 추가돼 실제 437항목이 됐지만 기대값은 434였다. 수정 전 바이너리에서도 실패를 재현하고 실제 개수·변경 diff를 대조했다. native 기대값은 437, 새 planning 검사는 131로 맞췄으며 불일치 시 실제/기대 개수를 출력한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-비교-조건">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="비교-조건">비교 조건</h2></div>
+<div class="prose"><ul>
+<li>RTX 4070 Ti, driver 610.88, VS18/v145 Release, DX12.</li>
+<li>실제 <code>Dynamic_CPP/Assets/Scenes/TestShadow.creator</code>, window 1600×900, <strong>Scene native render/display 972×394</strong>.</li>
+<li>upscaler·FG·NIS·DeepDVC·aliasing·GPU validation OFF.</li>
+<li>같은 프로세스에서 Forward <strong>0→1→2</strong>, 별도 프로세스에서 Reverse <strong>2→1→0</strong>. mode 0은 기존 실행기, mode 1은 graphics-only owned 실행기, mode 2는 overlap 탐색이다.</li>
+<li>일반 프레임 warmup 32개 뒤 후보 64개를 수집하고, identity·완전한 이력·calibrated interval 검사를 통과한 첫 32개를 채택했다. 바이너리당 192개, 전후 합계 <strong>384개</strong>다.</li>
+<li>일반 샘플 수집 후 같은 mode에서 별도 12초 <code>.ceprof</code>를 녹화했다. 표의 CPU는 완전한 <strong>RenderThreadFrame wall time</strong>, GPU는 녹화하지 않은 일반 샘플의 <strong>calibrated query span</strong>이다. primary/OFF는 timed-pass envelope이고 owned 경로는 QueuePrologue/QueueEpilogue scope도 포함한다. CPU whole-frame에는 녹화와 RG8 evidence 비용이 포함된다. FPS·물리 표시 주기를 계산한 값은 아니다.</li>
+<li>첫 수집은 녹화의 nonzero <code>captureGeneration</code> 때문에 일반 프레임 게이트에서 0/32로 제외됐다. 수집 창을 분리해 재실행했으며 해당 첫 수집은 아래 수치에 포함하지 않았다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-측정-결과">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="측정-결과">측정 결과</h2></div>
+<div class="prose"><p>단위 ms. CPU 칸은 p50 / p95, GPU는 p50이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>순서·mode</th><th style="text-align:right">수정 전 CPU</th><th style="text-align:right">수정 후 CPU</th><th style="text-align:right">수정 전 GPU</th><th style="text-align:right">수정 후 GPU</th></tr></thead>
+<tbody><tr><td>Forward OFF(0)</td><td style="text-align:right">3.156 / 3.700</td><td style="text-align:right">3.447 / 4.112</td><td class="num" style="text-align:right">5.857</td><td class="num" style="text-align:right">5.627</td></tr>
+<tr><td>Forward graphics(1)</td><td style="text-align:right">4.611 / 5.682</td><td style="text-align:right">4.659 / 5.552</td><td class="num" style="text-align:right">5.767</td><td class="num" style="text-align:right">5.734</td></tr>
+<tr><td>Forward compute(2)</td><td style="text-align:right">11.947 / 15.087</td><td style="text-align:right">10.891 / 13.565</td><td class="num" style="text-align:right">7.210</td><td class="num" style="text-align:right">7.375</td></tr>
+<tr><td>Reverse OFF(0)</td><td style="text-align:right">3.190 / 3.795</td><td style="text-align:right">3.178 / 3.699</td><td class="num" style="text-align:right">5.685</td><td class="num" style="text-align:right">5.692</td></tr>
+<tr><td>Reverse graphics(1)</td><td style="text-align:right">4.674 / 5.822</td><td style="text-align:right">4.680 / 5.722</td><td class="num" style="text-align:right">5.699</td><td class="num" style="text-align:right">5.712</td></tr>
+<tr><td>Reverse compute(2)</td><td style="text-align:right">11.444 / 13.215</td><td style="text-align:right">10.072 / 11.911</td><td class="num" style="text-align:right">6.953</td><td class="num" style="text-align:right">7.483</td></tr></tbody></table></div>
+<p>mode 2 의존성 재계산 중앙값은 <strong>2.126→0.562ms / 2.123→0.582ms</strong>로 72.6~73.6% 감소했다. 전체 planning 중앙값은 <strong>3.693→2.104ms / 3.693→2.501ms</strong>였다. 전체 RenderThreadFrame p50은 이 수집에서 <strong>8.8% / 12.0% 감소</strong>했다. OFF 제어군 p50은 Forward +9.2%, Reverse -0.4%였으며, 기록된 전후 분포와 이 제어군을 함께 보존한다.</p>
+<p>수정 후에도 mode 2 CPU p50은 OFF보다 <strong>216% / 217% 증가</strong>했고 GPU span도 증가했다. topology 재사용으로 CPU 비용은 줄었지만 현재 batch·전이·제출 비용을 실제 overlap이 회수하지 못한다. 기본 ON 채택 근거는 성립하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-검증과-남은-작업">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="검증과-남은-작업">검증과 남은 작업</h2></div>
+<div class="prose"><ul>
+<li>Debug/Release 빌드 성공. 양 구성에서 GPU validation을 켜고 native <strong>437항목</strong>, planning <strong>131항목</strong>, 전체 RenderGraph 회귀 통과. RG5 final은 <strong>129프레임·9 stage·최대 픽셀 오차 0</strong>, validation error 0.</li>
+<li>실제 live snapshot의 누락·잘못된 frame/view/해상도/temporal identity 변이 <strong>52개 거부</strong>.</li>
+<li>실제 TestShadow의 일반 mode 2 프레임은 별도 DX12 <strong>basic debug layer</strong> 실행에서 compute 제출과 validation 문제 0·메시지 드롭 0을 확인했다. GBV shader instrumentation 실행과 구분한다.</li>
+<li>일반 프레임은 양 바이너리·양 순서에서 모두 32/32 identity gate를 통과했고 raw calibrated interval을 다시 검증했다. <code>.ceprof</code>는 lossless native-real gate를 통과했다.</li>
+<li>추가 제품 GBV readback 검증은 완료되지 않았다. CPU hot thread는 <code>D3D12SDKLayers::CreatePatchedPipelineState → NVIDIA shader creation</code>에 있었다. 스택 채집 중 HTTP polling 제한으로 실행이 중단됐으며 통과로 계상하지 않는다. native 전체 GPU-validation 회귀와 별도 결과로 보존한다.</li>
+<li>RG8의 다음 대상은 <strong>많은 batch/COMMON 전이·native 제출 비용을 가격에 반영하는 모델과 탐색 budget</strong>, RG7 조합 및 지원 행렬이다. cross-queue read/read 소유권이나 실제 의존 edge를 제거해 overlap을 만들지 않는다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-증거">
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="증거">증거</h2></div>
+<div class="prose"><p>실행 원장은 <code>Artifacts/rg8-overlap-20261022/</code>에 보존한다. <code>baseline-normal-final/</code>과 <code>after-normal/</code>에 normal cohort, raw interval, <code>.ceprof</code>, whole-frame 요약 및 binary identity가 있다. <code>native-final-Debug/</code>, <code>native-final-Release/</code>는 회귀 결과다. <code>harness-count-cause.json</code>은 기존 개수 오류의 재현·원인이고 <code>product-validation/capture-stack-cdb.log</code>는 추가 GBV 생성 단계의 스택이다.</p>
+<p><a href="RenderRg8Overlap20261022.json">기계 판독 원장</a> · <a href="../plans/RenderGraphDependencySchedulingPlan.html">RG8 소유 계획</a></p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="RenderRg8Overlap20261022.md"><code>docs/analysis/RenderRg8Overlap20261022.md</code></a> · 마지막 커밋 2026-10-23 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

@@ -12,12 +12,14 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, posix, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Marked } from 'marked';
+import { resolveDocumentLink, renderDocumentLink } from './document-links.mjs';
 import { BASE_CSS, BASE_SCRIPT, FAVICON, FONT_LINKS, MERMAID_SCRIPT, TOKENS, escapeHtml, statusClass } from './visual-kit.mjs';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..');
 const GENERATOR = 'Tools/docs/render-markdown-docs.mjs';
 
 const git = (...args) => execFileSync('git', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28 });
+const repositoryFiles = new Set(git('ls-files', '-z').split('\0'));
 const toPosix = p => p.replace(/\\/g, '/');
 
 // 추적·미추적(무시 제외) Markdown 전부. 지운 파일이 목록에 남지 않도록 실재를 확인한다.
@@ -71,7 +73,6 @@ function headingWithChip(html) {
 
 function renderDocument(source, file, markdownSet) {
   const slug = slugger();
-  const here = posix.dirname(file);
   let mermaidCount = 0;
   const outline = [];
 
@@ -86,7 +87,7 @@ function renderDocument(source, file, markdownSet) {
       },
       link({ href, title, tokens }) {
         const text = this.parser.parseInline(tokens);
-        return `<a href="${escapeHtml(rewriteHref(href, here, markdownSet))}"${title ? ` title="${escapeHtml(title)}"` : ''}>${text}</a>`;
+        return renderDocumentLink(resolveDocumentLink(href, file, { markdownSet, tracked: repositoryFiles }), text, title);
       },
       code({ text, lang }) {
         if ((lang || '').trim() === 'mermaid') {
@@ -174,16 +175,6 @@ function renderDocument(source, file, markdownSet) {
   const allChips = named.flatMap(r => r.chips);
 
   return { titleHtml, titleText, preambleHtml, rendered, named, tasks: tasks.length, tasksDone, allChips, mermaidCount };
-}
-
-// 상대 .md 링크를 생성될 .html 로 돌린다. 대상 Markdown 이 실재할 때만 바꾼다.
-function rewriteHref(href, here, markdownSet) {
-  if (!href || /^(?:[a-z]+:|#|\/\/)/i.test(href)) return href;
-  const [path, hash] = href.split('#');
-  if (!path.toLowerCase().endsWith('.md')) return href;
-  const target = posix.normalize(posix.join(here, decodeURI(path)));
-  if (!markdownSet.has(target)) return href;
-  return path.replace(/\.md$/i, '.html') + (hash !== undefined ? `#${hash}` : '');
 }
 
 const STATUS_NAME = { ok: '완료·통과', info: '진행·부분', warn: '주의', risk: '차단·중단', dim: '대기·미검증' };

@@ -162,6 +162,7 @@
   .map-row:hover .map-bar i { background: var(--accent); }
   .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
   @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
 </style>
 </head>
 <body>
@@ -214,7 +215,7 @@
 </section>
 <section class="doc-sec" id="sec-사람이-읽는-저작-코드와-생성-코드">
 <div class="sec-head"><p class="ve-label">§02</p><h2 id="사람이-읽는-저작-코드와-생성-코드">사람이 읽는 저작 코드와 생성 코드</h2></div>
-<div class="prose"><p><a href="../../../FSharp_Tool_Pakage_for_CreatorEngine/vscode/README.md">VS Code 작성 도우미</a>는 현재 컴포넌트의 멤버 위치에서 <code>On…</code> 자동완성과 <strong>생명주기 추가</strong> 선택 메뉴를 제공한다. 선택한 일반 멤버만 single/unit 서명으로 삽입하며 기존 훅은 제외한다. 주석·문자열·메서드 본문에는 제안하지 않는다. 파일 저장·빌드·compile.order 변경은 수행하지 않는다. 다른 파일의 기반 타입과 복잡한 F# 구문은 편집 도우미가 추측하지 않으며 최종 검사는 FCS 생성기가 담당한다. <a href="../analysis/FSharpOptionalLifecycleAcceptance20261023.html">선택적 저작 수용 기록</a>을 따른다.</p>
+<div class="prose"><p><a href="https://github.com/29thnight/FSharp_Tool_Pakage_for_CreatorEngine/blob/3351cbc80d7216eb10110c4c8b30dce98aef1d1f/vscode/README.md">VS Code 작성 도우미</a>는 현재 컴포넌트의 멤버 위치에서 <code>On…</code> 자동완성과 <strong>생명주기 추가</strong> 선택 메뉴를 제공한다. 선택한 일반 멤버만 single/unit 서명으로 삽입하며 기존 훅은 제외한다. 주석·문자열·메서드 본문에는 제안하지 않는다. 파일 저장·빌드·compile.order 변경은 수행하지 않는다. 다른 파일의 기반 타입과 복잡한 F# 구문은 편집 도우미가 추측하지 않으며 최종 검사는 FCS 생성기가 담당한다. <a href="../analysis/FSharpOptionalLifecycleAcceptance20261023.html">선택적 저작 수용 기록</a>을 따른다.</p>
 <p>F# 스크립트와 내부 C# 바인딩은 사람이 수정·검토하는 코드다. 공백만 늘리는 대신 다음 기준을 적용한다.</p>
 <ul>
 <li>상태와 단계는 역할을 드러내는 이름을 사용한다. 여러 의미를 겸하는 정수 단계 대신 명명된 상태와 별도 처리 메서드를 둔다.</li>
@@ -241,7 +242,7 @@
 </section>
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="FSharpScriptingContract.md"><code>docs/design/FSharpScriptingContract.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+<p><a href="FSharpScriptingContract.md"><code>docs/design/FSharpScriptingContract.md</code></a> · 마지막 커밋 2026-10-23 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
 </section>
 </main>
 </div>

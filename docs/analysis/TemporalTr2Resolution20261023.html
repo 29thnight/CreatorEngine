@@ -162,6 +162,7 @@
   .map-row:hover .map-bar i { background: var(--accent); }
   .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
   @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
 </style>
 </head>
 <body>
@@ -179,15 +180,15 @@
 
 <figure>
 <div class="frame doc-map" role="img" aria-label="절 7개의 분량 막대">
-<a class="map-row" href="#구현과-원인-수정"><span class="ve-label">§00</span><span class="map-name">구현과 원인 수정</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#독립-route-초기화와-fsr-노출-연산"><span class="ve-label">§01</span><span class="map-name">독립 route 초기화와 FSR 노출 연산</span><span class="map-bar"><i style="width:69.4%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#표시-셰이더-정밀도와-추가-입력-검증"><span class="ve-label">§02</span><span class="map-name">표시 셰이더 정밀도와 추가 입력 검증</span><span class="map-bar"><i style="width:62.8%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#sdk-설치와-재현"><span class="ve-label">§03</span><span class="map-name">SDK 설치와 재현</span><span class="map-bar"><i style="width:95.7%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#debug--release-결과"><span class="ve-label">§04</span><span class="map-name">Debug / Release 결과</span><span class="map-bar"><i style="width:82.2%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#픽셀-판정"><span class="ve-label">§05</span><span class="map-name">픽셀 판정</span><span class="map-bar"><i style="width:65.7%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#증거와-후속-소유-범위"><span class="ve-label">§06</span><span class="map-name">증거와 후속 소유 범위</span><span class="map-bar"><i style="width:31.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#구현과-원인-수정"><span class="ve-label">§00</span><span class="map-name">구현과 원인 수정</span><span class="map-bar"><i style="width:98.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#독립-route-초기화와-fsr-노출-연산"><span class="ve-label">§01</span><span class="map-name">독립 route 초기화와 FSR 노출 연산</span><span class="map-bar"><i style="width:74%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#표시-셰이더-정밀도와-추가-입력-검증"><span class="ve-label">§02</span><span class="map-name">표시 셰이더 정밀도와 추가 입력 검증</span><span class="map-bar"><i style="width:67.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#sdk-설치와-재현"><span class="ve-label">§03</span><span class="map-name">SDK 설치와 재현</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#debug--release-결과"><span class="ve-label">§04</span><span class="map-name">Debug / Release 결과</span><span class="map-bar"><i style="width:80.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#픽셀-판정"><span class="ve-label">§05</span><span class="map-name">픽셀 판정</span><span class="map-bar"><i style="width:64.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#증거와-후속-소유-범위"><span class="ve-label">§06</span><span class="map-name">증거와 후속 소유 범위</span><span class="map-bar"><i style="width:91.7%"></i></span><span class="map-marks"></span></a>
 </div>
-<figcaption><span class="fig-n">그림 1</span>절 7개 가운데 「구현과 원인 수정」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+<figcaption><span class="fig-n">그림 1</span>절 7개 가운데 「SDK 설치와 재현」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
 </figure>
 <section class="doc-sec" id="sec-구현과-원인-수정">
 <div class="sec-head"><p class="ve-label">§00</p><h2 id="구현과-원인-수정">구현과 원인 수정</h2></div>
@@ -215,28 +216,28 @@
 <div class="sec-head"><p class="ve-label">§01</p><h2 id="독립-route-초기화와-fsr-노출-연산">독립 route 초기화와 FSR 노출 연산</h2></div>
 <div class="prose"><p>각 route의 기준 입력이 준비된 첫 실제 제출에서 SDK context를 새로 만들고 jitter/history를 초기화한다. 이후 34회의 warmup과 current/control history는 그대로 이어진다. 이 정책은 명시적인 SDK fixture에만 적용된다. 카메라 전환 후 binding을 기다리며 제출된 프레임이 독립 비교의 시작 상태에 섞이지 않게 한다.</p>
 <p>초기화만으로는 Debug의 큰 해상도에서 FSR 출력 차이가 남았다. 37회 전체 SDK 입력을 읽어 비교한 결과, 색·깊이·모션·마스크와 내부 상수가 모두 같았다. 첫 차이는 자동 노출의 로그 휘도 이력에서 부동소수점 한 단계로 나타났고 이후 FP16 누적 색상과 display 출력에 전파됐다. 원래 휘도 reduction 값도 같았다. 매 프레임 GPU 완료를 기다리는 직접 재생은 8회씩 세 실험에서 최종 출력이 일치했다.</p>
-<p>자동 노출 누적 변수에 <code>precise</code>를 지정해 계산 순서를 보존했다. 임시 GPU 입력·내부 버퍼 계측을 제거한 최종 Debug/Release 빌드에서 전체 행렬과 독립 solo 반복 비교를 1e-6 기준 그대로 통과했다. 고정 SDK에 적용되는 변경은 별도 patch로 보존한다. <a href="../../Artifacts/tr2-20261023/fsr-diagnostic-summary.json">진단 비교 기록</a>.</p>
+<p>자동 노출 누적 변수에 <code>precise</code>를 지정해 계산 순서를 보존했다. 임시 GPU 입력·내부 버퍼 계측을 제거한 최종 Debug/Release 빌드에서 전체 행렬과 독립 solo 반복 비교를 1e-6 기준 그대로 통과했다. 고정 SDK에 적용되는 변경은 별도 patch로 보존한다. 진단 비교 기록 · 로컬 기록, 사이트 미포함 (<code>Artifacts/tr2-20261023/fsr-diagnostic-summary.json</code>).</p>
 <p>SPD memory barrier·전체 mip 초기화·reset 시점 정렬 실험은 차이를 해결하지 못했다. 이 실험들은 최종 SDK에서 제거했다. SDK 파일 복원 시 이전 수정 시각이 남아 셰이더 재생성이 생략된 구간도 확인했으며, 최종 빌드에서는 원본과 검증한 precision patch로 shader blob과 라이브러리를 다시 생성했다. 실패 결과와 원본 캡처는 Artifacts에 보존했다.</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-표시-셰이더-정밀도와-추가-입력-검증">
 <div class="sec-head"><p class="ve-label">§02</p><h2 id="표시-셰이더-정밀도와-추가-입력-검증">표시 셰이더 정밀도와 추가 입력 검증</h2></div>
-<div class="prose"><p>FSR 노출 수정을 적용한 뒤, Release FSR Balanced와 Debug DLSS Native AA에서 HDR 출력은 같지만 표시 출력 일부 성분이 1/255씩 달랐다. bloom 최종 텍스처와 포스트 설정을 기존 캡처에 추가한 결과, 단독·교차·단독 반복의 28개 route/단계에서 HDR·bloom·설정이 모두 같고 표시값만 달랐다. 실제 생성된 표시 셰이더를 같은 입력으로 직접 128회씩 재생한 RGBA32F·RGBA8 출력은 각각 전부 일치했다. <a href="../../Artifacts/tr2-20261023/post-bloom-trace-comparison.json">추가 입력 비교</a>.</p>
+<div class="prose"><p>FSR 노출 수정을 적용한 뒤, Release FSR Balanced와 Debug DLSS Native AA에서 HDR 출력은 같지만 표시 출력 일부 성분이 1/255씩 달랐다. bloom 최종 텍스처와 포스트 설정을 기존 캡처에 추가한 결과, 단독·교차·단독 반복의 28개 route/단계에서 HDR·bloom·설정이 모두 같고 표시값만 달랐다. 실제 생성된 표시 셰이더를 같은 입력으로 직접 128회씩 재생한 RGBA32F·RGBA8 출력은 각각 전부 일치했다. 추가 입력 비교 · 로컬 기록, 사이트 미포함 (<code>Artifacts/tr2-20261023/post-bloom-trace-comparison.json</code>).</p>
 <p>8비트 표시 코드를 명시적으로 반올림하는 후보는 Release 집중 검사에서 통과했지만 Debug의 독립 단독 반복에서 다시 실패했다. 이 후보는 제거했다. 최종 변경은 <code>EnhancedPostChainPass::CompilePostShader</code>에서 Uber·UberHDR 두 톤매핑 셰이더에 기존 <code>strictMath</code> 옵션을 적용하는 것이다. 해당 옵션은 shader cache identity에 포함되며 Slang의 <code>-fp-mode precise</code>로 전달된다.</p>
 <p>bloom·포스트 설정 캡처는 동일 입력을 검증하는 도구로 유지했다. 일반 렌더링에는 추가 readback을 넣지 않고 명시적 캡처에서만 실행한다. 최종 단독/교차 검사는 기존 10개 이미지에 bloom을 더한 11개 전체 이미지를 비교하고 포스트 설정도 일치해야 통과한다. 기존 <code>dx12.post</code>의 bloom·tone map·vignette·FXAA 검사도 함께 실행했다. 픽셀 비교 허용 오차는 1e-6을 그대로 유지했다.</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-sdk-설치와-재현">
 <div class="sec-head"><p class="ve-label">§03</p><h2 id="sdk-설치와-재현">SDK 설치와 재현</h2></div>
-<div class="prose"><p>SDK는 <code>ThirdParty/Temporal</code>에 설치했다. FidelityFX SDK v1.1.4(FSR 3.1.4), Streamline v2.14.1, XeSS v3.0.2를 고정했다. 버전·revision·원본 archive 및 배포 DLL 해시는 <a href="../../ThirdParty/Temporal/SDKVersions.json">SDKVersions.json</a>에 있다.</p>
-<p>검증 빌드는 <code>Validation.props</code>를 opt-in으로 적용한다. 일반 엔진 빌드의 SDK 기본 옵션은 유지한다. 외부 SDK 빌드는 별도 Directory.Build 파일로 엔진 module/reflection 설정을 격리했다. 구성별 20개 temporal runtime DLL을 Editor/Temporal에 배포했다. <a href="../../ThirdParty/Temporal/README.md">설치·빌드 안내</a>.</p>
+<div class="prose"><p>SDK는 <code>ThirdParty/Temporal</code>에 설치했다. FidelityFX SDK v1.1.4(FSR 3.1.4), Streamline v2.14.1, XeSS v3.0.2를 고정했다. 버전·revision·원본 archive 및 배포 DLL 해시는 <a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/ThirdParty/Temporal/SDKVersions.json">SDKVersions.json</a>에 있다.</p>
+<p>검증 빌드는 <code>Validation.props</code>를 opt-in으로 적용한다. 일반 엔진 빌드의 SDK 기본 옵션은 유지한다. 외부 SDK 빌드는 별도 Directory.Build 파일로 엔진 module/reflection 설정을 격리했다. 구성별 20개 temporal runtime DLL을 Editor/Temporal에 배포했다. <a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/ThirdParty/Temporal/README.md">설치·빌드 안내</a>.</p>
 <pre><code class="language-powershell">&amp; ThirdParty/Temporal/Build-Validation.ps1 -OutputDirectory Artifacts/tr2-rebuild
 &amp; Tools/regression/verify-tr2-history.ps1 -Configuration Debug -OutputDirectory Artifacts/tr2-history-debug -IncludePostChain
 &amp; Tools/regression/verify-tr2-resolution.ps1 -Configuration Debug -OutputDirectory Artifacts/tr2-matrix-debug -Resolutions 1600x900,960x640,1280x720 -RepeatFirstSoloControl
 # Release도 같은 두 회귀 도구의 Configuration을 Release로 실행한다.
 # 반복 대조군 없는 matrix만 같은 바이너리·출력 경로에 -Resume을 사용할 수 있다.</code></pre>
 <p>Resume은 이전 프로세스의 validation 0 기록과 완료된 단독/교차 oracle·isolation 세트가 함께 있을 때 재사용한다. 미완료 세트는 보존 디렉토리로 이동한 뒤 단독/교차를 함께 다시 만든다. 바이너리 해시가 다르면 재개를 거부한다.</p>
-<p>최종 Debug 행렬은 동일 바이너리로 해상도 그룹을 나눠 실행했다. 초기 9조건의 모든 캡처가 validation 0 확인 전에 완료됐음을 대조한 뒤 정상 종료하고, 큰·작은 해상도 그룹을 Resume으로 이어갔다. 중간 해상도는 별도 프로세스에서 실행했다. 미완료 조건은 재사용하지 않았다. <a href="../../Artifacts/tr2-20261023/debug-resume-reuse-audit.json">재사용 증거 대조</a>.</p>
+<p>최종 Debug 행렬은 동일 바이너리로 해상도 그룹을 나눠 실행했다. 초기 9조건의 모든 캡처가 validation 0 확인 전에 완료됐음을 대조한 뒤 정상 종료하고, 큰·작은 해상도 그룹을 Resume으로 이어갔다. 중간 해상도는 별도 프로세스에서 실행했다. 미완료 조건은 재사용하지 않았다. 재사용 증거 대조 · 로컬 기록, 사이트 미포함 (<code>Artifacts/tr2-20261023/debug-resume-reuse-audit.json</code>).</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-debug--release-결과">
@@ -267,18 +268,18 @@
 <section class="doc-sec" id="sec-증거와-후속-소유-범위">
 <div class="sec-head"><p class="ve-label">§06</p><h2 id="증거와-후속-소유-범위">증거와 후속 소유 범위</h2></div>
 <div class="prose"><ul>
-<li><a href="../../Artifacts/tr2-20261023/source-freeze.json">소스·shader·runtime DLL·바이너리 해시</a></li>
-<li><a href="../../Artifacts/tr2-20261023/stable-matrix-Debug/matrix.json">Debug 큰·작은 해상도</a> · <a href="../../Artifacts/tr2-20261023/stable-matrix-Debug-medium/matrix.json">Debug 중간 해상도</a> · <a href="../../Artifacts/tr2-20261023/stable-matrix-Release/matrix.json">Release 행렬</a></li>
-<li><a href="../../Artifacts/tr2-20261023/stable-build-Debug/build-Debug.log">Debug 최종 빌드</a> · <a href="../../Artifacts/tr2-20261023/stable-build-Release/build-Release.log">Release 최종 빌드</a></li>
-<li><a href="../../Artifacts/tr2-20261023/stable-history-Debug/result.json">Debug history</a> · <a href="../../Artifacts/tr2-20261023/stable-history-Release/result.json">Release history</a></li>
-<li><a href="../../Artifacts/tr2-20261023/stable-ssgi-Debug/results.json">Debug SSGI</a> · <a href="../../Artifacts/tr2-20261023/stable-ssgi-Release/results.json">Release SSGI</a></li>
+<li>소스·shader·runtime DLL·바이너리 해시 · 로컬 기록, 사이트 미포함 (<code>Artifacts/tr2-20261023/source-freeze.json</code>)</li>
+<li>Debug 큰·작은 해상도 · 로컬 기록, 사이트 미포함 (<code>Artifacts/tr2-20261023/stable-matrix-Debug/matrix.json</code>) · Debug 중간 해상도 · 로컬 기록, 사이트 미포함 (<code>Artifacts/tr2-20261023/stable-matrix-Debug-medium/matrix.json</code>) · Release 행렬 · 로컬 기록, 사이트 미포함 (<code>Artifacts/tr2-20261023/stable-matrix-Release/matrix.json</code>)</li>
+<li>Debug 최종 빌드 · 로컬 기록, 사이트 미포함 (<code>Artifacts/tr2-20261023/stable-build-Debug/build-Debug.log</code>) · Release 최종 빌드 · 로컬 기록, 사이트 미포함 (<code>Artifacts/tr2-20261023/stable-build-Release/build-Release.log</code>)</li>
+<li>Debug history · 로컬 기록, 사이트 미포함 (<code>Artifacts/tr2-20261023/stable-history-Debug/result.json</code>) · Release history · 로컬 기록, 사이트 미포함 (<code>Artifacts/tr2-20261023/stable-history-Release/result.json</code>)</li>
+<li>Debug SSGI · 로컬 기록, 사이트 미포함 (<code>Artifacts/tr2-20261023/stable-ssgi-Debug/results.json</code>) · Release SSGI · 로컬 기록, 사이트 미포함 (<code>Artifacts/tr2-20261023/stable-ssgi-Release/results.json</code>)</li>
 </ul>
 <p>이번 수용은 DX12 실제 Editor의 제어된 7-route·SDK 품질·해상도·멀티뷰 행렬이다. 복잡 제품 장면의 장기 잔상·disocclusion, 전체 프레임 비용, 장치별 지원·배포·폴백은 TU0~4에서 계속 추적한다. FG와 Player 물리 표시 cadence/latency는 각 FG 항목에서 추적한다. SPIR-V는 CEMF3 cook으로 생성했고 실행 검증은 DX12에서 수행했다.</p>
 </div>
 </section>
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="TemporalTr2Resolution20261023.md"><code>docs/analysis/TemporalTr2Resolution20261023.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+<p><a href="TemporalTr2Resolution20261023.md"><code>docs/analysis/TemporalTr2Resolution20261023.md</code></a> · 마지막 커밋 2026-10-23 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
 </section>
 </main>
 </div>
