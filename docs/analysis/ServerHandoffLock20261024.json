@@ -4,10 +4,12 @@
   "result": "SERVER_HANDOFF_PINNED",
   "source": {
     "repository": "https://github.com/29thnight/CreatorEngine",
-    "revision": "b5d6e3680999ba9bb42c30114040b7c569fdcf94",
-    "tree": "3706e60ae9717aba3ac8bb5a39f4fd4408e8d645",
-    "selectedFiles": 93,
-    "bundleBase": "71504c4fd610a205c8c857538364e1d392e9e150"
+    "revision": "6752bf2db16d5a5220c00b5ac667659abafaa4d1",
+    "tree": "e4d49dca8b89aaa76575af8842f2d2f43a9a33d9",
+    "bundleBase": "8bb1abfe1d45d41a497156a5ae9ed31453954e6f",
+    "preparatoryFiles": 93,
+    "preparatoryRevision": "182480a080125b48229fb3ebc7d7eb26c16c70b1",
+    "revisionRole": "Full clean source after Artifacts history removal and viewer source relocation"
   },
   "fsharp": {
     "repository": "https://github.com/29thnight/FSharp_Tool_Pakage_for_CreatorEngine",
@@ -16,11 +18,11 @@
   },
   "sdk": {
     "archive": "engine-sdk.zip",
-    "buildId": "7ea251ca-076d-4ec9-9fbe-a923b3fcbc5c",
-    "payloadDigest": "acbc589acb9aa8d82fec539c9078ff7ea917f7876beb5728ceb4a8bafc2b3885",
-    "manifestSha256": "ec21c97831b9fe7bbae03b169114cf8a7c0cf0550bd20f9ee4b81645848570d8",
+    "buildId": "5f76f908-9df7-493e-8f39-5d24656a142a",
+    "payloadDigest": "6bfa2545334a8507ee83f0efad9fd72abe027515524a88760afc1f86f4cb124d",
+    "manifestSha256": "64e32ffc92afa57e5c84fd8dcbb12e1f4595bcf2375af251b3e695b8031956bd",
     "source": {
-      "revision": "b5d6e3680999ba9bb42c30114040b7c569fdcf94",
+      "revision": "6752bf2db16d5a5220c00b5ac667659abafaa4d1",
       "dirty": false,
       "kind": "build-workspace-observation"
     },
@@ -100,7 +102,7 @@
     "headless": {
       "archive": "headless-scene-fixture.zip",
       "source": "Tools/regression/fixtures/headless",
-      "sourceRevision": "b5d6e3680999ba9bb42c30114040b7c569fdcf94",
+      "sourceRevision": "6752bf2db16d5a5220c00b5ac667659abafaa4d1",
       "acceptedProcesses": 19
     },
     "fsharpPlayer": {
@@ -134,28 +136,23 @@
       "N3MovingGpuProduct",
       "HeadlessProduct"
     ],
-    "pinnedSourceProductReceiptSha256": "7f6b0bfa7dbae89571387d417ca902bccd0f5b600bfd192eb39288e41c6f3851",
+    "pinnedSourceProductReceiptSha256": "126fcc2cbeaa24b6e033262d11cf8795849f34bd2a230bdd617c5992db4b51e9",
     "priorPrimaryHostProcesses": 57,
     "priorEvidenceAudit": "95 receipt references, 72 overlay files, 417 direct source hashes matched before commit",
     "evidenceArchive": "validation-evidence.zip",
-    "evidenceFiles": 1172,
-    "scope": "Prior Debug/Release observations retained; pinned clean commit rebuilt native SDK and reran Release F# Player and All -Product 17 groups",
+    "evidenceFiles": 1518,
+    "scope": "Rewritten clean source rebuilt native SDK and reran F# Player and All -Product 17 groups; original observations remain unchanged",
     "dependencyMaterialization": "Pinned SDK packaging used a physical copy of the existing vcpkg installation; its reparse-point guard was preserved",
     "artifactIntegrity": "PowerShell 5 full artifact SHA256/size PASS; wrong-SHA canary rejected",
     "archiveCrc": [
       {
+        "path": "engine-source-6752bf2db1.zip",
+        "members": 5857,
+        "crc": "PASS"
+      },
+      {
         "path": "engine-sdk.zip",
         "members": 807,
-        "crc": "PASS"
-      },
-      {
-        "path": "engine-source-b5d6e3680.zip",
-        "members": 5858,
-        "crc": "PASS"
-      },
-      {
-        "path": "fixture-shader-meta-seed.zip",
-        "members": 126,
         "crc": "PASS"
       },
       {
@@ -170,10 +167,20 @@
       },
       {
         "path": "validation-evidence.zip",
-        "members": 1173,
+        "members": 1519,
+        "crc": "PASS"
+      },
+      {
+        "path": "fixture-shader-meta-seed.zip",
+        "members": 126,
         "crc": "PASS"
       }
     ],
+    "repinnedSuiteReceipt": "repinned/pinned/Build/Verification/NDA/Suite-b1337ef598854c31b052ac849ec4f674/result.json",
+    "repinnedPlayerReceipt": "repinned/pinned/Build/Verification/FSharp/Player-0b6913df73644df3a263183680e7bf50/result.json",
+    "repinnedHeadlessReceipt": "repinned/pinned/Build/Verification/Headless/Run-570cfbef83a74947b8347b8d2a467e9d/result.json",
+    "retryObservation": "The source-checkout N3 harness compiles its fixture into the source Managed directory; an SDK Editor invocation rejected that missing fixture. The complete suite passed with the rebuilt source Editor. The new SDK separately passed packaged F# Player acceptance.",
+    "extractedSdkVerification": "PASS",
     "extractedHeadlessSmoke": {
       "result": "PASS",
       "committedTicks": 120,
@@ -184,7 +191,7 @@
       "physicsResourcesBalanced": true
     }
   },
-  "artifactLocation": "Build/Handoff/Server-b5d6e3680/Payload",
+  "artifactLocation": "Build/Handoff/Server-6752bf2db1/Payload",
   "distribution": "Binary archives and evidence are frozen local handoff artifacts, not Git blobs or a claimed remote release upload",
   "requirements": [
     "Windows x64, installed .NET 10 and MSVC runtime",
@@ -200,14 +207,14 @@
   ],
   "artifacts": [
     {
-      "path": "engine-source-b5d6e3680.zip",
-      "bytes": 365924424,
-      "sha256": "ba5687346c311850d59d40ba9b7691cdc680e1bccdf97704768ab199b1a4c7e8"
+      "path": "engine-source-6752bf2db1.zip",
+      "bytes": 365964190,
+      "sha256": "e62610c936fa121facc3d252ff901ccd6c0e81171fd627b6ee74d4793623897c"
     },
     {
-      "path": "engine-changes-b5d6e3680.bundle",
-      "bytes": 111673,
-      "sha256": "402c0c021db82b95cbea98c8c96e214ff01d05158ddf44764e6678789064f8d4"
+      "path": "engine-changes-6752bf2db1.bundle",
+      "bytes": 191623,
+      "sha256": "f2d2bdba0e92617922059141d7b1b6780dd9f30bffd022d1f56aafc837042c0e"
     },
     {
       "path": "fsharp-tools-3351cbc80d.bundle",
@@ -216,23 +223,23 @@
     },
     {
       "path": "engine-sdk.zip",
-      "bytes": 409840497,
-      "sha256": "57645f247d0e0b9a93aa98b506a82288cfe54d4166c85c487b76d15e6fcba9df"
+      "bytes": 409840476,
+      "sha256": "4680bf0268ba14a447e91b16197d7a0f95f61f83890059d3ff6f543eaf041488"
     },
     {
       "path": "fsharp-cct-player-fixture.zip",
-      "bytes": 330724385,
-      "sha256": "0d4a5ef9a07855ff2fe8b70d37a1c7571ae782cda00b8b71b36b41479ff58203"
+      "bytes": 330724355,
+      "sha256": "fd66bcd64b7b25f2ce0122bd33778a39d4b9610103d7b8abda7796083254fd05"
     },
     {
       "path": "headless-scene-fixture.zip",
-      "bytes": 6440635,
-      "sha256": "4b2f942bde263b135fe5b20862c8a1335ff3a7a98767ee023930d3f480c3c3bb"
+      "bytes": 6440588,
+      "sha256": "f581c02102d0517d12aed9cc4c9f5eb9dc13f8b563db0cace43b5e256d0f09b4"
     },
     {
       "path": "validation-evidence.zip",
-      "bytes": 12883078,
-      "sha256": "b3f709c47ff50e901296e1e72a03a8152d7d49bf7255d936f5ca99ce8b668eb9"
+      "bytes": 14569950,
+      "sha256": "33bf5ecdbea813af35c6fb9ed7c4c175f647cc7c1d9a0fe7d83873418a84f744"
     },
     {
       "path": "fixture-shader-meta-seed.zip",
@@ -244,5 +251,14 @@
       "bytes": 1804,
       "sha256": "1165163368b8668bc313f79f322e1642887b335aea88f24c66219dfbd65c0f57"
     }
-  ]
+  ],
+  "historyRewrite": {
+    "removedPath": "Artifacts/",
+    "sourceBeforeRewrite": "b5d6e3680999ba9bb42c30114040b7c569fdcf94",
+    "rewrittenPreparatoryRevision": "182480a080125b48229fb3ebc7d7eb26c16c70b1",
+    "sourceRebuiltAndRetested": "6752bf2db16d5a5220c00b5ac667659abafaa4d1",
+    "priorEvidenceKeptByteForByte": true,
+    "fsharpRepositoryUnchanged": true,
+    "oldLocalPayloadPreserved": "Build/Handoff/Server-b5d6e3680/Payload"
+  }
 }

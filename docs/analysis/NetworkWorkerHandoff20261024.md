@@ -1,6 +1,6 @@
 # 데디케이티드 서버 최종 인계 점검 — 2026-10-24
 
-> 게시 고정: [소스·도구·SDK·fixture·검증 기록 lock](ServerHandoffLock20261024.md)을 따른다. 서버 소스 `b5d6e3680999ba9bb42c30114040b7c569fdcf94`와 F# 도구·새 SDK·인계 자료의 고정을 완료했다. 아래 점검 당시 전달 전 잔여는 이 후속 고정으로 닫혔다. 실제 서버 제품과 콘텐츠별 provider 수용은 별도다.
+> 게시 고정: [소스·도구·SDK·fixture·검증 기록 lock](ServerHandoffLock20261024.md)을 따른다. 서버 소스 `6752bf2db16d5a5220c00b5ac667659abafaa4d1`와 F# 도구·새 SDK·인계 자료의 고정을 완료했다. 아래 점검 당시 전달 전 잔여는 이 후속 고정으로 닫혔다. 실제 서버 제품과 콘텐츠별 provider 수용은 별도다.
 
 **수용한 Windows x64 콘텐츠 범위에서는 추가 사내 선행 구현 잔여를 발견하지 않았다. N0 → N2/N4 개발 착수는 가능하다. 실제 전달 전에는 미커밋·미추적 소스를 포함한 전달 리비전과 도구·SDK·증거를 고정해야 한다.** 실제 서버 제품과 모든 게임 씬의 무수정 실행을 완료한 판정은 아니다.
 
@@ -81,3 +81,7 @@ F# 콜백 예외는 기존대로 해당 스크립트를 격리하며 나머지 �
 ## 인계 정본
 
 [네트워크 계약과 변경 절차](../design/NetworkContractChangePolicy.md) · [로컬 관찰자](../design/SceneObservationContract.md) · [tick 명령/snapshot](../design/SimulationTickExchangeContract.md) · [Archive/Parser](../design/ArchiveParserBoundaryContract.md) · [F# 계약](../design/FSharpScriptingContract.md) · [무렌더 실행](../design/HeadlessSceneRuntimeContract.md) · [이전 점검 기록](NetworkWorkerHandoff20261023.md).
+
+## Git 이력 정리 후 재현 기준
+
+공유 이력의 `Artifacts/` 제거 후 개발 기준 소스는 `6752bf2db16d5a5220c00b5ac667659abafaa4d1`, 기준 ancestor는 `8bb1abfe1d45d41a497156a5ae9ed31453954e6f`이다. 위의 최종 점검 당시 HEAD와 로그에 남은 이전 SHA는 관찰값이다. 현재 checkout과 SDK·fixture의 판정은 [다시 고정한 lock](ServerHandoffLock20261024.json)의 새 리비전과 SHA256을 사용한다.

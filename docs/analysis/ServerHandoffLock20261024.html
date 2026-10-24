@@ -162,41 +162,43 @@
   .map-row:hover .map-bar i { background: var(--accent); }
   .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
   @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
 </style>
 </head>
 <body>
 <div class="shell has-toc">
-<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#고정한-식별자">고정한 식별자</a></li><li><a href="#인계-자료">인계 자료</a></li><li><a href="#수신-후-확인과-재현">수신 후 확인과 재현</a></li><li><a href="#이번-고정-검증">이번 고정 검증</a></li></ol></nav>
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#고정한-식별자">고정한 식별자</a></li><li><a href="#인계-자료">인계 자료</a></li><li><a href="#수신-후-확인과-재현">수신 후 확인과 재현</a></li><li><a href="#이번-고정-검증">이번 고정 검증</a></li><li><a href="#이력-정리-후-재고정">이력 정리 후 재고정</a></li></ol></nav>
 <main>
 <header class="page">
 <nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="ServerHandoffLock20261024.md">원본 Markdown</a></nav>
 <p class="eyebrow">분석</p>
 <h1>서버 사전 작업 인계 고정 — 2026-10-24</h1>
-<div class="meta"><p><strong>검증한 서버 사전 작업의 소스·F# 도구·SDK·fixture·기록을 고정했다.</strong> 네이티브 소스는 <code>b5d6e3680999ba9bb42c30114040b7c569fdcf94</code>이며, 이 문서와 lock을 담는 후속 커밋은 인계 메타데이터/검증 스크립트의 커밋이다. 두 리비전의 역할을 구분한다. 실제 2-client 서버·transport·운영 배포·soak 수용은 별도다.</p>
+<div class="meta"><p><strong>검증한 서버 사전 작업의 소스·F# 도구·SDK·fixture·기록을 고정했다.</strong> 네이티브 소스는 <code>6752bf2db16d5a5220c00b5ac667659abafaa4d1</code>이며, 이 문서와 lock을 담는 후속 커밋은 인계 메타데이터/검증 스크립트의 커밋이다. 두 리비전의 역할을 구분한다. 실제 2-client 서버·transport·운영 배포·soak 수용은 별도다.</p>
 <p><a href="ServerHandoffLock20261024.json">기계 판독 lock</a> · <a href="NetworkWorkerHandoff20261024.html">작업 순서와 완료 기준</a> · <a href="../design/HeadlessSceneRuntimeContract.html">실행 계약</a> · <a href="../RefactoringPlanDashboard.html#phase-20">대시보드</a>.</p>
 </div>
 </header>
 
 <figure>
-<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
-<a class="map-row" href="#고정한-식별자"><span class="ve-label">§00</span><span class="map-name">고정한 식별자</span><span class="map-bar"><i style="width:48.4%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#인계-자료"><span class="ve-label">§01</span><span class="map-name">인계 자료</span><span class="map-bar"><i style="width:85.5%"></i></span><span class="map-marks"></span></a>
+<div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
+<a class="map-row" href="#고정한-식별자"><span class="ve-label">§00</span><span class="map-name">고정한 식별자</span><span class="map-bar"><i style="width:49.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#인계-자료"><span class="ve-label">§01</span><span class="map-name">인계 자료</span><span class="map-bar"><i style="width:85.6%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#수신-후-확인과-재현"><span class="ve-label">§02</span><span class="map-name">수신 후 확인과 재현</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#이번-고정-검증"><span class="ve-label">§03</span><span class="map-name">이번 고정 검증</span><span class="map-bar"><i style="width:61.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#이력-정리-후-재고정"><span class="ve-label">§04</span><span class="map-name">이력 정리 후 재고정</span><span class="map-bar"><i style="width:41.4%"></i></span><span class="map-marks"></span></a>
 </div>
-<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「수신 후 확인과 재현」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+<figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「수신 후 확인과 재현」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
 </figure>
 <section class="doc-sec" id="sec-고정한-식별자">
 <div class="sec-head"><p class="ve-label">§00</p><h2 id="고정한-식별자">고정한 식별자</h2></div>
 <div class="prose"><div class="table-scroll"><table>
 <thead><tr><th>항목</th><th>고정 값</th></tr></thead>
-<tbody><tr><td>CreatorEngine 소스</td><td><code>b5d6e3680999ba9bb42c30114040b7c569fdcf94</code> / 서버 사전 작업 93파일 선별 커밋</td></tr>
+<tbody><tr><td>CreatorEngine 소스</td><td><code>6752bf2db16d5a5220c00b5ac667659abafaa4d1</code> / Artifacts 이력 제거 후 고정한 전체 소스</td></tr>
 <tr><td>F# 도구</td><td><code>3351cbc80d7216eb10110c4c8b30dce98aef1d1f</code> / 완전한 Git bundle</td></tr>
-<tr><td>SDK build ID</td><td><code>7ea251ca-076d-4ec9-9fbe-a923b3fcbc5c</code></td></tr>
+<tr><td>SDK build ID</td><td><code>5f76f908-9df7-493e-8f39-5d24656a142a</code></td></tr>
 <tr><td>SDK 구성</td><td>Windows x64 Release, Script API45, host ABI1, content ABI creator-content-v1</td></tr>
 <tr><td>SDK 출처</td><td>위 소스 커밋의 깨끗한 checkout에서 네이티브 재빌드, manifest의 dirty=false</td></tr>
 <tr><td>파일 원장</td><td>lock의 artifacts 9개에 bytes/SHA256 기록; SDK 내부 805개 파일도 검증</td></tr>
-<tr><td>인계 자료 폴더</td><td><code>Build/Handoff/Server-b5d6e3680/Payload</code></td></tr></tbody></table></div>
+<tr><td>인계 자료 폴더</td><td><code>Build/Handoff/Server-6752bf2db1/Payload</code></td></tr></tbody></table></div>
 <p>원격 Git에는 소스와 문서·lock·검증 스크립트를 게시한다. SDK와 대용량 fixture/증거 archive는 이 로컬 인계 폴더에 고정했으며 별도 전달 대상이다. 원격 release asset 업로드를 수행한 것으로 표기하지 않는다. 기존 Effect·모델·workspace 변경은 이 소스 커밋에서 제외했고 원본 바이트를 보존했다.</p>
 </div>
 </section>
@@ -204,14 +206,14 @@
 <div class="sec-head"><p class="ve-label">§01</p><h2 id="인계-자료">인계 자료</h2></div>
 <div class="prose"><div class="table-scroll"><table>
 <thead><tr><th>파일</th><th>용도</th></tr></thead>
-<tbody><tr><td>engine-source-b5d6e3680.zip</td><td>해당 커밋의 전체 저장소 스냅샷. dependency cache와 외부 F# 저장소는 포함하지 않음</td></tr>
-<tr><td>engine-changes-b5d6e3680.bundle</td><td>소스 커밋과 변경 객체. 기준 71504c4fd610a205c8c857538364e1d392e9e150이 있는 Git 저장소에 fetch</td></tr>
+<tbody><tr><td>engine-source-6752bf2db1.zip</td><td>해당 커밋의 전체 저장소 스냅샷. dependency cache와 외부 F# 저장소는 포함하지 않음</td></tr>
+<tr><td>engine-changes-6752bf2db1.bundle</td><td>소스 커밋과 변경 객체. 기준 8bb1abfe1d45d41a497156a5ae9ed31453954e6f이 있는 Git 저장소에 fetch</td></tr>
 <tr><td>fsharp-tools-3351cbc80d.bundle</td><td>고정된 main ref와 전체 이력. sibling 저장소 복원</td></tr>
 <tr><td>engine-sdk.zip</td><td>고정 소스에서 만든 SDK. engine.manifest.json의 build ID·payloadDigest·모든 파일 검증</td></tr>
 <tr><td>headless-scene-fixture.zip</td><td>실제 Scene/Entity 무렌더 host·CPU PhysX·관리 fixture·cooked 씬</td></tr>
 <tr><td>fsharp-cct-player-fixture.zip</td><td>새 SDK로 package/smoke·고정틱/native read/write·정상 종료를 통과한 cooked Player</td></tr>
 <tr><td>fixture-shader-meta-seed.zip</td><td>제품 fixture 생성에 필요한 Git 제외 셰이더 .meta 126개. fresh source의 Dynamic_CPP/Assets/Shaders에 먼저 적용</td></tr>
-<tr><td>validation-evidence.zip</td><td>이전/고정 소스의 로그·JSON·map·imports·GPU 이미지·manifest 등 1172파일과 portable evidence-index.json</td></tr>
+<tr><td>validation-evidence.zip</td><td>이전/고정 소스의 로그·JSON·map·imports·GPU 이미지·manifest 등 1518파일과 portable evidence-index.json</td></tr>
 <tr><td>verify-server-handoff.ps1</td><td>자료 폴더의 파일 크기/SHA256 검사. lock 사본과 함께 전달</td></tr></tbody></table></div>
 <p>Player fixture는 ZIP root 자체가 실행 stage다. headless와 Player archive의 런타임 파일을 서로 섞지 않는다. evidence-index.json은 primary/pinned 상대 경로로 원래 관찰 위치를 구분한다. 로그 안의 과거 절대 경로는 관찰 당시 위치이며 수신자의 설치 경로가 아니다. 폐기한 중간 산출물·의존 cache·이전 SDK/AnimationPlayer 전체 바이너리까지 포함한 archive는 아니다. 이전 SDK/애니메이션 소비자 관찰은 원장/로그로 보존하고 현재 SDK build ID의 검증과 구분한다.</p>
 </div>
@@ -243,9 +245,15 @@ Expand-Archive ./Payload/engine-sdk.zip -DestinationPath &lt;SDK&gt;</code></pre
 <p>N0 → N2/N4 → N5 → N6 → N7 → N9 → N10의 순서와 콘텐츠별 provider 연결 조건은 그대로다. 로컬 handle/schema를 wire에 전송하거나 F# 예외 격리를 Verse식 세계 rollback으로 해석하지 않는다. 원격 CI 배선과 원격 실행 PASS도 구분한다.</p>
 </div>
 </section>
+<section class="doc-sec" id="sec-이력-정리-후-재고정">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="이력-정리-후-재고정">이력 정리 후 재고정</h2></div>
+<div class="prose"><p><code>Artifacts/</code>를 공유 Git 이력에서 제거한 뒤 소스 <code>6752bf2db16d5a5220c00b5ac667659abafaa4d1</code>의 깨끗한 checkout에서 SDK를 다시 빌드했다. F# 도구 리비전은 유지하고, F# Player와 NetworkHandoff All -Product 17그룹 및 무렌더 19프로세스를 다시 검증했다. 기존 로컬 Payload와 실행 기록은 수정하지 않았으며 새 자료는 <code>Build/Handoff/Server-6752bf2db1/Payload</code>에 둔다. 과거 로그의 이전 SHA는 당시 관찰값이며 새 검증으로 덮어쓰지 않는다.</p>
+<p>새 제품 회귀 원장: <code>repinned/pinned/Build/Verification/NDA/Suite-b1337ef598854c31b052ac849ec4f674/result.json</code>. 상세 리비전 대응은 lock의 <code>historyRewrite</code>와 증거 archive의 <code>repinned/primary/Build/Verification/ArtifactHistoryRewrite20261024/commit-map.json</code>을 확인한다.</p>
+</div>
+</section>
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="ServerHandoffLock20261024.md"><code>docs/analysis/ServerHandoffLock20261024.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+<p><a href="ServerHandoffLock20261024.md"><code>docs/analysis/ServerHandoffLock20261024.md</code></a> · 마지막 커밋 2026-10-24 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
 </section>
 </main>
 </div>

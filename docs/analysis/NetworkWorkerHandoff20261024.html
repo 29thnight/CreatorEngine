@@ -162,11 +162,12 @@
   .map-row:hover .map-bar i { background: var(--accent); }
   .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
   @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
 </style>
 </head>
 <body>
 <div class="shell has-toc">
-<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#이번-점검의-근거와-판정">이번 점검의 근거와 판정</a></li><li><a href="#고정한-전달-준비와-조건부-사내-작업">고정한 전달 준비와 조건부 사내 작업</a></li><li><a href="#넘길-작업착수-순서완료-기준">넘길 작업·착수 순서·완료 기준</a></li><li><a href="#실제-연결-api와-유지할-동작">실제 연결 API와 유지할 동작</a></li><li><a href="#인수-gate">인수 gate</a></li><li><a href="#인계-정본">인계 정본</a></li></ol></nav>
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#이번-점검의-근거와-판정">이번 점검의 근거와 판정</a></li><li><a href="#고정한-전달-준비와-조건부-사내-작업">고정한 전달 준비와 조건부 사내 작업</a></li><li><a href="#넘길-작업착수-순서완료-기준">넘길 작업·착수 순서·완료 기준</a></li><li><a href="#실제-연결-api와-유지할-동작">실제 연결 API와 유지할 동작</a></li><li><a href="#인수-gate">인수 gate</a></li><li><a href="#인계-정본">인계 정본</a></li><li><a href="#git-이력-정리-후-재현-기준">Git 이력 정리 후 재현 기준</a></li></ol></nav>
 <main>
 <header class="page">
 <nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="NetworkWorkerHandoff20261024.md">원본 Markdown</a></nav>
@@ -178,18 +179,19 @@
 <div class="stack" role="img" aria-label="완료·통과 3"><i class="ok" style="flex:3"></i></div>
 <span class="legend"><span class="chip ok">완료·통과 3</span></span></div></div>
 <figure>
-<div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
+<div class="frame doc-map" role="img" aria-label="절 7개의 분량 막대">
 <a class="map-row" href="#이번-점검의-근거와-판정"><span class="ve-label">§01</span><span class="map-name">이번 점검의 근거와 판정</span><span class="map-bar"><i style="width:80.3%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span></span></a>
 <a class="map-row" href="#고정한-전달-준비와-조건부-사내-작업"><span class="ve-label">§02</span><span class="map-name">고정한 전달 준비와 조건부 사내 작업</span><span class="map-bar"><i style="width:61.4%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#넘길-작업착수-순서완료-기준"><span class="ve-label">§03</span><span class="map-name">넘길 작업·착수 순서·완료 기준</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#실제-연결-api와-유지할-동작"><span class="ve-label">§04</span><span class="map-name">실제 연결 API와 유지할 동작</span><span class="map-bar"><i style="width:78.8%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">2</span></span></a>
 <a class="map-row" href="#인수-gate"><span class="ve-label">§05</span><span class="map-name">인수 gate</span><span class="map-bar"><i style="width:43.5%"></i></span><span class="map-marks"></span></a>
 <a class="map-row" href="#인계-정본"><span class="ve-label">§06</span><span class="map-name">인계 정본</span><span class="map-bar"><i style="width:5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#git-이력-정리-후-재현-기준"><span class="ve-label">§07</span><span class="map-name">Git 이력 정리 후 재현 기준</span><span class="map-bar"><i style="width:13.3%"></i></span><span class="map-marks"></span></a>
 </div>
-<figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「넘길 작업·착수 순서·완료 기준」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+<figcaption><span class="fig-n">그림 1</span>절 7개 가운데 「넘길 작업·착수 순서·완료 기준」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
 </figure>
 <section class="prose"><blockquote>
-<p>게시 고정: <a href="ServerHandoffLock20261024.html">소스·도구·SDK·fixture·검증 기록 lock</a>을 따른다. 서버 소스 <code>b5d6e3680999ba9bb42c30114040b7c569fdcf94</code>와 F# 도구·새 SDK·인계 자료의 고정을 완료했다. 아래 점검 당시 전달 전 잔여는 이 후속 고정으로 닫혔다. 실제 서버 제품과 콘텐츠별 provider 수용은 별도다.</p>
+<p>게시 고정: <a href="ServerHandoffLock20261024.html">소스·도구·SDK·fixture·검증 기록 lock</a>을 따른다. 서버 소스 <code>6752bf2db16d5a5220c00b5ac667659abafaa4d1</code>와 F# 도구·새 SDK·인계 자료의 고정을 완료했다. 아래 점검 당시 전달 전 잔여는 이 후속 고정으로 닫혔다. 실제 서버 제품과 콘텐츠별 provider 수용은 별도다.</p>
 </blockquote>
 <p><strong>수용한 Windows x64 콘텐츠 범위에서는 추가 사내 선행 구현 잔여를 발견하지 않았다. N0 → N2/N4 개발 착수는 가능하다. 실제 전달 전에는 미커밋·미추적 소스를 포함한 전달 리비전과 도구·SDK·증거를 고정해야 한다.</strong> 실제 서버 제품과 모든 게임 씬의 무수정 실행을 완료한 판정은 아니다.</p>
 <p><a href="../plans/NetworkFrameworkPlan.html">네트워크 계획</a> · <a href="../design/HeadlessSceneRuntimeContract.html">무렌더 실행 계약</a> · <a href="HeadlessSceneRuntimeAcceptance20261024.html">실제 실행 수용</a> · <a href="../RefactoringPlanDashboard.html#phase-20">대시보드</a>.</p>
@@ -264,6 +266,11 @@
 <section class="doc-sec" id="sec-인계-정본">
 <div class="sec-head"><p class="ve-label">§06</p><h2 id="인계-정본">인계 정본</h2></div>
 <div class="prose"><p><a href="../design/NetworkContractChangePolicy.html">네트워크 계약과 변경 절차</a> · <a href="../design/SceneObservationContract.html">로컬 관찰자</a> · <a href="../design/SimulationTickExchangeContract.html">tick 명령/snapshot</a> · <a href="../design/ArchiveParserBoundaryContract.html">Archive/Parser</a> · <a href="../design/FSharpScriptingContract.html">F# 계약</a> · <a href="../design/HeadlessSceneRuntimeContract.html">무렌더 실행</a> · <a href="NetworkWorkerHandoff20261023.html">이전 점검 기록</a>.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-git-이력-정리-후-재현-기준">
+<div class="sec-head"><p class="ve-label">§07</p><h2 id="git-이력-정리-후-재현-기준">Git 이력 정리 후 재현 기준</h2></div>
+<div class="prose"><p>공유 이력의 <code>Artifacts/</code> 제거 후 개발 기준 소스는 <code>6752bf2db16d5a5220c00b5ac667659abafaa4d1</code>, 기준 ancestor는 <code>8bb1abfe1d45d41a497156a5ae9ed31453954e6f</code>이다. 위의 최종 점검 당시 HEAD와 로그에 남은 이전 SHA는 관찰값이다. 현재 checkout과 SDK·fixture의 판정은 <a href="ServerHandoffLock20261024.json">다시 고정한 lock</a>의 새 리비전과 SHA256을 사용한다.</p>
 </div>
 </section>
 <section class="sources" aria-label="출처">
