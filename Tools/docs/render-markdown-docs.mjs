@@ -237,6 +237,7 @@ const PAGE_CSS = `
   @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }`;
 
 function page(doc, file, date) {
+  const handoffDocument = file.startsWith('docs/handoff/');
   const depth = file.split('/').length - 2;
   const up = depth ? '../'.repeat(depth) : './';
   const toc = doc.named.length >= 4
@@ -254,9 +255,14 @@ function page(doc, file, date) {
 ${FAVICON}
 ${FONT_LINKS}
 <style>${TOKENS}${BASE_CSS}${PAGE_CSS}
+${handoffDocument ? `
+.human-handoff .meta{font-family:inherit;font-size:1rem;line-height:1.8;color:var(--text)}
+.human-handoff .meta p{max-width:75ch}
+.human-handoff h1{font-size:clamp(1.9rem,4vw,2.8rem);line-height:1.3}
+` : ''}
 </style>
 </head>
-<body>
+<body${handoffDocument ? ' class="human-handoff"' : ''}>
 <div class="shell${toc ? ' has-toc' : ''}">
 ${toc}
 <main>
@@ -267,11 +273,11 @@ ${toc}
 ${meta}
 </header>
 ${statusFigure(doc)}
-${docMapFigure(doc)}
+${handoffDocument ? '' : docMapFigure(doc)}
 ${doc.rendered.map(r => r.html).join('\n')}
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="${escapeHtml(md)}"><code>${escapeHtml(file)}</code></a>${date ? ` · 마지막 커밋 ${date}` : ' · 아직 커밋 전'} · <code>${GENERATOR}</code> 로 생성</p>
+<p><a href="${escapeHtml(md)}"><code>${escapeHtml(file)}</code></a>${handoffDocument ? ' · 전달용 문서' : date ? ` · 마지막 커밋 ${date}` : ' · 아직 커밋 전'} · <code>${GENERATOR}</code> 로 생성</p>
 </section>
 </main>
 </div>
