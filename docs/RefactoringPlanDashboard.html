@@ -1420,9 +1420,9 @@
   Authoring YAML/JSON DOM, process-local EntityHandle, live Scene/Entity pointer를 wire에서 배제하고, Loopback correctness를 닫은 뒤 실제 transport와 선택적 prediction/headless server를 판정한다.</div>
   <div class="risknote" id="phase-20-worker-handoff">
     <div class="vt">서버 개발 담당자 인계 · 2026-10-24</div>
-    <p><a href="https://github.com/29thnight/CreatorEngine/blob/c8eb80275c24d38367dc92f3e72945a18ff28974/docs/handoff/DedicatedServerWorkerHandoff20261024.md" target="_blank" rel="noopener noreferrer"><b>데디케이티드 서버 작업자 인계서 · 고정본 ↗</b></a></p>
+    <p><a href="https://github.com/29thnight/CreatorEngine/blob/dad6be859cf78b5f9238c81e070401cee40d9a13/docs/handoff/DedicatedServerWorkerHandoff20261024.md" target="_blank" rel="noopener noreferrer"><b>데디케이티드 서버 작업자 인계서 · 고정본 ↗</b></a></p>
     <p>받을 자료와 버전, 환경 준비·첫 실행, 검증 기록 위치, N0 → N2/N4 → N5 착수 순서와 단계별 완료 기준을 한 문서에 정리했다.</p>
-    <p>소스 <a href="https://github.com/29thnight/CreatorEngine/tree/b5d6e3680999ba9bb42c30114040b7c569fdcf94" target="_blank" rel="noopener noreferrer">b5d6e3680</a> · F# 도구 3351cbc80d · SDK 7ea251ca… / API45.</p>
+    <p>소스 <a href="https://github.com/29thnight/CreatorEngine/tree/6752bf2db16d5a5220c00b5ac667659abafaa4d1" target="_blank" rel="noopener noreferrer">6752bf2db1</a> · F# 도구 3351cbc80d · SDK 5f76f908… / API45.</p>
     <p>SDK·fixture·검증 기록은 <code>Payload</code> 폴더를 별도로 전달한다. Git clone만으로는 해당 바이너리 자료를 받을 수 없다.</p>
   </div>
   <div class="risknote"><div class="vt">사내 선행 수용 — 2026-10-22</div>
@@ -1436,7 +1436,7 @@
   adapter/project 경계·native imports·링크 map·패키지·실제 DLL에서 렌더/저작 parser 의존을 차단한다.
   기존 SceneManager·Scene·Entity·ClrHost·수명·DDOL을 재사용한다. 추가 컴포넌트/에셋은 reader/provider를 설치한다.
   <a href="design/HeadlessSceneRuntimeContract.html">계약</a> · <a href="analysis/HeadlessSceneRuntimeAcceptance20261024.html">새 checkout 수용 기록</a> · <a href="analysis/NetworkWorkerHandoff20261024.html">최종 인계 순서·기준</a>.
-  수용 범위 내 추가 사내 선행 구현 잔여는 없으며, 소스 b5d6e3680·F# 도구·새 SDK·fixture·검증 기록은 <a href="analysis/ServerHandoffLock20261024.html">인계 고정 원장</a>에 고정했다.
+  수용 범위 내 추가 사내 선행 구현 잔여는 없으며, 소스 6752bf2db1·F# 도구·새 SDK·fixture·검증 기록은 <a href="analysis/ServerHandoffLock20261024.html">인계 고정 원장</a>에 고정했다.
   N9 전체 서버 제품·2-client 동기화·운영 배포 상태는 유지한다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="20"><!-- JS 생성 --></table></div>
 </section>
@@ -2788,7 +2788,7 @@ const TASKS = [
   { phase: 20, id: "N9", title: "Headless Server target (선택 제품)",
     detail: "Editor/ImGui/RenderCore/authoring parser 없이 cooked content와 공통 simulation tick으로 2-client smoke를 통과한다. 제품 요구가 있을 때 착수한다.",
     refs: "NetworkFrameworkPlan N9 · design/HeadlessSceneRuntimeContract.html · analysis/HeadlessSceneRuntimeAcceptance20261024.html · analysis/NetworkWorkerHandoff20261024.html · analysis/ServerHandoffLock20261024.html", priority: "P2", days: 5, status: "stopped",
-    note: "2026-10-24 사내 기존 Scene/Entity 재사용 무렌더 실행 수용: 같은 수명·GC·핸들·DDOL·60Hz·실제 물리/CCT·F# API45·정상/오류 종료·렌더/파서 의존 차단. 별도 엔티티 저장소·ABI 제거. 추가 컴포넌트/외부 에셋은 reader/provider 설치가 필요하다. 계약·새 checkout 근거: design/HeadlessSceneRuntimeContract.html, analysis/HeadlessSceneRuntimeAcceptance20261024.html. N9 실제 wire/2-client/connection drain·운영 배포는 조건부·미수용으로 유지한다. 2026-10-24 최종 점검: 추가 사내 선행 구현 잔여 없음(수용 콘텐츠 범위). 소스 b5d6e3680·F# 도구3351cbc80d·깨끗한 SDK·fixture·검증 기록 고정 완료. ServerHandoffLock20261024와 NetworkWorkerHandoff20261024 참조." },
+    note: "2026-10-24 사내 기존 Scene/Entity 재사용 무렌더 실행 수용: 같은 수명·GC·핸들·DDOL·60Hz·실제 물리/CCT·F# API45·정상/오류 종료·렌더/파서 의존 차단. 별도 엔티티 저장소·ABI 제거. 추가 컴포넌트/외부 에셋은 reader/provider 설치가 필요하다. 계약·새 checkout 근거: design/HeadlessSceneRuntimeContract.html, analysis/HeadlessSceneRuntimeAcceptance20261024.html. N9 실제 wire/2-client/connection drain·운영 배포는 조건부·미수용으로 유지한다. 2026-10-24 최종 점검: 추가 사내 선행 구현 잔여 없음(수용 콘텐츠 범위). 소스 6752bf2db1·F# 도구3351cbc80d·깨끗한 SDK·fixture·검증 기록 고정 완료. ServerHandoffLock20261024와 NetworkWorkerHandoff20261024 참조." },
   { phase: 20, id: "N10", title: "Hardening·관측·soak",
     detail: "bounds/authority/rate limit, queue backpressure, disconnect/shutdown 순서, 장시간 soak와 운영 telemetry를 완결한다.",
     refs: "NetworkFrameworkPlan N10", priority: "P1", days: 4, status: "todo",
