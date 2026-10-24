@@ -126,6 +126,9 @@ project.lock.json
 project.fragment.lock.json
 artifacts/
 
+# Local profiling captures and generated reports (also on case-sensitive systems).
+/Artifacts/
+
 # ASP.NET Scaffolding
 ScaffoldingReadMe.txt
 

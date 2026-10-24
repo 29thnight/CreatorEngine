@@ -1,7 +1,7 @@
 param([int]$Port=8765)
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
-$url="http://127.0.0.1:$Port/Artifacts/timeline-viewer/index.html"
+$url="http://127.0.0.1:$Port/Tools/profiling-validation/viewer/index.html"
 $ready=$false
 try { $ready=(Invoke-WebRequest $url -TimeoutSec 2).Content.Contains('CreatorEngine 공용 CPU GPU ETW 타임라인') } catch {}
 if(!$ready){
