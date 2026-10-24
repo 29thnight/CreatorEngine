@@ -11,34 +11,34 @@
 | 항목 | 고정 값 / 받는 위치 |
 |---|---|
 | 엔진 저장소 | [29thnight/CreatorEngine](https://github.com/29thnight/CreatorEngine) |
-| 개발 기준 소스 | [`b5d6e3680999ba9bb42c30114040b7c569fdcf94`](https://github.com/29thnight/CreatorEngine/tree/b5d6e3680999ba9bb42c30114040b7c569fdcf94) |
-| 인계 lock·검증 스크립트 기준 | [`ca324716f49655f8c8a8073dd55abfde372ca95a`](https://github.com/29thnight/CreatorEngine/commit/ca324716f49655f8c8a8073dd55abfde372ca95a) |
+| 개발 기준 소스 | [`6752bf2db16d5a5220c00b5ac667659abafaa4d1`](https://github.com/29thnight/CreatorEngine/tree/6752bf2db16d5a5220c00b5ac667659abafaa4d1) |
+| 인계 lock·검증 스크립트 기준 | [`be057dca750fa2618076584d6c08e1e5d6ee61f6`](https://github.com/29thnight/CreatorEngine/commit/be057dca750fa2618076584d6c08e1e5d6ee61f6) |
 | F# 도구 저장소 | [29thnight/FSharp_Tool_Pakage_for_CreatorEngine](https://github.com/29thnight/FSharp_Tool_Pakage_for_CreatorEngine/tree/3351cbc80d7216eb10110c4c8b30dce98aef1d1f) |
 | F# 도구 리비전 | `3351cbc80d7216eb10110c4c8b30dce98aef1d1f` |
-| SDK build ID | `7ea251ca-076d-4ec9-9fbe-a923b3fcbc5c` |
+| SDK build ID | `5f76f908-9df7-493e-8f39-5d24656a142a` |
 | SDK 구성 | Windows x64 / Release / Script API45 / host ABI1 / content ABI `creator-content-v1` |
 
-SDK는 위 소스 리비전의 깨끗한 checkout에서 재빌드했습니다. `engine.manifest.json`의 `source.revision`은 `b5d6e3680…`, `source.dirty`는 `false`입니다. 개발 기준을 복원할 때에는 최신 master 대신 표의 소스 SHA를 사용하십시오. 인계 lock을 담은 후속 커밋과 SDK가 빌드된 소스 커밋은 역할이 다릅니다.
+SDK는 위 소스 리비전의 깨끗한 checkout에서 재빌드했습니다. `engine.manifest.json`의 `source.revision`은 `6752bf2db1…`, `source.dirty`는 `false`입니다. 개발 기준을 복원할 때에는 최신 master 대신 표의 소스 SHA를 사용하십시오. 인계 lock을 담은 후속 커밋과 SDK가 빌드된 소스 커밋은 역할이 다릅니다.
 
 ### 발신자가 함께 전달할 폴더
 
 이 문서와 **Payload 폴더 전체**를 함께 전달해야 합니다. Git clone만으로는 SDK·cooked fixture·검증 archive를 받을 수 없습니다.
 
-- 발신자 PC의 자료 위치: `C:\Users\idene\source\repos\CreatorEngine\Build\Handoff\Server-b5d6e3680\Payload`
+- 발신자 PC의 자료 위치: `C:\Users\idene\source\repos\CreatorEngine\Build\Handoff\Server-6752bf2db1\Payload`
 - 위 경로는 발신자 로컬 경로입니다. 수신자는 별도로 복사받아 아래 예시의 `C:\CreatorServerHandoff\Payload`처럼 배치합니다.
 - 원격 Git에는 소스·문서·lock·검증 스크립트가 게시돼 있습니다. 바이너리 자료의 원격 다운로드 URL은 제공되지 않았습니다. 자료를 받지 못했으면 발신자에게 Payload 폴더를 요청하십시오.
-- SHA256 정본: [고정 커밋의 ServerHandoffLock20261024.json](https://github.com/29thnight/CreatorEngine/blob/ca324716f49655f8c8a8073dd55abfde372ca95a/docs/analysis/ServerHandoffLock20261024.json). Payload 안의 동명 사본과 함께 보관합니다.
+- SHA256 정본: [고정 커밋의 ServerHandoffLock20261024.json](https://github.com/29thnight/CreatorEngine/blob/be057dca750fa2618076584d6c08e1e5d6ee61f6/docs/analysis/ServerHandoffLock20261024.json). Payload 안의 동명 사본과 함께 보관합니다.
 
 | Payload 파일 | 용도 |
 |---|---|
-| `engine-source-b5d6e3680.zip` | 고정 소스 스냅샷. Git 이력·외부 dependency는 포함하지 않음 |
-| `engine-changes-b5d6e3680.bundle` | 기존 Git 저장소에 가져올 변경 객체. 기준 커밋 `71504c4fd610a205c8c857538364e1d392e9e150` 필요 |
+| `engine-source-6752bf2db1.zip` | 고정 소스 스냅샷. Git 이력·외부 dependency는 포함하지 않음 |
+| `engine-changes-6752bf2db1.bundle` | 기존 Git 저장소에 가져올 변경 객체. 기준 커밋 `8bb1abfe1d45d41a497156a5ae9ed31453954e6f` 필요 |
 | `fsharp-tools-3351cbc80d.bundle` | 고정된 F# 도구의 전체 Git 이력과 main ref |
 | `engine-sdk.zip` | SDK. 펼친 폴더의 root에 `engine.manifest.json`이 있음 |
 | `headless-scene-fixture.zip` | 실행 가능한 무렌더 host·CPU PhysX·F# 어셈블리·cooked 씬 |
 | `fsharp-cct-player-fixture.zip` | 고정 SDK로 검증한 F# CCT Player stage |
 | `fixture-shader-meta-seed.zip` | 제품 회귀 입력용 셰이더 `.meta` 126개 |
-| `validation-evidence.zip` | 검증 기록 1,172개와 `evidence-index.json` |
+| `validation-evidence.zip` | 검증 기록 1,518개와 `evidence-index.json` |
 | `verify-server-handoff.ps1` | 위 고정 자료의 크기/SHA256 검사 |
 
 추가로 `ServerHandoffLock20261024.json`, `README.md`, 이 인계서를 전달합니다. lock은 9개 payload 파일의 크기와 SHA256을 지정합니다. 파일 이름이나 SDK/fixture 내부 파일을 바꾸거나 다른 빌드의 DLL을 섞지 마십시오.
@@ -91,7 +91,7 @@ Expand-Archive -LiteralPath "$payloadRoot\validation-evidence.zip" -DestinationP
 if ($LASTEXITCODE -ne 0) { throw 'SDK 검사가 실패했습니다.' }
 ```
 
-SDK build ID는 `7ea251ca-076d-4ec9-9fbe-a923b3fcbc5c`여야 합니다. Player fixture는 압축 해제한 폴더 자체가 실행 stage입니다.
+SDK build ID는 `5f76f908-9df7-493e-8f39-5d24656a142a`여야 합니다. Player fixture는 압축 해제한 폴더 자체가 실행 stage입니다.
 
 ### ③ 컴파일 없이 무렌더 실행 확인
 
@@ -135,7 +135,7 @@ if ((Test-Path $engineSource) -or (Test-Path $fsharpSource)) {
 
 git clone https://github.com/29thnight/CreatorEngine.git $engineSource
 if ($LASTEXITCODE -ne 0) { throw '엔진 저장소 복제 실패' }
-git -C $engineSource checkout --detach b5d6e3680999ba9bb42c30114040b7c569fdcf94
+git -C $engineSource checkout --detach 6752bf2db16d5a5220c00b5ac667659abafaa4d1
 if ($LASTEXITCODE -ne 0) { throw '고정 소스 checkout 실패' }
 
 git clone --branch main "$payloadRoot\fsharp-tools-3351cbc80d.bundle" $fsharpSource
@@ -207,11 +207,11 @@ N2와 N4는 N0 이후 병행할 수 있습니다. N5는 양쪽 계약 수용 뒤
 | 확인할 기록 | Evidence 폴더 안의 상대 위치 |
 |---|---|
 | 파일 원장·SHA256 | `evidence-index.json` |
-| 고정 소스 제품 회귀 17그룹 | `pinned/Build/Verification/NDA/Suite-456641545c364c4186aadb20862aa55a/result.json` |
+| 고정 소스 제품 회귀 17그룹 | `repinned/pinned/Build/Verification/NDA/Suite-b1337ef598854c31b052ac849ec4f674/result.json` |
 | 같은 실행의 그룹별 로그 | 위 Suite 폴더의 `Product.log`, `W4NDBProduct.log`, `N1Product.log`, `N1DiagnosticProduct.log`, `N3PacingProduct.log`, `N3MovingGpuProduct.log`, `HeadlessProduct.log` |
-| 무렌더 Release 19프로세스 | `pinned/Build/Verification/Headless/Run-a5ffe58892bf44139a457a1539eb2a4a/result.json` 및 같은 폴더의 case별 JSON·imports·link.map |
-| 새 SDK F# Player | `pinned/Build/Verification/FSharp/Player-4a35177182d34da69c6a65d35ccfe326/result.json` |
-| SDK 최종 패키징 | `primary/Build/Verification/ServerPublish20261024/pinned-sdk-final.log` |
+| 무렌더 Release 19프로세스 | `repinned/pinned/Build/Verification/Headless/Run-570cfbef83a74947b8347b8d2a467e9d/result.json` 및 같은 폴더의 case별 JSON·imports·link.map |
+| 새 SDK F# Player | `repinned/pinned/Build/Verification/FSharp/Player-0b6913df73644df3a263183680e7bf50/result.json` |
+| SDK 최종 패키징 | `repinned/primary/Build/Verification/ArtifactHistoryRewrite20261024/sdk-build.log` |
 | 셰이더 metadata seed 원장 | `primary/Build/Verification/ServerPublish20261024/fixture-meta-seed.json` |
 | 이전 Debug/Release/새 checkout 관찰 | `primary/Build/Verification/SharedScene20261024/` 및 `pinned/Build/Verification/SharedSceneFinal/` |
 
@@ -240,7 +240,7 @@ foreach ($project in @(
 }
 
 ./Tools/regression/verify-net-wire-boundary.ps1 `
-    -Configuration All -BaseRef b5d6e3680999ba9bb42c30114040b7c569fdcf94
+    -Configuration All -BaseRef 6752bf2db16d5a5220c00b5ac667659abafaa4d1
 
 ./Tools/regression/run-all.ps1 -Suite NetworkHandoff -Configuration All -Product `
     -EditorExe "$engineSource\Bin\x64-Release\Editor\CreatorEditor.exe" `
@@ -262,12 +262,18 @@ foreach ($project in @(
 
 ## 8. 계약을 확인할 고정 문서
 
-- [네트워크 계약 6종·ID 원장·변경 절차](https://github.com/29thnight/CreatorEngine/blob/ca324716f49655f8c8a8073dd55abfde372ca95a/docs/design/NetworkContractChangePolicy.md)
-- [로컬 엔티티/쓰기 관찰 계약](https://github.com/29thnight/CreatorEngine/blob/ca324716f49655f8c8a8073dd55abfde372ca95a/docs/design/SceneObservationContract.md)
-- [명령·커밋 snapshot 계약](https://github.com/29thnight/CreatorEngine/blob/ca324716f49655f8c8a8073dd55abfde372ca95a/docs/design/SimulationTickExchangeContract.md)
-- [F# 저작·수명 계약](https://github.com/29thnight/CreatorEngine/blob/ca324716f49655f8c8a8073dd55abfde372ca95a/docs/design/FSharpScriptingContract.md)
-- [기존 Scene/Entity 무렌더 실행 계약](https://github.com/29thnight/CreatorEngine/blob/ca324716f49655f8c8a8073dd55abfde372ca95a/docs/design/HeadlessSceneRuntimeContract.md)
-- [Archive/Parser 경계](https://github.com/29thnight/CreatorEngine/blob/ca324716f49655f8c8a8073dd55abfde372ca95a/docs/design/ArchiveParserBoundaryContract.md)
-- [인계 고정 원장](https://github.com/29thnight/CreatorEngine/blob/ca324716f49655f8c8a8073dd55abfde372ca95a/docs/analysis/ServerHandoffLock20261024.md)
+- [네트워크 계약 6종·ID 원장·변경 절차](https://github.com/29thnight/CreatorEngine/blob/be057dca750fa2618076584d6c08e1e5d6ee61f6/docs/design/NetworkContractChangePolicy.md)
+- [로컬 엔티티/쓰기 관찰 계약](https://github.com/29thnight/CreatorEngine/blob/be057dca750fa2618076584d6c08e1e5d6ee61f6/docs/design/SceneObservationContract.md)
+- [명령·커밋 snapshot 계약](https://github.com/29thnight/CreatorEngine/blob/be057dca750fa2618076584d6c08e1e5d6ee61f6/docs/design/SimulationTickExchangeContract.md)
+- [F# 저작·수명 계약](https://github.com/29thnight/CreatorEngine/blob/be057dca750fa2618076584d6c08e1e5d6ee61f6/docs/design/FSharpScriptingContract.md)
+- [기존 Scene/Entity 무렌더 실행 계약](https://github.com/29thnight/CreatorEngine/blob/be057dca750fa2618076584d6c08e1e5d6ee61f6/docs/design/HeadlessSceneRuntimeContract.md)
+- [Archive/Parser 경계](https://github.com/29thnight/CreatorEngine/blob/be057dca750fa2618076584d6c08e1e5d6ee61f6/docs/design/ArchiveParserBoundaryContract.md)
+- [인계 고정 원장](https://github.com/29thnight/CreatorEngine/blob/be057dca750fa2618076584d6c08e1e5d6ee61f6/docs/analysis/ServerHandoffLock20261024.md)
 
 실제 콘텐츠/provider와 계약·패키지 변경은 엔진 담당자와 조정합니다. 서버 담당자는 위 확장점을 사용해 네트워크 구현을 진행하고, 공통 씬·수명·고정 틱을 별도로 다시 구현하지 않습니다.
+
+## 9. Artifacts 이력 정리와 자료 교체 안내
+
+이번 자료는 Git 이력의 `Artifacts/` 제거 후 다시 빌드·검증한 인계본입니다. 소스 `6752bf2db1`, SDK `5f76f908-9df7-493e-8f39-5d24656a142a`와 이 문서가 가리키는 lock을 함께 사용하십시오. F# 도구 리비전과 착수 순서·완료 기준은 유지합니다. 기존 자료의 DLL이나 lock을 새 Payload에 섞지 마십시오.
+
+기존 개발 checkout에서 일반 pull/merge하면 제거한 이력이 다시 합쳐질 수 있습니다. 작업 파일과 로컬 측정 자료를 보존한 뒤 새 clone에서 이 문서의 고정 SHA로 시작하십시오. 이전 실행 로그와 이전 로컬 Payload는 관찰 기록으로 보존했으며, 로그의 옛 SHA를 새 실행의 리비전으로 바꾸지 않았습니다. 새 회귀 기록은 Evidence의 `repinned/` 아래에 있습니다.
