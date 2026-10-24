@@ -1,4 +1,4 @@
-#include "PhysicsTransformPolicy.h"
+﻿#include "PhysicsTransformPolicy.h"
 #include "../Utility_Framework/TimeSystem.h"
 #include "Scene.h"
 #include "TemporalMotionFixture.h"
@@ -360,7 +360,9 @@ void Scene::InitializeManaged()
 {
     gc::begin_cleanup_obligation(root_from_this());
     resetObjHandle = SceneManagers->resetSelectedObjectEvent.AddRaw(this, &Scene::ResetSelectedEntity);
+#if !defined(CE_SCENE_HEADLESS)
     m_soundSystem.Bind(*this, SceneManagers->AudioPlayback(), SceneManagers->AudioResolver());
+#endif
 }
 
 gc::root_ref<Scene> Scene::LoadScene(gc::domain& domain, std::string_view name)
@@ -424,7 +426,9 @@ void Scene::RetireManagedGraph()
     gc::advance_lifecycle(keepAlive, gc::lifecycle_state::destroy_requested);
     gc::advance_lifecycle(keepAlive, gc::lifecycle_state::destroying);
     DrainAIUpdate();
+#if !defined(CE_SCENE_HEADLESS)
     m_soundSystem.EndWorld();
+#endif
     (void)m_physicsSimulation.Stop();
     AllDestroyMark(true);
     // The synthetic root is protected during ordinary destruction and Play restore.
@@ -972,6 +976,9 @@ gc::root_ref<Entity> Scene::ReleaseSlot(Entity::Index index, bool transfer)
 
 void Scene::SerializeEntityHierarchy(const Entity& entity, const Authoring::MutableNodeView& view) const
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring writer service is not installed");
+#else
 	const Authoring::WriteNode node = Authoring::MutableNodeViewAccess::Node(view);
 	if (!Entity::IsValidIndex(entity.m_index)) return;
 	const size_t index = static_cast<size_t>(entity.m_index);
@@ -988,6 +995,8 @@ void Scene::SerializeEntityHierarchy(const Entity& entity, const Authoring::Muta
 	{
 		children.Append().SetScalar(child);
 	}
+
+#endif
 }
 
 size_t Scene::CountHierarchyStoreMismatches() const
@@ -1006,6 +1015,10 @@ size_t Scene::CountHierarchyStoreMismatches() const
 
 void Scene::CollectAIUpdate(bool waitForCompletion)
 {
+#if defined(CE_SCENE_HEADLESS)
+    // Optional presentation/AI service is absent in this build.
+    return;
+#else
     if (!m_AIJob.valid() || (!waitForCompletion && !m_AIJob.is_complete()))
     {
         return;
@@ -1020,20 +1033,32 @@ void Scene::CollectAIUpdate(bool waitForCompletion)
     {
         m_completedAIUpdates.push_back(std::move(batch));
     }
+
+#endif
 }
 
 void Scene::ApplyAIUpdate()
 {
+#if defined(CE_SCENE_HEADLESS)
+    // Optional presentation/AI service is absent in this build.
+    return;
+#else
     CollectAIUpdate(false);
     auto batches = std::exchange(m_completedAIUpdates, {});
     for (const auto& batch : batches)
     {
         AIManagers->ApplyAIUpdate(*this, *batch);
     }
+
+#endif
 }
 
 void Scene::DrainAIUpdate()
 {
+#if defined(CE_SCENE_HEADLESS)
+    // Optional presentation/AI service is absent in this build.
+    return;
+#else
     auto job = std::exchange(m_AIJob, {});
     // 콜백 자체도 batch를 소유한다. Scene 저장소를 먼저 비워도 워커는 값만
     // 읽을 수 있으며, 수명 경계에서는 완료 결과로 새 틱을 큐에 넣지 않는다.
@@ -1041,6 +1066,8 @@ void Scene::DrainAIUpdate()
     m_completedAIUpdates.clear();
     m_aiTickBoundaryReached = false;
     job.wait();
+
+#endif
 }
 
 void Scene::UnlinkFromParentChildren(Entity::Index index)
@@ -1834,7 +1861,7 @@ Entity* Scene::LoadEntity(size_t instanceID, std::string_view name, GameObjectTy
     gc::root_ref<Entity> ptr;
     try
     {
-        ptr = Entity::Create(ManagedDomain(), this, uniqueName, type, index, parentIndex);
+        ptr = Entity::Create(ManagedDomain(), this, instanceID, uniqueName, type, index, parentIndex);
     }
     catch (...)
     {
@@ -2198,6 +2225,10 @@ void Scene::DestroyEntity(Entity::Index index)
 // stage is the sole component -> render proxy publication point.
 void Scene::CommitRenderProxies()
 {
+#if defined(CE_SCENE_HEADLESS)
+    // Optional presentation/AI service is absent in this build.
+    return;
+#else
     auto renderScene = SceneManagers->GetRenderScene();
     if (nullptr == renderScene) return;
 
@@ -2376,6 +2407,8 @@ void Scene::CommitRenderProxies()
 		registry.metrics.lastCommitted = committed;
 		registry.metrics.lastMask = committedMask;
 	}
+
+#endif
 }
 
 size_t Scene::RenderProxyComponentCount() const
@@ -2452,6 +2485,10 @@ void Scene::ResetRenderProxyCommitMetrics()
 
 void Scene::UpdateRenderData()
 {
+#if defined(CE_SCENE_HEADLESS)
+    // Optional presentation/AI service is absent in this build.
+    return;
+#else
     InternalPauseUpdateForUI();
 
     // ── 렌더 프록시 갱신 (카메라와 무관) ──
@@ -2489,10 +2526,16 @@ void Scene::UpdateRenderData()
     //   · 클리어 0 — ClearUIRenderDataBuffer 호출자 0이라 푸시된 ID가 무한 축적
     // 즉 매 프레임 워커 팬아웃 비용과 누수만 내고 화면에는 아무 기여가 없었다.
     // 컬링 버퍼를 걷어낸 RenderSceneViewPlan ③과 같은 양식 — 생산만 있고 소비가 없다.
+
+#endif
 }
 
 void Scene::InternalPauseUpdateForUI()
 {
+#if defined(CE_SCENE_HEADLESS)
+    // Optional presentation/AI service is absent in this build.
+    return;
+#else
     if (SceneManagers->IsGamePaused())
     {
         float deltaTime = Time->GetElapsedSeconds();
@@ -2543,6 +2586,8 @@ void Scene::InternalPauseUpdateForUI()
             }
         }
     }
+
+#endif
 }
 
 void Scene::Reset()
@@ -3153,7 +3198,11 @@ ce::physics::result<void> Scene::StartPhysicsSimulation()
     if (auto layers = CommitPhysicsLayers(); !layers)
         return layers;
 
-    const auto started = m_physicsSimulation.Start();
+    ce::physics::scene_config config;
+#if defined(CE_SCENE_HEADLESS)
+    config.execution = ce::physics::execution_preference::cpu;
+#endif
+    const auto started = m_physicsSimulation.Start(config);
     if (started)
     {
         for (auto* component : m_physicsBodies | std::views::values) component->m_transferState.reset();
@@ -3343,6 +3392,10 @@ void Scene::FixedUpdate(float deltaSecond, bool singleStep)
 
 void Scene::Update(float deltaSecond)
 {
+#if defined(CE_SCENE_HEADLESS)
+    AllUpdateWorldMatrix(TransformSyncPoint::PreUpdate);
+    AllUpdateWorldMatrix(TransformSyncPoint::LateUpdate);
+#else
     {
         ce::profile_scope _profile{ ce::marker<"PreAllUpdateWorldMatrix">() };
     	AllUpdateWorldMatrix(TransformSyncPoint::PreUpdate);
@@ -3426,10 +3479,15 @@ void Scene::Update(float deltaSecond)
         ce::profile_scope _profile{ ce::marker<"LateAllUpdateWorldMatrix">() };
     	AllUpdateWorldMatrix(TransformSyncPoint::LateUpdate);
     }
+
+#endif
 }
 
 void Scene::LateUpdate(float deltaSecond)
 {
+#if defined(CE_SCENE_HEADLESS)
+    AllUpdateWorldMatrix(TransformSyncPoint::LateUpdate);
+#else
     // 이 페이즈엔 순회 중 발화점이 없다 — 폴백뿐이다. SceneManager::GameLogic이
     // 같은 호출 안에서 Update를 항상 LateUpdate보다 먼저 부르므로(SceneManager.cpp),
     // Update가 이미 무장을 다 소비한 뒤라 실제로는 거의 항상 no-op이다 — 그래도
@@ -3450,10 +3508,17 @@ void Scene::LateUpdate(float deltaSecond)
     // 늦으면 EndFrame의 기존 대기로 회수하고 다음 프레임에 먼저 적용한다.
     ApplyAIUpdate();
     m_aiTickBoundaryReached = true;
+
+#endif
 }
 
 void Scene::EndFramePass()
 {
+#if defined(CE_SCENE_HEADLESS)
+    FlushPendingDestroy();
+    DestroyComponents();
+    DestroyEntities();
+#else
     const bool tickBoundaryReached = std::exchange(m_aiTickBoundaryReached, false);
     const auto canUpdateAI = [this]
     {
@@ -3515,6 +3580,8 @@ void Scene::EndFramePass()
             }
         }
     }
+
+#endif
 }
 
 void Scene::AllDestroyMark(bool includePersistent)
@@ -4070,6 +4137,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
 
 	// ★ E7-b/E7-c(트랙 E) — Bone 판정은 BoneComponent 보유가 정본이다.
 	// 나머지 공간 판정도 위 HasTransform()으로 끝나므로 저장 타입 switch는 없다.
+#if !defined(CE_SCENE_HEADLESS)
     if (BoneComponent* boneComp = obj->GetComponent<BoneComponent>())
     {
         const auto& rootObj = TryGetEntity(obj->GetRootIndex());
@@ -4176,6 +4244,8 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
         childParentChanged = true;
     }
 	else
+#endif
+
     {
         // dirty 인지 순회의 본체. mustRecompute 네 조건 중 하나라도 참이면
         // 기존과 동일하게 GetLocalMatrix+곱셈+SetAndDecomposeMatrix를 전부
@@ -4311,6 +4381,9 @@ void Scene::LayoutUINode(Entity* obj, const math::rect& parentRect,
     float parentScale, bool parentChanged, bool isTopLevel, int depth,
     std::unordered_set<Entity*>& visited)
 {
+#if defined(CE_SCENE_HEADLESS)
+    return;
+#else
     if (nullptr == obj || obj->IsDestroyMark()) return;
 
     // 이미 계산한 노드는 건드리지 않는다. 두 번째 방문은 부모 문맥이 달라서
@@ -4384,10 +4457,15 @@ void Scene::LayoutUINode(Entity* obj, const math::rect& parentRect,
         LayoutUINode(TryGetEntity(childIndex), childRect, childScale,
             childChanged, childIsTopLevel, depth + 1, visited);
     }
+
+#endif
 }
 
 bool Scene::UpdateUILayout()
 {
+#if defined(CE_SCENE_HEADLESS)
+    return false;
+#else
     const math::rect screenRect = RectTransformComponent::GetScreenRootRect();
 	if (!m_hasLastUILayoutScreenRect
 		|| screenRect.width != m_lastUILayoutScreenRect.width
@@ -4435,10 +4513,16 @@ bool Scene::UpdateUILayout()
 	m_hasLastUILayoutScreenRect = true;
 	m_uiResolvedEpoch.store(dirtyEpoch, std::memory_order_release);
 	return true;
+
+#endif
 }
 
 void Scene::LayoutUISubtree(Entity* root)
 {
+#if defined(CE_SCENE_HEADLESS)
+    // Optional presentation/AI service is absent in this build.
+    return;
+#else
     if (nullptr == root) return;
 
     // 부모 기준은 컴포넌트와 같은 규칙으로 찾는다 — 여기에 (0,0,W,H)를 따로 적어
@@ -4463,6 +4547,8 @@ void Scene::LayoutUISubtree(Entity* root)
 
     std::unordered_set<Entity*> visited;
     LayoutUINode(root, parentRect, parentScale, /*parentChanged=*/true, isTopLevel, 0, visited);
+
+#endif
 }
 
 uint64_t Scene::TakeSpatialDirtySnapshot(
@@ -4628,12 +4714,15 @@ bool Scene::ResolveSpatialTransformsSparse(uint64_t dirtyEpoch,
 				BoneComponent* bone = graph.boneComponents[exec];
 				Entity* owner = bone ? Resolve(bone->m_animatorOwner) : nullptr;
 				Animator* animator = owner ? owner->GetComponent<Animator>() : nullptr;
+#if !defined(CE_SCENE_HEADLESS)
 				if (animator && animator->IsEnabled()
 					&& animator->GetSkeletonSerial() == bone->m_resolvedSerial)
 				{
 					exec = (std::min)(range.end, graph.subtreeEnd[exec]);
 					continue;
 				}
+#endif
+
 			}
 
 			const size_t slot = handle.index;
@@ -4754,6 +4843,9 @@ math::matrix4x4 BoneComponent::GetWorldTransform() const
 
 bool Scene::PrepareAnimatedBoneRead(Entity& boneEntity)
 {
+#if defined(CE_SCENE_HEADLESS)
+    return false;
+#else
 	if (boneEntity.GetScene() != this || boneEntity.IsDestroyMark()) return false;
 	BoneComponent* bone = boneEntity.GetComponent<BoneComponent>();
 	if (!bone) return false;
@@ -4834,6 +4926,8 @@ bool Scene::PrepareAnimatedBoneRead(Entity& boneEntity)
 	// established binding above keeps subsequent reads proportional to depth.
 	PublishAnimatorPose(*animator);
 	return EnsureResolved(HandleOf(boneEntity.m_index));
+
+#endif
 }
 
 bool Scene::TryGetLastAnimatorPoseMetrics(const Animator& animator,
@@ -4848,6 +4942,9 @@ bool Scene::TryGetLastAnimatorPoseMetrics(const Animator& animator,
 
 AnimatorPoseUploadMetrics Scene::PublishAnimatorPoseImpl(Animator& animator)
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Animation service is not installed");
+#else
 	using State = TransformExecutionGraphState;
 	using ExecIndex = State::ExecIndex;
 	AnimatorPoseUploadMetrics metrics{};
@@ -5073,6 +5170,8 @@ AnimatorPoseUploadMetrics Scene::PublishAnimatorPoseImpl(Animator& animator)
 		}
 	}
 	return metrics;
+
+#endif
 }
 
 TransformBulkWriteMetrics Scene::ApplyWorldWriteBatch(

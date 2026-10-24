@@ -45,4 +45,8 @@ private:
     std::vector<FoliageComponent*> m_foliages;
 };
 
+#if defined(CE_SCENE_HEADLESS)
+#define FoliageSystems (FoliageSystem::GetIfAlive())
+#else
 static auto FoliageSystems = FoliageSystem::GetInstance();
+#endif

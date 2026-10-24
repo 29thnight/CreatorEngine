@@ -1,6 +1,8 @@
 # 네트워크 준비형 런타임 · Replication 기반 계획 (PHASE 20)
 
-<!-- plan-summary: 2026-10-23: F# 일반 멤버·정적 콜백 등록, API45 OnTickSimulate(dt) 고정 틱을 유지한다. ND-a/ND-b/N1/N3의 사내 선행 수용과 서버 담당자의 wire schema·replication·transport·headless 제품 작업을 구분한다. -->
+<!-- plan-summary: 2026-10-24 최종 인계: 수용 범위 내 추가 사내 선행 구현 잔여 없음. 전달 리비전·도구·증거 고정은 남는다. 기존 Scene/Entity 무렌더 실행과 F# API45를 재사용해 N0→N2/N4→N5부터 착수한다. 실제 서버 N9와 soak N10은 별도 수용이다. -->
+
+> 2026-10-24 후속: `SceneRuntimeHeadless`는 기존 SceneManager·Scene·Entity·Component·ClrHost production 소스를 선택 서비스 없이 빌드한다. `HeadlessHost`는 순서만 조정하며 별도 엔티티 저장소·수명 큐·HeadlessBindings ABI를 사용하지 않는다. cooked reader는 실제 컴포넌트에 복원하고 추가 reader를 등록할 수 있다. 미설치 서비스가 필요한 콘텐츠는 명시적으로 거부한다. [실행 계약](../design/HeadlessSceneRuntimeContract.md)과 [새 checkout 수용 기록](../analysis/HeadlessSceneRuntimeAcceptance20261024.md)을 따른다. N9의 실제 wire/2-client/connection drain·운영 배포는 미수용이다.
 
 > 2026-10-23 최신 결정: 게임 저작과 공통 관리 실행기는 F#이다. 컴포넌트 생명주기는 **override 없는 일반 멤버 → 생성기의 정적 콜백 등록**, 고정 틱은 **OnTickSimulate(dt), Script API45**다. ScriptCore의 C# 코드는 네이티브 ABI·값 형식·바인딩 진입점으로 유지한다. 수명·세대 핸들·실패 reload 보존은 유지한다. [현재 계약](../design/FSharpScriptingContract.md)과 [API45 수용 기록](../analysis/FSharpManagedRuntimeAcceptance20261023.md)을 따른다. 아래 API43/44·C# 기본 저작 기록은 이전 단계이며 OnSimulate·Scope.Delay·simulation CE는 복원하지 않는다.
 
@@ -14,6 +16,8 @@
 [전체 문서 대조·충돌 판정](MasterPlanAudit20261020.html) · [정리 전 원문](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/docs/plans/NetworkFrameworkPlan.md)
 
 ## 남은 작업과 완료 판정
+
+2026-10-24 사내 렌더 없는 SceneRuntime 링크·구동을 기존 Scene/Entity 재사용 구조로 수용했다. 실제 cooked·60Hz·CPU 물리·CCT·F#·DDOL·GC/핸들 정리·의존 차단과 새 checkout 재현은 [실행 계약](../design/HeadlessSceneRuntimeContract.md)과 [수용 기록](../analysis/HeadlessSceneRuntimeAcceptance20261024.md)을 따른다. 별도 제한 프로필은 폐기했다. 추가 gameplay component·외부 geometry/asset bundle은 서비스 reader/provider 설치가 필요하며 모든 기존 씬의 무수정 실행을 뜻하지 않는다. 서버 담당자의 N0→N2/N4→N5와 N9 2-client/운영 제품은 남는다.
 
 2026-10-23 master 통합 재점검: `a985ee7e1`의 상류 변경과 기존 작업을 통합한 실행·호출자 수정은 [동기화 수용 기록](../analysis/MasterSyncRecheck20261023.md)을 따른다. 이전 실행 기록의 지문은 보존하고 이번 통합 작업본의 제품 검증과 구분한다.
 
@@ -42,7 +46,7 @@
 | `N5` · PHASE 20 | Spawn/Despawn과 Full Snapshot | todo |
 | `N6` · PHASE 20 | Dirty Delta·Quantization·Interest | todo |
 | `N7` · PHASE 20 | 실제 Transport A/B 판정과 adapter | todo |
-| `N9` · PHASE 20 | Dedicated Server 제품 target — 요구 시 별도 수용 | 조건부 · 미수용 |
+| `N9` · PHASE 20 | 기존 Scene/Entity 무렌더 실행·DDOL 수용 / 실제 서버·2-client·운영 제품은 별도 | 조건부 제품 · 미수용 |
 | `N10` · PHASE 20 | Hardening·관측·soak | todo |
 
 대시보드 상태는 인계용 식별 정보다. 위 구현 기반에서 이미 충족한 하위 요구는 재작성하지 않고, 남은 제품/실패/비용 수용을 수행한다.
@@ -119,23 +123,25 @@ shared-owner 구독과 해제 토큰, owner-thread dispatch, worker copied queue
 
 실제 codec Debug/Release 각 226검사, runtime 860소스/역할별 전이 1014항목, 변이 35건과 필수 회귀 등록/실패 전파를 검사한다. 새 cooked Player는 text parser 호출 0·직접 backend 참조 0·패키지 불변, 실제 PBR capture는 manifest와 첨부 7개를 검증했다. [경계 계약](../design/ArchiveParserBoundaryContract.md)과 [수용 기록](../analysis/ArchiveParserAcceptance20261022.md)을 따른다.
 
-Product 회귀에는 명시적 새 cooked Stage가 필요하다. 전체 runtime parser 라이브러리 unlink·Dedicated Server 제품 및 N2 wire schema/transport는 별도다. Motion fixture 준비 실패는 변경 전 SDK에서도 재현되어 잔여로 보존한다.
+Product 회귀에는 명시적 새 cooked Stage가 필요하다. 2026-10-24 headless 최종 map/import에서 parser unlink를 추가 수용했다. 전체 Player/runtime의 parser 라이브러리 unlink·실제 Dedicated Server 제품 및 N2 wire schema/transport는 별도다. Motion fixture 준비 실패는 변경 전 SDK에서도 재현되어 잔여로 보존한다.
 
-### 서버 작업자 인계와 제품 수용
+### 서버 작업자 인계와 제품 수용 — 2026-10-24 정본
 
-2026-10-23 [최종 인계 점검·착수 순서·검증 기준](../analysis/NetworkWorkerHandoff20261023.md): 네트워크 구현 착수는 가능하다. 실제 Dedicated Server 제품 전에는 사내 소유의 렌더 없는 SceneRuntime 링크·구동 수용과 전달 리비전 고정이 남는다. N9 조건부·미수용은 유지한다.
+[최종 점검·작업 소유·착수 순서·검증 기준](../analysis/NetworkWorkerHandoff20261024.md)을 따른다. ND-a·W4/ND-b·N1·N3·기존 Scene/Entity 무렌더 실행은 수용됐으며, 수용한 Windows x64 콘텐츠 범위에서 추가 사내 선행 구현 잔여는 발견하지 않았다. 미커밋·미추적 구현을 포함한 전달 리비전·도구·SDK·증거 고정은 전달 전 잔여다. 현재 HEAD만 넘기면 검증된 구현을 전달하지 못한다.
 
-ND-a 계약 6종·변경 절차·금지 타입 실패 canary와 전체 회귀 배선, W4→ND-b 엔티티 수명/일반 쓰기 관찰, N1 Archive/Parser 경계 검증은 유지한다. W8은 기존 프레임 훅 dispatch 검증으로 독립 유지한다. C# Verse식 계약이나 PrSM 전체 언어 완성은 서버 인계 선행 조건이 아니다. C# 전용 표면 제거 작업은 별도 소유하며, 서버와 공유하는 수명/ABI 경계가 바뀌면 계약 동결 및 인수 gate에 반영한다.
+N0 기준선/실패 gate → N2 wire ID/schema와 N4 loopback 병행 → N5 full snapshot/late join → N6 delta/interest/quantization → N7 실제 transport → N9 실제 서버 제품 → N10 최종 soak 순서로 진행한다. N9 bootstrap과 N10 실패 하네스는 일찍 병행할 수 있으나 최종 인수는 통합 제품으로 한다. N8 prediction은 gameplay 요구 확정 시 별도다. N9 전체를 완료로 표시하지 않는다.
 
-1. N3는 사내 소유: 단일 clock, C++↔C# OnUpdate 고정 틱 계약, 명시적 tick 명령 API, 성공 커밋 observer를 먼저 수용한다. ND-a가 닫히면 담당자는 N0/N4를 제한 착수할 수 있고, N5 전체 인계는 tick 계약 확정 뒤다.
-2. 30/60/144fps·0틱/다중틱·물리 없는 씬에서 같은 tick 명령의 적용 서수·상태·물리 step 수와 OnUpdate 호출 수/fixedDelta/물리 앞 순서를 비교한다. C++/C# 서명 불일치·중복 dispatch·프레임 dt 전달 변이는 실패해야 한다. 임의 Task 완료 순서나 플랫폼 간 물리 결정성까지 보장하지 않는다.
-3. 제거될 Scope.Delay 전용 검사는 폐기 사유를 기록하고 lifecycle/ddol/axis/thread/generation/failure/retention/reentrancy의 수명·스레드 안전성 검사를 기본 C# 경로로 이주한다. tick 명령 순서·포화·stale 세대·pause/씬 교체·실패 커밋 거부는 별도 검증한다. 대기 검사 전체를 tick 검사로 바꾸지 않는다.
-4. Editor와 신규 cooked Player에서 CCT·동적 바디·접촉·렌더 보간을 검증한다. 렌더 없는 SceneRuntime 링크/구동은 사내 경계이며 담당자의 개발 하네스와 구분한다.
-5. N9 배포용 Dedicated Server는 제품 요구 범위로 추적한다. N3·transport 및 런타임/배포 경계 수용 후 cooked startup, 창/렌더 장치 없는 tick 진행, 2-client 연결, graceful shutdown/connection drain, renderer/Editor/저작 parser 패키지 의존 차단을 실제 서버 산출물로 검증한다. 현재 완료로 표시하지 않는다.
+- 현재 생명주기는 F# 일반 멤버 OnTickSimulate(dt)/API45이며, Pre/PostPhysics·일반 Task·수명/핸들/DDOL을 유지한다. OnSimulate·Scope.Delay·새 생명주기·C# 병행 저작·PrSM 언어 완성은 인계 선행이 아니다.
+- N2/N5는 SceneManager::Observations()의 기존 구독을 소비한다. N5는 SimulationCommands()·SimulationAdapter::Apply/Capture와 성공 커밋 후 Read에 연결한다. 현재 구현에 없는 ISimulationFrameObserver를 전제로 하지 않는다. Capture에서 커밋 전에 전송하지 않고 기존 로컬 명령/snapshot 소비자를 보존한다.
+- 현재 로컬 handle/token/schema 1·bounded exchange 상수를 wire ID/포맷/용량 정책으로 전용하지 않는다. 개별 F# 예외 격리와 배치 전체 실패의 미커밋을 구분하며, 세계 전체 rollback·임의 Task 순서·플랫폼 간 PhysX 결정성을 가정하지 않는다.
+- 실제 서버 콘텐츠에 추가 reader·project layer·asset bundle·외부 geometry가 필요하면 엔진 담당자가 기존 컴포넌트/서비스에 연결하고 그 콘텐츠를 별도 수용한다. 이 조건부 작업을 모든 담당자 개발 착수의 선행으로 확대하지 않는다. quantizer·snapshot 배치·backpressure와 transport 의존/패키징 변경은 측정 뒤 공동 확정한다.
+- N9는 실제 DedicatedServer 산출물로 cooked 시작·창/GPU 없는 tick·CPU 물리/F#·2-client 수렴·정상 종료/connection drain·렌더/Editor/저작 parser 의존 차단을 검증한다. 기존 HeadlessHost 수용만으로 이 제품 gate를 대체하지 않는다.
+
+이번 최종 점검은 기존 실제 host 57건·NetworkHandoff All -Product 17그룹의 기록과 현재 source/receipt 지문을 대조했고 불일치 0이다. source 경계·wire v1·8종 필수 등록은 재검사했다. 이번에 Editor/Player/GPU 전체를 다시 실행하거나 원격 CI를 수용한 것으로 표기하지 않는다.
 
 ## 검증 경계
 
-2026-10-20 고정 master의 문서 감사와 2026-10-22 현재 작업 트리의 구현·제품 수용은 별도다. C# 저작 이주의 빌드·Editor/신규 cooked Player는 [기존 수용 기록](../analysis/CSharpFixedUpdateAcceptance20261022.md), 후속 API43 명령·snapshot 배선과 최종 코드 신원은 [N3 수용 기록](../analysis/N3ExchangeAcceptance20261022.md)으로 구분한다. 서버/PrSM 전체, 대표 성능·GPU 픽셀·Debug/Shipping·다른 OS 수용으로 확대하지 않는다.
+현재 인계는 [2026-10-24 최종 점검](../analysis/NetworkWorkerHandoff20261024.md)과 [기존 Scene/Entity 실행 수용](../analysis/HeadlessSceneRuntimeAcceptance20261024.md), [F# API45 계약](../design/FSharpScriptingContract.md)을 따른다. 2026-10-20 고정 master 문서 감사와 2026-10-22 C#/API43 단계는 과거 근거로 보존한다. Linux/컨테이너·cache 없는 clean VM·self-contained 배포·실제 서버/transport·대표 성능·다른 장치·soak는 해당 제품 gate로 별도 수용한다.
 
 <details><summary>이전 절 링크 호환</summary>
 

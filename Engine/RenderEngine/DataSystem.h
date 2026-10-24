@@ -945,4 +945,8 @@ private:
 
 };
 
+#if defined(CE_SCENE_HEADLESS)
+#define DataSystems (DataSystem::GetIfAlive())
+#else
 static auto DataSystems = DataSystem::GetInstance();
+#endif

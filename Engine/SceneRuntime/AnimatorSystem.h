@@ -364,4 +364,8 @@ private:
     const std::thread::id m_ownerThreadId{ std::this_thread::get_id() };
 };
 
+#if defined(CE_SCENE_HEADLESS)
+#define AnimatorSystems (AnimatorSystem::GetIfAlive())
+#else
 static auto AnimatorSystems = AnimatorSystem::GetInstance();
+#endif

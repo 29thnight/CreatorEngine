@@ -222,6 +222,7 @@
     <ClCompile Include="Prefab.cpp" />
     <ClCompile Include="PrefabUtility.cpp" />
     <ClCompile Include="Scene.cpp" />
+    <ClCompile Include="CookedSceneLoader.cpp" />
     <ClCompile Include="ScenePhysicsSimulation.cpp" />
     <ClCompile Include="PhysicsBodyComponent.cpp" />
     <ClCompile Include="CharacterMovementComponent.cpp" />
@@ -231,6 +232,7 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="ClrHost.cpp" />
+    <ClCompile Include="ManagedAssembly.cpp" />
     <ClCompile Include="ManagedAniBehavior.cpp" />
     <ClCompile Include="ScriptComponent.cpp" />
     <ClCompile Include="ScriptObjectRegistry.cpp" />
@@ -333,6 +335,7 @@
     <ClInclude Include="RenderableComponents.h" />
     <ClInclude Include="AnimationDiagnostics.h" />
     <ClInclude Include="Scene.h" />
+    <ClInclude Include="CookedSceneLoader.h" />
     <ClInclude Include="ScenePhysicsSimulation.h" />
     <ClInclude Include="SimulationSessionPolicy.h" />
     <ClInclude Include="SimulationTick.h" />
@@ -343,6 +346,8 @@
     <ClInclude Include="CharacterMotionPolicy.h" />
     <ClInclude Include="Socket.h" />
     <ClInclude Include="ClrHost.h" />
+    <ClInclude Include="ManagedAssembly.h" />
+    <ClInclude Include="SimulationTickExecution.h" />
     <ClInclude Include="ManagedAniBehavior.h" />
     <ClInclude Include="ScriptComponent.h" />
     <ClInclude Include="ScriptObjectRegistry.h" />

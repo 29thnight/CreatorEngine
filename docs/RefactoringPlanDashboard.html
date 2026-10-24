@@ -1422,8 +1422,15 @@
   <b>ND-a·W4·ND-b 완료.</b> 계약 6종 동결·변경 절차·금지 타입 검사 위에 저작 변경·Undo/Redo와 로컬 엔티티 수명/일반 쓰기 관찰자를 연결했다.
   DDOL은 같은 정체성의 Detached→Attached이며 ScriptObjectHandle을 유지한다. 큐 예외/포화 metrics와 전체 재구성 규칙을 포함한다.
   <a href="analysis/SceneObservationAcceptance20261022.html">실제 Editor·등록 회귀 10개 그룹 수용 기록</a>을 따른다.
-  <b>N3는 사내 소유.</b> F# 공통 관리 실행기와 일반 멤버 OnTickSimulate(dt)를 정적으로 등록해 고정 틱을 실행한다. ScriptCore의 C# 코드는 API/ABI 바인딩이다. Scope.Delay·공개 Scope·OnSimulate 전용 구조는 제거했으며 별도 OnSimulationTick은 없다. PrSM 언어 계약은 장기 보류한다. 현재 30/60/144fps·moving GPU 0틱·Editor·cooked Player와 등록 인계 회귀 15그룹을 수용했다. 전체 C# fixture의 F# 이주는 진행 중이다.
+  <b>N3는 사내 소유.</b> F# 공통 관리 실행기와 일반 멤버 OnTickSimulate(dt)를 정적으로 등록해 고정 틱을 실행한다. ScriptCore의 C# 코드는 API/ABI 바인딩이다. Scope.Delay·공개 Scope·OnSimulate 전용 구조는 제거했으며 별도 OnSimulationTick은 없다. PrSM 언어 계약은 장기 보류한다. 현재 30/60/144fps·moving GPU 0틱·Editor·cooked Player와 등록 인계 회귀 15그룹을 수용했다. 현행 게임 저작은 F#이며 C#은 ScriptCore ABI와 격리 비교/이전 기록을 구분한다.
   <b>전량 인계·서버 제품 완료와 구분한다.</b> N2 wire ID/schema·N5 replication·transport 및 N9 cooked 서버 startup·2-client·정상 종료는 별도다. W5 렌더 소비 수용도 남는다.</div>
+  <div class="risknote"><div class="vt">2026-10-24 · 렌더 없는 사내 실행 경계</div>
+  <b>기존 Scene/Entity 재사용 무렌더 실행.</b> 실제 cooked 씬 → 공통 고정틱 → CPU 물리 → F# 일반 멤버 → 정상/오류 종료를 검사하고,
+  adapter/project 경계·native imports·링크 map·패키지·실제 DLL에서 렌더/저작 parser 의존을 차단한다.
+  기존 SceneManager·Scene·Entity·ClrHost·수명·DDOL을 재사용한다. 추가 컴포넌트/에셋은 reader/provider를 설치한다.
+  <a href="design/HeadlessSceneRuntimeContract.html">계약</a> · <a href="analysis/HeadlessSceneRuntimeAcceptance20261024.html">새 checkout 수용 기록</a> · <a href="analysis/NetworkWorkerHandoff20261024.html">최종 인계 순서·기준</a>.
+  수용 범위 내 추가 사내 선행 구현 잔여는 없으며, 전달 리비전·도구·증거 고정은 남는다.
+  N9 전체 서버 제품·2-client 동기화·운영 배포 상태는 유지한다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="20"><!-- JS 생성 --></table></div>
 </section>
 
@@ -2726,11 +2733,11 @@ const TASKS = [
   { phase: 20, id: "N0", title: "기준선·금지 타입·telemetry 실패 게이트",
     detail: "frame/physics tick, Entity/Component 변화량을 계측하고 EntityHandle·HashedGuid·YAML/JSON Node의 wire 유입을 실패시킨다. packet/encode/alloc/queue/drop 공통 telemetry를 먼저 세운다.",
     refs: "NetworkFrameworkPlan N0", priority: "P0", days: 1.5, status: "todo",
-    note: "담당자 전량 — telemetry 값 타입과 계측이라 값 경계에서 닫힌다. 여기서 나온 실측으로 사내가 헤더 8·9·10(quantizer·snapshot 배치·backpressure 임계)을 동결한다." },
+    note: "담당자 전량 — telemetry 값 타입과 계측이라 값 경계에서 닫힌다. 실측 후 quantizer·snapshot 배치·backpressure 계약을 사내 소유자와 확정한다. 미작성 후속 계약을 이미 동결한 헤더로 취급하지 않는다." },
   { phase: 20, id: "N1", title: "Archive·Parser 경계 밀봉",
     detail: "공통 schema의 Authoring/CEDO codec 경계와 opaque 진단 writer. runtime 직접 backend 누출 및 Network 전이 의존을 필수 회귀로 차단한다.",
     refs: "NetworkFrameworkPlan N1 · ArchiveParserAcceptance20261022", priority: "P0", days: 0.5, status: "done",
-    note: "2026-10-22 — 진단 backend 누출 2곳과 기존 호출자 이주. Debug/Release 각 226검사·소스 860/역할별 전이 1014·변이 35건. 새 cooked Player parser 0·패키지 불변 및 실제 PBR 첨부 7개 수용. Motion fixture 준비 실패는 변경 전 SDK도 동일하며 잔여 보존. 전체 parser unlink/서버 제품은 별도." },
+    note: "2026-10-22 — 진단 backend 누출 2곳과 기존 호출자 이주. Debug/Release 각 226검사·소스 860/역할별 전이 1014·변이 35건. 새 cooked Player parser 0·패키지 불변 및 실제 PBR 첨부 7개 수용. Motion fixture 준비 실패는 변경 전 SDK도 동일하며 잔여 보존. 2026-10-24 headless 최종 parser unlink는 수용. 전체 Player/runtime parser unlink와 실제 서버 제품은 별도." },
   { phase: 20, id: "N2", title: "Network ID와 schema 정본",
     detail: "NetworkObjectId·고정폭 type/field ID·tombstone registry와 replicated schema validation을 만든다. DDOL/scene transfer/destroy의 Bind·Rebind·Unbind 순서를 검증한다.",
     refs: "NetworkFrameworkPlan N2", priority: "P0", days: 4, status: "todo",
@@ -2750,7 +2757,7 @@ const TASKS = [
   { phase: 20, id: "N3", title: "Fixed Simulation Clock + C++ 계약 OnTickSimulate",
     detail: "API45/F# 일반 멤버·공통 관리 실행기, Editor·신규 cooked Player·30/60/144fps·moving 0틱 GPU 및 등록 NetworkHandoff 15그룹 수용. 전체 fixture 이주는 별도.",
     refs: "NetworkFrameworkPlan N3 · FSharpManagedRuntimeAcceptance20261023 · analysis/MasterSyncRecheck20261023.md", priority: "P0", days: 4, status: "done",
-    note: "2026-10-23 숨은 Scene 뷰 중복 제출과 moving readback 제어권 경합 수정. 30.000/59.994/144.042fps, 동일 tick CCT/강체 궤적 차이 0, Scene/Game GPU 전환 4회·canary17 통과. API45/F# 공통 실행기에서 등록 인계 15그룹 재검증. 새 SDK·실제 Player 수용. master a985ee7e1 통합 후 30.0042/59.9864/144.0422fps·동일 tick 궤적 차이0·moving 0틱 GPU 재수용. 이번 인계 CPU 회귀는7게이트이며 이전15그룹 기록과 구분한다. 미이주 fixture·렌더 없는 서버 링크와 N9는 별도." },
+    note: "2026-10-23 숨은 Scene 뷰 중복 제출과 moving readback 제어권 경합 수정. 30.000/59.994/144.042fps, 동일 tick CCT/강체 궤적 차이 0, Scene/Game GPU 전환 4회·canary17 통과. API45/F# 공통 실행기에서 등록 인계 15그룹 재검증. 새 SDK·실제 Player 수용. master a985ee7e1 통합 후 30.0042/59.9864/144.0422fps·동일 tick 궤적 차이0·moving 0틱 GPU 재수용. 이번 인계 CPU 회귀는7게이트이며 이전15그룹 기록과 구분한다. 2026-10-24 기존 Scene/Entity 무렌더 실행·물리/CCT·F#·DDOL·새 checkout은 HeadlessSceneRuntime 계약·수용 기록으로 갱신. All -Product 17그룹 수용 기록과 현재 지문 일치. N9 실제 2-client 서버는 별도." },
   { phase: 20, id: "N4", title: "Loopback Transport와 메시지 프레이밍",
     detail: "message-oriented INetworkTransport, bounded reader/writer, handshake와 loss/reorder/duplicate/corruption simulator를 실제 socket 없이 완결한다.",
     refs: "NetworkFrameworkPlan N4", priority: "P0", days: 4, status: "todo",
@@ -2758,7 +2765,7 @@ const TASKS = [
   { phase: 20, id: "N5", title: "Spawn/Despawn과 Full Snapshot",
     detail: "server-authoritative lifecycle과 immutable full snapshot, interpolation buffer를 Loopback 2-peer에서 검증한다. stale snapshot은 개체를 부활시키지 못해야 한다.",
     refs: "NetworkFrameworkPlan N5", priority: "P0", days: 5, status: "todo",
-    note: "담당자 전량 — N3가 심는 ISimulationFrameObserver::OnTickCommitted 위에서 capture하므로 tick 루프를 열지 않는다(1판에서는 이 항목이 C 구간이었다)." },
+    note: "담당자 전량 — 실제 SimulationCommands()/SimulationAdapter::Apply·Capture와 성공 커밋 후 Read를 소비한다. Capture에서 커밋 전 전송 금지, 기존 로컬 소비자 보존. ISimulationFrameObserver는 현재 구현 API가 아니다. NetworkWorkerHandoff20261024 기준." },
   { phase: 20, id: "N6", title: "Dirty Delta·Quantization·Interest",
     detail: "revision/dirty mask, acknowledged baseline, 실측 quantizer와 최소 interest grid로 full snapshot 대비 bytes/tick·encode·allocation을 줄인다.",
     refs: "NetworkFrameworkPlan N6", priority: "P1", days: 5, status: "todo",
@@ -2773,8 +2780,8 @@ const TASKS = [
     note: "담당자 전량(요구 확정 시) · 중단 — gameplay 요구가 확정되지 않았고 계획 원문도 전체 완료 조건에서 제외한다. locally-owned movement와 허용 오차가 제품 요구로 정해질 때 별도 슬라이스로 재개한다." },
   { phase: 20, id: "N9", title: "Headless Server target (선택 제품)",
     detail: "Editor/ImGui/RenderCore/authoring parser 없이 cooked content와 공통 simulation tick으로 2-client smoke를 통과한다. 제품 요구가 있을 때 착수한다.",
-    refs: "NetworkFrameworkPlan N9", priority: "P2", days: 5, status: "stopped",
-    note: "사내 — .sln·vcxproj·링크 경계 수술이다. 중단 — dedicated/headless 제품 요구가 없으므로 현재 네트워크 기반의 완료 조건에서 제외한다. 서버 배포 모델과 운영 요구가 확정되면 새 제품 타깃으로 재개한다." },
+    refs: "NetworkFrameworkPlan N9 · design/HeadlessSceneRuntimeContract.html · analysis/HeadlessSceneRuntimeAcceptance20261024.html · analysis/NetworkWorkerHandoff20261024.html", priority: "P2", days: 5, status: "stopped",
+    note: "2026-10-24 사내 기존 Scene/Entity 재사용 무렌더 실행 수용: 같은 수명·GC·핸들·DDOL·60Hz·실제 물리/CCT·F# API45·정상/오류 종료·렌더/파서 의존 차단. 별도 엔티티 저장소·ABI 제거. 추가 컴포넌트/외부 에셋은 reader/provider 설치가 필요하다. 계약·새 checkout 근거: design/HeadlessSceneRuntimeContract.html, analysis/HeadlessSceneRuntimeAcceptance20261024.html. N9 실제 wire/2-client/connection drain·운영 배포는 조건부·미수용으로 유지한다. 2026-10-24 최종 점검: 추가 사내 선행 구현 잔여 없음(수용 콘텐츠 범위). 전달 리비전·도구·증거 고정은 남음. NetworkWorkerHandoff20261024 참조." },
   { phase: 20, id: "N10", title: "Hardening·관측·soak",
     detail: "bounds/authority/rate limit, queue backpressure, disconnect/shutdown 순서, 장시간 soak와 운영 telemetry를 완결한다.",
     refs: "NetworkFrameworkPlan N10", priority: "P1", days: 4, status: "todo",

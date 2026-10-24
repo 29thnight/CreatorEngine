@@ -92,7 +92,11 @@ private:
 	bool isEnableUINavigation = true;
 };
 
+#if defined(CE_SCENE_HEADLESS)
+#define UIManagers (UIManager::GetIfAlive())
+#else
 static auto UIManagers = UIManager::GetInstance();
+#endif
 
 interface ICollision2D
 {

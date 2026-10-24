@@ -47,4 +47,8 @@ private:
     std::vector<LightComponent*> m_lights;
 };
 
+#if defined(CE_SCENE_HEADLESS)
+#define LightSystems (LightSystem::GetIfAlive())
+#else
 static auto LightSystems = LightSystem::GetInstance();
+#endif

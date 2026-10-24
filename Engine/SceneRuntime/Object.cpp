@@ -89,6 +89,9 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
 
 Object* Object::Instantiate(const Object* original, std::string_view newName)
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring service is not installed in this host; load a cooked scene instead");
+#else
     if (!original)
         return nullptr;
 
@@ -223,4 +226,6 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 
     return cloneObj;
 
+
+#endif
 }

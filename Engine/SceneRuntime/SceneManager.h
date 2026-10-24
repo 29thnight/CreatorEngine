@@ -91,6 +91,7 @@ public:
     // Native transport adapter: concurrent Submit/Read, GT-only Bind/Reset.
     Runtime::SimulationExchange& SimulationCommands() noexcept { return m_simulationExchange; }
     void ResetSimulationCommands();
+    const Runtime::SimulationTick& SimulationClock() const noexcept { return m_simulationTick; }
     void InputEvents(float deltaSecond);
     // ⚠ 기본 인자를 두지 않는다(E3-7). 예전에는 `= 0`이라 편집 모드 호출부가
     //   인자를 생략해 delta 0이 조용히 들어갔고, "delta 0은 일시정지에서만"이라는
@@ -155,7 +156,11 @@ public:
 
     RenderScene* GetRenderScene() { return m_ActiveRenderScene; }
     void SetRenderScene(RenderScene* renderScene) { m_ActiveRenderScene = renderScene; }
-    AnimationScheduler& GetAnimationScheduler() noexcept { return *m_animationScheduler; }
+    AnimationScheduler& GetAnimationScheduler()
+    {
+        if (!m_animationScheduler) throw std::logic_error("Animation provider is not installed");
+        return *m_animationScheduler;
+    }
     void AddDontDestroyOnLoad(Object* objPtr);
 	void RemoveDontDestroyOnLoad(Object* objPtr);
 	void RebindEventDontDestroyOnLoadObjects(Scene* scene);
@@ -351,7 +356,7 @@ private:
     AssetBundle                         m_dontDestroyOnLoadAssetsBundle{};
     std::atomic<Scene*>                 m_activeScene{};
     std::atomic<RenderScene*>           m_ActiveRenderScene{ nullptr };
-    std::unique_ptr<AnimationScheduler>  m_animationScheduler;
+    std::shared_ptr<AnimationScheduler>  m_animationScheduler;
 	std::string                         m_LoadSceneName{};
     std::atomic_size_t                  m_activeSceneIndex{};
 	std::atomic_bool                    m_renderProfileApplyPending{ false };

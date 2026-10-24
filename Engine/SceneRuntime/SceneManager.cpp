@@ -1,6 +1,8 @@
 #include "../Utility_Framework/Ownership.h"
 #include "ProjectLayerSettings.h"
 #include "SceneManager.h"
+#include "LifecycleRegistry.h"
+#include "SimulationTickExecution.h"
 #include "../Utility_Framework/StandardLibrary.h"
 #include "RenderScene.h"
 #include "AnimationScheduler.h"
@@ -43,6 +45,7 @@
 // 로직이 두 벌 도는 것을 막는 봉합이었다. 씬을 복제하지 않게 되면서 두 벌이
 // 생길 여지 자체가 사라져 걷어냈다.
 
+#if !defined(CE_SCENE_HEADLESS)
 namespace
 {
     // Scene 공개/리플렉션 API는 Entity 기준 이름(m_Entities)으로 저장한다.
@@ -285,8 +288,12 @@ namespace LegacyTransformPromotion
     }
 }
 
+#endif
+
 SceneManager::SceneManager()
-    : m_animationScheduler(std::make_unique<AnimationScheduler>(*this))
+    #if !defined(CE_SCENE_HEADLESS)
+    : m_animationScheduler(std::make_shared<AnimationScheduler>(*this))
+#endif
 {
 }
 
@@ -369,7 +376,9 @@ void SceneManager::RetireScene(Scene* scene)
     }
     if (scene == m_activeScene.load())
     {
+        #if !defined(CE_SCENE_HEADLESS)
         TemporalMotionFixture::Cancel("Fixture scene is being retired");
+        #endif
     }
     if (&scene->ManagedDomain() != &m_gcDomain)
     {
@@ -407,7 +416,9 @@ void SceneManager::RetireScene(Scene* scene)
         return entity && entity->GetScene() == scene;
     });
     scene->RetireManagedGraph();
+#if !defined(CE_SCENE_HEADLESS)
     PrefabUtilitys->ForgetScene(scene);
+#endif
     std::erase(m_scenes, scene);
     std::erase_if(m_sceneRoots, [scene](const auto& root)
         { return root.get() == scene; });
@@ -442,7 +453,9 @@ void SceneManager::SetActiveScene(Scene* scene)
     }
     if (m_activeScene.load() != scene)
     {
+        #if !defined(CE_SCENE_HEADLESS)
         TemporalMotionFixture::Cancel("Active scene is changing");
+        #endif
         AdvanceSceneContextEpoch();
         m_activeScene = scene;
     }
@@ -461,6 +474,11 @@ void SceneManager::SetCommittedSimulation(bool committed)
 
 void SceneManager::BindAudioPlayback(wave::PlaybackService* playback, SoundSystem::AssetResolver resolver)
 {
+#if defined(CE_SCENE_HEADLESS)
+    if (playback) throw std::logic_error("Audio provider is not installed");
+    m_audioPlayback = nullptr;
+    m_audioResolver = {};
+#else
     if (m_audioPlayback)
     {
         m_audioPlayback->EndScope(m_audioSession);
@@ -476,10 +494,15 @@ void SceneManager::BindAudioPlayback(wave::PlaybackService* playback, SoundSyste
     {
         scene->Sounds().Activate();
     }
+
+#endif
 }
 
 void SceneManager::SynchronizeAudioWorld()
 {
+#if defined(CE_SCENE_HEADLESS)
+    if (m_audioPlayback) throw std::logic_error("Audio provider is not installed");
+#else
     const auto* active = m_activeScene.load();
     for (auto* scene : m_scenes)
     {
@@ -489,17 +512,26 @@ void SceneManager::SynchronizeAudioWorld()
         }
         else
         {
-            scene->Sounds().EndWorld();
+    #if !defined(CE_SCENE_HEADLESS)
+        scene->Sounds().EndWorld();
+#endif
         }
     }
+
+#endif
 }
 
 void SceneManager::RefreshAudioClipKeys()
 {
+#if defined(CE_SCENE_HEADLESS)
+    if (m_audioPlayback) throw std::logic_error("Audio provider is not installed");
+#else
     for (auto* scene : m_scenes)
     {
         scene->Sounds().RefreshClipKeys();
     }
+
+#endif
 }
 
 void SceneManager::SetGameStart(bool isStart)
@@ -546,6 +578,13 @@ void SceneManager::ToggleGamePaused()
 
 void SceneManager::ManagerInitialize()
 {
+#if defined(CE_SCENE_HEADLESS)
+    m_sceneLoadOwner = std::this_thread::get_id();
+    m_gcDomain.bind_to_current_thread();
+    m_gcDomain.set_allocation_threshold(1024u * 1024u);
+    m_gcDomain.set_max_cycle_interval(std::chrono::seconds(1));
+    Lifecycle::Registry::RegisterAllComponents();
+#else
     m_sceneLoadOwner = std::this_thread::get_id();
     m_gcDomain.bind_to_current_thread();
     m_gcDomain.set_allocation_threshold(1024u * 1024u);
@@ -555,6 +594,8 @@ void SceneManager::ManagerInitialize()
     m_inputActionManager = new InputActionManager();
     InputActionManagers = m_inputActionManager;
     InputActionManagers->LoadManager();
+
+#endif
 }
 
 bool SceneManager::HasPendingSceneStructureChange() const
@@ -625,7 +666,9 @@ void SceneManager::NotifyActiveSceneChanged()
 {
     if (auto* active = m_activeScene.load())
     {
+#if !defined(CE_SCENE_HEADLESS)
         active->Sounds().Activate();
+#endif
     }
     // 길이가 없는 사건(§7.3 의 첫째 트랙). 씬이 바뀌면 그 뒤 프레임들의
     // 성격이 통째로 달라지는데, 그 까닭이 타임라인에 남지 않으면 "여기서부터
@@ -636,6 +679,9 @@ void SceneManager::NotifyActiveSceneChanged()
 
 void SceneManager::Editor()
 {
+#if defined(CE_SCENE_HEADLESS)
+    return;
+#else
     {
         ce::profile_scope _profile{ ce::marker<"Editor">() };
 
@@ -653,6 +699,8 @@ void SceneManager::Editor()
             activeScenePtr->DrainPendingLifecycle();
     	}
     }
+
+#endif
 }
 
 void SceneManager::Initialization()
@@ -713,13 +761,9 @@ void SceneManager::Physics(float deltaSecond)
         // Newly spawned scripts get their normal lifecycle before the next fixed update.
         scene->DrainPendingLifecycle();
         if (HasPendingSceneStructureChange() || IsGamePaused() || SceneContextEpoch() != epoch) break;
-        const auto commandEpoch = m_simulationExchange.Status().epoch;
-        auto failTick = [this](const char* reason)
-        {
-            m_simulationExchange.Fail();
-            ReportSimulationFailure(reason);
-        };
-        if (m_simulationExchange.Begin(m_simulationTick.committed + 1, [this](const Runtime::TickCommand& command)
+        auto& clr = ClrHost::Get();
+        const auto outcome = Runtime::ExecuteSimulationTick(m_simulationTick, m_simulationExchange,
+            [this](const Runtime::TickCommand& command)
         {
             if (command.kind != 1 || command.bytes != sizeof(Runtime::LocalPositionValue)) return false;
             Runtime::LocalPositionValue value;
@@ -732,29 +776,20 @@ void SceneManager::Physics(float deltaSecond)
             target->Transform_().SetWorldPosition({value.x, value.y, value.z}, TransformWriteReason::Script);
             m_tickPositionTarget = value;
             return true;
-        }) != Runtime::TickResult::Ok)
-        {
-            failTick("Simulation command application failed");
-            return;
-        }
-        auto& clr = ClrHost::Get();
-        if (!clr.TickUpdate(static_cast<float>(Runtime::SimulationTick::seconds)))
-        {
-            failTick("Managed OnTickSimulate batch failed");
-            return;
-        }
-        // A pause requested by OnTickSimulate takes effect after this tick, avoiding a repeated update on resume.
-        if (HasPendingSceneStructureChange() || SceneContextEpoch() != epoch
-            || m_simulationExchange.Status().epoch != commandEpoch)
-        {
-            failTick("Simulation context changed during tick");
-            return;
-        }
-        scene->FixedUpdate(static_cast<float>(Runtime::SimulationTick::seconds), true);
-        if (HasPendingSceneStructureChange()) { m_simulationExchange.Fail(); return; }
-        clr.FlushPhysicsEvents(); // Publish this step before the next tick's OnTickSimulate reads it.
-        m_observation.Drain();
-        if (m_simulationExchange.Prepare([this](std::span<std::byte> output, std::uint32_t& bytes, std::uint32_t& schema)
+        },
+            [&clr](float fixedDelta) { return clr.TickUpdate(fixedDelta); },
+            [this, epoch] { return !HasPendingSceneStructureChange() && SceneContextEpoch() == epoch; },
+            [this, scene](float fixedDelta)
+            {
+                scene->FixedUpdate(fixedDelta, true);
+                return !HasPendingSceneStructureChange();
+            },
+            [this, &clr]
+            {
+                clr.FlushPhysicsEvents();
+                m_observation.Drain();
+            },
+            [this](std::span<std::byte> output, std::uint32_t& bytes, std::uint32_t& schema)
         {
             Runtime::LocalPositionSnapshot snapshot{m_tickPositionTarget, 0};
             auto* target = ScriptObjectRegistry::Get().Resolve({m_tickPositionTarget.index, m_tickPositionTarget.generation});
@@ -768,21 +803,11 @@ void SceneManager::Physics(float deltaSecond)
             bytes = sizeof(snapshot); schema = 1;
             std::memcpy(output.data(), &snapshot, bytes);
             return true;
-        }) != Runtime::TickResult::Ok)
+        });
+        if (outcome != Runtime::TickExecutionError::None)
         {
-            failTick("Simulation snapshot capture failed");
-            return;
-        }
-        if (HasPendingSceneStructureChange() || SceneContextEpoch() != epoch
-            || m_simulationExchange.Status().epoch != commandEpoch)
-        {
-            failTick("Simulation context changed before commit");
-            return;
-        }
-        m_simulationTick.Commit();
-        if (m_simulationExchange.Commit() != Runtime::TickResult::Ok)
-        {
-            failTick("Simulation snapshot commit failed");
+            ReportSimulationFailure("Fixed simulation tick transaction failed (phase "
+                + std::to_string(static_cast<int>(outcome)) + ")");
             return;
         }
     }
@@ -802,7 +827,9 @@ void SceneManager::GameLogic(float deltaSecond, float animationDeltaSecond)
     SynchronizeAudioWorld();
     if (!m_activeScene)
     {
+        #if !defined(CE_SCENE_HEADLESS)
         TemporalMotionFixture::TickAfterAnimation();
+        #endif
         return;
     }
 
@@ -851,12 +878,17 @@ void SceneManager::EndOfFrame()
 
 void SceneManager::Pausing()
 {
+#if defined(CE_SCENE_HEADLESS)
+    return;
+#else
     if (!m_activeScene)
     {
         return;
     }
     m_activeScene.load()->Sounds().Update(0.0f, false);
     m_activeScene.load()->UpdateRenderData();
+
+#endif
 }
 
 void SceneManager::DisableOrEnable()
@@ -873,7 +905,9 @@ void SceneManager::DrainAIUpdates()
 
 void SceneManager::Decommissioning()
 {
+    #if !defined(CE_SCENE_HEADLESS)
     TemporalMotionFixture::Cancel("Scene manager is shutting down");
+    #endif
     SetDecommissioning();
     DrainSceneLoads();
     DrainAIUpdates();
@@ -881,11 +915,14 @@ void SceneManager::Decommissioning()
     // 것이고, 그것이 종료 시 더블 delete로 번진다(실제로 겪었다).
     std::printf("[SHUTDOWN] Decommissioning 진입(씬 %zu)\n", m_scenes.size());
 
+#if !defined(CE_SCENE_HEADLESS)
     if (auto* renderScene = m_ActiveRenderScene.load())
     {
         renderScene->Finalize();
     }
     m_animationScheduler->Finalize();
+
+#endif
 
 	// DDOL 대상을 먼저 파괴 표시한다. Scene graph의 강한 참조를 해제하기 전에
 	// 표시를 세워야 하며, 평상시 DDOL 목록은 비소유 포인터일 뿐이다.
@@ -1030,6 +1067,9 @@ Scene* SceneManager::CreateScene(std::string_view name)
 
 Scene* SceneManager::SaveScene(std::string_view name)
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring service is not installed in this host; load a cooked scene instead");
+#else
 	std::string fileStem = name.data();
 	//std::string fileExtension = ".creator";
     file::path saveSceneFileName = fileStem /*+ fileExtension*/;
@@ -1078,10 +1118,15 @@ Scene* SceneManager::SaveScene(std::string_view name)
     sceneFileOut.close();
 
     return m_activeScene;
+
+#endif
 }
 
 Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring service is not installed in this host; load a cooked scene instead");
+#else
     RequireSceneLoadOwner();
     if (m_exitCommand)
     {
@@ -1270,10 +1315,15 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 		return nullptr;
 	}
 	return m_activeScene;
+
+#endif
 }
 
 Scene* SceneManager::LoadScene(std::string_view name)
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring service is not installed in this host; load a cooked scene instead");
+#else
     RequireSceneLoadOwner();
     if (m_exitCommand)
     {
@@ -1393,6 +1443,8 @@ Scene* SceneManager::LoadScene(std::string_view name)
     }
 
 	return scene;
+
+#endif
 }
 
 void SceneManager::SaveSceneAsync(std::string_view name)
@@ -1428,6 +1480,9 @@ namespace
 // enqueue the asset batch and return; never wait inside this callback.
 void SceneManager::SubmitScenePreparation(const own::shared_owner<PendingSceneLoad>& load)
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring service is not installed in this host; load a cooked scene instead");
+#else
     load->m_preparation = ce::get_job_scheduler().submit([load]
     {
         ce::profile_scope parseProfile{ ce::marker<"SceneLoad.Parse">() };
@@ -1449,6 +1504,8 @@ void SceneManager::SubmitScenePreparation(const own::shared_owner<PendingSceneLo
         load->m_assets = DataSystems->PrepareSceneAssets(
             load->m_document.Root(), load->m_bundle, load->m_path);
     });
+
+#endif
 }
 
 void SceneManager::RequireSceneLoadOwner() const
@@ -1460,6 +1517,9 @@ void SceneManager::RequireSceneLoadOwner() const
 std::future<Scene*> SceneManager::BeginSceneLoad(std::string_view path, bool autoActivate,
     std::uint64_t* requestId)
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring scene provider is not installed; use cooked admission");
+#else
     RequireSceneLoadOwner();
     if (m_nextSceneLoadRequestId == (std::numeric_limits<std::uint64_t>::max)())
     {
@@ -1510,6 +1570,8 @@ std::future<Scene*> SceneManager::BeginSceneLoad(std::string_view path, bool aut
         Debug::PrintLog(spdlog::level::err, e.what());
     }
     return result;
+
+#endif
 }
 
 void SceneManager::RecordSceneLoadResult(PendingSceneLoad& load, SceneLoadRequestState state, std::string message)
@@ -1557,6 +1619,9 @@ void SceneManager::LoadSceneAsyncAndWaitCallback(std::string_view name)
 
 Scene* SceneManager::BuildPreparedScene(const PendingSceneLoad& load)
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring service is not installed in this host; load a cooked scene instead");
+#else
     auto scene = Scene::LoadScene(m_gcDomain, file::path(load.m_path).stem().string());
     try
     {
@@ -1636,10 +1701,15 @@ Scene* SceneManager::BuildPreparedScene(const PendingSceneLoad& load)
         throw;
     }
     return scene.get();
+
+#endif
 }
 
 void SceneManager::CompleteSceneLoads(bool wait)
 {
+#if defined(CE_SCENE_HEADLESS)
+    RequireSceneLoadOwner();
+#else
     RequireSceneLoadOwner();
     if (m_pendingSceneLoads.empty()) return;
     for (size_t i = 0; i < m_pendingSceneLoads.size();)
@@ -1750,6 +1820,8 @@ void SceneManager::CompleteSceneLoads(bool wait)
             : scene ? SceneLoadRequestState::Ready : SceneLoadRequestState::Failed;
         RecordSceneLoadResult(*load, state, std::move(failure));
     }
+
+#endif
 }
 
 bool SceneManager::PollSceneLoads()
@@ -1761,6 +1833,9 @@ bool SceneManager::PollSceneLoads()
 
 void SceneManager::DrainSceneLoads()
 {
+#if defined(CE_SCENE_HEADLESS)
+    RequireSceneLoadOwner();
+#else
     RequireSceneLoadOwner();
     ++m_sceneLoadEpoch;
     if (m_asyncSceneToActivate == m_sceneToActivate) m_sceneToActivate = nullptr;
@@ -1768,6 +1843,8 @@ void SceneManager::DrainSceneLoads()
     if (m_pendingSceneLoads.empty()) return;
     for (const auto& load : m_pendingSceneLoads) load->m_cancelled = true;
     CompleteSceneLoads(true);
+
+#endif
 }
 
 void SceneManager::ActivateScene(Scene* sceneToActivate, bool isOldSceneDelete)
@@ -1825,7 +1902,9 @@ void SceneManager::BeforeAwakeSceneLoad()
                 }
             }
 
+#if !defined(CE_SCENE_HEADLESS)
             UIManagers->ClearSelectUI();
+#endif
             sceneUnloadedEvent.Broadcast();
             m_activeScene.load()->AllDestroyMark();
             m_activeScene.load()->EndFramePass();
@@ -1886,7 +1965,9 @@ void SceneManager::BeforeAwakeSceneLoad()
         {
             // EntityHandle은 씬 스코프다 — 이 씬이 죽으면 그 씬 소속으로 등록된
             // 프리팹 인스턴스 항목도 함께 지운다(안 그러면 댕글링 Scene* — P2).
+#if !defined(CE_SCENE_HEADLESS)
             PrefabUtilitys->ForgetScene(oldScene);
+#endif
             RetireScene(oldScene);
         }
         m_sceneToActivate = nullptr;
@@ -1899,7 +1980,9 @@ void SceneManager::BeforeAwakeSceneLoad()
         // 에셋까지 파괴됐기 때문이다(12.2 보충 분석). 이제 컴포넌트·프록시·Model이
         // shared_ptr로 공동 소유하므로(2-2~2-5) 캐시에서 지워도 참조가 남아 있으면
         // 살아 있고, 아무도 쓰지 않는 것만 실제로 해제된다.
+#if !defined(CE_SCENE_HEADLESS)
         DataSystems->UnloadUnusedAssets();
+#endif
 
         // 관리 힙도 같은 경계에서 정리한다(PHASE 9-6).
         //
@@ -1917,7 +2000,9 @@ void SceneManager::BeforeAwakeSceneLoad()
         // 씬 전환마다 GPU 객체/VRAM 증감을 남긴다.
         // 같은 씬을 오가며 이 값이 계속 증가하면 회수되지 않는 리소스가 있다는 뜻이다.
         // 실행 중에는 VRAM 증감만 남는다(타입별 집계는 디버그 레이어를 망가뜨린다).
+#if !defined(CE_SCENE_HEADLESS)
         GpuDiagnostics::LogDelta("씬 전환 완료");
+#endif
     }
 }
 
@@ -2025,10 +2110,15 @@ void SceneManager::RequestRenderProfileApply()
 
 bool SceneManager::HasSceneSnapshot() const
 {
+#if defined(CE_SCENE_HEADLESS)
+    return false;
+#else
     // D3-a-3: 문서 자체의 빈 상태는 타입이 답하고, 그 안의 엔티티 목록만 노드로 본다.
     if (m_editorSceneBackup.IsEmpty()) return false;
     return static_cast<bool>(SerializedEntities(
         Authoring::DocumentAccess::Read(m_editorSceneBackup)));
+
+#endif
 }
 
 void SceneManager::DiscardSceneSnapshot()
@@ -2040,6 +2130,9 @@ void SceneManager::DiscardSceneSnapshot()
 
 bool SceneManager::CaptureSceneSnapshot()
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring service is not installed in this host; load a cooked scene instead");
+#else
     Scene* scene = m_activeScene.load();
     if (nullptr == scene)
     {
@@ -2105,10 +2198,15 @@ bool SceneManager::CaptureSceneSnapshot()
     }
 
     return true;
+
+#endif
 }
 
 bool SceneManager::RestoreSceneSnapshot()
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring service is not installed in this host; load a cooked scene instead");
+#else
     Scene* scene = m_activeScene.load();
     if (nullptr == scene || !HasSceneSnapshot())
     {
@@ -2194,6 +2292,8 @@ bool SceneManager::RestoreSceneSnapshot()
     }
 
     return true;
+
+#endif
 }
 
 // ── 시뮬레이션 primitive (E3-1) ──
@@ -2262,16 +2362,20 @@ bool SceneManager::BeginPlayTransaction()
         return false;
     }
 
+#if !defined(CE_SCENE_HEADLESS)
     if (m_audioPlayback)
     {
         m_audioPlayback->EndScope(m_audioSession);
         m_audioSession = m_audioPlayback->CreateScope(wave::ScopeKind::Session);
         if (auto* scene = m_activeScene.load())
         {
-            scene->Sounds().EndWorld();
+    #if !defined(CE_SCENE_HEADLESS)
+        scene->Sounds().EndWorld();
+#endif
             scene->Sounds().Activate();
         }
     }
+#endif
     SetSimulationPhase(ScenePhase::Simulating);
     ce::profile_instant(ce::marker<"PlayModeEntered">());
     PlayModeEvent.Broadcast(true);
@@ -2286,6 +2390,7 @@ void SceneManager::NotePlayFailure(std::string reason)
 
 void SceneManager::EndPlayTransaction()
 {
+#if !defined(CE_SCENE_HEADLESS)
     if (m_audioPlayback)
     {
         m_audioPlayback->EndScope(m_audioSession);
@@ -2295,6 +2400,7 @@ void SceneManager::EndPlayTransaction()
             active->Sounds().EndWorld();
         }
     }
+#endif
     SetCommittedSimulation(false);
     Scene* scene = m_activeScene.load();
     if (!scene)
@@ -2357,7 +2463,9 @@ bool SceneManager::PreparePhysicsSceneExit(Scene* scene)
     const auto prepared = scene->PreparePhysicsSceneExit();
     if (prepared)
     {
+#if !defined(CE_SCENE_HEADLESS)
         scene->Sounds().EndWorld();
+#endif
         return true;
     }
 
@@ -2399,6 +2507,9 @@ bool SceneManager::ResumePhysicsAfterSceneActivation()
 
 void SceneManager::DesirealizeGameObject(const reflgen::type_descriptor* type, const Authoring::NodeView& view, LoadIndexBatch* batch, bool strict)
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring service is not installed in this host; load a cooked scene instead");
+#else
 	ce::profile_scope entityProfile{ ce::marker<"SceneLoad.Entity">() };
 	const Authoring::ReadNode itNode = Authoring::NodeViewAccess::Node(view);
     if (Meta::TypeIDOf(*type) == type_guid(Entity))
@@ -2492,10 +2603,15 @@ void SceneManager::DesirealizeGameObject(const reflgen::type_descriptor* type, c
             }
         }
     }
+
+#endif
 }
 
 void SceneManager::DesirealizeGameObject(Scene* targetScene, const reflgen::type_descriptor* type, const Authoring::NodeView& view, LoadIndexBatch* batch)
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring service is not installed in this host; load a cooked scene instead");
+#else
 	ce::profile_scope entityProfile{ ce::marker<"SceneLoad.Entity">() };
 	const Authoring::ReadNode itNode = Authoring::NodeViewAccess::Node(view);
     if (Meta::TypeIDOf(*type) == type_guid(Entity))
@@ -2568,10 +2684,15 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const reflgen::type
             }
         }
     }
+
+#endif
 }
 
 void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const reflgen::type_descriptor* type, const Authoring::NodeView& view, LoadIndexBatch* batch)
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring service is not installed in this host; load a cooked scene instead");
+#else
 	const Authoring::ReadNode itNode = Authoring::NodeViewAccess::Node(view);
     if (Meta::TypeIDOf(*type) == type_guid(Entity))
     {
@@ -2646,6 +2767,8 @@ void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const
             }
         }
 	}
+
+#endif
 }
 
 void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& batch)

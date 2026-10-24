@@ -170,6 +170,7 @@ void Entity::FinalizeManagedDestroy()
 // 복사돼 있었고, 한쪽만 고치면 "코드로 만든 것"과 "파일에서 연 것"이 갈린다.
 void Entity::AttachSpatialComponent(GameObjectType type, Entity::Index parentIndex)
 {
+#if !defined(CE_SCENE_HEADLESS)
 	if (GameObjectType::UI == type)
 	{
 		AddComponent<RectTransformComponent>();
@@ -183,17 +184,27 @@ void Entity::AttachSpatialComponent(GameObjectType type, Entity::Index parentInd
 		AddComponent<RectTransformComponent>();
 	}
 
+#else
+    if (type == GameObjectType::UI || type == GameObjectType::Canvas)
+        throw std::logic_error("UI requires the presentation module");
+#endif
+
 	m_pTransformComponent = AddComponent<Transform>();
 	m_pTransformComponent->SetParentID(parentIndex);
 }
 
 void Entity::OnAfterSerialize(const Authoring::MutableNodeView& view) const
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring hook unavailable in a cooked-only host");
+#else
 	// 기본 팩토리/리플렉션 골든처럼 Scene 밖에 있는 Entity에는 계층이 없다.
 	// 가짜 기본값 블록을 만들지 않아 "attached Store만 직렬화한다"는 경계를 지킨다.
 	if (!m_ownerScene) return;
 	// D3-a-5: 뷰를 그대로 넘긴다 — 이 함수는 노드를 열어 볼 이유가 없다.
 	m_ownerScene->SerializeEntityHierarchy(*this, view);
+
+#endif
 }
 
 const std::string& Entity::RemoveSuffixNumberTag() const
@@ -217,9 +228,14 @@ void Entity::SetTag(std::string_view tag)
 
 void Entity::OnBeforeDeserialize(const Authoring::NodeView& view) const
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring hook unavailable in a cooked-only host");
+#else
     const auto project = SceneManagers->ProjectLayers();
     if (!project || !ce::layers::ReadEntityLayer(Authoring::NodeViewAccess::Node(view), project->Snapshot()->catalog))
         throw std::runtime_error("Entity layer schema requires a registered stable ID; migrate legacy authoring first");
+
+#endif
 }
 
 ce::layers::result<void> Entity::SetLayer(std::string_view name)
@@ -268,7 +284,9 @@ void Entity::Destroy()
 
     // 프리팹 인스턴스 목록에서 뺀다. 넣기만 하고 빼는 곳이 없어서 죽은 포인터가
     // 목록에 남았고, 다음 UpdateInstances가 그것을 역참조했다.
+#if !defined(CE_SCENE_HEADLESS)
     PrefabUtilitys->UnregisterInstance(this);
+#endif
 
 	m_destroyMark = true;
     gc::advance_lifecycle(root_from_this(), gc::lifecycle_state::destroy_requested);
@@ -401,6 +419,9 @@ Component* Entity::PublishManagedComponent(const gc::root_ref<Component>& compon
 
 Component* Entity::AddComponent(const reflgen::type_descriptor& type)
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring service is not installed in this host; load a cooked scene instead");
+#else
     const HashedGuid typeID = Meta::TypeIDOf(type);
     if (auto* existing = FindComponent(typeID))
     {
@@ -414,16 +435,23 @@ Component* Entity::AddComponent(const reflgen::type_descriptor& type)
     }
     auto component = ComponentFactorys->CreateManaged(Domain(), type);
     return PublishManagedComponent(component, false);
+
+#endif
 }
 
 Component* Entity::AddComponentAllowMultiple(const reflgen::type_descriptor& type)
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring service is not installed in this host; load a cooked scene instead");
+#else
     if (!CanAttachComponentType(Meta::TypeIDOf(type)))
     {
         return nullptr;
     }
     auto component = ComponentFactorys->CreateManaged(Domain(), type);
     return PublishManagedComponent(component, false);
+
+#endif
 }
 
 Component* Entity::GetComponent(const reflgen::type_descriptor& type)

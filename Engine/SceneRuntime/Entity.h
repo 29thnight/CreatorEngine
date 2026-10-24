@@ -21,6 +21,7 @@ class ModelLoader;
 class Prefab;
 class [[reflgen::reflect]] Entity : public Object, public gc::managed
 {
+    friend class CookedSceneLoader;
 public:
 	using Index = GameObjectIndex;
 	static constexpr Entity::Index kInvalidIndex = std::numeric_limits<uint32_t>::max();

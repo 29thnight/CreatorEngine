@@ -172,20 +172,24 @@
 <nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/design/</span><a href="ArchiveParserBoundaryContract.md">원본 Markdown</a></nav>
 <p class="eyebrow">설계</p>
 <h1>N1 Archive·Parser 경계 계약</h1>
-<div class="meta"><p>2026-10-22 로컬 구현 정본. <a href="../analysis/ArchiveParserAcceptance20261022.html">수용 기록</a>.</p>
-</div>
+
 </header>
 
 <figure>
 <div class="frame doc-map" role="img" aria-label="절 3개의 분량 막대">
-<a class="map-row" href="#책임과-호출-경계"><span class="ve-label">§00</span><span class="map-name">책임과 호출 경계</span><span class="map-bar"><i style="width:90.2%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#진단-출력"><span class="ve-label">§01</span><span class="map-name">진단 출력</span><span class="map-bar"><i style="width:55.1%"></i></span><span class="map-marks"></span></a>
-<a class="map-row" href="#실패-게이트와-실행"><span class="ve-label">§02</span><span class="map-name">실패 게이트와 실행</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#책임과-호출-경계"><span class="ve-label">§01</span><span class="map-name">책임과 호출 경계</span><span class="map-bar"><i style="width:97%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#진단-출력"><span class="ve-label">§02</span><span class="map-name">진단 출력</span><span class="map-bar"><i style="width:61.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실패-게이트와-실행"><span class="ve-label">§03</span><span class="map-name">실패 게이트와 실행</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
 </div>
 <figcaption><span class="fig-n">그림 1</span>절 3개 가운데 「실패 게이트와 실행」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
 </figure>
+<section class="prose"><blockquote>
+<p>2026-10-24 무렌더 링크 보강: 빈 <code>Authoring::Document</code>의 소유권 구현과 Adopt/Clone/Read/Write backend 접근을 분리했다. Entity prefab snapshot과 기존 writer/deep-clone 호출자는 유지한다. 중립 utility와 저작 구현의 Unity object 합성도 막아 최종 headless map에서 ryml/c4 의존을 차단한다. <a href="../analysis/HeadlessSceneRuntimeAcceptance20261024.html">실제 기존 Scene/Entity 수용</a>을 따른다.</p>
+</blockquote>
+<p>2026-10-22 로컬 구현 정본. <a href="../analysis/ArchiveParserAcceptance20261022.html">수용 기록</a>.</p>
+</section>
 <section class="doc-sec" id="sec-책임과-호출-경계">
-<div class="sec-head"><p class="ve-label">§00</p><h2 id="책임과-호출-경계">책임과 호출 경계</h2></div>
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="책임과-호출-경계">책임과 호출 경계</h2></div>
 <div class="prose"><p>공통 reflgen schema는 포맷을 소유하지 않는다. Authoring archive는 텍스트 저작, Cooked archive는 CEDO v1 bounded binary를 소비한다. 동일 schema의 양쪽 왕복을 실제 production codec으로 검사한다. 이 fixture schema는 Network ID/schema 정본이나 wire serializer가 아니다.</p>
 <div class="table-scroll"><table>
 <thead><tr><th>소비자</th><th>허용 경계</th><th>금지</th></tr></thead>
@@ -193,26 +197,26 @@
 <tr><td>중립 schema·공개 opaque 헤더</td><td>표준 C++ 및 중립 타입</td><td>전이 include를 통한 backend 누출</td></tr>
 <tr><td>Network</td><td>동결 wire 계약·중립 schema</td><td>Authoring/Diagnostics facade 및 backend 의존</td></tr>
 <tr><td>Utility archive 구현</td><td>parser/backend 내부 소유</td><td>공개 헤더로 backend 전달</td></tr></tbody></table></div>
-<p>기존 ComponentFactory의 Authoring::NodeView, scene/prefab/material의 로컬 읽기·쓰기 facade는 유지한다. 소스 게이트의 runtimeFacadeCallers에 ParseText/File/Cooked 호출 위치를 기록한다. 개발/저작 입력의 텍스트 허용과 cooked Player의 parser 호출 0을 구분한다. 전체 runtime에서 parser 라이브러리를 물리적으로 unlink하는 작업과 Dedicated Server 제품은 N9/E6 별도 수용이다.</p>
+<p>기존 ComponentFactory의 Authoring::NodeView, scene/prefab/material의 로컬 읽기·쓰기 facade는 유지한다. 소스 게이트의 runtimeFacadeCallers에 ParseText/File/Cooked 호출 위치를 기록한다. 개발/저작 입력의 텍스트 허용과 cooked Player의 parser 호출 0을 구분한다. 렌더 없는 CPU 프로필은 Cedo::Decode 중립 트리를 사용해 parser 라이브러리를 링크하지 않는다. 기존 Authoring cooked facade도 같은 decoder에 연결했다. 기존 전체 runtime의 parser unlink와 Dedicated Server 전체 제품은 별도 수용이다. <a href="HeadlessSceneRuntimeContract.html">headless 계약</a>을 따른다.</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-진단-출력">
-<div class="sec-head"><p class="ve-label">§01</p><h2 id="진단-출력">진단 출력</h2></div>
-<div class="prose"><p>TemporalMotionFixture와 EnhancedPbrCapture의 직접 ryml tree 소유를 Utility의 Diagnostics::Document로 이동했다. EnhancedSceneRenderer의 기존 manifest 호출자도 Root()로 이주했다. JSON writer만 제공하며 parser API를 추가하지 않는다. backend는 DiagnosticDocument.cpp에만 존재한다.</p>
-<p>Document는 단독 소유·이동 가능하다. Node는 빌린 핸들이므로 원래 document state가 파괴되기 전에 사용해야 한다. document 이동 후 state 주소는 유지되며 이동 대입으로 폐기된 state의 node는 사용할 수 없다. 키/문자열은 arena에 복사하고 문자열 scalar를 명시적으로 인용한다. bool·숫자와 문자열 true/123의 자료형을 보존한다. 빈 node와 범위 밖 sequence index는 실패한다.</p>
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="진단-출력">진단 출력</h2></div>
+<div class="prose"><p>TemporalMotionFixture와 EnhancedPbrCapture의 직접 ryml tree 소유를 Utility의 Diagnostics::Document로 이동했다. EnhancedSceneRenderer의 기존 manifest 호출자도 Root()로 이주했다. JSON writer만 제공하며 parser API를 추가하지 않는다. 2026-10-24에는 DiagnosticDocument.cpp를 parser/backend 없는 표준 C++ JSON writer로 교체했다. headless와 Editor/Player가 같은 writer를 사용한다.</p>
+<p>Document는 단독 소유·이동 가능하다. Node는 빌린 핸들이므로 원래 document state가 파괴되기 전에 사용해야 한다. document 이동 후 state 주소는 유지되며 이동 대입으로 폐기된 state의 node는 사용할 수 없다. 키/문자열은 소유 트리에 복사하고 문자열 scalar를 명시적으로 인용한다. bool·숫자와 문자열 true/123의 자료형을 보존한다. 빈 node와 범위 밖 sequence index는 실패한다.</p>
 </div>
 </section>
 <section class="doc-sec" id="sec-실패-게이트와-실행">
-<div class="sec-head"><p class="ve-label">§02</p><h2 id="실패-게이트와-실행">실패 게이트와 실행</h2></div>
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="실패-게이트와-실행">실패 게이트와 실행</h2></div>
 <div class="prose"><p><code>verify-archive-parser-boundary.ps1 -Configuration All</code>은 production codec·진단 writer native Debug/Release 각각 226검사와 독립 JSON 자료형 검사, runtime 860소스의 역할별 include 그래프, 격리 변이 35건을 실행한다. 소스 scanner는 일반 C++ preprocessor가 아니며 검토 facade에서 로컬 runtime 탐색을 멈춘다. 중립/Network root는 전이 의존을 추적한다. 실제 엔진 빌드가 이를 보완한다.</p>
 <p><code>verify-net-regression-wiring.ps1</code>은 N1 필수 등록 삭제와 실패 종료코드 전파를 검증한다. CI는 N1 dependency를 명시적으로 설치하고 누락 시 실패한다. 원격 CI 실행은 별도다.</p>
 <pre><code class="language-powershell">./Tools/regression/run-all.ps1 -Suite NetworkHandoff -Configuration All -Product -EditorExe &lt;새 Release Editor&gt; -CookedStage &lt;새 cooked 패키지 폴더&gt;</code></pre>
-<p>기본 등록 9그룹에 N3·W4/ND-b 실제 Editor, N1 cooked Player, N1 실제 PBR 진단 소비자와 N3 cadence/moving GPU 6그룹을 추가한다. CookedStage가 없거나 현재 빌드 runtime과 다르면 Product gate는 실패한다. Player parser 호출 0·직접 backend 참조 0·패키지 불변을 확인한다. 실제 PBR gate는 manifest 타입·실제 첨부·크기·유한값·GPU validation을 검사한다. Motion fixture와 전반적 픽셀 품질은 이 gate의 통과 범위에 포함하지 않는다.</p>
+<p>현재 기본 등록은 HeadlessBoundary 추가 후 10그룹이다. 여기에 N3·W4/ND-b 실제 Editor, N1 cooked Player, N1 실제 PBR 진단 소비자와 N3 cadence/moving GPU 6그룹과 headless 제품 1그룹을 추가한다. CookedStage가 없거나 현재 빌드 runtime과 다르면 Product gate는 실패한다. Player parser 호출 0·직접 backend 참조 0·패키지 불변을 확인한다. 실제 PBR gate는 manifest 타입·실제 첨부·크기·유한값·GPU validation을 검사한다. Motion fixture와 전반적 픽셀 품질은 이 gate의 통과 범위에 포함하지 않는다.</p>
 </div>
 </section>
 <section class="sources" aria-label="출처">
 <p class="ve-label">출처</p>
-<p><a href="ArchiveParserBoundaryContract.md"><code>docs/design/ArchiveParserBoundaryContract.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+<p><a href="ArchiveParserBoundaryContract.md"><code>docs/design/ArchiveParserBoundaryContract.md</code></a> · 마지막 커밋 2026-10-23 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
 </section>
 </main>
 </div>

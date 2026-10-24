@@ -1,5 +1,5 @@
 #include "../../Engine/SceneRuntime/SimulationExchange.h"
-#include "../../Engine/SceneRuntime/SimulationTick.h"
+#include "../../Engine/SceneRuntime/SimulationTickExecution.h"
 #include <cassert>
 #include <cstdio>
 #include <vector>
@@ -134,5 +134,41 @@ int main()
     Check(q.Begin(1,NoApply) == TickResult::Ok);
     Check(q.Prepare([&](std::span<std::byte>,std::uint32_t&,std::uint32_t&) { q.Reset(true); return true; }) == TickResult::StaleEpoch);
     Check(q.Commit() == TickResult::Failed);
+    // The actual transaction used by SceneManager and HeadlessHost must have
+    // one order and fail closed for every callback failure/exception.
+    for (int failure = 0; failure < 7; ++failure)
+    {
+        SimulationTick clock;
+        SimulationExchange exchange;
+        Check(exchange.Reset(true) == TickResult::Ok);
+        Check(clock.Admit(SimulationTick::seconds));
+        std::vector<int> order;
+        const auto run = [&]
+        {
+            return ExecuteSimulationTick(clock, exchange, NoApply,
+                [&](float dt) { order.push_back(1); Check(dt == static_cast<float>(SimulationTick::seconds));
+                    if (failure == 5) throw std::runtime_error("managed exception"); return failure != 1; },
+                [&] { return failure != 2; },
+                [&](float) { order.push_back(2); return failure != 3; },
+                [&] { order.push_back(3); if (failure == 6) throw std::runtime_error("observer exception"); },
+                [&](std::span<std::byte>, std::uint32_t& bytes, std::uint32_t& schema)
+                    { order.push_back(4); bytes = 0; schema = 1; return failure != 4; });
+        };
+        bool threw = false;
+        TickExecutionError result = TickExecutionError::None;
+        try { result = run(); } catch (const std::runtime_error&) { threw = true; }
+        if (!failure)
+        {
+            Check(!threw && result == TickExecutionError::None);
+            Check(order == std::vector<int>({1,2,3,4}));
+            Check(clock.committed == 1 && exchange.Status().committed == 1);
+        }
+        else
+        {
+            Check(threw || result != TickExecutionError::None);
+            Check(!clock.committed && !exchange.Status().committed && !exchange.Status().active);
+            Check(exchange.Read(exchange.Status().epoch, 0, header, out) == TickResult::NoSnapshot);
+        }
+    }
     std::printf("SIMULATION_EXCHANGE_OK checks=%d fps=30,60,144 queue=256 snapshots=8 concurrency=4 failure=closed\n", checks.load());
 }

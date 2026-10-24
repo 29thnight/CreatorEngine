@@ -1,69 +1,181 @@
 #include "DiagnosticDocument.h"
-#include "AuthoringRymlErrorPolicy.h"
-#include <ryml/ryml.hpp>
-#include <ryml/ryml_std.hpp>
-#include <c4/yml/emit.hpp>
-#include <c4/format.hpp>
+#include <charconv>
+#include <cmath>
 #include <stdexcept>
+#include <vector>
+
 namespace Diagnostics
 {
-    struct DocumentState { ryml::Tree tree; };
     namespace
     {
-        ryml::NodeRef Ref(DocumentState* state, std::size_t id)
+        enum class Kind { Null, Map, Sequence, String, Literal };
+
+        struct Value
         {
-            if (!state || id >= state->tree.size()) throw std::logic_error("Invalid diagnostic document node");
-            return state->tree.ref(id);
+            Kind kind = Kind::Null;
+            std::string text;
+            std::vector<std::pair<std::string, std::size_t>> children;
+        };
+
+        void Quote(std::string& output, std::string_view text)
+        {
+            constexpr char hex[] = "0123456789abcdef";
+            output += '"';
+            for (const unsigned char c : text)
+            {
+                switch (c)
+                {
+                case '"': output += "\\\""; break;
+                case '\\': output += "\\\\"; break;
+                case '\b': output += "\\b"; break;
+                case '\f': output += "\\f"; break;
+                case '\n': output += "\\n"; break;
+                case '\r': output += "\\r"; break;
+                case '\t': output += "\\t"; break;
+                default:
+                    if (c < 0x20)
+                    {
+                        output += "\\u00";
+                        output += hex[c >> 4];
+                        output += hex[c & 15];
+                    }
+                    else output += static_cast<char>(c);
+                }
+            }
+            output += '"';
+        }
+
+        template<class T> std::string Numeric(T value)
+        {
+            char buffer[128];
+            const auto [end, error] = std::to_chars(buffer, buffer + sizeof(buffer), value);
+            if (error != std::errc{}) throw std::runtime_error("Diagnostic number conversion failed");
+            return {buffer, end};
         }
     }
-    Document::Document() : state_(std::make_unique<DocumentState>()) {Authoring::EnsureRymlErrorPolicy();}
-    Document::~Document()=default;
-    Document::Document(Document&&) noexcept=default;
-    Document& Document::operator=(Document&&) noexcept=default;
+
+    // Writer-only owned tree. Node IDs survive growth and Document moves.
+    // Diagnostics never initializes the authoring parser or its error policy.
+    struct DocumentState
+    {
+        std::vector<Value> values{1};
+
+        Value& At(std::size_t id)
+        {
+            if (id >= values.size()) throw std::logic_error("Invalid diagnostic document node");
+            return values[id];
+        }
+
+        void Emit(std::size_t id, std::string& output, std::size_t depth = 0) const
+        {
+            if (depth > 512) throw std::length_error("Diagnostic document depth exceeded");
+            const auto& value = values.at(id);
+            if (value.kind == Kind::Null) { output += "null"; return; }
+            if (value.kind == Kind::String) { Quote(output, value.text); return; }
+            if (value.kind == Kind::Literal) { output += value.text; return; }
+            const bool map = value.kind == Kind::Map;
+            output += map ? '{' : '[';
+            bool first = true;
+            for (const auto& [key, child] : value.children)
+            {
+                if (!first) output += ',';
+                first = false;
+                if (map) { Quote(output, key); output += ':'; }
+                Emit(child, output, depth + 1);
+            }
+            output += map ? '}' : ']';
+        }
+    };
+
+    namespace
+    {
+        Value& Ref(DocumentState* state, std::size_t id)
+        {
+            if (!state) throw std::logic_error("Invalid diagnostic document node");
+            return state->At(id);
+        }
+
+        void Container(Value& value, Kind kind)
+        {
+            if (value.kind == Kind::Null) value.kind = kind;
+            if (value.kind != kind) throw std::logic_error("Diagnostic node kind mismatch");
+        }
+
+        void Scalar(Value& value, Kind kind, std::string text)
+        {
+            if (value.kind == Kind::Map || value.kind == Kind::Sequence)
+                throw std::logic_error("Cannot replace diagnostic container with scalar");
+            value.kind = kind;
+            value.text = std::move(text);
+        }
+    }
+
+    Document::Document() : state_(std::make_unique<DocumentState>()) {}
+    Document::~Document() = default;
+    Document::Document(Document&&) noexcept = default;
+    Document& Document::operator=(Document&&) noexcept = default;
+
     Node Document::Root()
     {
         if (!state_) throw std::logic_error("Moved diagnostic document");
-        return Node(state_.get(),state_->tree.rootref().id());
+        return Node(state_.get(), 0);
     }
+
     std::string Document::ToJson() const
     {
         if (!state_) throw std::logic_error("Moved diagnostic document");
-        return ryml::emitrs_json<std::string>(state_->tree);
+        std::string result;
+        state_->Emit(0, result);
+        return result;
     }
+
     Node Node::operator[](std::string_view key) const
     {
-        auto parent=Ref(state_,id_);
-        if (!parent.is_map()) parent |= ryml::MAP;
-        const ryml::csubstr text(key.data(),key.size());
-        if (parent.has_child(text)) return Node(state_,parent[text].id());
-        auto child=parent.append_child();child.set_key(state_->tree.copy_to_arena(text));
-        return Node(state_,child.id());
+        auto& parent = Ref(state_, id_);
+        Container(parent, Kind::Map);
+        for (const auto& [name, child] : parent.children)
+            if (name == key) return Node(state_, child);
+        const auto child = state_->values.size();
+        parent.children.emplace_back(key, child);
+        state_->values.emplace_back();
+        return Node(state_, child);
     }
+
     Node Node::operator[](std::size_t index) const
     {
-        auto parent=Ref(state_,id_);
-        if (!parent.is_seq() || index>=parent.num_children()) throw std::out_of_range("Diagnostic sequence index");
-        return Node(state_,parent[index].id());
+        const auto& parent = Ref(state_, id_);
+        if (parent.kind != Kind::Sequence || index >= parent.children.size())
+            throw std::out_of_range("Diagnostic sequence index");
+        return Node(state_, parent.children[index].second);
     }
+
     Node Node::Append() const
     {
-        auto parent=Ref(state_,id_);
-        if (!parent.is_seq()) parent |= ryml::SEQ;
-        return Node(state_,parent.append_child().id());
+        auto& parent = Ref(state_, id_);
+        Container(parent, Kind::Sequence);
+        const auto child = state_->values.size();
+        parent.children.emplace_back(std::string{}, child);
+        state_->values.emplace_back();
+        return Node(state_, child);
     }
+
     bool Node::Has(std::string_view key) const
     {
-        const auto parent=Ref(state_,id_);
-        return parent.is_map() && parent.has_child(ryml::csubstr(key.data(),key.size()));
+        const auto& parent = Ref(state_, id_);
+        for (const auto& child : parent.children)
+            if (child.first == key && parent.kind == Kind::Map) return true;
+        return false;
     }
-    void Node::SetMap() const {Ref(state_,id_) |= ryml::MAP;}
-    void Node::SetSequence() const {Ref(state_,id_) |= ryml::SEQ;}
-    void Node::operator<<(std::string_view value) const
+
+    void Node::SetMap() const { Container(Ref(state_, id_), Kind::Map); }
+    void Node::SetSequence() const { Container(Ref(state_, id_), Kind::Sequence); }
+    void Node::operator<<(std::string_view value) const { Scalar(Ref(state_, id_), Kind::String, std::string(value)); }
+    void Node::operator<<(bool value) const { Scalar(Ref(state_, id_), Kind::Literal, value ? "true" : "false"); }
+    void Node::SetSigned(std::int64_t value) const { Scalar(Ref(state_, id_), Kind::Literal, Numeric(value)); }
+    void Node::SetUnsigned(std::uint64_t value) const { Scalar(Ref(state_, id_), Kind::Literal, Numeric(value)); }
+    void Node::SetFloat(double value) const
     {
-        Ref(state_,id_).set_val(state_->tree.copy_to_arena(ryml::csubstr(value.data(),value.size())),ryml::NodeType{ryml::VAL_DQUO});
+        if (!std::isfinite(value)) throw std::invalid_argument("Nonfinite diagnostic number");
+        Scalar(Ref(state_, id_), Kind::Literal, Numeric(value));
     }
-    void Node::operator<<(bool value) const {Ref(state_,id_) << c4::fmt::boolalpha(value);}
-    void Node::SetSigned(std::int64_t value) const {Ref(state_,id_) << value;}
-    void Node::SetUnsigned(std::uint64_t value) const {Ref(state_,id_) << value;}
-    void Node::SetFloat(double value) const {Ref(state_,id_) << value;}
 }

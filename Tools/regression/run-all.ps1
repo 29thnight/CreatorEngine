@@ -1,4 +1,4 @@
-# Explicit registered suite only. This does not revive the retired engine-wide
+﻿# Explicit registered suite only. This does not revive the retired engine-wide
 # unbounded run-all. Every registered NetworkHandoff gate is mandatory.
 [CmdletBinding()]
 param(
@@ -56,9 +56,13 @@ if($Product -and !$failures.Count) {
     & $shell -NoProfile -File "$PSScriptRoot/verify-n3-pacing-product.ps1" -Configuration $configs[-1] -Rates 144 -MovingQuality *> "$out/N3MovingGpuProduct.log"
     if($LASTEXITCODE){$failures+=@{gate='N3MovingGpuProduct';exitCode=$LASTEXITCODE};Get-Content "$out/N3MovingGpuProduct.log" -Tail 12}else{$passed+='N3MovingGpuProduct'}
 }
+if($Product -and !$failures.Count) {
+    & $shell -NoProfile -File "$PSScriptRoot/verify-headless-scene.ps1" -Configuration $configs[-1] *> "$out/HeadlessProduct.log"
+    if($LASTEXITCODE){$failures+=@{gate='HeadlessProduct';exitCode=$LASTEXITCODE};Get-Content "$out/HeadlessProduct.log" -Tail 12}else{$passed+='HeadlessProduct'}
+}
 $expected=0
 foreach($gate in $data.gates){$expected+=if($gate.configuration -eq 'matrix'){$configs.Count}else{1}}
-if($Product){$expected+=6}
+if($Product){$expected+=7}
 if($passed.Count -ne $expected -and !$failures.Count){$failures+=@{gate='RequiredGateCoverage';exitCode=1}}
 @{result=if($failures.Count){'NETWORK_HANDOFF_REGRESSIONS_FAILED'}else{'NETWORK_HANDOFF_REGRESSIONS_OK'};suite=$Suite;configuration=$configs;passed=$passed;failures=$failures;manifestHash=(Get-FileHash $manifest).Hash;scope='All registered NetworkHandoff gates; not all engine/GPU/device/soak tests';product=[bool]$Product}|ConvertTo-Json -Depth 10|Set-Content "$out/result.json" -Encoding utf8
 if($failures.Count){throw "Network handoff regressions failed: $out"}

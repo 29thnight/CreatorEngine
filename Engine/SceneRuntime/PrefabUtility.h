@@ -133,4 +133,8 @@ private:
     static Entity* Resolve(const InstanceRef& ref);
 };
 
+#if defined(CE_SCENE_HEADLESS)
+#define PrefabUtilitys (PrefabUtility::GetIfAlive())
+#else
 static auto PrefabUtilitys = PrefabUtility::GetInstance();
+#endif

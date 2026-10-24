@@ -5,6 +5,9 @@ on:
     paths:
       - 'Engine/Network/**'
       - 'Engine/SceneRuntime/**'
+      - 'HeadlessHost/**'
+      - 'Tools/build/stage-headless.ps1'
+      - 'Engine/Utility_Framework/CookedDocumentTree.*'
       - 'Editor/EngineEntry/App.cpp'
       - 'Editor/EngineEntry/EditorPreferences.h'
       - 'Editor/EngineEntry/Commands/N3PacingCapture.h'
@@ -38,6 +41,9 @@ on:
     paths:
       - 'Engine/Network/**'
       - 'Engine/SceneRuntime/**'
+      - 'HeadlessHost/**'
+      - 'Tools/build/stage-headless.ps1'
+      - 'Engine/Utility_Framework/CookedDocumentTree.*'
       - 'Editor/EngineEntry/App.cpp'
       - 'Editor/EngineEntry/EditorPreferences.h'
       - 'Editor/EngineEntry/Commands/N3PacingCapture.h'
@@ -112,6 +118,7 @@ jobs:
           name: network-handoff-results
           path: |
             Build/Verification/NDA/**
+            Build/Verification/Headless/**
             Build/Verification/N3Exchange/**
             Build/Verification/W4NDB/**
             Build/Verification/N1/**

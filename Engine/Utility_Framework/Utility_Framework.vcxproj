@@ -39,9 +39,11 @@
     <ClInclude Include="AuthoringReadNode.h" />
     <ClInclude Include="AuthoringParsedDocument.h" />
     <ClInclude Include="AuthoringCookedDocument.h" />
+    <ClInclude Include="CookedDocumentTree.h" />
     <ClInclude Include="AuthoringNodeView.h" />
     <ClInclude Include="AuthoringNodeViewAccess.h" />
     <ClInclude Include="AuthoringDocument.h" />
+    <ClInclude Include="AuthoringDocumentStorage.h" />
     <ClInclude Include="DiagnosticDocument.h" />
     <ClInclude Include="RuntimeResults.h" />
     <ClInclude Include="AuthoringDocumentAccess.h" />
@@ -131,22 +133,24 @@
     <ClCompile Include="JobScheduler.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="AuthoringRymlErrorPolicy.cpp" />
-    <ClCompile Include="AuthoringScalarConvert.cpp" />
-    <ClCompile Include="AuthoringParsedDocument.cpp" />
-    <ClCompile Include="AuthoringCookedDocument.cpp" />
-    <ClCompile Include="AuthoringDocument.cpp" />
-    <ClCompile Include="DiagnosticDocument.cpp" />
-    <ClCompile Include="AuthoringNodeEquality.cpp" />
+    <ClCompile Include="AuthoringRymlErrorPolicy.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="AuthoringScalarConvert.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="AuthoringParsedDocument.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="AuthoringCookedDocument.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="CookedDocumentTree.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="AuthoringDocument.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="AuthoringDocumentAccess.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="DiagnosticDocument.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="AuthoringNodeEquality.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="SerializationProfiler.cpp" />
     <ClCompile Include="WindowsCoreWindow.cpp" />
-    <ClCompile Include="RuntimeSettings.cpp" />
+    <ClCompile Include="RuntimeSettings.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="LogSystem.cpp" />
     <ClCompile Include="TimeSystem.cpp" />
     <ClCompile Include="ProgressSink.cpp" />
     <ClCompile Include="ReflectionYml.cpp" />
-    <ClCompile Include="ReflgenRuntime.cpp" />
-    <ClCompile Include="TypeTrait.cpp" />
+    <ClCompile Include="ReflgenRuntime.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="TypeTrait.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="WarmupLedger.cpp" />
   </ItemGroup>
   <ItemGroup>

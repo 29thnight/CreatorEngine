@@ -21,7 +21,7 @@ $batch=Join-Path $dir 'probe.cmd'
 call "$vs\Common7\Tools\VsDevCmd.bat" -arch=x64 -host_arch=x64 >nul
 if errorlevel 1 exit /b 1
 set "PATH=$libroot\bin;%PATH%"
-cl /nologo /std:c++latest /EHsc /utf-8 /DCE_CONTRACT_STANDALONE=1 /DNOMINMAX /W4 $flags /I"$repo\Engine\Utility_Framework" /external:I"$deps\include" /external:W0 Tools\regression\ArchiveParserProbe.cpp Engine\Utility_Framework\DiagnosticDocument.cpp Engine\Utility_Framework\AuthoringParsedDocument.cpp Engine\Utility_Framework\AuthoringCookedDocument.cpp Engine\Utility_Framework\AuthoringRymlErrorPolicy.cpp Engine\Utility_Framework\AuthoringScalarConvert.cpp /Fo"$dir\\" /Fe"$dir\probe.exe" /Fd"$dir\probe.pdb" /link /LIBPATH:"$libroot\lib" ryml.lib c4core.lib
+cl /nologo /std:c++latest /EHsc /utf-8 /DCE_CONTRACT_STANDALONE=1 /DNOMINMAX /W4 $flags /I"$repo\Engine\Utility_Framework" /external:I"$deps\include" /external:W0 Tools\regression\ArchiveParserProbe.cpp Engine\Utility_Framework\DiagnosticDocument.cpp Engine\Utility_Framework\AuthoringParsedDocument.cpp Engine\Utility_Framework\AuthoringCookedDocument.cpp Engine\Utility_Framework\CookedDocumentTree.cpp Engine\Utility_Framework\AuthoringRymlErrorPolicy.cpp Engine\Utility_Framework\AuthoringScalarConvert.cpp /Fo"$dir\\" /Fe"$dir\probe.exe" /Fd"$dir\probe.pdb" /link /LIBPATH:"$libroot\lib" ryml.lib c4core.lib
 if errorlevel 1 exit /b 1
 "$dir\probe.exe" "$dir"
 "@ | Set-Content $batch -Encoding ascii

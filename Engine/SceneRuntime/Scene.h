@@ -741,6 +741,7 @@ public:
 
     //Physics
     void FixedUpdate(float deltaSecond, bool singleStep = false);
+    const ScenePhysicsSimulation& PhysicsSimulation() const noexcept { return m_physicsSimulation; }
     double SimulationInterpolation() const noexcept { return m_physicsSimulation.InterpolationAlpha(); }
     void SetSimulationInterpolation(double alpha) { m_physicsSimulation.SetInterpolationAlpha(alpha); }
     math::matrix4x4 PhysicsRenderMatrix(EntityHandle owner) const;

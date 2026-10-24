@@ -133,9 +133,14 @@ float RectTransformComponent::ResolveParentScale() const
 
 math::rect RectTransformComponent::GetScreenRootRect()
 {
+#if defined(CE_SCENE_HEADLESS)
+    return {};
+#else
     const float width = static_cast<float>(ScreenResizeBus::Get().GetWidth());
     const float height = static_cast<float>(ScreenResizeBus::Get().GetHeight());
     return { -width * 0.5f, -height * 0.5f, width, height };
+
+#endif
 }
 
 math::rect RectTransformComponent::ResolveParentRect() const

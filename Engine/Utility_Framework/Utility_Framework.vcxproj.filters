@@ -363,4 +363,8 @@
     <ClInclude Include="LayerTypes.h" />
     <ClInclude Include="LayerCatalog.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="AuthoringDocumentAccess.cpp" />
+    <ClInclude Include="AuthoringDocumentStorage.h" />
+  </ItemGroup>
 </Project>

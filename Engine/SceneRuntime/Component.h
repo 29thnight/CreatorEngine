@@ -14,6 +14,7 @@ class Transform;
 namespace Meta { enum class PropertyChangeSource : std::uint8_t; }
 class [[reflgen::reflect]] Component : public meta::identity<Component, Object>, public gc::managed
 {
+    friend class CookedSceneLoader;
    friend struct reflgen::access;
    public:
 public:

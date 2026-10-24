@@ -76,6 +76,9 @@ result<body_definition> PhysicsBodyComponent::CaptureDefinition(std::span<const 
         if (!scene)
             return std::unexpected(error{error_code::wrong_phase, 0, "Cooked geometry requires scene membership"});
 
+#if defined(CE_SCENE_HEADLESS)
+        return std::unexpected(error{error_code::wrong_phase, 0, "Collision geometry asset provider is not installed"});
+#else
         if (!PathFinder::IsAssetAuthoringEnabled())
             return scene->m_collisionGeometry.ResolveCooked(key, [](geometry_asset_key expected) -> result<std::vector<std::byte>> {
                 const auto catalog = DataSystems->GetCookedCatalog();
@@ -101,6 +104,7 @@ result<body_definition> PhysicsBodyComponent::CaptureDefinition(std::span<const 
             return CollisionGeometryIO::Read(CollisionGeometryIO::RevisionPath(PathFinder::Relative(), expected),
                                               expected);
         });
+#endif
     };
 
     return BuildPhysicsShapes(shapes, scale, *filter, m_motion, resolve, settings.get()).transform([&](auto&& built) {
@@ -111,12 +115,17 @@ result<body_definition> PhysicsBodyComponent::CaptureDefinition(std::span<const 
 
 void PhysicsBodyComponent::OnBeforeDeserialize(const Authoring::NodeView& view) const
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring hook unavailable in a cooked-only host");
+#else
     const auto node = Authoring::NodeViewAccess::Node(view);
     std::uint64_t schema = 0;
     if (!node.IsMap() || node["m_halfExtent"] || !node["m_shapeSchema"].IsScalar() ||
         !Authoring::Scalar::TryParseUInt64(node["m_shapeSchema"].AsString(), schema) || schema != 1 ||
         !node["m_shapes"].IsSequence())
         throw std::runtime_error("Physics body requires shape schema 1; migrate legacy authoring first");
+
+#endif
 }
 
 void PhysicsBodyComponent::OnDeserialized(const Authoring::NodeView& view)

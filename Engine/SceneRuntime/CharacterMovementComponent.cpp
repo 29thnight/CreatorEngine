@@ -1,4 +1,4 @@
-#include "CharacterMovementComponent.h"
+﻿#include "CharacterMovementComponent.h"
 #include "PhysicsLifecyclePolicy.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include "Scene.h"
@@ -87,11 +87,16 @@ result<ScenePhysicsSimulation::character_definition> CharacterMovementComponent:
 
 void CharacterMovementComponent::OnBeforeDeserialize(const Authoring::NodeView& view) const
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Authoring reader service is not installed; use cooked admission");
+#else
     const auto node = Authoring::NodeViewAccess::Node(view);
     std::uint64_t schema = 0;
     if (!node.IsMap() || !node["m_characterSchema"].IsScalar() ||
         !Authoring::Scalar::TryParseUInt64(node["m_characterSchema"].AsString(), schema) || schema != 1)
         throw std::runtime_error("Character requires schema 1; migrate legacy authoring first");
+
+#endif
 }
 
 void CharacterMovementComponent::OnDeserialized(const Authoring::NodeView& view)

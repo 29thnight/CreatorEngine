@@ -125,6 +125,7 @@ class ScenePhysicsSimulation final
     std::span<const changed_pose> ChangedPoses() const noexcept { return m_changed; }
     std::span<const changed_character> ChangedCharacters() const noexcept { return m_changedCharacters; }
     ce::physics::PhysicsScene* Runtime() const noexcept { return m_runtime.get(); }
+    std::uint64_t CompletedSteps() const noexcept { return m_completedSteps; }
     double DroppedSeconds() const noexcept { return m_dropped; }
 
     static constexpr double fixed_seconds = Runtime::SimulationTick::seconds;
@@ -184,6 +185,7 @@ class ScenePhysicsSimulation final
     std::unique_ptr<ce::physics::PhysicsScene> m_runtime;
     binding_id m_next = 1;
     std::uint64_t m_publication = 0;
+    std::uint64_t m_completedSteps = 0;
     std::uint64_t m_layerRevision = 0;
     double m_accumulator = 0, m_dropped = 0;
     double m_externalAlpha = -1;

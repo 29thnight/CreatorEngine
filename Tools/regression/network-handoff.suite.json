@@ -36,6 +36,11 @@
       "id": "LifecycleEnums",
       "script": "ScriptCore/check-lifecycle-enums.ps1",
       "configuration": "none"
+    },
+    {
+      "id": "HeadlessBoundary",
+      "script": "Tools/regression/verify-headless-boundary.ps1",
+      "configuration": "none"
     }
   ]
 }

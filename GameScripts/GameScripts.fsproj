@@ -7,6 +7,9 @@
   <CreatorScriptSourceRoot Condition="'$(CreatorScriptSourceRoot)' == ''">$(MSBuildThisFileDirectory)../Dynamic_CPP/Assets/Script</CreatorScriptSourceRoot>
   <CreatorFSharpToolsRoot Condition="'$(CreatorFSharpToolsRoot)' == ''">$(MSBuildThisFileDirectory)../../FSharp_Tool_Pakage_for_CreatorEngine</CreatorFSharpToolsRoot>
   <CreatorEngineRoot>$(MSBuildThisFileDirectory)..</CreatorEngineRoot>
+  <!-- Product fixtures can compile their own source order without replacing
+       another Editor/SDK build's generated registry or intermediate assembly. -->
+  <IntermediateOutputPath Condition="'$(CreatorScriptBuildKey)' != ''">$(BaseIntermediateOutputPath)$(Configuration)/$(CreatorScriptBuildKey)/</IntermediateOutputPath>
  </PropertyGroup>
  <ItemGroup>
   <ProjectReference Include="../ScriptCore/ScriptCore.csproj" Private="false" />
@@ -14,6 +17,7 @@
   <ProjectReference Include="$(CreatorFSharpToolsRoot)/src/CreatorEngine.FSharp.Runtime/CreatorEngine.FSharp.Runtime.fsproj" />
  </ItemGroup>
  <Target Name="CreatorReadFSharpOrder" BeforeTargets="ResolveReferences">
+  <Error Condition="'$(CreatorScriptBuildKey)' != '' and !$([System.Text.RegularExpressions.Regex]::IsMatch('$(CreatorScriptBuildKey)', '^[A-Za-z0-9_-]+$'))" Text="CreatorScriptBuildKey must be a simple directory name." />
   <Error Condition="!Exists('$(CreatorScriptSourceRoot)/compile.order')" Text="F# authoring requires Assets/Script/compile.order with dependency-ordered relative .fs paths." />
   <ReadLinesFromFile File="$(CreatorScriptSourceRoot)/compile.order"><Output TaskParameter="Lines" ItemName="_FSharpOrder" /></ReadLinesFromFile>
   <RemoveDuplicates Inputs="@(_FSharpOrder)"><Output TaskParameter="Filtered" ItemName="_UniqueFSharpOrder" /></RemoveDuplicates>

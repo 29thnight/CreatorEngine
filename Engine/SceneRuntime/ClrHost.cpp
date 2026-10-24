@@ -1,7 +1,8 @@
-#include "EngineRuntimePaths.h"
+﻿#include "EngineRuntimePaths.h"
 #include "../Utility_Framework/TimeSystem.h"
 #include "ScriptApiVersion.h"
 #include "ClrHost.h"
+#include "ManagedAssembly.h"
 #include "ProfileScope.h"
 #include "MaterialScriptBinding.h"
 #include "PathFinder.h"
@@ -620,6 +621,8 @@ namespace
 	//
 	// 문자열 수명: 관리 측이 핀한 버퍼가 이 호출 동안 살아 있고, 로거가
 	// 동기라 포매팅이 여기서 끝난다.
+    std::atomic<std::uint64_t> g_managedErrors{0};
+
 	void __stdcall Api_PrintLog(int level, const char* message,
 		const char* file, int line, const char* member)
 	{
@@ -641,6 +644,7 @@ namespace
 			return;
 		}
 		}
+        if (level >= 3) ++g_managedErrors;
 		Debug::PrintLog(logLevel, message, where);
 	}
 
@@ -2919,6 +2923,73 @@ namespace
 
 	void FillApiTable()
 	{
+#if defined(CE_SCENE_HEADLESS)
+        g_physicsApiOwner = std::this_thread::get_id();
+		g_apiTable.version    = kApiVersion;
+		g_apiTable.structSize = static_cast<int>(sizeof(ScriptApiTable));
+		g_apiTable.PrintLog                    = &Api_PrintLog;
+		g_apiTable.Entity_FindByName       = &Api_Entity_FindByName;
+		g_apiTable.Entity_IsAlive          = &Api_Entity_IsAlive;
+		g_apiTable.Entity_GetName          = &Api_Entity_GetName;
+		g_apiTable.Entity_SetEnabled       = &Api_Entity_SetEnabled;
+		g_apiTable.Script_SetEnabled       = &Api_Script_SetEnabled;
+		g_apiTable.Entity_GetChildCount    = &Api_Entity_GetChildCount;
+		g_apiTable.Entity_GetChild         = &Api_Entity_GetChild;
+		g_apiTable.Entity_GetParent        = &Api_Entity_GetParent;
+		g_apiTable.Entity_FindByIndex      = &Api_Entity_FindByIndex;
+		g_apiTable.Entity_GetIndex         = &Api_Entity_GetIndex;
+		g_apiTable.Transform_Exists            = &Api_Transform_Exists;
+		g_apiTable.Transform_GetLocalPosition  = &Api_Transform_GetLocalPosition;
+		g_apiTable.Transform_SetLocalPosition  = &Api_Transform_SetLocalPosition;
+		g_apiTable.Simulation_Status = &Api_Simulation_Status;
+        g_apiTable.Simulation_Submit = &Api_Simulation_Submit;
+        g_apiTable.Simulation_Read = &Api_Simulation_Read;
+        g_apiTable.Transform_GetWorldPosition  = &Api_Transform_GetWorldPosition;
+		g_apiTable.Transform_GetLocalRotation  = &Api_Transform_GetLocalRotation;
+		g_apiTable.Transform_SetLocalRotation  = &Api_Transform_SetLocalRotation;
+		g_apiTable.Transform_GetLocalScale     = &Api_Transform_GetLocalScale;
+		g_apiTable.Transform_SetLocalScale     = &Api_Transform_SetLocalScale;
+		g_apiTable.Transform_AddLocalPosition  = &Api_Transform_AddLocalPosition;
+		g_apiTable.Transform_AddLocalRotation  = &Api_Transform_AddLocalRotation;
+		g_apiTable.Transform_SetWorldPosition  = &Api_Transform_SetWorldPosition;
+		g_apiTable.Transform_GetWorldRotation  = &Api_Transform_GetWorldRotation;
+		g_apiTable.Transform_SetWorldRotation  = &Api_Transform_SetWorldRotation;
+		g_apiTable.Transform_GetWorldScale     = &Api_Transform_GetWorldScale;
+		g_apiTable.Transform_SetWorldScale     = &Api_Transform_SetWorldScale;
+		g_apiTable.Transform_GetForward        = &Api_Transform_GetForward;
+		g_apiTable.Transform_GetRight          = &Api_Transform_GetRight;
+		g_apiTable.Transform_GetUp             = &Api_Transform_GetUp;
+		g_apiTable.Entity_Destroy          = &Api_Entity_Destroy;
+        g_apiTable.Engine_GetFrameCount = &Api_Engine_GetFrameCount;
+        g_apiTable.Body_Find = &Api_Body_Find;
+        g_apiTable.Character_Find = &Api_Character_Find;
+        g_apiTable.Character_Read = &Api_Character_Read;
+        g_apiTable.Character_Velocity = &Api_Character_Velocity;
+        g_apiTable.Character_Teleport = &Api_Character_Teleport;
+        g_apiTable.Character_Jump = &Api_Character_Jump;
+        g_apiTable.Character_Force = &Api_Character_Force;
+        g_apiTable.Character_CancelForce = &Api_Character_CancelForce;
+        g_apiTable.Body_Read = &Api_Body_Read;
+        g_apiTable.Body_Velocity = &Api_Body_Velocity;
+        g_apiTable.Body_Force = &Api_Body_Force;
+        g_apiTable.Body_ShapeCount = &Api_Body_ShapeCount;
+        g_apiTable.Body_ShapeRead = &Api_Body_ShapeRead;
+        g_apiTable.Body_ShapeFlags = &Api_Body_ShapeFlags;
+        g_apiTable.Body_Remove = &Api_Body_Remove;
+        g_apiTable.Body_ShapeRole = &Api_Body_ShapeRole;
+        g_apiTable.Physics_Query = &Api_Physics_Query;
+        g_apiTable.Physics_QueryBatch = &Api_Physics_QueryBatch;
+        g_apiTable.Asset_Request = &Api_Asset_Request;
+        g_apiTable.Asset_Snapshot = &Api_Asset_Snapshot;
+        g_apiTable.Asset_AcquireResult = &Api_Asset_AcquireResult;
+        g_apiTable.Asset_Cancel = &Api_Asset_Cancel;
+        g_apiTable.Asset_Release = &Api_Asset_Release;
+        g_apiTable.Asset_ReadTexture = &Api_Asset_ReadTexture;
+        g_apiTable.Asset_ListRoots = &Api_Asset_ListRoots;
+        g_apiTable.Asset_RequestTyped = &Api_Asset_RequestTyped;
+        g_apiTable.Asset_TryAcquireTyped = &Api_Asset_TryAcquireTyped;
+        g_apiTable.Camera_NotifyCameraCut = [](ScriptObjectHandle) {};
+#else
         g_physicsApiOwner = std::this_thread::get_id();
 		g_apiTable.version    = kApiVersion;
 		g_apiTable.structSize = static_cast<int>(sizeof(ScriptApiTable));
@@ -3159,52 +3230,18 @@ namespace
         g_apiTable.Asset_RequestTyped = &Api_Asset_RequestTyped;
         g_apiTable.Asset_TryAcquireTyped = &Api_Asset_TryAcquireTyped;
 
+#endif
+
 	}
 
-	// ── hostfxr ──
-	hostfxr_initialize_for_runtime_config_fn g_hostInit{ nullptr };
-	hostfxr_get_runtime_delegate_fn          g_hostGetDelegate{ nullptr };
-	hostfxr_close_fn                         g_hostClose{ nullptr };
+    Runtime::ManagedAssembly g_managedAssembly;
 
-	load_assembly_and_get_function_pointer_fn g_loadAssembly{ nullptr };
 }
 
 ClrHost& ClrHost::Get()
 {
 	static ClrHost instance;
 	return instance;
-}
-
-bool ClrHost::LoadHostfxr()
-{
-	wchar_t path[MAX_PATH]{};
-	size_t size = MAX_PATH;
-
-	const auto privateRoot = ResolveEngineRuntimeDirectory() / L"DotNet";
-    const std::wstring privateRootText = privateRoot.wstring();
-    get_hostfxr_parameters parameters{ sizeof(get_hostfxr_parameters), nullptr, privateRootText.c_str() };
-    const bool hasPrivateRuntime = file::is_directory(privateRoot / L"host" / L"fxr");
-    if (0 != get_hostfxr_path(path, &size, hasPrivateRuntime ? &parameters : nullptr))
-	{
-		Debug::PrintLog(spdlog::level::warn, "[CLR] hostfxr를 찾을 수 없습니다. 스크립트 계층이 비활성화됩니다.");
-		return false;
-	}
-
-	HMODULE module = ::LoadLibraryW(path);
-	if (nullptr == module)
-	{
-		Debug::PrintLog(spdlog::level::warn, "[CLR] hostfxr 로드 실패");
-		return false;
-	}
-
-	g_hostInit = reinterpret_cast<hostfxr_initialize_for_runtime_config_fn>(
-		::GetProcAddress(module, "hostfxr_initialize_for_runtime_config"));
-	g_hostGetDelegate = reinterpret_cast<hostfxr_get_runtime_delegate_fn>(
-		::GetProcAddress(module, "hostfxr_get_runtime_delegate"));
-	g_hostClose = reinterpret_cast<hostfxr_close_fn>(
-		::GetProcAddress(module, "hostfxr_close"));
-
-	return nullptr != g_hostInit && nullptr != g_hostGetDelegate && nullptr != g_hostClose;
 }
 
 bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
@@ -3216,16 +3253,12 @@ bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
 	{
 		// UNMANAGEDCALLERSONLY_METHOD를 주면 델리게이트 마샬링 없이
 		// 관리 메서드를 직접 가리키는 함수 포인터를 받는다.
-		const int rc = g_loadAssembly(assembly.c_str(), owningType, method,
-			UNMANAGEDCALLERSONLY_METHOD, nullptr, out);
-
-		if (0 != rc || nullptr == *out)
-		{
-			char buffer[256]{};
-			std::snprintf(buffer, sizeof(buffer), "[CLR] 진입점 바인딩 실패 (rc=0x%X)", rc);
-			Debug::PrintLog(spdlog::level::err, buffer);
-			return false;
-		}
+        std::string error;
+        if (!g_managedAssembly.Bind(owningType, method, out, error))
+        {
+            Debug::PrintLog(spdlog::level::err, "[CLR] " + error);
+            return false;
+        }
 		return true;
 	};
 
@@ -3330,30 +3363,12 @@ bool ClrHost::Initialize()
 		return false;
 	}
 
-	if (!LoadHostfxr()) return false;
-
-	hostfxr_handle context = nullptr;
-	int rc = g_hostInit(configPath.c_str(), nullptr, &context);
-	// 0 = 성공, 1 = 이미 초기화됨(둘 다 정상)
-	if ((0 != rc && 1 != rc) || nullptr == context)
-	{
-		char buffer[256]{};
-		std::snprintf(buffer, sizeof(buffer), "[CLR] 런타임 초기화 실패 (rc=0x%X)", rc);
-		Debug::PrintLog(spdlog::level::err, buffer);
-		if (nullptr != context) g_hostClose(context);
-		return false;
-	}
-
-	void* loader = nullptr;
-	rc = g_hostGetDelegate(context, hdt_load_assembly_and_get_function_pointer, &loader);
-	g_hostClose(context);
-
-	if (0 != rc || nullptr == loader)
-	{
-		Debug::PrintLog(spdlog::level::err, "[CLR] 로더 델리게이트 획득 실패");
-		return false;
-	}
-	g_loadAssembly = reinterpret_cast<load_assembly_and_get_function_pointer_fn>(loader);
+    std::string loaderError;
+    if (!g_managedAssembly.Open(assemblyPath, ResolveEngineRuntimeDirectory() / L"DotNet", loaderError))
+    {
+        Debug::PrintLog(spdlog::level::err, "[CLR] " + loaderError);
+        return false;
+    }
 
 	if (!BindEntryPoints(assemblyPath)) return false;
 
@@ -3612,6 +3627,7 @@ bool ClrHost::TickUpdate(float fixedDelta)
 {
     if (!m_ready) return true;
     if (!m_fnUpdate) return false;
+    ++m_simulationBatches;
     const int count = m_fnUpdate(fixedDelta);
     if (count < 0) return false;
     m_lastActiveCount = count;
@@ -4003,3 +4019,5 @@ void ClrHost::SetFieldObject(int instanceId, int index, Entity* object)
 
 
 
+
+std::uint64_t ClrHost::ManagedErrorCount() const noexcept { return g_managedErrors.load(); }

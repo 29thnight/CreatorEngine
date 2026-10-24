@@ -577,6 +577,7 @@ result<std::uint32_t> ScenePhysicsSimulation::AdvanceInternal(double seconds, bo
             m_renderPrepared.clear();
             return std::unexpected(finished.error());
         }
+        ++m_completedSteps;
         const auto& snapshot = *m_runtime->latest_snapshot();
         if (snapshot.statistics.dropped_events || snapshot.statistics.unresolved_identities)
             return std::unexpected(error{error_code::capacity_exceeded, 0, "Contact snapshot incomplete"});

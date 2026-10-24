@@ -1,0 +1,106 @@
+m_sceneName: HeadlessAcceptance
+m_buildIndex: 0
+m_Entities:
+  - Entity: 8465162159729457626
+    m_name: Root
+    m_instanceID: 100
+    m_index: 0
+    m_parentIndex: -1
+    m_rootIndex: 0
+    m_childrenIndices: [1, 2, 3, 4, 5, 6]
+    m_components:
+      - Transform: 13979161094353040123
+        m_instanceID: 1000
+        position: {x: 0, y: 0, z: 0}
+  - Entity: 8465162159729457626
+    m_name: Floor
+    m_instanceID: 101
+    m_index: 1
+    m_parentIndex: 0
+    m_components:
+      - Transform: 13979161094353040123
+        m_instanceID: 1001
+        position: {x: 0, y: -0.5, z: 0}
+      - PhysicsBodyComponent: 6005066272611484821
+        m_instanceID: 2001
+        m_motion: 0
+        m_shapes:
+          - shapeId: 1
+            kind: 0
+            halfExtent: {x: 20, y: 0.5, z: 20}
+  - Entity: 8465162159729457626
+    m_name: Mover
+    m_instanceID: 102
+    m_index: 2
+    m_parentIndex: 0
+    m_components:
+      - Transform: 13979161094353040123
+        m_instanceID: 1002
+        position: {x: 0, y: 1, z: 0}
+      - PhysicsBodyComponent: 6005066272611484821
+        m_instanceID: 2002
+        m_motion: 2
+        m_gravityEnabled: false
+        m_shapes:
+          - shapeId: 1
+            kind: 0
+      - ScriptComponent: 1
+        m_instanceID: 3002
+        m_scriptType: HeadlessTickProbe
+        m_fieldData: ["1|3|Speed"]
+  - Entity: 8465162159729457626
+    m_name: Falling
+    m_instanceID: 103
+    m_index: 3
+    m_parentIndex: 0
+    m_components:
+      - Transform: 13979161094353040123
+        m_instanceID: 1003
+        position: {x: -4, y: 4, z: 0}
+      - PhysicsBodyComponent: 6005066272611484821
+        m_instanceID: 2003
+        m_motion: 2
+        m_shapes:
+          - shapeId: 1
+            kind: 0
+  - Entity: 8465162159729457626
+    m_name: Retiring
+    m_instanceID: 104
+    m_index: 4
+    m_parentIndex: 0
+    m_components:
+      - Transform: 13979161094353040123
+        m_instanceID: 1004
+        position: {x: -10, y: 1, z: 0}
+      - PhysicsBodyComponent: 6005066272611484821
+        m_instanceID: 2004
+        m_motion: 2
+        m_gravityEnabled: false
+        m_shapes:
+          - shapeId: 1
+            kind: 0
+  - Entity: 8465162159729457626
+    m_name: CommandTarget
+    m_instanceID: 105
+    m_index: 5
+    m_parentIndex: 0
+    m_components:
+      - Transform: 13979161094353040123
+        m_instanceID: 1005
+      - ScriptComponent: 1
+        m_instanceID: 3005
+        m_isEnabled: false
+        m_scriptType: DisabledLifecycleProbe
+
+  - Entity: 8465162159729457626
+    m_name: Character
+    m_instanceID: 106
+    m_index: 6
+    m_parentIndex: 0
+    m_components:
+      - Transform: 13979161094353040123
+        m_instanceID: 1006
+        position: {x: -8, y: 1.5, z: 0}
+      - CharacterMovementComponent: 1
+        m_instanceID: 2006
+        m_initialVelocity: {x: 2, y: 0, z: 0}

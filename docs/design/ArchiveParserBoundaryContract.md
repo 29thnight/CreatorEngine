@@ -1,5 +1,7 @@
 # N1 Archive·Parser 경계 계약
 
+> 2026-10-24 무렌더 링크 보강: 빈 `Authoring::Document`의 소유권 구현과 Adopt/Clone/Read/Write backend 접근을 분리했다. Entity prefab snapshot과 기존 writer/deep-clone 호출자는 유지한다. 중립 utility와 저작 구현의 Unity object 합성도 막아 최종 headless map에서 ryml/c4 의존을 차단한다. [실제 기존 Scene/Entity 수용](../analysis/HeadlessSceneRuntimeAcceptance20261024.md)을 따른다.
+
 2026-10-22 로컬 구현 정본. [수용 기록](../analysis/ArchiveParserAcceptance20261022.md).
 
 ## 책임과 호출 경계
@@ -13,13 +15,13 @@
 | Network | 동결 wire 계약·중립 schema | Authoring/Diagnostics facade 및 backend 의존 |
 | Utility archive 구현 | parser/backend 내부 소유 | 공개 헤더로 backend 전달 |
 
-기존 ComponentFactory의 Authoring::NodeView, scene/prefab/material의 로컬 읽기·쓰기 facade는 유지한다. 소스 게이트의 runtimeFacadeCallers에 ParseText/File/Cooked 호출 위치를 기록한다. 개발/저작 입력의 텍스트 허용과 cooked Player의 parser 호출 0을 구분한다. 전체 runtime에서 parser 라이브러리를 물리적으로 unlink하는 작업과 Dedicated Server 제품은 N9/E6 별도 수용이다.
+기존 ComponentFactory의 Authoring::NodeView, scene/prefab/material의 로컬 읽기·쓰기 facade는 유지한다. 소스 게이트의 runtimeFacadeCallers에 ParseText/File/Cooked 호출 위치를 기록한다. 개발/저작 입력의 텍스트 허용과 cooked Player의 parser 호출 0을 구분한다. 렌더 없는 CPU 프로필은 Cedo::Decode 중립 트리를 사용해 parser 라이브러리를 링크하지 않는다. 기존 Authoring cooked facade도 같은 decoder에 연결했다. 기존 전체 runtime의 parser unlink와 Dedicated Server 전체 제품은 별도 수용이다. [headless 계약](HeadlessSceneRuntimeContract.md)을 따른다.
 
 ## 진단 출력
 
-TemporalMotionFixture와 EnhancedPbrCapture의 직접 ryml tree 소유를 Utility의 Diagnostics::Document로 이동했다. EnhancedSceneRenderer의 기존 manifest 호출자도 Root()로 이주했다. JSON writer만 제공하며 parser API를 추가하지 않는다. backend는 DiagnosticDocument.cpp에만 존재한다.
+TemporalMotionFixture와 EnhancedPbrCapture의 직접 ryml tree 소유를 Utility의 Diagnostics::Document로 이동했다. EnhancedSceneRenderer의 기존 manifest 호출자도 Root()로 이주했다. JSON writer만 제공하며 parser API를 추가하지 않는다. 2026-10-24에는 DiagnosticDocument.cpp를 parser/backend 없는 표준 C++ JSON writer로 교체했다. headless와 Editor/Player가 같은 writer를 사용한다.
 
-Document는 단독 소유·이동 가능하다. Node는 빌린 핸들이므로 원래 document state가 파괴되기 전에 사용해야 한다. document 이동 후 state 주소는 유지되며 이동 대입으로 폐기된 state의 node는 사용할 수 없다. 키/문자열은 arena에 복사하고 문자열 scalar를 명시적으로 인용한다. bool·숫자와 문자열 true/123의 자료형을 보존한다. 빈 node와 범위 밖 sequence index는 실패한다.
+Document는 단독 소유·이동 가능하다. Node는 빌린 핸들이므로 원래 document state가 파괴되기 전에 사용해야 한다. document 이동 후 state 주소는 유지되며 이동 대입으로 폐기된 state의 node는 사용할 수 없다. 키/문자열은 소유 트리에 복사하고 문자열 scalar를 명시적으로 인용한다. bool·숫자와 문자열 true/123의 자료형을 보존한다. 빈 node와 범위 밖 sequence index는 실패한다.
 
 ## 실패 게이트와 실행
 
@@ -31,4 +33,4 @@ Document는 단독 소유·이동 가능하다. Node는 빌린 핸들이므로 �
 ./Tools/regression/run-all.ps1 -Suite NetworkHandoff -Configuration All -Product -EditorExe <새 Release Editor> -CookedStage <새 cooked 패키지 폴더>
 ```
 
-기본 등록 9그룹에 N3·W4/ND-b 실제 Editor, N1 cooked Player, N1 실제 PBR 진단 소비자와 N3 cadence/moving GPU 6그룹을 추가한다. CookedStage가 없거나 현재 빌드 runtime과 다르면 Product gate는 실패한다. Player parser 호출 0·직접 backend 참조 0·패키지 불변을 확인한다. 실제 PBR gate는 manifest 타입·실제 첨부·크기·유한값·GPU validation을 검사한다. Motion fixture와 전반적 픽셀 품질은 이 gate의 통과 범위에 포함하지 않는다.
+현재 기본 등록은 HeadlessBoundary 추가 후 10그룹이다. 여기에 N3·W4/ND-b 실제 Editor, N1 cooked Player, N1 실제 PBR 진단 소비자와 N3 cadence/moving GPU 6그룹과 headless 제품 1그룹을 추가한다. CookedStage가 없거나 현재 빌드 runtime과 다르면 Product gate는 실패한다. Player parser 호출 0·직접 backend 참조 0·패키지 불변을 확인한다. 실제 PBR gate는 manifest 타입·실제 첨부·크기·유한값·GPU validation을 검사한다. Motion fixture와 전반적 픽셀 품질은 이 gate의 통과 범위에 포함하지 않는다.

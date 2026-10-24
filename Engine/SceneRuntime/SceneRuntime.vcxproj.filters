@@ -772,4 +772,8 @@
     <ClInclude Include="Audio\AudioSourceValidation.h" />
     <ClInclude Include="Audio\EditorAudioClipCache.h" />
   </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="CookedSceneLoader.cpp" />
+    <ClInclude Include="CookedSceneLoader.h" />
+  </ItemGroup>
 </Project>

@@ -38,4 +38,8 @@ private:
     std::vector<PlayerInputComponent*> m_inputs;
 };
 
+#if defined(CE_SCENE_HEADLESS)
+#define PlayerInputSystems (PlayerInputSystem::GetIfAlive())
+#else
 static auto PlayerInputSystems = PlayerInputSystem::GetInstance();
+#endif

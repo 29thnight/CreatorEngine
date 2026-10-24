@@ -119,4 +119,8 @@ private:
 	std::unordered_map<FileGuid, own::shared_owner<BTBuildGraph>> m_btBuildGraphCache; // BT 빌드 그래프 캐시
 };
 
+#if defined(CE_SCENE_HEADLESS)
+#define AIManagers (AIManager::GetIfAlive())
+#else
 static auto AIManagers = AIManager::GetInstance();
+#endif

@@ -24,6 +24,8 @@ public:
 	void Shutdown();
 
 	bool IsReady() const { return m_ready; }
+    std::uint64_t ManagedErrorCount() const noexcept;
+    std::uint64_t SimulationBatchCount() const noexcept { return m_simulationBatches; }
     bool AreScriptsLoaded() const { return m_scriptsLoaded; }
 
 	// ── 틱 진입점 (게임 스레드에서만 호출할 것) ──
@@ -476,12 +478,12 @@ private:
 	ClrHost() = default;
 	~ClrHost() = default;
 
-	bool LoadHostfxr();
 	bool BindEntryPoints(const file::path& assemblyPath);
 
 	bool m_ready{ false };
     bool m_scriptsLoaded{ false };
 	int  m_lastActiveCount{ 0 };
+    std::uint64_t m_simulationBatches = 0;
 
 	// 관리 진입점 함수 포인터 (UnmanagedCallersOnly라 마샬링 스텁이 없다)
 	using InitializeFn      = int(__stdcall*)(void*);

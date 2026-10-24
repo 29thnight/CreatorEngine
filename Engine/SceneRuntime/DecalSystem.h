@@ -52,4 +52,8 @@ private:
     std::vector<DecalComponent*> m_decals;
 };
 
+#if defined(CE_SCENE_HEADLESS)
+#define DecalSystems (DecalSystem::GetIfAlive())
+#else
 static auto DecalSystems = DecalSystem::GetInstance();
+#endif

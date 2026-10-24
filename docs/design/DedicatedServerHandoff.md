@@ -1,6 +1,10 @@
 # 데디케이티드 서버 작업자 인계 설계
 
-> 2026-10-23 동기화 후 적용 기준: 이 문서의 본문은 2026-10-21 설계 제안을 보존한다. 최신 구현·인계 상태는 [NetworkFrameworkPlan](../plans/NetworkFrameworkPlan.md)과 [최종 인계 점검](../analysis/NetworkWorkerHandoff20261023.md)을 우선한다. 현재 고정 틱은 F# 일반 멤버 `OnTickSimulate(dt)`/Script API45이며 ND-a·ND-b·N1·N3의 사내 수용은 완료했다. 아래의 "누산기/observer 없음"과 C# 전용 저작 전제는 현행 코드에 적용하지 않는다. 렌더 없는 SceneRuntime 링크·구동과 실제 Dedicated Server 제품 수용은 여전히 별도다.
+> 2026-10-24 최종 인계 판정: [최종 점검·착수 순서·검증 기준](../analysis/NetworkWorkerHandoff20261024.md)이 최신 정본이다. 수용 범위 내 추가 사내 선행 구현 잔여는 없으며 전달 리비전·도구·SDK·증거 고정은 남는다. 아래 10월 21일 제안 API 이름 대신 최종 점검의 실제 SceneManager/SceneObservation/SimulationExchange 연결 지점을 따른다.
+
+> 2026-10-24 사내 선행 갱신: [기존 Scene/Entity 무렌더 실행 계약](HeadlessSceneRuntimeContract.md)과 [수용 기록](../analysis/HeadlessSceneRuntimeAcceptance20261024.md)이 현행 근거다. 별도 제한 씬 저장소 대신 기존 SceneManager·Scene·Entity·ClrHost·수명·DDOL 배선을 재사용한다. cooked·60Hz·CPU 물리/CCT·F# `OnTickSimulate`·종료·렌더/저작 parser 의존 차단과 새 checkout 재현을 수용했다. 추가 컴포넌트·외부 에셋은 reader/provider 설치가 필요하다. N2 wire schema 및 N9의 실제 두 client/connection drain·운영 배포는 별도다.
+
+> 2026-10-23 동기화 후 적용 기준: 이 문서의 본문은 2026-10-21 설계 제안을 보존한다. 최신 구현·인계 상태는 [NetworkFrameworkPlan](../plans/NetworkFrameworkPlan.md)과 [최종 인계 점검](../analysis/NetworkWorkerHandoff20261023.md)을 우선한다. 현재 고정 틱은 F# 일반 멤버 `OnTickSimulate(dt)`/Script API45이며 ND-a·ND-b·N1·N3의 사내 수용은 완료했다. 아래의 "누산기/observer 없음"과 C# 전용 저작 전제는 현행 코드에 적용하지 않는다. 렌더 없는 실행의 현행 범위는 위 기존 Scene/Entity 재사용 계약을 따르며 실제 Dedicated Server 제품 수용은 별도다.
 
 작성: 2026-10-21. 상태: 인터페이스 설계안. 아래 API 이름은 신규 제안이다.
 정본 계획: [NetworkFrameworkPlan](../plans/NetworkFrameworkPlan.md) §6.

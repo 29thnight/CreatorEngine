@@ -11,6 +11,7 @@ class RenderScene;
 class SceneManager;
 class [[reflgen::reflect]] Object : public IObject, public meta::polymorphic
 {
+    friend class CookedSceneLoader;
    friend struct reflgen::access;
    public:
 private:

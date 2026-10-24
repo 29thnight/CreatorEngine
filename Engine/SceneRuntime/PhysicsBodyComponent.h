@@ -11,6 +11,7 @@ class Scene;
 class [[reflgen::reflect]] PhysicsBodyComponent final : public meta::identity<PhysicsBodyComponent, Component>
 {
     friend struct reflgen::access;
+    friend class CookedSceneLoader;
     friend class Scene;
 
   public:

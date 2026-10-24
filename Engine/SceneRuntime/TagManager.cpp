@@ -57,6 +57,9 @@ void TagManager::Finalize()
 
 void TagManager::Load()
 {
+#if defined(CE_SCENE_HEADLESS)
+    return;
+#else
     file::path path = ResolveTagManagerPath();
     // 예전에는 이 존재 검사가 에디터 전용이었다 — 플레이어에서 파일이 없으면
     // YAML::LoadFile이 예외를 던졌다. 언팩 실패가 크래시로 둔갑하지 않게
@@ -90,10 +93,15 @@ void TagManager::Load()
             m_tagMap[tag] = index++;
         }
     }
+
+#endif
 }
 
 bool TagManager::Save()
 {
+#if defined(CE_SCENE_HEADLESS)
+    return false;
+#else
     // ★ 로드가 실패한 상태로 기존 파일을 덮지 않는다. 빈 상태 저장은
     //   사용자가 정말 전부 지운 경우에만 정당하고, 로드 실패 뒤에는 손실이다.
     if (!m_loadSucceeded && file::exists(ResolveTagManagerPath()))
@@ -127,6 +135,8 @@ bool TagManager::Save()
     }
 
     return true;
+
+#endif
 }
 
 // 태그 정의 저작(Add/Remove 4종)은 실행 모드 가드가 아니라 호출자

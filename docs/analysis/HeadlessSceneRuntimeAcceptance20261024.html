@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/HeadlessSceneRuntimeAcceptance20261024.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>기존 Scene/Entity 무렌더 실행 수용 — 2026-10-24</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#구현과-기존-호출자">구현과 기존 호출자</a></li><li><a href="#실제-실행-결과">실제 실행 결과</a></li><li><a href="#새-checkout-재현">새 checkout 재현</a></li><li><a href="#기존-소비자-회귀">기존 소비자 회귀</a></li><li><a href="#문서와-인계">문서와 인계</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="HeadlessSceneRuntimeAcceptance20261024.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>기존 Scene/Entity 무렌더 실행 수용 — 2026-10-24</h1>
+<div class="meta"><p><strong>별도 제한 프로필을 폐기하고 기존 SceneManager·Scene·Entity·Component·ClrHost를 재사용하는 렌더 없는 실행으로 전환했다.</strong> Debug·Release·새 checkout의 실제 host 57건과 기존 소비자 회귀를 통과했다. 실제 네트워크 서버 제품 수용은 별도다.</p>
+<p><a href="HeadlessSceneRuntimeAcceptance20261024.json">기계 판독 기록</a> · <a href="../design/HeadlessSceneRuntimeContract.html">실행 계약</a> · <a href="../plans/NetworkFrameworkPlan.html">네트워크 계획</a> · <a href="../RefactoringPlanDashboard.html#phase-20">대시보드</a>.</p>
+</div>
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">3<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 3"><i class="ok" style="flex:3"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 3</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
+<a class="map-row" href="#구현과-기존-호출자"><span class="ve-label">§00</span><span class="map-name">구현과 기존 호출자</span><span class="map-bar"><i style="width:83.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실제-실행-결과"><span class="ve-label">§01</span><span class="map-name">실제 실행 결과</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#새-checkout-재현"><span class="ve-label">§02</span><span class="map-name">새 checkout 재현</span><span class="map-bar"><i style="width:48.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#기존-소비자-회귀"><span class="ve-label">§03</span><span class="map-name">기존 소비자 회귀</span><span class="map-bar"><i style="width:76.5%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">3</span></span></a>
+<a class="map-row" href="#문서와-인계"><span class="ve-label">§04</span><span class="map-name">문서와 인계</span><span class="map-bar"><i style="width:34.4%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「실제 실행 결과」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-구현과-기존-호출자">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="구현과-기존-호출자">구현과 기존 호출자</h2></div>
+<div class="prose"><p><code>SceneRuntimeHeadless</code>는 기존 production SceneManager·Scene·Entity·Component·ScriptComponent·물리 구현을 표현 서비스 없이 컴파일한다. <code>Runtime::Headless::Session</code>은 입장·프레임·종료 순서만 조정한다. 자체 엔티티 저장소·Transform 계산·물리 바인딩·수명 큐와 HeadlessBindings 전용 ABI를 제거했다. 기존 Editor/Player도 같은 핵심 클래스와 ClrHost API45를 사용한다.</p>
+<p><code>CookedSceneLoader</code>는 기존 AssetCooker의 CEDO v1을 실제 factory에 복원한다. 엔티티/컴포넌트 identity·prefab/override·태그·설치된 프로젝트 layer ID·계층·sparse file slot·forward parent·UINT32_MAX 무효 참조·레거시 <code>m_transform</code>을 보존한다. 추가 CPU 컴포넌트는 reader를 등록한다. 미설치 컴포넌트·asset bundle·외부 geometry 서비스는 입장 오류이며, 조용히 버리지 않는다. 현재 host는 기본 project layer 서비스를 설치하며 알 수 없는 layer ID도 거부한다. 모든 기존 게임 씬을 그대로 지원한다고 확대하지 않는다.</p>
+<p>기존 수명 큐·GCCE owner domain·ScriptObjectRegistry의 세대/핸들과 지연 파괴를 유지한다. 비활성 스크립트의 초기화도 기존 규칙대로 지연한다. DDOL은 실제 SceneManager의 이송을 사용한다. Editor Play snapshot과 prefab snapshot을 제거하지 않았으며 <code>Authoring::Document</code>의 중립 소유권과 backend 접근을 분리했다. Adopt/Clone은 독립된 writer를 소유한다. Unity object의 중립/저작 코드 합성도 차단해 parser 링크를 제거했다.</p>
+<p>개별 F# 콜백 예외는 기존 일반 저작 계약대로 해당 스크립트만 비활성화한다. 배치가 정상 완료하면 물리·snapshot을 커밋한다. 배치 전체 실패 때에는 커밋하지 않는다. 검증 host는 관리 오류 기록이 있으면 정상 수명 정리를 마친 뒤 프로세스 실패로 보고한다. 전역 F# 예외 계약을 바꾸지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-실제-실행-결과">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="실제-실행-결과">실제 실행 결과</h2></div>
+<div class="prose"><p>합성 프레임 입력 2초를 각 구성에서 실행했다. FPS 성능 측정 결과가 아니다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>구성</th><th style="text-align:right">입력 cadence</th><th style="text-align:right">프레임</th><th style="text-align:right">F# 배치 / 커밋 / 물리</th><th style="text-align:right">0틱 프레임</th><th style="text-align:right">다중틱 프레임</th></tr></thead>
+<tbody><tr><td>Debug</td><td style="text-align:right">30 / 60 / 144</td><td style="text-align:right">60 / 120 / 288</td><td style="text-align:right">각각 120 / 120 / 120</td><td style="text-align:right">0 / 0 / 168</td><td style="text-align:right">60 / 0 / 0</td></tr>
+<tr><td>Release</td><td style="text-align:right">30 / 60 / 144</td><td style="text-align:right">60 / 120 / 288</td><td style="text-align:right">각각 120 / 120 / 120</td><td style="text-align:right">0 / 0 / 168</td><td style="text-align:right">60 / 0 / 0</td></tr>
+<tr><td>새 checkout Release</td><td style="text-align:right">30 / 60 / 144</td><td style="text-align:right">60 / 120 / 288</td><td style="text-align:right">각각 120 / 120 / 120</td><td style="text-align:right">0 / 0 / 168</td><td style="text-align:right">60 / 0 / 0</td></tr></tbody></table></div>
+<p>공통 TimeSystem의 FrameCount도 실제 프레임 수와 일치한다. 모든 cadence에서 이동체 x=6.0000048m, 낙하체 y=0.4999990m, 실제 CCT x=-5.0500498m/y=1.04999995m다. F# 소비자가 1/60 dt·명령 선적용·물리 뒤 snapshot·오래된 wrapper·필드 복원·수명/정리를 검사했다. DDOL은 동일 Entity·ScriptComponent·바디 컴포넌트·전역 script handle을 보존하고, 이전 씬 handle을 stale 처리하며 SDK scene/body handle·명령 epoch를 갱신했다. pose·속도를 보존했고 초기화/시작/종료/해제는 각각 1회, 씬 추가/제거는 각각 2회였다. 120 관리 배치 중 이송 후 새 epoch의 커밋/물리 서수는 90이다.</p>
+<p>각 구성의 실제 host 19건은 cadence 3·실제 시계·한글/상대 경로·텍스트/절단/버전 오류·sparse/forward 계층·레거시 Transform·미설치 컴포넌트·계층 순환·잘못된 body 필드·외부 geometry·F# 필드 타입 오류·틱/종료 예외·실제 DDOL·스크립트 누락을 검사했다. 주 수용은 57건이고 Product suite도 별도로 Release 19건을 다시 실행했다. 틱 콜백 예외는 10번째 호출에서 격리되며 정상 완료한 커밋/물리 10 뒤 host가 실패를 반환한다. 정상·오류 경로에서 GC 객체/루트/스크립트 핸들은 0, 물리 resource는 balanced, 생성/파괴 통지는 일치했다.</p>
+<p>패키지 원장·native imports·최종 map·실제 로드 모듈에서 RenderEngine/Editor·DXGI/D3D/Vulkan·shader compiler·GPU PhysX·ryml/c4 의존을 차단했다. adapter/project 금지 변이 5건·DLL 규칙 7건과 금지 패키지 canary도 거부했다. 공통 헤더의 선택 서비스 타입 선언을 최종 링크 코드와 혼동하지 않는다. CLR이 사용하는 USER32/GDI 등 OS DLL의 부재를 주장하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-새-checkout-재현">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="새-checkout-재현">새 checkout 재현</h2></div>
+<div class="prose"><p>기준 commit은 <code>71504c4fd610a205c8c857538364e1d392e9e150</code>, checkout은 <code>C:/Users/idene/.codex/worktrees/shared-scene-repro/CreatorEngine</code>다. 명시한 source overlay 72개 파일은 원본/새 checkout의 SHA256이 일치한다. F# 도구는 별도 checkout의 <code>3351cbc80d7216eb10110c4c8b30dce98aef1d1f</code>로 고정했다.</p>
+<p>원본 Bin/Build 산출물을 복사하지 않고 실제 native·managed fixture를 다시 빌드하고 씬을 다시 구웠다. vcpkg 설치 cache는 junction, NuGet은 전역 cache를 재사용했다. 재현 solution에서는 이번 경계와 무관한 기존 Effect 미추적 프로젝트 항목을 제외했고 direct target을 빌드했다. 전체 전이 include 지문의 raw byte 일치를 주장하지 않는다. source overlay와 actual package/import/map/프로세스 결과를 함께 기록했다.</p>
+<p>의존 cache가 없는 clean VM 설치·Linux/컨테이너·self-contained .NET 배포는 검증하지 않았다. 설치된 .NET 10 x64와 MSVC runtime이 필요하다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-기존-소비자-회귀">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="기존-소비자-회귀">기존 소비자 회귀</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>회귀</th><th>이번 최종 소스 결과</th></tr></thead>
+<tbody><tr><td>HeadlessHost·CreatorEditor·Player·AssetCooker native</td><td>Release 재빌드 PASS; Debug host 별도 제품 PASS</td></tr>
+<tr><td>NetworkHandoff <code>All -Product</code></td><td>등록 기본 10그룹 + 제품 7그룹, 단일 실행 17그룹 PASS</td></tr>
+<tr><td>기존 Editor 고정틱·활성·일반 async·실패/수명</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>실제 명령/snapshot·Scene GC 2회·진단 JSON/PBR</td><td><span class="chip ok">Product suite PASS</span></td></tr>
+<tr><td>실제 Editor 30/60/144fps·CCT/강체 궤적·moving 144 GPU</td><td>Product suite PASS; 합성 host cadence와 구분</td></tr>
+<tr><td>프리팹 override writer·snapshot deep clone</td><td>로컬 수정 기록·갱신·값/Transform 보존 7판정 PASS</td></tr>
+<tr><td>F# 생성·필드 보존·자동 reload·실패 compile 보존·일반 멤버 tick</td><td><span class="chip ok">실제 Editor PASS</span></td></tr>
+<tr><td>손상된 관리 DLL의 reload 실패/복구</td><td>임시 F# Bobber fixture로 편집/Play identity·활성 개수 보존 PASS</td></tr>
+<tr><td>새 로컬 SDK·새 cooked AnimationPlayer</td><td>실제 cooker/package·애니메이션/명령/정상 종료 PASS</td></tr>
+<tr><td>새 SDK F# CCT Player</td><td>실제 고정틱/native read/write·완료 marker·정상 종료·패키지 불변 PASS</td></tr>
+<tr><td>cooked Player parser 비호출·경계 변이</td><td>Product 및 등록 기본 suite PASS</td></tr></tbody></table></div>
+<p>추가 리로드 검사의 첫 시도는 이전 fixture DLL에 Bobber가 없어 기준 부착 단계에서 중단됐다. 임시 F# fixture를 명시적으로 빌드한 뒤 재실행했고 원래 관리 파일을 복원했다. 이전 제한 프로필의 결과 JSON과 실패 로그는 Build 증거에 보존했으며 새 실행으로 바꿔 쓰지 않았다. 기본 suite는 pwsh로, 주 host 수용 57건은 Windows PowerShell 5로 실행했다. 원격 CI 실행이나 모든 엔진/장치/soak 회귀 통과를 주장하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-문서와-인계">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="문서와-인계">문서와 인계</h2></div>
+<div class="prose"><p>계약·계획·인계·대시보드는 기존 Scene/Entity 재사용 구조로 갱신하고 Markdown에서 HTML을 다시 생성했다. 대시보드 기존 455개 작업의 ID/상태/공수/순서를 보존한다. 날짜가 고정된 master 감사와 과거 측정은 별도 기록으로 유지한다. 이번 소스·문서 지문과 검증 결과는 JSON 및 <code>Build/Verification/SharedScene20261024</code>에 있다.</p>
+<p>서버 담당자는 N0 → N2/N4 → N5 → N6 → N7 → N10 순서로 착수한다. 로컬 handle·schema 1을 wire identity/serializer로 사용하지 않는다. N9 실제 서버 bootstrap·2-client 동기화·connection drain·운영 배포, 추가 서비스/provider와 soak는 별도 수용이다. 기존 Effect·모델 메타·workspace 변경은 보존했으며 이번 작업을 커밋·푸시하지 않았다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="HeadlessSceneRuntimeAcceptance20261024.md"><code>docs/analysis/HeadlessSceneRuntimeAcceptance20261024.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

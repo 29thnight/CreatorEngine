@@ -9,6 +9,7 @@ class Scene;
 class [[reflgen::reflect]] CharacterMovementComponent final
     : public meta::identity<CharacterMovementComponent, Component>
 {
+    friend class CookedSceneLoader;
     friend struct reflgen::access;
     friend class Scene;
 

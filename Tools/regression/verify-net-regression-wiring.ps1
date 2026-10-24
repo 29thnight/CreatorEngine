@@ -1,4 +1,4 @@
-[CmdletBinding()]
+﻿[CmdletBinding()]
 param([Parameter(Mandatory)][string]$EvidenceRoot)
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -34,5 +34,10 @@ $manifest.gates=@($manifest.gates|Where-Object id -ne 'N1')
 $manifest|ConvertTo-Json -Depth 6|Set-Content "$root/Tools/regression/network-handoff.suite.json" -Encoding utf8
 & $shell -NoProfile -File "$root/Tools/regression/run-all.ps1" -Suite NetworkHandoff -Configuration Release *> "$root/archive-removal.log"
 if(!$LASTEXITCODE -or (Get-Content "$root/archive-removal.log" -Raw) -notmatch 'NET_SUITE_REGISTRATION'){throw 'Removed N1 registration was not rejected'}
-@{result='NET_REGRESSION_WIRING_CANARIES_OK';failedGateExit=37;failurePropagated=$true;removedGateRejected=$true;removedObservationGateRejected=$true;removedArchiveGateRejected=$true;productionSourcesChanged=$false}|ConvertTo-Json|Set-Content "$root/result.json" -Encoding utf8
-'NET_REGRESSION_WIRING_CANARIES_OK failure=37 removal=rejected observationRemoval=rejected archiveRemoval=rejected'
+$manifest=Get-Content "$PSScriptRoot/network-handoff.suite.json" -Raw|ConvertFrom-Json
+$manifest.gates=@($manifest.gates|Where-Object id -ne 'HeadlessBoundary')
+$manifest|ConvertTo-Json -Depth 6|Set-Content "$root/Tools/regression/network-handoff.suite.json" -Encoding utf8
+& $shell -NoProfile -File "$root/Tools/regression/run-all.ps1" -Suite NetworkHandoff -Configuration Release *> "$root/headless-removal.log"
+if(!$LASTEXITCODE -or (Get-Content "$root/headless-removal.log" -Raw) -notmatch 'NET_SUITE_REGISTRATION'){throw 'Removed headless registration was not rejected'}
+@{result='NET_REGRESSION_WIRING_CANARIES_OK';failedGateExit=37;failurePropagated=$true;removedGateRejected=$true;removedObservationGateRejected=$true;removedArchiveGateRejected=$true;removedHeadlessGateRejected=$true;productionSourcesChanged=$false}|ConvertTo-Json|Set-Content "$root/result.json" -Encoding utf8
+'NET_REGRESSION_WIRING_CANARIES_OK failure=37 removal=rejected observationRemoval=rejected archiveRemoval=rejected headlessRemoval=rejected'

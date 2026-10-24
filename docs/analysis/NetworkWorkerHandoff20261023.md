@@ -1,6 +1,10 @@
 # 네트워크 담당자 최종 인계 점검 — 2026-10-23
 
-> 후속 변경: 아래 본문은 API43/OnUpdate 시점의 기록이다. 현재는 API45의 F# 공통 관리 실행기와 override 없는 컴포넌트 일반 멤버를 정적으로 등록한다. 새 Editor·cooked Player·30/60/144fps·moving GPU와 등록 NetworkHandoff 15그룹을 재수용했다. [현재 계약](../design/FSharpScriptingContract.md)과 [API45 근거](FSharpManagedRuntimeAcceptance20261023.md)를 인계 정본으로 따른다. 전체 fixture 이주·렌더 없는 SceneRuntime 링크·N9 제품 수용은 별도다.
+> 2026-10-24 최종 정본: [사내 잔여·전달 준비·작업 순서·검증 기준](NetworkWorkerHandoff20261024.md)을 우선한다. 아래 판정과 표는 10월 23일 당시의 기록이다. 기존 Scene/Entity 재사용 무렌더 실행의 후속 수용으로 당시 headless 잔여는 닫혔다. 전달 리비전·도구·증거 고정과 콘텐츠별 provider 연결 조건, 실제 N9 서버 제품은 최종 정본에서 구분한다.
+
+현행 기본 인계 회귀는 HeadlessBoundary를 포함한 **8 등록 항목 / Debug·Release 10그룹**이다. `-Product`는 기존 6제품 gate와 headless 1제품 gate를 더해 **17그룹**을 실행한다. CI 기본 실행의 소스/계약 통과와 로컬 전체 제품 실행을 분리한다.
+
+> 후속 변경: 아래 본문은 API43/OnUpdate 시점의 기록이다. 현재는 API45의 F# 공통 관리 실행기와 override 없는 컴포넌트 일반 멤버를 정적으로 등록한다. 새 Editor·cooked Player·30/60/144fps·moving GPU와 등록 NetworkHandoff 15그룹을 재수용했다. [현재 계약](../design/FSharpScriptingContract.md)과 [API45 근거](FSharpManagedRuntimeAcceptance20261023.md)를 인계 정본으로 따른다. 현행 headless 범위는 위 2026-10-24 후속 계약을 따르고, N9 전체 제품 수용과 이전 기록은 구분한다.
 
 
 ## 판정

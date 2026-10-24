@@ -1,4 +1,4 @@
-#include "SceneRenderProfileComponent.h"
+﻿#include "SceneRenderProfileComponent.h"
 #include "SceneManager.h"
 #include "DataSystem.h"
 #include "RuntimeSettings.h"
@@ -6,6 +6,9 @@
 
 void SceneRenderProfileComponent::OnInitialized()
 {
+#if defined(CE_SCENE_HEADLESS)
+    return;
+#else
     if (!m_isProfileLoaded)
     {
         m_prevSettings = RuntimeSettings::Get().GetRenderPassSettings();
@@ -34,20 +37,30 @@ void SceneRenderProfileComponent::OnInitialized()
 
         SceneManagers->RequestRenderProfileApply();
     }
+
+#endif
 }
 
 void SceneRenderProfileComponent::OnUninitializing()
 {
+#if defined(CE_SCENE_HEADLESS)
+    return;
+#else
     if (m_isProfileLoaded)
     {
         RuntimeSettings::Get().SetRenderPassSettings(m_prevSettings);
 
         SceneManagers->RequestRenderProfileApply();
     }
+
+#endif
 }
 
 void SceneRenderProfileComponent::LoadProfile(FileGuid profileGuid)
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Presentation service is not installed");
+#else
     if (profileGuid == nullFileGuid)
         return;
     m_renderProfileGuid = profileGuid;
@@ -71,10 +84,17 @@ void SceneRenderProfileComponent::LoadProfile(FileGuid profileGuid)
         }
     }
     SceneManagers->RequestRenderProfileApply();
+
+#endif
 }
 
 void SceneRenderProfileComponent::UpdateProfileEditMode()
 {
+#if defined(CE_SCENE_HEADLESS)
+    throw std::logic_error("Presentation service is not installed");
+#else
     RuntimeSettings::Get().SetRenderPassSettings(m_profile.settings);
     SceneManagers->RequestRenderProfileApply();
+
+#endif
 }

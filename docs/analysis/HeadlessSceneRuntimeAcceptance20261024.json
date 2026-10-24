@@ -1,0 +1,1976 @@
+{
+  "schemaVersion": 2,
+  "date": "2026-10-24",
+  "baseRevision": "71504c4fd610a205c8c857538364e1d392e9e150",
+  "result": "SHARED_SCENE_RENDERLESS_ACCEPTED",
+  "scope": "Existing production SceneManager/Scene/Entity/Component/ClrHost reused without presentation services",
+  "supersedes": {
+    "result": "HEADLESS_RUNTIME_ACCEPTED_PROFILE_V1",
+    "preservedReceipt": {
+      "path": "Build/Verification/SharedScene20261024/before/docs/analysis/HeadlessSceneRuntimeAcceptance20261024.json",
+      "sha256": "a7ae418453b1a31f6c69919a35b36dca7d7a0fb1dd1e531ea7e6eaac22b2243c"
+    }
+  },
+  "implementation": {
+    "separateEntityStore": false,
+    "separateManagedAbi": false,
+    "lifecycle": "Existing LifecycleRegistry, ScriptComponent, ScriptObjectRegistry and GCCE domain",
+    "cooked": "CEDO v1 into actual Entity/Component factories; extensible registered component readers",
+    "ordinaryScriptExceptionContract": "Disable faulting script, continue batch; host reports managed errors after committed tick"
+  },
+  "profiles": {
+    "Release": {
+      "result": "HEADLESS_SCENE_ACCEPTANCE_OK",
+      "runs": [
+        {
+          "name": "cadence-30",
+          "exitCode": 0,
+          "reportSha256": "e1d5429be5b17debc2bd095d5c72e1abfdfd79dcdae4d31648dc4692796ff9dd"
+        },
+        {
+          "name": "cadence-60",
+          "exitCode": 0,
+          "reportSha256": "f6205b4bb15085b031a1a49a810fd9345884438865a84a51ca65c87a24bbf156"
+        },
+        {
+          "name": "cadence-144",
+          "exitCode": 0,
+          "reportSha256": "913a62129628e3c7ff8e5a5474a27649e01d890c9e27ba4a3d58dac05897647c"
+        },
+        {
+          "name": "real-clock",
+          "exitCode": 0,
+          "reportSha256": "4b7904b0cad11b8c3e92e7107feff2f9ef4b1f372a843ca4d41bf8094e491558"
+        },
+        {
+          "name": "unicode-and-relative-path",
+          "exitCode": 0,
+          "reportSha256": "d139f2a4590fb59b2ebd1f61522427057468ad8734df88e3e3d7894e1d764b96"
+        },
+        {
+          "name": "authoring-text",
+          "exitCode": 1,
+          "reportSha256": "f0db7d761e1dc29a53b7ba001c8b90bbbac3d29408319cc45ded2dc3cd8ffcda"
+        },
+        {
+          "name": "truncated",
+          "exitCode": 1,
+          "reportSha256": "fcbf275b7ac282a6b4e2643ac8917520386b88aeae3a04df320f6efcab4ad20b"
+        },
+        {
+          "name": "wrong-version",
+          "exitCode": 1,
+          "reportSha256": "a333e8be32367f8718fb94dbe35e3a113208717b901ab736d1ac778d25021637"
+        },
+        {
+          "name": "sparse-forward-hierarchy",
+          "exitCode": 0,
+          "reportSha256": "f0acea0cdb5d48453cabbb8abcc4e1cc2602891fa431ccf1fb9c234a3ec2d7c6"
+        },
+        {
+          "name": "legacy-transform",
+          "exitCode": 0,
+          "reportSha256": "1278d2f9b6722239e3c20954b822ff4fa11fc48a6d7a8ce80ac429f172db09c8"
+        },
+        {
+          "name": "presentation-component",
+          "exitCode": 1,
+          "reportSha256": "3ab38a554f28f1d870b833f1372ff14a7d81d79fcd27cca66b42959c46308b58"
+        },
+        {
+          "name": "hierarchy-cycle",
+          "exitCode": 1,
+          "reportSha256": "757b361cc1d92d31c0cd2e726e8b2089d17f609c31bded4d29a6db237489076b"
+        },
+        {
+          "name": "unknown-body-field",
+          "exitCode": 1,
+          "reportSha256": "cbf43e96efe86c09798318a51c58b35b5ae50604535e815f400ff2001416e8bc"
+        },
+        {
+          "name": "external-geometry",
+          "exitCode": 1,
+          "reportSha256": "904c1836add58996c585024f3325aee396e08e95e361d3650fcd82218320c3ce"
+        },
+        {
+          "name": "field-mismatch",
+          "exitCode": 1,
+          "reportSha256": "d3177a8b918474a690746758623ce8571266b55cbd2ba30786dfcc33ec2d42d1"
+        },
+        {
+          "name": "tick-exception",
+          "exitCode": 1,
+          "reportSha256": "28ec4d72fd8387492b204d6be42c012cc3d629f1f9537fbe0f0d8bf07de68493"
+        },
+        {
+          "name": "end-exception",
+          "exitCode": 1,
+          "reportSha256": "3e02de3086da7021bf3942feea9dc2d321742487fe76e4d9f0e10f8edfebf1c7"
+        },
+        {
+          "name": "ddol-transfer",
+          "exitCode": 0,
+          "reportSha256": "31d473b0ec12ccb46e1c85ade279da67bb46289c2886bc9feb84d5f7db009cb2"
+        },
+        {
+          "name": "missing-scripts",
+          "exitCode": 1,
+          "reportSha256": "7813b8dc302d948654c818230637c2df108ee6e0d20c078cca9de33e901af4a5"
+        }
+      ],
+      "receipt": {
+        "path": "Build/Verification/SharedScene20261024/Release-Final/result.json",
+        "sha256": "c15e52ca44bc9014c8b35a4815cad0cb649701d1ce580a0d03939c27824d7d3d"
+      },
+      "cadence": [
+        {
+          "inputRate": 30,
+          "scene": {
+            "implementation": "Scene/Entity/ScriptComponent/SceneManager",
+            "frames": 60,
+            "engineFrameCount": 60,
+            "committedTicks": 120,
+            "managedBatches": 120,
+            "physicsSteps": 120,
+            "zeroTickFrames": 0,
+            "multiTickFrames": 60,
+            "droppedSeconds": 0,
+            "cpuPhysics": true,
+            "stopped": true,
+            "ddolTransferred": false,
+            "managedErrors": 0,
+            "liveObjects": 0,
+            "roots": 0,
+            "liveScriptHandles": 0,
+            "entities": [
+              {
+                "name": "Root",
+                "x": 0,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Floor",
+                "x": 0,
+                "y": -0.5,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Mover",
+                "x": 6.000004768371582,
+                "y": 1,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Falling",
+                "x": -4.000044822692871,
+                "y": 0.4999990165233612,
+                "z": -7.572994945803657e-05,
+                "alive": false
+              },
+              {
+                "name": "CommandTarget",
+                "x": 10,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Character",
+                "x": -5.050049781799316,
+                "y": 1.0499999523162842,
+                "z": 0,
+                "alive": false
+              }
+            ]
+          },
+          "managedState": {
+            "ticks": 120,
+            "initialized": 1,
+            "began": 1,
+            "ended": 1,
+            "uninitialized": 1,
+            "failures": 0,
+            "stale": 2,
+            "snapshots": 1,
+            "cleanup": 1,
+            "disabledInitialized": 0,
+            "disabledEnableCalls": 0,
+            "disabledUpdates": 0,
+            "disabledRetired": 0
+          },
+          "observations": {
+            "created": 7,
+            "destroyed": 7,
+            "writes": 289,
+            "invalidWrites": 0,
+            "scriptWrites": 1,
+            "physicsWrites": 274
+          },
+          "physicsResources": {
+            "enabled": true,
+            "balanced": true
+          }
+        },
+        {
+          "inputRate": 60,
+          "scene": {
+            "implementation": "Scene/Entity/ScriptComponent/SceneManager",
+            "frames": 120,
+            "engineFrameCount": 120,
+            "committedTicks": 120,
+            "managedBatches": 120,
+            "physicsSteps": 120,
+            "zeroTickFrames": 0,
+            "multiTickFrames": 0,
+            "droppedSeconds": 0,
+            "cpuPhysics": true,
+            "stopped": true,
+            "ddolTransferred": false,
+            "managedErrors": 0,
+            "liveObjects": 0,
+            "roots": 0,
+            "liveScriptHandles": 0,
+            "entities": [
+              {
+                "name": "Root",
+                "x": 0,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Floor",
+                "x": 0,
+                "y": -0.5,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Mover",
+                "x": 6.000004768371582,
+                "y": 1,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Falling",
+                "x": -4.000044822692871,
+                "y": 0.4999990165233612,
+                "z": -7.572994945803657e-05,
+                "alive": false
+              },
+              {
+                "name": "CommandTarget",
+                "x": 10,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Character",
+                "x": -5.050049781799316,
+                "y": 1.0499999523162842,
+                "z": 0,
+                "alive": false
+              }
+            ]
+          },
+          "managedState": {
+            "ticks": 120,
+            "initialized": 1,
+            "began": 1,
+            "ended": 1,
+            "uninitialized": 1,
+            "failures": 0,
+            "stale": 2,
+            "snapshots": 1,
+            "cleanup": 1,
+            "disabledInitialized": 0,
+            "disabledEnableCalls": 0,
+            "disabledUpdates": 0,
+            "disabledRetired": 0
+          },
+          "observations": {
+            "created": 7,
+            "destroyed": 7,
+            "writes": 289,
+            "invalidWrites": 0,
+            "scriptWrites": 1,
+            "physicsWrites": 274
+          },
+          "physicsResources": {
+            "enabled": true,
+            "balanced": true
+          }
+        },
+        {
+          "inputRate": 144,
+          "scene": {
+            "implementation": "Scene/Entity/ScriptComponent/SceneManager",
+            "frames": 288,
+            "engineFrameCount": 288,
+            "committedTicks": 120,
+            "managedBatches": 120,
+            "physicsSteps": 120,
+            "zeroTickFrames": 168,
+            "multiTickFrames": 0,
+            "droppedSeconds": 0,
+            "cpuPhysics": true,
+            "stopped": true,
+            "ddolTransferred": false,
+            "managedErrors": 0,
+            "liveObjects": 0,
+            "roots": 0,
+            "liveScriptHandles": 0,
+            "entities": [
+              {
+                "name": "Root",
+                "x": 0,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Floor",
+                "x": 0,
+                "y": -0.5,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Mover",
+                "x": 6.000004768371582,
+                "y": 1,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Falling",
+                "x": -4.000044822692871,
+                "y": 0.4999990165233612,
+                "z": -7.572994945803657e-05,
+                "alive": false
+              },
+              {
+                "name": "CommandTarget",
+                "x": 10,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Character",
+                "x": -5.050049781799316,
+                "y": 1.0499999523162842,
+                "z": 0,
+                "alive": false
+              }
+            ]
+          },
+          "managedState": {
+            "ticks": 120,
+            "initialized": 1,
+            "began": 1,
+            "ended": 1,
+            "uninitialized": 1,
+            "failures": 0,
+            "stale": 2,
+            "snapshots": 1,
+            "cleanup": 1,
+            "disabledInitialized": 0,
+            "disabledEnableCalls": 0,
+            "disabledUpdates": 0,
+            "disabledRetired": 0
+          },
+          "observations": {
+            "created": 7,
+            "destroyed": 7,
+            "writes": 289,
+            "invalidWrites": 0,
+            "scriptWrites": 1,
+            "physicsWrites": 274
+          },
+          "physicsResources": {
+            "enabled": true,
+            "balanced": true
+          }
+        }
+      ],
+      "ddol": {
+        "scene": {
+          "implementation": "Scene/Entity/ScriptComponent/SceneManager",
+          "frames": 120,
+          "engineFrameCount": 120,
+          "committedTicks": 90,
+          "managedBatches": 120,
+          "physicsSteps": 90,
+          "zeroTickFrames": 0,
+          "multiTickFrames": 0,
+          "droppedSeconds": 0,
+          "cpuPhysics": true,
+          "stopped": true,
+          "ddolTransferred": true,
+          "managedErrors": 0,
+          "liveObjects": 0,
+          "roots": 0,
+          "liveScriptHandles": 0,
+          "entities": [
+            {
+              "name": "AfterTransfer",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "Mover",
+              "x": 6.000004768371582,
+              "y": 1,
+              "z": 0,
+              "alive": false
+            }
+          ]
+        },
+        "managedState": {
+          "ticks": 120,
+          "initialized": 1,
+          "added": 2,
+          "removing": 2,
+          "began": 1,
+          "ended": 1,
+          "retired": 1,
+          "failures": 0
+        }
+      },
+      "scriptFault": {
+        "scene": {
+          "implementation": "Scene/Entity/ScriptComponent/SceneManager",
+          "frames": 9,
+          "engineFrameCount": 10,
+          "committedTicks": 10,
+          "managedBatches": 10,
+          "physicsSteps": 10,
+          "zeroTickFrames": 0,
+          "multiTickFrames": 0,
+          "droppedSeconds": 0,
+          "cpuPhysics": true,
+          "stopped": true,
+          "ddolTransferred": false,
+          "managedErrors": 1,
+          "liveObjects": 0,
+          "roots": 0,
+          "liveScriptHandles": 0,
+          "entities": [
+            {
+              "name": "Root",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "Floor",
+              "x": 0,
+              "y": -0.5,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "Mover",
+              "x": 0.5000000596046448,
+              "y": 1,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "Falling",
+              "x": -4,
+              "y": 3.850125312805176,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "CommandTarget",
+              "x": 10,
+              "y": 0,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "Character",
+              "x": -7.75,
+              "y": 1.3501249551773071,
+              "z": 0,
+              "alive": false
+            }
+          ]
+        },
+        "managedState": {
+          "ticks": 10,
+          "initialized": 1,
+          "began": 1,
+          "ended": 1,
+          "uninitialized": 1,
+          "failures": 0,
+          "stale": 2,
+          "snapshots": 1,
+          "cleanup": 1,
+          "disabledInitialized": 0,
+          "disabledEnableCalls": 0,
+          "disabledUpdates": 0,
+          "disabledRetired": 0
+        }
+      },
+      "source": {
+        "path": "Build/Verification/SharedScene20261024/Release-Final/source.json",
+        "sha256": "8a657888724cc5caefe920ffeb5a4a3425a9c3a4b218ec64217a75c79efa54c2"
+      },
+      "imports": {
+        "path": "Build/Verification/SharedScene20261024/Release-Final/imports.txt",
+        "sha256": "870b91cdd2ce4679b961648921b31f6e7cefeebcc7b38bead67ff7e72cbd4505"
+      },
+      "map": {
+        "path": "Build/Verification/SharedScene20261024/Release-Final/link.map",
+        "sha256": "7edbf80700df42199e0771fee160b2d4600b8987d55b7bbcb9a8caf94cf51e9a"
+      }
+    },
+    "Debug": {
+      "result": "HEADLESS_SCENE_ACCEPTANCE_OK",
+      "runs": [
+        {
+          "name": "cadence-30",
+          "exitCode": 0,
+          "reportSha256": "d92e56682db74e538bac03332f8b498bbe2068c4cf2f83fe70c5cd3c7927e0cf"
+        },
+        {
+          "name": "cadence-60",
+          "exitCode": 0,
+          "reportSha256": "50ad9310822fa0d4c72bec692d475624371b1fbbdc41fd1ff7117570fb627400"
+        },
+        {
+          "name": "cadence-144",
+          "exitCode": 0,
+          "reportSha256": "a11a26fdc988dc007e3845c8d910d43b7d413a4bff845916dace45e43d9269c7"
+        },
+        {
+          "name": "real-clock",
+          "exitCode": 0,
+          "reportSha256": "1986fa09ff0b99e3633f4fbf405ea8358eacfdfecbae1f239eafe23ed2197f27"
+        },
+        {
+          "name": "unicode-and-relative-path",
+          "exitCode": 0,
+          "reportSha256": "4fe05335fc3fe0efd6994c24edf54f611de06c15f75dd9e76cf4df555da87236"
+        },
+        {
+          "name": "authoring-text",
+          "exitCode": 1,
+          "reportSha256": "7cd914b8db7eec03ce6baac6a2239cc38fbdcb4fb844bd08fbc94d901014d376"
+        },
+        {
+          "name": "truncated",
+          "exitCode": 1,
+          "reportSha256": "51fc8847fe375cf577e43894a6c20aa7410549e9970315ba74b4b0e35b158f78"
+        },
+        {
+          "name": "wrong-version",
+          "exitCode": 1,
+          "reportSha256": "c68c20b09ed54f8dc03ef47f43af653c8b146d60756cc16f6a8265b03aa02876"
+        },
+        {
+          "name": "sparse-forward-hierarchy",
+          "exitCode": 0,
+          "reportSha256": "b933aa2d38b7c37c04f5ff69d6f1dc70b5732f6f7d8cd3e78b6f376527f288be"
+        },
+        {
+          "name": "legacy-transform",
+          "exitCode": 0,
+          "reportSha256": "c61ddf7c58f0b2fd35200d4d7bbf5a9a175fbbbef66d2aa228c048e8070dbdbd"
+        },
+        {
+          "name": "presentation-component",
+          "exitCode": 1,
+          "reportSha256": "6b6a946d159366ce84e671b82ac5534ff20993a5f951c71c0f9cadb998bca996"
+        },
+        {
+          "name": "hierarchy-cycle",
+          "exitCode": 1,
+          "reportSha256": "4407d035f7af17ef5a5743947d8fb76c32eb9cd895ce98c57ad60d312ea29475"
+        },
+        {
+          "name": "unknown-body-field",
+          "exitCode": 1,
+          "reportSha256": "d4347564a1fbf0300f8aa1102a893b41b88bc3306d8bc61a26af6a5920c93c54"
+        },
+        {
+          "name": "external-geometry",
+          "exitCode": 1,
+          "reportSha256": "1cb099be8923d3018c8c7a5a71db2780f3fb1d32532531c015316613756c6f51"
+        },
+        {
+          "name": "field-mismatch",
+          "exitCode": 1,
+          "reportSha256": "7e5f89b2bd797c32946ea5ad47bffb9665084e734577eb8040dc1c484239ade7"
+        },
+        {
+          "name": "tick-exception",
+          "exitCode": 1,
+          "reportSha256": "25f20f1bc8cc93adaf6413d1e2f24a0579c1fbd5fcfa316c0b9ff911b8abb5d2"
+        },
+        {
+          "name": "end-exception",
+          "exitCode": 1,
+          "reportSha256": "c74cb36210c592d43668cbf951a85252e05f8c244b1b6cf6630b55a4e92bf5f9"
+        },
+        {
+          "name": "ddol-transfer",
+          "exitCode": 0,
+          "reportSha256": "249327120c0679a56c3c5f4de6eb5af49426a5ade491318c17ca3dbf67f2f2eb"
+        },
+        {
+          "name": "missing-scripts",
+          "exitCode": 1,
+          "reportSha256": "7b32125bf077175674c2794b46210149f2fdd76269ae2225602c3a297d8dd357"
+        }
+      ],
+      "receipt": {
+        "path": "Build/Verification/SharedScene20261024/Debug-Final/result.json",
+        "sha256": "861e02f2d0dce910c4ec33fdc9f1d794f4d733fe5c758adaf62bc326c64c792f"
+      },
+      "cadence": [
+        {
+          "inputRate": 30,
+          "scene": {
+            "implementation": "Scene/Entity/ScriptComponent/SceneManager",
+            "frames": 60,
+            "engineFrameCount": 60,
+            "committedTicks": 120,
+            "managedBatches": 120,
+            "physicsSteps": 120,
+            "zeroTickFrames": 0,
+            "multiTickFrames": 60,
+            "droppedSeconds": 0,
+            "cpuPhysics": true,
+            "stopped": true,
+            "ddolTransferred": false,
+            "managedErrors": 0,
+            "liveObjects": 0,
+            "roots": 0,
+            "liveScriptHandles": 0,
+            "entities": [
+              {
+                "name": "Root",
+                "x": 0,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Floor",
+                "x": 0,
+                "y": -0.5,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Mover",
+                "x": 6.000004768371582,
+                "y": 1,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Falling",
+                "x": -4.000044822692871,
+                "y": 0.4999990165233612,
+                "z": -7.572994945803657e-05,
+                "alive": false
+              },
+              {
+                "name": "CommandTarget",
+                "x": 10,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Character",
+                "x": -5.050049781799316,
+                "y": 1.0499999523162842,
+                "z": 0,
+                "alive": false
+              }
+            ]
+          },
+          "managedState": {
+            "ticks": 120,
+            "initialized": 1,
+            "began": 1,
+            "ended": 1,
+            "uninitialized": 1,
+            "failures": 0,
+            "stale": 2,
+            "snapshots": 1,
+            "cleanup": 1,
+            "disabledInitialized": 0,
+            "disabledEnableCalls": 0,
+            "disabledUpdates": 0,
+            "disabledRetired": 0
+          },
+          "observations": {
+            "created": 7,
+            "destroyed": 7,
+            "writes": 289,
+            "invalidWrites": 0,
+            "scriptWrites": 1,
+            "physicsWrites": 274
+          },
+          "physicsResources": {
+            "enabled": true,
+            "balanced": true
+          }
+        },
+        {
+          "inputRate": 60,
+          "scene": {
+            "implementation": "Scene/Entity/ScriptComponent/SceneManager",
+            "frames": 120,
+            "engineFrameCount": 120,
+            "committedTicks": 120,
+            "managedBatches": 120,
+            "physicsSteps": 120,
+            "zeroTickFrames": 0,
+            "multiTickFrames": 0,
+            "droppedSeconds": 0,
+            "cpuPhysics": true,
+            "stopped": true,
+            "ddolTransferred": false,
+            "managedErrors": 0,
+            "liveObjects": 0,
+            "roots": 0,
+            "liveScriptHandles": 0,
+            "entities": [
+              {
+                "name": "Root",
+                "x": 0,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Floor",
+                "x": 0,
+                "y": -0.5,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Mover",
+                "x": 6.000004768371582,
+                "y": 1,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Falling",
+                "x": -4.000044822692871,
+                "y": 0.4999990165233612,
+                "z": -7.572994945803657e-05,
+                "alive": false
+              },
+              {
+                "name": "CommandTarget",
+                "x": 10,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Character",
+                "x": -5.050049781799316,
+                "y": 1.0499999523162842,
+                "z": 0,
+                "alive": false
+              }
+            ]
+          },
+          "managedState": {
+            "ticks": 120,
+            "initialized": 1,
+            "began": 1,
+            "ended": 1,
+            "uninitialized": 1,
+            "failures": 0,
+            "stale": 2,
+            "snapshots": 1,
+            "cleanup": 1,
+            "disabledInitialized": 0,
+            "disabledEnableCalls": 0,
+            "disabledUpdates": 0,
+            "disabledRetired": 0
+          },
+          "observations": {
+            "created": 7,
+            "destroyed": 7,
+            "writes": 289,
+            "invalidWrites": 0,
+            "scriptWrites": 1,
+            "physicsWrites": 274
+          },
+          "physicsResources": {
+            "enabled": true,
+            "balanced": true
+          }
+        },
+        {
+          "inputRate": 144,
+          "scene": {
+            "implementation": "Scene/Entity/ScriptComponent/SceneManager",
+            "frames": 288,
+            "engineFrameCount": 288,
+            "committedTicks": 120,
+            "managedBatches": 120,
+            "physicsSteps": 120,
+            "zeroTickFrames": 168,
+            "multiTickFrames": 0,
+            "droppedSeconds": 0,
+            "cpuPhysics": true,
+            "stopped": true,
+            "ddolTransferred": false,
+            "managedErrors": 0,
+            "liveObjects": 0,
+            "roots": 0,
+            "liveScriptHandles": 0,
+            "entities": [
+              {
+                "name": "Root",
+                "x": 0,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Floor",
+                "x": 0,
+                "y": -0.5,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Mover",
+                "x": 6.000004768371582,
+                "y": 1,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Falling",
+                "x": -4.000044822692871,
+                "y": 0.4999990165233612,
+                "z": -7.572994945803657e-05,
+                "alive": false
+              },
+              {
+                "name": "CommandTarget",
+                "x": 10,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Character",
+                "x": -5.050049781799316,
+                "y": 1.0499999523162842,
+                "z": 0,
+                "alive": false
+              }
+            ]
+          },
+          "managedState": {
+            "ticks": 120,
+            "initialized": 1,
+            "began": 1,
+            "ended": 1,
+            "uninitialized": 1,
+            "failures": 0,
+            "stale": 2,
+            "snapshots": 1,
+            "cleanup": 1,
+            "disabledInitialized": 0,
+            "disabledEnableCalls": 0,
+            "disabledUpdates": 0,
+            "disabledRetired": 0
+          },
+          "observations": {
+            "created": 7,
+            "destroyed": 7,
+            "writes": 289,
+            "invalidWrites": 0,
+            "scriptWrites": 1,
+            "physicsWrites": 274
+          },
+          "physicsResources": {
+            "enabled": true,
+            "balanced": true
+          }
+        }
+      ],
+      "ddol": {
+        "scene": {
+          "implementation": "Scene/Entity/ScriptComponent/SceneManager",
+          "frames": 120,
+          "engineFrameCount": 120,
+          "committedTicks": 90,
+          "managedBatches": 120,
+          "physicsSteps": 90,
+          "zeroTickFrames": 0,
+          "multiTickFrames": 0,
+          "droppedSeconds": 0,
+          "cpuPhysics": true,
+          "stopped": true,
+          "ddolTransferred": true,
+          "managedErrors": 0,
+          "liveObjects": 0,
+          "roots": 0,
+          "liveScriptHandles": 0,
+          "entities": [
+            {
+              "name": "AfterTransfer",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "Mover",
+              "x": 6.000004768371582,
+              "y": 1,
+              "z": 0,
+              "alive": false
+            }
+          ]
+        },
+        "managedState": {
+          "ticks": 120,
+          "initialized": 1,
+          "added": 2,
+          "removing": 2,
+          "began": 1,
+          "ended": 1,
+          "retired": 1,
+          "failures": 0
+        }
+      },
+      "scriptFault": {
+        "scene": {
+          "implementation": "Scene/Entity/ScriptComponent/SceneManager",
+          "frames": 9,
+          "engineFrameCount": 10,
+          "committedTicks": 10,
+          "managedBatches": 10,
+          "physicsSteps": 10,
+          "zeroTickFrames": 0,
+          "multiTickFrames": 0,
+          "droppedSeconds": 0,
+          "cpuPhysics": true,
+          "stopped": true,
+          "ddolTransferred": false,
+          "managedErrors": 1,
+          "liveObjects": 0,
+          "roots": 0,
+          "liveScriptHandles": 0,
+          "entities": [
+            {
+              "name": "Root",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "Floor",
+              "x": 0,
+              "y": -0.5,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "Mover",
+              "x": 0.5000000596046448,
+              "y": 1,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "Falling",
+              "x": -4,
+              "y": 3.850125312805176,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "CommandTarget",
+              "x": 10,
+              "y": 0,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "Character",
+              "x": -7.75,
+              "y": 1.3501249551773071,
+              "z": 0,
+              "alive": false
+            }
+          ]
+        },
+        "managedState": {
+          "ticks": 10,
+          "initialized": 1,
+          "began": 1,
+          "ended": 1,
+          "uninitialized": 1,
+          "failures": 0,
+          "stale": 2,
+          "snapshots": 1,
+          "cleanup": 1,
+          "disabledInitialized": 0,
+          "disabledEnableCalls": 0,
+          "disabledUpdates": 0,
+          "disabledRetired": 0
+        }
+      },
+      "source": {
+        "path": "Build/Verification/SharedScene20261024/Debug-Final/source.json",
+        "sha256": "8a657888724cc5caefe920ffeb5a4a3425a9c3a4b218ec64217a75c79efa54c2"
+      },
+      "imports": {
+        "path": "Build/Verification/SharedScene20261024/Debug-Final/imports.txt",
+        "sha256": "54379685201c92b8c7211735ac8b07c7591282e9d71dd4b4b6f690e3678b12e7"
+      },
+      "map": {
+        "path": "Build/Verification/SharedScene20261024/Debug-Final/link.map",
+        "sha256": "2c3f0c7bc73e03c6ad6bb19e65ee5e1b348c0cd67040af3f683caf87ed577710"
+      }
+    },
+    "freshRelease": {
+      "result": "HEADLESS_SCENE_ACCEPTANCE_OK",
+      "runs": [
+        {
+          "name": "cadence-30",
+          "exitCode": 0,
+          "reportSha256": "9c85b467da7f810d4adc1af314cf0952b7b077ed2748a069e5d00f076514d03f"
+        },
+        {
+          "name": "cadence-60",
+          "exitCode": 0,
+          "reportSha256": "1af0b0810f1097e4853647169d8409cae1fbcd16debca822d7e88ae25f6f4e30"
+        },
+        {
+          "name": "cadence-144",
+          "exitCode": 0,
+          "reportSha256": "1274a63efc599995635d55eaa2a33922da98f97353cdb02e208386072ee0f747"
+        },
+        {
+          "name": "real-clock",
+          "exitCode": 0,
+          "reportSha256": "38ac2775e7a458a4dcd7a6054c94cb0851555b8a81f92f2b91f5acd35f02864e"
+        },
+        {
+          "name": "unicode-and-relative-path",
+          "exitCode": 0,
+          "reportSha256": "a2d23f3743b4a0cb2309ff6dbf38383b131d8792ae756fd1c091167ff6e025f6"
+        },
+        {
+          "name": "authoring-text",
+          "exitCode": 1,
+          "reportSha256": "df354306316952a615e307b48527293cbb67a872a650b916ab15b665731cceff"
+        },
+        {
+          "name": "truncated",
+          "exitCode": 1,
+          "reportSha256": "9d99e7ccea50e1a0dc4ee7b26a75e15e8306be0fbb1d8ce578a1f11654d2e388"
+        },
+        {
+          "name": "wrong-version",
+          "exitCode": 1,
+          "reportSha256": "1169fc8ebe12b5a6d2c1d15c484d62601bfca985c8e9d37d3936200c7490de4a"
+        },
+        {
+          "name": "sparse-forward-hierarchy",
+          "exitCode": 0,
+          "reportSha256": "0593eab3cd8d8fe6e9a36410648c6a80565c362e7836bf775eb325b8d8b7012e"
+        },
+        {
+          "name": "legacy-transform",
+          "exitCode": 0,
+          "reportSha256": "2e31883f19d93da8927295b461a479fd30bebea95fe1492c9bce71cec722eea4"
+        },
+        {
+          "name": "presentation-component",
+          "exitCode": 1,
+          "reportSha256": "8467b424c8c5bd979fb25950867c0da3d4117f49ab53bde3da9c22109211668b"
+        },
+        {
+          "name": "hierarchy-cycle",
+          "exitCode": 1,
+          "reportSha256": "a36151255dcb074e4020158f30264f36d0ca1236b8de27b331b66dca0c146d7a"
+        },
+        {
+          "name": "unknown-body-field",
+          "exitCode": 1,
+          "reportSha256": "f97a81d0cede13627d9fe6e158002a97470155befb8290a48014aef193f2789a"
+        },
+        {
+          "name": "external-geometry",
+          "exitCode": 1,
+          "reportSha256": "d714075dc6f40761790140e3573f8cd2c2abdeef6df27d3160c858606c1ad70a"
+        },
+        {
+          "name": "field-mismatch",
+          "exitCode": 1,
+          "reportSha256": "32ec5010967d8a9e01d86ddd59a4a0f4f5e5ab3fe34ffcfd53d7c777ac88a4ae"
+        },
+        {
+          "name": "tick-exception",
+          "exitCode": 1,
+          "reportSha256": "58e2be44dbfde5eab7a604444f9eee130e2583ae81ec22c825b5b9a6b5cbd46d"
+        },
+        {
+          "name": "end-exception",
+          "exitCode": 1,
+          "reportSha256": "4d0380afbcbe35eec31a5b4646129a6c796527f9c121134988d2c0c384df6475"
+        },
+        {
+          "name": "ddol-transfer",
+          "exitCode": 0,
+          "reportSha256": "57195418605511929a20e0383fa6cb9d14f7675e96f1be48bc7f183525fdd3df"
+        },
+        {
+          "name": "missing-scripts",
+          "exitCode": 1,
+          "reportSha256": "73186688aff899805c5b47a89e50a2f8686dd66418b24f10ed87cd3242d3c3a7"
+        }
+      ],
+      "receipt": {
+        "path": "C:/Users/idene/.codex/worktrees/shared-scene-repro/CreatorEngine/Build/Verification/SharedSceneFinal/result.json",
+        "sha256": "a96b2a9ebd864dbfe1f62b30b1894299964ee55c1875c427240d73d0bc454c0d"
+      },
+      "cadence": [
+        {
+          "inputRate": 30,
+          "scene": {
+            "implementation": "Scene/Entity/ScriptComponent/SceneManager",
+            "frames": 60,
+            "engineFrameCount": 60,
+            "committedTicks": 120,
+            "managedBatches": 120,
+            "physicsSteps": 120,
+            "zeroTickFrames": 0,
+            "multiTickFrames": 60,
+            "droppedSeconds": 0,
+            "cpuPhysics": true,
+            "stopped": true,
+            "ddolTransferred": false,
+            "managedErrors": 0,
+            "liveObjects": 0,
+            "roots": 0,
+            "liveScriptHandles": 0,
+            "entities": [
+              {
+                "name": "Root",
+                "x": 0,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Floor",
+                "x": 0,
+                "y": -0.5,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Mover",
+                "x": 6.000004768371582,
+                "y": 1,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Falling",
+                "x": -4.000044822692871,
+                "y": 0.4999990165233612,
+                "z": -7.572994945803657e-05,
+                "alive": false
+              },
+              {
+                "name": "CommandTarget",
+                "x": 10,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Character",
+                "x": -5.050049781799316,
+                "y": 1.0499999523162842,
+                "z": 0,
+                "alive": false
+              }
+            ]
+          },
+          "managedState": {
+            "ticks": 120,
+            "initialized": 1,
+            "began": 1,
+            "ended": 1,
+            "uninitialized": 1,
+            "failures": 0,
+            "stale": 2,
+            "snapshots": 1,
+            "cleanup": 1,
+            "disabledInitialized": 0,
+            "disabledEnableCalls": 0,
+            "disabledUpdates": 0,
+            "disabledRetired": 0
+          },
+          "observations": {
+            "created": 7,
+            "destroyed": 7,
+            "writes": 289,
+            "invalidWrites": 0,
+            "scriptWrites": 1,
+            "physicsWrites": 274
+          },
+          "physicsResources": {
+            "enabled": true,
+            "balanced": true
+          }
+        },
+        {
+          "inputRate": 60,
+          "scene": {
+            "implementation": "Scene/Entity/ScriptComponent/SceneManager",
+            "frames": 120,
+            "engineFrameCount": 120,
+            "committedTicks": 120,
+            "managedBatches": 120,
+            "physicsSteps": 120,
+            "zeroTickFrames": 0,
+            "multiTickFrames": 0,
+            "droppedSeconds": 0,
+            "cpuPhysics": true,
+            "stopped": true,
+            "ddolTransferred": false,
+            "managedErrors": 0,
+            "liveObjects": 0,
+            "roots": 0,
+            "liveScriptHandles": 0,
+            "entities": [
+              {
+                "name": "Root",
+                "x": 0,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Floor",
+                "x": 0,
+                "y": -0.5,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Mover",
+                "x": 6.000004768371582,
+                "y": 1,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Falling",
+                "x": -4.000044822692871,
+                "y": 0.4999990165233612,
+                "z": -7.572994945803657e-05,
+                "alive": false
+              },
+              {
+                "name": "CommandTarget",
+                "x": 10,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Character",
+                "x": -5.050049781799316,
+                "y": 1.0499999523162842,
+                "z": 0,
+                "alive": false
+              }
+            ]
+          },
+          "managedState": {
+            "ticks": 120,
+            "initialized": 1,
+            "began": 1,
+            "ended": 1,
+            "uninitialized": 1,
+            "failures": 0,
+            "stale": 2,
+            "snapshots": 1,
+            "cleanup": 1,
+            "disabledInitialized": 0,
+            "disabledEnableCalls": 0,
+            "disabledUpdates": 0,
+            "disabledRetired": 0
+          },
+          "observations": {
+            "created": 7,
+            "destroyed": 7,
+            "writes": 289,
+            "invalidWrites": 0,
+            "scriptWrites": 1,
+            "physicsWrites": 274
+          },
+          "physicsResources": {
+            "enabled": true,
+            "balanced": true
+          }
+        },
+        {
+          "inputRate": 144,
+          "scene": {
+            "implementation": "Scene/Entity/ScriptComponent/SceneManager",
+            "frames": 288,
+            "engineFrameCount": 288,
+            "committedTicks": 120,
+            "managedBatches": 120,
+            "physicsSteps": 120,
+            "zeroTickFrames": 168,
+            "multiTickFrames": 0,
+            "droppedSeconds": 0,
+            "cpuPhysics": true,
+            "stopped": true,
+            "ddolTransferred": false,
+            "managedErrors": 0,
+            "liveObjects": 0,
+            "roots": 0,
+            "liveScriptHandles": 0,
+            "entities": [
+              {
+                "name": "Root",
+                "x": 0,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Floor",
+                "x": 0,
+                "y": -0.5,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Mover",
+                "x": 6.000004768371582,
+                "y": 1,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Falling",
+                "x": -4.000044822692871,
+                "y": 0.4999990165233612,
+                "z": -7.572994945803657e-05,
+                "alive": false
+              },
+              {
+                "name": "CommandTarget",
+                "x": 10,
+                "y": 0,
+                "z": 0,
+                "alive": false
+              },
+              {
+                "name": "Character",
+                "x": -5.050049781799316,
+                "y": 1.0499999523162842,
+                "z": 0,
+                "alive": false
+              }
+            ]
+          },
+          "managedState": {
+            "ticks": 120,
+            "initialized": 1,
+            "began": 1,
+            "ended": 1,
+            "uninitialized": 1,
+            "failures": 0,
+            "stale": 2,
+            "snapshots": 1,
+            "cleanup": 1,
+            "disabledInitialized": 0,
+            "disabledEnableCalls": 0,
+            "disabledUpdates": 0,
+            "disabledRetired": 0
+          },
+          "observations": {
+            "created": 7,
+            "destroyed": 7,
+            "writes": 289,
+            "invalidWrites": 0,
+            "scriptWrites": 1,
+            "physicsWrites": 274
+          },
+          "physicsResources": {
+            "enabled": true,
+            "balanced": true
+          }
+        }
+      ],
+      "ddol": {
+        "scene": {
+          "implementation": "Scene/Entity/ScriptComponent/SceneManager",
+          "frames": 120,
+          "engineFrameCount": 120,
+          "committedTicks": 90,
+          "managedBatches": 120,
+          "physicsSteps": 90,
+          "zeroTickFrames": 0,
+          "multiTickFrames": 0,
+          "droppedSeconds": 0,
+          "cpuPhysics": true,
+          "stopped": true,
+          "ddolTransferred": true,
+          "managedErrors": 0,
+          "liveObjects": 0,
+          "roots": 0,
+          "liveScriptHandles": 0,
+          "entities": [
+            {
+              "name": "AfterTransfer",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "Mover",
+              "x": 6.000004768371582,
+              "y": 1,
+              "z": 0,
+              "alive": false
+            }
+          ]
+        },
+        "managedState": {
+          "ticks": 120,
+          "initialized": 1,
+          "added": 2,
+          "removing": 2,
+          "began": 1,
+          "ended": 1,
+          "retired": 1,
+          "failures": 0
+        }
+      },
+      "scriptFault": {
+        "scene": {
+          "implementation": "Scene/Entity/ScriptComponent/SceneManager",
+          "frames": 9,
+          "engineFrameCount": 10,
+          "committedTicks": 10,
+          "managedBatches": 10,
+          "physicsSteps": 10,
+          "zeroTickFrames": 0,
+          "multiTickFrames": 0,
+          "droppedSeconds": 0,
+          "cpuPhysics": true,
+          "stopped": true,
+          "ddolTransferred": false,
+          "managedErrors": 1,
+          "liveObjects": 0,
+          "roots": 0,
+          "liveScriptHandles": 0,
+          "entities": [
+            {
+              "name": "Root",
+              "x": 0,
+              "y": 0,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "Floor",
+              "x": 0,
+              "y": -0.5,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "Mover",
+              "x": 0.5000000596046448,
+              "y": 1,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "Falling",
+              "x": -4,
+              "y": 3.850125312805176,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "CommandTarget",
+              "x": 10,
+              "y": 0,
+              "z": 0,
+              "alive": false
+            },
+            {
+              "name": "Character",
+              "x": -7.75,
+              "y": 1.3501249551773071,
+              "z": 0,
+              "alive": false
+            }
+          ]
+        },
+        "managedState": {
+          "ticks": 10,
+          "initialized": 1,
+          "began": 1,
+          "ended": 1,
+          "uninitialized": 1,
+          "failures": 0,
+          "stale": 2,
+          "snapshots": 1,
+          "cleanup": 1,
+          "disabledInitialized": 0,
+          "disabledEnableCalls": 0,
+          "disabledUpdates": 0,
+          "disabledRetired": 0
+        }
+      },
+      "source": {
+        "path": "C:/Users/idene/.codex/worktrees/shared-scene-repro/CreatorEngine/Build/Verification/SharedSceneFinal/source.json",
+        "sha256": "8a657888724cc5caefe920ffeb5a4a3425a9c3a4b218ec64217a75c79efa54c2"
+      },
+      "imports": {
+        "path": "C:/Users/idene/.codex/worktrees/shared-scene-repro/CreatorEngine/Build/Verification/SharedSceneFinal/imports.txt",
+        "sha256": "d40cc49a605d3eb8e0a031943ef0a60a107db508d6595186b8932a4aba44d6f7"
+      },
+      "map": {
+        "path": "C:/Users/idene/.codex/worktrees/shared-scene-repro/CreatorEngine/Build/Verification/SharedSceneFinal/link.map",
+        "sha256": "f8870bc94cc2c41b147cb9f7feccef69d9b7cdac815efa1374aedeed07c62a8c"
+      }
+    }
+  },
+  "totalPrimaryHostProcesses": 57,
+  "consumerRegressions": {
+    "editorFixedTick": {
+      "path": "Build/Verification/SharedScene20261024/editor-fixed-final.log",
+      "sha256": "e5ca440b50b833ef3b6d45de2e87900095504c85f622011a7118747d3fa7c1b0"
+    },
+    "prefabWriterAndDeepClone": {
+      "path": "Build/Verification/SharedScene20261024/prefab-final.log",
+      "sha256": "8347e4039efc3dbecb97baca2b7934f15068888004464295f51cf5208db0360b"
+    },
+    "fsharpAuthoring": {
+      "path": "Build/Verification/SharedScene20261024/fsharp-authoring-final.log",
+      "sha256": "651ca81c183579571eae8e70317ce6c5f5c1542cd12a7264717d667129a912be"
+    },
+    "reloadInvalidAssembly": {
+      "path": "Build/Verification/SharedScene20261024/reload-fixture-final.log",
+      "sha256": "ea7a5fb31822c252529c06566d3c01b67d7785e1aef3471c1c0cc2010f6473f8"
+    },
+    "fsharpPlayer": {
+      "path": "Build/Verification/SharedScene20261024/fsharp-player-final.log",
+      "sha256": "d843fb404be70366659b147335a9c7778a1cef77bb9f885ace058ad23782ab91"
+    },
+    "animationPlayer": {
+      "path": "Build/Verification/SharedScene20261024/animation-player-final.log",
+      "sha256": "12a01a1c0071d22698eb35e1f070b505fc5e30ea57e66b1a65b9e09210b3afd5"
+    },
+    "animationPackage": {
+      "path": "Build/Verification/SharedScene20261024/animation-package-final.log",
+      "sha256": "cb1908cdd176a48981547fc427a1f9c7566e34487f37dbf29e875f919a9fd76e"
+    },
+    "sdk": {
+      "path": "Build/Verification/SharedScene20261024/sdk-publish-final.log",
+      "sha256": "1469f7c982ab6a52a00aeb204951cbeaa4bc75b1d1dd249f6d5b7fe64bb8319a"
+    },
+    "networkProduct": {
+      "receipt": {
+        "path": "Build/Verification/NDA/Suite-71774f6ef9ed425daf200b252b0e2c94/result.json",
+        "sha256": "8405ff089726042ee90957bdef25fdc4c8d1ea24d809528a796f1639e4212cf7"
+      },
+      "passed": [
+        "ND-a-All",
+        "W4-ND-b-All",
+        "N1-All",
+        "N3-Debug",
+        "N3-Release",
+        "PhysicsABI-All",
+        "PhysicsIdentity-Debug",
+        "PhysicsIdentity-Release",
+        "LifecycleEnums-None",
+        "HeadlessBoundary-None",
+        "N3Product",
+        "W4NDBProduct",
+        "N1Product",
+        "N1DiagnosticProduct",
+        "N3PacingProduct",
+        "N3MovingGpuProduct",
+        "HeadlessProduct"
+      ],
+      "scope": "All registered NetworkHandoff gates; not all engine/GPU/device/soak tests"
+    },
+    "normalReleaseBuilds": {
+      "receipt": {
+        "path": "Build/Verification/SharedScene20261024/release-final-builds.json",
+        "sha256": "f05591bb6d24ba64cb24d6c5552660813f30474edb4d77d4369b918fe0d90222"
+      },
+      "targets": [
+        {
+          "target": "HeadlessHost",
+          "exitCode": 0
+        },
+        {
+          "target": "CreatorEditor",
+          "exitCode": 0
+        },
+        {
+          "target": "Player",
+          "exitCode": 0
+        },
+        {
+          "target": "AssetCooker",
+          "exitCode": 0
+        }
+      ]
+    },
+    "boundaryCanaries": {
+      "result": "HEADLESS_BOUNDARY_CANARIES_OK",
+      "mutations": 5,
+      "modules": 7
+    }
+  },
+  "freshCheckout": {
+    "base": "71504c4fd610a205c8c857538364e1d392e9e150",
+    "checkout": "C:\\Users\\idene\\.codex\\worktrees\\shared-scene-repro\\CreatorEngine",
+    "files": [
+      {
+        "path": ".github/workflows/network-contracts.yml",
+        "sha256": "1951c65bdf87d07bdffd9f6d4c8ec0a68f938a4babbc913b13d4a19a6b62bce2"
+      },
+      {
+        "path": "Engine/RenderEngine/DataSystem.h",
+        "sha256": "4821c46c01a5db5e55d130879ee19153306a259395083ef28d6478390999bc3f"
+      },
+      {
+        "path": "Engine/SceneRuntime/AIManager.h",
+        "sha256": "34eee4e2711f8908a95b3c32fd51576cf2ad7f060ee1ca70ea2241a442405433"
+      },
+      {
+        "path": "Engine/SceneRuntime/AnimatorSystem.h",
+        "sha256": "2dbf12f1c5fcb74377864a6ecf7bbf1d3fa79c8c462187cda990d84de197bba9"
+      },
+      {
+        "path": "Engine/SceneRuntime/CharacterMovementComponent.cpp",
+        "sha256": "e84b6e89c730bd2c2859e5a86fdc7b6ebad8aa240098bb56d3044f4d71fba3ca"
+      },
+      {
+        "path": "Engine/SceneRuntime/CharacterMovementComponent.h",
+        "sha256": "7d93ba621df5a051725177260cb8dee43ed584ca1d868ab68a060dd7fbed1ee3"
+      },
+      {
+        "path": "Engine/SceneRuntime/ClrHost.cpp",
+        "sha256": "022daf58c601130b02a48b0e90d51427239f1349f57ed59ab4d4c941cb3b4233"
+      },
+      {
+        "path": "Engine/SceneRuntime/ClrHost.h",
+        "sha256": "1cc8a6adba104b6be3369b2ec6d42dc61d0e394492fe9b99a6bb0d55fb723998"
+      },
+      {
+        "path": "Engine/SceneRuntime/Component.h",
+        "sha256": "faaee7b847a52c558c8e2480dd7923227b1a52edde5454adfe2743837c44c40e"
+      },
+      {
+        "path": "Engine/SceneRuntime/CookedSceneLoader.cpp",
+        "sha256": "242dd5eb6957864b5598269902d3ea7853ad950720f6224dd8072ac4bad9aee0"
+      },
+      {
+        "path": "Engine/SceneRuntime/CookedSceneLoader.h",
+        "sha256": "be0e15ce8f922abfbe3dee004e1dc759407bf1062bd03c84d35f50fe7071118a"
+      },
+      {
+        "path": "Engine/SceneRuntime/DecalSystem.h",
+        "sha256": "7a5a9fbff3926ae85a57c94e4ea104beeb32c6bd32407f8c690e1cfb0a135817"
+      },
+      {
+        "path": "Engine/SceneRuntime/Entity.cpp",
+        "sha256": "b02dc2a3319ab7b964c8847e71f15ae2f70b3b45792fc6f1d7629711dd1d003b"
+      },
+      {
+        "path": "Engine/SceneRuntime/Entity.h",
+        "sha256": "c36b377ea46235d09c2223447278dc6c773fefcdd831266e0ba768c88cd8e167"
+      },
+      {
+        "path": "Engine/SceneRuntime/FoliageSystem.h",
+        "sha256": "8cdd74cd7c3d157b5cf48b79a9c2456a8b0c7e75d8df73444c1f384dde67ee5a"
+      },
+      {
+        "path": "Engine/SceneRuntime/Headless/HeadlessScene.cpp",
+        "sha256": "7c3f37770c7f67985156535bcb8bd603480a4c15702729f3bed253073343f3aa"
+      },
+      {
+        "path": "Engine/SceneRuntime/Headless/HeadlessScene.h",
+        "sha256": "a55200f71a70113dca7f9f1b23ca15aaee652fde51f57849c35d35ed40d8c998"
+      },
+      {
+        "path": "Engine/SceneRuntime/Headless/HeadlessTransfer.cpp",
+        "sha256": "5613266e35a9b4cf9d4727165ea80c056412c1d70d43cf5205557638b0317466"
+      },
+      {
+        "path": "Engine/SceneRuntime/Headless/SceneRuntimeHeadless.vcxproj",
+        "sha256": "d9316d0792a02c643b973c20030f763051e6761ee4e8626369ea3ff6b2733af8"
+      },
+      {
+        "path": "Engine/SceneRuntime/LightSystem.h",
+        "sha256": "ae9383ab70ae807dafbdf8ffd3c1e393cf5784e963ffc65a7825dcc110d59ac1"
+      },
+      {
+        "path": "Engine/SceneRuntime/ManagedAssembly.cpp",
+        "sha256": "5639d77d5da426f9781307440c0eef24d42a1ba108f52a746faabd62bbd2c03a"
+      },
+      {
+        "path": "Engine/SceneRuntime/ManagedAssembly.h",
+        "sha256": "974a15e09c46651af726110c6393942731296e39397100eca8241e7462fc9cee"
+      },
+      {
+        "path": "Engine/SceneRuntime/Object.cpp",
+        "sha256": "5626740199758fce34e525b1cc5a4ac10966665a846ef51dbd1de99ac5c60bc7"
+      },
+      {
+        "path": "Engine/SceneRuntime/Object.h",
+        "sha256": "1b91eec1daa412eaacaaa5b2896f7fe96a910e1cb80362de210389f1f93412c2"
+      },
+      {
+        "path": "Engine/SceneRuntime/PhysicsBodyComponent.cpp",
+        "sha256": "438c7d3f81cddf967105ee3e6730edd97d6b9a560b3a91f7e3dfd57359236161"
+      },
+      {
+        "path": "Engine/SceneRuntime/PhysicsBodyComponent.h",
+        "sha256": "015268a5fa3f67af0bd879cd5e811017127ff570e7e6ad852f69b619ba08a833"
+      },
+      {
+        "path": "Engine/SceneRuntime/PlayerInputSystem.h",
+        "sha256": "997b9b07d32d588de537b28e4cfcdb553d39174cc26bd88fd5eb7a449134b024"
+      },
+      {
+        "path": "Engine/SceneRuntime/PrefabUtility.h",
+        "sha256": "8beb081f06f630814cab3a97ebab13e3c2a8d3f457f09fccb75907e27e8e195c"
+      },
+      {
+        "path": "Engine/SceneRuntime/RectTransformComponent.cpp",
+        "sha256": "26830b3f4824617058cf249760caad9ddbf32e1b7b306c05ed8e629a0c925983"
+      },
+      {
+        "path": "Engine/SceneRuntime/Scene.cpp",
+        "sha256": "d41212987167bd1b2c1e7b18156c289d3a1970201b9bffc54e0e575ca929159c"
+      },
+      {
+        "path": "Engine/SceneRuntime/Scene.h",
+        "sha256": "6d09d1f864b389f957af26dd66da7f4169aaf84d5585424156fba81d7d097db6"
+      },
+      {
+        "path": "Engine/SceneRuntime/SceneManager.cpp",
+        "sha256": "f0ac791ab3e3ef289b7625ca299a33471df45a6abdcf5ea4f6885b7acf033955"
+      },
+      {
+        "path": "Engine/SceneRuntime/SceneManager.h",
+        "sha256": "fd5cc6ddcdfdf993a4658ba3178d7bc054fa9d0540828e6c9ca629bfac0fcdf7"
+      },
+      {
+        "path": "Engine/SceneRuntime/ScenePhysicsSimulation.cpp",
+        "sha256": "7b4d3f622254ec3d467a559cd218fe32fda5d27e41783011415a4c02dd648f08"
+      },
+      {
+        "path": "Engine/SceneRuntime/ScenePhysicsSimulation.h",
+        "sha256": "1670c6cc02155848d28fc1fb99f09ec8561920fdc01a32d70a132459046ec083"
+      },
+      {
+        "path": "Engine/SceneRuntime/SceneRenderProfileComponent.cpp",
+        "sha256": "d0604abd6ed43ecd583e3f5dc27fd5f50719938bbd4d2d99491926698bae247f"
+      },
+      {
+        "path": "Engine/SceneRuntime/SceneRuntime.vcxproj",
+        "sha256": "c501540e789e94eb00d5d2bac1040911e8fd67ea9472e1f2044d94354e6131a5"
+      },
+      {
+        "path": "Engine/SceneRuntime/SceneRuntime.vcxproj.filters",
+        "sha256": "2361c229ee82e67fe657a9cde6b4435103e403a0c7895a9ba22c58460851994c"
+      },
+      {
+        "path": "Engine/SceneRuntime/ScriptObjectRegistry.cpp",
+        "sha256": "f68e0a5fc8dfdccbd3312418a6fd6e3bdbe922ac55e3f7b20b9fa205ca77958f"
+      },
+      {
+        "path": "Engine/SceneRuntime/SimulationTickExecution.h",
+        "sha256": "3a7ad3ae7606d7e957467cb2bf30242c6a0a11008685d75cab53ffd5af094ba6"
+      },
+      {
+        "path": "Engine/SceneRuntime/TagManager.cpp",
+        "sha256": "7d0666bbacad600bfe3ff16afd260a9dc2e072d81c8b3ef30a5a190fa3c1122e"
+      },
+      {
+        "path": "Engine/SceneRuntime/UIManager.h",
+        "sha256": "63f6bc79b1d0500cbdaade341bb489c70a513f61fec8e22c55f3e5198255f5f4"
+      },
+      {
+        "path": "Engine/SceneRuntime/UITickSystem.h",
+        "sha256": "b2ecef4d060afa806fb4669238d7cdb772c061b5b20b5d3235b45a655f29b757"
+      },
+      {
+        "path": "Engine/Utility_Framework/AuthoringCookedDocument.cpp",
+        "sha256": "5fa92655c81244bcbaa98b89658e00bc1b3200304edc5fadb428273c4161e39d"
+      },
+      {
+        "path": "Engine/Utility_Framework/AuthoringDocument.cpp",
+        "sha256": "8d212ee3f37a7e0143dd4b87e041e5fda612797c78ef547506bf21a4ec8adb8c"
+      },
+      {
+        "path": "Engine/Utility_Framework/AuthoringDocumentAccess.cpp",
+        "sha256": "a6be4b5e1ee5d55833012634ca0f81145253c7a13f8c5b44f5a2ff22c79fdcb2"
+      },
+      {
+        "path": "Engine/Utility_Framework/AuthoringDocumentStorage.h",
+        "sha256": "a06c3fee91bea1e529d536e3cf8ebced47c36041efc5c3d79d8d3d5d517213a5"
+      },
+      {
+        "path": "Engine/Utility_Framework/CookedDocumentTree.cpp",
+        "sha256": "47147f98342b8afd6ce444d36eff3091898c0e4830f47543f58e263a6fd730f4"
+      },
+      {
+        "path": "Engine/Utility_Framework/CookedDocumentTree.h",
+        "sha256": "837b3c2f67538a505504cfad0f33b1e7387b987620ec45ad4a6b4b197a48a7d2"
+      },
+      {
+        "path": "Engine/Utility_Framework/DiagnosticDocument.cpp",
+        "sha256": "c114246db6e21e207347a9ae9c91eaa97e1f56a49b8a7238c48b5f5b6b7b7bc5"
+      },
+      {
+        "path": "Engine/Utility_Framework/Utility_Framework.vcxproj",
+        "sha256": "e29fdce6472c729273c3cf97a8e2836434d9578fdbd97c8c5b040e7f30f9b858"
+      },
+      {
+        "path": "Engine/Utility_Framework/Utility_Framework.vcxproj.filters",
+        "sha256": "e868cc2de4c8ba67f8906af1c7a8e4dd4f1371dcbd034fc75dadc166f6c0c3b5"
+      },
+      {
+        "path": "GameScripts/GameScripts.fsproj",
+        "sha256": "37de8985d4b7035f40ee9b31f871bab03c290f1bc8d639af43dd88b491faded7"
+      },
+      {
+        "path": "HeadlessHost/HeadlessHost.vcxproj",
+        "sha256": "7c6339fd68732c9106107ac91a06f927e383d5812289a29c536d2290a86d4a3d"
+      },
+      {
+        "path": "HeadlessHost/Main.cpp",
+        "sha256": "9ba73a7b13ec90da6bd79c23cc7af6b3a856c74d18400905adaa1f0b124053d7"
+      },
+      {
+        "path": "Tools/build/stage-headless.ps1",
+        "sha256": "37774df4e50d4dfc0f7081d406167332deba57cfc7d11ec51ecb594da142e3ab"
+      },
+      {
+        "path": "Tools/regression/SimulationExchangeProbe.cpp",
+        "sha256": "382d15ecb545ccd966b7e9747d3a9df242b376c183f12c4206ef496ca4043548"
+      },
+      {
+        "path": "Tools/regression/fixtures/headless/DisabledLifecycleProbe.fs",
+        "sha256": "205d76bed2d5fe94cac534b3cab1d0c990e64c85897b01edb90ba3064ad389a9"
+      },
+      {
+        "path": "Tools/regression/fixtures/headless/HeadlessTickProbe.fs",
+        "sha256": "e4b743d296e7fda9b7e440c3461895c599197701db8fdf6ee6516971d63fc365"
+      },
+      {
+        "path": "Tools/regression/fixtures/headless/Scene.creator",
+        "sha256": "f21a3785a56bf17cde3225bedf70a2dcb44ca68386667e482d5f15fac8411dbe"
+      },
+      {
+        "path": "Tools/regression/fixtures/headless/Scene.creator.meta",
+        "sha256": "cf8bbf8e401c0cfa315681f9b3a288a3ec8982db3cd63106e3eb625893bb4d4e"
+      },
+      {
+        "path": "Tools/regression/fixtures/headless/TransferProbe.fs",
+        "sha256": "a91a2578786e584184c03d8f679e61ac1cae9604b14d1b32c4f6c64dd2059965"
+      },
+      {
+        "path": "Tools/regression/fixtures/headless/compile.order",
+        "sha256": "71042ea451587d09c6604808742a5d00861f0c64ebef8059ae6e4ae942095160"
+      },
+      {
+        "path": "Tools/regression/headless_boundary_tests.py",
+        "sha256": "93a24580ed8249782b049884b37c6417ea800d2ebf3928a5357e45374159579f"
+      },
+      {
+        "path": "Tools/regression/headless_scene.py",
+        "sha256": "1d559fb4ae6fb447446066f95c8ccba9438f7169944a421d8aac59691aae2d9e"
+      },
+      {
+        "path": "Tools/regression/network-handoff.suite.json",
+        "sha256": "5761eb91394060285c461c419542ae377113be56c56dd0944521827a03dccd67"
+      },
+      {
+        "path": "Tools/regression/network_handoff_suite.py",
+        "sha256": "5b1d567e0905b6e61b692926839d035bfe10c66321d6f0fa866f3bed990cc74e"
+      },
+      {
+        "path": "Tools/regression/run-all.ps1",
+        "sha256": "dff0cdac320b63713f1410642d62a09aa8033b9f7acbd4c060aa1e376d3ee2ad"
+      },
+      {
+        "path": "Tools/regression/verify-archive-parser-boundary.ps1",
+        "sha256": "d9978ff9d12e982177215f31160fded6f12b1bc0d6c95503e72e9cefa0b27cac"
+      },
+      {
+        "path": "Tools/regression/verify-headless-boundary.ps1",
+        "sha256": "e5c32f39377193af0560673184bba2f20541f9b6c34868fca2ab31937a73e5ad"
+      },
+      {
+        "path": "Tools/regression/verify-headless-scene.ps1",
+        "sha256": "00d27fa14f91dd4e5936f9c5f72dac7f0eb12cdf9908e2bb1b78048475ee2a07"
+      },
+      {
+        "path": "Tools/regression/verify-net-regression-wiring.ps1",
+        "sha256": "d0f49dba052596dac543abe9b854be567822b9291945b8526cf03df7ed204cd0"
+      }
+    ],
+    "engineBuildOutputsCopied": false,
+    "dependencyCache": "External vcpkg install tree and global NuGet cache only",
+    "solutionDifference": "Pre-existing Effect project entries preserved only in primary checkout",
+    "verifiedAfterFinalRun": true
+  },
+  "fsharpToolsRevision": "3351cbc80d7216eb10110c4c8b30dce98aef1d1f",
+  "limitations": [
+    "Cadence inputs are synthetic; separate Product suite exercises actual Editor/GPU pacing",
+    "Windows x64, installed .NET 10 and MSVC runtime; dependency and NuGet caches reused",
+    "Missing optional component/asset/geometry providers fail admission; not every existing game scene is accepted",
+    "No wire identity, transport, two-client server, connection drain, deployment or soak acceptance",
+    "Historical fixed-master documentation audits retain their original scope and failures"
+  ]
+}

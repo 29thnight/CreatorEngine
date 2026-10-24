@@ -131,4 +131,8 @@ private:
     std::vector<ImageComponent*> m_images;
 };
 
+#if defined(CE_SCENE_HEADLESS)
+#define UITickSystems (UITickSystem::GetIfAlive())
+#else
 static auto UITickSystems = UITickSystem::GetInstance();
+#endif

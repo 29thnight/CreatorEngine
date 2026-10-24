@@ -3,6 +3,7 @@ import json
 import pathlib
 
 REQUIRED = {
+    'HeadlessBoundary': ('Tools/regression/verify-headless-boundary.ps1', 'none'),
     'ND-a': ('Tools/regression/verify-net-wire-boundary.ps1', 'all'),
     'W4-ND-b': ('Tools/regression/verify-scene-observation.ps1', 'all'),
     'N1': ('Tools/regression/verify-archive-parser-boundary.ps1', 'all'),

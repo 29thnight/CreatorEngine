@@ -1,5 +1,6 @@
 #include "AuthoringCookedDocument.h"
 #include "AuthoringBase64.h"
+#include "CookedDocumentTree.h"
 
 #include "StandardLibrary.h"
 
@@ -146,174 +147,23 @@ namespace Authoring
 			return true;
 		}
 
-		class Reader final
-		{
-		public:
-			explicit Reader(std::span<const std::byte> bytes) noexcept
-				: bytes_(bytes) {}
-
-			[[nodiscard]] std::size_t Remaining() const noexcept
-			{
-				return bytes_.size() - offset_;
-			}
-
-			[[nodiscard]] std::uint8_t U8(bool& ok) noexcept
-			{
-				if (Remaining() < 1u) { ok = false; return 0u; }
-				return std::to_integer<std::uint8_t>(bytes_[offset_++]);
-			}
-
-			[[nodiscard]] std::uint16_t U16(bool& ok) noexcept
-			{
-				const std::uint16_t a = U8(ok);
-				const std::uint16_t b = U8(ok);
-				return static_cast<std::uint16_t>(a | (b << 8u));
-			}
-
-			[[nodiscard]] std::uint32_t U32(bool& ok) noexcept
-			{
-				std::uint32_t value{};
-				for (std::uint32_t shift = 0u; shift < 32u; shift += 8u)
-					value |= static_cast<std::uint32_t>(U8(ok)) << shift;
-				return value;
-			}
-
-			[[nodiscard]] std::string_view String(std::uint32_t length,
-				bool& ok) noexcept
-			{
-				if (length > Remaining()) { ok = false; return {}; }
-				const char* data = reinterpret_cast<const char*>(bytes_.data() + offset_);
-				offset_ += length;
-				return { data, length };
-			}
-
-		private:
-			std::span<const std::byte> bytes_{};
-			std::size_t offset_{};
-		};
-
-		enum class Relation { Root, MapChild, SequenceChild };
-
-		bool DecodeNode(Reader& reader, const WriteNode& parent,
-			const WriteNode& root, Relation relation,
-			std::unordered_set<std::string>* siblingKeys,
-			std::uint32_t depth, std::uint32_t& decodedNodes,
-			std::string& error)
-		{
-			if (depth > kMaxDepth || decodedNodes == kMaxNodeCount)
-			{
-				error = "cooked document node 상한을 넘었다";
-				return false;
-			}
-			bool ok = true;
-			const auto kind = static_cast<NodeKind>(reader.U8(ok));
-			const std::uint8_t flags = reader.U8(ok);
-			const std::uint16_t reserved = reader.U16(ok);
-			const std::uint32_t keyLength = reader.U32(ok);
-			const std::uint32_t valueLength = reader.U32(ok);
-			const std::uint32_t childCount = reader.U32(ok);
-			if (!ok)
-			{
-				error = "cooked document node header가 잘렸다";
-				return false;
-			}
-			if (flags != 0u || reserved != 0u
-				|| keyLength > kMaxScalarBytes || valueLength > kMaxScalarBytes
-				|| childCount > kMaxNodeCount)
-			{
-				error = "cooked document node header가 유효하지 않다";
-				return false;
-			}
-
-			const std::string_view key = reader.String(keyLength, ok);
-			const std::string_view value = reader.String(valueLength, ok);
-			if (!ok)
-			{
-				error = "cooked document node payload가 잘렸다";
-				return false;
-			}
-			if ((relation == Relation::MapChild) != (keyLength != 0u)
-				|| (relation != Relation::MapChild && keyLength != 0u))
-			{
-				error = "cooked document map key 배치가 유효하지 않다";
-				return false;
-			}
-
-			WriteNode target;
-			if (relation == Relation::Root)
-				target = root;
-			else if (relation == Relation::SequenceChild)
-				target = parent.Append();
-			else
-			{
-				if (nullptr == siblingKeys
-					|| !siblingKeys->insert(std::string{ key }).second)
-				{
-					error = "cooked document map key가 중복됐다";
-					return false;
-				}
-				target = parent.Child(key);
-			}
-			if (!target)
-			{
-				error = "cooked document node를 만들 수 없다";
-				return false;
-			}
-			++decodedNodes;
-
-			switch (kind)
-			{
-			case NodeKind::Null:
-				if (valueLength != 0u || childCount != 0u)
-				{
-					error = "null cooked node에 값 또는 자식이 있다";
-					return false;
-				}
-				target.SetNull();
-				break;
-			case NodeKind::Scalar:
-				if (childCount != 0u)
-				{
-					error = "scalar cooked node에 자식이 있다";
-					return false;
-				}
-				// CEDO already distinguishes Null from Scalar. Quoting preserves
-                // a literal "null"/"~" scalar while numeric readers still use As<T>.
-                target.SetString(value);
-				break;
-			case NodeKind::Map:
-			case NodeKind::Sequence:
-				if (valueLength != 0u)
-				{
-					error = "container cooked node에 scalar 값이 있다";
-					return false;
-				}
-				if (kind == NodeKind::Map) target.SetMap();
-				else target.SetSequence();
-				break;
-			default:
-				error = "cooked document node kind가 유효하지 않다";
-				return false;
-			}
-
-			std::unordered_set<std::string> keys;
-			if (kind == NodeKind::Map) keys.reserve(childCount);
-			for (std::uint32_t index = 0u; index < childCount; ++index)
-			{
-				const Relation childRelation = kind == NodeKind::Map
-					? Relation::MapChild : Relation::SequenceChild;
-				if (kind != NodeKind::Map && kind != NodeKind::Sequence)
-				{
-					error = "scalar cooked node childCount가 0이 아니다";
-					return false;
-				}
-				if (!DecodeNode(reader, target, root, childRelation,
-					kind == NodeKind::Map ? &keys : nullptr,
-					depth + 1u, decodedNodes, error)) return false;
-			}
-			return true;
-		}
-	}
+        void CopyCookedNode(const Cedo::Node& source, const WriteNode& target)
+        {
+            switch (source.kind)
+            {
+            case Cedo::Kind::Null: target.SetNull(); break;
+            case Cedo::Kind::Scalar: target.SetString(source.value); break;
+            case Cedo::Kind::Map: target.SetMap(); break;
+            case Cedo::Kind::Sequence: target.SetSequence(); break;
+            }
+            for (const auto& child : source.children)
+            {
+                const auto destination = source.kind == Cedo::Kind::Map
+                    ? target.Child(child.key) : target.Append();
+                CopyCookedNode(child, destination);
+            }
+        }
+    }
 
 	bool IsCookedDocument(std::span<const std::byte> bytes) noexcept
 	{
@@ -348,41 +198,15 @@ namespace Authoring
 		return true;
 	}
 
-	std::optional<WriteDocument> DecodeCookedDocument(
-		std::span<const std::byte> bytes, std::string& error)
-	{
-		error.clear();
-		if (bytes.size() < kHeaderBytes || bytes.size() > kMaxDocumentBytes
-			|| !IsCookedDocument(bytes))
-		{
-			error = "CEDO magic 또는 문서 크기가 유효하지 않다";
-			return std::nullopt;
-		}
-		Reader reader(bytes.subspan(kCookedDocumentMagic.size()));
-		bool ok = true;
-		const std::uint16_t version = reader.U16(ok);
-		const std::uint16_t reserved = reader.U16(ok);
-		const std::uint32_t expectedNodes = reader.U32(ok);
-		const std::uint32_t payloadBytes = reader.U32(ok);
-		if (!ok || version != kCookedDocumentVersion || reserved != 0u
-			|| expectedNodes == 0u || expectedNodes > kMaxNodeCount
-			|| payloadBytes != reader.Remaining())
-		{
-			error = "CEDO header/version이 유효하지 않다; 재쿠킹이 필요하다";
-			return std::nullopt;
-		}
-
-		WriteDocument document;
-		std::uint32_t decodedNodes{};
-		if (!DecodeNode(reader, {}, document.Root(), Relation::Root, nullptr,
-			0u, decodedNodes, error)) return std::nullopt;
-		if (reader.Remaining() != 0u || decodedNodes != expectedNodes)
-		{
-			error = "CEDO node 수 또는 trailing byte가 유효하지 않다";
-			return std::nullopt;
-		}
-		return document;
-	}
+    std::optional<WriteDocument> DecodeCookedDocument(
+        std::span<const std::byte> bytes, std::string& error)
+    {
+        auto decoded = Cedo::Decode(bytes, error);
+        if (!decoded) return std::nullopt;
+        WriteDocument document;
+        CopyCookedNode(decoded->root, document.Root());
+        return document;
+    }
 
 	bool EncodeCookedDocumentTextEnvelope(const ReadNode& root,
 		std::string& outText, std::string& error)

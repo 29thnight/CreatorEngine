@@ -363,6 +363,7 @@ void ScriptObjectRegistry::ReleaseAssetLocked(AssetSlot& slot)
     ++slot.generation;
 }
 
+#if !defined(CE_SCENE_HEADLESS)
 template<class T>
 ScriptAssetResult ScriptObjectRegistry::RequestTypedAssetLocked(const ScriptAssetLink& link,
     const ScriptTextureAssetVariant& variant, bool residentOnly, ScriptAssetToken& token)
@@ -408,9 +409,14 @@ ScriptAssetResult ScriptObjectRegistry::RequestTypedAssetLocked(const ScriptAsse
     return ScriptAssetResult::Success;
 }
 
+#endif
+
 ScriptAssetResult ScriptObjectRegistry::RequestAsset(const ScriptAssetLink& link,
     const ScriptTextureAssetVariant& variant, bool residentOnly, ScriptAssetToken& token)
 {
+#if defined(CE_SCENE_HEADLESS)
+    token = {}; return ScriptAssetResult::Unavailable;
+#else
     token = {};
     std::lock_guard lock(m_assetMutex);
     const auto available = CheckAssetSessionLocked();
@@ -422,11 +428,17 @@ ScriptAssetResult ScriptObjectRegistry::RequestAsset(const ScriptAssetLink& link
     {
         return RequestTypedAssetLocked<T>(link, variant, residentOnly, token);
     });
+
+#endif
 }
 
 ScriptAssetResult ScriptObjectRegistry::RequestAssetTyped(const ScriptAssetLink& link,
     std::uint32_t concreteType, const ScriptTextureAssetVariant& variant, bool residentOnly, ScriptAssetToken& token)
 {
+#if defined(CE_SCENE_HEADLESS)
+    token = {};
+    return ScriptAssetResult::Unavailable;
+#else
     token = {};
     std::lock_guard lock(m_assetMutex);
     const auto available = CheckAssetSessionLocked();
@@ -440,6 +452,8 @@ ScriptAssetResult ScriptObjectRegistry::RequestAssetTyped(const ScriptAssetLink&
         // matching kinds alone never authorize a cast between native owners.
         return RequestTypedAssetLocked<T>(link, variant, residentOnly, token);
     });
+
+#endif
 }
 
 ScriptAssetResult ScriptObjectRegistry::SnapshotAssetRequest(ScriptAssetToken token,
@@ -547,6 +561,9 @@ ScriptAssetResult ScriptObjectRegistry::ReleaseAsset(ScriptAssetToken token)
 
 ScriptAssetResult ScriptObjectRegistry::ReadTexture(ScriptAssetToken token, ScriptTextureDescriptor& descriptor)
 {
+#if defined(CE_SCENE_HEADLESS)
+    descriptor = {}; return ScriptAssetResult::Unavailable;
+#else
     descriptor = {};
     std::lock_guard lock(m_assetMutex);
     auto* slot = FindAssetLocked(token);
@@ -562,11 +579,17 @@ ScriptAssetResult ScriptObjectRegistry::ReadTexture(ScriptAssetToken token, Scri
     const auto image = texture->GetImageDescription();
     descriptor = { image.Width(), image.Height(), image.MipLevels(), image.ArraySize(), image.IsCube() ? 1u : 0u };
     return ScriptAssetResult::Success;
+
+#endif
 }
 
 ScriptAssetResult ScriptObjectRegistry::ListAssetRoots(std::uint64_t mount, std::uint32_t kind,
     ScriptAssetLink* links, int capacity, int& count)
 {
+#if defined(CE_SCENE_HEADLESS)
+    count = 0;
+    return ScriptAssetResult::Unavailable;
+#else
     count = 0;
     if (capacity < 0 || (capacity > 0 && links == nullptr))
     {
@@ -582,8 +605,11 @@ ScriptAssetResult ScriptObjectRegistry::ListAssetRoots(std::uint64_t mount, std:
     {
         return ListTypedAssetRootsLocked<T>(mount, links, capacity, count);
     });
+
+#endif
 }
 
+#if !defined(CE_SCENE_HEADLESS)
 template<class T>
 ScriptAssetResult ScriptObjectRegistry::ListTypedAssetRootsLocked(std::uint64_t mount,
     ScriptAssetLink* links, int capacity, int& count)
@@ -603,3 +629,5 @@ ScriptAssetResult ScriptObjectRegistry::ListTypedAssetRootsLocked(std::uint64_t 
     }
     return ScriptAssetResult::Success;
 }
+
+#endif
