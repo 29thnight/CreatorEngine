@@ -1,16 +1,18 @@
 # 데디케이티드 서버 최종 인계 점검 — 2026-10-24
 
+> 게시 고정: [소스·도구·SDK·fixture·검증 기록 lock](ServerHandoffLock20261024.md)을 따른다. 서버 소스 `b5d6e3680999ba9bb42c30114040b7c569fdcf94`와 F# 도구·새 SDK·인계 자료의 고정을 완료했다. 아래 점검 당시 전달 전 잔여는 이 후속 고정으로 닫혔다. 실제 서버 제품과 콘텐츠별 provider 수용은 별도다.
+
 **수용한 Windows x64 콘텐츠 범위에서는 추가 사내 선행 구현 잔여를 발견하지 않았다. N0 → N2/N4 개발 착수는 가능하다. 실제 전달 전에는 미커밋·미추적 소스를 포함한 전달 리비전과 도구·SDK·증거를 고정해야 한다.** 실제 서버 제품과 모든 게임 씬의 무수정 실행을 완료한 판정은 아니다.
 
 [네트워크 계획](../plans/NetworkFrameworkPlan.md) · [무렌더 실행 계약](../design/HeadlessSceneRuntimeContract.md) · [실제 실행 수용](HeadlessSceneRuntimeAcceptance20261024.md) · [대시보드](../RefactoringPlanDashboard.html#phase-20).
 
 ## 이번 점검의 근거와 판정
 
-정본은 `C:/Users/idene/source/repos/CreatorEngine`의 현재 작업 트리다. 기준 HEAD는 `71504c4fd610a205c8c857538364e1d392e9e150`이며, HEAD만 전달하면 아래 미커밋 구현을 전달하지 못한다. 별도 재현 checkout과 원본의 명시적 source overlay 72개 SHA256을 다시 대조했다.
+사전 점검 당시 정본은 `C:/Users/idene/source/repos/CreatorEngine`의 작업 트리였다. 당시 기준 HEAD는 `71504c4fd610a205c8c857538364e1d392e9e150`이며, HEAD만 전달하면 아래 미커밋 구현을 전달하지 못한다. 별도 재현 checkout과 원본의 명시적 source overlay 72개 SHA256을 다시 대조했다.
 
-이번에는 기존 수용 JSON의 참조 95개·직접 프로젝트 소스 지문 417개·실제 host 결과 57건·제품 회귀 17그룹의 기록을 현재 파일과 대조했고 불일치는 0이다. wire 경계는 6 headers/16 records/8 wire records, contract/protocol v1을 재검사했다. 필수 회귀 8등록 항목과 headless source/project 경계도 재검사했다. 원장은 `Build/Verification/HandoffAudit20261024/evidence-audit.json`, 실제 실행 기록은 [수용 JSON](HeadlessSceneRuntimeAcceptance20261024.json)에 있다.
+사전 점검에서는 기존 수용 JSON의 참조 95개·직접 프로젝트 소스 지문 417개·실제 host 결과 57건·제품 회귀 17그룹의 기록을 현재 파일과 대조했고 불일치는 0이다. wire 경계는 6 headers/16 records/8 wire records, contract/protocol v1을 재검사했다. 필수 회귀 8등록 항목과 headless source/project 경계도 재검사했다. 원장은 `Build/Verification/HandoffAudit20261024/evidence-audit.json`, 실제 실행 기록은 [수용 JSON](HeadlessSceneRuntimeAcceptance20261024.json)에 있다.
 
-이번 점검에서 Editor/Player/GPU 전체를 다시 실행하지 않았다. 실제 실행 PASS는 연결한 직전 수용 기록의 범위이며, 원격 CI 실행 PASS를 주장하지 않는다. 과거 고정 master의 전체 문서 감사 실패는 기존 리비전/설명 기준과 누락된 Artifacts 링크 문제로 남아 있으며 현재 변경 문서 검사와 구분한다.
+사전 기록 대조 점검은 Editor/Player/GPU 전체 재실행이 아니었다. 후속 인계 고정에서는 lock에 기록한 깨끗한 소스와 SDK로 F# Player·All -Product 17그룹을 실제 재실행했다. 실제 실행 PASS는 연결한 직전 수용 기록의 범위이며, 원격 CI 실행 PASS를 주장하지 않는다. 과거 고정 master의 전체 문서 감사 실패는 기존 리비전/설명 기준과 누락된 Artifacts 링크 문제로 남아 있으며 현재 변경 문서 검사와 구분한다.
 
 | 사내 선행 | 현재 판정 | 넘길 경계 |
 |---|---|---|
@@ -20,11 +22,13 @@
 | N3 clock·명령·snapshot·보간 | 수용 | 공통 60Hz/최대 catch-up 4, F# 일반 멤버 OnTickSimulate(dt), API45, 성공 커밋 읽기 |
 | 렌더 없는 SceneRuntime | 수용 | 기존 SceneManager/Scene/Entity/Component/ClrHost·수명/핸들/GC/DDOL 재사용 |
 | 기존 소비자·재현 | 수용 기록 대조 일치 | Debug/Release/새 checkout host 57건, NetworkHandoff All -Product 17그룹, Editor/Player/F#/프리팹/애니메이션 |
-| 전달 리비전·도구·증거 고정 | **전달 전 잔여** | 아래 전달 준비를 끝내고 동일 리비전의 검증 원장을 함께 전달 |
+| 전달 리비전·도구·증거 고정 | **후속 고정 완료** | ServerHandoffLock20261024의 소스/도구/SDK/fixture/archive 원장으로 전달 |
 
-## 전달 전 준비와 조건부 사내 작업
+## 고정한 전달 준비와 조건부 사내 작업
 
-1. **전달 소스 고정:** 계약·공통 런타임·HeadlessHost·fixture·회귀·문서를 누락 없이 검토해 리비전을 고정한다. 현재 미추적 구현과 무관한 Effect·모델·workspace 작업을 구분한다. 이번 점검은 커밋·푸시를 실행하지 않았다.
+전달 준비 1~2는 후속 lock으로 완료했으며 소스/도구/자료를 변경하면 다시 수행한다. 3~4는 실제 콘텐츠와 실측 결과에 따라 수행할 공동 작업이다.
+
+1. **전달 소스 고정:** 계약·공통 런타임·HeadlessHost·fixture·회귀·문서를 누락 없이 검토해 리비전을 고정한다. 현재 미추적 구현과 무관한 Effect·모델·workspace 작업을 구분한다. 사전 점검 단계에서는 커밋·푸시를 실행하지 않았으며, 후속 소스 커밋과 전달 자료는 인계 고정 원장을 따른다.
 2. **재현 묶음 고정:** F# 도구 revision `3351cbc80d7216eb10110c4c8b30dce98aef1d1f`, MSVC/Windows SDK/.NET 10, dependency 설치 조건, SDK·cooked fixture·패키지 원장·source overlay·로그를 전달한다. Build 하위 증거는 Git 추적 여부와 별도로 함께 전달한다. 기존 새 checkout은 vcpkg/NuGet cache를 재사용했으며 clean VM/Linux/self-contained 수용이 아니다.
 3. **서버 콘텐츠 목록 확정:** 사용할 component reader·project layer·asset bundle·외부 collision geometry와 관리 서비스 목록을 정한다. 현재 기본 reader는 실제 Transform/PhysicsBody/CharacterMovement/ScriptComponent다. 미설치 항목은 입장 오류다. 추가 항목이 필요하면 엔진 담당자가 기존 Entity/Component factory·서비스 경계에 연결하고 해당 콘텐츠 회귀를 추가한다. 별도 제한 엔티티 모델을 다시 만들지 않는다. 이 작업은 그 콘텐츠를 처음 사용하는 통합 단계의 선행이며, 현재 fixture로 N0/N2/N4를 시작하는 조건은 아니다.
 4. **측정 후 공동 확정:** quantizer·snapshot 배치·backpressure 임계와 큐/대역폭/오차 예산은 N0/N5 실측 후 담당자가 제안하고 사내 계약 소유자가 변경 절차로 확정한다. 실제 transport 의존 매니페스트·패키징 변경도 사내 저장소 소유자가 반영한다. 수치를 지금 임의로 동결하지 않는다.

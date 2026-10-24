@@ -1429,7 +1429,7 @@
   adapter/project 경계·native imports·링크 map·패키지·실제 DLL에서 렌더/저작 parser 의존을 차단한다.
   기존 SceneManager·Scene·Entity·ClrHost·수명·DDOL을 재사용한다. 추가 컴포넌트/에셋은 reader/provider를 설치한다.
   <a href="design/HeadlessSceneRuntimeContract.html">계약</a> · <a href="analysis/HeadlessSceneRuntimeAcceptance20261024.html">새 checkout 수용 기록</a> · <a href="analysis/NetworkWorkerHandoff20261024.html">최종 인계 순서·기준</a>.
-  수용 범위 내 추가 사내 선행 구현 잔여는 없으며, 전달 리비전·도구·증거 고정은 남는다.
+  수용 범위 내 추가 사내 선행 구현 잔여는 없으며, 소스 b5d6e3680·F# 도구·새 SDK·fixture·검증 기록은 <a href="analysis/ServerHandoffLock20261024.html">인계 고정 원장</a>에 고정했다.
   N9 전체 서버 제품·2-client 동기화·운영 배포 상태는 유지한다.</div>
   <div class="task-wrap"><table class="tasks" data-phase="20"><!-- JS 생성 --></table></div>
 </section>
@@ -2780,8 +2780,8 @@ const TASKS = [
     note: "담당자 전량(요구 확정 시) · 중단 — gameplay 요구가 확정되지 않았고 계획 원문도 전체 완료 조건에서 제외한다. locally-owned movement와 허용 오차가 제품 요구로 정해질 때 별도 슬라이스로 재개한다." },
   { phase: 20, id: "N9", title: "Headless Server target (선택 제품)",
     detail: "Editor/ImGui/RenderCore/authoring parser 없이 cooked content와 공통 simulation tick으로 2-client smoke를 통과한다. 제품 요구가 있을 때 착수한다.",
-    refs: "NetworkFrameworkPlan N9 · design/HeadlessSceneRuntimeContract.html · analysis/HeadlessSceneRuntimeAcceptance20261024.html · analysis/NetworkWorkerHandoff20261024.html", priority: "P2", days: 5, status: "stopped",
-    note: "2026-10-24 사내 기존 Scene/Entity 재사용 무렌더 실행 수용: 같은 수명·GC·핸들·DDOL·60Hz·실제 물리/CCT·F# API45·정상/오류 종료·렌더/파서 의존 차단. 별도 엔티티 저장소·ABI 제거. 추가 컴포넌트/외부 에셋은 reader/provider 설치가 필요하다. 계약·새 checkout 근거: design/HeadlessSceneRuntimeContract.html, analysis/HeadlessSceneRuntimeAcceptance20261024.html. N9 실제 wire/2-client/connection drain·운영 배포는 조건부·미수용으로 유지한다. 2026-10-24 최종 점검: 추가 사내 선행 구현 잔여 없음(수용 콘텐츠 범위). 전달 리비전·도구·증거 고정은 남음. NetworkWorkerHandoff20261024 참조." },
+    refs: "NetworkFrameworkPlan N9 · design/HeadlessSceneRuntimeContract.html · analysis/HeadlessSceneRuntimeAcceptance20261024.html · analysis/NetworkWorkerHandoff20261024.html · analysis/ServerHandoffLock20261024.html", priority: "P2", days: 5, status: "stopped",
+    note: "2026-10-24 사내 기존 Scene/Entity 재사용 무렌더 실행 수용: 같은 수명·GC·핸들·DDOL·60Hz·실제 물리/CCT·F# API45·정상/오류 종료·렌더/파서 의존 차단. 별도 엔티티 저장소·ABI 제거. 추가 컴포넌트/외부 에셋은 reader/provider 설치가 필요하다. 계약·새 checkout 근거: design/HeadlessSceneRuntimeContract.html, analysis/HeadlessSceneRuntimeAcceptance20261024.html. N9 실제 wire/2-client/connection drain·운영 배포는 조건부·미수용으로 유지한다. 2026-10-24 최종 점검: 추가 사내 선행 구현 잔여 없음(수용 콘텐츠 범위). 소스 b5d6e3680·F# 도구3351cbc80d·깨끗한 SDK·fixture·검증 기록 고정 완료. ServerHandoffLock20261024와 NetworkWorkerHandoff20261024 참조." },
   { phase: 20, id: "N10", title: "Hardening·관측·soak",
     detail: "bounds/authority/rate limit, queue backpressure, disconnect/shutdown 순서, 장시간 soak와 운영 telemetry를 완결한다.",
     refs: "NetworkFrameworkPlan N10", priority: "P1", days: 4, status: "todo",

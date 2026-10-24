@@ -1,6 +1,6 @@
 # 네트워크 준비형 런타임 · Replication 기반 계획 (PHASE 20)
 
-<!-- plan-summary: 2026-10-24 최종 인계: 수용 범위 내 추가 사내 선행 구현 잔여 없음. 전달 리비전·도구·증거 고정은 남는다. 기존 Scene/Entity 무렌더 실행과 F# API45를 재사용해 N0→N2/N4→N5부터 착수한다. 실제 서버 N9와 soak N10은 별도 수용이다. -->
+<!-- plan-summary: 2026-10-24 최종 인계: 수용 범위 내 추가 사내 선행 구현 잔여 없음. 소스 b5d6e3680·F# 도구·새 SDK·fixture·검증 기록을 ServerHandoffLock20261024에 고정했다. 기존 Scene/Entity 무렌더 실행과 F# API45를 재사용해 N0→N2/N4→N5부터 착수한다. 실제 서버 N9와 soak N10은 별도 수용이다. -->
 
 > 2026-10-24 후속: `SceneRuntimeHeadless`는 기존 SceneManager·Scene·Entity·Component·ClrHost production 소스를 선택 서비스 없이 빌드한다. `HeadlessHost`는 순서만 조정하며 별도 엔티티 저장소·수명 큐·HeadlessBindings ABI를 사용하지 않는다. cooked reader는 실제 컴포넌트에 복원하고 추가 reader를 등록할 수 있다. 미설치 서비스가 필요한 콘텐츠는 명시적으로 거부한다. [실행 계약](../design/HeadlessSceneRuntimeContract.md)과 [새 checkout 수용 기록](../analysis/HeadlessSceneRuntimeAcceptance20261024.md)을 따른다. N9의 실제 wire/2-client/connection drain·운영 배포는 미수용이다.
 
@@ -127,7 +127,7 @@ Product 회귀에는 명시적 새 cooked Stage가 필요하다. 2026-10-24 head
 
 ### 서버 작업자 인계와 제품 수용 — 2026-10-24 정본
 
-[최종 점검·작업 소유·착수 순서·검증 기준](../analysis/NetworkWorkerHandoff20261024.md)을 따른다. ND-a·W4/ND-b·N1·N3·기존 Scene/Entity 무렌더 실행은 수용됐으며, 수용한 Windows x64 콘텐츠 범위에서 추가 사내 선행 구현 잔여는 발견하지 않았다. 미커밋·미추적 구현을 포함한 전달 리비전·도구·SDK·증거 고정은 전달 전 잔여다. 현재 HEAD만 넘기면 검증된 구현을 전달하지 못한다.
+[최종 점검·작업 소유·착수 순서·검증 기준](../analysis/NetworkWorkerHandoff20261024.md)을 따른다. ND-a·W4/ND-b·N1·N3·기존 Scene/Entity 무렌더 실행은 수용됐으며, 수용한 Windows x64 콘텐츠 범위에서 추가 사내 선행 구현 잔여는 발견하지 않았다. [인계 고정 원장](../analysis/ServerHandoffLock20261024.md)에 소스 b5d6e3680·F# 도구·깨끗한 소스의 SDK·fixture·검증 기록을 고정했다. 기존 미커밋/미추적 사전 작업은 이 소스 커밋에 선별해 포함했다. 바이너리 archive는 원장에 기록한 로컬 인계 폴더의 별도 전달 대상이다.
 
 N0 기준선/실패 gate → N2 wire ID/schema와 N4 loopback 병행 → N5 full snapshot/late join → N6 delta/interest/quantization → N7 실제 transport → N9 실제 서버 제품 → N10 최종 soak 순서로 진행한다. N9 bootstrap과 N10 실패 하네스는 일찍 병행할 수 있으나 최종 인수는 통합 제품으로 한다. N8 prediction은 gameplay 요구 확정 시 별도다. N9 전체를 완료로 표시하지 않는다.
 
