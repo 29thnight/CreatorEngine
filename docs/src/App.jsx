@@ -20,12 +20,16 @@ function Header({ api = false }) {
       <a href={api ? '../' : './'} aria-current={!api ? 'page' : undefined}>엔진</a>
       <a href={api ? './' : 'api/'} aria-current={api ? 'page' : undefined}>문서 · API</a>
       <a href={dashboardLink(api)}>대시보드</a>
-      <a href={api ? '../design/DedicatedServerHandoff.html' : 'design/DedicatedServerHandoff.html'}>서버 인계 설계</a>
+      {!api && <a href="design/DedicatedServerHandoff.html">서버 인계 설계</a>}
       <a href="https://github.com/29thnight/CreatorEngine" target="_blank" rel="noopener noreferrer">GitHub <span aria-hidden="true">↗</span></a>
     </nav>
     <div className="nav-end"><span className="preview-badge"><i /> Preview</span><button className="menu-toggle icon-button" aria-label={open ? '메뉴 닫기' : '메뉴 열기'} aria-controls="mobile-menu" aria-expanded={open} onClick={() => setOpen(!open)}>☰</button></div>
     <nav id="mobile-menu" className="mobile-menu" aria-label="모바일 메뉴" hidden={!open}>
-      <a href={api ? '../' : './'} onClick={close}>엔진</a><a href={api ? './' : 'api/'} onClick={close}>문서 · API</a><a href={dashboardLink(api)} onClick={close}>대시보드</a><a href={api ? '../design/DedicatedServerHandoff.html' : 'design/DedicatedServerHandoff.html'} onClick={close}>서버 인계 설계</a><a href="https://github.com/29thnight/CreatorEngine" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
+      <a href={api ? '../' : './'} onClick={close}>엔진</a>
+      <a href={api ? './' : 'api/'} onClick={close}>문서 · API</a>
+      <a href={dashboardLink(api)} onClick={close}>대시보드</a>
+      {!api && <a href="design/DedicatedServerHandoff.html" onClick={close}>서버 인계 설계</a>}
+      <a href="https://github.com/29thnight/CreatorEngine" target="_blank" rel="noopener noreferrer">GitHub ↗</a>
     </nav>
   </header>;
 }

@@ -1418,6 +1418,13 @@
   <div class="phase-meta">갱신: 2026-10-23 · ND-a·W4·ND-b·N1 수용 · N3 API45/F# 일반 멤버·고정틱·GPU 수용 · 설계 문서: <a href="plans/NetworkFrameworkPlan.html">NetworkFrameworkPlan.md</a> · 선행: PHASE 17 archive/parser 경계(N1) <b>완료</b>, SceneGraph E1·H3·L5 <b>완료</b> · 초기 공수는 대시보드 추정치이며 N0 실측 뒤 갱신 · <b>소유권 분할은 설계 문서 §6</b></div>
   <div class="phase-goal"><b>목표:</b> 서버 권위 replication을 실제 fixed Simulation Tick과 값 기반 thread boundary 위에 세운다.
   Authoring YAML/JSON DOM, process-local EntityHandle, live Scene/Entity pointer를 wire에서 배제하고, Loopback correctness를 닫은 뒤 실제 transport와 선택적 prediction/headless server를 판정한다.</div>
+  <div class="risknote" id="phase-20-worker-handoff">
+    <div class="vt">서버 개발 담당자 인계 · 2026-10-24</div>
+    <p><a href="https://github.com/29thnight/CreatorEngine/blob/c8eb80275c24d38367dc92f3e72945a18ff28974/docs/handoff/DedicatedServerWorkerHandoff20261024.md" target="_blank" rel="noopener noreferrer"><b>데디케이티드 서버 작업자 인계서 · 고정본 ↗</b></a></p>
+    <p>받을 자료와 버전, 환경 준비·첫 실행, 검증 기록 위치, N0 → N2/N4 → N5 착수 순서와 단계별 완료 기준을 한 문서에 정리했다.</p>
+    <p>소스 <a href="https://github.com/29thnight/CreatorEngine/tree/b5d6e3680999ba9bb42c30114040b7c569fdcf94" target="_blank" rel="noopener noreferrer">b5d6e3680</a> · F# 도구 3351cbc80d · SDK 7ea251ca… / API45.</p>
+    <p>SDK·fixture·검증 기록은 <code>Payload</code> 폴더를 별도로 전달한다. Git clone만으로는 해당 바이너리 자료를 받을 수 없다.</p>
+  </div>
   <div class="risknote"><div class="vt">사내 선행 수용 — 2026-10-22</div>
   <b>ND-a·W4·ND-b 완료.</b> 계약 6종 동결·변경 절차·금지 타입 검사 위에 저작 변경·Undo/Redo와 로컬 엔티티 수명/일반 쓰기 관찰자를 연결했다.
   DDOL은 같은 정체성의 Detached→Attached이며 ScriptObjectHandle을 유지한다. 큐 예외/포화 metrics와 전체 재구성 규칙을 포함한다.
