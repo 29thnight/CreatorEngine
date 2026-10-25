@@ -1,5 +1,6 @@
 #include "FoliageComponent.h"
 #include "FoliageSystem.h"
+#include "FoliageCulling.h"
 #include "Assets/ModelAssetGeneration.h"
 #include "Assets/ModelAnimationDescriptor.h"
 #include "Assets/ModelMeshDescriptor.h"
@@ -591,54 +592,18 @@ void FoliageComponent::RemoveInstancesInBrush(TerrainComponent* terrain, const T
 void FoliageComponent::UpdateFoliageCullingData(
     const std::optional<math::bounding_frustum>& cameraFrustum)
 {
-    if (m_foliageTypes.empty()) return;
-
-    const size_t count = m_foliageInstances.size();
-    if (count == 0) return;
-
-    auto process_range = [&](size_t begin, size_t end)
-    {
-        for (size_t i = begin; i < end; ++i)
+    // Add/load/terrain insertion and every owner-thread edit seal the matrix.
+    // Culling borrows that pose instead of rebuilding S*Rx*Ry*Rz*T each frame.
+    if (m_foliageTypes.empty() || m_foliageInstances.empty()) return;
+    foliage::CullSealedInstances(std::span{m_foliageInstances}, m_foliageTypes.size(),
+        [&](std::uint32_t typeID) -> const math::aabb*
         {
-            if (i >= m_foliageInstances.size()) return;
-
-            auto& foliage = m_foliageInstances[i];
-
- // 경계 체크 보정: >=
-            if (static_cast<size_t>(foliage.m_foliageTypeID) >= m_foliageTypes.size())
-                continue;
-
-            foliage.RebuildWorldMatrix();
-
-            const FoliageType& foliageType = m_foliageTypes[foliage.m_foliageTypeID];
-            const auto* bounds = foliageType.m_meshDescriptor ? &foliageType.m_meshDescriptor->bounds
-                : foliageType.m_modelGeneration && foliageType.m_modelMeshIndex < foliageType.m_modelGeneration->Meshes().size()
-                    ? &foliageType.m_modelGeneration->Meshes()[foliageType.m_modelMeshIndex].bounds : nullptr;
-            if (!bounds)
-            {
-                foliage.m_isCulled = true;
-                continue;
-            }
-
-            if(SceneManagers->IsGameStart())
-            {
-				const math::aabb worldBounds = math::transform(
-					*bounds,
-					foliage.m_worldMatrix);
-				foliage.m_isCulled = cameraFrustum.has_value() &&
-					!worldBounds.is_empty() &&
-					!math::intersects(*cameraFrustum, worldBounds);
-            }
-            else
-            {
-				foliage.m_isCulled = false;
-            }
-        }
-    };
-
-    // Bounds-only owner-thread work avoids queued raw component captures and
-    // a blocking job barrier on the scene/UI thread.
-    process_range(0u, count);
+            const auto& type = m_foliageTypes[typeID];
+            if (type.m_meshDescriptor) return &type.m_meshDescriptor->bounds;
+            if (type.m_modelGeneration && type.m_modelMeshIndex < type.m_modelGeneration->Meshes().size())
+                return &type.m_modelGeneration->Meshes()[type.m_modelMeshIndex].bounds;
+            return nullptr;
+        }, cameraFrustum, SceneManagers->IsGameStart());
 }
 
 

@@ -251,6 +251,7 @@
     <ClInclude Include="DecalSystem.h" />
     <ClInclude Include="EForceMode.h" />
     <ClInclude Include="FoliageComponent.h" />
+    <ClInclude Include="FoliageCulling.h" />
     <ClInclude Include="FoliageSystem.h" />
     <ClInclude Include="KeyArray.h" />
     <ClInclude Include="KeyBitFlag.h" />

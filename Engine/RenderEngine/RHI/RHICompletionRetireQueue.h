@@ -53,22 +53,42 @@ public:
     RHIRetireCollection Collect(RHICompletionPoint completed, Releaser&& release)
     {
         RHIRetireCollection result{};
-        auto it = m_entries.begin();
-        while (it != m_entries.end())
+        size_t write = 0;
+        for (size_t read = 0; read < m_entries.size(); ++read)
         {
+            Entry& entry = m_entries[read];
             if (!RHICompletionRetirePolicy::CanCollect(
-                    completed.value, it->completion.value))
+                    completed.value, entry.completion.value))
             {
-                ++it;
+                if (write != read) m_entries[write] = std::move(entry);
+                ++write;
                 continue;
             }
 
-            release(it->payload);
+            try
+            {
+                release(entry.payload);
+            }
+            catch (...)
+            {
+                // Earlier collections remain committed, but the throwing entry
+                // and unvisited tail must remain queued, as with repeated erase.
+                for (size_t tail = read; tail < m_entries.size(); ++tail, ++write)
+                    if (write != tail) m_entries[write] = std::move(m_entries[tail]);
+                m_entries.erase(m_entries.begin() + write, m_entries.end());
+                throw;
+            }
             ++result.count;
-            result.bytes += it->bytes;
-            m_pendingBytes -= it->bytes;
-            it = m_entries.erase(it);
+            result.bytes += entry.bytes;
+            m_pendingBytes -= entry.bytes;
+            // Release residual RAII ownership before the next callback, rather
+            // than retaining collected resources until the final tail erase.
+            // The callback may also have transferred ownership elsewhere.
+            [[maybe_unused]] Payload retired(std::move(entry.payload));
         }
+        // Stable in-place compaction: no allocation, no survivor self-move,
+        // at most one move assignment per survivor, and capacity is retained.
+        m_entries.erase(m_entries.begin() + write, m_entries.end());
         return result;
     }
 
