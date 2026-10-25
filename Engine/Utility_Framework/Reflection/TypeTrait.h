@@ -263,8 +263,6 @@ namespace std
 	};
 }
 
-static std::set<HashedGuid> g_guids;
-
 namespace TypeTrait
 {
     // Process-runtime cache identity for Texture and Material only. Never use
@@ -321,29 +319,11 @@ namespace TypeTrait
 			return typeID;
 		}
 
-		static inline void InsertGUID(HashedGuid guid)
-		{
-			g_guids.insert(guid);
-		}
-
-		static inline void EraseGUID(HashedGuid guid)
-		{
-			g_guids.erase(guid);
-		}
-
-		static inline HashedGuid MakeGUID()
-		{
-			GUID guid = GenerateGUID();
-			HashedGuid hash = ConvertGUIDToHash(guid);
-			while (g_guids.find(hash) != g_guids.end())
-			{
-				guid = GenerateGUID();
-				hash = ConvertGUIDToHash(guid);
-			}
-			g_guids.insert(hash);
-
-			return hash;
-		}
+		// One out-of-line registry for all TUs. Duplicate registration remains
+		// idempotent; the result also supports atomic candidate reservation.
+		static bool InsertGUID(HashedGuid guid);
+		static void EraseGUID(HashedGuid guid);
+		static HashedGuid MakeGUID();
 
 	};
 

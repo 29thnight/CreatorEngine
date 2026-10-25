@@ -18,8 +18,48 @@ import Creator.Core.Uuid;
 #include "TypeTrait.h"
 #include "../Foundation/StandardLibrary.h"
 
+namespace
+{
+    struct GuidRegistry
+    {
+        std::mutex mutex;
+        std::set<HashedGuid> reserved;
+    };
+
+    GuidRegistry& GetGuidRegistry()
+    {
+        static GuidRegistry registry;
+        return registry;
+    }
+}
+
 namespace TypeTrait
 {
+    bool GUIDCreator::InsertGUID(HashedGuid guid)
+    {
+        auto& registry = GetGuidRegistry();
+        std::lock_guard lock(registry.mutex);
+        return registry.reserved.insert(guid).second;
+    }
+
+    void GUIDCreator::EraseGUID(HashedGuid guid)
+    {
+        auto& registry = GetGuidRegistry();
+        std::lock_guard lock(registry.mutex);
+        registry.reserved.erase(guid);
+    }
+
+    HashedGuid GUIDCreator::MakeGUID()
+    {
+        for (;;)
+        {
+            // Keep OS GUID generation outside the registry lock. Test-and-
+            // reserve is a single operation, so concurrent collisions retry.
+            const HashedGuid candidate = ConvertGUIDToHash(GenerateGUID());
+            if (InsertGUID(candidate)) return candidate;
+        }
+    }
+
     HashedGuid MakeRuntimeResourceId() noexcept
     {
         static_assert(sizeof(std::size_t) >= sizeof(std::uint64_t));
