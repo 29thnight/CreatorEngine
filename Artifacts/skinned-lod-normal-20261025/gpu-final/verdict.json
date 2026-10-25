@@ -1,0 +1,20 @@
+{
+  "gpuValidation": "on",
+  "runs": [
+    {
+      "passed": false,
+      "timedOut": false,
+      "gpuValidationCoverageNotices": 0,
+      "exitCode": 1,
+      "missingMarkers": [
+        "METEOR_SKINNED_COARSE_SCENE_OK frames=32 poses=2 partitions=2",
+        "METEOR_STREAMING_FEEDBACK_OK frames=32 sparse=1 stableBuffers=1 completedGpuDemand=1 validation=0",
+        "METEOR_SPARSE_IDLE_SCENE_OK emptyViews=1 productPool=1 pressureTrim=1 validation=0"
+      ],
+      "mode": "--skinned-cluster-lod-only"
+    }
+  ],
+  "passed": false,
+  "configuration": "Debug",
+  "sourceStable": true
+}

@@ -1,0 +1,8 @@
+{
+  "nativeGpuWorkPerformed": false,
+  "actualDummyExitCode": 1,
+  "blockedWhileSourceScratchHeld": true,
+  "passed": true,
+  "expectedDummyExitCode": 1,
+  "launchedAfterRelease": true
+}

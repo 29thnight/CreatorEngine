@@ -1,0 +1,198 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-25",
+  "head": "9b0892d051be17ab64f2df78b775ad84135d491b",
+  "phase": 2,
+  "status": "phase-2-validated",
+  "implementation": {
+    "poolPolicy": {
+      "minimumTiles": 256,
+      "growthTiles": 256,
+      "maximumTiles": 8192,
+      "tileBytes": 65536,
+      "idleRecordingGrace": 120
+    },
+    "stableReservedResourceAndGpuAddress": true,
+    "nativeMappingSlabOwner": "RHISparseTileMapping.physicalPoolOwner",
+    "growthArbitration": "device RHIDeviceMemoryBudgetCoordinator growth reservations and commits",
+    "pressureRelease": "completed/unreferenced extra tail slabs only",
+    "nativeRetirement": "RHI FIFO NULL map + GPU fence retains native heap and coordinator lease",
+    "cacheMaintenance": "SceneHost BeginFrame, including no input/no draws; cache mutex released before mapping wait",
+    "growthDeniedFallback": "existing ancestor/root LOD admission path"
+  },
+  "build": {
+    "configuration": "Debug",
+    "probe": {
+      "exitCode": 0,
+      "log": "probe-final-build.log"
+    },
+    "editor": {
+      "exitCode": 0,
+      "log": "editor-build-final.log"
+    }
+  },
+  "coverage": {
+    "variablePoolNative": {
+      "passed": true,
+      "assets": 2,
+      "floorPages": 2,
+      "peakPages": 6,
+      "gpuWords": 80,
+      "activePin": true,
+      "pressureTrim": true,
+      "coordinatorSnapshotInjection": true,
+      "foreignGrowthReservation": true,
+      "regrow": true,
+      "idleHysteresis": true,
+      "stableGpuAddress": true,
+      "malformedSourceBatchAtomic": true,
+      "globalLeaseReleasedAfterFenceAndDrain": true,
+      "testedIdleRecordingGrace": 2
+    },
+    "sceneHostStreaming": {
+      "passed": true,
+      "frames": 32,
+      "pixelChecks": 7416,
+      "transitionChecks": 6392,
+      "mixedFrames": 2,
+      "sharedQueueReads": 192,
+      "fallbackFrames": 24,
+      "evictionFrames": 4,
+      "gpuValidationProblems": 0
+    },
+    "emptySceneMaintenance": {
+      "passed": true,
+      "emptyViews": 1,
+      "usesProductPool": true,
+      "pressureTrim": true,
+      "newDrawRequests": 0
+    }
+  },
+  "performanceMeasured": false,
+  "scope": {
+    "backend": "DX12",
+    "releaseBuild": false,
+    "liveEditorSceneCapture": false,
+    "budgetPressure": "controlled native device coordinator snapshots; GPU data transfers and heap mappings use DX12",
+    "capacityMetric": "pool-owned committed heap capacity; retiring native heaps retain budget leases until GPU completion",
+    "returnOrder": "tail slabs first; an active tail defers older slab returns; floor retained"
+  },
+  "evidence": {
+    "gpuVerdict": "gpu-final/verdict.json",
+    "sourceIdentityBefore": "gpu-final/identity-before.json",
+    "sourceIdentityAfter": "gpu-final/identity-after.json",
+    "nativeLog": "gpu-final/cluster-storage-only.stdout.log",
+    "sceneHostLog": "gpu-final/cluster-streaming-only.stdout.log"
+  },
+  "supersededValidation": {
+    "path": "gpu/verdict.json",
+    "accepted": false,
+    "reason": "Source changed to add no-input frame maintenance during the preliminary run; final acceptance uses gpu-final only."
+  },
+  "files": [
+    {
+      "path": "Engine/RenderEngine/RHI/RHISharedSparsePagePool.h",
+      "sha256": "3fcd78a1e94de1e8097a1b30ba15b13069eec718abef2f28c47e06ee8b723d17"
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/RHIResourceTypes.h",
+      "sha256": "99eba159f3c7eacda9f65f8017b3bdc22d79dc54ecdd0926aeaa622b7250742a"
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/IRenderDeviceServices.h",
+      "sha256": "a2df0c20d32b5178c7b4087d8ee85456ecdc66c805f7c7eae45b5d3c7dc963db"
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h",
+      "sha256": "a1ab44272683065ab232dda7354c0934788587ea627bf9295114ce0f32921eaa"
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/DX12/DX12DeviceResources.cpp",
+      "sha256": "6a5e748d1070209aad481920efbcb8cb1814d17958570b2b15c317697772ea19"
+    },
+    {
+      "path": "Engine/RenderEngine/MeshletSparseStorage.inl",
+      "sha256": "9bfde61ac0052f9a14b99427ff528ad409d740ddc65f5ac08fa109a9c9e74d26"
+    },
+    {
+      "path": "Engine/RenderEngine/MaterialGraphMeshSurface.cpp",
+      "sha256": "68d819ecd0ae898b60d3e75d53bb9aa9d1d6c6ffaa722d332374e47ab6a9d115"
+    },
+    {
+      "path": "Tools/regression/support/VariableSparsePoolProbe.inl",
+      "sha256": "55a8fc62b69e4fdc701914d4a5b05d58d61c50a5729705e34a222d466b8ef0d9"
+    },
+    {
+      "path": "Tools/regression/support/SharedSparseStorageProbe.inl",
+      "sha256": "03ca393c4465a8dad47237d4b8ca68a79bd7ca10c4bf0052e50043e11af867c1"
+    },
+    {
+      "path": "Tools/regression/support/ClusterLodProbe.inl",
+      "sha256": "99d77aacffeca2d6e690b24890cf8abee53ae8b4b6034ee1aedcd1219e948548"
+    },
+    {
+      "path": "Tools/regression/verify-material-scene-probes.ps1",
+      "sha256": "2e73d3e41d69ed6f9ac4872ac4838d2b37a5c0fcefdbd862bfb9fd5ffb9fe9a1"
+    }
+  ],
+  "binaries": [
+    {
+      "path": "Bin/x64-Debug/Tools/MaterialRasterSurfaceProbe/MaterialRasterSurfaceProbe.exe",
+      "sha256": "ecbca704f57493da0526181f6aae843559476dee035a8f0825a703c1d1add96f"
+    },
+    {
+      "path": "Bin/x64-Debug/Editor/CreatorEditor.runtime.dll",
+      "sha256": "2754a9344f730e4af939f76290cd7770c979f9ba20fb31ad15dee7dc020879aa"
+    }
+  ],
+  "gpuRegression": {
+    "runs": [
+      {
+        "missingMarkers": [],
+        "passed": true,
+        "timedOut": false,
+        "mode": "--cluster-storage-only",
+        "gpuValidationCoverageNotices": 0,
+        "exitCode": 0
+      },
+      {
+        "missingMarkers": [],
+        "passed": true,
+        "timedOut": false,
+        "mode": "--cluster-streaming-only",
+        "gpuValidationCoverageNotices": 0,
+        "exitCode": 0
+      }
+    ],
+    "configuration": "Debug",
+    "sourceStable": true,
+    "passed": true,
+    "gpuValidation": "on"
+  },
+  "nativeMarkers": {
+    "cluster-storage-only": [
+      "[DX12 검증] DebugLayer=on GPUValidation=on DRED=on BreakOnError=off",
+      "METEOR_SPARSE_VRAM_BUDGET_OK commit=1 release=1 pressure=1 validation=0",
+      "METEOR_SPARSE_BUFFER_OK frames=6 words=384 malformed=6 stableAddress=1 validation=0",
+      "METEOR_VARIABLE_SPARSE_POOL_OK floorPages=2 peakPages=6 gpuWords=80 activePin=1 pressure=1 globalReservation=1 regrow=1 hysteresis=1 stableAddress=1 validation=0",
+      "METEOR_COARSE_ADMISSION_OK physicalPages=2 rootWords=8 immutable=1 minimumReject=1 validation=0",
+      "METEOR_SHARED_SPARSE_POOL_OK assets=3 physicalPages=3 gpuWords=192 activePin=1 priority=1 lru=1 reuse=1 delta=1 abort=1 validation=0",
+      "METEOR_CLUSTER_RESIDENCY_OK root=1 refinement=1 eviction=1 partial=1 asyncFailure=1 asyncRecovery=1 sharedView=1 validation=0",
+      "METEOR_CLUSTER_STORAGE_OK cases=8 rejected=40 words=8960 seamChecks=512 validation=0"
+    ],
+    "cluster-streaming-only": [
+      "[DX12 검증] DebugLayer=on GPUValidation=on DRED=on BreakOnError=off",
+      "METEOR_GEOMETRY_PAGE_ONLY_OK schema=9 bodyBytes=0 oldSchemasRejected=3",
+      "METEOR_COLD_BACKING_OK loose=1 pak=1 capturedLifetime=1 pageHashes=1",
+      "METEOR_COLD_METADATA_OK metadataBytes=2932 totalBytes=23460 bulkReads=0 corruption=2 exactCpu=1",
+      "METEOR_PRODUCTION_QUEUE_FILTER_OK sealedJobs=9152 publishedJobs=1592 filteredJobs=7560",
+      "METEOR_STREAMING_FEEDBACK_OK frames=32 sparse=1 stableBuffers=1 completedGpuDemand=1 validation=0",
+      "METEOR_PRODUCTION_SHARED_QUEUE_OK headers=224 cameraFrames=32 shadowFrames=32 sharedReads=192 validation=0",
+      "METEOR_SPARSE_IDLE_SCENE_OK emptyViews=1 productPool=1 pressureTrim=1 validation=0",
+      "METEOR_CLUSTER_STREAMING_OK frames=32 fallbackFrames=24 evictionFrames=4 pixels=7416 validation=0",
+      "METEOR_COLD_RENDER_OK frames=32 rawPayload=0 cpuConnectivity=0 bulkReads=0 validation=0",
+      "METEOR_CLUSTER_LOD_OK frames=32 partitions=2 malformed=9 pixels=7416 transitions=6392 mixedFrames=2 validation=0"
+    ]
+  },
+  "report": "index.html"
+}

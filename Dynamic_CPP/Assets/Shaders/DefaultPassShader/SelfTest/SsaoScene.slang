@@ -41,6 +41,18 @@ void CSMain(uint3 id : SV_DispatchThreadID)
         viewZ = abs(int(id.x) - int(gSize.x / 2)) < int(gSize.x / 32)
             ? gLeftViewZ : gRightViewZ;
     }
+    if (gMode == 6)
+    {
+        viewZ = gLeftViewZ;
+    }
+    if (gMode == 4)
+    {
+        viewNormal = -viewNormal;
+    }
+    if (gMode == 5)
+    {
+        viewZ += 2.0;
+    }
     const float a = gFarZ / (gFarZ - gNearZ);
     gDepth[id.xy] = (gMode == 3) ? 1.0f : a * (1.0f - gNearZ / viewZ);
     // Match the production GBuffer contract even when the camera is rotated.

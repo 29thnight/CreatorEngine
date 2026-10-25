@@ -1,0 +1,22 @@
+{
+  "validation": "gpu",
+  "exitCode": 0,
+  "test": {
+    "schemaVersion": 1,
+    "command": "dx12.ssao",
+    "status": "succeeded",
+    "code": "ok",
+    "message": "dx12.ssao 통과",
+    "data": {
+      "log": "SSAO: world normals, signed hemispheres and texel-center regression\nstep: GPU execution/readback finite PASS\nrotated step: GPU execution/readback finite PASS\nflat=1.00000 edge=0.72461 rotation max=0.00000000 filter variation ratio=0.56855\n90-degree camera/world rotation invariance: PASS\nUnoccluded plane and contact visibility: PASS\nSpatial filter reduces variation: PASS\ntilted plane: GPU execution/readback finite PASS\ntilted plane minimum=0.999512\nOdd-size tilted plane does not self-occlude: PASS\none-sided occluder: GPU execution/readback finite PASS\ntwo-sided recess: GPU execution/readback finite PASS\none-sided center=0.500000 two-sided center=0.221680\nOne-sided wall covers at most half at optical center: PASS\nOpposite occluders cover distinct sectors: PASS\nintensity zero: GPU execution/readback finite PASS\nIntensity zero produces visibility one: PASS\nsky: GPU execution/readback finite PASS\nSky remains unoccluded: PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\nAccepted static surface accumulates history: PASS\nTemporal/spatial output suppresses sample rotation noise: PASS\ntemporal variation=13.539551 raw variation=694.343750\ndepth rejection: GPU execution/readback finite PASS\nChanged view depth rejects old AO: PASS\nnormal warmup: GPU execution/readback finite PASS\nnormal rejection: GPU execution/readback finite PASS\nChanged world normal rejects old AO: PASS\noccluder warmup: GPU execution/readback finite PASS\noccluder warmup: GPU execution/readback finite PASS\noccluder warmup: GPU execution/readback finite PASS\noccluder warmup: GPU execution/readback finite PASS\noccluder warmup: GPU execution/readback finite PASS\noccluder warmup: GPU execution/readback finite PASS\noccluder warmup: GPU execution/readback finite PASS\noccluder warmup: GPU execution/readback finite PASS\noccluder removed: GPU execution/readback finite PASS\nDisappearing occluder leaves no receiver ghost on the first frame: PASS\ncamera cut: GPU execution/readback finite PASS\nCamera cut discards AO history: PASS\nsame-half-size resize: GPU execution/readback finite PASS\nFull-resolution resize resets even when half extent is unchanged: PASS\nabort warmup: GPU execution/readback finite PASS\nabort warmup: GPU execution/readback finite PASS\nabort warmup: GPU execution/readback finite PASS\nabort warmup: GPU execution/readback finite PASS\naborted history: GPU execution/readback finite PASS\nAborted recording cannot publish an AO history slot: PASS\nDX12 validation problems=0\nSSAO regression PASS\n",
+      "passed": true
+    },
+    "timing": {
+      "queuedMs": 0.0961,
+      "waitedFrames": 0,
+      "executedMs": 7109.98
+    }
+  },
+  "runtimeSha256": "7DE9321C0B32E14190CC323C66D71E4541BDF839C04AF7ED382809CA19A0026F",
+  "passed": true
+}

@@ -9,7 +9,7 @@ namespace experiment::importer
 {
 // Authoring only, after base vertex/index finalization. Creates separate
 // spatial replacement patches, aggregated by depth; never changes LOD0 geometry.
-// Disabled/skinned/single-cluster meshes succeed with an empty chain and an
+// Disabled/legacy-skinned/single-cluster meshes succeed with an empty chain and an
 // explicit diagnostic. Failure clears outLods and returns false.
 [[nodiscard]] bool BuildMeshLods(const Mesh& mesh, MeshLodChain& outLods, std::string& diagnostic,
                                  const MeshLodBuildSettings& settings = {},

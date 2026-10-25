@@ -1,0 +1,22 @@
+{
+  "runs": [
+    {
+      "exitCode": 1,
+      "mode": "--hybrid-visibility-only",
+      "timedOut": false,
+      "gpuValidationCoverageNotices": 0,
+      "missingMarkers": [
+        "METEOR_HYBRID_VISIBILITY_OK frames=24 cases=8 partitions=3 validation=0"
+      ],
+      "passed": false
+    }
+  ],
+  "auditRepeats": null,
+  "gpuValidation": "off",
+  "passed": false,
+  "configuration": "Debug",
+  "auditMode": null,
+  "sourceStable": true,
+  "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\skinned-depth-fix-20261026\\final-probe.exe",
+  "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\skindepth-b"
+}

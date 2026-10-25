@@ -194,6 +194,9 @@ namespace material_graph
         IRenderDeviceServices& device;
         own::shared_owner<const MeshSurfaceInput> identity;
         own::shared_owner<const assets::cluster::ResidentSet> residency;
+        own::shared_owner<const assets::cluster::ResidentSet> requestedResidency;
+        uint64_t admissionTiles{};
+        bool budgetLimited{};
         own::shared_owner<MeshletSparseStorage> sparse;
         std::vector<std::pair<RHIBufferSlice, RHIBufferSlice>> sparseCopies;
         SparseClusterPayload sparsePayload;
@@ -367,9 +370,41 @@ namespace material_graph
             result.entries = entries.size();
             return result;
         }
+        own::shared_owner<RHISharedSparsePagePool> ClassifySparsePool()
+        {
+            // All views/recordings of a storage must be idle before any of its
+            // pages can be reused by another asset. A new acquisition pins it again.
+            idleScratch.clear();
+            idleScratch.reserve(entries.size());
+            for (const auto& cached : std::span(entries))
+            {
+                if (cached->sparse)
+                {
+                    const bool eligible = cached.use_count() == 1 &&
+                                          cached->state == RHIUploadTransactionState::Resident &&
+                                          cached->completion <= completed;
+                    idleScratch.emplace_back(cached->sparse.operator->(), eligible);
+                }
+            }
+            auto idle = std::span(idleScratch);
+            std::ranges::sort(idle, [](const auto& left, const auto& right)
+                              { return std::less<MeshletSparseStorage*>{}(left.first, right.first); });
+            for (std::size_t index = 0; index < idle.size();)
+            {
+                const auto storage = idle[index].first;
+                bool eligible = idle[index++].second;
+                while (index < idle.size() && idle[index].first == storage)
+                {
+                    eligible = idle[index++].second && eligible;
+                }
+                storage->SetEvictable(eligible);
+            }
+            return idleScratch.empty() ? own::shared_owner<RHISharedSparsePagePool>{}
+                                       : idleScratch.front().first->pool;
+        }
         void TrimIdle()
         {
-            std::lock_guard lock(mutex);
+            std::unique_lock lock(mutex);
             const bool pressure = device.StreamingMemoryPressure();
             for (auto it = entries.begin();
                  it != entries.end() && (pressure || stats.residentBytes > maxBytes || entries.size() > maxEntries);)
@@ -385,6 +420,14 @@ namespace material_graph
                 {
                     ++it;
                 }
+            }
+            const auto pool = ClassifySparsePool();
+            lock.unlock();
+            // A mapping wait must not hold the cache listener mutex.
+            std::string error;
+            if (pool && !pool->Tick(device.GetCurrentUploadRecordingId(), error))
+            {
+                throw std::runtime_error(error);
             }
         }
         bool Acquire(own::shared_owner<const MeshSurfaceInput> identity,
@@ -404,35 +447,17 @@ namespace material_graph
                 identity->StreamedTopology() ? 16 : std::uint64_t(geometry.indexCount) * sizeof(std::uint32_t),
                 residency ? 16 : identity->Lods().size_bytes(), sizeof(RHIMeshletBufferHeader)};
             auto bytes = sizes[0] + sizes[1] + sizes[2] + sizes[3];
+            own::shared_owner<RHISharedSparsePagePool> pool;
             {
                 std::lock_guard lock(mutex);
-                // All views/recordings of a storage must be idle before any of its
-                // pages can be reused by another asset. A new acquisition pins it again.
-                idleScratch.clear();
-                idleScratch.reserve(entries.size());
-                for (const auto& cached : std::span(entries))
-                {
-                    if (cached->sparse)
-                    {
-                        const bool eligible = cached.use_count() == 1 &&
-                                              cached->state == RHIUploadTransactionState::Resident &&
-                                              cached->completion <= completed;
-                        idleScratch.emplace_back(cached->sparse.operator->(), eligible);
-                    }
-                }
-                auto idle = std::span(idleScratch);
-                std::ranges::sort(idle, [](const auto& left, const auto& right)
-                                  { return std::less<MeshletSparseStorage*>{}(left.first, right.first); });
-                for (std::size_t index = 0; index < idle.size();)
-                {
-                    const auto storage = idle[index].first;
-                    bool eligible = idle[index++].second;
-                    while (index < idle.size() && idle[index].first == storage)
-                    {
-                        eligible = idle[index++].second && eligible;
-                    }
-                    storage->SetEvictable(eligible);
-                }
+                pool = ClassifySparsePool();
+            }
+            if (pool && !pool->Tick(recording, error))
+            {
+                return false;
+            }
+            {
+                std::lock_guard lock(mutex);
                 for (const auto& entry : std::span(entries))
                 {
                     if (sparseClusters && entry->identity.operator->() == identity.operator->() && entry->sparse)
@@ -440,10 +465,13 @@ namespace material_graph
                         sparseStorage = entry->sparse;
                         sparseStorage->SetEvictable(false);
                     }
-                    if (entry->identity.operator->() == identity.operator->() && bool(entry->residency) == bool(residency) &&
-                        (!residency || (entry->residency->revision == residency->revision &&
-                                        entry->residency->residentLimit == residency->residentLimit &&
-                                        entry->residency->residencyAlignment == residency->residencyAlignment)) &&
+                    const auto& requested = entry->requestedResidency ? entry->requestedResidency : entry->residency;
+                    if (entry->identity.operator->() == identity.operator->() && bool(requested) == bool(residency) &&
+                        (!residency || (requested->revision == residency->revision &&
+                                        requested->residentLimit == residency->residentLimit &&
+                                        requested->residencyAlignment == residency->residencyAlignment)) &&
+                        (!entry->budgetLimited || (!entry->sparse->pool->CanGrow() && entry->admissionTiles ==
+                            entry->sparse->pool->AdmissibleTiles(entry->sparse->allocation))) &&
                         entry->prepared && (!entry->sparse || entry->sparseRevision == entry->sparse->Revision()) &&
                         ((entry->state == RHIUploadTransactionState::Resident && entry->usable) ||
                          (entry->state == RHIUploadTransactionState::Recording && entry->recording == recording)))
@@ -496,15 +524,38 @@ namespace material_graph
             }
             auto entry = own::make_shared<MeshSurfaceStaticBuffers>(device);
             entry->identity = std::move(identity);
+            entry->requestedResidency = residency;
             entry->residency = std::move(residency);
             if (sparseClusters)
             {
                 entry->sparse = sparseStorage ? sparseStorage : own::make_shared<MeshletSparseStorage>(device);
-                if (!entry->sparse->Prepare(sparsePayload, topology.bytes.size(), entry->residency->residentLimit,
-                                            error))
+                const bool admitted = entry->sparse->PrepareResidentCut(sparsePayload, topology.bytes,
+                    entry->residency, entry->identity->Hierarchy().groups, entry->admissionTiles, entry->budgetLimited,
+                    [&](const assets::cluster::ResidentSet& cut)
+                    {
+                        topology.bytes.clear();
+                        topology.bytes.resize(sizeof(RHIMeshletBufferHeader));
+                        if (entry->identity->StreamedTopology())
+                        {
+                            PackStreamedMeshletGpuPayload(topology, *entry->identity);
+                        }
+                        else if (!PackMeteorMeshletGpuPayload(entry->identity->Meshlets(), entry->identity->Count(),
+                            geometry.vertexStride, geometry.vertexAttributeMask, geometry.sourceLodIndex,
+                            entry->identity->SourcePrimitiveCount(), entry->identity->SourceVertexCount(),
+                            entry->identity->SourceVertexIds(), topology, error, &entry->identity->Hierarchy()))
+                        {
+                            return false;
+                        }
+                        sparsePayload.packets.clear();
+                        AppendClusterTopology(topology, *entry->identity, cut, &sparsePayload);
+                        return true;
+                    }, error);
+                if (!admitted)
                 {
                     return false;
                 }
+                sizes[3] = topology.bytes.size();
+                bytes = sizes[0] + sizes[1] + sizes[2] + sizes[3];
             }
             if (entry->sparse)
             {
@@ -849,7 +900,7 @@ namespace material_graph
             const auto& chain = geometry.SourceMesh()->coarseLods;
             // Geometry admission validated the immutable cooked chain. Revalidate
             // its ranges at this CPU ownership boundary before flattening it.
-            if (chain.groups.empty() || chain.groups.size() > experiment::kMeshClusterMaxGroups || draw.boneCount)
+            if (chain.groups.empty() || chain.groups.size() > experiment::kMeshClusterMaxGroups)
             {
                 return Fail(error, "METEOR cluster hierarchy is invalid for this pose; force recook.");
             }
@@ -1768,6 +1819,8 @@ namespace material_graph
             {
                 return false;
             }
+            // Every consumer sees the cut actually installed in GPU metadata.
+            candidate->clusterResidency_ = candidate->staticBuffers_->residency;
             nextDetail(ce::marker<"MeshPrepareTransformLookup">());
             if (candidate->staticBuffers_ && bufferPool_)
             {

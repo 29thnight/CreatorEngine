@@ -1,0 +1,24 @@
+{
+  "passed": false,
+  "sourceStable": false,
+  "configuration": "Debug",
+  "gpuValidation": "on",
+  "runs": [
+    {
+      "mode": "--cluster-storage-only",
+      "gpuValidationCoverageNotices": 0,
+      "exitCode": 0,
+      "timedOut": false,
+      "missingMarkers": [],
+      "passed": true
+    },
+    {
+      "mode": "--cluster-streaming-only",
+      "gpuValidationCoverageNotices": 0,
+      "exitCode": 0,
+      "timedOut": false,
+      "missingMarkers": [],
+      "passed": true
+    }
+  ]
+}

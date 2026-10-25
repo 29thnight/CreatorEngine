@@ -1,0 +1,16 @@
+{
+  "configuration": "Debug",
+  "passed": true,
+  "sourceStable": true,
+  "gpuValidation": "off",
+  "runs": [
+    {
+      "mode": "--skinned-cluster-lod-only",
+      "timedOut": false,
+      "gpuValidationCoverageNotices": 0,
+      "exitCode": 0,
+      "missingMarkers": [],
+      "passed": true
+    }
+  ]
+}

@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "command": "object.transform",
+  "status": "succeeded",
+  "code": "ok",
+  "message": "object.transform",
+  "data": {
+    "id": "@2:10:1",
+    "name": "P_Suzanne",
+    "layerId": "1",
+    "layer": "Default",
+    "layerSlot": 0,
+    "editorIcon": "",
+    "editorLocked": false,
+    "enabled": true,
+    "editBlocked": false,
+    "sceneId": 2,
+    "index": 10,
+    "generation": 1,
+    "parent": "@2:0:1",
+    "position": [
+      6.75,
+      0.6,
+      0
+    ],
+    "scale": [
+      1,
+      1,
+      1
+    ],
+    "rotation": [
+      0,
+      1,
+      0,
+      -1.19209E-07
+    ],
+    "children": [],
+    "components": [
+      {
+        "id": "#2065858695",
+        "type": "Transform",
+        "enabled": true
+      },
+      {
+        "id": "#3861733645",
+        "type": "MeshRenderer",
+        "enabled": true
+      }
+    ],
+    "changed": true
+  },
+  "timing": {
+    "queuedMs": 2.8678,
+    "waitedFrames": 1,
+    "executedMs": 1.8752
+  }
+}

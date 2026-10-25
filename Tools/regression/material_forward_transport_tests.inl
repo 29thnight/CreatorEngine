@@ -1,8 +1,3 @@
-#if defined(CE_CONTRACT_STANDALONE)
-#include "../build/ModuleAdapters/Creator.Core.Paths.h"
-#else
-import Creator.Core.Paths;
-#endif
 // Independent alpha recurrence, identity refraction, and Beer-Lambert transport
 // across the real blended stream (light tiles + SceneHost), volume composed first.
 own::shared_owner<const Generation> ForwardTransportProduct(const std::filesystem::path& root, unsigned kind)

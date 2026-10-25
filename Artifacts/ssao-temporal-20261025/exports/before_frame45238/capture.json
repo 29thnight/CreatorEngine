@@ -1,0 +1,2966 @@
+{
+  "capture": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\ssao-temporal-20261025\\before_frame45238.rdc",
+  "actions": [
+    {
+      "eid": 1075,
+      "name": "=> ExecuteCommandLists(8)[0]: Reset(ResourceId::366136)",
+      "flags": "ActionFlags.CommandBufferBoundary|BeginPass|PassBoundary"
+    },
+    {
+      "eid": 1091,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1108,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1125,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1128,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1129,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1130,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1131,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1132,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1133,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1134,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1135,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1137,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1138,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1139,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1140,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1141,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1142,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1143,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1144,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1146,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1147,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1148,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1149,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1150,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1151,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1152,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1153,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1155,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1156,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1157,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1158,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1159,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1160,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1161,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1162,
+      "name": "ID3D12GraphicsCommandList::CopyBufferRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1169,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1170,
+      "name": "=> ExecuteCommandLists(8)[0]: Close(ResourceId::366136)",
+      "flags": "ActionFlags.CommandBufferBoundary|EndPass|PassBoundary"
+    },
+    {
+      "eid": 1171,
+      "name": "=> ExecuteCommandLists(8)[1]: Reset(ResourceId::366137)",
+      "flags": "ActionFlags.CommandBufferBoundary|BeginPass|PassBoundary"
+    },
+    {
+      "eid": 1180,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1187,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1195,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1205,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1212,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1222,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1235,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 1236,
+      "name": "[0] arg0: IndirectDispatch(<60, 1, 1>)",
+      "flags": "ActionFlags.Indirect|Dispatch"
+    },
+    {
+      "eid": 1237,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 1263,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 1264,
+      "name": "[0] arg0: IndirectDispatchMesh(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 1265,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 1283,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 1284,
+      "name": "[0] arg0: IndirectDispatchMesh(<18, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 1285,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 1303,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 1304,
+      "name": "[0] arg0: IndirectDispatchMesh(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 1305,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 1323,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 1324,
+      "name": "[0] arg0: IndirectDispatchMesh(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 1325,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 1343,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 1344,
+      "name": "[0] arg0: IndirectDispatchMesh(<2, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 1345,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 1363,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 1364,
+      "name": "[0] arg0: IndirectDispatchMesh(<1, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 1365,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 1383,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 1384,
+      "name": "[0] arg0: IndirectDispatchMesh(<35, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 1385,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 1403,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 1404,
+      "name": "[0] arg0: IndirectDispatchMesh(<4, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 1405,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 1413,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1425,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 1426,
+      "name": "[0] arg0: IndirectDispatch(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|Dispatch"
+    },
+    {
+      "eid": 1427,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 1438,
+      "name": "ID3D12GraphicsCommandList::DrawInstanced()",
+      "flags": "ActionFlags.Instanced|Drawcall"
+    },
+    {
+      "eid": 1447,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1452,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1457,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1462,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1467,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1472,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1477,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1482,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1487,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1492,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1497,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1498,
+      "name": "=> ExecuteCommandLists(8)[1]: Close(ResourceId::366137)",
+      "flags": "ActionFlags.CommandBufferBoundary|EndPass|PassBoundary"
+    },
+    {
+      "eid": 1499,
+      "name": "=> ExecuteCommandLists(8)[2]: Reset(ResourceId::366138)",
+      "flags": "ActionFlags.CommandBufferBoundary|BeginPass|PassBoundary"
+    },
+    {
+      "eid": 1511,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1525,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1538,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1541,
+      "name": "ID3D12GraphicsCommandList::CopyTextureRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1543,
+      "name": "ID3D12GraphicsCommandList::CopyTextureRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1545,
+      "name": "ID3D12GraphicsCommandList::CopyTextureRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1553,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1558,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1563,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1568,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1573,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1578,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1583,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1588,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1593,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1598,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1603,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1611,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1616,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1621,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1626,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1631,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1636,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1641,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1646,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1651,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1656,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1661,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1662,
+      "name": "=> ExecuteCommandLists(8)[2]: Close(ResourceId::366138)",
+      "flags": "ActionFlags.CommandBufferBoundary|EndPass|PassBoundary"
+    },
+    {
+      "eid": 1663,
+      "name": "=> ExecuteCommandLists(8)[3]: Reset(ResourceId::366139)",
+      "flags": "ActionFlags.CommandBufferBoundary|BeginPass|PassBoundary"
+    },
+    {
+      "eid": 1671,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1676,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1681,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1686,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1691,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1696,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1701,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1706,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1711,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1716,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1721,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1737,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1754,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1771,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1773,
+      "name": "=> ExecuteCommandLists(8)[3]: Close(ResourceId::366139)",
+      "flags": "ActionFlags.CommandBufferBoundary|EndPass|PassBoundary"
+    },
+    {
+      "eid": 1774,
+      "name": "=> ExecuteCommandLists(8)[4]: Reset(ResourceId::366140)",
+      "flags": "ActionFlags.CommandBufferBoundary|BeginPass|PassBoundary"
+    },
+    {
+      "eid": 1777,
+      "name": "ID3D12GraphicsCommandList::ClearDepthStencilView()",
+      "flags": "ActionFlags.ClearDepthStencil|Clear"
+    },
+    {
+      "eid": 1779,
+      "name": "ID3D12GraphicsCommandList::ClearDepthStencilView()",
+      "flags": "ActionFlags.ClearDepthStencil|Clear"
+    },
+    {
+      "eid": 1781,
+      "name": "ID3D12GraphicsCommandList::ClearDepthStencilView()",
+      "flags": "ActionFlags.ClearDepthStencil|Clear"
+    },
+    {
+      "eid": 1791,
+      "name": "ID3D12GraphicsCommandList::DrawInstanced()",
+      "flags": "ActionFlags.Instanced|Drawcall"
+    },
+    {
+      "eid": 1802,
+      "name": "ID3D12GraphicsCommandList::DrawInstanced()",
+      "flags": "ActionFlags.Instanced|Drawcall"
+    },
+    {
+      "eid": 1813,
+      "name": "ID3D12GraphicsCommandList::DrawInstanced()",
+      "flags": "ActionFlags.Instanced|Drawcall"
+    },
+    {
+      "eid": 1816,
+      "name": "ID3D12GraphicsCommandList::CopyTextureRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1824,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1829,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1834,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1839,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1844,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1849,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1854,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1859,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1864,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1869,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1874,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1877,
+      "name": "ID3D12GraphicsCommandList::CopyTextureRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1885,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1890,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1895,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1900,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1905,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1910,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1915,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1920,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1925,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1930,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1935,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1938,
+      "name": "ID3D12GraphicsCommandList::CopyTextureRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 1946,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1951,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1956,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1961,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1966,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1971,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1976,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1981,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1986,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1991,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1996,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 1998,
+      "name": "=> ExecuteCommandLists(8)[4]: Close(ResourceId::366140)",
+      "flags": "ActionFlags.CommandBufferBoundary|EndPass|PassBoundary"
+    },
+    {
+      "eid": 1999,
+      "name": "=> ExecuteCommandLists(8)[5]: Reset(ResourceId::366141)",
+      "flags": "ActionFlags.CommandBufferBoundary|BeginPass|PassBoundary"
+    },
+    {
+      "eid": 2006,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2015,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2022,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2030,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2040,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2047,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2057,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2070,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2071,
+      "name": "[0] arg0: IndirectDispatch(<60, 1, 1>)",
+      "flags": "ActionFlags.Indirect|Dispatch"
+    },
+    {
+      "eid": 2072,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2098,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2099,
+      "name": "[0] arg0: IndirectDispatchMesh(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2100,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2118,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2119,
+      "name": "[0] arg0: IndirectDispatchMesh(<18, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2120,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2138,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2139,
+      "name": "[0] arg0: IndirectDispatchMesh(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2140,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2158,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2159,
+      "name": "[0] arg0: IndirectDispatchMesh(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2160,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2178,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2179,
+      "name": "[0] arg0: IndirectDispatchMesh(<2, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2180,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2198,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2199,
+      "name": "[0] arg0: IndirectDispatchMesh(<1, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2200,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2218,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2219,
+      "name": "[0] arg0: IndirectDispatchMesh(<35, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2220,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2238,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2239,
+      "name": "[0] arg0: IndirectDispatchMesh(<4, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2240,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2248,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2260,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2261,
+      "name": "[0] arg0: IndirectDispatch(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|Dispatch"
+    },
+    {
+      "eid": 2262,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2273,
+      "name": "ID3D12GraphicsCommandList::DrawInstanced()",
+      "flags": "ActionFlags.Instanced|Drawcall"
+    },
+    {
+      "eid": 2281,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2291,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2298,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2306,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2317,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2320,
+      "name": "ID3D12GraphicsCommandList::ClearRenderTargetView()",
+      "flags": "ActionFlags.ClearColor|Clear"
+    },
+    {
+      "eid": 2321,
+      "name": "ID3D12GraphicsCommandList::ClearRenderTargetView()",
+      "flags": "ActionFlags.ClearColor|Clear"
+    },
+    {
+      "eid": 2322,
+      "name": "ID3D12GraphicsCommandList::ClearRenderTargetView()",
+      "flags": "ActionFlags.ClearColor|Clear"
+    },
+    {
+      "eid": 2323,
+      "name": "ID3D12GraphicsCommandList::ClearRenderTargetView()",
+      "flags": "ActionFlags.ClearColor|Clear"
+    },
+    {
+      "eid": 2324,
+      "name": "ID3D12GraphicsCommandList::ClearRenderTargetView()",
+      "flags": "ActionFlags.ClearColor|Clear"
+    },
+    {
+      "eid": 2348,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2349,
+      "name": "[0] arg0: IndirectDispatchMesh(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2350,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2367,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2368,
+      "name": "[0] arg0: IndirectDispatchMesh(<11449, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2369,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2386,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2387,
+      "name": "[0] arg0: IndirectDispatchMesh(<444, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2388,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2405,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2406,
+      "name": "[0] arg0: IndirectDispatchMesh(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2407,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2424,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2425,
+      "name": "[0] arg0: IndirectDispatchMesh(<484, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2426,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2443,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2444,
+      "name": "[0] arg0: IndirectDispatchMesh(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2445,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2462,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2463,
+      "name": "[0] arg0: IndirectDispatchMesh(<302, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2464,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2481,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2482,
+      "name": "[0] arg0: IndirectDispatchMesh(<290, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2483,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2491,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2496,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2501,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2506,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2511,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2516,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2521,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2526,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2531,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2536,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2541,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2544,
+      "name": "ID3D12GraphicsCommandList::CopyTextureRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 2545,
+      "name": "=> ExecuteCommandLists(8)[5]: Close(ResourceId::366141)",
+      "flags": "ActionFlags.CommandBufferBoundary|EndPass|PassBoundary"
+    },
+    {
+      "eid": 2546,
+      "name": "=> ExecuteCommandLists(8)[6]: Reset(ResourceId::366142)",
+      "flags": "ActionFlags.CommandBufferBoundary|BeginPass|PassBoundary"
+    },
+    {
+      "eid": 2554,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2578,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2579,
+      "name": "[0] arg0: IndirectDispatchMesh(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2580,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2597,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2598,
+      "name": "[0] arg0: IndirectDispatchMesh(<11449, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2599,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2616,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2617,
+      "name": "[0] arg0: IndirectDispatchMesh(<444, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2618,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2635,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2636,
+      "name": "[0] arg0: IndirectDispatchMesh(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2637,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2654,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2655,
+      "name": "[0] arg0: IndirectDispatchMesh(<484, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2656,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2673,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2674,
+      "name": "[0] arg0: IndirectDispatchMesh(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2675,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2692,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2693,
+      "name": "[0] arg0: IndirectDispatchMesh(<302, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2694,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2711,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2712,
+      "name": "[0] arg0: IndirectDispatchMesh(<290, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2713,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2721,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2729,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2732,
+      "name": "ID3D12GraphicsCommandList::ClearRenderTargetView()",
+      "flags": "ActionFlags.ClearColor|Clear"
+    },
+    {
+      "eid": 2739,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 2779,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2780,
+      "name": "[0] arg0: IndirectDispatchMesh(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2781,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2814,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2815,
+      "name": "[0] arg0: IndirectDispatchMesh(<11449, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2816,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2849,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2850,
+      "name": "[0] arg0: IndirectDispatchMesh(<444, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2851,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2884,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2885,
+      "name": "[0] arg0: IndirectDispatchMesh(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2886,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2919,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2920,
+      "name": "[0] arg0: IndirectDispatchMesh(<484, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2921,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2954,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2955,
+      "name": "[0] arg0: IndirectDispatchMesh(<0, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2956,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 2989,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 2990,
+      "name": "[0] arg0: IndirectDispatchMesh(<302, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 2991,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 3024,
+      "name": "ExecuteIndirect(maxCount 1, count <1>)",
+      "flags": "ActionFlags.MultiAction|PushMarker"
+    },
+    {
+      "eid": 3025,
+      "name": "[0] arg0: IndirectDispatchMesh(<290, 1, 1>)",
+      "flags": "ActionFlags.Indirect|MeshDispatch"
+    },
+    {
+      "eid": 3026,
+      "name": "ExecuteIndirect()",
+      "flags": "ActionFlags.PopMarker"
+    },
+    {
+      "eid": 3028,
+      "name": "=> ExecuteCommandLists(8)[6]: Close(ResourceId::366142)",
+      "flags": "ActionFlags.CommandBufferBoundary|EndPass|PassBoundary"
+    },
+    {
+      "eid": 3029,
+      "name": "=> ExecuteCommandLists(8)[7]: Reset(ResourceId::366143)",
+      "flags": "ActionFlags.CommandBufferBoundary|BeginPass|PassBoundary"
+    },
+    {
+      "eid": 3041,
+      "name": "ID3D12GraphicsCommandList::DrawInstanced()",
+      "flags": "ActionFlags.Instanced|Drawcall"
+    },
+    {
+      "eid": 3049,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3057,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3065,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3073,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3081,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3089,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3097,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3105,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3113,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3121,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3129,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3137,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3139,
+      "name": "ID3D12GraphicsCommandList::CopyResource()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 3140,
+      "name": "ID3D12GraphicsCommandList::CopyResource()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 3148,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3156,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3164,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3172,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3180,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3188,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3196,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3204,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3212,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3220,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3228,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3236,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3244,
+      "name": "ID3D12GraphicsCommandList::Dispatch()",
+      "flags": "ActionFlags.Dispatch"
+    },
+    {
+      "eid": 3248,
+      "name": "ID3D12GraphicsCommandList::ClearRenderTargetView()",
+      "flags": "ActionFlags.ClearColor|Clear"
+    },
+    {
+      "eid": 3257,
+      "name": "ID3D12GraphicsCommandList::DrawInstanced()",
+      "flags": "ActionFlags.Instanced|Drawcall"
+    },
+    {
+      "eid": 3268,
+      "name": "ID3D12GraphicsCommandList::DrawInstanced()",
+      "flags": "ActionFlags.Instanced|Drawcall"
+    },
+    {
+      "eid": 3271,
+      "name": "ID3D12GraphicsCommandList::DrawInstanced()",
+      "flags": "ActionFlags.Instanced|Drawcall"
+    },
+    {
+      "eid": 3276,
+      "name": "ID3D12GraphicsCommandList::CopyTextureRegion()",
+      "flags": "ActionFlags.Copy"
+    },
+    {
+      "eid": 3278,
+      "name": "=> ExecuteCommandLists(8)[7]: Close(ResourceId::366143)",
+      "flags": "ActionFlags.CommandBufferBoundary|EndPass|PassBoundary"
+    },
+    {
+      "eid": 3281,
+      "name": "=> ExecuteCommandLists(1)[0]: Reset(ResourceId::366106)",
+      "flags": "ActionFlags.CommandBufferBoundary|BeginPass|PassBoundary"
+    },
+    {
+      "eid": 3282,
+      "name": "=> ExecuteCommandLists(1)[0]: Close(ResourceId::366106)",
+      "flags": "ActionFlags.CommandBufferBoundary|EndPass|PassBoundary"
+    },
+    {
+      "eid": 3285,
+      "name": "=> ExecuteCommandLists(1)[0]: Reset(ResourceId::366144)",
+      "flags": "ActionFlags.CommandBufferBoundary|BeginPass|PassBoundary"
+    },
+    {
+      "eid": 3287,
+      "name": "ID3D12GraphicsCommandList::ClearRenderTargetView()",
+      "flags": "ActionFlags.ClearColor|Clear"
+    },
+    {
+      "eid": 3300,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3303,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3306,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3309,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3312,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3315,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3318,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3321,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3324,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3327,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3330,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3333,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3336,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3339,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3342,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3345,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3348,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3351,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3354,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3357,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3360,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3363,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3366,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3369,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3372,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3375,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3378,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3381,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3384,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3387,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3390,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3393,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3396,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3399,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3402,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3405,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3408,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3411,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3414,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3417,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3420,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3423,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3426,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3429,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3432,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3435,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3438,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3441,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3444,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3447,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3450,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3453,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3456,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3459,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3462,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3465,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3468,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3471,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3474,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3477,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3480,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3483,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3486,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3489,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3492,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3495,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3498,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3501,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3504,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3507,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3510,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3513,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3516,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3519,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3522,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3525,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3528,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3531,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3534,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3537,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3540,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3543,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3546,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3549,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3552,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3555,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3558,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3561,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3564,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3567,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3570,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3573,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3576,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3579,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3582,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3585,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3588,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3591,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3594,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3597,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3600,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3603,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3606,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3609,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3612,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3615,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3618,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3621,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3624,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3627,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3630,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3633,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3636,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3639,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3642,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3645,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3648,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3651,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3654,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3657,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3660,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3663,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3666,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3669,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3672,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 3674,
+      "name": "=> ExecuteCommandLists(1)[0]: Close(ResourceId::366144)",
+      "flags": "ActionFlags.CommandBufferBoundary|EndPass|PassBoundary"
+    },
+    {
+      "eid": 3676,
+      "name": "Present(ResourceId::336584)",
+      "flags": "ActionFlags.Present"
+    }
+  ],
+  "stages": [
+    {
+      "eid": 2721,
+      "shader": "ResourceId::514",
+      "entry": "CSMain",
+      "outputs": [
+        {
+          "id": "ResourceId::337244",
+          "width": 736,
+          "height": 369,
+          "format": "R16G16_FLOAT",
+          "bytes": 1086336,
+          "file": "raw.bin",
+          "name": "SSAO.Filtered"
+        }
+      ],
+      "constants": [
+        {
+          "name": "SSAOParams_0",
+          "rows": 0,
+          "columns": 0,
+          "float": [],
+          "uint": [],
+          "members": [
+            {
+              "name": "gInverseProjection_0",
+              "rows": 4,
+              "columns": 4,
+              "float": [
+                1.151571273803711,
+                -0.0,
+                0.0,
+                -0.0,
+                -0.0,
+                0.5773503184318542,
+                -0.0,
+                0.0,
+                0.0,
+                -0.0,
+                0.0,
+                -9.998000144958496,
+                -0.0,
+                0.0,
+                1.0,
+                10.0
+              ],
+              "uint": [
+                1066624688,
+                2147483648,
+                0,
+                2147483648,
+                2147483648,
+                1058262331,
+                2147483648,
+                0,
+                0,
+                2147483648,
+                0,
+                3240097743,
+                2147483648,
+                0,
+                1065353216,
+                1092616192
+              ],
+              "members": []
+            },
+            {
+              "name": "gProjection_0",
+              "rows": 4,
+              "columns": 4,
+              "float": [
+                0.868378758430481,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.7320507764816284,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0002000331878662,
+                1.0,
+                0.0,
+                0.0,
+                -0.10002000629901886,
+                0.0
+              ],
+              "uint": [
+                1063144978,
+                0,
+                0,
+                0,
+                0,
+                1071494103,
+                0,
+                0,
+                0,
+                0,
+                1065354894,
+                1065353216,
+                0,
+                0,
+                3184318282,
+                0
+              ],
+              "members": []
+            },
+            {
+              "name": "gSize_0",
+              "rows": 1,
+              "columns": 2,
+              "float": [
+                1.0313556697430654e-42,
+                5.170791333358575e-43
+              ],
+              "uint": [
+                736,
+                369
+              ],
+              "members": []
+            },
+            {
+              "name": "gFullSize_0",
+              "rows": 1,
+              "columns": 2,
+              "float": [
+                2.0627113394861307e-42,
+                1.034158266671715e-42
+              ],
+              "uint": [
+                1472,
+                738
+              ],
+              "members": []
+            },
+            {
+              "name": "gRadius_0",
+              "rows": 1,
+              "columns": 1,
+              "float": [
+                0.5
+              ],
+              "uint": [
+                1056964608
+              ],
+              "members": []
+            },
+            {
+              "name": "gThickness_0",
+              "rows": 1,
+              "columns": 1,
+              "float": [
+                0.25
+              ],
+              "uint": [
+                1048576000
+              ],
+              "members": []
+            },
+            {
+              "name": "gIntensity_0",
+              "rows": 1,
+              "columns": 1,
+              "float": [
+                1.0
+              ],
+              "uint": [
+                1065353216
+              ],
+              "members": []
+            },
+            {
+              "name": "gDepthSigma_0",
+              "rows": 1,
+              "columns": 1,
+              "float": [
+                0.05000000074505806
+              ],
+              "uint": [
+                1028443341
+              ],
+              "members": []
+            },
+            {
+              "name": "gFrameIndex_0",
+              "rows": 1,
+              "columns": 1,
+              "float": [
+                2.519534638856021e-42
+              ],
+              "uint": [
+                1798
+              ],
+              "members": []
+            },
+            {
+              "name": "gPad_0",
+              "rows": 1,
+              "columns": 3,
+              "float": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "uint": [
+                0,
+                0,
+                0
+              ],
+              "members": []
+            },
+            {
+              "name": "gView_0",
+              "rows": 4,
+              "columns": 4,
+              "float": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.9396927356719971,
+                -0.3420201539993286,
+                0.0,
+                -0.0,
+                0.3420201539993286,
+                0.9396927356719971,
+                0.0,
+                -3.75,
+                -0.5113048553466797,
+                4.442811012268066,
+                1.0
+              ],
+              "uint": [
+                1065353216,
+                0,
+                0,
+                0,
+                0,
+                1064341428,
+                3199147332,
+                0,
+                2147483648,
+                1051663684,
+                1064341428,
+                0,
+                3228565504,
+                3204637920,
+                1083059074,
+                1065353216
+              ],
+              "members": []
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "eid": 2729,
+      "shader": "ResourceId::516",
+      "entry": "CSMain",
+      "outputs": [
+        {
+          "id": "ResourceId::337243",
+          "width": 736,
+          "height": 369,
+          "format": "R16G16_FLOAT",
+          "bytes": 1086336,
+          "file": "filtered.bin",
+          "name": "SSAO.Raw"
+        }
+      ],
+      "constants": [
+        {
+          "name": "SSAOParams_0",
+          "rows": 0,
+          "columns": 0,
+          "float": [],
+          "uint": [],
+          "members": [
+            {
+              "name": "gInverseProjection_0",
+              "rows": 4,
+              "columns": 4,
+              "float": [
+                1.151571273803711,
+                -0.0,
+                0.0,
+                -0.0,
+                -0.0,
+                0.5773503184318542,
+                -0.0,
+                0.0,
+                0.0,
+                -0.0,
+                0.0,
+                -9.998000144958496,
+                -0.0,
+                0.0,
+                1.0,
+                10.0
+              ],
+              "uint": [
+                1066624688,
+                2147483648,
+                0,
+                2147483648,
+                2147483648,
+                1058262331,
+                2147483648,
+                0,
+                0,
+                2147483648,
+                0,
+                3240097743,
+                2147483648,
+                0,
+                1065353216,
+                1092616192
+              ],
+              "members": []
+            },
+            {
+              "name": "gProjection_0",
+              "rows": 4,
+              "columns": 4,
+              "float": [
+                0.868378758430481,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.7320507764816284,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                1.0002000331878662,
+                1.0,
+                0.0,
+                0.0,
+                -0.10002000629901886,
+                0.0
+              ],
+              "uint": [
+                1063144978,
+                0,
+                0,
+                0,
+                0,
+                1071494103,
+                0,
+                0,
+                0,
+                0,
+                1065354894,
+                1065353216,
+                0,
+                0,
+                3184318282,
+                0
+              ],
+              "members": []
+            },
+            {
+              "name": "gSize_0",
+              "rows": 1,
+              "columns": 2,
+              "float": [
+                1.0313556697430654e-42,
+                5.170791333358575e-43
+              ],
+              "uint": [
+                736,
+                369
+              ],
+              "members": []
+            },
+            {
+              "name": "gFullSize_0",
+              "rows": 1,
+              "columns": 2,
+              "float": [
+                2.0627113394861307e-42,
+                1.034158266671715e-42
+              ],
+              "uint": [
+                1472,
+                738
+              ],
+              "members": []
+            },
+            {
+              "name": "gRadius_0",
+              "rows": 1,
+              "columns": 1,
+              "float": [
+                0.5
+              ],
+              "uint": [
+                1056964608
+              ],
+              "members": []
+            },
+            {
+              "name": "gThickness_0",
+              "rows": 1,
+              "columns": 1,
+              "float": [
+                0.25
+              ],
+              "uint": [
+                1048576000
+              ],
+              "members": []
+            },
+            {
+              "name": "gIntensity_0",
+              "rows": 1,
+              "columns": 1,
+              "float": [
+                1.0
+              ],
+              "uint": [
+                1065353216
+              ],
+              "members": []
+            },
+            {
+              "name": "gDepthSigma_0",
+              "rows": 1,
+              "columns": 1,
+              "float": [
+                0.05000000074505806
+              ],
+              "uint": [
+                1028443341
+              ],
+              "members": []
+            },
+            {
+              "name": "gFrameIndex_0",
+              "rows": 1,
+              "columns": 1,
+              "float": [
+                2.519534638856021e-42
+              ],
+              "uint": [
+                1798
+              ],
+              "members": []
+            },
+            {
+              "name": "gPad_0",
+              "rows": 1,
+              "columns": 3,
+              "float": [
+                0.0,
+                0.0,
+                0.0
+              ],
+              "uint": [
+                0,
+                0,
+                0
+              ],
+              "members": []
+            },
+            {
+              "name": "gView_0",
+              "rows": 4,
+              "columns": 4,
+              "float": [
+                1.0,
+                0.0,
+                0.0,
+                0.0,
+                0.0,
+                0.9396927356719971,
+                -0.3420201539993286,
+                0.0,
+                -0.0,
+                0.3420201539993286,
+                0.9396927356719971,
+                0.0,
+                -3.75,
+                -0.5113048553466797,
+                4.442811012268066,
+                1.0
+              ],
+              "uint": [
+                1065353216,
+                0,
+                0,
+                0,
+                0,
+                1064341428,
+                3199147332,
+                0,
+                2147483648,
+                1051663684,
+                1064341428,
+                0,
+                3228565504,
+                3204637920,
+                1083059074,
+                1065353216
+              ],
+              "members": []
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "final": [
+    {
+      "id": "ResourceId::337267",
+      "width": 1472,
+      "height": 738,
+      "format": "R8G8B8A8_UNORM",
+      "bytes": 4345344,
+      "file": "final.bin"
+    }
+  ]
+}

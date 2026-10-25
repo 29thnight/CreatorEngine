@@ -1,0 +1,662 @@
+{
+  "capture": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\ssao-temporal-20261025\\after_frame3755.rdc",
+  "actions": [
+    {
+      "eid": 2,
+      "name": "=> ExecuteCommandLists(1)[0]: Reset(ResourceId::31689)",
+      "flags": "ActionFlags.CommandBufferBoundary|BeginPass|PassBoundary"
+    },
+    {
+      "eid": 3,
+      "name": "=> ExecuteCommandLists(1)[0]: Close(ResourceId::31689)",
+      "flags": "ActionFlags.CommandBufferBoundary|EndPass|PassBoundary"
+    },
+    {
+      "eid": 8,
+      "name": "=> ExecuteCommandLists(1)[0]: Reset(ResourceId::31708)",
+      "flags": "ActionFlags.CommandBufferBoundary|BeginPass|PassBoundary"
+    },
+    {
+      "eid": 10,
+      "name": "ID3D12GraphicsCommandList::ClearRenderTargetView()",
+      "flags": "ActionFlags.ClearColor|Clear"
+    },
+    {
+      "eid": 23,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 26,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 29,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 32,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 35,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 38,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 41,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 44,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 47,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 50,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 53,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 56,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 59,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 62,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 65,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 68,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 71,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 74,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 77,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 80,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 83,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 86,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 89,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 92,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 95,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 98,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 101,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 104,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 107,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 110,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 113,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 116,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 119,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 122,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 125,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 128,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 131,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 134,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 137,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 140,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 143,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 146,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 149,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 152,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 155,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 158,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 161,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 164,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 167,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 170,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 173,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 176,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 179,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 182,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 185,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 188,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 191,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 194,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 197,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 200,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 203,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 206,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 209,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 212,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 215,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 218,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 221,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 224,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 227,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 230,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 233,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 236,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 239,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 242,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 245,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 248,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 251,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 254,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 257,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 260,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 263,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 266,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 269,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 272,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 275,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 278,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 281,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 284,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 287,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 290,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 293,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 296,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 299,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 302,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 305,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 308,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 311,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 314,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 317,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 320,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 323,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 326,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 329,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 332,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 335,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 338,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 341,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 344,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 347,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 350,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 353,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 356,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 359,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 362,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 365,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 368,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 371,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 374,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 377,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 380,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 383,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 386,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 389,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 392,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 395,
+      "name": "ID3D12GraphicsCommandList::DrawIndexedInstanced()",
+      "flags": "ActionFlags.Instanced|Indexed|Drawcall"
+    },
+    {
+      "eid": 397,
+      "name": "=> ExecuteCommandLists(1)[0]: Close(ResourceId::31708)",
+      "flags": "ActionFlags.CommandBufferBoundary|EndPass|PassBoundary"
+    },
+    {
+      "eid": 399,
+      "name": "Present(ResourceId::6683)",
+      "flags": "ActionFlags.Present"
+    }
+  ],
+  "stages": [],
+  "final": []
+}

@@ -1,0 +1,15 @@
+{
+  "schemaVersion": 1,
+  "command": "camera.cut",
+  "status": "succeeded",
+  "code": "ok",
+  "message": "Camera cut requested; renderer observation is separate",
+  "data": {
+    "cameraCutRevision": "1"
+  },
+  "timing": {
+    "queuedMs": 12.492,
+    "waitedFrames": 1,
+    "executedMs": 3.2775
+  }
+}

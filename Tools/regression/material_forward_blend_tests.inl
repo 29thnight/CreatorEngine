@@ -1,8 +1,3 @@
-#if defined(CE_CONTRACT_STANDALONE)
-#include "../build/ModuleAdapters/Creator.Core.Paths.h"
-#else
-import Creator.Core.Paths;
-#endif
 // Pixel-level alpha composition of the cooked blended stream (light tiles + SceneHost).
 void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& device, ProbeRoots& roots,
                      ProbePipelines& pipelines, ProbeTextures& textures, ProbePool& pool,

@@ -1,0 +1,28 @@
+{
+  "gpuValidation": "on",
+  "runs": [
+    {
+      "missingMarkers": [],
+      "exitCode": 0,
+      "passed": true,
+      "gpuValidationCoverageNotices": 0,
+      "timedOut": false,
+      "mode": "--cluster-storage-only"
+    },
+    {
+      "missingMarkers": [
+        "METEOR_SKINNED_COARSE_SCENE_OK frames=32 poses=2 partitions=2",
+        "METEOR_STREAMING_FEEDBACK_OK frames=32 sparse=1 stableBuffers=1 completedGpuDemand=1 validation=0",
+        "METEOR_SPARSE_IDLE_SCENE_OK emptyViews=1 productPool=1 pressureTrim=1 validation=0"
+      ],
+      "exitCode": 1,
+      "passed": false,
+      "gpuValidationCoverageNotices": 0,
+      "timedOut": false,
+      "mode": "--skinned-cluster-lod-only"
+    }
+  ],
+  "configuration": "Debug",
+  "sourceStable": true,
+  "passed": false
+}

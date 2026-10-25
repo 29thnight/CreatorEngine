@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "command": "scene.load.status",
+  "status": "succeeded",
+  "code": "ok",
+  "message": "Scene construction completed; requested activation commits at the frame boundary",
+  "data": {
+    "requestId": "2",
+    "path": "C:/Users/lance/source/CreatorEngine/Dynamic_CPP/Assets/Scenes/FT_Primitives.creator",
+    "state": "Ready",
+    "complete": true,
+    "activationRequested": true
+  },
+  "timing": {
+    "queuedMs": 3.0358,
+    "waitedFrames": 1,
+    "executedMs": 0.2548
+  }
+}

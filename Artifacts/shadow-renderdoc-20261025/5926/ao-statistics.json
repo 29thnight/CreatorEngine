@@ -1,0 +1,26 @@
+{
+  "under_chin": {
+    "raw_ao_range": [
+      0.375,
+      1.0
+    ],
+    "filtered_ao_range": [
+      0.40966796875,
+      0.9736328125
+    ],
+    "filter_abs_change": 0.05402174729567308,
+    "effective_taps_mean": 8.999662425785685
+  },
+  "contact_ground": {
+    "raw_ao_range": [
+      0.765625,
+      1.0
+    ],
+    "filtered_ao_range": [
+      0.794921875,
+      1.0
+    ],
+    "filter_abs_change": 0.03375651041666667,
+    "effective_taps_mean": 8.999827111195613
+  }
+}

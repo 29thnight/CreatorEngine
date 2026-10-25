@@ -286,8 +286,11 @@ public:
 
     virtual uint64_t SparseBufferTileBytes() const { return 0; }
     virtual bool StreamingMemoryPressure() const { return false; }
-    virtual bool CreateSparseBuffer(const RHISparseBufferDesc&,
-        RHIBufferHandle&, std::string& error)
+    virtual RHIStreamingMemoryBudget GetStreamingMemoryBudget() const
+    {
+        return {UINT64_MAX, 0, StreamingMemoryPressure()};
+    }
+    virtual bool CreateSparseBuffer(const RHISparseBufferDesc&, RHIBufferHandle&, std::string& error)
     {
         error = "Sparse buffers are unsupported";
         return false;

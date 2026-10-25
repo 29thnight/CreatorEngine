@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "command": "window.resize",
+  "status": "succeeded",
+  "code": "ok",
+  "message": "[CLI] 창 크기 변경: 2200x1400",
+  "data": {
+    "requestedWidth": 2200,
+    "requestedHeight": 1400,
+    "width": 2200,
+    "height": 1400,
+    "clamped": false
+  },
+  "timing": {
+    "queuedMs": 1.4316,
+    "waitedFrames": 0,
+    "executedMs": 12.9098
+  }
+}

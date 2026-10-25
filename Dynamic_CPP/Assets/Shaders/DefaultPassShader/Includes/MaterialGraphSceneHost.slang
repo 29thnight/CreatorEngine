@@ -409,7 +409,8 @@ void LXSceneVisibilityMS(uint3 group : SV_GroupID, uint lane : SV_GroupIndex,
 // the true pixel-center ray on the original triangle plane. Attribute and
 // position derivatives span the same affine world-space barycentric plane;
 // solving its homogeneous projection avoids extra index/vertex buffer reads.
-// Coverage/depth remain owned by the rasterizer. Derivatives precede guards.
+// Coverage remains owned by the rasterizer. Visibility reprojects the restored
+// position for its key; attachment passes retain native depth. Derivatives precede guards.
 LXSceneVertex LXScenePixelCenter(LXSceneVertex input)
 {
     if (input.reconstruction != 0u) return input;
@@ -836,11 +837,18 @@ void LXSceneVisibilityPS(LXSceneVertex input, bool frontFace : SV_IsFrontFace,
     const LXMaterialContext context = LXSceneContext(input);
     const LXGeneratedMaterial generated = LXSceneGenerateMaterial(context, input.record);
     ApplyPbrCoverage(saturate(generated.surfaceInputs.alpha), LXSceneCutoff(input.record), LXSceneCoverage(input.record), frontFace);
-    if (input.clip.z >= 0.0 && input.clip.z < 1.0) {
+    // Visibility stores the original triangle plane at the true pixel center.
+    // LXScenePixelCenter already restores that position from the snapped raster
+    // interpolation. Reproject it instead of mixing that position with the
+    // rasterizer's independent SV_Position depth plane in the atomic key.
+    const float4 centerClip = mul(float4(input.position, 1.0f), lx_viewProjection);
+    const float depth = centerClip.z / centerClip.w;
+    if (isfinite(depth) && depth >= 0.0f && depth < 1.0f)
+    {
         const uint2 pixel = uint2(input.clip.xy);
         uint64_t ignored;
         InterlockedMin(lx_visibilityKeys[pixel.y * lx_width + pixel.x],
-            MeteorVisibilityKey(input.clip.z, LXSceneIdentity(input.record).y + primitiveAddress), ignored);
+            MeteorVisibilityKey(depth, LXSceneIdentity(input.record).y + primitiveAddress), ignored);
     }
 }
 

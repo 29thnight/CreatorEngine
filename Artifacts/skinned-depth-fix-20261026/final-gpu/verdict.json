@@ -1,0 +1,20 @@
+{
+  "configuration": "Debug",
+  "passed": true,
+  "sourceStable": true,
+  "auditMode": null,
+  "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\skindepth-a",
+  "auditRepeats": "1",
+  "gpuValidation": "on",
+  "runs": [
+    {
+      "exitCode": 0,
+      "missingMarkers": [],
+      "mode": "--skinned-cluster-lod-only",
+      "timedOut": false,
+      "gpuValidationCoverageNotices": 0,
+      "passed": true
+    }
+  ],
+  "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\skinned-depth-fix-20261026\\final-probe.exe"
+}

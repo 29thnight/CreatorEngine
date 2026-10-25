@@ -60,7 +60,8 @@ inline void AppendClusterTopology(RHIModelMeshletUpload& upload, const MeshSurfa
     RHIMeshletBufferHeader header;
     Require(bytes.size() >= sizeof(header) && input.ClusterArchive(), "Cluster topology contract");
     std::memcpy(&header, bytes.data(), sizeof(header));
-    const auto reserve = [&](uint64_t size) {
+    const auto reserve = [&](uint64_t size)
+    {
         const auto offset = (bytes.size() + 15u) & ~uint64_t(15u);
         Require(offset + size <= assets::quantized::MaximumBytes, "Resident cluster byte budget");
         bytes.resize(offset + size);
@@ -70,7 +71,9 @@ inline void AppendClusterTopology(RHIModelMeshletUpload& upload, const MeshSurfa
     header.clusterResidentOffset = reserve(uint64_t(input.Meshlets().descriptors.size()) * 4);
     header.clusterGroupResidentOffset = reserve(uint64_t(resident.groups.size()) * 4);
     if (input.StreamedTopology())
+    {
         header.clusterReserved[0] = reserve(uint64_t(input.Meshlets().descriptors.size()) * 4);
+    }
     header.clusterPositionError = input.ClusterArchive()->grid.positionError;
     // Metadata occupies pinned tiles. Packet addresses depend on the sealed
     // topology alone, so residency changes never relocate a surviving packet.
@@ -120,7 +123,9 @@ inline void AppendClusterTopology(RHIModelMeshletUpload& upload, const MeshSurfa
             std::memcpy(bytes.data() + offset, packet->data(), packet->size());
         }
         if (input.StreamedTopology())
+        {
             Put(bytes, header.clusterReserved[0] + index * 4, offset);
+        }
         for (uint32_t corner = 0; corner < descriptor.vertexCount; ++corner)
         {
             const auto vertex = input.StreamedTopology()
@@ -144,7 +149,14 @@ inline void AppendClusterTopology(RHIModelMeshletUpload& upload, const MeshSurfa
             const auto error = std::bit_cast<float>(assets::quantized::Word(bytes, address + 28));
             const auto margin = header.clusterPositionError * 1.732051f;
             Put(bytes, address + 44, std::bit_cast<uint32_t>(std::nextafter(bound + margin, INFINITY)));
-            Put(bytes, address + 28, std::bit_cast<uint32_t>(error + margin));
+            const bool certifiedSkin = (assets::quantized::Word(bytes, address + 60) & 1u) != 0;
+            Put(bytes, address + 28,
+                std::bit_cast<uint32_t>(std::nextafter(error + (certifiedSkin ? 2.f : 1.f) * margin, INFINITY)));
+            if (certifiedSkin)
+            {
+                const auto weighted = std::bit_cast<float>(assets::quantized::Word(bytes, address + 52));
+                Put(bytes, address + 52, std::bit_cast<uint32_t>(std::nextafter(weighted + 2.f * margin, INFINITY)));
+            }
         }
     }
     bytes.resize((bytes.size() + 15u) & ~size_t(15u));

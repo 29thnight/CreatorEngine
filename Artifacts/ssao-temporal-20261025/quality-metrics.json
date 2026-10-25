@@ -1,0 +1,47 @@
+{
+  "roiAoPixels": [
+    310,
+    204,
+    425,
+    235
+  ],
+  "receiverPixels": 3478,
+  "beforeSnapshots": [
+    "before_frame45238",
+    "before_frame45239"
+  ],
+  "afterSnapshots": [
+    "after_frame13110",
+    "after_frame13111",
+    "after_frame13112",
+    "after_frame13113",
+    "after_frame13114"
+  ],
+  "spatialHighpassRms": {
+    "before": 0.006640694369362628,
+    "after": 0.001853958490877304,
+    "reductionPercent": 72.08185789379662
+  },
+  "staticSnapshotDifferenceRms": {
+    "before": 0.01799208308300728,
+    "after": 0.0038725429332357917,
+    "reductionPercent": 78.4764058982518,
+    "note": "RDC snapshots at a fixed camera, not guaranteed adjacent engine submissions."
+  },
+  "acceptedHistoryCountPercentiles": [
+    4.0,
+    16.0,
+    16.0
+  ],
+  "movedReceiver": {
+    "capture": "after_frame9796",
+    "pixels": 1574,
+    "maximumResidualDarkening": 0.109375,
+    "meanResidualDarkening": 0.002739214382147395,
+    "note": "Center-only raw visibility is not a ghost oracle: this mask includes AO from nearby remaining objects. Use the fully-open footprint check below.",
+    "fullyOpenFootprintPixels": 1426,
+    "fullyOpenResolvedMaxDarkening": 0.0,
+    "fullyOpenFilteredMaxDarkening": 0.00048828125,
+    "firstFrameCheck": "Native GPU fixture removes its only occluder; verifies visibility >= 0.99 on that first frame."
+  }
+}

@@ -1,0 +1,170 @@
+{
+  "date": "2026-10-25",
+  "head": "9b0892d051be17ab64f2df78b775ad84135d491b",
+  "renderdocVersion": "1.46",
+  "finding": "Contact-shadow grain is primarily screen-space AO sampling noise; confirmed by replay shader replacement with unchanged CSM.",
+  "captures": [
+    {
+      "uiDraws": 142,
+      "actions": 148,
+      "scope": "UI composition only; scene textures preserved as initial contents",
+      "frame": 5733
+    },
+    {
+      "scope": "Scene rendering and UI; used for causal replay tests",
+      "actions": 506,
+      "frame": 5926
+    }
+  ],
+  "ao": {
+    "fullSize": [
+      1302,
+      602
+    ],
+    "history": "No AO history/temporal resolve in current pass",
+    "radius": 0.5,
+    "filterRadius": 1,
+    "frameIndex": 689,
+    "currentSourceBitmaskBits": 32,
+    "currentSourceSteps": 8,
+    "filteredResource": "ResourceId::2695",
+    "size": [
+      651,
+      301
+    ],
+    "currentSourceDirections": 2,
+    "computeEvent": 2733,
+    "filterShader": "ResourceId::506",
+    "thickness": 0.25,
+    "rawResource": "ResourceId::2696",
+    "computeShader": "ResourceId::502",
+    "intensity": 1,
+    "note": "Resource debug labels Raw/Filtered are reversed relative to actual producer/consumer events",
+    "filterEvent": 2741,
+    "depthSigma": 0.05
+  },
+  "csm": {
+    "filter": "Tent5",
+    "size": [
+      2048,
+      2048,
+      3
+    ],
+    "packedCameraForwardW": 32,
+    "normalizedBias": [
+      0.0001220703125,
+      0.0001220703125,
+      0.0001220703125
+    ],
+    "blend": 0.15,
+    "resource": "ResourceId::16638",
+    "heldUnchangedInReplay": true,
+    "slope": 2,
+    "splits": [
+      17.628273,
+      45.247177,
+      200
+    ]
+  },
+  "replayExperiments": [
+    {
+      "change": "SSAO generation shader outputs visibility=1, preserves view-depth channel",
+      "name": "no-ao",
+      "engineSourceChanged": false
+    },
+    {
+      "change": "SSGI composite returns direct input, removes additive GI",
+      "name": "no-gi",
+      "engineSourceChanged": false
+    }
+  ],
+  "metrics": {
+    "contact_ground": {
+      "captured": {
+        "highpass_rms_255": 0.2034757594506312,
+        "mean_luma_255": 113.58926478596493,
+        "delta_vs_capture_rgb_mae_255": 0.0
+      },
+      "no_ao": {
+        "highpass_rms_255": 0.1678776383245426,
+        "mean_luma_255": 115.09038630175439,
+        "delta_vs_capture_rgb_mae_255": 1.48846783625731
+      },
+      "no_gi": {
+        "highpass_rms_255": 0.19817462508732916,
+        "mean_luma_255": 111.44278628771931,
+        "delta_vs_capture_rgb_mae_255": 1.9098947368421049
+      }
+    },
+    "open_ground": {
+      "captured": {
+        "highpass_rms_255": 0.17221207794560706,
+        "mean_luma_255": 116.85900850461536,
+        "delta_vs_capture_rgb_mae_255": 0.0
+      },
+      "no_ao": {
+        "highpass_rms_255": 0.17215895505583897,
+        "mean_luma_255": 116.85956279384614,
+        "delta_vs_capture_rgb_mae_255": 0.0005538461538461535
+      },
+      "no_gi": {
+        "highpass_rms_255": 0.1664682203496226,
+        "mean_luma_255": 114.80896737230768,
+        "delta_vs_capture_rgb_mae_255": 1.8714358974358973
+      }
+    },
+    "under_chin": {
+      "captured": {
+        "highpass_rms_255": 0.2831774128686873,
+        "mean_luma_255": 109.78033803773585,
+        "delta_vs_capture_rgb_mae_255": 0.0
+      },
+      "no_ao": {
+        "highpass_rms_255": 0.1687388544526818,
+        "mean_luma_255": 118.27775913207547,
+        "delta_vs_capture_rgb_mae_255": 8.374025157232701
+      },
+      "no_gi": {
+        "highpass_rms_255": 0.27470727290297725,
+        "mean_luma_255": 107.41708498113206,
+        "delta_vs_capture_rgb_mae_255": 2.1280503144654084
+      }
+    }
+  },
+  "aoStatistics": {
+    "under_chin": {
+      "raw_ao_range": [
+        0.375,
+        1.0
+      ],
+      "filtered_ao_range": [
+        0.40966796875,
+        0.9736328125
+      ],
+      "filter_abs_change": 0.05402174729567308,
+      "effective_taps_mean": 8.999662425785685
+    },
+    "contact_ground": {
+      "raw_ao_range": [
+        0.765625,
+        1.0
+      ],
+      "filtered_ao_range": [
+        0.794921875,
+        1.0
+      ],
+      "filter_abs_change": 0.03375651041666667,
+      "effective_taps_mean": 8.999827111195613
+    }
+  },
+  "metricDefinition": "RMS of luma minus 3x3 box mean, measured in 0..255 PNG units; per-region local spatial metric, not a temporal flicker metric",
+  "roiUnderChin": [
+    460,
+    402,
+    560,
+    455
+  ],
+  "underChinHighpassReductionAoPercent": 40.41231864388563,
+  "underChinHighpassReductionGiPercent": 2.9911071931565947,
+  "engineBuildOrEdit": false
+}

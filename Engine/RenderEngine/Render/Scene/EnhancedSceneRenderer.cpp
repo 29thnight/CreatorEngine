@@ -1448,6 +1448,7 @@ namespace
             views[selected].promotedSlotMask = 0;
             views[selected].completedFrameId = 0;
             views[selected].ssgi.ResetHistory();
+            executions[selected].ssao.ResetHistory();
             return static_cast<int>(selected);
         }
 
@@ -1721,10 +1722,16 @@ namespace
             struct CaptureHistoryGuard
             {
                 View& view;
+                EnhancedSSAOPass& ssao;
                 bool active;
-                void Reset() { view.ssgi.ResetHistory(); view.fog.ResetHistory(); }
+                void Reset()
+                {
+                    view.ssgi.ResetHistory();
+                    view.fog.ResetHistory();
+                    ssao.ResetHistory();
+                }
                 ~CaptureHistoryGuard() { if (active) Reset(); }
-            } historyGuard{ views[viewIndex], capture && capture->controlled };
+            } historyGuard{ views[viewIndex], Execution().ssao, capture && capture->controlled };
             if (historyGuard.active) historyGuard.Reset();
             ++frameCounter;
             {
@@ -3719,6 +3726,7 @@ namespace
                     slot = {};
                 }
                 view.ssgi.ReleaseHistory(p.Execution().frameContext);
+                p.executions[&view - &p.views[0]].ssao.ReleaseHistory(p.Execution().frameContext);
             }
             for (auto& [key, entries] : p.transientPool.freeList)
             {
@@ -4353,7 +4361,8 @@ namespace
                 node.perView = true;
                 node.instance = [&p](uint32_t viewIndex) -> EnhancedRenderPass*
                 { return &p.executions[viewIndex].ssao; };
-                node.Inputs({LiveResources::kGBufferDepth, LiveResources::kGBufferNormal});
+                node.Inputs({LiveResources::kGBufferDepth, LiveResources::kGBufferNormal,
+                    LiveResources::kTemporalMotion, LiveResources::kTemporalResponsive, LiveResources::kTemporalReactive});
                 node.Outputs({LiveResources::kAmbientOcclusion});
                 node.declare = [this, &p](LiveBlackboard& bb, EnhancedRenderGraph& graph,
                     const EnhancedFrameContext& ctx, const LiveFrameBinding& binding)
@@ -4361,6 +4370,9 @@ namespace
                     EnhancedSSAOPass::Inputs inputs{};
                     inputs.depth = bb.Get(LiveSlots::kGBufferDepth);
                     inputs.normal = bb.Get(LiveSlots::kGBufferNormal);
+                    inputs.motionVectors = bb.Get(LiveSlots::kTemporalMotion);
+                    inputs.responsiveMask = bb.Get(LiveSlots::kTemporalResponsive);
+                    inputs.reactiveMask = bb.Get(LiveSlots::kTemporalReactive);
                     p.Execution().ssao.SetInputs(inputs);
                     // Rotation follows the owning view's accepted sample sequence.
                     // Other views and aborted recordings cannot consume its seed.
@@ -6642,7 +6654,12 @@ namespace
                 (pbrCapture && pbrCapture->target == viewPacket.displayTarget &&
                  pbrCapture->result.state != EnhancedPbrCaptureState::Complete &&
                  pbrCapture->result.state != EnhancedPbrCaptureState::Failed);
-            if (view.temporal.frame.reset) { view.ssgi.ResetHistory();view.fog.ResetHistory(); }
+            if (view.temporal.frame.reset)
+            {
+                view.ssgi.ResetHistory();
+                view.fog.ResetHistory();
+                p.Execution().ssao.ResetHistory();
+            }
             view.temporal.pendingDecals.clear();
             for (auto& decal:decals)
             {
@@ -7461,10 +7478,16 @@ namespace
             struct CaptureHistoryGuard
             {
                 LivePipeline::CameraView& view;
+                EnhancedSSAOPass& ssao;
                 bool active;
-                void Reset() { view.ssgi.ResetHistory(); view.fog.ResetHistory(); }
+                void Reset()
+                {
+                    view.ssgi.ResetHistory();
+                    view.fog.ResetHistory();
+                    ssao.ResetHistory();
+                }
                 ~CaptureHistoryGuard() { if (active) Reset(); }
-            } historyGuard{ view, capture && capture->controlled };
+            } historyGuard{ view, p.Execution().ssao, capture && capture->controlled };
             if (historyGuard.active) historyGuard.Reset();
             {
                 RenderThreadPhaseScope prepare(RenderPhase::resource_prepare);
@@ -10625,7 +10648,7 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             state.lastGpuMs = 0.0; // Vulkan timestamp profiler는 후속 성능 슬라이스
             state.lastPassTimings = {
                 { "METEOR.Scene.Shadow.C0", 0.0 }, { "METEOR.Scene.GBuffer", 0.0 },
-                { "Decal", 0.0 }, { "SSAO.Compute", 0.0 }, { "SSAO.Filter", 0.0 },
+                { "Decal", 0.0 }, { "SSAO.Compute", 0.0 }, { "SSAO.Temporal", 0.0 }, { "SSAO.Filter", 0.0 },
                 { "METEOR.Scene.HdrClear", 0.0 }, { "SkyBox", 0.0 },
                 { "SSGI.HiZ", 0.0 }, { "SSGI.Trace", 0.0 },
                 { "SSGI.Resolve", 0.0 }, { "SSGI.Filter", 0.0 },

@@ -1,0 +1,8 @@
+{
+  "timedOut": false,
+  "passed": true,
+  "gpuValidationCoverageNotices": 0,
+  "exitCode": 0,
+  "mode": "--skinned-cluster-lod-only",
+  "missingMarkers": []
+}

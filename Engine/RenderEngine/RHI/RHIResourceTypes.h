@@ -824,6 +824,13 @@ struct RHIBufferDesc
 
 inline constexpr uint64_t RHISparseTileBytes = 64ull * 1024ull;
 
+struct RHIStreamingMemoryBudget
+{
+    uint64_t availableGrowthBytes{UINT64_MAX};
+    uint64_t targetReleaseBytes{};
+    bool memoryPressure{};
+};
+
 struct RHISparseBufferDesc
 {
     uint64_t virtualBytes{};
@@ -839,6 +846,8 @@ struct RHISparseTileMapping
     uint32_t virtualTile{};
     uint32_t physicalTile{};
     bool mapped{true};
+    // Optional source slab; invalid uses the reserved buffer's original heap.
+    RHIBufferHandle physicalPoolOwner{};
 };
 
 struct RHITextureDesc

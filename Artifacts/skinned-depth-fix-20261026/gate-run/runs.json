@@ -1,0 +1,15 @@
+{
+  "mode": "--skinned-cluster-lod-only",
+  "missingMarkers": [
+    "METEOR_SKIN_DEPTH_REGRESSION_OK focusedPixels=4",
+    "METEOR_SKIN_LOD_AUDIT_ALL_OK",
+    "METEOR_SKIN_LOD_BOUND_OK poses=6 malformed=2",
+    "METEOR_SKINNED_COARSE_SCENE_OK frames=32 poses=2 partitions=2",
+    "METEOR_STREAMING_FEEDBACK_OK frames=32 sparse=1 stableBuffers=1 completedGpuDemand=1 validation=0",
+    "METEOR_SPARSE_IDLE_SCENE_OK emptyViews=1 productPool=1 pressureTrim=1 validation=0"
+  ],
+  "exitCode": 1,
+  "timedOut": false,
+  "gpuValidationCoverageNotices": 0,
+  "passed": false
+}

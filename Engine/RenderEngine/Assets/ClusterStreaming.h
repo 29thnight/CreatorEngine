@@ -103,6 +103,57 @@ namespace assets::cluster
         std::vector<uint32_t> groups;
         std::vector<own::shared_owner<const std::vector<std::byte>>> packets;
     };
+    // Lower the GPU cut without changing a submitted CPU snapshot or packet
+    // addresses. Complete ancestors remain available when finer children vanish.
+    inline own::shared_owner<const ResidentSet> CoarsenResidentCut(const ResidentSet& source,
+                                                                   std::span<const experiment::MeshClusterGroup> groups,
+                                                                   uint32_t minimumLod)
+    {
+        quantized::Require(source.groups.size() == groups.size(), "Coarse residency group count");
+        auto cut = own::make_shared<ResidentSet>(source);
+        for (uint32_t i = 0; i < groups.size(); ++i)
+        {
+            const auto& group = groups[i];
+            quantized::Require(group.parentGroup == UINT32_MAX ||
+                                   (group.parentGroup > i && group.parentGroup < groups.size()),
+                               "Coarse residency parent range");
+            if (group.parentGroup != UINT32_MAX && group.lodIndex < minimumLod)
+            {
+                cut->groups[i] = 0;
+            }
+        }
+        for (size_t i = groups.size(); i-- > 0;)
+        {
+            const auto parent = groups[i].parentGroup;
+            if (parent != UINT32_MAX && !cut->groups[parent])
+            {
+                cut->groups[i] = 0;
+            }
+        }
+        cut->packets.assign(source.packets.size(), {});
+        cut->bytes = 0;
+        for (uint32_t i = 0; i < groups.size(); ++i)
+        {
+            const auto& group = groups[i];
+            if (!cut->groups[i])
+            {
+                continue;
+            }
+            quantized::Require(uint64_t(group.firstMeshlet) + group.meshletCount <= cut->packets.size(),
+                               "Coarse residency packet range");
+            for (uint32_t page = group.firstMeshlet; page < group.firstMeshlet + group.meshletCount; ++page)
+            {
+                quantized::Require(bool(source.packets[page]), "Coarse residency requires complete groups");
+                if (!cut->packets[page])
+                {
+                    cut->packets[page] = source.packets[page];
+                    const auto bytes = source.packets[page]->size();
+                    cut->bytes += (bytes + cut->residencyAlignment - 1) & ~(cut->residencyAlignment - 1);
+                }
+            }
+        }
+        return cut;
+    }
     // An immutable snapshot is held by the submitted buffer's upload transaction.
     // Eviction changes future snapshots only; in-flight buffers remain owned by
     // the existing RHI completion/rejection protocol, never overwritten in place.
@@ -164,7 +215,7 @@ namespace assets::cluster
             }
         }
         own::shared_owner<const ResidentSet> Prepare(uint64_t recording, std::span<const uint32_t> requests,
-                                                   const StreamBudget& budget = {})
+                                                     const StreamBudget& budget = {})
         {
             std::lock_guard lock(m_mutex);
             quantized::Require(recording && budget.residentBytes && budget.uploadBytes && budget.residencyAlignment &&
@@ -389,7 +440,8 @@ namespace assets::cluster
                 }
             }
             const bool changed = !m_current || next->groups != m_current->groups ||
-                                 !std::ranges::equal(next->packets, m_current->packets, [](const auto& a, const auto& b) { return a.operator->() == b.operator->(); }) ||
+                                 !std::ranges::equal(next->packets, m_current->packets, [](const auto& a, const auto& b)
+                                                     { return a.operator->() == b.operator->(); }) ||
                                  next->residencyAlignment != m_current->residencyAlignment;
             next->revision = m_current ? m_current->revision + changed : 1;
             m_allResident = std::ranges::all_of(std::span(next->groups), [](auto resident) { return resident != 0; });

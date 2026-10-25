@@ -5,9 +5,12 @@ using namespace material_graph;
 #include "../../../Engine/RenderEngine/MeshletSparseStorage.inl"
 } // namespace shared_storage_probe
 
+#include "VariableSparsePoolProbe.inl"
+
 void RunSharedSparseStorage(RecordingChangeDevice& device)
 {
     using namespace shared_storage_probe;
+    RunVariableSparsePool(device);
     std::string error;
     const auto budgetBefore = device.GetPersistentMemoryBudgetStats();
     auto pool = own::make_shared<RHISharedSparsePagePool>(device, 3);
@@ -19,6 +22,10 @@ void RunSharedSparseStorage(RecordingChangeDevice& device)
           "Shared assets register exactly one physical heap VRAM owner");
     Check(pool->Prepare(a, {{0, 2}, {1, 0}}, error) && pool->Prepare(b, {{0, 2}}, error),
           "Three-page global residency admission " + error);
+    Check(pool->AdmissibleTiles(a) == 2 && pool->AdmissibleTiles(c) == 0,
+          "Admission counts owned and free pages while excluding active foreign pages");
+    Check(pool->WithAdmissionBudget(a, [&](uint64_t available) { return available == 2; }),
+          "Planning and mapping share the physical admission lock");
     const auto address = device.Resolve(a->buffer)->GetGPUVirtualAddress();
     const auto originalA = a->tiles;
     const auto revision = pool->Revision(a);
@@ -123,6 +130,83 @@ void RunSharedSparseStorage(RecordingChangeDevice& device)
     Check(storage.Prepare(payload, 32, 1024, error) && storage.NeedsPacket(payload.packets[0]) &&
               storage.NeedsPacket(payload.packets[2]),
           "Complete asset restoration requires root and data reuploads");
+    // Exercise the same admission/coarsening method used by the production cache.
+    MeshletSparseStorage fallback(device);
+    fallback.pool = own::make_shared<RHISharedSparsePagePool>(device, 2);
+    auto requested = own::make_shared<assets::cluster::ResidentSet>();
+    requested->revision = 77;
+    requested->residencyAlignment = 16;
+    requested->groups = {1, 1};
+    requested->packets = {packet, packet};
+    requested->bytes = 64;
+    std::vector<experiment::MeshClusterGroup> hierarchy(2);
+    hierarchy[0].parentGroup = 1;
+    hierarchy[0].firstMeshlet = 0;
+    hierarchy[0].meshletCount = 1;
+    hierarchy[1].parentGroup = UINT32_MAX;
+    hierarchy[1].lodIndex = 1;
+    hierarchy[1].firstMeshlet = 1;
+    hierarchy[1].meshletCount = 1;
+    own::shared_owner<const assets::cluster::ResidentSet> cut = requested;
+    SparseClusterPayload fallbackPayload;
+    fallbackPayload.virtualBytes = 3 * RHISparseTileBytes;
+    fallbackPayload.packets = {{uint32_t(RHISparseTileBytes), 1, packet},
+        {uint32_t(2 * RHISparseTileBytes), 0, packet}};
+    std::vector<std::byte> metadata(32);
+    uint64_t allowance{};
+    bool limited{};
+    const auto rebuild = [&](const assets::cluster::ResidentSet& selected)
+    {
+        fallbackPayload.packets.clear();
+        fallbackPayload.packets.push_back({uint32_t(RHISparseTileBytes), 1, selected.packets[1]});
+        std::memcpy(metadata.data(), selected.groups.data(), selected.groups.size() * sizeof(uint32_t));
+        return true;
+    };
+    Check(fallback.PrepareResidentCut(fallbackPayload, metadata, cut, hierarchy, allowance, limited, rebuild, error) &&
+        allowance == 2 && limited && !cut->groups[0] && cut->groups[1] && cut->bytes == 32 &&
+        requested->groups[0] && requested->packets[0] && fallback.allocation->tiles.size() == 2,
+        "Production admission falls back to a complete root before physical mapping");
+    Check(device.BeginFrame(error), "Coarse cut native recording");
+    const auto fallbackBuffer = fallback.buffer;
+    auto& encoder = device.GetImmediateEncoder();
+    RHIBarrierBatch activation{};
+    activation.aliasBuffers = {&fallbackBuffer, 1};
+    encoder.ResourceBarriers(activation);
+    device.TransitionBuffers(std::array{RHIBufferTransition{fallbackBuffer, RHIResourceState::Common,
+        RHIResourceState::CopyDest}});
+    for (unsigned part = 0; part < 2; ++part)
+    {
+        const auto upload = device.AllocateUpload({32, RHIUploadUsage::BufferCopy, 16});
+        Check(upload.IsWritable(), "Coarse metadata/root staging");
+        std::memcpy(upload.cpuAddress, part ? packet->data() : metadata.data(), 32);
+        auto destination = RHIBufferSlice::Whole(fallbackBuffer);
+        destination.offset = part ? RHISparseTileBytes : 0;
+        destination.size = 32;
+        Check(encoder.CopyBuffer(destination, upload), "Coarse metadata/root upload");
+    }
+    device.TransitionBuffers(std::array{RHIBufferTransition{fallbackBuffer, RHIResourceState::CopyDest,
+        RHIResourceState::CopySource}});
+    RHIReadback coarseRead;
+    Check(device.CreateBufferReadback(32, coarseRead, error), "Coarse native readback creation");
+    encoder.CopyBufferToReadback(coarseRead, fallbackBuffer, RHISparseTileBytes);
+    Check(device.EndFrame(error) && device.DrainForLifecycle(RHILifecycleCommand::OfflineReadbackCapture, error),
+        "Coarse GPU completion " + error);
+    RHIReadbackImage coarseImage;
+    Check(device.MapReadback(coarseRead, coarseImage, error), "Coarse native readback map");
+    for (uint32_t word = 0; word < 8; ++word)
+    {
+        Check(coarseImage.Elements<uint32_t>()[word] == 0x42424242u, "Coarse root survives native sparse upload");
+    }
+    device.ReleaseReadback(coarseRead);
+    MeshletSparseStorage insufficient(device);
+    insufficient.pool = own::make_shared<RHISharedSparsePagePool>(device, 1);
+    bool failedLimited{};
+    uint64_t failedAllowance{};
+    Check(!insufficient.PrepareResidentCut(fallbackPayload, metadata, cut, hierarchy, failedAllowance,
+        failedLimited, rebuild, error) && !insufficient.allocation &&
+        error == "Shared sparse budget cannot fit metadata and minimum root LOD",
+        "An impossible minimum cut fails before any GPU mapping is changed");
+    std::cout << "METEOR_COARSE_ADMISSION_OK physicalPages=2 rootWords=8 immutable=1 minimumReject=1 validation=0\n";
     std::cout
         << "METEOR_SHARED_SPARSE_POOL_OK assets=3 physicalPages=3 gpuWords=192 activePin=1 priority=1 lru=1 reuse=1 "
            "delta=1 abort=1 validation=0\n";

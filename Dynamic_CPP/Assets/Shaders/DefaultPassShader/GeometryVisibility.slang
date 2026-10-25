@@ -468,6 +468,7 @@ bool GeometrySharedBoxOccluded(float3 minimumWorld, float3 maximumWorld, float4 
 }
 
 #endif
+#include "Includes/SkinLodError.slang"
 bool GeometryAcceptClusterGroup(uint bin, uint base, uint group, bool demand)
 {
     const MeshletViewData view = MeshletView(bin);
@@ -484,8 +485,13 @@ bool GeometryAcceptClusterGroup(uint bin, uint base, uint group, bool demand)
         return true;
     }
     if (shadowMeshletTopology[NonUniformResourceIndex(bin)].Load(node+8u)==0xffffffffu) return true;
-    const float4 sphere=asfloat(shadowMeshletTopology[NonUniformResourceIndex(bin)].Load4(node+32u));
-    const float error=asfloat(shadowMeshletTopology[NonUniformResourceIndex(bin)].Load(node+28u));
+    float4 sphere=asfloat(shadowMeshletTopology[NonUniformResourceIndex(bin)].Load4(node+32u));
+    float error=asfloat(shadowMeshletTopology[NonUniformResourceIndex(bin)].Load(node+28u));
+    if (!MeteorSkinGroupMetric(shadowMeshletVertices[NonUniformResourceIndex(bin)],
+        shadowMeshletTopology[NonUniformResourceIndex(bin)], node, sphere, error))
+    {
+        return false;
+    }
     const float4 metric=geometryVisibilityCandidates[bin].sphere;
     if (!all(isfinite(metric)) || metric.x<=0 || metric.y<=0 || metric.w<=0) return false;
     const float4 object = float4(sphere.xyz, 1);

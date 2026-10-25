@@ -1,0 +1,106 @@
+{
+  "schemaVersion": 1,
+  "title": "렌더링 파이프라인 세션 작업 요약",
+  "period": [
+    "2026-10-25",
+    "2026-10-26"
+  ],
+  "targetBranch": "master",
+  "integrationBase": "5831cfa7de2ee7b547e2814bc2cb15bd28ff8c08",
+  "work": [
+    {
+      "name": "SSAO 시간 누적과 디노이즈",
+      "changes": [
+        "모션·이전 뷰 투영을 이용한 재투영",
+        "깊이·world 법선·반응 마스크·화면 경계·쌍선형 탭별 히스토리 검증",
+        "5x5 깊이·법선 가중 디노이즈와 이웃 범위 clamp",
+        "카메라 컷·뷰 변경·리사이즈·설정 변경·제출 거절 시 히스토리 초기화",
+        "기록 판정과 GPU 완료 후 히스토리 자원 퇴역"
+      ],
+      "evidence": "../../Artifacts/ssao-temporal-20261025/validation.json"
+    },
+    {
+      "name": "스트리밍 1단계 물리 예산 승인과 coarse fallback",
+      "changes": [
+        "상주 조상·루트를 선택하는 물리 페이지 예산 승인",
+        "최소 root와 메타데이터가 들어가지 않으면 매핑 전 거절",
+        "다른 자산의 활성 페이지와 불변 상주 스냅샷 보호"
+      ],
+      "evidence": "../../Artifacts/streaming-coarse-20261025/validation.json"
+    },
+    {
+      "name": "스트리밍 2단계 가변 물리 풀과 VRAM 예산",
+      "changes": [
+        "Reserved Resource와 GPU 주소를 유지하며 물리 slab 확장·축소",
+        "전역 device-local 예산 성장 예약·승인 연동",
+        "완료되고 참조되지 않는 추가 slab만 회수",
+        "RHI NULL 매핑과 GPU fence 이후 native heap·예산 lease 해제",
+        "빈 장면에서도 풀 유지보수와 예산 압력 반영"
+      ],
+      "evidence": "../../Artifacts/streaming-slabs-20261025/validation.json"
+    },
+    {
+      "name": "스킨드 coarse LOD 오차와 법선 압축",
+      "changes": [
+        "원본·coarse 삼각형 양방향의 전체 표면 위치·가중 위치·가중치 잔차 인증",
+        "현재 본 행렬의 변형을 반영한 카메라·그림자 GPU LOD 오차 상한",
+        "0 가중치 정점의 identity 처리와 포즈를 포함한 공유 키",
+        "법선 octahedral SNORM12x2 압축과 메시 전체 오차 정책",
+        "QMC v2와 무손실 스킨 가중치, v1 읽기 및 기존 rigid LOD 호환 검증"
+      ],
+      "evidence": "../../Artifacts/skinned-lod-normal-20261025/validation.json"
+    },
+    {
+      "name": "초기 깊이 불일치 수정과 회귀",
+      "changes": [
+        "초기 두 오류를 동일 값과 픽셀에서 재현",
+        "실패 후에만 GPU key·가시성·포즈·기하·상수 되읽기로 오류 경계 확인",
+        "HW Visibility atomic key의 SV_Position.z 사용을 픽셀 중심 world 위치 재투영 깊이로 변경",
+        "기존·추가 되읽기·수명 연장 세 조건의 GPU 검증 ON/OFF 비교",
+        "문제 픽셀·전체 최대 깊이 오차 판정과 현재 packet 생산자에 맞춘 HW/SW 회귀 갱신",
+        "동일 임시 source 폴더 프로브 실행 직렬화와 검증 출력·출처 기록"
+      ],
+      "evidence": "../../Artifacts/skinned-depth-fix-20261026/validation.json"
+    }
+  ],
+  "validation": {
+    "configuration": "Debug x64",
+    "depthMatrix": {
+      "gpuOnFrames": 96,
+      "gpuOffFrames": 96,
+      "pixelsPerSetting": 22326,
+      "focusedPixelsPerSetting": 12,
+      "maximumError": 2.47663e-07,
+      "tolerance": 3e-05
+    },
+    "sameBinaryFixedStressGpuFrames": 128,
+    "hybridCoverageOffFrames": 24,
+    "objectSpaceOffFrames": 18,
+    "skinBoundPoses": 6,
+    "skinBoundSamples": 17280,
+    "normalDirections": 70,
+    "performanceMeasured": false,
+    "publicationMasterBuild": {
+      "passed": true,
+      "configuration": "Debug",
+      "log": "../../Artifacts/skinned-depth-fix-20261026/publish-probe-build.log"
+    },
+    "publicationClusterDepth": {
+      "passed": true,
+      "gpuValidation": "off",
+      "frames": 32,
+      "focusedPixels": 4,
+      "pixels": 7212,
+      "maximumError": 2.80963e-07,
+      "verdict": "../../Artifacts/skinned-depth-fix-20261026/publish-smoke/verdict.json"
+    }
+  },
+  "provenance": "각 검증 JSON의 head와 source hash는 실행 당시 값을 유지한다. 게시 직전에 master의 추가 3커밋을 동기화했다.",
+  "publication": {
+    "sourceFiles": 48,
+    "html": "local only",
+    "nativeCapturesAndExecutables": "local only",
+    "validationData": "plain JSON",
+    "scope": "this session rendering implementation and tests"
+  }
+}

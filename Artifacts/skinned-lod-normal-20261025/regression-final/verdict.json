@@ -1,0 +1,24 @@
+{
+  "passed": true,
+  "gpuValidation": "on",
+  "runs": [
+    {
+      "mode": "--cluster-storage-only",
+      "exitCode": 0,
+      "missingMarkers": [],
+      "timedOut": false,
+      "gpuValidationCoverageNotices": 0,
+      "passed": true
+    },
+    {
+      "mode": "--object-space-only",
+      "exitCode": 0,
+      "missingMarkers": [],
+      "timedOut": false,
+      "gpuValidationCoverageNotices": 0,
+      "passed": true
+    }
+  ],
+  "sourceStable": true,
+  "configuration": "Debug"
+}

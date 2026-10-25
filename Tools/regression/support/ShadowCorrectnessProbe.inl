@@ -1,9 +1,3 @@
-#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
-#if defined(CE_CONTRACT_STANDALONE)
-#include "../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
-#else
-import winrt_base;
-#endif
 // Production shadow stages, independent rectangle depth oracle and lifecycle faults.
 void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
     ProbeTextures& textures, ProbePool& pool, const own::shared_owner<const Instance>& sourceMaterial)

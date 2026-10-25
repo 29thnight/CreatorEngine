@@ -12,7 +12,7 @@ import Creator.Core.DynamicBitset;
 #include "IRenderDeviceServices.h"
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
-// One physical heap per device, with independent stable virtual buffers per asset.
+// One slab pool per device, with independent stable virtual buffers per asset.
 // Only completed, unreferenced cache entries may offer their pages for eviction.
 class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSparsePagePool>
 {
@@ -33,19 +33,34 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
             }
         }
     };
+    struct Policy
+    {
+        uint32_t minimumTiles{256}, growthTiles{256}, maximumTiles{8192};
+        uint64_t idleFrames{120};
+    };
     struct Stats
     {
         uint64_t physicalBytes{}, mappedPages{}, evictions{}, reuses{};
+        uint64_t slabs{}, growths{}, shrinks{}, growthDenials{}, deferredShrinks{};
     };
     explicit RHISharedSparsePagePool(IRenderDeviceServices& device, uint32_t capacity = 1024)
-        : device_(device), capacity_(capacity), occupied_(capacity), usedBefore_(capacity)
+        : RHISharedSparsePagePool(device, Policy{capacity, capacity, capacity, 120})
     {
+    }
+    RHISharedSparsePagePool(IRenderDeviceServices& device, Policy policy)
+        : device_(device), policy_(policy), capacity_(policy.minimumTiles), occupied_(policy.minimumTiles),
+          usedBefore_(policy.minimumTiles)
+    {
+        if (!policy.minimumTiles || !policy.growthTiles || policy.maximumTiles < policy.minimumTiles)
+        {
+            throw std::invalid_argument("Invalid sparse slab pool policy");
+        }
     }
     ~RHISharedSparsePagePool()
     {
-        if (anchor_.IsValid())
+        for (const auto& slab : slabs_)
         {
-            device_.ReleaseBuffer(anchor_);
+            device_.ReleaseBuffer(slab.owner);
         }
     }
     static own::shared_owner<RHISharedSparsePagePool> ForDevice(IRenderDeviceServices& device)
@@ -56,7 +71,7 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
         auto result = registry[&device].lock();
         if (!result)
         {
-            result = own::make_shared<RHISharedSparsePagePool>(device);
+            result = own::make_shared<RHISharedSparsePagePool>(device, Policy{});
             registry[&device] = result;
         }
         return result;
@@ -70,9 +85,14 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
         {
             return {};
         }
+        if (slabs_.empty())
+        {
+            slabs_.push_back({anchor_, 0, policy_.minimumTiles, tick_});
+        }
         auto result = own::make_shared<Allocation>();
-        if (!device_.CreateSparseBuffer({virtualBytes, capacity_, false, L"METEOR.AssetVirtualPages", anchor_},
-                                        result->buffer, error))
+        if (!device_.CreateSparseBuffer(
+                {virtualBytes, policy_.minimumTiles, false, L"METEOR.AssetVirtualPages", anchor_}, result->buffer,
+                error))
         {
             return {};
         }
@@ -88,6 +108,7 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
         if (!value)
         {
             allocation->lastUse = ++clock_;
+            Touch(*allocation);
         }
     }
     uint64_t Revision(const own::shared_owner<Allocation>& allocation) const
@@ -99,7 +120,121 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
     {
         std::lock_guard lock(mutex_);
         return {anchor_.IsValid() ? uint64_t(capacity_) * RHISparseTileBytes : 0,
-                uint64_t(occupied_.count()), evictions_, reuses_};
+                uint64_t(occupied_.count()),
+                evictions_,
+                reuses_,
+                slabs_.size(),
+                growths_,
+                shrinks_,
+                growthDenials_,
+                deferredShrinks_};
+    }
+    bool CanGrow() const
+    {
+        std::lock_guard lock(mutex_);
+        const auto budget = device_.GetStreamingMemoryBudget();
+        return capacity_ < policy_.maximumTiles && !budget.memoryPressure &&
+               budget.availableGrowthBytes >= RHISparseTileBytes;
+    }
+    // Called once per upload recording after the cache has classified every owner.
+    bool Tick(uint64_t recording, std::string& error)
+    {
+        std::lock_guard lock(mutex_);
+        if (lastRecording_ == recording)
+        {
+            return true;
+        }
+        lastRecording_ = recording;
+        ++tick_;
+        const auto budget = device_.GetStreamingMemoryBudget();
+        uint64_t released{};
+        while (slabs_.size() > 1)
+        {
+            const auto& tail = slabs_.back();
+            if (!budget.memoryPressure && tick_ - tail.lastUse < policy_.idleFrames)
+            {
+                break;
+            }
+            std::vector<own::shared_owner<Allocation>> owners;
+            for (const auto& weak : allocations_)
+            {
+                auto owner = weak.lock();
+                if (!owner)
+                {
+                    continue;
+                }
+                const bool usesTail =
+                    std::ranges::any_of(owner->tiles, [&](const auto& item) { return item.second >= tail.base; });
+                if (!usesTail)
+                {
+                    continue;
+                }
+                if (!owner->evictable)
+                {
+                    ++deferredShrinks_;
+                    return true;
+                }
+                owners.push_back(std::move(owner));
+            }
+            for (const auto& owner : owners)
+            {
+                auto found = owner->tiles.begin();
+                while (found != owner->tiles.end())
+                {
+                    const auto tile = found->first;
+                    const auto physical = found->second;
+                    ++found;
+                    if (physical >= tail.base)
+                    {
+                        if (!Unmap(*owner, tile, error))
+                        {
+                            return false;
+                        }
+                        ++evictions_;
+                    }
+                }
+            }
+            const auto bytes = uint64_t(tail.count) * RHISparseTileBytes;
+            capacity_ = tail.base;
+            // NULL mapping retains the slab and budget until its GPU fence completes.
+            device_.ReleaseBuffer(tail.owner);
+            slabs_.pop_back();
+            occupied_.resize(capacity_);
+            usedBefore_.resize(capacity_);
+            ++shrinks_;
+            released += bytes;
+            if (budget.memoryPressure && budget.targetReleaseBytes && released >= budget.targetReleaseBytes)
+            {
+                break;
+            }
+        }
+        error.clear();
+        return true;
+    }
+    // A target may retain its own tiles. Only idle, completed other assets offer
+    // pages; active allocations are never counted as available refinement space.
+    uint64_t AdmissibleTiles(const own::shared_owner<Allocation>& target = {}) const
+    {
+        std::lock_guard lock(mutex_);
+        uint64_t available = occupied_.size() - occupied_.count();
+        for (const auto& weak : allocations_)
+        {
+            const auto allocation = weak.lock();
+            if (allocation && ((target && allocation.operator->() == target.operator->()) || allocation->evictable))
+            {
+                available += allocation->tiles.size();
+            }
+        }
+        return available;
+    }
+    template<typename Plan>
+    bool WithAdmissionBudget(const own::shared_owner<Allocation>& target, Plan&& plan, uint64_t wanted = 0)
+    {
+        std::lock_guard lock(mutex_);
+        // Planning and mapping share the lock; another asset cannot consume the
+        // selected budget between a coarse-cut decision and tile admission.
+        Grow(target, wanted);
+        return std::forward<Plan>(plan)(AdmissibleTiles(target));
     }
     bool Prepare(const own::shared_owner<Allocation>& allocation, const std::map<uint32_t, uint32_t>& wanted,
                  std::string& error)
@@ -115,6 +250,7 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
                 return false;
             }
         }
+        Grow(allocation, wanted.size());
         uint64_t missing{}, reclaim{};
         for (const auto& [tile, priority] : wanted)
         {
@@ -147,9 +283,9 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
             }
             ++it;
         }
-        std::ranges::sort(candidates, [](const auto& a, const auto& b) {
-            return a.priority != b.priority ? a.priority < b.priority : a.owner->lastUse < b.owner->lastUse;
-        });
+        std::ranges::sort(
+            candidates, [](const auto& a, const auto& b)
+            { return a.priority != b.priority ? a.priority < b.priority : a.owner->lastUse < b.owner->lastUse; });
         const uint64_t free = (occupied_.size() - occupied_.count());
         if (missing > free + reclaim + candidates.size())
         {
@@ -199,7 +335,9 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
             {
                 ++cursor;
             }
-            maps.push_back({tile, cursor++, true});
+            const auto& slab = SlabFor(cursor);
+            maps.push_back({tile, cursor - slab.base, true, slab.owner});
+            ++cursor;
         }
         if (!maps.empty() && !device_.UpdateSparseBufferMappings(target.buffer, maps, error))
         {
@@ -207,10 +345,12 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
         }
         for (const auto& map : maps)
         {
-            occupied_.set(map.physicalTile, true);
-            reuses_ += usedBefore_.test(map.physicalTile);
-            usedBefore_.set(map.physicalTile, true);
-            target.tiles.emplace(map.virtualTile, map.physicalTile);
+            const auto slab = std::ranges::find(slabs_, map.physicalPoolOwner, &Slab::owner);
+            const auto physical = slab->base + map.physicalTile;
+            occupied_.set(physical, true);
+            reuses_ += usedBefore_.test(physical);
+            usedBefore_.set(physical, true);
+            target.tiles.emplace(map.virtualTile, physical);
         }
         if (!maps.empty())
         {
@@ -218,14 +358,83 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
         }
         target.priorities = wanted;
         target.lastUse = ++clock_;
+        Touch(target);
         error.clear();
         return true;
     }
 
   private:
+    struct Slab
+    {
+        RHIBufferHandle owner;
+        uint32_t base{}, count{};
+        uint64_t lastUse{};
+    };
+    const Slab& SlabFor(uint32_t physical) const
+    {
+        const auto found = std::ranges::find_if(slabs_, [&](const auto& slab)
+                                                { return physical >= slab.base && physical - slab.base < slab.count; });
+        if (found == slabs_.end())
+        {
+            throw std::out_of_range("Sparse physical slab index");
+        }
+        return *found;
+    }
+    void Touch(const Allocation& allocation)
+    {
+        for (auto& slab : slabs_)
+        {
+            // tiles is keyed by virtual tile; physical indices can be in any order.
+            if (std::ranges::any_of(allocation.tiles, [&](const auto& item)
+                                    { return item.second >= slab.base && item.second - slab.base < slab.count; }))
+            {
+                slab.lastUse = tick_;
+            }
+        }
+    }
+    void Grow(const own::shared_owner<Allocation>& target, uint64_t wanted)
+    {
+        if (wanted > AdmissibleTiles(target) && !anchor_.IsValid())
+        {
+            std::string error;
+            if (!device_.CreateSparseBuffer(
+                    {RHISparseTileBytes, policy_.minimumTiles, false, L"METEOR.SharedPhysicalPages"}, anchor_, error))
+            {
+                ++growthDenials_;
+                return;
+            }
+            slabs_.push_back({anchor_, 0, policy_.minimumTiles, tick_});
+        }
+        while (wanted > AdmissibleTiles(target) && capacity_ < policy_.maximumTiles)
+        {
+            const auto budget = device_.GetStreamingMemoryBudget();
+            const auto pages =
+                (std::min)(uint64_t(policy_.growthTiles), (std::min)(uint64_t(policy_.maximumTiles - capacity_),
+                                                                     budget.availableGrowthBytes / RHISparseTileBytes));
+            if (budget.memoryPressure || !pages)
+            {
+                ++growthDenials_;
+                break;
+            }
+            RHIBufferHandle owner;
+            std::string error;
+            if (!device_.CreateSparseBuffer({RHISparseTileBytes, uint32_t(pages), false, L"METEOR.SharedPhysicalSlab"},
+                                            owner, error))
+            {
+                ++growthDenials_;
+                break;
+            }
+            slabs_.push_back({owner, capacity_, uint32_t(pages), tick_});
+            capacity_ += uint32_t(pages);
+            occupied_.resize(capacity_);
+            usedBefore_.resize(capacity_);
+            ++growths_;
+        }
+    }
     bool Unmap(Allocation& owner, uint32_t tile, std::string& error)
     {
-        const RHISparseTileMapping change{tile, 0, false};
+        const auto& slab = SlabFor(owner.tiles.at(tile));
+        const RHISparseTileMapping change{tile, 0, false, slab.owner};
         if (!device_.UpdateSparseBufferMappings(owner.buffer, std::span(&change, 1), error))
         {
             return false;
@@ -249,7 +458,11 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
         }
     }
     IRenderDeviceServices& device_;
+    Policy policy_;
     uint32_t capacity_;
+    std::vector<Slab> slabs_;
+    uint64_t tick_{}, lastRecording_{UINT64_MAX};
+    uint64_t growths_{}, shrinks_{}, growthDenials_{}, deferredShrinks_{};
     RHIBufferHandle anchor_;
     mutable std::recursive_mutex mutex_;
     ce::dynamic_bitset occupied_, usedBefore_;

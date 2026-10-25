@@ -488,7 +488,8 @@ namespace
     class MeshletGroupLookup final
     {
       public:
-        explicit MeshletGroupLookup(std::span<const own::shared_owner<const material_graph::MeshSurfaceBatch>> geometries)
+        explicit MeshletGroupLookup(
+            std::span<const own::shared_owner<const material_graph::MeshSurfaceBatch>> geometries)
             : m_geometries(geometries)
         {
             static thread_local Scratch scratch;
@@ -518,7 +519,8 @@ namespace
         MeshletGroupLookup& operator=(const MeshletGroupLookup&) = delete;
 
         std::uint32_t FindOwner(std::uintptr_t stream, std::uintptr_t residency,
-                                const std::array<std::uint32_t, 16>& worldBits, std::uint32_t bin)
+                                const std::array<std::uint32_t, 16>& worldBits, std::span<const PackedBoneMatrix> pose,
+                                std::uint32_t bin)
         {
             const auto matches = [&](std::uint32_t owner)
             {
@@ -526,6 +528,12 @@ namespace
                 if (!geometry->UsesDirectClusters() ||
                     reinterpret_cast<std::uintptr_t>(geometry->Input()->ClusterStream().operator->()) != stream ||
                     reinterpret_cast<std::uintptr_t>(geometry->ClusterResidency().operator->()) != residency)
+                {
+                    return false;
+                }
+                const auto ownerPose = geometry->Input()->Bones();
+                if (ownerPose.size() != pose.size() ||
+                    (!pose.empty() && std::memcmp(ownerPose.data(), pose.data(), pose.size_bytes()) != 0))
                 {
                     return false;
                 }
@@ -544,7 +552,7 @@ namespace
             };
             if (m_owned)
             {
-                const auto hash = Hash(stream, residency, worldBits);
+                const auto hash = Hash(stream, residency, worldBits, pose);
                 const auto mask = m_scratch->m_slots.size() - 1u;
                 auto index = std::size_t{hash} & mask;
                 for (std::size_t examined = 0; examined < m_scratch->m_slots.size(); ++examined)
@@ -586,7 +594,8 @@ namespace
         static_assert(sizeof(Slot) * 2u * kMeshletBinCapacity == 96u * 1024u);
 
         static std::uint32_t Hash(std::uintptr_t stream, std::uintptr_t residency,
-                                  const std::array<std::uint32_t, 16>& worldBits)
+                                  const std::array<std::uint32_t, 16>& worldBits,
+                                  std::span<const PackedBoneMatrix> pose)
         {
             std::uint32_t hash = 2166136261u;
             const auto append = [&](std::uint32_t word) { hash = (hash ^ word) * 16777619u; };
@@ -597,6 +606,16 @@ namespace
             for (const auto word : worldBits)
             {
                 append(word);
+            }
+            for (const auto& bone : pose)
+            {
+                for (const auto& row : bone.rows)
+                {
+                    for (const auto value : row)
+                    {
+                        append(std::bit_cast<std::uint32_t>(value));
+                    }
+                }
             }
             return hash ^ (hash >> 16u);
         }
@@ -611,17 +630,21 @@ bool GpuGeometryVisibility::PrepareMeshlets(
     const EnhancedFrameContext& context, const math::matrix4x4& projection,
     std::span<const own::shared_owner<const material_graph::MeshSurfaceBatch>> geometries,
     own::shared_owner<const Frame>& result, std::string& error, bool currentFrameOcclusion,
-    own::shared_owner<const GpuGeometryOcclusion::Pyramid> history, own::shared_owner<const Frame> firstStage, bool ordered,
-    float maxPixelError, uint32_t lodWidth, uint32_t lodHeight,
+    own::shared_owner<const GpuGeometryOcclusion::Pyramid> history, own::shared_owner<const Frame> firstStage,
+    bool ordered, float maxPixelError, uint32_t lodWidth, uint32_t lodHeight,
     const GpuGeometryOcclusion::ViewKey* cameraPredictionView)
 {
     ce::profile_scope profile{ce::marker<"GeometryVisibilityPrepare">()};
     std::uint64_t offset{}, groups{};
     result.reset();
     if (geometries.size() > kMeshletBinCapacity)
+    {
         return VisibilityFail(error, "METEOR meshlet work exceeds 4096 bins; no per-bin dispatch route.");
+    }
     if (!context.resources)
+    {
         return VisibilityFail(error, "Meshlet work requires its current device.");
+    }
     if (cameraPredictionView)
     {
         const auto lightView = GpuGeometryOcclusion::CaptureView(context, projection);
@@ -661,18 +684,24 @@ bool GpuGeometryVisibility::PrepareMeshlets(
     for (const auto& geometry : geometries)
     {
         if (!geometry || !geometry->MeshletCount() || geometry->Device() != context.resources)
+        {
             return VisibilityFail(error, "Shadow meshlet culling requires its nonempty transformed topology.");
+        }
         offset = (offset + kOutputAlignment - 1) / kOutputAlignment * kOutputAlignment;
         const auto count = geometry->MeshletCount();
         const auto dispatchX = (std::min)(count, kVisibilityDispatchWidth);
         const auto dispatchY =
             static_cast<uint32_t>((uint64_t(count) + kVisibilityDispatchWidth - 1) / kVisibilityDispatchWidth);
         if (!context.resources->GetMeshShaderCapabilities().SupportsDispatch(dispatchX, dispatchY, 1))
+        {
             return VisibilityFail(error,
                                   "Meshlet range exceeds native 2D dispatch limits; split and recook the asset.");
+        }
         const auto groupCount = (std::max)(1u, geometry->Input()->Hierarchy().groupCount);
         if (groupCount > static_cast<std::uint32_t>(INT32_MAX))
+        {
             return VisibilityFail(error, "Meshlet group count exceeds its sealed GPU range.");
+        }
         const auto bin = static_cast<std::uint32_t>(bins.size());
         auto groupOwner = bin;
         if (geometry->UsesDirectClusters())
@@ -684,14 +713,21 @@ bool GpuGeometryVisibility::PrepareMeshlets(
             const auto& stream = geometry->Input()->ClusterStream();
             const auto& residency = geometry->ClusterResidency();
             if (!stream || !residency)
+            {
                 return VisibilityFail(error, "Direct cluster groups require their sealed stream and residency.");
+            }
             std::array<std::uint32_t, 16> worldBits;
             const auto& world = geometry->ObjectToWorld();
             for (unsigned row = 0; row < 4; ++row)
+            {
                 for (unsigned column = 0; column < 4; ++column)
+                {
                     worldBits[row * 4u + column] = std::bit_cast<std::uint32_t>(world.m[row][column]);
+                }
+            }
             groupOwner = groupOwners->FindOwner(reinterpret_cast<std::uintptr_t>(stream.operator->()),
-                                                reinterpret_cast<std::uintptr_t>(residency.operator->()), worldBits, bin);
+                                                reinterpret_cast<std::uintptr_t>(residency.operator->()), worldBits,
+                                                geometry->Input()->Bones(), bin);
             if (groupOwner != bin && static_cast<std::uint32_t>(bins[groupOwner].baseVertex) != groupCount)
             {
                 return VisibilityFail(error, "Shared cluster groups have incompatible hierarchy domains.");
@@ -717,12 +753,18 @@ bool GpuGeometryVisibility::PrepareMeshlets(
         offset += MeshletOutputWords(candidates.back(), bins.back());
         std::uint32_t storageWords{};
         if (!MeshletQueueStorageWords(offset, groups, bins.size(), storageWords))
+        {
             return VisibilityFail(error, "Meshlet lists, group masks and arguments exceed the 32 MiB view budget.");
+        }
     }
     if (history && firstStage)
+    {
         return VisibilityFail(error, "Meshlet stage cannot both read history and recover.");
+    }
     if (ordered && (history || firstStage))
+    {
         return VisibilityFail(error, "Ordered meshlet lists are single-stage.");
+    }
     if (!PrepareInternal(context, projection, candidates, bins, result, error,
                          currentFrameOcclusion || bool(history) || bool(firstStage) || cameraPredictionView, geometries,
                          preparedInputs))
@@ -730,7 +772,9 @@ bool GpuGeometryVisibility::PrepareMeshlets(
         return false;
     }
     if (!result)
+    {
         return true;
+    }
     // Construction is not published until this function returns.
     auto* frame = const_cast<Frame*>(result.operator->());
     frame->m_ordered = ordered;
@@ -751,7 +795,9 @@ bool GpuGeometryVisibility::PrepareMeshlets(
     {
         history->RequireView(frame->m_occlusionView);
         if (!history->HistoryOwner())
+        {
             return VisibilityFail(error, "First stage requires retained history.");
+        }
         frame->m_historyPyramid = std::move(history);
         frame->m_occlusionCull = m_meshletHistoryCull.GetGeneration();
     }
@@ -759,20 +805,28 @@ bool GpuGeometryVisibility::PrepareMeshlets(
     if (firstStage)
     {
         if (firstStage->m_occlusionView != frame->m_occlusionView ||
-            !std::ranges::equal(firstStage->m_meshletGeometries, frame->m_meshletGeometries, [](const auto& a, const auto& b) { return a.operator->() == b.operator->(); }) ||
+            !std::ranges::equal(firstStage->m_meshletGeometries, frame->m_meshletGeometries,
+                                [](const auto& a, const auto& b) { return a.operator->() == b.operator->(); }) ||
             firstStage->m_meshletOffsets != frame->m_meshletOffsets)
+        {
             return VisibilityFail(error, "Meshlet recovery requires the same sealed first-stage geometry and view.");
+        }
         // Occlusion history changes visibility, not desired/resident LOD.
         // Include the explicit LOD metric in the first-stage reuse proof.
         reuseGroups = !firstStage->m_firstStage && firstStage->m_meshletInputs &&
                       firstStage->m_meshletInputs->candidates.size() == candidates.size();
         for (std::size_t bin = 0; reuseGroups && bin < candidates.size(); ++bin)
-            reuseGroups = std::memcmp(&candidates[bin].sphere,
-                                      &firstStage->m_meshletInputs->candidates[bin].sphere,
+        {
+            reuseGroups = std::memcmp(&candidates[bin].sphere, &firstStage->m_meshletInputs->candidates[bin].sphere,
                                       sizeof(math::vector4)) == 0;
+        }
         if (reuseGroups)
+        {
             for (auto& candidate : frame->m_meshletInputs->candidates)
+            {
                 candidate.flags |= kReuseFirstGroups;
+            }
+        }
         frame->m_firstStage = std::move(firstStage);
         frame->m_occlusionCull = m_meshletRecoveryCull.GetGeneration();
     }
@@ -784,7 +838,9 @@ bool GpuGeometryVisibility::PrepareMeshlets(
             const auto words = FeedbackWords(static_cast<std::uint32_t>(bins[bin].baseVertex));
             if (geometries[bin]->UsesDirectClusters() && (candidates[bin].flags & kReuseBinGroups) == 0 &&
                 !m_bufferPool->AcquireReadback(std::uint64_t(words) * 4u, frame->m_streamingFeedback[bin], error))
+            {
                 return false;
+            }
         }
     }
     return true;

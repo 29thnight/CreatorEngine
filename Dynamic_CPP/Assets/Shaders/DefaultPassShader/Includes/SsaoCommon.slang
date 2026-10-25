@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 cbuffer SSAOParams : register(b0)
 {
     float4x4 gInverseProjection;
@@ -25,7 +25,7 @@ float3 ViewFromDepth(float2 uv, float depth)
     return view.xyz / view.w;
 }
 
-// Pixel/frame sample rotation. This pass currently uses spatial filtering only.
+// Pixel/frame sample rotation. SsaoTemporal accumulates accepted view samples.
 float Hash21(uint2 pixel, uint frame)
 {
     const float2 p = float2(pixel) + float2(frame * 0.7548f, frame * 0.5698f);

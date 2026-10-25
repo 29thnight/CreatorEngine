@@ -1,0 +1,25 @@
+{
+  "before": [
+    "before_frame45238.rdc",
+    "before_frame45239.rdc",
+    "before_frame45240.rdc"
+  ],
+  "staticAfter": [
+    "after_frame3753.rdc",
+    "after_frame3754.rdc",
+    "after_frame3755.rdc"
+  ],
+  "moved": [
+    "after_frame9795.rdc",
+    "after_frame9796.rdc",
+    "after_frame9797.rdc"
+  ],
+  "staticRepeat": [
+    "after_frame13109.rdc",
+    "after_frame13110.rdc",
+    "after_frame13111.rdc",
+    "after_frame13112.rdc",
+    "after_frame13113.rdc",
+    "after_frame13114.rdc"
+  ]
+}

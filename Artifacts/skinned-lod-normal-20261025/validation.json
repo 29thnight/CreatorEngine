@@ -1,0 +1,302 @@
+{
+  "schemaVersion": 1,
+  "date": "2026-10-25",
+  "head": "9b0892d051be17ab64f2df78b775ad84135d491b",
+  "phase": 3,
+  "status": "phase-3-validated-depth-fix-20261026",
+  "implementation": {
+    "lodBuilderVersion": 4,
+    "legacyLodBuilderRead": 3,
+    "certificate": {
+      "directions": "source-to-coarse and coarse-to-source",
+      "quantizationMargin": "2*sqrt(3)*positionError added to e/cp for certified skin",
+      "weightedPosition": "cp",
+      "fullTriangleInteriors": true,
+      "gpuBound": "Frobenius(Aref)*e + maxFrobenius(Ab-Aref)*cp + maxLength(tb-tref)*cw + float slack",
+      "zeroWeightIdentity": true,
+      "weights": "cw",
+      "normalizedNonnegativeWeights": true,
+      "position": "e"
+    },
+    "normalCodec": {
+      "maxComponentPolicy": 0.002,
+      "boneWeightsLossless": true,
+      "axisDirectionsExact": true,
+      "encoding": "octahedral SNORM12x2",
+      "bits": 24,
+      "legacyPacketReadVersion": 1,
+      "meshWideFallback": true,
+      "packetWriteVersion": 2
+    },
+    "lifetime": "existing sealed pose, pending RHI/GPU owners and fence retirement retained; group sharing includes packed pose content",
+    "residencyFallback": "missing children select resident ancestor/root for coverage; pixel budget can be exceeded during loading",
+    "bulkUserAssetRecook": false
+  },
+  "build": {
+    "editor": {
+      "exitCode": 0,
+      "log": "editor-build-final.log"
+    },
+    "configuration": "Debug",
+    "probe": {
+      "exitCode": 0,
+      "log": "probe-audit-final-build.log"
+    }
+  },
+  "coverage": {
+    "nativeDx12": true,
+    "performanceMeasured": false,
+    "liveEditorCapture": false,
+    "skinPoseBounds": {
+      "samples": 17280,
+      "maxActualToBoundRatio": 0.0873756,
+      "poses": 6,
+      "malformedCertificates": 2
+    },
+    "validationOff": {
+      "passed": true,
+      "sourceStable": true,
+      "verdict": "lifetime-matrix-off/verdict.json",
+      "frames": 96,
+      "runs": 3,
+      "framesPerCondition": 32,
+      "poses": 2,
+      "partitions": 2,
+      "pixelsPerCondition": 7442,
+      "transitionsPerCondition": 6438,
+      "coarseFramesPerCondition": 24,
+      "fineFramesPerCondition": 8,
+      "sharedQueueHeadersPerCondition": 224,
+      "bulkCpuReads": 0
+    },
+    "normal": {
+      "passed": true,
+      "directions": 70,
+      "scalarPacketBytes": 700,
+      "octPacketBytes": 644,
+      "maxComponentError": 0.00069011,
+      "layouts": 8,
+      "gpuWords": 8960,
+      "seamChecks": 512,
+      "malformedPackets": 40,
+      "verdict": "regression-final/verdict.json",
+      "log": "regression-final/cluster-storage-only.stdout.log"
+    },
+    "validationOn": {
+      "passed": true,
+      "sourceStable": true,
+      "verdict": "lifetime-matrix-gpu/verdict.json",
+      "frames": 96,
+      "runs": 3,
+      "framesPerCondition": 32,
+      "poses": 2,
+      "partitions": 2,
+      "pixelsPerCondition": 7442,
+      "transitionsPerCondition": 6438,
+      "coarseFramesPerCondition": 24,
+      "fineFramesPerCondition": 8,
+      "sharedQueueHeadersPerCondition": 224,
+      "bulkCpuReads": 0,
+      "gpuValidationCoverageNotices": 0,
+      "stderrBytes": 0
+    },
+    "visibilityConditions": [
+      {
+        "mode": 0,
+        "extraVisibilityReadback": false,
+        "extraVisibilityLifetimePass": false
+      },
+      {
+        "mode": 1,
+        "extraVisibilityReadback": true,
+        "extraVisibilityLifetimePass": false
+      },
+      {
+        "mode": 2,
+        "extraVisibilityReadback": false,
+        "extraVisibilityLifetimePass": true
+      }
+    ],
+    "legacySkinnedObjectSpace": {
+      "passed": true,
+      "frames": 18,
+      "worlds": 4,
+      "poses": 2,
+      "partitions": 3,
+      "normalAndMotionPixels": 6384,
+      "warmAndCold": true,
+      "verdict": "regression-final/verdict.json",
+      "log": "regression-final/object-space-only.stdout.log"
+    }
+  },
+  "audit": [
+    {
+      "resolution": "removed obsolete rejection; authenticated metadata certificate checks remain",
+      "failure": "cold skinned hierarchy blocked by prior blanket boneCount condition",
+      "run": "gpu"
+    },
+    {
+      "resolution": "Unresolved prior observation; final 96-frame on/off matrix passed without changing pixel tolerance.",
+      "failure": "analytic depth actual=0.232469 expected=0.252403",
+      "run": "gpu-final"
+    },
+    {
+      "resolution": "corrected static-cache expectation; dynamic depth still verified each frame",
+      "failure": "test expected empty static shadow cache never hit for dynamic-only scene",
+      "run": "diagnostic"
+    },
+    {
+      "resolution": "independent posed vertex six-plane visibility set comparison added",
+      "failure": "CPU oracle counted selected groups without rejecting posed near-plane-outside meshlets",
+      "run": "check-off"
+    },
+    {
+      "resolution": "superseded by gpu-final3",
+      "failure": "run interrupted after CPU oracle correction was identified",
+      "run": "gpu-final2"
+    },
+    {
+      "run": "gpu-final3",
+      "failure": "Depth mismatch at second partition first frame: actual 0.249841 expected 0.249903",
+      "resolution": "Unresolved prior observation; retained stderr diagnostic."
+    },
+    {
+      "run": "diag-gpu4",
+      "result": "32 frames passed with additional visibility readback; not treated as a causal product fix."
+    },
+    {
+      "run": "lifetime-matrix-gpu / lifetime-matrix-off",
+      "result": "All modes 0/1/2 passed; 96 frames per validation setting; source and binary stable."
+    }
+  ],
+  "acceptance": {
+    "currentBuildAndCorrectnessGatesPassed": true,
+    "priorDepthDiscrepancyExplained": true,
+    "pixelToleranceUnchanged": 3e-05
+  },
+  "priorDepthDiscrepancy": {
+    "resolved": true,
+    "productFixClaimed": true,
+    "observations": [
+      {
+        "run": "gpu-final",
+        "actual": 0.232469,
+        "expected": 0.252403
+      },
+      {
+        "run": "gpu-final3",
+        "frame": 16,
+        "step": 0,
+        "chunkPoints": 1048576,
+        "pixel": [
+          10,
+          8
+        ],
+        "actual": 0.249841,
+        "expected": 0.249903
+      }
+    ],
+    "subsequentResult": "All three visibility readback/lifetime conditions passed 32 frames each with GPU validation both on and off. The two prior mismatches were not reproduced in the final matrix; root cause is not established.",
+    "resolution": {
+      "date": "2026-10-26",
+      "causeBoundary": "HW visibility atomic key used SV_Position.z instead of reprojecting the restored pixel-center position",
+      "fix": "Reproject restored world position for the atomic visibility depth",
+      "originalGraphExtraReadbackRequired": false,
+      "report": "../skinned-depth-fix-20261026/index.html",
+      "validation": "../skinned-depth-fix-20261026/validation.json"
+    }
+  },
+  "identity": {
+    "onBefore": "lifetime-matrix-gpu/identity-before.json",
+    "onAfter": "lifetime-matrix-gpu/identity-after.json",
+    "offBefore": "lifetime-matrix-off/identity-before.json",
+    "offAfter": "lifetime-matrix-off/identity-after.json",
+    "independentRegression": "regression-final/identity-before.json"
+  },
+  "sourceHashes": [
+    {
+      "path": "Engine/RenderEngine/Assets/OctahedralNormal.h",
+      "sha256": "7a3b31b0bd1d29089e545c7fc840f80177255ba05f84b12840b3998e32c58154"
+    },
+    {
+      "path": "Engine/RenderEngine/Assets/MeshletCompression.h",
+      "sha256": "835fcd66c8fed6e9ede7bb9bd64f8ef66d61fff8c767bb83c299b1d5962cd5c0"
+    },
+    {
+      "path": "Engine/RenderEngine/Assets/ClusterTopologyPage.h",
+      "sha256": "80cfffa7fe39c52a41a49df6fe579473e2080dfcdcf8bbe8ff883dcfdaa4712c"
+    },
+    {
+      "path": "Engine/RenderEngine/Experiment/Import/MeshLodSkinError.h",
+      "sha256": "43e1ccbbf1e6a915c6f5adac5fb83f06d7790c6841a0f9fe60b0c22666457090"
+    },
+    {
+      "path": "Engine/RenderEngine/Experiment/Import/MeshLodBuilder.cpp",
+      "sha256": "ce92c7ce1cef3012bc0acf88d1b3f1003db0d5e71c84d2830e55dfbee95ff7b6"
+    },
+    {
+      "path": "Engine/RenderEngine/Experiment/MeshLodData.h",
+      "sha256": "62303923e04e1835fc2342aaacd26c3de298843a3910c1e0b7bc2b10d0276392"
+    },
+    {
+      "path": "Engine/RenderEngine/Experiment/Cooked/CookedModelStreaming.inl",
+      "sha256": "6115f2f31e2071e9c0dd106eab19daf802de6b73cc03c3deed11a70f7d468269"
+    },
+    {
+      "path": "Engine/RenderEngine/GpuGeometryVisibility.cpp",
+      "sha256": "58e8a504d31b3676ce7dbb5e692be7eb89e805b2a457fb82ac0d3a35c892a263"
+    },
+    {
+      "path": "Engine/RenderEngine/MaterialGraphMeshSurface.cpp",
+      "sha256": "3c34fe5817dfb0dcc688e448cfd14519fbf6d7780635db57804b4394217d3b69"
+    },
+    {
+      "path": "Engine/RenderEngine/MeshletStreamedPlan.inl",
+      "sha256": "1ea2cda4bb4c54f0f8092ad3ba42590820303779d4a2dbfa6423876c95adfb0b"
+    },
+    {
+      "path": "Engine/RenderEngine/MeshletStreamingTopology.inl",
+      "sha256": "84a513c6d1578072321460069bc30d1535c3dc4ecbebed419930f9bf582e4ee2"
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/RHIModelMeshletUpload.h",
+      "sha256": "c406edc3666095996fd0ca906fbd3e0f9f9c4f3203e531ae56b4f94fcf49655d"
+    },
+    {
+      "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SkinLodError.slang",
+      "sha256": "01c791e758ebf9e7af3fd54f8f7da955834a2f49ce65f3024481bcb4cccf8b47"
+    },
+    {
+      "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MeshletGeometryAccess.slang",
+      "sha256": "00accc6c4ae42c98b93844e4cbe59b45a5d8d92f493e5f01fa5e2578f5093d74"
+    },
+    {
+      "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/GeometryVisibility.slang",
+      "sha256": "cb0c9b35f014699b6c0871db81c5bf04a4fa793e7f5c26156be2ef43efc95d0a"
+    },
+    {
+      "path": "Tools/regression/support/SkinLodErrorProbe.inl",
+      "sha256": "5160cd7ebab716544cce85dd0a69006d4c22ed473159641601b1c52b457f68bf"
+    },
+    {
+      "path": "Tools/regression/support/SkinLodErrorProbe.slang",
+      "sha256": "b9b4ee498b814ed06c14ae5a30d3fe034629de86251cc48c8083aba0194a74cb"
+    },
+    {
+      "path": "Tools/regression/support/OctahedralNormalProbe.inl",
+      "sha256": "cd5cea248d63cda32dd786a0d3904bc265dc81ae78e01f40f7213f8dcc16c17b"
+    },
+    {
+      "path": "Tools/regression/support/ClusterLodProbe.inl",
+      "sha256": "6445d3dd54cfddcd4c3effd16c1016840631cb693ac081f7258889328d794334"
+    },
+    {
+      "path": "Tools/regression/material_raster_surface_probe.cpp",
+      "sha256": "f9cecbc1bb6815f8f10ca34a768dd73f4e18e34830b5786ab9fd0fa68b808b09"
+    },
+    {
+      "path": "Tools/regression/verify-material-scene-probes.ps1",
+      "sha256": "66d8392b2de1acf210e6fdce6652f8fb8341fd9f2a4ae0b7427cf8b47d04e278"
+    }
+  ]
+}

@@ -1,0 +1,676 @@
+{
+  "schemaVersion": 2,
+  "date": "2026-10-26",
+  "head": "9b0892d051be17ab64f2df78b775ad84135d491b",
+  "status": "depth-fix-validated",
+  "productFixApplied": true,
+  "performanceMeasured": false,
+  "nativeDx12": true,
+  "implementation": {
+    "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang",
+    "function": "LXSceneVisibilityPS",
+    "oldDepth": "input.clip.z (SV_Position.z)",
+    "newDepth": "mul(float4(LXScenePixelCenter(input).position,1),lx_viewProjection).z/w",
+    "atomicKeyContract": "pixel-center triangle depth, standard-Z float bits, original primitive address",
+    "resourceOwnershipChanged": false,
+    "gpuSynchronizationChanged": false,
+    "depthTolerance": 3e-05
+  },
+  "initialFailures": [
+    {
+      "actual": 0.232469,
+      "expected": 0.252403,
+      "reproduced": true,
+      "case": "decoded-pair-b-gpu",
+      "frame": 0,
+      "chunk": 64,
+      "pixel": [
+        10,
+        8
+      ],
+      "address": 1446,
+      "record": 12,
+      "cluster": 11,
+      "triangle": 37,
+      "poseBuffersExact": 13,
+      "gpuPosedVertices": [
+        [
+          -0.594,
+          0.227244,
+          0.025
+        ],
+        [
+          -0.296995,
+          0.606,
+          0.0539904
+        ],
+        [
+          -9.02832e-06,
+          -0.151493,
+          0.0629981
+        ]
+      ]
+    },
+    {
+      "actual": 0.249841,
+      "expected": 0.249903,
+      "reproduced": true,
+      "case": "cold-a3-gpu",
+      "frame": 16,
+      "chunk": 1048576,
+      "pixel": [
+        10,
+        8
+      ],
+      "address": 1446,
+      "record": 1,
+      "cluster": 11,
+      "triangle": 37,
+      "poseBuffersExact": 1
+    }
+  ],
+  "faultBoundary": {
+    "cases": [
+      "boundary-a-gpu",
+      "boundary-b-gpu"
+    ],
+    "failedAttempts": 4,
+    "route": {
+      "value": 1,
+      "meaning": "hardware raster"
+    },
+    "keyDepth": 0.249841,
+    "resolveDepth": 0.249841,
+    "keyMatchesResolve": true,
+    "gpuGeometryTableExact": true,
+    "gpuPoseExact": true,
+    "cpuViewConstantsExact": true,
+    "gpuViewConstantsExact": true,
+    "gpuProjection": [
+      1,
+      0,
+      0,
+      0,
+      0,
+      1,
+      0,
+      0,
+      0,
+      0,
+      0.05,
+      0,
+      0,
+      0,
+      0,
+      1
+    ],
+    "sourceProductDeltaForControl": [
+      {
+        "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/MaterialGraphSceneHost.slang",
+        "before": "F746A7BC8F359B080843B02099EF429004238DF5740F109E2FC77990F8D34C93",
+        "after": "E82F5D12D08858CEBF847C97712E3FB46EFC959F58945DE6A1717D1362F6FFEF"
+      }
+    ],
+    "sameControlExecutable": true,
+    "snapOnlyReference": {
+      "decodedOriginalPlane": 0.24990307937914163,
+      "snappedEightBitSubpixelPlane": 0.24990277730899038,
+      "explainsObservedDepth": false
+    }
+  },
+  "readbackAndLifetime": {
+    "originalGraphUnchangedByFailureDiagnostics": true,
+    "diagnosticCaptureTiming": "only after original submission completed and depth oracle failed",
+    "extraGpuCommandsOnPassingFrames": 0,
+    "retainedOwners": "frame graph, geometry batches, pose and topology owners remain alive through diagnostic retirement",
+    "finalConditions": {
+      "0": "original readbacks only",
+      "1": "additional visibility texture readback",
+      "2": "visibility lifetime extension without an extra copy"
+    },
+    "additionalVisibilityReadbackRequiredForFix": false,
+    "noResourceLifetimeOrBarrierModificationInFix": true
+  },
+  "before": [
+    {
+      "case": "cold-a3-gpu",
+      "verdict": {
+        "configuration": "Debug",
+        "gpuValidation": "on",
+        "passed": false,
+        "runs": [
+          {
+            "gpuValidationCoverageNotices": 0,
+            "mode": "--skinned-cluster-lod-only",
+            "exitCode": 1,
+            "missingMarkers": [
+              "METEOR_SKIN_LOD_AUDIT_ALL_OK",
+              "METEOR_SKINNED_COARSE_SCENE_OK frames=32 poses=2 partitions=2",
+              "METEOR_STREAMING_FEEDBACK_OK frames=32 sparse=1 stableBuffers=1 completedGpuDemand=1 validation=0",
+              "METEOR_SPARSE_IDLE_SCENE_OK emptyViews=1 productPool=1 pressureTrim=1 validation=0"
+            ],
+            "passed": false,
+            "timedOut": false
+          }
+        ],
+        "sourceStable": true
+      },
+      "stderr": "cold-a3-gpu/skinned-cluster-lod-only.stderr.log"
+    },
+    {
+      "case": "decoded-pair-b-gpu",
+      "verdict": {
+        "configuration": "Debug",
+        "passed": false,
+        "sourceStable": true,
+        "runs": [
+          {
+            "passed": false,
+            "exitCode": 1,
+            "missingMarkers": [
+              "METEOR_SKIN_LOD_AUDIT_ALL_OK",
+              "METEOR_SKINNED_COARSE_SCENE_OK frames=32 poses=2 partitions=2",
+              "METEOR_STREAMING_FEEDBACK_OK frames=32 sparse=1 stableBuffers=1 completedGpuDemand=1 validation=0",
+              "METEOR_SPARSE_IDLE_SCENE_OK emptyViews=1 productPool=1 pressureTrim=1 validation=0"
+            ],
+            "timedOut": false,
+            "gpuValidationCoverageNotices": 0,
+            "mode": "--skinned-cluster-lod-only"
+          }
+        ],
+        "gpuValidation": "on"
+      },
+      "stderr": "decoded-pair-b-gpu/skinned-cluster-lod-only.stderr.log"
+    },
+    {
+      "case": "boundary-a-gpu",
+      "verdict": {
+        "configuration": "Debug",
+        "sourceStable": true,
+        "runs": [
+          {
+            "mode": "--skinned-cluster-lod-only",
+            "exitCode": 1,
+            "missingMarkers": [
+              "METEOR_SKIN_LOD_AUDIT_ALL_OK",
+              "METEOR_SKINNED_COARSE_SCENE_OK frames=32 poses=2 partitions=2",
+              "METEOR_STREAMING_FEEDBACK_OK frames=32 sparse=1 stableBuffers=1 completedGpuDemand=1 validation=0",
+              "METEOR_SPARSE_IDLE_SCENE_OK emptyViews=1 productPool=1 pressureTrim=1 validation=0"
+            ],
+            "passed": false,
+            "gpuValidationCoverageNotices": 0,
+            "timedOut": false
+          }
+        ],
+        "passed": false,
+        "gpuValidation": "on"
+      },
+      "stderr": "boundary-a-gpu/skinned-cluster-lod-only.stderr.log"
+    },
+    {
+      "case": "boundary-b-gpu",
+      "verdict": {
+        "runs": [
+          {
+            "passed": false,
+            "timedOut": false,
+            "exitCode": 1,
+            "mode": "--skinned-cluster-lod-only",
+            "gpuValidationCoverageNotices": 0,
+            "missingMarkers": [
+              "METEOR_SKIN_LOD_AUDIT_ALL_OK",
+              "METEOR_SKINNED_COARSE_SCENE_OK frames=32 poses=2 partitions=2",
+              "METEOR_STREAMING_FEEDBACK_OK frames=32 sparse=1 stableBuffers=1 completedGpuDemand=1 validation=0",
+              "METEOR_SPARSE_IDLE_SCENE_OK emptyViews=1 productPool=1 pressureTrim=1 validation=0"
+            ]
+          }
+        ],
+        "configuration": "Debug",
+        "passed": false,
+        "gpuValidation": "on",
+        "sourceStable": true
+      },
+      "stderr": "boundary-b-gpu/skinned-cluster-lod-only.stderr.log"
+    }
+  ],
+  "afterSameBinaryStress": [
+    {
+      "case": "plane-a-gpu",
+      "frames": 64,
+      "runs": 2,
+      "verdict": {
+        "passed": true,
+        "configuration": "Debug",
+        "sourceStable": true,
+        "runs": [
+          {
+            "mode": "--skinned-cluster-lod-only",
+            "passed": true,
+            "missingMarkers": [],
+            "timedOut": false,
+            "gpuValidationCoverageNotices": 0,
+            "exitCode": 0
+          }
+        ],
+        "gpuValidation": "on"
+      }
+    },
+    {
+      "case": "plane-b-gpu",
+      "frames": 64,
+      "runs": 2,
+      "verdict": {
+        "runs": [
+          {
+            "mode": "--skinned-cluster-lod-only",
+            "gpuValidationCoverageNotices": 0,
+            "exitCode": 0,
+            "missingMarkers": [],
+            "passed": true,
+            "timedOut": false
+          }
+        ],
+        "sourceStable": true,
+        "gpuValidation": "on",
+        "passed": true,
+        "configuration": "Debug"
+      }
+    }
+  ],
+  "finalGpuOn": {
+    "verdict": {
+      "configuration": "Debug",
+      "passed": true,
+      "sourceStable": true,
+      "auditMode": null,
+      "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\skindepth-a",
+      "auditRepeats": "1",
+      "gpuValidation": "on",
+      "runs": [
+        {
+          "exitCode": 0,
+          "missingMarkers": [],
+          "mode": "--skinned-cluster-lod-only",
+          "timedOut": false,
+          "gpuValidationCoverageNotices": 0,
+          "passed": true
+        }
+      ],
+      "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\skinned-depth-fix-20261026\\final-probe.exe"
+    },
+    "frames": 96,
+    "conditions": [
+      {
+        "auditMode": 0,
+        "focusedPixels": 4,
+        "pixels": 7442,
+        "maximumError": 2.47663e-07,
+        "tolerance": 3e-05
+      },
+      {
+        "auditMode": 1,
+        "focusedPixels": 4,
+        "pixels": 7442,
+        "maximumError": 2.47663e-07,
+        "tolerance": 3e-05
+      },
+      {
+        "auditMode": 2,
+        "focusedPixels": 4,
+        "pixels": 7442,
+        "maximumError": 2.47663e-07,
+        "tolerance": 3e-05
+      }
+    ],
+    "pixels": 22326,
+    "focusedPixels": 12,
+    "maximumError": 2.47663e-07,
+    "focusedResults": [
+      {
+        "frame": 0,
+        "chunk": 64,
+        "actualLogged": 0.252403,
+        "expectedLogged": 0.252403,
+        "absoluteError": 1.30645e-08
+      },
+      {
+        "frame": 1,
+        "chunk": 64,
+        "actualLogged": 0.252403,
+        "expectedLogged": 0.252403,
+        "absoluteError": 1.30645e-08
+      },
+      {
+        "frame": 16,
+        "chunk": 1048576,
+        "actualLogged": 0.249903,
+        "expectedLogged": 0.249903,
+        "absoluteError": 2.55134e-08
+      },
+      {
+        "frame": 17,
+        "chunk": 1048576,
+        "actualLogged": 0.249903,
+        "expectedLogged": 0.249903,
+        "absoluteError": 2.55134e-08
+      },
+      {
+        "frame": 0,
+        "chunk": 64,
+        "actualLogged": 0.252403,
+        "expectedLogged": 0.252403,
+        "absoluteError": 1.30645e-08
+      },
+      {
+        "frame": 1,
+        "chunk": 64,
+        "actualLogged": 0.252403,
+        "expectedLogged": 0.252403,
+        "absoluteError": 1.30645e-08
+      },
+      {
+        "frame": 16,
+        "chunk": 1048576,
+        "actualLogged": 0.249903,
+        "expectedLogged": 0.249903,
+        "absoluteError": 2.55134e-08
+      },
+      {
+        "frame": 17,
+        "chunk": 1048576,
+        "actualLogged": 0.249903,
+        "expectedLogged": 0.249903,
+        "absoluteError": 2.55134e-08
+      },
+      {
+        "frame": 0,
+        "chunk": 64,
+        "actualLogged": 0.252403,
+        "expectedLogged": 0.252403,
+        "absoluteError": 1.30645e-08
+      },
+      {
+        "frame": 1,
+        "chunk": 64,
+        "actualLogged": 0.252403,
+        "expectedLogged": 0.252403,
+        "absoluteError": 1.30645e-08
+      },
+      {
+        "frame": 16,
+        "chunk": 1048576,
+        "actualLogged": 0.249903,
+        "expectedLogged": 0.249903,
+        "absoluteError": 2.55134e-08
+      },
+      {
+        "frame": 17,
+        "chunk": 1048576,
+        "actualLogged": 0.249903,
+        "expectedLogged": 0.249903,
+        "absoluteError": 2.55134e-08
+      }
+    ],
+    "stderrBytes": 0,
+    "log": "final-gpu/skinned-cluster-lod-only.stdout.log"
+  },
+  "finalGpuOff": {
+    "verdict": {
+      "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\skindepth-b",
+      "runs": [
+        {
+          "timedOut": false,
+          "passed": true,
+          "gpuValidationCoverageNotices": 0,
+          "exitCode": 0,
+          "mode": "--skinned-cluster-lod-only",
+          "missingMarkers": []
+        }
+      ],
+      "gpuValidation": "off",
+      "passed": true,
+      "auditRepeats": "1",
+      "auditMode": null,
+      "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\skinned-depth-fix-20261026\\final-probe.exe",
+      "configuration": "Debug",
+      "sourceStable": true
+    },
+    "frames": 96,
+    "conditions": [
+      {
+        "auditMode": 0,
+        "focusedPixels": 4,
+        "pixels": 7442,
+        "maximumError": 2.47663e-07,
+        "tolerance": 3e-05
+      },
+      {
+        "auditMode": 1,
+        "focusedPixels": 4,
+        "pixels": 7442,
+        "maximumError": 2.47663e-07,
+        "tolerance": 3e-05
+      },
+      {
+        "auditMode": 2,
+        "focusedPixels": 4,
+        "pixels": 7442,
+        "maximumError": 2.47663e-07,
+        "tolerance": 3e-05
+      }
+    ],
+    "pixels": 22326,
+    "focusedPixels": 12,
+    "maximumError": 2.47663e-07,
+    "focusedResults": [
+      {
+        "frame": 0,
+        "chunk": 64,
+        "actualLogged": 0.252403,
+        "expectedLogged": 0.252403,
+        "absoluteError": 1.30645e-08
+      },
+      {
+        "frame": 1,
+        "chunk": 64,
+        "actualLogged": 0.252403,
+        "expectedLogged": 0.252403,
+        "absoluteError": 1.30645e-08
+      },
+      {
+        "frame": 16,
+        "chunk": 1048576,
+        "actualLogged": 0.249903,
+        "expectedLogged": 0.249903,
+        "absoluteError": 2.55134e-08
+      },
+      {
+        "frame": 17,
+        "chunk": 1048576,
+        "actualLogged": 0.249903,
+        "expectedLogged": 0.249903,
+        "absoluteError": 2.55134e-08
+      },
+      {
+        "frame": 0,
+        "chunk": 64,
+        "actualLogged": 0.252403,
+        "expectedLogged": 0.252403,
+        "absoluteError": 1.30645e-08
+      },
+      {
+        "frame": 1,
+        "chunk": 64,
+        "actualLogged": 0.252403,
+        "expectedLogged": 0.252403,
+        "absoluteError": 1.30645e-08
+      },
+      {
+        "frame": 16,
+        "chunk": 1048576,
+        "actualLogged": 0.249903,
+        "expectedLogged": 0.249903,
+        "absoluteError": 2.55134e-08
+      },
+      {
+        "frame": 17,
+        "chunk": 1048576,
+        "actualLogged": 0.249903,
+        "expectedLogged": 0.249903,
+        "absoluteError": 2.55134e-08
+      },
+      {
+        "frame": 0,
+        "chunk": 64,
+        "actualLogged": 0.252403,
+        "expectedLogged": 0.252403,
+        "absoluteError": 1.30645e-08
+      },
+      {
+        "frame": 1,
+        "chunk": 64,
+        "actualLogged": 0.252403,
+        "expectedLogged": 0.252403,
+        "absoluteError": 1.30645e-08
+      },
+      {
+        "frame": 16,
+        "chunk": 1048576,
+        "actualLogged": 0.249903,
+        "expectedLogged": 0.249903,
+        "absoluteError": 2.55134e-08
+      },
+      {
+        "frame": 17,
+        "chunk": 1048576,
+        "actualLogged": 0.249903,
+        "expectedLogged": 0.249903,
+        "absoluteError": 2.55134e-08
+      }
+    ],
+    "stderrBytes": 0,
+    "log": "final-off/skinned-cluster-lod-only.stdout.log"
+  },
+  "additionalCoverage": {
+    "verdict": {
+      "sourceStable": true,
+      "auditMode": null,
+      "configuration": "Debug",
+      "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe",
+      "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\skindepth-b",
+      "passed": true,
+      "auditRepeats": null,
+      "runs": [
+        {
+          "exitCode": 0,
+          "mode": "--hybrid-visibility-only",
+          "timedOut": false,
+          "gpuValidationCoverageNotices": 0,
+          "missingMarkers": [],
+          "passed": true
+        },
+        {
+          "exitCode": 0,
+          "mode": "--object-space-only",
+          "timedOut": false,
+          "gpuValidationCoverageNotices": 0,
+          "missingMarkers": [],
+          "passed": true
+        }
+      ],
+      "gpuValidation": "off"
+    },
+    "productDeltaFromDepthMatrix": [],
+    "requestedModes": [
+      "--hybrid-visibility-only",
+      "--object-space-only"
+    ],
+    "hybridFrames": 24,
+    "objectSpaceFrames": 18,
+    "staleOracleCorrection": "Commands.{Depth,Surface}.Arguments and .Scatter replace old .Build; Material.Count replaces old .CountTiles"
+  },
+  "build": {
+    "configuration": "Debug",
+    "probe": {
+      "exitCode": 0,
+      "log": "final-probe-build.log"
+    },
+    "editorLibrary": {
+      "exitCode": 0,
+      "log": "editor-build.log"
+    },
+    "editorRuntime": {
+      "exitCode": 0,
+      "log": "editor-runtime-build.log"
+    },
+    "coverageProbe": {
+      "exitCode": 0,
+      "log": "coverage-probe-build.log"
+    }
+  },
+  "probeScratchGate": {
+    "nativeGpuWorkPerformed": false,
+    "actualDummyExitCode": 1,
+    "blockedWhileSourceScratchHeld": true,
+    "passed": true,
+    "expectedDummyExitCode": 1,
+    "launchedAfterRelease": true
+  },
+  "excludedRuns": {
+    "before-gpu": "shared generated-source file collision before native rendering",
+    "cold-a-gpu/cold-b-gpu": "incomplete isolated source root: missing pinned Slang bundle",
+    "cold-a2-gpu/cold-b2-gpu": "incomplete isolated source root: missing Sheen LUT fixture",
+    "decoded-gpu": "native checks passed, but diagnostic shader source changed during this run; excluded from stable final gates",
+    "final-coverage-off": "stale graph pass-name oracle stopped before GPU execution; rerun in coverage-off",
+    "gate-run": "Expected dummy-process failure used only to validate source scratch serialization; see gate-test.json"
+  },
+  "evidenceRetained": true,
+  "atMeasurement": {
+    "committed": false,
+    "pushed": false
+  },
+  "publicationScope": {
+    "targetBranch": "master",
+    "baseCommit": "5831cfa7de2ee7b547e2814bc2cb15bd28ff8c08",
+    "measurementHeadUnchanged": true,
+    "excludedLocalFeatures": [],
+    "regressionSelection": "Full session SSAO, streaming, skinned coarse LOD, normal codec, depth diagnostics and regression fixtures",
+    "htmlReports": "local only",
+    "sessionRenderingImplementationIncluded": true
+  },
+  "publicationVerification": {
+    "build": {
+      "configuration": "Debug",
+      "exitCode": 0,
+      "log": "publish-probe-build.log"
+    },
+    "nativeClusterDepth": {
+      "verdict": {
+        "passed": true,
+        "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe",
+        "gpuValidation": "off",
+        "sourceStable": true,
+        "configuration": "Debug",
+        "auditMode": null,
+        "auditRepeats": null,
+        "runs": [
+          {
+            "gpuValidationCoverageNotices": 0,
+            "missingMarkers": [],
+            "exitCode": 0,
+            "mode": "--cluster-lod-only",
+            "passed": true,
+            "timedOut": false
+          }
+        ],
+        "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine"
+      },
+      "frames": 32,
+      "focusedPixels": 4,
+      "pixels": 7212,
+      "maximumError": 2.80963e-07,
+      "tolerance": 3e-05,
+      "log": "publish-smoke/cluster-lod-only.stdout.log"
+    }
+  }
+}

@@ -33,8 +33,21 @@ LXSurfacePoint MeteorCompatibilityPoint(StructuredBuffer<float4> data, uint vert
     point.bitangent = data[row+4u];
     return point;
 }
+float3 MeteorOctahedralNormal(ByteAddressBuffer data, uint packet, uint vertex)
+{
+    const uint code = uint(asfloat(LXGeometryWord(data, packet + data.Load(packet + 16u), vertex, 12u)));
+    float2 xy = float2(float(int(code << 20u) >> 20), float(int(code << 8u) >> 20)) / 2047.0f;
+    const float z = 1.0f - abs(xy.x) - abs(xy.y);
+    const float fold = max(-z, 0.0f);
+    xy += float2(xy.x >= 0.0f ? -fold : fold, xy.y >= 0.0f ? -fold : fold);
+    return normalize(float3(xy, z));
+}
 uint MeteorClusterWord(ByteAddressBuffer data, uint packet, uint vertex, uint offset)
 {
+    if (data.Load(packet + 28u) == 1u && offset >= 12u && offset <= 20u)
+    {
+        return asuint(MeteorOctahedralNormal(data, packet, vertex)[(offset - 12u) / 4u]);
+    }
     const uint bits = LXGeometryWord(data,packet+data.Load(packet+16u),vertex,offset);
     const uint descriptor = packet+32u+(offset/4u)*8u;
     const float step = asfloat(data.Load(descriptor+4u));
@@ -48,6 +61,10 @@ uint MeteorClusterWord(ByteAddressBuffer data, uint packet, uint vertex, uint of
 }
 float4 MeteorClusterChannels(ByteAddressBuffer data,uint packet,uint vertex,uint offset,uint count)
 {
+    if (offset == 12u && count == 3u && data.Load(packet + 28u) == 1u)
+    {
+        return float4(MeteorOctahedralNormal(data, packet, vertex), 0.0f);
+    }
     // Keep one bounded decoder body. Surface reconstruction reads three
     // vertices inside quad evaluation; expanding the scalar decoder at every
     // component also expands the validation layer's patched shader.

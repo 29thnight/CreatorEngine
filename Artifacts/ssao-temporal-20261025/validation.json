@@ -1,0 +1,417 @@
+{
+  "schema": "creator.ssao-temporal-validation.v1",
+  "date": "2026-10-25",
+  "head": "9b0892d051be17ab64f2df78b775ad84135d491b",
+  "configuration": "Debug x64",
+  "build": {
+    "passed": true,
+    "logs": [
+      "build3.log",
+      "build4.log"
+    ],
+    "initialFailures": [
+      "Editor held gcce.dll during first build",
+      "FoliageCulling.h referenced two pre-move Utility_Framework headers; corrected to Foundation/"
+    ],
+    "runtimeSha256": "7de9321c0b32e14190cc323c66d71e4541bdf839c04af7ed382809ca19a0026f"
+  },
+  "implementation": {
+    "sampleDirections": 2,
+    "stepsPerDirection": 8,
+    "temporalHistoryMaxWeight": 16,
+    "historySlotsPerView": 2,
+    "historyFormats": [
+      "RGBA16Float AO/count",
+      "RGBA32Float world normal/view depth"
+    ],
+    "reprojection": "motion with jitter delta; previous-view-projection fallback",
+    "historyChecks": [
+      "view depth",
+      "world normal",
+      "responsive/reactive masks",
+      "finite coordinates",
+      "viewport bounds",
+      "per-tap bilinear validity",
+      "current-surface neighborhood clamp"
+    ],
+    "denoise": "5x5 spatial/depth/normal weighted filter; unfiltered resolve retained in history",
+    "lifetime": "view-owned textures; accepted submission advances slot; generation guards reset; rejection invalidates history; retirement waits for recording decision and GPU completion; history dispatch stays graphics-ordered across submissions",
+    "reset": [
+      "camera/view reassignment",
+      "camera cut",
+      "full-resolution resize including unchanged half extent",
+      "tuning changes",
+      "controlled diagnostic capture",
+      "recording rejection/abort"
+    ]
+  },
+  "nativeGpuValidation": {
+    "validation": "gpu",
+    "exitCode": 0,
+    "test": {
+      "schemaVersion": 1,
+      "command": "dx12.ssao",
+      "status": "succeeded",
+      "code": "ok",
+      "message": "dx12.ssao 통과",
+      "data": {
+        "log": "SSAO: world normals, signed hemispheres and texel-center regression\nstep: GPU execution/readback finite PASS\nrotated step: GPU execution/readback finite PASS\nflat=1.00000 edge=0.72461 rotation max=0.00000000 filter variation ratio=0.56855\n90-degree camera/world rotation invariance: PASS\nUnoccluded plane and contact visibility: PASS\nSpatial filter reduces variation: PASS\ntilted plane: GPU execution/readback finite PASS\ntilted plane minimum=0.999512\nOdd-size tilted plane does not self-occlude: PASS\none-sided occluder: GPU execution/readback finite PASS\ntwo-sided recess: GPU execution/readback finite PASS\none-sided center=0.500000 two-sided center=0.221680\nOne-sided wall covers at most half at optical center: PASS\nOpposite occluders cover distinct sectors: PASS\nintensity zero: GPU execution/readback finite PASS\nIntensity zero produces visibility one: PASS\nsky: GPU execution/readback finite PASS\nSky remains unoccluded: PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\ntemporal step: GPU execution/readback finite PASS\nAccepted static surface accumulates history: PASS\nTemporal/spatial output suppresses sample rotation noise: PASS\ntemporal variation=13.539551 raw variation=694.343750\ndepth rejection: GPU execution/readback finite PASS\nChanged view depth rejects old AO: PASS\nnormal warmup: GPU execution/readback finite PASS\nnormal rejection: GPU execution/readback finite PASS\nChanged world normal rejects old AO: PASS\noccluder warmup: GPU execution/readback finite PASS\noccluder warmup: GPU execution/readback finite PASS\noccluder warmup: GPU execution/readback finite PASS\noccluder warmup: GPU execution/readback finite PASS\noccluder warmup: GPU execution/readback finite PASS\noccluder warmup: GPU execution/readback finite PASS\noccluder warmup: GPU execution/readback finite PASS\noccluder warmup: GPU execution/readback finite PASS\noccluder removed: GPU execution/readback finite PASS\nDisappearing occluder leaves no receiver ghost on the first frame: PASS\ncamera cut: GPU execution/readback finite PASS\nCamera cut discards AO history: PASS\nsame-half-size resize: GPU execution/readback finite PASS\nFull-resolution resize resets even when half extent is unchanged: PASS\nabort warmup: GPU execution/readback finite PASS\nabort warmup: GPU execution/readback finite PASS\nabort warmup: GPU execution/readback finite PASS\nabort warmup: GPU execution/readback finite PASS\naborted history: GPU execution/readback finite PASS\nAborted recording cannot publish an AO history slot: PASS\nDX12 validation problems=0\nSSAO regression PASS\n",
+        "passed": true
+      },
+      "timing": {
+        "queuedMs": 0.0961,
+        "waitedFrames": 0,
+        "executedMs": 7109.98
+      }
+    },
+    "runtimeSha256": "7DE9321C0B32E14190CC323C66D71E4541BDF839C04AF7ED382809CA19A0026F",
+    "passed": true
+  },
+  "gpuFrameCases": 50,
+  "postCaptureCommentOnlyChange": "SsaoCommon comment updated to describe temporal accumulation; no shader expressions changed.",
+  "ftPrimitives": {
+    "scene": "Dynamic_CPP/Assets/Scenes/FT_Primitives.creator",
+    "originalSceneUnchanged": true,
+    "renderExtent": [
+      1472,
+      738
+    ],
+    "aoExtent": [
+      736,
+      369
+    ],
+    "camera": {
+      "position": [
+        3.75,
+        2,
+        -4
+      ],
+      "rotationDegrees": [
+        20,
+        0,
+        0
+      ],
+      "fovDegrees": 60
+    },
+    "staticQuality": {
+      "roiAoPixels": [
+        310,
+        204,
+        425,
+        235
+      ],
+      "receiverPixels": 3478,
+      "beforeSnapshots": [
+        "before_frame45238",
+        "before_frame45239"
+      ],
+      "afterSnapshots": [
+        "after_frame13110",
+        "after_frame13111",
+        "after_frame13112",
+        "after_frame13113",
+        "after_frame13114"
+      ],
+      "spatialHighpassRms": {
+        "before": 0.006640694369362628,
+        "after": 0.001853958490877304,
+        "reductionPercent": 72.08185789379662
+      },
+      "staticSnapshotDifferenceRms": {
+        "before": 0.01799208308300728,
+        "after": 0.0038725429332357917,
+        "reductionPercent": 78.4764058982518,
+        "note": "RDC snapshots at a fixed camera, not guaranteed adjacent engine submissions."
+      },
+      "acceptedHistoryCountPercentiles": [
+        4.0,
+        16.0,
+        16.0
+      ],
+      "movedReceiver": {
+        "capture": "after_frame9796",
+        "pixels": 1574,
+        "maximumResidualDarkening": 0.109375,
+        "meanResidualDarkening": 0.002739214382147395,
+        "note": "Center-only raw visibility is not a ghost oracle: this mask includes AO from nearby remaining objects. Use the fully-open footprint check below.",
+        "fullyOpenFootprintPixels": 1426,
+        "fullyOpenResolvedMaxDarkening": 0.0,
+        "fullyOpenFilteredMaxDarkening": 0.00048828125,
+        "firstFrameCheck": "Native GPU fixture removes its only occluder; verifies visibility >= 0.99 on that first frame."
+      }
+    },
+    "readiness": {
+      "ft-ready": {
+        "schemaVersion": 1,
+        "command": "render.live.ready",
+        "status": "succeeded",
+        "code": "ok",
+        "message": "Editor GPU view completed a frame published after readiness wait began",
+        "data": {
+          "afterFrame": 3698,
+          "completionKind": "editor_gpu_frame_completed",
+          "completedFrame": 3699,
+          "publishedFrame": 3702,
+          "waitedMs": 65.0014
+        },
+        "timing": {
+          "queuedMs": 2.6848,
+          "waitedFrames": 1,
+          "executedMs": 75.0999
+        }
+      },
+      "resize-ready": {
+        "schemaVersion": 1,
+        "command": "render.live.ready",
+        "status": "succeeded",
+        "code": "ok",
+        "message": "Editor GPU view completed a frame published after readiness wait began",
+        "data": {
+          "afterFrame": 13953,
+          "completionKind": "editor_gpu_frame_completed",
+          "completedFrame": 13955,
+          "publishedFrame": 13958,
+          "waitedMs": 60.6207
+        },
+        "timing": {
+          "queuedMs": 2.0242,
+          "waitedFrames": 1,
+          "executedMs": 76.3279
+        }
+      },
+      "reload-status": {
+        "schemaVersion": 1,
+        "command": "scene.load.status",
+        "status": "succeeded",
+        "code": "ok",
+        "message": "Scene construction completed; requested activation commits at the frame boundary",
+        "data": {
+          "requestId": "2",
+          "path": "C:/Users/lance/source/CreatorEngine/Dynamic_CPP/Assets/Scenes/FT_Primitives.creator",
+          "state": "Ready",
+          "complete": true,
+          "activationRequested": true
+        },
+        "timing": {
+          "queuedMs": 3.0358,
+          "waitedFrames": 1,
+          "executedMs": 0.2548
+        }
+      },
+      "reload-ready": {
+        "schemaVersion": 1,
+        "command": "render.live.ready",
+        "status": "succeeded",
+        "code": "ok",
+        "message": "Editor GPU view completed a frame published after readiness wait began",
+        "data": {
+          "afterFrame": 17176,
+          "completionKind": "editor_gpu_frame_completed",
+          "completedFrame": 17177,
+          "publishedFrame": 17180,
+          "waitedMs": 64.1702
+        },
+        "timing": {
+          "queuedMs": 0.8029,
+          "waitedFrames": 0,
+          "executedMs": 76.7755
+        }
+      },
+      "quit": {
+        "schemaVersion": 1,
+        "command": "quit",
+        "status": "succeeded",
+        "code": "ok",
+        "message": "종료 요청",
+        "data": {},
+        "timing": {
+          "queuedMs": 14.1439,
+          "waitedFrames": 1,
+          "executedMs": 7.9432
+        }
+      }
+    },
+    "gracefulExit": true,
+    "errorCount": 0,
+    "warnings": 6
+  },
+  "captureGroups": {
+    "before": [
+      "before_frame45238.rdc",
+      "before_frame45239.rdc",
+      "before_frame45240.rdc"
+    ],
+    "staticAfter": [
+      "after_frame3753.rdc",
+      "after_frame3754.rdc",
+      "after_frame3755.rdc"
+    ],
+    "moved": [
+      "after_frame9795.rdc",
+      "after_frame9796.rdc",
+      "after_frame9797.rdc"
+    ],
+    "staticRepeat": [
+      "after_frame13109.rdc",
+      "after_frame13110.rdc",
+      "after_frame13111.rdc",
+      "after_frame13112.rdc",
+      "after_frame13113.rdc",
+      "after_frame13114.rdc"
+    ]
+  },
+  "captures": [
+    {
+      "file": "after_frame13109.rdc",
+      "bytes": 157176857,
+      "sha256": "cd862e7b8b807519a62c37d9c877466e80cdde9ec09d80a78b047a15730810ae",
+      "aoDispatches": 0,
+      "usedForStaticMetric": false
+    },
+    {
+      "file": "after_frame13110.rdc",
+      "bytes": 239522769,
+      "sha256": "09c09b742e04f46207c84cf7496f67032bd84a67dc3fe6f923717d23a21f6307",
+      "aoDispatches": 3,
+      "usedForStaticMetric": true
+    },
+    {
+      "file": "after_frame13111.rdc",
+      "bytes": 239536009,
+      "sha256": "c1ecbc73c307f04c266aa3d74e4c8510baf724cd0d23237f7319f930a00b440e",
+      "aoDispatches": 3,
+      "usedForStaticMetric": true
+    },
+    {
+      "file": "after_frame13112.rdc",
+      "bytes": 239510366,
+      "sha256": "25babd95221c82da83b3fa2e25485ee2a6b777ad83253d31c9e7b0808f899e9d",
+      "aoDispatches": 3,
+      "usedForStaticMetric": true
+    },
+    {
+      "file": "after_frame13113.rdc",
+      "bytes": 239519271,
+      "sha256": "e1841a29d91dc84a5afdcbb7efd48df9335afb0b9d9561f09d08716162969563",
+      "aoDispatches": 3,
+      "usedForStaticMetric": true
+    },
+    {
+      "file": "after_frame13114.rdc",
+      "bytes": 239476381,
+      "sha256": "ab43ed315ef6afdb70e30d9828d26db1a71a3f010cda0ed3d8f259f9645f7f78",
+      "aoDispatches": 3,
+      "usedForStaticMetric": true
+    },
+    {
+      "file": "after_frame3753.rdc",
+      "bytes": 154992192,
+      "sha256": "2fbff4ecb44be72d5676c6eca7fcf19bd18183e5f086657a6d84db863ceadad7",
+      "aoDispatches": 0,
+      "usedForStaticMetric": false
+    },
+    {
+      "file": "after_frame3754.rdc",
+      "bytes": 237353655,
+      "sha256": "c06358407a2fdab46ffff33fec6a9dfbe7f25862f7b3c9835429294ead182397",
+      "aoDispatches": 3,
+      "usedForStaticMetric": false
+    },
+    {
+      "file": "after_frame3755.rdc",
+      "bytes": 76683361,
+      "sha256": "e80e6026777823e3ce01aeda0b81f4cdd3867bcfef20ae8014ac99c92e64b896",
+      "aoDispatches": 0,
+      "usedForStaticMetric": false
+    },
+    {
+      "file": "after_frame9795.rdc",
+      "bytes": 197357834,
+      "sha256": "3736c8eb000c3c33b2c7f7b7ddcec6205d13c6f44b68dd781b477b9c878cb1e5",
+      "aoDispatches": 0,
+      "usedForStaticMetric": false
+    },
+    {
+      "file": "after_frame9796.rdc",
+      "bytes": 239840920,
+      "sha256": "7b9fa9f58d116439199cdc9d67b0705a23d0a7e4d329181491a26dd1cd188b4b",
+      "aoDispatches": 3,
+      "usedForStaticMetric": false
+    },
+    {
+      "file": "after_frame9797.rdc",
+      "bytes": 197351297,
+      "sha256": "dd39807fee247455833b20816d13b920c46a95501a545c135bee6f7038c34765",
+      "aoDispatches": 0,
+      "usedForStaticMetric": false
+    },
+    {
+      "file": "before_frame45238.rdc",
+      "bytes": 198999280,
+      "sha256": "b636145dbe796943e49445ba176b2693ca798562d32ce9b8c700f03a88752832",
+      "aoDispatches": 2,
+      "usedForStaticMetric": true
+    },
+    {
+      "file": "before_frame45239.rdc",
+      "bytes": 236949738,
+      "sha256": "067015028a152c3542785af09dfcbd651e41fd8ed59364051052040b9fcbd41e",
+      "aoDispatches": 2,
+      "usedForStaticMetric": true
+    },
+    {
+      "file": "before_frame45240.rdc",
+      "bytes": 238643153,
+      "sha256": "83cde7f8ae0bab3ff9ff810a98646675561741f107a568b65db55ba4ef51fa8d",
+      "aoDispatches": 4,
+      "usedForStaticMetric": false
+    }
+  ],
+  "sources": [
+    {
+      "path": "Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSAOPass.h",
+      "sha256": "80fdfba50b993d4e3c0bcff3c6eeb0f556e0e1c831b4504219f73a6c7462aacf"
+    },
+    {
+      "path": "Engine/RenderEngine/Render/Passes/Lighting/EnhancedSSAOPass.cpp",
+      "sha256": "408e3536c3ae5f78bdb470bf2095f4d4469cdf3385db129e6f95bdac3bd72a30"
+    },
+    {
+      "path": "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp",
+      "sha256": "64e2b039a3cdf1425c18fde7e1039fe577e74aac9a3520142803081259a5ccff"
+    },
+    {
+      "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/SsaoTemporal.slang",
+      "sha256": "067f090eddd3157c09ae397f6e3aab3aad5fe00f2d3a2dd804491c6b8b8bf9ed"
+    },
+    {
+      "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/SsaoFilter.slang",
+      "sha256": "50b59be53ae32205087a2e80ce05b0eaf345cb94a3714b92b2554bffcd7a6562"
+    },
+    {
+      "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/SelfTest/SsaoScene.slang",
+      "sha256": "2769fdb7756381dee49302ad89be6a58ea9656838d943ef8c222fac6bd27ee61"
+    },
+    {
+      "path": "Editor/RenderTests/RHI/DX12/Tests/Lighting/EnhancedSSAOTest.cpp",
+      "sha256": "c86e15217e7b68516bf8300e504668708f6d188c081ccef6b56d6e9bf6df7c72"
+    },
+    {
+      "path": "Tools/regression/verify-ssao-temporal.ps1",
+      "sha256": "8232e893413fadfb75c5473b14e919bd65d08db5038161f55cf4adc5b6de7d69"
+    },
+    {
+      "path": "Engine/SceneRuntime/FoliageCulling.h",
+      "sha256": "aa612253c416c12b15a9d289bcbf5e6f977e2694ccf350b6ca4c6b20868c0f6b"
+    },
+    {
+      "path": "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes/SsaoCommon.slang",
+      "sha256": "58b7eacbe6f18fc8e79239fda0b16ef5857dfb7db699a37d9ea82bd4a22133a8"
+    }
+  ],
+  "limits": [
+    "RenderDoc fixed-camera snapshots are not guaranteed adjacent engine submissions.",
+    "Native GPU fixture checks first-frame occluder removal; moved-object RDC checks a later live snapshot.",
+    "This change did not measure frame-rate performance or validate Vulkan runtime."
+  ]
+}

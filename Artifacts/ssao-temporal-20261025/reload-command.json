@@ -1,0 +1,18 @@
+{
+  "schemaVersion": 1,
+  "command": "scene.switch",
+  "status": "succeeded",
+  "code": "ok",
+  "message": "Scene preparation queued; use scene.load.status for the terminal result",
+  "data": {
+    "path": "C:/Users/lance/source/CreatorEngine/Dynamic_CPP/Assets/Scenes/FT_Primitives.creator",
+    "requestId": "2",
+    "queued": true,
+    "activationRequested": true
+  },
+  "timing": {
+    "queuedMs": 28.6445,
+    "waitedFrames": 1,
+    "executedMs": 0.3918
+  }
+}

@@ -20,6 +20,7 @@ import winrt_base;
 import Creator.Core.DynamicBitset;
 #endif
 #include "Assets/QuantizedGeometry.h"
+#include "Experiment/Import/MeshLodSkinError.h"
 #include "Assets/ModelCpuGeometry.h"
 #include "RHI/RHIShaderSource.h"
 #include "RHI/RHIModelMeshletUpload.h"
@@ -758,6 +759,19 @@ class RecordingChangeDevice : public ProbeDevice
             Check(FlushCommandList(error), "Injected native prefix: " + error);
         }
         return ProbeDevice::AllocateUpload(request);
+    }
+    bool captureSkinViewConstants{};
+    RHIBufferSlice skinViewConstants;
+    std::array<std::byte, 4800> skinViewExpected{};
+    RHIBufferSlice UploadConstants(const void* data, size_t bytes) override
+    {
+        const auto slice = ProbeDevice::UploadConstants(data, bytes);
+        if (captureSkinViewConstants && bytes == skinViewExpected.size())
+        {
+            skinViewConstants = slice;
+            std::memcpy(skinViewExpected.data(), data, bytes);
+        }
+        return slice;
     }
     const EnhancedRenderGraph* visibilityBindingGraph{};
     RGHandle visibilityBindingTarget{};
@@ -4309,6 +4323,7 @@ void RunMeshletDispatchBoundaries(RecordingChangeDevice& device, ProbeRoots& roo
 #include "support/HybridVisibilityProbe.inl"
 #include "support/ColdGeometryProbe.inl"
 #include "support/ObjectSpaceInstanceProbe.inl"
+#include "support/SkinLodErrorProbe.inl"
 #include "support/ClusterLodProbe.inl"
 #include "support/ShadowCorrectnessProbe.inl"
 #include "support/MeshletHzbProbe.inl"
@@ -4528,6 +4543,45 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
     if (mode == "--cluster-streaming-only")
     {
         RunClusterLod(device, roots, pipelines, textures, pool, instances[0], true);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        return;
+    }
+    if (mode == "--skinned-cluster-lod-only")
+    {
+        RunSkinLodError(device, roots, pipelines, root);
+        const auto* repeatText = std::getenv("CREATOR_SKIN_LOD_AUDIT_REPEATS");
+        const unsigned repeats = repeatText ? unsigned(std::stoul(repeatText)) : 1u;
+        Check(repeats > 0 && repeats <= 16, "Bounded skin LOD audit repetitions");
+        const auto* modeText = std::getenv("CREATOR_SKIN_LOD_AUDIT_MODE");
+        const unsigned selectedMode = modeText ? unsigned(std::stoul(modeText)) : UINT32_MAX;
+        Check(selectedMode == UINT32_MAX || selectedMode < 3, "Bounded skin LOD audit mode");
+        unsigned auditFailures{}, auditRuns{};
+        for (unsigned repeat = 0; repeat < repeats; ++repeat)
+        {
+            for (unsigned index : {0u, 1u, 2u})
+            {
+                const unsigned auditMode = repeat % 2 ? 2u - index : index;
+                if (selectedMode != UINT32_MAX && selectedMode != auditMode)
+                {
+                    continue;
+                }
+                ++auditRuns;
+                try
+                {
+                    RunClusterLod(device, roots, pipelines, textures, pool, instances[0], true, true, auditMode);
+                    std::cout << "METEOR_SKIN_LOD_AUDIT_OK mode=" << auditMode << " repeat=" << repeat << " frames=32\n";
+                }
+                catch (const std::exception& failure)
+                {
+                    ++auditFailures;
+                    std::cerr << "METEOR_SKIN_LOD_AUDIT_FAIL mode=" << auditMode << " repeat=" << repeat
+                              << " error=" << failure.what() << '\n';
+                }
+            }
+        }
+        Check(auditFailures == 0 && auditRuns > 0, "Every visibility lifetime/readback audit must pass");
+        std::cout << "METEOR_SKIN_LOD_AUDIT_ALL_OK runs=" << auditRuns << " frames=" << auditRuns * 32
+                  << " repeats=" << repeats << "\n";
         ShutdownNative(device, roots, pipelines, textures, pool);
         return;
     }
@@ -5231,6 +5285,7 @@ int main(int argc, char** argv)
                     std::string_view(argv[2]) == "--temporal-transmission-only" ||
                     std::string_view(argv[2]) == "--shadow-correctness-only" ||
                     std::string_view(argv[2]) == "--shadow-correctness-recreated" ||
+                    std::string_view(argv[2]) == "--skinned-cluster-lod-only" ||
                     std::string_view(argv[2]) == "--cluster-lod-only" ||
                     std::string_view(argv[2]) == "--object-space-only" ||
                     std::string_view(argv[2]) == "--object-space-dx12-only" ||

@@ -14,11 +14,11 @@ struct RHIModelMeshletUpload
 
 // Canonical METEOR GPU serialization. Cluster/primitive IDs come only from cooked
 // payloads. Chunk-local vertex remaps are paired with original geometry IDs.
-inline bool PackMeteorMeshletGpuPayload(const experiment::MeshletPayload& cooked,
-    uint64_t vertexCount, uint32_t vertexStride, uint32_t vertexAttributeMask,
-    uint32_t sourceLodIndex, uint32_t sourcePrimitiveCount, uint32_t sourceVertexCount,
-    std::span<const uint32_t> sourceVertices, RHIModelMeshletUpload& result, std::string& error,
-    const experiment::MeshClusterHierarchy* hierarchy = nullptr)
+inline bool PackMeteorMeshletGpuPayload(const experiment::MeshletPayload& cooked, uint64_t vertexCount,
+                                        uint32_t vertexStride, uint32_t vertexAttributeMask, uint32_t sourceLodIndex,
+                                        uint32_t sourcePrimitiveCount, uint32_t sourceVertexCount,
+                                        std::span<const uint32_t> sourceVertices, RHIModelMeshletUpload& result,
+                                        std::string& error, const experiment::MeshClusterHierarchy* hierarchy = nullptr)
 {
     result = {};
     const auto* payload = &cooked;
@@ -30,34 +30,65 @@ inline bool PackMeteorMeshletGpuPayload(const experiment::MeshletPayload& cooked
         error = "METEOR requires current cooked meshlets; force reimport/recook.";
         return false;
     }
-    if (hierarchy && !hierarchy->groupCount && (!hierarchy->groups.empty() || hierarchy->rootGroup!=UINT32_MAX)) {
-        error="METEOR empty spatial DAG has stale metadata."; return false;
+    if (hierarchy && !hierarchy->groupCount && (!hierarchy->groups.empty() || hierarchy->rootGroup != UINT32_MAX))
+    {
+        error = "METEOR empty spatial DAG has stale metadata.";
+        return false;
     }
-    if (hierarchy && hierarchy->groupCount) {
-        if (hierarchy->groupCount != hierarchy->groups.size() || hierarchy->groupCount > experiment::kMeshClusterMaxGroups ||
-            hierarchy->rootGroup + 1 != hierarchy->groupCount) {
-            error = "METEOR GPU spatial DAG has invalid count/root."; return false;
+    if (hierarchy && hierarchy->groupCount)
+    {
+        if (hierarchy->groupCount != hierarchy->groups.size() ||
+            hierarchy->groupCount > experiment::kMeshClusterMaxGroups ||
+            hierarchy->rootGroup + 1 != hierarchy->groupCount)
+        {
+            error = "METEOR GPU spatial DAG has invalid count/root.";
+            return false;
         }
-        for (uint32_t i=0;i<hierarchy->groupCount;++i) {
-            const auto& g=hierarchy->groups[i];
-            if (!g.meshletCount || !std::isfinite(g.geometricError) || g.geometricError<0 ||
+        for (uint32_t i = 0; i < hierarchy->groupCount; ++i)
+        {
+            const auto& g = hierarchy->groups[i];
+            const bool skin = assets::Has(vertexAttributeMask, assets::VertexAttribute::BoneIndices);
+            const auto weighted = std::bit_cast<float>(g.reserved[0]), weight = std::bit_cast<float>(g.reserved[1]);
+            if (skin ? ((g.reserved[2] != 1 && g.reserved[2] != 3) || !std::isfinite(weighted) || weighted < 0 ||
+                        !std::isfinite(weight) || weight < 0)
+                     : (g.reserved[0] || g.reserved[1] || g.reserved[2]))
+            {
+                error = "METEOR GPU deformation certificate is invalid.";
+                return false;
+            }
+            if (!g.meshletCount || !std::isfinite(g.geometricError) || g.geometricError < 0 ||
                 !std::isfinite(g.sphere[0]) || !std::isfinite(g.sphere[1]) || !std::isfinite(g.sphere[2]) ||
-                !std::isfinite(g.sphere[3]) || g.sphere[3]<0 || g.lodIndex>experiment::kMeshLodMaxLevels ||
-                (i==hierarchy->rootGroup ? g.parentGroup!=UINT32_MAX : (g.parentGroup<=i || g.parentGroup>=hierarchy->groupCount)) ||
-                (g.childGroup!=UINT32_MAX && (g.childGroup>=i || g.secondChild>=i || g.childGroup==g.secondChild))) {
-                error = "METEOR GPU spatial DAG edges/bounds/errors are invalid."; return false;
+                !std::isfinite(g.sphere[3]) || g.sphere[3] < 0 || g.lodIndex > experiment::kMeshLodMaxLevels ||
+                (i == hierarchy->rootGroup ? g.parentGroup != UINT32_MAX
+                                           : (g.parentGroup <= i || g.parentGroup >= hierarchy->groupCount)) ||
+                (g.childGroup != UINT32_MAX &&
+                 (g.childGroup >= i || g.secondChild >= i || g.childGroup == g.secondChild)))
+            {
+                error = "METEOR GPU spatial DAG edges/bounds/errors are invalid.";
+                return false;
             }
-            if (g.childGroup==UINT32_MAX ? (g.secondChild!=UINT32_MAX || g.lodIndex!=0 || g.geometricError!=0) :
-                (hierarchy->groups[g.childGroup].parentGroup!=i || hierarchy->groups[g.secondChild].parentGroup!=i ||
-                 g.geometricError<hierarchy->groups[g.childGroup].geometricError || g.geometricError<hierarchy->groups[g.secondChild].geometricError)) {
-                error="METEOR GPU spatial DAG ownership/error is invalid."; return false;
+            if (g.childGroup == UINT32_MAX ? (g.secondChild != UINT32_MAX || g.lodIndex != 0 || g.geometricError != 0)
+                                           : (hierarchy->groups[g.childGroup].parentGroup != i ||
+                                              hierarchy->groups[g.secondChild].parentGroup != i ||
+                                              g.geometricError < hierarchy->groups[g.childGroup].geometricError ||
+                                              g.geometricError < hierarchy->groups[g.secondChild].geometricError))
+            {
+                error = "METEOR GPU spatial DAG ownership/error is invalid.";
+                return false;
             }
         }
-        for (const auto& d:payload->descriptors) {
-            if (d.reserved>=hierarchy->groupCount) { error="METEOR cluster has no spatial group."; return false; }
-            const auto& g=hierarchy->groups[d.reserved];
-            if (d.clusterId<g.firstMeshlet || uint64_t(d.clusterId)>=uint64_t(g.firstMeshlet)+g.meshletCount) {
-                error="METEOR cluster belongs to another spatial group."; return false;
+        for (const auto& d : payload->descriptors)
+        {
+            if (d.reserved >= hierarchy->groupCount)
+            {
+                error = "METEOR cluster has no spatial group.";
+                return false;
+            }
+            const auto& g = hierarchy->groups[d.reserved];
+            if (d.clusterId < g.firstMeshlet || uint64_t(d.clusterId) >= uint64_t(g.firstMeshlet) + g.meshletCount)
+            {
+                error = "METEOR cluster belongs to another spatial group.";
+                return false;
             }
         }
     }
@@ -73,25 +104,42 @@ inline bool PackMeteorMeshletGpuPayload(const experiment::MeshletPayload& cooked
             vertexEnd + descriptor.vertexCount > payload->vertexRemap.size() ||
             triangleEnd + descriptor.triangleCount * 3 > payload->triangleIndices.size() ||
             primitiveEnd + descriptor.triangleCount > payload->primitiveRemap.size())
-        { error = "METEOR GPU meshlet descriptor range/identity is invalid."; return false; }
+        {
+            error = "METEOR GPU meshlet descriptor range/identity is invalid.";
+            return false;
+        }
         for (uint32_t i = 0; i < descriptor.triangleCount * 3; ++i)
+        {
             if (payload->triangleIndices[triangleEnd + i] >= descriptor.vertexCount)
-            { error = "METEOR GPU micro-triangle index is out of range."; return false; }
+            {
+                error = "METEOR GPU micro-triangle index is out of range.";
+                return false;
+            }
+        }
         for (uint32_t i = 0; i < descriptor.triangleCount; ++i)
-            if (payload->primitiveRemap[primitiveEnd + i] != previousPrimitive++ || previousPrimitive > sourcePrimitiveCount)
-            { error = "METEOR GPU source primitive identity is invalid."; return false; }
+        {
+            if (payload->primitiveRemap[primitiveEnd + i] != previousPrimitive++ ||
+                previousPrimitive > sourcePrimitiveCount)
+            {
+                error = "METEOR GPU source primitive identity is invalid.";
+                return false;
+            }
+        }
         vertexEnd += descriptor.vertexCount;
         triangleEnd += descriptor.triangleCount * 3;
         primitiveEnd += descriptor.triangleCount;
     }
     if (vertexEnd != payload->vertexRemap.size() || triangleEnd != payload->triangleIndices.size() ||
         primitiveEnd != payload->primitiveRemap.size() || sourceLodIndex > kRHIMaxCoarseMeshLods ||
-        !sourceVertexCount || !sourcePrimitiveCount || (!sourceVertices.empty() && sourceVertices.size() != vertexCount))
-    { error = "METEOR GPU geometry extent/LOD is invalid."; return false; }
+        !sourceVertexCount || !sourcePrimitiveCount ||
+        (!sourceVertices.empty() && sourceVertices.size() != vertexCount))
+    {
+        error = "METEOR GPU geometry extent/LOD is invalid.";
+        return false;
+    }
     constexpr uint64_t maximum = (std::numeric_limits<uint32_t>::max)();
-    if (vertexCount > maximum || payload->descriptors.size() > maximum ||
-        payload->vertexRemap.size() > maximum || payload->triangleIndices.size() > maximum ||
-        payload->primitiveRemap.size() > maximum)
+    if (vertexCount > maximum || payload->descriptors.size() > maximum || payload->vertexRemap.size() > maximum ||
+        payload->triangleIndices.size() > maximum || payload->primitiveRemap.size() > maximum)
     {
         error = "Meshlet GPU streams exceed 32-bit addressing.";
         return false;
@@ -154,16 +202,19 @@ inline bool PackMeteorMeshletGpuPayload(const experiment::MeshletPayload& cooked
                 std::memcpy(candidate.bytes.data() + offset, source, size);
             }
         };
-        if (header.hierarchyOffset) {
-            const uint32_t dagHeader[4]{hierarchy->groupCount,hierarchy->rootGroup,0,0};
-            copy(header.hierarchyOffset,dagHeader,sizeof(dagHeader));
-            copy(header.hierarchyOffset+16,hierarchy->groups.data(),hierarchy->groups.size()*sizeof(experiment::MeshClusterGroup));
+        if (header.hierarchyOffset)
+        {
+            const uint32_t dagHeader[4]{hierarchy->groupCount, hierarchy->rootGroup, 0, 0};
+            copy(header.hierarchyOffset, dagHeader, sizeof(dagHeader));
+            copy(header.hierarchyOffset + 16, hierarchy->groups.data(),
+                 hierarchy->groups.size() * sizeof(experiment::MeshClusterGroup));
         }
         copy(header.descriptorOffset, payload->descriptors.data(),
-            payload->descriptors.size() * sizeof(experiment::MeshletDescriptor));
+             payload->descriptors.size() * sizeof(experiment::MeshletDescriptor));
         copy(header.vertexRemapOffset, payload->vertexRemap.data(), payload->vertexRemap.size() * sizeof(uint32_t));
         copy(header.triangleOffset, payload->triangleIndices.data(), payload->triangleIndices.size());
-        copy(header.primitiveRemapOffset, payload->primitiveRemap.data(), payload->primitiveRemap.size() * sizeof(uint32_t));
+        copy(header.primitiveRemapOffset, payload->primitiveRemap.data(),
+             payload->primitiveRemap.size() * sizeof(uint32_t));
         for (uint32_t i = 0; i < header.vertexRemapCount; ++i)
         {
             const auto local = payload->vertexRemap[i];
@@ -173,8 +224,13 @@ inline bool PackMeteorMeshletGpuPayload(const experiment::MeshletPayload& cooked
                 return false;
             }
             const uint32_t original = sourceVertices.empty() ? local : sourceVertices[local];
-            if (original >= sourceVertexCount) { error = "METEOR source vertex identity is out of range."; return false; }
-            std::memcpy(candidate.bytes.data() + header.sourceVertexRemapOffset + i * sizeof(uint32_t), &original, sizeof(original));
+            if (original >= sourceVertexCount)
+            {
+                error = "METEOR source vertex identity is out of range.";
+                return false;
+            }
+            std::memcpy(candidate.bytes.data() + header.sourceVertexRemapOffset + i * sizeof(uint32_t), &original,
+                        sizeof(original));
         }
         candidate.meshletCount = header.meshletCount;
         candidate.profileVersion = header.profileVersion;
@@ -192,8 +248,7 @@ inline bool PackMeteorMeshletGpuPayload(const experiment::MeshletPayload& cooked
     return false;
 }
 
-inline bool BuildRHIModelMeshletUpload(const RHIModelMeshView& view,
-    RHIModelMeshletUpload& result, std::string& error)
+inline bool BuildRHIModelMeshletUpload(const RHIModelMeshView& view, RHIModelMeshletUpload& result, std::string& error)
 {
     const auto* payload = view.Meshlets();
     if (!view.IsComplete() || !payload)
@@ -202,7 +257,7 @@ inline bool BuildRHIModelMeshletUpload(const RHIModelMeshView& view,
         error = "METEOR model meshlet upload requires validated cooked geometry; force reimport/recook.";
         return false;
     }
-    return PackMeteorMeshletGpuPayload(*payload, view.vertexBytes / view.vertexStride,
-        view.vertexStride, view.vertexAttributeMask, view.sourceLodIndex,
-        view.indexCount / 3, static_cast<uint32_t>(view.vertexBytes / view.vertexStride), {}, result, error);
+    return PackMeteorMeshletGpuPayload(*payload, view.vertexBytes / view.vertexStride, view.vertexStride,
+                                       view.vertexAttributeMask, view.sourceLodIndex, view.indexCount / 3,
+                                       static_cast<uint32_t>(view.vertexBytes / view.vertexStride), {}, result, error);
 }

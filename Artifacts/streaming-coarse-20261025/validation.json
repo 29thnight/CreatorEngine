@@ -1,0 +1,158 @@
+{
+  "date": "2026-10-25",
+  "head": "9b0892d051be17ab64f2df78b775ad84135d491b",
+  "phase": 1,
+  "implementation": "physical budget admission with ancestor/root LOD fallback",
+  "status": "phase-1-validated",
+  "build": {
+    "configuration": "Debug",
+    "probe": {
+      "exitCode": 0,
+      "log": "build3.log"
+    },
+    "editor": {
+      "exitCode": 0,
+      "log": "editor-build.log"
+    }
+  },
+  "coverage": {
+    "coarseAdmission": {
+      "physicalPages": 2,
+      "rootWords": 8,
+      "immutableSnapshot": true,
+      "minimumCutRejectedBeforeMapping": true,
+      "passed": true
+    },
+    "sceneHostStreaming": {
+      "frames": 32,
+      "pixelChecks": 7416,
+      "transitionChecks": 6392,
+      "mixedFrames": 2,
+      "sharedQueueReads": 192,
+      "gpuFeedback": true,
+      "coldMetadataOnly": true,
+      "passed": true
+    }
+  },
+  "performanceMeasured": false,
+  "limits": [
+    "Fixed physical heap capacity remains unchanged.",
+    "The current target can coarsen; active foreign pages are never evicted.",
+    "A minimum root plus metadata that cannot fit is rejected before mapping.",
+    "No cross-asset root reservation or variable slabs in this phase."
+  ],
+  "nextPhases": [
+    {
+      "phase": 2,
+      "task": "variable physical slabs and VRAM-aware budget",
+      "status": "pending"
+    },
+    {
+      "phase": 3,
+      "task": "skinned coarse LOD error and normal compression",
+      "status": "pending"
+    },
+    {
+      "phase": 4,
+      "task": "point/spot shadow cache and atlas incremental updates",
+      "status": "pending"
+    },
+    {
+      "phase": 5,
+      "task": "cross-asset sub-page packing",
+      "status": "pending"
+    },
+    {
+      "phase": 6,
+      "task": "recursive GPU child work emission tuning",
+      "status": "deferred"
+    },
+    {
+      "phase": 7,
+      "task": "wide stress/failure correctness validation",
+      "status": "pending"
+    },
+    {
+      "phase": 8,
+      "task": "Vulkan/backend and Release acceptance",
+      "status": "pending"
+    }
+  ],
+  "files": [
+    {
+      "path": "Engine/RenderEngine/Assets/ClusterStreaming.h",
+      "sha256": "9a16ba42871178002db1f0ca83b8eb9209326fb41f73b4fd5cb8e43be7c8cef3"
+    },
+    {
+      "path": "Engine/RenderEngine/MaterialGraphMeshSurface.cpp",
+      "sha256": "72a3dc9a25426011b1f8acf6f46d09a13c4e282f9517b8852778cfa35aa18653"
+    },
+    {
+      "path": "Engine/RenderEngine/MeshletSparseStorage.inl",
+      "sha256": "289c1fd4945349479d044a2000c204aa9b9d544f4f625c57900fc1c0ee6bf621"
+    },
+    {
+      "path": "Engine/RenderEngine/RHI/RHISharedSparsePagePool.h",
+      "sha256": "4e31208221d3c4d9c08f13e29f803ce43a122c764da8e5a5c3521aefe77821ef"
+    },
+    {
+      "path": "Tools/regression/support/ClusterStorageProbe.inl",
+      "sha256": "979303df9c62dcf7ead18ce75f5d5932eee4d0084878967bac48b441bcbe7a54"
+    },
+    {
+      "path": "Tools/regression/support/SharedSparseStorageProbe.inl",
+      "sha256": "64a33d3bad019f98220d93854f3d8fd8df9190812fe6d411b18d00f89e8a7eff"
+    },
+    {
+      "path": "Tools/regression/support/ShadowCorrectnessProbe.inl",
+      "sha256": "19e419e5457b439d9a5582b307963b2fac71299fd7a48cdd6b765bf34fa19a4d"
+    },
+    {
+      "path": "Tools/regression/material_forward_blend_tests.inl",
+      "sha256": "d1c2e34ed0fd68cfee8b85a8251cb2e6b9a1ce36ecdfa0274cd9236ca27fe1ed"
+    },
+    {
+      "path": "Tools/regression/material_forward_transport_tests.inl",
+      "sha256": "6d82de62b0b6ec7b124f69010d2ea44fad18544e1cea58f89fd0ffe02b500c36"
+    },
+    {
+      "path": "Tools/regression/verify-material-scene-probes.ps1",
+      "sha256": "2086f83bdf4b70f14a439100055f48e151e35cc58e708164cdc2af05e276c277"
+    }
+  ],
+  "gpuRegression": {
+    "sourceStable": true,
+    "runs": [
+      {
+        "gpuValidationCoverageNotices": 0,
+        "mode": "--cluster-storage-only",
+        "passed": true,
+        "missingMarkers": [],
+        "exitCode": 0,
+        "timedOut": false
+      },
+      {
+        "gpuValidationCoverageNotices": 0,
+        "mode": "--cluster-streaming-only",
+        "passed": true,
+        "missingMarkers": [],
+        "exitCode": 0,
+        "timedOut": false
+      }
+    ],
+    "configuration": "Debug",
+    "gpuValidation": "on",
+    "passed": true
+  },
+  "scope": "Shared sparse admission helper and native GPU upload/readback; existing SceneHost sparse streaming camera/shadow integration. No new live Editor scene capture or performance measurement.",
+  "binaries": [
+    {
+      "path": "Bin/x64-Debug/Tools/MaterialRasterSurfaceProbe/MaterialRasterSurfaceProbe.exe",
+      "sha256": "ae436997f2ab3822e180fbead1ca242c3137b5129ed70fec16b8c239413adf0d"
+    },
+    {
+      "path": "Bin/x64-Debug/Editor/CreatorEditor.runtime.dll",
+      "sha256": "7f77154a655009fb60003b85ce67e148e7271a7b21db68819f980e292d0a2d0a"
+    }
+  ]
+}

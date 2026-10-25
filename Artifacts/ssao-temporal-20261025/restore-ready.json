@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "command": "render.live.ready",
+  "status": "succeeded",
+  "code": "ok",
+  "message": "Editor GPU view completed a frame published after readiness wait began",
+  "data": {
+    "afterFrame": 7918,
+    "completionKind": "editor_gpu_frame_completed",
+    "completedFrame": 7921,
+    "publishedFrame": 7926,
+    "waitedMs": 340.101
+  },
+  "timing": {
+    "queuedMs": 20.0947,
+    "waitedFrames": 1,
+    "executedMs": 364.976
+  }
+}

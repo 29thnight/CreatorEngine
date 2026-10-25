@@ -1,0 +1,551 @@
+[
+  {
+    "eid": 1803,
+    "stage": "ShaderStage.Mesh",
+    "shader": "ResourceId::0",
+    "outputs": "[]",
+    "depth": {
+      "bufferStructCount": 0,
+      "byteOffset": 0,
+      "byteSize": 0,
+      "counterByteOffset": 0,
+      "elementByteSize": 4,
+      "firstMip": 0,
+      "firstSlice": 0,
+      "flags": 0,
+      "format": {
+        "compByteWidth": 4,
+        "compCount": 1,
+        "compType": 8,
+        "type": 0
+      },
+      "minLODClamp": 0.0,
+      "numMips": 1,
+      "numSlices": 1,
+      "resource": "ResourceId::16638",
+      "secondary": "ResourceId::0",
+      "swizzle": {
+        "alpha": 3,
+        "blue": 2,
+        "green": 1,
+        "red": 0
+      },
+      "textureType": 6,
+      "type": 7,
+      "view": "ResourceId::0"
+    },
+    "ro": "[]",
+    "rw": "[]",
+    "cb": "[]",
+    "samplers": "[]"
+  },
+  {
+    "eid": 2361,
+    "stage": "ShaderStage.Pixel",
+    "shader": "ResourceId::15087",
+    "outputs": "[<Swig Object of type 'Descriptor *' at 0x0000024EF9390CB0>, <Swig Object of type 'Descriptor *' at 0x0000024EF93909F0>, <Swig Object of type 'Descriptor *' at 0x0000024EF93908F0>, <Swig Object of type 'Descriptor *' at 0x0000024EF93909B0>, <Swig Object of type 'Descriptor *' at 0x0000024EF9390A30>]",
+    "depth": {
+      "bufferStructCount": 0,
+      "byteOffset": 0,
+      "byteSize": 0,
+      "counterByteOffset": 0,
+      "elementByteSize": 0,
+      "firstMip": 0,
+      "firstSlice": 0,
+      "flags": 0,
+      "format": {
+        "compByteWidth": 0,
+        "compCount": 0,
+        "compType": 0,
+        "type": 1
+      },
+      "minLODClamp": 0.0,
+      "numMips": 1,
+      "numSlices": 1,
+      "resource": "ResourceId::0",
+      "secondary": "ResourceId::0",
+      "swizzle": {
+        "alpha": 3,
+        "blue": 2,
+        "green": 1,
+        "red": 0
+      },
+      "textureType": 0,
+      "type": 0,
+      "view": "ResourceId::0"
+    },
+    "ro": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF93908F0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF93909B0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF9390A30>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF9390A70>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF9390BF0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF9390B70>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF9390EF0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF9390F30>]",
+    "rw": "[]",
+    "cb": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF93908F0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF93909B0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF9390A30>]",
+    "samplers": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF93908F0>]",
+    "reflection": {
+      "entry": "LXSceneGBufferPS",
+      "constantBlocks": "[<Swig Object of type 'ConstantBlock *' at 0x0000024EF93909B0>, <Swig Object of type 'ConstantBlock *' at 0x0000024EF9390A30>, <Swig Object of type 'ConstantBlock *' at 0x0000024EF9390A70>]",
+      "ro": "[<Swig Object of type 'ShaderResource *' at 0x0000024EF9390B70>, <Swig Object of type 'ShaderResource *' at 0x0000024EF93909B0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF9390A30>, <Swig Object of type 'ShaderResource *' at 0x0000024EF9390A70>, <Swig Object of type 'ShaderResource *' at 0x0000024EF9390EF0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF9390F70>, <Swig Object of type 'ShaderResource *' at 0x0000024EF9395030>, <Swig Object of type 'ShaderResource *' at 0x0000024EF9395070>]",
+      "rw": "[]",
+      "debugInfo": {
+        "compileFlags": {
+          "flags": "[]"
+        },
+        "compiler": 7,
+        "debugInfoLoadingLog": "Did not find debug data for 'c2651cace28de1788fb8a5da725db8ad.pdb'\n\nDetails\n-------\n\nNo shader PDB filename specified using default 'c2651cace28de1788fb8a5da725db8ad.pdb'\n\nShader filepath 'c2651cace28de1788fb8a5da725db8ad.pdb'\n\nNo Recursive Search Paths\n\nNo Non-Recursive Search Paths\n\nFile not found using filepath 'c2651cace28de1788fb8a5da725db8ad.pdb'\n\nFile not found in recursive directory search using filepath 'c2651cace28de1788fb8a5da725db8ad.pdb'\n\nFile not found in files embedded in the capture using nickname 'c2651cace28de1788fb8a5da725db8ad.pdb'\n",
+        "debugStatus": "",
+        "debuggable": true,
+        "editBaseFile": -1,
+        "encoding": 5,
+        "entryLocation": {
+          "colEnd": 0,
+          "colStart": 0,
+          "disassemblyLine": 0,
+          "fileIndex": -1,
+          "lineEnd": 0,
+          "lineStart": 0
+        },
+        "entrySourceName": "LXSceneGBufferPS",
+        "files": "[]",
+        "sourceDebugInformation": false
+      }
+    },
+    "values": [
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF93951B0>]",
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF93951F0>]",
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF93952B0>]"
+    ]
+  },
+  {
+    "eid": 2733,
+    "stage": "ShaderStage.Compute",
+    "shader": "ResourceId::502",
+    "outputs": "[<Swig Object of type 'Descriptor *' at 0x0000024EF93956B0>, <Swig Object of type 'Descriptor *' at 0x0000024EF93953B0>, <Swig Object of type 'Descriptor *' at 0x0000024EF93957B0>, <Swig Object of type 'Descriptor *' at 0x0000024EF9395370>, <Swig Object of type 'Descriptor *' at 0x0000024EF9395BB0>]",
+    "depth": {
+      "bufferStructCount": 0,
+      "byteOffset": 0,
+      "byteSize": 0,
+      "counterByteOffset": 0,
+      "elementByteSize": 0,
+      "firstMip": 0,
+      "firstSlice": 0,
+      "flags": 0,
+      "format": {
+        "compByteWidth": 0,
+        "compCount": 0,
+        "compType": 0,
+        "type": 1
+      },
+      "minLODClamp": 0.0,
+      "numMips": 1,
+      "numSlices": 1,
+      "resource": "ResourceId::0",
+      "secondary": "ResourceId::0",
+      "swizzle": {
+        "alpha": 3,
+        "blue": 2,
+        "green": 1,
+        "red": 0
+      },
+      "textureType": 0,
+      "type": 0,
+      "view": "ResourceId::0"
+    },
+    "ro": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF93957B0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF9395370>]",
+    "rw": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF93957B0>]",
+    "cb": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF93957B0>]",
+    "samplers": "[]",
+    "reflection": {
+      "entry": "CSMain",
+      "constantBlocks": "[<Swig Object of type 'ConstantBlock *' at 0x0000024EF9395BB0>]",
+      "ro": "[<Swig Object of type 'ShaderResource *' at 0x0000024EF9395BB0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF9395B70>]",
+      "rw": "[<Swig Object of type 'ShaderResource *' at 0x0000024EF9395BB0>]",
+      "debugInfo": {
+        "compileFlags": {
+          "flags": "[]"
+        },
+        "compiler": 7,
+        "debugInfoLoadingLog": "Did not find debug data for '6a0d6b6a4c9e62762afea7130b46ac07.pdb'\n\nDetails\n-------\n\nNo shader PDB filename specified using default '6a0d6b6a4c9e62762afea7130b46ac07.pdb'\n\nShader filepath '6a0d6b6a4c9e62762afea7130b46ac07.pdb'\n\nNo Recursive Search Paths\n\nNo Non-Recursive Search Paths\n\nFile not found using filepath '6a0d6b6a4c9e62762afea7130b46ac07.pdb'\n\nFile not found in recursive directory search using filepath '6a0d6b6a4c9e62762afea7130b46ac07.pdb'\n\nFile not found in files embedded in the capture using nickname '6a0d6b6a4c9e62762afea7130b46ac07.pdb'\n",
+        "debugStatus": "",
+        "debuggable": true,
+        "editBaseFile": -1,
+        "encoding": 5,
+        "entryLocation": {
+          "colEnd": 0,
+          "colStart": 0,
+          "disassemblyLine": 0,
+          "fileIndex": -1,
+          "lineEnd": 0,
+          "lineStart": 0
+        },
+        "entrySourceName": "CSMain",
+        "files": "[]",
+        "sourceDebugInformation": false
+      }
+    },
+    "values": [
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF9395270>]"
+    ]
+  },
+  {
+    "eid": 2741,
+    "stage": "ShaderStage.Compute",
+    "shader": "ResourceId::506",
+    "outputs": "[<Swig Object of type 'Descriptor *' at 0x0000024EF9399370>, <Swig Object of type 'Descriptor *' at 0x0000024EF93994F0>, <Swig Object of type 'Descriptor *' at 0x0000024EF93995B0>, <Swig Object of type 'Descriptor *' at 0x0000024EF9399630>, <Swig Object of type 'Descriptor *' at 0x0000024EF93996F0>]",
+    "depth": {
+      "bufferStructCount": 0,
+      "byteOffset": 0,
+      "byteSize": 0,
+      "counterByteOffset": 0,
+      "elementByteSize": 0,
+      "firstMip": 0,
+      "firstSlice": 0,
+      "flags": 0,
+      "format": {
+        "compByteWidth": 0,
+        "compCount": 0,
+        "compType": 0,
+        "type": 1
+      },
+      "minLODClamp": 0.0,
+      "numMips": 1,
+      "numSlices": 1,
+      "resource": "ResourceId::0",
+      "secondary": "ResourceId::0",
+      "swizzle": {
+        "alpha": 3,
+        "blue": 2,
+        "green": 1,
+        "red": 0
+      },
+      "textureType": 0,
+      "type": 0,
+      "view": "ResourceId::0"
+    },
+    "ro": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF93996F0>]",
+    "rw": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF93996F0>]",
+    "cb": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF93996F0>]",
+    "samplers": "[]",
+    "reflection": {
+      "entry": "CSMain",
+      "constantBlocks": "[<Swig Object of type 'ConstantBlock *' at 0x0000024EF93998B0>]",
+      "ro": "[<Swig Object of type 'ShaderResource *' at 0x0000024EF93998B0>]",
+      "rw": "[<Swig Object of type 'ShaderResource *' at 0x0000024EF93998B0>]",
+      "debugInfo": {
+        "compileFlags": {
+          "flags": "[]"
+        },
+        "compiler": 7,
+        "debugInfoLoadingLog": "Did not find debug data for '5b5e4ca1a1c6ebc126d8484f138902a2.pdb'\n\nDetails\n-------\n\nNo shader PDB filename specified using default '5b5e4ca1a1c6ebc126d8484f138902a2.pdb'\n\nShader filepath '5b5e4ca1a1c6ebc126d8484f138902a2.pdb'\n\nNo Recursive Search Paths\n\nNo Non-Recursive Search Paths\n\nFile not found using filepath '5b5e4ca1a1c6ebc126d8484f138902a2.pdb'\n\nFile not found in recursive directory search using filepath '5b5e4ca1a1c6ebc126d8484f138902a2.pdb'\n\nFile not found in files embedded in the capture using nickname '5b5e4ca1a1c6ebc126d8484f138902a2.pdb'\n",
+        "debugStatus": "",
+        "debuggable": true,
+        "editBaseFile": -1,
+        "encoding": 5,
+        "entryLocation": {
+          "colEnd": 0,
+          "colStart": 0,
+          "disassemblyLine": 0,
+          "fileIndex": -1,
+          "lineEnd": 0,
+          "lineStart": 0
+        },
+        "entrySourceName": "CSMain",
+        "files": "[]",
+        "sourceDebugInformation": false
+      }
+    },
+    "values": [
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF9395E70>]"
+    ]
+  },
+  {
+    "eid": 2792,
+    "stage": "ShaderStage.Pixel",
+    "shader": "ResourceId::15384",
+    "outputs": "[<Swig Object of type 'Descriptor *' at 0x0000024EF33DA730>]",
+    "depth": {
+      "bufferStructCount": 0,
+      "byteOffset": 0,
+      "byteSize": 0,
+      "counterByteOffset": 0,
+      "elementByteSize": 0,
+      "firstMip": 0,
+      "firstSlice": 0,
+      "flags": 0,
+      "format": {
+        "compByteWidth": 0,
+        "compCount": 0,
+        "compType": 0,
+        "type": 1
+      },
+      "minLODClamp": 0.0,
+      "numMips": 1,
+      "numSlices": 1,
+      "resource": "ResourceId::0",
+      "secondary": "ResourceId::0",
+      "swizzle": {
+        "alpha": 3,
+        "blue": 2,
+        "green": 1,
+        "red": 0
+      },
+      "textureType": 0,
+      "type": 0,
+      "view": "ResourceId::0"
+    },
+    "ro": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DA8F0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DA970>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DA9B0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DA9F0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAA30>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAAB0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAAF0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAB30>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAB70>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAA70>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DABB0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DABF0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAC30>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAC70>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DACB0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DACF0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAD30>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAD70>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DADB0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DADF0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAE30>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAE70>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAEB0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAEF0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAF30>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAF70>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAFB0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E0030>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E0070>]",
+    "rw": "[]",
+    "cb": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DA970>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DA9B0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DA9F0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAA30>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAAB0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAB30>]",
+    "samplers": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DAAF0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DA970>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33DA9B0>]",
+    "reflection": {
+      "entry": "LXSceneColorPS",
+      "constantBlocks": "[<Swig Object of type 'ConstantBlock *' at 0x0000024EF33DA970>, <Swig Object of type 'ConstantBlock *' at 0x0000024EF33DA9B0>, <Swig Object of type 'ConstantBlock *' at 0x0000024EF33DA9F0>, <Swig Object of type 'ConstantBlock *' at 0x0000024EF33DAA30>, <Swig Object of type 'ConstantBlock *' at 0x0000024EF33DAAB0>, <Swig Object of type 'ConstantBlock *' at 0x0000024EF33DAB70>]",
+      "ro": "[<Swig Object of type 'ShaderResource *' at 0x0000024EF33DAB30>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DA970>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DA9B0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DA9F0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DAA30>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DAB70>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DAA70>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DABB0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DABF0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DAAB0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DAC30>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DAC70>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DACB0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DACF0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DAD30>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DAD70>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DADB0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DADF0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DAE30>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DAE70>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DAEB0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DAEF0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DAF30>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DAF70>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33DAFB0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E0030>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E0070>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E00B0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E00F0>]",
+      "rw": "[]",
+      "debugInfo": {
+        "compileFlags": {
+          "flags": "[]"
+        },
+        "compiler": 7,
+        "debugInfoLoadingLog": "Did not find debug data for '8bb74330a9c45e21f5710336d2bfc703.pdb'\n\nDetails\n-------\n\nNo shader PDB filename specified using default '8bb74330a9c45e21f5710336d2bfc703.pdb'\n\nShader filepath '8bb74330a9c45e21f5710336d2bfc703.pdb'\n\nNo Recursive Search Paths\n\nNo Non-Recursive Search Paths\n\nFile not found using filepath '8bb74330a9c45e21f5710336d2bfc703.pdb'\n\nFile not found in recursive directory search using filepath '8bb74330a9c45e21f5710336d2bfc703.pdb'\n\nFile not found in files embedded in the capture using nickname '8bb74330a9c45e21f5710336d2bfc703.pdb'\n",
+        "debugStatus": "",
+        "debuggable": true,
+        "editBaseFile": -1,
+        "encoding": 5,
+        "entryLocation": {
+          "colEnd": 0,
+          "colStart": 0,
+          "disassemblyLine": 0,
+          "fileIndex": -1,
+          "lineEnd": 0,
+          "lineStart": 0
+        },
+        "entrySourceName": "LXSceneColorPS",
+        "files": "[]",
+        "sourceDebugInformation": false
+      }
+    },
+    "values": [
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF93990B0>]",
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF9399B30>]",
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF93990B0>]",
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF9399C70>]",
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF33DAD30>]",
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF9399B30>]"
+    ]
+  },
+  {
+    "eid": 3037,
+    "stage": "ShaderStage.Pixel",
+    "shader": "ResourceId::15384",
+    "outputs": "[<Swig Object of type 'Descriptor *' at 0x0000024EF33DA670>]",
+    "depth": {
+      "bufferStructCount": 0,
+      "byteOffset": 0,
+      "byteSize": 0,
+      "counterByteOffset": 0,
+      "elementByteSize": 0,
+      "firstMip": 0,
+      "firstSlice": 0,
+      "flags": 0,
+      "format": {
+        "compByteWidth": 0,
+        "compCount": 0,
+        "compType": 0,
+        "type": 1
+      },
+      "minLODClamp": 0.0,
+      "numMips": 1,
+      "numSlices": 1,
+      "resource": "ResourceId::0",
+      "secondary": "ResourceId::0",
+      "swizzle": {
+        "alpha": 3,
+        "blue": 2,
+        "green": 1,
+        "red": 0
+      },
+      "textureType": 0,
+      "type": 0,
+      "view": "ResourceId::0"
+    },
+    "ro": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E31B0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E32F0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3870>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3530>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3630>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3670>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3730>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E35F0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E30B0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E36F0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3770>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E38B0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3AB0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3B70>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3A30>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3AF0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E36B0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E34F0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E34B0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3BB0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3B30>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3BF0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3C30>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3C70>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3CB0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3CF0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3D30>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3D70>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3DB0>]",
+    "rw": "[]",
+    "cb": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E32F0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3870>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3530>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3630>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3670>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E35F0>]",
+    "samplers": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3730>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E32F0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33E3870>]",
+    "reflection": {
+      "entry": "LXSceneColorPS",
+      "constantBlocks": "[<Swig Object of type 'ConstantBlock *' at 0x0000024EF33E32F0>, <Swig Object of type 'ConstantBlock *' at 0x0000024EF33E3870>, <Swig Object of type 'ConstantBlock *' at 0x0000024EF33E3530>, <Swig Object of type 'ConstantBlock *' at 0x0000024EF33E3630>, <Swig Object of type 'ConstantBlock *' at 0x0000024EF33E3670>, <Swig Object of type 'ConstantBlock *' at 0x0000024EF33E30B0>]",
+      "ro": "[<Swig Object of type 'ShaderResource *' at 0x0000024EF33E35F0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E32F0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3870>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3530>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3630>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E30B0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E36F0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3770>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E38B0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3670>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3AB0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3B70>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3A30>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3AF0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E36B0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E34F0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E34B0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3BB0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3B30>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3BF0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3C30>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3C70>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3CB0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3CF0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3D30>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3D70>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3DB0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3DF0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33E3E30>]",
+      "rw": "[]",
+      "debugInfo": {
+        "compileFlags": {
+          "flags": "[]"
+        },
+        "compiler": 7,
+        "debugInfoLoadingLog": "Did not find debug data for '8bb74330a9c45e21f5710336d2bfc703.pdb'\n\nDetails\n-------\n\nNo shader PDB filename specified using default '8bb74330a9c45e21f5710336d2bfc703.pdb'\n\nShader filepath '8bb74330a9c45e21f5710336d2bfc703.pdb'\n\nNo Recursive Search Paths\n\nNo Non-Recursive Search Paths\n\nFile not found using filepath '8bb74330a9c45e21f5710336d2bfc703.pdb'\n\nFile not found in recursive directory search using filepath '8bb74330a9c45e21f5710336d2bfc703.pdb'\n\nFile not found in files embedded in the capture using nickname '8bb74330a9c45e21f5710336d2bfc703.pdb'\n",
+        "debugStatus": "",
+        "debuggable": true,
+        "editBaseFile": -1,
+        "encoding": 5,
+        "entryLocation": {
+          "colEnd": 0,
+          "colStart": 0,
+          "disassemblyLine": 0,
+          "fileIndex": -1,
+          "lineEnd": 0,
+          "lineStart": 0
+        },
+        "entrySourceName": "LXSceneColorPS",
+        "files": "[]",
+        "sourceDebugInformation": false
+      }
+    },
+    "values": [
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF33DADB0>]",
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF33B8E30>]",
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF33E3330>]",
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF33B8E30>]",
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF33E3330>]",
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF33DADB0>]"
+    ]
+  },
+  {
+    "eid": 3133,
+    "stage": "ShaderStage.Compute",
+    "shader": "ResourceId::517",
+    "outputs": "[<Swig Object of type 'Descriptor *' at 0x0000024EF33ED6B0>]",
+    "depth": {
+      "bufferStructCount": 0,
+      "byteOffset": 0,
+      "byteSize": 0,
+      "counterByteOffset": 0,
+      "elementByteSize": 0,
+      "firstMip": 0,
+      "firstSlice": 0,
+      "flags": 0,
+      "format": {
+        "compByteWidth": 0,
+        "compCount": 0,
+        "compType": 0,
+        "type": 1
+      },
+      "minLODClamp": 0.0,
+      "numMips": 1,
+      "numSlices": 1,
+      "resource": "ResourceId::0",
+      "secondary": "ResourceId::0",
+      "swizzle": {
+        "alpha": 3,
+        "blue": 2,
+        "green": 1,
+        "red": 0
+      },
+      "textureType": 0,
+      "type": 0,
+      "view": "ResourceId::0"
+    },
+    "ro": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF33EDBB0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33ED9B0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33EDA30>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33EDC30>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33EDC70>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33EDCF0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF33EDD30>]",
+    "rw": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF33EDCB0>]",
+    "cb": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF33EDCB0>]",
+    "samplers": "[]",
+    "reflection": {
+      "entry": "CSMain",
+      "constantBlocks": "[<Swig Object of type 'ConstantBlock *' at 0x0000024EF33ED9B0>]",
+      "ro": "[<Swig Object of type 'ShaderResource *' at 0x0000024EF33ED9B0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33EDA30>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33EDC30>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33EDC70>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33EDCF0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33EDD70>, <Swig Object of type 'ShaderResource *' at 0x0000024EF33EDDB0>]",
+      "rw": "[<Swig Object of type 'ShaderResource *' at 0x0000024EF33EDD30>]",
+      "debugInfo": {
+        "compileFlags": {
+          "flags": "[]"
+        },
+        "compiler": 7,
+        "debugInfoLoadingLog": "Did not find debug data for '1357a55b7f5b8399c2938d48c01dc7fd.pdb'\n\nDetails\n-------\n\nNo shader PDB filename specified using default '1357a55b7f5b8399c2938d48c01dc7fd.pdb'\n\nShader filepath '1357a55b7f5b8399c2938d48c01dc7fd.pdb'\n\nNo Recursive Search Paths\n\nNo Non-Recursive Search Paths\n\nFile not found using filepath '1357a55b7f5b8399c2938d48c01dc7fd.pdb'\n\nFile not found in recursive directory search using filepath '1357a55b7f5b8399c2938d48c01dc7fd.pdb'\n\nFile not found in files embedded in the capture using nickname '1357a55b7f5b8399c2938d48c01dc7fd.pdb'\n",
+        "debugStatus": "",
+        "debuggable": true,
+        "editBaseFile": -1,
+        "encoding": 5,
+        "entryLocation": {
+          "colEnd": 0,
+          "colStart": 0,
+          "disassemblyLine": 0,
+          "fileIndex": -1,
+          "lineEnd": 0,
+          "lineStart": 0
+        },
+        "entrySourceName": "CSMain",
+        "files": "[]",
+        "sourceDebugInformation": false
+      }
+    },
+    "values": [
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF33E3C70>]"
+    ]
+  },
+  {
+    "eid": 3149,
+    "stage": "ShaderStage.Compute",
+    "shader": "ResourceId::524",
+    "outputs": "[<Swig Object of type 'Descriptor *' at 0x0000024EF37505F0>]",
+    "depth": {
+      "bufferStructCount": 0,
+      "byteOffset": 0,
+      "byteSize": 0,
+      "counterByteOffset": 0,
+      "elementByteSize": 0,
+      "firstMip": 0,
+      "firstSlice": 0,
+      "flags": 0,
+      "format": {
+        "compByteWidth": 0,
+        "compCount": 0,
+        "compType": 0,
+        "type": 1
+      },
+      "minLODClamp": 0.0,
+      "numMips": 1,
+      "numSlices": 1,
+      "resource": "ResourceId::0",
+      "secondary": "ResourceId::0",
+      "swizzle": {
+        "alpha": 3,
+        "blue": 2,
+        "green": 1,
+        "red": 0
+      },
+      "textureType": 0,
+      "type": 0,
+      "view": "ResourceId::0"
+    },
+    "ro": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF37507B0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF3750830>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF3750870>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF37508B0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF37508F0>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF3750970>, <Swig Object of type 'UsedDescriptor *' at 0x0000024EF37509B0>]",
+    "rw": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF3750930>]",
+    "cb": "[<Swig Object of type 'UsedDescriptor *' at 0x0000024EF3750930>]",
+    "samplers": "[]",
+    "reflection": {
+      "entry": "CSMain",
+      "constantBlocks": "[<Swig Object of type 'ConstantBlock *' at 0x0000024EF3750830>]",
+      "ro": "[<Swig Object of type 'ShaderResource *' at 0x0000024EF3750830>, <Swig Object of type 'ShaderResource *' at 0x0000024EF3750870>, <Swig Object of type 'ShaderResource *' at 0x0000024EF37508B0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF37508F0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF3750970>, <Swig Object of type 'ShaderResource *' at 0x0000024EF37509F0>, <Swig Object of type 'ShaderResource *' at 0x0000024EF3750A30>]",
+      "rw": "[<Swig Object of type 'ShaderResource *' at 0x0000024EF37509B0>]",
+      "debugInfo": {
+        "compileFlags": {
+          "flags": "[]"
+        },
+        "compiler": 7,
+        "debugInfoLoadingLog": "Did not find debug data for '1a11b808f55b3f425a8bcaa08b35f2bf.pdb'\n\nDetails\n-------\n\nNo shader PDB filename specified using default '1a11b808f55b3f425a8bcaa08b35f2bf.pdb'\n\nShader filepath '1a11b808f55b3f425a8bcaa08b35f2bf.pdb'\n\nNo Recursive Search Paths\n\nNo Non-Recursive Search Paths\n\nFile not found using filepath '1a11b808f55b3f425a8bcaa08b35f2bf.pdb'\n\nFile not found in recursive directory search using filepath '1a11b808f55b3f425a8bcaa08b35f2bf.pdb'\n\nFile not found in files embedded in the capture using nickname '1a11b808f55b3f425a8bcaa08b35f2bf.pdb'\n",
+        "debugStatus": "",
+        "debuggable": true,
+        "editBaseFile": -1,
+        "encoding": 5,
+        "entryLocation": {
+          "colEnd": 0,
+          "colStart": 0,
+          "disassemblyLine": 0,
+          "fileIndex": -1,
+          "lineEnd": 0,
+          "lineStart": 0
+        },
+        "entrySourceName": "CSMain",
+        "files": "[]",
+        "sourceDebugInformation": false
+      }
+    },
+    "values": [
+      "[<Swig Object of type 'ShaderVariable *' at 0x0000024EF9399C70>]"
+    ]
+  }
+]

@@ -3398,7 +3398,8 @@ bool DX12DeviceResources::UpdateSparseBufferMappings(RHIBufferHandle buffer,
         return false;
     }
     const auto virtualTiles = resource->GetDesc().Width / RHISparseTileBytes;
-    const auto physicalTiles = heap->GetDesc().SizeInBytes / RHISparseTileBytes;
+    std::vector<winrt::com_ptr<ID3D12Heap>> sourceHeaps;
+    std::vector<ce::lifetime_token> sourceBudgets;
     std::vector<D3D12_TILED_RESOURCE_COORDINATE> coordinates;
     std::vector<D3D12_TILE_REGION_SIZE> regions;
     std::vector<D3D12_TILE_RANGE_FLAGS> flags;
@@ -3406,13 +3407,20 @@ bool DX12DeviceResources::UpdateSparseBufferMappings(RHIBufferHandle buffer,
     std::set<uint32_t> seen;
     for (const auto& mapping : mappings)
     {
-        // Validate the complete batch before issuing any queue mutation.
-        if (mapping.virtualTile >= virtualTiles || (mapping.mapped && mapping.physicalTile >= physicalTiles) ||
-            !seen.insert(mapping.virtualTile).second)
+        const auto source = mapping.physicalPoolOwner.IsValid() ? mapping.physicalPoolOwner : buffer;
+        const auto sourceHeap = m_resourceTable.ResolveSparseHeap(source);
+        const auto physicalTiles = sourceHeap ? sourceHeap->GetDesc().SizeInBytes / RHISparseTileBytes : 0;
+        // Validate every slab and virtual range before issuing any queue mutation.
+        if (!sourceHeap || mapping.virtualTile >= virtualTiles ||
+            (mapping.mapped && mapping.physicalTile >= physicalTiles) || !seen.insert(mapping.virtualTile).second)
         {
             outError = "Sparse mapping range or duplicate virtual tile";
             return false;
         }
+        winrt::com_ptr<ID3D12Heap> retainedSource;
+        retainedSource.copy_from(sourceHeap);
+        sourceHeaps.push_back(std::move(retainedSource));
+        sourceBudgets.push_back(m_resourceTable.ResolveBufferLifetime(source));
         coordinates.push_back({mapping.virtualTile, 0, 0, 0});
         regions.push_back({1, FALSE, 0, 0, 0});
         flags.push_back(mapping.mapped ? D3D12_TILE_RANGE_FLAG_NONE : D3D12_TILE_RANGE_FLAG_NULL);
@@ -3427,15 +3435,20 @@ bool DX12DeviceResources::UpdateSparseBufferMappings(RHIBufferHandle buffer,
     retainedHeap.copy_from(heap);
     struct MappingLifetime
     {
+        // Destroy native references before returning their global budget leases.
+        ce::lifetime_token budget;
+        std::vector<ce::lifetime_token> sourceBudgets;
         winrt::com_ptr<ID3D12Resource> resource;
         winrt::com_ptr<ID3D12Heap> heap;
         winrt::com_ptr<ID3D12Fence> fence;
-        ce::lifetime_token budget;
+        std::vector<winrt::com_ptr<ID3D12Heap>> sourceHeaps;
     };
     auto lifetime = own::make_shared<MappingLifetime>();
     lifetime->resource = retainedResource;
     lifetime->heap = retainedHeap;
     lifetime->budget = m_resourceTable.ResolveBufferLifetime(buffer);
+    lifetime->sourceHeaps = std::move(sourceHeaps);
+    lifetime->sourceBudgets = std::move(sourceBudgets);
     const auto fenceResult = m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(lifetime->fence.put()));
     if (FAILED(fenceResult))
     {
@@ -3449,10 +3462,21 @@ bool DX12DeviceResources::UpdateSparseBufferMappings(RHIBufferHandle buffer,
              flags = std::move(flags), offsets = std::move(offsets), counts = std::move(counts),
              lifetime](std::string& error)
             {
-                m_queue->UpdateTileMappings(retainedResource.get(), static_cast<UINT>(coordinates.size()),
-                                            coordinates.data(), regions.data(), retainedHeap.get(),
-                                            static_cast<UINT>(flags.size()), flags.data(), offsets.data(),
-                                            counts.data(), D3D12_TILE_MAPPING_FLAG_NONE);
+                for (size_t begin = 0; begin < coordinates.size();)
+                {
+                    size_t end = begin + 1;
+                    const auto sourceHeap = lifetime->sourceHeaps[begin].get();
+                    while (end < coordinates.size() && lifetime->sourceHeaps[end].get() == sourceHeap)
+                    {
+                        ++end;
+                    }
+                    const auto count = static_cast<UINT>(end - begin);
+                    m_queue->UpdateTileMappings(retainedResource.get(), count, coordinates.data() + begin,
+                                                regions.data() + begin, sourceHeap, count, flags.data() + begin,
+                                                offsets.data() + begin, counts.data() + begin,
+                                                D3D12_TILE_MAPPING_FLAG_NONE);
+                    begin = end;
+                }
                 auto result = m_queue->Signal(lifetime->fence.get(), 1);
                 if (SUCCEEDED(result))
                 {

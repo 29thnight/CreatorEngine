@@ -1,0 +1,28 @@
+{
+  "sourceStable": true,
+  "auditMode": null,
+  "configuration": "Debug",
+  "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe",
+  "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\skindepth-b",
+  "passed": true,
+  "auditRepeats": null,
+  "runs": [
+    {
+      "exitCode": 0,
+      "mode": "--hybrid-visibility-only",
+      "timedOut": false,
+      "gpuValidationCoverageNotices": 0,
+      "missingMarkers": [],
+      "passed": true
+    },
+    {
+      "exitCode": 0,
+      "mode": "--object-space-only",
+      "timedOut": false,
+      "gpuValidationCoverageNotices": 0,
+      "missingMarkers": [],
+      "passed": true
+    }
+  ],
+  "gpuValidation": "off"
+}

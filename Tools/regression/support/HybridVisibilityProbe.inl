@@ -434,16 +434,21 @@ void RunHybridVisibility(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                 sourceResource = target->resource;
                 sourceVersion = target->version;
             }
-            const auto& depthCommands = find("METEOR.Scene.Commands.Depth.Build");
-            const auto& surfaceCommands = find("METEOR.Scene.Commands.Surface.Build");
-            Check(depthCommands.authoredIndex < find("METEOR.Scene.Occluder.HW").authoredIndex &&
-                      surfaceCommands.authoredIndex > finalize.authoredIndex &&
-                      surfaceCommands.authoredIndex < find("METEOR.Scene.Visibility.HW").authoredIndex,
-                  "Depth/surface command producers stay with their consumer raster stages");
+            // Packet dispatch has separate indirect-argument and packet producers.
+            // Both must precede their raster consumer; surface production follows final culling.
+            for (const auto* suffix : {".Arguments", ".Scatter"})
+            {
+                const auto& depthCommands = find(std::string("METEOR.Scene.Commands.Depth") + suffix);
+                const auto& surfaceCommands = find(std::string("METEOR.Scene.Commands.Surface") + suffix);
+                Check(depthCommands.authoredIndex < find("METEOR.Scene.Occluder.HW").authoredIndex &&
+                          surfaceCommands.authoredIndex > finalize.authoredIndex &&
+                          surfaceCommands.authoredIndex < find("METEOR.Scene.Visibility.HW").authoredIndex,
+                      "Depth/surface packet producers stay with their consumer raster stages");
+            }
             Check(std::ranges::none_of(snap.passes,
                                        [](const auto& p) { return p.name == "METEOR.Scene.OccluderDepth"; }),
                   "No separate depth-only occluder raster");
-            Check(finalResolve < find("METEOR.Scene.Material.CountTiles").compiledIndex,
+            Check(finalResolve < find("METEOR.Scene.Material.Count").compiledIndex,
                   "Tile assignment reads merged visibility");
             if (workers)
             {

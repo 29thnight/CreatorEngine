@@ -1,4 +1,4 @@
-﻿#pragma once
+#pragma once
 #include "../../../RHI/RHIFormat.h"
 #include "../../../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
@@ -8,13 +8,15 @@ import "Creator.WinAPI.h";
 #endif
 
 #include "../../Graph/EnhancedRenderPass.h"
+#include "../../Core/PassResourceRetirement.h"
 
 // Half-resolution screen-space AO using signed visibility sectors.
 // The angular average is an approximation, not cosine-weighted GTAO.
+// Temporal history belongs to one camera view and advances on accepted submission.
 // RG16F output stores visibility and view-space depth for the spatial filter.
 class EnhancedSSAOPass : public EnhancedRenderPass
 {
-public:
+  public:
     /// 계산 해상도의 분모. AO는 저주파라 반해상도에서 잃는 것이 거의 없다.
     /// 넷으로 나누면 얇은 물체의 접촉 그림자가 뭉개지기 시작한다 —
     /// 바꿀 근거가 생기면 실측으로 바꾼다.
@@ -45,21 +47,25 @@ public:
     {
         /// 가림을 볼 최대 거리(뷰 공간 단위). 크면 넓은 그늘, 작으면
         /// 접촉 그림자만 남는다.
-        float radius{ 0.5f };
+        float radius{0.5f};
 
         /// 표면 두께 가정. 화면 공간에서는 물체 뒤쪽을 볼 수 없어서,
         /// 깊이가 크게 다른 표본을 '무한히 두꺼운 가림막'으로 보면
         /// 배경이 통째로 가려진다. 그 깊이를 이 값으로 자른다.
-        float thickness{ 0.25f };
+        float thickness{0.25f};
 
         /// Visibility reduction multiplier; zero disables occlusion.
-        float intensity{ 1.f };
+        float intensity{1.f};
 
         /// 디노이즈의 깊이 민감도. 작을수록 경계를 잘 지키고 잡음이 남는다.
-        float filterDepthSigma{ 0.05f };
+        float filterDepthSigma{0.05f};
+        uint32_t maxHistoryFrames{16};
+        float historyDepthTolerance{0.02f};
+        float historyNormalThreshold{0.9f};
+        bool temporalEnabled{true};
     };
 
-    void SetTuning(const Tuning& tuning) { m_tuning = tuning; }
+    void SetTuning(const Tuning& tuning);
     const Tuning& GetTuning() const { return m_tuning; }
 
     const char* GetName() const override { return "SSAO"; }
@@ -71,8 +77,11 @@ public:
 
     struct Inputs
     {
-        RGHandle depth;    // GBuffer 깊이
-        RGHandle normal;   // Encoded world-space GBuffer normal (normal * 0.5 + 0.5)
+        RGHandle depth;  // GBuffer 깊이
+        RGHandle normal; // Encoded world-space GBuffer normal (normal * 0.5 + 0.5)
+        RGHandle motionVectors;
+        RGHandle responsiveMask;
+        RGHandle reactiveMask;
     };
 
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
@@ -89,26 +98,48 @@ public:
     /// 알 수 없다(SSGI 필터 스윕에서 전 구간 0.0%가 나왔던 일이 그 예다).
     RGHandle GetRawOutput() const { return m_rawOutput; }
 
-    /// Sample rotation seed. The current filter is spatial; it has no history.
+    /// Sample rotation seed follows the accepted view sequence.
     void SetFrameIndex(uint32_t index) { m_frameIndex = index; }
+    void ResetHistory();
+    void ReleaseHistory(const EnhancedFrameContext& context);
+    RGHandle GetResolvedOutput() const { return m_resolved; }
+    RGHandle GetHistoryOutput() const { return m_historyOutput; }
 
-
-private:
+  private:
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
+    bool EnsureHistory(const EnhancedFrameContext& context, std::string& outError);
 
-    Inputs   m_inputs{};
+    Inputs m_inputs{};
     RGHandle m_output;
     RGHandle m_rawOutput;
+    RGHandle m_resolved;
+    RGHandle m_historyOutput;
 
-    Tuning   m_tuning{};
-    uint32_t m_frameIndex{ 0 };
-    bool     m_keepAlive{ false };
+    static constexpr uint32_t kHistoryCount = 2;
+    PassResourceRetirement m_resourceRetirement;
+    std::array<RHITextureHandle, kHistoryCount> m_history{};
+    std::array<RHITextureHandle, kHistoryCount> m_geometryHistory{};
+    std::array<RHIResourceState, kHistoryCount> m_historyState{RHIResourceState::ShaderResource,
+                                                               RHIResourceState::ShaderResource};
+    std::array<RHIResourceState, kHistoryCount> m_geometryState{RHIResourceState::ShaderResource,
+                                                                RHIResourceState::ShaderResource};
+    math::matrix4x4 m_previousView{math::matrix4x4::identity()};
+    math::matrix4x4 m_previousViewProjection{math::matrix4x4::identity()};
+    uint64_t m_historyGeneration{};
+    uint32_t m_historyIndex{};
+    bool m_historyValid{};
 
-    uint32_t m_width{ 0 };    // 반해상도 폭
-    uint32_t m_height{ 0 };
+    Tuning m_tuning{};
+    uint32_t m_frameIndex{0};
+    bool m_keepAlive{false};
+
+    uint32_t m_width{0}; // 반해상도 폭
+    uint32_t m_height{0};
+
+    uint32_t m_fullWidth{}, m_fullHeight{};
 
     RHIPipelineHandle m_aoPSO;
 
     RHIPipelineHandle m_filterPSO;
+    RHIPipelineHandle m_temporalPSO;
 };
-

@@ -1,3 +1,4 @@
+#include "OctahedralNormalProbe.inl"
 #include "SharedSparseStorageProbe.inl"
 void RunClusterResidencyState(const own::shared_owner<const assets::cluster::Archive>& source)
 {
@@ -21,6 +22,30 @@ void RunClusterResidencyState(const own::shared_owner<const assets::cluster::Arc
     Check(cold->groups[2] && !cold->groups[0] && cold->bytes == pageBytes, "Cold root is pinned before refinement");
     const auto refined = stream.Prepare(2,left,budget);
     Check(refined->groups[0] && refined->groups[2] && !refined->groups[1], "Requested refinement arrives next recording");
+    const auto coarse = CoarsenResidentCut(*refined, groups, 1);
+    Check(coarse->groups[2] && !coarse->groups[0] && !coarse->packets[0] && coarse->bytes == pageBytes &&
+        refined->groups[0] && refined->packets[0], "GPU budget fallback keeps root coverage and submitted owners immutable");
+    auto closureGroups = groups;
+    closureGroups[0].parentGroup = 1;
+    closureGroups[0].lodIndex = 2;
+    auto closureSource = *refined;
+    closureSource.groups = {1, 1, 1};
+    closureSource.packets[1] = closureSource.packets[2];
+    const auto closed = CoarsenResidentCut(closureSource, closureGroups, 1);
+    Check(!closed->groups[0] && !closed->groups[1] && closed->groups[2],
+        "Coarsening removes descendants of an unavailable ancestor regardless of LOD labels");
+    auto invalidGroups = groups;
+    invalidGroups[0].parentGroup = 0;
+    bool invalidCutRejected = false;
+    try
+    {
+        CoarsenResidentCut(*refined, invalidGroups, 1);
+    }
+    catch (const std::exception&)
+    {
+        invalidCutRejected = true;
+    }
+    Check(invalidCutRejected, "Malformed coarse hierarchy rejects before publication");
     const auto switched = stream.Prepare(3,right,budget);
     Check(switched->groups[1] && !switched->groups[0] && switched->evictions == 1 && refined->groups[0] && refined->packets[0],
         "Eviction preserves the preceding submitted snapshot's immutable page owner");
@@ -209,6 +234,7 @@ void RunSparseBufferStorage(RecordingChangeDevice& device)
 void RunClusterStorage(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
     const std::filesystem::path& root)
 {
+    RunOctahedralNormalContract();
     RunSparseBufferStorage(device);
     RunSharedSparseStorage(device);
     using namespace assets::cluster;
@@ -378,8 +404,20 @@ void RunClusterStorage(RecordingChangeDevice& device, ProbeRoots& roots, ProbePi
         {
             Check(device.MapReadback(reads[i], images[i], error), "Direct cluster map");
         }
-        Check(images[1].data.size() >= expected.size() && std::memcmp(images[1].data.data(), expected.data(), expected.size()) == 0,
-            "Actual GPU attribute decoder matches CPU quantized bits for every semantic");
+        Check(images[1].data.size() >= expected.size(), "GPU decoded attribute extent");
+        for (uint32_t word = 0; word < expected.size()/4; ++word)
+        {
+            const auto channel = (word*4)%stride;
+            const auto actual = Word(std::as_bytes(std::span(images[1].data)), word*4), referenceBits = Word(expected, word*4);
+            if (channel >= 12 && channel < 24)
+            {
+                Near(std::bit_cast<float>(actual), std::bit_cast<float>(referenceBits), "Octahedral CPU/GPU direction", .000002);
+            }
+            else
+            {
+                Check(actual == referenceBits, "GPU attribute decoding remains bit exact outside direction normalization");
+            }
+        }
         for (uint32_t vertex = 0; vertex < count; ++vertex)
         {
             SurfacePoint point; std::memcpy(&point, images[0].data.data() + vertex * sizeof(point), sizeof(point));

@@ -1,0 +1,39 @@
+{
+  "head": "9b0892d051be17ab64f2df78b775ad84135d491b",
+  "runtimeSha256": "70945540B24D6EACA890645EBA20A8E2EEAC2D63654D6208BC013E83D0AE5028",
+  "runtimeLastWrite": "2026-10-25T06:47:19.3578154Z",
+  "sceneSha256": "EACEF91D0D6C8286EC1A2A1056A10E434523B6DAC0308EB57CB390A328BAFFEA",
+  "scene": "FT_Primitives",
+  "window": [
+    2400,
+    1500
+  ],
+  "camera": {
+    "position": [
+      3.75,
+      2,
+      -4
+    ],
+    "rotationDegrees": [
+      20,
+      0,
+      0
+    ]
+  },
+  "renderScale": "off",
+  "viewport": "scene",
+  "captures": [
+    {
+      "Name": "before_frame45238.rdc",
+      "Length": 198999280
+    },
+    {
+      "Name": "before_frame45239.rdc",
+      "Length": 236949738
+    },
+    {
+      "Name": "before_frame45240.rdc",
+      "Length": 238643153
+    }
+  ]
+}

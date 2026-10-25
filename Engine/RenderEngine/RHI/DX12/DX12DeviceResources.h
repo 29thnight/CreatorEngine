@@ -601,6 +601,14 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     {
         return m_persistentMemoryBudget.GetMemoryPressureInfo().memoryPressure;
     }
+    RHIStreamingMemoryBudget GetStreamingMemoryBudget() const override
+    {
+        const auto decision = m_persistentMemoryBudget.GetDecision(kRHIDeviceLocalMemoryBudgetDomain);
+        const auto consumed = decision.reservedGrowthBytes + decision.committedSinceRefreshBytes;
+        const auto pressure = m_persistentMemoryBudget.GetMemoryPressureInfo();
+        return {decision.growthBudgetBytes > consumed ? decision.growthBudgetBytes - consumed : 0,
+                pressure.targetReleaseBytes, pressure.memoryPressure};
+    }
     bool IsSparseBuffer(RHIBufferHandle buffer) const { return m_resourceTable.ResolveSparseHeap(buffer) != nullptr; }
     bool CreateSparseBuffer(const RHISparseBufferDesc& desc, RHIBufferHandle& outHandle,
                             std::string& outError) override;

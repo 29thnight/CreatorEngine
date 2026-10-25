@@ -1,0 +1,18 @@
+[
+  "90-degree camera/world rotation invariance: PASS",
+  "Unoccluded plane and contact visibility: PASS",
+  "Spatial filter reduces variation: PASS",
+  "Odd-size tilted plane does not self-occlude: PASS",
+  "One-sided wall covers at most half at optical center: PASS",
+  "Opposite occluders cover distinct sectors: PASS",
+  "Intensity zero produces visibility one: PASS",
+  "Sky remains unoccluded: PASS",
+  "Accepted static surface accumulates history: PASS",
+  "Temporal/spatial output suppresses sample rotation noise: PASS",
+  "Changed view depth rejects old AO: PASS",
+  "Changed world normal rejects old AO: PASS",
+  "Disappearing occluder leaves no receiver ghost on the first frame: PASS",
+  "Camera cut discards AO history: PASS",
+  "Full-resolution resize resets even when half extent is unchanged: PASS",
+  "Aborted recording cannot publish an AO history slot: PASS"
+]
