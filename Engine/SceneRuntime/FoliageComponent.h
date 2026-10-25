@@ -7,6 +7,7 @@ import Creator.Core.Ownership;
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "FoliageType.h"
 #include "FoliageInstance.h"
+#include "FoliageCulling.h"
 #include "TerrainBuffers.h"
 #include "Component.h"
 #include "AssetDepot/AssetRequest.h"
@@ -81,6 +82,8 @@ private:
 
     [[reflgen::ignore]]
     std::vector<FoliageInstance> m_foliageInstances{};
+    [[reflgen::ignore]]
+    foliage::WorldBoundsCache m_worldBoundsCache{};
 private:
     [[reflgen::ignore]]
     void ReleaseManagedResources() override;

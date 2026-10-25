@@ -9,12 +9,21 @@ $header = [IO.File]::ReadAllText((Join-Path $repo 'Engine/SceneRuntime/FoliageCo
 $required = @(
     'sealed\.RebuildWorldMatrix\(\);\s*m_foliageInstances\.push_back',
     'found->m_scale = scale;\s*found->RebuildWorldMatrix\(\);',
+    'found->RebuildWorldMatrix\(\);\s*m_worldBoundsCache\.Invalidate\(',
+    'binding\.status = Status::Ready;[\s\S]*?m_worldBoundsCache\.InvalidateType\(',
+    'm_foliageInstances\.clear\(\);\s*m_worldBoundsCache\.Clear\(\);',
+    'm_foliageTypes\.erase\([^;]+;\s*m_worldBoundsCache\.InvalidateAll\(\);',
+    'm_foliageInstances\.erase\(m_foliageInstances\.begin\(\)\+index\);\s*m_worldBoundsCache\.InvalidateAll\(\);',
+    'm_foliageInstances\.size\(\) != previousSize\)\s*\{\s*m_worldBoundsCache\.InvalidateAll\(\);',
     'Meta::Deserialize\(&instance, instanceNode\);\s*AddFoliageInstance\(instance\);',
     'inst\.m_position\.y = heightMap\[idx\];\s*AddFoliageInstance\(inst\);',
-    'foliage::CullSealedInstances\(std::span\{m_foliageInstances\}'
+    'm_worldBoundsCache\.Cull\(std::span\{m_foliageInstances\}'
 )
 foreach ($pattern in $required) {
     if ($component -notmatch $pattern) { throw "Foliage sealed-pose producer wiring changed: $pattern" }
+}
+if ($header -notmatch '\[\[reflgen::ignore\]\]\s*foliage::WorldBoundsCache m_worldBoundsCache') {
+    throw 'World bounds cache must remain nonserialized component-local state'
 }
 if ($header -notmatch 'const std::vector<FoliageInstance>& GetFoliageInstances\(\) const') {
     throw 'Foliage instance publication must remain a const view'

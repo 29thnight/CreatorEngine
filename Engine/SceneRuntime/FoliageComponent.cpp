@@ -70,6 +70,7 @@ void FoliageComponent::ReleaseManagedResources()
 {
     CancelAssetBindings();
     m_assetBindings.clear();
+    m_worldBoundsCache.Clear();
 }
 
 void FoliageComponent::CancelAssetBindings()
@@ -215,6 +216,7 @@ void FoliageComponent::LoadFoliageAsset(FileGuid assetGuid)
     m_assetBindings.clear();
     m_foliageTypes.clear();
     m_foliageInstances.clear();
+    m_worldBoundsCache.Clear();
     for (const Authoring::ReadNode typeNode :
         assetNode["FoliageAsset"]["Types"])
     {
@@ -443,6 +445,9 @@ void FoliageComponent::PollAssetBindings()
         type.m_authoredMaterial.reset();
         binding.material = {};
         binding.status = Status::Ready;
+        // Invalidate only after the coherent replacement owners are published.
+        // Pending/failed rebinds leave the old selected mesh and cache valid.
+        m_worldBoundsCache.InvalidateType(static_cast<uint32_t>(index), std::span{m_foliageInstances});
         PublishRenderPropertyWrite(ProxyDirty::Material | ProxyDirty::Payload);
     }
 }
@@ -477,6 +482,7 @@ void FoliageComponent::RemoveFoliageType(uint32 typeID)
         m_assetBindings[typeID]->Cancel();
         m_assetBindings.erase(m_assetBindings.begin() + typeID);
         m_foliageTypes.erase(m_foliageTypes.begin() + typeID);
+        m_worldBoundsCache.InvalidateAll();
         std::erase_if(m_foliageInstances, [typeID](const auto& instance)
         {
             return instance.m_foliageTypeID == typeID;
@@ -529,6 +535,7 @@ bool FoliageComponent::UpdateFoliageInstance(std::uint64_t identity,
     found->m_rotation = rotation;
     found->m_scale = scale;
     found->RebuildWorldMatrix();
+    m_worldBoundsCache.Invalidate(static_cast<size_t>(found - m_foliageInstances.begin()));
     PublishRenderPropertyWrite(ProxyDirty::Payload);
     return true;
 }
@@ -538,6 +545,7 @@ void FoliageComponent::RemoveFoliageInstance(size_t index)
     if(index < m_foliageInstances.size())
 	{
         m_foliageInstances.erase(m_foliageInstances.begin()+index);
+        m_worldBoundsCache.InvalidateAll();
 		PublishRenderPropertyWrite(ProxyDirty::Payload);
 	}
 }
@@ -597,7 +605,10 @@ void FoliageComponent::RemoveInstancesInBrush(TerrainComponent* terrain, const T
             return dx * dx + dz * dz <= brush.m_radius * brush.m_radius;
         }), m_foliageInstances.end());
 	if (m_foliageInstances.size() != previousSize)
+    {
+        m_worldBoundsCache.InvalidateAll();
 		PublishRenderPropertyWrite(ProxyDirty::Payload);
+    }
 }
 void FoliageComponent::UpdateFoliageCullingData(
     const std::optional<math::bounding_frustum>& cameraFrustum)
@@ -605,7 +616,7 @@ void FoliageComponent::UpdateFoliageCullingData(
     // Add/load/terrain insertion and every owner-thread edit seal the matrix.
     // Culling borrows that pose instead of rebuilding S*Rx*Ry*Rz*T each frame.
     if (m_foliageTypes.empty() || m_foliageInstances.empty()) return;
-    foliage::CullSealedInstances(std::span{m_foliageInstances}, m_foliageTypes.size(),
+    m_worldBoundsCache.Cull(std::span{m_foliageInstances}, m_foliageTypes.size(),
         [&](std::uint32_t typeID) -> const math::aabb*
         {
             const auto& type = m_foliageTypes[typeID];
