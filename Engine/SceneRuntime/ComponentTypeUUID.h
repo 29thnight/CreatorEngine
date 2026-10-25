@@ -1,7 +1,12 @@
 #pragma once
-#include "TypeTrait.h"
-#include "LogSystem.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
+#include "../Utility_Framework/Reflection/TypeTrait.h"
+#include "../Utility_Framework/Diagnostics/LogSystem.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // 컴포넌트 타입의 영속(디스크) UUID 표 (SceneGraphRedesignPlan K1-b).
 //
@@ -9,7 +14,7 @@
 // 이름의 해시일 뿐이다(TypeTrait.h GUIDCreator::GetTypeID — typeid(T).hash_code()
 // 32비트 절단). 리네임하면 이름도 typeID도 함께 바뀌어 로드 시 컴포넌트 노드를
 // 찾지 못하고 조용히 버려진다(§1.1 "리네임 시 컴포넌트 소실"). 여기 UUID는 손으로
-// 박아 리네임에 불변이다 — Uuid::FromName처럼 이름에서 유도하면 "이름이 바뀌면
+// 박아 리네임에 불변이다 — uuid::from_name처럼 이름에서 유도하면 "이름이 바뀌면
 // 값도 바뀐다"는 점에서 같은 병을 재현하므로 쓰지 않는다(§5 예외 2).
 //
 // 새 컴포넌트를 추가하면 이 표에 한 줄, LifecycleRegistry::RegisterAllComponents에
@@ -20,7 +25,7 @@ namespace ComponentTypeUUID
     struct Entry
     {
         std::string_view typeName;
-        const char*       literal; // Uuid::Parse가 읽는 8-4-4-4-12 표기.
+        const char*       literal; // uuid::parse가 읽는 8-4-4-4-12 표기.
     };
 
     // LifecycleRegistry.cpp의 RegisterAllComponents와 같은 순서 — 새 타입을
@@ -83,7 +88,7 @@ namespace ComponentTypeUUID
                 std::abort();
             }
 
-            const Uuid::Uuid16 uuid = Uuid::Parse(entry.literal);
+            const uuid::uuid16 uuid = uuid::parse(entry.literal);
 
             if (const std::string* dupName = TypeTrait::ComponentUUIDRegistry::FindNameByUUID(uuid))
             {

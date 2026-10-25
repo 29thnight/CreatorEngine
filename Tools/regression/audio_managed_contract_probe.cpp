@@ -1,4 +1,8 @@
-#include "Contract.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 // Test body for extracted production native audio bindings. The Python runner
 // injects exact ABI structs/functions from ClrHost.cpp and stub scene objects.
 int main()
@@ -53,8 +57,8 @@ int main()
             return static_cast<bool>((Api_Audio_SetReverbPreset(1) == 1 && Api_Audio_SetReverbPreset(3) == 0));
         },
         "Api_Audio_SetReverbPreset(1) == 1 && Api_Audio_SetReverbPreset(3) == 0");
-    AudioAssetId asset{}; const auto guid = Uuid::Parse(audio.key.Text());
-    std::memcpy(&asset, guid.data.data(), sizeof(asset));
+    AudioAssetId asset{}; const auto guid = uuid::parse(audio.key.Text());
+    std::memcpy(&asset, guid.data_.data(), sizeof(asset));
     ::ce::contracts::enforce_that(
         [&]() -> bool {
             return static_cast<bool>((AudioKey(asset) == audio.key));
@@ -126,7 +130,7 @@ int main()
             return static_cast<bool>((graph));
         },
         "graph");
-    const auto graphGuid=Uuid::Parse("dd4949ac-22b2-42f1-ab2e-1775b5776611");
+    const auto graphGuid=uuid::parse("dd4949ac-22b2-42f1-ab2e-1775b5776611");
     const auto graphKey=wave::ClipKey::FromGuid(graphGuid); ::ce::contracts::enforce_that(
         [&]() -> bool {
             return static_cast<bool>((playback.RegisterGraph(graphKey, graph)));

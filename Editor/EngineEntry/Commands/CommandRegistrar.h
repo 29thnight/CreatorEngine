@@ -17,9 +17,9 @@
 // 링크 심볼을 181 개 늘리지 않는 것이 요점이다 — 이 프로젝트는 유니티 빌드라
 // 심볼 충돌이 엉뚱한 파일에서 터진다.
 
-#include "../ConsoleCommandSystem.h"
+#include "ConsoleCommandSystem.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace ConsoleCmd
 {

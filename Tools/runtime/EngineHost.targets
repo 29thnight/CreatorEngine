@@ -17,6 +17,11 @@
     <ResourceCompile Include="$(SolutionDir)Tools\runtime\EngineVersion.rc">
       <PreprocessorDefinitions>CREATOR_ENGINE_RUNTIME_HOST;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ResourceCompile>
+    <!-- One distribution identity cache in every host, including lean tools without Utility. -->
+    <ClCompile Include="$(SolutionDir)Engine\Utility_Framework\Runtime\EngineDistributionIdentity.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
     <ClCompile Include="$(SolutionDir)Tools\runtime\HostInfo.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>

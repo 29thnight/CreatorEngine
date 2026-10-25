@@ -1,12 +1,22 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
 // Script runtime controls, UI authoring operations and isolated domain Commandlets.
 // UI authoring shares property transactions with Inspector and Scene View.
 
 #include "CommandRegistrar.h"
 #include "CommandSupport.h"
-#include "EditorObjectOperations.h"
-#include "EditorScriptAuthoring.h"
+#include "../Scene/EditorObjectOperations.h"
+#include "../Scripting/EditorScriptAuthoring.h"
 #include <stdio.h>
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
@@ -15,10 +25,10 @@
 #include "CommandCore/CommandDescriptorSeeds.h"
 #include "EditorCommandServiceHost.h"        // LC4: 로컬 HTTP/JSON 서비스  // LC2: 토크나이저와 소유형 invocation
 #include "EditorCameraRig.h"
-#include "EditorSessionState.h"
+#include "../Project/EditorSessionState.h"
 #include "EngineBootstrap.h"
-#include "GameBuilderSystem.h"
-#include "EditorAssetDatabase.h"
+#include "../Build/GameBuilderSystem.h"
+#include "../Assets/EditorAssetDatabase.h"
 #include "Interfaces/AssetAuthoringPort.h"
 #include "Interfaces/FoliageInstance.h"
 #include <mathematics/color.hpp>
@@ -82,15 +92,18 @@
 #include "AIManager.h"
 #include "DataSystem.h"
 #include "GpuDiagnostics.h"
-#include "LogSystem.h"
-#include "PathFinder.h"
-#include "RuntimeSettings.h"
-#include "AuthoringNodeEquality.h" // D3-a-1: 저작 노드 구조 비교
-#include "AuthoringNodeViewAccess.h" // D3-a-5b
-#include "AuthoringParsedDocument.h"
-#include "AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
-#include "SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
-#include "WindowsCoreWindow.h"
+#include "../../../Engine/Utility_Framework/Diagnostics/LogSystem.h"
+#include "../../../Engine/Utility_Framework/Runtime/RuntimeSettings.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeEquality.h" // D3-a-1: 저작 노드 구조 비교
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-5b
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
+#include "../../../Engine/Utility_Framework/Authoring/SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.AppBackend.WinAPI.h"
+#else
+import Creator.AppBackend.WinAPI;
+#endif
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
@@ -115,19 +128,23 @@
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
 #include "RHI/ScreenSizedResource.h"
-#include "ReflectionYml.h"
-#include "ReflectionUndo.h"
-#include "GameObjectCommand.h"
-#include "StringHelper.h"
+#include "../../../Engine/Utility_Framework/Reflection/ReflectionYml.h"
+#include "../Editing/ReflectionUndo.h"
+#include "../Editing/GameObjectCommand.h"
 #include "BlackBoard.h"
 #include "TagManager.h"
-#include <Windows.h>
-#include <psapi.h> // MBC11: peak working set
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+// MBC11: peak working set
 #include <crtdbg.h>
-#include <DbgHelp.h>
-#include <DXProgrammableCapture.h>
-#include <dxgidebug.h>
-#include <wrl/client.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 #include "../../Engine/SceneRuntime/MeshRenderer.h"
 #include "../../Engine/RenderEngine/Material.h"
 
@@ -282,7 +299,7 @@ namespace ConsoleCmd
             for (size_t i = 0; i < count; ++i) {
                 const auto comma = raw.find(',', start);
                 if ((i + 1 < count) != (comma != std::string::npos)) return false;
-                if (!ParseNumber(TrimLine(raw.substr(start, comma == std::string::npos ? comma : comma - start)), values[i])) return false;
+                if (!ParseNumber(ce::strings::trim(raw.substr(start, comma == std::string::npos ? comma : comma - start), " \t\r\n"), values[i])) return false;
                 start = comma == std::string::npos ? raw.size() : comma + 1;
             }
             return true;
@@ -411,7 +428,7 @@ namespace ConsoleCmd
                 const auto& anchored = rect->GetAnchoredPosition();
                 const auto screenPosition = rect->GetScreenPosition();
                 const std::string line =
-                    std::string(static_cast<size_t>(depth) * 2, ' ') + obj->m_name.ToString() +
+                    std::string(static_cast<size_t>(depth) * 2, ' ') + obj->m_name +
                     " world(" + std::to_string(static_cast<int>(world.x)) + ", " +
                     std::to_string(static_cast<int>(world.y)) + ", " +
                     std::to_string(static_cast<int>(world.width)) + ", " +
@@ -539,7 +556,7 @@ namespace ConsoleCmd
 
             const auto& hitbox = button->GetHitbox();
             const auto& world = rect->GetWorldRect();
-            const std::string line = owner->m_name.ToString() +
+            const std::string line = owner->m_name +
                 " rect(" + std::to_string(static_cast<int>(world.x)) + ", " +
                 std::to_string(static_cast<int>(world.y)) + ", " +
                 std::to_string(static_cast<int>(world.width)) + ", " +
@@ -753,7 +770,7 @@ namespace ConsoleCmd
             if (Entity* canvas = scene->Resolve(canvasHandle))
             {
                 if (!canvasNames.empty()) canvasNames += ", ";
-                canvasNames += canvas->m_name.ToString();
+                canvasNames += canvas->m_name;
 
                 if (Canvas* canvasComponent = canvas->GetComponent<Canvas>())
                 {
@@ -1001,7 +1018,7 @@ namespace ConsoleCmd
                     if (auto* script = dynamic_cast<ScriptComponent*>(component.get()); script && !script->IsDestroyMark())
                     {
                         auto item = CommandCore::CommandData::Object();
-                        item.Set("owner", CommandCore::CommandData::String(object->m_name.ToString()));
+                        item.Set("owner", CommandCore::CommandData::String(object->m_name));
                         item.Set("type", CommandCore::CommandData::String(script->m_scriptType));
                         item.Set("instanceId", CommandCore::CommandData::Int(script->GetInstanceId()));
                         item.Set("initializationAttempts", CommandCore::CommandData::Int(script->InitializationAttempts()));

@@ -178,7 +178,7 @@
          달라진다. -->
     <ReflgenRegistration>true</ReflgenRegistration>
     <ReflgenRegistrationHeaders>$(MSBuildThisFileDirectory)Engine\RenderEngine\ReflgenRegistration.h</ReflgenRegistrationHeaders>
-    <ReflgenAttributeHeaders>$(MSBuildThisFileDirectory)Engine\Utility_Framework\ReflgenAttributes.h</ReflgenAttributeHeaders>
+    <ReflgenAttributeHeaders>$(MSBuildThisFileDirectory)Engine\Utility_Framework\Reflection\ReflgenAttributes.h</ReflgenAttributeHeaders>
   </PropertyGroup>
 
   <PropertyGroup Condition="'$(MSBuildProjectName)' == 'Physics' or '$(MSBuildProjectName)' == 'EngineDiagnostics' or '$(MSBuildProjectName)' == 'DxCaptureHelper' or '$(MSBuildProjectName)' == 'ProfilerViewer' or '$(MSBuildProjectName)' == 'GCCE'">

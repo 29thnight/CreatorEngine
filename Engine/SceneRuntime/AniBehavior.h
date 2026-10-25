@@ -1,5 +1,5 @@
 #pragma once
-#include "TypeTrait.h"
+#include "../Utility_Framework/Reflection/TypeTrait.h"
 
 class AnimationController;
 class AniBehavior

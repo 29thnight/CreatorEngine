@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 // 크롬 스냅샷을 뜨는 쪽 (PHASE 21 W0 전반) — ImGui 를 아는 유일한 자리.
 //
 // ── 내부 API 를 읽는다는 것 ──────────────────────────────────────────────
@@ -24,7 +29,7 @@
 #include "EditorChromeSnapshot.h"
 #include "EditorWindowRegistry.h"
 #include "EditorWindowNames.h"
-#include "EditorSettingsStore.h"
+#include "../EngineEntry/Project/EditorSettingsStore.h"
 #include "EditorFontResources.h"
 #include "EditorIcons.h"
 #include "EditorTheme.h"
@@ -32,7 +37,7 @@
 
 #include "ImGui.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -352,7 +357,7 @@ namespace editor
 
         // ── ini ───────────────────────────────────────────────────────────
         //
-        // `PathFinder::ConfigPath` 를 다시 조립하지 않고 **ImGui 가 실제로 쓰는
+        // `ce::paths::config_path` 를 다시 조립하지 않고 **ImGui 가 실제로 쓰는
         // 값**을 싣는다. 둘이 같다는 것은 계획서 §1.2 의 주장이고, 주장을
         // 베끼면 어긋난 순간을 못 본다.
         const auto workspace = get_workspace_status();

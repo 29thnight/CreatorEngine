@@ -1,15 +1,19 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <commdlg.h>
-#include <objbase.h>
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 #include "ImGui.h"
 #include "ProfilerView.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace editor::profiler_view
 {

@@ -2,8 +2,12 @@
 #include "../../Engine/EngineDiagnostics/ProfileCaptureFile.h"
 #include "../../Engine/EngineDiagnostics/ProfileService.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
-#include "../../Engine/Utility_Framework/Contract.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 
 namespace profiler_render_measurement_tests
 {

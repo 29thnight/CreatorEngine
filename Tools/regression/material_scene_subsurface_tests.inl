@@ -93,7 +93,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     const auto product = SubsurfaceProduct(root);
     std::string error;
     experiment::AssetId graphId;
-    Check(Uuid::TryParse("77777777-7777-4777-8777-777777777777", graphId.value), "SSS graph identity");
+    Check(uuid::try_parse("77777777-7777-4777-8777-777777777777", graphId.value), "SSS graph identity");
     GenerationStore store;
     const auto generation = store.Load(
         graphId,
@@ -185,7 +185,7 @@ void RunSceneSubsurface(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
                 a.draw.coverage.flags |= EnhancedMaterialCoverage::Masked;
                 b.draw.coverage.flags |= EnhancedMaterialCoverage::Masked;
             }
-            Check(Uuid::TryParse("33333333-3333-8333-8333-333333333333", legacy.draw.modelMeshView.handle.meshId),
+            Check(uuid::try_parse("33333333-3333-8333-8333-333333333333", legacy.draw.modelMeshView.handle.meshId),
                   "Legacy SSS occluder identity");
             std::vector<EnhancedDrawItem> oldDraws{legacy.draw};
             context.draws = &oldDraws;

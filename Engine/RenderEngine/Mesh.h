@@ -1,16 +1,20 @@
 #pragma once
-#include "../Utility_Framework/Ownership.h"
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include "Core.Minimal.h"
-#include "MetaPolymorphic.h"
-#include "EngineResourceCensus.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
+#include "../Utility_Framework/Reflection/MetaPolymorphic.h"
+#include "../Utility_Framework/Diagnostics/EngineResourceCensus.h"
 #include <mathematics/bounds.hpp>
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
 #include <stddef.h>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 struct ModelNode : public meta::polymorphic
 {

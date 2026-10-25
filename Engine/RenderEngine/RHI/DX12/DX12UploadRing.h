@@ -1,9 +1,31 @@
 #pragma once
-#include "../../../Utility_Framework/LifetimeToken.h"
-#include "../../../Utility_Framework/Ownership.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
-#include <d3d12.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 
 #include "../RHIResourceTypes.h"
 
@@ -62,12 +84,10 @@ class DX12UploadSegmentAllocator
     uint64_t GetFrameUsedBytes() const { return GetRecordingUsedBytes(); }
 
   private:
-    template<typename T>
-    using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     struct Segment
     {
-        ComPtr<ID3D12Resource> buffer;
+        winrt::com_ptr<ID3D12Resource> buffer;
         uint8_t* mapped{nullptr};
         RHIBufferHandle handle;
         uint64_t capacity{0};

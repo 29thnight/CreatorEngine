@@ -1,4 +1,9 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
 #include "Assets/ModelAssetGeneration.h"
 #include "Assets/ModelGeometryPayload.h"
@@ -8,7 +13,7 @@
 #include "Experiment/Import/MeshLodBuilder.h"
 #include "RHI/IRenderDeviceServices.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // METEOR Scene draws only granular geometry with current cooked meshlets. Test
 // fixtures author meshes as loose vertex/index views; CookMeshFixture copies

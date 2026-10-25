@@ -1,5 +1,9 @@
 #pragma once
-#include <windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 interface ICustomEditor
 {

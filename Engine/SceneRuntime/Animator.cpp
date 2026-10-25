@@ -1,7 +1,20 @@
-#include "../Utility_Framework/Ownership.h"
-#include "../Utility_Framework/DynamicBitset.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.DynamicBitset.h"
+#else
+import Creator.Core.DynamicBitset;
+#endif
 #include "Animator.h"
-#include "AuthoringNodeViewAccess.h" // D3-a-4
+#include "../Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-4
 #include "AnimatorSystem.h"
 #include "AnimationScheduler.h"
 #include "TransCondition.h"
@@ -10,7 +23,7 @@
 #include "ManagedAniBehavior.h"
 #include "AvatarMask.h"
 #include "ConditionParameter.h"
-#include "ReflectionYml.h"
+#include "../Utility_Framework/Reflection/ReflectionYml.h"
 #include "DataSystem.h"
 #include "AnimationController.h"
 #include "../RenderEngine/BoneRegion.h"
@@ -21,8 +34,12 @@
 #include "../RenderEngine/Assets/ModelAnimationPayload.h"
 #include "../RenderEngine/Assets/ModelMeshDescriptor.h"
 #include <stdint.h>
-#include "../Utility_Framework/StandardLibrary.h"
-#include "../Utility_Framework/Contract.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 
 Animator::Animator() : m_instance(AnimatorSystems->CreateInstance()) {}
 
@@ -151,7 +168,7 @@ namespace
 			static_cast<std::uint8_t>(BoneRegion::Root));
 		for (std::size_t index = 0; index < boneCount; ++index)
 		{
-			const std::string name = ToLower(nameOf(index));
+			const std::string name = ce::strings::to_lower(nameOf(index));
 			bool matched = true;
 			BoneRegion region = BoneRegion::Root;
 			if (name.find("spine") != std::string::npos) region = BoneRegion::Spine;
@@ -224,8 +241,8 @@ namespace
 			}
 		};
 		const assets::ModelAssetGenerationIdentity& identity = generation.Identity();
-		mix(identity.modelId.data.data(), identity.modelId.data.size());
-		mix(skeleton.skeletonId.data.data(), skeleton.skeletonId.data.size());
+		mix(identity.modelId.data_.data(), identity.modelId.data_.size());
+		mix(skeleton.skeletonId.data_.data(), skeleton.skeletonId.data_.size());
 		mix(&identity.generation, sizeof(identity.generation));
 		if (0 == hash) hash = 1;
 		return static_cast<uint64>(hash);

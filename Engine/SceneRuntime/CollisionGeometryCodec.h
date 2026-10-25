@@ -1,7 +1,7 @@
 #pragma once
 
 #include "CollisionGeometrySource.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace ce::physics
 {
@@ -34,7 +34,7 @@ class CollisionGeometryCodec final
             bytes.reserve(payloadSize);
             Put(bytes, 0x47434543, 4); // CECG
             Put(bytes, 1, 4);
-            for (const auto byte : source.key.asset.data)
+            for (const auto byte : source.key.asset.data_)
                 Put(bytes, byte, 1);
             Put(bytes, source.key.revision, 8);
             Put(bytes, source.form.index(), 4);
@@ -96,7 +96,7 @@ class CollisionGeometryCodec final
             return Corrupt();
 
         CollisionGeometrySource source;
-        for (auto& byte : source.key.asset.data)
+        for (auto& byte : source.key.asset.data_)
             byte = static_cast<std::uint8_t>(Get(bytes, cursor, 1));
         source.key.revision = Get(bytes, cursor, 8);
         const auto kind = Get(bytes, cursor, 4);

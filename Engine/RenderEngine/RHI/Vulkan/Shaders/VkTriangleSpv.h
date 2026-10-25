@@ -1,5 +1,5 @@
 #pragma once
-#include "../../../../Utility_Framework/StandardLibrary.h"
+#include "../../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // 자동 생성 — 손으로 고치지 말 것.
 // 재생성: pwsh scripts/build_vk_shaders.ps1

@@ -1,0 +1,238 @@
+#pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#include "../Foundation/StandardLibrary.h"
+#include "../Foundation/TypeDefinition.h"
+#include "../Reflection/ClassProperty.h"
+
+// ★ 이 클래스가 namespace DirectX11에 있었다 (2026-08-10에 옮겼다).
+//
+//   여는 QueryPerformanceCounter만 쓰는 순수 Win32 타이머다. DirectX가 한
+//   줄도 없는데 백엔드 이름을 달고 있었고, 그 탓에 "DX11을 지우려면 이것도
+//   지워야 하나"를 매번 다시 판단해야 했다.
+//
+//   Core는 Delegate.h의 선례를 따른다(ce::delegate_handle) — 엔진 기반 계층.
+namespace Core
+{
+	class TimeSystem : public Singleton<TimeSystem>
+	{
+	private:
+		friend Singleton<TimeSystem>;
+		TimeSystem();
+		~TimeSystem() = default;
+
+	public:
+		// Get elapsed time since the previous Update call.
+		uint64_t GetElapsedTicks() const { return m_elapsedTicks; }
+
+		//실제 쓰는 tick 값  * timeScale
+		double GetElapsedSeconds() const { return TicksToSeconds(m_elapsedTicks) * timeScale; }
+		
+		// Get total time since the start of the program.
+		uint64_t GetTotalTicks() const { return m_totalTicks; }
+		double GetTotalSeconds() const { return TicksToSeconds(m_totalTicks); }
+
+		// Get total number of updates since start of the program.
+		uint32_t GetFrameCount() const { return m_frameCount; }
+
+		// Get the current framerate.
+		uint32_t GetFramesPerSecond() const { return m_framesPerSecond; }
+
+		// Set whether to use fixed or variable timestep mode.
+		void SetFixedTimeStep(bool isFixedTimestep) { m_isFixedTimeStep = isFixedTimestep; }
+
+		// Set how often to call Update when in fixed timestep mode.
+		void SetTargetElapsedTicks(uint64_t targetElapsed) { m_targetElapsedTicks = targetElapsed; }
+		void SetTargetElapsedSeconds(double targetElapsed) { m_targetElapsedTicks = SecondsToTicks(targetElapsed); }
+
+		double GetTargetElapsedTicks() { return TicksToSeconds(m_targetElapsedTicks); }
+
+		float GetFixedInterpolatedSeconds() { return m_fixedInterpolatedLerp; }
+
+		// Integer format represents time using 10,000,000 ticks per second.
+		static const uint64_t TicksPerSecond = 10000000;
+
+		static double TicksToSeconds(uint64_t ticks) { return static_cast<double>(ticks) / TicksPerSecond; }
+		static uint64_t SecondsToTicks(double seconds) { return static_cast<uint64_t>(seconds * TicksPerSecond); }
+
+		// After an intentional timing discontinuity (for instance a blocking IO operation)
+		// call this to avoid having the fixed timestep logic attempt a set of catch-up
+		// Update calls.
+
+		void ResetElapsedTime()
+		{
+			if (!QueryPerformanceCounter(&m_qpcLastTime))
+			{
+				throw std::exception("Failed_QueryPerformanceCounter");
+			}
+			m_leftOverTicks = 0;
+			m_framesPerSecond = 0;
+			m_framesThisSecond = 0;
+			m_qpcSecondCounter = 0;
+		}
+
+		// Update timer state, calling the specified Update function the appropriate number of times.
+		template<typename TUpdate>
+		void Tick(const TUpdate& update)
+		{
+			// 현재 시간을 쿼리합니다.
+			LARGE_INTEGER currentTime;
+
+			if (!QueryPerformanceCounter(&currentTime))
+			{
+				throw std::exception("Failed_QueryPerformanceCounter");
+			}
+
+			uint64 timeDelta = currentTime.QuadPart - m_qpcLastTime.QuadPart;
+
+			m_qpcLastTime = currentTime;
+			m_qpcSecondCounter += timeDelta;
+
+			// 너무 큰 시간 델타를 제한합니다(예: 디버거에서 일시 중지된 후).
+			if (timeDelta > m_qpcMaxDelta)
+			{
+				timeDelta = m_qpcMaxDelta;
+			}
+
+			// QPC 단위를 정규 눈금 형식으로 변환합니다. 이전의 제한으로 인해 오버플로할 수 없습니다.
+			timeDelta *= TicksPerSecond;
+			timeDelta /= m_qpcFrequency.QuadPart;
+
+			UpdateTimeScale(TicksToSeconds(timeDelta));
+			uint32 lastFrameCount = m_frameCount;
+
+			{
+				// 가변 timestep 업데이트 논리입니다.
+				m_elapsedTicks = timeDelta;
+				m_totalTicks += timeDelta;
+				m_leftOverTicks = 0;
+				m_frameCount++;
+				update();
+			}
+
+			// 현재 framerate를 추적합니다.
+			if (m_frameCount != lastFrameCount)
+			{
+				m_framesThisSecond++;
+			}
+
+			if (m_qpcSecondCounter >= static_cast<uint64>(m_qpcFrequency.QuadPart))
+			{
+				m_framesPerSecond = m_framesThisSecond;
+				m_framesThisSecond = 0;
+				m_qpcSecondCounter %= m_qpcFrequency.QuadPart;
+			}
+		}
+
+		template<typename TUpdate>
+		void FixedTick(const TUpdate& fixedUpdate)
+		{
+			// 현재 시간을 쿼리합니다.
+			LARGE_INTEGER currentTime;
+
+			if (!QueryPerformanceCounter(&currentTime))
+			{
+				throw std::exception("Failed_QueryPerformanceCounter");
+			}
+
+			uint64 timeDelta = currentTime.QuadPart - m_qpcLastTime.QuadPart;
+
+			// 너무 큰 시간 델타를 제한합니다(예: 디버거에서 일시 중지된 후).
+			if (timeDelta > m_qpcMaxDelta)
+			{
+				timeDelta = m_qpcMaxDelta;
+			}
+
+			// QPC 단위를 정규 눈금 형식으로 변환합니다. 이전의 제한으로 인해 오버플로할 수 없습니다.
+			timeDelta *= TicksPerSecond;
+			timeDelta /= m_qpcFrequency.QuadPart;
+
+			// 앱이 목표 경과 시간(1/4밀리초 이내)에 근접하게 실행하는 경우
+			// 대상 값에 정확히 일치하도록 클록을 제한합니다. 이렇게 하면 사소하고 무관한 오류가 방지됩니다.
+			// 방지할 수 있습니다. 시간을 제한하지 않으면 59.94 NTSC 디스플레이에서 사용하도록 설정된
+			// vsync와 함께 실행되며 60fps 고정 업데이트가 요구되는 게임에
+			// 사소한 오류가 누적되어 결국 프레임이 삭제될 수 있습니다. 반올림하는 것이 좋습니다.
+			// 작은 편차를 0으로 줄여 원활하게 실행될 수 있도록 하세요.
+
+			if (abs(static_cast<int64>(timeDelta - m_targetElapsedTicks)) < TicksPerSecond / 4000)
+			{
+				timeDelta = m_targetElapsedTicks;
+			}
+
+			m_fixedLeftOverTicks = m_leftOverTicks + timeDelta;
+
+			while (m_fixedLeftOverTicks >= m_targetElapsedTicks)
+			{
+				m_elapsedTicks = m_targetElapsedTicks;
+				m_totalTicks += m_targetElapsedTicks;
+				m_fixedLeftOverTicks -= m_targetElapsedTicks;
+				m_frameCount++;
+
+				fixedUpdate();
+			}
+		}
+
+		template<typename TUpdate>
+		void PostFixedTick(const TUpdate& postFixedUpdate) {
+			m_fixedInterpolatedLerp = (float)m_fixedLeftOverTicks / m_targetElapsedTicks;
+
+			postFixedUpdate();
+		}
+
+		double NowSeconds() const
+		{
+			static LARGE_INTEGER frequency;
+			static BOOL init = QueryPerformanceFrequency(&frequency);
+
+			LARGE_INTEGER counter;
+			QueryPerformanceCounter(&counter);
+
+			// 초 단위(double)
+			return static_cast<double>(counter.QuadPart) / static_cast<double>(frequency.QuadPart);
+		}
+
+		void UpdateTimeScale(float _timeDelta);
+		void SetTimeScale(float _timeScale,float _changeTimeScaleTime);
+		void SetTimeScale(float _timeScale);
+	private:
+		// 원본 타이밍 데이터에는 QPC 단위가 사용됩니다.
+        LARGE_INTEGER m_qpcFrequency{};
+		LARGE_INTEGER m_qpcLastTime{};
+		uint64 m_qpcMaxDelta{};
+
+		// 파생된 타이밍 데이터에는 정식 눈금 형식이 사용됩니다.
+		uint64 m_elapsedTicks{};
+		uint64 m_totalTicks{};
+		uint64 m_leftOverTicks{};
+		uint32 m_fixedLeftOverTicks{};
+
+		// framerate 추적용 멤버입니다.
+		std::atomic<uint32> m_frameCount{};
+		uint32 m_framesPerSecond{};
+		uint32 m_framesThisSecond{};
+		uint64 m_qpcSecondCounter{};
+
+		// 고정 timestep 모드 구성용 멤버입니다.
+		bool m_isFixedTimeStep{};
+		uint64 m_targetElapsedTicks{};
+
+		float m_fixedInterpolatedLerp{};
+
+
+		float orginTimeScale = 1.0f;    //기본 타임스케일값 아마 무조건1 고정
+		float timeScale = 1.0f;         //실 적용중인 타임스케일 값
+		float changeTimeScaleTime = 0.f; //해당시간동안 타임스케일변경
+		
+	};
+}
+
+//[unsafe]
+static auto Time = Core::TimeSystem::GetInstance();

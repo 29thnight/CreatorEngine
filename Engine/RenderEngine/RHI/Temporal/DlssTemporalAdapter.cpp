@@ -1,23 +1,42 @@
-#include "../../../Utility_Framework/LifetimeToken.h"
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "DlssTemporalAdapter.h"
 
 #ifndef CREATOR_ENABLE_DLSS_STREAMLINE
 #define CREATOR_ENABLE_DLSS_STREAMLINE 0
 #endif
 
-#include "../../../Utility_Framework/Contract.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 #include <stdint.h>
 #include <stdio.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #if CREATOR_ENABLE_DLSS_STREAMLINE && defined(_WIN32)
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <Windows.h>
-#include <d3d12.h>
-#include <dxgi1_6.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 #include "../DX12/DX12DeviceResources.h"
 #include "../DX12/DX12Encoder.h"
 

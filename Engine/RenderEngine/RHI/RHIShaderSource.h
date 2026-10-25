@@ -1,5 +1,5 @@
 #pragma once
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // 패스 셰이더 소스 — 백엔드 중립.
 //

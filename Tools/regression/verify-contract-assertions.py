@@ -2,6 +2,7 @@
 from pathlib import Path
 import re
 import subprocess
+import runpy
 import xml.etree.ElementTree as ET
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -53,12 +54,13 @@ def main():
             if not ((ROOT / name).parent / include).is_file():
                 failures.append(f"{name}: missing {include}")
 
+    runpy.run_path(str(ROOT / "Tools/build/generate-module-adapters.py"))["generate"](check=True)
     ns = {"ms": "http://schemas.microsoft.com/developer/msbuild/2003"}
     for suffix in ["vcxproj", "vcxproj.filters"]:
         project = ET.parse(ROOT / f"Engine/Utility_Framework/Utility_Framework.{suffix}")
         entries = project.findall('.//ms:ClInclude[@Include="Contract.h"]', ns)
-        if len(entries) != 1:
-            failures.append(f"{suffix}: expected one Contract.h entry, found {len(entries)}")
+        if entries:
+            failures.append(f"{suffix}: removed Contract.h facade is still registered")
     if failures:
         raise SystemExit("\n".join(failures))
     provider = ET.parse(ROOT / "Engine/Contracts/EngineContracts.vcxproj")
@@ -88,9 +90,10 @@ def main():
         raise SystemExit("Named module export missing")
     if "import std;" not in interface:
         raise SystemExit("Engine contract module must import std")
-    facade = (ROOT / "Engine/Utility_Framework/Contract.h").read_text(encoding="utf-8")
-    if "import Creator.Contracts;" not in facade:
-        raise SystemExit("Native consumers must import the module")
+    if (ROOT / "Engine/Utility_Framework/Contract.h").exists():
+        raise SystemExit("Native Contract.h facade must not be restored")
+    if '#include "ContractImplementation.h"' in interface or "export namespace ce::contracts" not in interface:
+        raise SystemExit("Contracts must be defined directly in the module interface")
     print(f"PASS: {calls} lazy contract calls ({enforced} always enforced) in {migrated} files; no owned CRT assertions/includes; module/configuration/XML paths valid")
 
 

@@ -24,6 +24,8 @@
     <OutDir>$(SolutionDir)Bin\$(Platform)-$(Configuration)\HeadlessHost\</OutDir>
     <IntDir>$(SolutionDir)Build\Obj\$(MSBuildProjectName)\$(Configuration)\</IntDir>
     <VcpkgApplocalDeps>false</VcpkgApplocalDeps>
+    <!-- /OPT:REF and /OPT:ICF require a full link in both configurations. -->
+    <LinkIncremental>false</LinkIncremental>
   </PropertyGroup>
   <ItemDefinitionGroup>
     <ClCompile>
@@ -32,6 +34,8 @@
       <PreprocessorDefinitions>CE_SCENE_HEADLESS=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <FunctionLevelLinking>true</FunctionLevelLinking>
+      <!-- Keep PDB symbols without the /ZI Edit and Continue option that conflicts with /OPT:ICF. -->
+      <DebugInformationFormat Condition="'$(Configuration)' == 'Debug'">ProgramDatabase</DebugInformationFormat>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(SolutionDir)Engine\SceneRuntime;$(SolutionDir)Engine\RenderEngine;$(SolutionDir)Engine\RenderEngine\Interfaces;$(SolutionDir)Engine\Physics;$(SolutionDir)ThirdParty\mimalloc\include;$(SolutionDir)Engine\Utility_Framework;$(SolutionDir)Engine\EngineDiagnostics;$(SolutionDir)ThirdParty\Mathematics\include;$(SolutionDir)ThirdParty\DotNetHost\include;$(_ZVcpkgCurrentInstalledDir)include\physx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>

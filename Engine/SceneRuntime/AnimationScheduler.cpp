@@ -1,19 +1,31 @@
-#include "../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "AnimationScheduler.h"
 #include "ProfileScope.h"
 #include "AnimationDiagnostics.h"
-#include "JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include "RenderScene.h"
 #include "BoneRegion.h"
 #include "SceneManager.h"
 #include "Scene.h"
 #include "CameraComponent.h"
 #include "CameraSystem.h"
-#include "Benchmark.hpp"
 #include "AnimationController.h"
 #include "AnimationPlayback.h"
 #include "AnimationBudget.h"
-#include "RuntimeSettings.h"
+#include "../Utility_Framework/Runtime/RuntimeSettings.h"
 #include "TwoBoneIK.h"
 #include "Animator.h"
 #include "Socket.h"
@@ -21,12 +33,12 @@
 #include "Assets/ModelAnimationDescriptor.h"
 #include "Assets/ModelAnimationPayload.h"
 #include "Assets/ModelAnimationSampler.h"  // PHASE 3.75 MBC8
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "ModelConsumptionDiagnostics.h" // MBC10: 틱 경로 관측(읽기 전용 계수)
 #include <mathematics/transform.hpp>
 #include <mathematics/bounds.hpp>
 #include <mathematics/scalar.hpp>
-#include "Mathematics.Intersect.h"
+#include "../Utility_Framework/Foundation/Mathematics.Intersect.h"
 
 namespace
 {
@@ -408,16 +420,16 @@ AnimationScheduler::AnimationScheduler(SceneManager& owner)
     : m_owner(owner), m_taskCostModel(std::make_unique<animation::task_cost_model>()),
       m_scratch(std::make_unique<Scratch>())
 {
-	m_sceneLoadedHandle = m_owner.sceneLoadedEvent.AddRaw(this, &AnimationScheduler::PrepareAnimation);
-    m_AnimationUpdateHandle = m_owner.InternalAnimationUpdateEvent.AddRaw(this, &AnimationScheduler::Update);
-	m_sceneUnloadedHandle = m_owner.sceneUnloadedEvent.AddRaw(this, &AnimationScheduler::CleanUp);
+	m_sceneLoadedHandle = m_owner.sceneLoadedEvent.add_raw(this, &AnimationScheduler::PrepareAnimation);
+    m_AnimationUpdateHandle = m_owner.InternalAnimationUpdateEvent.add_raw(this, &AnimationScheduler::Update);
+	m_sceneUnloadedHandle = m_owner.sceneUnloadedEvent.add_raw(this, &AnimationScheduler::CleanUp);
 }
 
 AnimationScheduler::~AnimationScheduler()
 {
-	m_owner.sceneLoadedEvent.Remove(m_sceneLoadedHandle);
-	m_owner.InternalAnimationUpdateEvent.Remove(m_AnimationUpdateHandle);
-    m_owner.sceneUnloadedEvent.Remove(m_sceneUnloadedHandle);
+	m_owner.sceneLoadedEvent.remove(m_sceneLoadedHandle);
+	m_owner.InternalAnimationUpdateEvent.remove(m_AnimationUpdateHandle);
+    m_owner.sceneUnloadedEvent.remove(m_sceneUnloadedHandle);
 }
 
 void AnimationScheduler::RequireOwnerThread() const

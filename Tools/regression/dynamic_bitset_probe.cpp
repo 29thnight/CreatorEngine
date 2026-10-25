@@ -1,5 +1,9 @@
-#define CE_CONTRACT_STANDALONE
-#include "../../Engine/Utility_Framework/DynamicBitset.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.DynamicBitset.h"
+#else
+import Creator.Core.DynamicBitset;
+#endif
 
 int main()
 {

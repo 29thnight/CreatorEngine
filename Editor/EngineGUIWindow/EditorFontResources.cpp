@@ -4,16 +4,24 @@
 
 // `GetWindowsDirectoryW` 하나 때문에 든다. 폰트 디렉터리를 하드코딩하거나
 // 환경 변수에 묻지 않고 OS 에 묻는 이유는 아래 `fonts_directory` 에 적었다.
+#ifndef NOMINMAX
 #define NOMINMAX
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 #include "ImGui.h"
 #include "EditorIcons.h"
 #include "EditorIconAlignment.h"
 #include "EditorTextFallback.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace editor::fonts
 {

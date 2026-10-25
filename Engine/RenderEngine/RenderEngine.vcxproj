@@ -156,6 +156,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Assets/ClusterStreaming.cpp" />
+    <ClCompile Include="RHI/RHIRecordingDiagnostics.cpp" />
     <ClCompile Include="RHI\Temporal\DlssTemporalAdapter.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <IncludeInUnityFile>false</IncludeInUnityFile>
@@ -410,7 +412,6 @@
     </ClCompile>
     <ClCompile Include="ShaderMetaReflection.cpp" />
     <ClCompile Include="ShaderPermutationDomain.cpp" />
-    <ClCompile Include="BoneRegion.cpp" />
     <ClCompile Include="Mesh.cpp" />
     <!-- 벤더링한 fastgltf/simdjson. per-file 설정 셋이 반드시 필요하다:
          PCH 미사용(외부 소스에 pch.h include 가 없다), 유니티 빌드 제외(매크로·
@@ -689,9 +690,6 @@
     <ClInclude Include="Interfaces\LightMapping.h" />
     <ClInclude Include="Interfaces\FoliageInstance.h" />
     <ClInclude Include="Interfaces\FoliageType.h" />
-    <ClInclude Include="Interfaces\LightMapping.generated.h" />
-    <ClInclude Include="Interfaces\FoliageInstance.generated.h" />
-    <ClInclude Include="Interfaces\FoliageType.generated.h" />
     <ClInclude Include="Interfaces\AAPassSetting.h" />
 	<ClInclude Include="Interfaces\AssetAuthoringPort.h" />
 	<ClInclude Include="Render\Core\RenderFeatureContributor.h" />

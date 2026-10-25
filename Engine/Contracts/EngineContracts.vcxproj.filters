@@ -1,16 +1,159 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <ItemGroup>
-    <ClCompile Include="Creator.Contracts.ixx" />
-    <ClCompile Include="Creator.Concurrency.ixx" />
-    <ClCompile Include="Creator.Core.Window.ixx" />
-    <ClCompile Include="Creator.Platform.Windows.ixx" />
-    <ClInclude Include="ContractImplementation.h" />
-    <ClInclude Include="WindowsApartmentImplementation.h" />
-    <ClInclude Include="CoreWindowImplementation.h" />
-    <ClInclude Include="WindowsWindowImplementation.h" />
-    <ClInclude Include="AppWindowBackendDeclarations.h" />
-    <ClCompile Include="Creator.Platform.Windows.AppWindow.cpp" />
-    <None Include="packages.config" />
+    <Filter Include="External"><UniqueIdentifier>{0167452F-392C-4AA5-8E7A-C72F0C716601}</UniqueIdentifier></Filter>
+    <Filter Include="Compiler">
+      <UniqueIdentifier>{89C9E1F1-9A8C-5E80-831E-D68CFC7A1B22}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Concurrency">
+      <UniqueIdentifier>{25C0E89A-C20A-5BC6-8419-C7BC56158319}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Configuration">
+      <UniqueIdentifier>{1097AE75-342B-5D81-9FC0-0DC70117F8A4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Core">
+      <UniqueIdentifier>{8A18E4B2-1D64-56DF-AF81-00EAB2E9AD95}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Platform">
+      <UniqueIdentifier>{00CAFEC0-98FF-5002-804E-DA062A3C2A65}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Platform\Windows">
+      <UniqueIdentifier>{9E28A6B3-9D76-5FBA-A08A-D5CBF5B12967}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Platform\WindowsSDK">
+      <UniqueIdentifier>{2C0D6EC8-C1E1-55A2-932B-F22D09E1D607}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source">
+      <UniqueIdentifier>{CA0C3FA4-72D4-5490-B301-2327A5324026}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\Platform\WindowsSDK\Creator.AppRuntimeSDK.h">
+      <Filter>Platform\WindowsSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Platform\WindowsSDK\Creator.GameInputSDK.h">
+      <Filter>Platform\WindowsSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Platform\WindowsSDK\Creator.GraphicsSDK.h">
+      <Filter>Platform\WindowsSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Platform\WindowsSDK\Creator.LegacyGraphicsSDK.h">
+      <Filter>Platform\WindowsSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Platform\WindowsSDK\Creator.WinAPI.h">
+      <Filter>Platform\WindowsSDK</Filter>
+    </ClCompile>
+    <ClCompile Include="Concurrency/Creator.Concurrency.ixx">
+      <Filter>Concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.BitFlag.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.DynamicBitset.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.Layers.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.Sha256.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.SpinLock.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.Strings.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.Stopwatch.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.RingBuffer.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.BoundedMemory.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.Base64.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.ContentAbi.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Concurrency/Creator.Concurrency.JobGraph.ixx">
+      <Filter>Concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.LayerCatalog.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.HeapAllocator.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.Arena.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.LifetimeToken.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.Ownership.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="External/Creator.Ownership.h">
+      <Filter>External</Filter>
+    </ClCompile>
+    <ClCompile Include="External/Creator.MemoryProvider.h">
+      <Filter>External</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.Paths.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.Distribution.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Platform/Windows/Creator.Core.Paths.WinAPI.cpp">
+      <Filter>Platform\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.EngineMode.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.Progress.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.Uuid.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.Window.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Core/Creator.Core.WorkPartition.ixx">
+      <Filter>Core</Filter>
+    </ClCompile>
+    <ClCompile Include="Creator.Contracts.ixx">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="Platform/Windows/Creator.Platform.Windows.AppWindow.cpp">
+      <Filter>Platform\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="Platform/Windows/Creator.Platform.Windows.ixx">
+      <Filter>Platform\Windows</Filter>
+    </ClCompile>
+    <ClCompile Include="Platform/Windows/Creator.Platform.Windows.Strings.ixx">
+      <Filter>Platform\Windows</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\Platform\WindowsSDK\Creator.ComSupport.h">
+      <Filter>Platform\WindowsSDK</Filter>
+    </ClInclude>
+    <ClInclude Include="Compiler/Creator.RotateIntrinsic.h">
+      <Filter>Compiler</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="packages.config">
+      <Filter>Configuration</Filter>
+    </None>
+    <ClCompile Include="Core/Creator.Core.Delegate.ixx"><Filter>Core</Filter></ClCompile>
+    <ClCompile Include="Concurrency/Creator.Concurrency.Jobs.ixx"><Filter>Concurrency</Filter></ClCompile>
+    <ClCompile Include="External/Creator.EnkiTS.h"><Filter>External</Filter></ClCompile>
   </ItemGroup>
 </Project>

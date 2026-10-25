@@ -1,9 +1,13 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // 실제 cache 준비/선언/PSO 선택 본문을 실행한다. 장치·그래프 서비스는 결정적인 CPU 경계다.
 #include "RHI/RHIResourceTypes.h"
 #include "RHI/RHIPipelineState.h"
 #include "RHI/RHIPipelineLayout.h"
 #include "RHI/RHIShaderBlob.h"
-#include "Ownership.h"
 #include "MaterialGraphPrimitiveCacheContract.h"
 #include <latch>
 #include <thread>

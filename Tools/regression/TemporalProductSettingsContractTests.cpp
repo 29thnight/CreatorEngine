@@ -1,11 +1,11 @@
 // Authored, UNEXECUTED CPU/source fixture. Link TemporalRuntimeControl.cpp and
 // the existing Authoring document implementation. No SDK/hardware acceptance.
-#include "../../Engine/Utility_Framework/TemporalProductSettingsIO.h"
-#include "../../Engine/Utility_Framework/AuthoringParsedDocument.h"
+#include "../../Engine/Utility_Framework/Runtime/TemporalProductSettingsIO.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
 #include "../../Engine/RenderEngine/Render/Temporal/TemporalRuntimeControl.h"
 
 #include <stdio.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace TemporalProductSettingsContractFixture
 {

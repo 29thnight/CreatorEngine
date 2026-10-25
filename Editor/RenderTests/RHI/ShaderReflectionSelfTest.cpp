@@ -1,5 +1,10 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "ShaderReflectionSelfTest.h"
-#include "AuthoringNodeViewAccess.h" // D3-a-5b
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-5b
 
 #include "DataSystem.h"
 #include "FoliageType.h"
@@ -7,11 +12,11 @@
 #include "RHI/RHIShaderCompiler.h"
 #include "RHI/RHIShaderSource.h"
 #include "Material.h"
-#include "ReflectionYml.h"
+#include "../../../Engine/Utility_Framework/Reflection/ReflectionYml.h"
 #include "ShaderMetaReflection.h"
 #include "ShaderPermutationDomain.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -201,7 +206,7 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
     //   때는 무해했지만 복원 경로가 GUID 로 텍스처를 실제로 읽게 되자 셰이더 메타를
     //   WIC 로 디코드하다 예외가 났다. 왕복은 진짜 그림으로 재고, 그림이 아닌 자산을
     //   가리키는 경우는 아래 fail-closed 단정이 따로 본다.
-    const FileGuid textureGuid = DataSystems->GetFileGuid(file::path(texturePath));
+    const FileGuid textureGuid = DataSystems->GetFileGuid(std::filesystem::path(texturePath));
     if (FileGuid{} == textureGuid)
     {
         outLog += "[material schema] 텍스처 fixture GUID 가 catalog 에 없다: " + texturePath + "\n";
@@ -353,13 +358,13 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
 
     stage = "texture mapping and ownership";
 	Material legacyTextures;
-	legacyTextures.m_baseColorTexName = file::path(texturePath).filename().string();
-	legacyTextures.m_normalTexName = file::path(texturePath).filename().string();
-	legacyTextures.m_ORM_TexName = file::path(texturePath).filename().string();
-	legacyTextures.m_AO_TexName = file::path(texturePath).filename().string();
-	legacyTextures.m_EmissiveTexName = file::path(texturePath).filename().string();
+	legacyTextures.m_baseColorTexName = std::filesystem::path(texturePath).filename().string();
+	legacyTextures.m_normalTexName = std::filesystem::path(texturePath).filename().string();
+	legacyTextures.m_ORM_TexName = std::filesystem::path(texturePath).filename().string();
+	legacyTextures.m_AO_TexName = std::filesystem::path(texturePath).filename().string();
+	legacyTextures.m_EmissiveTexName = std::filesystem::path(texturePath).filename().string();
 	const FileGuid legacyTextureGuid =
-		DataSystems->GetFileGuid(file::path(texturePath));
+		DataSystems->GetFileGuid(std::filesystem::path(texturePath));
 	MaterialPropertyValue genericTexture;
 	genericTexture.m_name = "baseMap";
 	genericTexture.m_textureGuid = legacyTextureGuid;

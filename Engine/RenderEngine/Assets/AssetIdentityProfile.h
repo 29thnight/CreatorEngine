@@ -27,15 +27,19 @@
 //
 // ── 기존 GUID와의 관계 ──
 //   없다. 기존 UUIDv4 GUID나 pseudo-v5(SHA-1, v4 nibble 스탬프) 값은 namespace로도
-//   key로도 들어오지 않는다(§0.1-1). 이 헤더는 Uuid::FromName을 부르지 않는다.
+//   key로도 들어오지 않는다(§0.1-1). 이 헤더는 uuid::from_name을 부르지 않는다.
 //
 // ── 위치 ──
 //   `Engine/RenderEngine/Assets/`는 experiment 네임스페이스가 아니다(§5.1 마지막 문단).
 //   cutover 뒤 제품 소비자가 직접 include하는 정식 계층이다.
 
-#include "Uuid.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace assets
 {
@@ -97,7 +101,7 @@ namespace assets
 
     struct IdentityDerivation final
     {
-        Uuid::Uuid16 uuid{};
+        uuid::uuid16 uuid{};
         IdentityIssue issue{ IdentityIssue::None };
         std::string context{}; // 어느 필드/어느 위치가 걸렸나
 
@@ -116,7 +120,7 @@ namespace assets
 
     // 바이트열에서 UUID만 낸다(SHA-256 → 16바이트 → v8/variant bit). 바이트열은
     // 프로필을 이미 포함하므로 프로필 인자가 없다. registry의 재검산이 쓴다.
-    [[nodiscard]] Uuid::Uuid16 DeriveUuidFromIdentityInputBytes(
+    [[nodiscard]] uuid::uuid16 DeriveUuidFromIdentityInputBytes(
         std::span<const std::uint8_t> canonicalInput) noexcept;
 
     [[nodiscard]] IdentityDerivation DeriveIdentity(
@@ -136,22 +140,22 @@ namespace assets
     // XId = V8(domain="subasset", namespace=ModelId, kind=<kind>, key=stableKey)
     // modelId가 이 프로필의 UUIDv8이 아니면 NamespaceNotV8로 거부한다 — legacy
     // v4 GUID를 namespace로 흘려 넣는 경로를 타입이 아니라 값에서 막는다.
-    [[nodiscard]] IdentityDerivation DeriveSubAssetId(const Uuid::Uuid16& modelId,
+    [[nodiscard]] IdentityDerivation DeriveSubAssetId(const uuid::uuid16& modelId,
         SubAssetKind kind, std::string_view stableKey) noexcept;
 
     // ── 판정·표기 ─────────────────────────────────────────────────────────
     // nil이 아니고 version nibble 8, RFC variant 10xx.
-    [[nodiscard]] inline bool IsUuidV8(const Uuid::Uuid16& value) noexcept
+    [[nodiscard]] inline bool IsUuidV8(const uuid::uuid16& value) noexcept
     {
-        return !value.IsNil()
-            && (value.data[6] & 0xF0u) == 0x80u
-            && (value.data[8] & 0xC0u) == 0x80u;
+        return !value.is_nil()
+            && (value.data_[6] & 0xF0u) == 0x80u
+            && (value.data_[8] & 0xC0u) == 0x80u;
     }
 
-    [[nodiscard]] inline bool TryParseCanonicalUuidV8(std::string_view text, Uuid::Uuid16& out) noexcept
+    [[nodiscard]] inline bool TryParseCanonicalUuidV8(std::string_view text, uuid::uuid16& out) noexcept
     {
-        Uuid::Uuid16 parsed{};
-        if (!Uuid::TryParse(text, parsed))
+        uuid::uuid16 parsed{};
+        if (!uuid::try_parse(text, parsed))
         {
             return false;
         }
@@ -159,9 +163,9 @@ namespace assets
         {
             return false;
         }
-        // 소문자 8-4-4-4-12만. Uuid::TryParse가 받는 대문자·brace·무하이픈은 여기서
+        // 소문자 8-4-4-4-12만. uuid::try_parse가 받는 대문자·brace·무하이픈은 여기서
         // 걸린다(재표기가 원문과 다르다).
-        if (Uuid::ToString(parsed) != text)
+        if (uuid::to_string(parsed) != text)
         {
             return false;
         }

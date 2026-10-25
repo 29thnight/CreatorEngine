@@ -21,14 +21,14 @@ $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $failures = @()
 
 # ── 양성 확인 1: Editor 쪽에 실물이 있다 ──
-foreach ($rel in @("Editor\EngineEntry\PrefabEditor.h", "Editor\EngineEntry\PrefabEditor.cpp")) {
+foreach ($rel in @("Editor\EngineEntry\Scene\PrefabEditor.h", "Editor\EngineEntry\Scene\PrefabEditor.cpp")) {
     if (-not (Test-Path -LiteralPath (Join-Path $repoRoot $rel))) {
         throw "$rel 이 없다 — 아래 부재 단정이 전부 무의미해진다"
     }
 }
-$editorSource = Get-Content (Join-Path $repoRoot "Editor\EngineEntry\PrefabEditor.cpp") -Raw -Encoding UTF8
+$editorSource = Get-Content (Join-Path $repoRoot "Editor\EngineEntry\Scene\PrefabEditor.cpp") -Raw -Encoding UTF8
 if ($editorSource -notmatch 'void PrefabEditor::Open\(') {
-    $failures += "Editor/EngineEntry/PrefabEditor.cpp에 Open 구현이 없다 — 껍데기만 옮겨졌는가?"
+    $failures += "Editor/EngineEntry/Scene/PrefabEditor.cpp에 Open 구현이 없다 — 껍데기만 옮겨졌는가?"
 }
 
 # ── 양성 확인 2: Editor 층 프로젝트가 그것을 컴파일한다 ──

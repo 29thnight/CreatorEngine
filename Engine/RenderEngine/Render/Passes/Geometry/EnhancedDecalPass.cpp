@@ -9,7 +9,7 @@
 #include "../../../TextureCodecImage.h"
 
 #include <stddef.h>
-#include "../../../../Utility_Framework/StandardLibrary.h"
+#include "../../../../Utility_Framework/Foundation/StandardLibrary.h"
 #include "../../../RHI/RHIShaderCompiler.h"
 
 namespace

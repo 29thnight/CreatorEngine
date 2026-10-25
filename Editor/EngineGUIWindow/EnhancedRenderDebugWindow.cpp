@@ -6,11 +6,11 @@
 #include "EditorIcons.h"
 #include "ProfilerHUD.h"
 #include "EditorWindowRegistry.h"
-#include "EditorSettingsStore.h"
-#include "RuntimeSettings.h"
+#include "../EngineEntry/Project/EditorSettingsStore.h"
+#include "../../Engine/Utility_Framework/Runtime/RuntimeSettings.h"
 #include "Windows/EditorToolboxWindows.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // 익명 네임스페이스가 아니라 이름을 준다. 이 프로젝트는 유니티 빌드라
 // (EnableUnitySupport) 여러 .cpp가 한 TU로 합쳐지는데, ResourceCounterWindow.cpp도

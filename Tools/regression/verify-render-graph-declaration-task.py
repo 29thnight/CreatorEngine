@@ -50,8 +50,8 @@ def main():
             compiler, "-std=c++23", "-O2", "-pthread", "-DCE_CONTRACT_STANDALONE=1", "-DCE_SHIPPING=1",
             "-I", str(ROOT), "-I", str(include.parent),
             str(ROOT / "Tools/regression/render_graph_declaration_task_probe.cpp"),
-            str(ROOT / "Engine/Utility_Framework/JobScheduler.cpp"),
-            str(ROOT / "Engine/Utility_Framework/ThreadPool.cpp"),
+            str(ROOT / "Engine/Utility_Framework/Concurrency/JobScheduler.cpp"),
+            str(ROOT / "Engine/Utility_Framework/Concurrency/ThreadPool.cpp"),
             str(source / "TaskScheduler.cpp"), "-o", str(executable),
         ]
         print("Compiling production declaration helper + JobScheduler.cpp + ThreadPool.cpp", flush=True)

@@ -1,4 +1,3 @@
-#include "../Utility_Framework/Ownership.h"
 // Included inside material_graph by MaterialGraphSceneHost.cpp.
 namespace
 {

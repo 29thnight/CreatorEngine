@@ -1,12 +1,30 @@
 #pragma once
-#include "../../../../Utility_Framework/LifetimeToken.h"
-#include "../../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "FsrBackend.h"
 #if CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_DX12_SDK
 #include "../../../Render/Temporal/ITemporalUpscaler.h"
 #include "../../../Render/Temporal/ITemporalFrameGenerator.h"
 #include <FidelityFX/host/backends/dx12/ffx_dx12.h>
-#include <wrl/client.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 class DX12DeviceResources;
 
@@ -41,7 +59,7 @@ public:
     TemporalResult PresentRealFrame(uint32_t syncInterval, uint32_t flags,
         TemporalResult* presentObservation = nullptr);
     TemporalResult Shutdown() override;
-    IDXGISwapChain4* GetSwapchain() const { return m_swapchain.Get(); } // Borrowed.
+    IDXGISwapChain4* GetSwapchain() const { return m_swapchain.get(); } // Borrowed.
     uint32_t GetCompletedGeneratedFrameCount() const { return m_generator->GetCompletedGeneratedFrameCount(); }
 #if CE_DEVELOPMENT && !CE_SHIPPING
     void SetDevelopmentEvaluationFailure(std::function<bool()> reject)
@@ -53,10 +71,10 @@ public:
 private:
     DX12DeviceResources* m_resources{ nullptr };
     own::unique_owner<FsrFrameGenerator> m_generator{ own::make_unique<FsrFrameGenerator>() };
-    Microsoft::WRL::ComPtr<IDXGISwapChain4> m_swapchain;
+    winrt::com_ptr<IDXGISwapChain4> m_swapchain;
     struct FramePins
     {
-        Microsoft::WRL::ComPtr<ID3D12Resource> resources[4];
+        winrt::com_ptr<ID3D12Resource> resources[4];
         ce::lifetime_token lifetimeToken;
     };
     own::unique_owner<FramePins> m_lifetime;

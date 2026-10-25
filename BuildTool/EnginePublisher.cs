@@ -122,7 +122,7 @@ internal static class EnginePublisher
             var api = hosts["Player"]!.Int("scriptApi");
             var expected = Regex.Match(File.ReadAllText(Path.Combine(repository, "ScriptCore/Native.cs")), @"ExpectedVersion\s*=\s*(\d+)");
             var nativeExpected = Regex.Match(File.ReadAllText(Path.Combine(repository,
-                "Engine/Utility_Framework/ScriptApiVersion.h")), @"CreatorScriptApiVersion\s*=\s*(\d+)");
+                "Engine/Utility_Framework/Runtime/ScriptApiVersion.h")), @"CreatorScriptApiVersion\s*=\s*(\d+)");
             if (!expected.Success || !nativeExpected.Success
                 || !int.TryParse(expected.Groups[1].Value, out int managedApi)
                 || !int.TryParse(nativeExpected.Groups[1].Value, out int nativeApi)

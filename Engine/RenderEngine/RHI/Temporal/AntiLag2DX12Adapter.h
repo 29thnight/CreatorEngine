@@ -1,7 +1,11 @@
 #pragma once
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../../Render/Temporal/TemporalReconstruction.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 struct ID3D12Device;
 struct IDXGISwapChain;
 // Optional official Anti-Lag2 v2.0.0a source header. No bundled driver/DLL load.

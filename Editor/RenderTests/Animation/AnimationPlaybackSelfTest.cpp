@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../../../Engine/RenderEngine/RenderAllocator.h"
 #include "../../../Tools/regression/gcce_probe_cleanup.h"
 #include "Animation/AnimationPlaybackSelfTest.h"
@@ -13,15 +18,15 @@
 #include "DataSystem.h"
 #include "Object.h"
 #include "RenderScene.h"
-#include "RuntimeSettings.h"
-#include "ReflectionYml.h"
+#include "../../../Engine/Utility_Framework/Runtime/RuntimeSettings.h"
+#include "../../../Engine/Utility_Framework/Reflection/ReflectionYml.h"
 #include "RuntimeFrame.h"
-#include "AuthoringNodeViewAccess.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeViewAccess.h"
 #include "Scene.h"
 #include "SceneManager.h"
 #include "ScriptComponent.h"
 #include "Socket.h"
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include <mathematics/transform.hpp>
 
 namespace RenderTest

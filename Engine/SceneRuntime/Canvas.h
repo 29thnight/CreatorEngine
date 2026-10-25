@@ -1,13 +1,13 @@
 #pragma once
 #include <mathematics/vector2.hpp>
-#include "../Utility_Framework/Core.Minimal.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include <mathematics/rect.hpp>
 #include "Component.h"
 #include "IRenderable.h"
 #include "CanvasScaleMode.h"
 #include "CanvasRenderMode.h"
 #include "EntityHandle.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace Meta { enum class PropertyChangeSource : std::uint8_t; }
 

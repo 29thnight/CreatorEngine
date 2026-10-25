@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "SpriteSheetComponent.h"
 #include "Canvas.h"
 #include "DataSystem.h"
@@ -19,7 +24,7 @@ void SpriteSheetComponent::ReplaceTextureOwner(const Texture* previous,
     }
 }
 
-void SpriteSheetComponent::LoadSpriteSheet(const file::path& path)
+void SpriteSheetComponent::LoadSpriteSheet(const std::filesystem::path& path)
 {
 	m_spriteSheetPath = path.filename().string();
 	m_spriteSheetTexture = DataSystems->LoadSharedTexture(m_spriteSheetPath,

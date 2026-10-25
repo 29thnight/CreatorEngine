@@ -1,14 +1,16 @@
 #include "AssetIdentityEpoch.h"
 #include "AssetIdentityHex.h"
 
-#include "AuthoringParsedDocument.h"
-#include "AuthoringCookedDocument.h"
-#include "AuthoringWriteNode.h"
+#include "../../Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../Utility_Framework/Authoring/AuthoringCookedDocument.h"
+#include "../../Utility_Framework/Authoring/AuthoringWriteNode.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
-#include <Windows.h>
-#include <bcrypt.h>
-
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #pragma comment(lib, "bcrypt.lib")
 

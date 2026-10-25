@@ -1,6 +1,6 @@
 #pragma once
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include "Core.Minimal.h"
+#include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 
 // 프리팹 인스턴스가 프리팹 원본 값을 지역적으로 덮어쓴 지점 하나를 기록한다
 // (SceneGraphRedesignPlan.md 트랙 P, P1 — 직렬화 예외 1).

@@ -1,16 +1,42 @@
-#include "../../../Utility_Framework/Ownership.h"
+#include "../../RenderArena.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Arena.h"
+#else
+import Creator.Core.Arena;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.JobGraph.h"
+#else
+import Creator.Concurrency.JobGraph;
+#endif
 #include "../../RHI/RHISoftwareRecorder.h"
 #include "../../RHI/RHIProfilingContext.h"
-#include "../../../Utility_Framework/DynamicBitset.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.DynamicBitset.h"
+#else
+import Creator.Core.DynamicBitset;
+#endif
 #include "EnhancedRenderGraph.h"
-#include "../../../Utility_Framework/JobScheduler.h"
-#include "../../../Utility_Framework/WorkPartition.h"
-#include "../../RenderArena.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.WorkPartition.h"
+#else
+import Creator.Core.WorkPartition;
+#endif
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
 
 #include <stdint.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {

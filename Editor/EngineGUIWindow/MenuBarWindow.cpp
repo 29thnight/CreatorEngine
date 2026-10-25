@@ -1,61 +1,85 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Distribution.h"
+#else
+import Creator.Core.Distribution;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
 #include "ImGui.h"
-#include "EngineDistributionIdentity.h"
-#include "ScriptApiVersion.h"
+#include "../../Engine/Utility_Framework/Runtime/ScriptApiVersion.h"
 #include "EditorTheme.h"
 #include "ClrHost.h"
-#include "EditorImGuiTexture.h"
+#include "../EngineEntry/Presentation/EditorImGuiTexture.h"
 #include "MenuBarWindow.h"
 #include "EditorWorkspaceStore.h"
 #include "EditorChromeSnapshot.h"
-#include "LogSystem.h"
+#include "../../Engine/Utility_Framework/Diagnostics/LogSystem.h"
 #include "SceneManager.h"
-#include "EditorProjectOperations.h"
-#include "ConsoleCommandSystem.h"
+#include "../EngineEntry/Project/EditorProjectOperations.h"
+#include "../EngineEntry/Commands/ConsoleCommandSystem.h"
 // SceneManager.h는 Scene을 전방 선언만 한다. 여기서는 m_sceneName을 읽으므로
 // 완전한 Scene 형이 필요하다.
 // 유니티 빌드에서는 같은 블롭의 앞선 파일이 둘 다 공급했다.
 #include "Scene.h"
 #include "DataSystem.h"
-#include "FileDialog.h"
+#include "../../Engine/Platform/Windows/FileDialog.h"
 #include "ProfilerHUD.h"
 #include "EnhancedRenderDebugWindow.h"
-#include "WindowsCoreWindow.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.AppBackend.WinAPI.h"
+#else
+import Creator.AppBackend.WinAPI;
+#endif
 #include "EditorIcons.h"
 #include "EditorFontResources.h"
-#include "EditorAssetPresentation.h"
+#include "../EngineEntry/Assets/EditorAssetPresentation.h"
 #include "Prefab.h"
 #include "PrefabUtility.h"
 #include "AIManager.h"
 #include "BTBuildGraphAuthoring.h"
 #include "BTEditorBridge.h"
-#include "AuthoringParsedDocument.h"
-#include "ReflectionUndo.h"
-#include "EditorPlayModeController.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../EngineEntry/Editing/ReflectionUndo.h"
+#include "../EngineEntry/Scene/EditorPlayModeController.h"
 #include "BlackBoard.h"
 #include "InputActionManager.h"
 #include "TagManager.h"
 #include "EditorMenuDraw.h"
 #include "EditorMenuTargets.h"
-#include "EditorSettingsStore.h"
-#include "EditorPlatform.h"
-#include "RuntimeSettings.h"
+#include "../EngineEntry/Project/EditorSettingsStore.h"
+#include "../EngineEntry/Bootstrap/EditorPlatform.h"
+#include "../../Engine/Utility_Framework/Runtime/RuntimeSettings.h"
 #include "EnhancedGizmoSceneBinding.h"
-#include "GameBuilderSystem.h"
+#include "../EngineEntry/Build/GameBuilderSystem.h"
 #include "EditorRenderer.h"
 #include "EditorWindowChrome.h"
 #include "EditorWindowNames.h"
 #include "EditorWindowRegistry.h"
 #include "Windows/EditorStandardWindows.h"
 #include "Windows/EditorToolboxWindows.h"
-#include "Core.Definition.h"
+#include "../../Engine/Utility_Framework/Foundation/Core.Definition.h"
 #include "EditorClipContract.h"
 #include "EditorNavContract.h"
 #include "EditorStateContract.h"
-#include "EditorModelPlacement.h"
-#include "EditorScriptAuthoring.h"
+#include "../EngineEntry/Assets/Models/EditorModelPlacement.h"
+#include "../EngineEntry/Scripting/EditorScriptAuthoring.h"
 #include "RHI/RHIShaderCompiler.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 constexpr int kMaxLayerSize = 32;
 
@@ -323,11 +347,11 @@ void MenuBarWindow::RenderMenuBar()
 				}
                 if (ImGui::MenuItem("Save", "Ctrl+S"))
                 {
-                    SceneManagers->resetSelectedObjectEvent.Broadcast();
-                    std::string sceneName = SceneManagers->GetActiveScene()->m_sceneName.ToString();
-					file::path fileName = PathFinder::Relative("Scenes\\" + sceneName + ".creator").wstring();
+                    SceneManagers->resetSelectedObjectEvent.broadcast();
+                    std::string sceneName = SceneManagers->GetActiveScene()->m_sceneName;
+					std::filesystem::path fileName = ce::paths::relative("Scenes\\" + sceneName + ".creator").wstring();
 
-                    if (file::exists(fileName))
+                    if (std::filesystem::exists(fileName))
                     {
                         SceneManagers->SaveScene(fileName.string());
                     }
@@ -336,7 +360,7 @@ void MenuBarWindow::RenderMenuBar()
                         fileName = ShowSaveFileDialog(
                             L"Scene Files (*.creator)\0*.creator\0",
                             L"Save Scene",
-                            PathFinder::Relative("Scenes\\").wstring()
+                            ce::paths::relative("Scenes\\").wstring()
                         );
                         if (!fileName.empty())
                         {
@@ -350,11 +374,11 @@ void MenuBarWindow::RenderMenuBar()
                 }
                 if (ImGui::MenuItem("Save As", "Ctrl+Shift+S"))
                 {
-                    SceneManagers->resetSelectedObjectEvent.Broadcast();
-                    file::path fileName = ShowSaveFileDialog(
+                    SceneManagers->resetSelectedObjectEvent.broadcast();
+                    std::filesystem::path fileName = ShowSaveFileDialog(
                         L"Scene Files (*.creator)\0*.creator\0",
                         L"Save Scene",
-                        PathFinder::Relative("Scenes\\").wstring()
+                        ce::paths::relative("Scenes\\").wstring()
                     );
                     if (!fileName.empty())
                     {
@@ -367,11 +391,11 @@ void MenuBarWindow::RenderMenuBar()
                 }
                 if (ImGui::MenuItem("Load Scene"))
                 {
-					SceneManagers->resetSelectedObjectEvent.Broadcast();
-					file::path fileName = ShowOpenFileDialog(
+					SceneManagers->resetSelectedObjectEvent.broadcast();
+					std::filesystem::path fileName = ShowOpenFileDialog(
 						L"Scene Files (*.creator)\0*.creator\0",
 						L"Load Scene",
-						PathFinder::Relative("Scenes\\").wstring()
+						ce::paths::relative("Scenes\\").wstring()
 					);
                     if (!fileName.empty())
                     {
@@ -400,10 +424,10 @@ void MenuBarWindow::RenderMenuBar()
                 {
                     // Exit action
 					//
-					// 창 핸들은 WindowsCoreWindow 싱글턴에서 온다. 예전에는 DeviceResources를
+					// 창 핸들은 AppBackendWinAPI 싱글턴에서 온다. 예전에는 DeviceResources를
 					// 거쳤는데, 창을 디바이스가 들고 있을 이유가 없었고 그 경유가
 					// DeviceResources::GetActive의 마지막 소비자였다(2026-08-10).
-					if (auto* window = WindowsCoreWindow::GetForCurrentInstance())
+					if (auto* window = AppBackendWinAPI::GetForCurrentInstance())
 					{
 						PostMessage(window->GetHandle(), WM_CLOSE, 0, 0);
 					}
@@ -937,7 +961,7 @@ void MenuBarWindow::RenderMenuBar()
         ImGui::Separator();
         if (ImGui::Button("Create"))
         {
-            SceneManagers->resetSelectedObjectEvent.Broadcast();
+            SceneManagers->resetSelectedObjectEvent.broadcast();
             std::string sceneName = newSceneName;
             if (sceneName.empty())
             {
@@ -969,11 +993,11 @@ void MenuBarWindow::RenderMenuBar()
         isDownS)
     {
         // 기존 Save As 로직 호출
-        SceneManagers->resetSelectedObjectEvent.Broadcast();
-        file::path fileName = ShowSaveFileDialog(
+        SceneManagers->resetSelectedObjectEvent.broadcast();
+        std::filesystem::path fileName = ShowSaveFileDialog(
             L"Scene Files (*.creator)\0*.creator\0",
             L"Save Scene",
-            PathFinder::Relative("Scenes\\").wstring()
+            ce::paths::relative("Scenes\\").wstring()
         );
 
         if (!fileName.empty())
@@ -988,11 +1012,11 @@ void MenuBarWindow::RenderMenuBar()
     else if (isPressedControl && isDownS)
     {
         // 기존 Save 로직 호출
-        SceneManagers->resetSelectedObjectEvent.Broadcast();
-        std::string sceneName = SceneManagers->GetActiveScene()->m_sceneName.ToString();
-        file::path fileName = PathFinder::Relative("Scenes\\" + sceneName + ".creator").wstring();
+        SceneManagers->resetSelectedObjectEvent.broadcast();
+        std::string sceneName = SceneManagers->GetActiveScene()->m_sceneName;
+        std::filesystem::path fileName = ce::paths::relative("Scenes\\" + sceneName + ".creator").wstring();
 
-        if (file::exists(fileName))
+        if (std::filesystem::exists(fileName))
         {
             SceneManagers->SaveScene(fileName.string());
         }
@@ -1001,7 +1025,7 @@ void MenuBarWindow::RenderMenuBar()
             fileName = ShowSaveFileDialog(
                 L"Scene Files (*.creator)\0*.creator\0",
                 L"Save Scene",
-                PathFinder::Relative("Scenes\\").wstring()
+                ce::paths::relative("Scenes\\").wstring()
             );
             if (!fileName.empty())
             {
@@ -1093,7 +1117,7 @@ void MenuBarWindow::ShowAboutWindow()
     // 여는 이 창으로 옮겼다.
     const BuildSettings& buildSettings = EditorSettingsStore::Get().Build();
 
-    ImGui::Text("%s \xF0\x9F\x8E\xB9\xE2\x9C\xA8", CreatorEngineVersion::ProductName); // 🎹✨ (UTF-8)
+    ImGui::Text("%s \xF0\x9F\x8E\xB9\xE2\x9C\xA8", ce::distribution::product_name); // 🎹✨ (UTF-8)
     ImGui::Separator();
 
     const auto row = [](const char* label, const char* value)
@@ -1103,12 +1127,12 @@ void MenuBarWindow::ShowAboutWindow()
         ImGui::TextUnformatted(value);
     };
 
-    row("Feature release", CreatorEngineVersion::FeatureRelease[0] ? CreatorEngineVersion::FeatureRelease : "Unassigned (local development)");
-    row("Engine build", CreatorEngineVersion::Build);
-    const auto& identity = CurrentEngineDistributionIdentity();
+    row("Feature release", ce::distribution::feature_release[0] ? ce::distribution::feature_release : "Unassigned (local development)");
+    row("Engine build", ce::distribution::build);
+    const auto& identity = ce::distribution::current_identity();
     row("Channel", identity.channel == "stable" ? "Stable" : "Preview");
-    row("Distribution", CreatorEngineVersion::LocalDevelopment ? "Local development" : "Published");
-    row("Build ID", identity.buildId.c_str());
+    row("Distribution", ce::distribution::local_development ? "Local development" : "Published");
+    row("Build ID", identity.build_id.c_str());
     row("Script API", std::to_string(CreatorScriptApiVersion).c_str());
     row("Project", buildSettings.GetProjectName().c_str());
     row("Dear ImGui", IMGUI_VERSION);
@@ -1165,17 +1189,17 @@ void MenuBarWindow::BehaviorTreeWindow(bool drawing)
         if (ImGui::Button("Create"))
         {
             isfirstLoad = true;
-            file::path BTSavePath = ShowSaveFileDialog(
+            std::filesystem::path BTSavePath = ShowSaveFileDialog(
                 L"Behavior Tree Files (*.bt)\0*.bt\0", 
                 L"Save Behavior Tree Asset",
-                PathFinder::Relative("BehaviorTree"));
+                ce::paths::relative("BehaviorTree"));
 
             if (!BTSavePath.empty())
             {
                 BTName = BTSavePath.stem().string();
-                if (!file::exists(BTSavePath.parent_path()))
+                if (!std::filesystem::exists(BTSavePath.parent_path()))
                 {
-                    file::create_directories(BTSavePath.parent_path());
+                    std::filesystem::create_directories(BTSavePath.parent_path());
                 }
                 graph.Clear();
                 s_nodeScreenPos.clear();
@@ -1210,16 +1234,16 @@ void MenuBarWindow::BehaviorTreeWindow(bool drawing)
         if (ImGui::Button("Open"))
         {
             isfirstLoad = true;
-            file::path fileName = ShowOpenFileDialog(
+            std::filesystem::path fileName = ShowOpenFileDialog(
                 L"Behavior Tree Files (*.bt)\0*.bt\0",
                 L"Load Behavior Tree",
-                PathFinder::Relative("BehaviorTree").wstring()
+                ce::paths::relative("BehaviorTree").wstring()
             );
 
             if (!fileName.empty())
             {
                 BTName = fileName.stem().string();
-				if (file::exists(fileName))
+				if (std::filesystem::exists(fileName))
 				{
 					graph.CleanUp();
 					s_nodeScreenPos.clear();
@@ -1261,10 +1285,10 @@ void MenuBarWindow::BehaviorTreeWindow(bool drawing)
             isfirstLoad = true;
             if (BTName.empty())
             {
-                file::path fileName = ShowSaveFileDialog(
+                std::filesystem::path fileName = ShowSaveFileDialog(
                     L"Behavior Tree Files (*.bt)\0*.bt\0",
                     L"Save Behavior Tree",
-                    PathFinder::Relative("BehaviorTree").wstring()
+                    ce::paths::relative("BehaviorTree").wstring()
 				);
 
                 if (!fileName.empty())
@@ -1277,11 +1301,11 @@ void MenuBarWindow::BehaviorTreeWindow(bool drawing)
 				}
             }
 
-            file::path BTPath = PathFinder::Relative("BehaviorTree\\" + BTName + ".bt");
+            std::filesystem::path BTPath = ce::paths::relative("BehaviorTree\\" + BTName + ".bt");
 
-            if (!file::exists(BTPath.parent_path()))
+            if (!std::filesystem::exists(BTPath.parent_path()))
             {
-                file::create_directories(BTPath.parent_path());
+                std::filesystem::create_directories(BTPath.parent_path());
             }
 
             for (auto& node : graph.NodeList)
@@ -1944,11 +1968,11 @@ void MenuBarWindow::BehaviorTreeWindow(bool drawing)
             ed::DestroyEditor(s_MenuBarBTEditorContext);
             s_MenuBarBTEditorContext = nullptr;
 
-            file::path BTPath = PathFinder::Relative("BehaviorTree\\" + BTName + ".bt");
+            std::filesystem::path BTPath = ce::paths::relative("BehaviorTree\\" + BTName + ".bt");
 
-            if (!file::exists(BTPath.parent_path()))
+            if (!std::filesystem::exists(BTPath.parent_path()))
             {
-                file::create_directories(BTPath.parent_path());
+                std::filesystem::create_directories(BTPath.parent_path());
             }
 
             for (auto& node : graph.NodeList)
@@ -2023,10 +2047,10 @@ void MenuBarWindow::BlackBoardWindow(bool drawing)
         // --- Toolbar Buttons ---
         if (ImGui::Button("Create"))
         {
-            file::path BBSavePath = ShowSaveFileDialog(
+            std::filesystem::path BBSavePath = ShowSaveFileDialog(
                 L"BlackBoard Files (*.blackboard)\0*.blackboard\0",
                 L"Save BlackBoard Asset",
-                PathFinder::Relative("BehaviorTree").wstring()
+                ce::paths::relative("BehaviorTree").wstring()
             );
 
             if (!BBSavePath.empty())
@@ -2044,10 +2068,10 @@ void MenuBarWindow::BlackBoardWindow(bool drawing)
         ImGui::SameLine();
         if (ImGui::Button("Open"))
         {
-            file::path fileName = ShowOpenFileDialog(
+            std::filesystem::path fileName = ShowOpenFileDialog(
                 L"BlackBoard Files (*.blackboard)\0*.blackboard\0",
                 L"Load BlackBoard",
-                PathFinder::Relative("BehaviorTree").wstring()
+                ce::paths::relative("BehaviorTree").wstring()
             );
 
             if (!fileName.empty())
@@ -2877,9 +2901,9 @@ void MenuBarWindow::ShowBuildSceneSettingWindow()
 		const std::wstring& startupSceneName = buildSettings.GetStartupSceneName();
 		ImGui::Text("Startup Scene: %s",
 			startupSceneName.empty() ? "(none)" :
-			file::path(startupSceneName).string().c_str());
+			std::filesystem::path(startupSceneName).string().c_str());
 		static char sceneName[128] = "";
-        static file::path sceneFileName{};
+        static std::filesystem::path sceneFileName{};
         if (ImGui::InputText("Scene Name", sceneName, sizeof(sceneName), ImGuiInputTextFlags_EnterReturnsTrue))
         {
             sceneFileName = std::string(sceneName) + ".creator";

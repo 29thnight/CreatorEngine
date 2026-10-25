@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
 #include "GltfImporter.h"
 #include "NormalGeneration.h"
 #include "TangentGeneration.h"
@@ -9,7 +14,7 @@
 #include <fastgltf/types.hpp>
 #include <simdjson.h>
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace experiment::importer
 {
@@ -624,8 +629,7 @@ namespace experiment::importer
     bool GltfImporter::CanImport(const std::filesystem::path& sourcePath) const
     {
         std::string extension = sourcePath.extension().string();
-        std::ranges::transform(extension, extension.begin(),
-            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        ce::strings::to_lower_in_place(extension);
         return extension == ".gltf" || extension == ".glb";
     }
 

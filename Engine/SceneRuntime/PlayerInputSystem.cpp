@@ -2,7 +2,7 @@
 #include "PlayerInput.h"
 #include "Entity.h"
 #include "LifecycleTrace.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 void PlayerInputSystem::Register(PlayerInputComponent* component)
 {
@@ -40,7 +40,7 @@ void PlayerInputSystem::Update(float tick)
 
         // C3 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.
         LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(input),
-            owner->m_name.ToString().c_str(), input->GetInstanceID());
+            owner->m_name.c_str(), input->GetInstanceID());
 
         input->TickInput(tick);
     }

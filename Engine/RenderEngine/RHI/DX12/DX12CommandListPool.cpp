@@ -1,10 +1,19 @@
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "DX12CommandListPool.h"
 #include "DX12DeviceResources.h"
 #include "DX12Encoder.h"
 #include "../RHIBackendExecution.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -45,7 +54,7 @@ bool DX12CommandListPool::Initialize(DX12DeviceResources& resources, uint32_t wo
 
     workerCount = (std::min)(workerCount, kMaxWorkers);
 
-    m_device = device;
+    m_device.copy_from(device);
     m_resources = &resources;
     m_workerCount = workerCount;
     m_frameCount = frameCount;
@@ -61,7 +70,7 @@ bool DX12CommandListPool::Initialize(DX12DeviceResources& resources, uint32_t wo
             Slot& slot = m_slots[frame][worker];
 
             HRESULT hr =
-                m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&slot.allocator));
+                m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(slot.allocator.put()));
             if (FAILED(hr))
             {
                 outError = "커맨드 얼로케이터 생성 실패 " + CmdPoolHrToString(hr);
@@ -69,8 +78,8 @@ bool DX12CommandListPool::Initialize(DX12DeviceResources& resources, uint32_t wo
                 return false;
             }
 
-            hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, slot.allocator.Get(), nullptr,
-                                             IID_PPV_ARGS(&slot.list));
+            hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, slot.allocator.get(), nullptr,
+                                             IID_PPV_ARGS(slot.list.put()));
             if (FAILED(hr))
             {
                 outError = "커맨드 리스트 생성 실패 " + CmdPoolHrToString(hr);
@@ -98,7 +107,7 @@ void DX12CommandListPool::Shutdown()
     m_slots.clear();
     m_encoders.clear();
     m_translationPools.clear();
-    m_device.Reset();
+    m_device = nullptr;
     m_recordingResources.reset();
     m_resources = nullptr;
     m_workerCount = 0;
@@ -246,7 +255,7 @@ ID3D12GraphicsCommandList* DX12CommandListPool::Open(uint32_t worker, std::strin
     Slot& slot = m_slots[m_frameIndex][worker];
     if (slot.opened)
     {
-        return slot.list.Get();
+        return slot.list.get();
     }
 
     HRESULT hr = slot.allocator->Reset();
@@ -256,7 +265,7 @@ ID3D12GraphicsCommandList* DX12CommandListPool::Open(uint32_t worker, std::strin
         return nullptr;
     }
 
-    hr = slot.list->Reset(slot.allocator.Get(), nullptr);
+    hr = slot.list->Reset(slot.allocator.get(), nullptr);
     if (FAILED(hr))
     {
         outError = "커맨드 리스트 Reset 실패 " + CmdPoolHrToString(hr);
@@ -265,7 +274,7 @@ ID3D12GraphicsCommandList* DX12CommandListPool::Open(uint32_t worker, std::strin
 
     slot.translationBegun = false;
     slot.opened = true;
-    return slot.list.Get();
+    return slot.list.get();
 }
 
 uint32_t DX12CommandListPool::DrainEncoderDrops(std::string& outLast)
@@ -333,7 +342,7 @@ ID3D12GraphicsCommandList* DX12CommandListPool::Get(uint32_t worker) const
     {
         return nullptr;
     }
-    return m_slots[m_frameIndex][worker].list.Get();
+    return m_slots[m_frameIndex][worker].list.get();
 }
 
 uint64_t DX12CommandListPool::GetCurrentRecordingId() const
@@ -404,7 +413,7 @@ bool DX12CommandListPool::SubmitRecordedCommands(uint32_t frameSlot, std::span<c
         {
             continue;
         }
-        ID3D12GraphicsCommandList* const list = slot.list.Get();
+        ID3D12GraphicsCommandList* const list = slot.list.get();
         if (nullptr != list)
         {
             submission[submissionCount++] = list;

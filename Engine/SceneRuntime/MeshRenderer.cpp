@@ -1,9 +1,14 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include <stdio.h>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "MeshRenderer.h"
-#include "AuthoringParsedDocument.h"
-#include "AuthoringNodeViewAccess.h" // D3-a-4
-#include "ReflectionYml.h"
+#include "../Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-4
+#include "../Utility_Framework/Reflection/ReflectionYml.h"
 #include "DataSystem.h"
 #include "ProfileScope.h"
 #include "Entity.h"

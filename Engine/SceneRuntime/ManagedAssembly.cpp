@@ -1,5 +1,5 @@
 #include "ManagedAssembly.h"
-#include <windows.h>
+import "Creator.WinAPI.h";
 #include <nethost.h>
 #include <hostfxr.h>
 #include <coreclr_delegates.h>

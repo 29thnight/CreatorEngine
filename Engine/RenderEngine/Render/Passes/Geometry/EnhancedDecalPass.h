@@ -1,7 +1,15 @@
 #pragma once
-#include "../../../../Utility_Framework/Ownership.h"
-#include "../../../../Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 #include "../../Graph/EnhancedRenderPass.h"
 #include "../../../GpuGeometryVisibility.h"

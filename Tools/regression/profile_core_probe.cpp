@@ -8,12 +8,16 @@
 //
 // 판정은 종료 코드다. 실패 사유는 stderr 로 낸다.
 #if defined(_WIN32)
-#include <windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 #include <crtdbg.h>
 #endif
 
 #include <stdio.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "ProfileAggregate.h"
 #include "ProfileCaptureFile.h"

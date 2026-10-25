@@ -1,4 +1,13 @@
-#include "../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 // UIRenderProxy의 컴포넌트 읽기 생성자들 (PHASE 4-2 C1).
 //
 // 프록시 타입은 렌더 소유(UIRenderProxy.h), 컴포넌트 -> 프록시 변환은 게임플레이
@@ -117,8 +126,8 @@ UIRenderProxy::UIRenderProxy(SpriteSheetComponent* sprite) noexcept
     {
         try
         {
-		    file::path path = PathFinder::Relative("SpriteSheets\\") /
-                file::path(data.spriteSheetPath).filename().replace_extension(".txt");
+		    std::filesystem::path path = ce::paths::relative("SpriteSheets\\") /
+                std::filesystem::path(data.spriteSheetPath).filename().replace_extension(".txt");
 
             m_spriteSheet->Load(path.c_str());
         }

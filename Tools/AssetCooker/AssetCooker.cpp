@@ -1,14 +1,34 @@
-#include "../../Editor/EngineEntry/TextureSourceProcessing.h"
-#include "../../Engine/Utility_Framework/WindowsApartment.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Platform.Windows.Strings.h"
+#else
+import Creator.Platform.Windows.Strings;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
+#include "../../Editor/EngineEntry/Assets/Textures/TextureSourceProcessing.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
 #include "Experiment/Cooked/CookedTerrain.h"
 #include "Experiment/Cooked/CookedTexture.h"
 #include "AssetSetBuild.h"
 #include "AssetDepot/AssetSetActivation.h"
 #include "AssetDepot/RuntimeBootstrap.h"
 #include "Experiment/Cooked/MaterialAssetSetCodec.h"
-#include "ArtifactStoreGuard.h"
+#include "../../Engine/Utility_Framework/Packaging/ArtifactStoreGuard.h"
 #include <stdint.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "SoundAssetCookProducer.h"
 #include "FontAssetCookSupport.h"
 #include "CollisionGeometryCookProducer.h"
@@ -31,17 +51,15 @@
 #include "Assets/ModelAssetAuthoringTransaction.h"
 #include "Assets/ModelMaterialGraph.h"
 #include "AudioDecodeValidation.h"
-#include "AuthoringCookedDocument.h"
-#include "AuthoringNodeEquality.h"
-#include "AuthoringParsedDocument.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringCookedDocument.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringNodeEquality.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
 
 #include <process.h>
-#include <objbase.h>
 
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <Windows.h>
 
 namespace
 {
@@ -139,15 +157,13 @@ namespace
         while (std::getline(lines, line))
         {
             if (!line.empty() && line.back() == '\r') line.pop_back();
-            const auto length = static_cast<int>(line.size());
-            const int count = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, line.data(), length, nullptr, 0);
-            if (count <= 0 || line.find('\0') != std::string::npos || tokens.size() >= 1000000u)
+            std::wstring token;
+            if (line.empty() || line.find('\0') != std::string::npos || tokens.size() >= 1000000u
+                || !ce::strings::try_utf8_to_wide(line, token))
             {
                 failure = "invalid UTF-8 argument, empty argument, or too many arguments.";
                 return false;
             }
-            std::wstring token(static_cast<size_t>(count), L'\0');
-            MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, line.data(), length, token.data(), count);
             if (token == L"--arguments-file")
             {
                 failure = "nested arguments files are not supported.";
@@ -722,7 +738,7 @@ namespace
             failure = "해시할 파일을 열 수 없다: " + path.string();
             return false;
         }
-        Hash::Sha256 hash;
+        ce::hash::sha256 hash;
         std::array<char, 64u * 1024u> buffer{};
         size = 0u;
         while (input)
@@ -730,7 +746,7 @@ namespace
             input.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
             const auto count = static_cast<std::size_t>(input.gcount());
             if (count == 0u) break;
-            hash.Update(buffer.data(), count);
+            hash.update(buffer.data(), count);
             size += count;
         }
         if (!input.eof() || input.bad())
@@ -738,7 +754,7 @@ namespace
             failure = "파일 해시 읽기가 완료되지 않았다: " + path.string();
             return false;
         }
-        digest = hash.Finish();
+        digest = hash.finish();
         return true;
     }
 
@@ -1016,7 +1032,7 @@ namespace
         std::string artifactPath{};
         std::array<std::byte, ck::kAudioClipHeaderBytes> header{};
         ck::CookedAssetManifestEntry manifestEntry{};
-        Hash::Sha256Digest payloadSha256{};
+        ce::hash::sha256_digest payloadSha256{};
         std::uint64_t payloadBytes{};
     };
 
@@ -1165,7 +1181,7 @@ namespace
                     || !assets::InspectAudioClipSource(source, inspected, inspectionError)
                     || codec.Scalar() != assets::AudioCodecName(inspected.codec)
                     || size.Scalar() != std::to_string(inspected.payloadSize)
-                    || hash.Scalar() != Hash::ToHex(inspected.sourceContentHash))
+                    || hash.Scalar() != ce::hash::to_hex(inspected.sourceContentHash))
                 {
                     failure = "audio source/meta stamp가 유효하지 않거나 다르다: "
                         + source.string() + " (" + inspectionError + ")";
@@ -1267,9 +1283,9 @@ namespace
                 failure = "audio artifact source를 열 수 없다: " + input.source.string();
                 return false;
             }
-            Hash::Sha256 payloadHash;
-            Hash::Sha256 artifactHash;
-            artifactHash.Update(header.data(), header.size());
+            ce::hash::sha256 payloadHash;
+            ce::hash::sha256 artifactHash;
+            artifactHash.update(header.data(), header.size());
             std::array<char, 64u * 1024u> buffer{};
             std::uint64_t size = 0u;
             while (source)
@@ -1277,12 +1293,12 @@ namespace
                 source.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
                 const auto count = static_cast<std::size_t>(source.gcount());
                 if (count == 0u) break;
-                payloadHash.Update(buffer.data(), count);
-                artifactHash.Update(buffer.data(), count);
+                payloadHash.update(buffer.data(), count);
+                artifactHash.update(buffer.data(), count);
                 size += count;
             }
             if (!source.eof() || source.bad() || size != metadata.payloadBytes
-                || payloadHash.Finish() != metadata.payloadSha256)
+                || payloadHash.finish() != metadata.payloadSha256)
             {
                 failure = "audio source가 artifact 준비 중 바뀌었다: "
                     + input.source.string();
@@ -1299,7 +1315,7 @@ namespace
             product.manifestEntry.kind = ck::CookedAssetKind::AudioClip;
             product.manifestEntry.formatVersion = ck::kAudioClipArtifactVersion;
             product.manifestEntry.byteSize = header.size() + size;
-            product.manifestEntry.contentSha256 = artifactHash.Finish();
+            product.manifestEntry.contentSha256 = artifactHash.finish();
             product.manifestEntry.artifactPath = path;
             manifest.entries.push_back(product.manifestEntry);
             products.push_back(std::move(product));
@@ -1328,7 +1344,7 @@ namespace
         }
         output.write(reinterpret_cast<const char*>(product.header.data()),
             static_cast<std::streamsize>(product.header.size()));
-        Hash::Sha256 payloadHash;
+        ce::hash::sha256 payloadHash;
         std::array<char, 64u * 1024u> buffer{};
         std::uint64_t copied = 0u;
         while (input)
@@ -1337,12 +1353,12 @@ namespace
             const auto count = static_cast<std::size_t>(input.gcount());
             if (count == 0u) break;
             output.write(buffer.data(), static_cast<std::streamsize>(count));
-            payloadHash.Update(buffer.data(), count);
+            payloadHash.update(buffer.data(), count);
             copied += count;
         }
         output.flush();
         if (!input.eof() || input.bad() || !output || copied != product.payloadBytes
-            || payloadHash.Finish() != product.payloadSha256)
+            || payloadHash.finish() != product.payloadSha256)
         {
             failure = "audio source가 artifact 기록 중 바뀌었거나 쓰기가 실패했다: "
                 + product.source.string();
@@ -1686,7 +1702,7 @@ namespace
                     ? assetRoot / "Shaders/DefaultPassShader"
                     : std::filesystem::absolute(arguments.materialShaderRoot);
                 const auto source = assetRoot.parent_path() / "Library/LXSceneCook" /
-                    (Uuid::ToString(graphId.value) + ".slang");
+                    (uuid::to_string(graphId.value) + ".slang");
                 if (!generated || !material_graph::CompileSceneProduct(*generated, shaders, source,
                         materialBudget, verifiedProduct, graphError, FileGuid{graphId.value}))
                 {
@@ -1856,7 +1872,7 @@ namespace
                         std::uint64_t revision = 0;
                         const auto parsed = std::from_chars(text.data(), text.data() + text.size(), revision);
                         const auto found = std::ranges::find_if(geometryProducts, [&](const auto& product) {
-                            return Uuid::ToString(product.entry.assetId.value) == asset.AsString();
+                            return uuid::to_string(product.entry.assetId.value) == asset.AsString();
                         });
                         if (!experiment::TryParseCanonicalAssetId(asset.AsString(), id) || !revision ||
                             parsed.ec != std::errc{} || parsed.ptr != text.data() + text.size() ||
@@ -1905,7 +1921,7 @@ namespace
                     if (bootstrapCatalog.Find(reference, resolved) != ck::AssetLookupStatus::Found)
                     {
                         std::cerr << "asset-cooker error: missing/wrong-kind bootstrap Foliage reference in "
-                            << item.path() << ": " << Uuid::ToString(reference.key.assetId.value) << '\n';
+                            << item.path() << ": " << uuid::to_string(reference.key.assetId.value) << '\n';
                         return 3;
                     }
                 }
@@ -2028,7 +2044,7 @@ namespace
                     if (bootstrapCatalog.Find(reference, external) != ck::AssetLookupStatus::Found)
                     {
                         std::cerr << "asset-cooker error: missing/wrong-kind bootstrap reference: "
-                            << Uuid::ToString(reference.key.assetId.value) << '\n';
+                            << uuid::to_string(reference.key.assetId.value) << '\n';
                         return 3;
                     }
                     document.references.push_back(reference);
@@ -2432,7 +2448,7 @@ namespace
                     if (restoredManifest.Find(dependency)) continue;
                     std::cerr << "asset-cooker error: 폐포가 닫히지 않았다 — "
                         << entry.artifactPath << " 의 dependency "
-                        << Uuid::ToString(dependency.value)
+                        << uuid::to_string(dependency.value)
                         << " 가 manifest 에 없다.\n";
                     return 5;
                 }
@@ -2580,10 +2596,10 @@ namespace
             // ★ source 셰이더 GUID 를 여기서 소비한다. 해소는 증명해 놓고
             //   아무도 안 읽는 필드로 두면 B3 가 그것을 못 믿는다.
             std::cout << "asset-cooker shadermeta="
-                << Uuid::ToString(product.shaderMetaAssetId.value)
+                << uuid::to_string(product.shaderMetaAssetId.value)
                 << " name=" << product.name
                 << " source=" << product.sourceRelativePath
-                << " sourceGuid=" << Uuid::ToString(product.sourceShaderAssetId.value)
+                << " sourceGuid=" << uuid::to_string(product.sourceShaderAssetId.value)
                 << " properties=" << product.propertyCount
                 << " keywordAxes=" << product.keywordAxisCount
                 << " passes=" << product.passCount << '\n';
@@ -2591,7 +2607,7 @@ namespace
         for (const ck::ModelGenerationExportProduct& product : products)
         {
             std::cout << "asset-cooker model="
-                << Uuid::ToString(product.modelAssetId.value)
+                << uuid::to_string(product.modelAssetId.value)
                 << " generation=" << product.generation
                 << " files=" << product.files.size()
                 << " artifact=" << product.recordArtifactPath << '\n';
@@ -2800,7 +2816,7 @@ int wmain(int argc, wchar_t** argv)
             std::cerr << "asset-cooker warning [" << warning.stage << "]: " << warning.message << '\n';
         }
         std::cout << "asset-cooker model-authoring model="
-            << Uuid::ToString(result.modelAssetId)
+            << uuid::to_string(result.modelAssetId)
             << " generation=" << result.generation
             << " subAssets=" << result.subAssetCount
             << " materials=" << result.materialCount

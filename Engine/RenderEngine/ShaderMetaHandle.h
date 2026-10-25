@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // DataSystem이 소유하는 ShaderMeta cache slot의 세대 식별자다. slot 0과
 // generation 0은 항상 invalid이며, reload/remove 뒤 이전 handle은 resolve되지 않는다.

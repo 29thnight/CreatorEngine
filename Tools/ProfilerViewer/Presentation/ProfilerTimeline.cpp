@@ -11,7 +11,7 @@
 //   코어 프로브가 물고 있어서, 여기서는 그 결과를 픽셀로 옮기기만 한다.
 #include "ProfilerView.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "ImGui.h"
 #include "EditorIcons.h"

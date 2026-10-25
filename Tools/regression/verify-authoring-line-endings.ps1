@@ -116,7 +116,7 @@ if (-not (Test-Path -LiteralPath $attributesPath -PathType Leaf)) {
 $writerFiles = @(
     'Engine\SceneRuntime\PrefabUtility.cpp',
     'Engine\SceneRuntime\SceneManager.cpp',
-    'Editor\EngineEntry\EditorAssetDatabase.cpp',
+    'Editor\EngineEntry\Assets\EditorAssetDatabase.cpp',
     'Editor\EngineGUIWindow\MenuBarWindow.cpp',
     'Editor\EngineGUIWindow\InspectorWindow.cpp'
 )

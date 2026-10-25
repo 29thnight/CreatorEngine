@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../../Engine/RenderEngine/Render/Scene/PreparedViewInputPool.h"
 
 #include <cstdio>

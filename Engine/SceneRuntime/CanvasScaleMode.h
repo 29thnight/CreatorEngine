@@ -1,5 +1,5 @@
 #pragma once
-#include "Reflection.hpp"
+#include "../Utility_Framework/Reflection/Reflection.hpp"
 
 // 캔버스가 화면 크기에 어떻게 반응할지 정한다(uGUI CanvasScaler와 같은 개념).
 enum class CanvasScaleMode

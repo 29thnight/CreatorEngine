@@ -1,7 +1,10 @@
 #pragma once
-#include "../../../Utility_Framework/StandardLibrary.h"
-#include <d3d12.h>
-#include <dxgiformat.h>
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 
 #include "../RHIResourceTypes.h"
 

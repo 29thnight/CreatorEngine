@@ -1,9 +1,14 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include "RHI/RHIParallelCommandPool.h"
 #include "RHI/RHISubmissionThread.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // Both native pools exercise the same execution and aborted-recording contract.
 // The injected scheduler is test-owned; the product pools use the engine scheduler.

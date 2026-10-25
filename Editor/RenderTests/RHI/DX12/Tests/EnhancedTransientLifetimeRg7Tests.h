@@ -1,5 +1,16 @@
+#include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
 namespace
 {
@@ -48,7 +59,7 @@ namespace
             Rg7FailureServices resources;
             RGTransientPool cache;
             Rg7PostSubmitPool pool;
-            Microsoft::WRL::ComPtr<ID3D12Fence> gate;
+            winrt::com_ptr<ID3D12Fence> gate;
             std::array<std::array<RHIReadback, 4>, 3> readbacks{};
             std::array<std::array<RHIBufferHandle, 3>, 3> handles{};
             std::array<own::weak_owner<EnhancedRenderGraph>, 3> retained;
@@ -93,7 +104,7 @@ namespace
             {
                 if (!resources.Initialize(32, 32, error) ||
                     !pool.Initialize(resources, 2, 3, error) ||
-                    FAILED(resources.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gate))))
+                    FAILED(resources.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(gate.put()))))
                 {
                     throw std::runtime_error("RG7 lifetime initialization failed " + error);
                 }
@@ -111,7 +122,7 @@ namespace
                 // GPU delay is a real queue wait, recorded only through the RHI thread.
                 if (!submission.ExecuteAndWait(&resources, "RG7 GPU gate", [&resources, gate](std::string& taskError)
                 {
-                    if (FAILED(resources.GetCommandQueue()->Wait(gate.Get(), 1)))
+                    if (FAILED(resources.GetCommandQueue()->Wait(gate.get(), 1)))
                     {
                         taskError = "Cannot gate the isolated DX12 queue";
                         return false;

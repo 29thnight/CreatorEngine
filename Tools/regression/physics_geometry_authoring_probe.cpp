@@ -1,8 +1,8 @@
-#include "../../Editor/EngineEntry/CollisionGeometryAuthoring.h"
-#include "../../Editor/EngineEntry/UndoHistoryTransaction.h"
+#include "../../Editor/EngineEntry/Assets/Models/CollisionGeometryAuthoring.h"
+#include "../../Editor/EngineEntry/Editing/UndoHistoryTransaction.h"
 #include "../../Engine/SceneRuntime/CollisionGeometryIO.h"
 #include "../../Engine/SceneRuntime/CollisionGeometryLibrary.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 struct HistoryCommand
 {
@@ -41,7 +41,7 @@ int main(int argc, char** argv)
             return 2;
         const std::filesystem::path root(argv[1]);
         std::filesystem::create_directories(root);
-        const geometry_asset_key key{Uuid::Parse("91ea9b44-13a6-4aec-99ec-0963eef7eaa1"), 1};
+        const geometry_asset_key key{uuid::parse("91ea9b44-13a6-4aec-99ec-0963eef7eaa1"), 1};
         constexpr std::string_view tetra = "4 0 0 0 1 0 0 0 1 0 0 0 1";
         auto source = Editor::ParseCollisionGeometry(tetra, "convex", key);
         check(bool(source));
@@ -98,7 +98,7 @@ int main(int argc, char** argv)
         }
 
         auto second = *source;
-        second.key.asset = Uuid::Parse("c53b60ef-d00c-47b7-bd12-dcd3433d6476");
+        second.key.asset = uuid::parse("c53b60ef-d00c-47b7-bd12-dcd3433d6476");
         const auto before = *library.Stats();
         check(!library.Publish(
             second, [&](auto) { return bool(Editor::CollisionGeometryAuthoring::Create(root, target, second)); }));
@@ -122,7 +122,7 @@ int main(int argc, char** argv)
         Editor::CollisionGeometryRevisionEdit edit(*source, revision);
         const auto apply = [&](const auto& expected, const auto& next) {
             return library.Publish(next, [&](auto) {
-                const auto meta = "guid: " + Uuid::ToString(next.key.asset) +
+                const auto meta = "guid: " + uuid::to_string(next.key.asset) +
                                   "\ngeometryRevision: " + std::to_string(next.key.revision) + "\ncustom: retained\n";
                 return bool(Editor::CollisionGeometryAuthoring::Replace(root, target, expected, next, meta));
             });

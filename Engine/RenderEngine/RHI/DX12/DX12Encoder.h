@@ -1,8 +1,27 @@
 #pragma once
-#include "../../../Utility_Framework/Ownership.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
-#include <d3d12.h> // 5a — 인터페이스가 더는 이것을 물지 않는다(비유니티가 잡았다)
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
+// 5a — 인터페이스가 더는 이것을 물지 않는다(비유니티가 잡았다)
 #include "../RHIEncoder.h"
 #include "DX12ResourceEntries.h"
 
@@ -113,10 +132,10 @@ class DX12Encoder final : public RHIEncoder
     {
         if (m_commandList != commandList)
         {
-            m_meshCommandList.Reset();
+            m_meshCommandList = nullptr;
             if (commandList)
             {
-                commandList->QueryInterface(IID_PPV_ARGS(&m_meshCommandList));
+                commandList->QueryInterface(IID_PPV_ARGS(m_meshCommandList.put()));
             }
         }
         m_commandList = commandList;
@@ -184,7 +203,7 @@ class DX12Encoder final : public RHIEncoder
 
     ID3D12GraphicsCommandList* m_commandList{nullptr};
     DX12DeviceResources* m_resources{nullptr};
-    Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList6> m_meshCommandList;
+    winrt::com_ptr<ID3D12GraphicsCommandList6> m_meshCommandList;
     RHIPipelineHandle m_boundPipeline;
     ID3D12PipelineState* m_nativePipeline{};
 

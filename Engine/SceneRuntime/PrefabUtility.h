@@ -1,6 +1,11 @@
 #pragma once
-#include "Core.Minimal.h"
-#include "ClassProperty.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
+#include "../Utility_Framework/Reflection/ClassProperty.h"
 #include "EntityHandle.h"
 #include "Prefab.h"
 
@@ -12,10 +17,10 @@ private:
     ~PrefabUtility() = default;
 
 public:
-    Core::Delegate<void, Entity&> prefabInstanceUpdated;
-    Core::Delegate<void, Entity&> prefabInstanceApplied;
-    Core::Delegate<void, Entity&> prefabInstanceReverted;
-    Core::Delegate<void, Entity&> prefabInstanceUnpacked;
+    ce::delegate<void, Entity&> prefabInstanceUpdated;
+    ce::delegate<void, Entity&> prefabInstanceApplied;
+    ce::delegate<void, Entity&> prefabInstanceReverted;
+    ce::delegate<void, Entity&> prefabInstanceUnpacked;
 
     // 같은 타입 컴포넌트들 중 이 컴포넌트가 몇 번째인가 (0-based, 못 찾으면 -1).
     //

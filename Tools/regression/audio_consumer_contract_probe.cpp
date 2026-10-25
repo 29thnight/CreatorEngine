@@ -3,13 +3,17 @@
 #include "SoundComponent.h"
 #include "AudioListenerComponent.h"
 #include "Scene.h"
-#include "../../Engine/Utility_Framework/Contract.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 class FakeAudio final : public wave::AudioService
 {
 public:
-    wave::ClipKey key{wave::ClipKey::FromGuid(Uuid::Parse("cc4949ac-22b2-42f1-ab2e-1775b5776611"))};
+    wave::ClipKey key{wave::ClipKey::FromGuid(uuid::parse("cc4949ac-22b2-42f1-ab2e-1775b5776611"))};
     std::unordered_map<std::uint32_t,wave::PlayRequest> voices;
     wave::ListenerState listener;
     std::uint32_t serial{};
@@ -184,7 +188,7 @@ int main()
         },
         "playback.State(loop)==wave::PlaybackState::Playing");
 
-    const auto presetKey=wave::ClipKey::FromGuid(Uuid::Parse("dd4949ac-22b2-42f1-ab2e-1775b5776611"));
+    const auto presetKey=wave::ClipKey::FromGuid(uuid::parse("dd4949ac-22b2-42f1-ab2e-1775b5776611"));
     wave::SoundPreset preset; preset.source={wave::SoundSourceKind::Clip,audio.key};
     preset.defaults.volume=0.7f; preset.defaults.loop=true; preset.defaults.spatialBlend=0;
     ::ce::contracts::enforce_that(

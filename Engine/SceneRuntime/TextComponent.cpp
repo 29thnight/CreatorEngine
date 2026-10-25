@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "TextComponent.h"
 #include "DataSystem.h"
 #include "Canvas.h"
@@ -10,7 +15,7 @@
 #include "Entity.h"
 #include "UITickSystem.h"
 #include "FontAsset.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -227,14 +232,14 @@ void TextComponent::OnRemovingFromScene()
 	UIComponent::OnRemovingFromScene();
 }
 
-void TextComponent::SetFont(const file::path& path)
+void TextComponent::SetFont(const std::filesystem::path& path)
 {
     // Registered project assets store their relocation-safe identity. Unregistered
     // and engine resource requests retain directories, never a colliding basename.
     FileGuid guid = DataSystems->GetFileGuid(path);
     if (guid == FileGuid{} && path.is_relative() && !path.empty())
     {
-        guid = DataSystems->GetFileGuid((PathFinder::Relative() / path).lexically_normal());
+        guid = DataSystems->GetFileGuid((ce::paths::relative() / path).lexically_normal());
     }
     const auto utf8 = path.generic_u8string();
     fontPath = guid != FileGuid{} ? guid.ToString() : std::string(utf8.begin(), utf8.end());

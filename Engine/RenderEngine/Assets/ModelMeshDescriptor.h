@@ -1,10 +1,19 @@
 #pragma once
-#include "../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 
 #include "ModelSkeletonPayload.h"
 #include "../Experiment/Cooked/CookedModelSubAssetCodec.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace assets
 {
@@ -83,7 +92,7 @@ namespace assets
         // pair, which may be shared with compatible content from another mount.
         experiment::cooked::ResolvedAssetEntry origin{};
         ModelGeometryKey geometryKey{};
-        Uuid::Uuid16 meshId{};
+        uuid::uuid16 meshId{};
         // Names and material selection are model-summary/renderer metadata,
         // not part of independently shared geometry or its hard dependency.
         std::uint32_t vertexAttributeMask{};

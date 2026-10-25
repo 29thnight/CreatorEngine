@@ -1,6 +1,11 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "Interfaces/AssetAuthoringPort.h"
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -43,7 +48,7 @@ void AssetAuthoringPort::Uninstall(CreateMetaHandler handler) noexcept
 		handler, nullptr, std::memory_order_acq_rel);
 }
 
-FileGuid AssetAuthoringPort::CreateMeta(const file::path& filepath,
+FileGuid AssetAuthoringPort::CreateMeta(const std::filesystem::path& filepath,
 	const FileGuid& preferredGuid) noexcept
 {
 	const CreateMetaHandler handler =
@@ -65,7 +70,7 @@ void AssetAuthoringPort::UninstallTextAssetWriter(
 }
 
 FileGuid AssetAuthoringPort::WriteTextAssetWithMeta(
-	const file::path& destination, std::string_view payload,
+	const std::filesystem::path& destination, std::string_view payload,
 	const FileGuid& preferredGuid) noexcept
 {
 	const WriteTextAssetWithMetaHandler handler =
@@ -94,7 +99,7 @@ void AssetAuthoringPort::UninstallModelRecovery(RecoverModelHandler handler) noe
 	if (g_modelRecoveryHandler == handler) g_modelRecoveryHandler = nullptr;
 }
 
-bool AssetAuthoringPort::RecoverModel(const file::path& source, FileGuid expectedId) noexcept
+bool AssetAuthoringPort::RecoverModel(const std::filesystem::path& source, FileGuid expectedId) noexcept
 {
 	std::shared_lock lock(g_modelRecoveryMutex);
 	if (!g_modelRecoveryHandler) return false;
@@ -115,7 +120,7 @@ void AssetAuthoringPort::UninstallModelCacheWriter(
 		handler, nullptr, std::memory_order_acq_rel);
 }
 
-bool AssetAuthoringPort::WriteModelCache(const file::path& destination,
+bool AssetAuthoringPort::WriteModelCache(const std::filesystem::path& destination,
 	std::span<const std::byte> bytes) noexcept
 {
 	const WriteModelCacheHandler handler =
@@ -144,7 +149,7 @@ void AssetAuthoringPort::UninstallEmbeddedTextureWriter(
 		handler, nullptr, std::memory_order_acq_rel);
 }
 
-bool AssetAuthoringPort::WriteEmbeddedTexture(const file::path& destination,
+bool AssetAuthoringPort::WriteEmbeddedTexture(const std::filesystem::path& destination,
 	std::span<const std::byte> bytes, uint32 width, uint32 height) noexcept
 {
 	const WriteEmbeddedTextureHandler handler =
@@ -380,7 +385,7 @@ void AssetAuthoringPort::UninstallSourceTextureLoader(SourceTextureLoader handle
 }
 
 own::shared_owner<const Texture::CodecImage> AssetAuthoringPort::LoadSourceTexture(
-    const file::path& path, std::span<const std::byte> bytes, TextureSourceCompression compression) noexcept
+    const std::filesystem::path& path, std::span<const std::byte> bytes, TextureSourceCompression compression) noexcept
 {
     const auto handler = g_sourceTextureLoader.load(std::memory_order_acquire);
     if (!handler)
@@ -468,7 +473,7 @@ void AssetAuthoringPort::UninstallTerrainSourceImageReader(TerrainSourceImageRea
 }
 
 bool AssetAuthoringPort::ReadTerrainSourceImage(
-    const file::path& path, TerrainSourceImageKind kind, TerrainSourceImage& result) noexcept
+    const std::filesystem::path& path, TerrainSourceImageKind kind, TerrainSourceImage& result) noexcept
 {
     const auto handler = g_terrainSourceImageReader.load(std::memory_order_acquire);
     if (!handler)

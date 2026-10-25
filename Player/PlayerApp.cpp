@@ -1,5 +1,15 @@
-﻿#include <stdio.h>
-#include "../Engine/Utility_Framework/StandardLibrary.h"
+﻿#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Core.EngineMode.h"
+#else
+import Creator.Core.EngineMode;
+#endif
+#include <stdio.h>
+#include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "PlayerApp.h"
 #include "PlayerCommands.h"
 
@@ -10,14 +20,17 @@
 #include "EngineLaunchConfig.h"
 #include "GpuDiagnostics.h"
 #include "InputManager.h"
-#include "LogSystem.h"
+#include "../Engine/Utility_Framework/Diagnostics/LogSystem.h"
 #include "Material.h"
-#include "PakHelper.h"
+#include "../Engine/Utility_Framework/Packaging/PakHelper.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "SceneManager.h"
-#include "TimeSystem.h"
-
-#include <shellapi.h>
+#include "../Engine/Utility_Framework/Time/TimeSystem.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 
 #pragma comment(linker,"\"/manifestdependency:type='win32' \
@@ -65,13 +78,13 @@ namespace
 		catch (...) { return false; }
 	}
 
-	bool PreparePlayerRuntimeContent(const EnginePaths& paths) noexcept
+	bool PreparePlayerRuntimeContent(const ce::paths::roots& paths) noexcept
 	{
 		try
 		{
 			const std::filesystem::path pakPath =
-				(paths.executableRoot / L"GameAssets.pak").lexically_normal();
-			return UnpackageGameAssets(pakPath, paths.runtimeContentRoot);
+				(paths.executable_root / L"GameAssets.pak").lexically_normal();
+			return UnpackageGameAssets(pakPath, paths.runtime_content_root);
 		}
 		catch (...)
 		{
@@ -110,7 +123,7 @@ namespace
 		config.prepareRuntimeContent = &PreparePlayerRuntimeContent;
 
 		const std::filesystem::path executableRoot =
-			ResolveProcessExecutableDirectory();
+			ce::paths::resolve_process_executable_directory();
 		// Only the Editor owns an authoring project root. Each Player process owns an
 		// isolated runtime-content directory, so parallel Players never clean or
 		// overwrite one another's extracted package.
@@ -131,21 +144,21 @@ namespace
 			std::fputs("[Player] runtime root crosses an unsafe reparse point\n", stderr);
 			return config;
 		}
-		config.paths.executableRoot = executableRoot;
-		config.paths.projectRoot = runtimeContentRoot;
-		config.paths.runtimeOwnerRoot = runtimeOwnerRoot;
-		config.paths.runtimeProcessRoot = runtimeProcessRoot;
-		config.paths.runtimeContentRoot = runtimeContentRoot;
-		config.paths.runtimeDataRoot = runtimeDataRoot;
-		config.paths.assetsRoot =
+		config.paths.executable_root = executableRoot;
+		config.paths.project_root = runtimeContentRoot;
+		config.paths.runtime_owner_root = runtimeOwnerRoot;
+		config.paths.runtime_process_root = runtimeProcessRoot;
+		config.paths.runtime_content_root = runtimeContentRoot;
+		config.paths.runtime_data_root = runtimeDataRoot;
+		config.paths.assets_root =
 			(runtimeContentRoot / L"Assets").lexically_normal();
-		config.paths.managedRoot =
+		config.paths.managed_root =
 			ResolvePlayerDeploymentDirectory(executableRoot, L"Managed");
-		config.paths.engineResourceRoot =
+		config.paths.engine_resource_root =
 			ResolvePlayerDeploymentDirectory(executableRoot, L"Resources");
-		config.paths.testArtifactRoot =
+		config.paths.test_artifact_root =
 			(runtimeDataRoot / L"Tests").lexically_normal();
-		config.paths.enableAssetAuthoring = false;
+		config.paths.enable_asset_authoring = false;
 
 		config.window.title = L"Creator Player";
 		config.window.clientWidth = 1920;
@@ -168,7 +181,7 @@ namespace
 	}
 }
 
-MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
+int WINAPI wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 {
 	// Smoke and Development-only local command inputs share the Windows argv scan.
 	// 판정 규약(종료 코드 + 로그 마커)은 BuildPipelinePlan §2.3.
@@ -262,7 +275,7 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 	// endpoint 파일은 **이 프로세스의** runtime 데이터 뿌리에 놓는다.
 	// Player 를 여럿 띄우는 것이 정상 경로라(각자 격리된 runtimeProcessRoot),
 	// 에디터처럼 프로젝트 뿌리 하나를 쓰면 나중에 뜬 쪽이 앞선 쪽의 파일을 덮는다.
-	Player::g_service.endpointRoot = launchConfig.paths.runtimeDataRoot.string();
+	Player::g_service.endpointRoot = launchConfig.paths.runtime_data_root.string();
 	// Player is always a packaged Host. An invalid launch config must not bypass
 	// ownership preflight merely because its remaining capability fields are defaults.
 	if (!CleanupOwnedRuntime(launchConfig.paths, RuntimeCleanupScope::Process))
@@ -289,21 +302,21 @@ MAIN_ENTRY wWinMain(HINSTANCE hInstance, HINSTANCE, PWSTR, int nCmdShow)
 			if (!CleanupOwnedRuntime(launchConfig.paths, RuntimeCleanupScope::Process))
 			{
 				std::fwprintf(stderr, L"[Player] runtime content cleanup failed: %ls\n",
-					launchConfig.paths.runtimeProcessRoot.c_str());
+					launchConfig.paths.runtime_process_root.c_str());
 				if (0 == finalExitCode) finalExitCode = kRuntimeCleanupFailureExitCode;
 			}
 		}
 		catch (...)
 		{
 			std::fwprintf(stderr, L"[Player] runtime cleanup threw: %ls\n",
-				launchConfig.paths.runtimeProcessRoot.c_str());
+				launchConfig.paths.runtime_process_root.c_str());
 			if (0 == finalExitCode) finalExitCode = kRuntimeCleanupFailureExitCode;
 		}
 	}
 	return finalExitCode;
 }
 
-void Player::App::Initialize(WindowsCoreWindow& coreWindow, CoreWindow& window)
+void Player::App::Initialize(AppBackendWinAPI& coreWindow, CoreWindow& window)
 {
 	m_hWnd = coreWindow.GetHandle();
 
@@ -328,7 +341,7 @@ void Player::App::Finalize()
 	GpuDiagnostics::ReportLiveObjects();
 }
 
-void Player::App::RegisterHandler(WindowsCoreWindow& coreWindow)
+void Player::App::RegisterHandler(AppBackendWinAPI& coreWindow)
 {
 	coreWindow.RegisterHandler(WM_SIZE, this, &App::HandleResizeEvent);
 	coreWindow.RegisterHandler(WM_CLOSE, this, &App::Shutdown);
@@ -344,7 +357,7 @@ void Player::App::Load()
 
 void Player::App::Run(CoreWindow& window)
 {
-	WindowsCoreWindow::GetForCurrentInstance()->InitializeTask([&]
+	AppBackendWinAPI::GetForCurrentInstance()->InitializeTask([&]
 	{
 		m_main->Initialize();
 		InputManagement->Initialize(m_hWnd);

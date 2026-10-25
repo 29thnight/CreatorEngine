@@ -1,12 +1,13 @@
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "Prefab.h"
 #include "EntityAuthoringRead.h" // D3-a-2: 저작 읽기 어댑터
-#include "AuthoringDocumentAccess.h"
-#include "AuthoringNodeViewAccess.h" // D3-a-5b
+#include "../Utility_Framework/Authoring/AuthoringDocumentAccess.h"
+#include "../Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-5b
 #include "Entity.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
 #include "Scene.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // 구파일 승격 공유 헬퍼(레인 2, SceneGraphRedesignPlan §5 예외 4) — 정의는
 // SceneManager.cpp에 있다(그쪽 파일 상단 주석 참고). 헤더를 새로 두지 않기
@@ -216,7 +217,7 @@ Prefab* Prefab::CreateFromGameObject(const Entity* source, std::string_view name
     if (!source)
         return nullptr;
 
-    std::string prefabName = name.empty() ? source->GetHashedName().ToString() + "_Prefab" : std::string(name);
+    std::string prefabName = name.empty() ? source->GetName() + "_Prefab" : std::string(name);
     return new Prefab(prefabName, source);
 }
 
@@ -418,7 +419,7 @@ Entity* Prefab::InstantiateRecursive(const Authoring::ReadNode& node,
 
     const reflgen::type_descriptor* meta = Meta::Find(TypeTrait::GUIDCreator::GetTypeID<Entity>());
     HashedGuid newInstanceID = obj->GetInstanceID();
-	HashingString newHashedName = obj->GetHashedName();
+	std::string newName = obj->GetName();
     Entity::Index newIndex = obj->m_index;
 	const Entity::Index targetRootIndex = obj->GetRootIndex();
 	const Entity::Index sourceIndex = node["m_index"]
@@ -448,7 +449,7 @@ Entity* Prefab::InstantiateRecursive(const Authoring::ReadNode& node,
 	// 다른 엔티티와 똑같이 매 인스턴스마다 새 ID를 받아야 하며, 같은 프리팹을
 	// 여러 번 배치해도 각 링크는 자기 계층 안에서만 풀린다.
     obj->m_instanceID = newInstanceID;
-    obj->m_name = newHashedName;
+    obj->m_name = newName;
     obj->m_index = newIndex;
 	// H3에서 Meta::Deserialize는 계층을 건드리지 않는다. 대상 Scene에서 갓 할당된
 	// 안전한 root를 유지하고, 전체 트리가 생기면 context가 source->target remap으로
@@ -457,9 +458,9 @@ Entity* Prefab::InstantiateRecursive(const Authoring::ReadNode& node,
 	if (hasSourceRootIndex)
 		context.RecordRoot(obj, newIndex, sourceRootIndex);
 
-    if (!obj->m_tag.ToString().empty())
+    if (!obj->m_tag.empty())
     {
-        TagManager::GetInstance()->AddTagToObject(obj->m_tag.ToString(), obj);
+        TagManager::GetInstance()->AddTagToObject(obj->m_tag, obj);
     }
 
     if (!obj->SetLayer(obj->GetLayer()))

@@ -4,7 +4,7 @@
 // Reproduce with Tools/blender/export-ggx-energy-tables.py.
 #pragma once
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 namespace MaterialProbe::Reference {
 
 inline constexpr std::array<double, 1024> kGgxEnergy{{

@@ -4,12 +4,14 @@
 #include "EditorNavContract.h"
 
 struct PhysicsShapeDefinition;
+struct ColorGradingPassSetting;
+class Scene;
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
-#include "EditorObjectOperations.h"
+#include "../EngineEntry/Scene/EditorObjectOperations.h"
 #include "Component.h"
-#include "ReflectionPropertyEdit.h"
+#include "../EngineEntry/Editing/ReflectionPropertyEdit.h"
 // 인스펙터 typed Draw (PHASE 18 CT6-c).
 //
 // 레거시 DrawProperties(프로퍼티당 정수 비교 선형 체인 + function/any 접근)를
@@ -31,10 +33,10 @@ struct PhysicsShapeDefinition;
 #include "ReflectionImGuiHelper.h"
 #include "InspectorDrawerList.h" // InspectorDrawer<T> 특수화 모음 — 분기보다 먼저 본다
 #include "EditorPropertyRow.h"   // 공통 배치 계약 (W2-I2)
-#include "ReflectionTypedYml.h" // Typed::PointeeT·RawPtrOf·EncodeMapKey 재사용
+#include "../../Engine/Utility_Framework/Reflection/ReflectionTypedYml.h" // Typed::PointeeT·RawPtrOf·EncodeMapKey 재사용
 #include "InspectorControl.h"    // 접힘 머리 펼침(W2-I3 자극)
 #include <stddef.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 static_assert(std::is_standard_layout_v<math::vector2>);
 static_assert(std::is_standard_layout_v<math::vector3>);
@@ -273,18 +275,6 @@ namespace Meta::TypedDraw
             }
             return false;
         }
-        else if constexpr (std::is_same_v<E, HashingString>)
-        {
-            char buffer[128];
-            strncpy_s(buffer, sizeof(buffer), value.ToString().c_str(), _TRUNCATE);
-            buffer[sizeof(buffer) - 1] = '\0';
-            if (ImGui::InputText(id, buffer, sizeof(buffer)))
-            {
-                value = HashingString(std::string_view{ buffer });
-                return true;
-            }
-            return false;
-        }
         else if constexpr (std::is_same_v<E, bool>)
         {
             return ImGui::Checkbox(id, &value);
@@ -352,7 +342,7 @@ namespace Meta::TypedDraw
     inline constexpr bool kElementHasWidget =
         editor::inspector::HasInspectorDrawer<E>
         || std::is_arithmetic_v<E> || std::is_enum_v<E>
-        || std::is_same_v<E, std::string> || std::is_same_v<E, HashingString>
+        || std::is_same_v<E, std::string>
         || std::is_same_v<E, HashedGuid>
         || std::is_same_v<E, math::vector2> || std::is_same_v<E, math::vector3>
         || std::is_same_v<E, math::vector4> || std::is_same_v<E, math::quaternion>
@@ -653,44 +643,23 @@ namespace Meta::TypedDraw
         else if constexpr (std::is_same_v<MemberT, std::string>)
         {
             std::string v = value;
+            // These domain fields required nonempty commits before the storage
+            // conversion. Keep that policy on the field, rather than its value type.
+            const std::string_view fieldName{name};
+            const bool requiresText =
+                (std::is_same_v<Owner, Object> && fieldName == "m_name") ||
+                (std::is_same_v<Owner, Entity> && fieldName == "m_tag") ||
+                (std::is_same_v<Owner, Scene> && fieldName == "m_sceneName") ||
+                (std::is_same_v<Owner, ColorGradingPassSetting> && fieldName == "textureFilePath");
             ImGui::PushID(name);
             ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
             if (ImGui::InputText(kValueId, v.data(), v.size() + 1,
                 ImGuiInputTextFlags_CallbackResize, Meta::InputTextCallback,
                 static_cast<void*>(&v)))
             {
-                if (InputManagement->IsKeyPressed(VK_RETURN))
+                if (InputManagement->IsKeyPressed(VK_RETURN) && (!requiresText || !v.empty()))
                 {
                     (void)CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
-                }
-            }
-            ImGui::PopID();
-        }
-        else if constexpr (std::is_same_v<MemberT, HashingString>)
-        {
-            // PHASE 15 H-a. 예전에는 HashingString 복사본을 만들어 그 내부 버퍼를
-            // ImGui에 직접 넘겼다. 셋이 한꺼번에 깨져 있었다 — ImGui가 버퍼에
-            // 써도 m_hash가 갱신되지 않아 문자열과 해시가 어긋났고, 버퍼 크기로
-            // 현재 길이를 넘겨 이름을 늘릴 수 없었으며, 늘리면 범위 밖 쓰기였다.
-            //
-            // 바로 위 std::string 브랜치와 같은 모양으로 맞춘다. 편집은
-            // std::string 버퍼에서 하고(리사이즈 콜백이 성장을 감당한다),
-            // 확정할 때 HashingString을 새로 만들어 setter로 커밋한다 —
-            // 그래야 해시가 다시 계산된다.
-            std::string buffer = value.ToString();
-            ImGui::PushID(name);
-            ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
-            if (ImGui::InputText(kValueId, buffer.data(), buffer.size() + 1,
-                ImGuiInputTextFlags_CallbackResize, Meta::InputTextCallback,
-                static_cast<void*>(&buffer)))
-            {
-                // 빈 이름 커밋은 저작 UX 판단으로 막는다. HashingString 자체는
-                // 빈 문자열을 합법으로 다루지만(H5 결정), 이름이 비면 하이어라키에서
-                // 그 오브젝트를 다시 고를 수 없다 — 되돌리기 어려운 편집이다.
-                if (InputManagement->IsKeyPressed(VK_RETURN) && !buffer.empty())
-                {
-                    HashingString committed(std::string_view{ buffer });
-                    (void)CommitMemberChange<Owner, MemberT, MP>(&obj, value, committed, name);
                 }
             }
             ImGui::PopID();

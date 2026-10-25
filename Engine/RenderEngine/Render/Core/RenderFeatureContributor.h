@@ -1,7 +1,11 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
 #include "../../RHI/RHIFormat.h"
-#include "../../../Utility_Framework/Ownership.h"
 
 class LivePipelineDesc;
 struct EnhancedGizmoSceneData;

@@ -1,7 +1,11 @@
 #include "../../Engine/RenderEngine/Render/Graph/ShadowMath.h"
 #include <mathematics/transform.hpp>
-#include "../../Engine/Utility_Framework/Contract.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 int main()
 {

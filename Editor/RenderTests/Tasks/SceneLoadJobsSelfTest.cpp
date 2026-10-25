@@ -4,8 +4,19 @@
 #include "Entity.h"
 #include "Transform.h"
 #include "DataSystem.h"
-#include "JobScheduler.h"
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#include "Interfaces/ColorGradingPassSetting.h"
+
+static_assert(std::is_same_v<decltype(Object::m_name), std::string>);
+static_assert(std::is_same_v<decltype(Entity::m_tag), std::string>);
+static_assert(std::is_same_v<decltype(Scene::m_sceneName), std::string>);
+static_assert(std::is_same_v<decltype(ColorGradingPassSetting::textureFilePath), std::string>);
+static_assert(std::is_same_v<decltype(std::declval<const Entity&>().GetName()), const std::string&>);
 
 namespace
 {
@@ -18,7 +29,7 @@ namespace
     {
         if (scene)
             for (const auto& entity : scene->m_Entities)
-                if (entity && entity->m_name.ToString() == name) return entity.get();
+                if (entity && entity->m_name == name) return entity.get();
         return nullptr;
     }
 
@@ -73,14 +84,14 @@ namespace RenderTest
     {
         try
         {
-            const auto first = (file::path(directory) / "SceneJobsA.creator").string();
-            const auto second = (file::path(directory) / "SceneJobsB.creator").string();
-            Check(!file::exists(first) && !file::exists(second), "Fixture paths already exist");
+            const auto first = (std::filesystem::path(directory) / "SceneJobsA.creator").string();
+            const auto second = (std::filesystem::path(directory) / "SceneJobsB.creator").string();
+            Check(!std::filesystem::exists(first) && !std::filesystem::exists(second), "Fixture paths already exist");
             Scene* original = SceneManagers->CreateScene("SceneJobsFixture");
             Check(original != nullptr, "Fixture scene creation failed");
             auto* child = original->CreateEntity("SceneJobsChild");
             Check(child && child->GetComponent<Transform>(), "Fixture transform missing");
-            original->m_requiredLoadAssetsBundle.AddAsset(AssetEntry(ManagedAssetType::Model, file::path(modelPath)));
+            original->m_requiredLoadAssetsBundle.AddAsset(AssetEntry(ManagedAssetType::Model, std::filesystem::path(modelPath)));
             Check(SceneManagers->SaveScene(first) != nullptr, "First fixture save failed");
             auto* serializedDdol = original->CreateEntity("SceneJobsSerializedDdol");
             Object::SetDontDestroyOnLoad(serializedDdol);
@@ -97,7 +108,7 @@ namespace RenderTest
                 const auto generations = DataSystems->SnapshotCurrentModelAssetGenerations();
                 return std::ranges::any_of(generations, [&](const auto& generation)
                 {
-                    return generation && generation->SourcePath().filename() == file::path(modelPath).filename();
+                    return generation && generation->SourcePath().filename() == std::filesystem::path(modelPath).filename();
                 });
             };
             Check(!hasModel(), "Fixture model is already cached; run in a fresh isolated process");
@@ -152,7 +163,7 @@ namespace RenderTest
             // The latest callback activates at the same boundary the hosts use.
             SceneManagers->ApplyPendingSceneStructureChange();
             Scene* active = SceneManagers->GetActiveScene();
-            Check(active && active->m_sceneName.ToString() == "SceneJobsB", "Latest callback did not win");
+            Check(active && active->m_sceneName == "SceneJobsB", "Latest callback did not win");
             Check(Find(active, "SceneJobsPersistent") == persistent && persistent->GetInstanceID() == persistentId,
                 "Existing DDOL ownership/identity changed");
             auto* restoredDdol = Find(active, "SceneJobsSerializedDdol");
@@ -198,9 +209,9 @@ namespace RenderTest
         try
         {
             Scene* active = SceneManagers->GetActiveScene();
-            Check(active && active->m_sceneName.ToString() == "SceneJobsA", "Normal frame pump did not activate");
+            Check(active && active->m_sceneName == "SceneJobsA", "Normal frame pump did not activate");
             Check(Find(active, "SceneJobsPersistent") && Find(active, "SceneJobsSerializedDdol"), "DDOL lost on second transition");
-            const auto path = (file::path(directory) / "SceneJobsA.creator").string();
+            const auto path = (std::filesystem::path(directory) / "SceneJobsA.creator").string();
             auto accepted = SceneManagers->LoadSceneAsync(path);
             SceneManagers->SetDecommissioning();
             auto rejected = SceneManagers->LoadSceneAsync(path);

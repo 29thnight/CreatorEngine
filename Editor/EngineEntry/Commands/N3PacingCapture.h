@@ -1,8 +1,8 @@
 #pragma once
 #include "CharacterMovementComponent.h"
 #include "PhysicsBodyComponent.h"
-#include "DiagnosticDocument.h"
-#include "TimeSystem.h"
+#include "../../../Engine/Utility_Framework/Authoring/DiagnosticDocument.h"
+#include "../../../Engine/Utility_Framework/Time/TimeSystem.h"
 #include <fstream>
 
 // Explicit local development consumer of the existing copied-value tick adapter.

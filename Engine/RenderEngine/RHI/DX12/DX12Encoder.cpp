@@ -4,7 +4,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 static_assert(sizeof(RHIDrawIndirectArguments) == sizeof(D3D12_DRAW_ARGUMENTS));
 static_assert(offsetof(RHIDrawIndirectArguments, vertexCount) ==
@@ -584,8 +584,8 @@ void DX12Encoder::EnsureDescriptorHeaps()
 
     if (m_recordingResources)
     {
-        ID3D12DescriptorHeap* heaps[] = {m_recordingResources->descriptors.heap.Get(),
-                                         m_recordingResources->samplers.Get()};
+        ID3D12DescriptorHeap* heaps[] = {m_recordingResources->descriptors.heap.get(),
+                                         m_recordingResources->samplers.get()};
         m_commandList->SetDescriptorHeaps(2, heaps);
     }
     else

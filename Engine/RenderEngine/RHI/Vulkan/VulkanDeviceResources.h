@@ -1,5 +1,9 @@
 #pragma once
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "VulkanLoader.h"
 #include "../IRHIDeviceResources.h"
 #include "../RHIQueueContract.h"
@@ -17,7 +21,7 @@
 #include "VulkanEncoder.h"
 
 #include <stdint.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 class VulkanPipelineCache;
 class XeSSUpscalerVulkan;

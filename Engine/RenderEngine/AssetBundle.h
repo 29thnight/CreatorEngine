@@ -1,12 +1,12 @@
 #pragma once
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "AssetEntry.h"
 
 struct [[reflgen::reflect]] AssetBundle
 {
    public:
 	AssetBundle() = default;
-	AssetBundle(const std::string& name, const file::path& path)
+	AssetBundle(const std::string& name, const std::filesystem::path& path)
 		: name(name), path(path.string()) {}
 	AssetBundle(const std::string& name, const std::string& path)
 		: name(name), path(path) {

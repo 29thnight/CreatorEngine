@@ -2,8 +2,12 @@
 #include "../Core/LXDocument.h"
 
 #include <float.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
-#include "../../Engine/Utility_Framework/Contract.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 
 namespace LX
 {

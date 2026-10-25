@@ -1,5 +1,29 @@
-#include "../../Editor/EngineEntry/TextureSourceProcessing.h"
-#include "../../Engine/Utility_Framework/WindowsApartment.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
+#include "../../Editor/EngineEntry/Assets/Textures/TextureSourceProcessing.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
 #include "Assets/CookedEnvironment.h"
 #include "RHI/DX12/EnhancedIBLGenerator.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -8,10 +32,8 @@
 #include "RHI/DX12/DX12TextureCache.h"
 #include "RHI/RHISubmissionThread.h"
 #include "Texture.h"
-#include "PathFinder.h"
 #include "RHI/RHIShaderCompiler.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
-#include <objbase.h>
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -39,15 +61,15 @@ int wmain(int argc,wchar_t** argv)
     {
         EnvironmentRequire(SUCCEEDED(com),"COM initialization failed");
         const auto root=std::filesystem::absolute(argv[1]), source=std::filesystem::absolute(argv[2]), output=std::filesystem::absolute(argv[3]);
-        auto* paths=InternalPath::GetInstance();
-        paths->BaseProjectPath=root/"Dynamic_CPP"; paths->ShaderSourcePath=root/"Dynamic_CPP/Assets/Shaders";
-        paths->CacheRoot=root/"Build/Obj/EnvironmentCooker/ShaderCache";
-        paths->AssetAuthoringEnabled=true;
+        auto* paths=(&ce::paths::get_state());
+        paths->base_project_path=root/"Dynamic_CPP"; paths->shader_source_path=root/"Dynamic_CPP/Assets/Shaders";
+        paths->cache_root=root/"Build/Obj/EnvironmentCooker/ShaderCache";
+        paths->asset_authoring_enabled=true;
         constexpr uint32_t cube=512,brdf=512;
         std::string error;
         assets::EnvironmentIdentity identity;
         EnvironmentRequire(assets::EnvironmentSourceIdentity(source,identity.source,error),error);
-        EnvironmentRequire(assets::EnvironmentRecipeIdentity(paths->ShaderSourcePath/"DefaultPassShader",cube,brdf,identity.recipe,error),error);
+        EnvironmentRequire(assets::EnvironmentRecipeIdentity(paths->shader_source_path/"DefaultPassShader",cube,brdf,identity.recipe,error),error);
         if(argc==5 && std::wstring_view(argv[4])==L"--check-shaders")
         {
             RHIShaderCompileOptions options;options.strictMath=true;
@@ -55,13 +77,13 @@ int wmain(int argc,wchar_t** argv)
             {
                 RHIShaderCompiler::VerifiedShader shader;
                 EnvironmentRequire(RHIShaderCompiler::VerifyFile(
-                    (paths->ShaderSourcePath/"DefaultPassShader/IblSceneImportance.slang").string(),
+                    (paths->shader_source_path/"DefaultPassShader/IblSceneImportance.slang").string(),
                     "CSMain","cs_6_0",backend,{},shader,error,options),error);
                 options.strictMath=false;
                 for (const auto* stage : {"IblRectToCube.slang", "IblSourceCopy.slang", "IblCubeDownsample.slang",
                      "IblIrradiance.slang", "IblPrefilter.slang", "IblImportanceSamples.slang"})
                     EnvironmentRequire(RHIShaderCompiler::VerifyFile(
-                        (paths->ShaderSourcePath/"DefaultPassShader"/stage).string(),
+                        (paths->shader_source_path/"DefaultPassShader"/stage).string(),
                         "PSMain","ps_5_0",backend,{},shader,error,options),error);
                 options.strictMath=true;
             }
@@ -132,7 +154,7 @@ int wmain(int argc,wchar_t** argv)
         do { EnvironmentRequire(generator.FinishCookedCapture(device.GetCompletedFenceValue(),error),error);
             if (generator.HasPendingCookedCapture()) std::this_thread::sleep_for(std::chrono::milliseconds(5));
         } while(generator.HasPendingCookedCapture());
-        Hash::Sha256Digest original{},copy{};
+        ce::hash::sha256_digest original{},copy{};
         EnvironmentRequire(assets::EnvironmentSourceIdentity(output,original,error) &&
             assets::EnvironmentSourceIdentity(roundtrip,copy,error) && original==copy,"Environment GPU upload roundtrip differs: "+error);
         std::filesystem::remove(roundtrip);

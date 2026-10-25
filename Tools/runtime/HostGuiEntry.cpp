@@ -1,6 +1,10 @@
-#include <Windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 #include <stdio.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "HostAbi.h"
 
 int WINAPI wWinMain(HINSTANCE, HINSTANCE, PWSTR, int);

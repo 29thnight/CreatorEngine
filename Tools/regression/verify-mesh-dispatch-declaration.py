@@ -91,8 +91,8 @@ def main():
             include.mkdir(parents=True)
             shutil.copyfile(enkits / 'TaskScheduler.h', include / 'TaskScheduler.h')
             command += ['-DCE_MESH_DISPATCH_NATIVE_EXECUTOR=1', '-Wno-unknown-pragmas',
-                        '-I' + str(include.parent), str(root / 'Engine/Utility_Framework/JobScheduler.cpp'),
-                        str(root / 'Engine/Utility_Framework/ThreadPool.cpp'), str(enkits / 'TaskScheduler.cpp')]
+                        '-I' + str(include.parent), str(root / 'Engine/Utility_Framework/Concurrency/JobScheduler.cpp'),
+                        str(root / 'Engine/Utility_Framework/Concurrency/ThreadPool.cpp'), str(enkits / 'TaskScheduler.cpp')]
         if args.sanitize != 'none':
             command += ['-fsanitize=' + ('address,undefined' if args.sanitize == 'address' else 'thread'),
                         '-fno-omit-frame-pointer']
@@ -108,7 +108,7 @@ def main():
     for path in paths:
         print(f'PRODUCTION_SHA256 {path.relative_to(root)} {hashlib.sha256(path.read_bytes()).hexdigest()}')
     if enkits:
-        for path in (root / 'Engine/Utility_Framework/JobScheduler.cpp', root / 'Engine/Utility_Framework/ThreadPool.cpp',
+        for path in (root / 'Engine/Utility_Framework/Concurrency/JobScheduler.cpp', root / 'Engine/Utility_Framework/Concurrency/ThreadPool.cpp',
                      enkits / 'TaskScheduler.cpp', enkits / 'TaskScheduler.h'):
             print(f'EXECUTOR_SHA256 {path.name} {hashlib.sha256(path.read_bytes()).hexdigest()}')
     print('SCOPE exact-production-mesh-dispatch-preparation fake-native-device ' +

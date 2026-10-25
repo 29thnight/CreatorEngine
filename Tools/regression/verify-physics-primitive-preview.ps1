@@ -10,7 +10,7 @@ foreach($config in $configs){
     $lib=if($config -eq 'Debug'){Join-Path $deps 'debug'}else{$deps}
     $flags=if($config -eq 'Debug'){'/MDd /Od /D_DEBUG'}elseif($config -eq 'ASan'){'/MD /Od /Zi /fsanitize=address /D_DISABLE_VECTOR_ANNOTATION /D_DISABLE_STRING_ANNOTATION /DNDEBUG'}else{'/MD /O2 /DNDEBUG'}
     $exe=Join-Path $out 'physics-primitive-preview.exe'
-    $sources=@('Tools/regression/physics_primitive_preview_probe.cpp','Engine/RenderEngine/EnhancedGizmoLineCollector.cpp','Engine/Utility_Framework/AuthoringParsedDocument.cpp','Engine/Utility_Framework/AuthoringCookedDocument.cpp','Engine/Utility_Framework/AuthoringScalarConvert.cpp','Engine/Utility_Framework/AuthoringRymlErrorPolicy.cpp')
+    $sources=@('Tools/regression/physics_primitive_preview_probe.cpp','Engine/RenderEngine/EnhancedGizmoLineCollector.cpp','Engine/Utility_Framework/Authoring/AuthoringParsedDocument.cpp','Engine/Utility_Framework/Authoring/AuthoringCookedDocument.cpp','Engine/Utility_Framework/Authoring/AuthoringScalarConvert.cpp','Engine/Utility_Framework/Authoring/AuthoringRymlErrorPolicy.cpp')
     $sourceArgs=($sources | ForEach-Object {'"'+(Join-Path $repo $_)+'"'}) -join ' '
     $cmd='call "'+$vcvars+'" >nul && cl /nologo /MP4 /EHsc /std:c++latest /utf-8 /DNOMINMAX '+$flags+' /I"'+$repo+'/Engine/Utility_Framework" /I"'+$repo+'/ThirdParty/Mathematics/include" /external:I"'+$deps+'/include" /external:I"'+$deps+'/include/physx" /external:W0 /Fo"'+$out+'/" /Fd"'+$out+'/compiler.pdb" /FS /Fe"'+$exe+'" '+$sourceArgs+' /link /LIBPATH:"'+$lib+'/lib" ryml.lib c4core.lib'
     & $env:ComSpec /d /s /c $cmd *> "$out/build.log"

@@ -1,370 +1,323 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <ItemGroup>
-    <Filter Include="Core.Container">
-      <UniqueIdentifier>{c31df127-c823-4373-be0f-7991c39a4788}</UniqueIdentifier>
+    <Filter Include="Authoring">
+      <UniqueIdentifier>{F81C839E-C102-591A-A61F-BDB3469DDDBC}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Core.definition">
-      <UniqueIdentifier>{45cff361-ee34-40e2-9569-c2ba7b8f04d9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core.definition\Type">
-      <UniqueIdentifier>{82770586-7f15-4429-8c83-84bf5f361838}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core.Delegate">
-      <UniqueIdentifier>{a1b99cd2-1945-4fa3-8a84-dc3ff277e569}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core.LinkedList">
-      <UniqueIdentifier>{ac1a3691-9e70-4a2f-853d-512eca7f7692}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core.Logger">
-      <UniqueIdentifier>{680961e0-282d-49b5-b66c-942eed35b315}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core.Memory">
-      <UniqueIdentifier>{2b89a087-a940-4951-bf45-1cca8ced71d9}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core.Memory\MemoryPool">
-      <UniqueIdentifier>{114114a8-7d3c-419c-a79f-4a099cebcd00}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core.Memory\SpinLock">
-      <UniqueIdentifier>{4584675b-2578-4d75-a537-a62df1b1dc49}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core.Property">
-      <UniqueIdentifier>{ad9f4a99-f789-4433-ade5-606e00c3a85b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core.Reflection">
-      <UniqueIdentifier>{fabc6f1b-1af9-4234-b2d3-22470fb2531a}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Core.Thread">
+    <Filter Include="Concurrency">
       <UniqueIdentifier>{bea73a02-d831-429d-a1b7-4a02b675965b}</UniqueIdentifier>
     </Filter>
-    <Filter Include="DirectX11Common">
-      <UniqueIdentifier>{21614411-27dc-43d0-baf6-806027afc35d}</UniqueIdentifier>
+    <Filter Include="Containers">
+      <UniqueIdentifier>{12FA6FB2-403E-521E-8998-CA9A00A5FF7C}</UniqueIdentifier>
     </Filter>
-    <Filter Include="DirectX11Common\TimeSystem">
-      <UniqueIdentifier>{9fb06a54-84b4-4fb5-9427-2e590b30f9e3}</UniqueIdentifier>
+    <Filter Include="Diagnostics">
+      <UniqueIdentifier>{3FDCF8FF-6D01-56FC-B15E-7506050B506C}</UniqueIdentifier>
     </Filter>
-    <Filter Include="EngineBootstrap">
-      <UniqueIdentifier>{a7991059-5026-4fa6-aec1-3f56f6d5e3e4}</UniqueIdentifier>
+    <Filter Include="Foundation">
+      <UniqueIdentifier>{0D880982-85C9-5B21-8304-FE1F5F51AEF0}</UniqueIdentifier>
     </Filter>
-    <Filter Include="RuntimeSettings">
-      <UniqueIdentifier>{014dfd05-e80d-5d85-a970-5906764c21b7}</UniqueIdentifier>
+    <Filter Include="Memory">
+      <UniqueIdentifier>{5536C2C2-47D2-5126-AB32-13BBACEAEE2D}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Utility">
-      <UniqueIdentifier>{059fcb1a-79fa-4d01-82ee-2821d77a9a57}</UniqueIdentifier>
+    <Filter Include="Packaging">
+      <UniqueIdentifier>{E29D64FC-796E-5526-A5C2-B146292545BC}</UniqueIdentifier>
     </Filter>
-    <Filter Include="WindowsApplication">
+    <Filter Include="Platform">
+      <UniqueIdentifier>{6B1104D9-E76B-5C86-8228-0AFD1A8C2EE8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Platform\Windows">
       <UniqueIdentifier>{e45d8173-5cd0-4c14-93c8-f109ead57c31}</UniqueIdentifier>
     </Filter>
-    <Filter Include="WindowsApplication\CoreWindow">
+    <Filter Include="Platform\Windows\AppBackendWinAPI">
       <UniqueIdentifier>{eec97127-ce4f-42bb-b91d-0f8e870e58f4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Platform\Windows\Crash">
+      <UniqueIdentifier>{46BD6347-B7F6-5804-9F21-A684714E8E02}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Reflection">
+      <UniqueIdentifier>{fabc6f1b-1af9-4234-b2d3-22470fb2531a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Runtime">
+      <UniqueIdentifier>{EE7A2F0D-BB49-5A31-ADFA-A84CBB03EC03}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared">
+      <UniqueIdentifier>{67043240-F5F7-5E70-B933-19F1AFD6EB3B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\ThirdParty">
+      <UniqueIdentifier>{94D36595-8605-5B39-9D3C-F01E704FDFEF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\ThirdParty\mimalloc">
+      <UniqueIdentifier>{2FB53AC5-47BB-58F4-9018-15DB28C811B2}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\ThirdParty\mimalloc\src">
+      <UniqueIdentifier>{B5A1CFB5-3549-552D-A34E-0FFB5677965C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Time">
+      <UniqueIdentifier>{BF378B5C-BFAD-58EA-9C0B-B2F88E3B51E1}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Arena.cpp"><Filter>Core.Memory</Filter></ClCompile>
-    <ClCompile Include="..\..\ThirdParty\mimalloc\src\static.c"><Filter>Core.Memory</Filter></ClCompile>
-    <ClCompile Include="ThreadPool.cpp"><Filter>Core.Thread</Filter></ClCompile>
-    <ClCompile Include="JobScheduler.cpp"><Filter>Core.Thread</Filter></ClCompile>
-    <ClCompile Include="AuthoringRymlErrorPolicy.cpp">
-      <Filter>Core.Reflection</Filter>
+    <ClCompile Include="../Platform/Windows/AppBackendWinAPI/AppBackendWinAPI.cpp">
+      <Filter>Platform\Windows\AppBackendWinAPI</Filter>
     </ClCompile>
-    <ClCompile Include="ProgressSink.cpp">
-      <Filter>Utility</Filter>
+    <ClCompile Include="../Platform/Windows/AppBackendWinAPI/AppBackendWinAPI.Crash.cpp">
+      <Filter>Platform\Windows\AppBackendWinAPI</Filter>
     </ClCompile>
-    <ClCompile Include="ReflectionYml.cpp">
-      <Filter>Core.Reflection</Filter>
+    <ClCompile Include="../Platform/Windows/AppBackendWinAPI/Creator.AppBackend.WinAPI.ixx">
+      <Filter>Platform\Windows\AppBackendWinAPI</Filter>
     </ClCompile>
-    <ClCompile Include="ReflgenRuntime.cpp">
-      <Filter>Core.Reflection</Filter>
+    <ClCompile Include="..\..\ThirdParty\mimalloc\src\static.c">
+      <Filter>Shared\ThirdParty\mimalloc\src</Filter>
     </ClCompile>
-    <ClCompile Include="TypeTrait.cpp">
-      <Filter>Core.Reflection</Filter>
+    <ClCompile Include="Authoring/AuthoringCookedDocument.cpp">
+      <Filter>Authoring</Filter>
     </ClCompile>
-    <ClCompile Include="AuthoringScalarConvert.cpp">
-      <Filter>Core.Reflection</Filter>
+    <ClCompile Include="Authoring/AuthoringDocument.cpp">
+      <Filter>Authoring</Filter>
     </ClCompile>
-    <ClCompile Include="AuthoringParsedDocument.cpp">
-      <Filter>Core.Reflection</Filter>
+    <ClCompile Include="Authoring/AuthoringDocumentAccess.cpp">
+      <Filter>Authoring</Filter>
     </ClCompile>
-    <ClCompile Include="AuthoringCookedDocument.cpp">
-      <Filter>Core.Reflection</Filter>
+    <ClCompile Include="Authoring/AuthoringNodeEquality.cpp">
+      <Filter>Authoring</Filter>
     </ClCompile>
-    <ClCompile Include="AuthoringDocument.cpp">
-      <Filter>Core.Reflection</Filter>
+    <ClCompile Include="Authoring/AuthoringParsedDocument.cpp">
+      <Filter>Authoring</Filter>
     </ClCompile>
-    <ClCompile Include="AuthoringNodeEquality.cpp">
-      <Filter>Core.Reflection</Filter>
+    <ClCompile Include="Authoring/AuthoringRymlErrorPolicy.cpp">
+      <Filter>Authoring</Filter>
     </ClCompile>
-    <ClCompile Include="SerializationProfiler.cpp">
-      <Filter>Core.Reflection</Filter>
+    <ClCompile Include="Authoring/AuthoringScalarConvert.cpp">
+      <Filter>Authoring</Filter>
     </ClCompile>
-    <ClCompile Include="WindowsCoreWindow.cpp">
-      <Filter>WindowsApplication\CoreWindow</Filter>
+    <ClCompile Include="Authoring/CookedDocumentTree.cpp">
+      <Filter>Authoring</Filter>
     </ClCompile>
-    <ClCompile Include="LogSystem.cpp">
-      <Filter>Core.Logger</Filter>
+    <ClCompile Include="Authoring/DiagnosticDocument.cpp">
+      <Filter>Authoring</Filter>
     </ClCompile>
-    <ClCompile Include="RuntimeSettings.cpp">
-      <Filter>RuntimeSettings</Filter>
+    <ClCompile Include="Authoring/SerializationProfiler.cpp">
+      <Filter>Authoring</Filter>
     </ClCompile>
-    <ClCompile Include="TimeSystem.cpp">
-      <Filter>DirectX11Common\TimeSystem</Filter>
+    <ClCompile Include="Concurrency/JobScheduler.cpp">
+      <Filter>Concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="Concurrency/ThreadPool.cpp">
+      <Filter>Concurrency</Filter>
+    </ClCompile>
+    <ClCompile Include="Diagnostics/LogSystem.cpp">
+      <Filter>Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="Diagnostics/ProgressSink.cpp">
+      <Filter>Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="Memory/Arena.cpp">
+      <Filter>Memory</Filter>
+    </ClCompile>
+    <ClCompile Include="Reflection/ReflectionYml.cpp">
+      <Filter>Reflection</Filter>
+    </ClCompile>
+    <ClCompile Include="Reflection/ReflgenRuntime.cpp">
+      <Filter>Reflection</Filter>
+    </ClCompile>
+    <ClCompile Include="Reflection/TypeTrait.cpp">
+      <Filter>Reflection</Filter>
+    </ClCompile>
+    <ClCompile Include="Runtime/PathFinder.cpp">
+      <Filter>Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="Runtime/RuntimeSettings.cpp">
+      <Filter>Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="Runtime/WarmupLedger.cpp">
+      <Filter>Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="Time/TimeSystem.cpp">
+      <Filter>Time</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ArtifactStoreGuard.h" />
-    <ClInclude Include="Ownership.h" />
-    <ClInclude Include="Arena.h"><Filter>Core.Memory</Filter></ClInclude>
-    <ClInclude Include="HeapAllocator.h"><Filter>Core.Memory</Filter></ClInclude>
-    <ClInclude Include="LinearArena.h"><Filter>Core.Memory</Filter></ClInclude>
-    <ClInclude Include="StackArena.h"><Filter>Core.Memory</Filter></ClInclude>
-    <ClInclude Include="FixedPool.h"><Filter>Core.Memory</Filter></ClInclude>
-    <ClInclude Include="LifetimeToken.h" />
-    <ClInclude Include="BaseTypeDef.h">
-      <Filter>Core.definition\Type</Filter>
+    <ClInclude Include="../Platform/Windows/AppBackendWinAPI/AppBackendWinAPI.Crash.h">
+      <Filter>Platform\Windows\AppBackendWinAPI</Filter>
     </ClInclude>
-    <ClInclude Include="Benchmark.hpp">
-      <Filter>Utility</Filter>
+    <ClInclude Include="../Platform/Windows/Crash/DumpHandler.h">
+      <Filter>Platform\Windows\Crash</Filter>
     </ClInclude>
-    <ClInclude Include="BitFlag.h">
-      <Filter>Core.definition</Filter>
+    <ClInclude Include="../Platform/Windows/DirectXHelper.h">
+      <Filter>Platform\Windows</Filter>
     </ClInclude>
-    <ClInclude Include="ClassProperty.h">
-      <Filter>Core.definition</Filter>
+    <ClInclude Include="../Platform/Windows/FileDialog.h">
+      <Filter>Platform\Windows</Filter>
     </ClInclude>
-    <ClInclude Include="Core.Definition.h">
-      <Filter>Core.definition</Filter>
+    <ClInclude Include="Authoring/AuthoringCookedDocument.h">
+      <Filter>Authoring</Filter>
     </ClInclude>
-    <ClInclude Include="Core.Memory.hpp">
-      <Filter>Core.Memory</Filter>
+    <ClInclude Include="Authoring/AuthoringDocument.h">
+      <Filter>Authoring</Filter>
     </ClInclude>
-    <ClInclude Include="Core.Minimal.h">
-      <Filter>Core.definition</Filter>
+    <ClInclude Include="Authoring/AuthoringDocumentAccess.h">
+      <Filter>Authoring</Filter>
     </ClInclude>
-    <ClInclude Include="Core.Property.h">
-      <Filter>Core.Property</Filter>
+    <ClInclude Include="Authoring/AuthoringDocumentStorage.h">
+      <Filter>Authoring</Filter>
     </ClInclude>
-    <ClInclude Include="Core.Runtime.h">
-      <Filter>Core.definition</Filter>
+    <ClInclude Include="Authoring/AuthoringNodeEquality.h">
+      <Filter>Authoring</Filter>
     </ClInclude>
-    <ClInclude Include="ThreadPool.h">
-      <Filter>Core.Thread</Filter>
+    <ClInclude Include="Authoring/AuthoringNodeView.h">
+      <Filter>Authoring</Filter>
     </ClInclude>
-    <ClInclude Include="JobScheduler.h">
-      <Filter>Core.Thread</Filter>
+    <ClInclude Include="Authoring/AuthoringNodeViewAccess.h">
+      <Filter>Authoring</Filter>
     </ClInclude>
-    <ClInclude Include="JobGraph.h">
-      <Filter>Core.Thread</Filter>
+    <ClInclude Include="Authoring/AuthoringParsedDocument.h">
+      <Filter>Authoring</Filter>
     </ClInclude>
-    <ClInclude Include="WorkPartition.h">
-      <Filter>Core.Thread</Filter>
+    <ClInclude Include="Authoring/AuthoringParseTelemetry.h">
+      <Filter>Authoring</Filter>
     </ClInclude>
-    <ClInclude Include="WindowsCoreWindow.h">
-      <Filter>WindowsApplication\CoreWindow</Filter>
+    <ClInclude Include="Authoring/AuthoringReadNode.h">
+      <Filter>Authoring</Filter>
     </ClInclude>
-    <ClInclude Include="WindowsWindow.h">
-      <Filter>WindowsApplication\CoreWindow</Filter>
+    <ClInclude Include="Authoring/AuthoringRymlErrorPolicy.h">
+      <Filter>Authoring</Filter>
     </ClInclude>
-    <ClInclude Include="CoreWindow.h">
-      <Filter>WindowsApplication\CoreWindow</Filter>
+    <ClInclude Include="Authoring/AuthoringScalarConvert.h">
+      <Filter>Authoring</Filter>
     </ClInclude>
-    <ClInclude Include="Delegate.h">
-      <Filter>Core.Delegate</Filter>
+    <ClInclude Include="Authoring/CookedDocumentTree.h">
+      <Filter>Authoring</Filter>
     </ClInclude>
-    <ClInclude Include="DirectXHelper.h">
-      <Filter>DirectX11Common</Filter>
+    <ClInclude Include="Authoring/DiagnosticDocument.h">
+      <Filter>Authoring</Filter>
     </ClInclude>
-    <ClInclude Include="DumpHandler.h">
-      <Filter>WindowsApplication\CoreWindow</Filter>
+    <ClInclude Include="Authoring/SerializationProfiler.h">
+      <Filter>Authoring</Filter>
     </ClInclude>
-    <ClInclude Include="Contract.h">
-      <Filter>Core.definition</Filter>
+    <ClInclude Include="Containers/LinkedListLib.hpp">
+      <Filter>Containers</Filter>
     </ClInclude>
-    <ClInclude Include="StandardLibrary.h">
-      <Filter>Core.definition</Filter>
+    <ClInclude Include="Diagnostics/EngineResourceCensus.h">
+      <Filter>Diagnostics</Filter>
     </ClInclude>
-    <ClInclude Include="ConcurrentQueue.h">
-      <Filter>Core.definition</Filter>
+    <ClInclude Include="Diagnostics/HtmlFileSink.h">
+      <Filter>Diagnostics</Filter>
     </ClInclude>
-    <ClInclude Include="EngineMode.h">
-      <Filter>Core.definition</Filter>
+    <ClInclude Include="Diagnostics/LogEntry.h">
+      <Filter>Diagnostics</Filter>
     </ClInclude>
-    <ClInclude Include="EnginePaths.h">
-      <Filter>WindowsApplication\CoreWindow</Filter>
+    <ClInclude Include="Diagnostics/LogGroup.h">
+      <Filter>Diagnostics</Filter>
     </ClInclude>
-    <ClInclude Include="EngineResourceCensus.h">
-      <Filter>Utility</Filter>
+    <ClInclude Include="Diagnostics/LogSink.h">
+      <Filter>Diagnostics</Filter>
     </ClInclude>
-    <ClInclude Include="FileDialog.h">
-      <Filter>WindowsApplication\CoreWindow</Filter>
+    <ClInclude Include="Diagnostics/LogStore.h">
+      <Filter>Diagnostics</Filter>
     </ClInclude>
-    <ClInclude Include="HashingString.h">
-      <Filter>Utility</Filter>
+    <ClInclude Include="Diagnostics/LogSystem.h">
+      <Filter>Diagnostics</Filter>
     </ClInclude>
-    <ClInclude Include="HtmlFileSink.h">
-      <Filter>Core.Logger</Filter>
+    <ClInclude Include="Foundation/BaseTypeDef.h">
+      <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="IObject.h">
-      <Filter>Core.definition</Filter>
+    <ClInclude Include="Foundation/Core.Definition.h">
+      <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="LinkedListLib.hpp">
-      <Filter>Core.LinkedList</Filter>
+    <ClInclude Include="Foundation/Core.Minimal.h">
+      <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="LogEntry.h">
-      <Filter>Core.Logger</Filter>
+    <ClInclude Include="Foundation/Core.Runtime.h">
+      <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="LogGroup.h">
-      <Filter>Core.Logger</Filter>
+    <ClInclude Include="Foundation/IObject.h">
+      <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="LogSink.h">
-      <Filter>Core.Logger</Filter>
+    <ClInclude Include="Foundation/Mathematics.Intersect.h">
+      <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="LogStore.h">
-      <Filter>Core.Logger</Filter>
+    <ClInclude Include="Foundation/StandardLibrary.h">
+      <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="LogSystem.h">
-      <Filter>Core.Logger</Filter>
+    <ClInclude Include="Foundation/TypeDefinition.h">
+      <Filter>Foundation</Filter>
     </ClInclude>
-    <ClInclude Include="Mathematics.Intersect.h">
-      <Filter>Utility</Filter>
+    <ClInclude Include="Packaging/ArtifactStoreGuard.h">
+      <Filter>Packaging</Filter>
     </ClInclude>
-    <ClInclude Include="MemoryPool.h">
-      <Filter>Core.Memory\MemoryPool</Filter>
+    <ClInclude Include="Packaging/PakHelper.h">
+      <Filter>Packaging</Filter>
     </ClInclude>
-    <ClInclude Include="ReflgenAttributes.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Packaging/Paklib.hpp">
+      <Filter>Packaging</Filter>
     </ClInclude>
-    <ClInclude Include="ReflgenAuthoring.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Reflection/ClassProperty.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="ReflgenAuthoringSerializers.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Reflection/Core.Property.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="ReflgenRuntime.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Reflection/MetaPolymorphic.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="MetaStateCommand.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Reflection/MetaStateCommand.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="AuthoringRymlErrorPolicy.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Reflection/PropertyChange.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="AuthoringParseTelemetry.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Reflection/Reflection.hpp">
+      <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="AuthoringScalarConvert.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Reflection/ReflectionFunction.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="AuthoringReadNode.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Reflection/ReflectionRegister.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="AuthoringParsedDocument.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Reflection/ReflectionType.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="AuthoringCookedDocument.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Reflection/ReflectionYml.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="AuthoringNodeView.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Reflection/ReflgenAttributes.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="AuthoringNodeViewAccess.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Reflection/ReflgenAuthoring.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="AuthoringDocument.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Reflection/ReflgenAuthoringSerializers.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="AuthoringDocumentAccess.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Reflection/ReflgenRuntime.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="AuthoringNodeEquality.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Reflection/TypeIO.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="SerializationProfiler.h">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Reflection/TypeTrait.h">
+      <Filter>Reflection</Filter>
     </ClInclude>
-    <ClInclude Include="PakHelper.h">
-      <Filter>EngineBootstrap</Filter>
+    <ClInclude Include="Runtime/RuntimeResults.h">
+      <Filter>Runtime</Filter>
     </ClInclude>
-    <ClInclude Include="Paklib.hpp">
-      <Filter>Utility</Filter>
+    <ClInclude Include="Runtime/RuntimeSettings.h">
+      <Filter>Runtime</Filter>
     </ClInclude>
-    <ClInclude Include="PathFinder.h">
-      <Filter>Utility</Filter>
+    <ClInclude Include="Runtime/TemporalProductSettings.h">
+      <Filter>Runtime</Filter>
     </ClInclude>
-    <ClInclude Include="ProgressSink.h">
-      <Filter>Utility</Filter>
+    <ClInclude Include="Runtime/TemporalProductSettingsIO.h">
+      <Filter>Runtime</Filter>
     </ClInclude>
-    <ClInclude Include="Reflection.hpp">
-      <Filter>Core.Reflection</Filter>
+    <ClInclude Include="Runtime/WarmupLedger.h">
+      <Filter>Runtime</Filter>
     </ClInclude>
-    <ClInclude Include="ReflectionFunction.h">
-      <Filter>Core.Reflection</Filter>
-    </ClInclude>
-    <ClInclude Include="ReflectionRegister.h">
-      <Filter>Core.Reflection</Filter>
-    </ClInclude>
-    <ClInclude Include="ReflectionType.h">
-      <Filter>Core.Reflection</Filter>
-    </ClInclude>
-    <ClInclude Include="ReflectionYml.h">
-      <Filter>Core.Reflection</Filter>
-    </ClInclude>
-    <ClInclude Include="RingBuffer.h">
-      <Filter>Core.Logger</Filter>
-    </ClInclude>
-    <ClInclude Include="RuntimeSettings.h">
-      <Filter>RuntimeSettings</Filter>
-    </ClInclude>
-    <ClInclude Include="TemporalProductSettings.h">
-      <Filter>RuntimeSettings</Filter>
-    </ClInclude>
-    <ClInclude Include="TemporalProductSettingsIO.h">
-      <Filter>RuntimeSettings</Filter>
-    </ClInclude>
-    <ClInclude Include="SpinLock.h">
-      <Filter>Core.Memory\SpinLock</Filter>
-    </ClInclude>
-    <ClInclude Include="StringHelper.h">
-      <Filter>Utility</Filter>
-    </ClInclude>
-    <ClInclude Include="TimeSystem.h">
-      <Filter>DirectX11Common\TimeSystem</Filter>
-    </ClInclude>
-    <ClInclude Include="TypeDefinition.h">
-      <Filter>Core.definition</Filter>
-    </ClInclude>
-    <ClInclude Include="TypeIO.h">
-      <Filter>Core.definition\Type</Filter>
-    </ClInclude>
-    <ClInclude Include="TypeTrait.h">
-      <Filter>Core.Reflection</Filter>
-    </ClInclude>
-    <ClInclude Include="DynamicBitset.h">
-        <Filter>Core.Container</Filter>
-      </ClInclude>
-      <ClInclude Include="Sha256.h">
-      <Filter>Core.Reflection</Filter>
-    </ClInclude>
-    <ClInclude Include="WindowsApartment.h">
-      <Filter>WindowsApplication</Filter>
-    </ClInclude>
-    <ClInclude Include="WindowDesc.h">
-      <Filter>WindowsApplication\CoreWindow</Filter>
+    <ClInclude Include="Time/TimeSystem.h">
+      <Filter>Time</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <None Include="Delegate.inl">
-      <Filter>Core.Delegate</Filter>
-    </None>
-    <None Include="MemoryPool.inl">
-      <Filter>Core.Memory\MemoryPool</Filter>
-    </None>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="LayerTypes.h" />
-    <ClInclude Include="LayerCatalog.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="AuthoringDocumentAccess.cpp" />
-    <ClInclude Include="AuthoringDocumentStorage.h" />
   </ItemGroup>
 </Project>

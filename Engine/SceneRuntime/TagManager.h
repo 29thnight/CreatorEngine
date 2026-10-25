@@ -1,6 +1,6 @@
 #pragma once
-#include "Core.Minimal.h"
-#include "ClassProperty.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
+#include "../Utility_Framework/Reflection/ClassProperty.h"
 #include "Entity.h"
 
 class TagManager : public Singleton<TagManager>

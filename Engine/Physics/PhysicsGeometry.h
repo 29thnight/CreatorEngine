@@ -1,10 +1,14 @@
 #pragma once
-#include "../Utility_Framework/LayerTypes.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
 
 #include "PhysicsTypes.h"
 #include <mathematics/vector3.hpp>
 #include <mathematics/quaternion.hpp>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace ce::physics
 {

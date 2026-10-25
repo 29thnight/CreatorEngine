@@ -1,15 +1,27 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "Experiment/Import/ImporterModelDecoder.h"
-#include "../../Engine/Utility_Framework/WindowsApartment.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
 #include "Assets/ModelAssetAuthoringTransaction.h"
 #include "Assets/ModelAssetGeneration.h"
 #include "Assets/ModelGenerationStreaming.h"
 #include "Assets/ModelCpuGeometryPayload.h"
 #include "RHI/IRenderDeviceServices.h"
 #include "Render/Scene/EnhancedDrawReplayInput.h"
-#include "../../Editor/EngineEntry/TextureSourceProcessing.h"
-#include "PathFinder.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
-#include <objbase.h>
+#include "../../Editor/EngineEntry/Assets/Textures/TextureSourceProcessing.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -49,8 +61,8 @@ int main(int argc, char** argv)
         std::filesystem::copy(source / "ProjectSetting",project / "ProjectSetting",std::filesystem::copy_options::recursive);
         const ce::platform::windows::apartment_scope apartmentScope{ ce::platform::windows::apartment_model::mta };
         const HRESULT com = apartmentScope.result; Check(SUCCEEDED(com),"COM initialization");
-        auto* paths = InternalPath::GetInstance(); paths->AssetAuthoringEnabled = true;
-        paths->BaseProjectPath = project; paths->DataPath = project / "Assets";
+        auto* paths = (&ce::paths::get_state()); paths->asset_authoring_enabled = true;
+        paths->base_project_path = project; paths->data_path = project / "Assets";
         Authoring::InstallTextureSourceProcessing();
         struct Sources { ~Sources(){Authoring::UninstallTextureSourceProcessing();} } sourceProcessing;
         assets::ModelAssetAuthoringRequest request;

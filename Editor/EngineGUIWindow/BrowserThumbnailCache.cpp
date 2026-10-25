@@ -1,11 +1,25 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
 #include "BrowserThumbnailCache.h"
 
-#include "EditorImGuiTexture.h"
+#include "../EngineEntry/Presentation/EditorImGuiTexture.h"
 #include "Texture.h"
 #include "TextureImage.h"
-#include "JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace editor
 {
@@ -282,10 +296,7 @@ namespace editor
 
     thumbnail_generator thumbnail_pick_generator(std::string_view extension) noexcept
     {
-        std::string lowered;
-        lowered.reserve(extension.size());
-        for (const char c : extension)
-            lowered.push_back(static_cast<char>(std::tolower(static_cast<unsigned char>(c))));
+        const auto lowered = ce::strings::to_lower(extension);
 
         // ★ 여기 없는 확장자는 유형 아이콘에 머문다. 계약의 "미지원 생성기는
         //   아이콘을 유지한다" 이고, 줄을 더하는 것이 생성기를 넓히는 방법이다.

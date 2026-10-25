@@ -1,14 +1,32 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "../../Engine/RenderEngine/DataSystem.h"
-#include "../../Engine/Utility_Framework/WindowsApartment.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
 #include "../../Engine/RenderEngine/Material.h"
 #include "../../Engine/RenderEngine/ShaderMeta.h"
-#include "../../Engine/Utility_Framework/AuthoringNodeViewAccess.h"
-#include "../../Engine/Utility_Framework/AuthoringParsedDocument.h"
-#include "../../Engine/Utility_Framework/AuthoringWriteNode.h"
-#include "../../Engine/Utility_Framework/PathFinder.h"
-#include "../../Engine/Utility_Framework/ReflectionTypedYml.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringNodeViewAccess.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringWriteNode.h"
+#include "../../Engine/Utility_Framework/Reflection/ReflectionTypedYml.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace reflgen::generated
 {
@@ -51,10 +69,10 @@ int main(int argc, char** argv)
         if (argc != 2)
             throw std::runtime_error("Expected packaged fixture Assets root.");
         const auto root = std::filesystem::absolute(argv[1]);
-        auto* paths = InternalPath::GetInstance();
-        paths->DataPath = root;
-        paths->BaseProjectPath = root.parent_path();
-        paths->AssetAuthoringEnabled = false;
+        auto* paths = (&ce::paths::get_state());
+        paths->data_path = root;
+        paths->base_project_path = root.parent_path();
+        paths->asset_authoring_enabled = false;
         auto* data = DataSystem::GetInstance();
         data->Initialize();
         std::size_t checks = 0;
@@ -64,7 +82,7 @@ int main(int argc, char** argv)
                 throw std::runtime_error(message);
         };
         FileGuid graph;
-        check(Uuid::TryParse("11111111-1111-4111-8111-111111111111", graph.m_guid), "Fixture graph GUID");
+        check(uuid::try_parse("11111111-1111-4111-8111-111111111111", graph.m_guid), "Fixture graph GUID");
         std::string error;
         const auto generation = data->LoadMaterialGraphGeneration(graph, error);
         check(!!generation, "Actual DataSystem graph GUID load: " + error);
@@ -97,7 +115,7 @@ int main(int argc, char** argv)
               "Common texture setter publishes a stable-ID owning snapshot");
         const auto textureAccepted = material.GetMaterialGraphInstance();
         FileGuid unavailableTexture;
-        check(Uuid::TryParse("44444444-4444-4444-8444-444444444444", unavailableTexture.m_guid) &&
+        check(uuid::try_parse("44444444-4444-4444-8444-444444444444", unavailableTexture.m_guid) &&
                   !material.TrySetTextureGuid(textureProperty->name, unavailableTexture) &&
                   SameGraphOwner(material.GetMaterialGraphInstance(), textureAccepted),
               "Common texture setter preserves the snapshot when an owner cannot load");
@@ -164,7 +182,7 @@ int main(int argc, char** argv)
 
         // Switch only the authoring capability; the mounted CEMF registry already
         // points at copied sources in this isolated fixture package.
-        paths->AssetAuthoringEnabled = true;
+        paths->asset_authoring_enabled = true;
         const auto sourcePath = data->GetFilePath(graph);
         const auto source = LX::LXMaterialAsset::Load(sourcePath, LX::CreateMaterialDefinitions(), &error);
         check(!!source, "Editor reload source: " + error);

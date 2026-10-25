@@ -1,0 +1,4982 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Platform.Windows.Strings.h"
+#else
+import Creator.Platform.Windows.Strings;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
+#include "../../../Engine/Utility_Framework/Runtime/RuntimeResults.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#include "Models/CollisionGeometryAuthoring.h"
+#include "../../../Engine/EngineDiagnostics/ProfileScope.h"
+#include "ProjectLayerSettingsCodec.h"
+#include "EditorAssetDatabase.h"
+#include "ConditionalAssetPublish.h"
+#include "../Scripting/EditorScriptAuthoring.h"
+#include "Textures/TextureSourceProcessing.h"
+#include "Textures/TextureGenerationHash.h"
+#include "Assets/ModelMaterialGraph.h"
+#include "Experiment/Cooked/TextureImportSettings.h"
+#include "Experiment/Cooked/TextureCookProducer.h"
+#include "Experiment/Cooked/CookedTexture.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.ContentAbi.h"
+#else
+import Creator.Core.ContentAbi;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+
+#include "Interfaces/AssetAuthoringPort.h"
+#include "Assets/AudioClipSourceMetadata.h"
+#include "Assets/ModelAssetAuthoringTransaction.h"
+#include "Assets/ModelSidecarV2.h"
+#include "Experiment/Import/GltfSourceDependencies.h"
+#include "DataSystem.h"
+#include "../../../Engine/Platform/Windows/FileDialog.h"
+#include "Material.h"
+#include "../../../Lattice/Material/LXMaterialCompiler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../../Engine/Utility_Framework/Reflection/ReflectionYml.h"
+#include "../../../Engine/Utility_Framework/Runtime/RuntimeSettings.h"
+#include "SceneRenderProfile.h"
+#include "SceneManager.h"
+#include "Scene.h"
+#include "MeshRenderer.h"
+#include "ImageComponent.h"
+#include "SpriteRenderer.h"
+#include "SpriteSheetComponent.h"
+#include "DecalComponent.h"
+#include "Animator.h"
+#include "Assets/ModelAssetGeneration.h"
+#include "ShaderMeta.h"
+#include "ShaderMetaReflection.h"
+#include "ShaderPermutationDomain.h"
+#include "Experiment/Cooked/CookedCodeMaterial.h"
+#include "Experiment/Cooked/CookedShaderMeta.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringCookedDocument.h"
+
+#include <efsw/efsw.hpp>
+#include <DirectXTex.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
+
+
+namespace
+{
+    std::string ReadModelRecoveryText(const std::filesystem::path& path);
+    own::shared_owner<const LX::Runtime::ShaderGeneration> CompileCodeReload(
+        const LX::Runtime::Instance& instance, const std::filesystem::path& root, std::string& error)
+    {
+        const auto& previous = *instance.shader;
+        const auto metadataPath = previous.codeProgram ? root / previous.codeProgram->metadataPath
+            : previous.meta.originPath;
+        const auto document = Authoring::ParsedDocument::ParseFile(metadataPath.string(), error);
+        ShaderMeta meta;
+        if (!document || !ShaderMetaLoader::Parse(ReadModelRecoveryText(metadataPath), metadataPath,
+            previous.meta.guid, meta, error))
+        {
+            return {};
+        }
+        if (meta.keywords != previous.meta.keywords || meta.passes != previous.meta.passes)
+        {
+            error = "Code shader pass/keyword changes require compatible material contracts; prior generation retained";
+            return {};
+        }
+        std::vector<RHIShaderReflection> reflections;
+        ce::hash::sha256 identity;
+        const auto source = meta.ResolveSource(metadataPath);
+        std::map<std::filesystem::path, std::string> inputs;
+        inputs.emplace(metadataPath, ReadModelRecoveryText(metadataPath));
+        inputs.emplace(source, ReadModelRecoveryText(source));
+        if (previous.codeProgram)
+        {
+            for (const auto& input : previous.codeProgram->inputs)
+            {
+                inputs.try_emplace(root / input.path, ReadModelRecoveryText(root / input.path));
+            }
+        }
+        RHIShaderCompiler::ModuleReuseScope reuse;
+        auto program = previous.codeProgram ? own::make_shared<experiment::cooked::CodeProgram>(*previous.codeProgram)
+            : own::shared_owner<experiment::cooked::CodeProgram>{};
+        if (program)
+        {
+            if (!Authoring::EncodeCookedDocument(document.Root(), program->metadataBytes, error)
+                || !experiment::cooked::ReadShaderMetaArtifact(program->metadataBytes,
+                    program->shaderMetaAssetId, program->meta, error))
+            {
+                return {};
+            }
+            for (auto& variant : program->variants)
+            {
+                for (auto& stage : variant.stages)
+                {
+                    RHIShaderCompiler::VerifiedShader verified;
+                    if (!RHIShaderCompiler::VerifyFile(source.string(), stage.entry, stage.profile, variant.backend,
+                        variant.permutation, verified, error))
+                    {
+                        return {};
+                    }
+                    stage.bytecode = verified.bytecode;
+                    stage.reflection = verified.reflection;
+                    reflections.push_back(verified.reflection);
+                    identity.update(verified.dependencyIdentity.data(), verified.dependencyIdentity.size());
+                    for (const auto& dependency : verified.dependencies)
+                    {
+                        inputs.try_emplace(dependency, ReadModelRecoveryText(dependency));
+                    }
+                }
+            }
+            if (!ShaderMetaReflection::Resolve(meta, reflections, program->layout, error))
+            {
+                return {};
+            }
+            program->inputs.clear();
+            for (const auto& [path, bytes] : inputs)
+            {
+                std::error_code pathError;
+                const auto relative = std::filesystem::relative(path, root, pathError);
+                if (pathError || relative.empty() || *relative.begin() == "..")
+                {
+                    error = "Code shader dependency escapes the project Assets directory";
+                    return {};
+                }
+                ce::hash::sha256 hash;
+                hash.update(bytes.data(), bytes.size());
+                program->inputs.push_back({ relative.generic_string(), bytes.size(), hash.finish() });
+            }
+            std::ranges::sort(program->inputs, {}, &experiment::cooked::CodeProgramInput::path);
+            meta = program->meta;
+            std::vector<std::byte> encoded;
+            std::vector<experiment::cooked::AssetDependency> edges;
+            if (!experiment::cooked::EncodeCodeProgramArtifact(*program, encoded, edges, error))
+            {
+                return {};
+            }
+            identity.update(encoded.data(), encoded.size());
+            meta.codeProgram = std::move(program);
+        }
+        else
+        {
+            for (std::uint32_t index = 0; index < meta.passes.size(); ++index)
+            {
+                const auto& pass = meta.passes[index];
+                ShaderMetaPermutation permutation;
+                if (!ShaderPermutationDomain::Resolve(meta, index, instance.keywordSelections, permutation, error))
+                {
+                    return {};
+                }
+                const auto compile = [&](const std::optional<ShaderStageEntry>& entry, std::string_view profile)
+                {
+                    if (!entry)
+                    {
+                        return true;
+                    }
+                    RHIShaderCompiler::VerifiedShader verified;
+                    if (!RHIShaderCompiler::VerifyFile(source.string(), entry->entry, profile,
+                        RHIShaderCompiler::GetOutput(), permutation.defines, verified, error))
+                    {
+                        return false;
+                    }
+                    reflections.push_back(verified.reflection);
+                    identity.update(verified.dependencyIdentity.data(), verified.dependencyIdentity.size());
+                    for (const auto& dependency : verified.dependencies)
+                    {
+                        inputs.try_emplace(dependency, ReadModelRecoveryText(dependency));
+                    }
+                    return true;
+                };
+                if (!compile(pass.vertex, "vs_6_0") || !compile(pass.pixel, "ps_6_0") || !compile(pass.compute, "cs_6_0"))
+                {
+                    return {};
+                }
+            }
+        }
+        for (const auto& [path, bytes] : inputs)
+        {
+            if (bytes != ReadModelRecoveryText(path))
+            {
+                error = "Shader sources changed during compilation; prior generation retained";
+                return {};
+            }
+        }
+        ShaderMetaBindingLayout layout;
+        if (!ShaderMetaReflection::Resolve(meta, reflections, layout, error))
+        {
+            return {};
+        }
+        meta.codeProgramIdentity = ce::hash::to_hex(identity.finish());
+        own::shared_owner<const LX::Runtime::ShaderGeneration> result;
+        if (!LX::Runtime::CreateCodeShader(meta, layout, previous.codeHandle, result, error))
+        {
+            return {};
+        }
+        return result;
+    }
+
+	bool RecoverModelThroughEditor(const std::filesystem::path& source, FileGuid expectedId)
+	{
+		return EditorAssetDatabase::Get().RecoverModel(source, expectedId);
+	}
+
+	struct ModelSourceStamp
+	{
+		std::filesystem::file_time_type modified{};
+		std::uintmax_t size{};
+		bool present{};
+		bool operator==(const ModelSourceStamp&) const = default;
+	};
+
+	ModelSourceStamp ReadModelSourceStamp(const std::filesystem::path& path)
+	{
+		std::error_code error;
+		ModelSourceStamp stamp;
+		if (!std::filesystem::is_regular_file(path, error) || error) return stamp;
+		stamp.size = std::filesystem::file_size(path, error);
+		if (error) return {};
+		stamp.modified = std::filesystem::last_write_time(path, error);
+		stamp.present = !error;
+		return stamp;
+	}
+
+	std::string ReadModelRecoveryText(const std::filesystem::path& path)
+	{
+		std::ifstream input(path, std::ios::binary);
+		return { std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>() };
+	}
+
+	std::filesystem::path RemoveMetaExtension(const std::filesystem::path& metaPath)
+	{
+		std::filesystem::path target = metaPath;
+		target.replace_extension();
+		return target;
+	}
+
+	FileGuid CreateMetaThroughEditor(const std::filesystem::path& filepath,
+		const FileGuid& preferredGuid) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().CreateMeta(filepath, preferredGuid);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset meta creation failed: " +
+				std::string(exception.what()));
+			return {};
+		}
+		catch (...)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset meta creation failed with an unknown error");
+			return {};
+		}
+	}
+
+	FileGuid WriteTextAssetWithMetaThroughEditor(const std::filesystem::path& destination,
+		std::string_view payload, const FileGuid& preferredGuid) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteTextAssetWithMeta(
+				destination, payload, preferredGuid);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor text asset publication failed: "
+				+ std::string(exception.what()));
+			return {};
+		}
+		catch (...)
+		{
+			Debug::PrintLog(spdlog::level::err,
+				"Editor text asset publication failed with an unknown error");
+			return {};
+		}
+	}
+
+	bool WriteModelCacheThroughEditor(const std::filesystem::path& destination,
+		std::span<const std::byte> bytes) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteModelCache(destination, bytes);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor model-cache write failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor model-cache write failed with an unknown error");
+		}
+		return false;
+	}
+
+	bool WriteEmbeddedTextureThroughEditor(const std::filesystem::path& destination,
+		std::span<const std::byte> bytes, uint32 width, uint32 height) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteEmbeddedTexture(
+				destination, bytes, width, height);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor embedded-texture write failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug::PrintLog(spdlog::level::err,
+				"Editor embedded-texture write failed with an unknown error");
+		}
+		return false;
+	}
+
+	bool WriteTerrainThroughEditor(const TerrainAuthoringRequest& request,
+		TerrainAuthoringResult& result) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteTerrain(request, result);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor terrain authoring transaction failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug::PrintLog(spdlog::level::err,
+				"Editor terrain authoring transaction failed with an unknown error");
+		}
+		return false;
+	}
+
+	bool WriteFoliageThroughEditor(const TextAssetAuthoringRequest& request,
+		TextAssetAuthoringResult& result) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteFoliage(request, result);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor foliage authoring transaction failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug::PrintLog(spdlog::level::err,
+				"Editor foliage authoring transaction failed with an unknown error");
+		}
+		return false;
+	}
+
+	bool WriteCollisionMatrixThroughEditor(
+		const UncatalogedAuthoringRequest& request) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteCollisionMatrix(request);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor collision-matrix authoring failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor collision-matrix authoring failed with an "
+				"unknown error");
+		}
+		return false;
+	}
+
+	bool WriteInputActionMapThroughEditor(
+		const UncatalogedAuthoringRequest& request) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteInputActionMap(request);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor input-action-map authoring failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor input-action-map authoring failed with an "
+				"unknown error");
+		}
+		return false;
+	}
+
+	bool WriteTagManagerThroughEditor(
+		const UncatalogedAuthoringRequest& request) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteTagManager(request);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor tag-manager authoring failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor tag-manager authoring failed with an "
+				"unknown error");
+		}
+		return false;
+	}
+
+	bool WriteLayerSettingsThroughEditor(
+		const UncatalogedAuthoringRequest& request) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteLayerSettings(request);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor layer-settings authoring failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor layer-settings authoring failed with an "
+				"unknown error");
+		}
+		return false;
+	}
+
+	bool WriteBlackBoardThroughEditor(const TextAssetAuthoringRequest& request,
+		TextAssetAuthoringResult& result) noexcept
+	{
+		try
+		{
+			return EditorAssetDatabase::Get().WriteBlackBoard(request, result);
+		}
+		catch (const std::exception& exception)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor blackboard authoring transaction failed: " +
+				std::string(exception.what()));
+		}
+		catch (...)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor blackboard authoring transaction failed with "
+				"an unknown error");
+		}
+		return false;
+	}
+
+	const char* ImportDirectory(EditorAssetDatabase::ImportKind kind) noexcept
+	{
+		switch (kind)
+		{
+		case EditorAssetDatabase::ImportKind::Model:
+			return "Models";
+		case EditorAssetDatabase::ImportKind::Texture:
+			return "Textures";
+		case EditorAssetDatabase::ImportKind::MaterialTexture:
+			return "Materials";
+		case EditorAssetDatabase::ImportKind::TerrainTexture:
+			return "Terrain\\Texture";
+		case EditorAssetDatabase::ImportKind::HDR:
+			return "HDR";
+		case EditorAssetDatabase::ImportKind::UITexture:
+			return "UI";
+		case EditorAssetDatabase::ImportKind::SpriteSheet:
+			return "SpriteSheets";
+		}
+		return nullptr;
+	}
+
+	RuntimeAssetType ToRuntimeAssetType(
+		EditorAssetDatabase::ImportKind kind) noexcept
+	{
+		switch (kind)
+		{
+		case EditorAssetDatabase::ImportKind::Model:
+			return RuntimeAssetType::Model;
+		case EditorAssetDatabase::ImportKind::UITexture:
+			return RuntimeAssetType::UITexture;
+		case EditorAssetDatabase::ImportKind::SpriteSheet:
+			return RuntimeAssetType::SpriteSheet;
+		default:
+			return RuntimeAssetType::Texture;
+		}
+	}
+
+	bool IsAllowedImportExtension(EditorAssetDatabase::ImportKind kind,
+		std::string extension)
+	{
+		extension = ce::strings::to_lower(std::move(extension));
+		if (kind == EditorAssetDatabase::ImportKind::Model)
+		{
+			return extension == ".fbx" || extension == ".gltf" ||
+				extension == ".glb" || extension == ".obj";
+		}
+
+		if (kind == EditorAssetDatabase::ImportKind::HDR)
+			return extension == ".hdr";
+
+		return extension == ".png" || extension == ".dds" ||
+			extension == ".jpg" || extension == ".jpeg";
+	}
+
+	std::wstring MakeTerrainGenerationId()
+	{
+		GUID guid{};
+		if (FAILED(::CoCreateGuid(&guid))) return {};
+
+		wchar_t text[40]{};
+		if (0 == ::StringFromGUID2(guid, text, static_cast<int>(std::size(text))))
+			return {};
+		std::wstring result(text);
+		result.erase(std::remove(result.begin(), result.end(), L'{'), result.end());
+		result.erase(std::remove(result.begin(), result.end(), L'}'), result.end());
+		result.erase(std::remove(result.begin(), result.end(), L'-'), result.end());
+		return result;
+	}
+
+	bool IsSafeAssetName(const std::wstring& name)
+	{
+		if (name.empty() || name == L"." || name == L"..") return false;
+
+		// std::filesystem은 "Foo:hidden"을 평범한 파일명으로 본다. NTFS는 그것을
+		// 대체 데이터 스트림으로 열기 때문에 filename() 비교만으로는 부족하다.
+		if (name.find_first_of(L"<>:\"/\\|?*") != std::wstring::npos) return false;
+		for (const wchar_t character : name)
+		{
+			if (character < 0x20) return false;
+		}
+		// 후행 점·공백은 Win32가 조용히 잘라내므로 목적 경로가 의도와 어긋난다.
+		if (name.back() == L'.' || name.back() == L' ') return false;
+
+		static constexpr std::wstring_view kReservedDeviceNames[] = {
+			L"CON", L"PRN", L"AUX", L"NUL",
+			L"COM1", L"COM2", L"COM3", L"COM4", L"COM5",
+			L"COM6", L"COM7", L"COM8", L"COM9",
+			L"LPT1", L"LPT2", L"LPT3", L"LPT4", L"LPT5",
+			L"LPT6", L"LPT7", L"LPT8", L"LPT9",
+		};
+		std::wstring stem = name.substr(0, name.find(L'.'));
+		for (wchar_t& character : stem)
+		{
+			if (character >= L'a' && character <= L'z')
+				character = static_cast<wchar_t>(character - (L'a' - L'A'));
+		}
+		for (const std::wstring_view reserved : kReservedDeviceNames)
+		{
+			if (stem == reserved) return false;
+		}
+
+		const std::filesystem::path path(name);
+		return path == path.filename() && !path.has_root_path();
+	}
+
+	// ── 다중 파일 임포트 원본 ──
+	//
+	// `.gltf` 는 `.bin` 과 이미지를 **상대 URI** 로 끌고 온다. 그 상대 경로는
+	// 복사한 뒤의 위치에서 다시 풀리므로, 파일 하나만 옮기면 하위 폴더가
+	// 평탄화되어 링크가 전부 끊긴다. 임포터(GltfImporter)는 제자리에서 열기
+	// 때문에 멀쩡하다 — 깨지는 것은 복사 단계뿐이다.
+	struct ImportPlan final
+	{
+		std::filesystem::path destinationDirectory{};
+		std::filesystem::path destination{};
+		// 상대 경로다. 원본 폴더와 destinationDirectory 양쪽에 **같은 모양으로**
+		// 붙는다 — 그 동일함이 곧 상대 URI 가 새 자리에서 풀리는 이유다.
+		std::vector<std::filesystem::path> sidecars{};
+		// 사이드카가 있어 전용 폴더를 쓰는 임포트인가.
+		bool isBundle{ false };
+	};
+
+	// 상대 경로의 모든 구성요소가 자산 트리에 그대로 쓸 수 있는 이름인지 본다.
+	// glTF 훑기는 "원본 폴더를 벗어나지 않는다"까지만 답한다 — NTFS 대체 데이터
+	// 스트림(`Foo:hidden`)·예약 장치 이름은 쓰는 쪽인 여기서 막는다.
+	bool IsSafeRelativeAssetPath(const std::filesystem::path& relative)
+	{
+		if (relative.empty() || relative.is_absolute()) return false;
+		if (relative.has_root_name() || relative.has_root_directory()) return false;
+		for (const std::filesystem::path& part : relative)
+		{
+			if (!IsSafeAssetName(part.wstring())) return false;
+		}
+		return true;
+	}
+
+	// 복사를 시작하기 전에 "어디에 무엇을 놓을지"를 전부 정한다. 풀리지 않거나
+	// 안전하지 않은 참조는 여기서 거부한다 — 임포트 원본은 신뢰 경계 밖이다.
+	bool PlanImport(const std::filesystem::path& source, const std::filesystem::path& importRoot,
+		ImportPlan& plan)
+	{
+		const experiment::importer::GltfSourceDependencies dependencies =
+			experiment::importer::ScanGltfSourceDependencies(source);
+		if (!dependencies.Succeeded())
+		{
+			Debug::PrintLog(spdlog::level::err, std::string("Editor asset import rejected a glTF reference (")
+				+ experiment::importer::ToString(dependencies.rejection) + "): "
+				+ source.string() + " — " + dependencies.rejectionDetail);
+			return false;
+		}
+
+		plan = ImportPlan{};
+		plan.destinationDirectory = importRoot;
+		plan.isBundle = !dependencies.relativePaths.empty();
+		if (plan.isBundle)
+		{
+			// 사이드카를 자산 루트에 흩뿌리면 다른 모델의 같은 이름과 충돌한다
+			// (`texture.png` 는 흔하다). 다중 파일 자산은 묶음이므로 자기 폴더를
+			// 갖는다. 단일 파일 `.glb`·embedded `.gltf` 는 지금 자리 그대로다.
+			const std::wstring bundleName = source.stem().wstring();
+			if (!IsSafeAssetName(bundleName))
+			{
+				Debug::PrintLog(spdlog::level::err, "Editor asset import bundle name is unsafe: "
+					+ source.string());
+				return false;
+			}
+			plan.destinationDirectory /= bundleName;
+			for (const std::filesystem::path& relative : dependencies.relativePaths)
+			{
+				if (!IsSafeRelativeAssetPath(relative))
+				{
+					Debug::PrintLog(spdlog::level::err, "Editor asset import rejected an unsafe sidecar path: "
+						+ source.string() + " — " + relative.generic_string());
+					return false;
+				}
+				plan.sidecars.push_back(relative);
+			}
+		}
+		plan.destination = plan.destinationDirectory / source.filename();
+		return true;
+	}
+
+	// 이미 같은 파일이면 복사하지 않는다. 원본이 이미 자산 트리 안에 있는
+	// 제자리 임포트가 정확히 그 경우이고, copy_file 은 자기 자신 위에 복사하면
+	// 실패한다. 새로 생긴 파일만 created 에 담는다(되돌리기 대상).
+	bool CopyImportedFile(const std::filesystem::path& source, const std::filesystem::path& destination,
+		std::vector<std::filesystem::path>& created)
+	{
+		std::error_code error;
+		const bool existed = std::filesystem::exists(destination, error) && !error;
+		if (existed)
+		{
+			std::error_code equivalentError;
+			if (std::filesystem::equivalent(source, destination, equivalentError)
+				&& !equivalentError)
+			{
+				return true;
+			}
+		}
+
+		error.clear();
+		std::filesystem::create_directories(destination.parent_path(), error);
+		if (error)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset import directory creation failed: "
+				+ destination.parent_path().string() + " (" + error.message() + ")");
+			return false;
+		}
+
+		error.clear();
+		std::filesystem::copy_file(source, destination,
+			std::filesystem::copy_options::overwrite_existing, error);
+		if (error)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset import copy failed: " + source.string()
+				+ " -> " + destination.string() + " (" + error.message() + ")");
+			return false;
+		}
+		if (!existed) created.push_back(destination);
+		return true;
+	}
+
+	// 임포트가 실패했을 때 이번 호출이 새로 만든 것만 거둔다. 원래 있던 파일은
+	// 건드리지 않는다 — 덮어쓴 자산을 지우면 실패가 자료 손실이 된다.
+	std::filesystem::path RollbackImport(const std::vector<std::filesystem::path>& created,
+		const ImportPlan& plan)
+	{
+		for (const std::filesystem::path& path : created)
+		{
+			std::error_code error;
+			std::filesystem::remove(path, error);
+		}
+		if (!plan.isBundle) return {};
+
+		// 사이드카가 하위 폴더에 있었다면 그 폴더도 이번 임포트가 만든 것이다.
+		// remove 는 빈 폴더에서만 성공하므로 남의 파일이 들어 있으면 그대로 둔다.
+		// 제자리 임포트(원본이 이미 자산 트리 안)는 복사한 것이 없어 created 가
+		// 비고, 아래 remove 도 전부 실패한다 — 원본은 건드려지지 않는다.
+		for (const std::filesystem::path& relative : plan.sidecars)
+		{
+			std::filesystem::path parent = relative.parent_path();
+			while (!parent.empty())
+			{
+				std::error_code error;
+				if (!std::filesystem::remove(plan.destinationDirectory / parent, error)) break;
+				parent = parent.parent_path();
+			}
+		}
+		std::error_code error;
+		std::filesystem::remove(plan.destinationDirectory, error);
+		return {};
+	}
+
+	bool IsPathInside(const std::filesystem::path& path, const std::filesystem::path& root)
+	{
+		std::error_code error;
+		const std::filesystem::path relative = std::filesystem::relative(path, root, error);
+		if (error || relative.empty() || relative.is_absolute()) return false;
+		for (const std::filesystem::path& part : relative)
+		{
+			if (part == "..") return false;
+		}
+		return true;
+	}
+
+	struct ScopedPathCleanup
+	{
+		std::filesystem::path target;
+
+		~ScopedPathCleanup()
+		{
+			if (target.empty()) return;
+			std::error_code ignored;
+			std::filesystem::remove_all(target, ignored);
+		}
+
+		void Release() noexcept { target.clear(); }
+	};
+}
+
+struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
+    own::enable_owner_from_this<EditorAssetDatabase::Impl>
+{
+	explicit Impl(std::filesystem::path root) : m_root(std::move(root)) {}
+
+	bool Start()
+	{
+		if (!std::filesystem::exists(m_root) || !std::filesystem::is_directory(m_root))
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset root is missing: " + m_root.string());
+			return false;
+		}
+
+        // Restore interrupted conditional saves before missing-source cleanup can
+        // remove their GUID sidecars. The watcher is not running yet.
+        for (const auto& entry : std::filesystem::recursive_directory_iterator(m_root))
+        {
+            const auto name = entry.path().native();
+            if (name.ends_with(Editor::AuthoringPublish::recoverySuffix) && !entry.is_symlink())
+            {
+                const std::filesystem::path destination(name.substr(0,
+                    name.size() - Editor::AuthoringPublish::recoverySuffix.size()));
+                std::string failure;
+                if (!Editor::AuthoringPublish::Recover(destination, failure))
+                {
+                    Debug::PrintLog(spdlog::level::err, failure);
+                    return false;
+                }
+            }
+        }
+		ScanAndCleanupInvalidMeta();
+		PruneUnusableTextureGenerations();
+		ScanAndRegisterMeta();
+
+		m_watcher = std::make_unique<efsw::FileWatcher>();
+		const auto rootUtf8 = m_root.u8string();
+		const std::string watcherRoot(rootUtf8.begin(), rootUtf8.end());
+		const efsw::WatchID watchId =
+			m_watcher->addWatch(watcherRoot, this, true);
+		if (watchId < 0)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset watcher registration failed: " +
+				watcherRoot);
+			m_watcher.reset();
+			return false;
+		}
+		m_watcher->watch();
+		return true;
+	}
+
+	void Stop() noexcept
+	{
+		// FileWatcher owns the callback thread. Destroy it while this listener is
+		// still alive, then let the rest of Impl be released.
+		m_watcher.reset();
+        {
+            std::lock_guard lock(m_authoringMutex);
+            m_stopping = true;
+            for (auto& [path, work] : m_textureImports)
+            {
+                work.latestRevision->fetch_add(1u, std::memory_order_release);
+            }
+        }
+        for (const auto& work : m_shaderReloads)
+        {
+            try
+            {
+                work->job.wait();
+            }
+            catch (const std::exception&)
+            {
+                // Shutdown drains compiler ownership without publishing late results.
+            }
+        }
+        m_shaderReloads.clear();
+        for (const auto& job : m_modelReloads)
+        {
+            try
+            {
+                job.wait();
+            }
+            catch (const std::exception&)
+            {
+            }
+        }
+        m_modelReloads.clear();
+	}
+
+    std::uint64_t AudioRevision() const noexcept
+    {
+        return m_audioRevision.load(std::memory_order_acquire);
+    }
+
+    struct AutomaticModelLoad final
+    {
+        assets::ModelAssetGeneration::Shared generation;
+        job_handle job;
+    };
+
+    struct TextureRefresh final
+    {
+        own::shared_owner<const Texture> previous;
+        AssetDepot::AssetRequest<Texture> descriptor;
+        AssetDepot::AssetRequest<Texture::CodecImage> image;
+        bool imageRequested{};
+        std::uint64_t resolverRevision{};
+    };
+
+    struct ShaderReload final
+    {
+        own::shared_owner<const material_graph::Generation> expectedGraph;
+        own::shared_owner<const material_graph::Generation> graph;
+        own::shared_owner<const LX::Runtime::Instance> expectedCode;
+        own::shared_owner<const LX::Runtime::ShaderGeneration> shader;
+        std::filesystem::path source, root, shaders, cache;
+        FileGuid guid;
+        std::string error;
+        job_handle job;
+        std::uint64_t revision{};
+    };
+
+    void TickShaderReloads()
+    {
+        for (auto it = m_shaderReloads.begin(); it != m_shaderReloads.end();)
+        {
+            const auto work = *it;
+            if (!work->job.is_complete())
+            {
+                ++it;
+                continue;
+            }
+            try
+            {
+                work->job.wait();
+            }
+            catch (const std::exception& exception)
+            {
+                work->error = exception.what();
+            }
+            if (work->revision == m_shaderRevision && work->error.empty())
+            {
+                if (work->graph)
+                {
+                    DataSystems->PublishMaterialGraphReload(work->graph, work->expectedGraph, work->error);
+                }
+                else if (work->shader)
+                {
+                    // Prepare every dependent material before changing any accepted instance.
+                    std::vector<std::pair<MeshRenderer*, own::shared_owner<Material>>> replacements;
+                    for (auto* scene : SceneManagers->GetScenes())
+                    {
+                        if (!scene)
+                        {
+                            continue;
+                        }
+                        for (const auto& entity : scene->m_Entities)
+                        {
+                            if (!entity || entity->IsDestroyMark())
+                            {
+                                continue;
+                            }
+                            for (auto* mesh : entity->GetComponents<MeshRenderer>())
+                            {
+                                const auto instance = mesh->m_Material ? mesh->m_Material->GetLXMaterialInstance() : nullptr;
+                                if (!instance || mesh->m_Material->HasMaterialGraph()
+                                    || &*instance->shader != &*work->expectedCode->shader)
+                                {
+                                    continue;
+                                }
+                                auto candidate = own::make_shared<Material>(*mesh->m_Material);
+                                if (!candidate->ReloadCodeShader(work->shader, work->error))
+                                {
+                                    break;
+                                }
+                                replacements.emplace_back(mesh, std::move(candidate));
+                            }
+                        }
+                    }
+                    if (work->error.empty())
+                    {
+                        if (!DataSystems->PublishCodeShaderReload(work->expectedCode->shader, work->shader, work->error))
+                        {
+                            Debug::PrintLog(spdlog::level::err, "Automatic shader publication retained prior materials: " + work->error);
+                            it = m_shaderReloads.erase(it);
+                            continue;
+                        }
+                        for (auto& [mesh, material] : replacements)
+                        {
+                            // Publication allocates the real cache generation handle after validation.
+                            material->ReloadCodeShader(work->shader, work->error);
+                            mesh->SetMaterial(std::move(material));
+                        }
+                    }
+                }
+            }
+            if (work->revision == m_shaderRevision && !work->error.empty())
+            {
+                Debug::PrintLog(spdlog::level::err, "Automatic shader reload retained prior materials: " + work->error);
+            }
+            it = m_shaderReloads.erase(it);
+        }
+        if (!m_shaderDirty || !m_shaderReloads.empty())
+        {
+            return;
+        }
+        m_shaderDirty = false;
+        std::map<uuid::uuid16, own::shared_owner<const material_graph::Generation>> graphs;
+        std::map<const LX::Runtime::ShaderGeneration*, own::shared_owner<const LX::Runtime::Instance>> codes;
+        const auto collect = [&](const Material& material)
+        {
+            if (const auto graph = material.GetMaterialGraphInstance())
+            {
+                graphs.try_emplace(graph->generation->assetId.value, graph->generation);
+            }
+            else if (const auto instance = material.GetLXMaterialInstance(); instance && instance->shader)
+            {
+                codes.try_emplace(&*instance->shader, instance);
+            }
+        };
+        for (const auto& [name, material] : DataSystems->SnapshotMaterials())
+        {
+            collect(*material);
+        }
+        for (auto* scene : SceneManagers->GetScenes())
+        {
+            if (!scene)
+            {
+                continue;
+            }
+            for (const auto& entity : scene->m_Entities)
+            {
+                if (!entity || entity->IsDestroyMark())
+                {
+                    continue;
+                }
+                for (auto* mesh : entity->GetComponents<MeshRenderer>())
+                {
+                    if (mesh->m_Material)
+                    {
+                        collect(*mesh->m_Material);
+                    }
+                }
+            }
+        }
+        const auto submit = [&](own::shared_owner<ShaderReload> work)
+        {
+            work->root = m_root;
+            work->shaders = ce::paths::relative_to_shader("DefaultPassShader");
+            work->cache = ce::paths::cache_path("Lattice/AutomaticReload");
+            work->revision = m_shaderRevision;
+            work->job = ce::get_job_scheduler().submit([work]
+            {
+                if (work->expectedGraph)
+                {
+                    const auto source = LX::LXMaterialAsset::Load(work->source, LX::CreateMaterialDefinitions(), &work->error);
+                    if (source)
+                    {
+                        work->graph = DataSystem::CompileMaterialGraphAuthoring(*source, work->guid,
+                            work->shaders, work->cache, work->error);
+                    }
+                }
+                else
+                {
+                    work->shader = CompileCodeReload(*work->expectedCode, work->root, work->error);
+                }
+            });
+            m_shaderReloads.push_back(std::move(work));
+        };
+        for (const auto& [id, graph] : graphs)
+        {
+            auto work = own::make_shared<ShaderReload>();
+            work->expectedGraph = graph;
+            work->guid = FileGuid(id);
+            work->source = DataSystems->GetMaterialGraphSourcePath(work->guid);
+            if (!work->source.empty())
+            {
+                submit(std::move(work));
+            }
+        }
+        for (const auto& [shader, instance] : codes)
+        {
+            auto work = own::make_shared<ShaderReload>();
+            work->expectedCode = instance;
+            submit(std::move(work));
+        }
+    }
+
+    void ScheduleModelReload(const std::filesystem::path& source, bool metadata)
+    {
+        const auto self = shared_from_this();
+        m_modelReloads.push_back(ce::get_job_scheduler().submit([self, source, metadata]
+        {
+            try
+            {
+                if (metadata)
+                {
+                    const auto guid = self->CreateMeta(source);
+                    if (guid != FileGuid{})
+                    {
+                        DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+                            RuntimeAssetType::Model, guid, source });
+                    }
+                }
+                else
+                {
+                    self->ReloadChangedModel(source);
+                }
+            }
+            catch (const std::exception& failure)
+            {
+                Debug::PrintLog(spdlog::level::err, "Automatic model reload retained prior references: " + std::string(failure.what()));
+            }
+            self->m_modelRefreshEpoch.fetch_add(1u, std::memory_order_release);
+        }));
+    }
+
+    bool SaveImportMetadata(const std::filesystem::path& requestedSource, std::string_view payload, std::string& failure,
+        const std::string* expectedDisk = nullptr)
+    {
+        std::lock_guard lock(m_authoringMutex);
+        std::error_code error;
+        const auto source = std::filesystem::weakly_canonical(requestedSource, error);
+        const auto document = Authoring::ParsedDocument::ParseText(std::string(payload), failure);
+        const auto sidecar = std::filesystem::path(source.string() + ".meta");
+        const auto expected = LoadGuidFromMeta(sidecar);
+        auto identityNode = document ? document.Root()["assetId"] : Authoring::ReadNode{};
+        if (!identityNode && document)
+        {
+            identityNode = document.Root()["guid"];
+        }
+        uuid::uuid16 identity;
+        if (error || m_stopping || !IsPathInside(source, std::filesystem::weakly_canonical(m_root))
+            || !document || !document.Root().IsMap() || expected == FileGuid{}
+            || !identityNode || !identityNode.IsScalar()
+            || !uuid::try_parse(identityNode.AsString(), identity) || identity != expected.m_guid)
+        {
+            failure = "Import settings must retain the existing asset GUID and project path";
+            return false;
+        }
+        if (!WriteBinaryFileLocked(sidecar, std::as_bytes(std::span(payload.data(), payload.size())),
+            PublishEncoding::Text, expectedDisk, &failure))
+        {
+            if (failure.empty())
+            {
+                failure = "Could not save import metadata";
+            }
+            return false;
+        }
+        HandleModified(sidecar);
+        failure.clear();
+        return true;
+    }
+
+    bool SaveAutomaticRenderProfilePayload(const std::filesystem::path& path, std::string_view payload, std::string& error,
+        const std::string* expectedDisk = nullptr)
+    {
+        std::lock_guard lock(m_authoringMutex);
+        if (m_stopping || !IsPathInside(path, m_root)
+            || !WriteBinaryFileLocked(path, std::as_bytes(std::span(payload.data(), payload.size())),
+                PublishEncoding::Text, expectedDisk, &error))
+        {
+            if (error.empty())
+            {
+                error = "Render profile save failed; current settings are retained.";
+            }
+            return false;
+        }
+        HandleModified(path);
+        return true;
+    }
+
+    struct AutomaticSave
+    {
+        std::string expectedDisk;
+        std::function<bool(const std::string&, std::string&)> write;
+        std::chrono::steady_clock::time_point changedAt;
+    };
+
+    void QueueAutomaticSave(const std::filesystem::path& path, std::function<bool(const std::string&, std::string&)> write)
+    {
+        std::lock_guard lock(m_automaticSaveMutex);
+        const auto key = path.lexically_normal();
+        m_automaticSaveErrors.erase(key);
+        auto [it, inserted] = m_automaticSaves.try_emplace(key);
+        if (inserted)
+        {
+            it->second.expectedDisk = ReadModelRecoveryText(key);
+        }
+        it->second.write = std::move(write);
+        it->second.changedAt = std::chrono::steady_clock::now();
+    }
+
+    void TickAutomaticSaves(bool flush = false)
+    {
+        std::map<std::filesystem::path, AutomaticSave> ready;
+        {
+            std::lock_guard lock(m_automaticSaveMutex);
+            const auto now = std::chrono::steady_clock::now();
+            for (auto it = m_automaticSaves.begin(); it != m_automaticSaves.end();)
+            {
+                if (flush || now - it->second.changedAt >= std::chrono::milliseconds(400))
+                {
+                    if (flush)
+                    {
+                        const auto age = std::chrono::duration_cast<std::chrono::milliseconds>(now - it->second.changedAt);
+                        std::printf("[AUTOSAVE_FLUSH] ageMs=%lld path=%s\n",
+                            static_cast<long long>(age.count()), it->first.string().c_str());
+                        Diagnostics::RuntimeResults::Emit("autosave.flush", [&](Diagnostics::Node data)
+                        {
+                            data["ageMs"] << age.count();
+                            const auto utf8 = it->first.u8string();
+                            data["path"] << std::string(utf8.begin(), utf8.end());
+                        });
+                    }
+                    ready.emplace(it->first, std::move(it->second));
+                    it = m_automaticSaves.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+        }
+        for (auto& [path, save] : ready)
+        {
+            std::string error;
+            const bool conflict = ReadModelRecoveryText(path) != save.expectedDisk;
+            const auto recordSave = [&](bool succeeded)
+            {
+                Diagnostics::RuntimeResults::Emit("autosave.completed", [&](Diagnostics::Node data)
+                {
+                    const auto utf8 = path.u8string();
+                    data["path"] << std::string(utf8.begin(), utf8.end());
+                    data["succeeded"] << succeeded;
+                    data["conflict"] << conflict;
+                });
+            };
+            if (conflict)
+            {
+                error = "The source changed on disk; pending edits were not written.";
+                std::printf("[AUTOSAVE_CONFLICT] pending edit rejected path=%s\n", path.string().c_str());
+            }
+            else
+            {
+                try
+                {
+                    if (save.write(save.expectedDisk, error))
+                    {
+                        recordSave(true);
+                        continue;
+                    }
+                }
+                catch (const std::exception& failure)
+                {
+                    error = failure.what();
+                }
+            }
+            recordSave(false);
+            {
+                std::lock_guard lock(m_automaticSaveMutex);
+                m_automaticSaveErrors[path] = error;
+            }
+            Debug::PrintLog(spdlog::level::err, "Automatic asset save failed: " + path.string() + ": " + error);
+        }
+    }
+
+    std::string AutomaticSaveError(const std::filesystem::path& sidecar)
+    {
+        std::lock_guard lock(m_automaticSaveMutex);
+        const auto found = m_automaticSaveErrors.find(sidecar.lexically_normal());
+        return found == m_automaticSaveErrors.end() ? std::string{} : found->second;
+    }
+
+    void ClearAutomaticSaveError(const std::filesystem::path& sidecar)
+    {
+        std::lock_guard lock(m_automaticSaveMutex);
+        m_automaticSaveErrors.erase(sidecar.lexically_normal());
+    }
+
+    std::optional<std::chrono::milliseconds> PendingAutomaticSaveAge(const std::filesystem::path& sidecar)
+    {
+        std::lock_guard lock(m_automaticSaveMutex);
+        const auto found = m_automaticSaves.find(sidecar.lexically_normal());
+        if (found == m_automaticSaves.end())
+        {
+            return std::nullopt;
+        }
+        return std::chrono::duration_cast<std::chrono::milliseconds>(
+            std::chrono::steady_clock::now() - found->second.changedAt);
+    }
+
+    void TickAutomaticChanges()
+    {
+        TickAutomaticSaves();
+        std::erase_if(m_modelReloads, [](const auto& job) { return job.is_complete(); });
+        std::vector<std::filesystem::path> changed;
+        {
+            std::lock_guard lock(m_modifiedMutex);
+            const auto now = std::chrono::steady_clock::now();
+            for (auto it = m_modifiedPaths.begin(); it != m_modifiedPaths.end();)
+            {
+                if (now - it->second >= std::chrono::milliseconds(350))
+                {
+                    changed.push_back(it->first);
+                    it = m_modifiedPaths.erase(it);
+                }
+                else
+                {
+                    ++it;
+                }
+            }
+        }
+        for (const auto& path : changed)
+        {
+            ProcessModified(path);
+        }
+        bool pendingShaderEdit = false;
+        {
+            std::lock_guard lock(m_modifiedMutex);
+            for (const auto& [path, stamp] : m_modifiedPaths)
+            {
+                const auto extension = path.extension();
+                if (extension == ".hlsl" || extension == ".hlsli" || extension == ".slang"
+                    || extension == ".shadermeta" || extension == ".shadergraph")
+                {
+                    pendingShaderEdit = true;
+                    break;
+                }
+            }
+        }
+        if (!pendingShaderEdit)
+        {
+            TickShaderReloads();
+        }
+        // Resident-only lookup; unused models remain lazy and no source I/O belongs here.
+        auto models = DataSystems->SnapshotCurrentModelAssetGenerations();
+        const auto modelRefreshEpoch = m_modelRefreshEpoch.load(std::memory_order_acquire);
+        if (modelRefreshEpoch != m_observedModelRefreshEpoch)
+        {
+            m_observedModelRefreshEpoch = modelRefreshEpoch;
+            m_automaticModelLoads.clear();
+        }
+        for (const auto& [id, work] : m_automaticModelLoads)
+        {
+            if (work->job.is_complete() && work->generation
+                && std::ranges::none_of(models, [&](const auto& model) { return model->Identity().modelId == id; }))
+            {
+                models.push_back(work->generation);
+            }
+        }
+        std::map<uuid::uuid16, std::uint64_t> modelGenerations;
+        for (const auto& model : models)
+        {
+            modelGenerations.emplace(model->Identity().modelId, model->Identity().generation);
+        }
+        const auto liveNow = std::chrono::steady_clock::now();
+        const bool refreshScenes = liveNow >= m_nextLiveRefresh;
+        if (refreshScenes)
+        {
+            m_nextLiveRefresh = liveNow + std::chrono::milliseconds(500);
+        }
+        const auto requestModel = [&](uuid::uuid16 id)
+        {
+            if (modelGenerations.contains(id) || m_automaticModelLoads.contains(id))
+            {
+                return;
+            }
+            auto work = own::make_shared<AutomaticModelLoad>();
+            work->job = ce::get_job_scheduler().submit([id, work]
+            {
+                try
+                {
+                    // Invalidation retires the cache entry, not the live scene owner.
+                    // Admit its replacement from the immutable model products off-thread.
+                    work->generation = DataSystems->LoadModelAssetGeneration(FileGuid(id));
+                }
+                catch (const std::exception& failure)
+                {
+                    Debug::PrintLog(spdlog::level::err, "Automatic model preparation retained prior references: " + std::string(failure.what()));
+                }
+            });
+            m_modelReloads.push_back(work->job);
+            m_automaticModelLoads.emplace(id, std::move(work));
+        };
+        if (refreshScenes || modelGenerations != m_liveModelGenerations)
+        {
+            for (auto* scene : SceneManagers->GetScenes())
+            {
+                if (!scene)
+                {
+                    continue;
+                }
+                for (const auto& entity : scene->m_Entities)
+                {
+                    if (!entity || entity->IsDestroyMark())
+                    {
+                        continue;
+                    }
+                    for (auto* animator : entity->GetComponents<Animator>())
+                    {
+                        if (animator->m_modelGeneration)
+                        {
+                            requestModel(animator->m_modelGeneration->Identity().modelId);
+                        }
+                        for (const auto& model : models)
+                        {
+                            if (animator->m_modelGeneration && model->Skeleton()
+                                && animator->m_Motion.m_guid == model->Identity().modelId
+                                && &*animator->m_modelGeneration != &*model)
+                            {
+                                const auto elapsed = animator->GetInstance().timeElapsed;
+                            animator->BindModelGeneration(model);
+                            animator->GetInstance().timeElapsed = elapsed;
+                            }
+                        }
+                    }
+                    for (auto* mesh : entity->GetComponents<MeshRenderer>())
+                    {
+                        const auto handle = mesh->GetModelMeshHandle();
+                        if (handle.IsValid() && handle.domain == assets::ModelMeshDomain::LegacyAggregate)
+                        {
+                            requestModel(handle.modelId);
+                        }
+                        for (const auto& model : models)
+                        {
+                            mesh->RefreshModelGeneration(model);
+                        }
+                    }
+                }
+            }
+            m_liveModelGenerations = std::move(modelGenerations);
+        }
+        // All scene mutation is owner-thread only, after asset publication and before frame sealing.
+        const auto catalog = DataSystems->GetCookedCatalog();
+        const auto revision = catalog ? catalog->ResolverRevision() : 0u;
+        if (revision != m_liveTextureRevision)
+        {
+            m_liveTextureRevision = revision;
+            m_liveTexturePending = true;
+            m_liveTextureRefresh.clear();
+        }
+        if (!m_liveTexturePending && !refreshScenes)
+        {
+            return;
+        }
+        std::map<std::uint64_t, own::shared_owner<const Texture>> owners;
+        std::map<Scene*, std::unordered_set<std::uint64_t>> sceneOwners;
+        Scene* collectingScene{};
+        const auto collect = [&](const own::shared_owner<const Texture>& texture)
+        {
+            if (texture)
+            {
+                owners.try_emplace(texture->m_assetId, texture);
+                sceneOwners[collectingScene].insert(texture->m_assetId);
+            }
+        };
+        for (auto* scene : SceneManagers->GetScenes())
+        {
+            collectingScene = scene;
+            if (!scene)
+            {
+                continue;
+            }
+            for (const auto& entity : scene->m_Entities)
+            {
+                if (!entity || entity->IsDestroyMark())
+                {
+                    continue;
+                }
+                for (auto* mesh : entity->GetComponents<MeshRenderer>())
+                {
+                    if (mesh->m_Material)
+                    {
+                        for (const auto& texture : mesh->m_Material->GetTextureOwners())
+                        {
+                            collect(texture.textureOwner);
+                        }
+                    }
+                }
+                for (auto* image : entity->GetComponents<ImageComponent>())
+                {
+                    for (const auto& texture : image->GetTextures())
+                    {
+                        collect(texture);
+                    }
+                }
+                for (auto* sprite : entity->GetComponents<SpriteRenderer>())
+                {
+                    collect(sprite->GetSprite());
+                }
+                for (auto* sheet : entity->GetComponents<SpriteSheetComponent>())
+                {
+                    collect(sheet->m_spriteSheetTexture);
+                }
+                for (auto* decal : entity->GetComponents<DecalComponent>())
+                {
+                    collect(decal->GetDecalTextureShared());
+                    collect(decal->GetNormalTextureShared());
+                    collect(decal->GetORMTextureShared());
+                }
+            }
+        }
+        bool pending = false;
+        for (const auto& [id, previous] : owners)
+        {
+            const auto origin = previous->GetAssetOrigin();
+            FileGuid guid = origin ? FileGuid(origin->resolved.entry.asset.key.assetId.value)
+                : DataSystems->GetFileGuid(previous->m_assetPath);
+            const AssetDepot::AssetLink<Texture> link{ { experiment::AssetId{ guid.m_guid }, {} } };
+            experiment::cooked::ResolvedAssetEntry resolved;
+            if (!catalog || !link.IsValid() || catalog->Find(link.ToReference(), resolved)
+                != experiment::cooked::AssetLookupStatus::Found)
+            {
+                continue;
+            }
+            if (origin && origin->resolved.blob.contentSha256 == resolved.blob.contentSha256)
+            {
+                continue;
+            }
+            auto& work = m_liveTextureRefresh[id];
+            if (!work.previous)
+            {
+                work.previous = previous;
+                work.resolverRevision = revision;
+                work.descriptor = DataSystems->RequestAsync<Texture>(link,
+                    origin ? origin->variant : AssetDepot::TextureAssetVariant{});
+            }
+            const auto descriptor = work.descriptor.Snapshot();
+            if (descriptor.status == AssetDepot::AssetRequestStatus::Pending)
+            {
+                pending = true;
+                continue;
+            }
+            if (descriptor.status == AssetDepot::AssetRequestStatus::Stale
+                || descriptor.status == AssetDepot::AssetRequestStatus::Cancelled)
+            {
+                work.descriptor = DataSystems->RequestAsync<Texture>(link,
+                    origin ? origin->variant : AssetDepot::TextureAssetVariant{});
+                pending = true;
+                continue;
+            }
+            if (descriptor.status == AssetDepot::AssetRequestStatus::Failed)
+            {
+                Debug::PrintLog(spdlog::level::err, "Automatic texture reload retained prior references: " + descriptor.message);
+                continue;
+            }
+            const auto replacement = DataSystems->TryAcquire<Texture>(link,
+                origin ? origin->variant : AssetDepot::TextureAssetVariant{});
+            if (!replacement)
+            {
+                continue;
+            }
+            if (!work.imageRequested)
+            {
+                work.image = DataSystems->RequestAsync<Texture::CodecImage>(replacement);
+                work.imageRequested = true;
+            }
+            const auto image = DataSystems->TryAcquire<Texture::CodecImage>(replacement);
+            if (!image)
+            {
+                const auto status = work.image.Snapshot().status;
+                if (status == AssetDepot::AssetRequestStatus::Stale || status == AssetDepot::AssetRequestStatus::Cancelled)
+                {
+                    work.image = DataSystems->RequestAsync<Texture::CodecImage>(replacement);
+                    pending = true;
+                }
+                else
+                {
+                    pending = status == AssetDepot::AssetRequestStatus::Pending || pending;
+                }
+                continue;
+            }
+            for (auto* scene : SceneManagers->GetScenes())
+            {
+                if (!scene)
+                {
+                    continue;
+                }
+                if (!sceneOwners[scene].contains(id))
+                {
+                    continue;
+                }
+                // Copy the scene's pin table; already sealed packets retain the prior table.
+                auto pins = own::make_shared<TextureFramePins>();
+                if (const auto oldPins = scene->PreparedTextureImagePins())
+                {
+                    for (const auto& owner : oldPins->Owners())
+                    {
+                        if (&*owner != &*previous)
+                        {
+                            pins->Retain(owner);
+                            pins->RetainImage(owner, oldPins->Image(&*owner));
+                        }
+                    }
+                }
+                pins->RetainImage(replacement, image);
+                scene->SetPreparedTextureImagePins(std::move(pins));
+                for (const auto& entity : scene->m_Entities)
+                {
+                    if (!entity || entity->IsDestroyMark())
+                    {
+                        continue;
+                    }
+                    for (auto* mesh : entity->GetComponents<MeshRenderer>())
+                    {
+                        if (mesh->m_Material)
+                        {
+                            auto material = own::make_shared<Material>(*mesh->m_Material);
+                            std::string error;
+                            if (material->ReplaceTextureOwner(&*previous, replacement, error))
+                            {
+                                mesh->SetMaterial(std::move(material));
+                            }
+                        }
+                    }
+                    for (auto* component : entity->GetComponents<ImageComponent>())
+                    {
+                        component->ReplaceTextureOwner(&*previous, replacement);
+                    }
+                    for (auto* component : entity->GetComponents<SpriteRenderer>())
+                    {
+                        if (component->GetSprite() && &*component->GetSprite() == &*previous)
+                        {
+                            component->SetSprite(replacement);
+                        }
+                    }
+                    for (auto* component : entity->GetComponents<SpriteSheetComponent>())
+                    {
+                        component->ReplaceTextureOwner(&*previous, replacement);
+                    }
+                    for (auto* component : entity->GetComponents<DecalComponent>())
+                    {
+                        component->ReplaceTextureOwner(&*previous, replacement);
+                    }
+                }
+            }
+        }
+        m_liveTexturePending = pending;
+        if (!pending)
+        {
+            m_liveTextureRefresh.clear();
+        }
+    }
+
+	bool IsSupportExtension(std::string_view extension) const
+	{
+		return m_registeredFiles.contains(ce::strings::to_lower(std::string(extension)));
+	}
+
+	FileGuid CreateMeta(const std::filesystem::path& targetFile,
+		const FileGuid& preferredGuid = {})
+	{
+		std::lock_guard lock(m_authoringMutex);
+		return CreateMetaLocked(targetFile, preferredGuid);
+	}
+
+    struct TextureImportWork final
+    {
+        std::array<ModelSourceStamp, 2> stamps{};
+        own::shared_owner<std::atomic<std::uint64_t>> latestRevision{
+            own::make_shared<std::atomic<std::uint64_t>>(0u) };
+        job_handle completion{};
+        own::shared_owner<std::atomic<bool>> dispatchFailed{ own::make_shared<std::atomic<bool>>(false) };
+        own::shared_owner<RuntimeTexturePublication> publication{};
+        AssetDepot::AssetRequest<Texture> refreshRequest{};
+        std::uint64_t refreshRevision{};
+        std::string failure{};
+        bool cooking{};
+    };
+
+    bool SetTextureImportSettingsAndReimport(const std::filesystem::path& requestedSource,
+        const experiment::cooked::TextureImportSettings& settings, std::string& failure,
+        const std::string* expectedDisk = nullptr)
+    {
+        failure.clear();
+        if (!experiment::cooked::ValidateTextureImportSettings(settings, failure))
+        {
+            return false;
+        }
+        std::lock_guard lock(m_authoringMutex);
+        std::error_code error;
+        const auto source = std::filesystem::weakly_canonical(requestedSource, error);
+        if (m_stopping || error || !IsPathInside(source, std::filesystem::weakly_canonical(m_root))
+            || !EditorAssetDatabase::IsTextureSource(source) || !std::filesystem::is_regular_file(source, error) || error)
+        {
+            failure = "Choose a supported texture inside the project Assets directory";
+            return false;
+        }
+        const std::filesystem::path sidecar = source.string() + ".meta";
+        const auto canonicalSidecar = std::filesystem::weakly_canonical(sidecar, error);
+        if (error || !IsPathInside(canonicalSidecar, std::filesystem::weakly_canonical(m_root)))
+        {
+            failure = "Texture sidecar escapes the project Assets directory";
+            return false;
+        }
+        auto document = Authoring::WriteDocument::ParseFile(sidecar, &failure);
+        if (!document)
+        {
+            if (failure.empty())
+            {
+                failure = "Could not read texture sidecar";
+            }
+            return false;
+        }
+        const auto root = document->Root().Read();
+        if (!root.IsMap())
+        {
+            failure = "Texture sidecar must contain a mapping";
+            return false;
+        }
+        auto identity = root["assetId"];
+        if (!identity || !identity.IsScalar())
+        {
+            identity = root["guid"];
+        }
+        uuid::uuid16 parsedIdentity;
+        if (!identity || !identity.IsScalar() || !uuid::try_parse(identity.AsString(), parsedIdentity)
+            || !FileGuid(parsedIdentity).IsRandomV4())
+        {
+            failure = "Texture sidecar must have a valid canonical UUIDv4 identity";
+            return false;
+        }
+        EditorAssetDatabase::WriteTextureImportSettings(document->Root(), settings);
+        const auto text = document->Dump();
+        if (!WriteBinaryFileLocked(sidecar, std::as_bytes(std::span(text.data(), text.size())),
+            PublishEncoding::Text, expectedDisk, &failure))
+        {
+            if (failure.empty())
+            {
+                failure = "Could not publish texture import settings";
+            }
+            return false;
+        }
+        return QueueTextureReimportLocked(source, failure, true);
+    }
+
+    std::string TextureImportStatus(const std::filesystem::path& source)
+    {
+        std::lock_guard lock(m_authoringMutex);
+        const auto key = source.lexically_normal();
+        const auto found = m_textureImports.find(key);
+        if (found == m_textureImports.end())
+        {
+            return "Save and Reimport creates a cooked texture generation";
+        }
+        auto& work = found->second;
+        if (work.dispatchFailed->load(std::memory_order_acquire))
+        {
+            return "Texture import scheduler job failed; save and reimport to retry";
+        }
+        if (!work.failure.empty())
+        {
+            return "Import failed; previous generation retained: " + work.failure;
+        }
+        if (work.cooking)
+        {
+            return "Cooking texture in the background...";
+        }
+        if (!work.publication)
+        {
+            return "Texture has no accepted cooked generation";
+        }
+        const auto state = work.publication->state.load(std::memory_order_acquire);
+        if (state == RuntimeTexturePublication::State::Queued)
+        {
+            return "Cook complete; waiting for frame-boundary publication...";
+        }
+        if (state == RuntimeTexturePublication::State::Failed)
+        {
+            return "Texture generation publication failed; see the editor log";
+        }
+        if (state == RuntimeTexturePublication::State::Superseded)
+        {
+            return "A newer import superseded this generation";
+        }
+        const auto request = work.publication->request.Snapshot();
+        if (request.status == AssetDepot::AssetRequestStatus::Pending)
+        {
+            return "Cooked generation published; preparing the texture...";
+        }
+        if (request.status == AssetDepot::AssetRequestStatus::Ready
+            || request.status == AssetDepot::AssetRequestStatus::Stale
+            || request.status == AssetDepot::AssetRequestStatus::Cancelled)
+        {
+            const AssetDepot::AssetLink<Texture> link{ work.publication->manifest.entries.front().asset.key };
+            if (DataSystems->TryAcquire<Texture>(link))
+            {
+                return "Cooked generation ready. Existing scene references update automatically when image preparation completes.";
+            }
+            // Other asset publications can advance the shared resolver while
+            // this preload runs. Reacquire through the existing nonblocking API.
+            const auto catalog = DataSystems->GetCookedCatalog();
+            const auto resolverRevision = catalog ? catalog->ResolverRevision() : 0u;
+            auto refresh = work.refreshRequest.Snapshot();
+            if (work.refreshRevision == 0u || work.refreshRevision != resolverRevision
+                || refresh.status == AssetDepot::AssetRequestStatus::Stale
+                || refresh.status == AssetDepot::AssetRequestStatus::Cancelled)
+            {
+                work.refreshRequest = DataSystems->RequestAsync<Texture>(link);
+                work.refreshRevision = resolverRevision;
+                refresh = work.refreshRequest.Snapshot();
+            }
+            if (refresh.status == AssetDepot::AssetRequestStatus::Failed)
+            {
+                return "Cooked texture preparation failed: " + refresh.message;
+            }
+            return "Preparing the texture against the current asset generation...";
+        }
+        return "Cooked texture preparation failed: " + request.message;
+    }
+
+    bool HasPendingTexturePublications()
+    {
+        std::lock_guard lock(m_authoringMutex);
+        for (const auto& [path, work] : m_textureImports)
+        {
+            // Failed dispatch/imports are terminal and must not hold admission.
+            if (work.dispatchFailed->load(std::memory_order_acquire) || !work.failure.empty()) continue;
+            if (work.cooking || (work.publication && work.publication->state.load(
+                std::memory_order_acquire) == RuntimeTexturePublication::State::Queued)) return true;
+        }
+        return false;
+    }
+
+    bool TextureImportReady(const std::filesystem::path& source)
+    {
+        std::lock_guard lock(m_authoringMutex);
+        const auto found = m_textureImports.find(source.lexically_normal());
+        if (found == m_textureImports.end() || found->second.cooking || !found->second.failure.empty()
+            || found->second.dispatchFailed->load(std::memory_order_acquire) || !found->second.publication)
+        {
+            return false;
+        }
+        const auto& publication = found->second.publication;
+        return publication->state.load(std::memory_order_acquire) == RuntimeTexturePublication::State::Loading
+            && bool(DataSystems->TryAcquire<Texture>(AssetDepot::AssetLink<Texture>{
+                publication->manifest.entries.front().asset.key }));
+    }
+
+    bool QueueTextureReimportLocked(const std::filesystem::path& source, std::string& failure, bool force = false)
+    {
+        if (m_stopping)
+        {
+            failure = "Editor authoring is stopping";
+            return false;
+        }
+        const auto key = source.lexically_normal();
+        const std::array stamps{ ReadModelSourceStamp(source),
+            ReadModelSourceStamp(source.string() + ".meta") };
+        if (!stamps[0].present || !stamps[1].present)
+        {
+            failure = "Texture source or sidecar is missing";
+            return false;
+        }
+        auto& work = m_textureImports[key];
+        if (!force && !work.dispatchFailed->load(std::memory_order_acquire)
+            && work.stamps == stamps && (work.cooking || work.publication))
+        {
+            return true;
+        }
+        work.stamps = stamps;
+        work.failure.clear();
+        work.cooking = true;
+        work.dispatchFailed = own::make_shared<std::atomic<bool>>(false);
+        const auto revision = work.latestRevision->fetch_add(1u, std::memory_order_acq_rel) + 1u;
+        const auto self = shared_from_this();
+        job_group jobs;
+        jobs.add([self, key, stamps, revision]
+        {
+            self->CookTextureGeneration(key, stamps, revision);
+        });
+        // Every accepted scheduler path, including dispatch failure, terminates
+        // the status. A stale job cannot clear a newer request's pending state.
+        jobs.on_complete([failed = work.dispatchFailed](std::exception_ptr error)
+        {
+            // Submission failure can invoke this inline under the authoring
+            // lock. The terminal signal must never re-enter that lock.
+            failed->store(bool(error), std::memory_order_release);
+        });
+        try
+        {
+            const std::array dependencies{ m_textureCookTail };
+            const auto preceding = m_textureCookTail.valid() && !m_textureCookTail.is_complete()
+                ? std::span<const job_handle>(dependencies) : std::span<const job_handle>{};
+            work.completion = ce::get_job_scheduler().submit_after(preceding, std::move(jobs));
+            m_textureCookTail = work.completion;
+            return true;
+        }
+        catch (const std::exception& exception)
+        {
+            work.cooking = false;
+            work.failure = exception.what();
+            failure = work.failure;
+            return false;
+        }
+    }
+
+    // One immutable cooked texture generation on disk, named by its content key.
+    struct TextureGenerationRecord
+    {
+        experiment::AssetId textureAssetId{};
+        std::string artifactPath;
+        std::uint64_t byteSize{};
+        ce::hash::sha256_digest contentSha256{};
+        std::uint32_t formatVersion{};
+    };
+    static constexpr std::string_view kTextureGenerationRecord = "generation.record";
+    static constexpr std::string_view kTextureGenerationMagic = "ce.texture.generation.v1";
+
+    // Key: texture identity, source bytes, import recipe and artifact format. The
+    // sidecar timestamp is not part of it, so a checkout or touch reuses the cook.
+    bool TextureGenerationKey(const std::filesystem::path& source, std::string& key, std::string& failure)
+    {
+        namespace cooked = experiment::cooked;
+        const std::filesystem::path sidecar = source.string() + ".meta";
+        std::ifstream metaStream(sidecar, std::ios::binary);
+        const std::string metaText{ std::istreambuf_iterator<char>(metaStream), {} };
+        const FileGuid guid = LoadGuidFromMeta(sidecar);
+        cooked::TextureImportSettings settings;
+        if (!metaStream || guid == FileGuid{} || !cooked::ParseTextureImportSettings(metaText, settings, failure))
+        {
+            if (failure.empty()) failure = "Texture sidecar is missing or has no identity";
+            return false;
+        }
+        std::ifstream sourceStream(source, std::ios::binary);
+        if (!sourceStream)
+        {
+            failure = "Texture source cannot be read";
+            return false;
+        }
+        TextureGenerationHash hash;
+        const auto add = [&](std::string_view text)
+        {
+            const std::uint64_t size = text.size();
+            hash.Update(&size, sizeof(size));
+            hash.Update(text.data(), text.size());
+        };
+        add(kTextureGenerationMagic);
+        add(guid.ToString());
+        add(cooked::TextureImportRecipe(settings));
+        add(std::to_string(cooked::kTextureArtifactVersion) + "/" +
+            std::to_string(cooked::kCookedTextureRepresentationVersion));
+        std::array<char, 65536> chunk;
+        while (sourceStream)
+        {
+            sourceStream.read(chunk.data(), chunk.size());
+            hash.Update(chunk.data(), static_cast<std::size_t>(sourceStream.gcount()));
+        }
+        if (!sourceStream.eof())
+        {
+            failure = "Texture source read failed";
+            return false;
+        }
+        // Half the digest keeps the generation path short (Windows path limits).
+        ce::hash::sha256_digest digest;
+        if (!hash.Finish(digest, failure)) return false;
+        key = ce::hash::to_hex(digest).substr(0, 32);
+        return true;
+    }
+
+    static bool WriteTextureGenerationRecord(const std::filesystem::path& generation, const TextureGenerationRecord& record)
+    {
+        std::ofstream output(generation / kTextureGenerationRecord, std::ios::binary | std::ios::trunc);
+        output << kTextureGenerationMagic << '\n'
+               << FileGuid(record.textureAssetId.value).ToString() << '\n'
+               << record.artifactPath << '\n'
+               << record.byteSize << '\n'
+               << ce::hash::to_hex(record.contentSha256) << '\n'
+               << record.formatVersion << '\n';
+        output.close();
+        return !output.fail();
+    }
+
+    // A record is accepted only if its artifact exists with the recorded size and
+    // content hash; anything else is cooked again.
+    static bool ReadTextureGenerationRecord(const std::filesystem::path& generation, TextureGenerationRecord& record)
+    {
+        std::ifstream input(generation / kTextureGenerationRecord, std::ios::binary);
+        std::string magic, guid, path, size, digest, format;
+        if (!input || !std::getline(input, magic) || magic != kTextureGenerationMagic
+            || !std::getline(input, guid) || !std::getline(input, path) || !std::getline(input, size)
+            || !std::getline(input, digest) || !std::getline(input, format) || path.empty())
+        {
+            return false;
+        }
+        TextureGenerationRecord candidate;
+        FileGuid parsed;
+        if (!uuid::try_parse(guid, parsed.m_guid))
+        {
+            return false;
+        }
+        candidate.textureAssetId.value = parsed.m_guid;
+        candidate.artifactPath = path;
+        const auto parseNumber = [](const std::string& text, auto& value)
+        {
+            const auto end = text.data() + text.size();
+            return std::from_chars(text.data(), end, value).ptr == end && !text.empty();
+        };
+        if (!parseNumber(size, candidate.byteSize) || !parseNumber(format, candidate.formatVersion))
+        {
+            return false;
+        }
+        std::ifstream artifact(generation / path, std::ios::binary);
+        if (!artifact)
+        {
+            return false;
+        }
+        TextureGenerationHash hash;
+        std::uint64_t read = 0;
+        std::array<char, 65536> chunk;
+        while (artifact)
+        {
+            artifact.read(chunk.data(), chunk.size());
+            const auto count = static_cast<std::size_t>(artifact.gcount());
+            hash.Update(chunk.data(), count);
+            read += count;
+        }
+        std::string hashFailure;
+        if (!hash.Finish(candidate.contentSha256, hashFailure)) return false;
+        if (!artifact.eof() || read != candidate.byteSize || ce::hash::to_hex(candidate.contentSha256) != digest)
+        {
+            return false;
+        }
+        record = std::move(candidate);
+        return true;
+    }
+
+    // Before this process publishes anything: random-GUID generations from the
+    // previous per-start cooking and abandoned staging trees can never be reused.
+    void PruneUnusableTextureGenerations()
+    {
+        const auto generations = m_root.parent_path() / "Library" / "TextureAssetGenerations";
+        std::error_code error;
+        if (!std::filesystem::is_directory(generations, error))
+        {
+            return;
+        }
+        std::size_t removed = 0;
+        for (const auto& entry : std::filesystem::directory_iterator(generations, error))
+        {
+            const std::string name = entry.path().filename().string();
+            FileGuid legacy;
+            const bool legacyName = name.size() == 36 && uuid::try_parse(name, legacy.m_guid);
+            if (!legacyName && !name.starts_with("stage-"))
+            {
+                continue;
+            }
+            std::error_code ignored;
+            if (std::filesystem::remove_all(entry.path(), ignored) > 0 && !ignored)
+            {
+                ++removed;
+            }
+        }
+        if (removed)
+        {
+            Debug::PrintLog(spdlog::level::info, "Removed " + std::to_string(removed)
+                + " unusable texture generation directories");
+        }
+    }
+
+    void CookTextureGeneration(const std::filesystem::path& source,
+        const std::array<ModelSourceStamp, 2>& stamps, std::uint64_t revision)
+    {
+        const auto timingStart = std::chrono::steady_clock::now();
+        auto keyFinished = timingStart, recordFinished = timingStart;
+        bool reusedGeneration = false;
+        namespace cooked = experiment::cooked;
+        {
+            std::lock_guard lock(m_authoringMutex);
+            const auto& work = m_textureImports.at(source);
+            if (m_stopping || work.latestRevision->load(std::memory_order_acquire) != revision)
+            {
+                return;
+            }
+        }
+        std::string failure;
+        ScopedPathCleanup generationCleanup;
+        own::shared_owner<RuntimeTexturePublication> publication;
+        experiment::AssetId textureAssetId{};
+        // Content-addressed generations: identical source bytes, import recipe and
+        // artifact format reuse one immutable directory instead of decoding and
+        // writing a new random generation on every Editor start.
+        const auto generations = m_root.parent_path() / "Library" / "TextureAssetGenerations";
+        std::string key;
+        TextureGenerationRecord record;
+        if (const auto keyed = TextureGenerationKey(source, key, failure); keyed)
+        {
+            keyFinished = std::chrono::steady_clock::now();
+            reusedGeneration = ReadTextureGenerationRecord(generations / key, record);
+            recordFinished = std::chrono::steady_clock::now();
+            if (!reusedGeneration)
+            {
+                auto result = cooked::BuildTextureCookProduct({ source, m_root });
+                if (!result.Succeeded())
+                {
+                    for (const auto& issue : result.issues)
+                    {
+                        failure += (failure.empty() ? "" : "; ") + issue.context + ": " + issue.message;
+                    }
+                }
+                else
+                {
+                    const auto& product = *result.product;
+                    record = { product.textureAssetId, product.artifactPath, product.artifactBytes.size(),
+                        product.manifestEntry.contentSha256, product.manifestEntry.formatVersion };
+                    // Write a private staging tree, then publish it under the key in
+                    // one rename. A concurrent identical cook that wins keeps its tree.
+                    // A short name: artifactPath already repeats the texture GUID and
+                    // a 36-character generation name was the previous length budget.
+                    const auto staging = generations /
+                        ("stage-" + FileGuid::CreateRandomV4().ToString().substr(0, 8));
+                    generationCleanup.target = staging;
+                    std::error_code renameError;
+                    if (!WriteBinaryFileLocked(staging / product.artifactPath, product.artifactBytes)
+                        || !WriteTextureGenerationRecord(staging, record))
+                    {
+                        failure = "Could not write the immutable texture artifact";
+                    }
+                    else
+                    {
+                        // Serialize publication and recovery between this Editor's
+                        // cooks. Never remove a valid generation that won the race.
+                        static std::mutex publicationMutex;
+                        std::lock_guard publicationLock(publicationMutex);
+                        std::filesystem::rename(staging, generations / key, renameError);
+                        if (!renameError)
+                        {
+                            generationCleanup.Release();
+                        }
+                        else if (!ReadTextureGenerationRecord(generations / key, record))
+                        {
+                            // A corrupt existing directory cannot be overwritten by
+                            // rename. Move it aside only after the replacement is
+                            // complete, and restore it if publication fails.
+                            const auto damaged = generations /
+                                ("stage-" + FileGuid::CreateRandomV4().ToString().substr(0, 8));
+                            std::error_code repairError;
+                            std::filesystem::rename(generations / key, damaged, repairError);
+                            if (!repairError)
+                            {
+                                std::filesystem::rename(staging, generations / key, repairError);
+                                if (!repairError)
+                                {
+                                    generationCleanup.Release();
+                                    ScopedPathCleanup damagedCleanup;
+                                    damagedCleanup.target = damaged;
+                                }
+                                else
+                                {
+                                    std::error_code restoreError;
+                                    std::filesystem::rename(damaged, generations / key, restoreError);
+                                    failure = "Could not replace the damaged texture generation: "
+                                        + repairError.message();
+                                    if (restoreError)
+                                        failure += "; damaged generation retained at " + damaged.string()
+                                            + ": " + restoreError.message();
+                                }
+                            }
+                            else
+                            {
+                                failure = "Could not quarantine the damaged texture generation: "
+                                    + repairError.message();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        if (failure.empty())
+        {
+            const auto generation = generations / key;
+            textureAssetId = record.textureAssetId;
+            publication = own::make_shared<RuntimeTexturePublication>();
+            auto& manifest = publication->manifest;
+            manifest.assetSetId = record.textureAssetId;
+            manifest.revision = revision;
+            manifest.targetPlatform = "win-x64";
+            manifest.targetAbi = ce::content_abi::token;
+            const cooked::TypedAssetReference reference{ { record.textureAssetId, {} }, cooked::CookedAssetKind::Texture };
+            manifest.entries.push_back({ reference, 0u, {} });
+            manifest.roots.push_back(reference);
+            cooked::AssetBlobRecord blob;
+            blob.contentSha256 = record.contentSha256;
+            blob.byteSize = record.byteSize;
+            blob.kind = cooked::CookedAssetKind::Texture;
+            blob.representation = cooked::kCookedTextureRepresentationVersion;
+            blob.schemaVersion = record.formatVersion;
+            blob.targetPlatform = manifest.targetPlatform;
+            blob.targetAbi = manifest.targetAbi;
+            blob.artifactPath = record.artifactPath;
+            manifest.blobs.push_back(std::move(blob));
+            auto written = cooked::WriteAssetSetManifest(manifest);
+            if (!written.Succeeded())
+            {
+                failure = "Texture generation manifest validation failed";
+                publication.reset();
+            }
+            else
+            {
+                publication->manifestBytes = std::move(written.bytes);
+                publication->byteSource = own::make_shared<const cooked::LooseArtifactByteSource>(generation);
+                if (!cooked::CaptureArtifactSource(publication->byteSource, record.artifactPath, failure))
+                {
+                    publication.reset();
+                }
+            }
+        }
+        if (std::getenv("CE_TRACE_TEXTURE_STARTUP"))
+        {
+            const auto end = std::chrono::steady_clock::now();
+            const auto ms = [](auto from, auto to) { return std::chrono::duration<double, std::milli>(to - from).count(); };
+            std::printf("[texture.startup] path=%s reused=%d bytes=%llu keyMs=%.3f recordMs=%.3f publishPrepareMs=%.3f totalMs=%.3f\n",
+                source.string().c_str(), int(reusedGeneration), static_cast<unsigned long long>(record.byteSize),
+                ms(timingStart, keyFinished), ms(keyFinished, recordFinished), ms(recordFinished, end), ms(timingStart, end));
+        }
+        const std::array after{ ReadModelSourceStamp(source),
+            ReadModelSourceStamp(source.string() + ".meta") };
+        {
+            std::lock_guard lock(m_authoringMutex);
+            auto& work = m_textureImports.at(source);
+            const bool current = !m_stopping
+                && work.latestRevision->load(std::memory_order_acquire) == revision;
+            if (current && failure.empty() && after == stamps && publication)
+            {
+                publication->latestRevision = work.latestRevision;
+                publication->revision = revision;
+                DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+                    RuntimeAssetType::Texture, FileGuid(textureAssetId.value), source, publication });
+                generationCleanup.Release();
+                work.publication = publication;
+                work.refreshRequest = {};
+                work.refreshRevision = 0u;
+                work.cooking = false;
+                return;
+            }
+            if (current)
+            {
+                work.cooking = false;
+                work.failure = failure.empty() ? "Source changed during import; save or reimport again" : failure;
+                Debug::PrintLog(spdlog::level::err, "Texture import failed: " + source.string() + ": " + work.failure);
+            }
+        }
+        // Release the pinned byte source before removing an unpublished tree.
+        publication.reset();
+    }
+
+    void InvalidateTextureImportLocked(const std::filesystem::path& source)
+    {
+        if (const auto found = m_textureImports.find(source.lexically_normal()); found != m_textureImports.end())
+        {
+            found->second.latestRevision->fetch_add(1u, std::memory_order_release);
+            found->second.stamps = {};
+            found->second.cooking = false;
+            found->second.publication.reset();
+            found->second.refreshRequest = {};
+            found->second.refreshRevision = 0u;
+        }
+    }
+
+    void ReloadChangedTexture(const std::filesystem::path& source, bool force = false)
+    {
+        std::lock_guard lock(m_authoringMutex);
+        std::string failure;
+        if (!QueueTextureReimportLocked(source, failure, force))
+        {
+            Debug::PrintLog(spdlog::level::err, "Cannot schedule texture import: " + failure);
+        }
+    }
+
+	bool ReimportModel(const std::filesystem::path& requestedSource)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		std::error_code error;
+		const std::filesystem::path source = std::filesystem::weakly_canonical(requestedSource, error);
+		if (error || !IsPathInside(source, std::filesystem::weakly_canonical(m_root))
+			|| !assets::IsModelAuthoringSource(source)) return false;
+		const FileGuid existing = LoadGuidFromMeta(std::filesystem::path(source.string() + ".meta"));
+		if (!assets::IsUuidV8(existing.m_guid) || CreateMetaLocked(source, {}, existing) != existing)
+			return false;
+		m_failedModelRecovery.erase(source);
+		DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+			RuntimeAssetType::Model, existing, source });
+		return true;
+	}
+
+	bool SetModelMeshletsAndReimport(const std::filesystem::path& requestedSource, bool enabled)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		std::error_code error;
+		const std::filesystem::path source = std::filesystem::weakly_canonical(requestedSource, error);
+		if (error || !IsPathInside(source, std::filesystem::weakly_canonical(m_root))
+			|| !assets::IsModelAuthoringSource(source))
+		{
+			return false;
+		}
+		std::filesystem::path sidecar = source;
+		sidecar += ".meta";
+		const FileGuid existing = LoadGuidFromMeta(sidecar);
+		if (!assets::IsUuidV8(existing.m_guid))
+		{
+			return false;
+		}
+		if (CreateMetaLocked(source, {}, existing, enabled) != existing)
+        {
+            return false;
+        }
+        DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+            RuntimeAssetType::Model, existing, source });
+        m_modelRefreshEpoch.fetch_add(1u, std::memory_order_release);
+        return true;
+	}
+
+	bool SetModelLodsAndReimport(const std::filesystem::path& requestedSource, std::uint32_t levels)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		std::error_code error;
+		const std::filesystem::path source = std::filesystem::weakly_canonical(requestedSource, error);
+		if (error || levels > 7u || !IsPathInside(source, std::filesystem::weakly_canonical(m_root))
+			|| !assets::IsModelAuthoringSource(source))
+		{
+			return false;
+		}
+		std::filesystem::path sidecar = source;
+		sidecar += ".meta";
+		const FileGuid existing = LoadGuidFromMeta(sidecar);
+		if (!assets::IsUuidV8(existing.m_guid))
+		{
+			return false;
+		}
+		if (CreateMetaLocked(source, {}, existing, {}, levels) != existing)
+        {
+            return false;
+        }
+        DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+            RuntimeAssetType::Model, existing, source });
+        m_modelRefreshEpoch.fetch_add(1u, std::memory_order_release);
+        return true;
+	}
+
+	bool RecoverModel(const std::filesystem::path& requestedSource, FileGuid expectedId)
+	{
+		// This mutex also serializes explicit imports and watcher authoring. A
+		// concurrent failing load rechecks the winner's result before rebuilding.
+		std::lock_guard lock(m_authoringMutex);
+		std::error_code error;
+		const std::filesystem::path source = std::filesystem::weakly_canonical(requestedSource, error);
+		if (error || !IsPathInside(source, std::filesystem::weakly_canonical(m_root))
+			|| !assets::IsModelAuthoringSource(source) || !ReadModelSourceStamp(source).present
+			|| !assets::IsUuidV8(expectedId.m_guid))
+		{
+			++m_modelRecoveryStats.declined;
+			return false;
+		}
+		const std::filesystem::path meta = source.string() + ".meta";
+		const std::filesystem::path headerPath = m_root.parent_path() / "ProjectSetting/AssetIdentity.asset";
+		assets::IdentityEpochHeader header;
+		assets::ModelSidecarV2 sidecar;
+		std::vector<assets::EpochHeaderIssue> headerIssues;
+		std::vector<assets::SidecarIssue> sidecarIssues;
+		if (!assets::ReadIdentityEpochHeader(ReadModelRecoveryText(headerPath), header, headerIssues)
+			|| !assets::ReadModelSidecarV2(ReadModelRecoveryText(meta), sidecar, sidecarIssues)
+			|| sidecar.assetId != expectedId.m_guid
+			|| !assets::ValidateModelSidecarV2Closure(sidecar, header, sidecarIssues))
+		{
+			// Missing/corrupt identity is not a license to allocate a different ID.
+			++m_modelRecoveryStats.declined;
+			return false;
+		}
+		assets::ModelAssetGenerationLoadRequest load;
+		load.identityHeaderPath = headerPath;
+		load.generationRoot = m_root.parent_path() / "Library/ModelAssetGenerations";
+		load.canonicalSidecarPath = meta;
+		load.expectedModelId = expectedId.m_guid;
+        const auto current = assets::LoadModelAssetGeneration(load);
+        if (current.Succeeded() && assets::ModelMaterialGraphsPresent(m_root, *current.generation)) return true;
+
+		const auto inputs = std::array{ ReadModelSourceStamp(source),
+			ReadModelSourceStamp(meta), ReadModelSourceStamp(headerPath) };
+		if (const auto failed = m_failedModelRecovery.find(source);
+			failed != m_failedModelRecovery.end() && failed->second == inputs)
+		{
+			++m_modelRecoveryStats.suppressed;
+			return false;
+		}
+		m_failedModelRecovery[source] = inputs;
+		++m_modelRecoveryStats.attempts;
+		Debug::PrintLog(spdlog::level::info, "[model.recovery] rebuilding derived data: " + source.string());
+		// Rebuild in place; ImportSourceAsset may copy external sources to a new
+		// destination and must not be used to repair an existing model identity.
+		const FileGuid rebuilt = CreateMetaLocked(source, {}, expectedId);
+		if (rebuilt != expectedId || !assets::LoadModelAssetGeneration(load).Succeeded())
+		{
+			m_failedModelRecovery[source] = { ReadModelSourceStamp(source),
+				ReadModelSourceStamp(meta), ReadModelSourceStamp(headerPath) };
+			Debug::PrintLog(spdlog::level::err, "[model.recovery] failed; automatic retry waits for input change: " + source.string());
+			return false;
+		}
+		m_failedModelRecovery.erase(source);
+		++m_modelRecoveryStats.succeeded;
+		Debug::PrintLog(spdlog::level::info, "[model.recovery] repaired: " + source.string());
+		return true;
+	}
+
+	ModelRecoveryStats GetModelRecoveryStats()
+	{
+		std::lock_guard lock(m_authoringMutex);
+		return m_modelRecoveryStats;
+	}
+
+	FileGuid WriteTextAssetWithMeta(const std::filesystem::path& requestedDestination,
+		std::string_view payload, const FileGuid& preferredGuid)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		std::error_code error;
+		const std::filesystem::path destination =
+			std::filesystem::absolute(requestedDestination, error).lexically_normal();
+		if (error) return {};
+		error.clear();
+		const std::filesystem::path root = std::filesystem::absolute(m_root, error).lexically_normal();
+		if (error || payload.empty() || !preferredGuid.IsRandomV4()
+			|| !IsPathInside(destination, root) || !IsTargetFile(destination)
+			|| !IsSafeAssetName(destination.filename().wstring()))
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor cataloged text publication rejected: "
+				+ requestedDestination.string());
+			return {};
+		}
+
+        const auto catalogGuid = DataSystems->GetFileGuid(destination);
+        const auto identityPath = DataSystems->GetFilePath(preferredGuid);
+        const auto metaPath = std::filesystem::path(destination.string() + ".meta");
+        if ((catalogGuid != FileGuid{} && catalogGuid != preferredGuid) ||
+            (!identityPath.empty() && std::filesystem::absolute(identityPath).lexically_normal() != destination) ||
+            (std::filesystem::exists(metaPath) && LoadGuidFromMeta(metaPath) != preferredGuid) ||
+            (std::filesystem::exists(destination) && catalogGuid == FileGuid{} && !std::filesystem::exists(metaPath)))
+        {
+            Debug::PrintLog(spdlog::level::err, "Editor text save would replace a different asset identity: " +
+                destination.string());
+            return {};
+        }
+
+		const std::span<const std::byte> bytes{
+			reinterpret_cast<const std::byte*>(payload.data()), payload.size() };
+		if (!WriteBinaryFileLocked(destination, bytes, PublishEncoding::Text))
+			return {};
+		return CreateMetaLocked(destination, preferredGuid);
+	}
+
+    bool SaveMaterialGraph(own::shared_owner<Material> preparedMaterial,
+                           const own::shared_owner<const Material>& expectedMaterial,
+                           const LX::LXMaterialAsset& graph, const std::filesystem::path& requestedGraphPath, FileGuid graphGuid,
+                           EditorAssetDatabase::MaterialGraphSaveResult& result, std::string& error)
+    {
+        std::lock_guard lock(m_authoringMutex);
+        result = {};
+        error.clear();
+        if (!preparedMaterial)
+        {
+            error = "Save requires a completed material compilation.";
+            return false;
+        }
+        // 완료된 요청의 값을 고정한 뒤 파일과 런타임에 같은 후보를 전달한다.
+        auto candidate = own::make_shared<Material>(*preparedMaterial);
+        const auto& material = *candidate;
+        const auto accepted = DataSystems->FindCachedMaterial(material.m_fileGuid);
+        const auto& instance = material.GetMaterialGraphInstance();
+        if (!ce::paths::is_asset_authoring_enabled() || !instance ||
+            static_cast<bool>(accepted) != static_cast<bool>(expectedMaterial) ||
+            (accepted && std::addressof(*accepted) != std::addressof(*expectedMaterial)) ||
+            !material.m_fileGuid.IsRandomV4() || instance->description.graphId.value != graphGuid.m_guid ||
+            material.m_fileGuid == graphGuid || !instance->generation ||
+            instance->generation->assetId != instance->description.graphId)
+        {
+            error = "The prepared material or accepted asset changed. Compile the current draft before saving.";
+            return false;
+        }
+        std::string sourceKey;
+        if (!LX::ComputeMaterialSourceKey(graph, sourceKey, error))
+        {
+            return false;
+        }
+        if (instance->generation->authoringSourceKey.empty() ||
+            instance->generation->authoringEnvironmentKey.empty() ||
+            instance->generation->authoringSourceKey != sourceKey)
+        {
+            error = "The graph draft differs from the completed compilation. Compile it before saving.";
+            return false;
+        }
+        std::error_code pathError;
+        const auto graphPath = std::filesystem::absolute(requestedGraphPath, pathError).lexically_normal();
+        auto materialPath = DataSystems->GetFilePath(material.m_fileGuid);
+        if (materialPath.empty())
+        {
+            if (!IsSafeAssetName(std::filesystem::path(material.m_name).wstring()))
+            {
+                error = "Choose a valid material asset name.";
+                return false;
+            }
+            materialPath = m_root / "Materials" / (material.m_name + ".asset");
+        }
+        materialPath = std::filesystem::absolute(materialPath, pathError).lexically_normal();
+        const auto root = std::filesystem::absolute(m_root, pathError).lexically_normal();
+        if (pathError || !IsPathInside(graphPath, root) || !IsPathInside(materialPath, root) ||
+            ce::strings::to_lower(graphPath.extension().string()) != ".shadergraph" ||
+            ce::strings::to_lower(materialPath.extension().string()) != ".asset" || graphPath == materialPath)
+        {
+            error = "Save requires distinct material and shader graph paths inside project Assets.";
+            return false;
+        }
+        struct SavedFile
+        {
+            std::filesystem::path path;
+            std::string previous;
+            std::string next;
+            bool existed{};
+        };
+        std::vector<SavedFile> files;
+        Authoring::WriteDocument materialDocument;
+        Material serializedMaterial(material);
+        if (!DataSystems->SerializeMaterialPayload(serializedMaterial, materialDocument.Root()))
+        {
+            error = "The prepared material cannot be serialized.";
+            return false;
+        }
+        const auto prepare = [&](const std::filesystem::path& path, FileGuid guid, std::string payload) {
+            const auto catalogGuid = DataSystems->GetFileGuid(path);
+            const auto identityPath = DataSystems->GetFilePath(guid);
+            const auto metaPath = std::filesystem::path(path.string() + ".meta");
+            if ((catalogGuid != FileGuid{} && catalogGuid != guid) ||
+                (!identityPath.empty() && std::filesystem::absolute(identityPath).lexically_normal() != path) ||
+                (std::filesystem::exists(metaPath) && LoadGuidFromMeta(metaPath) != guid) ||
+                (std::filesystem::exists(path) && catalogGuid == FileGuid{} && !std::filesystem::exists(metaPath)) ||
+                (!std::filesystem::exists(metaPath) && !guid.IsRandomV4()))
+            {
+                error = "Save would overwrite an unrelated asset or change its identity: " + path.string();
+                return false;
+            }
+            Authoring::WriteDocument metadata;
+            if (std::filesystem::exists(metaPath))
+            {
+                auto existing = Authoring::WriteDocument::ParseFile(metaPath, &error);
+                if (!existing || !existing->Root().Read().IsMap())
+                {
+                    return false;
+                }
+                metadata = std::move(*existing);
+            }
+            metadata.Root().Child("guid").SetScalar(guid.ToString());
+            metadata.Root().Child("importSettings").Child("extension").SetScalar(path.extension().string());
+            if (path == graphPath)
+            {
+                // 저장된 키는 참고 정보다. 컴파일 재사용은 메모리의 검증된 증명을 사용한다.
+                auto source = metadata.Root().Child("materialGraph");
+                source.Child("sourceKeyVersion").SetScalar(LX::kMaterialSourceKeyVersion);
+                source.Child("sourceKey").SetScalar(sourceKey);
+            }
+            files.push_back({metaPath, {}, metadata.Dump(), false});
+            files.push_back({path, {}, std::move(payload), false});
+            return true;
+        };
+        if (!prepare(graphPath, graphGuid, LX::LXMaterialArchive::Write(graph)) ||
+            !prepare(materialPath, material.m_fileGuid, materialDocument.Dump()))
+        {
+            return false;
+        }
+        // Keep exact backups of both sources and both sidecars. This is a
+        // rollback-capable save, not an atomic multi-file filesystem commit.
+        for (auto& saved : files)
+        {
+            saved.existed = std::filesystem::exists(saved.path);
+            if (saved.existed)
+            {
+                std::ifstream input(saved.path, std::ios::binary);
+                saved.previous.assign(std::istreambuf_iterator<char>(input), {});
+                if (!input)
+                {
+                    error = "Cannot back up existing asset before saving: " + saved.path.string();
+                    return false;
+                }
+            }
+        }
+        // Allocate notification records before changing any file. Their prior
+        // fingerprints already cover a complete rollback even under allocation
+        // failure while updating the advisory watcher records afterward.
+        for (const auto& saved : files)
+        {
+            RememberMaterialAuthoringWrite(saved.path);
+        }
+        const auto write = [&](const std::filesystem::path& path, std::string_view payload) {
+            try
+            {
+                return WriteBinaryFileLocked(path,
+                    {reinterpret_cast<const std::byte*>(payload.data()), payload.size()}, PublishEncoding::Text);
+            }
+            catch (...)
+            {
+                return false;
+            }
+        };
+        const auto rememberFinal = [&]() noexcept {
+            for (const auto& saved : files)
+            {
+                try
+                {
+                    RememberMaterialAuthoringWrite(saved.path);
+                }
+                catch (...)
+                {
+                    // Failed rollback retains the initial fingerprint. Successful
+                    // saves also have exact-payload checks at the runtime boundary.
+                }
+            }
+        };
+        std::size_t attempted = 0;
+        const auto restore = [&]() noexcept {
+            bool restored = true;
+            while (attempted != 0)
+            {
+                const auto& saved = files[--attempted];
+                try
+                {
+                    if (saved.existed)
+                    {
+                        std::ifstream input(saved.path, std::ios::binary);
+                        const std::string current{std::istreambuf_iterator<char>(input),
+                                                  std::istreambuf_iterator<char>{}};
+                        const bool unchanged = input && current == saved.previous;
+                        input.close();
+                        restored = (unchanged || write(saved.path, saved.previous)) && restored;
+                    }
+                    else
+                    {
+                        std::error_code removeError;
+                        std::filesystem::remove(saved.path, removeError);
+                        restored = !removeError && restored;
+                    }
+                }
+                catch (...)
+                {
+                    restored = false;
+                }
+            }
+            rememberFinal();
+            return restored;
+        };
+        const auto failAndRestore = [&]() {
+            if (!restore())
+            {
+                error += " File rollback was incomplete. Inspect both asset files before retrying.";
+            }
+            return false;
+        };
+        try
+        {
+            while (attempted < files.size())
+            {
+                // 실패한 쓰기 자체도 원복한다. 쓰기 함수가 교체 후 실패했을 수 있다.
+                const auto& saved = files[attempted++];
+                if (!write(saved.path, saved.next))
+                {
+                    error = "Material/graph save failed; the accepted runtime material is unchanged.";
+                    return failAndRestore();
+                }
+            }
+            // 게시 경쟁이나 의존 머티리얼 검증 실패 시 카탈로그를 건드리기 전에 파일을 되돌린다.
+            if (!DataSystems->PublishMaterialAsset(candidate, expectedMaterial, error, &result.publishedMaterial))
+            {
+                return failAndRestore();
+            }
+        }
+        catch (const std::exception& exception)
+        {
+            // 메시지 할당도 실패할 수 있으므로 파일 복원을 먼저 마친다.
+            const bool restored = restore();
+            error = std::string("Material/graph save failed: ") + exception.what();
+            if (!restored)
+            {
+                error += " File rollback was incomplete. Inspect both asset files before retrying.";
+            }
+            return false;
+        }
+        catch (...)
+        {
+            const bool restored = restore();
+            error = restored ? "Material/graph save failed; the previous files were restored."
+                             : "Material/graph save failed and file rollback was incomplete. Inspect both assets.";
+            return false;
+        }
+        rememberFinal();
+        try
+        {
+            const bool registeredGraph = DataSystems->ApplyAssetChange({RuntimeAssetChangeKind::CatalogUpsert,
+                RuntimeAssetType::MaterialGraph, graphGuid, graphPath});
+            const bool registeredMaterial = DataSystems->ApplyAssetChange({RuntimeAssetChangeKind::CatalogUpsert,
+                RuntimeAssetType::Material, material.m_fileGuid, materialPath});
+            result.catalogRegistered = registeredGraph && registeredMaterial;
+            if (!result.catalogRegistered)
+            {
+                result.warning = "Saved and applied, but an asset catalog identity conflict prevented registration.";
+            }
+        }
+        catch (const std::exception& exception)
+        {
+            result.warning = "Saved and applied, but catalog registration failed: " + std::string(exception.what());
+        }
+        catch (...)
+        {
+            result.warning = "Saved and applied, but catalog registration failed.";
+        }
+        // 이 시점에는 파일과 런타임이 모두 같은 후보를 채택했다. 등록 경고로 성공을 되돌리지 않는다.
+        error.clear();
+        return true;
+    }
+
+	FileGuid RenameAsset(const std::filesystem::path& source, const std::filesystem::path& destination)
+	{
+		std::lock_guard lock(m_authoringMutex);
+
+		std::error_code error;
+		const std::filesystem::path sourcePath = std::filesystem::absolute(source, error).lexically_normal();
+		if (error) return {};
+		error.clear();
+		const std::filesystem::path destinationPath =
+			std::filesystem::absolute(destination, error).lexically_normal();
+		if (error) return {};
+		error.clear();
+		const std::filesystem::path rootPath = std::filesystem::absolute(m_root, error).lexically_normal();
+		if (error || !IsPathInside(sourcePath, rootPath)
+			|| !IsPathInside(destinationPath, rootPath)
+			|| sourcePath == destinationPath
+			|| !std::filesystem::is_regular_file(sourcePath, error) || error
+			|| std::filesystem::exists(destinationPath)
+			|| !IsTargetFile(sourcePath) || !IsTargetFile(destinationPath)
+			|| ce::strings::to_lower(sourcePath.extension().string())
+				!= ce::strings::to_lower(destinationPath.extension().string())
+			|| !std::filesystem::is_directory(destinationPath.parent_path()))
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset rename rejected: " + source.string()
+				+ " -> " + destination.string());
+			return {};
+		}
+
+		const std::filesystem::path sourceMeta = sourcePath.string() + ".meta";
+		const std::filesystem::path destinationMeta = destinationPath.string() + ".meta";
+		if (!std::filesystem::is_regular_file(sourceMeta, error) || error
+			|| std::filesystem::exists(destinationMeta))
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset rename requires exactly one source sidecar: "
+				+ sourceMeta.string());
+			return {};
+		}
+
+		const FileGuid guid = LoadGuidFromMeta(sourceMeta);
+		if (guid == FileGuid{})
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset rename rejected invalid source sidecar: "
+				+ sourceMeta.string());
+			return {};
+		}
+
+		// sidecar를 먼저 옮긴다. target을 먼저 옮기면 watcher가 그 짧은 틈에
+		// missing meta로 판단해 새 UUID를 발급할 수 있다.
+		error.clear();
+		std::filesystem::rename(sourceMeta, destinationMeta, error);
+		if (error)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset sidecar rename failed: " + error.message());
+			return {};
+		}
+
+		error.clear();
+		std::filesystem::rename(sourcePath, destinationPath, error);
+		if (error)
+		{
+			const std::string moveError = error.message();
+			std::error_code rollbackError;
+			std::filesystem::rename(destinationMeta, sourceMeta, rollbackError);
+			Debug::PrintLog(spdlog::level::err, "Editor asset rename failed: " + moveError
+				+ (rollbackError ? " (sidecar rollback failed: "
+					+ rollbackError.message() + ")" : ""));
+			return {};
+		}
+
+        if (EditorAssetDatabase::IsTextureSource(sourcePath))
+        {
+            InvalidateTextureImportLocked(sourcePath);
+            std::string failure;
+            if (!QueueTextureReimportLocked(destinationPath, failure))
+            {
+                Debug::PrintLog(spdlog::level::err, "Renamed texture import failed: " + failure);
+            }
+        }
+		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
+			RuntimeAssetType::Auto, guid, sourcePath });
+		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
+			RuntimeAssetType::Auto, guid, destinationPath });
+		return guid;
+	}
+
+	bool CreateCollisionGeometry(const std::filesystem::path& destination,
+        const ce::physics::CollisionGeometrySource& source)
+    {
+        std::lock_guard lock(m_authoringMutex);
+        ce::profile_scope publication{ce::marker<"Physics.GeometryAuthoringPublish">()};
+
+        if (!IsSafeAssetName(destination.filename().wstring())) return false;
+
+        return bool(Editor::CollisionGeometryAuthoring::Create(m_root, destination, source));
+    }
+
+    bool ReplaceCollisionGeometry(const std::filesystem::path& destination,
+        const ce::physics::CollisionGeometrySource& expected,
+        const ce::physics::CollisionGeometrySource& replacement)
+    {
+        std::lock_guard lock(m_authoringMutex);
+        ce::profile_scope publication{ce::marker<"Physics.GeometryRevisionPublish">()};
+
+        const auto meta = std::filesystem::path(destination.string() + ".meta");
+        if (LoadGuidFromMeta(meta) != FileGuid(expected.key.asset)) return false;
+
+        std::string error;
+        auto document = Authoring::WriteDocument::ParseFile(meta, &error);
+        if (!document || !document->Root().Read().IsMap()) return false;
+
+        const auto revision = document->Root().Read()["geometryRevision"];
+        if (!revision || !revision.IsScalar() || revision.AsString() != std::to_string(expected.key.revision))
+            return false;
+
+        document->Root().Child("geometryRevision").SetScalar(replacement.key.revision);
+        return bool(Editor::CollisionGeometryAuthoring::Replace(m_root, destination, expected, replacement,
+                                                                 document->Dump()));
+    }
+
+	bool WriteModelCache(const std::filesystem::path& destination,
+		std::span<const std::byte> bytes)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		return WriteBinaryFileLocked(destination, bytes);
+	}
+
+	bool WriteEmbeddedTexture(const std::filesystem::path& destination,
+		std::span<const std::byte> bytes, uint32 width, uint32 height)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		std::error_code error;
+		std::filesystem::create_directories(destination.parent_path(), error);
+		if (error)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor embedded-texture directory creation failed: " +
+				destination.parent_path().string() + " (" + error.message() + ")");
+			return false;
+		}
+
+		// height == 0 is Assimp's contract for an already encoded payload.
+		if (height == 0)
+		{
+			if (width != bytes.size() || !WriteBinaryFileLocked(destination, bytes))
+				return false;
+		}
+		else
+		{
+			const size_t rowBytes = static_cast<size_t>(width) * 4;
+			if (width == 0 || height > std::numeric_limits<size_t>::max() / rowBytes ||
+				bytes.size() != rowBytes * static_cast<size_t>(height))
+			{
+				Debug::PrintLog(spdlog::level::err, "Editor embedded-texture payload is invalid: " +
+					destination.string());
+				return false;
+			}
+
+			DirectX::ScratchImage image{};
+			if (FAILED(image.Initialize2D(DXGI_FORMAT_B8G8R8A8_UNORM,
+				width, height, 1, 1)))
+			{
+				return false;
+			}
+
+			const DirectX::Image* target = image.GetImage(0, 0, 0);
+			if (!target) return false;
+			for (uint32 row = 0; row < height; ++row)
+			{
+				std::memcpy(target->pixels + target->rowPitch * row,
+					bytes.data() + rowBytes * row, rowBytes);
+			}
+
+			if (FAILED(DirectX::SaveToWICFile(*target, DirectX::WIC_FLAGS_NONE,
+				DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), destination.c_str())))
+			{
+				return false;
+			}
+		}
+
+		const FileGuid guid = CreateMetaLocked(destination);
+		if (guid == FileGuid{}) return false;
+		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::ContentReload,
+			RuntimeAssetType::Texture, guid, destination });
+		return true;
+	}
+
+	bool WriteTerrain(const TerrainAuthoringRequest& request,
+		TerrainAuthoringResult& result)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		result = {};
+
+		if (!IsSafeAssetName(request.name) || request.width == 0 ||
+			request.height == 0 || !std::isfinite(request.minHeight) ||
+			!std::isfinite(request.maxHeight) ||
+			request.minHeight > request.maxHeight ||
+			request.width > static_cast<uint32>(
+				std::numeric_limits<int>::max() / 4) ||
+			request.height > static_cast<uint32>(std::numeric_limits<int>::max()) ||
+			request.layers.size() > 4)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor Terrain request header is invalid");
+			return false;
+		}
+
+		const size_t width = request.width;
+		const size_t height = request.height;
+		if (height > std::numeric_limits<size_t>::max() / width)
+			return false;
+		const size_t pixelCount = width * height;
+		if (pixelCount > std::numeric_limits<size_t>::max() / 4 ||
+			request.heightMap.size() != pixelCount)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor Terrain height payload is invalid");
+			return false;
+		}
+		for (const float value : request.heightMap)
+		{
+			if (!std::isfinite(value)) return false;
+		}
+		for (const TerrainAuthoringLayerSnapshot& layer : request.layers)
+		{
+			std::error_code sourceError;
+			if (layer.splatWeights.size() != pixelCount ||
+				!std::isfinite(layer.tiling) ||
+				!std::filesystem::is_regular_file(layer.diffuseTextureSource, sourceError) ||
+				sourceError)
+			{
+				Debug::PrintLog(spdlog::level::err, "Editor Terrain layer payload is invalid: " +
+					layer.diffuseTextureSource.string());
+				return false;
+			}
+			for (const float weight : layer.splatWeights)
+			{
+				if (!std::isfinite(weight)) return false;
+			}
+		}
+
+		std::error_code error;
+		const std::filesystem::path terrainRoot =
+			std::filesystem::absolute(m_root / "Terrain", error).lexically_normal();
+		if (error) return false;
+		error.clear();
+		const std::filesystem::path destinationDirectory =
+			std::filesystem::absolute(request.destinationDirectory, error).lexically_normal();
+		if (error || !IsPathInside(destinationDirectory, terrainRoot))
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor Terrain destination escaped the Terrain root: " +
+				request.destinationDirectory.string());
+			return false;
+		}
+		std::filesystem::create_directories(destinationDirectory, error);
+		if (error) return false;
+		const bool descriptorUsesRelativePaths =
+			destinationDirectory == terrainRoot;
+
+		const std::wstring generationId = MakeTerrainGenerationId();
+		if (generationId.empty()) return false;
+		const std::filesystem::path generationRoot =
+			destinationDirectory / (request.name + L".terrain-data");
+		const bool generationRootExisted = std::filesystem::exists(generationRoot);
+		std::filesystem::create_directories(generationRoot, error);
+		if (error) return false;
+		ScopedPathCleanup generationRootCleanup{
+			generationRootExisted ? std::filesystem::path{} : generationRoot };
+
+		const std::filesystem::path stagingDirectory = destinationDirectory /
+			(L"." + request.name + L".terrain." + generationId + L".tmp");
+		const std::filesystem::path finalGeneration = generationRoot / generationId;
+		std::filesystem::create_directories(stagingDirectory / "Texture", error);
+		if (error) return false;
+		ScopedPathCleanup stagingCleanup{ stagingDirectory };
+		ScopedPathCleanup generationCleanup{};
+
+		auto WriteHeightPng = [&](const std::filesystem::path& destination)
+		{
+			std::vector<uint8_t> bytes(pixelCount * 4);
+			for (size_t index = 0; index < pixelCount; ++index)
+			{
+				uint32_t bits{};
+				static_assert(sizeof(float) == sizeof(bits));
+				std::memcpy(&bits, &request.heightMap[index], sizeof(bits));
+				bytes[index * 4 + 0] = static_cast<uint8_t>(bits >> 24);
+				bytes[index * 4 + 1] = static_cast<uint8_t>(bits >> 16);
+				bytes[index * 4 + 2] = static_cast<uint8_t>(bits >> 8);
+				bytes[index * 4 + 3] = static_cast<uint8_t>(bits);
+			}
+			// Every RGBA channel stores float bits, including alpha. The native
+			// PNG encoder accepts straight BGRA8; WIC only swaps R/B on write.
+			// Requiring that format prevents opaque/premultiplied substitution.
+			const DirectX::Image image{ width, height, DXGI_FORMAT_R8G8B8A8_UNORM,
+				width * 4, bytes.size(), bytes.data() };
+			return SUCCEEDED(DirectX::SaveToWICFile(image, DirectX::WIC_FLAGS_NONE,
+				DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), destination.c_str(),
+				&GUID_WICPixelFormat32bppBGRA));
+		};
+
+		auto WriteSplatPng = [&](const std::filesystem::path& destination,
+			const std::vector<float>& weights)
+		{
+			std::vector<uint8_t> bytes(pixelCount);
+			for (size_t index = 0; index < pixelCount; ++index)
+			{
+				bytes[index] = static_cast<uint8_t>(
+					std::clamp(weights[index], 0.0f, 1.0f) * 255.0f);
+			}
+			const DirectX::Image image{ width, height, DXGI_FORMAT_R8_UNORM,
+				width, bytes.size(), bytes.data() };
+			return SUCCEEDED(DirectX::SaveToWICFile(image, DirectX::WIC_FLAGS_NONE,
+				DirectX::GetWICCodec(DirectX::WIC_CODEC_PNG), destination.c_str(),
+				&GUID_WICPixelFormat8bppGray));
+		};
+
+		const std::filesystem::path stagedHeight = stagingDirectory / "HeightMap.png";
+		if (!WriteHeightPng(stagedHeight)) return false;
+
+		std::vector<std::filesystem::path> stagedSplats;
+		std::vector<std::filesystem::path> stagedTextures;
+		stagedSplats.reserve(request.layers.size());
+		stagedTextures.reserve(request.layers.size());
+		for (size_t index = 0; index < request.layers.size(); ++index)
+		{
+			const TerrainAuthoringLayerSnapshot& layer = request.layers[index];
+			const std::filesystem::path splat = stagingDirectory /
+				(L"Splat_" + std::to_wstring(index) + L".png");
+			if (!WriteSplatPng(splat, layer.splatWeights)) return false;
+			stagedSplats.push_back(splat);
+
+			const std::filesystem::path texture = stagingDirectory / "Texture" /
+				(std::to_wstring(index) + L"_" +
+					layer.diffuseTextureSource.filename().wstring());
+			error.clear();
+			if (!std::filesystem::copy_file(layer.diffuseTextureSource, texture,
+				std::filesystem::copy_options::overwrite_existing, error) || error)
+			{
+				return false;
+			}
+			stagedTextures.push_back(texture);
+		}
+
+		auto PublishedPath = [&](const std::filesystem::path& staged)
+		{
+			return finalGeneration / std::filesystem::relative(staged, stagingDirectory);
+		};
+		auto DescriptorPath = [&](const std::filesystem::path& published)
+		{
+			const std::filesystem::path stored = descriptorUsesRelativePaths
+				? std::filesystem::relative(published, terrainRoot) : published;
+			return ce::strings::wide_to_utf8(stored.generic_wstring());
+		};
+
+		Authoring::WriteDocument descriptor;
+		const Authoring::WriteNode descriptorRoot = descriptor.Root();
+		descriptorRoot.SetMap();
+		descriptorRoot.Child("schemaVersion").SetScalar(1);
+		descriptorRoot.Child("name").SetScalar(ce::strings::wide_to_utf8(request.name));
+		descriptorRoot.Child("terrainID").SetScalar(request.terrainId);
+		descriptorRoot.Child("width").SetScalar(request.width);
+		descriptorRoot.Child("height").SetScalar(request.height);
+		descriptorRoot.Child("minHeight").SetScalar(request.minHeight);
+		descriptorRoot.Child("maxHeight").SetScalar(request.maxHeight);
+		descriptorRoot.Child("heightmap").SetScalar(
+			DescriptorPath(PublishedPath(stagedHeight)));
+		const Authoring::WriteNode splatmaps =
+			descriptorRoot.Child("splatmaps");
+		splatmaps.SetSequence();
+		const Authoring::WriteNode layers = descriptorRoot.Child("layers");
+		layers.SetSequence();
+		for (size_t index = 0; index < request.layers.size(); ++index)
+		{
+			splatmaps.Append().SetScalar(
+				DescriptorPath(PublishedPath(stagedSplats[index])));
+			const TerrainAuthoringLayerSnapshot& layer = request.layers[index];
+			const Authoring::WriteNode layerDescriptor = layers.Append();
+			layerDescriptor.SetMap();
+			layerDescriptor.Child("layerID").SetScalar(layer.layerId);
+			layerDescriptor.Child("layerName").SetScalar(layer.name);
+			layerDescriptor.Child("diffuseTexturePath").SetScalar(
+				DescriptorPath(PublishedPath(stagedTextures[index])));
+			layerDescriptor.Child("tiling").SetScalar(layer.tiling);
+		}
+
+		const std::filesystem::path descriptorPath =
+			destinationDirectory / (request.name + L".terrain");
+		std::filesystem::path descriptorTemporary = descriptorPath;
+		descriptorTemporary += L".tmp";
+		ScopedPathCleanup descriptorTemporaryCleanup{ descriptorTemporary };
+		{
+			std::ofstream output(descriptorTemporary,
+				std::ios::binary | std::ios::trunc);
+			if (!output.is_open()) return false;
+			output << descriptor.Dump();
+			output.flush();
+			if (!output.good()) return false;
+		}
+
+		std::filesystem::path descriptorBackup = descriptorPath;
+		descriptorBackup += L".rollback.tmp";
+		std::filesystem::path metaPath = descriptorPath;
+		metaPath += L".meta";
+		std::filesystem::path metaBackup = metaPath;
+		metaBackup += L".rollback.tmp";
+		ScopedPathCleanup descriptorBackupCleanup{ descriptorBackup };
+		ScopedPathCleanup metaBackupCleanup{ metaBackup };
+		const bool hadDescriptor = std::filesystem::exists(descriptorPath);
+		const bool hadMeta = std::filesystem::exists(metaPath);
+		if (hadDescriptor)
+		{
+			error.clear();
+			std::filesystem::copy_file(descriptorPath, descriptorBackup,
+				std::filesystem::copy_options::overwrite_existing, error);
+			if (error) return false;
+		}
+		if (hadMeta)
+		{
+			error.clear();
+			std::filesystem::copy_file(metaPath, metaBackup,
+				std::filesystem::copy_options::overwrite_existing, error);
+			if (error) return false;
+		}
+
+		error.clear();
+		std::filesystem::rename(stagingDirectory, finalGeneration, error);
+		if (error) return false;
+		stagingCleanup.Release();
+		generationCleanup.target = finalGeneration;
+
+		bool descriptorPublished = false;
+		auto RollbackDescriptor = [&]()
+		{
+			std::error_code ignored;
+			if (hadDescriptor)
+			{
+				::MoveFileExW(descriptorBackup.c_str(), descriptorPath.c_str(),
+					MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+				descriptorBackupCleanup.Release();
+			}
+			else
+			{
+				std::filesystem::remove(descriptorPath, ignored);
+			}
+			if (hadMeta)
+			{
+				::MoveFileExW(metaBackup.c_str(), metaPath.c_str(),
+					MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH);
+				metaBackupCleanup.Release();
+			}
+			else
+			{
+				std::filesystem::remove(metaPath, ignored);
+			}
+		};
+
+		try
+		{
+			if (!::MoveFileExW(descriptorTemporary.c_str(), descriptorPath.c_str(),
+				MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+			{
+				return false;
+			}
+			descriptorTemporaryCleanup.Release();
+			descriptorPublished = true;
+
+			const FileGuid guid = CreateMetaLocked(descriptorPath);
+			if (guid == FileGuid{})
+			{
+				RollbackDescriptor();
+				return false;
+			}
+
+			result.descriptorPath = descriptorPath;
+			result.guid = guid;
+			generationCleanup.Release();
+			generationRootCleanup.Release();
+			return true;
+		}
+		catch (...)
+		{
+			if (descriptorPublished) RollbackDescriptor();
+			throw;
+		}
+	}
+
+	bool WriteFoliage(const TextAssetAuthoringRequest& request,
+		TextAssetAuthoringResult& result)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		return PublishTextAssetLocked("Foliage", L"Foliage", L".foliage",
+			request, result);
+	}
+
+	bool WriteBlackBoard(const TextAssetAuthoringRequest& request,
+		TextAssetAuthoringResult& result)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		return PublishTextAssetLocked("BlackBoard", L"BehaviorTree",
+			L".blackboard", request, result);
+	}
+
+	bool WriteCollisionMatrix(const UncatalogedAuthoringRequest& request)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		return PublishUncatalogedLocked("CollisionMatrix",
+			ce::paths::project_setting_path(""), request);
+	}
+
+	bool WriteTagManager(const UncatalogedAuthoringRequest& request)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		return PublishUncatalogedLocked("TagManager",
+			ce::paths::project_setting_path(""), request);
+	}
+
+	bool WriteLayerSettings(const UncatalogedAuthoringRequest& request)
+	{
+        if (request.destinationPath.filename() != "Layers.celayers" ||
+            !ce::layers::ProjectLayerSettingsCodec::Decode(std::as_bytes(std::span(request.payload))))
+            return false;
+
+		std::lock_guard lock(m_authoringMutex);
+		return PublishUncatalogedLocked("LayerSettings",
+			ce::paths::project_setting_path(""), request);
+	}
+
+	bool WriteInputActionMap(const UncatalogedAuthoringRequest& request)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		return PublishUncatalogedLocked("InputActionMap",
+			ce::paths::input_map_path(), request);
+	}
+
+	std::filesystem::path ImportSourceAsset(const std::filesystem::path& source,
+		EditorAssetDatabase::ImportKind kind)
+	{
+		std::unique_lock lock(m_authoringMutex);
+
+		std::error_code error;
+		if (source.empty() || !std::filesystem::is_regular_file(source, error) || error)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset import source is missing: " + source.string());
+			return {};
+		}
+
+		if (!IsAllowedImportExtension(kind, source.extension().string()))
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset import extension does not match its kind: " +
+				source.string());
+			return {};
+		}
+
+		const char* directory = ImportDirectory(kind);
+		if (nullptr == directory) return {};
+
+		ImportPlan plan;
+		if (!PlanImport(source, m_root / directory, plan)) return {};
+
+		error.clear();
+		std::filesystem::create_directories(plan.destinationDirectory, error);
+		if (error)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset import directory creation failed: " +
+				plan.destinationDirectory.string() + " (" + error.message() + ")");
+			return {};
+		}
+
+		// 실패하면 이번 임포트가 새로 만든 것만 지운다. 반쯤 실린 자산을 트리에
+		// 남기면 다음 임포트·watcher 가 그것을 정상 자산으로 본다.
+		std::vector<std::filesystem::path> created;
+		const std::filesystem::path sourceDirectory = source.parent_path();
+		if (!CopyImportedFile(source, plan.destination, created))
+			return RollbackImport(created, plan);
+		for (const std::filesystem::path& relative : plan.sidecars)
+		{
+			if (!CopyImportedFile(sourceDirectory / relative,
+				plan.destinationDirectory / relative, created))
+				return RollbackImport(created, plan);
+		}
+
+		// 복사해 온 사이드카 중 자산으로 등록되는 것(텍스처 등)은 **여기서**
+		// .meta 를 만든다. 모델 저작은 외부 texture 의 신원을 그 .meta 에서 읽으므로
+		// (Mbc3ReadExternalAssetId), watcher 가 비동기로 만들어 주기를 기다리면
+		// 방금 임포트한 모델이 자기 텍스처를 못 찾고 저작 단계에서 실패한다.
+		// `.bin` 처럼 등록 확장자가 아닌 것은 watcher 도 만들지 않으므로 건너뛴다.
+		for (const std::filesystem::path& relative : plan.sidecars)
+		{
+			const std::filesystem::path sidecar = plan.destinationDirectory / relative;
+			if (!IsTargetFile(sidecar)) continue;
+			const std::filesystem::path sidecarMeta = sidecar.string() + ".meta";
+			std::error_code metaError;
+			const bool hadMeta = std::filesystem::exists(sidecarMeta, metaError) && !metaError;
+			const FileGuid sidecarGuid = CreateMetaLocked(sidecar);
+			if (!hadMeta) created.push_back(sidecarMeta);
+			if (sidecarGuid == FileGuid{})
+			{
+				Debug::PrintLog(spdlog::level::err, "Editor asset import sidecar meta creation failed: "
+					+ sidecar.string());
+				return RollbackImport(created, plan);
+			}
+		}
+
+		const std::filesystem::path destinationMeta = plan.destination.string() + ".meta";
+		error.clear();
+		const bool hadDestinationMeta = std::filesystem::exists(destinationMeta, error) && !error;
+		const FileGuid guid = CreateMetaLocked(plan.destination);
+		if (guid == FileGuid{})
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset import meta creation failed: " +
+				plan.destination.string());
+			if (!hadDestinationMeta) created.push_back(destinationMeta);
+			return RollbackImport(created, plan);
+		}
+		// Runtime validation can request Editor recovery. Do not re-enter our
+		// authoring mutex while applying the published generation.
+		lock.unlock();
+		if (!DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::ContentReload,
+			ToRuntimeAssetType(kind), guid, plan.destination }))
+		{
+			Debug::PrintLog(spdlog::level::err,
+				"Runtime rejected the published asset reload: "
+				+ plan.destination.string());
+			return {};
+		}
+		return plan.destination;
+	}
+
+	void handleFileAction(efsw::WatchID, const std::string& directory,
+		const std::string& filename, efsw::Action action,
+		const std::string& oldFilename) override
+	{
+		try
+		{
+			const std::filesystem::path directoryPath(std::u8string(directory.begin(), directory.end()));
+			const std::filesystem::path filepath = directoryPath / std::u8string(filename.begin(), filename.end());
+			if (ContainsTemporaryPath(filepath)) return;
+            if (MatchesMaterialAuthoringWrite(filepath))
+            {
+                return;
+            }
+
+			switch (action)
+			{
+			case efsw::Actions::Add:
+				HandleCreated(filepath);
+				break;
+			case efsw::Actions::Moved:
+				HandleMoved(directoryPath, oldFilename, filename);
+				break;
+			case efsw::Actions::Delete:
+				HandleDeleted(filepath);
+				break;
+			case efsw::Actions::Modified:
+				HandleModified(filepath);
+				break;
+			default:
+				break;
+			}
+            const auto extension = ce::strings::to_lower(filepath.extension().string());
+            if (extension == ".hlsl" || extension == ".hlsli" || extension == ".slang" || extension == ".shadermeta")
+            {
+                HandleModified(filepath);
+            }
+            if (IsAudioAssetPath(filepath) || IsAudioAssetPath(directoryPath / oldFilename))
+            {
+                m_audioRevision.fetch_add(1u, std::memory_order_release);
+            }
+		}
+		catch (const std::exception& exception)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset watcher callback failed: " +
+				std::string(exception.what()));
+		}
+	}
+
+private:
+	// 본문 하나와 meta로 끝나는 저작 자산의 공통 게시 경로. 목적지를 authoring
+	// root 하위 지정 폴더로 제한하고, `.tmp` staging → 원자적 교체 → meta 생성까지
+	// 한 임계 구역에서 끝낸다. 호출자가 m_authoringMutex를 이미 잡고 들어온다.
+	bool PublishTextAssetLocked(std::string_view label,
+		std::wstring_view rootFolder, std::wstring_view extension,
+		const TextAssetAuthoringRequest& request,
+		TextAssetAuthoringResult& result)
+	{
+		result = {};
+
+		if (!IsSafeAssetName(request.name) || request.payload.empty())
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor " + std::string(label) +
+				" request is invalid");
+			return false;
+		}
+
+		std::error_code error;
+		const std::filesystem::path authoringRoot =
+			std::filesystem::absolute(m_root / rootFolder, error).lexically_normal();
+		if (error) return false;
+		error.clear();
+		const std::filesystem::path destinationDirectory =
+			std::filesystem::absolute(request.destinationDirectory, error).lexically_normal();
+		if (error || !IsPathInside(destinationDirectory, authoringRoot))
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor " + std::string(label) +
+				" destination escaped its authoring root: " +
+				request.destinationDirectory.string());
+			return false;
+		}
+
+		const std::filesystem::path assetPath =
+			destinationDirectory / (request.name + std::wstring(extension));
+		const std::span<const std::byte> payload{
+			reinterpret_cast<const std::byte*>(request.payload.data()),
+			request.payload.size() };
+		if (!WriteBinaryFileLocked(assetPath, payload, PublishEncoding::Text))
+			return false;
+
+		const FileGuid guid = CreateMetaLocked(assetPath);
+		if (guid == FileGuid{}) return false;
+
+		result.assetPath = assetPath;
+		result.guid = guid;
+		return true;
+	}
+
+	// 카탈로그에 등록되지 않는 자산의 게시 경로. 저작 자산과 달리 meta를 만들지 않고
+	// catalog에도 넣지 않는다 — 이 파일들은 GUID로 참조되지 않으며 `.meta`가 하나도
+	// 없다. 목적지는 호출자가 지정한 루트 바로 아래 한 칸으로 못 박는다. 루트는 요청이
+	// 아니라 handler가 정하므로 요청으로는 벗어날 수 없다.
+	bool PublishUncatalogedLocked(std::string_view label,
+		const std::filesystem::path& authoringRoot,
+		const UncatalogedAuthoringRequest& request)
+	{
+		if (request.payload.empty())
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor " + std::string(label) + " payload is empty");
+			return false;
+		}
+
+		std::error_code error;
+		// PathFinder의 디렉터리 접근자는 후행 구분자가 붙은 경로를 돌려줄 수 있다.
+		// 그대로 두면 parent_path() 비교가 항상 어긋나 정상 요청까지 거부된다.
+		std::filesystem::path root = std::filesystem::absolute(authoringRoot, error).lexically_normal();
+		if (error) return false;
+		if (root.filename().empty())
+		{
+			root = root.parent_path();
+		}
+		error.clear();
+		const std::filesystem::path destination =
+			std::filesystem::absolute(request.destinationPath, error).lexically_normal();
+		if (error || destination.parent_path() != root ||
+			!IsSafeAssetName(destination.filename().wstring()))
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor " + std::string(label) +
+				" destination is not directly under its authoring root: " +
+				request.destinationPath.string());
+			return false;
+		}
+
+		const std::span<const std::byte> payload{
+			reinterpret_cast<const std::byte*>(request.payload.data()),
+			request.payload.size() };
+		return WriteBinaryFileLocked(destination, payload, PublishEncoding::Text);
+	}
+
+	// 텍스트 자산은 텍스트 모드로 쓴다. 이진 모드는 줄바꿈을 LF로 남기는데, 추적
+	// 자산은 CRLF로 체크아웃되므로 저장할 때마다 워킹트리가 더러워진다. 기존
+	// text-mode ofstream writer들이 지켜 온 규약이다.
+	enum class PublishEncoding { Binary, Text };
+
+	bool WriteBinaryFileLocked(const std::filesystem::path& destination,
+		std::span<const std::byte> bytes,
+		PublishEncoding encoding = PublishEncoding::Binary,
+        const std::string* expectedDisk = nullptr, std::string* failure = nullptr)
+	{
+		if (destination.empty() || bytes.empty() ||
+			bytes.size() > static_cast<size_t>(
+				std::numeric_limits<std::streamsize>::max()))
+		{
+			return false;
+		}
+		std::error_code error;
+		std::filesystem::create_directories(destination.parent_path(), error);
+		if (error)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset directory creation failed: " +
+				destination.parent_path().string() + " (" + error.message() + ")");
+			return false;
+		}
+
+		// The watcher ignores .tmp paths. Publish only after the complete payload
+		// is flushed so runtime readers never observe a partial cache/image.
+		const std::filesystem::path temporary = destination.string() + ".tmp";
+		// D3-b: 두 인코딩 모두 binary 모드로 연다. 여기서 텍스트 모드를 쓰면
+		// Windows가 개행을 CRLF로 바꿔, 같은 내용을 저장할 때마다 개행이 뒤집힌다.
+		// 인코딩 구분은 **무엇을 쓰는가**이지 **개행을 어떻게 쓰는가**가 아니다.
+		const std::ios::openmode mode = std::ios::binary | std::ios::trunc;
+		(void)encoding;
+		std::ofstream output(temporary, mode);
+		if (!output.is_open())
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset staging file could not be opened: " +
+				temporary.string());
+			return false;
+		}
+		output.write(reinterpret_cast<const char*>(bytes.data()),
+			static_cast<std::streamsize>(bytes.size()));
+		output.flush();
+		const bool complete = output.good();
+		output.close();
+		if (!complete)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset staging write was incomplete: " +
+				temporary.string());
+			std::filesystem::remove(temporary, error);
+			return false;
+		}
+
+        if (expectedDisk)
+        {
+            std::string publishFailure;
+            const bool published = Editor::AuthoringPublish::Publish(destination, temporary,
+                *expectedDisk, publishFailure);
+            if (!published)
+            {
+                if (failure)
+                {
+                    *failure = std::move(publishFailure);
+                }
+                std::printf("[AUTOSAVE_CONFLICT] conditional edit rejected path=%s\n", destination.string().c_str());
+                std::filesystem::remove(temporary, error);
+            }
+            return published;
+        }
+		if (!::MoveFileExW(temporary.c_str(), destination.c_str(),
+			MOVEFILE_REPLACE_EXISTING | MOVEFILE_WRITE_THROUGH))
+		{
+			// 잠금·권한·경로 길이가 여기서 갈린다. 실패 이유를 여기서 남기지 않으면
+			// 호출부는 자산 이름밖에 모른 채 실패한다.
+			Debug::PrintLog(spdlog::level::err, "Editor asset publish failed: " + destination.string() +
+				" (GetLastError=" + std::to_string(::GetLastError()) + ")");
+			std::filesystem::remove(temporary, error);
+			return false;
+		}
+		return true;
+	}
+
+	bool ContainsTemporaryPath(const std::filesystem::path& path) const
+	{
+		const std::string lower = ce::strings::to_lower(path.string());
+		return lower.find(".tmp") != std::string::npos ||
+			lower.find("~$") != std::string::npos;
+	}
+
+    bool IsAudioAssetPath(std::filesystem::path path) const
+    {
+        if (path.extension() == ".meta")
+        {
+            path.replace_extension();
+        }
+        const auto extension = ce::strings::to_lower(path.extension().string());
+        return assets::IsAudioClipSource(path) || extension == ".soundgraph" || extension == ".soundpreset";
+    }
+
+    bool IsCookedArtifactPath(const std::filesystem::path& path) const
+    {
+        const auto relative = path.lexically_normal().lexically_relative(m_root.lexically_normal());
+        return !relative.empty() && ce::strings::to_lower(relative.begin()->string()) == "derived";
+    }
+    bool IsTargetFile(const std::filesystem::path& path) const
+	{
+        if (IsCookedArtifactPath(path))
+        {
+            return false;
+        }
+		const std::string filename = path.filename().string();
+		if (filename.find('~') != std::string::npos || ContainsTemporaryPath(path))
+			return false;
+		return IsSupportExtension(path.extension().string());
+	}
+
+	FileGuid LoadGuidFromMeta(const std::filesystem::path& metaPath) const
+	{
+		std::string error;
+		const Authoring::ParsedDocument document =
+			Authoring::ParsedDocument::ParseFile(metaPath.string(), error);
+		if (!document) return {};
+		Authoring::ReadNode guid = document.Root()["assetId"];
+		if (!guid || !guid.IsScalar()) guid = document.Root()["guid"];
+		return guid && guid.IsScalar() ? FileGuid(guid.AsString()) : FileGuid{};
+	}
+
+	void RegisterMetaFile(const std::filesystem::path& metaPath)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		const std::filesystem::path targetFile = RemoveMetaExtension(metaPath);
+		if (!std::filesystem::exists(targetFile) || !IsTargetFile(targetFile)) return;
+		const FileGuid guid = LoadGuidFromMeta(metaPath);
+		if (ce::strings::to_lower(targetFile.extension().string()) == ".cegeometry")
+		{
+			const auto source = Editor::ReadCollisionGeometrySource(targetFile);
+			if (!source || !guid.IsRandomV4() || guid != FileGuid(source->key.asset)) return;
+		}
+
+		if (guid != FileGuid{})
+		{
+			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
+				RuntimeAssetType::Auto, guid, targetFile });
+		}
+	}
+
+	void ScanAndRegisterMeta()
+	{
+		for (const auto& entry : std::filesystem::recursive_directory_iterator(
+			m_root, std::filesystem::directory_options::skip_permission_denied))
+		{
+			if (!entry.is_regular_file() || !IsTargetFile(entry.path()))
+			{
+				continue;
+			}
+			const std::filesystem::path metaPath = entry.path().string() + ".meta";
+			if (std::filesystem::exists(metaPath))
+			{
+                if (EditorAssetDatabase::IsTextureSource(entry.path()))
+                {
+                    (void)CreateMeta(entry.path());
+                    continue;
+                }
+				// Existing GUID-only audio sidecars predate the import policy.
+				// Migrate them through the normal validated importer, preserving
+				// their identity; malformed/current policies still fail closed.
+				if (assets::IsAudioClipSource(entry.path()))
+				{
+					std::string parseError;
+					const auto prior = Authoring::WriteDocument::ParseFile(metaPath, &parseError);
+					if (prior && prior->Root().IsMap() && !prior->Root().HasChild("audioClip"))
+					{
+						CreateMeta(entry.path());
+						continue;
+					}
+				}
+				RegisterMetaFile(metaPath);
+			}
+			else
+			{
+				CreateMeta(entry.path());
+			}
+		}
+	}
+
+	void ScanAndCleanupInvalidMeta()
+	{
+		for (const auto& entry : std::filesystem::recursive_directory_iterator(
+			m_root, std::filesystem::directory_options::skip_permission_denied))
+		{
+            if (IsCookedArtifactPath(entry.path()))
+            {
+                continue;
+            }
+			if (!entry.is_regular_file() || entry.path().extension() != ".meta")
+				continue;
+
+			const std::filesystem::path& metaPath = entry.path();
+			const std::string filename = metaPath.filename().string();
+			const std::filesystem::path targetPath = RemoveMetaExtension(metaPath);
+			if (filename.ends_with(".meta.meta") ||
+				filename.find('~') != std::string::npos ||
+				!std::filesystem::exists(targetPath))
+			{
+				DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::Removed,
+					RuntimeAssetType::Auto, {}, targetPath });
+				std::error_code error;
+				std::filesystem::remove(metaPath, error);
+				if (error)
+					Debug::PrintLog(spdlog::level::warn, "Failed to remove invalid meta: " +
+						metaPath.string() + " (" + error.message() + ")");
+			}
+		}
+	}
+
+	std::vector<std::string> ExtractFunctionNames(const std::filesystem::path& source) const
+	{
+		std::vector<std::string> functions;
+		std::ifstream input(source);
+		std::string line;
+		const std::regex functionRegex(
+			R"((?:[\w:&<>\*\s]+)\s+[\w:]+::([\w_]+)\s*\([^)]*\)\s*\{?)");
+		while (std::getline(input, line))
+		{
+			std::smatch match;
+			if (std::regex_search(line, match, functionRegex) && match.size() >= 2)
+				functions.push_back(match[1].str());
+		}
+		return functions;
+	}
+
+	bool HasScriptReflectionFieldAttribute(const std::filesystem::path& header) const
+	{
+		std::ifstream input(header);
+		std::string line;
+		const std::regex attributeRegex(
+			R"(^\s*\[\[ScriptReflectionField(\(.*\))?\]\])");
+		while (std::getline(input, line))
+		{
+			if (std::regex_search(line, attributeRegex)) return true;
+		}
+		return false;
+	}
+
+	FileGuid LoadInitialIdentityHint(const std::filesystem::path& targetFile) const
+	{
+		const std::string extension = ce::strings::to_lower(targetFile.extension().string());
+		if (extension == ".cegeometry")
+		{
+			const auto source = Editor::ReadCollisionGeometrySource(targetFile);
+			return source ? FileGuid(source->key.asset) : FileGuid{};
+		}
+
+		const bool prefab = extension == ".prefab";
+        const bool material = extension == ".asset";
+		if (!prefab && !material) return {};
+
+		std::string error;
+		const Authoring::ParsedDocument document =
+			Authoring::ParsedDocument::ParseFile(targetFile.string(), error);
+		if (!document) return {};
+        const auto root = document.Root();
+        const Authoring::ReadNode identity = material && root["lattice_material"]
+            ? root["assetId"] : root["m_fileGuid"];
+		if (!identity || !identity.IsScalar()) return {};
+		const FileGuid hint(identity.AsString());
+		return hint.IsRandomV4() ? hint : FileGuid{};
+	}
+
+	FileGuid ResolveOrCreateGuid(const std::filesystem::path& targetFile,
+		Authoring::WriteNode root,
+		const FileGuid& preferredGuid) const
+	{
+		// sidecar가 생긴 뒤에는 이 값만 정본이다. payload의 m_fileGuid를
+		// 다시 읽어 sidecar를 덮는 경로는 두지 않는다.
+		const Authoring::ReadNode existingGuid = root.Read()["guid"];
+		if (existingGuid && existingGuid.IsScalar())
+		{
+			const FileGuid existing(existingGuid.AsString());
+			return existing;
+		}
+
+		if (preferredGuid != FileGuid{} && !preferredGuid.IsRandomV4()) return {};
+
+		// 새 sidecar의 첫 생성만 예외다. SavePrefab/SaveMaterial이 본문에 먼저
+		// 기록한 UUIDv4 mirror를 watcher도 같은 authoring handshake로 채택한다.
+		// 이 분기가 없으면 본문 close와 명시 CreateMeta 사이에서 watcher가 이겨
+		// 서로 다른 UUIDv4 두 개가 생긴다. sidecar가 생긴 뒤에는 위 분기만 탄다.
+		const FileGuid payloadHint = LoadInitialIdentityHint(targetFile);
+		const FileGuid generated = preferredGuid != FileGuid{} ? preferredGuid
+			: payloadHint != FileGuid{} ? payloadHint : FileGuid::CreateRandomV4();
+		root.Child("guid").SetScalar(generated.ToString());
+		return generated;
+	}
+
+	FileGuid CreateMetaLocked(const std::filesystem::path& targetFile,
+		const FileGuid& preferredGuid = {}, const FileGuid& expectedModelId = {},
+		std::optional<bool> buildMeshlets = {}, std::optional<std::uint32_t> lodLevels = {})
+	{
+		if (targetFile.empty() || !std::filesystem::exists(targetFile)) return {};
+		if (ce::strings::to_lower(targetFile.extension().string()) == ".cegeometry")
+		{
+			const auto source = Editor::ReadCollisionGeometrySource(targetFile);
+			if (!source || !FileGuid(source->key.asset).IsRandomV4()) return {};
+
+			const auto sidecar = std::filesystem::path(targetFile.string() + ".meta");
+			if ((preferredGuid != FileGuid{} && preferredGuid != FileGuid(source->key.asset)) ||
+				(std::filesystem::exists(sidecar) && LoadGuidFromMeta(sidecar) != FileGuid(source->key.asset)))
+				return {};
+		}
+
+		// Audio import policy is explicit: an old .ogg sidecar must not make an
+		// unsupported source look cataloged through a direct CreateMeta call.
+		if (ce::strings::to_lower(targetFile.extension().string()) == ".ogg") return {};
+		if (assets::IsModelAuthoringSource(targetFile))
+		{
+			if (preferredGuid != FileGuid{})
+			{
+				Debug::PrintLog(spdlog::level::err, "Model authoring rejects caller-supplied legacy identity: "
+					+ targetFile.string());
+				return {};
+			}
+			assets::ModelAssetAuthoringRequest request;
+			request.assetRoot = m_root;
+			request.sourcePath = targetFile;
+			request.identityHeaderPath = m_root.parent_path()
+				/ "ProjectSetting" / "AssetIdentity.asset";
+			request.generationRoot = m_root.parent_path()
+				/ "Library" / "ModelAssetGenerations";
+			request.expectedModelId = expectedModelId.m_guid;
+			request.buildMeshlets = buildMeshlets;
+			request.lodLevels = lodLevels;
+			const assets::ModelAssetAuthoringResult result =
+				assets::AuthorModelAsset(request);
+			if (!result.Succeeded())
+			{
+				for (const assets::ModelAssetAuthoringIssue& issue : result.issues)
+					Debug::PrintLog(spdlog::level::err, "Model authoring failed [" + issue.stage + "]: "
+						+ issue.message + " (" + targetFile.string() + ")");
+				return {};
+			}
+            for (const auto& warning : result.warnings)
+            {
+                Debug::PrintLog(spdlog::level::warn, "Model authoring [" + warning.stage + "]: " + warning.message);
+            }
+			const FileGuid guid(result.modelAssetId);
+			m_modelSourceImports[targetFile.lexically_normal()] = ReadModelSourceStamp(targetFile);
+            RememberMaterialAuthoringWrite(targetFile.string() + ".meta");
+            m_modelRefreshEpoch.fetch_add(1u, std::memory_order_release);
+			DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
+				RuntimeAssetType::Model, guid, targetFile });
+			return guid;
+		}
+
+		const std::string extension = ce::strings::to_lower(targetFile.extension().string());
+		const bool audioSource = assets::IsAudioClipSource(targetFile);
+		assets::AudioClipSourceMetadata audioMetadata{};
+		if (audioSource)
+		{
+			std::string failure;
+			if (!assets::InspectAudioClipSource(targetFile, audioMetadata, failure))
+			{
+				Debug::PrintLog(spdlog::level::err, "Audio source import rejected: "
+					+ targetFile.string() + " (" + failure + ")");
+				return {};
+			}
+		}
+
+		const std::filesystem::path metaPath = targetFile.string() + ".meta";
+		Authoring::WriteDocument document;
+		std::optional<std::string> existingMeta;
+		if (std::filesystem::exists(metaPath))
+		{
+			std::ifstream existing(metaPath, std::ios::binary);
+			existingMeta.emplace(std::istreambuf_iterator<char>(existing), std::istreambuf_iterator<char>());
+			std::string parseError;
+			std::optional<Authoring::WriteDocument> parsed =
+				Authoring::WriteDocument::ParseFile(metaPath, &parseError);
+			if (!parsed || !parsed->Root().Read().IsMap())
+			{
+				Debug::PrintLog(spdlog::level::err, "Editor meta parse failed: " + metaPath.string()
+					+ " — " + parseError);
+				return {};
+			}
+			document = std::move(*parsed);
+		}
+		const Authoring::WriteNode root = document.Root();
+		root.SetMap();
+        const bool textureSource = EditorAssetDatabase::IsTextureSource(targetFile);
+        experiment::cooked::TextureImportSettings textureSettings;
+        if (textureSource)
+        {
+            std::string failure;
+            if (!experiment::cooked::ParseTextureImportSettings(document.Dump(), textureSettings, failure))
+            {
+                Debug::PrintLog(spdlog::level::err, "Texture import settings rejected: " + metaPath.string() + ": " + failure);
+                return {};
+            }
+            EditorAssetDatabase::WriteTextureImportSettings(root, textureSettings);
+        }
+		std::string audioLoadMode = "Auto";
+		std::string audioSpatialKind = "NonSpatial";
+		if (audioSource)
+		{
+            if (root.Read().HasChild("loopStartFrame") || root.Read().HasChild("loopEndFrame"))
+            {
+                Debug::PrintLog(spdlog::level::err,
+                    "Audio .meta loop markers are unsupported by CEAC v1: " + metaPath.string());
+                return {};
+            }
+			const Authoring::ReadNode prior = root.Read()["audioClip"];
+			if (prior)
+			{
+                if (prior.HasChild("loopStartFrame") || prior.HasChild("loopEndFrame")
+                    || root.Read().HasChild("loopStartFrame") || root.Read().HasChild("loopEndFrame"))
+                {
+                    Debug::PrintLog(spdlog::level::err,
+                        "Audio .meta loop markers require a newer CEAC schema; only whole-clip looping is supported: " + metaPath.string());
+                    return {};
+                }
+				if (!prior.IsMap() || prior["schemaVersion"].As(0u)
+					!= assets::kAudioClipMetaSchemaVersion
+					|| !prior["loadMode"].IsScalar()
+					|| !prior["spatialKind"].IsScalar())
+				{
+					Debug::PrintLog(spdlog::level::err, "Audio clip meta schema is invalid: "
+						+ metaPath.string());
+					return {};
+				}
+				audioLoadMode = prior["loadMode"].AsString();
+				audioSpatialKind = prior["spatialKind"].AsString();
+				if (!assets::IsAudioLoadMode(audioLoadMode)
+					|| !assets::IsAudioSpatialKind(audioSpatialKind))
+				{
+					Debug::PrintLog(spdlog::level::err, "Audio clip import setting is invalid: "
+						+ metaPath.string());
+					return {};
+				}
+			}
+		}
+
+		const FileGuid guid = ResolveOrCreateGuid(targetFile, root, preferredGuid);
+		if (guid == FileGuid{} || (audioSource && !guid.IsRandomV4())) return {};
+		if (preferredGuid != FileGuid{} && guid != preferredGuid)
+		{
+			Debug::PrintLog(spdlog::level::err, "Editor asset identity disagrees with canonical sidecar: "
+				+ targetFile.string() + " requested=" + preferredGuid.ToString()
+				+ " canonical=" + guid.ToString());
+			return guid;
+		}
+		const Authoring::WriteNode importSettings = root.Child("importSettings");
+		importSettings.Child("extension").SetScalar(
+			targetFile.extension().string());
+		// The timestamp records when the sidecar was first created; nothing reads it
+		// back. Refreshing it from the source's write time rewrote every sidecar on
+		// each checkout and startup, so an existing value is kept.
+		if (!importSettings.Read().HasChild("timestamp"))
+		{
+			std::error_code timestampError;
+			const auto timestamp = std::filesystem::last_write_time(targetFile, timestampError);
+			importSettings.Child("timestamp").SetScalar(timestampError
+				? 0 : timestamp.time_since_epoch().count());
+		}
+
+		if (audioSource)
+		{
+			const Authoring::WriteNode audioClip = root.Child("audioClip");
+			audioClip.Child("schemaVersion").SetScalar(assets::kAudioClipMetaSchemaVersion);
+			audioClip.Child("loadMode").SetScalar(audioLoadMode);
+			audioClip.Child("spatialKind").SetScalar(audioSpatialKind);
+			audioClip.Child("codec").SetScalar(assets::AudioCodecName(audioMetadata.codec));
+			audioClip.Child("payloadSize").SetScalar(audioMetadata.payloadSize);
+			audioClip.Child("sourceContentHash").SetScalar(
+				ce::hash::to_hex(audioMetadata.sourceContentHash));
+		}
+		if (extension == ".cpp")
+		{
+			root.RemoveChild("reflectionFlag");
+			std::filesystem::path header = targetFile;
+			header.replace_extension(".h");
+			root.Child("reflectionFlag").SetScalar(std::filesystem::exists(header) &&
+				HasScriptReflectionFieldAttribute(header));
+			root.RemoveChild("eventRegisterSetting");
+			Authoring::WriteNode eventSettings;
+			for (const std::string& function : ExtractFunctionNames(targetFile))
+			{
+				if (!eventSettings)
+				{
+					eventSettings = root.Child("eventRegisterSetting");
+					eventSettings.SetSequence();
+				}
+				eventSettings.Append().SetScalar(function);
+			}
+		}
+		// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
+		// An unchanged sidecar is not rewritten: the rewrite itself is a watcher
+		// event and an import trigger.
+		const std::string dumped = document.Dump();
+		if (!existingMeta || *existingMeta != dumped)
+		{
+			std::ofstream output(metaPath, std::ios::binary | std::ios::trunc);
+			if (!output.is_open()) return {};
+			output << dumped;
+			output.flush();
+			if (!output.good()) return {};
+			output.close();
+			if (output.fail()) return {};
+		}
+
+		DataSystems->ApplyAssetChange({ RuntimeAssetChangeKind::CatalogUpsert,
+			RuntimeAssetType::Auto, guid, targetFile });
+        if (IsAudioAssetPath(targetFile))
+        {
+            m_audioRevision.fetch_add(1u, std::memory_order_release);
+        }
+        if (textureSource)
+        {
+            std::string failure;
+            if (!QueueTextureReimportLocked(targetFile, failure))
+            {
+                Debug::PrintLog(spdlog::level::err, "Cannot schedule texture import: " + failure);
+            }
+        }
+		return guid;
+	}
+
+    bool ReadMaterialAuthoringFingerprint(const std::filesystem::path& path,
+                                          std::optional<ce::hash::sha256_digest>& fingerprint) const
+    {
+        std::error_code error;
+        const bool exists = std::filesystem::exists(path, error);
+        if (error)
+        {
+            return false;
+        }
+        if (!exists)
+        {
+            fingerprint.reset();
+            return true;
+        }
+        std::ifstream input(path, std::ios::binary);
+        if (!input)
+        {
+            return false;
+        }
+        ce::hash::sha256 hash;
+        std::array<char, 65536> buffer;
+        while (input)
+        {
+            input.read(buffer.data(), buffer.size());
+            hash.update(buffer.data(), static_cast<std::size_t>(input.gcount()));
+        }
+        if (!input.eof())
+        {
+            return false;
+        }
+        fingerprint = hash.finish();
+        return true;
+    }
+
+    void RememberMaterialAuthoringWrite(const std::filesystem::path& path)
+    {
+        std::optional<ce::hash::sha256_digest> fingerprint;
+        if (ReadMaterialAuthoringFingerprint(path, fingerprint))
+        {
+            m_materialAuthoringWrites[path.lexically_normal()] = fingerprint;
+        }
+    }
+
+    bool MatchesMaterialAuthoringWrite(const std::filesystem::path& path)
+    {
+        // Wait for the whole save/rollback before examining its final state.
+        // Keep the fingerprint for delayed/duplicate callbacks, including a
+        // rollback that removed a newly created source or sidecar.
+        std::lock_guard lock(m_authoringMutex);
+        const auto found = m_materialAuthoringWrites.find(path.lexically_normal());
+        if (found == m_materialAuthoringWrites.end())
+        {
+            return false;
+        }
+        std::optional<ce::hash::sha256_digest> actual;
+        if (ReadMaterialAuthoringFingerprint(path, actual) && actual == found->second)
+        {
+            return true;
+        }
+        m_materialAuthoringWrites.erase(found);
+        return false;
+    }
+
+	void HandleCreated(const std::filesystem::path& filepath)
+	{
+        if (ce::strings::to_lower(filepath.extension().string()) == ".fs")
+        {
+            HandleModified(filepath);
+        }
+        if (IsCookedArtifactPath(filepath))
+        {
+            return;
+        }
+		if (filepath.extension() == ".meta")
+		{
+            RegisterMetaFile(filepath);
+            const auto source = RemoveMetaExtension(filepath);
+            if (EditorAssetDatabase::IsTextureSource(source))
+            {
+                ReloadChangedTexture(source);
+            }
+            return;
+		}
+        if (assets::IsModelAuthoringSource(filepath))
+        {
+            ReloadChangedModel(filepath);
+        }
+        else if (IsTargetFile(filepath))
+        {
+            CreateMeta(filepath);
+        }
+	}
+
+	void HandleMoved(const std::filesystem::path& directory, const std::string& oldName,
+		const std::string& newName)
+	{
+		const std::filesystem::path oldPath = directory / std::u8string(oldName.begin(), oldName.end());
+		const std::filesystem::path newPath = directory / std::u8string(newName.begin(), newName.end());
+        if (ce::strings::to_lower(oldPath.extension().string()) == ".fs")
+        {
+            HandleModified(oldPath);
+        }
+        if (ce::strings::to_lower(newPath.extension().string()) == ".fs")
+        {
+            HandleModified(newPath);
+        }
+        if (IsCookedArtifactPath(oldPath) || IsCookedArtifactPath(newPath))
+        {
+            return;
+        }
+        const auto oldSource = oldPath.extension() == ".meta" ? RemoveMetaExtension(oldPath) : oldPath;
+        if (EditorAssetDatabase::IsTextureSource(oldSource) && !ContainsTemporaryPath(oldPath))
+        {
+            std::lock_guard lock(m_authoringMutex);
+            InvalidateTextureImportLocked(oldSource);
+        }
+        if (newPath.extension() == ".meta")
+		{
+            if (!ContainsTemporaryPath(oldPath))
+            {
+                DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::Removed,
+                    RuntimeAssetType::Auto, {}, RemoveMetaExtension(oldPath) });
+            }
+            RegisterMetaFile(newPath);
+            const auto newSource = RemoveMetaExtension(newPath);
+            if (EditorAssetDatabase::IsTextureSource(newSource))
+            {
+                ReloadChangedTexture(newSource);
+            }
+            return;
+		}
+
+		DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::Removed,
+			RuntimeAssetType::Auto, {}, oldPath });
+        if (!IsTargetFile(newPath))
+        {
+            return;
+        }
+
+		const std::filesystem::path oldMeta = oldPath.string() + ".meta";
+		const std::filesystem::path newMeta = newPath.string() + ".meta";
+		if (std::filesystem::exists(oldMeta) && !std::filesystem::exists(newMeta))
+		{
+			std::error_code error;
+			std::filesystem::rename(oldMeta, newMeta, error);
+            if (error)
+            {
+                Debug::PrintLog(spdlog::level::warn, "Failed to move asset meta: " + error.message());
+            }
+		}
+
+        if (assets::IsModelAuthoringSource(newPath))
+        {
+            ReloadChangedModel(newPath);
+        }
+        else if (std::filesystem::exists(newMeta))
+        {
+            RegisterMetaFile(newMeta);
+            if (EditorAssetDatabase::IsTextureSource(newPath))
+            {
+                ReloadChangedTexture(newPath);
+            }
+        }
+        else
+        {
+            CreateMeta(newPath);
+        }
+	}
+
+	// 본문이 아직 살아 있으면 이 Delete 알림은 삭제가 아니라 **게시**다.
+	//
+	// PublishTextAssetLocked는 `.tmp` staging -> 원자적 교체로 끝나는데, 그 교체를
+	// 워처가 목적지 경로의 Delete로 받는다(2026-08-30 실측: 정상 실행 한 판에서
+	// DupProbe.prefab.meta가 스스로 두 번, 각각 ~26ms 사라졌다 — 본문은 내내
+	// 존재했다). 그때 catalog 항목을 떨어뜨리면 그 창에 GetFileGuid가 널을
+	// 돌려주고, 그 널이 다음으로 번진다.
+	//
+	//   LoadPrefab이 살아 있는 identity를 널로 덮는다
+	//     -> SavePrefab이 널을 보고 CreateRandomV4()로 새 GUID를 발급한다
+	//       -> UpdateInstances가 그 새 키로 조회해 **조용히 0건 적용**한다
+	//
+	// 에러도 로그도 없이 인스턴스 값만 옛것으로 남는다. verify-prefab-duplicate가
+	// 2026-08-30에 한 번 그 창에 걸렸고, 창이 좁아 재현되지 않았다.
+	// verify-prefab-identity-injection이 그 교란을 확정적으로 재현한다.
+	bool TargetStillExists(const std::filesystem::path& targetPath) const
+	{
+		std::error_code error;
+		return std::filesystem::exists(targetPath, error) && !error;
+	}
+
+	void HandleDeleted(const std::filesystem::path& deletedPath)
+	{
+        if (ce::strings::to_lower(deletedPath.extension().string()) == ".fs")
+        {
+            HandleModified(deletedPath);
+        }
+        if (IsCookedArtifactPath(deletedPath))
+        {
+            return;
+        }
+		if (deletedPath.extension() == ".meta")
+		{
+			// sidecar만 사라졌다면 본문의 identity를 버릴 이유가 없다. 다음
+			// 저작 게시가 sidecar를 같은 GUID로 다시 쓴다.
+			const std::filesystem::path targetPath = RemoveMetaExtension(deletedPath);
+			if (TargetStillExists(targetPath)) return;
+
+			DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::Removed,
+				RuntimeAssetType::Auto, {}, targetPath });
+			return;
+		}
+
+		if (TargetStillExists(deletedPath)) return;
+        if (EditorAssetDatabase::IsTextureSource(deletedPath))
+        {
+            std::lock_guard lock(m_authoringMutex);
+            InvalidateTextureImportLocked(deletedPath);
+        }
+
+		if (assets::IsModelAuthoringSource(deletedPath))
+		{
+			// A restored file may retain the deleted file's size and timestamp.
+			// Its Add event must not be mistaken for a duplicate modification.
+			std::lock_guard lock(m_authoringMutex);
+			m_modelSourceImports.erase(deletedPath.lexically_normal());
+			std::error_code pathError;
+			const auto canonical = std::filesystem::weakly_canonical(deletedPath, pathError);
+			if (!pathError) m_failedModelRecovery.erase(canonical);
+		}
+
+		// ★ ApplyAssetChange가 아니라 QueueAssetChange다. 이 함수는 efsw I/O
+		// 스레드에서 돈다 — DataSystem.h의 계약("Watcher I/O thread는 cache/catalog를
+		// 직접 바꾸지 않고 이 큐에 게시한다")대로 프레임 경계로 넘긴다.
+		// HandleModified는 이미 그렇게 하고 있었고 여기만 어긋나 있었다.
+		DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::Removed,
+			RuntimeAssetType::Auto, {}, deletedPath });
+		const std::filesystem::path metaPath = deletedPath.string() + ".meta";
+		std::error_code error;
+		std::filesystem::remove(metaPath, error);
+		if (error)
+			Debug::PrintLog(spdlog::level::warn, "Failed to remove deleted asset meta: " +
+				error.message());
+	}
+
+	void ReloadChangedModel(const std::filesystem::path& filepath)
+	{
+		std::lock_guard lock(m_authoringMutex);
+		const auto key = filepath.lexically_normal();
+		const auto stamp = ReadModelSourceStamp(filepath);
+		if (const auto previous = m_modelSourceImports.find(key);
+			previous != m_modelSourceImports.end() && previous->second == stamp) return;
+		m_modelSourceImports[key] = stamp;
+		const FileGuid guid = CreateMetaLocked(filepath);
+		if (guid != FileGuid{})
+		{
+			++m_modelRecoveryStats.sourceReloads;
+			DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+				RuntimeAssetType::Model, guid, filepath });
+		}
+	}
+
+    void HandleModified(const std::filesystem::path& filepath)
+    {
+        std::lock_guard lock(m_modifiedMutex);
+        m_modifiedPaths[filepath.lexically_normal()] = std::chrono::steady_clock::now();
+    }
+
+	void ProcessModified(const std::filesystem::path& filepath)
+	{
+        if (ce::strings::to_lower(filepath.extension().string()) == ".fs")
+        {
+            EditorScriptAuthoring::NotifySourceChanged(filepath);
+            return;
+        }
+        if (IsCookedArtifactPath(filepath))
+        {
+            return;
+        }
+        const auto textureSource = filepath.extension() == ".meta" ? RemoveMetaExtension(filepath) : filepath;
+        if (EditorAssetDatabase::IsTextureSource(textureSource))
+        {
+            ReloadChangedTexture(textureSource);
+            return;
+        }
+        const auto shaderExtension = ce::strings::to_lower(filepath.extension().string());
+        if (shaderExtension == ".hlsl" || shaderExtension == ".hlsli" || shaderExtension == ".slang"
+            || shaderExtension == ".shadermeta")
+        {
+            ++m_shaderRevision;
+            m_shaderDirty = true;
+            return;
+        }
+        if (filepath.extension() == ".meta")
+        {
+            const auto source = RemoveMetaExtension(filepath);
+            if (MatchesMaterialAuthoringWrite(filepath))
+            {
+                return;
+            }
+            if (assets::IsModelAuthoringSource(source))
+            {
+                ScheduleModelReload(source, true);
+            }
+            else if (assets::IsAudioClipSource(source))
+            {
+                (void)CreateMeta(source);
+            }
+            else
+            {
+                RegisterMetaFile(filepath);
+                const auto guid = DataSystems->GetFileGuid(source);
+                DataSystems->QueueAssetChange({ RuntimeAssetChangeKind::ContentReload,
+                    RuntimeAssetType::Auto, guid, source });
+            }
+            return;
+        }
+		if (assets::IsModelAuthoringSource(filepath))
+		{
+			ScheduleModelReload(filepath, false);
+			return;
+		}
+        if (assets::IsAudioClipSource(filepath))
+        {
+            // Reinspect import metadata through the existing watcher event.
+            // Playback reload itself is deferred to the host's game thread.
+            (void)CreateMeta(filepath);
+            return;
+        }
+        // Resource documents use their established typed reload contracts.
+        // Material shader sources/includes are compiled asynchronously above.
+        const auto extension = ce::strings::to_lower(filepath.extension().string());
+        if (extension != ".shadermeta" && extension != ".shadergraph" && extension != ".asset")
+        {
+            return;
+        }
+
+		FileGuid guid = DataSystems->GetFileGuid(filepath);
+		if (guid == FileGuid{})
+		{
+			const std::filesystem::path metaPath = filepath.string() + ".meta";
+			if (std::filesystem::exists(metaPath)) guid = LoadGuidFromMeta(metaPath);
+		}
+		if (guid == FileGuid{}) return;
+
+        const auto type = extension == ".shadergraph" ? RuntimeAssetType::MaterialGraph :
+            extension == ".asset" ? RuntimeAssetType::Auto : RuntimeAssetType::ShaderMeta;
+        DataSystems->QueueAssetChange({RuntimeAssetChangeKind::ContentReload, type, guid, filepath});
+	}
+
+    std::atomic<std::uint64_t> m_audioRevision{ 1u };
+    std::chrono::steady_clock::time_point m_nextLiveRefresh{};
+    std::atomic<std::uint64_t> m_modelRefreshEpoch{ 1u };
+    std::uint64_t m_observedModelRefreshEpoch{};
+    std::map<uuid::uuid16, own::shared_owner<AutomaticModelLoad>> m_automaticModelLoads;
+    std::vector<job_handle> m_modelReloads;
+    std::mutex m_automaticSaveMutex;
+    std::map<std::filesystem::path, AutomaticSave> m_automaticSaves;
+    std::map<std::filesystem::path, std::string> m_automaticSaveErrors;
+    std::mutex m_modifiedMutex;
+    std::uint64_t m_shaderRevision{};
+    bool m_shaderDirty{};
+    std::vector<own::shared_owner<ShaderReload>> m_shaderReloads;
+    std::map<std::filesystem::path, std::chrono::steady_clock::time_point> m_modifiedPaths;
+    std::map<uuid::uuid16, std::uint64_t> m_liveModelGenerations;
+    std::uint64_t m_liveTextureRevision{};
+    bool m_liveTexturePending{};
+    std::map<std::uint64_t, TextureRefresh> m_liveTextureRefresh;
+	std::filesystem::path m_root;
+	std::mutex m_authoringMutex;
+    bool m_stopping{};
+    std::map<std::filesystem::path, TextureImportWork> m_textureImports;
+    job_handle m_textureCookTail;
+    std::map<std::filesystem::path, std::optional<ce::hash::sha256_digest>> m_materialAuthoringWrites;
+	std::map<std::filesystem::path, std::array<ModelSourceStamp, 3>> m_failedModelRecovery;
+	std::map<std::filesystem::path, ModelSourceStamp> m_modelSourceImports;
+	ModelRecoveryStats m_modelRecoveryStats;
+	std::unique_ptr<efsw::FileWatcher> m_watcher;
+	const std::unordered_set<std::string> m_registeredFiles{
+		".fbx", ".gltf", ".obj", ".glb",
+		".png", ".dds", ".jpg", ".jpeg", ".hdr",
+		".hlsl", ".slang", ".shadermeta", ".shader", ".shadergraph", ".cpp", ".fs",
+		".wav", ".mp3", ".flac", ".soundgraph", ".soundpreset", ".spritefont", ".ttf", ".otf",
+		".terrain", ".bt", ".blackboard", ".prefab", ".renderprofile", ".cegeometry",
+		// ★ `.creator`(씬)가 빠져 있었다. `.prefab` 은 있는데 씬만 없어서
+		//   씬 14개가 sidecar 를 하나도 갖지 못했고, 그래서 **asset identity
+		//   자체가 없었다** — 지금은 경로로만 참조된다. D5-c 의 "Player 가
+		//   `.meta` 나 source path 탐색 없이 scene 을 해석한다"는 조회할 GUID 가
+		//   없어 성립할 수 없었다(D5-b2c-4 실측).
+		//
+		//   `Tools/migration/Repair-AssetSidecarIdentities.ps1` 이 기존 14개를
+		//   백필했고, 여기 등록으로 새 씬도 저장 시 sidecar 를 받는다. 두 곳
+		//   중 하나만 고치면 백필이 되거나 신규가 되거나 둘 중 하나만 산다.
+		".creator",
+		".foliage", ".asset"
+	};
+};
+
+EditorAssetDatabase& EditorAssetDatabase::Get() noexcept
+{
+	static EditorAssetDatabase instance;
+	return instance;
+}
+
+void EditorAssetDatabase::FlushAutomaticSaves()
+{
+    if (m_impl)
+    {
+        m_impl->TickAutomaticSaves(true);
+    }
+}
+
+std::optional<std::chrono::milliseconds> EditorAssetDatabase::PendingAutomaticSaveAge(const std::filesystem::path& sidecar) const
+{
+    if (!m_impl)
+    {
+        return std::nullopt;
+    }
+    return m_impl->PendingAutomaticSaveAge(sidecar);
+}
+
+std::string EditorAssetDatabase::AutomaticSaveError(const std::filesystem::path& sidecar) const
+{
+    return m_impl ? m_impl->AutomaticSaveError(sidecar) : std::string{};
+}
+
+void EditorAssetDatabase::ClearAutomaticSaveError(const std::filesystem::path& sidecar)
+{
+    if (m_impl)
+    {
+        m_impl->ClearAutomaticSaveError(sidecar);
+    }
+}
+
+void EditorAssetDatabase::TickAutomaticChanges()
+{
+    if (m_impl)
+    {
+        m_impl->TickAutomaticChanges();
+    }
+}
+
+bool EditorAssetDatabase::SaveImportMetadata(const std::filesystem::path& source, std::string_view payload,
+    std::string& error)
+{
+    if (!m_impl)
+    {
+        error = "Editor asset database is unavailable";
+        return false;
+    }
+    return m_impl->SaveImportMetadata(source, payload, error);
+}
+
+bool EditorAssetDatabase::IsTextureSource(const std::filesystem::path& source)
+{
+    return experiment::cooked::IsSupportedTextureExtension(ce::strings::to_lower(source.extension().string()));
+}
+
+void EditorAssetDatabase::WriteTextureImportSettings(Authoring::WriteNode root,
+    const experiment::cooked::TextureImportSettings& settings)
+{
+    std::string failure;
+    if (!experiment::cooked::ValidateTextureImportSettings(settings, failure))
+    {
+        return;
+    }
+    constexpr std::array colorSpaces{ "Source", "Linear", "Srgb" };
+    constexpr std::array compressionModes{ "None", "Auto", "BC1", "BC3", "BC5", "BC7" };
+    constexpr std::array mipPolicies{ "PreserveAuthored", "GenerateFull" };
+    constexpr std::array qualities{ "Fast", "Normal", "High" };
+    const auto node = root.Child("importSettings");
+    node.Child("importerVersion").SetScalar(experiment::cooked::kTextureImporterVersion);
+    node.Child("colorSpace").SetScalar(colorSpaces[static_cast<std::size_t>(settings.colorSpace)]);
+    node.Child("compression").SetScalar(compressionModes[static_cast<std::size_t>(settings.compression)]);
+    node.Child("mipPolicy").SetScalar(mipPolicies[static_cast<std::size_t>(settings.mipPolicy)]);
+    node.Child("maxDimension").SetScalar(settings.maxDimension);
+    node.Child("normalMap").SetScalar(settings.normalMap);
+    node.Child("preserveAlphaCoverage").SetScalar(settings.preserveAlphaCoverage);
+    node.Child("alphaCutoff").SetScalar(settings.alphaCutoff);
+    node.Child("compressionQuality").SetScalar(qualities[static_cast<std::size_t>(settings.compressionQuality)]);
+}
+
+bool EditorAssetDatabase::SetTextureImportSettingsAndReimport(const std::filesystem::path& source,
+    const experiment::cooked::TextureImportSettings& settings, std::string& error)
+{
+    if (!m_impl)
+    {
+        error = "Editor asset database is unavailable";
+        return false;
+    }
+    return m_impl->SetTextureImportSettingsAndReimport(source, settings, error);
+}
+
+std::string EditorAssetDatabase::TextureImportStatus(const std::filesystem::path& source) const
+{
+    return m_impl ? m_impl->TextureImportStatus(source) : "Editor asset database is unavailable";
+}
+
+bool EditorAssetDatabase::TextureImportReady(const std::filesystem::path& source) const
+{
+    return m_impl && m_impl->TextureImportReady(source);
+}
+
+EditorAssetDatabase::~EditorAssetDatabase()
+{
+	Shutdown();
+}
+
+bool EditorAssetDatabase::Initialize()
+{
+    if (m_impl)
+    {
+        return true;
+    }
+    if (!ce::paths::is_asset_authoring_enabled())
+    {
+        return false;
+    }
+
+    Authoring::InstallTextureSourceProcessing();
+    own::shared_owner<Impl> implementation;
+    try
+    {
+        implementation = own::make_shared<Impl>(ce::paths::relative());
+        if (!implementation->Start())
+        {
+            implementation->Stop();
+            Authoring::UninstallTextureSourceProcessing();
+            return false;
+        }
+    }
+    catch (...)
+    {
+        if (implementation)
+        {
+            implementation->Stop();
+        }
+        Authoring::UninstallTextureSourceProcessing();
+        throw;
+    }
+	m_impl = std::move(implementation);
+	AssetAuthoringPort::InstallModelRecovery(&RecoverModelThroughEditor);
+	AssetAuthoringPort::Install(&CreateMetaThroughEditor);
+	AssetAuthoringPort::InstallTextAssetWriter(
+		&WriteTextAssetWithMetaThroughEditor);
+	AssetAuthoringPort::InstallModelCacheWriter(&WriteModelCacheThroughEditor);
+	AssetAuthoringPort::InstallEmbeddedTextureWriter(
+		&WriteEmbeddedTextureThroughEditor);
+	AssetAuthoringPort::InstallTerrainWriter(&WriteTerrainThroughEditor);
+	AssetAuthoringPort::InstallFoliageWriter(&WriteFoliageThroughEditor);
+	AssetAuthoringPort::InstallBlackBoardWriter(&WriteBlackBoardThroughEditor);
+	AssetAuthoringPort::InstallCollisionMatrixWriter(
+		&WriteCollisionMatrixThroughEditor);
+	AssetAuthoringPort::InstallTagManagerWriter(&WriteTagManagerThroughEditor);
+	AssetAuthoringPort::InstallLayerSettingsWriter(&WriteLayerSettingsThroughEditor);
+	AssetAuthoringPort::InstallInputActionMapWriter(
+		&WriteInputActionMapThroughEditor);
+	return true;
+}
+
+void EditorAssetDatabase::Shutdown() noexcept
+{
+	AssetAuthoringPort::UninstallModelRecovery(&RecoverModelThroughEditor);
+	AssetAuthoringPort::UninstallInputActionMapWriter(
+		&WriteInputActionMapThroughEditor);
+	AssetAuthoringPort::UninstallTagManagerWriter(&WriteTagManagerThroughEditor);
+	AssetAuthoringPort::UninstallLayerSettingsWriter(&WriteLayerSettingsThroughEditor);
+	AssetAuthoringPort::UninstallCollisionMatrixWriter(
+		&WriteCollisionMatrixThroughEditor);
+	AssetAuthoringPort::UninstallBlackBoardWriter(&WriteBlackBoardThroughEditor);
+	AssetAuthoringPort::UninstallFoliageWriter(&WriteFoliageThroughEditor);
+	AssetAuthoringPort::UninstallTerrainWriter(&WriteTerrainThroughEditor);
+	AssetAuthoringPort::UninstallEmbeddedTextureWriter(
+		&WriteEmbeddedTextureThroughEditor);
+	AssetAuthoringPort::UninstallModelCacheWriter(&WriteModelCacheThroughEditor);
+	AssetAuthoringPort::UninstallTextAssetWriter(
+		&WriteTextAssetWithMetaThroughEditor);
+	AssetAuthoringPort::Uninstall(&CreateMetaThroughEditor);
+    if (m_impl)
+    {
+        m_impl->Stop();
+    }
+    m_impl.reset();
+    Authoring::UninstallTextureSourceProcessing();
+}
+
+bool EditorAssetDatabase::IsInitialized() const noexcept
+{
+	return nullptr != m_impl;
+}
+
+bool EditorAssetDatabase::RecoverModel(const std::filesystem::path& source, FileGuid expectedId)
+{
+	return m_impl && m_impl->RecoverModel(source, expectedId);
+}
+
+bool EditorAssetDatabase::ReimportModel(const std::filesystem::path& source)
+{
+    return m_impl && m_impl->ReimportModel(source);
+}
+
+EditorAssetDatabase::ModelRecoveryStats EditorAssetDatabase::GetModelRecoveryStats() const
+{
+	return m_impl ? m_impl->GetModelRecoveryStats() : ModelRecoveryStats{};
+}
+
+FileGuid EditorAssetDatabase::CreateMeta(const std::filesystem::path& filepath,
+	const FileGuid& preferredGuid)
+{
+	return m_impl ? m_impl->CreateMeta(filepath, preferredGuid) : FileGuid{};
+}
+
+FileGuid EditorAssetDatabase::WriteTextAssetWithMeta(
+	const std::filesystem::path& destination, std::string_view payload,
+	const FileGuid& preferredGuid)
+{
+	return m_impl
+		? m_impl->WriteTextAssetWithMeta(destination, payload, preferredGuid)
+		: FileGuid{};
+}
+
+FileGuid EditorAssetDatabase::RenameAsset(const std::filesystem::path& source,
+	const std::filesystem::path& destination)
+{
+	return m_impl ? m_impl->RenameAsset(source, destination) : FileGuid{};
+}
+
+bool EditorAssetDatabase::WriteModelCache(const std::filesystem::path& destination,
+	std::span<const std::byte> bytes)
+{
+	return m_impl && m_impl->WriteModelCache(destination, bytes);
+}
+
+bool EditorAssetDatabase::WriteEmbeddedTexture(const std::filesystem::path& destination,
+	std::span<const std::byte> bytes, uint32 width, uint32 height)
+{
+	return m_impl && m_impl->WriteEmbeddedTexture(destination, bytes, width, height);
+}
+
+bool EditorAssetDatabase::WriteTerrain(const TerrainAuthoringRequest& request,
+	TerrainAuthoringResult& result)
+{
+	return m_impl && m_impl->WriteTerrain(request, result);
+}
+
+bool EditorAssetDatabase::WriteFoliage(const TextAssetAuthoringRequest& request,
+	TextAssetAuthoringResult& result)
+{
+	return m_impl && m_impl->WriteFoliage(request, result);
+}
+
+bool EditorAssetDatabase::WriteBlackBoard(
+	const TextAssetAuthoringRequest& request, TextAssetAuthoringResult& result)
+{
+	return m_impl && m_impl->WriteBlackBoard(request, result);
+}
+
+bool EditorAssetDatabase::WriteCollisionMatrix(
+	const UncatalogedAuthoringRequest& request)
+{
+	return m_impl && m_impl->WriteCollisionMatrix(request);
+}
+
+bool EditorAssetDatabase::WriteTagManager(
+	const UncatalogedAuthoringRequest& request)
+{
+	return m_impl && m_impl->WriteTagManager(request);
+}
+
+bool EditorAssetDatabase::WriteLayerSettings(
+	const UncatalogedAuthoringRequest& request)
+{
+	return m_impl && m_impl->WriteLayerSettings(request);
+}
+
+bool EditorAssetDatabase::WriteInputActionMap(
+	const UncatalogedAuthoringRequest& request)
+{
+	return m_impl && m_impl->WriteInputActionMap(request);
+}
+
+std::filesystem::path EditorAssetDatabase::ImportSourceAsset(
+	const std::filesystem::path& source, ImportKind kind)
+{
+	if (!m_impl) return {};
+	try
+	{
+		return m_impl->ImportSourceAsset(source, kind);
+	}
+	catch (const std::exception& exception)
+	{
+		Debug::PrintLog(spdlog::level::err, "Editor asset import failed: " + source.string() +
+			" (" + exception.what() + ")");
+	}
+	catch (...)
+	{
+		Debug::PrintLog(spdlog::level::err, "Editor asset import failed with an unknown error: " +
+			source.string());
+	}
+	return {};
+}
+
+bool EditorAssetDatabase::IsSupportExtension(std::string_view extension) const
+{
+	return m_impl && m_impl->IsSupportExtension(extension);
+}
+
+bool EditorAssetDatabase::SaveMaterial(Material* material)
+{
+    if (!m_impl || !material)
+    {
+        return false;
+    }
+    auto savePath = DataSystems->GetFilePath(material->m_fileGuid);
+    if (savePath.empty())
+    {
+        if (!IsSafeAssetName(std::filesystem::path(material->m_name).wstring()))
+        {
+            return false;
+        }
+        savePath = ce::paths::relative("Materials") / (material->m_name + ".asset");
+    }
+    const FileGuid catalogGuid = DataSystems->GetFileGuid(savePath);
+    if (catalogGuid != FileGuid{} && catalogGuid != material->m_fileGuid)
+    {
+        return false;
+    }
+    Material candidate(*material);
+    if (candidate.m_fileGuid == FileGuid{})
+    {
+        candidate.m_fileGuid = FileGuid::CreateRandomV4();
+    }
+    Authoring::WriteDocument document;
+    if (!DataSystems->SerializeMaterialPayload(candidate, document.Root()) ||
+        WriteTextAssetWithMeta(savePath, document.Dump(), candidate.m_fileGuid) != candidate.m_fileGuid)
+    {
+        return false;
+    }
+    material->m_fileGuid = candidate.m_fileGuid;
+    return true;
+}
+
+bool EditorAssetDatabase::SaveMaterialGraph(own::shared_owner<Material> preparedMaterial,
+                                            const own::shared_owner<const Material>& expectedMaterial,
+                                            const LX::LXMaterialAsset& graph, const std::filesystem::path& graphPath,
+                                            FileGuid graphGuid, MaterialGraphSaveResult& result, std::string& error)
+{
+    result = {};
+    if (!m_impl)
+    {
+        error = "The Editor asset database is unavailable.";
+        return false;
+    }
+    try
+    {
+        return m_impl->SaveMaterialGraph(std::move(preparedMaterial), expectedMaterial, graph, graphPath,
+                                         graphGuid, result, error);
+    }
+    catch (const std::exception& exception)
+    {
+        if (result.publishedMaterial)
+        {
+            // 게시 뒤 경고 문자열 구성에 실패해도 호출자는 저장된 런타임 소유자를 채택해야 한다.
+            try
+            {
+                result.warning = std::string("Saved and applied; catalog status is unavailable: ") + exception.what();
+            }
+            catch (...)
+            {
+            }
+            error.clear();
+            return true;
+        }
+        error = exception.what();
+        return false;
+    }
+    catch (...)
+    {
+        if (result.publishedMaterial)
+        {
+            error.clear();
+            return true;
+        }
+        error = "Material/graph save failed before publication.";
+        return false;
+    }
+}
+
+namespace
+{
+    /// 새 자산 이름 하나를 검사한다. 폴더와 Scene Render Profile 이 같은 규칙을 쓴다.
+    bool asset_database_valid_new_name(std::string_view name)
+    {
+        return !name.empty() && name != "." && name != ".."
+            && name.find_first_of("<>:\"/\\|?*") == std::string_view::npos
+            && name.back() != '.' && name.back() != ' '
+            && std::none_of(name.begin(), name.end(), [](unsigned char c) { return c < 32; });
+    }
+
+    /// `parent` 를 정규형으로 풀고 프로젝트 Assets 안인지 본다.
+    bool asset_database_target_inside_assets(const std::filesystem::path& parent, std::filesystem::path& target, std::string& error)
+    {
+        std::error_code ec;
+        const auto root = std::filesystem::weakly_canonical(ce::paths::relative(), ec);
+        if (ec) { error = ec.message(); return false; }
+        target = std::filesystem::canonical(parent, ec);
+        if (ec) { error = ec.message(); return false; }
+        const auto relative = target.lexically_relative(root);
+        if (relative.empty() || *relative.begin() == "..")
+        {
+            error = "Choose a folder inside the project Assets directory.";
+            return false;
+        }
+        return true;
+    }
+}
+
+bool EditorAssetDatabase::CreateFolder(const std::filesystem::path& parent, std::string_view name,
+    std::filesystem::path& createdPath, std::string& error)
+{
+    createdPath.clear();
+    error.clear();
+    if (!m_impl || !asset_database_valid_new_name(name))
+    {
+        error = "Enter a valid folder name.";
+        return false;
+    }
+    std::error_code ec;
+    std::filesystem::path target;
+    if (!asset_database_target_inside_assets(parent, target, error)) return false;
+    const auto candidate = target / std::filesystem::u8path(name.begin(), name.end());
+    if (!std::filesystem::create_directory(candidate, ec))
+    {
+        error = ec ? ec.message() : "A file or folder with that name already exists.";
+        return false;
+    }
+    createdPath = candidate;
+    return true;
+}
+
+// PHASE 21 W2-B — 예전에는 OS 저장 대화상자를 `SceneRenderProfilePath()` 에 열어 두고
+// 거기서 고른 **이름만** 가져와 `directory` 에 썼다(다른 폴더를 골라도 무시). 같은
+// 이름이 있으면 말없이 숫자를 붙였고, 취소·쓰기 실패·메타 실패가 전부 같은 `false`
+// 였는데 호출자 둘 다 반환값을 버렸다. 이제 대상 폴더는 호출자가 정하고, 이름은
+// 폴더 만들기와 같은 규칙으로 검사하며, 실패마다 이유를 돌려준다.
+bool EditorAssetDatabase::CreateSceneRenderProfile(const std::filesystem::path& directory, std::string_view name,
+	std::filesystem::path& createdPath, std::string& error)
+{
+	createdPath.clear();
+	error.clear();
+	if (!m_impl || !asset_database_valid_new_name(name))
+	{
+		error = "Enter a valid scene render profile name.";
+		return false;
+	}
+	std::filesystem::path target;
+	if (!asset_database_target_inside_assets(directory, target, error)) return false;
+	std::string fileName(name);
+	fileName += ".renderprofile";
+	const std::filesystem::path candidate = target / std::filesystem::u8path(fileName);
+	std::filesystem::path metaPath = candidate;
+	metaPath += ".meta";
+	std::error_code ec;
+	if (std::filesystem::exists(candidate, ec) || std::filesystem::exists(metaPath, ec))
+	{
+		error = "A file with that name already exists.";
+		return false;
+	}
+
+	SceneRenderProfile profile;
+	profile.settings = RuntimeSettings::Get().GetRenderPassSettings();
+	bool written = false;
+	{
+		// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
+		std::ofstream output(candidate, std::ios::binary | std::ios::trunc);
+		if (output.is_open())
+		{
+			output << Meta::SerializeDocument(&profile).Dump();
+			output.flush();
+			written = output.good();
+		}
+	}
+	if (!written)
+	{
+		std::filesystem::remove(candidate, ec);
+		error = "Could not write the scene render profile file.";
+		return false;
+	}
+	if (CreateMeta(candidate) == FileGuid{})
+	{
+		// 반쯤 만든 자산을 남기지 않는다 — 메타 없는 .renderprofile 은 참조할 수 없다.
+		std::filesystem::remove(candidate, ec);
+		std::filesystem::remove(metaPath, ec);
+		error = "Could not create the .meta file for the scene render profile.";
+		return false;
+	}
+	createdPath = candidate;
+	return true;
+}
+
+void EditorAssetDatabase::QueueAutomaticImportMetadata(const std::filesystem::path& source, std::string payload)
+{
+    if (m_impl)
+    {
+        m_impl->QueueAutomaticSave(source.string() + ".meta", [impl = m_impl.operator->(), source, payload = std::move(payload)](const std::string& expectedDisk, std::string& error)
+        {
+            return impl->SaveImportMetadata(source, payload, error, &expectedDisk);
+        });
+    }
+}
+
+void EditorAssetDatabase::QueueAutomaticTextureSettings(const std::filesystem::path& source,
+    const experiment::cooked::TextureImportSettings& settings)
+{
+    if (m_impl)
+    {
+        m_impl->QueueAutomaticSave(source.string() + ".meta", [impl = m_impl.operator->(), source, settings](const std::string& expectedDisk, std::string& error)
+        {
+            return impl->SetTextureImportSettingsAndReimport(source, settings, error, &expectedDisk);
+        });
+    }
+}
+
+void EditorAssetDatabase::QueueAutomaticRenderProfile(FileGuid guid, const SceneRenderProfile& profile)
+{
+    const auto path = DataSystems->GetFilePath(guid);
+    if (m_impl && !path.empty())
+    {
+        m_impl->QueueAutomaticSave(path, [impl = m_impl.operator->(), path, payload = Meta::SerializeDocument(const_cast<SceneRenderProfile*>(&profile)).Dump()](const std::string& expectedDisk, std::string& error)
+        {
+            return impl->SaveAutomaticRenderProfilePayload(path, payload, error, &expectedDisk);
+        });
+    }
+}
+
+bool EditorAssetDatabase::SaveExistingSceneRenderProfile(
+	FileGuid guid, SceneRenderProfile* volume)
+{
+	if (!m_impl || !volume) return false;
+	const std::filesystem::path savePath = DataSystems->GetFilePath(guid);
+	if (savePath.empty())
+	{
+		Debug::PrintLog(spdlog::level::err,
+			"EditorAssetDatabase::SaveExistingSceneRenderProfile: path is empty");
+		return false;
+	}
+
+	// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾼다.
+	std::ofstream output(savePath, std::ios::binary | std::ios::trunc);
+	if (!output.is_open()) return false;
+	output << Meta::SerializeDocument(volume).Dump();
+	output.flush();
+	return output.good();
+}
+
+bool EditorAssetDatabase::CreateCollisionGeometry(const std::filesystem::path& destination,
+    const ce::physics::CollisionGeometrySource& source)
+{
+    return m_impl && m_impl->CreateCollisionGeometry(destination, source);
+}
+
+bool EditorAssetDatabase::ReplaceCollisionGeometry(const std::filesystem::path& destination,
+    const ce::physics::CollisionGeometrySource& expected,
+    const ce::physics::CollisionGeometrySource& replacement)
+{
+    return m_impl && m_impl->ReplaceCollisionGeometry(destination, expected, replacement);
+}
+
+std::uint64_t EditorAssetDatabase::AudioRevision() const noexcept
+{
+    return m_impl ? m_impl->AudioRevision() : 0u;
+}
+
+// Called through the game-thread command service by the Content Browser menu.
+bool EditorAssetDatabase::SetModelMeshletsAndReimport(const std::filesystem::path& source, bool enabled)
+{
+	return m_impl && m_impl->SetModelMeshletsAndReimport(source, enabled);
+}
+
+bool EditorAssetDatabase::SetModelLodsAndReimport(const std::filesystem::path& source, std::uint32_t levels)
+{
+	return m_impl && m_impl->SetModelLodsAndReimport(source, levels);
+}
+
+bool EditorAssetDatabase::HasPendingTexturePublications() const
+{
+    return m_impl && m_impl->HasPendingTexturePublications();
+}

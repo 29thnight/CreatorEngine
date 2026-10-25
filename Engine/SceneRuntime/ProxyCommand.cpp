@@ -1,4 +1,13 @@
-#include "../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.SpinLock.h"
+#else
+import Creator.Core.SpinLock;
+#endif
 #include "ProxyCommand.h"
 #include "AnimationDiagnostics.h"
 #include "Animator.h"
@@ -20,7 +29,7 @@
 #include "LightRenderProxy.h"
 #include "Canvas.h"
 #include "RectTransformComponent.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 own::shared_owner<TextureFramePins> RenderScene::TakePreparedTextureImagePins()
 {
@@ -458,43 +467,43 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 
 	if (auto* create = std::get_if<PrimitiveCreate>(&m_payload))
 	{
-		SpinLock lock(renderScene.m_proxyMapFlag);
+		spin_lock lock(renderScene.m_proxyMapFlag);
 		applied = nullptr != create->proxy &&
 			renderScene.m_proxyMap.try_emplace(m_proxyGUID,
 				std::move(create->proxy)).second;
 	}
 	else if (auto* create = std::get_if<LightCreate>(&m_payload))
 	{
-		SpinLock lock(renderScene.m_lightProxyMapFlag);
+		spin_lock lock(renderScene.m_lightProxyMapFlag);
 		applied = nullptr != create->proxy &&
 			renderScene.m_lightProxyMap.try_emplace(m_proxyGUID,
 				std::move(create->proxy)).second;
 	}
 	else if (auto* create = std::get_if<UICreate>(&m_payload))
 	{
-		SpinLock lock(renderScene.m_uiProxyMapFlag);
+		spin_lock lock(renderScene.m_uiProxyMapFlag);
 		applied = nullptr != create->proxy &&
 			renderScene.m_uiProxyMap.try_emplace(m_proxyGUID,
 				std::move(create->proxy)).second;
 	}
 	else if (std::holds_alternative<PrimitiveDestroy>(m_payload))
 	{
-		SpinLock lock(renderScene.m_proxyMapFlag);
+		spin_lock lock(renderScene.m_proxyMapFlag);
 		applied = 0 != renderScene.m_proxyMap.erase(m_proxyGUID);
 	}
 	else if (std::holds_alternative<LightDestroy>(m_payload))
 	{
-		SpinLock lock(renderScene.m_lightProxyMapFlag);
+		spin_lock lock(renderScene.m_lightProxyMapFlag);
 		applied = 0 != renderScene.m_lightProxyMap.erase(m_proxyGUID);
 	}
 	else if (std::holds_alternative<UIDestroy>(m_payload))
 	{
-		SpinLock lock(renderScene.m_uiProxyMapFlag);
+		spin_lock lock(renderScene.m_uiProxyMapFlag);
 		applied = 0 != renderScene.m_uiProxyMap.erase(m_proxyGUID);
 	}
 	else if (auto* update = std::get_if<MeshUpdate>(&m_payload))
 	{
-		SpinLock lock(renderScene.m_proxyMapFlag);
+		spin_lock lock(renderScene.m_proxyMapFlag);
 		auto it = renderScene.m_proxyMap.find(m_proxyGUID);
 		if (it != renderScene.m_proxyMap.end() && nullptr != it->second)
 		{
@@ -543,7 +552,7 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 	}
 	else if (auto* update = std::get_if<TerrainUpdate>(&m_payload))
 	{
-		SpinLock lock(renderScene.m_proxyMapFlag);
+		spin_lock lock(renderScene.m_proxyMapFlag);
 		auto it = renderScene.m_proxyMap.find(m_proxyGUID);
 		if (it != renderScene.m_proxyMap.end() && nullptr != it->second)
 		{
@@ -560,7 +569,7 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 	}
 	else if (auto* update = std::get_if<FoliageUpdate>(&m_payload))
 	{
-		SpinLock lock(renderScene.m_proxyMapFlag);
+		spin_lock lock(renderScene.m_proxyMapFlag);
 		auto it = renderScene.m_proxyMap.find(m_proxyGUID);
 		if (it != renderScene.m_proxyMap.end() && nullptr != it->second)
 		{
@@ -578,7 +587,7 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 	}
 	else if (auto* update = std::get_if<DecalUpdate>(&m_payload))
 	{
-		SpinLock lock(renderScene.m_proxyMapFlag);
+		spin_lock lock(renderScene.m_proxyMapFlag);
 		auto it = renderScene.m_proxyMap.find(m_proxyGUID);
 		if (it != renderScene.m_proxyMap.end() && nullptr != it->second)
 		{
@@ -598,7 +607,7 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 	}
 	else if (auto* update = std::get_if<SpriteUpdate>(&m_payload))
 	{
-		SpinLock lock(renderScene.m_proxyMapFlag);
+		spin_lock lock(renderScene.m_proxyMapFlag);
 		auto it = renderScene.m_proxyMap.find(m_proxyGUID);
 		if (it != renderScene.m_proxyMap.end() && nullptr != it->second)
 		{
@@ -619,7 +628,7 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 	}
 	else if (auto* update = std::get_if<LightUpdate>(&m_payload))
 	{
-		SpinLock lock(renderScene.m_lightProxyMapFlag);
+		spin_lock lock(renderScene.m_lightProxyMapFlag);
 		auto it = renderScene.m_lightProxyMap.find(m_proxyGUID);
 		if (it != renderScene.m_lightProxyMap.end() && nullptr != it->second)
 		{
@@ -629,7 +638,7 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 	}
 	else if (auto* update = std::get_if<ImageUpdate>(&m_payload))
 	{
-		SpinLock lock(renderScene.m_uiProxyMapFlag);
+		spin_lock lock(renderScene.m_uiProxyMapFlag);
 		auto it = renderScene.m_uiProxyMap.find(m_proxyGUID);
 		if (it != renderScene.m_uiProxyMap.end() && nullptr != it->second)
 		{
@@ -640,7 +649,7 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 	}
 	else if (auto* update = std::get_if<TextUpdate>(&m_payload))
 	{
-		SpinLock lock(renderScene.m_uiProxyMapFlag);
+		spin_lock lock(renderScene.m_uiProxyMapFlag);
 		auto it = renderScene.m_uiProxyMap.find(m_proxyGUID);
 		if (it != renderScene.m_uiProxyMap.end() && nullptr != it->second)
 		{
@@ -651,7 +660,7 @@ ProxyCommand::ApplyResult ProxyCommand::Apply(
 	}
 	else if (auto* update = std::get_if<SpriteSheetUpdate>(&m_payload))
 	{
-		SpinLock lock(renderScene.m_uiProxyMapFlag);
+		spin_lock lock(renderScene.m_uiProxyMapFlag);
 		auto it = renderScene.m_uiProxyMap.find(m_proxyGUID);
 		if (it != renderScene.m_uiProxyMap.end() && nullptr != it->second)
 		{

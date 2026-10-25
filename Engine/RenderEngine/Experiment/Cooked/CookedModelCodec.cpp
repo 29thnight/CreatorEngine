@@ -1,9 +1,15 @@
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "CookedModelCodec.h"
 #include "../Import/MeshletBuilder.h"
 #include "../Import/MeshLodBuilder.h"
 
 #include <stdio.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 
 namespace experiment::cooked
@@ -1135,8 +1141,8 @@ bool Read(std::span<const std::byte> bytes, ModelDraft& outDraft, std::vector<Mo
         for (std::uint32_t i = 0; i < entry.elementCount; ++i)
         {
             Material& material = decoded.materials[i];
-            material.assetId.value = cursor.Pod<Uuid::Uuid16>();
-            material.shaderAssetId.value = cursor.Pod<Uuid::Uuid16>();
+            material.assetId.value = cursor.Pod<uuid::uuid16>();
+            material.shaderAssetId.value = cursor.Pod<uuid::uuid16>();
             material.name = readString(cursor.Pod<StringRef>());
             material.blendMode = static_cast<MaterialBlendMode>(cursor.Pod<std::uint8_t>());
             if (material.blendMode != MaterialBlendMode::Opaque &&
@@ -1183,7 +1189,7 @@ bool Read(std::span<const std::byte> bytes, ModelDraft& outDraft, std::vector<Mo
                     break;
                 case 8: {
                     TextureReference reference{};
-                    reference.assetId.value = cursor.Pod<Uuid::Uuid16>();
+                    reference.assetId.value = cursor.Pod<uuid::uuid16>();
                     reference.logicalName = readString(cursor.Pod<StringRef>());
                     reference.fallbackPath = Utf8ToPath(readString(cursor.Pod<StringRef>()));
                     reference.colorSpace = static_cast<TextureColorSpace>(cursor.Pod<std::uint8_t>());

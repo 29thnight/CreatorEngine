@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <Project>
   <Import Project="$(MSBuildThisFileDirectory)WindowsAppSdk.props" Condition="'$(CreatorWindowsAppSdkPropsImported)' != 'true'" />
+  <Import Project="$(MSBuildThisFileDirectory)WindowsSdkModules.props" Condition="'$(CreatorWindowsSdkModulesPropsImported)' != 'true'" />
   <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">
     <_CreatorContractsRoot>$(MSBuildThisFileDirectory)..\..\</_CreatorContractsRoot>
     <CreatorContractConfigDir>$(_CreatorContractsRoot)Build\Generated\Contracts\$(Platform)-$(EngineConfigKey)\</CreatorContractConfigDir>
@@ -11,7 +12,9 @@
     <ClCompile>
       <ScanSourceForModuleDependencies>true</ScanSourceForModuleDependencies>
       <SDLCheck>true</SDLCheck>
-      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalOptions>/utf-8 /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
+      <AdditionalIncludeDirectories>$(_CreatorContractsRoot)Engine\Platform\WindowsSDK;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>NOMINMAX;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)' == 'Debug' and '$(MSBuildProjectName)' != 'RuntimeLauncher'">_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)' == 'Release'">NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
@@ -61,6 +64,9 @@
     <Error Condition="'$(_CreatorAssertionsEnabled)' == ''" Text="Unsupported contracts configuration: $(Configuration)" />
     <PropertyGroup>
       <_CreatorContractParserConfigDir>$(IntDir)contracts-parser\</_CreatorContractParserConfigDir>
+      <!-- SetModuleDependencies escapes a multi-directory header-unit path list.
+           Restore its separators before reflgen turns IncludePath into items. -->
+      <IncludePath>$([MSBuild]::Unescape('$(IncludePath)'))</IncludePath>
     </PropertyGroup>
     <MakeDir Directories="$(_CreatorContractParserConfigDir)" />
     <WriteLinesToFile File="$(_CreatorContractParserConfigDir)CreatorContractConfig.h"
@@ -68,17 +74,45 @@
       Overwrite="true" WriteOnlyWhenDifferent="true" Encoding="UTF-8" />
     <ItemGroup>
       <_ReflgenCompile>
-        <PreprocessorDefinitions>CE_CONTRACT_STANDALONE=1;%(_ReflgenCompile.PreprocessorDefinitions)</PreprocessorDefinitions>
-        <AdditionalIncludeDirectories>$(_CreatorContractParserConfigDir);%(_ReflgenCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+        <!-- Clang treats a directory also present in -isystem as a system path,
+             even when it was prepended with -I. Bind this overlapping SDK name
+             to the same v3 header used by the native header-unit provider. -->
+        <PreprocessorDefinitions>CE_CONTRACT_STANDALONE=1;CE_GAMEINPUT_HEADER=&quot;$(CreatorGameInputHeader)&quot;;%(_ReflgenCompile.PreprocessorDefinitions)</PreprocessorDefinitions>
+        <AdditionalIncludeDirectories>$(_CreatorContractParserConfigDir);$(CreatorGameInputIncludeDir);%(_ReflgenCompile.AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       </_ReflgenCompile>
       <FileWrites Include="$(_CreatorContractParserConfigDir)CreatorContractConfig.h" />
+    </ItemGroup>
+  </Target>
+  <!-- A project may register this source early for unity discovery. reflgen also
+       adds it at execution time, so collapse both spellings before compilation. -->
+  <Target Name="DeduplicateCreatorReflgenSource" AfterTargets="_ReflgenComputeInputs"
+          BeforeTargets="ReferenceStandardModulesInReflgenSource"
+          Condition="'$(ReflgenTargetsImported)' == 'true' and '@(_ReflgenHeader)' != '' and '$(ReflgenRegistration)' != 'false'">
+    <PropertyGroup>
+      <_CreatorReflgenSourceFullPath>$([System.IO.Path]::GetFullPath('$(_ReflgenModuleSource)'))</_CreatorReflgenSourceFullPath>
+    </PropertyGroup>
+    <ItemGroup>
+      <_CreatorReflgenCompileCandidate Include="@(ClCompile)" Condition="'%(ClCompile.FullPath)' == '$(_CreatorReflgenSourceFullPath)'" />
+    </ItemGroup>
+    <!-- Keep the early item's module-scan metadata as well as its unity policy. -->
+    <RemoveDuplicates Inputs="@(_CreatorReflgenCompileCandidate)">
+      <Output TaskParameter="Filtered" ItemName="_CreatorUniqueReflgenCompile" />
+    </RemoveDuplicates>
+    <ItemGroup>
+      <ClCompile Remove="@(_CreatorReflgenCompileCandidate)" />
+      <ClCompile Include="@(_CreatorUniqueReflgenCompile)" />
     </ItemGroup>
   </Target>
   <!-- reflgen adds its registration .cpp after the regular module scan. Supply
        the already-built public module references to that late compiler input. -->
   <Target Name="ReferenceStandardModulesInReflgenSource" AfterTargets="_ReflgenComputeInputs"
+          DependsOnTargets="DeduplicateCreatorReflgenSource"
           Condition="'$(ReflgenTargetsImported)' == 'true' and '@(ReferencedProjectsPublicModules)' != ''">
     <ItemGroup>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)"
+            Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Delegate.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Concurrency.Jobs.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Uuid.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Layers.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.BitFlag.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Sha256.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Strings.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Platform.Windows.Strings.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.DynamicBitset.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.WorkPartition.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.SpinLock.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Stopwatch.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.RingBuffer.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.BoundedMemory.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Base64.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.ContentAbi.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.LayerCatalog.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.EngineMode.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Progress.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Paths.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Ownership.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.HeapAllocator.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Arena.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.LifetimeToken.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Distribution.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Concurrency.JobGraph.ixx'">
+        <ModuleName>$([System.IO.Path]::GetFileNameWithoutExtension('%(ReferencedProjectsPublicModules.Filename)'))</ModuleName>
+      </_CreatorReflgenModuleReference>
       <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)"
           Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'std.ixx'">
         <ModuleName>std</ModuleName>
@@ -99,8 +133,17 @@
           Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Window.ixx'">
         <ModuleName>Creator.Core.Window</ModuleName>
       </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)"
+          Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'Creator.AppBackend.WinAPI.ixx'">
+        <ModuleName>Creator.AppBackend.WinAPI</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenHeaderUnitReference Include="@(ReferencedProjectsPublicHeaderUnits)">
+        <HeaderName>%(ReferencedProjectsPublicHeaderUnits.Filename)</HeaderName>
+      </_CreatorReflgenHeaderUnitReference>
       <ClCompile Condition="'%(ClCompile.Identity)' == '$(_ReflgenModuleSource)'">
-        <AdditionalOptions>@(_CreatorReflgenModuleReference -> '/reference &quot;%(ModuleName)=%(FullPath)&quot;', ' ') %(ClCompile.AdditionalOptions)</AdditionalOptions>
+        <!-- reflgen owns registration; keep its generated source outside unity files. -->
+        <IncludeInUnityFile>false</IncludeInUnityFile>
+        <AdditionalOptions>@(_CreatorReflgenModuleReference -> '/reference &quot;%(ModuleName)=%(FullPath)&quot;', ' ') @(_CreatorReflgenHeaderUnitReference -> '/headerUnit:quote &quot;%(HeaderName)=%(FullPath)&quot;', ' ') %(ClCompile.AdditionalOptions)</AdditionalOptions>
       </ClCompile>
     </ItemGroup>
   </Target>

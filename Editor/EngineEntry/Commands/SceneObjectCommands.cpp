@@ -1,4 +1,9 @@
-#include "../EditorDiagnostics.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../Diagnostics/EditorDiagnostics.h"
 #include "../../EngineGUIWindow/HierarchyFlatten.h"
 #include "SoundGraphEditor.h"
 // LC6 (PHASE 14.5) — SceneObject 도메인 명령.
@@ -21,7 +26,7 @@
 
 #include "CommandRegistrar.h"
 #include "CommandSupport.h"
-#include "EditorObjectOperations.h"
+#include "../Scene/EditorObjectOperations.h"
 
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
@@ -30,13 +35,13 @@
 #include "CommandCore/CommandDescriptorSeeds.h"
 #include "EditorCommandServiceHost.h"        // LC4: 로컬 HTTP/JSON 서비스  // LC2: 토크나이저와 소유형 invocation
 #include "EditorCameraRig.h"
-#include "EditorPlayModeController.h"
-#include "EditorSessionState.h"
+#include "../Scene/EditorPlayModeController.h"
+#include "../Project/EditorSessionState.h"
 #include "ViewportHostWindow.h"
 #include "InputManager.h"
 #include "EngineBootstrap.h"
-#include "GameBuilderSystem.h"
-#include "EditorAssetDatabase.h"
+#include "../Build/GameBuilderSystem.h"
+#include "../Assets/EditorAssetDatabase.h"
 #include "Interfaces/AssetAuthoringPort.h"
 #include "Interfaces/FoliageInstance.h"
 #include <mathematics/color.hpp>
@@ -98,15 +103,18 @@
 #include "AIManager.h"
 #include "DataSystem.h"
 #include "GpuDiagnostics.h"
-#include "LogSystem.h"
-#include "PathFinder.h"
-#include "RuntimeSettings.h"
-#include "AuthoringNodeEquality.h" // D3-a-1: 저작 노드 구조 비교
-#include "AuthoringNodeViewAccess.h" // D3-a-5b
-#include "AuthoringParsedDocument.h"
-#include "AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
-#include "SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
-#include "WindowsCoreWindow.h"
+#include "../../../Engine/Utility_Framework/Diagnostics/LogSystem.h"
+#include "../../../Engine/Utility_Framework/Runtime/RuntimeSettings.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeEquality.h" // D3-a-1: 저작 노드 구조 비교
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-5b
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
+#include "../../../Engine/Utility_Framework/Authoring/SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.AppBackend.WinAPI.h"
+#else
+import Creator.AppBackend.WinAPI;
+#endif
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
@@ -131,21 +139,25 @@
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
 #include "RHI/ScreenSizedResource.h"
-#include "ReflectionYml.h"
-#include "ReflectionUndo.h"
-#include "GameObjectCommand.h"
-#include "StringHelper.h"
+#include "../../../Engine/Utility_Framework/Reflection/ReflectionYml.h"
+#include "../Editing/ReflectionUndo.h"
+#include "../Editing/GameObjectCommand.h"
 #include "BlackBoard.h"
 #include "TagManager.h"
-#include <Windows.h>
-#include <psapi.h> // MBC11: peak working set
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+// MBC11: peak working set
 #include <crtdbg.h>
 #include <stdio.h>
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
-#include <DbgHelp.h>
-#include <DXProgrammableCapture.h>
-#include <dxgidebug.h>
-#include <wrl/client.h>
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 #include "../../Engine/SceneRuntime/MeshRenderer.h"
 #include "../../Engine/RenderEngine/Material.h"
 
@@ -338,12 +350,12 @@ namespace ConsoleCmd
         // 상위 디렉터리를 만들어 준다. 없으면 ofstream이 조용히 실패하고
         // '저장했다'는 메시지만 남는다.
         std::error_code directoryError{};
-        file::create_directories(file::path(path).parent_path(), directoryError);
+        std::filesystem::create_directories(std::filesystem::path(path).parent_path(), directoryError);
 
         SceneManagers->SaveScene(path);
 
         // 실제로 파일이 생겼는지 확인한다 — SaveScene은 실패를 돌려주지 않는다.
-        if (!file::exists(path))
+        if (!std::filesystem::exists(path))
         {
             Debug::PrintLog(spdlog::level::err, "[CLI] 씬 저장 실패: " + path);
             std::printf("[CLI] 씬 저장 실패: %s\n", path.c_str());
@@ -353,7 +365,7 @@ namespace ConsoleCmd
             return CommandCore::Fail("scene.save_failed", "씬을 저장하지 못했다: " + path);
         }
 
-        const auto bytes = file::file_size(path);
+        const auto bytes = std::filesystem::file_size(path);
         Debug::PrintLog(spdlog::level::warn, "[CLI] 씬 저장: " + path);
         std::printf("[CLI] 씬 저장: %s (%llu 바이트)\n", path.c_str(),
             static_cast<unsigned long long>(bytes));
@@ -744,7 +756,7 @@ namespace ConsoleCmd
         {
             if (auto* child = scene->TryGetEntity(index))
             {
-                names.Append(D::String(child->m_name.ToString()));
+                names.Append(D::String(child->m_name));
             }
         }
         auto visible = D::Array();
@@ -755,7 +767,7 @@ namespace ConsoleCmd
         {
             if (row.kind == editor::hierarchy_row_kind::entity && row.depth == 1)
             {
-                visible.Append(D::String(scene->TryGetEntity(row.index)->m_name.ToString()));
+                visible.Append(D::String(scene->TryGetEntity(row.index)->m_name));
             }
         }
         auto data = D::Object();
@@ -811,13 +823,13 @@ namespace ConsoleCmd
         const Entity::Index rootIndex = object->GetRootIndex();
         Entity* root = scene->TryGetEntity(rootIndex);
         std::printf("[object.rootref] %s root=%d name=%s\n",
-            object->GetHashedName().ToString().c_str(), static_cast<int>(rootIndex),
-            root ? root->GetHashedName().ToString().c_str() : "<invalid>");
+            object->GetName().c_str(), static_cast<int>(rootIndex),
+            root ? root->GetName().c_str() : "<invalid>");
 
         // ★ root 가 무효인 것은 **실패가 아니다.** 최상위 오브젝트는 루트 참조가
         //   없는 것이 정상이고, 이 명령은 그 상태를 답하는 조회다. 값으로 낸다.
         CommandCore::CommandData data = CommandCore::CommandData::Object();
-        data.Set("object", CommandCore::CommandData::String(object->GetHashedName().ToString()));
+        data.Set("object", CommandCore::CommandData::String(object->GetName()));
         data.Set("rootIndex", CommandCore::CommandData::Int(static_cast<int64_t>(rootIndex)));
         data.Set("rootValid", CommandCore::CommandData::Bool(nullptr != root));
         return CommandCore::Ok("object.rootref", std::move(data));
@@ -1182,7 +1194,7 @@ namespace ConsoleCmd
         // 결함을 P4-b가 드러낸 것이지 새로 만든 것이 아니다.
         //
         // 경로 규칙은 prefab.create와 같아야 한다(같은 파일을 가리켜야 하므로).
-        const file::path savePath = PathFinder::Relative("Prefabs\\") / (prefabName + ".prefab");
+        const std::filesystem::path savePath = ce::paths::relative("Prefabs\\") / (prefabName + ".prefab");
         if (!PrefabUtilitys->SavePrefab(prefab, savePath.string()))
         {
             std::printf("[CLI] 프리팹 정의 저장 실패: %s\n", savePath.string().c_str());
@@ -1298,8 +1310,8 @@ namespace ConsoleCmd
 			++entityCount;
 			Entity* parent = scene->TryGetEntity(entity->GetParentIndex());
 			const std::string parentName = parent
-				? parent->m_name.ToString() : std::string("<none>");
-			const std::string prefix = entity->m_name.ToString() + "|" + parentName
+				? parent->m_name : std::string("<none>");
+			const std::string prefix = entity->m_name + "|" + parentName
 				+ "|" + entity->m_prefabFileGuid.ToString();
 			rows.push_back("entity|" + prefix);
 			for (const PrefabOverride& item : entity->m_prefabOverrides)
@@ -1515,7 +1527,7 @@ namespace ConsoleCmd
             return CommandCore::Fail("prefab.create.create_failed", "프리팹을 만들지 못했다");
         }
 
-        const file::path path = PathFinder::Relative("Prefabs\\") / (prefabName + ".prefab");
+        const std::filesystem::path path = ce::paths::relative("Prefabs\\") / (prefabName + ".prefab");
         if (!PrefabUtilitys->SavePrefab(prefab, path.string()))
         {
             std::printf("[CLI] 프리팹 저장 실패: %s\n", path.string().c_str());
@@ -1760,18 +1772,18 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
         const Entity* primary = scene->m_selectedEntity;
         std::printf("[selection:%s] primary=%s multi=%zu\n",
             label.c_str(),
-            primary ? primary->m_name.ToString().c_str() : "(none)",
+            primary ? primary->m_name.c_str() : "(none)",
             scene->m_selectedEntities.size());
 
         for (const Entity* entity : scene->m_selectedEntities)
         {
             std::printf("[selection:%s] multi|%s\n", label.c_str(),
-                entity ? entity->m_name.ToString().c_str() : "(null)");
+                entity ? entity->m_name.c_str() : "(null)");
         }
 
         CommandCore::CommandData data = CommandCore::CommandData::Object();
         data.Set("primary", CommandCore::CommandData::String(
-            primary ? primary->m_name.ToString() : std::string("")));
+            primary ? primary->m_name : std::string("")));
         data.Set("multi", CommandCore::CommandData::Int(
             static_cast<int64_t>(scene->m_selectedEntities.size())));
         return CommandCore::Ok("scene.selection", std::move(data));
@@ -1801,7 +1813,7 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
             char position[96]{};
             std::snprintf(position, sizeof(position), "(%.3f, %.3f, %.3f)", p.x, p.y, p.z);
 
-            Debug::PrintLog(spdlog::level::warn, "[씬 덤프]   " + object->m_name.ToString() +
+            Debug::PrintLog(spdlog::level::warn, "[씬 덤프]   " + object->m_name +
                 " (index=" + std::to_string(object->m_index) +
                 ", parent=" + std::to_string(object->GetParentIndex()) +
                 ", 컴포넌트 " + std::to_string(object->m_components.size()) + "개"

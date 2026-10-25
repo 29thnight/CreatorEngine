@@ -1,7 +1,11 @@
 #pragma once
 #include "../RHIResourceState.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
-#include <d3d12.h>
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 
 inline D3D12_RESOURCE_BARRIER_FLAGS DX12TransitionFlags(RHITransitionPhase phase)
 {

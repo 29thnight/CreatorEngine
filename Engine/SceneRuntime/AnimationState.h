@@ -1,7 +1,11 @@
-#include "../Utility_Framework/Ownership.h"
 #pragma once
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include "../Utility_Framework/Core.Minimal.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "AniTransition.h"
 #include "AniBehavior.h"
 

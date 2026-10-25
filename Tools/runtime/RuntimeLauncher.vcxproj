@@ -47,13 +47,25 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(LauncherName)' == 'CreatorEditor'">
     <Manifest>
-      <AdditionalManifestFiles>$(MSBuildThisFileDirectory)..\..\Editor\EngineEntry\CreatorEditor.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
+      <AdditionalManifestFiles>$(MSBuildThisFileDirectory)..\..\Editor\Resources\Windows\CreatorEditor.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
     </Manifest>
   </ItemDefinitionGroup>
   <ItemGroup><ClCompile Include="RuntimeLauncher.cpp" /><ClCompile Include="CrashReporter.cpp" /></ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Engine\Platform\WindowsSDK\Creator.WinAPI.h">
+      <CompileAs>CompileAsHeaderUnit</CompileAs>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <AdditionalOptions>/I&quot;$(SolutionDir)Tools\build\StdModuleHeaders&quot; %(AdditionalOptions)</AdditionalOptions>
+      <DisableSpecificWarnings>5260;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup><ClCompile Include="..\..\Engine\Contracts\Platform\Windows\Creator.Platform.Windows.Strings.ixx"><CompileAs>CompileAsCppModule</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile></ItemGroup>
+  <!-- Compile the canonical ABI constants with this independent static-CRT launcher. -->
+  <ItemGroup><ClCompile Include="..\..\Engine\Contracts\Core\Creator.Core.ContentAbi.ixx"><CompileAs>CompileAsCppModule</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile></ItemGroup>
+  <ItemGroup><ClCompile Include="..\..\Engine\Contracts\Core\Creator.Core.Distribution.ixx"><CompileAs>CompileAsCppModule</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile></ItemGroup>
   <ItemGroup><ResourceCompile Include="EngineVersion.rc" /></ItemGroup>
   <ItemGroup Condition="'$(LauncherName)' == 'CreatorEditor'">
-    <ResourceCompile Include="..\..\Editor\EngineEntry\Academy_4Q.rc" />
+    <ResourceCompile Include="..\..\Editor\Resources\Windows\Academy_4Q.rc" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
 </Project>

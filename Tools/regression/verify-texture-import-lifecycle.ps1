@@ -11,8 +11,8 @@ $msbuild = 'C:/Program Files/Microsoft Visual Studio/18/Community/MSBuild/Curren
 $configs = if ($Configuration -eq 'All') { @('Debug', 'Release') } else { @($Configuration) }
 $output = Join-Path $repo 'Build/TextureImportLifecycle'
 New-Item -ItemType Directory -Path $output -Force | Out-Null
-$sourcePaths = @('Editor/EngineEntry/EditorAssetDatabase.cpp', 'Editor/EngineEntry/EditorAssetDatabase.h',
-    'Editor/EngineEntry/ConditionalAssetPublish.h', 'Editor/Editor.vcxproj',
+$sourcePaths = @('Editor/EngineEntry/Assets/EditorAssetDatabase.cpp', 'Editor/EngineEntry/Assets/EditorAssetDatabase.h',
+    'Editor/EngineEntry/Assets/ConditionalAssetPublish.h', 'Editor/Editor.vcxproj',
     'Engine/RenderEngine/AssetDepot/AssetDepot.cpp', 'Engine/RenderEngine/AssetDepot/TextureAssetRuntime.cpp',
     'Engine/RenderEngine/Experiment/Cooked/TextureCookProducer.cpp',
     'Engine/RenderEngine/Experiment/Cooked/TextureCooker.cpp',

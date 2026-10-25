@@ -9,7 +9,7 @@
 // 곳과 안 보이는 곳이 갈리면 `IconRoleOf<T>` 의 값이 번역 단위마다 달라지므로,
 // 묻는 자리를 여기로 가뒀다.
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "InspectorIcon.h"
 #include "RegisterReflectManual.h"

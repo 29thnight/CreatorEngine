@@ -12,7 +12,7 @@ int main(int argc, char** argv)
     {
         return 2;
     }
-    const auto work = file::absolute(argv[1]);
+    const auto work = std::filesystem::absolute(argv[1]);
     const int seconds = std::stoi(argv[2]);
     if (work.generic_string().find("/Build/Validation/") == std::string::npos || seconds < 1 || seconds > 3600)
     {
@@ -40,7 +40,7 @@ int main(int argc, char** argv)
     header.frameCount = 55296u;
     std::shared_ptr<MemoryArtifact> memory;
     const auto source = MakeSource(fixture.root / "Formats" / "silent.mp3", header, memory);
-    const wave::ClipKey streamKey = wave::ClipKey::FromGuid(Uuid::Parse("01234567-89ab-4cde-8fab-0123456789ab"));
+    const wave::ClipKey streamKey = wave::ClipKey::FromGuid(uuid::parse("01234567-89ab-4cde-8fab-0123456789ab"));
     Check(runtime.LoadCookedClip(source), "CEAC MP3 stream load");
     const wave::ClipKey wavKey("hardware-wav");
     const wave::ClipKey flacKey("hardware-flac");

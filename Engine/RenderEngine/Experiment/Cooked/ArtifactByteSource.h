@@ -1,10 +1,14 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
-#include "../../../Utility_Framework/Ownership.h"
-#include "../../../Utility_Framework/ArtifactStoreGuard.h"
+#include "../../../Utility_Framework/Packaging/ArtifactStoreGuard.h"
 
 #include <stdio.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 #include <sys/stat.h>
 #if defined(_WIN32)
 #include <io.h>

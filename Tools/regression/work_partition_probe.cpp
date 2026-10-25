@@ -1,4 +1,8 @@
-#include "../../Engine/Utility_Framework/WorkPartition.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.WorkPartition.h"
+#else
+import Creator.Core.WorkPartition;
+#endif
 
 #include <array>
 #include <atomic>

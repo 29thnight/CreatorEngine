@@ -1,12 +1,21 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
 #include "AssetLink.h"
 #include "AssetRequest.h"
 #include "../Texture.h"
-#include "../../Utility_Framework/JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include "../Experiment/Cooked/CookedAssetCatalog.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 class Texture;
 

@@ -1,12 +1,17 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../../Engine/RenderEngine/MaterialGraphInstancePins.h"
 #include "../../Engine/RenderEngine/Texture.h"
 #include "material_owner_checks.h"
 #include "material_runtime_tests.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedAssetCatalog.h"
-#include "../../Engine/Utility_Framework/AuthoringWriteNode.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringWriteNode.h"
 
 #include <stdint.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 void VerifyMaterialRuntime(const material_graph::VerifiedProduct& numericProduct,
                            const experiment::cooked::CookedAssetCatalog& catalog,

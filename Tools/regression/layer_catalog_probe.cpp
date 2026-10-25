@@ -1,8 +1,17 @@
-#include "../../Engine/Utility_Framework/LayerCatalog.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.LayerCatalog.h"
+#else
+import Creator.Core.LayerCatalog;
+#endif
 #include "../../Engine/Physics/PhysicsCollisionPolicy.h"
 #include "../../Engine/SceneRuntime/SceneLayerIndex.h"
 #include "../../Engine/SceneRuntime/ProjectLayerSettingsIO.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -29,17 +38,17 @@ void exercise()
     const auto wall = catalog.Add("Wall");
     check(actor && wall, "add common layers");
     const auto before = catalog.Snapshot();
-    const auto actor_slot = before->Find(*actor)->slot;
-    check(before->Find("Actor")->id == *actor, "name resolves stable identity");
+    const auto actor_slot = before->find(*actor)->slot;
+    check(before->find("Actor")->id == *actor, "name resolves stable identity");
     check(!catalog.Add("Actor") && catalog.Snapshot() == before, "duplicate failure is transactional");
     check(!catalog.Add(std::string_view("bad\0name", 8)) && !catalog.Rename(*actor, std::string_view("\xc0\x80", 2)),
           "malformed names cannot enter the catalog");
     check(!catalog.Rename(default_layer, "Changed") && !catalog.Retire(default_layer), "Default is reserved");
     check(bool(catalog.Rename(*actor, "Hero")), "rename succeeds");
-    check(catalog.Snapshot()->Find("Hero")->id == *actor && catalog.Snapshot()->Find(*actor)->slot == actor_slot,
+    check(catalog.Snapshot()->find("Hero")->id == *actor && catalog.Snapshot()->find(*actor)->slot == actor_slot,
           "rename changes neither ID nor mask");
-    check(before->Find("Actor") && !before->Find("Hero"), "retained snapshot remains immutable");
-    check(!catalog.Snapshot()->Find("missing") && !catalog.Snapshot()->Find(layer_id{999}),
+    check(before->find("Actor") && !before->find("Hero"), "retained snapshot remains immutable");
+    check(!catalog.Snapshot()->find("missing") && !catalog.Snapshot()->find(layer_id{999}),
           "missing layer never silently maps to Default");
 
     ce::physics::PhysicsCollisionPolicy policy;
@@ -47,7 +56,7 @@ void exercise()
     auto definitions = catalog.Snapshot();
     check(bool(policy.Set(*definitions, *actor, *wall, false)), "update collision policy");
     const auto changed = policy.Snapshot();
-    const auto wall_slot = definitions->Find(*wall)->slot;
+    const auto wall_slot = definitions->find(*wall)->slot;
     check(!changed->Allows(actor_slot, wall_slot) && !changed->Allows(wall_slot, actor_slot), "policy is symmetric");
     check(initial_policy->Allows(actor_slot, wall_slot), "reader-held policy survives update");
     const auto filter = changed->Filter(*definitions, *actor);
@@ -85,19 +94,19 @@ void exercise()
     std::jthread foreign([&] {
         owner_rejected = !catalog.Add("Foreign") && !policy.Set(*definitions, *actor, *wall, true) &&
                          !index.Remove(entity) && !index.Members(*definitions, *actor);
-        check(catalog.Snapshot()->Find(*actor) != nullptr, "immutable snapshot is readable off owner");
+        check(catalog.Snapshot()->find(*actor) != nullptr, "immutable snapshot is readable off owner");
     });
     foreign.join();
     check(owner_rejected, "foreign mutation rejected");
 
     check(bool(catalog.Retire(*actor)), "retire layer");
     auto replacement = catalog.Add("Hero");
-    check(replacement && *replacement != *actor && catalog.Snapshot()->Find(*replacement)->slot != actor_slot,
+    check(replacement && *replacement != *actor && catalog.Snapshot()->find(*replacement)->slot != actor_slot,
           "retired name may return but ID and slot never reuse");
     check(!policy.Snapshot()->Filter(*catalog.Snapshot(), *actor), "retired layer cannot create filters");
     check(bool(catalog.Replace(*original)), "authoring restore succeeds");
     const auto restored = catalog.Add("AfterRestore");
-    check(restored && restored->value > replacement->value && catalog.Snapshot()->Find(*restored)->slot.Value() > 3,
+    check(restored && restored->value > replacement->value && catalog.Snapshot()->find(*restored)->slot.Value() > 3,
           "restore retains ID high water and tombstone slots");
     auto invalid = *catalog.Snapshot();
     invalid.definitions[1]->id = layer_id{999};
@@ -107,7 +116,7 @@ void exercise()
     for (int i = 1; i < 32; ++i)
         names.push_back("Layer" + std::to_string(i));
     auto imported = LayerCatalog::ImportLegacy(names);
-    check(imported && imported->ActiveMask() == 0xffffffffu, "32 legacy layers preserve every old bit");
+    check(imported && imported->active_mask() == 0xffffffffu, "32 legacy layers preserve every old bit");
     LayerCatalog full;
     check(bool(full.Replace(*imported)) && !full.Add("33rd"), "33rd layer cannot commit");
     names.push_back("33rd");
@@ -135,9 +144,9 @@ void exercise_project(const std::filesystem::path& path)
           "project commits definitions and policy together");
     const auto authored = project.Snapshot();
     check(authored->catalog.revision == authored->revision && authored->policy.revision == authored->revision &&
-              authored->catalog.Find(actor) && !(authored->policy.Filter(authored->catalog, actor)->collides_with & 1),
+              authored->catalog.find(actor) && !(authored->policy.Filter(authored->catalog, actor)->collides_with & 1),
           "single revision contains the paired definition and policy");
-    check(bool(before->catalog.Find(default_layer)) && !before->catalog.Find(actor), "project reader retains old pair");
+    check(bool(before->catalog.find(default_layer)) && !before->catalog.find(actor), "project reader retains old pair");
     check(!project.Change([&](LayerCatalog& catalog, ce::physics::PhysicsCollisionPolicy& policy) -> result<void> {
         check(bool(catalog.Add("MustRollback")), "stage definition before failed policy");
         return policy.Set(*catalog.Snapshot(), layer_id{999}, default_layer, true);
@@ -155,7 +164,7 @@ void exercise_project(const std::filesystem::path& path)
               },
               [&](const auto& prepared) -> result<void> {
                   attempted = true;
-                  check(prepared.catalog.Find(actor)->name == "SavedName" && publishing.Snapshot() == publicationBefore,
+                  check(prepared.catalog.find(actor)->name == "SavedName" && publishing.Snapshot() == publicationBefore,
                         "writer receives prepared pair before memory publication");
                   check(!publishing.Restore(*before), "publication callback cannot reenter a project mutation");
                   return std::unexpected(error::io_failure);
@@ -168,7 +177,7 @@ void exercise_project(const std::filesystem::path& path)
     auto encoded = ProjectLayerSettingsCodec::Encode(*authored);
     check(bool(encoded), "encode typed binary project settings");
     auto decoded = ProjectLayerSettingsCodec::Decode(*encoded);
-    check(decoded && decoded->catalog.Find(actor)->name == "플레이어" &&
+    check(decoded && decoded->catalog.find(actor)->name == "플레이어" &&
               decoded->policy.matrix == authored->policy.matrix,
           "decode preserves UTF8 IDs slots and matrix");
     check(ProjectLayerSettingsCodec::Encode(*decoded).value() == *encoded, "codec produces canonical bytes");
@@ -219,7 +228,7 @@ void exercise_project(const std::filesystem::path& path)
           "Play-time layer added");
     check(bool(project.Restore(*authored)), "Stop restores catalog and policy together");
     const auto restored = project.Snapshot();
-    check(restored->catalog.Find(actor) && !restored->catalog.Find("CreatedDuringPlay") &&
+    check(restored->catalog.find(actor) && !restored->catalog.find("CreatedDuringPlay") &&
               restored->policy.matrix == authored->policy.matrix && restored->revision > authored->revision,
           "authoring restore keeps monotonic runtime revision");
     check(restored->catalog.definitions[2]->retired && restored->catalog.next_id > authored->catalog.next_id,
@@ -239,7 +248,7 @@ void exercise_project(const std::filesystem::path& path)
                                              })),
           "publish project fixture through writer boundary");
     auto reloaded = ProjectLayerSettingsIO::Read(path);
-    check(reloaded && reloaded->catalog.Find(actor) && reloaded->catalog.definitions[2]->retired &&
+    check(reloaded && reloaded->catalog.find(actor) && reloaded->catalog.definitions[2]->retired &&
               reloaded->policy.matrix == restored->policy.matrix,
           "file reload preserves catalog and policy");
     ProjectLayerSettings player;

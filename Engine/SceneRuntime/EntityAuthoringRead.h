@@ -1,6 +1,6 @@
 #pragma once
 #include "Entity.h"
-#include "AuthoringReadNode.h"
+#include "../Utility_Framework/Authoring/AuthoringReadNode.h"
 
 // SerializationPlan D3-a-2 — 저작 문서에서 Entity 생성 입력을 읽는 어댑터.
 //

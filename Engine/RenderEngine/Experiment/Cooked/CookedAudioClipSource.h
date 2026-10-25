@@ -1,12 +1,21 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 #pragma once
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
 #include "ArtifactByteSource.h"
 #include "CookedAssetManifest.h"
 #include "CookedAudioClipFormat.h"
 #include "../../Assets/AssetIdentityProfile.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace experiment::cooked
 {
@@ -153,9 +162,9 @@ namespace experiment::cooked
             return false;
         }
 
-        Hash::Sha256 artifactHash;
-        Hash::Sha256 payloadHash;
-        artifactHash.Update(headerBytes.data(), headerBytes.size());
+        ce::hash::sha256 artifactHash;
+        ce::hash::sha256 payloadHash;
+        artifactHash.update(headerBytes.data(), headerBytes.size());
         std::array<std::byte, 64u * 1024u> block{};
         std::uint64_t position = 0u;
         while (position < metadata.payloadBytes)
@@ -165,12 +174,12 @@ namespace experiment::cooked
             if (!source.ReadAt(entry.artifactPath,
                 metadata.payloadOffset + position,
                 std::span(block.data(), count), failure)) return false;
-            artifactHash.Update(block.data(), count);
-            payloadHash.Update(block.data(), count);
+            artifactHash.update(block.data(), count);
+            payloadHash.update(block.data(), count);
             position += count;
         }
-        if (artifactHash.Finish() != entry.contentSha256
-            || payloadHash.Finish() != metadata.payloadSha256)
+        if (artifactHash.finish() != entry.contentSha256
+            || payloadHash.finish() != metadata.payloadSha256)
         {
             failure = "audio artifact or payload hash differs from manifest";
             return false;

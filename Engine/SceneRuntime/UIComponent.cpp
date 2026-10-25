@@ -1,10 +1,10 @@
 #include "UIComponent.h"
-#include "AuthoringNodeViewAccess.h" // D3-a-4
+#include "../Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-4
 #include "Entity.h"
 #include "Canvas.h"
 #include "UIManager.h"
 #include "Scene.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 float MaxOreder = 100.0f;
 
@@ -28,7 +28,7 @@ void UIComponent::SetCanvas(Canvas* canvas)
 	// 매 프레임 이름 변화를 폴링해 자식들 문자열을 갱신했다(6-2에서 제거).
 	// 런타임 연결은 이제 직접 참조라 이름이 어긋나도 동작에는 영향이 없고,
 	// 이 값은 다음 로드 때 캔버스를 되찾는 열쇠로만 쓰인다.
-	m_ownerCanvasName = canvas->GetOwner()->m_name.ToString();
+	m_ownerCanvasName = canvas->GetOwner()->m_name;
 }
 
 Canvas* UIComponent::GetOwnerCanvas()

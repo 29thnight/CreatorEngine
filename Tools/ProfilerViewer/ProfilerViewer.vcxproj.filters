@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <ItemGroup>
+    <Filter Include="Headers">
+      <UniqueIdentifier>{15CDA537-835F-5B89-9976-AFF7411916C4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Presentation">
+      <UniqueIdentifier>{08F1794E-D5BB-5D92-A52F-F1D5C63F890C}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source">
+      <UniqueIdentifier>{EF7927B1-D556-5ABB-85B6-9EB0ED8B6357}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="Presentation\ProfilerAnimation.cpp">
+      <Filter>Presentation</Filter>
+    </ClCompile>
+    <ClCompile Include="Presentation\ProfilerCaptureDialog.cpp">
+      <Filter>Presentation</Filter>
+    </ClCompile>
+    <ClCompile Include="Presentation\ProfilerDxCapture.cpp">
+      <Filter>Presentation</Filter>
+    </ClCompile>
+    <ClCompile Include="Presentation\ProfilerFrameOverview.cpp">
+      <Filter>Presentation</Filter>
+    </ClCompile>
+    <ClCompile Include="Presentation\ProfilerLiveDiagnostics.cpp">
+      <Filter>Presentation</Filter>
+    </ClCompile>
+    <ClCompile Include="Presentation\ProfilerMemory.cpp">
+      <Filter>Presentation</Filter>
+    </ClCompile>
+    <ClCompile Include="Presentation\ProfilerRendering.cpp">
+      <Filter>Presentation</Filter>
+    </ClCompile>
+    <ClCompile Include="Presentation\ProfilerTables.cpp">
+      <Filter>Presentation</Filter>
+    </ClCompile>
+    <ClCompile Include="Presentation\ProfilerTelemetry.cpp">
+      <Filter>Presentation</Filter>
+    </ClCompile>
+    <ClCompile Include="Presentation\ProfilerTimeline.cpp">
+      <Filter>Presentation</Filter>
+    </ClCompile>
+    <ClCompile Include="Presentation\ProfilerWindow.cpp">
+      <Filter>Presentation</Filter>
+    </ClCompile>
+    <ClCompile Include="ProfilerViewer.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="PreparationWorker.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="Presentation\ProfilerLiveDiagnostics.h">
+      <Filter>Presentation</Filter>
+    </ClInclude>
+    <ClInclude Include="Presentation\ProfilerPresenter.h">
+      <Filter>Presentation</Filter>
+    </ClInclude>
+    <ClInclude Include="Presentation\ProfilerView.h">
+      <Filter>Presentation</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfilerViewerResources.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="ViewerArguments.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="ViewerWindowChrome.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <Image Include="ProfilerViewer.ico">
+      <Filter>Source</Filter>
+    </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="ProfilerViewer.rc">
+      <Filter>Source</Filter>
+    </ResourceCompile>
+  </ItemGroup>
+</Project>

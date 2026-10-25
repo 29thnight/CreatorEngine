@@ -1,11 +1,15 @@
 #include "MeshLodBuilder.h"
 
 #include "MeshletBuilder.h"
-#include "Sha256.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 #include "meshoptimizer.h"
 
 #include <stdint.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace experiment::importer
 {
@@ -82,23 +86,23 @@ bool MeshLodBaseValid(const Mesh& mesh, std::string& diagnostic)
     return true;
 }
 
-void MeshLodHashU32(Hash::Sha256& hash, std::uint32_t value) noexcept
+void MeshLodHashU32(ce::hash::sha256& hash, std::uint32_t value) noexcept
 {
-    hash.Update(&value, sizeof(value));
+    hash.update(&value, sizeof(value));
 }
 
 template<class T>
-void MeshLodHashVector(Hash::Sha256& hash, const std::vector<T>& values) noexcept
+void MeshLodHashVector(ce::hash::sha256& hash, const std::vector<T>& values) noexcept
 {
     const auto count = static_cast<std::uint64_t>(values.size());
-    hash.Update(&count, sizeof(count));
+    hash.update(&count, sizeof(count));
     if (!values.empty())
     {
-        hash.Update(values.data(), values.size() * sizeof(T));
+        hash.update(values.data(), values.size() * sizeof(T));
     }
 }
 
-void MeshLodHashMeshletSettings(Hash::Sha256& hash, const MeshletBuildSettings& settings) noexcept
+void MeshLodHashMeshletSettings(ce::hash::sha256& hash, const MeshletBuildSettings& settings) noexcept
 {
     MeshLodHashU32(hash, settings.profileVersion);
     MeshLodHashU32(hash, settings.builderVersion);
@@ -454,16 +458,16 @@ bool MeshLodBuildChain(const Mesh& mesh, MeshLodChain& result, std::string& diag
 
 MeshletGeometryDigest ComputeMeshLodGeometryDigest(const Mesh& mesh, const MeshLodChain& lods) noexcept
 {
-    Hash::Sha256 hash;
+    ce::hash::sha256 hash;
     constexpr char domain[] = "CreatorEngine.SpatialClusterDag.v3";
-    hash.Update(domain, sizeof(domain) - 1u);
+    hash.update(domain, sizeof(domain) - 1u);
     MeshLodHashU32(hash, mesh.vertices.AttributeMask());
     MeshLodHashU32(hash, mesh.vertices.Stride());
     const auto vertexBytes = static_cast<std::uint64_t>(mesh.vertices.ByteSize());
-    hash.Update(&vertexBytes, sizeof(vertexBytes));
+    hash.update(&vertexBytes, sizeof(vertexBytes));
     if (vertexBytes)
     {
-        hash.Update(mesh.vertices.Bytes().data(), mesh.vertices.ByteSize());
+        hash.update(mesh.vertices.Bytes().data(), mesh.vertices.ByteSize());
     }
     MeshLodHashVector(hash, mesh.indices);
     MeshLodHashU32(hash, lods.settings.builderVersion);
@@ -479,7 +483,7 @@ MeshletGeometryDigest ComputeMeshLodGeometryDigest(const Mesh& mesh, const MeshL
         MeshLodHashVector(hash, level.indices);
         const auto& meshlets = level.meshlets;
         MeshLodHashMeshletSettings(hash, meshlets.settings);
-        hash.Update(meshlets.geometryDigest.data(), meshlets.geometryDigest.size());
+        hash.update(meshlets.geometryDigest.data(), meshlets.geometryDigest.size());
         MeshLodHashVector(hash, meshlets.descriptors);
         MeshLodHashVector(hash, meshlets.vertexRemap);
         MeshLodHashVector(hash, meshlets.triangleIndices);
@@ -488,7 +492,7 @@ MeshletGeometryDigest ComputeMeshLodGeometryDigest(const Mesh& mesh, const MeshL
         MeshLodHashU32(hash, meshlets.lod0.meshletCount);
     }
     MeshLodHashVector(hash, lods.groups);
-    return hash.Finish();
+    return hash.finish();
 }
 
 bool BuildMeshLods(const Mesh& mesh, MeshLodChain& outLods, std::string& diagnostic,

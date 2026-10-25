@@ -76,8 +76,8 @@ def main():
               root / 'Engine/RenderEngine/MaterialGraphGeometryContract.h',
               root / 'Engine/RenderEngine/MaterialGraphVisibilityContract.h',
               root / 'Engine/RenderEngine/MaterialGraphPreparationTasks.h',
-              root / 'Engine/Utility_Framework/JobScheduler.cpp',
-              root / 'Engine/Utility_Framework/ThreadPool.cpp', enki / 'TaskScheduler.cpp']
+              root / 'Engine/Utility_Framework/Concurrency/JobScheduler.cpp',
+              root / 'Engine/Utility_Framework/Concurrency/ThreadPool.cpp', enki / 'TaskScheduler.cpp']
     probe = Path(__file__).with_name('scene_cpu_preparation_probe.cpp')
     snapshots = {path: path.read_bytes() for path in inputs + [probe]}
     hashes = {path: hashlib.sha256(content).hexdigest() for path, content in snapshots.items()}
@@ -130,8 +130,8 @@ def main():
         executable = output / 'scene-cpu-preparation'
         command = [args.compiler, '-std=c++23', '-O2', '-g', '-pthread', '-DCE_CONTRACT_STANDALONE=1',
                    '-DCE_SHIPPING=1', '-I', str(output), '-I', str(root),
-                   str(probe), str(root / 'Engine/Utility_Framework/JobScheduler.cpp'),
-                   str(root / 'Engine/Utility_Framework/ThreadPool.cpp'), str(enki / 'TaskScheduler.cpp'),
+                   str(probe), str(root / 'Engine/Utility_Framework/Concurrency/JobScheduler.cpp'),
+                   str(root / 'Engine/Utility_Framework/Concurrency/ThreadPool.cpp'), str(enki / 'TaskScheduler.cpp'),
                    '-o', str(executable)]
         if args.sanitize != 'none':
             command += ['-fsanitize=' + ('address,undefined' if args.sanitize == 'address' else 'thread'),

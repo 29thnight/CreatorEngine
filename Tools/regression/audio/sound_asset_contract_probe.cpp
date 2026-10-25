@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 #include "Audio/AudioCatalog.h"
 #include "Audio/AudioRuntime.h"
 #include "Audio/EditorAudioClipCache.h"
@@ -5,10 +10,10 @@
 #include "Audio/NullAudioBackend.h"
 #include "Audio/MiniaudioBackend.h"
 #include "Audio/SoundAssetSerialization.h"
-#include "AuthoringParseTelemetry.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringParseTelemetry.h"
 
 #include <stdio.h>
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -24,8 +29,8 @@ namespace
 
     wave::ClipKey Guid(unsigned value)
     {
-        auto id = Uuid::Parse("01234567-89ab-4cde-8fab-0123456789ab");
-        id.data[15] = static_cast<std::uint8_t>(value);
+        auto id = uuid::parse("01234567-89ab-4cde-8fab-0123456789ab");
+        id.data_[15] = static_cast<std::uint8_t>(value);
         return wave::ClipKey::FromGuid(id);
     }
 
@@ -193,7 +198,7 @@ namespace
             && oldSource.Metadata().frameCount == 4800u, "Editor import preserves requested load/spatial policy and actual PCM metadata");
         std::vector<std::byte> payload(oldSource.PayloadSize());
         Check(oldSource.ReadPayload(0u, payload, error) && payload == original
-            && Hash::Sha256::Compute(payload.data(), payload.size()) == oldSource.Metadata().payloadSha256,
+            && ce::hash::sha256::compute(payload.data(), payload.size()) == oldSource.Metadata().payloadSha256,
             "Editor cached source contains full original encoded payload with matching digest");
         const auto changed = ReadBytes(formats / "impulse.wav");
         WriteBytes(mutableSource, changed);
@@ -206,9 +211,9 @@ namespace
         payload.resize(newSource.PayloadSize());
         Check(newSource.ReadPayload(0u, payload, error) && payload == changed,
             "New mounted source reads newly authored bytes");
-        const auto generation = work / "cache" / (Hash::ToHex(newSource.Metadata().payloadSha256)
+        const auto generation = work / "cache" / (ce::hash::to_hex(newSource.Metadata().payloadSha256)
             + "-Stream-PointMono-v1");
-        const experiment::AssetId id{ Uuid::Parse(Guid(1u).Text()) };
+        const experiment::AssetId id{ uuid::parse(Guid(1u).Text()) };
         const auto artifact = generation / ck::MakeDerivedAudioClipArtifactPath(id);
         auto corrupt = ReadBytes(artifact);
         if (!corrupt.empty())
@@ -220,7 +225,7 @@ namespace
         Check(!wave::ImportEditorAudioClip(mutableSource, work / "cache", Guid(1u),
             "Stream", "PointMono", untouched, error), "Corrupt existing immutable cache artifact fails instead of being overwritten");
         Check(ReadBytes(artifact) == corrupt, "Rejected import leaves corrupt existing target byte-identical");
-        const auto oldGeneration = work / "cache" / (Hash::ToHex(oldSource.Metadata().payloadSha256)
+        const auto oldGeneration = work / "cache" / (ce::hash::to_hex(oldSource.Metadata().payloadSha256)
             + "-Stream-PointMono-v1");
         fs::rename(oldGeneration, work / "retired-generation");
         const auto substitute = oldGeneration / ck::MakeDerivedAudioClipArtifactPath(id);
@@ -323,7 +328,7 @@ namespace
             "Resident", "PointMono", untouched, error) && fs::is_empty(outside),
             "Symlink cache root rejected before creating any outside artifact");
         const auto nestedCache = work / "nested-cache";
-        const auto nestedGeneration = nestedCache / (Hash::ToHex(newSource.Metadata().payloadSha256)
+        const auto nestedGeneration = nestedCache / (ce::hash::to_hex(newSource.Metadata().payloadSha256)
             + "-Resident-PointMono-v1");
         fs::create_directories(nestedGeneration);
         fs::create_directory_symlink(outside, nestedGeneration / "Derived");

@@ -1,9 +1,13 @@
 #pragma once
-#include "Ownership.h"
-#include "Reflection.hpp"
-#include "TypeTrait.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../Utility_Framework/Reflection/Reflection.hpp"
+#include "../../Utility_Framework/Reflection/TypeTrait.h"
 #include "../AssetDepot/AssetLink.h"
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 class Material;
 namespace material_graph

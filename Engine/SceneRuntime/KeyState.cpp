@@ -22,7 +22,7 @@ void KeyboardState::Update()
 {
 	for (unsigned int i = 0; i < kKeyboardCount; ++i)
 	{
-		bool isDown = InputManagement->m_curKeyStates.Test(i);
+		bool isDown = InputManagement->m_curKeyStates.test(i);
 		KeyState current = GetKeyState(i);
 		SetKeyState(i, NextKeyState(current, isDown));
 	}
@@ -32,7 +32,7 @@ void MouseState::Update()
 {
 	for (size_t i = 0; i < kMouseCount; ++i)
 	{
-		bool isDown = InputManagement->m_curMouseState.Test(i);
+		bool isDown = InputManagement->m_curMouseState.test(i);
 		KeyState current = GetKeyState(i);
 		SetKeyState(i, NextKeyState(current, isDown));
 	}
@@ -44,7 +44,7 @@ void PadState::Update()
 	{
 		for (size_t btn = 0; btn < kGamepadKeyCount; ++btn)
 		{
-			bool isDown = InputManagement->m_curPadState[padNum].Test(btn);
+			bool isDown = InputManagement->m_curPadState[padNum].test(btn);
 			KeyState current = GetKeyState(padNum, btn);
 			SetKeyState(padNum, btn, NextKeyState(current, isDown));
 		}

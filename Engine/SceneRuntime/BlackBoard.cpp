@@ -1,19 +1,29 @@
-#include "AuthoringParsedDocument.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../Utility_Framework/Authoring/AuthoringParsedDocument.h"
 #include "BlackBoard.h"
 #include "Entity.h"
 #include "Transform.h"
 #include "SceneManager.h"
 #include "Interfaces/AssetAuthoringPort.h"
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
 	// 이름→경로 규약은 한 곳에만 둔다. 저작 쓰기와 런타임 읽기가 각자 경로를
 	// 조립하면 조용히 갈라진다.
-	file::path ResolveBlackBoardPath(std::string_view name)
+	std::filesystem::path ResolveBlackBoardPath(std::string_view name)
 	{
-		return PathFinder::Relative(
+		return ce::paths::relative(
 			"BehaviorTree\\" + std::string(name) + ".blackboard");
 	}
 }
@@ -53,7 +63,7 @@ void BlackBoard::SetValueAsBool(const std::string& key, bool value)
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Bool;
 	entry.BoolValue = value;
-	//m_valueChangedDelegate.Broadcast(key);
+	//m_valueChangedDelegate.broadcast(key);
 }
 
 void BlackBoard::SetValueAsInt(const std::string& key, int value)
@@ -61,7 +71,7 @@ void BlackBoard::SetValueAsInt(const std::string& key, int value)
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Int;
 	entry.IntValue = value;
-	//m_valueChangedDelegate.Broadcast(key);
+	//m_valueChangedDelegate.broadcast(key);
 }
 
 void BlackBoard::SetValueAsFloat(const std::string& key, float value)
@@ -69,7 +79,7 @@ void BlackBoard::SetValueAsFloat(const std::string& key, float value)
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Float;
 	entry.FloatValue = value;
-	//m_valueChangedDelegate.Broadcast(key);
+	//m_valueChangedDelegate.broadcast(key);
 }
 
 void BlackBoard::SetValueAsString(const std::string& key, const std::string& value)
@@ -77,7 +87,7 @@ void BlackBoard::SetValueAsString(const std::string& key, const std::string& val
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::String;
 	entry.StringValue = value;
-	//m_valueChangedDelegate.Broadcast(key);
+	//m_valueChangedDelegate.broadcast(key);
 }
 
 void BlackBoard::SetValueAsVector2(const std::string& key, const math::vector2& value)
@@ -85,7 +95,7 @@ void BlackBoard::SetValueAsVector2(const std::string& key, const math::vector2& 
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Vector2;
 	entry.Vec2Value = value;
-	//m_valueChangedDelegate.Broadcast(key);
+	//m_valueChangedDelegate.broadcast(key);
 }
 
 void BlackBoard::SetValueAsVector3(const std::string& key, const math::vector3& value)
@@ -93,7 +103,7 @@ void BlackBoard::SetValueAsVector3(const std::string& key, const math::vector3& 
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Vector3;
 	entry.Vec3Value = value;
-	//m_valueChangedDelegate.Broadcast(key);
+	//m_valueChangedDelegate.broadcast(key);
 }
 
 void BlackBoard::SetValueAsVector4(const std::string& key, const math::vector4& value)
@@ -101,7 +111,7 @@ void BlackBoard::SetValueAsVector4(const std::string& key, const math::vector4& 
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Vector4;
 	entry.Vec4Value = value;
-	//m_valueChangedDelegate.Broadcast(key);
+	//m_valueChangedDelegate.broadcast(key);
 }
 
 void BlackBoard::SetValueAsGameObject(const std::string& key, const std::string& objectName)
@@ -109,7 +119,7 @@ void BlackBoard::SetValueAsGameObject(const std::string& key, const std::string&
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Entity;
 	entry.StringValue = objectName;
-	//m_valueChangedDelegate.Broadcast(key);
+	//m_valueChangedDelegate.broadcast(key);
 }
 
 void BlackBoard::SetValueAsTransform(const std::string& key, const std::string& transformPath)
@@ -117,7 +127,7 @@ void BlackBoard::SetValueAsTransform(const std::string& key, const std::string& 
 	auto& entry = GetOrCreate(key);
 	entry.Type = BlackBoardType::Transform;
 	entry.StringValue = transformPath;
-	//m_valueChangedDelegate.Broadcast(key);
+	//m_valueChangedDelegate.broadcast(key);
 }
 
 // Getters
@@ -252,7 +262,7 @@ bool BlackBoard::Serialize(std::string_view name)
 
 	// 목적 경로는 런타임 읽기와 같은 규약에서 만든다. 확장자를 붙이고 파일을
 	// 게시하는 일은 Editor Host가 소유한다.
-	const file::path assetPath = ResolveBlackBoardPath(name);
+	const std::filesystem::path assetPath = ResolveBlackBoardPath(name);
 
 	TextAssetAuthoringRequest request{};
 	request.destinationDirectory = assetPath.parent_path();
@@ -278,8 +288,8 @@ void BlackBoard::Deserialize(std::string_view name)
 		m_name = name;
 	}
 
-	file::path filePath = ResolveBlackBoardPath(name);
-	if (!file::exists(filePath))
+	std::filesystem::path filePath = ResolveBlackBoardPath(name);
+	if (!std::filesystem::exists(filePath))
 	{
 		Debug::PrintLog(spdlog::level::err, "Blackboard file not found: " + filePath.string());
 

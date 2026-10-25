@@ -2,8 +2,12 @@
 #include "EditorWindowNames.h"
 #include <imgui.h>
 #include <imgui_internal.h>
-#include <Windows.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 int wmain(int argc,wchar_t** argv)
 {

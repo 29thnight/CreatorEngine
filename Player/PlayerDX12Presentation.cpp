@@ -1,3 +1,14 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "../Engine/RenderEngine/RenderAllocator.h"
 #include "PlayerPresentation.h"
 #include "PlayerTemporalDX12.h"
@@ -8,15 +19,17 @@
 
 #include <stdint.h>
 #include <stdio.h>
-#include "../Engine/Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
+#include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 namespace Player
 {
     namespace
     {
-        template<typename T>
-        using ComPtr = Microsoft::WRL::ComPtr<T>;
 
         class DX12Presentation final : public Presentation
         {
@@ -157,7 +170,7 @@ namespace Player
                 {
                     // Release every borrowed backbuffer before replacing SDK ownership.
                     m_proxyBuffers = {};
-                    m_proxyRtv.Reset();
+                    m_proxyRtv = nullptr;
                     if (!m_temporal->Shutdown(outError, false) ||
                         !m_temporal->Configure(m_window, width, height, outError) ||
                         !(m_temporal->HasProxy() ? CreateProxyViews(outError) :
@@ -248,7 +261,7 @@ namespace Player
                 {
                     SharedImage image{};
                     const HRESULT result = m_resources.GetDevice()->OpenSharedHandle(
-                        sharedHandle, IID_PPV_ARGS(&image.resource));
+                        sharedHandle, IID_PPV_ARGS(image.resource.put()));
                     if (FAILED(result))
                     {
                         m_recordingError = "Player DX12 could not open the producer display image: " +
@@ -277,7 +290,7 @@ namespace Player
                 view.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
                 view.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
                 view.Texture2D.MipLevels = 1;
-                m_resources.GetDevice()->CreateShaderResourceView(cached->resource.Get(), &view,
+                m_resources.GetDevice()->CreateShaderResourceView(cached->resource.get(), &view,
                     m_srvHeap->GetCPUDescriptorHandleForHeapStart());
                 m_pendingUse = {std::move(consumerLease), cached->resource};
                 return 1;
@@ -326,7 +339,7 @@ namespace Player
                 auto* commands = m_resources.GetCommandList();
                 const uint32_t index = temporal ? m_temporal->GetSwapchain()->GetCurrentBackBufferIndex() :
                     m_resources.GetBackBufferIndex();
-                auto* backBuffer = temporal ? m_proxyBuffers[index].Get() : m_resources.GetBackBuffer(index);
+                auto* backBuffer = temporal ? m_proxyBuffers[index].get() : m_resources.GetBackBuffer(index);
                 D3D12_RESOURCE_BARRIER targetBarrier{};
                 targetBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
                 targetBarrier.Transition = {backBuffer, D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
@@ -356,14 +369,14 @@ namespace Player
                     }
                     D3D12_RESOURCE_BARRIER sourceBarrier{};
                     sourceBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                    sourceBarrier.Transition = {m_pendingUse.resource.Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                    sourceBarrier.Transition = {m_pendingUse.resource.get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
                                                 D3D12_RESOURCE_STATE_COMMON,
                                                 D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE};
                     if (!sdkColor) commands->ResourceBarrier(1, &sourceBarrier);
-                    ID3D12DescriptorHeap* heaps[]{m_srvHeap.Get()};
+                    ID3D12DescriptorHeap* heaps[]{m_srvHeap.get()};
                     commands->SetDescriptorHeaps(1, heaps);
-                    commands->SetGraphicsRootSignature(m_rootSignature.Get());
-                    commands->SetPipelineState(m_pipeline.Get());
+                    commands->SetGraphicsRootSignature(m_rootSignature.get());
+                    commands->SetPipelineState(m_pipeline.get());
                     commands->SetGraphicsRootDescriptorTable(0, m_srvHeap->GetGPUDescriptorHandleForHeapStart());
                     const D3D12_VIEWPORT viewport{0.0f, 0.0f, static_cast<float>(m_width),
                         static_cast<float>(m_height), 0.0f, 1.0f};
@@ -432,7 +445,7 @@ namespace Player
                 {
                     std::string error;
                     m_proxyBuffers = {};
-                    m_proxyRtv.Reset();
+                    m_proxyRtv = nullptr;
                     if (m_temporal && !m_temporal->Shutdown(error))
                     {
                         MarkShutdownFailure();
@@ -485,13 +498,13 @@ namespace Player
                     CloseHandle(m_shutdownFenceEvent);
                     m_shutdownFenceEvent = nullptr;
                 }
-                m_shutdownFence.Reset();
+                m_shutdownFence = nullptr;
                 m_pendingUse = {};
                 m_submittedUse = {};
                 m_sharedImages = {};
-                m_pipeline.Reset();
-                m_rootSignature.Reset();
-                m_srvHeap.Reset();
+                m_pipeline = nullptr;
+                m_rootSignature = nullptr;
+                m_srvHeap = nullptr;
                 m_resources.Shutdown();
                 m_consumerFence = 0;
                 m_nextSharedImage = 0;
@@ -512,19 +525,19 @@ namespace Player
                 D3D12_DESCRIPTOR_HEAP_DESC description{};
                 description.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
                 description.NumDescriptors = DX12DeviceResources::kFrameCount;
-                if (FAILED(m_resources.GetDevice()->CreateDescriptorHeap(&description, IID_PPV_ARGS(&m_proxyRtv))))
+                if (FAILED(m_resources.GetDevice()->CreateDescriptorHeap(&description, IID_PPV_ARGS(m_proxyRtv.put()))))
                 {
                     error = "Could not create Player SDK proxy backbuffer views";
                     return false;
                 }
                 for (uint32_t index = 0; index < m_proxyBuffers.size(); ++index)
                 {
-                    if (FAILED(m_temporal->GetSwapchain()->GetBuffer(index, IID_PPV_ARGS(&m_proxyBuffers[index]))))
+                    if (FAILED(m_temporal->GetSwapchain()->GetBuffer(index, IID_PPV_ARGS(m_proxyBuffers[index].put()))))
                     {
                         error = "Could not obtain Player SDK proxy backbuffer";
                         return false;
                     }
-                    m_resources.GetDevice()->CreateRenderTargetView(m_proxyBuffers[index].Get(), nullptr, ProxyRtv(index));
+                    m_resources.GetDevice()->CreateRenderTargetView(m_proxyBuffers[index].get(), nullptr, ProxyRtv(index));
                 }
                 return true;
             }
@@ -533,7 +546,7 @@ namespace Player
                 const std::string failure = error;
                 m_temporal->LatchFailure(failure, recordingAborted);
                 m_proxyBuffers = {};
-                m_proxyRtv.Reset();
+                m_proxyRtv = nullptr;
                 // A provider may fail after submission. Only a proven SDK drain
                 // permits fallback; otherwise normal shutdown quarantines owners.
                 if (!m_temporal->Shutdown(error, false)) return false;
@@ -556,7 +569,7 @@ namespace Player
                 if (!m_temporal->Drain(error)) return false;
                 CollectDisplayUse();
                 m_proxyBuffers = {};
-                m_proxyRtv.Reset();
+                m_proxyRtv = nullptr;
                 if (!m_temporal->Shutdown(error, false)) return false;
                 if (m_resources.HasSwapChain() && !m_resources.DetachSwapChain(error)) return false;
                 if (!m_temporal->Configure(m_window, m_width, m_height, error)) return false;
@@ -569,13 +582,13 @@ namespace Player
             struct DisplayUse
             {
                 own::shared_owner<RHIDisplayConsumerLease> lease;
-                ComPtr<ID3D12Resource> resource;
+                winrt::com_ptr<ID3D12Resource> resource;
             };
             struct SharedImage
             {
                 void* handle{nullptr};
                 own::weak_owner<RHIDisplayConsumerLease> lease;
-                ComPtr<ID3D12Resource> resource;
+                winrt::com_ptr<ID3D12Resource> resource;
             };
 
             bool CompleteAbandonedQueue()
@@ -583,12 +596,12 @@ namespace Player
                 // Exceptional shutdown recovery only. The RHI owner has been abandoned,
                 // so no submission thread can concurrently access this queue anymore.
                 if (!m_resources.GetCommandQueue() || FAILED(m_resources.GetDevice()->CreateFence(
-                        0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_shutdownFence))))
+                        0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_shutdownFence.put()))))
                 {
                     return false;
                 }
                 m_shutdownFenceEvent = CreateEvent(nullptr, FALSE, FALSE, nullptr);
-                if (!m_shutdownFenceEvent || FAILED(m_resources.GetCommandQueue()->Signal(m_shutdownFence.Get(), 1)) ||
+                if (!m_shutdownFenceEvent || FAILED(m_resources.GetCommandQueue()->Signal(m_shutdownFence.get(), 1)) ||
                     FAILED(m_shutdownFence->SetEventOnCompletion(1, m_shutdownFenceEvent)))
                 {
                     return false;
@@ -615,7 +628,7 @@ namespace Player
                 heap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
                 heap.NumDescriptors = 1;
                 heap.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-                if (FAILED(m_resources.GetDevice()->CreateDescriptorHeap(&heap, IID_PPV_ARGS(&m_srvHeap))))
+                if (FAILED(m_resources.GetDevice()->CreateDescriptorHeap(&heap, IID_PPV_ARGS(m_srvHeap.put()))))
                 {
                     outError = "Player DX12 display descriptor creation failed";
                     return false;
@@ -641,10 +654,10 @@ namespace Player
                 signature.pParameters = &parameter;
                 signature.NumStaticSamplers = 1;
                 signature.pStaticSamplers = &sampler;
-                ComPtr<ID3DBlob> serialized;
-                ComPtr<ID3DBlob> errors;
+                winrt::com_ptr<ID3DBlob> serialized;
+                winrt::com_ptr<ID3DBlob> errors;
                 HRESULT result = D3D12SerializeRootSignature(&signature, D3D_ROOT_SIGNATURE_VERSION_1,
-                    &serialized, &errors);
+            serialized.put(), errors.put());
                 if (FAILED(result))
                 {
                     outError = "Player DX12 root signature serialization failed";
@@ -656,7 +669,7 @@ namespace Player
                     return false;
                 }
                 result = m_resources.GetDevice()->CreateRootSignature(0, serialized->GetBufferPointer(),
-                    serialized->GetBufferSize(), IID_PPV_ARGS(&m_rootSignature));
+                    serialized->GetBufferSize(), IID_PPV_ARGS(m_rootSignature.put()));
                 if (FAILED(result))
                 {
                     outError = "Player DX12 root signature creation failed";
@@ -671,7 +684,7 @@ namespace Player
                     return false;
                 }
                 D3D12_GRAPHICS_PIPELINE_STATE_DESC pipeline{};
-                pipeline.pRootSignature = m_rootSignature.Get();
+                pipeline.pRootSignature = m_rootSignature.get();
                 pipeline.VS = {vertex.Data(), vertex.Size()};
                 pipeline.PS = {pixel.Data(), pixel.Size()};
                 pipeline.BlendState.RenderTarget[0].SrcBlend = D3D12_BLEND_ONE;
@@ -697,7 +710,7 @@ namespace Player
                 pipeline.NumRenderTargets = 1;
                 pipeline.RTVFormats[0] = DXGI_FORMAT_R8G8B8A8_UNORM;
                 pipeline.SampleDesc.Count = 1;
-                if (FAILED(m_resources.GetDevice()->CreateGraphicsPipelineState(&pipeline, IID_PPV_ARGS(&m_pipeline))))
+                if (FAILED(m_resources.GetDevice()->CreateGraphicsPipelineState(&pipeline, IID_PPV_ARGS(m_pipeline.put()))))
                 {
                     outError = "Player DX12 fullscreen pipeline creation failed";
                     return false;
@@ -708,11 +721,11 @@ namespace Player
             DX12DeviceResources m_resources;
             own::unique_owner<TemporalDX12> m_temporal;
             HWND m_window{nullptr};
-            std::array<ComPtr<ID3D12Resource>, DX12DeviceResources::kFrameCount> m_proxyBuffers;
-            ComPtr<ID3D12DescriptorHeap> m_proxyRtv;
-            ComPtr<ID3D12DescriptorHeap> m_srvHeap;
-            ComPtr<ID3D12RootSignature> m_rootSignature;
-            ComPtr<ID3D12PipelineState> m_pipeline;
+            std::array<winrt::com_ptr<ID3D12Resource>, DX12DeviceResources::kFrameCount> m_proxyBuffers;
+            winrt::com_ptr<ID3D12DescriptorHeap> m_proxyRtv;
+            winrt::com_ptr<ID3D12DescriptorHeap> m_srvHeap;
+            winrt::com_ptr<ID3D12RootSignature> m_rootSignature;
+            winrt::com_ptr<ID3D12PipelineState> m_pipeline;
             std::array<SharedImage, DX12DeviceResources::kFrameCount> m_sharedImages{};
             size_t m_nextSharedImage{0};
             DisplayUse m_pendingUse;
@@ -725,7 +738,7 @@ namespace Player
             std::atomic<bool> m_exportTemporalInputs{false};
             bool m_shutdown{true};
             bool m_quarantined{false};
-            ComPtr<ID3D12Fence> m_shutdownFence;
+            winrt::com_ptr<ID3D12Fence> m_shutdownFence;
             HANDLE m_shutdownFenceEvent{nullptr};
             bool m_frameOpen{false};
             bool m_suspended{false};

@@ -7,7 +7,7 @@
 #include "../RHIResourceTypes.h"
 
 #include <stdint.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 /// VkDeviceMemory segment + vkBindBufferMemory adapter.
 class VulkanPersistentHeap

@@ -6,7 +6,7 @@ on:
     paths:
       - 'Tools/regression/**'
       - 'Engine/CommandService/**'
-      - 'Engine/Utility_Framework/RuntimeResults.h'
+      - 'Engine/Utility_Framework/Runtime/RuntimeResults.h'
       - 'Engine/RuntimeHost/EngineBootstrap.h'
       - 'Player/PlayerMain.cpp'
       - 'Editor/EngineEntry/**'
@@ -15,7 +15,7 @@ on:
     paths:
       - 'Tools/regression/**'
       - 'Engine/CommandService/**'
-      - 'Engine/Utility_Framework/RuntimeResults.h'
+      - 'Engine/Utility_Framework/Runtime/RuntimeResults.h'
       - 'Engine/RuntimeHost/EngineBootstrap.h'
       - 'Player/PlayerMain.cpp'
       - 'Editor/EngineEntry/**'

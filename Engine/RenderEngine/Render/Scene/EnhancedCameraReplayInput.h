@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../FrameCameraSnapshot.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // Diagnostic camera/clock slice only. Geometry, materials, pose, tuning and
 // history are NOT archived here. No process-local pointer or publication ID is

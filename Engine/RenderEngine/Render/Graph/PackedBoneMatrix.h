@@ -2,7 +2,7 @@
 
 #include <mathematics/matrix4x4.hpp>
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // Three transposed float4 rows retain every affine bone coefficient. Slang's
 // structured-buffer matrix layout is column-major, so the shader transposes

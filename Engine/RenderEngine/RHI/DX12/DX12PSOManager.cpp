@@ -1,13 +1,37 @@
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "DX12PipelineLayoutTranslate.h"
 #include "DX12PSOManager.h"
 #include "DX12DeviceResources.h"
-#include "PathFinder.h"
 #include "../RHIGraphicsPipelineRequest.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
 
 #include <limits.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 struct DX12PSOManager::PendingCompile
 {
@@ -15,8 +39,8 @@ struct DX12PSOManager::PendingCompile
     RHIMeshPipelineDesc m_meshInput;
     std::vector<std::byte> m_meshBytes, m_pixelBytes;
     std::string m_error;
-    ComPtr<ID3D12RootSignature> m_signature;
-    ComPtr<ID3D12PipelineState> m_result;
+    winrt::com_ptr<ID3D12RootSignature> m_signature;
+    winrt::com_ptr<ID3D12PipelineState> m_result;
     job_handle m_completion;
     std::chrono::steady_clock::time_point m_finished;
 };
@@ -221,7 +245,7 @@ bool DX12PSOManager::Initialize(DX12DeviceResources* resources,
         resolvedCachePath=std::filesystem::path(isolatedCacheRoot)/resolvedCachePath.filename();
     if (resolvedCachePath.is_relative())
     {
-        resolvedCachePath = PathFinder::CachePath("RHI/DX12") / resolvedCachePath;
+        resolvedCachePath = ce::paths::cache_path("RHI/DX12") / resolvedCachePath;
     }
     resolvedCachePath = resolvedCachePath.lexically_normal();
     std::error_code cacheDirectoryError{};
@@ -237,7 +261,7 @@ bool DX12PSOManager::Initialize(DX12DeviceResources* resources,
 
     // PipelineLibrary는 ID3D12Device1부터다. 없으면 메모리 캐시만으로 동작한다 —
     // 기능이 죽는 게 아니라 디스크 캐시만 빠지는 것이므로 실패로 취급하지 않는다.
-    if (FAILED(resources->GetDevice()->QueryInterface(IID_PPV_ARGS(&m_device))))
+    if (FAILED(resources->GetDevice()->QueryInterface(IID_PPV_ARGS(m_device.put()))))
     {
         outError = "ID3D12Device1 미지원 — 디스크 캐시 없이 진행";
         return true;
@@ -288,7 +312,7 @@ bool DX12PSOManager::Initialize(DX12DeviceResources* resources,
             file.close();
 
             const HRESULT hr = m_device->CreatePipelineLibrary(m_libraryBlob.data(),
-                m_libraryBlob.size(), IID_PPV_ARGS(&m_library));
+                m_libraryBlob.size(), IID_PPV_ARGS(m_library.put()));
             if (SUCCEEDED(hr))
             {
                 m_libraryLoadedFromDisk = true;
@@ -309,7 +333,7 @@ bool DX12PSOManager::Initialize(DX12DeviceResources* resources,
 
     if (!m_library)
     {
-        const HRESULT hr = m_device->CreatePipelineLibrary(nullptr, 0, IID_PPV_ARGS(&m_library));
+        const HRESULT hr = m_device->CreatePipelineLibrary(nullptr, 0, IID_PPV_ARGS(m_library.put()));
         if (FAILED(hr))
         {
             outError = "파이프라인 라이브러리 생성 실패 " + PsoHrToString(hr);
@@ -370,17 +394,17 @@ void DX12PSOManager::Shutdown()
         }
     }
     RetireCachedPipelinesLocked({});
-    m_retiredPipelines.Drain([](ComPtr<ID3D12PipelineState>& pipeline)
+    m_retiredPipelines.Drain([](winrt::com_ptr<ID3D12PipelineState>& pipeline)
     {
-        pipeline.Reset();
+        pipeline = nullptr;
     });
-    m_library.Reset();
+    m_library = nullptr;
     m_libraryBlob.clear();
-    m_device.Reset();
+    m_device = nullptr;
     m_resources = nullptr;
 }
 
-DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
+winrt::com_ptr<ID3D12PipelineState> DX12PSOManager::CreateOne(
     const RHIGraphicsPipelineDesc& desc, uint64_t hash, std::string& outError,
     ID3D12RootSignature* ownedSignature)
 {
@@ -486,13 +510,13 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
     d3dDesc.SampleDesc.Count = desc.sampleCount;
 
     const std::wstring name = MakeLibraryName(hash);
-    ComPtr<ID3D12PipelineState> pso;
+    winrt::com_ptr<ID3D12PipelineState> pso;
 
     // 1) 라이브러리에서 복원 시도 — 성공하면 드라이버 컴파일이 없다.
     if (m_library)
     {
         const HRESULT hr = m_library->LoadGraphicsPipeline(name.c_str(), &d3dDesc,
-            IID_PPV_ARGS(&pso));
+            IID_PPV_ARGS(pso.put()));
         trace.libraryMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-trace.started).count();
         if (SUCCEEDED(hr))
         {
@@ -512,7 +536,7 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
     }
 
     const auto nativeStart=std::chrono::steady_clock::now();
-    const HRESULT hr = m_device->CreateGraphicsPipelineState(&d3dDesc, IID_PPV_ARGS(&pso));
+    const HRESULT hr = m_device->CreateGraphicsPipelineState(&d3dDesc, IID_PPV_ARGS(pso.put()));
     trace.nativeMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-nativeStart).count();
     if (FAILED(hr))
     {
@@ -531,14 +555,14 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOne(
     if (m_library)
     {
         const auto storeStart=std::chrono::steady_clock::now();
-        m_library->StorePipeline(name.c_str(), pso.Get());
+        m_library->StorePipeline(name.c_str(), pso.get());
         trace.storeMs=std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-storeStart).count();
     }
 
     return pso;
 }
 
-DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOneCompute(
+winrt::com_ptr<ID3D12PipelineState> DX12PSOManager::CreateOneCompute(
     const RHIComputePipelineDesc& desc, uint64_t hash, std::string& outError)
 {
     D3D12_COMPUTE_PIPELINE_STATE_DESC d3dDesc{};
@@ -553,12 +577,12 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOneCompute(
     d3dDesc.CS = { desc.csBytecode, desc.csSize };
 
     const std::wstring name = MakeLibraryName(hash);
-    ComPtr<ID3D12PipelineState> pso;
+    winrt::com_ptr<ID3D12PipelineState> pso;
 
     if (m_library)
     {
         const HRESULT hr = m_library->LoadComputePipeline(name.c_str(), &d3dDesc,
-            IID_PPV_ARGS(&pso));
+            IID_PPV_ARGS(pso.put()));
         if (SUCCEEDED(hr))
         {
             std::lock_guard<std::mutex> guard(m_mutex);
@@ -573,7 +597,7 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOneCompute(
         return nullptr;
     }
 
-    const HRESULT hr = m_device->CreateComputePipelineState(&d3dDesc, IID_PPV_ARGS(&pso));
+    const HRESULT hr = m_device->CreateComputePipelineState(&d3dDesc, IID_PPV_ARGS(pso.put()));
     if (FAILED(hr))
     {
         outError = "컴퓨트 PSO 생성 실패 " + PsoHrToString(hr);
@@ -589,7 +613,7 @@ DX12PSOManager::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOneCompute(
 
     if (m_library)
     {
-        m_library->StorePipeline(name.c_str(), pso.Get());
+        m_library->StorePipeline(name.c_str(), pso.get());
     }
 
     return pso;
@@ -611,7 +635,7 @@ RHIPipelineHandle DX12PSOManager::GetOrCreateCompute(const RHIComputePipelineDes
         }
     }
 
-    ComPtr<ID3D12PipelineState> pso = CreateOneCompute(desc, hash, outError);
+    winrt::com_ptr<ID3D12PipelineState> pso = CreateOneCompute(desc, hash, outError);
     if (!pso) return {};
 
     std::lock_guard<std::mutex> guard(m_mutex);
@@ -645,7 +669,7 @@ RHIPipelineHandle DX12PSOManager::GetOrCreateMesh(const RHIMeshPipelineDesc& des
     return Publish(hash, std::move(pipeline), ResolveSignature(desc.layout), outError, true);
 }
 
-Microsoft::WRL::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOneMesh(const RHIMeshPipelineDesc& desc,
+winrt::com_ptr<ID3D12PipelineState> DX12PSOManager::CreateOneMesh(const RHIMeshPipelineDesc& desc,
     uint64_t hash,
     std::string& outError)
 {
@@ -715,20 +739,20 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOneMesh(const 
 
     D3D12_PIPELINE_STATE_STREAM_DESC nativeDesc{ sizeof(stream), &stream };
     const auto name = MakeLibraryName(hash);
-    ComPtr<ID3D12PipelineState> pipeline;
-    ComPtr<ID3D12PipelineLibrary1> meshLibrary;
-    if (m_library && SUCCEEDED(m_library.As(&meshLibrary)) &&
-        SUCCEEDED(meshLibrary->LoadPipeline(name.c_str(), &nativeDesc, IID_PPV_ARGS(&pipeline))))
+    winrt::com_ptr<ID3D12PipelineState> pipeline;
+    winrt::com_ptr<ID3D12PipelineLibrary1> meshLibrary;
+    if (m_library && SUCCEEDED(ce::platform::windows::QueryComInterface(m_library, meshLibrary)) &&
+        SUCCEEDED(meshLibrary->LoadPipeline(name.c_str(), &nativeDesc, IID_PPV_ARGS(pipeline.put()))))
     {
         std::lock_guard guard(m_mutex);
         ++m_stats.libraryHits;
     }
     else
     {
-        ComPtr<ID3D12Device2> meshDevice;
-        const HRESULT query = m_device.As(&meshDevice);
+        winrt::com_ptr<ID3D12Device2> meshDevice;
+        const HRESULT query = ce::platform::windows::QueryComInterface(m_device, meshDevice);
         const HRESULT created = SUCCEEDED(query)
-            ? meshDevice->CreatePipelineState(&nativeDesc, IID_PPV_ARGS(&pipeline)) : query;
+            ? meshDevice->CreatePipelineState(&nativeDesc, IID_PPV_ARGS(pipeline.put())) : query;
         if (FAILED(created))
         {
             outError = "DX12 mesh pipeline creation failed: " + PsoHrToString(created);
@@ -742,7 +766,7 @@ Microsoft::WRL::ComPtr<ID3D12PipelineState> DX12PSOManager::CreateOneMesh(const 
         }
         if (m_library)
         {
-            m_library->StorePipeline(name.c_str(), pipeline.Get());
+            m_library->StorePipeline(name.c_str(), pipeline.get());
         }
     }
     return pipeline;
@@ -767,7 +791,7 @@ RHIPipelineRequestState DX12PSOManager::RequestMesh(const RHIMeshPipelineDesc& d
         try { compile->m_completion.wait(); }
         catch (const std::exception& failure) { error=failure.what(); return RHIPipelineRequestState::Failed; }
         if (!compile->m_result) { error=compile->m_error; return RHIPipelineRequestState::Failed; }
-        result=Publish(hash, std::move(compile->m_result), compile->m_signature.Get(), error, true);
+        result=Publish(hash, std::move(compile->m_result), compile->m_signature.get(), error, true);
         return result.IsValid() ? RHIPipelineRequestState::Ready : RHIPipelineRequestState::Failed;
     }
     try {
@@ -779,7 +803,7 @@ RHIPipelineRequestState DX12PSOManager::RequestMesh(const RHIMeshPipelineDesc& d
         compile->m_meshInput=desc;
         compile->m_meshInput.msBytecode=compile->m_meshBytes.data();
         compile->m_meshInput.psBytecode=desc.psSize ? compile->m_pixelBytes.data() : nullptr;
-        compile->m_signature=ResolveSignature(desc.layout);
+        compile->m_signature.copy_from(ResolveSignature(desc.layout));
         if (!compile->m_signature) { error="Invalid mesh layout."; return RHIPipelineRequestState::Failed; }
         m_pending.emplace(hash,compile);
         compile->m_completion=m_scheduler.submit([this,compile,hash] {
@@ -822,7 +846,7 @@ DX12PSOManager::DrawDecision DX12PSOManager::Resolve(const RHIGraphicsPipelineDe
     if (m_fallback)
     {
         ++m_stats.fallbackDraws;
-        if (outPso) *outPso = m_fallback.Get();
+        if (outPso) *outPso = m_fallback.get();
         return DrawDecision::UseFallback;
     }
 
@@ -883,9 +907,9 @@ std::uint32_t DX12PSOManager::CollectRetiredPipelines(RHICompletionPoint complet
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     const RHIRetireCollection collected = m_retiredPipelines.Collect(
-        completed, [](ComPtr<ID3D12PipelineState>& pipeline)
+        completed, [](winrt::com_ptr<ID3D12PipelineState>& pipeline)
         {
-            pipeline.Reset();
+            pipeline = nullptr;
         });
     m_stats.retiredCollections += static_cast<std::uint32_t>(collected.count);
     m_stats.retiredPipelines = static_cast<std::uint32_t>(
@@ -908,7 +932,7 @@ RHIPipelineHandle DX12PSOManager::GetOrCreate(const RHIGraphicsPipelineDesc& des
         }
     }
 
-    ComPtr<ID3D12PipelineState> pso = CreateOne(desc, hash, outError);
+    winrt::com_ptr<ID3D12PipelineState> pso = CreateOne(desc, hash, outError);
     if (!pso) return {};
 
     std::lock_guard<std::mutex> guard(m_mutex);
@@ -923,7 +947,7 @@ RHIPipelineHandle DX12PSOManager::GetOrCreate(const RHIGraphicsPipelineDesc& des
 /// ★ 표 자체에는 락이 없다(DX12ResourceTable). 그래서 발급은 반드시 이 락
 ///   안에서, 즉 부르는 스레드에서만 한다 — 컴파일은 백그라운드로 가도
 ///   등록은 여기로 모인다.
-RHIPipelineHandle DX12PSOManager::Publish(uint64_t hash, ComPtr<ID3D12PipelineState> pso,
+RHIPipelineHandle DX12PSOManager::Publish(uint64_t hash, winrt::com_ptr<ID3D12PipelineState> pso,
     ID3D12RootSignature* signature, std::string& outError, bool meshPipeline, bool computePipeline)
 {
     const auto found = m_cache.find(hash);
@@ -931,7 +955,7 @@ RHIPipelineHandle DX12PSOManager::Publish(uint64_t hash, ComPtr<ID3D12PipelineSt
 
     CacheEntry entry{};
     entry.pso = pso;
-    entry.handle = m_resources->RegisterPipeline(pso.Get(), signature, meshPipeline, computePipeline);
+    entry.handle = m_resources->RegisterPipeline(pso.get(), signature, meshPipeline, computePipeline);
     if (!entry.handle.IsValid())
     {
         ++m_stats.failures;
@@ -950,7 +974,7 @@ std::uint32_t DX12PSOManager::RetireCachedPipelinesLocked(
     for (auto& [hash, entry] : m_cache)
         RetireCacheEntryLocked(entry, retireAfter);
     m_cache.clear();
-    m_fallback.Reset();
+    m_fallback = nullptr;
     return retired;
 }
 
@@ -958,7 +982,7 @@ void DX12PSOManager::RetireCacheEntryLocked(CacheEntry& entry,
     RHICompletionPoint retireAfter)
 {
     if (nullptr != m_resources) m_resources->ReleasePipeline(entry.handle);
-    if (m_fallback.Get() == entry.pso.Get()) m_fallback.Reset();
+    if (m_fallback.get() == entry.pso.get()) m_fallback = nullptr;
     if (entry.pso)
         m_retiredPipelines.Enqueue(retireAfter, std::move(entry.pso));
 }
@@ -980,7 +1004,7 @@ DX12PSOManager::RequestState DX12PSOManager::Request(const RHIGraphicsPipelineDe
     if (found != m_cache.end())
     {
         ++m_stats.memoryHits;
-        if (outPso) *outPso = found->second.pso.Get();
+        if (outPso) *outPso = found->second.pso.get();
         return RequestState::Ready;
     }
 
@@ -1003,12 +1027,12 @@ DX12PSOManager::RequestState DX12PSOManager::Request(const RHIGraphicsPipelineDe
         if (!compile->m_result) return RequestState::Failed;
 
         std::string ignored;
-        if (!Publish(hash, compile->m_result, compile->m_signature.Get(), ignored).IsValid())
+        if (!Publish(hash, compile->m_result, compile->m_signature.get(), ignored).IsValid())
             return RequestState::Failed;
         if (GetEnvironmentVariableA("CE_TRACE_SHADER_COMPILE", nullptr, 0))
             std::printf("[pso.graphics] phase=publish hash=%llu lagMs=%.3f\n",static_cast<unsigned long long>(hash),
                 std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-compile->m_finished).count());
-        if (outPso) *outPso = m_cache.find(hash)->second.pso.Get();
+        if (outPso) *outPso = m_cache.find(hash)->second.pso.get();
         return RequestState::Ready;
     }
 
@@ -1022,7 +1046,7 @@ DX12PSOManager::RequestState DX12PSOManager::Request(const RHIGraphicsPipelineDe
             ++m_stats.failures;
             return RequestState::Failed;
         }
-        compile->m_signature = ResolveSignature(desc.layout);
+        compile->m_signature.copy_from(ResolveSignature(desc.layout));
         if (!compile->m_signature)
         {
             ++m_stats.failures;
@@ -1040,7 +1064,7 @@ DX12PSOManager::RequestState DX12PSOManager::Request(const RHIGraphicsPipelineDe
                 if (thread_pool::is_worker_thread()) ++m_stats.m_asyncWorkerExecutions;
             }
             std::string error;
-            compile->m_result = CreateOne(compile->m_input.GetDesc(), hash, error, compile->m_signature.Get());
+            compile->m_result = CreateOne(compile->m_input.GetDesc(), hash, error, compile->m_signature.get());
             compile->m_finished=std::chrono::steady_clock::now();
         });
         ++m_stats.m_asyncSubmissions;

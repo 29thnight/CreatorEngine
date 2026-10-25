@@ -23,14 +23,14 @@ foreach ($source in @(
     'Engine/SceneRuntime/Entity.cpp',
     'Engine/SceneRuntime/Component.cpp',
     'Engine/SceneRuntime/PhysicsBodyComponent.cpp',
-    'Engine/Utility_Framework/ReflectionYml.h',
-    'Editor/EngineEntry/ReflectionUndo.h',
+    'Engine/Utility_Framework/Reflection/ReflectionYml.h',
+    'Editor/EngineEntry/Editing/ReflectionUndo.h',
     'Engine/SceneRuntime/SceneObservation.h',
-    'Engine/Utility_Framework/PropertyChange.h',
-    'Engine/Utility_Framework/ReflgenAuthoringSerializers.h',
+    'Engine/Utility_Framework/Reflection/PropertyChange.h',
+    'Engine/Utility_Framework/Reflection/ReflgenAuthoringSerializers.h',
     'Editor/EngineGUIWindow/ReflectionTypedDraw.h',
-    'Editor/EngineEntry/ReflectionPropertyEdit.h',
-    'Editor/EngineEntry/EditorObjectOperations.cpp',
+    'Editor/EngineEntry/Editing/ReflectionPropertyEdit.h',
+    'Editor/EngineEntry/Scene/EditorObjectOperations.cpp',
     'Engine/SceneRuntime/SceneManager.cpp')) {
     if ((Get-Item -LiteralPath (Join-Path $repository $source)).LastWriteTimeUtc -gt $runtime.LastWriteTimeUtc) {
         throw "Fresh $Configuration Editor build required: $source is newer than the runtime."

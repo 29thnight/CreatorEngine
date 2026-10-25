@@ -1,8 +1,16 @@
 #pragma once
-#include "../../Utility_Framework/Ownership.h"
-#include "JobGraph.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.JobGraph.h"
+#else
+import Creator.Concurrency.JobGraph;
+#endif
 #include "RHIRecordingTaskGraph.h"
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 struct RHIRecordingUnitTiming
 {
@@ -75,15 +83,5 @@ struct RHIRecordingPolicy
         return value;
     }
 
-    static const RHIRecordingPolicy& Get()
-    {
-        static const RHIRecordingPolicy policy = []
-        {
-            RHIRecordingPolicy value;
-            value.batchSubmit = ReadBounded("CREATOR_RECORDING_BATCH_SUBMIT", 1, 1) != 0;
-            value.timingEnabled = ReadBounded("CREATOR_RECORDING_JOB_TRACE", 0, 1) != 0;
-            return value;
-        }();
-        return policy;
-    }
+    static const RHIRecordingPolicy& Get();
 };

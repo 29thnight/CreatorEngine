@@ -1,6 +1,10 @@
 #pragma once
-#include "Core.Minimal.h"
-#include "SpinLock.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.SpinLock.h"
+#else
+import Creator.Core.SpinLock;
+#endif
 #include "ScriptObjectRegistry.h"
 #include "ScriptLifecyclePhase.h"
 #include "../Physics/PhysicsGeometry.h"
@@ -478,7 +482,7 @@ private:
 	ClrHost() = default;
 	~ClrHost() = default;
 
-	bool BindEntryPoints(const file::path& assemblyPath);
+	bool BindEntryPoints(const std::filesystem::path& assemblyPath);
 
 	bool m_ready{ false };
     bool m_scriptsLoaded{ false };

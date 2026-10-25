@@ -2,10 +2,10 @@
 
 #include "Experiment/AssetIdentity.h"
 #include "Experiment/MaterialAuthoringCodec.h"
-#include "AuthoringParsedDocument.h"
-#include "AuthoringWriteNode.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringWriteNode.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace RenderTest
 {

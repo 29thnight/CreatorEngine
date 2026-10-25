@@ -3,9 +3,9 @@
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/CookSupport.h"
 #include "Experiment/Cooked/SceneCookProducer.h"
-#include "AuthoringCookedDocument.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringCookedDocument.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace font_cook
 {
@@ -43,10 +43,10 @@ namespace font_cook
         {
             // The runtime FileGuid parser accepts hexadecimal case; serialize
             // its canonical lowercase form so cooking and direct loading agree.
-            Uuid::Uuid16 parsed{};
-            if (Uuid::TryParse(text, parsed))
+            uuid::uuid16 parsed{};
+            if (uuid::try_parse(text, parsed))
             {
-                const auto canonical = Uuid::ToString(parsed);
+                const auto canonical = uuid::to_string(parsed);
                 if (references.ids.contains(canonical))
                 {
                     output = canonical;
@@ -215,7 +215,7 @@ namespace font_cook
             {
                 continue;
             }
-            const auto guid = Uuid::ToString(source.assetId.value);
+            const auto guid = uuid::to_string(source.assetId.value);
             references.paths.emplace(path, guid);
             references.ids.emplace(guid, path);
         }

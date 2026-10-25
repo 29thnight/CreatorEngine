@@ -1,8 +1,19 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.LayerCatalog.h"
+#else
+import Creator.Core.LayerCatalog;
+#endif
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
 #include "PhysicsBodyComponent.h"
 #include "CharacterMovementComponent.h"
 #include "Entity.h"
 #include "EntityLayerSchema.h"
-#include "AuthoringNodeViewAccess.h" // D3-a-4
+#include "../Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-4
 #include "Scene.h"
 #include "SceneManager.h"
 #include "RenderableComponents.h"
@@ -13,7 +24,7 @@
 #include "PrefabUtility.h"
 #include "ScriptObjectRegistry.h"
 #include "ComponentFactory.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 Entity::Entity() : Object("Entity"), m_index(0)
 {
@@ -245,7 +256,7 @@ ce::layers::result<void> Entity::SetLayer(std::string_view name)
         return std::unexpected(ce::layers::error::invalid_definition);
 
     const auto snapshot = project->Snapshot();
-    const auto* layer = snapshot->catalog.Find(name);
+    const auto* layer = snapshot->catalog.find(name);
     if (!layer)
         return std::unexpected(ce::layers::error::unknown_layer);
 
@@ -258,7 +269,7 @@ ce::layers::result<void> Entity::SetLayer(ce::layers::layer_id layer)
         return m_ownerScene->AssignLayer(*this, layer);
 
     const auto project = SceneManagers->ProjectLayers();
-    if (!project || !project->Snapshot()->catalog.Find(layer))
+    if (!project || !project->Snapshot()->catalog.find(layer))
         return std::unexpected(ce::layers::error::unknown_layer);
 
     m_layerId = layer.value;
@@ -280,7 +291,7 @@ void Entity::Destroy()
 		return;
     }
 
-    TagManager::GetInstance()->RemoveTagFromObject(m_tag.ToString(), this);
+    TagManager::GetInstance()->RemoveTagFromObject(m_tag, this);
 
     // 프리팹 인스턴스 목록에서 뺀다. 넣기만 하고 빼는 곳이 없어서 죽은 포인터가
     // 목록에 남았고, 다음 UpdateInstances가 그것을 역참조했다.
@@ -426,7 +437,7 @@ Component* Entity::AddComponent(const reflgen::type_descriptor& type)
     if (auto* existing = FindComponent(typeID))
     {
         Debug::PrintLog(spdlog::level::warn, "Component of type " + std::string(type.name())
-            + " already exists on Entity " + m_name.ToString() + ". Only one instance allowed.");
+            + " already exists on Entity " + m_name + ". Only one instance allowed.");
         return existing;
     }
     if (!CanAttachComponentType(typeID))
@@ -491,7 +502,7 @@ Transform& Entity::MissingTransformFallback(const Entity* who)
     std::call_once(who->m_missingTransformReported, [who]
     {
         Debug::PrintLog(spdlog::level::err,
-            "Transform requested on UI Entity '" + who->m_name.ToString()
+            "Transform requested on UI Entity '" + who->m_name
             + "'; writes affect only its diagnostic fallback");
     });
     return *who->m_missingTransformFallback;

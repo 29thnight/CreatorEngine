@@ -1,12 +1,34 @@
 #pragma once
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "../RHICompletionRetireQueue.h"
 #include "../RHIPipelineState.h"
 #include "../IRenderPipelineCache.h"
-#include "JobScheduler.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
-#include <d3d12.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 
 // 전방 선언. 유니티 빌드에서는 옆 파일이 넣어 주어 가려져 있었다(비유니티 점검).
 class DX12DeviceResources;
@@ -126,17 +148,16 @@ public:
 
 private:
     uint64_t ComputeMeshHash(const RHIMeshPipelineDesc& desc) const;
-    Microsoft::WRL::ComPtr<ID3D12PipelineState> CreateOneMesh(const RHIMeshPipelineDesc& desc,
+    winrt::com_ptr<ID3D12PipelineState> CreateOneMesh(const RHIMeshPipelineDesc& desc,
         uint64_t hash, std::string& outError);
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     // 라이브러리 이름은 해시에서 유도한다 — 실행 간 안정적이어야 복원이 된다.
     static std::wstring MakeLibraryName(uint64_t hash);
 
     // 라이브러리 로드 → 실패 시 컴파일 → 라이브러리 저장. 락 밖에서 부른다.
-    ComPtr<ID3D12PipelineState> CreateOne(const RHIGraphicsPipelineDesc& desc,
+    winrt::com_ptr<ID3D12PipelineState> CreateOne(const RHIGraphicsPipelineDesc& desc,
         uint64_t hash, std::string& outError, ID3D12RootSignature* ownedSignature = nullptr);
-    ComPtr<ID3D12PipelineState> CreateOneCompute(const RHIComputePipelineDesc& desc,
+    winrt::com_ptr<ID3D12PipelineState> CreateOneCompute(const RHIComputePipelineDesc& desc,
         uint64_t hash, std::string& outError);
 
     /// ★ desc 의 멤버가 아니라 여기 있는 이유(A-1): 레이아웃 핸들을 **안정
@@ -151,13 +172,13 @@ private:
     uint64_t ResolveStableHash(RHIPipelineLayoutHandle layout) const;
 
     /// 캐시에 넣고 핸들을 발급한다. **락을 쥔 채로** 부른다.
-    RHIPipelineHandle Publish(uint64_t hash, ComPtr<ID3D12PipelineState> pso,
+    RHIPipelineHandle Publish(uint64_t hash, winrt::com_ptr<ID3D12PipelineState> pso,
         ID3D12RootSignature* signature, std::string& outError, bool meshPipeline = false, bool computePipeline = false);
     std::uint32_t RetireCachedPipelinesLocked(RHICompletionPoint retireAfter);
 
     class DX12DeviceResources*     m_resources{ nullptr };
-    ComPtr<ID3D12Device1>          m_device;
-    ComPtr<ID3D12PipelineLibrary>  m_library;
+    winrt::com_ptr<ID3D12Device1>          m_device;
+    winrt::com_ptr<ID3D12PipelineLibrary>  m_library;
     // 라이브러리는 넘겨받은 블롭을 복사하지 않는다 — 라이브러리보다 오래 살려야 한다.
     std::vector<uint8_t>           m_libraryBlob;
     std::wstring                   m_cachePath;
@@ -167,7 +188,7 @@ private:
     /// 표가 무한히 자란다.
     struct CacheEntry
     {
-        ComPtr<ID3D12PipelineState> pso;
+        winrt::com_ptr<ID3D12PipelineState> pso;
         RHIPipelineHandle           handle;
     };
     void RetireCacheEntryLocked(CacheEntry& entry, RHICompletionPoint retireAfter);
@@ -182,7 +203,7 @@ private:
     bool m_acceptingRequests{ false };
     std::unordered_map<uint64_t, CacheEntry> m_cache;
     PendingCompiles m_pending;
-    RHICompletionRetireQueue<ComPtr<ID3D12PipelineState>> m_retiredPipelines;
-    ComPtr<ID3D12PipelineState> m_fallback;
+    RHICompletionRetireQueue<winrt::com_ptr<ID3D12PipelineState>> m_retiredPipelines;
+    winrt::com_ptr<ID3D12PipelineState> m_fallback;
     Stats m_stats;
 };

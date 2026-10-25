@@ -1,4 +1,15 @@
-﻿#include "DX12TextureCache.h"
+﻿#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
+#include "DX12TextureCache.h"
 #include "../../MaterialGraphBindingDiagnostics.h"
 #include "DX12DeviceResources.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
@@ -10,7 +21,7 @@
 // d3d11.h도 직접 include하지 않는다 — T4로 이 파일에 DX11 타입이 남지 않았고,
 // Texture.h가 전이로 끌어오던 것마저 축 A가 걷었다.
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 uint64_t DX12TextureCache::RetireUnused(uint64_t fenceValue, RHIAssetEvictionPass* evictionPass)
 {
@@ -210,7 +221,7 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
     }
 
     outEntry = Entry{};
-    outEntry.handle = m_resources->RegisterExternalTexture(allocation.resource.Get());
+    outEntry.handle = m_resources->RegisterExternalTexture(allocation.resource.get());
     if (!outEntry.handle.IsValid())
     {
         m_persistentHeap.Release(allocation);
@@ -218,24 +229,26 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
         return false;
     }
 
+    winrt::com_ptr<ID3D12Resource> retainedSource;
+    retainedSource.copy_from(stagingResource);
     m_resources->RecordImmediateNative([target = allocation.resource,
-        source = Microsoft::WRL::ComPtr<ID3D12Resource>(stagingResource), stagingOffset = staging.offset,
+        source = std::move(retainedSource), stagingOffset = staging.offset,
         aliasingRequired = allocation.block.requiresAliasingBarrier](ID3D12GraphicsCommandList* commandList)
     {
         if (aliasingRequired)
         {
             D3D12_RESOURCE_BARRIER aliasing{};
             aliasing.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
-            aliasing.Aliasing.pResourceAfter = target.Get();
+            aliasing.Aliasing.pResourceAfter = target.get();
             commandList->ResourceBarrier(1, &aliasing);
         }
 
         D3D12_TEXTURE_COPY_LOCATION dst{};
-        dst.pResource = target.Get();
+        dst.pResource = target.get();
         dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 
         D3D12_TEXTURE_COPY_LOCATION src{};
-        src.pResource = source.Get();
+        src.pResource = source.get();
         src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
         src.PlacedFootprint.Offset = stagingOffset;
         src.PlacedFootprint.Footprint.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
@@ -248,7 +261,7 @@ bool DX12TextureCache::CreateSolidTexture(const uint8_t rgba[4], const wchar_t* 
 
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = target.Get();
+        barrier.Transition.pResource = target.get();
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -423,7 +436,7 @@ bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image, const 
         return false;
     }
 
-    outEntry.handle = m_resources->RegisterExternalTexture(allocation.resource.Get());
+    outEntry.handle = m_resources->RegisterExternalTexture(allocation.resource.get());
     if (!outEntry.handle.IsValid())
     {
         m_persistentHeap.Release(allocation);
@@ -434,15 +447,17 @@ bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image, const 
     const auto footprintView = std::span<const D3D12_PLACED_SUBRESOURCE_FOOTPRINT>(footprints.data(), subresourceCount);
     const auto pendingFootprints = m_resources->UsesDeferredImmediateRecording()
         ? m_resources->CopyPendingValues(footprintView) : footprintView;
+    winrt::com_ptr<ID3D12Resource> retainedSource;
+    retainedSource.copy_from(stagingResource);
     m_resources->RecordImmediateNative([target = allocation.resource,
-        source = Microsoft::WRL::ComPtr<ID3D12Resource>(stagingResource), pendingFootprints, subresourceCount, stagingBaseOffset,
+        source = std::move(retainedSource), pendingFootprints, subresourceCount, stagingBaseOffset,
         aliasingRequired = allocation.block.requiresAliasingBarrier](ID3D12GraphicsCommandList* commandList)
     {
         if (aliasingRequired)
         {
             D3D12_RESOURCE_BARRIER aliasing{};
             aliasing.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
-            aliasing.Aliasing.pResourceAfter = target.Get();
+            aliasing.Aliasing.pResourceAfter = target.get();
             commandList->ResourceBarrier(1, &aliasing);
         }
 
@@ -451,12 +466,12 @@ bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image, const 
             const auto& footprint = pendingFootprints[subresource];
 
             D3D12_TEXTURE_COPY_LOCATION dst{};
-            dst.pResource = target.Get();
+            dst.pResource = target.get();
             dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
             dst.SubresourceIndex = subresource;
 
             D3D12_TEXTURE_COPY_LOCATION src{};
-            src.pResource = source.Get();
+            src.pResource = source.get();
             src.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
             src.PlacedFootprint = footprint;
             src.PlacedFootprint.Offset += stagingBaseOffset;
@@ -466,7 +481,7 @@ bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image, const 
 
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = target.Get();
+        barrier.Transition.pResource = target.get();
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;

@@ -6,7 +6,7 @@
 #include "../../Engine/EngineDiagnostics/ProfileCaptureFile.h"
 #endif
 #include <stdint.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 using namespace ce::physics;
 
@@ -26,20 +26,20 @@ void check(bool value, const char* label)
 
 CollisionGeometrySource convex(std::uint64_t revision = 1)
 {
-    return {{Uuid::Parse("550e8400-e29b-41d4-a716-446655440000"), revision},
+    return {{uuid::parse("550e8400-e29b-41d4-a716-446655440000"), revision},
             convex_source{
                 {{-1, -1, -1}, {1, -1, -1}, {-1, 1, -1}, {1, 1, -1}, {-1, -1, 1}, {1, -1, 1}, {-1, 1, 1}, {1, 1, 1}}}};
 }
 
 CollisionGeometrySource mesh()
 {
-    return {{Uuid::Parse("550e8400-e29b-41d4-a716-446655440001"), 1},
+    return {{uuid::parse("550e8400-e29b-41d4-a716-446655440001"), 1},
             triangle_mesh_source{{{0, 0, 0}, {0, 0, 2}, {2, 0, 0}, {2, 0, 2}}, {{0, 1, 2}, {2, 1, 3}}}};
 }
 
 CollisionGeometrySource heightfield()
 {
-    return {{Uuid::Parse("550e8400-e29b-41d4-a716-446655440002"), 1}, heightfield_source{2, 2, {0, 1, 2, 0}}};
+    return {{uuid::parse("550e8400-e29b-41d4-a716-446655440002"), 1}, heightfield_source{2, 2, {0, 1, 2, 0}}};
 }
 
 void seal(std::vector<std::byte>& bytes)
@@ -179,7 +179,7 @@ std::array<PhysicsShapeDefinition, 2> authoring()
     for (auto& shape : definitions)
     {
         shape.kind = PhysicsShapeKind::convex;
-        shape.geometryAsset = Uuid::ToString(convex().key.asset);
+        shape.geometryAsset = uuid::to_string(convex().key.asset);
         shape.geometryRevision = 1;
     }
     definitions[0].shapeId = 101;
@@ -221,7 +221,7 @@ bool exercise(execution_preference execution)
         definition.shapes = std::move(*built);
 
         source[0].kind = PhysicsShapeKind::triangle_mesh;
-        source[0].geometryAsset = Uuid::ToString(mesh().key.asset);
+        source[0].geometryAsset = uuid::to_string(mesh().key.asset);
         auto loadedMesh = library.Publish(mesh());
         check(bool(loadedMesh), "triangle mesh source cooked");
         auto wrong = BuildPhysicsShapes(std::span(source).subspan(1), {1, 1, 1}, {}, body_kind::static_body,
@@ -243,7 +243,7 @@ bool exercise(execution_preference execution)
         definition.shapes.push_back(std::move(built->front()));
 
         source[0].kind = PhysicsShapeKind::heightfield;
-        source[0].geometryAsset = Uuid::ToString(heightfield().key.asset);
+        source[0].geometryAsset = uuid::to_string(heightfield().key.asset);
         source[0].geometryScale = {1, .1f, 1};
         source[0].localPosition = {20, -2, 0};
         source[0].shapeId = 301;

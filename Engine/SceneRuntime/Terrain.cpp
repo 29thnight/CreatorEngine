@@ -1,34 +1,31 @@
-#include "../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Platform.Windows.Strings.h"
+#else
+import Creator.Platform.Windows.Strings;
+#endif
 #include "Transform.h"
 #include "Scene.h"
 #include "Terrain.h"
 #include "DataSystem.h"
 #include "Interfaces/AssetAuthoringPort.h"
 #include "Experiment/Cooked/CookedTerrain.h"
-#include "AuthoringParsedDocument.h"
+#include "../Utility_Framework/Authoring/AuthoringParsedDocument.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
-static std::string Utf8Encode(const std::wstring& wstr)
-{
-	int size = static_cast<int>(wstr.size());
-	const wchar_t* wstrPtr = wstr.c_str();
-	int size_needed = WideCharToMultiByte(
-		CP_UTF8, 0,
-		wstrPtr, size,
-		nullptr, 0, nullptr, nullptr);
 
-	std::string str(size_needed, 0);
-
-	WideCharToMultiByte(
-		CP_UTF8, 0,
-		wstrPtr, size,
-		&str[0], size_needed,
-		nullptr, nullptr);
-
-	return str;
-}
 
 TerrainComponent::TerrainComponent()
 {
@@ -86,9 +83,9 @@ void TerrainComponent::Initialize()
 	}
 
 	// TerrainMesh 생성 (한 번만)
-	m_pTerrainMesh = own::make_shared<TerrainMesh>(m_name.ToString(), verts, indices, (uint32_t)m_width);
+	m_pTerrainMesh = own::make_shared<TerrainMesh>(m_name, verts, indices, (uint32_t)m_width);
 	/*m_pMesh = new TerrainMesh(
-		m_name.ToString(),
+		m_name,
 		verts,
 		indices,
 		(uint32_t)m_width
@@ -142,7 +139,7 @@ void TerrainComponent::Resize(int newWidth, int newHeight)
 				indices.push_back(bl); indices.push_back(br); indices.push_back(tr);
 			}
 		}
-		m_pTerrainMesh = own::make_shared<TerrainMesh>(m_name.ToString(), verts, indices, (uint32_t)m_width);
+		m_pTerrainMesh = own::make_shared<TerrainMesh>(m_name, verts, indices, (uint32_t)m_width);
 	}
 
 	// [수정] MateialDataUpdate를 호출하여 모든 머티리얼 리소스를 새 크기에 맞게 재구성합니다.
@@ -384,7 +381,7 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 	}
 
 	TerrainAuthoringRequest request{};
-	request.destinationDirectory = file::path(assetRoot);
+	request.destinationDirectory = std::filesystem::path(assetRoot);
 	request.name = name;
 	request.terrainId = m_terrainID;
 	request.width = static_cast<uint32>(m_width);
@@ -415,18 +412,18 @@ void TerrainComponent::Save(const std::wstring& assetRoot, const std::wstring& n
 
 	m_terrainTargetPath = result.descriptorPath.wstring();
 	m_trrainAssetGuid = result.guid;
-	Debug::PrintLog(spdlog::level::debug, "Terrain saved to: " + Utf8Encode(m_terrainTargetPath));
+	Debug::PrintLog(spdlog::level::debug, "Terrain saved to: " + ce::strings::wide_to_utf8(m_terrainTargetPath));
 }
 bool TerrainComponent::Load(const std::wstring& filePath)
 {
-	Debug::PrintLog(spdlog::level::debug, "Loading terrain from: " + Utf8Encode(filePath));
+	Debug::PrintLog(spdlog::level::debug, "Loading terrain from: " + ce::strings::wide_to_utf8(filePath));
 
 	namespace fs = std::filesystem;
 	const fs::path descriptorPath = filePath;
 	if (!fs::is_regular_file(descriptorPath))
 	{
 		Debug::PrintLog(spdlog::level::err, "Terrain descriptor does not exist: "
-			+ Utf8Encode(descriptorPath.wstring()));
+			+ ce::strings::wide_to_utf8(descriptorPath.wstring()));
 		return false;
 	}
 
@@ -437,7 +434,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
     {
         return LoadRunTimeTerrain(filePath);
     }
-    if (!PathFinder::IsAssetAuthoringEnabled())
+    if (!ce::paths::is_asset_authoring_enabled())
     {
         Debug::PrintLog(spdlog::level::err, "Terrain requires its neutral v2 package artifact; recook: " + descriptorPath.string());
         return false;
@@ -449,7 +446,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	if (!document)
 	{
 		Debug::PrintLog(spdlog::level::err, "Terrain descriptor parse failed: "
-			+ Utf8Encode(descriptorPath.wstring()) + " / " + parseError);
+			+ ce::strings::wide_to_utf8(descriptorPath.wstring()) + " / " + parseError);
 		return false;
 	}
 
@@ -486,7 +483,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		return false;
 	}
 
-	const fs::path terrainRoot = PathFinder::Relative("Terrain");
+	const fs::path terrainRoot = ce::paths::relative("Terrain");
 	const bool usesRelativePaths =
 		descriptorPath.parent_path().lexically_normal()
 			== terrainRoot.lexically_normal();
@@ -494,7 +491,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	{
 		const fs::path stored = pathNode.AsString();
 		return usesRelativePaths
-			? PathFinder::TerrainSourcePath(stored.generic_string()) : stored;
+			? ce::paths::terrain_source_path(stored.generic_string()) : stored;
 	};
 
 	fs::path heightMapPath = ResolvePath(root["heightmap"]);
@@ -548,7 +545,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 			ResolvePath(layerData["diffuseTexturePath"]);
 		desc.tilling = layerData["tiling"].As<float>();
 		if (desc.layerName.empty() || !std::isfinite(desc.tilling)
-			|| !file::is_regular_file(desc.diffuseTexturePath))
+			|| !std::filesystem::is_regular_file(desc.diffuseTexturePath))
 		{
 			Debug::PrintLog(spdlog::level::err, "Terrain layer value is invalid: " + desc.layerName);
 			return false;
@@ -616,8 +613,8 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	tmpLayerDescs.clear();
 	PublishRenderPropertyWrite(ProxyDirty::Material | ProxyDirty::Payload);
 
-	file::path Path = filePath + L".meta";
-	if (file::exists(Path))
+	std::filesystem::path Path = filePath + L".meta";
+	if (std::filesystem::exists(Path))
 	{
 		std::string parseError;
 		const Authoring::ParsedDocument document =
@@ -793,8 +790,8 @@ void TerrainComponent::AddLayer(const std::wstring& path, const std::wstring& di
 	newLayer.diffuseTexturePath = path;
 
 	// 1. TerrainComponent가 직접 텍스처를 로드합니다.
-	file::path texturePath = file::path(newLayer.diffuseTexturePath);
-	if (file::exists(texturePath))
+	std::filesystem::path texturePath = std::filesystem::path(newLayer.diffuseTexturePath);
+	if (std::filesystem::exists(texturePath))
 	{
 		newLayer.diffuseTexture = Texture::LoadFormPath(newLayer.diffuseTexturePath);
 	}
@@ -863,7 +860,7 @@ void TerrainComponent::ClearLayers()
 
 void TerrainComponent::RefreshTexture()
 {
-    if (!PathFinder::IsAssetAuthoringEnabled())
+    if (!ce::paths::is_asset_authoring_enabled())
     {
         return;
     }
@@ -877,7 +874,7 @@ void TerrainComponent::RefreshTexture()
 bool TerrainComponent::LoadBrushMaskTexture(const std::wstring& path, std::vector<uint8_t>& outMask, int& dataWidth, int& dataHeight)
 {
     TerrainSourceImage image;
-    if (!AssetAuthoringPort::ReadTerrainSourceImage(file::path(path), TerrainSourceImageKind::Gray8, image))
+    if (!AssetAuthoringPort::ReadTerrainSourceImage(std::filesystem::path(path), TerrainSourceImageKind::Gray8, image))
     {
         return false;
     }
@@ -902,7 +899,7 @@ void TerrainComponent::SetBrushMaskTexture(TerrainBrush* brush, const std::wstri
 	TerrainBrush::BrushMask mask;
 
 	if (!LoadBrushMaskTexture(path, mask.m_mask, mask.m_maskWidth, mask.m_maskHeight)) {
-		Debug::PrintLog(spdlog::level::err, "Failed to load brush mask texture: " + Utf8Encode(path));
+		Debug::PrintLog(spdlog::level::err, "Failed to load brush mask texture: " + ce::strings::wide_to_utf8(path));
 		return;
 	}
 
@@ -924,7 +921,7 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
     static_assert(sizeof(Vertex) == ck::kCookedTerrainVertexBytes, "Update terrain working-set admission when the vertex layout changes");
     try
     {
-        std::ifstream input(file::path(filePath), std::ios::binary | std::ios::ate);
+        std::ifstream input(std::filesystem::path(filePath), std::ios::binary | std::ios::ate);
         const auto size = input.tellg();
         if (!input || size <= 0 || static_cast<std::uint64_t>(size) > ck::kCookedTerrainMaxBytes)
         {
@@ -958,7 +955,7 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
             TerrainLayer layer;
             layer.m_layerID = source.id;
             layer.layerName = std::string(source.name);
-            layer.diffuseTexturePath = file::u8path(source.diffuseReference).wstring();
+            layer.diffuseTexturePath = std::filesystem::u8path(source.diffuseReference).wstring();
             layer.tilling = source.tiling;
             layer.diffuseTexture = Texture::LoadSharedFromMemory(source.texture);
             if (!layer.diffuseTexture)
@@ -1005,7 +1002,7 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
                 }
             }
         }
-        auto mesh = own::make_shared<TerrainMesh>(m_name.ToString(), vertices, indices, terrain.width);
+        auto mesh = own::make_shared<TerrainMesh>(m_name, vertices, indices, terrain.width);
         auto material = own::make_shared<TerrainMaterial>();
         material->MateialDataUpdate(width, height, layers, weights);
         std::wstring targetPath = filePath;

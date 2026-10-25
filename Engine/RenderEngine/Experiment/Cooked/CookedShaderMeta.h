@@ -2,7 +2,7 @@
 
 #include "CookedAssetManifest.h"
 #include "../../ShaderMeta.h"
-#include "AuthoringCookedDocument.h"
+#include "../../../Utility_Framework/Authoring/AuthoringCookedDocument.h"
 
 namespace experiment::cooked
 {

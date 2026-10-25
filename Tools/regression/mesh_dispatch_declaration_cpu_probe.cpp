@@ -3,7 +3,11 @@
 #include "RHI/RHIResourceTypes.h"
 #include "Assets/ModelVertexLayout.h"
 #include "MeshTransformDeclarationPlan.h"
-#include "JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 
 namespace Probe
 {
@@ -119,7 +123,7 @@ CE_ALLOCATION_PROBE_NOINLINE void operator delete[](void* memory, std::size_t) n
 #undef CE_ALLOCATION_PROBE_NOINLINE
 
 #if !defined(CE_MESH_DISPATCH_NATIVE_EXECUTOR)
-// 실제 JobScheduler.h 계약에 맞춘 작은 지속 실행기. 벤치마크에는 게이트/지연을 쓰지 않는다.
+// 실제 Creator.Concurrency.Jobs 계약에 맞춘 작은 지속 실행기. 벤치마크에는 게이트/지연을 쓰지 않는다.
 // 완료 handle 파괴는 합류하지 않으며, 마지막 콜백 해제 뒤에만 완료가 보인다.
 namespace job_detail
 {

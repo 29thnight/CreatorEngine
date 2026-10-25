@@ -5,7 +5,7 @@
 #include "../../Engine/EngineDiagnostics/ProfileCaptureFile.h"
 #endif
 #include <stdint.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 using namespace ce::physics;
 static_assert(!std::is_copy_constructible_v<command>);

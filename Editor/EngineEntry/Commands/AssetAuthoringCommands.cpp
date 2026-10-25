@@ -1,17 +1,57 @@
-#include "../../../Engine/Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.LayerCatalog.h"
+#else
+import Creator.Core.LayerCatalog;
+#endif
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Platform.Windows.Strings.h"
+#else
+import Creator.Platform.Windows.Strings;
+#endif
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
 #include "../../../Tools/regression/gcce_probe_cleanup.h"
-#include "../EditorModelPlacement.h"
+#include "../Assets/Models/EditorModelPlacement.h"
 #include <DirectXTex.h>
-#include <wincodec.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 #include "Texture.h"
 #include "TextureCodecImage.h"
 #include "SpriteRenderer.h"
 #include "Experiment/Cooked/TextureImportSettings.h"
-#include "../EditorDiagnostics.h"
-#include "../EditorProjectOperations.h"
-#include "../EditorObjectOperations.h"
-#include "../EditorProjectLayerSettings.h"
-#include "../CollisionGeometryAuthoring.h"
+#include "../Diagnostics/EditorDiagnostics.h"
+#include "../Project/EditorProjectOperations.h"
+#include "../Scene/EditorObjectOperations.h"
+#include "../Project/EditorProjectLayerSettings.h"
+#include "../Assets/Models/CollisionGeometryAuthoring.h"
 // LC6 (PHASE 14.5) — AssetAuthoring 도메인 명령.
 //
 // `assets.*` · `asset.*` · `material.*` · `model.*` · `terrain.*` · `foliage.*` ·
@@ -37,7 +77,7 @@
 
 #include "CommandRegistrar.h"
 #include "CommandSupport.h"
-#include "EditorObjectOperations.h"
+#include "../Scene/EditorObjectOperations.h"
 
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
@@ -46,10 +86,10 @@
 #include "CommandCore/CommandDescriptorSeeds.h"
 #include "EditorCommandServiceHost.h"        // LC4: 로컬 HTTP/JSON 서비스  // LC2: 토크나이저와 소유형 invocation
 #include "EditorCameraRig.h"
-#include "EditorSessionState.h"
+#include "../Project/EditorSessionState.h"
 #include "EngineBootstrap.h"
-#include "GameBuilderSystem.h"
-#include "EditorAssetDatabase.h"
+#include "../Build/GameBuilderSystem.h"
+#include "../Assets/EditorAssetDatabase.h"
 #include "EditorWindowRegistry.h"
 #include "Interfaces/AssetAuthoringPort.h"
 #include "Interfaces/FoliageInstance.h"
@@ -61,7 +101,7 @@
 #include "ClrHost.h"
 #include "ScriptComponent.h"
 #include "PrefabUtility.h"
-#include "PrefabEditor.h"
+#include "../Scene/PrefabEditor.h"
 #include "ComponentFactory.h"
 #include "ModelSceneInstantiation.h" // MBC9: generation 씬 인스턴스화
 #include "ModelConsumptionDiagnostics.h" // MBC10: 읽기 전용 소비 스냅샷
@@ -110,15 +150,18 @@
 #include "AIManager.h"
 #include "DataSystem.h"
 #include "GpuDiagnostics.h"
-#include "LogSystem.h"
-#include "PathFinder.h"
-#include "RuntimeSettings.h"
-#include "AuthoringNodeEquality.h" // D3-a-1: 저작 노드 구조 비교
-#include "AuthoringNodeViewAccess.h" // D3-a-5b
-#include "AuthoringParsedDocument.h"
-#include "AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
-#include "SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
-#include "WindowsCoreWindow.h"
+#include "../../../Engine/Utility_Framework/Diagnostics/LogSystem.h"
+#include "../../../Engine/Utility_Framework/Runtime/RuntimeSettings.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeEquality.h" // D3-a-1: 저작 노드 구조 비교
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-5b
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
+#include "../../../Engine/Utility_Framework/Authoring/SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.AppBackend.WinAPI.h"
+#else
+import Creator.AppBackend.WinAPI;
+#endif
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
@@ -136,21 +179,20 @@
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
 #include "RHI/ScreenSizedResource.h"
-#include "ReflectionYml.h"
-#include "ReflectionUndo.h"
-#include "GameObjectCommand.h"
-#include "StringHelper.h"
+#include "../../../Engine/Utility_Framework/Reflection/ReflectionYml.h"
+#include "../Editing/ReflectionUndo.h"
+#include "../Editing/GameObjectCommand.h"
 #include "BlackBoard.h"
 #include "TagManager.h"
-#include <Windows.h>
-#include <psapi.h> // MBC11: peak working set
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+// MBC11: peak working set
 #include <crtdbg.h>
 #include <stdio.h>
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
-#include <DbgHelp.h>
-#include <DXProgrammableCapture.h>
-#include <dxgidebug.h>
-#include <wrl/client.h>
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "../../Engine/SceneRuntime/MeshRenderer.h"
 #include "../../Engine/RenderEngine/Material.h"
 
@@ -161,9 +203,9 @@ namespace ConsoleCmd
     class GeometryRevisionCommand final : public Meta::IUndoableCommand
     {
       public:
-        GeometryRevisionCommand(file::path destination, ce::physics::CollisionGeometrySource before, ce::physics::CollisionGeometrySource after)
+        GeometryRevisionCommand(std::filesystem::path destination, ce::physics::CollisionGeometrySource before, ce::physics::CollisionGeometrySource after)
             : m_destination(std::move(destination)), m_edit(std::move(before), std::move(after)),
-              m_root(file::canonical(PathFinder::Relative())), m_project(SceneManagers->ProjectLayers()) {}
+              m_root(std::filesystem::canonical(ce::paths::relative())), m_project(SceneManagers->ProjectLayers()) {}
 
         void Undo() override { m_edit.Undo([&](const auto& expected, const auto& source) { Apply(expected, source); }); }
         void Redo() override { m_edit.Redo([&](const auto& expected, const auto& source) { Apply(expected, source); }); }
@@ -175,7 +217,7 @@ namespace ConsoleCmd
             const auto project = m_project.lock();
             Scene* scene = SceneManagers->GetActiveScene();
             if (!project || project.operator->() != SceneManagers->ProjectLayers().operator->() || !scene || SceneManagers->IsPlayCommitted() ||
-                file::canonical(PathFinder::Relative()) != m_root)
+                std::filesystem::canonical(ce::paths::relative()) != m_root)
                 throw std::runtime_error("Geometry Undo target is not an idle active project");
 
             const auto published = scene->PublishCollisionGeometry(source, [&](auto) {
@@ -185,9 +227,9 @@ namespace ConsoleCmd
                 throw std::runtime_error("Geometry revision publication failed or edit is stale");
         }
 
-        file::path m_destination;
+        std::filesystem::path m_destination;
         Editor::CollisionGeometryRevisionEdit m_edit;
-        file::path m_root;
+        std::filesystem::path m_root;
         own::weak_owner<ProjectLayerSettings> m_project;
     };
 
@@ -198,18 +240,18 @@ namespace ConsoleCmd
         if (ctx.parts.size() != 4)
             return InvalidArguments("geometry.update <asset-relative.cegeometry> <convex|mesh|heightfield> <input.txt>");
 
-        const file::path relative(ctx.parts[1]);
+        const std::filesystem::path relative(ctx.parts[1]);
         if (relative.is_absolute() || relative.has_root_path() || relative.extension() != ".cegeometry")
             return InvalidArguments("Geometry destination must be an Assets-relative native asset");
 
-        const auto destination = PathFinder::Relative() / relative;
+        const auto destination = ce::paths::relative() / relative;
         auto before = Editor::ReadCollisionGeometrySource(destination);
         if (!before) return InvalidArguments("Existing geometry source is invalid");
 
-        auto revision = Editor::CollisionGeometryAuthoring::NextRevision(PathFinder::Relative(), before->key);
+        auto revision = Editor::CollisionGeometryAuthoring::NextRevision(ce::paths::relative(), before->key);
         if (!revision) return Fail("geometry.revision_failed", "Cannot allocate next immutable revision");
 
-        std::ifstream input(file::path(ctx.parts[3]), std::ios::binary | std::ios::ate);
+        std::ifstream input(std::filesystem::path(ctx.parts[3]), std::ios::binary | std::ios::ate);
         const auto size = input ? input.tellg() : std::streampos{-1};
         if (size <= 0 || size > static_cast<std::streamoff>(CollisionGeometryCodec::max_bytes))
             return InvalidArguments("Geometry text input missing or too large");
@@ -233,7 +275,7 @@ namespace ConsoleCmd
         }
 
         auto data = CommandData::Object();
-        data.Set("uuid", CommandData::String(Uuid::ToString(after->key.asset)));
+        data.Set("uuid", CommandData::String(uuid::to_string(after->key.asset)));
         data.Set("revision", CommandData::String(std::to_string(after->key.revision)));
         return Ok({}, std::move(data));
     }
@@ -249,11 +291,11 @@ namespace ConsoleCmd
         if (!scene || SceneManagers->IsPlayCommitted())
             return Fail("geometry.authoring_unavailable", "Geometry creation requires an idle Editor scene");
 
-        const file::path relative(ctx.parts[1]);
+        const std::filesystem::path relative(ctx.parts[1]);
         if (relative.is_absolute() || relative.has_root_path())
             return InvalidArguments("Geometry destination must be relative to Assets");
 
-        std::ifstream input(file::path(ctx.parts[3]), std::ios::binary | std::ios::ate);
+        std::ifstream input(std::filesystem::path(ctx.parts[3]), std::ios::binary | std::ios::ate);
         const auto size = input ? input.tellg() : std::streampos{-1};
         if (size <= 0 || size > static_cast<std::streamoff>(CollisionGeometryCodec::max_bytes))
             return InvalidArguments("Geometry text input missing or too large");
@@ -268,7 +310,7 @@ namespace ConsoleCmd
         if (!source)
             return InvalidArguments("Invalid geometry input: counts, values, or trailing data");
 
-        const auto destination = PathFinder::Relative("") / relative;
+        const auto destination = ce::paths::relative("") / relative;
         auto published = scene->PublishCollisionGeometry(*source, [&](std::span<const std::byte>) {
             return EditorAssetDatabase::Get().CreateCollisionGeometry(destination, *source);
         });
@@ -309,10 +351,10 @@ namespace ConsoleCmd
 
 		// 경로에 공백이 들어갈 수 있으므로 명령어 뒤 전체를 경로로 본다.
 		const std::string path = CommandCore::JoinFrom(parts, 1);
-		const std::string modelName = file::path(path).stem().string();
+		const std::string modelName = std::filesystem::path(path).stem().string();
 		const assets::ModelAssetGeneration::Shared previousGeneration =
 			DataSystems->FindModelAssetGenerationByStem(modelName);
-		const file::path imported = EditorAssetDatabase::Get().ImportSourceAsset(
+		const std::filesystem::path imported = EditorAssetDatabase::Get().ImportSourceAsset(
 			path, EditorAssetDatabase::ImportKind::Model);
 		if (imported.empty())
 		{
@@ -347,8 +389,8 @@ namespace ConsoleCmd
         }
 
         TerrainAuthoringRequest request{};
-        request.destinationDirectory = PathFinder::Relative("Terrain");
-        request.name = StringToWstring(ctx.parts[1]);
+        request.destinationDirectory = ce::paths::relative("Terrain");
+        request.name = ce::strings::utf8_to_wide(ctx.parts[1]);
         request.terrainId = 73;
         request.width = 2;
         request.height = 2;
@@ -361,7 +403,7 @@ namespace ConsoleCmd
         layer.name = "ProbeLayer";
         layer.diffuseTextureSource = ctx.parts[2] == "-"
             ? request.destinationDirectory / "__missing_terrain_probe__.png"
-            : file::path(ctx.parts[2]);
+            : std::filesystem::path(ctx.parts[2]);
         layer.tiling = 2.0f;
         layer.splatWeights = { 0.0f, 0.25f, 0.75f, 1.0f };
         request.layers.push_back(std::move(layer));
@@ -417,8 +459,8 @@ namespace ConsoleCmd
 
         TextAssetAuthoringRequest request{};
         request.destinationDirectory = escape
-            ? PathFinder::Relative("Terrain") : PathFinder::Relative("Foliage");
-        request.name = StringToWstring(ctx.parts[1]);
+            ? ce::paths::relative("Terrain") : ce::paths::relative("Foliage");
+        request.name = ce::strings::utf8_to_wide(ctx.parts[1]);
 
         FoliageInstance source{};
         source.m_position = { 12.5f, 3.25f, -8.75f };
@@ -723,8 +765,8 @@ namespace ConsoleCmd
         const auto project = SceneManagers->ProjectLayers();
         if (!project) return CommandCore::PreconditionFailed("layer.unbound", "Project layers are not bound");
         const auto snapshot = project->Snapshot();
-        const auto* left = snapshot->catalog.Find(ctx.parts[1]);
-        const auto* right = snapshot->catalog.Find(ctx.parts[2]);
+        const auto* left = snapshot->catalog.find(ctx.parts[1]);
+        const auto* right = snapshot->catalog.find(ctx.parts[2]);
         if (!left || !right) return CommandCore::InvalidArguments("Unknown collision layer");
         return EditorProjectOperations::SetCollision(left->id, right->id, ctx.parts[3] == "true");
     }
@@ -735,7 +777,7 @@ namespace ConsoleCmd
         const auto project = SceneManagers->ProjectLayers();
         if (!entity || !project) return CommandCore::PreconditionFailed("layer.target_missing", "Entity or layers not found");
         const auto snapshot = project->Snapshot();
-        const auto* layer = snapshot->catalog.Find(ctx.parts[2]);
+        const auto* layer = snapshot->catalog.find(ctx.parts[2]);
         if (!layer) return CommandCore::InvalidArguments("Unknown layer name");
         return EditorObjectOperations::SetEntityLayer(entity->GetScene()->HandleOf(entity->m_index), layer->id);
     }
@@ -773,7 +815,7 @@ namespace ConsoleCmd
             const auto encoded = ce::layers::ProjectLayerSettingsCodec::Encode(*before);
             if (!encoded) return Fail("layer.encode_failed", "Cannot encode project layers");
             UncatalogedAuthoringRequest request{};
-            request.destinationPath = PathFinder::Relative("Foliage") / ProjectLayerSettingsIO::filename;
+            request.destinationPath = ce::paths::relative("Foliage") / ProjectLayerSettingsIO::filename;
             request.payload.assign(reinterpret_cast<const char*>(encoded->data()), encoded->size());
             const bool written = AssetAuthoringPort::WriteLayerSettings(request);
             return !written ? Ok("Escaping path rejected") : Fail("authoring.escape_accepted", "Escaping path accepted");
@@ -781,11 +823,11 @@ namespace ConsoleCmd
         const auto* second = before->catalog.definitions[1] ? &*before->catalog.definitions[1] : nullptr;
         if (!second || second->retired) return PreconditionFailed("layer.coverage_missing", "Requires two active layers");
         const auto first = ce::layers::default_layer;
-        const bool allowed = before->policy.Allows(before->catalog.Find(first)->slot, second->slot);
+        const bool allowed = before->policy.Allows(before->catalog.find(first)->slot, second->slot);
         const auto changed = EditorProjectOperations::SetCollision(first, second->id, !allowed);
         if (!changed.IsSuccess()) return changed;
-        const auto reloaded = ProjectLayerSettingsIO::Read(PathFinder::ProjectSettingPath(ProjectLayerSettingsIO::filename));
-        const bool matched = reloaded && reloaded->policy.Allows(before->catalog.Find(first)->slot, second->slot) != allowed;
+        const auto reloaded = ProjectLayerSettingsIO::Read(ce::paths::project_setting_path(ProjectLayerSettingsIO::filename));
+        const bool matched = reloaded && reloaded->policy.Allows(before->catalog.find(first)->slot, second->slot) != allowed;
         const auto restored = EditorProjectOperations::SetCollision(first, second->id, allowed);
         auto data = CommandData::Object();
         data.Set("roundTrip", CommandData::Bool(matched));
@@ -885,7 +927,7 @@ namespace ConsoleCmd
         for (size_t index = 1; index < ctx.parts.size(); ++index)
         {
             const std::string& name = ctx.parts[index];
-            const file::path assetPath = PathFinder::Relative("Materials\\") /
+            const std::filesystem::path assetPath = ce::paths::relative("Materials\\") /
                 (name + ".asset");
             bool decoded = false;
             bool identity = false;
@@ -908,10 +950,10 @@ namespace ConsoleCmd
                 identity = decoded && catalogGuid != FileGuid{}
                     && first.m_fileGuid == catalogGuid;
 
-                const file::path shaderPath = decoded
-                    ? DataSystems->GetFilePath(first.m_shaderMetaGuid) : file::path{};
+                const std::filesystem::path shaderPath = decoded
+                    ? DataSystems->GetFilePath(first.m_shaderMetaGuid) : std::filesystem::path{};
                 shader = decoded && first.m_shaderMetaGuid != FileGuid{}
-                    && !shaderPath.empty() && file::is_regular_file(shaderPath)
+                    && !shaderPath.empty() && std::filesystem::is_regular_file(shaderPath)
                     && shaderPath.extension() == ".shadermeta";
 
                 textures = decoded;
@@ -921,9 +963,9 @@ namespace ConsoleCmd
                     {
                         if (property.m_textureGuid == FileGuid{}) continue;
                         ++materialTextureReferences;
-                        const file::path texturePath = DataSystems->GetFilePath(
+                        const std::filesystem::path texturePath = DataSystems->GetFilePath(
                             property.m_textureGuid);
-                        if (texturePath.empty() || !file::is_regular_file(texturePath))
+                        if (texturePath.empty() || !std::filesystem::is_regular_file(texturePath))
                             textures = false;
                     }
                 }
@@ -1000,7 +1042,7 @@ namespace ConsoleCmd
         auto data = CommandData::Object();
         data.Set("path", CommandData::String(parts[1]));
         data.Set("generation", CommandData::Int(generation ? generation->Handle().generation : 0));
-        data.Set("modelId", CommandData::String(generation ? Uuid::ToString(generation->Identity().modelId) : ""));
+        data.Set("modelId", CommandData::String(generation ? uuid::to_string(generation->Identity().modelId) : ""));
         const auto recovery = EditorAssetDatabase::Get().GetModelRecoveryStats();
         data.Set("recoveryAttempts", CommandData::Int(recovery.attempts));
         data.Set("recoverySucceeded", CommandData::Int(recovery.succeeded));
@@ -1312,12 +1354,12 @@ namespace ConsoleCmd
         {
             return InvalidArguments("limit must be a nonnegative integer");
         }
-        const file::path root = (ctx.parts.size() > 1 && ctx.parts[1] != "-")
-            ? file::path(ctx.parts[1]) : PathFinder::Relative();
-        std::vector<file::path> sources;
+        const std::filesystem::path root = (ctx.parts.size() > 1 && ctx.parts[1] != "-")
+            ? std::filesystem::path(ctx.parts[1]) : ce::paths::relative();
+        std::vector<std::filesystem::path> sources;
         std::error_code walkError;
-        for (auto it = file::recursive_directory_iterator(root, walkError);
-            it != file::recursive_directory_iterator(); it.increment(walkError))
+        for (auto it = std::filesystem::recursive_directory_iterator(root, walkError);
+            it != std::filesystem::recursive_directory_iterator(); it.increment(walkError))
         {
             if (walkError)
             {
@@ -1332,10 +1374,7 @@ namespace ConsoleCmd
                 continue;
             }
             std::string extension = it->path().extension().string();
-            for (char& character : extension)
-            {
-                character = static_cast<char>(std::tolower(static_cast<unsigned char>(character)));
-            }
+            ce::strings::to_lower_in_place(extension);
             if (extension == (hdr ? ".hdr" : ".png"))
             {
                 sources.push_back(it->path());
@@ -1458,17 +1497,17 @@ namespace ConsoleCmd
         namespace chrono = std::chrono;
         const int limit = ctx.parts.size() > 1
             ? parsedLimit : 64;
-        const file::path root = PathFinder::Relative();
+        const std::filesystem::path root = ce::paths::relative();
 
-        std::vector<file::path> sources;
+        std::vector<std::filesystem::path> sources;
         std::error_code walkError;
-        for (auto it = file::recursive_directory_iterator(root, walkError);
-            it != file::recursive_directory_iterator(); it.increment(walkError))
+        for (auto it = std::filesystem::recursive_directory_iterator(root, walkError);
+            it != std::filesystem::recursive_directory_iterator(); it.increment(walkError))
         {
             if (walkError) break;
             if (!it->is_regular_file(walkError)) continue;
             std::string ext = it->path().extension().string();
-            for (char& c : ext) c = static_cast<char>(std::tolower(c));
+            ce::strings::to_lower_in_place(ext);
             if (ext == ".png") sources.push_back(it->path());
             if (static_cast<int>(sources.size()) >= limit) break;
         }
@@ -1483,7 +1522,7 @@ namespace ConsoleCmd
         uint64_t sourceBytes = 0, decodedBytes = 0, mippedBytes = 0, compressedBytes = 0;
         uint32_t decoded = 0, mipped = 0, compressed = 0;
 
-        for (const file::path& path : sources)
+        for (const std::filesystem::path& path : sources)
         {
             // ① 파일 바이트 읽기 — cooked artifact 로드의 하한이다.
             //    (artifact 는 헤더 파싱 + mmap 이므로 디코드가 0 이다)
@@ -1948,9 +1987,9 @@ namespace ConsoleCmd
         return Ok(log);
     }
 
-    static file::path ModelImportSourcePath(const std::string& utf8)
+    static std::filesystem::path ModelImportSourcePath(const std::string& utf8)
     {
-        return file::path(std::u8string(reinterpret_cast<const char8_t*>(utf8.data()), utf8.size()));
+        return std::filesystem::path(std::u8string(reinterpret_cast<const char8_t*>(utf8.data()), utf8.size()));
     }
 
     static CommandCore::CommandResult Cmd_assets_model_meshlets(const ConsoleCommandContext& ctx)

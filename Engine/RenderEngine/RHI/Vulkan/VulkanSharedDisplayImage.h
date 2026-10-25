@@ -1,7 +1,16 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
 #include "../RHIDisplayFrame.h"
-#include "../../../Utility_Framework/Ownership.h"
 
 class VulkanDeviceResources;
 

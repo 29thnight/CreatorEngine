@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "MemoryProfilerSnapshot.h"
 
 #include "ClrHost.h"
@@ -6,12 +11,13 @@
 #include "ProfileScope.h"
 #include "Texture.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include <crtdbg.h>
-
-#include <Windows.h>
-#include <Psapi.h>
-#include <bcrypt.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 #pragma comment(lib, "bcrypt.lib")
 

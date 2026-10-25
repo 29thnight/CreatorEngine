@@ -111,7 +111,6 @@ $scenes = @(
             $c += Place-Primitive "Cone"      "P_Cone"      "0.75 0.5 0 0 0 0 1 1 1"
             $c += Place-Primitive "Torus"     "P_Torus"     "2.25 0.5 0 90 0 0 1 1 1"
             $c += Place-Primitive "Suzanne"   "P_Suzanne"   "3.75 0.6 0 0 180 0 1 1 1"
-            $c += "script.add FT_Primitives PackageSmokeProbe"
             return $c
         }
     },
@@ -268,8 +267,7 @@ foreach ($scene in $scenes) {
 
             if ($entityCount -ne 11 -or $transformCount -ne 11 -or
                 $meshCount -ne 8 -or $cameraCount -ne 1 -or
-                $lightCount -ne 1 -or $scriptCount -ne 1 -or
-                $sceneText -notmatch '(?m)^\s+m_scriptType:\s*PackageSmokeProbe\s*$') {
+                $lightCount -ne 1 -or $scriptCount -ne 0) {
                 $schemaErrors += "구성 불일치(Entity=$entityCount Transform=$transformCount Mesh=$meshCount Camera=$cameraCount Light=$lightCount Script=$scriptCount)"
             }
         }

@@ -25,8 +25,8 @@ RHI = Path("Engine/RenderEngine/RHI")
 CPP = [RHI / name for name in (
     "RHISoftwareQueueRecorder.cpp", "RHISoftwareCommandList.cpp", "RHISoftwareEncoder.cpp",
     "RHISoftwareBatch.cpp", "RHISoftwareRecorder.cpp")]
-CPP += [Path("Engine/RenderEngine/RenderArena.cpp"), Path("Engine/Utility_Framework/JobScheduler.cpp"),
-        Path("Engine/Utility_Framework/ThreadPool.cpp"), Path("Engine/Utility_Framework/Arena.cpp")]
+CPP += [Path("Engine/RenderEngine/RenderArena.cpp"), Path("Engine/Utility_Framework/Concurrency/JobScheduler.cpp"),
+        Path("Engine/Utility_Framework/Concurrency/ThreadPool.cpp"), Path("Engine/Utility_Framework/Memory/Arena.cpp")]
 
 
 def main():

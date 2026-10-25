@@ -1,6 +1,14 @@
 #pragma once
-#include "../../../Utility_Framework/LifetimeToken.h"
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
 #include "EnhancedSceneRenderer.h"
 #include "../../RHI/RHIHandle.h"
@@ -8,7 +16,7 @@
 // GpuFrameToken 은 값으로 오가므로 전방 선언으로는 부족하다.
 #include "../../RHI/IRHIGpuProfiler.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 struct IDisplayPresentationSink;
 class IRHIParallelCommandPool;

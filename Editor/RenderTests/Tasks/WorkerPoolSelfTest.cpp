@@ -1,9 +1,18 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../../../Tools/regression/gcce_probe_cleanup.h"
 #include "Tasks/WorkerPoolSelfTest.h"
 #include "DataSystem.h"
 #include "AssetDepot/LegacyResourceCache.h"
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
-#include "JobScheduler.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include "FoliageComponent.h"
 
 namespace RenderTest
@@ -92,7 +101,7 @@ namespace RenderTest
             });
             AssetBundle bundle;
             for (int i = 0; i < 32; ++i)
-                bundle.AddAsset(AssetEntry(ManagedAssetType::Model, file::path(modelPath)));
+                bundle.AddAsset(AssetEntry(ManagedAssetType::Model, std::filesystem::path(modelPath)));
             const auto loaded = DataSystems->LoadAssetBundle(bundle);
             const bool bundleBarrier = loaded.submitted == 32 && loaded.completed == 32
                 && loaded.status == AssetDepot::AssetRequestStatus::Ready

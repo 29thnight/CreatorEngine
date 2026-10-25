@@ -4,11 +4,11 @@
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/ShaderMetaCookProducer.h"
 #include "ShaderMeta.h"
-#include "AuthoringCookedDocument.h"
-#include "AuthoringNodeEquality.h"
-#include "AuthoringParsedDocument.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringCookedDocument.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeEquality.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include <process.h>
 
 namespace RenderTest

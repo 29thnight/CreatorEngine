@@ -86,8 +86,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Editor\EngineEntry\TerrainSourceProcessing.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
-    <ClCompile Include="..\..\Editor\EngineEntry\TextureSourceProcessing.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="..\..\Editor\EngineEntry\Assets\Terrain\TerrainSourceProcessing.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="..\..\Editor\EngineEntry\Assets\Textures\TextureSourceProcessing.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="..\..\Engine\RenderEngine\Experiment\Cooked\TextureCooker.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="AssetCooker.cpp" />
     <ClCompile Include="AssetSetBuild.cpp" />

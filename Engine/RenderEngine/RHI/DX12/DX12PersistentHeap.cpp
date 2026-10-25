@@ -1,8 +1,14 @@
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 
 #include "DX12PersistentHeap.h"
 
 #include <stdint.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -35,7 +41,7 @@ bool DX12PersistentHeap::Initialize(ID3D12Device* device, IDXGIAdapter1* adapter
     }
 
     m_device = device;
-    if (nullptr != adapter) adapter->QueryInterface(IID_PPV_ARGS(&m_adapter));
+    if (nullptr != adapter) adapter->QueryInterface(IID_PPV_ARGS(m_adapter.put()));
     m_budgetCoordinator = budgetCoordinator;
     if (nullptr != m_budgetCoordinator)
         m_budgetOwner = m_budgetCoordinator->RegisterOwner();
@@ -61,7 +67,7 @@ void DX12PersistentHeap::Shutdown()
         m_budgetCoordinator->UnregisterOwner(m_budgetOwner);
     m_budgetCoordinator = nullptr;
     m_budgetOwner = 0;
-    m_adapter.Reset();
+    m_adapter = nullptr;
     m_policy.Reset();
     m_softBudgetBytes = 0;
     m_memoryPressure = false;
@@ -80,8 +86,8 @@ bool DX12PersistentHeap::CreateNativeSegment(uint64_t compatibilityKey,
     heapDesc.Properties.Type = D3D12_HEAP_TYPE_DEFAULT;
     heapDesc.Flags = heapFlags;
 
-    Microsoft::WRL::ComPtr<ID3D12Heap> heap;
-    const HRESULT created = m_device->CreateHeap(&heapDesc, IID_PPV_ARGS(&heap));
+    winrt::com_ptr<ID3D12Heap> heap;
+    const HRESULT created = m_device->CreateHeap(&heapDesc, IID_PPV_ARGS(heap.put()));
     if (FAILED(created))
     {
         outError = "DX12 persistent ID3D12Heap 생성 실패 " + DX12PersistentHeapHr(created);
@@ -106,10 +112,10 @@ bool DX12PersistentHeap::CreateDedicated(const D3D12_RESOURCE_DESC& desc,
     D3D12_HEAP_PROPERTIES heap{};
     heap.Type = D3D12_HEAP_TYPE_DEFAULT;
 
-    Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+    winrt::com_ptr<ID3D12Resource> resource;
     const HRESULT created = m_device->CreateCommittedResource(&heap,
         D3D12_HEAP_FLAG_NONE, &desc, initialState, nullptr,
-        IID_PPV_ARGS(&resource));
+        IID_PPV_ARGS(resource.put()));
     if (FAILED(created))
     {
         m_policy.RecordAllocationFailure();
@@ -246,9 +252,9 @@ bool DX12PersistentHeap::CreateResource(const D3D12_RESOURCE_DESC& desc,
         return false;
     }
 
-    Microsoft::WRL::ComPtr<ID3D12Resource> resource;
-    const HRESULT placed = m_device->CreatePlacedResource(native->second.Get(),
-        block.offset, &desc, initialState, nullptr, IID_PPV_ARGS(&resource));
+    winrt::com_ptr<ID3D12Resource> resource;
+    const HRESULT placed = m_device->CreatePlacedResource(native->second.get(),
+        block.offset, &desc, initialState, nullptr, IID_PPV_ARGS(resource.put()));
     if (FAILED(placed))
     {
         m_policy.Release(block);
@@ -307,7 +313,7 @@ RHIPersistentHeapStats DX12PersistentHeap::GetStats() const
 void DX12PersistentHeap::Release(Allocation& allocation)
 {
     if (!allocation.IsValid()) return;
-    allocation.resource.Reset();
+    allocation.resource = nullptr;
     if (allocation.dedicated)
     {
         m_policy.RecordDedicatedRelease();
@@ -352,8 +358,8 @@ bool RunDX12PersistentHeapSelfTest(ID3D12Device* device,
     std::string error;
     RHIDeviceMemoryBudgetCoordinator coordinator;
     RHIPersistentHeapBudget snapshot{};
-    Microsoft::WRL::ComPtr<IDXGIAdapter3> adapter3;
-    if (nullptr != adapter && SUCCEEDED(adapter->QueryInterface(IID_PPV_ARGS(&adapter3))))
+    winrt::com_ptr<IDXGIAdapter3> adapter3;
+    if (nullptr != adapter && SUCCEEDED(adapter->QueryInterface(IID_PPV_ARGS(adapter3.put()))))
     {
         DXGI_QUERY_VIDEO_MEMORY_INFO memory{};
         if (SUCCEEDED(adapter3->QueryVideoMemoryInfo(0,

@@ -1,14 +1,23 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "DataSystem.h"
 
 #include "ShaderMeta.h"
 #include "Material.h"
 #include "AssetDepot/LegacyResourceCharges.h"
 #include "ShaderPermutationDomain.h"
-#include "../Utility_Framework/LogSystem.h"
-#include "../Utility_Framework/PathFinder.h"
+#include "../Utility_Framework/Diagnostics/LogSystem.h"
 
 #include <stdint.h>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -259,14 +268,14 @@ own::shared_owner<const ShaderMeta> DataSystem::LoadShaderMetaOwner(FileGuid gui
         requested = { cached->second + 1, slot.generation };
     }
 
-    const file::path sourcePath = registry->GetPath(guid);
+    const std::filesystem::path sourcePath = registry->GetPath(guid);
     if (sourcePath.empty())
     {
         outError = "Shader metadata source identity was not found: " + guid.ToString();
         return {};
     }
-    file::path path = ResolveCookedArtifact(experiment::AssetId{ guid.m_guid });
-    if (path.empty() && PathFinder::IsAssetAuthoringEnabled())
+    std::filesystem::path path = ResolveCookedArtifact(experiment::AssetId{ guid.m_guid });
+    if (path.empty() && ce::paths::is_asset_authoring_enabled())
     {
         path = sourcePath;
     }

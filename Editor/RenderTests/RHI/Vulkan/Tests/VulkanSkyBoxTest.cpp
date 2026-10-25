@@ -1,3 +1,13 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "../VulkanSelfTest.h"
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/Vulkan/VulkanPipelineCache.h"
@@ -7,9 +17,8 @@
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "FrameCameraSnapshot.h"
 #include "Texture.h"
-#include "PathFinder.h"
 
-#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // EnhancedSkyBoxPass — Vulkan. 두 백엔드가 공유하는 첫 텍스처 소비 패스다.
 //
@@ -366,7 +375,7 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
     outLog += "── 기즈모 아이콘 패스 — Vulkan (실제 PNG·root buffer) ──\n";
     std::string error;
 
-    const file::path cameraIconPath = PathFinder::IconPath() / L"CameraGizmo.png";
+    const std::filesystem::path cameraIconPath = ce::paths::icon_path() / L"CameraGizmo.png";
     own::shared_owner<const Texture> cameraIcon(Texture::LoadFormPath(cameraIconPath));
     if (!cameraIcon || cameraIcon->GetImageDescription().IsEmpty())
     {
@@ -457,7 +466,7 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
     own::shared_owner<const Texture> compressedIcon =
         Texture::LoadSharedFromPath(cameraIconPath, /*isCompress*/ true);
     own::shared_owner<const Texture> blockNoise = Texture::LoadSharedFromPath(
-        PathFinder::Relative("VolumetricFog\\blueNoise.dds"));
+        ce::paths::relative("VolumetricFog\\blueNoise.dds"));
     const uint8_t bgraPixel[4] = { 32u, 64u, 128u, 255u };   // B, G, R, A
     own::shared_owner<const Texture> bgraTexture(Texture::CreateFromPixels(
         1, 1, "vk_codec_bgra", RHIFormat::BGRA8Unorm, bgraPixel));

@@ -1,8 +1,17 @@
-// 제품 선언/캐시 본문과 arena를 CPU 경계에서 검증한다. native/GPU 성능 검사가 아니다.
 #include "Engine/RenderEngine/RenderArena.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Arena.h"
+#else
+import Creator.Core.Arena;
+#endif
+// 제품 선언/캐시 본문과 arena를 CPU 경계에서 검증한다. native/GPU 성능 검사가 아니다.
 #include "Engine/RenderEngine/RHI/RHIFormat.h"
 #include "Engine/RenderEngine/RHI/RHIResourceState.h"
-#include "Engine/Utility_Framework/DynamicBitset.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.DynamicBitset.h"
+#else
+import Creator.Core.DynamicBitset;
+#endif
 #include <cstdio>
 #include <cstdlib>
 #include <iostream>
@@ -635,10 +644,10 @@ namespace
         ce::render_arena_objects arena;
         const std::array<uint32_t, 7> source{1, 2, 3, 4, 5, 6, 7};
         const auto copied = arena.copy<uint32_t>(source);
-        require(arena.stats().usedBytes == sizeof(source), "trivial array allocated destructor bookkeeping");
+        require(arena.stats().used_bytes == sizeof(source), "trivial array allocated destructor bookkeeping");
         require(std::equal(copied.begin(), copied.end(), source.begin()), "trivial array copy changed bytes");
         arena.emplace<uint64_t>(91);
-        require(arena.stats().usedBytes == sizeof(source) + sizeof(uint64_t),
+        require(arena.stats().used_bytes == sizeof(source) + sizeof(uint64_t),
                 "trivial object allocated destructor bookkeeping");
         struct alignas(128) aligned_value
         {
@@ -766,7 +775,7 @@ namespace
         std::cout << "ALLOCATIONS passes=128 usagesPerPass=8 baselineLvalue=" << old_lvalue
                   << " currentLvalue=" << new_lvalue << " baselineRvalue=" << old_rvalue
                   << " currentRvalue=" << new_rvalue
-                  << " currentArenaUsedBytes=" << current.value.m_declarationData.stats().usedBytes << '\n';
+                  << " currentArenaUsedBytes=" << current.value.m_declarationData.stats().used_bytes << '\n';
     }
 } // namespace
 

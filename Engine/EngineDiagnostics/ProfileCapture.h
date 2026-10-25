@@ -8,7 +8,7 @@
 // 여기서는 수집기가 봉인된 청크를 프레임 단위로 모으고, 얼리는 순간
 // shared_ptr<const capture_session> 하나를 원자적으로 공개한다. reader 는
 // 그 스냅샷만 보므로 엔진이 계속 돌아도 손에 든 자료가 변하지 않는다(§6.4).
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "ProfileEvent.h"
 #include "ProfileCaptureAllocator.h"

@@ -65,7 +65,7 @@ try {
         $baseline = Join-Path $output 'baseline'
         New-Item -ItemType Directory -Force -Path "$baseline/Engine/CommandService", "$baseline/Engine/Utility_Framework", "$baseline/Tools/regression" | Out-Null
         Get-ChildItem "$repo/Engine/CommandService" -File | Copy-Item -Destination "$baseline/Engine/CommandService"
-        Copy-Item "$repo/Engine/Utility_Framework/StandardLibrary.h" "$baseline/Engine/Utility_Framework"
+        Copy-Item "$repo/Engine/Utility_Framework/Foundation/StandardLibrary.h" "$baseline/Engine/Utility_Framework"
         Copy-Item "$repo/Tools/regression/CommandServiceShutdownProbe.cpp" "$baseline/Tools/regression"
         foreach ($name in @('CommandService.cpp', 'CommandService.h')) {
             $original = & git show "${BaselineRevision}:Engine/CommandService/$name"

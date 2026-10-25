@@ -1,24 +1,37 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 
 #include "Texture.h"
 #include "TextureFramePins.h"
-#include "AuthoringNodeView.h" // D3-a-5b
+#include "../Utility_Framework/Authoring/AuthoringNodeView.h" // D3-a-5b
 #include "AssetMetaRegistry.h"
-#include "ClassProperty.h"
+#include "../Utility_Framework/Reflection/ClassProperty.h"
 #include "AssetBundle.h"
-#include "JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include "ShaderMetaHandle.h"
 #include "AssetDepot/AssetLink.h"
 #include "AssetDepot/AssetMountId.h"
 #include "Assets/ModelAssetGeneration.h"
 #include "Assets/ModelSceneAssetInputs.h"
 #include "MaterialGraphRuntime.h"
-#include "../Utility_Framework/Ownership.h"
 #include "AssetDepot/TextureAssetRuntime.h"
 #include "AssetDepot/LegacyResourceCache.h"
 #include "AssetDepot/ModelAssetRuntime.h"
 #include "AssetDepot/MaterialAssetRuntime.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 template <typename T>
 using DataContainer = std::unordered_map<std::string, asset_cache_detail::Entry<T>>;
@@ -109,7 +122,7 @@ struct RuntimeAssetChange
 	RuntimeAssetChangeKind kind{ RuntimeAssetChangeKind::CatalogUpsert };
 	RuntimeAssetType assetType{ RuntimeAssetType::Auto };
 	FileGuid guid{};
-	file::path path{};
+	std::filesystem::path path{};
     own::shared_owner<RuntimeTexturePublication> texturePublication{};
 };
 
@@ -361,7 +374,7 @@ public:
         std::string name;
     };
     own::shared_owner<SceneAssetPreparation> PrepareSceneAssets(
-        const Authoring::ReadNode& root, const AssetBundle& bundle, const file::path& scene);
+        const Authoring::ReadNode& root, const AssetBundle& bundle, const std::filesystem::path& scene);
     bool PollSceneAssets(const own::shared_owner<SceneAssetPreparation>& preparation,
         bool wait, bool publish, std::string& error);
     void CancelSceneAssets(const own::shared_owner<SceneAssetPreparation>& preparation);
@@ -420,7 +433,7 @@ public:
 	};
 	[[nodiscard]] own::shared_owner<const Texture> ResolveModelGenerationTexture(
 		const assets::ModelAssetGeneration& generation,
-		const Uuid::Uuid16& textureId);
+		const uuid::uuid16& textureId);
 	[[nodiscard]] ModelGenerationTextureCacheSnapshot
 		SnapshotModelGenerationTextures() const;
 	// 재질의 texture property(GUID 정본) 중 이 generation closure 안의 TextureId를
@@ -438,7 +451,7 @@ public:
 	// 읽어 자산 GUID→cooked artifact 표를 세운다. 파일이 없으면 **무동작**이다
 	// (에디터 작업 트리에는 Derived가 없다 — 마운트 실패가 아니라 미게시다).
 	// 이것이 M2 resolver의 cooked 우선 해석과 모델 cookedPath의 유일한 출처다.
-	bool MountCookedCatalog(const file::path& derivedRoot, std::string& outError);
+	bool MountCookedCatalog(const std::filesystem::path& derivedRoot, std::string& outError);
 
     // AssetDepot metadata transactions. v2 packages remain on MountCookedCatalog;
     // a new AssetSet must be explicitly cooked as CEMF v3. replaceMount retires
@@ -483,12 +496,12 @@ public:
 	// 위해 일부러 지운다("같은 Assets tree를 어느 staging 경로에 놓아도 동일한
 	// CEMC"). 내구적인 답은 소스 **내용 해시**를 CEMF에 싣는 것이고 그것은
 	// 포맷 확장이라 별도 슬라이스다 — 그때까지 이 heuristic이 자리를 지킨다.
-	[[nodiscard]] file::path ResolveCookedArtifact(
+	[[nodiscard]] std::filesystem::path ResolveCookedArtifact(
 		const experiment::AssetId& assetId) const;
 	// D5-d document cutover. Produced runtime assets use a fresh cooked artifact
 	// when one exists. Editor may fall back to the authoring source; packaged
 	// Player fails closed instead of silently reopening source YAML/bytes.
-	[[nodiscard]] file::path ResolveCatalogAssetPath(FileGuid assetGuid) const;
+	[[nodiscard]] std::filesystem::path ResolveCatalogAssetPath(FileGuid assetGuid) const;
 	[[nodiscard]] std::size_t CookedCatalogStaleCount() const;
 
 	//Resource Texture
@@ -559,7 +572,7 @@ public:
         std::optional<bool> srgb = std::nullopt);
 	own::shared_owner<Material> CreateMaterial();
 	// Asset Metadata
-	FileGuid GetFileGuid(const file::path& filepath) const;
+	FileGuid GetFileGuid(const std::filesystem::path& filepath) const;
     // Transitional synchronous engine-internal handoff: the immutable owner and
     // numeric identity are acquired together. The handle itself never pins data.
     own::shared_owner<const ShaderMeta> LoadShaderMetaOwner(FileGuid guid,
@@ -573,14 +586,14 @@ public:
     own::shared_owner<const material_graph::Generation> LoadMaterialGraphGeneration(FileGuid guid, std::string& error,
                                                                                  bool reload = false, bool* invalidated = nullptr);
     own::shared_owner<const material_graph::Generation> ResolveMaterialGraphGeneration(FileGuid guid) const;
-    file::path GetMaterialGraphSourcePath(FileGuid guid) const;
+    std::filesystem::path GetMaterialGraphSourcePath(FileGuid guid) const;
     // Explicit synchronous warm-up retains verified graph generations, so later
     // entity loads consume the prepared owners without a second cache decode.
     // Synchronous scene-owner entry point; pool workers cannot call or wait here.
     // Historical lists are hints here; PrepareSceneAssets discovers current
     // dependencies for the normal asynchronous editor path.
-    void PrewarmSceneMaterials(const file::path& scene);
-    void CommitSceneMaterials(const file::path& scene);
+    void PrewarmSceneMaterials(const std::filesystem::path& scene);
+    void CommitSceneMaterials(const std::filesystem::path& scene);
     bool ConfigureModelMaterialGraph(Material& material, const assets::ModelAssetGeneration& model,
                                       const assets::ModelMaterialAsset& source, std::string& error);
     // Editor import/load recovery publishes a separate editable graph; never a native pass fallback.
@@ -599,16 +612,16 @@ public:
     // Capture paths on the caller thread. This CPU-only job owns all inputs and
     // has no DataSystem lifetime dependency or shared generated-source filename.
     static own::shared_owner<const material_graph::Generation> CompileMaterialGraphAuthoring(
-        const LX::LXMaterialAsset& asset, FileGuid graphGuid, const file::path& shaderDirectory,
-        const file::path& cacheDirectory, std::string& error);
+        const LX::LXMaterialAsset& asset, FileGuid graphGuid, const std::filesystem::path& shaderDirectory,
+        const std::filesystem::path& cacheDirectory, std::string& error);
     static own::shared_owner<const material_graph::Generation> CompileEditorPreviewMaterial(
-        const LX::LXMaterialAsset& asset, FileGuid graphGuid, const file::path& shaderDirectory,
-        const file::path& cacheDirectory, std::string& error, bool packageBuild = false);
+        const LX::LXMaterialAsset& asset, FileGuid graphGuid, const std::filesystem::path& shaderDirectory,
+        const std::filesystem::path& cacheDirectory, std::string& error, bool packageBuild = false);
     // 명시적 요청의 작업 스레드에서만 호출한다. 원본뿐 아니라 현재 도구·include 내용도 다시 확인한다.
     // 다음 요청의 scratch 부모도 검사한다. 빈 cacheDirectory는 기본 Lattice 캐시를 뜻한다.
     static bool CanReuseMaterialGraphAuthoring(const material_graph::Generation& generation,
-        std::string_view sourceKey, const file::path& shaderDirectory, std::string& error,
-        const file::path& cacheDirectory = {});
+        std::string_view sourceKey, const std::filesystem::path& shaderDirectory, std::string& error,
+        const std::filesystem::path& cacheDirectory = {});
     bool PublishMaterialGraphReload(own::shared_owner<const material_graph::Generation> generation,
         const own::shared_owner<const material_graph::Generation>& expected, std::string& error);
     bool PublishCodeShaderReload(const own::shared_owner<const LX::Runtime::ShaderGeneration>& expected,
@@ -629,7 +642,7 @@ public:
 	std::size_t DrainQueuedAssetChanges();
 	FileGuid GetFilenameToGuid(const std::string& filename) const;
 	FileGuid GetStemToGuid(const std::string& stem) const;
-	file::path GetFilePath(FileGuid fileguid) const;
+	std::filesystem::path GetFilePath(FileGuid fileguid) const;
 
 private:
     // Transitional synchronous caches: lookup and retained CPU budget share each entry.
@@ -682,7 +695,7 @@ private:
 	mutable std::mutex m_cookedCatalogMutex;
     // Boot-only I/O, before asset consumers start. Publishes the complete configured
     // set group or preserves the old resolver; never exposed as a cache-hit path.
-    [[nodiscard]] bool MountConfiguredAssetSets(const file::path& assetRoot, std::string& failure);
+    [[nodiscard]] bool MountConfiguredAssetSets(const std::filesystem::path& assetRoot, std::string& failure);
     // Guarded with m_cookedCatalogMutex; never reset/reused on reinitialize.
     std::uint64_t m_assetDepotRevision{};
     std::uint64_t m_nextAssetMountId{ 1u };
@@ -702,8 +715,8 @@ private:
     static constexpr std::size_t kMaxCachedFonts = 32u;
     std::unordered_map<std::string, own::shared_owner<FontAsset>> m_fonts;
     std::atomic<std::uint64_t> m_fontCacheRevision{ 1 };
-    own::shared_owner<FontAsset> LoadFontFile(const file::path& path, std::string& error) const;
-    bool ReloadCachedFont(const file::path& path, FileGuid guid, std::string& error);
+    own::shared_owner<FontAsset> LoadFontFile(const std::filesystem::path& path, std::string& error) const;
+    bool ReloadCachedFont(const std::filesystem::path& path, FileGuid guid, std::string& error);
     [[nodiscard]] own::shared_owner<const Texture> TryAcquireTexture(
         AssetDepot::AssetLink<Texture> link, const AssetDepot::TextureAssetVariant& variant);
     [[nodiscard]] AssetDepot::AssetRequest<Texture> RequestTextureAsync(
@@ -813,7 +826,7 @@ private:
     job_handle SubmitAssetWorkLocked(job_group work,
         std::span<const job_handle> dependencies = {}, bool exactGeneration = false);
     own::shared_owner<PreparedRuntimeAsset> PrepareRuntimeAsset(
-        FileGuid guid, const file::path& path, RuntimeAssetType type,
+        FileGuid guid, const std::filesystem::path& path, RuntimeAssetType type,
         std::optional<std::uint64_t> expectedEpoch = {},
         std::optional<std::uint64_t> expectedResolverRevision = {});
     bool PublishRuntimeAsset(const own::shared_owner<PreparedRuntimeAsset>& asset, std::string& error);
@@ -838,13 +851,13 @@ private:
     std::uint64_t m_assetPreparationEpoch{ 1 };
     bool m_assetPreparationStopping{};
     std::size_t m_assetInvalidationDepth{};
-	void LoadAssetCatalog(const file::path& root);
+	void LoadAssetCatalog(const std::filesystem::path& root);
 	[[nodiscard]] assets::ModelAssetGeneration::Shared LoadAndPublishModelAssetGeneration(
 		FileGuid guid, bool allowEditorRecovery = false, bool publish = true,
         std::optional<std::uint64_t> expectedEpoch = {},
         std::optional<std::uint64_t> expectedResolverRevision = {});
 	DataContainer<Texture>& TextureCacheFor(TextureFileType type);
-	void RetireCachedAsset(RuntimeAssetType assetType, const file::path& path,
+	void RetireCachedAsset(RuntimeAssetType assetType, const std::filesystem::path& path,
 		FileGuid guid, bool remove);
 	// MBC7 — 한 generation의 embedded texture owner를 전부 캐시에서 떼어 낸다.
 	// 이미 그 owner를 붙든 Material은 자기 shared_ptr로 살려 두므로 그리는 중에
@@ -872,7 +885,7 @@ private:
 	uint32 currMaterialFileCount = 0;
 	//--------- Data Thread and Editor Payload
 	std::thread m_DataThread{};
-	file::path m_dragDropPath{};
+	std::filesystem::path m_dragDropPath{};
     // Both service root handles use m_cookedCatalogMutex. Writers additionally
     // hold admission first; readers copy a root and release before registry work.
     [[nodiscard]] own::shared_owner<AssetMetaRegistry> SnapshotAssetMetaRegistry() const;
@@ -910,11 +923,11 @@ private:
     // Monotonic across Finalize; exhaustion fails closed instead of wrapping.
     std::uint64_t m_shaderMetaGenerationSerial{};
     material_graph::GenerationStore m_materialGraphGenerations;
-    bool LoadMaterialGraphProgram(FileGuid guid, const file::path& sourcePath, material_graph::CookedProgram& result,
+    bool LoadMaterialGraphProgram(FileGuid guid, const std::filesystem::path& sourcePath, material_graph::CookedProgram& result,
                                   std::string& failure) const;
     std::mutex m_sceneMaterialMutex;
     bool m_recordingSceneMaterials{};
-    std::vector<std::pair<FileGuid, file::path>> m_sceneMaterials;
+    std::vector<std::pair<FileGuid, std::filesystem::path>> m_sceneMaterials;
     std::mutex m_pendingAssetChangeMutex;
 	std::vector<RuntimeAssetChange> m_pendingAssetChanges;
 

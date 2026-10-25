@@ -396,7 +396,7 @@ try {
     }
 
     # ── 정적: 파일 하나만 복사하던 옛 모양이 되살아났는가 ──
-    $database = [IO.File]::ReadAllText((Join-Path $root 'Editor\EngineEntry\EditorAssetDatabase.cpp'))
+    $database = [IO.File]::ReadAllText((Join-Path $root 'Editor\EngineEntry\Assets\EditorAssetDatabase.cpp'))
     if ($database -notmatch 'ScanGltfSourceDependencies') {
         Add-Failure '정적 임포트가 glTF 사이드카 폐포를 훑지 않는다.'
     }

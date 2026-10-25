@@ -1,5 +1,29 @@
-#include "../../../Utility_Framework/LifetimeToken.h"
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "DX12SoftwareCommandValidator.h"
 #include "DX12CommandTranslator.h"
 #include "../RHISoftwareRecorder.h"
@@ -23,12 +47,15 @@
 #include "../../RHI/DX12/DX12QueueRecorder.h"
 #include "../../Render/Graph/EnhancedRenderGraph.h"
 #include "../../Render/Graph/EnhancedGpuMeasurementHistory.h"
-#include "PathFinder.h"
 
 #include <stdint.h>
 #include <stdio.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 namespace
 {
@@ -66,11 +93,10 @@ namespace
 
 struct EnhancedSceneRendererLiveDX12Adapter::Impl
 {
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     struct DisplayTransport
     {
-        ComPtr<ID3D12Resource> texture;
+        winrt::com_ptr<ID3D12Resource> texture;
         HANDLE sharedHandle{nullptr};
         RHIDisplayAdapterIdentity adapter;
         uint32_t width{0};
@@ -92,7 +118,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
         RHIDisplayFrameMetadata displayMetadata;
         RHICompletionPoint publishedCompletion;
         uint64_t observedPublishedCompletion{0};
-        std::array<ComPtr<ID3D12Resource>, 4> temporalTextures;
+        std::array<winrt::com_ptr<ID3D12Resource>, 4> temporalTextures;
         std::array<HANDLE, 4> temporalHandles{};
         RHITemporalDisplayResources temporalResources;
         TemporalFrame temporalFrame;
@@ -309,7 +335,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
         return true;
     }
 
-    ComPtr<ID3D12Resource> fogCloudNeutral;
+    winrt::com_ptr<ID3D12Resource> fogCloudNeutral;
     std::vector<DisplayResource> activeDisplays;
     std::vector<DisplayResource> retiredDisplays;
     DisplayToken nextDisplayToken{ 1 };
@@ -382,7 +408,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::Initialize(
     const auto commandWorkers = static_cast<uint32_t>(
         (std::clamp)(ce::get_thread_pool().size(), size_t{1}, size_t{IRHIParallelCommandPool::kMaxWorkers}));
     if (!impl.commandPool.Initialize(impl.resources, commandWorkers, kFrameCount, outError) ||
-        !impl.pipelines.Initialize(&impl.resources, PathFinder::CachePath("RHI/DX12/dx12_live.cache").wstring(),
+        !impl.pipelines.Initialize(&impl.resources, ce::paths::cache_path("RHI/DX12/dx12_live.cache").wstring(),
                                    outError) ||
         !impl.rootSignatures.Initialize(&impl.resources, outError) ||
         !impl.meshCache.Initialize(&impl.resources, outError) ||
@@ -468,7 +494,7 @@ void EnhancedSceneRendererLiveDX12Adapter::ShutdownPipeline()
             display.producerCompletionLost = !display.producerComplete;
         }
     }
-    impl.fogCloudNeutral.Reset();
+    impl.fogCloudNeutral = nullptr;
 
     if (impl.resources.IsInitialized())
     {
@@ -1124,21 +1150,21 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateDisplayTexture(
                                  {
                                      return impl.resources.GetDevice()->CreateCommittedResource(
                                          &heap, D3D12_HEAP_FLAG_SHARED, &desc, D3D12_RESOURCE_STATE_COMMON, nullptr,
-                                         IID_PPV_ARGS(&transport.texture));
+                                         IID_PPV_ARGS(transport.texture.put()));
                                  })))
     {
         outError = "공유 텍스처 생성 실패";
         return false;
     }
 
-    outTexture = impl.resources.RegisterExternalTexture(transport.texture.Get());
+    outTexture = impl.resources.RegisterExternalTexture(transport.texture.get());
     if (!outTexture.IsValid())
     {
         outError = "공유 텍스처 RHI 등록 실패";
         return false;
     }
 
-    if (FAILED(impl.resources.GetDevice()->CreateSharedHandle(transport.texture.Get(), nullptr, GENERIC_ALL, nullptr,
+    if (FAILED(impl.resources.GetDevice()->CreateSharedHandle(transport.texture.get(), nullptr, GENERIC_ALL, nullptr,
                                                               &transport.sharedHandle)) ||
         nullptr == transport.sharedHandle)
     {
@@ -1221,7 +1247,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateTemporalDisplayTextures(
         }
         constexpr DXGI_FORMAT formats[]{DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM,
             DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_R16G16_FLOAT};
-        std::array<Impl::ComPtr<ID3D12Resource>, 4> textures;
+        std::array<winrt::com_ptr<ID3D12Resource>, 4> textures;
         std::array<HANDLE, 4> handles{};
         std::array<RHITextureHandle, 4> registered{};
         const auto rollback = [&]
@@ -1247,15 +1273,15 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateTemporalDisplayTextures(
             // No simultaneous-access flag: producer and consumer synchronize by
             // completion + lease and return each copy to COPY_DEST before reuse.
             if (FAILED(DX12InvokeBackend(&impl.resources, "DX12 adapter resource", [&] { return impl.resources.GetDevice()->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_SHARED,
-                    &description, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&textures[index])); })) ||
-                FAILED(impl.resources.GetDevice()->CreateSharedHandle(textures[index].Get(), nullptr,
+                    &description, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(textures[index].put())); })) ||
+                FAILED(impl.resources.GetDevice()->CreateSharedHandle(textures[index].get(), nullptr,
                     GENERIC_ALL, nullptr, &handles[index])))
             {
                 rollback();
                 outError = "Could not allocate full temporal shared display inputs";
                 return false;
             }
-            registered[index] = impl.resources.RegisterExternalTexture(textures[index].Get());
+            registered[index] = impl.resources.RegisterExternalTexture(textures[index].get());
             if (!registered[index].IsValid())
             {
                 rollback();
@@ -1437,7 +1463,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateFogCloudNeutral(
 
     if (FAILED(DX12InvokeBackend(&impl.resources, "DX12 adapter resource", [&] { return impl.resources.GetDevice()->CreateCommittedResource(&heap,
         D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON,
-        nullptr, IID_PPV_ARGS(&impl.fogCloudNeutral)); })))
+        nullptr, IID_PPV_ARGS(impl.fogCloudNeutral.put())); })))
     {
         outError = "포그 중립 구름 텍스처 생성 실패";
         return false;
@@ -1449,7 +1475,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateFogCloudNeutral(
             RHIUploadUsage::TextureCopy, 1 });
     if (!staging.IsValid())
     {
-        impl.fogCloudNeutral.Reset();
+        impl.fogCloudNeutral = nullptr;
         outError = "포그 중립 구름 업로드 링 할당 실패";
         return false;
     }
@@ -1462,7 +1488,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateFogCloudNeutral(
     std::memcpy(staging.cpuAddress, white, sizeof(white));
 
     D3D12_TEXTURE_COPY_LOCATION dst{};
-    dst.pResource = impl.fogCloudNeutral.Get();
+    dst.pResource = impl.fogCloudNeutral.get();
     dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 
     D3D12_TEXTURE_COPY_LOCATION src{};
@@ -1474,16 +1500,18 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateFogCloudNeutral(
     src.PlacedFootprint.Footprint.Height = 1;
     src.PlacedFootprint.Footprint.Depth = 1;
     src.PlacedFootprint.Footprint.RowPitch = D3D12_TEXTURE_DATA_PITCH_ALIGNMENT;
+    winrt::com_ptr<ID3D12Resource> retainedSource;
+    retainedSource.copy_from(src.pResource);
     impl.resources.RecordImmediateNative([dst, src, destination = impl.fogCloudNeutral,
-                                        source = Microsoft::WRL::ComPtr<ID3D12Resource>(src.pResource)](ID3D12GraphicsCommandList* list)
+                                        source = std::move(retainedSource)](ID3D12GraphicsCommandList* list)
     {
         list->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
     });
 
-    outTexture = impl.resources.RegisterExternalTexture(impl.fogCloudNeutral.Get());
+    outTexture = impl.resources.RegisterExternalTexture(impl.fogCloudNeutral.get());
     if (!outTexture.IsValid())
     {
-        impl.fogCloudNeutral.Reset();
+        impl.fogCloudNeutral = nullptr;
         outError = "포그 중립 구름 RHI 등록 실패";
         return false;
     }
@@ -1498,7 +1526,7 @@ void EnhancedSceneRendererLiveDX12Adapter::ReleaseFogCloudNeutral(
 {
     if (texture.IsValid()) m_impl->resources.ReleaseTexture(texture);
     texture = {};
-    m_impl->fogCloudNeutral.Reset();
+    m_impl->fogCloudNeutral = nullptr;
 }
 
 GpuFrameToken EnhancedSceneRendererLiveDX12Adapter::BeginProfilerFrame(

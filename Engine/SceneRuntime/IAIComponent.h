@@ -1,5 +1,9 @@
 #pragma once
-#include "Delegate.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
 
 enum class AIType
 {
@@ -17,7 +21,7 @@ public:
 	virtual AIType GetAIType() const { return m_aiType; }
 	virtual void InternalAIUpdate(float deltaSecond) {};
 
-	Core::DelegateHandle m_handle{};
+	ce::delegate_handle m_handle{};
 
 protected:
 	AIType m_aiType{ AIType::BT }; // Default to Behavior Tree

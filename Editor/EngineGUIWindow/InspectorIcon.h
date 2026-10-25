@@ -1,5 +1,5 @@
 #pragma once
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // 타입 단위 인스펙터 아이콘 지정 (PHASE 21 W2-I4).
 //
@@ -63,11 +63,7 @@ namespace editor::inspector
     }();
 
     /// 타입 ID → 글리프. 그리는 쪽은 런타임 타입만 들고 있으므로 표가 필요하다.
-    inline std::unordered_map<std::size_t, const char*>& inspector_icon_table()
-    {
-        static std::unordered_map<std::size_t, const char*> table;
-        return table;
-    }
+    std::unordered_map<std::size_t, const char*>& inspector_icon_table();
 
     inline void set_inspector_icon(std::size_t typeID, const char* glyph) noexcept
     {

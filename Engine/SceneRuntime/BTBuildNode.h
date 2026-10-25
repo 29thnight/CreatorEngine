@@ -1,6 +1,6 @@
 #pragma once
 #include <mathematics/vector2.hpp>
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "BTEnum.h"
 
 

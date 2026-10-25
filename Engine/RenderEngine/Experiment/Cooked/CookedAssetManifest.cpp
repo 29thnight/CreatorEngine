@@ -1,15 +1,28 @@
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "CookedAssetManifest.h"
 #include "CookedAudioClipFormat.h"
 #include "../../Assets/AssetIdentityProfile.h" // MBC11: IsUuidV8
 
 #if defined(_WIN32)
-#include <Windows.h>
-#include <bcrypt.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
 #else
-#include "../../../Utility_Framework/Sha256.h"
+import "Creator.WinAPI.h";
+#endif
+#else
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 #endif
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #if defined(_WIN32)
 #pragma comment(lib, "bcrypt.lib")
@@ -378,8 +391,8 @@ namespace experiment::cooked
                             "entries[" + std::to_string(index) + "].dependencies["
                                 + std::to_string(dependencyIndex) + "]",
                             "dependency GUID가 manifest entry로 해석되지 않는다: "
-                                + Uuid::ToString(dependency.value) + " (entry "
-                                + Uuid::ToString(manifest.entries[index].assetId.value)
+                                + uuid::to_string(dependency.value) + " (entry "
+                                + uuid::to_string(manifest.entries[index].assetId.value)
                                 + " " + manifest.entries[index].artifactPath + ")");
                         valid = false;
                     }
@@ -456,7 +469,7 @@ namespace experiment::cooked
     std::string MakeDerivedModelArtifactPath(const AssetId& modelAssetId)
     {
         if (!IsAssetIdV4(modelAssetId)) return {};
-        const std::string guid = Uuid::ToString(modelAssetId.value);
+        const std::string guid = uuid::to_string(modelAssetId.value);
         return "Derived/Models/" + guid.substr(0u, 2u) + "/" + guid + ".cemc";
     }
 
@@ -476,7 +489,7 @@ namespace experiment::cooked
             return {};
         }
 
-        const std::string guid = Uuid::ToString(textureAssetId.value);
+        const std::string guid = uuid::to_string(textureAssetId.value);
         return "Derived/Textures/" + guid.substr(0u, 2u) + "/" + guid
             + std::string(extension);
     }
@@ -485,7 +498,7 @@ namespace experiment::cooked
         const AssetId& shaderMetaAssetId)
     {
         if (!IsAssetIdV4(shaderMetaAssetId)) return {};
-        const std::string guid = Uuid::ToString(shaderMetaAssetId.value);
+        const std::string guid = uuid::to_string(shaderMetaAssetId.value);
         return "Derived/ShaderMeta/" + guid.substr(0u, 2u) + "/" + guid
             + ".shadermeta";
     }
@@ -493,7 +506,7 @@ namespace experiment::cooked
     std::string MakeDerivedMaterialArtifactPath(const AssetId& materialAssetId)
     {
         if (!IsAssetIdV4(materialAssetId)) return {};
-        const std::string guid = Uuid::ToString(materialAssetId.value);
+        const std::string guid = uuid::to_string(materialAssetId.value);
         return "Derived/Materials/" + guid.substr(0u, 2u) + "/" + guid
             + ".asset";
     }
@@ -501,14 +514,14 @@ namespace experiment::cooked
     std::string MakeDerivedMaterialProgramArtifactPath(const AssetId& graphAssetId)
     {
         if (!IsAssetIdV4(graphAssetId) && !assets::IsUuidV8(graphAssetId.value)) return {};
-        const std::string guid = Uuid::ToString(graphAssetId.value);
+        const std::string guid = uuid::to_string(graphAssetId.value);
         return "Derived/MaterialPrograms/" + guid.substr(0u, 2u) + "/" + guid + ".lxmaterial";
     }
 
     std::string MakeDerivedSceneArtifactPath(const AssetId& sceneAssetId)
     {
         if (!IsAssetIdV4(sceneAssetId)) return {};
-        const std::string guid = Uuid::ToString(sceneAssetId.value);
+        const std::string guid = uuid::to_string(sceneAssetId.value);
         return "Derived/Scenes/" + guid.substr(0u, 2u) + "/" + guid
             + ".creator";
     }
@@ -516,7 +529,7 @@ namespace experiment::cooked
     std::string MakeDerivedPrefabArtifactPath(const AssetId& prefabAssetId)
     {
         if (!IsAssetIdV4(prefabAssetId)) return {};
-        const std::string guid = Uuid::ToString(prefabAssetId.value);
+        const std::string guid = uuid::to_string(prefabAssetId.value);
         return "Derived/Prefabs/" + guid.substr(0u, 2u) + "/" + guid
             + ".prefab";
     }
@@ -527,7 +540,7 @@ namespace experiment::cooked
         {
             return {};
         }
-        const auto guid = Uuid::ToString(assetId.value);
+        const auto guid = uuid::to_string(assetId.value);
         return "Derived/SoundGraphs/" + guid.substr(0u, 2u) + "/" + guid + ".cesg";
     }
 
@@ -537,14 +550,14 @@ namespace experiment::cooked
         {
             return {};
         }
-        const auto guid = Uuid::ToString(assetId.value);
+        const auto guid = uuid::to_string(assetId.value);
         return "Derived/SoundPresets/" + guid.substr(0u, 2u) + "/" + guid + ".cesp";
     }
 
     std::string MakeDerivedAudioClipArtifactPath(const AssetId& audioClipAssetId)
     {
         if (!IsAssetIdV4(audioClipAssetId)) return {};
-        const std::string guid = Uuid::ToString(audioClipAssetId.value);
+        const std::string guid = uuid::to_string(audioClipAssetId.value);
         return "Derived/Audio/" + guid.substr(0u, 2u) + "/" + guid + ".ceac";
     }
 
@@ -625,9 +638,9 @@ namespace experiment::cooked
         outError.clear();
         return true;
 #else
-        Hash::Sha256 hash;
-        hash.Update(bytes.data(), bytes.size());
-        outDigest = hash.Finish();
+        ce::hash::sha256 hash;
+        hash.update(bytes.data(), bytes.size());
+        outDigest = hash.finish();
         outError.clear();
         return true;
 #endif
@@ -698,7 +711,7 @@ namespace experiment::cooked
         std::uint32_t dependencyBegin = 0u;
         for (const CookedAssetManifestEntry& entry : canonical.entries)
         {
-            writer.Raw(entry.assetId.value.data.data(), entry.assetId.value.data.size());
+            writer.Raw(entry.assetId.value.data_.data(), entry.assetId.value.data_.size());
             writer.U8(static_cast<std::uint8_t>(entry.kind));
             writer.U8(0u);
             writer.U8(0u);
@@ -717,7 +730,7 @@ namespace experiment::cooked
         std::uint32_t sourcePathOffset = 0u;
         for (const AssetSourceManifestEntry& source : canonical.sourceAssets)
         {
-            writer.Raw(source.assetId.value.data.data(), source.assetId.value.data.size());
+            writer.Raw(source.assetId.value.data_.data(), source.assetId.value.data_.size());
             writer.U32(sourcePathOffset);
             writer.U32(static_cast<std::uint32_t>(source.sourcePath.size()));
             sourcePathOffset += static_cast<std::uint32_t>(source.sourcePath.size());
@@ -727,8 +740,8 @@ namespace experiment::cooked
         {
             for (const AssetId& dependency : entry.dependencies)
             {
-                writer.Raw(dependency.value.data.data(),
-                    dependency.value.data.size());
+                writer.Raw(dependency.value.data_.data(),
+                    dependency.value.data_.size());
             }
         }
         for (const CookedAssetManifestEntry& entry : canonical.entries)
@@ -793,14 +806,14 @@ namespace experiment::cooked
             return false;
         }
         expected += sourceEntries * kSourceEntryBytes;
-        if (MultiplyWouldOverflow(dependencies, sizeof(Uuid::Uuid16))
-            || AddWouldOverflow(expected, dependencies * sizeof(Uuid::Uuid16)))
+        if (MultiplyWouldOverflow(dependencies, sizeof(uuid::uuid16))
+            || AddWouldOverflow(expected, dependencies * sizeof(uuid::uuid16)))
         {
             AddIssue(outIssues, "manifest.header",
                 "dependency table 크기가 overflow한다.");
             return false;
         }
-        expected += dependencies * sizeof(Uuid::Uuid16);
+        expected += dependencies * sizeof(uuid::uuid16);
         if (AddWouldOverflow(expected, artifactStringBytes)
             || AddWouldOverflow(expected + artifactStringBytes, sourceStringBytes))
         {
@@ -821,7 +834,7 @@ namespace experiment::cooked
         for (std::uint32_t index = 0u; index < entryCount; ++index)
         {
             RawEntry raw;
-            static_cast<void>(reader.Raw(raw.assetId.value.data.data(), raw.assetId.value.data.size()));
+            static_cast<void>(reader.Raw(raw.assetId.value.data_.data(), raw.assetId.value.data_.size()));
             raw.kind = static_cast<CookedAssetKind>(reader.U8());
             const std::uint8_t reserved0 = reader.U8();
             const std::uint8_t reserved1 = reader.U8();
@@ -847,7 +860,7 @@ namespace experiment::cooked
         for (std::uint32_t index = 0u; index < sourceEntryCount; ++index)
         {
             RawSourceEntry raw;
-            static_cast<void>(reader.Raw(raw.assetId.value.data.data(), raw.assetId.value.data.size()));
+            static_cast<void>(reader.Raw(raw.assetId.value.data_.data(), raw.assetId.value.data_.size()));
             raw.pathOffset = reader.U32();
             raw.pathBytes = reader.U32();
             if (!reader.Ok())
@@ -862,7 +875,7 @@ namespace experiment::cooked
         std::vector<AssetId> dependencyIds(dependencyCount);
         for (AssetId& dependency : dependencyIds)
         {
-            if (!reader.Raw(dependency.value.data.data(), dependency.value.data.size()))
+            if (!reader.Raw(dependency.value.data_.data(), dependency.value.data_.size()))
             {
                 AddIssue(outIssues, "manifest.dependencies",
                     "dependency table이 잘렸다.");
@@ -1010,10 +1023,10 @@ namespace experiment::cooked
 
         [[nodiscard]] std::string IdentityText(const AssetIdentity& identity)
         {
-            std::string text = Uuid::ToString(identity.assetId.value);
+            std::string text = uuid::to_string(identity.assetId.value);
             if (identity.subassetId.IsValid())
             {
-                text += "/" + Uuid::ToString(identity.subassetId.value);
+                text += "/" + uuid::to_string(identity.subassetId.value);
             }
             return text;
         }
@@ -1229,14 +1242,14 @@ namespace experiment::cooked
 
         void WriteIdentity(Writer& writer, const AssetIdentity& identity)
         {
-            writer.Raw(identity.assetId.value.data.data(), identity.assetId.value.data.size());
-            writer.Raw(identity.subassetId.value.data.data(), identity.subassetId.value.data.size());
+            writer.Raw(identity.assetId.value.data_.data(), identity.assetId.value.data_.size());
+            writer.Raw(identity.subassetId.value.data_.data(), identity.subassetId.value.data_.size());
         }
 
         [[nodiscard]] bool ReadIdentity(Reader& reader, AssetIdentity& identity)
         {
-            return reader.Raw(identity.assetId.value.data.data(), identity.assetId.value.data.size())
-                && reader.Raw(identity.subassetId.value.data.data(), identity.subassetId.value.data.size());
+            return reader.Raw(identity.assetId.value.data_.data(), identity.assetId.value.data_.size())
+                && reader.Raw(identity.subassetId.value.data_.data(), identity.subassetId.value.data_.size());
         }
 
         void WriteStringRange(Writer& writer, const std::string& text,
@@ -1433,7 +1446,7 @@ namespace experiment::cooked
         writer.U32(kAssetManifestMagic);
         writer.U16(kAssetSetManifestVersion);
         writer.U16(static_cast<std::uint16_t>(kSetHeaderBytes));
-        writer.Raw(canonical.assetSetId.value.data.data(), canonical.assetSetId.value.data.size());
+        writer.Raw(canonical.assetSetId.value.data_.data(), canonical.assetSetId.value.data_.size());
         writer.U64(canonical.revision);
         writer.U32(static_cast<std::uint32_t>(canonical.entries.size()));
         writer.U32(static_cast<std::uint32_t>(canonical.blobs.size()));
@@ -1520,7 +1533,7 @@ namespace experiment::cooked
                 "AssetSet requires CEMF v3; legacy v2 dependencies cannot be reinterpreted. Re-cook authoring sources.");
         }
         AssetSetManifest parsed;
-        static_cast<void>(reader.Raw(parsed.assetSetId.value.data.data(), parsed.assetSetId.value.data.size()));
+        static_cast<void>(reader.Raw(parsed.assetSetId.value.data_.data(), parsed.assetSetId.value.data_.size()));
         parsed.revision = reader.U64();
         const std::uint32_t entryCount = reader.U32();
         const std::uint32_t blobCount = reader.U32();

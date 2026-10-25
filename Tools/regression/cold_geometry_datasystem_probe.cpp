@@ -1,12 +1,30 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "DataSystem.h"
-#include "../../Engine/Utility_Framework/WindowsApartment.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
 #include "Assets/ModelGeometryPayload.h"
 #include "Assets/ModelCpuGeometryPayload.h"
 #include "Experiment/Cooked/CookedModelSubAssetCodec.h"
 #include "Experiment/Import/MeshletBuilder.h"
 #include "RHI/IRenderDeviceServices.h"
-#include "PathFinder.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace reflgen::generated { void register_RenderEngine(reflgen::registry& target); }
 namespace
@@ -15,7 +33,7 @@ namespace ck = experiment::cooked;
 void Check(bool valid, const std::string& message) { if (!valid) throw std::runtime_error(message); }
 experiment::AssetId Id(uint8_t seed)
 {
-    experiment::AssetId value; value.value.data[0] = seed; value.value.data[6] = 0x80; value.value.data[8] = 0x80; return value;
+    experiment::AssetId value; value.value.data_[0] = seed; value.value.data_[6] = 0x80; value.value.data_[8] = 0x80; return value;
 }
 struct Source final : ck::ArtifactByteSource
 {
@@ -68,7 +86,7 @@ int main(int argc, char** argv)
         // test selects only an independently mounted typed Mesh entry.
         ck::CookedAssetManifest legacy;
         experiment::AssetId unselected;
-        Check(Uuid::TryParse("00000003-0000-4000-8000-000000000003", unselected.value), "Unselected source identity");
+        Check(uuid::try_parse("00000003-0000-4000-8000-000000000003", unselected.value), "Unselected source identity");
         legacy.sourceAssets.push_back({unselected, "Models/Unselected.glb"});
         std::filesystem::create_directories(project / "Assets/Models");
         { std::ofstream output(project / "Assets/Models/Unselected.glb", std::ios::binary); output << "unselected fixture"; }
@@ -89,8 +107,8 @@ int main(int argc, char** argv)
         reflgen::generated::register_RenderEngine(Meta::Types());
         auto& scheduler = ce::get_job_scheduler(); scheduler.start(4);
         struct JobRelease { ~JobRelease() { ce::get_job_scheduler().shutdown(); } } jobRelease;
-        auto* paths = InternalPath::GetInstance(); paths->DataPath = project / "Assets";
-        paths->BaseProjectPath = project; paths->AssetAuthoringEnabled = false;
+        auto* paths = (&ce::paths::get_state()); paths->data_path = project / "Assets";
+        paths->base_project_path = project; paths->asset_authoring_enabled = false;
         auto* data = DataSystem::GetInstance(); data->Initialize();
         struct DataRelease { DataSystem* value; ~DataRelease() { if(value) value->Finalize(); } } dataRelease{data};
         ck::ModelGeometryArtifact authored;

@@ -42,7 +42,7 @@ for p in sorted(source_paths):
         by_stem[pathlib.Path(p).stem.casefold()].append(p)
 plan_data=json.loads((ROOT/'docs/plans/MasterPlanAudit20261020.json').read_text(encoding='utf-8'))
 fallbacks={g:[x['path'] for x in e['sources']][:3] for g,e in plan_data['evidence'].items()}
-fallbacks['core']=['Engine/Utility_Framework/JobScheduler.h','Engine/Utility_Framework/ThreadPool.h']
+fallbacks['core']=['Engine/Contracts/Concurrency/Creator.Concurrency.Jobs.ixx']
 facts={
 'core':['공용 인프라의 작업 실행·완료와 컨테이너 저장 수명은 호출자 계약을 따른다. job handle의 완료·join과 저장소/자원 owner를 구분한다.','과거 PPL/독립 thread pool 이행 제안은 현재 공용 구현과 실제 소비자를 먼저 대조한다. 기반 구현의 존재가 모든 병렬 소비자의 취소·종료·비용 수용을 뜻하지 않는다.'],
 'scene':['SceneManager는 GCCE domain과 Scene root를 소유한다. Scene→Entity→Component의 trace 참조와 논리적 제거·핸들 무효화를 분리한다.','일반 new/unique_ptr 기반 Scene 그래프를 새 이행 목표로 사용하지 않는다. 자산·SDK·GPU 수명은 독립 owner/완료 계약을 따른다.'],

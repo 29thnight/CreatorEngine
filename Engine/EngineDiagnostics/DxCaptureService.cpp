@@ -1,14 +1,17 @@
 #include "DxCaptureService.h"
 #include "DxCaptureSubmission.h"
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 #if CE_DX_TIMING_CAPTURE && !CE_SHIPPING
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <Windows.h>
-#include <bcrypt.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 #pragma comment(lib, "Bcrypt.lib")
 #endif
 

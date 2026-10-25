@@ -1,10 +1,19 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "HeadlessScene.h"
 #include "../CookedSceneLoader.h"
 #include "../ClrHost.h"
 #include "../ScriptComponent.h"
 #include "../ProjectLayerSettings.h"
-#include "../../Utility_Framework/PathFinder.h"
-#include "../../Utility_Framework/TimeSystem.h"
+#include "../../Utility_Framework/Time/TimeSystem.h"
 
 namespace Runtime::Headless
 {
@@ -48,15 +57,15 @@ namespace Runtime::Headless
     {
         CheckOwner();
         if (!scene_ || started_ || stopped_) throw std::logic_error("Scene is not ready to start");
-        const auto executable = ResolveProcessExecutableDirectory();
-        EnginePaths paths;
-        paths.executableRoot = executable;
-        paths.projectRoot = executable;
-        paths.runtimeContentRoot = executable;
-        paths.runtimeDataRoot = executable / "RuntimeData";
-        paths.assetsRoot = executable / "Assets";
-        paths.managedRoot = std::filesystem::absolute(managed);
-        if (!PathFinder::Initialize(paths)) throw std::runtime_error("Host paths could not be bound");
+        const auto executable = ce::paths::resolve_process_executable_directory();
+        ce::paths::roots paths;
+        paths.executable_root = executable;
+        paths.project_root = executable;
+        paths.runtime_content_root = executable;
+        paths.runtime_data_root = executable / "RuntimeData";
+        paths.assets_root = executable / "Assets";
+        paths.managed_root = std::filesystem::absolute(managed);
+        if (!ce::paths::initialize(paths)) throw std::runtime_error("Host paths could not be bound");
 
         auto& clr = ClrHost::Get();
         if (!clr.Initialize() || !clr.AreScriptsLoaded()) throw std::runtime_error("F# runtime could not be loaded");
@@ -105,7 +114,7 @@ namespace Runtime::Headless
         scene_->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
         for (const auto& entity : scene_->m_Entities)
             if (entity && !entity->IsDestroyMark())
-                entityReport_.push_back({entity->GetHashedName().ToString(), entity->Transform_().GetWorldPosition()});
+                entityReport_.push_back({entity->GetName(), entity->Transform_().GetWorldPosition()});
     }
 
     void Session::Stop()

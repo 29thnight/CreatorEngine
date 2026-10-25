@@ -1,7 +1,7 @@
 #include "../../Tools/regression/gcce_probe_cleanup.h"
 #include "EditorThemeSelfTest.h"
-#include "EditorSelectionHistory.h"
-#include "EditorEntityIcons.h"
+#include "../EngineEntry/Editing/EditorSelectionHistory.h"
+#include "../EngineEntry/Assets/EditorEntityIcons.h"
 
 #include "EditorTheme.h"
 #include "EditorWindowChrome.h"
@@ -10,14 +10,18 @@
 #include "EditorAxisField3.h"
 #include "EditorModeButton.h"
 #include "EditorInspectorPanel.h"
-#include "WindowDesc.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Window.h"
+#else
+import Creator.Core.Window;
+#endif
 #include "ImGui.h"
 #include "SceneViewportOverlay.h"
 #include "SceneViewWindow.h"
 #include "Entity.h"
 #include "../../ThirdParty/ImViewGuizmo/MathematicsAdapter.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace editor
 {

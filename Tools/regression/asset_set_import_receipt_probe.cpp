@@ -1,11 +1,19 @@
 // Source-only opt-in Windows regression harness. NOT built or run in this change.
-#include "../../Engine/Utility_Framework/WindowsApartment.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
 // Compile this translation unit INSTEAD OF AssetSetBuild.cpp and link the
 // AssetCooker native dependencies plus the offline TextureCooker.cpp object;
 // RenderEngine.lib deliberately contains no image SDK cooker. Including this
 // file exposes only local test seams.
 #include "../AssetCooker/AssetSetBuild.cpp"
-#include <objbase.h>
 
 namespace
 {

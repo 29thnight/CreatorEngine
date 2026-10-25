@@ -1,5 +1,24 @@
-#include "../../Utility_Framework/Ownership.h"
-#include "EngineRuntimePaths.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Platform.Windows.Strings.h"
+#else
+import Creator.Platform.Windows.Strings;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
 #include "RHIShaderCompiler.h"
 #include "RHIShaderVerifiedCache.h"
 #if CE_DEVELOPMENT
@@ -8,13 +27,15 @@
 
 #include "RHIShaderSource.h"
 #include "Vulkan/VulkanBindingModel.h"
-#include "../../Utility_Framework/PathFinder.h"
-
-#include <Windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 #include <slang.h>
 #include <slang-com-ptr.h>
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -418,33 +439,13 @@ namespace
         return nullptr != outProc;
     }
 
-    std::string NarrowUtf8(std::wstring_view value)
-    {
-        if (value.empty()) return {};
-        const int bytes = WideCharToMultiByte(CP_UTF8, 0, value.data(),
-            static_cast<int>(value.size()), nullptr, 0, nullptr, nullptr);
-        if (bytes <= 0) return {};
-        std::string result(static_cast<std::size_t>(bytes), '\0');
-        WideCharToMultiByte(CP_UTF8, 0, value.data(), static_cast<int>(value.size()),
-            result.data(), bytes, nullptr, nullptr);
-        return result;
-    }
 
-    std::wstring WidenUtf8(std::string_view value)
-    {
-        if (value.empty()) return {};
-        const int characters = MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-            value.data(), static_cast<int>(value.size()), nullptr, 0);
-        if (characters <= 0) return {};
-        std::wstring result(static_cast<std::size_t>(characters), L'\0');
-        MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS, value.data(),
-            static_cast<int>(value.size()), result.data(), characters);
-        return result;
-    }
+
+
 
     std::string PathUtf8(const std::filesystem::path& path)
     {
-        return NarrowUtf8(path.generic_wstring());
+        return ce::strings::wide_to_utf8(path.generic_wstring());
     }
 
     // 확장자 하나가 front-end를 고른다. 대소문자를 접는 이유는 자산 트리의
@@ -453,11 +454,7 @@ namespace
     [[nodiscard]] bool IsSlangSource(const std::filesystem::path& path)
     {
         std::string extension = PathUtf8(path.extension());
-        std::ranges::transform(extension, extension.begin(),
-            [](unsigned char character)
-            {
-                return static_cast<char>(std::tolower(character));
-            });
+        ce::strings::to_lower_in_place(extension);
         return ".slang" == extension;
     }
 
@@ -513,9 +510,9 @@ namespace
         // 배포 호스트는 실행 파일 옆의 고정 번들만 허용한다. 에디터/테스트 같은
         // authoring 호스트만 저장소의 동일 번들을 직접 참조할 수 있다.
         TryLoadSlangPath(runtime,
-            ResolveEngineRuntimeDirectory() / L"Common" / L"slang-compiler.dll");
+            ce::paths::resolve_runtime_directory() / L"Common" / L"slang-compiler.dll");
 
-        if (nullptr == runtime.module && !PathFinder::IsAssetAuthoringEnabled())
+        if (nullptr == runtime.module && !ce::paths::is_asset_authoring_enabled())
         {
             runtime.loadError = "실행 파일 옆 slang-compiler.dll을 로드하지 못했다";
             return;
@@ -524,7 +521,7 @@ namespace
         if (nullptr == runtime.module)
         {
             const std::filesystem::path repository =
-                PathFinder::BaseProjectPath().parent_path();
+                ce::paths::base_project_path().parent_path();
             TryLoadSlangPath(runtime, repository / "ThirdParty" / "Slang" / "bin"
                 / "slang-compiler.dll");
         }
@@ -841,7 +838,7 @@ namespace
         {
             const char* dependency = module.getDependencyFilePath(index);
             if (nullptr == dependency || '\0' == dependency[0]) continue;
-            std::filesystem::path path(WidenUtf8(dependency));
+            std::filesystem::path path(ce::strings::utf8_to_wide(dependency, true));
             if (path.is_relative()) path = sourcePath.parent_path() / path;
             path = NormalizePath(path);
             paths.emplace(path.native(), std::move(path));
@@ -883,7 +880,7 @@ namespace
         }
         std::error_code ec;
         const auto temp = std::filesystem::temp_directory_path(ec);
-        if (ec) return PathFinder::CachePath("Shaders/v1");
+        if (ec) return ce::paths::cache_path("Shaders/v1");
         return temp / "CreatorEngine" / "ShaderCache" / "v1";
     }
 
@@ -1107,7 +1104,7 @@ namespace
             hash.Add(PathUtf8(directory));
         for (const SourceUnit& unit : units)
         {
-            hash.Add(NarrowUtf8(unit.path.generic_wstring()));
+            hash.Add(ce::strings::wide_to_utf8(unit.path.generic_wstring()));
             hash.Add(unit.text);
         }
         if (nullptr != request.permutation && !request.permutation->Empty())
@@ -1147,7 +1144,7 @@ namespace
         std::vector<std::filesystem::path> dependencies;
         while (std::getline(file, line))
         {
-            if (!line.empty()) dependencies.emplace_back(WidenUtf8(line));
+            if (!line.empty()) dependencies.emplace_back(ce::strings::utf8_to_wide(line, true));
         }
         return dependencies;
     }

@@ -89,7 +89,7 @@ if ($blackBoardPathPolicy -ne 1) {
 # 없다. meta를 만드는 저작 자산 경로를 재사용하면 없던 사이드카가 생기기 시작한다.
 Assert-DoesNotMatch "Engine\SceneRuntime\ProjectLayerSettingsIO.h" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
-Assert-Matches "Editor\EngineEntry\EditorProjectLayerSettings.h" `
+Assert-Matches "Editor\EngineEntry\Project\EditorProjectLayerSettings.h" `
     'AssetAuthoringPort::WriteLayerSettings'
 Assert-Matches "Engine\RenderEngine\Assets\ModelAssetGeneration.cpp" `
     'AssetAuthoringPort::WriteModelCache'
@@ -97,14 +97,14 @@ Assert-Matches "Engine\RenderEngine\Assets\ModelAssetGeneration.cpp" `
 # authoring handler가 다시 생기면 단일 정본 계약이 깨진다.
 Assert-DoesNotMatch "Engine\SceneRuntime\Animator.cpp" `
 	'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta|AssetAuthoringPort::WriteAnimatorController|SerializeControllers|DeserializeControllers|ImportLegacyControllerJson|nlohmann'
-Assert-DoesNotMatch "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-DoesNotMatch "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
 	'AnimatorControllerWriter|WriteAnimatorControllerThroughEditor'
 
 Assert-DoesNotMatch "Engine\SceneRuntime\InputActionManager.cpp" `
     'std::ofstream|create_directories\s*\(|AssetAuthoringPort::CreateMeta'
 Assert-Matches "Engine\SceneRuntime\InputActionManager.cpp" `
     'AssetAuthoringPort::WriteInputActionMap'
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'InstallInputActionMapWriter\(\s*&WriteInputActionMapThroughEditor\)'
 
 Assert-DoesNotMatch "Engine\SceneRuntime\TagManager.cpp" `
@@ -125,7 +125,7 @@ if ($tagPathPolicy -ne 1) {
 # ★ 이번 슬라이스가 실제로 밟은 함정의 회귀 방지. 태그 저장은 asset database가
 #   authoring handler를 설치한 뒤부터 걷기 전까지만 성공한다. 호출 순서가 그
 #   창 밖으로 나가면 빌드도 다른 게이트도 잡지 못한 채 저장이 조용히 사라진다.
-$editorMainLines = Get-Content -LiteralPath (Join-Path $repoRoot "Editor\EngineEntry\EditorMain.cpp")
+$editorMainLines = Get-Content -LiteralPath (Join-Path $repoRoot "Editor\EngineEntry\Bootstrap\EditorMain.cpp")
 function Find-CallLine([string]$pattern) {
     for ($i = 0; $i -lt $editorMainLines.Count; $i++) {
         if ($editorMainLines[$i] -match $pattern) { return $i + 1 }
@@ -146,12 +146,12 @@ if ($tagDown -gt $databaseDown) {
         "EditorAssetDatabase::Get().Shutdown (line $databaseDown) — " +
         "the shutdown save is lost after the handler is uninstalled")
 }
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'InstallTagManagerWriter\(&WriteTagManagerThroughEditor\)'
 
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'InstallLayerSettingsWriter\(\s*&WriteLayerSettingsThroughEditor\)'
-$publishSettingBody = [regex]::Match((Read-Source "Editor\EngineEntry\EditorAssetDatabase.cpp"),
+$publishSettingBody = [regex]::Match((Read-Source "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp"),
     'bool PublishUncatalogedLocked[\s\S]*?\n\t\}').Value
 if ([string]::IsNullOrWhiteSpace($publishSettingBody)) {
     throw "PublishUncatalogedLocked body could not be located for inspection"
@@ -160,12 +160,12 @@ if ($publishSettingBody -match 'CreateMetaLocked') {
     throw "project setting publication must not create .meta sidecars"
 }
 
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'InstallFoliageWriter\(&WriteFoliageThroughEditor\)'
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'InstallBlackBoardWriter\(&WriteBlackBoardThroughEditor\)'
 # Editor 쪽 규약 철자도 한 벌만 있어야 Core의 ResolveBlackBoardPath와 갈라지지 않는다.
-$databaseSource = Read-Source "Editor\EngineEntry\EditorAssetDatabase.cpp"
+$databaseSource = Read-Source "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp"
 foreach ($literal in @('L"BehaviorTree"', 'L".blackboard"')) {
     $spelled = ([regex]::Matches($databaseSource, [regex]::Escape($literal))).Count
     if ($spelled -ne 1) {
@@ -173,29 +173,29 @@ foreach ($literal in @('L"BehaviorTree"', 'L".blackboard"')) {
     }
 }
 
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'InstallModelCacheWriter'
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'InstallEmbeddedTextureWriter'
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'InstallTerrainWriter'
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'InstallFoliageWriter'
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'SaveToWICFile'
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'file::copy_file'
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'GUID_WICPixelFormat32bppBGRA'
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'GUID_WICPixelFormat8bppGray'
-Assert-DoesNotMatch "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-DoesNotMatch "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'stb_image_write|stbi_write_'
 Assert-DoesNotMatch "Engine\SceneRuntime\Terrain.cpp" `
     'stb_image|stbi_'
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'file::rename\(stagingDirectory, finalGeneration'
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'MoveFileExW\(descriptorTemporary\.c_str\(\), descriptorPath\.c_str\(\)'
 
 $playerSources = Get-ChildItem -LiteralPath (Join-Path $repoRoot "Player") `
@@ -229,8 +229,8 @@ foreach ($relative in @(
     "Engine/RenderEngine/Assets/ModelAssetGeneration.cpp",
     "Engine/RenderEngine/AssetAuthoringPort.cpp",
     "Engine/SceneRuntime/TagManager.cpp",
-    "Editor/EngineEntry/EditorAssetDatabase.cpp",
-    "Editor/EngineEntry/EditorProjectLayerSettings.h",
+    "Editor/EngineEntry/Assets/EditorAssetDatabase.cpp",
+    "Editor/EngineEntry/Project/EditorProjectLayerSettings.h",
     "Editor/EngineEntry/Commands/AssetAuthoringCommands.cpp")) {
     if ((Get-Item -LiteralPath (Join-Path $repoRoot $relative)).LastWriteTimeUtc -gt $editorStamp) {
         throw "Editor executable is stale for ownership probes; rebuild the cutover product first: $relative"

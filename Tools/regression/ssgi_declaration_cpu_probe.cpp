@@ -1,3 +1,9 @@
+#include "Engine/RenderEngine/RenderArena.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Arena.h"
+#else
+import Creator.Core.Arena;
+#endif
 // The runner supplies exact baseline/current SSGI source and production graph
 // ownership templates. Only the graph/RHI service boundary is substituted.
 #include <algorithm>
@@ -18,7 +24,6 @@
 #include <string_view>
 #include <utility>
 #include <vector>
-#include "Engine/RenderEngine/RenderArena.h"
 
 namespace
 {

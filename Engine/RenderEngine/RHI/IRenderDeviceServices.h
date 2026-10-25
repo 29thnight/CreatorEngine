@@ -1,7 +1,11 @@
 #pragma once
-#include "../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include <stdint.h>
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "RHIResourceTypes.h"
 #include "RHIFormat.h"
@@ -458,7 +462,7 @@ struct RHIModelMeshView
         {
             return false;
         }
-        if (!origin.byteSource || !handle.modelId.IsNil() || handle.generation != 0 ||
+        if (!origin.byteSource || !handle.modelId.is_nil() || handle.generation != 0 ||
             handle.meshId != descriptor.meshId || handle.asset != origin.entry.asset || handle.Blob() != origin.blob ||
             handle.resolverRevision != origin.resolverRevision || handle.mountId != origin.mountId.value ||
             handle.assetSetId != origin.assetSetId || handle.manifestRevision != origin.manifestRevision ||
@@ -587,12 +591,12 @@ struct RHIModelMeshView
         mix(&size, sizeof(size));
         mix(value.data(), value.size());
     };
-    mix(handle.modelId.data.data(), handle.modelId.data.size());
-    mix(handle.meshId.data.data(), handle.meshId.data.size());
+    mix(handle.modelId.data_.data(), handle.modelId.data_.size());
+    mix(handle.meshId.data_.data(), handle.meshId.data_.size());
     mix(&handle.generation, sizeof(handle.generation));
     mix(&handle.domain, sizeof(handle.domain));
-    mix(handle.asset.key.assetId.value.data.data(), handle.asset.key.assetId.value.data.size());
-    mix(handle.asset.key.subassetId.value.data.data(), handle.asset.key.subassetId.value.data.size());
+    mix(handle.asset.key.assetId.value.data_.data(), handle.asset.key.assetId.value.data_.size());
+    mix(handle.asset.key.subassetId.value.data_.data(), handle.asset.key.subassetId.value.data_.size());
     mix(&handle.asset.kind, sizeof(handle.asset.kind));
     const auto& blob = handle.Blob();
     mix(blob.contentSha256.data(), blob.contentSha256.size());
@@ -605,7 +609,7 @@ struct RHIModelMeshView
     mixString(blob.artifactPath);
     mix(&handle.resolverRevision, sizeof(handle.resolverRevision));
     mix(&handle.mountId, sizeof(handle.mountId));
-    mix(handle.assetSetId.value.data.data(), handle.assetSetId.value.data.size());
+    mix(handle.assetSetId.value.data_.data(), handle.assetSetId.value.data_.size());
     mix(&handle.manifestRevision, sizeof(handle.manifestRevision));
     if (hash == 0)
     {

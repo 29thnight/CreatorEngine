@@ -1,7 +1,11 @@
 #pragma once
-#include "../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 #include "RHIDisplayFrame.h"
 
 // 라이브 표시 결과를 presentation 계층에 여는 백엔드 중립 계약.

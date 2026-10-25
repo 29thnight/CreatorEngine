@@ -1,10 +1,16 @@
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "SoundAssetSerialization.h"
 
-#include "../../Utility_Framework/AuthoringCookedDocument.h"
-#include "../../Utility_Framework/AuthoringParsedDocument.h"
-#include "../../Utility_Framework/AuthoringWriteNode.h"
+#include "../../Utility_Framework/Authoring/AuthoringCookedDocument.h"
+#include "../../Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../Utility_Framework/Authoring/AuthoringWriteNode.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace wave
 {
@@ -61,10 +67,10 @@ namespace wave
             {
                 return {};
             }
-            Uuid::Uuid16 id;
-            Require(node.IsScalar() && Uuid::TryParse(node.Scalar(), id)
-                && !id.IsNil() && Uuid::ToString(id) == node.Scalar()
-                && (id.data[6] & 0xf0u) == 0x40u && (id.data[8] & 0xc0u) == 0x80u,
+            uuid::uuid16 id;
+            Require(node.IsScalar() && uuid::try_parse(node.Scalar(), id)
+                && !id.is_nil() && uuid::to_string(id) == node.Scalar()
+                && (id.data_[6] & 0xf0u) == 0x40u && (id.data_[8] & 0xc0u) == 0x80u,
                 "Sound asset reference must be a canonical UUIDv4");
             return ClipKey::FromGuid(id);
         }

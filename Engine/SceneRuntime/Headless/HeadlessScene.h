@@ -1,8 +1,13 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
 #include "../SceneManager.h"
 #include "../Scene.h"
-#include "../../Utility_Framework/DiagnosticDocument.h"
+#include "../../Utility_Framework/Authoring/DiagnosticDocument.h"
 
 namespace Runtime::Headless
 {

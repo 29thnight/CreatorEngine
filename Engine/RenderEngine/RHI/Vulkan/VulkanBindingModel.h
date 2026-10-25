@@ -1,5 +1,5 @@
 #pragma once
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // HLSL 레지스터 → SPIR-V binding 매핑 규약 (V8-b).
 //

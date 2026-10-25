@@ -1,14 +1,34 @@
+#include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
+#include "RenderArena.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Arena.h"
+#else
+import Creator.Core.Arena;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "RHI/DX12/DX12CommandTranslator.h"
 #include "RHI/RHISoftwareRecorder.h"
 #include "RHI/RHISoftwareQueueRecorder.h"
 #include "RHI/DX12/DX12QueueRecorder.h"
 #include "RHI/DX12/DX12QueueService.h"
-#include "RenderArena.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "Render/Core/EnhancedLivePipelineDesc.h"
-#include "JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include "RHI/DX12/DX12GpuProfiler.h"
 
 namespace
@@ -452,7 +472,7 @@ namespace
             require(pendingFrame.expired(), "Completed GPU retirement still owns the arena frame.");
             auto recycledArena = frameArenas.Acquire();
             require(recycledArena.operator->() == pendingArena && recycledArena->Resource(0).stats().resets > 0 &&
-                        recycledArena->Resource(0).stats().usedBytes == 0,
+                        recycledArena->Resource(0).stats().used_bytes == 0,
                     "GPU-retired arena was not bulk reset and reused.");
             auto* cachedPool = heldFork.operator->();
             heldFork.reset();
@@ -717,13 +737,14 @@ namespace
             }
             {
                 DX12ResourceTable table;
-                Microsoft::WRL::ComPtr<ID3D12Resource> pinned = resources.Resolve(texture);
+                winrt::com_ptr<ID3D12Resource> pinned;
+        pinned.copy_from(resources.Resolve(texture));
                 const auto original = table.AddTexture(pinned);
                 auto frozen = table.CaptureRecordingSnapshot();
                 table.Release(original);
                 const auto replacement = table.AddTexture(pinned);
                 require(original != replacement && !table.Resolve(original) &&
-                            frozen->Resolve(original) == pinned.Get() && !frozen->Resolve(replacement),
+                            frozen->Resolve(original) == pinned.get() && !frozen->Resolve(replacement),
                         "Pending resource snapshot followed a released handle into its replacement generation.");
                 table.Release(replacement);
             }

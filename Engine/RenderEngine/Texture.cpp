@@ -1,12 +1,26 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "Texture.h"
 #include "TextureCodecImage.h"
 #include "AssetDepot/TextureAssetRuntime.h"
 #include "Experiment/Cooked/CookedTexture.h"
 #include "Interfaces/AssetAuthoringPort.h"
-#include "PathFinder.h"
-#include "Core.Memory.hpp"
-#include "LogSystem.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Diagnostics/LogSystem.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -348,15 +362,15 @@ own::shared_owner<const Texture> Texture::CreateFromSourceImage(
     return std::move(texture);
 }
 
-own::shared_owner<const Texture> Texture::LoadFormPath(_In_ const file::path& path, bool isCompress)
+own::shared_owner<const Texture> Texture::LoadFormPath(_In_ const std::filesystem::path& path, bool isCompress)
 {
-    const file::path materialPath = PathFinder::RelativeToMaterial(path.string());
-    const file::path resolved = file::is_regular_file(materialPath) ? materialPath : path;
+    const std::filesystem::path materialPath = ce::paths::relative_to_material(path.string());
+    const std::filesystem::path resolved = std::filesystem::is_regular_file(materialPath) ? materialPath : path;
     if (resolved.extension() == ".cetex")
     {
         return LoadSharedFromPath(resolved, false);
     }
-    if (!file::is_regular_file(resolved))
+    if (!std::filesystem::is_regular_file(resolved))
     {
         return {};
     }
@@ -364,17 +378,17 @@ own::shared_owner<const Texture> Texture::LoadFormPath(_In_ const file::path& pa
         isCompress ? TextureSourceCompression::LegacyColor : TextureSourceCompression::None), {}, {}, {});
 }
 
-own::shared_owner<const Texture> Texture::LoadSharedFromPath(const file::path& path, bool isCompress, std::string_view assetPath)
+own::shared_owner<const Texture> Texture::LoadSharedFromPath(const std::filesystem::path& path, bool isCompress, std::string_view assetPath)
 {
-    file::path matPath = PathFinder::RelativeToMaterial(path.string());
+    std::filesystem::path matPath = ce::paths::relative_to_material(path.string());
     // 폴더는 파일이 아니다. 빈 이름이 `Textures\` 폴더가 되어 "있음" 을 통과하고 디코더가
     // 폴더를 열다 예외로 에디터를 죽였다(DecalComponent 를 붙이는 순간).
-    if (!file::is_regular_file(path) && !file::is_regular_file(matPath))
+    if (!std::filesystem::is_regular_file(path) && !std::filesystem::is_regular_file(matPath))
     {
         return nullptr;
     }
 
-    const file::path preparePath = file::is_regular_file(path) ? path : matPath;
+    const std::filesystem::path preparePath = std::filesystem::is_regular_file(path) ? path : matPath;
     if (preparePath.extension() == ".cetex")
     {
         std::ifstream stream(preparePath, std::ios::binary | std::ios::ate);
@@ -553,7 +567,7 @@ own::shared_owner<const Texture> Texture::CreateOwnedDescriptor(
         // One diagnostic at descriptor publication, never in the rehydration or
         // upload hot path. Authored bytes and intentional mip policy stay exact.
         Debug::PrintLog(spdlog::level::warn,
-            "Cooked texture " + Uuid::ToString(origin->resolved.entry.asset.key.assetId.value)
+            "Cooked texture " + uuid::to_string(origin->resolved.entry.asset.key.assetId.value)
             + " preserves its offline mip/compression policy; legacy runtime hints were ignored.");
     }
     auto texture = own::make_shared<Texture>();
@@ -662,15 +676,15 @@ Texture::ImageMemorySnapshot Texture::SnapshotImageMemory() noexcept
         TextureLiveImageCount.load(std::memory_order_relaxed) };
 }
 
-own::shared_owner<const Texture> Texture::LoadManagedFromPath(const file::path& path, bool isCompress)
+own::shared_owner<const Texture> Texture::LoadManagedFromPath(const std::filesystem::path& path, bool isCompress)
 {
-    const file::path materialPath = PathFinder::RelativeToMaterial(path.string());
-    const file::path resolved = file::is_regular_file(materialPath) ? materialPath : path;
+    const std::filesystem::path materialPath = ce::paths::relative_to_material(path.string());
+    const std::filesystem::path resolved = std::filesystem::is_regular_file(materialPath) ? materialPath : path;
     if (resolved.extension() == ".cetex")
     {
         return LoadSharedFromPath(resolved, false);
     }
-    if (!file::is_regular_file(resolved))
+    if (!std::filesystem::is_regular_file(resolved))
     {
         return {};
     }

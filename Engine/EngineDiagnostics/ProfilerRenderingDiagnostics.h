@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // Value-only Rendering - Live boundary. This header deliberately has no renderer,
 // scene, RHI, editor, or ImGui dependency and contains no process-local handles.

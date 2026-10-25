@@ -1,27 +1,56 @@
 #pragma once
-#include "../Utility_Framework/WindowsApartment.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
 #include "Camera.h"
 #include "ProfileScope.h"
-#include "ThreadPool.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "InputManager.h"
-#include "PathFinder.h"
-#include "DumpHandler.h"
-#include "WindowsCoreWindow.h"
+#include "../Utility_Framework/Diagnostics/LogSystem.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.AppBackend.WinAPI.h"
+#else
+import Creator.AppBackend.WinAPI;
+#endif
 #include "DataSystem.h"
-#include "RuntimeSettings.h"
+#include "../Utility_Framework/Runtime/RuntimeSettings.h"
 #include "PrefabUtility.h"
 #include "TagManager.h"
-#include "ReflectionRegister.h"
+#include "../Utility_Framework/Reflection/ReflectionRegister.h"
 #include "ComponentFactory.h"
 #include "InputActionManager.h"
-#include "EngineMode.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.EngineMode.h"
+#else
+import Creator.Core.EngineMode;
+#endif
 #include "EngineLaunchConfig.h"
-#include "JobScheduler.h"
-#include "../Utility_Framework/RuntimeResults.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+#include "../Utility_Framework/Runtime/RuntimeResults.h"
 
 #include <stdio.h>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace EngineBootstrap
 {
@@ -74,7 +103,7 @@ namespace EngineBootstrap
 
     inline void InitializeShutdownTrace()
     {
-        const std::string path = (PathFinder::LogPath() / "shutdown_trace.txt").string();
+        const std::string path = (ce::paths::log_path() / "shutdown_trace.txt").string();
         if (path.size() < MAX_PATH)
         {
             std::memcpy(g_shutdownTracePath, path.c_str(), path.size() + 1);
@@ -305,10 +334,10 @@ namespace EngineBootstrap
                  ce::profiler().submit_render_measurement(sample, origin.captureGeneration);
              }});
 
-        if ((config.prepareRuntimeContent || config.paths.HasRuntimeOwnershipCapability()) &&
-            !config.paths.HasValidRuntimeOwnership())
+        if ((config.prepareRuntimeContent || config.paths.has_runtime_ownership_capability()) &&
+            !config.paths.has_valid_runtime_ownership())
         {
-            std::fputs("[EnginePaths] Host runtime ownership capability is invalid\n", stderr);
+            std::fputs("[ce::paths::roots] Host runtime ownership capability is invalid\n", stderr);
             return false;
         }
 
@@ -316,15 +345,15 @@ namespace EngineBootstrap
         // 고정한다. PathFinder와 RuntimeSettings는 아래의 명시적 Host config만 쓴다.
         EngineMode::Set(config.compatibilityRunMode);
 
-        if (!PathFinder::Initialize(config.paths))
+        if (!ce::paths::initialize(config.paths))
         {
-            std::fputs("[EnginePaths] Host가 유효한 경로를 제공하지 않았다\n", stderr);
+            std::fputs("[ce::paths::roots] Host가 유효한 경로를 제공하지 않았다\n", stderr);
             return false;
         }
         try
         {
             Log::Initialize(config.logSessionName);
-            Diagnostics::RuntimeResults::Initialize(PathFinder::LogPath());
+            Diagnostics::RuntimeResults::Initialize(ce::paths::log_path());
         }
         catch (const std::exception& exception)
         {
@@ -347,13 +376,13 @@ namespace EngineBootstrap
         // 이미 다 걸어 둔 상태라, 등록이 늦으면 그 사이에 죽은 크래시는 로그에 CRASH
         // 줄만 남고 .dmp가 없다. 예전에는 App::Initialize 중반이 유일한 등록 지점이라
         // 디바이스 생성·셰이더 컴파일·리소스 로드 구간 전체가 덤프 사각지대였다.
-        WindowsCoreWindow::SetDumpType(DUMP_TYPE::DUMP_TYPE_FULL);
+        AppBackendWinAPI::SetDumpType(AppCrashDumpMode::Full);
 
         // The Host owns package/import preparation. Run it after path, log, and crash
         // diagnostics exist, but before RuntimeSettings reads ProjectSetting from that view.
         if (config.prepareRuntimeContent && !config.prepareRuntimeContent(config.paths))
         {
-            std::fputs("[EnginePaths] Host runtime content preparation failed\n", stderr);
+            std::fputs("[ce::paths::roots] Host runtime content preparation failed\n", stderr);
             Debug::PrintLog(spdlog::level::err, "Host runtime content preparation failed");
             Log::Finalize();
             return false;
@@ -379,7 +408,7 @@ namespace EngineBootstrap
             return false;
         }
 
-        WindowsCoreWindow::RegisterCreateEventHandler([](HWND, WPARAM, LPARAM) -> LRESULT { return 0; });
+        AppBackendWinAPI::RegisterCreateEventHandler([](HWND, WPARAM, LPARAM) -> LRESULT { return 0; });
 
         TagManager::GetInstance();
         InputManager::GetInstance();
@@ -468,24 +497,24 @@ namespace EngineBootstrap
         // 먼저 정리된다. 예전 App::Initialize 지역 window는 app.Finalize 전에
         // 파괴됐고, InitializeTask의 값 반환 복사본도 같은 HWND를 조기 파괴했다.
         {
-            std::unique_ptr<WindowsCoreWindow> backend;
+            std::unique_ptr<AppBackendWinAPI> backend;
             try
             {
-                backend = std::make_unique<WindowsCoreWindow>(hInstance, config.window);
+                backend = std::make_unique<AppBackendWinAPI>(hInstance, config.window);
             }
             catch (const std::exception& error)
             {
                 std::fprintf(stderr, "Window backend initialization failed: %s\n", error.what());
                 return 3;
             }
-            WindowsCoreWindow& platformWindow = *backend;
+            AppBackendWinAPI& platformWindow = *backend;
             CoreWindow coreWindow(std::move(backend));
             TApp app;
             // Disconnect HWND callbacks before App's destructor, including when
             // Initialize/Finalize throws and COM teardown pumps window messages.
             struct WindowCallbackGuard
             {
-                WindowsCoreWindow& window;
+                AppBackendWinAPI& window;
                 ~WindowCallbackGuard() noexcept { window.DetachCallbacks(); }
             } windowCallbacks{platformWindow};
             app.Initialize(platformWindow, coreWindow);

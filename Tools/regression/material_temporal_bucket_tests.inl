@@ -7,7 +7,7 @@ void RunTemporalBuckets(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
         transmitting ? RefractionProduct(root, false) : ShadowDecalProduct(root, false, RHIShaderCompiler::GetOutput());
     GenerationStore store;
     experiment::AssetId id;
-    Check(Uuid::TryParse("DDDDDDDD-DDDD-4DDD-8DDD-DDDDDDDDDDDD", id.value), "Temporal graph identity");
+    Check(uuid::try_parse("DDDDDDDD-DDDD-4DDD-8DDD-DDDDDDDDDDDD", id.value), "Temporal graph identity");
     std::string error;
     if(transmitting){
         IndirectMaterialBatch invalid;invalid.device=&device;

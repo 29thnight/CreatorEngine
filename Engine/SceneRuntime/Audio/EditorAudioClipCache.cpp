@@ -1,12 +1,25 @@
-#include "../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 #include "EditorAudioClipCache.h"
 #include "AudioSourceInspection.h"
 #include "../../RenderEngine/Assets/AudioClipSourceMetadata.h"
 
 #include <errno.h>
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(_WIN32)
-#include <Windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 #else
 #include <fcntl.h>
 #include <sys/stat.h>
@@ -364,10 +377,10 @@ namespace wave
         };
 
         bool CopyBounded(const std::filesystem::path& source, CacheFile& output,
-            std::uint64_t size, const Hash::Sha256Digest& expected, std::string& error)
+            std::uint64_t size, const ce::hash::sha256_digest& expected, std::string& error)
         {
             std::ifstream input(source, std::ios::binary);
-            Hash::Sha256 hash;
+            ce::hash::sha256 hash;
             std::array<std::byte, 64u * 1024u> block{};
             std::uint64_t remaining = size;
             while (input && remaining != 0u)
@@ -378,11 +391,11 @@ namespace wave
                 {
                     break;
                 }
-                hash.Update(block.data(), static_cast<std::size_t>(count));
+                hash.update(block.data(), static_cast<std::size_t>(count));
                 remaining -= static_cast<std::uint64_t>(count);
             }
             if (remaining != 0u || input.peek() != std::char_traits<char>::eof()
-                || !output.Flush(error) || hash.Finish() != expected)
+                || !output.Flush(error) || hash.finish() != expected)
             {
                 error = "Audio source changed during immutable cache snapshot";
                 return false;
@@ -477,7 +490,7 @@ namespace wave
         }
         // Content and import settings select a new immutable generation. Old
         // playbacks keep their own byte-source root across source edits.
-        const auto generationName = Hash::ToHex(original.sourceContentHash)
+        const auto generationName = ce::hash::to_hex(original.sourceContentHash)
             + "-" + std::string(loadMode) + "-" + std::string(spatialKind) + "-v1";
         auto destinationDirectory = cache->Child(generationName, true, false, error);
         for (const auto& segment : { std::string("Derived"), std::string("Audio"), key.Text().substr(0u, 2u) })
@@ -504,8 +517,8 @@ namespace wave
         {
             return false;
         }
-        Hash::Sha256 artifactHash;
-        artifactHash.Update(header.data(), header.size());
+        ce::hash::sha256 artifactHash;
+        artifactHash.update(header.data(), header.size());
         std::array<std::byte, 64u * 1024u> block{};
         std::uint64_t remaining = original.payloadSize;
         while (input && remaining != 0u)
@@ -520,7 +533,7 @@ namespace wave
             {
                 return false;
             }
-            artifactHash.Update(block.data(), static_cast<std::size_t>(count));
+            artifactHash.update(block.data(), static_cast<std::size_t>(count));
             remaining -= static_cast<std::uint64_t>(count);
         }
         if (remaining != 0u || !output->Flush(error))
@@ -529,7 +542,7 @@ namespace wave
             return false;
         }
         output.reset();
-        entry.contentSha256 = artifactHash.Finish();
+        entry.contentSha256 = artifactHash.finish();
         const auto filename = std::filesystem::path(key.Text() + ".ceac");
         if (!destinationDirectory->Publish(*staging, "artifact.ceac", filename, error))
         {

@@ -1,16 +1,24 @@
 #pragma once
-#include "TypeDefinition.h"
-#include "ClassProperty.h"
-#include "EngineResourceCensus.h"
-#include "MetaPolymorphic.h"
-#include "Delegate.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Foundation/TypeDefinition.h"
+#include "../Utility_Framework/Reflection/ClassProperty.h"
+#include "../Utility_Framework/Diagnostics/EngineResourceCensus.h"
+#include "../Utility_Framework/Reflection/MetaPolymorphic.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
 // m_assetId의 HashedGuid·MakeRuntimeResourceId()가 여기서 온다 — 전이 include에 기대지 않는다.
-#include "TypeTrait.h"
+#include "../Utility_Framework/Reflection/TypeTrait.h"
 // Image storage and runtime loading are SDK-free; source processing is authoring-only.
 #include "TextureImage.h"
-#include "../Utility_Framework/Ownership.h"
 #include <mathematics/vector2.hpp>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 //-----------------------------------------------------------------------------
 // Texture: 자산의 CPU 자료
@@ -72,7 +80,7 @@ public:
 		_In_opt_ size_t rowPitch = 0
 	);
 
-	static own::shared_owner<const Texture> LoadFormPath(_In_ const file::path& path, bool isCompress = false);
+	static own::shared_owner<const Texture> LoadFormPath(_In_ const std::filesystem::path& path, bool isCompress = false);
 
     // Shares encoded CPU pixels, but owns a distinct GPU cache identity when
     // the sampling format changes. Never mutates a texture used by another role.
@@ -86,7 +94,7 @@ public:
         const own::shared_owner<const Texture>& source, std::string& outFailure);
 
 	static own::shared_owner<const Texture> LoadSharedFromPath(
-		const file::path& path, bool isCompress = false, std::string_view assetPath = {});
+		const std::filesystem::path& path, bool isCompress = false, std::string_view assetPath = {});
 
 	// I2-E 후속 — 컨테이너 안에 묻힌 이미지(glb 임베디드 등)를 디스크에 뽑지
 	// 않고 바이트에서 바로 만든다. 포맷은 매직으로 가른다(DDS·HDR, 나머지는
@@ -117,7 +125,7 @@ public:
 		TextureImage& outImage, std::string& outFailure);
 
 	static own::shared_owner<const Texture> LoadManagedFromPath(
-		const file::path& path, bool isCompress = false);
+		const std::filesystem::path& path, bool isCompress = false);
 
     // Neutral storage; authoring-only derived images may retain SDK allocations.
     // Reproducible descriptors do not strongly own this payload.
@@ -217,8 +225,8 @@ private:
 	~TextureManager() = default;
 
 public:
-	Core::Delegate<void> OnTextureReleaseEvent{};
-	Core::Delegate<void, uint32, uint32> OnTextureResizeEvent{};
+	ce::delegate<void> OnTextureReleaseEvent{};
+	ce::delegate<void, uint32, uint32> OnTextureResizeEvent{};
 };
 
 static auto& OnResizeReleaseEvent = TextureManager::GetInstance()->OnTextureReleaseEvent;

@@ -1,4 +1,8 @@
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "TemporalUpscalerHost.h"
 #include "../../RHI/IRHIDeviceResources.h"
 #include "../../RHI/DX12/DX12DeviceResources.h"
@@ -8,7 +12,7 @@
 #include "../../RHI/Temporal/DlssTemporalAdapter.h"
 #include "../../RHI/Temporal/XeSSUpscaler.h"
 #include <stdint.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {

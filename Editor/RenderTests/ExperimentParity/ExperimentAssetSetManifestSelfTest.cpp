@@ -1,6 +1,6 @@
 #include "Experiment/Cooked/CookedAssetManifest.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace RenderTest
 {
@@ -33,9 +33,9 @@ namespace RenderTest
         [[nodiscard]] experiment::AssetId SetTestId(std::uint8_t value)
         {
             experiment::AssetId id;
-            id.value.data[6] = 0x40u;
-            id.value.data[8] = 0x80u;
-            id.value.data[15] = value;
+            id.value.data_[6] = 0x40u;
+            id.value.data_[8] = 0x80u;
+            id.value.data_[15] = value;
             return id;
         }
 
@@ -192,7 +192,7 @@ namespace RenderTest
         invalid.entries[0].dependencies.back().kind = ck::AssetDependencyKind::Loadable;
         check.Check(rejected(invalid), "contradictory duplicate edges rejected");
         invalid = manifest;
-        invalid.entries[0].asset.key.subassetId.value.data[6] = 0x50u;
+        invalid.entries[0].asset.key.subassetId.value.data_[6] = 0x50u;
         check.Check(rejected(invalid), "unsupported stable subasset UUID version rejected");
         invalid = manifest;
         invalid.blobs.push_back(invalid.blobs[0]);

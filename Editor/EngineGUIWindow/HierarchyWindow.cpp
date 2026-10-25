@@ -1,17 +1,22 @@
-#include "EditorModelPlacement.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../EngineEntry/Assets/Models/EditorModelPlacement.h"
 #include "EditorTheme.h"
-#include "EditorObjectOperations.h"
+#include "../EngineEntry/Scene/EditorObjectOperations.h"
 #include "EditorAssetDragPayload.h"
-#include "EditorAssetPresentation.h"
-#include "EditorImGuiTexture.h"
+#include "../EngineEntry/Assets/EditorAssetPresentation.h"
+#include "../EngineEntry/Presentation/EditorImGuiTexture.h"
 #include "HierarchyWindow.h"
 #include "EditorPanelCost.h"
 #include "EditorWindowNames.h"
 #include "Windows/EditorStandardWindows.h"
 #include "EditorMenuDraw.h"
 #include "EditorMenuTargets.h"
-#include "ReflectionUndo.h"
-#include "ConsoleCommandSystem.h"
+#include "../EngineEntry/Editing/ReflectionUndo.h"
+#include "../EngineEntry/Commands/ConsoleCommandSystem.h"
 #include "SpriteRenderer.h"
 #include "RenderScene.h"
 #include "Scene.h"
@@ -23,15 +28,14 @@
 #include "CameraComponent.h"
 #include "UIManager.h"
 #include "DataSystem.h"
-#include "PathFinder.h"
 #include "RectTransformComponent.h"
 #include "SpriteSheetComponent.h"
-#include "GameObjectCommand.h"
-#include "PrefabEditor.h"
+#include "../EngineEntry/Editing/GameObjectCommand.h"
+#include "../EngineEntry/Scene/PrefabEditor.h"
 #include "EditorIcons.h"
 #include "InputManager.h"
-#include "MetaStateCommand.h"
-#include "ReflectionRegister.h"
+#include "../../Engine/Utility_Framework/Reflection/MetaStateCommand.h"
+#include "../../Engine/Utility_Framework/Reflection/ReflectionRegister.h"
 
 namespace
 {
@@ -292,7 +296,7 @@ void HierarchyWindow::DrawSceneObjectRow(Entity* obj, const editor::hierarchy_fl
             ImVec2(imageMin.x+iconSize,imageMin.y+iconSize), ImVec2(0,0), ImVec2(1,1),
             IM_COL32(255,255,255,isDisabled ? 100 : 255));
     draw->AddText(ImVec2(imageMin.x+iconSize+editor::ThemePixels(4.f), imageMin.y),
-        ImGui::GetColorU32(ImGuiCol_Text), obj->m_name.ToString().c_str());
+        ImGui::GetColorU32(ImGuiCol_Text), obj->m_name.c_str());
     draw->PopClipRect();
     if (locked)
         draw->AddText(ImVec2(textRight, imageMin.y), ImGui::GetColorU32(ImGuiCol_TextDisabled), EditorIcon::Lock);
@@ -321,7 +325,7 @@ void HierarchyWindow::DrawSceneObjectRow(Entity* obj, const editor::hierarchy_fl
 		&& ImGui::BeginDragDropSource())
 	{
 		ImGui::SetDragDropPayload("SCENE_OBJECT", &obj->m_index, sizeof(Entity::Index));
-		ImGui::Text("Moving %s", obj->m_name.ToString().c_str());
+		ImGui::Text("Moving %s", obj->m_name.c_str());
 		ImGui::EndDragDropSource();
 	}
 
@@ -526,7 +530,7 @@ void HierarchyWindow::Draw()
 			{
 				if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model"))
 				{
-					const file::path filepath = editor::asset_drag::path_of(*payload);
+					const std::filesystem::path filepath = editor::asset_drag::path_of(*payload);
 
 					if (scene)
 					{
@@ -748,7 +752,7 @@ void HierarchyWindow::Draw()
 							{
 							case editor::hierarchy_row_kind::scene_group:
 							{
-								const std::string sceneName = scene->m_Entities[0]->m_name.ToString();
+								const std::string sceneName = scene->m_Entities[0]->m_name;
 								const std::string sceneIcon = EditorIcon::Scene + std::string(" ") + sceneName;
 								ImGui::SetNextItemOpen(true, ImGuiCond_Always);
 								group_tree_node(sceneIcon.c_str());

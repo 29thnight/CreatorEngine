@@ -1,16 +1,36 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "MaterialGraphWindow.h"
 #include "ProfileScope.h"
-#include "JobScheduler.h"
-#include "AuthoringParsedDocument.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+#include "../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
 #include "MaterialGraphPresentation.h"
 #include "EditorWindowNames.h"
 #include "EditorWindowRegistry.h"
-#include "EditorAssetDatabase.h"
-#include "EditorObjectOperations.h"
-#include "EditorImGuiTexture.h"
+#include "../EngineEntry/Assets/EditorAssetDatabase.h"
+#include "../EngineEntry/Scene/EditorObjectOperations.h"
+#include "../EngineEntry/Presentation/EditorImGuiTexture.h"
 #include "EditorAssetDragPayload.h"
 #include "Commands/CommandSupport.h"
-#include "ReflectionUndo.h"
+#include "../EngineEntry/Editing/ReflectionUndo.h"
 #include "SceneManager.h"
 #include "Scene.h"
 #include "MeshRenderer.h"
@@ -21,13 +41,12 @@
 #include "MaterialGraphSceneInput.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "DataSystem.h"
-#include "PathFinder.h"
 #include "../../Lattice/Core/LXDocument.h"
 #include "../../Lattice/Core/LXNodeDefinition.h"
 #include "../../Lattice/Material/LXMaterialCompiler.h"
 #include <imgui_stdlib.h>
 #include <float.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace editor::material_editing
 {
@@ -176,7 +195,7 @@ namespace editor::material_editing
             {
                 catalogRegistered = graphOnDisk && materialOnDisk;
                 materialPath = materialOnDisk ? DataSystems->GetFilePath(materialGuid)
-                                             : PathFinder::RelativeToMaterial("") / (name + ".asset");
+                                             : ce::paths::relative_to_material("") / (name + ".asset");
                 if (graphOnDisk)
                 {
                     ReadPayload(path, diskPayload);
@@ -209,8 +228,8 @@ namespace editor::material_editing
                     });
                 items.SetTextureResolver([this](const std::string& reference) {
                     ce::profile_scope profile{ce::marker<"MaterialNodeTextureResolve">()};
-                    Uuid::Uuid16 id;
-                    if (!Uuid::TryParse(reference, id))
+                    uuid::uuid16 id;
+                    if (!uuid::try_parse(reference, id))
                     {
                         return ImTextureID_Invalid;
                     }
@@ -253,7 +272,7 @@ namespace editor::material_editing
                     }
                     return result;
                 });
-                const auto stylePath = PathFinder::RuntimeDataPath("Editor/Styles/Material.lxstyle");
+                const auto stylePath = ce::paths::runtime_data_path("Editor/Styles/Material.lxstyle");
                 if (std::filesystem::exists(stylePath))
                 {
                     if (auto loaded = LXStyleSheet::Load(stylePath.string(), &message))
@@ -332,7 +351,7 @@ namespace editor::material_editing
 
             bool Editable() const
             {
-                return PathFinder::IsAssetAuthoringEnabled();
+                return ce::paths::is_asset_authoring_enabled();
             }
 
             bool CheckDisk()
@@ -479,7 +498,7 @@ namespace editor::material_editing
                 }
                 if (!persistedMaterial)
                 {
-                    materialPath = PathFinder::RelativeToMaterial("") / (name + ".asset");
+                    materialPath = ce::paths::relative_to_material("") / (name + ".asset");
                 }
                 if (!CheckDisk())
                 {
@@ -590,8 +609,8 @@ namespace editor::material_editing
                 auto work = own::make_shared<PreviewWork>();
                 work->graph = Snapshot();
                 work->graphGuid = guid;
-                work->shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader");
-                work->cacheDirectory = PathFinder::CachePath("Lattice/EditorDrafts");
+                work->shaderDirectory = ce::paths::relative_to_shader("DefaultPassShader");
+                work->cacheDirectory = ce::paths::cache_path("Lattice/EditorDrafts");
                 work->previousGeneration = preparedGeneration;
                 if (!work->previousGeneration)
                 {
@@ -970,12 +989,12 @@ namespace editor::material_editing
             asset.graph.SetSocketValue(pin(surface, "Roughness"), .85);
             asset.graph.Connect(pin(surface, "BSDF"), pin(asset.activeOutput, "Surface"));
             material_graph::InstanceDescription description;
-            Uuid::TryParse("815d8195-c028-4819-8626-8d41f532fb42", description.graphId.value);
+            uuid::try_parse("815d8195-c028-4819-8626-8d41f532fb42", description.graphId.value);
             auto work = own::make_shared<PreviewWork>();
             work->graph = std::move(asset);
             work->graphGuid = FileGuid(description.graphId.value);
-            work->shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader");
-            work->cacheDirectory = PathFinder::CachePath("Lattice/EditorDrafts");
+            work->shaderDirectory = ce::paths::relative_to_shader("DefaultPassShader");
+            work->cacheDirectory = ce::paths::cache_path("Lattice/EditorDrafts");
             try
             {
                 previewFloorJob = ce::get_job_scheduler().submit([work] {
@@ -1007,7 +1026,7 @@ namespace editor::material_editing
         bool OpenAssetLocked(const own::shared_owner<const Material>& material, std::string& error, bool create = false,
                              const LXMaterialAsset* draft = nullptr)
         {
-            if (shuttingDown || !PathFinder::IsAssetAuthoringEnabled())
+            if (shuttingDown || !ce::paths::is_asset_authoring_enabled())
             {
                 error = "Material authoring requires an active Editor project.";
                 return false;
@@ -1059,7 +1078,7 @@ namespace editor::material_editing
                 }
                 base = std::move(created);
                 graphGuid = FileGuid::CreateRandomV4();
-                graphPath = PathFinder::RelativeToMaterial("") / ("Material_" + graphGuid.ToString() + ".shadergraph");
+                graphPath = ce::paths::relative_to_material("") / ("Material_" + graphGuid.ToString() + ".shadergraph");
             }
             if (!create && (!instance || base->m_fileGuid == FileGuid{}))
             {
@@ -1203,7 +1222,7 @@ namespace editor::material_editing
                 {
                     paths.clear();
                     std::error_code failure;
-                    for (std::filesystem::recursive_directory_iterator it(PathFinder::RelativeToMaterial(""),
+                    for (std::filesystem::recursive_directory_iterator it(ce::paths::relative_to_material(""),
                         failure), end;
                          it != end && !failure; it.increment(failure))
                     {
@@ -1217,7 +1236,7 @@ namespace editor::material_editing
                 filter.Draw("Search");
                 for (const auto& path : paths)
                 {
-                    const auto caption = path.lexically_relative(PathFinder::RelativeToMaterial("")).generic_string();
+                    const auto caption = path.lexically_relative(ce::paths::relative_to_material("")).generic_string();
                     if (!filter.PassFilter(caption.c_str()))
                     {
                         continue;
@@ -1504,9 +1523,9 @@ namespace editor::material_editing
                 {
                     if (parameter.type == PinType::Texture)
                     {
-                        Uuid::Uuid16 identity;
+                        uuid::uuid16 identity;
                         const auto* reference = std::get_if<std::string>(&value);
-                        if (reference && Uuid::TryParse(*reference, identity))
+                        if (reference && uuid::try_parse(*reference, identity))
                         {
                             if (texture == session.defaults.textures.end())
                             {
@@ -1728,7 +1747,7 @@ namespace editor::material_editing
                         if (ImGui::MenuItem("Reload Style"))
                         {
                             if (auto style = LXStyleSheet::Load(
-                                    PathFinder::RuntimeDataPath("Editor/Styles/Material.lxstyle").string(),
+                                    ce::paths::runtime_data_path("Editor/Styles/Material.lxstyle").string(),
                                         &session.message))
                             {
                                 if (style->SourceVersion() < 6)
@@ -1741,7 +1760,7 @@ namespace editor::material_editing
                         }
                         if (ImGui::MenuItem("Export Style"))
                         {
-                            const auto path = PathFinder::RuntimeDataPath("Editor/Styles/Material.lxstyle");
+                            const auto path = ce::paths::runtime_data_path("Editor/Styles/Material.lxstyle");
                             std::filesystem::create_directories(path.parent_path());
                             session.styles.Save(path.string(), &session.message);
                         }
@@ -2004,7 +2023,7 @@ namespace editor::material_editing
         }
         ReconcileSceneLocked();
         static std::string error;
-        ImGui::BeginDisabled(!PathFinder::IsAssetAuthoringEnabled());
+        ImGui::BeginDisabled(!ce::paths::is_asset_authoring_enabled());
         DrawAssetPicker(error);
         ImGui::EndDisabled();
         if (!error.empty())
@@ -2218,8 +2237,8 @@ namespace editor::material_editing
         }
         if (parts.size() == 3 && parts[1] == "asset")
         {
-            Uuid::Uuid16 identity;
-            if (!Uuid::TryParse(parts[2], identity))
+            uuid::uuid16 identity;
+            if (!uuid::try_parse(parts[2], identity))
             {
                 return InvalidArguments("Expected a material asset GUID");
             }

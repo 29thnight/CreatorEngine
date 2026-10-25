@@ -1,9 +1,33 @@
-#include "../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Stopwatch.h"
+#else
+import Creator.Core.Stopwatch;
+#endif
 #include "ProjectLayerSettings.h"
 #include "SceneManager.h"
 #include "LifecycleRegistry.h"
 #include "SimulationTickExecution.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "RenderScene.h"
 #include "AnimationScheduler.h"
 #include "TemporalMotionFixture.h"
@@ -24,17 +48,17 @@
 #include "PrefabUtility.h"
 #include "DataSystem.h"
 #include "ComponentFactory.h"
-#include "AuthoringDocumentAccess.h"
-#include "AuthoringParsedDocument.h"
+#include "../Utility_Framework/Authoring/AuthoringDocumentAccess.h"
+#include "../Utility_Framework/Authoring/AuthoringParsedDocument.h"
 #include "EntityAuthoringRead.h" // D3-a-2: 저작 읽기 어댑터
 #include "RegisterReflectManual.h" // CT4: 명시 메타 이전 타입의 등록 (def 스캔 밖)
 #include "ProfileScope.h"
-#include "SerializationProfiler.h" // D0: 직렬화 기준선 계측
+#include "../Utility_Framework/Authoring/SerializationProfiler.h" // D0: 직렬화 기준선 계측
 #include "InputActionManager.h"
 #include "TagManager.h"
-#include "ReflectionRegister.h"
+#include "../Utility_Framework/Reflection/ReflectionRegister.h"
 #include "Component.h"
-#include "TimeSystem.h"
+#include "../Utility_Framework/Time/TimeSystem.h"
 #include "GpuDiagnostics.h"
 #include "ScriptComponent.h"
 #include "ClrHost.h"
@@ -74,8 +98,8 @@ namespace
 
     Authoring::ParsedDocument ParseSceneDocument(const std::string& path)
     {
-		const file::path sourcePath(path);
-		file::path readPath = sourcePath;
+		const std::filesystem::path sourcePath(path);
+		std::filesystem::path readPath = sourcePath;
 		FileGuid assetGuid{};
 		if (DataSystems)
 		{
@@ -89,7 +113,7 @@ namespace
 						"씬 cooked runtime artifact 해석 실패: " + path);
 				}
 			}
-			else if (!PathFinder::IsAssetAuthoringEnabled())
+			else if (!ce::paths::is_asset_authoring_enabled())
 			{
 				throw std::runtime_error(
 					"Player 씬 source identity 해석 실패: " + path);
@@ -140,7 +164,7 @@ namespace
         if (!prefab)
         {
             // 프리팹 파일이 삭제됐거나 GUID가 끊겼다 — 연결 없이 오브젝트는 그대로 살려 둔다.
-            Debug::PrintLog(spdlog::level::warn, "프리팹 재연결 실패(파일을 찾을 수 없음): " + obj->GetHashedName().ToString());
+            Debug::PrintLog(spdlog::level::warn, "프리팹 재연결 실패(파일을 찾을 수 없음): " + obj->GetName());
             return;
         }
 
@@ -308,6 +332,7 @@ SceneManager::~SceneManager()
     }
     m_observation.Clear();
     m_gcDomain.collect_full();
+    ReleaseInputActionManager();
 }
 
 gc::domain& SceneManager::ManagedDomain()
@@ -591,8 +616,8 @@ void SceneManager::ManagerInitialize()
     m_gcDomain.set_max_cycle_interval(std::chrono::seconds(1));
     RegisterReflectManual(); // CT4: 명시 메타 파일럿 4타입 — def에서 빠진 몫
     ComponentFactorys->Initialize();
-    m_inputActionManager = new InputActionManager();
-    InputActionManagers = m_inputActionManager;
+    m_inputActionManager = own::make_unique<InputActionManager>();
+    InputActionManagers = m_inputActionManager.operator->();
     InputActionManagers->LoadManager();
 
 #endif
@@ -674,7 +699,7 @@ void SceneManager::NotifyActiveSceneChanged()
     // 성격이 통째로 달라지는데, 그 까닭이 타임라인에 남지 않으면 "여기서부터
     // 갑자기 느려졌다" 까지만 읽힌다.
     ce::profile_instant(ce::marker<"SceneActivated">());
-    activeSceneChangedEvent.Broadcast();
+    activeSceneChangedEvent.broadcast();
 }
 
 void SceneManager::Editor()
@@ -818,7 +843,7 @@ void SceneManager::InputEvents(float deltaSecond)
 {
     {
         ce::profile_scope _profile{ ce::marker<"InputEvents">() };
-        InputEvent.Broadcast(deltaSecond);
+        InputEvent.broadcast(deltaSecond);
     }
 }
 
@@ -840,7 +865,7 @@ void SceneManager::GameLogic(float deltaSecond, float animationDeltaSecond)
 
     {
         ce::profile_scope _profile{ ce::marker<"InternalAnimationUpdateEvent">() };
-        InternalAnimationUpdateEvent.Broadcast(animationDeltaSecond);
+        InternalAnimationUpdateEvent.broadcast(animationDeltaSecond);
     }
 
     {
@@ -851,17 +876,17 @@ void SceneManager::GameLogic(float deltaSecond, float animationDeltaSecond)
 
 void SceneManager::SceneRendering(float deltaSecond)
 {
-    SceneRenderingEvent.Broadcast(deltaSecond);
+    SceneRenderingEvent.broadcast(deltaSecond);
 }
 
 void SceneManager::OnDrawGizmos()
 {
-	OnDrawGizmosEvent.Broadcast();
+	OnDrawGizmosEvent.broadcast();
 }
 
 void SceneManager::GUIRendering()
 {
-    GUIRenderingEvent.Broadcast();
+    GUIRenderingEvent.broadcast();
 }
 
 void SceneManager::EndOfFrame()
@@ -869,7 +894,7 @@ void SceneManager::EndOfFrame()
     m_observation.Drain();
     {
         ce::profile_scope _profile{ ce::marker<"EndOfFrame">() };
-        endOfFrameEvent.Broadcast();
+        endOfFrameEvent.broadcast();
     }
 
     // Sweep DDOL bucket for destroyed objects
@@ -979,25 +1004,25 @@ void SceneManager::Decommissioning()
     m_gcDomain.collect_full();
 
     // Keep callback targets alive through scene hooks and the first sweep.
-	PlayModeEvent.Clear();
-	InputEvent.Clear();
-	SceneRenderingEvent.Clear();
-	OnDrawGizmosEvent.Clear();
-	GUIRenderingEvent.Clear();
-    InternalAnimationUpdateEvent.Clear();
-    endOfFrameEvent.Clear();
-    sceneLoadedEvent.Clear();
-    sceneUnloadedEvent.Clear();
-    activeSceneChangedEvent.Clear();
-    newSceneCreatedEvent.Clear();
-    resourceTrimEvent.Clear();
-    AssetLoadEvent.Clear();
-    resetSelectedObjectEvent.Clear();
+	PlayModeEvent.clear();
+	InputEvent.clear();
+	SceneRenderingEvent.clear();
+	OnDrawGizmosEvent.clear();
+	GUIRenderingEvent.clear();
+    InternalAnimationUpdateEvent.clear();
+    endOfFrameEvent.clear();
+    sceneLoadedEvent.clear();
+    sceneUnloadedEvent.clear();
+    activeSceneChangedEvent.clear();
+    newSceneCreatedEvent.clear();
+    resourceTrimEvent.clear();
+    AssetLoadEvent.clear();
+    resetSelectedObjectEvent.clear();
     m_observation.Clear();
     // Callback destruction can release external roots. Sweep those releases
     // while the input/animation/audio/CLR services are still available too.
     m_gcDomain.collect_full();
-    Memory::SafeDelete(m_inputActionManager);
+    ReleaseInputActionManager();
     SetActiveScene(nullptr);
     m_activeSceneIndex = 0;
 
@@ -1018,7 +1043,7 @@ Scene* SceneManager::CreateScene(std::string_view name)
         return nullptr;
     }
     DrainSceneLoads();
-    resourceTrimEvent.Broadcast();
+    resourceTrimEvent.broadcast();
     auto candidate = Scene::CreateNewScene(m_gcDomain, name);
     Scene* scene = candidate.get();
     try
@@ -1037,7 +1062,7 @@ Scene* SceneManager::CreateScene(std::string_view name)
                     oldScene->DetachEntityHierarchy(entity, m_detachedDontDestroyOnLoadObjects);
                 }
             }
-            sceneUnloadedEvent.Broadcast();
+            sceneUnloadedEvent.broadcast();
             oldScene->AllDestroyMark();
             oldScene->EndFramePass();
             // Script handles stay valid through the old Scene's cleanup hooks.
@@ -1052,7 +1077,7 @@ Scene* SceneManager::CreateScene(std::string_view name)
         scene->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
         ResumePhysicsAfterSceneActivation();
         NotifyActiveSceneChanged();
-        newSceneCreatedEvent.Broadcast();
+        newSceneCreatedEvent.broadcast();
         return scene;
     }
     catch (...)
@@ -1072,7 +1097,7 @@ Scene* SceneManager::SaveScene(std::string_view name)
 #else
 	std::string fileStem = name.data();
 	//std::string fileExtension = ".creator";
-    file::path saveSceneFileName = fileStem /*+ fileExtension*/;
+    std::filesystem::path saveSceneFileName = fileStem /*+ fileExtension*/;
 
 	// D3-b: 저작 텍스트는 LF로 쓴다. Windows의 텍스트 모드는 개행을 CRLF로 바꾸는데,
 	// 그러면 같은 내용을 저장할 때마다 개행이 뒤집혀 git 작업 트리가 흔들린다.
@@ -1165,7 +1190,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
             }
 
 			swapScene = m_activeScene.load();
-            sceneUnloadedEvent.Broadcast();
+            sceneUnloadedEvent.broadcast();
             m_activeScene.load()->AllDestroyMark();
             m_activeScene.load()->EndFramePass();
 
@@ -1183,8 +1208,8 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 
             RetireScene(swapScene);
         }
-		file::path sceneName = name.data();
-        resourceTrimEvent.Broadcast();
+		std::filesystem::path sceneName = name.data();
+        resourceTrimEvent.broadcast();
         AssetBundle requiredBundle;
         // Keep the actual generation pins through deserialization, prefab
         // remapping, activation and Reset, even if cache retention is bounded.
@@ -1298,7 +1323,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
         AdoptScene(candidate);
 		m_activeSceneIndex = m_scenes.size() - 1;
 		NotifyActiveSceneChanged();
-		sceneLoadedEvent.Broadcast();
+		sceneLoadedEvent.broadcast();
 		// 여기 있던 "플레이어면 재생을 켠다" 분기는 PlayerMain으로 옮겼다(E3-6).
 		// 씬 로드가 곧 재생 시작이라는 것은 Player의 정책이지 씬 로더가 알아야 할
 		// 일이 아니다 — 로더가 실행 모드를 물어보는 대신 Player가 요청한다.
@@ -1346,7 +1371,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
             sceneDocument = ParseSceneDocument(loadSceneName);
         }
         const Authoring::ReadNode sceneNode = sceneDocument.Root();
-        file::path sceneName = name.data();
+        std::filesystem::path sceneName = name.data();
         AssetBundle requiredBundle;
         // Pins outlive both entity construction loops and scene publication.
         AssetBundleLoadResult bundleAssets;
@@ -1430,7 +1455,7 @@ Scene* SceneManager::LoadScene(std::string_view name)
 
 
         AdoptScene(candidate);
-        sceneLoadedEvent.Broadcast();
+        sceneLoadedEvent.broadcast();
     }
     catch (const std::exception& e)
     {
@@ -1622,7 +1647,7 @@ Scene* SceneManager::BuildPreparedScene(const PendingSceneLoad& load)
 #if defined(CE_SCENE_HEADLESS)
     throw std::logic_error("Authoring service is not installed in this host; load a cooked scene instead");
 #else
-    auto scene = Scene::LoadScene(m_gcDomain, file::path(load.m_path).stem().string());
+    auto scene = Scene::LoadScene(m_gcDomain, std::filesystem::path(load.m_path).stem().string());
     try
     {
         scene->m_requiredLoadAssetsBundle = load.m_bundle;
@@ -1879,7 +1904,7 @@ void SceneManager::BeforeAwakeSceneLoad()
         }
 
         ce::profile_scope activateProfile{ ce::marker<"SceneActivate">() };
-        Benchmark debugTimer;
+        ce::stopwatch debugTimer;
         Scene* oldScene{};
         if (m_activeScene.load())
         {
@@ -1905,7 +1930,7 @@ void SceneManager::BeforeAwakeSceneLoad()
 #if !defined(CE_SCENE_HEADLESS)
             UIManagers->ClearSelectUI();
 #endif
-            sceneUnloadedEvent.Broadcast();
+            sceneUnloadedEvent.broadcast();
             m_activeScene.load()->AllDestroyMark();
             m_activeScene.load()->EndFramePass();
 
@@ -1921,7 +1946,7 @@ void SceneManager::BeforeAwakeSceneLoad()
 
         }
 
-        //resourceTrimEvent.Broadcast();
+        //resourceTrimEvent.broadcast();
         SetActiveScene(m_sceneToActivate.load());
 
         // ★ 이미 목록에 있으면 다시 넣지 않는다.
@@ -1948,16 +1973,16 @@ void SceneManager::BeforeAwakeSceneLoad()
                 std::distance(m_scenes.begin(), found));
         }
         // Debug log the time taken to activate the scene
-        Debug::PrintLog(spdlog::level::info, std::string("Scene activation took ") + std::to_string(debugTimer.GetElapsedTime()) + " ms.");
+        Debug::PrintLog(spdlog::level::info, std::string("Scene activation took ") + std::to_string(debugTimer.elapsed_milliseconds()) + " ms.");
 
-        Benchmark debugTimer1;
+        ce::stopwatch debugTimer1;
 
         RebindEventDontDestroyOnLoadObjects(m_sceneToActivate.load());
 		m_activeScene.load()->AllUpdateWorldMatrix(TransformSyncPoint::SceneLoad);
         ResumePhysicsAfterSceneActivation();
 
         NotifyActiveSceneChanged();
-        sceneLoadedEvent.Broadcast();
+        sceneLoadedEvent.broadcast();
 
         m_activeScene.load()->Reset();
 
@@ -1972,7 +1997,7 @@ void SceneManager::BeforeAwakeSceneLoad()
         }
         m_sceneToActivate = nullptr;
         m_asyncSceneToActivate = nullptr;
-        Debug::PrintLog(spdlog::level::info, std::string("Rebinding DDOL and updating world matrices took ") + std::to_string(debugTimer1.GetElapsedTime()) + " ms.");
+        Debug::PrintLog(spdlog::level::info, std::string("Rebinding DDOL and updating world matrices took ") + std::to_string(debugTimer1.elapsed_milliseconds()) + " ms.");
 
         // 새 씬의 보존 목록(RetainAssets)이 갱신된 뒤이므로 이 시점에 캐시를 정리한다.
         //
@@ -2343,7 +2368,7 @@ bool SceneManager::BeginPlayTransaction()
             },
             [this]
             {
-                resourceTrimEvent.Broadcast();
+                resourceTrimEvent.broadcast();
                 auto* scene = m_activeScene.load();
                 if (!scene) { NotePlayFailure("no active scene for simulation"); return false; }
                 const auto started = scene->StartPhysicsSimulation();
@@ -2378,7 +2403,7 @@ bool SceneManager::BeginPlayTransaction()
 #endif
     SetSimulationPhase(ScenePhase::Simulating);
     ce::profile_instant(ce::marker<"PlayModeEntered">());
-    PlayModeEvent.Broadcast(true);
+    PlayModeEvent.broadcast(true);
     return true;
 }
 
@@ -2426,8 +2451,8 @@ void SceneManager::EndPlayTransaction()
                 return false;
             }
 
-            resetSelectedObjectEvent.Broadcast();
-            sceneUnloadedEvent.Broadcast();
+            resetSelectedObjectEvent.broadcast();
+            sceneUnloadedEvent.broadcast();
             scene->AllDestroyMark(true);
             std::erase_if(m_dontDestroyOnLoadObjects, [](Object* object)
             {
@@ -2448,12 +2473,12 @@ void SceneManager::EndPlayTransaction()
     SetSimulationPhase(ScenePhase::InScene);
     m_isSimulationSessionActive = false;
     ce::profile_instant(ce::marker<"PlayModeExited">());
-    PlayModeEvent.Broadcast(false);
+    PlayModeEvent.broadcast(false);
 
     if (m_sessionPolicy.RestoresAuthoring())
     {
         NotifyActiveSceneChanged();
-        sceneLoadedEvent.Broadcast();
+        sceneLoadedEvent.broadcast();
     }
 }
 
@@ -2525,7 +2550,7 @@ void SceneManager::DesirealizeGameObject(const reflgen::type_descriptor* type, c
         const bool restoreRoot = strict && itNode["m_index"]
             && itNode["m_index"].As<Entity::Index>() == Entity::kSceneRootIndex;
         auto* root = restoreRoot ? scene->GetEntityRaw(Entity::kSceneRootIndex) : nullptr;
-        if (root) scene->RemoveEntityName(root->GetHashedName().ToString());
+        if (root) scene->RemoveEntityName(root->GetName());
         auto obj = restoreRoot ? root : scene->LoadEntity(
             itNode["m_instanceID"].As<size_t>(),
             itNode["m_name"].AsString(),
@@ -2555,7 +2580,7 @@ void SceneManager::DesirealizeGameObject(const reflgen::type_descriptor* type, c
                 Meta::Deserialize(obj, itNode);
             }
 
-            if (restoreRoot) scene->RenameEntity(*obj, obj->GetHashedName().ToString());
+            if (restoreRoot) scene->RenameEntity(*obj, obj->GetName());
 
             const Entity::Index fileIndex = obj->m_index;
             if (fileIndex != actualSlotIndex)
@@ -2571,9 +2596,9 @@ void SceneManager::DesirealizeGameObject(const reflgen::type_descriptor* type, c
 					std::move(serializedHierarchy.childrenIndices) });
             }
 
-            if (!obj->m_tag.ToString().empty())
+            if (!obj->m_tag.empty())
             {
-                TagManager::GetInstance()->AddTagToObject(obj->m_tag.ToString(), obj);
+                TagManager::GetInstance()->AddTagToObject(obj->m_tag, obj);
             }
 
             if (!obj->SetLayer(obj->GetLayer()))
@@ -2655,9 +2680,9 @@ void SceneManager::DesirealizeGameObject(Scene* targetScene, const reflgen::type
 					std::move(serializedHierarchy.childrenIndices) });
             }
 
-            if (!obj->m_tag.ToString().empty())
+            if (!obj->m_tag.empty())
             {
-                TagManager::GetInstance()->AddTagToObject(obj->m_tag.ToString(), obj);
+                TagManager::GetInstance()->AddTagToObject(obj->m_tag, obj);
             }
 
             if (!obj->SetLayer(obj->GetLayer()))
@@ -2739,9 +2764,9 @@ void SceneManager::DesirealizeDontDestroyOnLoadObjects(Scene* targetScene, const
 					std::move(serializedHierarchy.childrenIndices), true });
             }
 
-            if (!obj->m_tag.ToString().empty())
+            if (!obj->m_tag.empty())
             {
-                TagManager::GetInstance()->AddTagToObject(obj->m_tag.ToString(), obj);
+                TagManager::GetInstance()->AddTagToObject(obj->m_tag, obj);
             }
 
             if (!obj->SetLayer(obj->GetLayer()))
@@ -2809,7 +2834,7 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
     // 오브젝트별 스팸 대신 배치당 한 줄 요약만 남긴다.
     if (mismatchCount > 0)
     {
-        Debug::PrintLog(spdlog::level::warn, "[Scene] '" + targetScene->GetSceneName().ToString() + "' 로드: m_index 불일치 "
+        Debug::PrintLog(spdlog::level::warn, "[Scene] '" + targetScene->GetSceneName() + "' 로드: m_index 불일치 "
             + std::to_string(mismatchCount) + "/" + std::to_string(batch.size())
             + "건을 슬롯 위치로 정정하고, 배치 내 계층 참조(m_parentIndex/m_childrenIndices/m_rootIndex)를 "
             + "슬롯 인덱스로 리매핑합니다.");
@@ -2824,8 +2849,8 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
             return foundIt->second;
         }
 
-        Debug::PrintLog(spdlog::level::err, "[Scene] '" + targetScene->GetSceneName().ToString() + "' Entity '"
-            + (owner ? owner->m_name.ToString() : std::string("?")) + "'의 " + label
+        Debug::PrintLog(spdlog::level::err, "[Scene] '" + targetScene->GetSceneName() + "' Entity '"
+            + (owner ? owner->m_name : std::string("?")) + "'의 " + label
             + " 참조(파일 인덱스 " + std::to_string(fileIdx) + ")가 이 배치 안에 없습니다 — 데이터 오염 가능성.");
         return Entity::kInvalidIndex;
     };
@@ -2992,4 +3017,15 @@ void SceneManager::ReportSimulationFailure(std::string reason)
     Debug::PrintLog(spdlog::level::err, reason);
     NotePlayFailure(std::move(reason));
     SetGameStart(false);
+}
+
+void SceneManager::ReleaseInputActionManager() noexcept
+{
+#if !defined(CE_SCENE_HEADLESS)
+    if (InputActionManagers == m_inputActionManager.operator->())
+    {
+        InputActionManagers = nullptr;
+    }
+#endif
+    m_inputActionManager.reset();
 }

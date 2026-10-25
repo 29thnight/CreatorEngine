@@ -3,8 +3,12 @@
 #if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
 
 #include <stdint.h>
-#include "../Utility_Framework/StandardLibrary.h"
-#include <Windows.h>
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 namespace ce::dx_capture
 {

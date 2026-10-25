@@ -1,3 +1,9 @@
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "Render/Passes/Lighting/EnhancedSkyBoxPass.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
@@ -5,7 +11,7 @@
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // 스카이박스 패스 자가 검증 (PHASE 3-6).
 //
@@ -64,7 +70,6 @@ namespace
 
 bool DX12Test::RunSkyBoxTest(std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
 
     outLog += "── 스카이박스 패스 검증 (PHASE 3-6) ──\n";
 
@@ -107,7 +112,7 @@ bool DX12Test::RunSkyBoxTest(std::string& outLog)
     //
     // D3D 면 순서: +X -X +Y -Y +Z -Z.
     // 빨강 초록 파랑 노랑 자홍 청록 — 어느 축이 뒤집혀도 원색이 갈린다.
-    ComPtr<ID3D12Resource> cubeMap;
+    winrt::com_ptr<ID3D12Resource> cubeMap;
     {
         constexpr uint16_t kFaceColors[6][4] = {
             { kHalfOne, kHalfZero, kHalfZero, kHalfOne },   // +X 빨강
@@ -132,7 +137,7 @@ bool DX12Test::RunSkyBoxTest(std::string& outLog)
 
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&defaultHeap,
             D3D12_HEAP_FLAG_NONE, &cubeDesc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&cubeMap))))
+            nullptr, IID_PPV_ARGS(cubeMap.put()))))
         {
             outLog += "[2/4] 큐브맵 생성 실패\n";
             resources.Shutdown();
@@ -189,7 +194,7 @@ bool DX12Test::RunSkyBoxTest(std::string& outLog)
             src.PlacedFootprint.Footprint.RowPitch = kFaceRowPitch;
 
             D3D12_TEXTURE_COPY_LOCATION dst{};
-            dst.pResource = cubeMap.Get();
+            dst.pResource = cubeMap.get();
             dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
             dst.SubresourceIndex = face;
 
@@ -198,7 +203,7 @@ bool DX12Test::RunSkyBoxTest(std::string& outLog)
 
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = cubeMap.Get();
+        barrier.Transition.pResource = cubeMap.get();
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
@@ -215,7 +220,7 @@ bool DX12Test::RunSkyBoxTest(std::string& outLog)
         outLog += "[2/4] 합성 큐브맵 업로드(6면 원색) 완료\n";
     }
 
-    sky.SetCubeMap(resources.RegisterExternalTexture(cubeMap.Get()),
+    sky.SetCubeMap(resources.RegisterExternalTexture(cubeMap.get()),
         RHIFormat::RGBA16Float, 1);
     sky.SetScale(10.f);
 

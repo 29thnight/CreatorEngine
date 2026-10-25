@@ -1,8 +1,8 @@
 #pragma once
-#include "Core.Minimal.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "SceneGC.h"
-#include "ClassProperty.h"
-#include "AuthoringNodeView.h" // D3-a-5: 완료 기준 9가 명시한 표면
+#include "../Utility_Framework/Reflection/ClassProperty.h"
+#include "../Utility_Framework/Authoring/AuthoringNodeView.h" // D3-a-5: 완료 기준 9가 명시한 표면
 
 class Entity;
 class Component;

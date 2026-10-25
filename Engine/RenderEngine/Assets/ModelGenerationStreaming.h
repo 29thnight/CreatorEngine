@@ -1,8 +1,18 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "ModelCpuGeometry.h"
 #include "ModelStreamDescriptor.h"
 #include "../Experiment/Cooked/CookedModelCodec.h"
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace assets::generation_streaming
 {
@@ -16,8 +26,8 @@ inline std::string Fingerprint(std::span<const std::byte> bytes)
     const auto path = cpu_geometry::Path(digest);
     return "sha256:" + path.substr(path.find_last_of('/') + 1,64);
 }
-inline Bundle Build(const experiment::ModelDraft& draft, std::span<const Uuid::Uuid16> meshIds,
-                     std::span<const Uuid::Uuid16> materialIds, Uuid::Uuid16 skeletonId, uint64_t generation,
+inline Bundle Build(const experiment::ModelDraft& draft, std::span<const uuid::uuid16> meshIds,
+                     std::span<const uuid::uuid16> materialIds, uuid::uuid16 skeletonId, uint64_t generation,
                      bool colliderDefault)
 {
     Bundle result;
@@ -39,14 +49,14 @@ inline Bundle Build(const experiment::ModelDraft& draft, std::span<const Uuid::U
         if (std::ranges::none_of(result.files,[&](const auto& file){return file.path == path;}))
             result.files.push_back({std::move(path),std::move(bytes)});
     };
-    const auto reference = [](Uuid::Uuid16 id, ck::CookedAssetKind kind) { return ck::TypedAssetReference{{experiment::AssetId{id},{}},kind}; };
-    const auto edge = [&](Uuid::Uuid16 id, ck::CookedAssetKind kind, ck::AssetDependencyKind dependency) {
+    const auto reference = [](uuid::uuid16 id, ck::CookedAssetKind kind) { return ck::TypedAssetReference{{experiment::AssetId{id},{}},kind}; };
+    const auto edge = [&](uuid::uuid16 id, ck::CookedAssetKind kind, ck::AssetDependencyKind dependency) {
         return ck::AssetDependency{reference(id,kind),dependency,ck::AssetDependencyScope::Internal}; };
     ck::SkeletonArtifact skeleton; std::string failure;
     if (draft.skeleton)
     {
         skeleton.skeleton = *draft.skeleton; skeleton.skeleton.clips.clear();
-        if (skeletonId.IsNil() || !ck::ComputeBoneLayoutDigest(skeleton.skeleton,skeleton.boneLayoutSha256,failure))
+        if (skeletonId.is_nil() || !ck::ComputeBoneLayoutDigest(skeleton.skeleton,skeleton.boneLayoutSha256,failure))
             throw std::runtime_error("Authoring stream skeleton: " + failure);
         std::vector<std::byte> bytes;
         if (!ck::WriteSkeletonArtifact(skeleton,bytes,failure)) throw std::runtime_error(failure);
@@ -70,7 +80,7 @@ inline Bundle Build(const experiment::ModelDraft& draft, std::span<const Uuid::U
         std::vector<std::byte> bytes; ck::Sha256Digest metadataDigest{};
         if (!ck::WriteModelGeometryArtifact(geometry,bytes,failure) || !ck::ModelGeometryStreamMetadataDigest(bytes,metadataDigest,failure))
             throw std::runtime_error(failure);
-        const auto path = "Derived/Geometry/" + ck::ModelGeometryStreamDirectory(metadataDigest) + "/" + Uuid::ToString(meshIds[index]) + ".cege";
+        const auto path = "Derived/Geometry/" + ck::ModelGeometryStreamDirectory(metadataDigest) + "/" + uuid::to_string(meshIds[index]) + ".cege";
         add(reference(meshIds[index],ck::CookedAssetKind::Mesh),ck::kModelGeometryRepresentation,ck::kModelGeometryArtifactVersion,
             path,std::move(bytes),std::move(dependencies));
         auto cpu = cpu_geometry::Encode(mesh.vertices.AttributeMask(),static_cast<uint32_t>(mesh.vertices.size()),mesh.vertices.Bytes(),mesh.indices);
@@ -118,7 +128,7 @@ inline std::vector<std::byte> Read(const std::filesystem::path& path, uint64_t m
     if (!bytes.empty() && !file.read(reinterpret_cast<char*>(bytes.data()),bytes.size())) throw std::runtime_error("Generation stream short read");
     return bytes;
 }
-inline Loaded Load(const std::filesystem::path& root, std::string_view manifestFingerprint, Uuid::Uuid16 modelId, uint64_t generation)
+inline Loaded Load(const std::filesystem::path& root, std::string_view manifestFingerprint, uuid::uuid16 modelId, uint64_t generation)
 {
     const auto bytes = Read(root / "streaming.cemf",16ull << 20);
     if (Fingerprint(bytes) != manifestFingerprint) throw std::runtime_error("Generation streaming manifest SHA-256");
@@ -130,7 +140,7 @@ inline Loaded Load(const std::filesystem::path& root, std::string_view manifestF
     if (!catalog.WithMountedAssetSet(manifest,source,AssetDepot::AssetMountId{generation},generation,
         {.expectedTargetPlatform="win-x64",.expectedTargetAbi="model-stream-v1"},candidate,issues))
         throw std::runtime_error("Generation streaming manifest closure");
-    const auto resolve = [&](Uuid::Uuid16 id, ck::CookedAssetKind kind) {
+    const auto resolve = [&](uuid::uuid16 id, ck::CookedAssetKind kind) {
         ck::ResolvedAssetEntry entry;
         if (candidate.Find({{experiment::AssetId{id},{}},kind},entry) != ck::AssetLookupStatus::Found)
             throw std::runtime_error("Generation streaming child identity"); return entry;

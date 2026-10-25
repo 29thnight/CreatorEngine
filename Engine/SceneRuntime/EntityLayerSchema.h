@@ -1,6 +1,15 @@
 #pragma once
-#include "../Utility_Framework/AuthoringReadNode.h"
-#include "../Utility_Framework/LayerCatalog.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
+#include "../Utility_Framework/Authoring/AuthoringReadNode.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.LayerCatalog.h"
+#else
+import Creator.Core.LayerCatalog;
+#endif
 
 namespace ce::layers
 {
@@ -10,7 +19,7 @@ inline result<layer_id> ReadEntityLayer(const Authoring::ReadNode& node, const c
         return std::unexpected(error::invalid_definition);
 
     std::uint64_t id = 0;
-    if (!Authoring::Scalar::TryParseUInt64(node["m_layerId"].AsString(), id) || !catalog.Find(layer_id{id}))
+    if (!Authoring::Scalar::TryParseUInt64(node["m_layerId"].AsString(), id) || !catalog.find(layer_id{id}))
         return std::unexpected(error::unknown_layer);
 
     return layer_id{id};

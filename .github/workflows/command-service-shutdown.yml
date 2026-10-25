@@ -4,7 +4,7 @@ on:
   pull_request:
     paths:
       - 'Engine/CommandService/**'
-      - 'Engine/Utility_Framework/StandardLibrary.h'
+      - 'Engine/Utility_Framework/Foundation/StandardLibrary.h'
       - 'Tools/regression/CommandServiceShutdownProbe.cpp'
       - 'Tools/regression/verify-command-service-shutdown*.ps1'
       - 'Tools/regression/verify-process-exit-code.ps1'
@@ -15,7 +15,7 @@ on:
     branches: [master]
     paths:
       - 'Engine/CommandService/**'
-      - 'Engine/Utility_Framework/StandardLibrary.h'
+      - 'Engine/Utility_Framework/Foundation/StandardLibrary.h'
       - 'Tools/regression/CommandServiceShutdownProbe.cpp'
       - 'Tools/regression/verify-command-service-shutdown*.ps1'
       - 'Tools/regression/verify-process-exit-code.ps1'

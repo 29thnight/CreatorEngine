@@ -1,3 +1,14 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "ModelAssetAuthoringTransaction.h"
 
 #include "../Experiment/Import/MeshletBuilder.h"
@@ -12,12 +23,15 @@
 #include "../Experiment/Cooked/TextureCookProducer.h"
 #include "../Experiment/Import/SceneToModelDraft.h"
 
-#include "AuthoringParsedDocument.h"
-#include "AuthoringWriteNode.h"
+#include "../../Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../Utility_Framework/Authoring/AuthoringWriteNode.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
-#include <Windows.h>
-
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 #include <process.h>
 
 namespace assets
@@ -29,7 +43,7 @@ namespace assets
 
         struct Mbc3PreparedTexture final
         {
-            Uuid::Uuid16 assetId{};
+            uuid::uuid16 assetId{};
             std::filesystem::path relativePath{};
             std::vector<std::byte> bytes{};
             std::string fingerprint{};
@@ -348,13 +362,13 @@ namespace assets
             const IdentityEpochHeader& header, const ModelSidecarV2& candidate,
             std::string& failure)
         {
-            std::map<Uuid::Uuid16, std::string> identities;
-            const auto addIdentity = [&](const Uuid::Uuid16& id,
+            std::map<uuid::uuid16, std::string> identities;
+            const auto addIdentity = [&](const uuid::uuid16& id,
                 std::string context) -> bool
                 {
                     const auto [found, inserted] = identities.emplace(id, context);
                     if (inserted) return true;
-                    failure = "UUIDv8 corpus collision: " + Uuid::ToString(id)
+                    failure = "UUIDv8 corpus collision: " + uuid::to_string(id)
                         + " (" + context + " vs " + found->second + ")";
                     return false;
                 };
@@ -636,7 +650,7 @@ namespace assets
                 Mbc3PreparedTexture prepared;
                 prepared.assetId = textureIds[index].value;
                 prepared.relativePath = std::filesystem::path("textures") /
-                    (Uuid::ToString(prepared.assetId) + std::string(extension));
+                    (uuid::to_string(prepared.assetId) + std::string(extension));
                 prepared.bytes = texture.embeddedBytes;
                 prepared.fingerprint = Mbc3Fingerprint(prepared.bytes);
                 outTextures.push_back(std::move(prepared));
@@ -655,7 +669,7 @@ namespace assets
             root.Child("schemaVersion").SetScalar(2u);
             root.Child("identityProfile").SetScalar(sidecar.identityProfile);
             root.Child("identityEpoch").SetScalar(sidecar.identityEpoch);
-            root.Child("assetId").SetScalar(Uuid::ToString(sidecar.assetId));
+            root.Child("assetId").SetScalar(uuid::to_string(sidecar.assetId));
             root.Child("generation").SetScalar(sidecar.generation);
             root.Child("sourceFingerprint").SetScalar(sidecar.sourceFingerprint);
             root.Child("sidecarFingerprint").SetScalar(sidecarFingerprint);
@@ -672,7 +686,7 @@ namespace assets
                 entry.SetMap();
                 entry.Child("kind").SetScalar(ToKindName(record.kind));
                 entry.Child("stableKey").SetScalar(record.stableKey);
-                entry.Child("assetId").SetScalar(Uuid::ToString(record.assetId));
+                entry.Child("assetId").SetScalar(uuid::to_string(record.assetId));
                 if (record.kind == SubAssetKind::Texture)
                 {
                     const auto found = std::ranges::find(
@@ -709,7 +723,7 @@ namespace assets
             const bool valid = root["schemaVersion"].As(0u) == 2u
                 && root["identityProfile"].AsString() == sidecar.identityProfile
                 && root["identityEpoch"].AsString() == sidecar.identityEpoch
-                && root["assetId"].AsString() == Uuid::ToString(sidecar.assetId)
+                && root["assetId"].AsString() == uuid::to_string(sidecar.assetId)
                 && root["generation"].As(std::uint64_t{ 0 }) == sidecar.generation
                 && root["sourceFingerprint"].AsString() == sidecar.sourceFingerprint
                 && root["sidecarFingerprint"].AsString() == sidecarFingerprint
@@ -727,8 +741,7 @@ namespace assets
     bool IsModelAuthoringSource(const std::filesystem::path& sourcePath) noexcept
     {
         std::string extension = sourcePath.extension().string();
-        std::ranges::transform(extension, extension.begin(),
-            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        ce::strings::to_lower_in_place(extension);
         return extension == ".fbx" || extension == ".gltf"
             || extension == ".glb" || extension == ".obj";
     }
@@ -897,7 +910,7 @@ namespace assets
             }
         }
 
-        if (!request.expectedModelId.IsNil()
+        if (!request.expectedModelId.is_nil()
             && (!hasPriorV2 || prior.assetId != request.expectedModelId))
         {
             Mbc3AddIssue(result, "sidecar.prior",
@@ -969,14 +982,49 @@ namespace assets
             Mbc3AddIssue(result, "identity.model-key", std::move(failure));
             return result;
         }
-        if (hasPriorV2
-            && prior.generation == (std::numeric_limits<std::uint64_t>::max)())
+        // A source-control rollback may restore an older canonical sidecar while
+        // newer immutable generations remain in Library. Reserve above both;
+        // never overwrite a published generation or adopt its import settings.
+        std::uint64_t lastGeneration = hasPriorV2 ? prior.generation : 0u;
+        if (hasPriorV2)
         {
-            Mbc3AddIssue(result, "identity.generation", "generation이 overflow한다.");
+            const auto parent = generationRoot / uuid::to_string(prior.assetId);
+            error.clear();
+            const bool parentExists = std::filesystem::exists(parent, error);
+            if (!error && parentExists)
+            {
+                std::filesystem::directory_iterator entry(parent, error);
+                const std::filesystem::directory_iterator end;
+                while (!error && entry != end)
+                {
+                    if (entry->is_directory(error))
+                    {
+                        const auto name = entry->path().filename().string();
+                        std::uint64_t occupied{};
+                        const auto parsed = std::from_chars(name.data(), name.data() + name.size(), occupied);
+                        if (parsed.ec == std::errc{} && parsed.ptr == name.data() + name.size())
+                        {
+                            lastGeneration = (std::max)(lastGeneration, occupied);
+                        }
+                    }
+                    if (!error)
+                    {
+                        entry.increment(error);
+                    }
+                }
+            }
+            if (error)
+            {
+                Mbc3AddIssue(result, "identity.generation", "Cannot enumerate model generations: " + error.message());
+                return result;
+            }
+        }
+        if (lastGeneration == (std::numeric_limits<std::uint64_t>::max)())
+        {
+            Mbc3AddIssue(result, "identity.generation", "Model generation overflow.");
             return result;
         }
-        const std::uint64_t generation = hasPriorV2
-            ? prior.generation + 1u : 1u;
+        const std::uint64_t generation = lastGeneration + 1u;
         ModelSidecarV2 sidecar;
         std::vector<SidecarIssue> sidecarIssues;
         if (!BuildModelSidecarV2(header, modelAuthoringKey, generation,
@@ -1073,7 +1121,7 @@ namespace assets
         generation_streaming::Bundle streaming;
         try
         {
-            std::vector<Uuid::Uuid16> meshIds, materialIds; Uuid::Uuid16 skeletonId{};
+            std::vector<uuid::uuid16> meshIds, materialIds; uuid::uuid16 skeletonId{};
             for (const auto& entry : sidecar.subAssets)
             {
                 if (entry.kind == SubAssetKind::Mesh) meshIds.push_back(entry.assetId);
@@ -1095,7 +1143,7 @@ namespace assets
             generationRecord = document->Dump();
         }
 
-        const std::string modelIdText = Uuid::ToString(sidecar.assetId);
+        const std::string modelIdText = uuid::to_string(sidecar.assetId);
         const std::filesystem::path finalParent = generationRoot / modelIdText;
         const std::filesystem::path finalGeneration =
             finalParent / std::to_string(generation);

@@ -1,6 +1,36 @@
-#include "../../../Utility_Framework/LifetimeToken.h"
-#include "../../../Utility_Framework/Ownership.h"
-#include "RuntimeResults.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Platform.Windows.Strings.h"
+#else
+import Creator.Platform.Windows.Strings;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
+#include "../../../Utility_Framework/Runtime/RuntimeResults.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
 #include "../../../EngineDiagnostics/DxCaptureSubmission.h"
 #include "DX12DeviceResources.h"
@@ -14,9 +44,13 @@
 #include "DX12Encoder.h" // A-3 — 즉시 인코더의 실물. 헤더는 이름만 안다
 #include <stdint.h>
 #include <stdio.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
-
-#include <dxgidebug.h> // IDXGIDebug — 종료 시 라이브 객체 보고(프로세스 범위)
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
+// IDXGIDebug — 종료 시 라이브 객체 보고(프로세스 범위)
 #include "../RHIValidationLedger.h"
 
 #pragma comment(lib, "d3d12.lib")
@@ -30,7 +64,7 @@ class DX12MemorySamplingSession
   public:
     DX12MemorySamplingSession(IDXGIAdapter1* adapter, const char* path) : m_file(path, std::ios::app)
     {
-        if (!m_file || FAILED(adapter->QueryInterface(IID_PPV_ARGS(&m_adapter))))
+        if (!m_file || FAILED(adapter->QueryInterface(IID_PPV_ARGS(m_adapter.put()))))
         {
             throw std::runtime_error("DX12 memory sampling initialization failed");
         }
@@ -78,7 +112,7 @@ class DX12MemorySamplingSession
                << ",\"budgetBytes\":" << info.Budget << "}\n";
         m_file.flush();
     }
-    Microsoft::WRL::ComPtr<IDXGIAdapter3> m_adapter;
+    winrt::com_ptr<IDXGIAdapter3> m_adapter;
     std::ofstream m_file;
     uint64_t m_stream{0};
     std::chrono::steady_clock::time_point m_began{std::chrono::steady_clock::now()};
@@ -105,8 +139,7 @@ namespace
         std::string value(length, '\0');
         GetEnvironmentVariableA(name, value.data(), length);
         value.resize(length - 1);
-        std::transform(value.begin(), value.end(), value.begin(),
-                       [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        ce::strings::to_lower_in_place(value);
         return value;
     }
 
@@ -155,22 +188,7 @@ namespace
         return fallback;
     }
 
-    std::string WideToUtf8(const wchar_t* value)
-    {
-        if (nullptr == value || L'\0' == *value)
-        {
-            return {};
-        }
-        const int bytes = WideCharToMultiByte(CP_UTF8, 0, value, -1, nullptr, 0, nullptr, nullptr);
-        if (bytes <= 1)
-        {
-            return {};
-        }
-        std::string result(static_cast<size_t>(bytes), '\0');
-        WideCharToMultiByte(CP_UTF8, 0, value, -1, result.data(), bytes, nullptr, nullptr);
-        result.resize(static_cast<size_t>(bytes - 1));
-        return result;
-    }
+
 
     std::string DebugName(const char* narrow, const wchar_t* wide)
     {
@@ -178,7 +196,7 @@ namespace
         {
             return narrow;
         }
-        const std::string converted = WideToUtf8(wide);
+        const std::string converted = ce::strings::wide_to_utf8(wide);
         return converted.empty() ? "<unnamed>" : converted;
     }
 
@@ -244,7 +262,7 @@ bool DX12DeviceResources::CreateSizeDependentResources(uint32_t width, uint32_t 
 
     HRESULT hr = m_device->CreateCommittedResource(&defaultHeap, D3D12_HEAP_FLAG_NONE, &rtDesc,
                                                    D3D12_RESOURCE_STATE_RENDER_TARGET, &clearValue,
-                                                   IID_PPV_ARGS(&m_renderTarget));
+                                                   IID_PPV_ARGS(m_renderTarget.put()));
     if (FAILED(hr))
     {
         outError = "렌더 타깃 생성 실패 " + HrToString(hr);
@@ -252,7 +270,7 @@ bool DX12DeviceResources::CreateSizeDependentResources(uint32_t width, uint32_t 
     }
 
     m_rtvHandle = m_rtvHeap->GetCPUDescriptorHandleForHeapStart();
-    WriteRenderTargetView(m_renderTarget.Get(), nullptr, m_rtvHandle);
+    WriteRenderTargetView(m_renderTarget.get(), nullptr, m_rtvHandle);
 
     // ── 프레임 리드백(행 정렬은 CreateReadback이 한다, R2c-b2) ──
     //
@@ -290,7 +308,7 @@ bool DX12DeviceResources::Resize(uint32_t width, uint32_t height, std::string& o
         return false;
     }
 
-    m_renderTarget.Reset();
+    m_renderTarget = nullptr;
     ReleaseReadback(m_frameReadback);
     m_frameReadback = RHIReadback{};
 
@@ -300,15 +318,15 @@ bool DX12DeviceResources::Resize(uint32_t width, uint32_t height, std::string& o
 bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::string& outError, LUID matchAdapterLuid,
                                      bool followScreenSize)
 {
-    m_nullTextureDescriptorHeap.Reset();
+    m_nullTextureDescriptorHeap = nullptr;
     m_nullTextureDescriptor = {};
     m_nullTextureDescriptorCount = 0;
     m_width = width;
     m_height = height;
-    m_drawIndirectSignature.Reset();
-    m_drawIndexedIndirectSignature.Reset();
-    m_dispatchMeshIndirectSignature.Reset();
-    m_dispatchIndirectSignature.Reset();
+    m_drawIndirectSignature = nullptr;
+    m_drawIndexedIndirectSignature = nullptr;
+    m_dispatchMeshIndirectSignature = nullptr;
+    m_dispatchIndirectSignature = nullptr;
     m_meshBatchSignatures.clear();
     m_meshBatchSignatureGeneration = NextMaterialBatchSignatureGeneration();
     m_meshShaderCapabilities = {};
@@ -327,15 +345,15 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     // Release 기본은 off라 배포 실행의 성능을 바꾸지 않는다.
     if (debugLayerEnabled && !HasTemporalDeviceDX12())
     {
-        Microsoft::WRL::ComPtr<ID3D12Debug> debug;
-        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&debug))))
+        winrt::com_ptr<ID3D12Debug> debug;
+        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(debug.put()))))
         {
             debug->EnableDebugLayer();
 
             if (gpuValidationEnabled)
             {
-                Microsoft::WRL::ComPtr<ID3D12Debug1> debug1;
-                if (SUCCEEDED(debug.As(&debug1)))
+                winrt::com_ptr<ID3D12Debug1> debug1;
+                if (SUCCEEDED(ce::platform::windows::QueryComInterface(debug, debug1)))
                 {
                     debug1->SetEnableGPUBasedValidation(TRUE);
                     debug1->SetEnableSynchronizedCommandQueueValidation(TRUE);
@@ -353,8 +371,8 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     // 필요한 breadcrumb와 page-fault 기록이 사라진 뒤다.
     if (dredEnabled && !HasTemporalDeviceDX12())
     {
-        Microsoft::WRL::ComPtr<ID3D12DeviceRemovedExtendedDataSettings1> dredSettings;
-        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(&dredSettings))))
+        winrt::com_ptr<ID3D12DeviceRemovedExtendedDataSettings1> dredSettings;
+        if (SUCCEEDED(D3D12GetDebugInterface(IID_PPV_ARGS(dredSettings.put()))))
         {
             dredSettings->SetAutoBreadcrumbsEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
             dredSettings->SetPageFaultEnablement(D3D12_DRED_ENABLEMENT_FORCED_ON);
@@ -379,7 +397,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     }
     else
     {
-        hr = CreateDXGIFactory2(factoryFlags, IID_PPV_ARGS(&m_factory));
+        hr = CreateDXGIFactory2(factoryFlags, IID_PPV_ARGS(m_factory.put()));
         if (FAILED(hr))
         {
             outError = "DXGI 팩토리 생성 실패 " + HrToString(hr);
@@ -393,7 +411,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         // 받지 않았으면(독립 자가 검증 등) 고성능 우선.
         if (0 != matchAdapterLuid.LowPart || 0 != matchAdapterLuid.HighPart)
         {
-            hr = m_factory->EnumAdapterByLuid(matchAdapterLuid, IID_PPV_ARGS(&m_adapter));
+            hr = m_factory->EnumAdapterByLuid(matchAdapterLuid, IID_PPV_ARGS(m_adapter.put()));
             if (FAILED(hr))
             {
                 outError = "지정 LUID의 어댑터를 찾지 못했다 " + HrToString(hr);
@@ -403,7 +421,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         else
         {
             hr = m_factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
-                                                       IID_PPV_ARGS(&m_adapter));
+                                                       IID_PPV_ARGS(m_adapter.put()));
             if (FAILED(hr))
             {
                 outError = "어댑터 열거 실패 " + HrToString(hr);
@@ -411,7 +429,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
             }
         }
 
-        hr = D3D12CreateDevice(m_adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&m_device));
+        hr = D3D12CreateDevice(m_adapter.get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(m_device.put()));
         if (FAILED(hr))
         {
             outError = "D3D12 디바이스 생성 실패 " + HrToString(hr);
@@ -434,7 +452,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     {
         try
         {
-            m_memorySampling = own::make_unique<DX12MemorySamplingSession>(m_adapter.Get(), samplingPath);
+            m_memorySampling = own::make_unique<DX12MemorySamplingSession>(m_adapter.get(), samplingPath);
         }
         catch (const std::exception& error)
         {
@@ -455,7 +473,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         // W8-3: 큐를 **들고 있는다.** 매 프레임 QueryInterface 를 다시 하면
         // 레이어가 꺼진 실행에서도 프레임마다 실패하는 호출이 하나 늘고,
         // 무엇보다 "큐가 있는가" 를 밖에서 물을 자리가 없다.
-        if (SUCCEEDED(m_device.As(&m_infoQueue)))
+        if (SUCCEEDED(ce::platform::windows::QueryComInterface(m_device, m_infoQueue)))
         {
             if (breakOnError)
             {
@@ -486,10 +504,10 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     indirectSignature.NumArgumentDescs = 1;
     indirectSignature.pArgumentDescs = &indexedArgument;
     const HRESULT indirectResult =
-        m_device->CreateCommandSignature(&indirectSignature, nullptr, IID_PPV_ARGS(&m_drawIndexedIndirectSignature));
+        m_device->CreateCommandSignature(&indirectSignature, nullptr, IID_PPV_ARGS(m_drawIndexedIndirectSignature.put()));
     if (FAILED(indirectResult))
     {
-        m_drawIndexedIndirectSignature.Reset();
+        m_drawIndexedIndirectSignature = nullptr;
         OutputDebugStringA(("[DX12] Indexed indirect unavailable: " + HrToString(indirectResult) + "\n").c_str());
     }
 
@@ -500,10 +518,10 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     drawSignature.NumArgumentDescs = 1;
     drawSignature.pArgumentDescs = &drawArgument;
     const HRESULT drawIndirectResult =
-        m_device->CreateCommandSignature(&drawSignature, nullptr, IID_PPV_ARGS(&m_drawIndirectSignature));
+        m_device->CreateCommandSignature(&drawSignature, nullptr, IID_PPV_ARGS(m_drawIndirectSignature.put()));
     if (FAILED(drawIndirectResult))
     {
-        m_drawIndirectSignature.Reset();
+        m_drawIndirectSignature = nullptr;
         OutputDebugStringA(
             ("[DX12] Nonindexed indirect unavailable: " + HrToString(drawIndirectResult) + "\n").c_str());
     }
@@ -512,7 +530,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     dispatchArgument.Type = D3D12_INDIRECT_ARGUMENT_TYPE_DISPATCH;
     const D3D12_COMMAND_SIGNATURE_DESC dispatchSignature{sizeof(RHIDispatchIndirectArguments), 1, &dispatchArgument, 0};
     const HRESULT dispatchIndirectResult =
-        m_device->CreateCommandSignature(&dispatchSignature, nullptr, IID_PPV_ARGS(&m_dispatchIndirectSignature));
+        m_device->CreateCommandSignature(&dispatchSignature, nullptr, IID_PPV_ARGS(m_dispatchIndirectSignature.put()));
     if (FAILED(dispatchIndirectResult))
     {
         outError = "DX12 compute indirect signature creation failed: " + HrToString(dispatchIndirectResult);
@@ -521,7 +539,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
 
     D3D12_COMMAND_QUEUE_DESC queueDesc{};
     queueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-    hr = m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(&m_queue));
+    hr = m_device->CreateCommandQueue(&queueDesc, IID_PPV_ARGS(m_queue.put()));
     if (FAILED(hr))
     {
         outError = "커맨드 큐 생성 실패 " + HrToString(hr);
@@ -530,7 +548,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
 
     for (uint32_t i = 0; i < kFrameCount; ++i)
     {
-        hr = m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&m_allocators[i]));
+        hr = m_device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(m_allocators[i].put()));
         if (FAILED(hr))
         {
             outError = "커맨드 얼로케이터 생성 실패 " + HrToString(hr);
@@ -538,8 +556,8 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         }
     }
 
-    hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_allocators[0].Get(), nullptr,
-                                     IID_PPV_ARGS(&m_commandList));
+    hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_allocators[0].get(), nullptr,
+                                     IID_PPV_ARGS(m_commandList.put()));
     if (FAILED(hr))
     {
         outError = "커맨드 리스트 생성 실패 " + HrToString(hr);
@@ -582,13 +600,13 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     }
     D3D12_FEATURE_DATA_D3D12_OPTIONS7 meshOptions{};
     D3D12_FEATURE_DATA_SHADER_MODEL shaderModel{D3D_SHADER_MODEL_6_5};
-    ComPtr<ID3D12Device2> meshDevice;
-    ComPtr<ID3D12GraphicsCommandList6> meshCommands;
+    winrt::com_ptr<ID3D12Device2> meshDevice;
+    winrt::com_ptr<ID3D12GraphicsCommandList6> meshCommands;
     if (SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_D3D12_OPTIONS7, &meshOptions, sizeof(meshOptions))) &&
         meshOptions.MeshShaderTier >= D3D12_MESH_SHADER_TIER_1 &&
         SUCCEEDED(m_device->CheckFeatureSupport(D3D12_FEATURE_SHADER_MODEL, &shaderModel, sizeof(shaderModel))) &&
-        shaderModel.HighestShaderModel >= D3D_SHADER_MODEL_6_5 && SUCCEEDED(m_device.As(&meshDevice)) &&
-        SUCCEEDED(m_commandList.As(&meshCommands)))
+        shaderModel.HighestShaderModel >= D3D_SHADER_MODEL_6_5 && SUCCEEDED(ce::platform::windows::QueryComInterface(m_device, meshDevice)) &&
+        SUCCEEDED(ce::platform::windows::QueryComInterface(m_commandList, meshCommands)))
     {
         // Core mesh shader limits; optional increased-dispatch extensions are
         // intentionally not required by the first mesh-only route.
@@ -611,12 +629,12 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         meshSignature.NumArgumentDescs = 1;
         meshSignature.pArgumentDescs = &meshArgument;
         m_meshShaderCapabilities.meshIndirect = SUCCEEDED(
-            m_device->CreateCommandSignature(&meshSignature, nullptr, IID_PPV_ARGS(&m_dispatchMeshIndirectSignature)));
+            m_device->CreateCommandSignature(&meshSignature, nullptr, IID_PPV_ARGS(m_dispatchMeshIndirectSignature.put())));
     }
     m_commandList->Close(); // BeginFrame이 여는 것이 규약 — 생성 직후는 닫아 둔다
     m_immediateEncoder.reset();
 
-    hr = m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&m_fence));
+    hr = m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(m_fence.put()));
     if (FAILED(hr))
     {
         outError = "펜스 생성 실패 " + HrToString(hr);
@@ -634,7 +652,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     D3D12_DESCRIPTOR_HEAP_DESC rtvHeapDesc{};
     rtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
     rtvHeapDesc.NumDescriptors = 1;
-    hr = m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(&m_rtvHeap));
+    hr = m_device->CreateDescriptorHeap(&rtvHeapDesc, IID_PPV_ARGS(m_rtvHeap.put()));
     if (FAILED(hr))
     {
         outError = "RTV 힙 생성 실패 " + HrToString(hr);
@@ -658,7 +676,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     uploadPolicy.standbyRegularSegments = kStandbyRegularSegments;
     uploadPolicy.largeCacheBudgetBytes = 64ull * 1024 * 1024;
     uploadPolicy.softBudgetBytes = DX12UploadSoftBudget(QueryUploadMemoryBudget(), 0);
-    if (!m_uploadAllocator.Initialize(m_device.Get(), m_resourceTable, uploadPolicy, outError))
+    if (!m_uploadAllocator.Initialize(m_device.get(), m_resourceTable, uploadPolicy, outError))
     {
         return false;
     }
@@ -669,7 +687,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     // tables of up to 4096 mesh bins, alongside transform/material descriptors.
     // These tables must coexist in one immutable shader-visible heap version.
     constexpr uint32_t kDescriptorsPerPage = 131072;
-    if (!m_descriptorRecycler.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kDescriptorsPerPage,
+    if (!m_descriptorRecycler.Initialize(m_device.get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kDescriptorsPerPage,
                                          kFrameCount, outError))
     {
         return false;
@@ -677,7 +695,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     InitializeNullTextureDescriptors();
 
     constexpr uint32_t kSamplerCapacity = 128;
-    if (!m_samplerHeap.Initialize(m_device.Get(), kSamplerCapacity, outError))
+    if (!m_samplerHeap.Initialize(m_device.get(), kSamplerCapacity, outError))
     {
         return false;
     }
@@ -688,11 +706,11 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     // 정확한 값은 peakFrameDescriptors가 알려 준다 — 추정하지 말고 재서 줄인다.
     constexpr uint32_t kRtvCapacity = 512;
     constexpr uint32_t kDsvCapacity = 256;
-    if (!m_rtvViewHeap.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, kRtvCapacity, outError))
+    if (!m_rtvViewHeap.Initialize(m_device.get(), D3D12_DESCRIPTOR_HEAP_TYPE_RTV, kRtvCapacity, outError))
     {
         return false;
     }
-    if (!m_dsvViewHeap.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, kDsvCapacity, outError))
+    if (!m_dsvViewHeap.Initialize(m_device.get(), D3D12_DESCRIPTOR_HEAP_TYPE_DSV, kDsvCapacity, outError))
     {
         return false;
     }
@@ -701,7 +719,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
     // 지금은 포그 볼륨 셋뿐이라 작게 잡는다 — 그 셋이 자기 힙을 들고 있던
     // 것을 이리로 합쳤다(R3-2).
     constexpr uint32_t kClearViewCapacity = 64;
-    if (!m_clearViewHeap.Initialize(m_device.Get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kClearViewCapacity,
+    if (!m_clearViewHeap.Initialize(m_device.get(), D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV, kClearViewCapacity,
                                     outError))
     {
         return false;
@@ -732,7 +750,7 @@ bool DX12DeviceResources::Initialize(uint32_t width, uint32_t height, std::strin
         return false;
     }
     m_submissionClient = true;
-    m_queueService = own::make_unique<DX12QueueService>(m_device.Get());
+    m_queueService = own::make_unique<DX12QueueService>(m_device.get());
     return true;
 }
 
@@ -809,10 +827,10 @@ void DX12DeviceResources::Shutdown()
     // 스왑체인은 백버퍼 참조를 먼저 놓아야 곱게 죽는다(GPU 완주는 위에서 확인).
     for (auto& backBuffer : m_backBuffers)
     {
-        backBuffer.Reset();
+        backBuffer = nullptr;
     }
-    m_backBufferRtvHeap.Reset();
-    m_swapChain.Reset();
+    m_backBufferRtvHeap = nullptr;
+    m_swapChain = nullptr;
     if (nullptr != m_frameLatencyWaitableObject)
     {
         CloseHandle(m_frameLatencyWaitableObject);
@@ -825,7 +843,7 @@ void DX12DeviceResources::Shutdown()
     // GPU가 다 끝난 뒤에 Unmap한다. 순서가 반대면 아직 읽는 중인 메모리를 푼다.
     m_uploadAllocator.Shutdown();
     m_descriptorRecycler.Shutdown();
-    m_nullTextureDescriptorHeap.Reset();
+    m_nullTextureDescriptorHeap = nullptr;
     m_nullTextureDescriptor = {};
     m_nullTextureDescriptorCount = 0;
     m_samplerHeap.Shutdown();
@@ -834,11 +852,11 @@ void DX12DeviceResources::Shutdown()
     m_clearViewHeap.Shutdown();
     m_uploadMemoryPressure = false;
     m_persistentMemoryBudget.Reset();
-    m_commandList.Reset();
-    m_drawIndirectSignature.Reset();
-    m_drawIndexedIndirectSignature.Reset();
-    m_dispatchMeshIndirectSignature.Reset();
-    m_dispatchIndirectSignature.Reset();
+    m_commandList = nullptr;
+    m_drawIndirectSignature = nullptr;
+    m_drawIndexedIndirectSignature = nullptr;
+    m_dispatchMeshIndirectSignature = nullptr;
+    m_dispatchIndirectSignature = nullptr;
     m_meshBatchSignatures.clear();
     m_meshBatchSignatureGeneration = NextMaterialBatchSignatureGeneration();
     m_meshShaderCapabilities = {};
@@ -859,20 +877,20 @@ void DX12DeviceResources::Shutdown()
     m_uploadTransactionListeners.clear();
     m_frameReadback = {};
     m_resourceTable.Clear();
-    m_renderTarget.Reset();
-    m_rtvHeap.Reset();
+    m_renderTarget = nullptr;
+    m_rtvHeap = nullptr;
     m_rtvHandle = {};
     for (auto& allocator : m_allocators)
     {
-        allocator.Reset();
+        allocator = nullptr;
     }
-    m_fence.Reset();
-    m_queue.Reset();
-    m_infoQueue.Reset();
-    m_device.Reset();
+    m_fence = nullptr;
+    m_queue = nullptr;
+    m_infoQueue = nullptr;
+    m_device = nullptr;
     m_memorySampling.reset();
-    m_adapter.Reset();
-    m_factory.Reset();
+    m_adapter = nullptr;
+    m_factory = nullptr;
     m_temporalDevice.reset();
     m_width = 0;
     m_height = 0;
@@ -922,7 +940,7 @@ void DX12DeviceResources::ResetImmediateEncoder()
     // 리스트를 Reset 할 때마다 새로 만든다. 들고 있으면 인코더가 기억하는
     // 디스크립터 힙 바인딩이 낡는다 — Reset 이 그것을 푸는데 인코더는
     // '이미 걸었다'로 남아, 다음 테이블 바인딩이 힙 없이 나간다.
-    m_immediateEncoder = own::make_unique<DX12Encoder>(m_commandList.Get(), this);
+    m_immediateEncoder = own::make_unique<DX12Encoder>(m_commandList.get(), this);
 }
 
 RHIEncoder& DX12DeviceResources::GetImmediateEncoder()
@@ -945,7 +963,7 @@ RHIEncoder& DX12DeviceResources::GetImmediateEncoder()
     }
     else
     {
-        m_immediateEncoder->ResetState(m_commandList.Get());
+        m_immediateEncoder->ResetState(m_commandList.get());
     }
     return *m_immediateEncoder;
 }
@@ -975,8 +993,8 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
         static_cast<uint32_t>(HasSwapChain() ? TestDeviceRemovalTarget::Host : TestDeviceRemovalTarget::Scene);
     if (0 != (g_testDeviceRemovalRequests.fetch_and(~removalBit) & removalBit))
     {
-        Microsoft::WRL::ComPtr<ID3D12Device5> device5;
-        const bool removed = SUCCEEDED(m_device.As(&device5));
+        winrt::com_ptr<ID3D12Device5> device5;
+        const bool removed = SUCCEEDED(ce::platform::windows::QueryComInterface(m_device, device5));
         if (removed)
         {
             device5->RemoveDevice();
@@ -1059,8 +1077,8 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
             }
             else
             {
-                hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator.Get(), nullptr,
-                                                 IID_PPV_ARGS(&m_commandList));
+                hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator.get(), nullptr,
+                                                 IID_PPV_ARGS(m_commandList.put()));
                 if (FAILED(hr))
                 {
                     outError = "커맨드 리스트 생성 실패 " + HrToString(hr);
@@ -1072,7 +1090,7 @@ bool DX12DeviceResources::BeginFrame(std::string& outError)
         }
         if (!created)
         {
-            hr = m_commandList->Reset(allocator.Get(), nullptr);
+            hr = m_commandList->Reset(allocator.get(), nullptr);
             if (FAILED(hr))
             {
                 outError = "커맨드 리스트 Reset 실패 " + HrToString(hr);
@@ -1166,9 +1184,9 @@ bool DX12DeviceResources::FlushCommandListImpl(bool preserveRecording, std::stri
     }
 
     const uint32_t frameSlot = m_frameIndex;
-    ComPtr<ID3D12GraphicsCommandList> submittedList = m_commandList;
+    winrt::com_ptr<ID3D12GraphicsCommandList> submittedList = m_commandList;
     m_retiredCommandLists[frameSlot].push_back(submittedList);
-    m_commandList.Reset();
+    m_commandList = nullptr;
     m_immediateEncoder.reset();
 
     RHISubmissionTicket ticket;
@@ -1181,13 +1199,13 @@ bool DX12DeviceResources::FlushCommandListImpl(bool preserveRecording, std::stri
                     error = "DX12 ExecuteCommandLists가 RHI thread 밖에서 호출됐다";
                     return false;
                 }
-                ID3D12CommandList* lists[] = {submittedList.Get()};
+                ID3D12CommandList* lists[] = {submittedList.get()};
                 {
                     // Immediate work has no proven frame/query token association.
-                    const ce::dx_capture::submission_scope capture(queue.Get(), 1);
+                    const ce::dx_capture::submission_scope capture(queue.get(), 1);
                     queue->ExecuteCommandLists(1, lists);
                 }
-                const HRESULT signalResult = queue->Signal(fence.Get(), fenceValue);
+                const HRESULT signalResult = queue->Signal(fence.get(), fenceValue);
                 if (FAILED(signalResult))
                 {
                     error = "DX12 중간 제출 Signal 실패 " + HrToString(signalResult);
@@ -1223,8 +1241,8 @@ bool DX12DeviceResources::FlushCommandListImpl(bool preserveRecording, std::stri
 
     // 같은 allocator는 되감지 않고 새 command-list 객체만 연다. 이전 객체는
     // RHI thread가 아직 Execute하지 않았을 수 있어 여기서 Reset할 수 없다.
-    hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_allocators[m_frameIndex].Get(), nullptr,
-                                     IID_PPV_ARGS(&m_commandList));
+    hr = m_device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, m_allocators[m_frameIndex].get(), nullptr,
+                                     IID_PPV_ARGS(m_commandList.put()));
     if (FAILED(hr))
     {
         outError = "중간 제출 후 command list 생성 실패 " + HrToString(hr);
@@ -1254,7 +1272,7 @@ bool DX12DeviceResources::GetPrimaryGraphicsQueue(own::shared_owner<IRHICommandQ
         outError = "Queue service is unavailable.";
         return false;
     }
-    return m_queueService->GetPrimaryGraphicsQueue(m_queue.Get(), queue, outError);
+    return m_queueService->GetPrimaryGraphicsQueue(m_queue.get(), queue, outError);
 }
 
 bool DX12DeviceResources::BeginQueueFrame(const own::shared_owner<IRHICommandQueue>& graphics, std::string& outError)
@@ -1288,11 +1306,11 @@ bool DX12DeviceResources::BeginQueueFrame(const own::shared_owner<IRHICommandQue
     m_queueFrameJoined = false;
     // The prefix ticket proves admission succeeded. On the primary graphics
     // queue, FIFO already orders the graph after that prefix without a GPU wait.
-    if (DX12QueueService::NativeQueue(graphics) == m_queue.Get())
+    if (DX12QueueService::NativeQueue(graphics) == m_queue.get())
     {
         return true;
     }
-    if (!m_queueService->ImportPrimaryCompletion(m_fence.Get(), m_lastAdmittedFenceValue, prefix, outError) ||
+    if (!m_queueService->ImportPrimaryCompletion(m_fence.get(), m_lastAdmittedFenceValue, prefix, outError) ||
         !graphics->Wait(prefix, outError))
     {
         return false;
@@ -1307,7 +1325,7 @@ bool DX12DeviceResources::JoinQueueFrame(const RHITimelinePoint& completion, std
         outError = "No unjoined queue frame is active.";
         return false;
     }
-    if (!m_queueService->JoinPrimaryQueue(m_queue.Get(), completion, outError))
+    if (!m_queueService->JoinPrimaryQueue(m_queue.get(), completion, outError))
     {
         return false;
     }
@@ -1434,12 +1452,12 @@ bool DX12DeviceResources::SubmitCommandLists(std::span<ID3D12CommandList* const>
     }
     if (!lists.empty())
     {
-        const ce::dx_capture::submission_scope capture(m_queue.Get(), static_cast<std::uint32_t>(lists.size()),
+        const ce::dx_capture::submission_scope capture(m_queue.get(), static_cast<std::uint32_t>(lists.size()),
                                                        ce::dx_capture::current_submission_context());
         RHICommandFailureScope::SetExecutionUncertain(true);
         m_queue->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
     }
-    HRESULT hr = m_queue->Signal(m_fence.Get(), completion.value);
+    HRESULT hr = m_queue->Signal(m_fence.get(), completion.value);
     // Signal can report success after removal. The native fence sentinel is
     // device loss, never proof that this batch finished on the GPU.
     if (SUCCEEDED(hr) && m_fence->GetCompletedValue() == UINT64_MAX)
@@ -1524,9 +1542,9 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
     m_currentRecordingId = 0;
 
     const uint32_t frameSlot = m_frameIndex;
-    ComPtr<ID3D12GraphicsCommandList> submittedList = m_commandList;
+    winrt::com_ptr<ID3D12GraphicsCommandList> submittedList = m_commandList;
     m_retiredCommandLists[frameSlot].push_back(submittedList);
-    m_commandList.Reset();
+    m_commandList = nullptr;
     m_immediateEncoder.reset();
 
     RHISubmissionTicket ticket;
@@ -1539,13 +1557,13 @@ bool DX12DeviceResources::EndFrame(std::string& outError)
                     error = "DX12 EndFrame queue 호출이 RHI thread 밖에서 실행됐다";
                     return false;
                 }
-                ID3D12CommandList* lists[] = {submittedList.Get()};
+                ID3D12CommandList* lists[] = {submittedList.get()};
                 {
                     // Immediate tails must not inherit another recorded batch's IDs.
-                    const ce::dx_capture::submission_scope capture(queue.Get(), 1);
+                    const ce::dx_capture::submission_scope capture(queue.get(), 1);
                     queue->ExecuteCommandLists(1, lists);
                 }
-                const HRESULT signalResult = queue->Signal(fence.Get(), fenceValue);
+                const HRESULT signalResult = queue->Signal(fence.get(), fenceValue);
                 if (FAILED(signalResult))
                 {
                     error = "DX12 EndFrame Signal 실패 " + HrToString(signalResult);
@@ -1687,7 +1705,7 @@ bool DX12DeviceResources::DrainForLifecycle(RHILifecycleCommand command, std::st
                     taskError = "DX12 lifecycle drain이 RHI thread 밖에서 호출됐다";
                     return false;
                 }
-                const HRESULT result = queue->Signal(fence.Get(), fenceValue);
+                const HRESULT result = queue->Signal(fence.get(), fenceValue);
                 if (FAILED(result))
                 {
                     taskError = "DX12 lifecycle Signal 실패 " + HrToString(result);
@@ -1747,7 +1765,7 @@ uint32_t DX12DeviceResources::DrainDebugMessages(std::string& outMessages)
         return 0;
     }
 
-    ID3D12InfoQueue* infoQueue = m_infoQueue.Get();
+    ID3D12InfoQueue* infoQueue = m_infoQueue.get();
     const uint64_t count = infoQueue->GetNumStoredMessages();
     uint32_t problems = 0;
 
@@ -1873,8 +1891,8 @@ RHIUploadMemoryBudget DX12DeviceResources::QueryUploadMemoryBudget() const
         return result;
     }
 
-    Microsoft::WRL::ComPtr<IDXGIAdapter3> adapter3;
-    if (FAILED(m_adapter.As(&adapter3)))
+    winrt::com_ptr<IDXGIAdapter3> adapter3;
+    if (FAILED(ce::platform::windows::QueryComInterface(m_adapter, adapter3)))
     {
         return result;
     }
@@ -1916,8 +1934,8 @@ void DX12DeviceResources::RefreshPersistentMemoryBudget()
     RHIPersistentHeapBudget budget{};
     if (m_adapter)
     {
-        Microsoft::WRL::ComPtr<IDXGIAdapter3> adapter3;
-        if (SUCCEEDED(m_adapter.As(&adapter3)))
+        winrt::com_ptr<IDXGIAdapter3> adapter3;
+        if (SUCCEEDED(ce::platform::windows::QueryComInterface(m_adapter, adapter3)))
         {
             DXGI_QUERY_VIDEO_MEMORY_INFO memory{};
             if (SUCCEEDED(adapter3->QueryVideoMemoryInfo(0, DXGI_MEMORY_SEGMENT_GROUP_LOCAL, &memory)) &&
@@ -1939,8 +1957,8 @@ RHIVideoMemoryInfo DX12DeviceResources::QueryVideoMemory() const
         return info;
     }
 
-    Microsoft::WRL::ComPtr<IDXGIAdapter3> adapter3;
-    if (FAILED(m_adapter.As(&adapter3)))
+    winrt::com_ptr<IDXGIAdapter3> adapter3;
+    if (FAILED(ce::platform::windows::QueryComInterface(m_adapter, adapter3)))
     {
         return info;
     }
@@ -1977,9 +1995,9 @@ RHIGpuObjectCensus DX12DeviceResources::CaptureLiveObjectCensus(bool allowDevice
         return census;
     }
 
-    Microsoft::WRL::ComPtr<ID3D12DebugDevice> debugDevice;
-    Microsoft::WRL::ComPtr<ID3D12InfoQueue> infoQueue;
-    if (FAILED(m_device.As(&debugDevice)) || FAILED(m_device.As(&infoQueue)))
+    winrt::com_ptr<ID3D12DebugDevice> debugDevice;
+    winrt::com_ptr<ID3D12InfoQueue> infoQueue;
+    if (FAILED(ce::platform::windows::QueryComInterface(m_device, debugDevice)) || FAILED(ce::platform::windows::QueryComInterface(m_device, infoQueue)))
     {
         return census; // 디버그 레이어가 꺼져 있다 — VRAM만 유효
     }
@@ -2040,8 +2058,8 @@ void DX12DeviceResources::ReportLiveObjectsToDebugOutput()
 #if defined(_DEBUG)
     if (m_device)
     {
-        Microsoft::WRL::ComPtr<ID3D12DebugDevice> debugDevice;
-        if (SUCCEEDED(m_device.As(&debugDevice)))
+        winrt::com_ptr<ID3D12DebugDevice> debugDevice;
+        if (SUCCEEDED(ce::platform::windows::QueryComInterface(m_device, debugDevice)))
         {
             debugDevice->ReportLiveDeviceObjects(D3D12_RLDO_IGNORE_INTERNAL);
         }
@@ -2050,8 +2068,8 @@ void DX12DeviceResources::ReportLiveObjectsToDebugOutput()
     // DXGI 디버그 계층은 프로세스 범위다 — 디바이스가 이미 해체됐어도 남은
     // 객체를 훑는다. DX11 DeviceResources는 이것을 생성 시점에 한 번 얻어
     // 멤버로 들고 있었는데, 쓰는 곳이 이 함수 하나뿐이라 여기서 연다.
-    Microsoft::WRL::ComPtr<IDXGIDebug> dxgiDebug;
-    if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiDebug))))
+    winrt::com_ptr<IDXGIDebug> dxgiDebug;
+    if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(dxgiDebug.put()))))
     {
         dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_IGNORE_INTERNAL);
     }
@@ -2084,8 +2102,8 @@ void DX12DeviceResources::AppendDeviceRemovedReport(HRESULT operationResult, std
     std::ostringstream report;
     report << "\n[DRED] deviceRemovedReason=" << HrToString(reason);
 
-    Microsoft::WRL::ComPtr<ID3D12DeviceRemovedExtendedData1> dred;
-    if (FAILED(m_device.As(&dred)))
+    winrt::com_ptr<ID3D12DeviceRemovedExtendedData1> dred;
+    if (FAILED(ce::platform::windows::QueryComInterface(m_device, dred)))
     {
         report << " (ID3D12DeviceRemovedExtendedData1 unavailable)";
         outError += report.str();
@@ -2123,7 +2141,7 @@ void DX12DeviceResources::AppendDeviceRemovedReport(HRESULT operationResult, std
             }
             if (nullptr != lastContext)
             {
-                report << " context=" << WideToUtf8(lastContext->pContextString);
+                report << " context=" << ce::strings::wide_to_utf8(lastContext->pContextString);
             }
         }
         if (nodeCount == 64)
@@ -2170,7 +2188,7 @@ bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, ui
         return false;
     }
 
-    if (nullptr == m_device.Get() || nullptr == m_queue.Get())
+    if (nullptr == m_device.get() || nullptr == m_queue.get())
     {
         outError = "스왑체인 부착 전에 Initialize가 필요하다";
         return false;
@@ -2191,9 +2209,9 @@ bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, ui
     desc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
     // tearing은 선택 사항이다. 데스크톱 합성이 표시 주기를 정하더라도
     // waitable swapchain이 DXGI의 새 프레임 허용량을 별도로 제한한다.
-    ComPtr<IDXGIFactory5> tearingFactory;
+    winrt::com_ptr<IDXGIFactory5> tearingFactory;
     BOOL allowTearing = FALSE;
-    const bool supportsTearing = SUCCEEDED(m_factory.As(&tearingFactory)) &&
+    const bool supportsTearing = SUCCEEDED(ce::platform::windows::QueryComInterface(m_factory, tearingFactory)) &&
                                  SUCCEEDED(tearingFactory->CheckFeatureSupport(DXGI_FEATURE_PRESENT_ALLOW_TEARING,
                                                                                &allowTearing, sizeof(allowTearing))) &&
                                  allowTearing;
@@ -2201,14 +2219,14 @@ bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, ui
         DXGI_SWAP_CHAIN_FLAG_FRAME_LATENCY_WAITABLE_OBJECT | (supportsTearing ? DXGI_SWAP_CHAIN_FLAG_ALLOW_TEARING : 0);
     desc.Flags = m_swapChainFlags;
 
-    ComPtr<IDXGISwapChain1> swapChain1;
-    HRESULT hr = m_factory->CreateSwapChainForHwnd(m_queue.Get(), hwnd, &desc, nullptr, nullptr, &swapChain1);
+    winrt::com_ptr<IDXGISwapChain1> swapChain1;
+    HRESULT hr = m_factory->CreateSwapChainForHwnd(m_queue.get(), hwnd, &desc, nullptr, nullptr, swapChain1.put());
     if (FAILED(hr))
     {
         outError = "CreateSwapChainForHwnd 실패 " + HrToString(hr);
         return false;
     }
-    if (FAILED(swapChain1.As(&m_swapChain)))
+    if (FAILED(ce::platform::windows::QueryComInterface(swapChain1, m_swapChain)))
     {
         outError = "IDXGISwapChain3 질의 실패";
         return false;
@@ -2217,14 +2235,14 @@ bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, ui
     if (FAILED(hr))
     {
         outError = "SetMaximumFrameLatency failed " + HrToString(hr);
-        m_swapChain.Reset();
+        m_swapChain = nullptr;
         return false;
     }
     m_frameLatencyWaitableObject = m_swapChain->GetFrameLatencyWaitableObject();
     if (nullptr == m_frameLatencyWaitableObject)
     {
         outError = "DX12 frame latency waitable object is unavailable";
-        m_swapChain.Reset();
+        m_swapChain = nullptr;
         return false;
     }
     m_frameLatencyReady = false;
@@ -2234,7 +2252,7 @@ bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, ui
     D3D12_DESCRIPTOR_HEAP_DESC heapDesc{};
     heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
     heapDesc.NumDescriptors = kFrameCount;
-    if (FAILED(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(&m_backBufferRtvHeap))))
+    if (FAILED(m_device->CreateDescriptorHeap(&heapDesc, IID_PPV_ARGS(m_backBufferRtvHeap.put()))))
     {
         outError = "백버퍼 RTV 힙 생성 실패";
         return false;
@@ -2243,12 +2261,12 @@ bool DX12DeviceResources::AttachSwapChain(void* windowHandle, uint32_t width, ui
 
     for (uint32_t i = 0; i < kFrameCount; ++i)
     {
-        if (FAILED(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_backBuffers[i]))))
+        if (FAILED(m_swapChain->GetBuffer(i, IID_PPV_ARGS(m_backBuffers[i].put()))))
         {
             outError = "백버퍼 " + std::to_string(i) + " 획득 실패";
             return false;
         }
-        WriteRenderTargetView(m_backBuffers[i].Get(), nullptr, GetBackBufferRtv(i));
+        WriteRenderTargetView(m_backBuffers[i].get(), nullptr, GetBackBufferRtv(i));
     }
     return true;
 }
@@ -2269,7 +2287,7 @@ bool DX12DeviceResources::ResizeSwapChain(uint32_t width, uint32_t height, std::
     }
     for (auto& backBuffer : m_backBuffers)
     {
-        backBuffer.Reset();
+        backBuffer = nullptr;
     }
 
     const HRESULT hr =
@@ -2282,12 +2300,12 @@ bool DX12DeviceResources::ResizeSwapChain(uint32_t width, uint32_t height, std::
 
     for (uint32_t i = 0; i < kFrameCount; ++i)
     {
-        if (FAILED(m_swapChain->GetBuffer(i, IID_PPV_ARGS(&m_backBuffers[i]))))
+        if (FAILED(m_swapChain->GetBuffer(i, IID_PPV_ARGS(m_backBuffers[i].put()))))
         {
             outError = "리사이즈 후 백버퍼 획득 실패";
             return false;
         }
-        WriteRenderTargetView(m_backBuffers[i].Get(), nullptr, GetBackBufferRtv(i));
+        WriteRenderTargetView(m_backBuffers[i].get(), nullptr, GetBackBufferRtv(i));
     }
     return true;
 }
@@ -2449,7 +2467,7 @@ void DX12DeviceResources::TransitionResources(std::span<const RHITransition> tra
         GetDeferredImmediateEncoder().ResourceBarriers(barriers);
         return;
     }
-    if (nullptr == m_commandList.Get() || transitions.empty())
+    if (nullptr == m_commandList.get() || transitions.empty())
     {
         return;
     }
@@ -2488,7 +2506,7 @@ void DX12DeviceResources::TransitionBuffers(std::span<const RHIBufferTransition>
         GetDeferredImmediateEncoder().ResourceBarriers(barriers);
         return;
     }
-    if (nullptr == m_commandList.Get() || transitions.empty())
+    if (nullptr == m_commandList.get() || transitions.empty())
     {
         return;
     }
@@ -2546,8 +2564,8 @@ void DX12DeviceResources::InitializeNullTextureDescriptors()
     heapDescription.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
     heapDescription.NumDescriptors = descriptorCount;
     heapDescription.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
-    ComPtr<ID3D12DescriptorHeap> heap;
-    if (FAILED(m_device->CreateDescriptorHeap(&heapDescription, IID_PPV_ARGS(&heap))))
+    winrt::com_ptr<ID3D12DescriptorHeap> heap;
+    if (FAILED(m_device->CreateDescriptorHeap(&heapDescription, IID_PPV_ARGS(heap.put()))))
     {
         // 최적화용 원본을 못 만들어도 기존 CreateBindings는 그대로 동작한다.
         // Initialize에서만 시도하므로 worker 기록에 할당 재시도나 잠금이 붙지 않는다.
@@ -2619,7 +2637,7 @@ RHIBindingTable DX12DeviceResources::CreateBindings(std::span<const RHIBindingDe
         return {};
     }
 
-    ID3D12Device* device = m_device.Get();
+    ID3D12Device* device = m_device.get();
     const auto isCanonicalNull = [](const RHIBindingDesc& desc)
     {
         // null padding의 정확한 기본 설명만 합친다. 자원이 해제된 경우에도
@@ -2752,12 +2770,12 @@ bool DX12DeviceResources::CaptureRecordingResources(own::shared_owner<const DX12
     recording->uploadRecordingId = m_currentRecordingId;
     recording->descriptors = m_descriptorRecycler.PinRecording(m_descriptorRecycler.GetCurrentVersionToken());
     recording->uploads = m_uploadAllocator.PinRecording(m_currentRecordingId);
-    recording->samplers = m_samplerHeap.GetHeap();
+    recording->samplers.copy_from(m_samplerHeap.GetHeap());
     if (!recording->descriptors.IsValid() || !recording->uploads ||
-        !m_rtvViewHeap.Capture(*m_device.Get(), recording->renderTargets, outError,
-                               retiredResources ? retiredResources->renderTargets.heap.Get() : nullptr) ||
-        !m_dsvViewHeap.Capture(*m_device.Get(), recording->depthTargets, outError,
-                               retiredResources ? retiredResources->depthTargets.heap.Get() : nullptr))
+        !m_rtvViewHeap.Capture(*m_device.get(), recording->renderTargets, outError,
+                               retiredResources ? retiredResources->renderTargets.heap.get() : nullptr) ||
+        !m_dsvViewHeap.Capture(*m_device.get(), recording->depthTargets, outError,
+                               retiredResources ? retiredResources->depthTargets.heap.get() : nullptr))
     {
         if (outError.empty())
         {
@@ -2781,7 +2799,7 @@ bool DX12DeviceResources::CaptureRecordingResources(own::shared_owner<const DX12
         }
         else
         {
-            const auto hr = m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&recording->clearDescriptors));
+            const auto hr = m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(recording->clearDescriptors.put()));
             if (FAILED(hr))
             {
                 outError = "Frozen clear descriptor heap creation failed " + HrToString(hr);
@@ -2945,7 +2963,7 @@ RHIRenderTargetBinding DX12DeviceResources::CreateRenderTargets(std::span<const 
     // 말하지 않으므로 여기가 그 뜻을 주는 유일한 자리다.
     uint32_t rtvIndex = DX12TargetViewHeap::kInvalidIndex;
     uint32_t dsvIndex = DX12TargetViewHeap::kInvalidIndex;
-    ID3D12Device* device = m_device.Get();
+    ID3D12Device* device = m_device.get();
 
     if (!colors.empty())
     {
@@ -3195,9 +3213,9 @@ bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc, RHIBufferHandl
     resourceDesc.Flags =
         desc.allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
 
-    Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+    winrt::com_ptr<ID3D12Resource> resource;
     const HRESULT hr = m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &resourceDesc,
-                                                         ToD3D12(desc.initialState), nullptr, IID_PPV_ARGS(&resource));
+                                                         ToD3D12(desc.initialState), nullptr, IID_PPV_ARGS(resource.put()));
     if (FAILED(hr))
     {
         outError = "버퍼 생성 실패 " + HrToString(hr);
@@ -3205,7 +3223,7 @@ bool DX12DeviceResources::CreateBuffer(const RHIBufferDesc& desc, RHIBufferHandl
         return false;
     }
 
-    DevResApplyDebugName(resource.Get(), desc.debugName);
+    DevResApplyDebugName(resource.get(), desc.debugName);
 
     // 표가 소유를 가져간다 — 호출부에는 핸들만 남는다(V2-a).
     outHandle = m_resourceTable.AddBuffer(std::move(resource), desc.allowIndirectArguments);
@@ -3273,9 +3291,9 @@ bool DX12DeviceResources::CreateSparseBuffer(const RHISparseBufferDesc& desc, RH
     resourceDesc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
     resourceDesc.Flags =
         desc.allowUnorderedAccess ? D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS : D3D12_RESOURCE_FLAG_NONE;
-    Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+    winrt::com_ptr<ID3D12Resource> resource;
     HRESULT hr =
-        m_device->CreateReservedResource(&resourceDesc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&resource));
+        m_device->CreateReservedResource(&resourceDesc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(resource.put()));
     if (FAILED(hr))
     {
         outError = "Reserved buffer creation failed " + HrToString(hr);
@@ -3292,8 +3310,9 @@ bool DX12DeviceResources::CreateSparseBuffer(const RHISparseBufferDesc& desc, RH
             outError = "Sparse shared pool owner or capacity is invalid";
             return false;
         }
-        Microsoft::WRL::ComPtr<ID3D12Heap> retainedHeap = sharedHeap;
-        DevResApplyDebugName(resource.Get(), desc.debugName);
+        winrt::com_ptr<ID3D12Heap> retainedHeap;
+        retainedHeap.copy_from(sharedHeap);
+        DevResApplyDebugName(resource.get(), desc.debugName);
         outHandle = m_resourceTable.AddBuffer(std::move(resource), false, std::move(retainedHeap), std::move(lease));
         if (!outHandle.IsValid())
         {
@@ -3334,14 +3353,14 @@ bool DX12DeviceResources::CreateSparseBuffer(const RHISparseBufferDesc& desc, RH
         outError = "Sparse physical heap exceeds the shared device VRAM growth budget";
         return false;
     }
-    Microsoft::WRL::ComPtr<ID3D12Heap> heap;
-    hr = m_device->CreateHeap(&heapDesc, IID_PPV_ARGS(&heap));
+    winrt::com_ptr<ID3D12Heap> heap;
+    hr = m_device->CreateHeap(&heapDesc, IID_PPV_ARGS(heap.put()));
     if (FAILED(hr))
     {
         outError = "Sparse physical heap creation failed " + HrToString(hr);
         return false;
     }
-    DevResApplyDebugName(resource.Get(), desc.debugName);
+    DevResApplyDebugName(resource.get(), desc.debugName);
     if (!m_persistentMemoryBudget.CommitGrowth(budget->ticket))
     {
         outError = "Sparse physical heap budget commitment failed";
@@ -3402,20 +3421,22 @@ bool DX12DeviceResources::UpdateSparseBufferMappings(RHIBufferHandle buffer,
     }
     // Use the same FIFO submission owner as ExecuteCommandLists. Calling the
     // native queue on the recording thread could overtake a prior frame batch.
-    ComPtr<ID3D12Resource> retainedResource = resource;
-    ComPtr<ID3D12Heap> retainedHeap = heap;
+    winrt::com_ptr<ID3D12Resource> retainedResource;
+    retainedResource.copy_from(resource);
+    winrt::com_ptr<ID3D12Heap> retainedHeap;
+    retainedHeap.copy_from(heap);
     struct MappingLifetime
     {
-        ComPtr<ID3D12Resource> resource;
-        ComPtr<ID3D12Heap> heap;
-        ComPtr<ID3D12Fence> fence;
+        winrt::com_ptr<ID3D12Resource> resource;
+        winrt::com_ptr<ID3D12Heap> heap;
+        winrt::com_ptr<ID3D12Fence> fence;
         ce::lifetime_token budget;
     };
     auto lifetime = own::make_shared<MappingLifetime>();
     lifetime->resource = retainedResource;
     lifetime->heap = retainedHeap;
     lifetime->budget = m_resourceTable.ResolveBufferLifetime(buffer);
-    const auto fenceResult = m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&lifetime->fence));
+    const auto fenceResult = m_device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(lifetime->fence.put()));
     if (FAILED(fenceResult))
     {
         outError = "Sparse mapping completion fence failed " + HrToString(fenceResult);
@@ -3428,11 +3449,11 @@ bool DX12DeviceResources::UpdateSparseBufferMappings(RHIBufferHandle buffer,
              flags = std::move(flags), offsets = std::move(offsets), counts = std::move(counts),
              lifetime](std::string& error)
             {
-                m_queue->UpdateTileMappings(retainedResource.Get(), static_cast<UINT>(coordinates.size()),
-                                            coordinates.data(), regions.data(), retainedHeap.Get(),
+                m_queue->UpdateTileMappings(retainedResource.get(), static_cast<UINT>(coordinates.size()),
+                                            coordinates.data(), regions.data(), retainedHeap.get(),
                                             static_cast<UINT>(flags.size()), flags.data(), offsets.data(),
                                             counts.data(), D3D12_TILE_MAPPING_FLAG_NONE);
-                auto result = m_queue->Signal(lifetime->fence.Get(), 1);
+                auto result = m_queue->Signal(lifetime->fence.get(), 1);
                 if (SUCCEEDED(result))
                 {
                     result = m_device->GetDeviceRemovedReason();
@@ -3463,7 +3484,7 @@ namespace
 {
     struct DX12GraphTransientHeap final : RHITransientHeap
     {
-        Microsoft::WRL::ComPtr<ID3D12Heap> native;
+        winrt::com_ptr<ID3D12Heap> native;
         ID3D12Device* owner{nullptr};
         RHITransientAllocationInfo allocation{};
     };
@@ -3589,13 +3610,13 @@ bool DX12DeviceResources::CreateTransientHeap(const RHITransientAllocationInfo& 
     desc.Properties.Type = D3D12_HEAP_TYPE_DEFAULT;
     desc.Properties.CreationNodeMask = desc.Properties.VisibleNodeMask = 1;
     desc.Flags = DX12GraphHeapFlags(info.heapClass);
-    const auto hr = m_device->CreateHeap(&desc, IID_PPV_ARGS(&result->native));
+    const auto hr = m_device->CreateHeap(&desc, IID_PPV_ARGS(result->native.put()));
     if (FAILED(hr))
     {
         error = "Transient heap creation failed " + HrToString(hr);
         return false;
     }
-    result->owner = m_device.Get();
+    result->owner = m_device.get();
     result->allocation = info;
     heap = std::move(result);
     return true;
@@ -3631,7 +3652,7 @@ bool DX12DeviceResources::CreatePlacedTransient(const RHITransientResourceDesc& 
     {
         return false;
     }
-    if (!nativeHeap || nativeHeap->owner != m_device.Get() || !nativeHeap->native ||
+    if (!nativeHeap || nativeHeap->owner != m_device.get() || !nativeHeap->native ||
         info.heapClass != nativeHeap->allocation.heapClass || info.bytes > nativeHeap->allocation.bytes ||
         (desc.buffer ? desc.bufferDesc.initialState : desc.textureDesc.initialState) != RHIResourceState::Common)
     {
@@ -3650,10 +3671,10 @@ bool DX12DeviceResources::CreatePlacedTransient(const RHITransientResourceDesc& 
         std::copy_n(desc.textureDesc.clearColor, 4, clear.Color);
     }
     const bool hasClear = !desc.buffer && (desc.textureDesc.allowRenderTarget || desc.textureDesc.allowDepthStencil);
-    Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+    winrt::com_ptr<ID3D12Resource> resource;
     const auto hr =
-        m_device->CreatePlacedResource(nativeHeap->native.Get(), 0, &nativeDesc, D3D12_RESOURCE_STATE_COMMON,
-                                       hasClear ? &clear : nullptr, IID_PPV_ARGS(&resource));
+        m_device->CreatePlacedResource(nativeHeap->native.get(), 0, &nativeDesc, D3D12_RESOURCE_STATE_COMMON,
+                                       hasClear ? &clear : nullptr, IID_PPV_ARGS(resource.put()));
     if (FAILED(hr))
     {
         error = "Placed transient creation failed " + HrToString(hr);
@@ -3661,12 +3682,12 @@ bool DX12DeviceResources::CreatePlacedTransient(const RHITransientResourceDesc& 
     }
     if (desc.buffer)
     {
-        DevResApplyDebugName(resource.Get(), desc.bufferDesc.debugName);
+        DevResApplyDebugName(resource.get(), desc.bufferDesc.debugName);
         buffer = m_resourceTable.AddBuffer(std::move(resource), desc.bufferDesc.allowIndirectArguments);
     }
     else
     {
-        DevResApplyDebugName(resource.Get(), desc.textureDesc.debugName);
+        DevResApplyDebugName(resource.get(), desc.textureDesc.debugName);
         texture = m_resourceTable.AddTexture(std::move(resource));
     }
     if (!buffer.IsValid() && !texture.IsValid())
@@ -3804,10 +3825,10 @@ bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc, RHITextureHa
     }
     const bool wantsClearValue = desc.allowRenderTarget || desc.allowDepthStencil;
 
-    Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+    winrt::com_ptr<ID3D12Resource> resource;
     const HRESULT hr =
         m_device->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &resourceDesc, ToD3D12(desc.initialState),
-                                          wantsClearValue ? &clearValue : nullptr, IID_PPV_ARGS(&resource));
+                                          wantsClearValue ? &clearValue : nullptr, IID_PPV_ARGS(resource.put()));
     if (FAILED(hr))
     {
         outError = "텍스처 생성 실패 " + HrToString(hr);
@@ -3815,7 +3836,7 @@ bool DX12DeviceResources::CreateTexture(const RHITextureDesc& desc, RHITextureHa
         return false;
     }
 
-    DevResApplyDebugName(resource.Get(), desc.debugName);
+    DevResApplyDebugName(resource.get(), desc.debugName);
 
     // 표가 소유를 가져간다 — 호출부에는 핸들만 남는다(V2-a).
     outHandle = m_resourceTable.AddTexture(std::move(resource));
@@ -3887,9 +3908,9 @@ bool DX12DeviceResources::CreateReadback(uint32_t width, uint32_t height, RHIFor
     desc.SampleDesc.Count = 1;
     desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-    Microsoft::WRL::ComPtr<ID3D12Resource> buffer;
+    winrt::com_ptr<ID3D12Resource> buffer;
     const HRESULT hr = m_device->CreateCommittedResource(
-        &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&buffer));
+        &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(buffer.put()));
     if (FAILED(hr))
     {
         outError = "리드백 버퍼 생성 실패 " + HrToString(hr);
@@ -3958,9 +3979,9 @@ bool DX12DeviceResources::CreateBufferReadback(uint64_t bytes, RHIReadback& outR
     desc.SampleDesc.Count = 1;
     desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
-    Microsoft::WRL::ComPtr<ID3D12Resource> buffer;
+    winrt::com_ptr<ID3D12Resource> buffer;
     const HRESULT hr = m_device->CreateCommittedResource(
-        &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(&buffer));
+        &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr, IID_PPV_ARGS(buffer.put()));
     if (FAILED(hr))
     {
         outError = "버퍼 리드백 생성 실패 " + HrToString(hr);
@@ -4055,10 +4076,10 @@ bool DX12DeviceResources::DetachSwapChain(std::string& outError)
     }
     for (auto& backBuffer : m_backBuffers)
     {
-        backBuffer.Reset();
+        backBuffer = nullptr;
     }
-    m_backBufferRtvHeap.Reset();
-    m_swapChain.Reset();
+    m_backBufferRtvHeap = nullptr;
+    m_swapChain = nullptr;
     if (m_frameLatencyWaitableObject)
     {
         CloseHandle(m_frameLatencyWaitableObject);
@@ -4138,14 +4159,14 @@ ID3D12CommandSignature* DX12DeviceResources::GetMaterialBatchSignature(ID3D12Roo
         const uint32_t stride = static_cast<uint32_t>(roots.size()) * 8 + (indexed ? 36 : 12);
         const D3D12_COMMAND_SIGNATURE_DESC desc{stride, count, descriptions.data(), 0};
         MaterialBatchSignature value;
-        value.root = rootSignature; // Prevent native root-address reuse inside this generation.
-        if (FAILED(GetDevice()->CreateCommandSignature(&desc, rootSignature, IID_PPV_ARGS(&value.signature))))
+        value.root.copy_from(rootSignature); // Prevent native root-address reuse inside this generation.
+        if (FAILED(GetDevice()->CreateCommandSignature(&desc, rootSignature, IID_PPV_ARGS(value.signature.put()))))
         {
             return nullptr;
         }
         found = m_meshBatchSignatures.emplace(key, std::move(value)).first;
     }
-    auto* signature = found->second.signature.Get();
+    auto* signature = found->second.signature.get();
     recent[nextRecent++ % recent.size()] = {this, m_meshBatchSignatureGeneration, key, signature};
     return signature;
 }

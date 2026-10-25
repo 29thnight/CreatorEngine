@@ -1,8 +1,17 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
 #pragma once
 
-#include "Sha256.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace assets
 {
@@ -34,8 +43,7 @@ namespace assets
     [[nodiscard]] inline bool IsAudioClipSource(const std::filesystem::path& path)
     {
         std::string extension = path.extension().string();
-        std::transform(extension.begin(), extension.end(), extension.begin(),
-            [](unsigned char value) { return static_cast<char>(std::tolower(value)); });
+        ce::strings::to_lower_in_place(extension);
         return extension == ".wav" || extension == ".mp3" || extension == ".flac";
     }
 
@@ -43,7 +51,7 @@ namespace assets
     {
         AudioCodec codec{};
         std::uint64_t payloadSize{};
-        Hash::Sha256Digest sourceContentHash{};
+        ce::hash::sha256_digest sourceContentHash{};
     };
 
     // This is a source fingerprint and a cheap signature check, not a full
@@ -53,8 +61,7 @@ namespace assets
         AudioClipSourceMetadata& out, std::string& error)
     {
         std::string extension = path.extension().string();
-        std::transform(extension.begin(), extension.end(), extension.begin(),
-            [](unsigned char value) { return static_cast<char>(std::tolower(value)); });
+        ce::strings::to_lower_in_place(extension);
 
         AudioClipSourceMetadata candidate{};
         if (extension == ".wav") candidate.codec = AudioCodec::Wav;
@@ -86,7 +93,7 @@ namespace assets
             error = "audio source cannot be opened";
             return false;
         }
-        Hash::Sha256 hash;
+        ce::hash::sha256 hash;
         std::array<char, 64u * 1024u> buffer{};
         std::array<unsigned char, 12u> prefix{};
         std::size_t prefixSize = 0u;
@@ -96,7 +103,7 @@ namespace assets
             input.read(buffer.data(), static_cast<std::streamsize>(buffer.size()));
             const auto read = static_cast<std::size_t>(input.gcount());
             if (read == 0u) break;
-            hash.Update(buffer.data(), read);
+            hash.update(buffer.data(), read);
             const std::size_t copied = std::min(read, prefix.size() - prefixSize);
             for (std::size_t index = 0u; index < copied; ++index)
                 prefix[prefixSize + index] = static_cast<unsigned char>(buffer[index]);
@@ -140,7 +147,7 @@ namespace assets
         }
 
         candidate.payloadSize = count;
-        candidate.sourceContentHash = hash.Finish();
+        candidate.sourceContentHash = hash.finish();
         out = candidate;
         error.clear();
         return true;

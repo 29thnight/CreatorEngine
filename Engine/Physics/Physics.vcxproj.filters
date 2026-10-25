@@ -1,57 +1,39 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <ItemGroup>
-    <Filter Include="Character">
-      <UniqueIdentifier>{16c9c28e-1d20-40ec-95e6-09bb9b963213}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Common">
-      <UniqueIdentifier>{1cc72946-c63f-40a6-9003-a5d95b767ca0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Data">
-      <UniqueIdentifier>{4ef4efaf-7369-4103-94c9-245ab631aceb}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Helper">
-      <UniqueIdentifier>{775e5a04-abc5-4072-8086-1f922a21ee31}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Interface">
-      <UniqueIdentifier>{851c8061-a75c-4fb8-9314-89d8d84d1c18}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Main">
-      <UniqueIdentifier>{e1a10329-f736-49d4-b20f-5c0c2b9e72e3}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="PhysicsActor">
-      <UniqueIdentifier>{4e72ddb1-1d48-460a-95ee-1e1534b14ff0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Ragdoll">
-      <UniqueIdentifier>{bd9da527-b3aa-4d7a-b70f-79094c5fe763}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="ResourceBase">
-      <UniqueIdentifier>{8141cf32-cbb0-4926-8b82-3465871d37b8}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="소스 파일">
-      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
-    </Filter>
-    <Filter Include="헤더 파일">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    <Filter Include="Headers">
+      <UniqueIdentifier>{7B3C13F4-F914-5A38-8C6D-5A90CCD3EBC3}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="PhysicsTypes.h" />
-    <ClInclude Include="PhysicsGeometry.h" />
-    <ClInclude Include="PhysicsStep.h" />
-    <ClInclude Include="PhysicsSensorPairs.h" />
-    <ClInclude Include="PhysicsCharacter.h" />
-    <ClInclude Include="PhysicsScene.h" />
-    <ClInclude Include="PhysicsTestHooks.h" />
+    <ClCompile Include="PhysicsScene.cpp">
+      <Filter>Headers</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="PhysicsScene.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="PhysicsCollisionPolicy.h" />
+    <ClInclude Include="PhysicsCharacter.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsCollisionPolicy.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsGeometry.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsScene.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsSensorPairs.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsStep.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsTestHooks.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsTypes.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

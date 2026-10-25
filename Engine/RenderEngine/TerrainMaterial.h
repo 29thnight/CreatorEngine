@@ -1,6 +1,6 @@
 #pragma once
 #include "TerrainBuffers.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 //-----------------------------------------------------------------------------
 // TerrainMaterial: 지형 레이어의 CPU 자료

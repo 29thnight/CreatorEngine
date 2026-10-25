@@ -381,7 +381,7 @@ def scan_core_source_debt(debt):
 
             # FileDialog.h declares the current platform primitive. E2 forbids Core
             # consumers, not the primitive's own implementation site.
-            editor_platform_count = 0 if rel == 'Engine/Utility_Framework/FileDialog.h' \
+            editor_platform_count = 0 if rel == 'Engine/Platform/Windows/FileDialog.h' \
                 else len(RE_EDITOR_PLATFORM_API.findall(text))
             if editor_platform_count:
                 debt[('editor-platform-api', rel,

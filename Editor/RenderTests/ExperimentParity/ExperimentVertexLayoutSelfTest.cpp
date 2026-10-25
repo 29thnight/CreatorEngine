@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../../../Engine/RenderEngine/RenderAllocator.h"
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 
@@ -10,7 +15,7 @@
 #include "Mesh.h" // legacy ::Vertex — 전환표 단정용
 
 #include <stddef.h>
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace RenderTest
 {

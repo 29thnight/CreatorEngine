@@ -5,7 +5,7 @@ $ErrorActionPreference = 'Stop'
 $repo = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 if (Get-Process CreatorEditor -ErrorAction SilentlyContinue) { throw 'An Editor is already running.' }
 $configs = if ($Configuration -eq 'All') { @('Debug','Release') } else { @($Configuration) }
-$paths = @('Editor/EngineEntry/EditorAssetDatabase.cpp','Editor/EngineEntry/Commands/AssetAuthoringCommands.cpp',
+$paths = @('Editor/EngineEntry/Assets/EditorAssetDatabase.cpp','Editor/EngineEntry/Commands/AssetAuthoringCommands.cpp',
     'Engine/RuntimeHost/CommandCore/CommandDescriptorSeeds.cpp','Engine/SceneRuntime/SceneManager.cpp',
     'Engine/SceneRuntime/ImageComponent.cpp','Engine/SceneRuntime/SpriteRenderer.cpp','Engine/RenderEngine/AssetDepot/TextureAssetRuntime.cpp',
     'Tools/regression/texture_reimport_scene_probe.inl','Tools/regression/verify-texture-reimport-scene.ps1')

@@ -1,5 +1,5 @@
 #pragma once
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // 디바이스·프레임·프레젠트 인터페이스 (PHASE 3-1 재정의, D1).
 //

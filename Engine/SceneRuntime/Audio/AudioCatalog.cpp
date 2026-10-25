@@ -1,4 +1,13 @@
-#include "../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
 #include "AudioCatalog.h"
 #include "SoundAssetSerialization.h"
 #include "EditorAudioClipCache.h"
@@ -6,9 +15,9 @@
 #include "../../RenderEngine/Assets/AudioClipSourceMetadata.h"
 #include "../../RenderEngine/Experiment/Cooked/CookedAssetCatalog.h"
 #include "../../RenderEngine/Experiment/Cooked/CookedAudioClipSource.h"
-#include "../../Utility_Framework/AuthoringParsedDocument.h"
+#include "../../Utility_Framework/Authoring/AuthoringParsedDocument.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace wave
 {
@@ -18,14 +27,7 @@ namespace wave
         using Graphs = std::unordered_map<ClipKey, own::shared_owner<const SoundGraphProgram>>;
         using Presets = std::unordered_map<ClipKey, SoundPreset>;
 
-        std::string Lower(std::string text)
-        {
-            std::ranges::transform(text, text.begin(), [](unsigned char value)
-            {
-                return static_cast<char>(value >= 'A' && value <= 'Z' ? value + ('a' - 'A') : value);
-            });
-            return text;
-        }
+
 
         bool ReadText(const std::filesystem::path& path, std::string& text, std::string& error)
         {
@@ -83,7 +85,7 @@ namespace wave
             const std::filesystem::path& path, const ClipKey& id)
         {
             const auto utf8 = path.stem().u8string();
-            const auto name = Lower(std::string(utf8.begin(), utf8.end()));
+            const auto name = ce::strings::ascii_to_lower(std::string_view(reinterpret_cast<const char*>(utf8.data()), utf8.size()));
             const auto [found, inserted] = aliases.emplace(name, id.Text());
             if (!inserted && found->second != id.Text())
             {
@@ -141,7 +143,7 @@ namespace wave
                 continue;
             }
             const auto& path = iterator->path();
-            const auto extension = Lower(path.extension().string());
+            const auto extension = ce::strings::ascii_to_lower(path.extension().string());
             const bool clip = assets::IsAudioClipSource(path);
             if (!clip && extension != ".soundgraph" && extension != ".soundpreset")
             {
@@ -517,7 +519,7 @@ namespace wave
             error = "Unknown audio clip GUID: " + std::string(name);
             return {};
         }
-        const auto alias = m_legacyAliases.find(Lower(std::string(name)));
+        const auto alias = m_legacyAliases.find(ce::strings::ascii_to_lower(name));
         if (alias == m_legacyAliases.end() || alias->second.empty())
         {
             error = alias == m_legacyAliases.end() ? "Unknown legacy audio clip: " : "Ambiguous legacy audio basename; select a GUID: ";

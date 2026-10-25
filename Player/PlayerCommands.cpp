@@ -1,7 +1,13 @@
+#include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Platform.Windows.Strings.h"
+#else
+import Creator.Platform.Windows.Strings;
+#endif
 #include "PlayerCommands.h"
 
 #include <stdio.h>
-#include "../Engine/Utility_Framework/StandardLibrary.h"
+#include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -18,7 +24,11 @@ namespace
 #include "CommandCore/TemporalCommands.h"
 #include "CommandCore/CommandParser.h"
 #include "CommandCore/CommandSession.h"
-#include <Windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 #include "CommandCore/CommandDescriptorSeeds.h"
 #include "CommandCore/CommandRegistry.h"
@@ -28,16 +38,20 @@ namespace
 #include "MeshRenderer.h"
 #include "Scene.h"
 #include "SceneManager.h"
-#include "TimeSystem.h"
+#include "../Engine/Utility_Framework/Time/TimeSystem.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "Transform.h"
 
 #if !CE_SHIPPING
 #include "ProfileService.h"
 #include "ProfileCaptureFile.h"
-#include "JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include "RHI/DX12/DX12DeviceResources.h"
-#include "RuntimeSettings.h"
+#include "../Engine/Utility_Framework/Runtime/RuntimeSettings.h"
 #endif
 
 
@@ -64,21 +78,13 @@ namespace PlayerCmd
 
         std::string Utf8(const wchar_t* value)
         {
-            const std::wstring_view text(value);
-            const int length = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
-                text.data(), static_cast<int>(text.size()), nullptr, 0, nullptr, nullptr);
-            if (length == 0 && !text.empty())
+            std::string result;
+            if (!ce::strings::try_wide_to_utf8(std::wstring_view(value), result))
             {
                 throw std::invalid_argument("Command argument is not valid Unicode");
             }
-            std::string result(static_cast<std::size_t>(length), '\0');
-            if (length > 0)
-            {
-                WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, text.data(),
-                    static_cast<int>(text.size()), result.data(), length, nullptr, nullptr);
-            }
             return result;
-        }
+    }
 
         bool AddBatchLine(std::string_view line, std::string& error)
         {
@@ -261,7 +267,7 @@ namespace PlayerCmd
 
 			CommandCore::CommandData data = CommandCore::CommandData::Object();
 			data.Set("name", CommandCore::CommandData::String(
-				scene->GetSceneName().ToString()));
+				scene->GetSceneName()));
 			data.Set("objects", CommandCore::CommandData::Int(
 				static_cast<int64_t>(scene->m_Entities.size())));
             data.Set("simulating", CommandCore::CommandData::Bool(SceneManagers->IsGameStart()));
@@ -285,7 +291,7 @@ namespace PlayerCmd
 			{
 				if (!entity) continue;
 
-				const std::string name = entity->GetHashedName().ToString();
+				const std::string name = entity->GetName();
 				if (!filter.empty() && name.find(filter) == std::string::npos) continue;
 
 				names.Append(CommandCore::CommandData::String(name));

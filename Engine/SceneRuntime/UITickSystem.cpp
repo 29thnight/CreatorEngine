@@ -6,7 +6,7 @@
 #include "Canvas.h"
 #include "ImageComponent.h"
 #include "Entity.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 void UITickSystem::RegisterSpriteSheet(SpriteSheetComponent* component)
 {
@@ -132,7 +132,7 @@ void UITickSystem::Update(float tick)
         // 안 남기면 이관할수록 기준선의 커버리지가 조용히 준다(같은 문자열을 써야
         // 대조가 성립하므로 Lifecycle::Trace::TypeNameOf 공용 함수를 쓴다).
         LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(sheet),
-            owner->m_name.ToString().c_str(), sheet->GetInstanceID());
+            owner->m_name.c_str(), sheet->GetInstanceID());
 
         sheet->TickLayout(tick);
     }
@@ -148,7 +148,7 @@ void UITickSystem::Update(float tick)
         // 안 남기면 이관할수록 기준선의 커버리지가 조용히 준다(같은 문자열을 써야
         // 대조가 성립하므로 Lifecycle::Trace::TypeNameOf 공용 함수를 쓴다).
         LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(text),
-            owner->m_name.ToString().c_str(), text->GetInstanceID());
+            owner->m_name.c_str(), text->GetInstanceID());
 
         text->TickLayout(tick);
     }
@@ -163,7 +163,7 @@ void UITickSystem::Update(float tick)
 
         // C3 — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.
         LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(button),
-            owner->m_name.ToString().c_str(), button->GetInstanceID());
+            owner->m_name.c_str(), button->GetInstanceID());
 
         button->TickInteraction(tick);
     }
@@ -178,7 +178,7 @@ void UITickSystem::Update(float tick)
 
         // 레인 UI — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.
         LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(canvas),
-            owner->m_name.ToString().c_str(), canvas->GetInstanceID());
+            owner->m_name.c_str(), canvas->GetInstanceID());
 
         canvas->TickCanvasOrder(tick);
     }
@@ -193,7 +193,7 @@ void UITickSystem::Update(float tick)
 
         // 레인 UI — 틱이 시스템으로 옮겨오면서 생명주기 트레이스의 발생지도 함께 옮긴다.
         LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(image),
-            owner->m_name.ToString().c_str(), image->GetInstanceID());
+            owner->m_name.c_str(), image->GetInstanceID());
 
         image->TickLayout(tick);
     }

@@ -1,4 +1,14 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 // PHASE 3.75 MBC5 — model runtime의 immutable publication unit.
 //
 // 디스크의 schema-v2 sidecar, generation record, CEMC, embedded texture를 모두
@@ -10,7 +20,6 @@
 #include "ModelVertexLayout.h"
 #include "TextureCoordinates.h"
 #include "TextureSampler.h"
-#include "../../Utility_Framework/Ownership.h"
 #include "../RHI/RHIFormat.h"
 #include "../Experiment/MeshletData.h"
 #include "../Experiment/MeshLodData.h"
@@ -23,7 +32,7 @@
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace assets::cluster
 {
@@ -37,7 +46,7 @@ namespace assets
 
     struct ModelAssetGenerationHandle final
     {
-        Uuid::Uuid16 modelId{};
+        uuid::uuid16 modelId{};
         std::uint64_t generation{};
 
         [[nodiscard]] bool IsValid() const noexcept
@@ -60,8 +69,8 @@ namespace assets
     struct ModelMeshHandle final
     {
         // Keep the legacy aggregate initializer/source adapter stable.
-        Uuid::Uuid16 modelId{};
-        Uuid::Uuid16 meshId{};
+        uuid::uuid16 modelId{};
+        uuid::uuid16 meshId{};
         std::uint64_t generation{};
         ModelMeshDomain domain{ ModelMeshDomain::LegacyAggregate };
         experiment::cooked::TypedAssetReference asset{};
@@ -106,7 +115,7 @@ namespace assets
 
     struct ModelTextureHandle final
     {
-        Uuid::Uuid16 textureId{};
+        uuid::uuid16 textureId{};
         // 0은 이 모델 generation 밖의 독립 texture asset이다. 같은 model
         // closure 안의 embedded texture만 model generation 번호를 공유한다.
         std::uint64_t generation{};
@@ -116,7 +125,7 @@ namespace assets
             // Embedded texture는 model identity epoch의 UUIDv8을 쓰지만,
             // 독립 texture asset은 아직 그 epoch 바깥의 UUID일 수 있다.
             // 이 handle의 유효성 계약은 UUID version이 아니라 non-nil이다.
-            return !textureId.IsNil();
+            return !textureId.is_nil();
         }
         friend auto operator<=>(const ModelTextureHandle&,
             const ModelTextureHandle&) noexcept = default;
@@ -158,8 +167,8 @@ namespace assets
 
     struct ModelMaterialAsset final
     {
-        Uuid::Uuid16 materialId{};
-        Uuid::Uuid16 shaderAssetId{};
+        uuid::uuid16 materialId{};
+        uuid::uuid16 shaderAssetId{};
         std::string name{};
         bool transparent{};
         bool masked{};
@@ -170,8 +179,8 @@ namespace assets
 
     struct ModelMeshAsset final
     {
-        Uuid::Uuid16 meshId{};
-        Uuid::Uuid16 materialId{};
+        uuid::uuid16 meshId{};
+        uuid::uuid16 materialId{};
         std::string name{};
         std::uint32_t vertexAttributeMask{};
         std::uint32_t vertexStride{};
@@ -196,7 +205,7 @@ namespace assets
 
     struct ModelTextureAsset final
     {
-        Uuid::Uuid16 textureId{};
+        uuid::uuid16 textureId{};
         std::string name{};
         ModelTextureColorSpace colorSpace{ ModelTextureColorSpace::Linear };
         RHIFormat format{ RHIFormat::Unknown };
@@ -217,7 +226,7 @@ namespace assets
         std::string name{};
         std::uint32_t parent{ kInvalidModelAssetIndex };
         math::matrix4x4 localTransform{ math::matrix4x4::identity() };
-        std::vector<Uuid::Uuid16> meshes{};
+        std::vector<uuid::uuid16> meshes{};
     };
 
     struct ModelBoneAsset final
@@ -270,7 +279,7 @@ namespace assets
 
     struct ModelAnimationAsset final
     {
-        Uuid::Uuid16 animationId{};
+        uuid::uuid16 animationId{};
         std::string name{};
         double durationTicks{};
         double ticksPerSecond{};
@@ -281,7 +290,7 @@ namespace assets
 
     struct ModelSkeletonAsset final
     {
-        Uuid::Uuid16 skeletonId{};
+        uuid::uuid16 skeletonId{};
         std::uint32_t rootBone{ kInvalidModelAssetIndex };
         math::matrix4x4 rootTransform{ math::matrix4x4::identity() };
         math::matrix4x4 globalInverseTransform{ math::matrix4x4::identity() };
@@ -290,8 +299,8 @@ namespace assets
 
     struct ModelAnimatorAsset final
     {
-        Uuid::Uuid16 motionAssetId{};
-        Uuid::Uuid16 defaultAnimationId{};
+        uuid::uuid16 motionAssetId{};
+        uuid::uuid16 defaultAnimationId{};
     };
 
     enum class ModelGpuUploadKind : std::uint8_t
@@ -306,7 +315,7 @@ namespace assets
     struct ModelGpuUploadDescriptor final
     {
         ModelGpuUploadKind kind{ ModelGpuUploadKind::VertexBuffer };
-        Uuid::Uuid16 assetId{};
+        uuid::uuid16 assetId{};
         std::uint32_t sourceIndex{};
         std::uint64_t byteSize{};
         std::uint32_t stride{};
@@ -321,7 +330,7 @@ namespace assets
 
     struct ModelAssetGenerationIdentity final
     {
-        Uuid::Uuid16 modelId{};
+        uuid::uuid16 modelId{};
         std::uint64_t generation{};
         std::string identityProfile{};
         std::string identityEpoch{};
@@ -336,7 +345,7 @@ namespace assets
         std::filesystem::path canonicalSidecarPath{};
         // Optional Editor cache. The source artifact is still hashed before a hit is accepted.
         std::filesystem::path decodedTextureCacheRoot{};
-        Uuid::Uuid16 expectedModelId{};
+        uuid::uuid16 expectedModelId{};
         std::uint64_t expectedGeneration{};
         // Offline export may validate old authoring generations before cooking.
         // Player leaves this false and accepts GPU-ready texture records only.
@@ -419,9 +428,9 @@ namespace assets
         [[nodiscard]] std::span<const ModelAnimationTrack* const> AnimationTracks(int clipIndex) const noexcept;
         [[nodiscard]] const ModelAnimatorAsset* Animator() const noexcept;
         [[nodiscard]] std::span<const ModelGpuUploadDescriptor> GpuDescriptors() const noexcept;
-        [[nodiscard]] const ModelMeshAsset* FindMesh(const Uuid::Uuid16& meshId) const noexcept;
-        [[nodiscard]] const ModelMaterialAsset* FindMaterial(const Uuid::Uuid16& materialId) const noexcept;
-        [[nodiscard]] const ModelTextureAsset* FindTexture(const Uuid::Uuid16& textureId) const noexcept;
+        [[nodiscard]] const ModelMeshAsset* FindMesh(const uuid::uuid16& meshId) const noexcept;
+        [[nodiscard]] const ModelMaterialAsset* FindMaterial(const uuid::uuid16& materialId) const noexcept;
+        [[nodiscard]] const ModelTextureAsset* FindTexture(const uuid::uuid16& textureId) const noexcept;
 
     private:
         ModelAssetGenerationIdentity identity_{};
@@ -544,19 +553,19 @@ namespace assets
         private:
             friend class ModelAssetGenerationCache;
             std::map<Key, Entry> generations_{};
-            std::map<Uuid::Uuid16, Key> currentByAsset_{};
+            std::map<uuid::uuid16, Key> currentByAsset_{};
         };
 
         [[nodiscard]] ModelAssetPublishResult Publish(
             ModelAssetGeneration::Shared generation);
         [[nodiscard]] ModelAssetGeneration::Shared ResolveCurrent(
-            const Uuid::Uuid16& modelId) const;
+            const uuid::uuid16& modelId) const;
         [[nodiscard]] ModelAssetGeneration::Shared Resolve(
             ModelAssetGenerationHandle handle) const;
         [[nodiscard]] const ModelMeshAsset* ResolveMesh(ModelMeshHandle handle,
             ModelAssetGeneration::Shared& outOwner) const;
         [[nodiscard]] ModelAssetGeneration::Shared Retire(
-            const Uuid::Uuid16& modelId,
+            const uuid::uuid16& modelId,
             ModelAssetGenerationHandle* outRetiredHandle = nullptr);
         // Drops only cache-owned pins. Consumer/frame/job owners stay valid.
         void SetRetentionBudgetBytes(std::size_t bytes);
@@ -578,7 +587,7 @@ namespace assets
 
         mutable std::mutex mutex_{};
         mutable std::map<Key, Entry> generations_{};
-        std::map<Uuid::Uuid16, Key> currentByAsset_{};
+        std::map<uuid::uuid16, Key> currentByAsset_{};
         std::size_t retentionBudgetBytes_{ 256u * 1024u * 1024u };
         mutable std::size_t retainedBytes_{};
         mutable std::uint64_t accessSerial_{};

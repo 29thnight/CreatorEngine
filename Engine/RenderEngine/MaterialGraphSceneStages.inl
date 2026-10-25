@@ -1,4 +1,3 @@
-#include "../Utility_Framework/Ownership.h"
 // Internal evaluator inputs. Public consumers receive purpose-specific contracts.
 struct SceneShadingInputs
 {

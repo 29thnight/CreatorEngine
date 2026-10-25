@@ -1,12 +1,21 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "../VulkanSelfTest.h"
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12TextureCache.h"
 #include "RHI/RHIResourceTypes.h"
 #include "Texture.h"
-#include "PathFinder.h"
 
-#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // 텍스처 코덱 경계 — DX12/Vulkan 업로드 A/B 다이제스트 대조.
 //
@@ -51,11 +60,11 @@ namespace
     /// WIC PNG 디코더는 FORCE_RGB 가 없으면 흔히 BGRA8 을 남긴다.
     bool BuildCodecAssets(CodecAssets& out, std::string& outError)
     {
-        const file::path iconPath = PathFinder::IconPath() / L"CameraGizmo.png";
+        const std::filesystem::path iconPath = ce::paths::icon_path() / L"CameraGizmo.png";
         out.plain = Texture::LoadSharedFromPath(iconPath);
         out.compressed = Texture::LoadSharedFromPath(iconPath, /*isCompress*/ true);
         out.blockNoise = Texture::LoadSharedFromPath(
-            PathFinder::Relative("VolumetricFog\\blueNoise.dds"));
+            ce::paths::relative("VolumetricFog\\blueNoise.dds"));
 
         const uint8_t bgraPixel[4] = { 32u, 64u, 128u, 255u };   // B, G, R, A
         out.bgra = Texture::CreateFromPixels(

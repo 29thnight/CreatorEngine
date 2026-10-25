@@ -1,7 +1,9 @@
-#include <windows.h>
-#include <evntrace.h>
-#include <evntcons.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 static LONGLONG frequency;
 static bool observedSwitch = false;

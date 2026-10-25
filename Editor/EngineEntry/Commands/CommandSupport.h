@@ -6,7 +6,7 @@
 // 공용 헤더가 "언젠가 쓸지도 모르는 것"의 창고가 되면 도메인 분리가 이름만
 // 남는다.
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace ConsoleCmd
 {
@@ -34,6 +34,5 @@ namespace ConsoleCmd
     /// 앞뒤 공백·개행을 뗀다.
     ///
     /// Core(입력 한 줄 정리)와 ScriptUiAnimator 가 함께 쓴다.
-    std::string TrimLine(const std::string& text);
 
 }

@@ -1,16 +1,32 @@
-#include "../../Editor/EngineEntry/EditorAssetDatabase.h"
-#include "../../Engine/Utility_Framework/WindowsApartment.h"
-#include "../../Editor/EngineEntry/ConditionalAssetPublish.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../Editor/EngineEntry/Assets/EditorAssetDatabase.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
+#include "../../Editor/EngineEntry/Assets/ConditionalAssetPublish.h"
 #include "DataSystem.h"
 #include "TextureCodecImage.h"
 #include "Experiment/Cooked/TextureImportSettings.h"
-#include "PathFinder.h"
 #include "SceneRenderProfile.h"
-#include "ReflectionYml.h"
-#include <d3d11.h>
+#include "../../Engine/Utility_Framework/Reflection/ReflectionYml.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.LegacyGraphicsSDK.h"
+#else
+import "Creator.LegacyGraphicsSDK.h";
+#endif
 #include <DirectXTex.h>
-#include <objbase.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace reflgen::generated
 {
@@ -36,19 +52,19 @@ namespace
             throw std::runtime_error(message);
         }
     }
-    void Write(const file::path& path, std::string_view text)
+    void Write(const std::filesystem::path& path, std::string_view text)
     {
         std::ofstream stream(path, std::ios::binary | std::ios::trunc);
         stream.write(text.data(), static_cast<std::streamsize>(text.size()));
         stream.close();
         Require(bool(stream), "fixture write failed");
     }
-    std::string Read(const file::path& path)
+    std::string Read(const std::filesystem::path& path)
     {
         std::ifstream stream(path, std::ios::binary);
         return { std::istreambuf_iterator<char>(stream), {} };
     }
-    bool WriteExternal(const file::path& path, std::string_view text, std::atomic<bool>& blocked)
+    bool WriteExternal(const std::filesystem::path& path, std::string_view text, std::atomic<bool>& blocked)
     {
         Editor::AuthoringPublish::FileHandle output(::CreateFileW(path.c_str(), GENERIC_WRITE,
             FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE, nullptr, CREATE_ALWAYS,
@@ -63,10 +79,10 @@ namespace
             && written == text.size() && ::FlushFileBuffers(output.Get());
     }
 
-    void RunConditionalPublisher(const file::path& directory)
+    void RunConditionalPublisher(const std::filesystem::path& directory)
     {
         const auto path = directory / "conditional.fixture";
-        const file::path staging = path.string() + ".tmp";
+        const std::filesystem::path staging = path.string() + ".tmp";
         const auto backup = Editor::AuthoringPublish::RecoveryPath(path);
         std::string failure;
         Write(path, "original");
@@ -82,16 +98,16 @@ namespace
         });
         Require(blocked, "retired original was writable during the final publication boundary");
         Require(!published && Read(path) == "foreign", "final-boundary foreign creation overwritten");
-        Require(!file::exists(backup), "completed conflict recovery copy retained");
+        Require(!std::filesystem::exists(backup), "completed conflict recovery copy retained");
         Write(path, "original");
         Require(Editor::AuthoringPublish::Publish(path, staging, "original", failure),
             "conditional normal publication failed");
-        Require(Read(path) == "draft" && !file::exists(staging) && !file::exists(backup),
+        Require(Read(path) == "draft" && !std::filesystem::exists(staging) && !std::filesystem::exists(backup),
             "conditional publication did not commit the complete payload");
         Write(path, "original");
         Require(!Editor::AuthoringPublish::Publish(path, staging, "original", failure),
             "missing staged file publication accepted");
-        Require(Read(path) == "original" && !file::exists(backup), "publish failure did not restore original");
+        Require(Read(path) == "original" && !std::filesystem::exists(backup), "publish failure did not restore original");
         Write(staging, "draft");
         bool threw{};
         try
@@ -105,18 +121,18 @@ namespace
         {
             threw = true;
         }
-        Require(threw && Read(path) == "original" && !file::exists(backup),
+        Require(threw && Read(path) == "original" && !std::filesystem::exists(backup),
             "boundary exception lost original");
-        file::remove(staging);
-        file::rename(path, backup);
+        std::filesystem::remove(staging);
+        std::filesystem::rename(path, backup);
         Require(Editor::AuthoringPublish::Recover(path, failure) && Read(path) == "original",
             "missing-path recovery failed");
         Write(backup, "old journal");
         Require(Editor::AuthoringPublish::Recover(path, failure) && Read(path) == "original"
-            && !file::exists(backup), "recovery overwrote an existing destination");
+            && !std::filesystem::exists(backup), "recovery overwrote an existing destination");
         std::cout << "CONDITIONAL_PUBLISH_BOUNDARY_OK\n";
     }
-    void Await(EditorAssetDatabase& editor, DataSystem& data, const file::path& source, bool success)
+    void Await(EditorAssetDatabase& editor, DataSystem& data, const std::filesystem::path& source, bool success)
     {
         const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
         while (std::chrono::steady_clock::now() < deadline)
@@ -135,12 +151,12 @@ namespace
         }
         throw std::runtime_error("texture import timeout: " + editor.TextureImportStatus(source));
     }
-    void RunRenderProfile(EditorAssetDatabase& editor, DataSystem& data, const file::path& directory)
+    void RunRenderProfile(EditorAssetDatabase& editor, DataSystem& data, const std::filesystem::path& directory)
     {
         reflgen::generated::register_RenderEngine(Meta::Types());
         const auto path = directory / "fixture.renderprofile";
-        const file::path meta = path.string() + ".meta";
-        const file::path staging = path.string() + ".tmp";
+        const std::filesystem::path meta = path.string() + ".meta";
+        const std::filesystem::path staging = path.string() + ".tmp";
         const FileGuid identity("55555555-5555-4555-8555-555555555555");
         SceneRenderProfile profile;
         const auto baseline = Meta::SerializeDocument(&profile).Dump();
@@ -156,7 +172,7 @@ namespace
             for (const int fault : { 0, 1, 2 })
             {
                 Write(path, baseline);
-                Require(!file::exists(staging), "RenderProfile stale staging file");
+                Require(!std::filesystem::exists(staging), "RenderProfile stale staging file");
                 auto draft = profile;
                 if (staged)
                 {
@@ -191,7 +207,7 @@ namespace
                         while (!stop.stop_requested() && std::chrono::steady_clock::now() < timeout)
                         {
                             std::error_code error;
-                            if (file::exists(staging, error))
+                            if (std::filesystem::exists(staging, error))
                             {
                                 observed = true;
                                 inject();
@@ -213,14 +229,14 @@ namespace
                     writer.join();
                 }
                 Require(observed && (injected || blocked), "RenderProfile fault boundary was not observed");
-                Require(injected ? (fault == 1 ? !file::exists(path) : Read(path) == external)
+                Require(injected ? (fault == 1 ? !std::filesystem::exists(path) : Read(path) == external)
                     : Read(path) == Meta::SerializeDocument(&draft).Dump(),
                     "RenderProfile external state overwritten");
                 Require(injected ? editor.AutomaticSaveError(path).find("changed on disk") != std::string::npos
                     : editor.AutomaticSaveError(path).empty(),
                     "RenderProfile conflict diagnostic missing");
                 Require(!editor.PendingAutomaticSaveAge(path), "RenderProfile pending save retained");
-                Require(!file::exists(staging), "RenderProfile rejected staging retained");
+                Require(!std::filesystem::exists(staging), "RenderProfile rejected staging retained");
                 if (fault == 1 && injected)
                 {
                     // Deleting the asset body intentionally removes its sidecar.
@@ -230,7 +246,7 @@ namespace
                     while (std::chrono::steady_clock::now() < timeout)
                     {
                         std::error_code error;
-                        if (!file::exists(meta, error) && !error)
+                        if (!std::filesystem::exists(meta, error) && !error)
                         {
                             removed = true;
                             break;
@@ -242,7 +258,7 @@ namespace
                 }
                 else if (fault == 1)
                 {
-                    Require(file::exists(meta), "rejected deletion removed GUID metadata");
+                    Require(std::filesystem::exists(meta), "rejected deletion removed GUID metadata");
                 }
                 const auto metadata = Authoring::WriteDocument::ParseFile(meta);
                 Require((fault == 1 && injected) || (metadata && metadata->Root()["guid"].AsString() == identity.ToString()),
@@ -258,19 +274,19 @@ namespace
             }
         }
     }
-    void Run(const file::path& root, const file::path& input)
+    void Run(const std::filesystem::path& root, const std::filesystem::path& input)
     {
-        EnginePaths paths;
-        paths.executableRoot = root;
-        paths.projectRoot = root;
-        paths.runtimeContentRoot = root;
-        paths.runtimeDataRoot = root / "RuntimeData";
-        paths.assetsRoot = root / "Assets";
-        paths.enableAssetAuthoring = true;
-        Require(InternalPath::GetInstance()->Initialize(paths), "path initialization failed");
-        const auto source = file::weakly_canonical(paths.assetsRoot) / "Textures" / "fixture.png";
-        const file::path sidecar = source.string() + ".meta";
-        file::copy_file(input, source);
+        ce::paths::roots paths;
+        paths.executable_root = root;
+        paths.project_root = root;
+        paths.runtime_content_root = root;
+        paths.runtime_data_root = root / "RuntimeData";
+        paths.assets_root = root / "Assets";
+        paths.enable_asset_authoring = true;
+        Require((&ce::paths::get_state())->initialize(paths), "path initialization failed");
+        const auto source = std::filesystem::weakly_canonical(paths.assets_root) / "Textures" / "fixture.png";
+        const std::filesystem::path sidecar = source.string() + ".meta";
+        std::filesystem::copy_file(input, source);
         const auto original = Read(source);
         const FileGuid guid("22222222-2222-4222-8222-222222222222");
         Write(sidecar, "guid: 22222222-2222-4222-8222-222222222222\ncustomField: retained\n"
@@ -338,12 +354,12 @@ namespace
         rejectSidecar("guid: 22222222-2222-4222-8222-222222222222\nimportSettings: [\n", "[parse]");
         rejectSidecar("[]\n", "must contain a mapping");
         rejectSidecar("guid: invalid\n", "canonical UUIDv4 identity");
-        file::remove(sidecar);
+        std::filesystem::remove(sidecar);
         Require(!editor.SetTextureImportSettingsAndReimport(source, settings, failure),
             "missing sidecar accepted");
         Require(failure.find("failed to open authoring document") != std::string::npos,
             "missing sidecar read error replaced by identity error");
-        Require(!file::exists(sidecar), "missing sidecar silently recreated");
+        Require(!std::filesystem::exists(sidecar), "missing sidecar silently recreated");
         Write(sidecar, sidecarBeforeFailures);
 
         Write(source, "broken png");
@@ -400,12 +416,12 @@ namespace
         const auto raceBaseline = sidecarBeforeFailures + "racePadding: " + std::string(16u * 1024u * 1024u, 'x') + "\n";
         const std::string external = "guid: 22222222-2222-4222-8222-222222222222\nexternalField: retained\n"
             "importSettings:\n  maxDimension: 1\n";
-        const file::path staging = sidecar.string() + ".tmp";
+        const std::filesystem::path staging = sidecar.string() + ".tmp";
         for (const bool genericMetadata : { false, true })
         {
             const auto raceOwner = data.TryAcquire<Texture>(link);
             Write(sidecar, raceBaseline);
-            Require(!file::exists(staging), "stale staging file before race");
+            Require(!std::filesystem::exists(staging), "stale staging file before race");
             std::atomic<bool> observed{}, injected{}, blocked{};
             std::jthread writer([&](std::stop_token stop)
             {
@@ -413,7 +429,7 @@ namespace
                 while (!stop.stop_requested() && std::chrono::steady_clock::now() < timeout)
                 {
                     std::error_code error;
-                    if (file::exists(staging, error))
+                    if (std::filesystem::exists(staging, error))
                     {
                         observed = true;
                         injected = WriteExternal(sidecar, external, blocked);
@@ -439,7 +455,7 @@ namespace
             Require(injected ? editor.AutomaticSaveError(sidecar).find("changed on disk") != std::string::npos
                 : editor.AutomaticSaveError(sidecar).empty(),
                 "staging conflict diagnostic missing");
-            Require(!file::exists(staging), "rejected staging file retained");
+            Require(!std::filesystem::exists(staging), "rejected staging file retained");
             Require(Read(source) == original, "staging conflict changed PNG");
             Require(data.TryAcquire<Texture>(link) && &*data.TryAcquire<Texture>(link) == &*raceOwner,
                 "staging conflict displaced accepted generation");
@@ -461,7 +477,7 @@ namespace
         const auto movedImage = data.TryAcquire<Texture::CodecImage>(movedTexture);
         Require(movedTexture && movedImage && movedTexture->GetImageView(movedImage).Width() == 2u,
             "rename did not publish the current recipe");
-        Require(!file::exists(source) && !file::exists(sidecar) && file::exists(moved)
+        Require(!std::filesystem::exists(source) && !std::filesystem::exists(sidecar) && std::filesystem::exists(moved)
             && Read(moved.string() + ".meta").find(guid.ToString()) != std::string::npos,
             "rename did not preserve the exact source/sidecar pair");
         Require(second->GetImageView(oldImage.asset).Width() == 2u,
@@ -471,7 +487,7 @@ namespace
         RunConditionalPublisher(moved.parent_path());
     }
 
-    void RunCacheRecovery(const file::path& root)
+    void RunCacheRecovery(const std::filesystem::path& root)
     {
         auto& data = *DataSystem::GetInstance();
         auto& editor = EditorAssetDatabase::Get();
@@ -486,12 +502,12 @@ namespace
         // recipes already have nonempty content-addressed directories, so a
         // plain staging rename cannot repair either a record or artifact fault.
         const auto generations = root / "Library" / "TextureAssetGenerations";
-        std::vector<std::pair<file::path, std::string>> records;
-        std::vector<std::pair<file::path, std::string>> artifacts;
-        for (const auto& entry : file::directory_iterator(generations))
+        std::vector<std::pair<std::filesystem::path, std::string>> records;
+        std::vector<std::pair<std::filesystem::path, std::string>> artifacts;
+        for (const auto& entry : std::filesystem::directory_iterator(generations))
         {
             const auto recordPath = entry.path() / "generation.record";
-            if (!file::exists(recordPath)) continue;
+            if (!std::filesystem::exists(recordPath)) continue;
             records.emplace_back(recordPath, Read(recordPath));
             std::ifstream record(recordPath);
             std::string line;
@@ -523,7 +539,7 @@ namespace
                 Require(Read(path) == bytes, "damaged record was not restored exactly");
             for (const auto& [path, bytes] : artifacts)
                 Require(Read(path) == bytes, "damaged artifact was not restored exactly");
-            for (const auto& entry : file::directory_iterator(generations))
+            for (const auto& entry : std::filesystem::directory_iterator(generations))
                 Require(!entry.path().filename().string().starts_with("stage-"),
                     "repair left a staging or quarantine directory");
             editor.Shutdown();
@@ -531,12 +547,12 @@ namespace
         }
     }
 
-    void InterruptConditional(const file::path& root)
+    void InterruptConditional(const std::filesystem::path& root)
     {
         const auto directory = root / "Assets" / "Textures";
-        file::create_directories(directory);
+        std::filesystem::create_directories(directory);
         const auto path = directory / "interrupted.renderprofile";
-        const file::path staging = path.string() + ".tmp";
+        const std::filesystem::path staging = path.string() + ".tmp";
         Write(path, "settings: {}\n");
         Write(path.string() + ".meta", "guid: 66666666-6666-4666-8666-666666666666\n");
         Write(staging, "settings: { skyboxTextureName: uncommitted }\n");
@@ -548,24 +564,24 @@ namespace
         throw std::runtime_error("controlled interruption did not reach retired boundary: " + failure);
     }
 
-    void RecoverConditional(const file::path& root)
+    void RecoverConditional(const std::filesystem::path& root)
     {
-        EnginePaths paths;
-        paths.executableRoot = root;
-        paths.projectRoot = root;
-        paths.runtimeContentRoot = root;
-        paths.runtimeDataRoot = root / "RuntimeData";
-        paths.assetsRoot = root / "Assets";
-        paths.enableAssetAuthoring = true;
-        Require(InternalPath::GetInstance()->Initialize(paths), "recovery path initialization failed");
-        const auto path = paths.assetsRoot / "Textures" / "interrupted.renderprofile";
-        Require(!file::exists(path) && file::exists(Editor::AuthoringPublish::RecoveryPath(path)),
+        ce::paths::roots paths;
+        paths.executable_root = root;
+        paths.project_root = root;
+        paths.runtime_content_root = root;
+        paths.runtime_data_root = root / "RuntimeData";
+        paths.assets_root = root / "Assets";
+        paths.enable_asset_authoring = true;
+        Require((&ce::paths::get_state())->initialize(paths), "recovery path initialization failed");
+        const auto path = paths.assets_root / "Textures" / "interrupted.renderprofile";
+        Require(!std::filesystem::exists(path) && std::filesystem::exists(Editor::AuthoringPublish::RecoveryPath(path)),
             "interruption did not leave the expected recovery journal");
         auto& data = *DataSystem::GetInstance();
         data.Initialize();
         Require(EditorAssetDatabase::Get().Initialize(), "recovery Editor startup failed");
         Require(Read(path) == "settings: {}\n", "startup recovery did not restore original bytes");
-        Require(!file::exists(Editor::AuthoringPublish::RecoveryPath(path)), "startup recovery journal retained");
+        Require(!std::filesystem::exists(Editor::AuthoringPublish::RecoveryPath(path)), "startup recovery journal retained");
         const FileGuid identity("66666666-6666-4666-8666-666666666666");
         Require(Read(path.string() + ".meta").find(identity.ToString()) != std::string::npos
             && data.GetFileGuid(path) == identity, "startup recovery lost GUID or catalog identity");
@@ -591,19 +607,19 @@ int main(int argc, char** argv)
         ce::get_job_scheduler().start(2u);
         if (argc == 3)
         {
-            Run(file::absolute(argv[1]), file::absolute(argv[2]));
+            Run(std::filesystem::absolute(argv[1]), std::filesystem::absolute(argv[2]));
             EditorAssetDatabase::Get().Shutdown();
             DataSystem::GetInstance()->Finalize();
-            RunCacheRecovery(file::absolute(argv[1]));
+            RunCacheRecovery(std::filesystem::absolute(argv[1]));
             std::cout << "TEXTURE_IMPORT_LIFECYCLE_OK checks=" << checks << '\n';
         }
         else if (std::string_view(argv[3]) == "--interrupt-conditional")
         {
-            InterruptConditional(file::absolute(argv[1]));
+            InterruptConditional(std::filesystem::absolute(argv[1]));
         }
         else if (std::string_view(argv[3]) == "--recover-conditional")
         {
-            RecoverConditional(file::absolute(argv[1]));
+            RecoverConditional(std::filesystem::absolute(argv[1]));
         }
         else
         {

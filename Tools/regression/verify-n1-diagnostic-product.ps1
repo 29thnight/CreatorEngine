@@ -11,7 +11,7 @@ Copy-Item "$repo/Dynamic_CPP/Assets/Shaders" "$project/Assets/Shaders" -Recurse
 $exe=Join-Path $repo "Bin/x64-$Configuration/Editor/CreatorEditor.exe"
 if($HistoricalEditorExe){$exe=[IO.Path]::GetFullPath($HistoricalEditorExe)}
 $runtime=Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll'
-foreach($source in @('Engine/Utility_Framework/DiagnosticDocument.cpp','Engine/Utility_Framework/DiagnosticDocument.h','Engine/SceneRuntime/TemporalMotionFixture.cpp','Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h','Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp')){
+foreach($source in @('Engine/Utility_Framework/Authoring/DiagnosticDocument.cpp','Engine/Utility_Framework/Authoring/DiagnosticDocument.h','Engine/SceneRuntime/TemporalMotionFixture.cpp','Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h','Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp')){
  if(!$HistoricalEditorExe -and (Get-Item "$repo/$source").LastWriteTimeUtc -gt (Get-Item $runtime).LastWriteTimeUtc){throw "Fresh diagnostic producer build required: $source"}
 }
 $hash=(Get-FileHash $runtime).Hash

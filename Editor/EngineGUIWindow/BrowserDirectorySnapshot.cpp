@@ -1,6 +1,11 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "BrowserDirectorySnapshot.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -48,7 +53,7 @@ namespace
     /// W7-5: 어휘 비교가 성립하려면 양쪽이 같은 모양이어야 한다. 두 가지를 접는다.
     ///
     ///   ① `lexically_normal` — `.`·`..`·중복 구분자.
-    ///   ② **후행 구분자** — `PathFinder::RelativeToPrefab("")` 은 `path / ""` 라
+    ///   ② **후행 구분자** — `ce::paths::relative_to_prefab("")` 은 `path / ""` 라
     ///      끝에 구분자를 남기는데, 표준의 정규화 절차는 마지막 요소가 `..` 일
     ///      때만 그것을 지운다. 그래서 `".../Prefabs/"` 와 `".../Prefabs"` 가
     ///      정규화 뒤에도 서로 다르다. `equivalent` 는 이 차이를 덮고 있었으므로

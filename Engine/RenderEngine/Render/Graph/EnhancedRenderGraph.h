@@ -1,23 +1,40 @@
 #pragma once
-#include "../../../Utility_Framework/LifetimeToken.h"
-#include "../../../Utility_Framework/Ownership.h"
+#include "../../RenderArena.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Arena.h"
+#else
+import Creator.Core.Arena;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../../RenderContainerReusePolicy.h"
 #include "../../RHI/RHIRecordingTaskGraph.h"
 class RHISoftwareRecorder;
 class RHISoftwareBatch;
 struct RHISoftwareBatchDesc;
-#include "../../../Utility_Framework/DynamicBitset.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.DynamicBitset.h"
+#else
+import Creator.Core.DynamicBitset;
+#endif
 #include "../Temporal/TemporalMeasurementProvenance.h"
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../RHI/RHIFormat.h"
 #include <stdint.h>
 #include <initializer_list>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "../../RHI/IRHIGpuProfiler.h"
 #include "../../RHI/RHIParallelCommandPool.h"
 #include "../../RenderAllocator.h"
-#include "../../RenderArena.h"
 #include "../../RHI/RHIEncoder.h"   // ExecuteContext::encoder 를 받는 쪽은 예외 없이 역참조한다
 #include "../../RHI/RHIHandle.h"
 #include "../../RHI/RHIQueueContract.h"

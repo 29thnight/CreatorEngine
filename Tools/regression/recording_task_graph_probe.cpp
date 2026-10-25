@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Concurrency.JobGraph.h"
+#else
+import Creator.Concurrency.JobGraph;
+#endif
 #include "RHI/RHICommandRecordingJobs.h"
 #include <iostream>
 

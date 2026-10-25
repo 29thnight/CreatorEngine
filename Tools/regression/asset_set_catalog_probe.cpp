@@ -1,7 +1,12 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "Experiment/Cooked/CookedAssetCatalog.h"
 #include "Experiment/Cooked/ArtifactByteSource.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if !defined(_WIN32)
 #include <sys/stat.h>
 #endif
@@ -68,10 +73,10 @@ namespace
     [[nodiscard]] experiment::AssetId MakeId(std::uint16_t seed)
     {
         experiment::AssetId id;
-        id.value.data[0] = static_cast<std::uint8_t>(seed >> 8u);
-        id.value.data[6] = 0x40u;
-        id.value.data[8] = 0x80u;
-        id.value.data[15] = static_cast<std::uint8_t>(seed);
+        id.value.data_[0] = static_cast<std::uint8_t>(seed >> 8u);
+        id.value.data_[6] = 0x40u;
+        id.value.data_[8] = 0x80u;
+        id.value.data_[15] = static_cast<std::uint8_t>(seed);
         return id;
     }
 

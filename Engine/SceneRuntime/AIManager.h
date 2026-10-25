@@ -1,9 +1,18 @@
-#include "../Utility_Framework/Ownership.h"
 #pragma once
-#include "Core.Minimal.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "IAIComponent.h"
 #include "EntityHandle.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 // NodeFactory.h媛 BTHeader.h瑜??듯빐 ?꾩씠濡?怨듦툒?섎뜕 寃껊뱾?대떎(PHASE 9-8 B7?먯꽌 ?쒓굅).
 // 媛곸옄 ?꾩슂??寃껋쓣 吏곸젒 諛쏅뒗??
 #include "BlackBoard.h"
@@ -98,7 +107,7 @@ public:
 
 private:
 
-	Core::Delegate<void, float>	InternalAIUpdateEvent{};
+	ce::delegate<void, float>	InternalAIUpdateEvent{};
 
 	BlackBoard m_globalBB;
     struct AIRegistration

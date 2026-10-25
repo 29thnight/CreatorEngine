@@ -1,9 +1,10 @@
 #include "DxTimingCollector.h"
 #include "DxCaptureTransport.h"
-
-#include <Windows.h>
-#include <evntrace.h>
-#include <evntcons.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 #include <intrin.h>
 
 #include <DxTimingCaptureLibrary/DxTimingCaptureEventHandler.h>
@@ -11,7 +12,7 @@
 #include <DxTimingCaptureLibrary/EtwProviders.h>
 
 #include <stddef.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace ce::dx_capture
 {

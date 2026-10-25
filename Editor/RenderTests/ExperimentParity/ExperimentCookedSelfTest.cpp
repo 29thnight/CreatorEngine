@@ -1,3 +1,9 @@
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "Experiment/Import/MeshletBuilder.h"
 #include "ExperimentParity/ExperimentCookedSelfTest.h"
 
@@ -10,7 +16,7 @@
 #include "Experiment/Import/ImporterModelDecoder.h"
 
 #include <stddef.h>
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace RenderTest
 {
@@ -277,7 +283,7 @@ namespace RenderTest
             draft.metadata.name = "합성 모델";                    // 비 ASCII
             draft.metadata.sourcePath = u8"C:/자산/모델 이름.glb"; // 유니코드 + 공백
             draft.metadata.cookedPath = u8"C:/파생/모델.cemc";
-            draft.metadata.assetId.value = Uuid::Parse("11111111-2222-3333-4444-555555555555");
+            draft.metadata.assetId.value = uuid::parse("11111111-2222-3333-4444-555555555555");
 
             // 노드 3개 — 하나는 이름이 비었고, 하나는 메시가 없다.
             ex::ModelNode root{};
@@ -346,8 +352,8 @@ namespace RenderTest
             // 재질 2개 — property 대안 9가지를 모두 덮는다.
             ex::Material material{};
             material.name = "재질0";
-            material.assetId.value = Uuid::Parse("66666666-7777-8888-9999-aaaaaaaaaaaa");
-            material.shaderAssetId.value = Uuid::Parse("bbbbbbbb-cccc-dddd-eeee-ffffffffffff");
+            material.assetId.value = uuid::parse("66666666-7777-8888-9999-aaaaaaaaaaaa");
+            material.shaderAssetId.value = uuid::parse("bbbbbbbb-cccc-dddd-eeee-ffffffffffff");
             material.blendMode = ex::MaterialBlendMode::Transparent;
             material.keywords = { "_NORMALMAP", "" };  // ★ 빈 키워드
             material.keywordSelections = { 0u, 3u, 65535u };
@@ -360,7 +366,7 @@ namespace RenderTest
                 return p;
             };
             ex::TextureReference texture{};
-            texture.assetId.value = Uuid::Parse("01234567-89ab-cdef-0123-456789abcdef");
+            texture.assetId.value = uuid::parse("01234567-89ab-cdef-0123-456789abcdef");
             texture.logicalName = "_BaseMap";
             texture.fallbackPath = u8"C:/자산/텍스처 이름.png";
             texture.colorSpace = ex::TextureColorSpace::Srgb;
@@ -385,7 +391,7 @@ namespace RenderTest
 
             ex::Material bare{};                      // ★ property·keyword 전부 0개
             bare.name = "재질1";
-            bare.assetId.value = Uuid::Parse("77777777-7777-4777-8777-777777777777");
+            bare.assetId.value = uuid::parse("77777777-7777-4777-8777-777777777777");
             bare.shaderAssetId = material.shaderAssetId;
             draft.materials.push_back(bare);
 
@@ -451,7 +457,7 @@ namespace RenderTest
             draft.skeleton = std::move(skeleton);
 
             ex::AnimatorData animator{};
-            animator.motionAssetId.value = Uuid::Parse("fedcba98-7654-3210-fedc-ba9876543210");
+            animator.motionAssetId.value = uuid::parse("fedcba98-7654-3210-fedc-ba9876543210");
             animator.defaultClip = ex::AnimationClipIndex(0);
             draft.animator = animator;
 
@@ -522,15 +528,15 @@ namespace RenderTest
             std::uint8_t domain, std::size_t index = 0) noexcept
         {
             ex::AssetId id{};
-            id.value.data[0] = domain;
+            id.value.data_[0] = domain;
             for (std::size_t byte = 0; byte < sizeof(index); ++byte)
             {
-                id.value.data[15 - byte] = static_cast<std::uint8_t>(
+                id.value.data_[15 - byte] = static_cast<std::uint8_t>(
                     (index >> (byte * 8u)) & std::size_t{ 0xffu });
             }
-            id.value.data[6] = 0x40u;
-            id.value.data[8] = static_cast<std::uint8_t>(
-                (id.value.data[8] & 0x3fu) | 0x80u);
+            id.value.data_[6] = 0x40u;
+            id.value.data_[8] = static_cast<std::uint8_t>(
+                (id.value.data_[8] & 0x3fu) | 0x80u);
             return id;
         }
 
@@ -1064,13 +1070,13 @@ namespace RenderTest
             assets::LoadModelAssetGeneration(load);
         check.Check(loaded.Succeeded(), "generation을 런타임 리더로 다시 읽는다");
         std::size_t materials = 0, shaders = 0, textures = 0;
-        std::vector<Uuid::Uuid16> materialIds;
+        std::vector<uuid::uuid16> materialIds;
         if (loaded.Succeeded())
         {
             for (const assets::ModelMaterialAsset& material : loaded.generation->Materials())
             {
                 ++materials;
-                if (!material.shaderAssetId.IsNil()) ++shaders;
+                if (!material.shaderAssetId.is_nil()) ++shaders;
                 materialIds.push_back(material.materialId);
             }
             textures = loaded.generation->Textures().size();
@@ -1108,7 +1114,7 @@ namespace RenderTest
         }
         ck::CookedAssetManifest manifest;
         manifest.entries.push_back(product.manifestEntry);
-        for (const Uuid::Uuid16& materialId : materialIds)
+        for (const uuid::uuid16& materialId : materialIds)
         {
             ck::CookedAssetManifestEntry materialEntry = product.manifestEntry;
             materialEntry.assetId = ex::AssetId{ materialId };
@@ -1127,7 +1133,7 @@ namespace RenderTest
         check.Check(resolvedModel && resolvedModel->artifactPath == product.recordArtifactPath,
             "model GUID가 generation record artifact로 해석된다");
         std::size_t resolvedMaterials = 0;
-        for (const Uuid::Uuid16& materialId : materialIds)
+        for (const uuid::uuid16& materialId : materialIds)
         {
             const ck::CookedAssetManifestEntry* resolved =
                 restoredManifest.Find(ex::AssetId{ materialId });

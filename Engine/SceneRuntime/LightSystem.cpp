@@ -2,7 +2,7 @@
 #include "LifecycleTrace.h"
 #include "LightComponent.h"
 #include "Entity.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 void LightSystem::Register(LightComponent* light)
 {
@@ -45,7 +45,7 @@ void LightSystem::Update(float tick)
         // (같은 문자열을 써야 대조가 성립하므로 Lifecycle::Trace::TypeNameOf
         // 공용 함수를 쓴다).
         LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(light),
-            owner->m_name.ToString().c_str(), light->GetInstanceID());
+            owner->m_name.c_str(), light->GetInstanceID());
 
 		// X8: Light는 여기서 조기 커밋하지 않는다. Transform/property writer가
 		// dirty를 발행하고 Scene::CommitRenderProxies가 final resolve 뒤 한 번 싣는다.

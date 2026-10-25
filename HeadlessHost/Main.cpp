@@ -1,3 +1,9 @@
+#include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Platform.Windows.Strings.h"
+#else
+import Creator.Platform.Windows.Strings;
+#endif
 #include "../Engine/SceneRuntime/Headless/HeadlessScene.h"
 #include <windows.h>
 #include <psapi.h>
@@ -51,13 +57,11 @@ namespace
 
     std::string Utf8(std::wstring_view text)
     {
-        if (text.empty()) return {};
-        const auto length = static_cast<int>(text.size()); // Windows command line is bounded to 32767 characters.
-        const int bytes = WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, text.data(), length, nullptr, 0, nullptr, nullptr);
-        if (!bytes) throw std::invalid_argument("Invalid Unicode option");
-        std::string result(static_cast<std::size_t>(bytes), '\0');
-        if (WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, text.data(), length, result.data(), bytes, nullptr, nullptr) != bytes)
-            throw std::runtime_error("UTF-8 option conversion failed");
+        std::string result;
+        if (!ce::strings::try_wide_to_utf8(text, result))
+        {
+            throw std::invalid_argument("Invalid Unicode option");
+        }
         return result;
     }
 

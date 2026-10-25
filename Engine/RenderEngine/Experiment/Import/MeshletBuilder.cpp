@@ -1,9 +1,13 @@
 #include "MeshletBuilder.h"
 
-#include "Sha256.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 #include "meshoptimizer.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace experiment::importer
 {
@@ -115,15 +119,15 @@ namespace experiment::importer
             return (std::min)(first, (std::min)(second, third));
         }
 
-        void MeshletHashU32(Hash::Sha256& hash, std::uint32_t value) noexcept
+        void MeshletHashU32(ce::hash::sha256& hash, std::uint32_t value) noexcept
         {
             const std::uint8_t bytes[4]{ static_cast<std::uint8_t>(value),
                 static_cast<std::uint8_t>(value >> 8), static_cast<std::uint8_t>(value >> 16),
                 static_cast<std::uint8_t>(value >> 24) };
-            hash.Update(bytes, sizeof(bytes));
+            hash.update(bytes, sizeof(bytes));
         }
 
-        void MeshletHashU64(Hash::Sha256& hash, std::uint64_t value) noexcept
+        void MeshletHashU64(ce::hash::sha256& hash, std::uint64_t value) noexcept
         {
             MeshletHashU32(hash, static_cast<std::uint32_t>(value));
             MeshletHashU32(hash, static_cast<std::uint32_t>(value >> 32));
@@ -576,9 +580,9 @@ namespace experiment::importer
 
     MeshletGeometryDigest ComputeMeshletGeometryDigest(const Mesh& mesh, const MeshletBuildSettings& settings) noexcept
     {
-        Hash::Sha256 hash;
+        ce::hash::sha256 hash;
         static constexpr char domain[] = "CreatorEngine.Meshlet.FinalGeometry.v1";
-        hash.Update(domain, sizeof(domain));
+        hash.update(domain, sizeof(domain));
         MeshletHashU32(hash, settings.profileVersion);
         MeshletHashU32(hash, settings.builderVersion);
         MeshletHashU32(hash, settings.meshoptimizerVersion);
@@ -590,13 +594,13 @@ namespace experiment::importer
         MeshletHashU32(hash, mesh.vertices.Stride());
         MeshletHashU64(hash, mesh.vertices.size());
         MeshletHashU64(hash, mesh.vertices.ByteSize());
-        hash.Update(mesh.vertices.Bytes().data(), mesh.vertices.ByteSize());
+        hash.update(mesh.vertices.Bytes().data(), mesh.vertices.ByteSize());
         MeshletHashU64(hash, mesh.indices.size());
         for (const std::uint32_t index : mesh.indices)
         {
             MeshletHashU32(hash, index);
         }
-        return hash.Finish();
+        return hash.finish();
     }
 
     bool BuildMeshlets(const Mesh& mesh, MeshletPayload& outPayload,

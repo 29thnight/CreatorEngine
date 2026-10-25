@@ -1,4 +1,9 @@
-﻿#pragma once
+﻿#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#pragma once
 // PHASE 3.75 MBC9 — 모델 자산의 씬 인스턴스화. legacy `Model`/`ModelLoader`
 // (Assimp 산물·역브리지)와 experiment 핸들이 은퇴하고, 씬에 세우는 정본 입력은
 // immutable `assets::ModelAssetGeneration` 하나다.
@@ -12,9 +17,8 @@
 // 게시 계약(parent < index) 덕에 노드·본 모두 단일 순회다. 계약을 어기는
 // generation이면 아무것도 만들지 않고 nullptr — 반쪽 시공은 없다.
 
-#include "Ownership.h"
 #include <stdio.h>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "CollisionGeometrySource.h"
 #include "EntityHandle.h"
 #include "Assets/ModelSceneAssetInputs.h"

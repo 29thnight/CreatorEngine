@@ -1,16 +1,20 @@
-#include "../Utility_Framework/Ownership.h"
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector4.hpp>
 #include <mathematics/matrix4x4.hpp>
-#include "../Utility_Framework/Core.Minimal.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include <mathematics/color.hpp>
 #include <mathematics/rect.hpp>
 #include "Component.h"
 #include "IRenderable.h"
 #include "Canvas.h"
 #include "UIComponent.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 class FontAsset;
 struct TextLayout;
@@ -49,7 +53,7 @@ public:
 	// immutable glyph geometry and atlas owners.
 	void SetMessage(std::string value);
 	std::string GetTextMessage() { return message; }
-	void SetFont(const file::path& path);
+	void SetFont(const std::filesystem::path& path);
 	void OnDeserialized();
 	void OnPropertyChanged(std::string_view propertyName, Meta::PropertyChangeSource source) override;
 	void PrepareTextLayout();

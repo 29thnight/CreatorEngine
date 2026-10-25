@@ -1,10 +1,15 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
-#include "Core.Minimal.h"
-#include "TypeTrait.h"
+#include "../../Utility_Framework/Foundation/Core.Minimal.h"
+#include "../../Utility_Framework/Reflection/TypeTrait.h"
 #include "../Texture.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // Runtime Terrain은 저작 파일 형식을 알지 않는다. PresentationThread가 살아 있는
 // component를 읽을 수 있는 구간에서 이 값 스냅샷을 만든 뒤 Editor Host에 넘긴다.
@@ -12,14 +17,14 @@ struct TerrainAuthoringLayerSnapshot
 {
 	uint32 layerId{};
 	std::string name;
-	file::path diffuseTextureSource;
+	std::filesystem::path diffuseTextureSource;
 	float tiling{ 1.0f };
 	std::vector<float> splatWeights;
 };
 
 struct TerrainAuthoringRequest
 {
-	file::path destinationDirectory;
+	std::filesystem::path destinationDirectory;
 	std::wstring name;
 	uint32 terrainId{};
 	uint32 width{};
@@ -32,7 +37,7 @@ struct TerrainAuthoringRequest
 
 struct TerrainAuthoringResult
 {
-	file::path descriptorPath;
+	std::filesystem::path descriptorPath;
 	FileGuid guid{};
 };
 
@@ -41,14 +46,14 @@ struct TerrainAuthoringResult
 // Editor Host가 소유한다. payload 생성은 순수 메모리 작업이라 Core에 남는다.
 struct TextAssetAuthoringRequest
 {
-	file::path destinationDirectory;
+	std::filesystem::path destinationDirectory;
 	std::wstring name;
 	std::string payload;
 };
 
 struct TextAssetAuthoringResult
 {
-	file::path assetPath;
+	std::filesystem::path assetPath;
 	FileGuid guid{};
 };
 
@@ -59,7 +64,7 @@ struct TextAssetAuthoringResult
 // 검증한다 — 이름 왕복을 없애 write/read가 갈라질 여지를 남기지 않는다.
 struct UncatalogedAuthoringRequest
 {
-	file::path destinationPath;
+	std::filesystem::path destinationPath;
 	std::string payload;
 };
 
@@ -92,18 +97,18 @@ class AssetAuthoringPort final
 {
 public:
     using SourceTextureLoader = own::shared_owner<const Texture::CodecImage> (*)(
-        const file::path& path, std::span<const std::byte> bytes, TextureSourceCompression compression);
+        const std::filesystem::path& path, std::span<const std::byte> bytes, TextureSourceCompression compression);
     using SourceTextureMipGenerator = own::shared_owner<const Texture::CodecImage> (*)(
         const TextureImageView& image, std::string& failure);
     using SourceTextureRgbaDecoder = bool (*)(std::span<const std::byte> bytes,
         TextureImage& image, std::string& failure);
-    using TerrainSourceImageReader = bool (*)(const file::path& path,
+    using TerrainSourceImageReader = bool (*)(const std::filesystem::path& path,
         TerrainSourceImageKind kind, TerrainSourceImage& result);
 
     static void InstallSourceTextureLoader(SourceTextureLoader handler) noexcept;
     static void UninstallSourceTextureLoader(SourceTextureLoader handler) noexcept;
     static own::shared_owner<const Texture::CodecImage> LoadSourceTexture(
-        const file::path& path, std::span<const std::byte> bytes, TextureSourceCompression compression) noexcept;
+        const std::filesystem::path& path, std::span<const std::byte> bytes, TextureSourceCompression compression) noexcept;
     static void InstallSourceTextureMipGenerator(SourceTextureMipGenerator handler) noexcept;
     static void UninstallSourceTextureMipGenerator(SourceTextureMipGenerator handler) noexcept;
     static own::shared_owner<const Texture::CodecImage> GenerateSourceTextureMips(
@@ -114,18 +119,18 @@ public:
         TextureImage& image, std::string& failure) noexcept;
     static void InstallTerrainSourceImageReader(TerrainSourceImageReader handler) noexcept;
     static void UninstallTerrainSourceImageReader(TerrainSourceImageReader handler) noexcept;
-    static bool ReadTerrainSourceImage(const file::path& path,
+    static bool ReadTerrainSourceImage(const std::filesystem::path& path,
         TerrainSourceImageKind kind, TerrainSourceImage& result) noexcept;
 
-	using CreateMetaHandler = FileGuid (*)(const file::path& filepath,
+	using CreateMetaHandler = FileGuid (*)(const std::filesystem::path& filepath,
 		const FileGuid& preferredGuid);
 	using WriteTextAssetWithMetaHandler = FileGuid (*)(
-		const file::path& destination, std::string_view payload,
+		const std::filesystem::path& destination, std::string_view payload,
 		const FileGuid& preferredGuid);
-	using WriteModelCacheHandler = bool (*)(const file::path& destination,
+	using WriteModelCacheHandler = bool (*)(const std::filesystem::path& destination,
 		std::span<const std::byte> bytes);
-	using RecoverModelHandler = bool (*)(const file::path& source, FileGuid expectedId);
-	using WriteEmbeddedTextureHandler = bool (*)(const file::path& destination,
+	using RecoverModelHandler = bool (*)(const std::filesystem::path& source, FileGuid expectedId);
+	using WriteEmbeddedTextureHandler = bool (*)(const std::filesystem::path& destination,
 		std::span<const std::byte> bytes, uint32 width, uint32 height);
 	using WriteTerrainHandler = bool (*)(const TerrainAuthoringRequest& request,
 		TerrainAuthoringResult& result);
@@ -147,30 +152,30 @@ public:
 	static void Uninstall(CreateMetaHandler handler) noexcept;
 	// preferredGuid는 새 sidecar를 처음 만들 때만 사용한다. 이미 존재하는
 	// sidecar의 GUID는 언제나 정본이며 handler가 그 값을 반환한다.
-	static FileGuid CreateMeta(const file::path& filepath,
+	static FileGuid CreateMeta(const std::filesystem::path& filepath,
 		const FileGuid& preferredGuid = {}) noexcept;
 	static void InstallTextAssetWriter(
 		WriteTextAssetWithMetaHandler handler) noexcept;
 	static void UninstallTextAssetWriter(
 		WriteTextAssetWithMetaHandler handler) noexcept;
-	static FileGuid WriteTextAssetWithMeta(const file::path& destination,
+	static FileGuid WriteTextAssetWithMeta(const std::filesystem::path& destination,
 		std::string_view payload, const FileGuid& preferredGuid) noexcept;
 
 	static void InstallModelCacheWriter(WriteModelCacheHandler handler) noexcept;
 	static void UninstallModelCacheWriter(WriteModelCacheHandler handler) noexcept;
-	static bool WriteModelCache(const file::path& destination,
+	static bool WriteModelCache(const std::filesystem::path& destination,
 		std::span<const std::byte> bytes) noexcept;
 	// Editor-only repair of derived model data. The caller retries its strict
 	// reader once; the host must preserve the canonical identity. Player has no handler.
 	static void InstallModelRecovery(RecoverModelHandler handler) noexcept;
 	static void UninstallModelRecovery(RecoverModelHandler handler) noexcept;
-	static bool RecoverModel(const file::path& source, FileGuid expectedId) noexcept;
+	static bool RecoverModel(const std::filesystem::path& source, FileGuid expectedId) noexcept;
 
 	static void InstallEmbeddedTextureWriter(
 		WriteEmbeddedTextureHandler handler) noexcept;
 	static void UninstallEmbeddedTextureWriter(
 		WriteEmbeddedTextureHandler handler) noexcept;
-	static bool WriteEmbeddedTexture(const file::path& destination,
+	static bool WriteEmbeddedTexture(const std::filesystem::path& destination,
 		std::span<const std::byte> bytes, uint32 width, uint32 height) noexcept;
 
 	static void InstallTerrainWriter(WriteTerrainHandler handler) noexcept;

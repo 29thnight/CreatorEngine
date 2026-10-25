@@ -26,7 +26,7 @@ def compile_probe(root, compiler, executable, probe=None, extra_sources=(), sani
         str(probe or Path("Tools/regression/render_graph_program_probe.cpp")),
     ] + [str(source) for source in extra_sources]
     # Older source snapshots keep the implementation in RenderArena.cpp.
-    utility_arena = "Engine/Utility_Framework/Arena.cpp"
+    utility_arena = "Engine/Utility_Framework/Memory/Arena.cpp"
     if (root / utility_arena).is_file():
         sources.append(utility_arena)
     command = [compiler, "-std=c++23", "-O1", "-g", "-pthread", "-ffunction-sections", "-fdata-sections",

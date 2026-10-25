@@ -1,18 +1,23 @@
-#include "AuthoringParsedDocument.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../Utility_Framework/Authoring/AuthoringParsedDocument.h"
 #include "TagManager.h"
-#include "Core.Minimal.h"
-#include "ReflectionYml.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
+#include "../Utility_Framework/Reflection/ReflectionYml.h"
 #include "Interfaces/AssetAuthoringPort.h"
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
 // 이름→경로 규약은 한 곳에만 둔다. 저작 쓰기와 런타임 읽기가 각자 경로를
 // 조립하면 조용히 갈라진다.
-file::path ResolveTagManagerPath()
+std::filesystem::path ResolveTagManagerPath()
 {
-    return PathFinder::ProjectSettingPath("TagManager.asset");
+    return ce::paths::project_setting_path("TagManager.asset");
 }
 } // namespace
 
@@ -26,7 +31,7 @@ void TagManager::Initialize()
     // Editor Host가 설치한 handler만 수행하므로 모드 분기가 필요 없다 —
     // Player는 handler가 없어 메모리 기본값만 갖고 지나간다(pak에 자산이 빠진
     // 방어 경로이며, 빈 표보다 낫다).
-    if (!file::exists(ResolveTagManagerPath()))
+    if (!std::filesystem::exists(ResolveTagManagerPath()))
     {
         // Initialize the tag map with some default tags if needed
         m_tagMap["Untagged"] = 0;
@@ -60,11 +65,11 @@ void TagManager::Load()
 #if defined(CE_SCENE_HEADLESS)
     return;
 #else
-    file::path path = ResolveTagManagerPath();
+    std::filesystem::path path = ResolveTagManagerPath();
     // 예전에는 이 존재 검사가 에디터 전용이었다 — 플레이어에서 파일이 없으면
     // YAML::LoadFile이 예외를 던졌다. 언팩 실패가 크래시로 둔갑하지 않게
     // 양쪽 모두 검사한다.
-    if (!file::exists(path))
+    if (!std::filesystem::exists(path))
     {
         return;
     }
@@ -104,7 +109,7 @@ bool TagManager::Save()
 #else
     // ★ 로드가 실패한 상태로 기존 파일을 덮지 않는다. 빈 상태 저장은
     //   사용자가 정말 전부 지운 경우에만 정당하고, 로드 실패 뒤에는 손실이다.
-    if (!m_loadSucceeded && file::exists(ResolveTagManagerPath()))
+    if (!m_loadSucceeded && std::filesystem::exists(ResolveTagManagerPath()))
     {
         Debug::PrintLog(spdlog::level::warn, "TagManager::Save 건너뜀 — 로드가 성공한 적이 없어 "
                                              "기존 자산을 빈 상태로 덮을 수 없다");

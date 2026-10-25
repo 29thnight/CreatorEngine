@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // 봉인 입력/RHI 경계만 모형으로 두고 실제 CPU 본문과 스케줄러의 순서·수명을 검증한다.
 #include "Engine/RenderEngine/MaterialGraphPreparationTasks.h"
 #include "Engine/RenderEngine/MaterialGraphGeometryContract.h"

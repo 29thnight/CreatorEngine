@@ -1,8 +1,17 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
 
-#include "../Utility_Framework/LayerCatalog.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.LayerCatalog.h"
+#else
+import Creator.Core.LayerCatalog;
+#endif
 #include "PhysicsGeometry.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace ce::physics
 {
@@ -20,7 +29,7 @@ struct collision_policy_snapshot
     ce::layers::result<collision_filter> Filter(const ce::layers::catalog_snapshot& catalog,
                                                 ce::layers::layer_id layer) const noexcept
     {
-        const auto* definition = catalog.Find(layer);
+        const auto* definition = catalog.find(layer);
         if (!definition)
             return std::unexpected(ce::layers::error::unknown_layer);
 
@@ -49,8 +58,8 @@ class PhysicsCollisionPolicy final
     ce::layers::result<void> Set(const ce::layers::catalog_snapshot& catalog, ce::layers::layer_id left,
                                  ce::layers::layer_id right, bool enabled)
     {
-        const auto* a = catalog.Find(left);
-        const auto* b = catalog.Find(right);
+        const auto* a = catalog.find(left);
+        const auto* b = catalog.find(right);
         if (!a || !b)
             return std::unexpected(ce::layers::error::unknown_layer);
 

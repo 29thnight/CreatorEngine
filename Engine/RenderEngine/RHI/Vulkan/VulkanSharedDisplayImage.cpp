@@ -1,10 +1,32 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "VulkanSharedDisplayImage.h"
 #include "VulkanDeviceResources.h"
 #include "VulkanResourceState.h"
-
-#include <d3d12.h>
-#include <dxgi1_6.h>
-#include <wrl/client.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 using namespace VulkanApi;
 
@@ -14,8 +36,8 @@ struct VulkanSharedDisplayImage::Impl
     RHITextureHandle texture;
     VulkanImageEntry native;
     RHIDisplayAdapterIdentity adapter;
-    Microsoft::WRL::ComPtr<ID3D12Device> sharedDevice;
-    Microsoft::WRL::ComPtr<ID3D12Resource> sharedResource;
+    winrt::com_ptr<ID3D12Device> sharedDevice;
+    winrt::com_ptr<ID3D12Resource> sharedResource;
     HANDLE sharedHandle{nullptr};
     own::shared_owner<RHIDisplayConsumerLease> consumerLease{own::make_shared<RHIDisplayConsumerLease>()};
 
@@ -108,13 +130,13 @@ bool VulkanSharedDisplayImage::Initialize(VulkanDeviceResources& resources, uint
     auto candidate = own::make_unique<Impl>();
     candidate->resources = &resources;
     candidate->adapter = consumer.adapter;
-    Microsoft::WRL::ComPtr<IDXGIFactory4> factory;
-    Microsoft::WRL::ComPtr<IDXGIAdapter1> adapter;
+    winrt::com_ptr<IDXGIFactory4> factory;
+    winrt::com_ptr<IDXGIAdapter1> adapter;
     LUID luid{};
     std::memcpy(&luid, identity.deviceLUID, sizeof(luid));
-    if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))) ||
-        FAILED(factory->EnumAdapterByLuid(luid, IID_PPV_ARGS(&adapter))) ||
-        FAILED(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&candidate->sharedDevice))))
+    if (FAILED(CreateDXGIFactory1(IID_PPV_ARGS(factory.put()))) ||
+        FAILED(factory->EnumAdapterByLuid(luid, IID_PPV_ARGS(adapter.put()))) ||
+        FAILED(D3D12CreateDevice(adapter.get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(candidate->sharedDevice.put()))))
     {
         outError = "Could not create the D3D12 transport device on the Vulkan adapter.";
         return false;
@@ -135,8 +157,8 @@ bool VulkanSharedDisplayImage::Initialize(VulkanDeviceResources& resources, uint
     description.Flags = D3D12_RESOURCE_FLAG_ALLOW_RENDER_TARGET;
     if (FAILED(candidate->sharedDevice->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_SHARED, &description,
                                                                 D3D12_RESOURCE_STATE_COMMON, nullptr,
-                                                                IID_PPV_ARGS(&candidate->sharedResource))) ||
-        FAILED(candidate->sharedDevice->CreateSharedHandle(candidate->sharedResource.Get(), nullptr, GENERIC_ALL,
+                                                                IID_PPV_ARGS(candidate->sharedResource.put()))) ||
+        FAILED(candidate->sharedDevice->CreateSharedHandle(candidate->sharedResource.get(), nullptr, GENERIC_ALL,
                                                            nullptr, &candidate->sharedHandle)))
     {
         outError = "Could not allocate the shared D3D12 display resource.";

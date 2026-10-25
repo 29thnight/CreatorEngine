@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <PropertyGroup>
+    <CreatorWindowsSdkModulesPropsImported>true</CreatorWindowsSdkModulesPropsImported>
+    <_CreatorSdkTriplet>$(VcpkgTriplet)</_CreatorSdkTriplet>
+    <_CreatorSdkTriplet Condition="'$(_CreatorSdkTriplet)' == '' and '$(Platform)' == 'x64'">x64-windows</_CreatorSdkTriplet>
+    <_CreatorSdkTriplet Condition="'$(_CreatorSdkTriplet)' == '' and '$(Platform)' == 'Win32'">x86-windows</_CreatorSdkTriplet>
+    <_CreatorSdkInstalledDir>$(VcpkgInstalledDir)</_CreatorSdkInstalledDir>
+    <_CreatorSdkInstalledDir Condition="'$(_CreatorSdkInstalledDir)' == ''">$(SolutionDir)vcpkg_installed\$(_CreatorSdkTriplet)\</_CreatorSdkInstalledDir>
+    <CreatorSdkDependencyIncludeDir>$([MSBuild]::EnsureTrailingSlash('$(_CreatorSdkInstalledDir)'))$(_CreatorSdkTriplet)\include\</CreatorSdkDependencyIncludeDir>
+    <CreatorGameInputIncludeDir Condition="'$(CreatorGameInputIncludeDir)' == ''">$(CreatorSdkDependencyIncludeDir)</CreatorGameInputIncludeDir>
+    <CreatorGameInputHeader>$([System.String]::Copy('$(CreatorGameInputIncludeDir)GameInput.h').Replace('\', '/'))</CreatorGameInputHeader>
+  </PropertyGroup>
+</Project>

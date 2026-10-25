@@ -1,4 +1,9 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
 #include "ModelMeshDescriptor.h"
 
@@ -24,7 +29,7 @@ namespace assets
         [[nodiscard]] std::size_t ByteSize() const noexcept { return decodedBytes; }
         [[nodiscard]] bool Matches(const ModelMeshDescriptor& descriptor) const noexcept
         {
-            if (key != descriptor.geometryKey || !mesh.meshId.IsNil() || !mesh.materialId.IsNil()
+            if (key != descriptor.geometryKey || !mesh.meshId.is_nil() || !mesh.materialId.is_nil()
                 || !mesh.name.empty() || mesh.bounds != descriptor.bounds
                 || mesh.vertexAttributeMask != descriptor.vertexAttributeMask
                 || !IsSupportedModelVertexLayout(mesh.vertexAttributeMask)

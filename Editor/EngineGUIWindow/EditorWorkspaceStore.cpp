@@ -1,13 +1,21 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "EditorWorkspaceStore.h"
 #include "EditorWindowNames.h"
 #include "ViewportHostWindow.h"
-#include "EditorSettingsStore.h"
-#include "PathFinder.h"
+#include "../EngineEntry/Project/EditorSettingsStore.h"
 #include <imgui.h>
 #include <imgui_internal.h>
-#include <Windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 #include "EditorTheme.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 static_assert(IMGUI_VERSION_NUM == 19280, "Revalidate workspace docking adapter for the new ImGui version");
 namespace editor
@@ -222,9 +230,9 @@ namespace editor
     }
     EditorWorkspaceStore::EditorWorkspaceStore(window_table& windows):m_windows(windows)
     {
-        m_path=(override_path(L"CREATOR_EDITOR_WORKSPACE_DIR",PathFinder::RuntimeDataPath("Editor/Workspaces"))/"active.workspace")
+        m_path=(override_path(L"CREATOR_EDITOR_WORKSPACE_DIR",ce::paths::runtime_data_path("Editor/Workspaces"))/"active.workspace")
             .lexically_normal().make_preferred();
-        m_legacy=override_path(L"CREATOR_EDITOR_LEGACY_INI",PathFinder::ConfigPath("imgui.ini")).lexically_normal().make_preferred();
+        m_legacy=override_path(L"CREATOR_EDITOR_LEGACY_INI",ce::paths::config_path("imgui.ini")).lexically_normal().make_preferred();
         // The declaration table must already be filled. An empty one is not an empty
         // editor, it is a boot-order mistake, and the cost is silent: every restored
         // panel state is dropped and the declaration defaults win on every start.

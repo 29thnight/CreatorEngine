@@ -1,4 +1,3 @@
-#include "../Utility_Framework/Ownership.h"
 // Included after BufferPool in GpuGeometryVisibility.cpp.
 namespace
 {

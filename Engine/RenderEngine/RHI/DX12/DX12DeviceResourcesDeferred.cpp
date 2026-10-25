@@ -1,4 +1,14 @@
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "DX12DeviceResources.h"
 #include "DX12Encoder.h"
 #include "../RHIBackendExecution.h"
@@ -20,8 +30,8 @@ struct DX12DeviceResources::PendingViews
     struct View
     {
         Kind kind{};
-        Microsoft::WRL::ComPtr<ID3D12Resource> resource;
-        Microsoft::WRL::ComPtr<ID3D12Resource> counter;
+        winrt::com_ptr<ID3D12Resource> resource;
+        winrt::com_ptr<ID3D12Resource> counter;
         D3D12_CPU_DESCRIPTOR_HANDLE destination{};
         D3D12_CPU_DESCRIPTOR_HANDLE source{};
         D3D12_SHADER_RESOURCE_VIEW_DESC shader{};
@@ -66,19 +76,19 @@ void DX12DeviceResources::FlushPendingViews()
         switch (view.kind)
         {
         case PendingViews::Kind::Shader:
-            m_device->CreateShaderResourceView(view.resource.Get(), view.described ? &view.shader : nullptr,
+            m_device->CreateShaderResourceView(view.resource.get(), view.described ? &view.shader : nullptr,
                                                view.destination);
             break;
         case PendingViews::Kind::Unordered:
-            m_device->CreateUnorderedAccessView(view.resource.Get(), view.counter.Get(),
+            m_device->CreateUnorderedAccessView(view.resource.get(), view.counter.get(),
                                                 view.described ? &view.unordered : nullptr, view.destination);
             break;
         case PendingViews::Kind::RenderTarget:
-            m_device->CreateRenderTargetView(view.resource.Get(), view.described ? &view.target : nullptr,
+            m_device->CreateRenderTargetView(view.resource.get(), view.described ? &view.target : nullptr,
                                              view.destination);
             break;
         case PendingViews::Kind::Depth:
-            m_device->CreateDepthStencilView(view.resource.Get(), view.described ? &view.depth : nullptr,
+            m_device->CreateDepthStencilView(view.resource.get(), view.described ? &view.depth : nullptr,
                                              view.destination);
             break;
         case PendingViews::Kind::Copy:
@@ -92,8 +102,8 @@ void DX12DeviceResources::FlushPendingViews()
 
 struct DX12DeviceResources::DeferredNativeFrame
 {
-    Microsoft::WRL::ComPtr<ID3D12CommandAllocator> allocator;
-    ce::render_vector<Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>> lists;
+    winrt::com_ptr<ID3D12CommandAllocator> allocator;
+    ce::render_vector<winrt::com_ptr<ID3D12GraphicsCommandList>> lists;
     size_t used{};
     bool reset{};
 };
@@ -274,11 +284,11 @@ bool DX12DeviceResources::SubmitPendingImmediate(bool preserveRecording, bool en
                     }
                     frame->reset = true;
                 }
-                Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList> list;
+                winrt::com_ptr<ID3D12GraphicsCommandList> list;
                 if (frame->used < frame->lists.size())
                 {
                     list = frame->lists[frame->used];
-                    if (FAILED(list->Reset(frame->allocator.Get(), nullptr)))
+                    if (FAILED(list->Reset(frame->allocator.get(), nullptr)))
                     {
                         outError = "Pending immediate list Reset failed.";
                         return false;
@@ -286,8 +296,8 @@ bool DX12DeviceResources::SubmitPendingImmediate(bool preserveRecording, bool en
                 }
                 else
                 {
-                    if (FAILED(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, frame->allocator.Get(),
-                                                         nullptr, IID_PPV_ARGS(&list))))
+                    if (FAILED(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, frame->allocator.get(),
+                                                         nullptr, IID_PPV_ARGS(list.put()))))
                     {
                         outError = "Pending immediate list creation failed.";
                         return false;
@@ -295,19 +305,19 @@ bool DX12DeviceResources::SubmitPendingImmediate(bool preserveRecording, bool en
                     frame->lists.push_back(list);
                 }
                 ++frame->used;
-                commands->Execute(list.Get());
+                commands->Execute(list.get());
                 if (FAILED(list->Close()))
                 {
                     outError = "Pending immediate list Close failed.";
                     return false;
                 }
-                ID3D12CommandList* lists[]{list.Get()};
+                ID3D12CommandList* lists[]{list.get()};
                 RHICommandFailureScope::SetExecutionUncertain(true);
                 {
-                const ce::dx_capture::submission_scope capture(queue.Get(), 1);
+                const ce::dx_capture::submission_scope capture(queue.get(), 1);
                 queue->ExecuteCommandLists(1, lists);
             }
-                if (FAILED(queue->Signal(fence.Get(), completion.value)))
+                if (FAILED(queue->Signal(fence.get(), completion.value)))
                 {
                     outError = "Pending immediate queue Signal failed.";
                     return false;
@@ -379,7 +389,7 @@ void DX12DeviceResources::WriteShaderResourceView(ID3D12Resource* resource, cons
     }
     auto& view = m_pendingViews->Reserve();
     view.kind = PendingViews::Kind::Shader;
-    view.resource = resource;
+    view.resource.copy_from(resource);
     view.destination = destination;
     view.described = desc != nullptr;
     if (desc)
@@ -399,14 +409,14 @@ void DX12DeviceResources::WriteUnorderedAccessView(ID3D12Resource* resource, ID3
     }
     auto& view = m_pendingViews->Reserve();
     view.kind = PendingViews::Kind::Unordered;
-    view.resource = resource;
+    view.resource.copy_from(resource);
     view.destination = destination;
     view.described = desc != nullptr;
     if (desc)
     {
         view.unordered = *desc;
     }
-    view.counter = counter;
+    view.counter.copy_from(counter);
 }
 
 void DX12DeviceResources::WriteRenderTargetView(ID3D12Resource* resource, const D3D12_RENDER_TARGET_VIEW_DESC* desc,
@@ -419,7 +429,7 @@ void DX12DeviceResources::WriteRenderTargetView(ID3D12Resource* resource, const 
     }
     auto& view = m_pendingViews->Reserve();
     view.kind = PendingViews::Kind::RenderTarget;
-    view.resource = resource;
+    view.resource.copy_from(resource);
     view.destination = destination;
     view.described = desc != nullptr;
     if (desc)
@@ -438,7 +448,7 @@ void DX12DeviceResources::WriteDepthStencilView(ID3D12Resource* resource, const 
     }
     auto& view = m_pendingViews->Reserve();
     view.kind = PendingViews::Kind::Depth;
-    view.resource = resource;
+    view.resource.copy_from(resource);
     view.destination = destination;
     view.described = desc != nullptr;
     if (desc)

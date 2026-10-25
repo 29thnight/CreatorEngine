@@ -1,13 +1,17 @@
-#include "../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "AIManager.h"
 #include "BehaviorTreeComponent.h"
 #include "StateMachineComponent.h"
 #include "SceneManager.h"
 #include "Scene.h"
 #include "MeshRenderer.h"
-#include "Mathematics.Intersect.h"
+#include "../Utility_Framework/Foundation/Mathematics.Intersect.h"
 #include <mathematics/transform.hpp>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 //#include <execution>
 
 own::shared_owner<AIUpdateBatch> AIManager::CaptureAIUpdate(Scene& scene, float deltaSeconds,

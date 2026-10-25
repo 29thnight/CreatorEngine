@@ -1,10 +1,19 @@
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "InputManager.h"
-#include <wrl.h>
-#include "../Utility_Framework/StandardLibrary.h"
-#include "LogSystem.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#include "../Utility_Framework/Diagnostics/LogSystem.h"
 
 #pragma comment(lib, "GameInput.lib")
-using namespace Microsoft::WRL;
 
 // GameInput 은 장치를 **비동기로** 열거한다. GameInputCreate 가 S_OK 로 돌아온
 // 뒤에도 열거가 끝나기 전까지 GetCurrentReading 은 GAMEINPUT_E_READING_NOT_FOUND
@@ -45,7 +54,7 @@ namespace
 
 bool InputManager::Initialize(HWND _hwnd)
 {
-    if (FAILED(GameInputCreate(&gameInput))) {
+    if (FAILED(GameInputCreate(gameInput.put()))) {
         return false;
     }
     else
@@ -84,10 +93,10 @@ void InputManager::KeyBoardUpdate()
 {
     static HRESULT lastReportedFailure = S_OK;
 
-    m_curKeyStates.Reset();
+    m_curKeyStates.reset();
 
-    ComPtr<IGameInputReading> reading;
-    HRESULT hr = gameInput->GetCurrentReading(GameInputKindKeyboard, nullptr, &reading);
+    winrt::com_ptr<IGameInputReading> reading;
+    HRESULT hr = gameInput->GetCurrentReading(GameInputKindKeyboard, nullptr, reading.put());
 
     if (!AcceptReading("키보드", hr, lastReportedFailure) || !reading)
         return;
@@ -104,7 +113,7 @@ void InputManager::KeyBoardUpdate()
         {
             uint8_t virtualKey = m_GameInputKeyStates[i].virtualKey;
             if (virtualKey < kKeyboardCount)
-                m_curKeyStates.Set(virtualKey);
+                m_curKeyStates.set(virtualKey);
         }
     }
 
@@ -125,13 +134,13 @@ void InputManager::MouseUpdate()
 {
     static HRESULT lastReportedFailure = S_OK;
 
-    ComPtr<IGameInputReading> reading;
+    winrt::com_ptr<IGameInputReading> reading;
     //memset(curmouseState, 0, sizeof(bool) * kMouseCount);
-    m_curMouseState.Reset();
+    m_curMouseState.reset();
     ResetMouseDelta();
     m_prevMouseWheelDelta = m_mouseWheelDelta;
     // 🔹 현재 마우스 입력 읽기
-    HRESULT hr = gameInput->GetCurrentReading(GameInputKindMouse, nullptr, &reading);
+    HRESULT hr = gameInput->GetCurrentReading(GameInputKindMouse, nullptr, reading.put());
     // 판독을 못 받은 프레임은 조용히 넘긴다. !reading 도 함께 막는다 — 예전에는
     // 성공 코드에 널 포인터가 오면 바로 아래에서 역참조했다.
     if (!AcceptReading("마우스", hr, lastReportedFailure) || !reading)
@@ -146,15 +155,15 @@ void InputManager::MouseUpdate()
 
         if (m_GameInputMouseState.buttons & GameInputMouseLeftButton)
         {
-            m_curMouseState.Set((uint8)MouseKey::LEFT);
+            m_curMouseState.set((uint8)MouseKey::LEFT);
         }
         if (m_GameInputMouseState.buttons & GameInputMouseRightButton)
         {
-            m_curMouseState.Set((uint8)MouseKey::RIGHT);
+            m_curMouseState.set((uint8)MouseKey::RIGHT);
         }
         if (m_GameInputMouseState.buttons & GameInputMouseMiddleButton)
         {
-            m_curMouseState.Set((uint8)MouseKey::MIDDLE);
+            m_curMouseState.set((uint8)MouseKey::MIDDLE);
         }
        /* curmouseState[1] = (m_GameInputMouseState.buttons & GameInputMouseRightButton) != 0;
         curmouseState[2] = (m_GameInputMouseState.buttons & GameInputMouseMiddleButton) != 0;*/
@@ -278,16 +287,16 @@ void InputManager::PadUpdate()
 {
     static HRESULT lastReportedFailure = S_OK;
 
-    ComPtr<IGameInputReading> reading;
-    HRESULT hr = gameInput->GetCurrentReading(GameInputKindGamepad, nullptr, &reading);
+    winrt::com_ptr<IGameInputReading> reading;
+    HRESULT hr = gameInput->GetCurrentReading(GameInputKindGamepad, nullptr, reading.put());
     if (!AcceptReading("게임패드", hr, lastReportedFailure))
     {
         return;
     }
-    ComPtr<IGameInputDevice> tempDevice;
-    if (reading.Get() == nullptr)
+    winrt::com_ptr<IGameInputDevice> tempDevice;
+    if (reading.get() == nullptr)
         return;
-    reading->GetDevice(&tempDevice);
+    reading->GetDevice(tempDevice.put());
     if (FAILED(hr) || tempDevice == nullptr)
     {
         return;
@@ -295,7 +304,7 @@ void InputManager::PadUpdate()
     bool found = false;
     for (int i = 0; i < kMaxController; i++)
     {
-        if (device[i] != nullptr && device[i] == tempDevice.Get())
+        if (device[i] != nullptr && device[i] == tempDevice.get())
         {
             found = true;
             break;
@@ -307,7 +316,7 @@ void InputManager::PadUpdate()
         {
             if (device[i] == nullptr)
             {
-                device[i] = tempDevice.Get();
+                device[i] = tempDevice.get();
                 break;
             }
         }
@@ -322,38 +331,38 @@ void InputManager::GamePadUpdate()
 
     for (int i = 0; i < kMaxController; ++i)
     {
-        m_curPadState[i].Reset();
+        m_curPadState[i].reset();
 
         if (!device[i])
             continue;
 
-        ComPtr<IGameInputReading> reading;
-        HRESULT hr = gameInput->GetCurrentReading(GameInputKindGamepad, device[i], &reading);
+        winrt::com_ptr<IGameInputReading> reading;
+        HRESULT hr = gameInput->GetCurrentReading(GameInputKindGamepad, device[i], reading.put());
         if (!AcceptReading("게임패드", hr, lastReportedFailure) || !reading)
             continue;
 
         reading->GetGamepadState(&m_GameInputPadState[i]);
         const auto& buttons = m_GameInputPadState[i].buttons;
 
-        if (buttons & GameInputGamepadA)               m_curPadState[i].Set(static_cast<size_t>(ControllerButton::A));
-        if (buttons & GameInputGamepadB)               m_curPadState[i].Set(static_cast<size_t>(ControllerButton::B));
-        if (buttons & GameInputGamepadX)               m_curPadState[i].Set(static_cast<size_t>(ControllerButton::X));
-        if (buttons & GameInputGamepadY)               m_curPadState[i].Set(static_cast<size_t>(ControllerButton::Y));
+        if (buttons & GameInputGamepadA)               m_curPadState[i].set(static_cast<size_t>(ControllerButton::A));
+        if (buttons & GameInputGamepadB)               m_curPadState[i].set(static_cast<size_t>(ControllerButton::B));
+        if (buttons & GameInputGamepadX)               m_curPadState[i].set(static_cast<size_t>(ControllerButton::X));
+        if (buttons & GameInputGamepadY)               m_curPadState[i].set(static_cast<size_t>(ControllerButton::Y));
 
-        if (buttons & GameInputGamepadDPadUp)          m_curPadState[i].Set(static_cast<size_t>(ControllerButton::DPAD_UP));
-        if (buttons & GameInputGamepadDPadDown)        m_curPadState[i].Set(static_cast<size_t>(ControllerButton::DPAD_DOWN));
-        if (buttons & GameInputGamepadDPadLeft)        m_curPadState[i].Set(static_cast<size_t>(ControllerButton::DPAD_LEFT));
-        if (buttons & GameInputGamepadDPadRight)       m_curPadState[i].Set(static_cast<size_t>(ControllerButton::DPAD_RIGHT));
+        if (buttons & GameInputGamepadDPadUp)          m_curPadState[i].set(static_cast<size_t>(ControllerButton::DPAD_UP));
+        if (buttons & GameInputGamepadDPadDown)        m_curPadState[i].set(static_cast<size_t>(ControllerButton::DPAD_DOWN));
+        if (buttons & GameInputGamepadDPadLeft)        m_curPadState[i].set(static_cast<size_t>(ControllerButton::DPAD_LEFT));
+        if (buttons & GameInputGamepadDPadRight)       m_curPadState[i].set(static_cast<size_t>(ControllerButton::DPAD_RIGHT));
 
-        if (buttons & GameInputGamepadMenu)            m_curPadState[i].Set(static_cast<size_t>(ControllerButton::START_BUTTON));
-        if (buttons & GameInputGamepadView)            m_curPadState[i].Set(static_cast<size_t>(ControllerButton::BACK_BUTTON));
+        if (buttons & GameInputGamepadMenu)            m_curPadState[i].set(static_cast<size_t>(ControllerButton::START_BUTTON));
+        if (buttons & GameInputGamepadView)            m_curPadState[i].set(static_cast<size_t>(ControllerButton::BACK_BUTTON));
 
-        if (buttons & GameInputGamepadLeftShoulder)    m_curPadState[i].Set(static_cast<size_t>(ControllerButton::LEFT_SHOULDER));
-        if (buttons & GameInputGamepadRightShoulder)   m_curPadState[i].Set(static_cast<size_t>(ControllerButton::RIGHT_SHOULDER));
-        if (buttons & GameInputGamepadLeftThumbstick)  m_curPadState[i].Set(static_cast<size_t>(ControllerButton::LEFT_THUMB));
-        if (buttons & GameInputGamepadRightThumbstick) m_curPadState[i].Set(static_cast<size_t>(ControllerButton::RIGHT_THUMB));
+        if (buttons & GameInputGamepadLeftShoulder)    m_curPadState[i].set(static_cast<size_t>(ControllerButton::LEFT_SHOULDER));
+        if (buttons & GameInputGamepadRightShoulder)   m_curPadState[i].set(static_cast<size_t>(ControllerButton::RIGHT_SHOULDER));
+        if (buttons & GameInputGamepadLeftThumbstick)  m_curPadState[i].set(static_cast<size_t>(ControllerButton::LEFT_THUMB));
+        if (buttons & GameInputGamepadRightThumbstick) m_curPadState[i].set(static_cast<size_t>(ControllerButton::RIGHT_THUMB));
 
-        if (buttons & GameInputGamepadNone)            m_curPadState[i].Set(static_cast<size_t>(ControllerButton::None));
+        if (buttons & GameInputGamepadNone)            m_curPadState[i].set(static_cast<size_t>(ControllerButton::None));
 
         m_controllerThumbL[i].x = m_GameInputPadState[i].leftThumbstickX;
         m_controllerThumbL[i].y = m_GameInputPadState[i].leftThumbstickY;

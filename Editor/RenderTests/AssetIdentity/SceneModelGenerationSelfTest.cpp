@@ -1,3 +1,14 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "AssetIdentity/SceneModelGenerationSelfTest.h"
 
 #include "Assets/ModelAssetGeneration.h"
@@ -11,7 +22,7 @@
 #include "Texture.h"
 #include "ModelSceneInstantiation.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace RenderTest
 {
@@ -211,7 +222,7 @@ namespace RenderTest
             if (!object || object->IsDestroyMark()) continue;
             MeshRenderer* renderer = object->GetComponent<MeshRenderer>();
             if (nullptr == renderer) continue;
-            TallyRenderer(*renderer, object->m_name.ToString(), tally);
+            TallyRenderer(*renderer, object->m_name, tally);
         }
 
         const DataSystem::ModelGenerationTextureCacheSnapshot cache =
@@ -288,7 +299,7 @@ namespace RenderTest
             return false;
         }
 
-        std::map<Uuid::Uuid16, own::shared_owner<const Texture>> ownersBefore;
+        std::map<uuid::uuid16, own::shared_owner<const Texture>> ownersBefore;
         for (const assets::ModelTextureAsset& texture : before->Textures())
         {
             ownersBefore[texture.textureId] =

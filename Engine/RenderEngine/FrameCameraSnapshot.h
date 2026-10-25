@@ -1,7 +1,7 @@
 #pragma once
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector3.hpp>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // 한 프레임 분량의 카메라 렌더 입력 (PHASE 3-2).
 //

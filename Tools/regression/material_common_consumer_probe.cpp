@@ -1,14 +1,23 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "DataSystem.h"
 #include "Material.h"
 #include "MaterialGraphShaderMeta.h"
-#include "AuthoringNodeViewAccess.h"
-#include "AuthoringParsedDocument.h"
-#include "AuthoringParseTelemetry.h"
-#include "AuthoringWriteNode.h"
-#include "PathFinder.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringNodeViewAccess.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringParseTelemetry.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringWriteNode.h"
 #include "RHI/RHIShaderCompiler.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 void RunMaterialCodeRuntimeTests(const std::filesystem::path& root);
 void RunCookedGraphicsIdentityTests(const material_graph::VerifiedProduct& product);
@@ -34,19 +43,19 @@ int main(int argc, char** argv)
         if (argc == 3 && std::string_view(argv[1]) == "--pipeline-runtime")
         {
             const auto repository = std::filesystem::absolute(argv[2]);
-            auto* paths = InternalPath::GetInstance();
-            paths->ShaderSourcePath = repository / "Dynamic_CPP/Assets/Shaders";
-            paths->BaseProjectPath = repository / "Dynamic_CPP";
-            paths->AssetAuthoringEnabled = true;
+            auto* paths = (&ce::paths::get_state());
+            paths->shader_source_path = repository / "Dynamic_CPP/Assets/Shaders";
+            paths->base_project_path = repository / "Dynamic_CPP";
+            paths->asset_authoring_enabled = true;
             RunMaterialPipelineRuntimeTests(repository);
             return 0;
         }
         if (argc != 4) throw std::runtime_error("Expected source-free packaged Assets root, repository and authoring fixture");
         const auto root = std::filesystem::absolute(argv[1]);
-        auto* paths = InternalPath::GetInstance();
-        paths->DataPath = root;
-        paths->BaseProjectPath = root.parent_path();
-        paths->AssetAuthoringEnabled = false;
+        auto* paths = (&ce::paths::get_state());
+        paths->data_path = root;
+        paths->base_project_path = root.parent_path();
+        paths->asset_authoring_enabled = false;
         const auto parserCallsBeforePackage = Authoring::GetTextParseTelemetry().calls;
         auto* data = DataSystem::GetInstance();
         data->Initialize();
@@ -117,10 +126,10 @@ int main(int argc, char** argv)
         // recreating any generated source file.
         const auto authoring = LX::LXMaterialAsset::Load(std::filesystem::absolute(argv[3]), LX::CreateMaterialDefinitions(), &error);
         check(!!authoring, "Open authoring fixture for warm cache gate");
-        paths->ShaderSourcePath = std::filesystem::absolute(argv[2]) / "Dynamic_CPP/Assets/Shaders";
-        paths->BaseProjectPath = std::filesystem::absolute(argv[2]) / "Dynamic_CPP";
-        paths->CacheRoot = root.parent_path() / "AuthoringCache";
-        paths->AssetAuthoringEnabled = true;
+        paths->shader_source_path = std::filesystem::absolute(argv[2]) / "Dynamic_CPP/Assets/Shaders";
+        paths->base_project_path = std::filesystem::absolute(argv[2]) / "Dynamic_CPP";
+        paths->cache_root = root.parent_path() / "AuthoringCache";
+        paths->asset_authoring_enabled = true;
         Material authored;
         const bool coldPrepared = data->ConfigureMaterialGraphAuthoring(authored, *authoring, description, error);
         check(coldPrepared, "Cold authoring common generation: " + error);
@@ -129,7 +138,7 @@ int main(int argc, char** argv)
         // directory and removes it (DataSystem::CompileMaterialGraphAuthoring); the
         // product owns its bytecode. The verified-product cache stays beside the
         // scratch roots, so "warm" means the same generation without a stage compile.
-        const auto scratchRoot = paths->CacheRoot / "Lattice";
+        const auto scratchRoot = paths->cache_root / "Lattice";
         check(std::filesystem::exists(scratchRoot / (guid.ToString() + ".slang.scene-cache")),
             "Cold authoring keeps its verified-product cache outside the scratch directory");
         const auto scratchLeft = [&] {
@@ -160,7 +169,7 @@ int main(int argc, char** argv)
         std::filesystem::remove_all(shaderCopy);
         std::filesystem::copy(std::filesystem::absolute(argv[2]) / "Dynamic_CPP/Assets/Shaders", shaderCopy,
             std::filesystem::copy_options::recursive);
-        paths->ShaderSourcePath = shaderCopy;
+        paths->shader_source_path = shaderCopy;
         const auto appendComment = [&](const std::filesystem::path& file) {
             check(std::filesystem::exists(file), "Shader to edit exists: " + file.string());
             std::ofstream stream(file, std::ios::binary | std::ios::app);
@@ -179,8 +188,8 @@ int main(int argc, char** argv)
         check(data->ConfigureMaterialGraphAuthoring(authored, *authoring, description, error) &&
             compiles() > compilesBefore,
             "Editing a recorded dependency recompiles the material: " + error);
-        paths->ShaderSourcePath = std::filesystem::absolute(argv[2]) / "Dynamic_CPP/Assets/Shaders";
-        RunMaterialCodeRuntimeTests(paths->CacheRoot / "CodeRuntime");
+        paths->shader_source_path = std::filesystem::absolute(argv[2]) / "Dynamic_CPP/Assets/Shaders";
+        RunMaterialCodeRuntimeTests(paths->cache_root / "CodeRuntime");
         RunMaterialPipelineRuntimeTests(std::filesystem::absolute(argv[2]));
         data->Finalize();
         check(material.GetGeneratedShaderMeta() == &shader.meta && material.TryGetFloat("LXMaterialProperties.lx_bound_p900", roughness),

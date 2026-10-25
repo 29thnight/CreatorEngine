@@ -2,7 +2,7 @@
 // Deterministic fixtures and pre-cutover contracts retained from 86f7efd.
 // Device-free PCM rendering and logical Null backend are reported separately.
 #include <stdio.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "Audio/AudioHost.h"
 #include "Audio/AudioRuntime.h"
@@ -61,7 +61,7 @@ namespace
         }
     }
 
-    bool WriteBytes(const file::path& target, const std::vector<std::uint8_t>& bytes)
+    bool WriteBytes(const std::filesystem::path& target, const std::vector<std::uint8_t>& bytes)
     {
         std::ofstream stream(target, std::ios::binary | std::ios::trunc);
         if (!stream.is_open())
@@ -73,7 +73,7 @@ namespace
         return stream.good();
     }
 
-    bool ReadBytes(const file::path& source, std::vector<std::uint8_t>& bytes)
+    bool ReadBytes(const std::filesystem::path& source, std::vector<std::uint8_t>& bytes)
     {
         std::ifstream stream(source, std::ios::binary);
         if (!stream.is_open())
@@ -86,7 +86,7 @@ namespace
 
     // MPEG-1 Layer III, 32 kb/s, 44.1 kHz, mono. Each silent frame contains
     // 104 bytes and represents 1152 PCM samples. No audio asset is checked in.
-    bool WriteSilentMp3(const file::path& target, const file::path& truncatedTarget)
+    bool WriteSilentMp3(const std::filesystem::path& target, const std::filesystem::path& truncatedTarget)
     {
         constexpr std::size_t kFrameBytes = 104u;
         constexpr std::size_t kFrameCount = 48u;
@@ -139,7 +139,7 @@ namespace
 
     // RFC 9639: STREAMINFO and fixed 4096-sample mono frames containing
     // constant-zero subframes. Both frame checksums are calculated here.
-    bool WriteSilentFlac(const file::path& target, const file::path& truncatedTarget)
+    bool WriteSilentFlac(const std::filesystem::path& target, const std::filesystem::path& truncatedTarget)
     {
         constexpr std::uint64_t kBlockSize = 4096u;
         constexpr std::uint64_t kFrameCount = 12u;
@@ -186,7 +186,7 @@ namespace
     //   길이·루프 판정에는 영향이 없다(채널 volume 이 아니라 내용이 0이므로
     //   `vol0virtualvol` 가상화 경로도 타지 않는다).
     template <typename Sample>
-    bool WritePcmWav(const file::path& target, std::uint32_t frameCount, Sample sampleAt)
+    bool WritePcmWav(const std::filesystem::path& target, std::uint32_t frameCount, Sample sampleAt)
     {
         const std::uint32_t dataBytes = frameCount * 2u;
 
@@ -216,7 +216,7 @@ namespace
         return WriteBytes(target, bytes);
     }
 
-    bool WriteSineWav(const file::path& target, float seconds, float frequency,
+    bool WriteSineWav(const std::filesystem::path& target, float seconds, float frequency,
         float amplitude = 0.0f)
     {
         const std::uint32_t frameCount =
@@ -230,7 +230,7 @@ namespace
         });
     }
 
-    bool WriteImpulseWav(const file::path& target)
+    bool WriteImpulseWav(const std::filesystem::path& target)
     {
         return WritePcmWav(target, 4800u, [](std::uint32_t frame) -> std::int16_t
         {
@@ -238,7 +238,7 @@ namespace
         });
     }
 
-    bool WriteShortLoopWav(const file::path& target)
+    bool WriteShortLoopWav(const std::filesystem::path& target)
     {
         // 24 complete 480 Hz cycles in 2400 frames (50 ms): a repeatable seam.
         return WritePcmWav(target, 2400u, [](std::uint32_t frame) -> std::int16_t
@@ -248,7 +248,7 @@ namespace
         });
     }
 
-    bool WriteMalformedFixtures(const file::path& formats)
+    bool WriteMalformedFixtures(const std::filesystem::path& formats)
     {
         if (!WriteBytes(formats / "corrupt.wav", std::vector<std::uint8_t>(44u, 0u)))
             return false;
@@ -287,7 +287,7 @@ namespace
         return WriteBytes(formats / "oversized.flac", oversizedFlac);
     }
 
-    bool WriteShortCompressedLoops(const file::path& formats)
+    bool WriteShortCompressedLoops(const std::filesystem::path& formats)
     {
         std::vector<std::uint8_t> mp3;
         if (!ReadBytes(formats / "silent.mp3", mp3) || mp3.size() < 4u * 104u)
@@ -307,7 +307,7 @@ namespace
         return WriteBytes(formats / "loop.flac", flac);
     }
 
-    bool WriteTailTruncatedFixtures(const file::path& formats)
+    bool WriteTailTruncatedFixtures(const std::filesystem::path& formats)
     {
         std::vector<std::uint8_t> wav;
         if (!ReadBytes(formats / "sine.wav", wav) || wav.size() != 44u + 4800u * 2u)
@@ -334,8 +334,8 @@ namespace
 
     struct Fixture
     {
-        file::path root;
-        file::path assets;
+        std::filesystem::path root;
+        std::filesystem::path assets;
     };
 
     // ★ 저장소 밖이 아니라 `Build/` 아래에 만든다 — git 이 무시하는 자리다.
@@ -345,19 +345,19 @@ namespace
     // 않아 `_isSoundLoaderThreadRunning` 이 초기값 true 에서 내려가지 않는다.
     //
     // ★ fixture 를 넣으면 이 조건이 지워진다. 종료 canary 는 반드시 빈 상태로 재야 한다.
-    bool PrepareFixture(const file::path& repositoryRoot, bool withClips, Fixture& out)
+    bool PrepareFixture(const std::filesystem::path& repositoryRoot, bool withClips, Fixture& out)
     {
         std::error_code error;
         out.root = repositoryRoot / "Build" / "Validation" / "AudioVoiceContract";
         out.assets = out.root / "Assets";
 
-        file::remove_all(out.root, error);
-        file::create_directories(out.assets, error);
+        std::filesystem::remove_all(out.root, error);
+        std::filesystem::create_directories(out.assets, error);
         if (error)
         {
             return false;
         }
-        file::create_directories(out.root / "Runtime" / "Data", error);
+        std::filesystem::create_directories(out.root / "Runtime" / "Data", error);
         if (error)
         {
             return false;
@@ -366,7 +366,7 @@ namespace
         {
             return true;
         }
-        file::create_directories(out.root / "Formats", error);
+        std::filesystem::create_directories(out.root / "Formats", error);
         if (error)
         {
             return false;
@@ -409,7 +409,7 @@ namespace
         {
             return false;
         }
-        file::create_directories(out.assets / "Sounds", error);
+        std::filesystem::create_directories(out.assets / "Sounds", error);
         if (error)
         {
             return false;
@@ -441,7 +441,7 @@ namespace
 
         // ★ 동명 충돌. 키가 파일명 stem 이라 폴더가 다르면 하나가 진다(AU2 까지).
         //   이기는 쪽을 따지기 전에 **졌다는 사실이 세어지는지**를 먼저 재야 한다.
-        file::create_directories(out.assets / "Sounds" / "BGM", error);
+        std::filesystem::create_directories(out.assets / "Sounds" / "BGM", error);
         if (error)
         {
             return false;
@@ -477,7 +477,7 @@ namespace
     int RunOfflineFixtures(const Fixture& fixture)
     {
         std::printf("[AU0] 생성 fixture PCM 검증\n");
-        const file::path formats = fixture.root / "Formats";
+        const std::filesystem::path formats = fixture.root / "Formats";
 
         assets::AudioClipSourceMetadata wav{}, mp3{}, flac{}, tail{};
         std::string inspectError;
@@ -572,7 +572,7 @@ namespace
             std::pair{ "tail.mp3", "silent.mp3" },
             std::pair{ "tail.flac", "silent.flac" } })
         {
-            const file::path source = fixture.root / "Formats" / name;
+            const std::filesystem::path source = fixture.root / "Formats" / name;
             std::vector<std::int16_t> originalPcm;
             std::uint64_t originalReported = 0u;
             (void)wave::probe::DecodePcmS16Mono48k(
@@ -740,7 +740,7 @@ namespace
         }
         void Stop() override { ++stops; m_partial.Stop(); }
         bool IsRunning() const override { return m_partial.IsRunning(); }
-        bool LoadClip(const wave::ClipKey& key, const file::path& source) override
+        bool LoadClip(const wave::ClipKey& key, const std::filesystem::path& source) override
         {
             return m_partial.LoadClip(key, source);
         }
@@ -929,7 +929,7 @@ namespace
         Report(backend.IsRunning(), "miniaudio 장치가 열린다");
         Report(backend.ActualSettings().sampleRate > 0u, "열린 장치의 sampleRate 가 보고된다");
 
-        const file::path sounds = fixture.assets / "Sounds";
+        const std::filesystem::path sounds = fixture.assets / "Sounds";
         const wave::ClipKey tone("probe_tone");
         const wave::ClipKey blip("probe_blip");
 

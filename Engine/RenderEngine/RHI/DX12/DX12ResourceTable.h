@@ -1,9 +1,31 @@
 #pragma once
-#include "../../../Utility_Framework/LifetimeToken.h"
-#include "../../../Utility_Framework/Ownership.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
-#include <d3d12.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 
 #include "../RHIHandle.h"
 #include "DX12ResourceEntries.h"
@@ -39,8 +61,8 @@ class DX12ResourceTable
     {
         struct Entry
         {
-            Microsoft::WRL::ComPtr<ID3D12Resource> resource;
-            Microsoft::WRL::ComPtr<ID3D12Heap> heap;
+            winrt::com_ptr<ID3D12Resource> resource;
+            winrt::com_ptr<ID3D12Heap> heap;
             ce::lifetime_token allocation;
             uint32_t generation{};
             uint64_t address{};
@@ -61,17 +83,17 @@ class DX12ResourceTable
         ID3D12Resource* Resolve(RHITextureHandle handle) const
         {
             const auto* entry = Find(textures, handle.id);
-            return entry ? entry->resource.Get() : nullptr;
+            return entry ? entry->resource.get() : nullptr;
         }
         ID3D12Resource* Resolve(RHIBufferHandle handle) const
         {
             const auto* entry = Find(buffers, handle.id);
-            return entry ? entry->resource.Get() : nullptr;
+            return entry ? entry->resource.get() : nullptr;
         }
         DX12BufferEntry DescribeBuffer(RHIBufferHandle handle) const
         {
             const auto* entry = Find(buffers, handle.id);
-            return entry ? DX12BufferEntry{entry->resource.Get(), entry->bytes, entry->indirect} : DX12BufferEntry{};
+            return entry ? DX12BufferEntry{entry->resource.get(), entry->bytes, entry->indirect} : DX12BufferEntry{};
         }
         uint64_t ResolveGpuAddress(RHIBufferHandle handle) const
         {
@@ -107,7 +129,7 @@ class DX12ResourceTable
                 entry = {};
                 if (slot.alive)
                 {
-                    entry.resource = slot.Get();
+                    entry.resource.copy_from(slot.Get());
                     entry.heap = slot.sparseHeap;
                     entry.allocation = slot.allocationLifetime;
                     entry.generation = slot.generation;
@@ -123,20 +145,20 @@ class DX12ResourceTable
     }
 
     /// 소유하고 등록한다. 표가 ComPtr을 들고 있으므로 호출부는 핸들만 남긴다.
-    RHITextureHandle AddTexture(Microsoft::WRL::ComPtr<ID3D12Resource> resource)
+    RHITextureHandle AddTexture(winrt::com_ptr<ID3D12Resource> resource)
     {
-        if (nullptr == resource.Get())
+        if (nullptr == resource.get())
         {
             return {};
         }
         return RHITextureHandle{AcquireTexture(std::move(resource), nullptr)};
     }
 
-    RHIBufferHandle AddBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> resource, bool allowIndirectArguments = false,
-                              Microsoft::WRL::ComPtr<ID3D12Heap> sparseHeap = {},
+    RHIBufferHandle AddBuffer(winrt::com_ptr<ID3D12Resource> resource, bool allowIndirectArguments = false,
+                              winrt::com_ptr<ID3D12Heap> sparseHeap = {},
                               ce::lifetime_token allocationLifetime = {})
     {
-        if (nullptr == resource.Get())
+        if (nullptr == resource.get())
         {
             return {};
         }
@@ -183,7 +205,7 @@ class DX12ResourceTable
             return nullptr;
         }
         const Slot& entry = m_buffers[slot];
-        return entry.alive && entry.generation == RHIHandleBits::GenerationOf(handle.id) ? entry.sparseHeap.Get()
+        return entry.alive && entry.generation == RHIHandleBits::GenerationOf(handle.id) ? entry.sparseHeap.get()
                                                                                          : nullptr;
     }
     ce::lifetime_token ResolveBufferLifetime(RHIBufferHandle handle) const
@@ -321,8 +343,8 @@ class DX12ResourceTable
             for (uint32_t i = 0; i < count; ++i)
             {
                 Slot& entry = m_buffers[i];
-                entry.owned.Reset();
-                entry.sparseHeap.Reset();
+                entry.owned = nullptr;
+                entry.sparseHeap = nullptr;
                 entry.allocationLifetime.reset();
                 entry.external = nullptr;
                 entry.gpuAddress = 0;
@@ -352,8 +374,8 @@ class DX12ResourceTable
   private:
     struct Slot
     {
-        Microsoft::WRL::ComPtr<ID3D12Resource> owned; // 소유할 때만
-        Microsoft::WRL::ComPtr<ID3D12Heap> sparseHeap;
+        winrt::com_ptr<ID3D12Resource> owned; // 소유할 때만
+        winrt::com_ptr<ID3D12Heap> sparseHeap;
         ce::lifetime_token allocationLifetime;
         ID3D12Resource* external{nullptr}; // 임포트일 때만
         uint32_t generation{0};
@@ -365,13 +387,13 @@ class DX12ResourceTable
         uint64_t bufferBytes{0};
         bool allowIndirectArguments{false};
 
-        ID3D12Resource* Get() const { return owned ? owned.Get() : external; }
+        ID3D12Resource* Get() const { return owned ? owned.get() : external; }
     };
 
     // The storage never relocates while a different worker registers a texture.
     // The recording/retirement contract keeps a resolved handle alive until its
     // consumers finish; concurrent mutation of the same live handle is forbidden.
-    uint32_t AcquireTexture(Microsoft::WRL::ComPtr<ID3D12Resource> owned, ID3D12Resource* external)
+    uint32_t AcquireTexture(winrt::com_ptr<ID3D12Resource> owned, ID3D12Resource* external)
     {
         std::lock_guard lock(m_textureRegistryMutex);
         std::uint32_t slot{};
@@ -419,8 +441,8 @@ class DX12ResourceTable
         return entry.Get();
     }
 
-    uint32_t AcquireBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> owned, ID3D12Resource* external,
-                           bool allowIndirectArguments = false, Microsoft::WRL::ComPtr<ID3D12Heap> sparseHeap = {},
+    uint32_t AcquireBuffer(winrt::com_ptr<ID3D12Resource> owned, ID3D12Resource* external,
+                           bool allowIndirectArguments = false, winrt::com_ptr<ID3D12Heap> sparseHeap = {},
                            ce::lifetime_token allocationLifetime = {})
     {
         std::lock_guard lock(m_bufferRegistryMutex);
@@ -499,8 +521,8 @@ class DX12ResourceTable
             return;
         }
         entry.alive = false;
-        entry.owned.Reset();
-        entry.sparseHeap.Reset();
+        entry.owned = nullptr;
+        entry.sparseHeap = nullptr;
         entry.allocationLifetime.reset();
         entry.external = nullptr;
         entry.gpuAddress = 0;
@@ -528,7 +550,7 @@ class DX12ResourceTable
         {
             return;
         }
-        entry.owned.Reset();
+        entry.owned = nullptr;
         entry.external = nullptr;
         entry.alive = false;
         ++entry.generation;

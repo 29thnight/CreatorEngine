@@ -1,6 +1,14 @@
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../../Assets/PreparedClusterPages.h"
-#include "../../../Utility_Framework/DynamicBitset.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.DynamicBitset.h"
+#else
+import Creator.Core.DynamicBitset;
+#endif
 #include "CookedModelSubAssetCodec.h"
 #include "CookedAssetCatalog.h"
 #include "../../Assets/ClusterTopologyPage.h"
@@ -10,7 +18,7 @@
 #include "../Import/MeshletBuilder.h"
 #include "../Import/MeshLodBuilder.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 
 namespace experiment::cooked
@@ -33,7 +41,7 @@ void Require(bool condition, const char* message)
 
 bool V8(const AssetId& value)
 {
-    return value.IsValid() && (value.value.data[6] & 0xf0u) == 0x80u && (value.value.data[8] & 0xc0u) == 0x80u;
+    return value.IsValid() && (value.value.data_[6] & 0xf0u) == 0x80u && (value.value.data_[8] & 0xc0u) == 0x80u;
 }
 
 struct WireWriter final
@@ -918,7 +926,7 @@ bool WriteAnimationClipArtifact(const AnimationClipArtifact& value, std::vector<
             ClipHeader(value);
             WireWriter wire;
             wire.Header(kClipMagic, kAnimationClipArtifactVersion);
-            wire.Bytes(value.skeletonAssetId.value.data);
+            wire.Bytes(value.skeletonAssetId.value.data_);
             wire.Bytes(value.requiredBoneLayoutSha256);
             wire.Integer(value.requiredBoneCount);
             wire.Text(value.clip.name);
@@ -956,7 +964,7 @@ bool ReadAnimationClipArtifact(std::span<const std::byte> bytes, AnimationClipAr
             WireReader wire(bytes);
             wire.Header(kClipMagic, kAnimationClipArtifactVersion);
             AnimationClipArtifact value;
-            wire.Bytes(value.skeletonAssetId.value.data);
+            wire.Bytes(value.skeletonAssetId.value.data_);
             wire.Bytes(value.requiredBoneLayoutSha256);
             value.requiredBoneCount = wire.Integer<std::uint32_t>();
             value.clip.name = wire.Text();
@@ -1002,13 +1010,13 @@ bool WriteModelDescriptorArtifact(const ModelDescriptorArtifact& value, std::vec
             Descriptor(value);
             WireWriter wire;
             wire.Header(kDescriptorMagic, kModelDescriptorVersion);
-            wire.Bytes(value.modelAssetId.value.data);
-            wire.Bytes(value.skeletonAssetId.value.data);
+            wire.Bytes(value.modelAssetId.value.data_);
+            wire.Bytes(value.skeletonAssetId.value.data_);
             wire.Text(value.name);
             wire.Integer(static_cast<std::uint32_t>(value.clips.size()));
             for (const auto& clip : value.clips)
             {
-                wire.Bytes(clip.clipAssetId.value.data);
+                wire.Bytes(clip.clipAssetId.value.data_);
                 wire.Text(clip.name);
                 wire.Double(clip.durationTicks);
                 wire.Double(clip.ticksPerSecond);
@@ -1018,8 +1026,8 @@ bool WriteModelDescriptorArtifact(const ModelDescriptorArtifact& value, std::vec
             wire.Integer(static_cast<std::uint32_t>(value.meshes.size()));
             for (const auto& mesh : value.meshes)
             {
-                wire.Bytes(mesh.meshAssetId.value.data);
-                wire.Bytes(mesh.materialAssetId.value.data);
+                wire.Bytes(mesh.meshAssetId.value.data_);
+                wire.Bytes(mesh.materialAssetId.value.data_);
                 wire.Text(mesh.name);
                 GeometryBounds(wire, mesh.bounds);
                 wire.Integer(mesh.attributes);
@@ -1037,13 +1045,13 @@ bool WriteModelDescriptorArtifact(const ModelDescriptorArtifact& value, std::vec
                 wire.Integer(static_cast<std::uint32_t>(node.meshAssetIds.size()));
                 for (const auto id : node.meshAssetIds)
                 {
-                    wire.Bytes(id.value.data);
+                    wire.Bytes(id.value.data_);
                 }
             }
             wire.Integer(static_cast<std::uint32_t>(value.materials.size()));
             for (const auto& material : value.materials)
             {
-                wire.Bytes(material.materialAssetId.value.data);
+                wire.Bytes(material.materialAssetId.value.data_);
                 wire.Text(material.name);
                 wire.Integer(static_cast<std::uint8_t>(material.blendMode));
             }
@@ -1061,15 +1069,15 @@ bool ReadModelDescriptorArtifact(std::span<const std::byte> bytes, ModelDescript
             // v1을 빈 v2로 받아들이면 node/mesh가 조용히 사라진다. 재cook만 허용한다.
             wire.Header(kDescriptorMagic, kModelDescriptorVersion);
             ModelDescriptorArtifact value;
-            wire.Bytes(value.modelAssetId.value.data);
-            wire.Bytes(value.skeletonAssetId.value.data);
+            wire.Bytes(value.modelAssetId.value.data_);
+            wire.Bytes(value.skeletonAssetId.value.data_);
             value.name = wire.Text();
             const auto count = wire.Count(kModelSubAssetMaxClips, 37u);
             value.clips.reserve(count);
             for (std::uint32_t index = 0; index < count; ++index)
             {
                 ModelClipSummary clip;
-                wire.Bytes(clip.clipAssetId.value.data);
+                wire.Bytes(clip.clipAssetId.value.data_);
                 clip.name = wire.Text();
                 clip.durationTicks = wire.Double();
                 clip.ticksPerSecond = wire.Double();
@@ -1084,8 +1092,8 @@ bool ReadModelDescriptorArtifact(std::span<const std::byte> bytes, ModelDescript
             for (std::uint32_t index = 0; index < meshCount; ++index)
             {
                 ModelMeshSummary mesh;
-                wire.Bytes(mesh.meshAssetId.value.data);
-                wire.Bytes(mesh.materialAssetId.value.data);
+                wire.Bytes(mesh.meshAssetId.value.data_);
+                wire.Bytes(mesh.materialAssetId.value.data_);
                 mesh.name = wire.Text();
                 mesh.bounds = GeometryBounds(wire);
                 mesh.attributes = wire.Integer<std::uint32_t>();
@@ -1113,7 +1121,7 @@ bool ReadModelDescriptorArtifact(std::span<const std::byte> bytes, ModelDescript
                 node.meshAssetIds.resize(referenceCount);
                 for (auto& id : node.meshAssetIds)
                 {
-                    wire.Bytes(id.value.data);
+                    wire.Bytes(id.value.data_);
                 }
                 value.nodes.push_back(std::move(node));
             }
@@ -1122,7 +1130,7 @@ bool ReadModelDescriptorArtifact(std::span<const std::byte> bytes, ModelDescript
             for (std::uint32_t index = 0; index < materialCount; ++index)
             {
                 ModelMaterialSummary material;
-                wire.Bytes(material.materialAssetId.value.data);
+                wire.Bytes(material.materialAssetId.value.data_);
                 material.name = wire.Text();
                 material.blendMode = static_cast<MaterialBlendMode>(wire.Integer<std::uint8_t>());
                 value.materials.push_back(std::move(material));

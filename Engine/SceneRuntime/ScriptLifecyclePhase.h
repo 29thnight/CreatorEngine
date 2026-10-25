@@ -1,5 +1,5 @@
 #pragma once
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // 관리 인스턴스 하나에 생명주기 단계 하나를 직접 전달할 때 쓰는 단계 번호
 // (SceneGraphRedesignPlan 트랙 L · L3 완결).

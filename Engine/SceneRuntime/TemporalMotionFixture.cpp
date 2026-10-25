@@ -1,5 +1,14 @@
-#include "../Utility_Framework/Ownership.h"
-#include "DiagnosticDocument.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../Utility_Framework/Authoring/DiagnosticDocument.h"
 #include "TemporalMotionFixture.h"
 #if CE_DEVELOPMENT && !CE_SHIPPING
 #include "TemporalMotionFixtureAssets.h"
@@ -21,9 +30,16 @@
 #include "DataSystem.h"
 #include "Material.h"
 #include "Texture.h"
-#include "PathFinder.h"
-#include "ContentAbi.h"
-#include "JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.ContentAbi.h"
+#else
+import Creator.Core.ContentAbi;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include "Assets/ModelMeshDescriptor.h"
 #include "Assets/ModelAnimationDescriptor.h"
 #include "Assets/ModelSkeletonPayload.h"
@@ -33,7 +49,7 @@
 #include "RHI/RHIShaderCompiler.h"
 #include <mathematics/transform.hpp>
 #include <stdio.h>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -846,7 +862,7 @@ bool TemporalMotionFixture::Begin(const std::string& directory, std::string& err
         return false;
     }
     if (!SceneManagers->GetActiveScene() || SceneManagers->IsPlayCommitted()
-        || !PathFinder::IsAssetAuthoringEnabled())
+        || !ce::paths::is_asset_authoring_enabled())
     {
         error = "The motion fixture requires an idle, paused Editor scene";
         return false;
@@ -935,8 +951,8 @@ bool TemporalMotionFixture::Begin(const std::string& directory, std::string& err
         }
         TemporalMotionFixtureAssetOptions options;
         options.targetPlatform = "win-x64";
-        options.targetAbi = CreatorContentAbi::Token;
-        options.shaderDirectory = PathFinder::ShaderPath() / "DefaultPassShader";
+        options.targetAbi = ce::content_abi::token;
+        options.shaderDirectory = ce::paths::shader_path() / "DefaultPassShader";
         options.cacheDirectory = destination / "compiler-cache";
         session->assetSourceIdentity = FixtureAssetSourceIdentity(options);
         own::shared_owner<BuildResult> preparedAssets;

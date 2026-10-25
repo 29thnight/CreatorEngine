@@ -1,10 +1,14 @@
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../RHISoftwareEncoder.h"
 #include "DX12GpuProfiler.h"
 #include "DX12Encoder.h"
 #include "../RHIProfilingContext.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -35,7 +39,7 @@ bool DX12GpuProfiler::Initialize(ID3D12Device* device, ID3D12CommandQueue* queue
         return false;
     }
 
-    m_queue = queue;
+    m_queue.copy_from(queue);
     m_maxPassesPerFrame = maxPassesPerFrame;
     m_frameCount = frameCount;
 
@@ -66,7 +70,7 @@ bool DX12GpuProfiler::Initialize(ID3D12Device* device, ID3D12CommandQueue* queue
     heapDesc.Type = D3D12_QUERY_HEAP_TYPE_TIMESTAMP;
     heapDesc.Count = totalQueries;
 
-    HRESULT hr = device->CreateQueryHeap(&heapDesc, IID_PPV_ARGS(&m_queryHeap));
+    HRESULT hr = device->CreateQueryHeap(&heapDesc, IID_PPV_ARGS(m_queryHeap.put()));
     if (FAILED(hr))
     {
         outError = "질의 힙 생성 실패 " + ProfilerHrToString(hr);
@@ -86,7 +90,7 @@ bool DX12GpuProfiler::Initialize(ID3D12Device* device, ID3D12CommandQueue* queue
     desc.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
 
     hr = device->CreateCommittedResource(&readbackHeap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COMMON,
-                                         nullptr, IID_PPV_ARGS(&m_readback));
+                                         nullptr, IID_PPV_ARGS(m_readback.put()));
     if (FAILED(hr))
     {
         outError = "질의 리드백 버퍼 생성 실패 " + ProfilerHrToString(hr);
@@ -100,11 +104,11 @@ bool DX12GpuProfiler::Initialize(ID3D12Device* device, ID3D12CommandQueue* queue
 
 void DX12GpuProfiler::Shutdown()
 {
-    m_queue.Reset();
+    m_queue = nullptr;
     m_calibration = ClockCalibration{};
     m_records.clear();
-    m_readback.Reset();
-    m_queryHeap.Reset();
+    m_readback = nullptr;
+    m_queryHeap = nullptr;
     m_maxPassesPerFrame = 0;
     m_frameCount = 0;
     m_recordingSlot = 0;
@@ -287,7 +291,7 @@ uint32_t DX12GpuProfiler::BeginPass(RHIEncoder& encoder, const std::string& name
         if (slot != kInvalidSlot &&
             !software->RecordGpuQuery(
                 RHISoftwareCommandType::BeginGpuPass,
-                DX12SoftwareTimestamp{m_queryHeap.Get(), m_records[RecordIndex(m_recordingSlot, slot)].beginQuery},
+                DX12SoftwareTimestamp{m_queryHeap.get(), m_records[RecordIndex(m_recordingSlot, slot)].beginQuery},
                 &ReplayDX12SoftwareTimestamp))
         {
             throw std::runtime_error("Software GPU begin timestamp could not be recorded.");
@@ -305,7 +309,7 @@ void DX12GpuProfiler::EndPass(RHIEncoder& encoder, uint32_t slot)
         if (slot != kInvalidSlot && slot < m_maxPassesPerFrame &&
             !software->RecordGpuQuery(
                 RHISoftwareCommandType::EndGpuPass,
-                DX12SoftwareTimestamp{m_queryHeap.Get(), m_records[RecordIndex(m_recordingSlot, slot)].endQuery},
+                DX12SoftwareTimestamp{m_queryHeap.get(), m_records[RecordIndex(m_recordingSlot, slot)].endQuery},
                 &ReplayDX12SoftwareTimestamp))
         {
             throw std::runtime_error("Software GPU end timestamp could not be recorded.");
@@ -330,7 +334,7 @@ uint32_t DX12GpuProfiler::BeginPass(ID3D12GraphicsCommandList* commandList, cons
     const auto slot = ReservePass(name, identity);
     if (slot != kInvalidSlot)
     {
-        commandList->EndQuery(m_queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP,
+        commandList->EndQuery(m_queryHeap.get(), D3D12_QUERY_TYPE_TIMESTAMP,
                               m_records[RecordIndex(m_recordingSlot, slot)].beginQuery);
     }
     return slot;
@@ -375,7 +379,7 @@ void DX12GpuProfiler::EndPass(ID3D12GraphicsCommandList* commandList, uint32_t s
         return;
     }
 
-    commandList->EndQuery(m_queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP,
+    commandList->EndQuery(m_queryHeap.get(), D3D12_QUERY_TYPE_TIMESTAMP,
                           m_records[RecordIndex(m_recordingSlot, slot)].endQuery);
 }
 
@@ -397,7 +401,7 @@ void DX12GpuProfiler::ResolveFrame(ID3D12GraphicsCommandList* commandList, const
     const uint32_t base = token.ringSlot * m_maxPassesPerFrame * 2;
     const uint32_t count = used * 2;
 
-    commandList->ResolveQueryData(m_queryHeap.Get(), D3D12_QUERY_TYPE_TIMESTAMP, base, count, m_readback.Get(),
+    commandList->ResolveQueryData(m_queryHeap.get(), D3D12_QUERY_TYPE_TIMESTAMP, base, count, m_readback.get(),
                                   static_cast<uint64_t>(base) * sizeof(uint64_t));
 }
 

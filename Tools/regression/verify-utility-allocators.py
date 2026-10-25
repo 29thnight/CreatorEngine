@@ -10,6 +10,7 @@ import argparse
 import hashlib
 import json
 import os
+import runpy
 from pathlib import Path
 import shlex
 import shutil
@@ -24,8 +25,9 @@ UTILITY = Path("Engine/Utility_Framework")
 PROBE = Path("Tools/regression/utility_allocators_probe.cpp")
 RUNNER = Path("Tools/regression/verify-utility-allocators.py")
 REQUIRED = [UTILITY / name for name in (
-    "Arena.h", "Arena.cpp", "HeapAllocator.h", "LinearArena.h", "StackArena.h", "FixedPool.h"
-)] + [PROBE, RUNNER]
+    "Memory/Arena.cpp", )] + [PROBE, RUNNER, Path("Engine/Contracts/Core/Creator.Core.BoundedMemory.ixx"),
+      Path("Tools/build/ModuleAdapters/Creator.Core.BoundedMemory.h"),
+      UTILITY / "Foundation/StandardLibrary.h", Path("Tools/build/generate-module-adapters.py")]
 
 
 def execute(command, cwd, environment=None):
@@ -51,7 +53,11 @@ def verify(root, work, compiler, c_compiler, sanitize):
     build = work / "build"
     source.mkdir(parents=True)
     build.mkdir()
-    inputs = {path: (root / path).read_bytes() for path in REQUIRED}
+    generator = runpy.run_path(str(root / "Tools/build/generate-module-adapters.py"))
+    expected = generator["render"]("Creator.Core.BoundedMemory")
+    if (root / "Tools/build/ModuleAdapters/Creator.Core.BoundedMemory.h").read_text(encoding="utf-8") != expected:
+        raise RuntimeError("Regenerate the bounded-memory source-tool adapter before running this probe")
+    inputs = {path: (root / path).read_bytes() for path in generator["memory_source_inputs"](REQUIRED)}
     for folder in ("ThirdParty/mimalloc/include", "ThirdParty/mimalloc/src"):
         for path in sorted((root / folder).rglob("*")):
             if path.is_file():
@@ -65,14 +71,14 @@ def verify(root, work, compiler, c_compiler, sanitize):
 
     sanitizer_flags = (["-fsanitize=address,undefined", "-fno-omit-frame-pointer",
                         "-fno-sanitize-recover=all"] if sanitize else [])
-    common = ["-O1" if sanitize else "-O2", "-g", "-pthread", "-DMI_STATIC_LIB", *sanitizer_flags]
+    common = ["-O1" if sanitize else "-O2", "-g", "-pthread", "-DMI_STATIC_LIB", "-DCE_CONTRACT_STANDALONE=1", *sanitizer_flags]
     allocator_command = [c_compiler, "-std=c11", *common,
                          f"-I{source / 'ThirdParty/mimalloc/include'}", "-MMD", "-MF", str(build / "mimalloc.d"),
                          "-c", str(source / "ThirdParty/mimalloc/src/static.c"), "-o", str(build / "mimalloc.o")]
     commands = [allocator_command]
     logs = [execute(allocator_command, source).stderr]
     objects = []
-    for name, path in (("arena", UTILITY / "Arena.cpp"), ("probe", PROBE)):
+    for name, path in (("arena", UTILITY / "Memory/Arena.cpp"), ("probe", PROBE)):
         target = build / f"{name}.o"
         command = [compiler, "-std=c++23", *common, "-Wall", "-Wextra", "-Wpedantic", "-MMD", "-MF",
                    str(build / f"{name}.d"), "-c", str(source / path), "-o", str(target)]

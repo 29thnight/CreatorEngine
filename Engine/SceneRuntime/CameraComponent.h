@@ -1,5 +1,5 @@
 #pragma once
-#include "Core.Minimal.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "Component.h"
 #include "Camera.h"
 #include <mathematics/bounds.hpp>

@@ -1,4 +1,15 @@
-﻿#include "ModelSceneInstantiation.h"
+﻿#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
+#include "ModelSceneInstantiation.h"
 
 #include "Scene.h"
 #include "Animator.h"
@@ -17,7 +28,7 @@
 #include "Assets/ModelAssetGeneration.h"
 #include "Experiment/ModelData.h"
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace ModelSceneInstantiation
 {
@@ -127,8 +138,8 @@ namespace ModelSceneInstantiation
         if (options.createMeshCollider && impl->hasBones)
             return reject(); // Static triangle assets cannot follow animated skin deformation.
 
-        std::map<Uuid::Uuid16, std::uint32_t> meshIndices;
-        std::map<Uuid::Uuid16, std::uint32_t> materialIndices;
+        std::map<uuid::uuid16, std::uint32_t> meshIndices;
+        std::map<uuid::uuid16, std::uint32_t> materialIndices;
         for (std::uint32_t i = 0; i < meshes.size(); ++i) meshIndices.emplace(meshes[i].meshId, i);
         for (std::uint32_t i = 0; i < materials.size(); ++i) materialIndices.emplace(materials[i].materialId, i);
         impl->meshMaterials.resize(meshes.size(), assets::kInvalidModelAssetIndex);
@@ -598,7 +609,7 @@ namespace ModelSceneInstantiation
 
                     PhysicsShapeDefinition shape;
                     shape.kind = PhysicsShapeKind::triangle_mesh;
-                    shape.geometryAsset = Uuid::ToString(key->asset);
+                    shape.geometryAsset = uuid::to_string(key->asset);
                     shape.geometryRevision = key->revision;
                     shape.staticFriction = shape.dynamicFriction = shape.restitution = 0;
                     auto* body = object->AddComponent<PhysicsBodyComponent>(ce::physics::body_kind::static_body,

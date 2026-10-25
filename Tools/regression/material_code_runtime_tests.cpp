@@ -1,14 +1,19 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "Material.h"
 #include "material_owner_checks.h"
 #include "MaterialPropertyPacker.h"
 #include "RHI/RHIShaderCompiler.h"
 #include "Render/Scene/ExperimentMaterialSealing.h"
-#include "AuthoringNodeViewAccess.h"
-#include "AuthoringWriteNode.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringNodeViewAccess.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringWriteNode.h"
 #include "DataSystem.h"
-#include "ReflectionTypedYml.h"
+#include "../../Engine/Utility_Framework/Reflection/ReflectionTypedYml.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace reflgen::generated
 {

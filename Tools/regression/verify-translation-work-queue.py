@@ -12,6 +12,7 @@ pinned commit 0289cf6ffce86697e1f46cb4eeca1c946bffec71.
 No dependencies are downloaded and no production source is modified.
 """
 
+import runpy
 import argparse
 import hashlib
 import json
@@ -40,7 +41,7 @@ def main():
     paths = [root / "Engine/RenderEngine/RHI/RHICommandTranslator.cpp",
              root / "Engine/RenderEngine/RHI/RHITranslationWorkQueue.h",
              ROOT / "Tools/regression/translation_work_queue_probe.cpp", Path(__file__).resolve(),
-             root / "Engine/Utility_Framework/StandardLibrary.h"]
+             root / "Engine/Utility_Framework/Foundation/StandardLibrary.h"]
     dependency = args.enkits.resolve() if args.enkits else None
     if dependency:
         if (dependency / "src/TaskScheduler.cpp").is_file():
@@ -49,12 +50,13 @@ def main():
             parser.error("--enkits must contain TaskScheduler.cpp and TaskScheduler.h, directly or under src")
         paths += [root / "Engine/RenderEngine/RHI/RHICommandRecordingJobs.h",
                   root / "Engine/RenderEngine/RHI/RHIRecordingTaskGraph.h",
-                  root / "Engine/Utility_Framework/JobScheduler.h",
-                  root / "Engine/Utility_Framework/JobScheduler.cpp",
-                  root / "Engine/Utility_Framework/ThreadPool.h",
-                  root / "Engine/Utility_Framework/ThreadPool.cpp",
-                  root / "Engine/Utility_Framework/JobGraph.h",
+                  root / "Engine/Utility_Framework/Concurrency/JobScheduler.cpp",
+                  root / "Engine/Utility_Framework/Concurrency/ThreadPool.cpp",
+                  root / "Engine/Contracts/Concurrency/Creator.Concurrency.JobGraph.ixx",
+                  root / "Tools/build/ModuleAdapters/Creator.Concurrency.JobGraph.h",
                   dependency / "TaskScheduler.cpp", dependency / "TaskScheduler.h"]
+    paths = [root / path if not path.is_absolute() else path for path in runpy.run_path(str(root / "Tools/build/generate-module-adapters.py"))["jobs_source_inputs"](paths)]
+
     snapshots = {path: path.read_bytes() for path in paths}
     hashes = {str(path.relative_to(root) if path.is_relative_to(root) else path):
               hashlib.sha256(data).hexdigest() for path, data in snapshots.items()}
@@ -81,8 +83,8 @@ def main():
             (include / "TaskScheduler.h").write_bytes(snapshots[dependency / "TaskScheduler.h"])
             command += ["-DCE_TRANSLATION_NATIVE_JOBS=1",
                         "-I", str(root / "Engine/Utility_Framework"), "-I", str(include.parent),
-                        str(root / "Engine/Utility_Framework/JobScheduler.cpp"),
-                        str(root / "Engine/Utility_Framework/ThreadPool.cpp"), str(dependency / "TaskScheduler.cpp")]
+                        str(root / "Engine/Utility_Framework/Concurrency/JobScheduler.cpp"),
+                        str(root / "Engine/Utility_Framework/Concurrency/ThreadPool.cpp"), str(dependency / "TaskScheduler.cpp")]
         if args.sanitize:
             command += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-fno-sanitize-recover=all"]
         print("Compiling exact RHICommandTranslator::Translate and fixed weighted work queue", flush=True)

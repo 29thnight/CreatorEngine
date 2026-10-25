@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
 #include "TextureCookProducer.h"
 
 #include "CookSupport.h"
@@ -5,9 +10,13 @@
 #include "CookedTexture.h"
 #include "TextureImportSettings.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 #ifdef _WIN32
-#include <Windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 #endif
 
 namespace experiment::cooked
@@ -24,15 +33,7 @@ namespace experiment::cooked
 
         // 확장자만 소문자로 접는다. ASCII 로 충분하다 — 확장자에 비ASCII 를
         // 허용하지 않는다(아래 allowlist 가 어차피 거른다).
-        [[nodiscard]] std::string LowercaseAscii(std::string text)
-        {
-            std::ranges::transform(text, text.begin(), [](unsigned char ch)
-            {
-                return static_cast<char>(
-                    ch >= 'A' && ch <= 'Z' ? ch - 'A' + 'a' : ch);
-            });
-            return text;
-        }
+
 
         inline constexpr std::array<std::string_view, 5> kSupportedExtensions{
             ".png", ".hdr", ".dds", ".jpg", ".jpeg"
@@ -193,7 +194,7 @@ namespace experiment::cooked
         }
 
         const std::string extension =
-            LowercaseAscii(source.extension().string());
+            ce::strings::ascii_to_lower(source.extension().string());
         if (!IsSupportedTextureExtension(extension))
         {
             // ★ 조용히 건너뛰지 않는다. 건너뛰면 그 텍스처를 참조하는 재질이

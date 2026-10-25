@@ -107,7 +107,7 @@ void RunSceneRefraction(RecordingChangeDevice& device, ProbeRoots& roots, ProbeP
     products[2] = RefractionProduct(root, false, true);
     GenerationStore store;
     experiment::AssetId graphId;
-    Check(Uuid::TryParse("88888888-8888-4888-8888-888888888888", graphId.value), "Refraction graph identity");
+    Check(uuid::try_parse("88888888-8888-4888-8888-888888888888", graphId.value), "Refraction graph identity");
     std::string error;
     std::array<own::shared_owner<const Generation>, 3> generations;
     for (unsigned i = filmOnly ? 2u : 0u; i < generations.size(); ++i)

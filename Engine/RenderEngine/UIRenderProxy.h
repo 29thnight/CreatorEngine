@@ -1,12 +1,16 @@
 #pragma once
-#include "Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include <mathematics/color.hpp>
 #include <mathematics/vector2.hpp>
-#include "Core.Minimal.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "Navigation.h"
 #include "SpriteSheet.h"
 #include "CanvasRenderMode.h"

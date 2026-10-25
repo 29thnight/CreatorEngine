@@ -8,6 +8,7 @@ the engine's pinned dependency (v1.12 / 0289cf6ffce86697e1f46cb4eeca1c946bffec71
 No dependency is downloaded or production source patched by this runner.
 """
 
+import runpy
 import argparse
 import hashlib
 import json
@@ -43,12 +44,13 @@ def main():
     if not compiler:
         parser.error("a GCC/Clang C++23 compiler is required")
     sources = [root / "Engine/RenderEngine/MaterialGraphPreparationTasks.h",
-               root / "Engine/Utility_Framework/JobScheduler.cpp",
-               root / "Engine/Utility_Framework/ThreadPool.cpp"]
+               root / "Engine/Utility_Framework/Concurrency/JobScheduler.cpp",
+               root / "Engine/Utility_Framework/Concurrency/ThreadPool.cpp"]
     probe = ROOT / "Tools/regression/scene_preparation_tasks_cpu_probe.cpp"
-    inputs = sources + [root / "Engine/Utility_Framework/JobScheduler.h",
-                        root / "Engine/Utility_Framework/ThreadPool.h", probe,
+    inputs = sources + [probe,
                         dependency / "TaskScheduler.cpp", dependency / "TaskScheduler.h"]
+
+    inputs = [root / path if not path.is_absolute() else path for path in runpy.run_path(str(root / "Tools/build/generate-module-adapters.py"))["jobs_source_inputs"](inputs)]
 
     def source_hashes():
         return {str(path.relative_to(root) if path.is_relative_to(root) else path):

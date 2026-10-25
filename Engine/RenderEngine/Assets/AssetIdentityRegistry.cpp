@@ -1,6 +1,12 @@
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "AssetIdentityRegistry.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace assets
 {
@@ -18,7 +24,7 @@ namespace assets
     }
 
     IdentityRegisterResult IdentityRegistry::Register(const IdentityInput& input,
-        std::string context, const Uuid::Uuid16& claimed)
+        std::string context, const uuid::uuid16& claimed)
     {
         IdentityRegisterResult result;
         std::vector<std::uint8_t> canonical;
@@ -31,25 +37,25 @@ namespace assets
             return result;
         }
 
-        const Uuid::Uuid16 derived = DeriveUuidFromIdentityInputBytes(canonical);
-        if (!claimed.IsNil() && claimed != derived)
+        const uuid::uuid16 derived = DeriveUuidFromIdentityInputBytes(canonical);
+        if (!claimed.is_nil() && claimed != derived)
         {
             result.outcome = IdentityRegisterOutcome::RecomputeMismatch;
             result.uuid = derived;
             result.conflictingContext = context;
-            result.message = "claimed " + Uuid::ToString(claimed) + " != derived "
-                + Uuid::ToString(derived) + " (" + context + ")";
+            result.message = "claimed " + uuid::to_string(claimed) + " != derived "
+                + uuid::to_string(derived) + " (" + context + ")";
             return result;
         }
         return Insert(std::move(canonical), derived, std::move(context));
     }
 
     IdentityRegisterResult IdentityRegistry::RegisterDerived(
-        std::vector<std::uint8_t> canonicalInput, const Uuid::Uuid16& uuid,
+        std::vector<std::uint8_t> canonicalInput, const uuid::uuid16& uuid,
         std::string context)
     {
         IdentityRegisterResult result;
-        if (canonicalInput.empty() || uuid.IsNil())
+        if (canonicalInput.empty() || uuid.is_nil())
         {
             result.outcome = IdentityRegisterOutcome::InvalidInput;
             result.issue = canonicalInput.empty()
@@ -57,21 +63,21 @@ namespace assets
             result.message = "empty canonical input or nil uuid (" + context + ")";
             return result;
         }
-        const Uuid::Uuid16 derived = DeriveUuidFromIdentityInputBytes(canonicalInput);
+        const uuid::uuid16 derived = DeriveUuidFromIdentityInputBytes(canonicalInput);
         if (derived != uuid)
         {
             result.outcome = IdentityRegisterOutcome::RecomputeMismatch;
             result.uuid = derived;
             result.conflictingContext = context;
-            result.message = "claimed " + Uuid::ToString(uuid) + " != derived "
-                + Uuid::ToString(derived) + " (" + context + ")";
+            result.message = "claimed " + uuid::to_string(uuid) + " != derived "
+                + uuid::to_string(derived) + " (" + context + ")";
             return result;
         }
         return Insert(std::move(canonicalInput), uuid, std::move(context));
     }
 
     void IdentityRegistry::InsertUncheckedForTest(
-        std::vector<std::uint8_t> canonicalInput, const Uuid::Uuid16& uuid,
+        std::vector<std::uint8_t> canonicalInput, const uuid::uuid16& uuid,
         std::string context)
     {
         const std::size_t index = m_entries.size();
@@ -81,7 +87,7 @@ namespace assets
     }
 
     IdentityRegisterResult IdentityRegistry::Insert(
-        std::vector<std::uint8_t> canonicalInput, const Uuid::Uuid16& uuid,
+        std::vector<std::uint8_t> canonicalInput, const uuid::uuid16& uuid,
         std::string context)
     {
         IdentityRegisterResult result;
@@ -101,7 +107,7 @@ namespace assets
         {
             result.outcome = IdentityRegisterOutcome::UuidCollision;
             result.conflictingContext = m_entries[found->second].context;
-            result.message = "uuid collision " + Uuid::ToString(uuid) + ": "
+            result.message = "uuid collision " + uuid::to_string(uuid) + ": "
                 + context + " vs " + result.conflictingContext;
             return result;
         }
@@ -114,13 +120,13 @@ namespace assets
         return result;
     }
 
-    bool IdentityRegistry::Contains(const Uuid::Uuid16& uuid) const noexcept
+    bool IdentityRegistry::Contains(const uuid::uuid16& uuid) const noexcept
     {
         return m_byUuid.contains(uuid);
     }
 
     const IdentityRegistryEntry* IdentityRegistry::Find(
-        const Uuid::Uuid16& uuid) const noexcept
+        const uuid::uuid16& uuid) const noexcept
     {
         const auto found = m_byUuid.find(uuid);
         return found == m_byUuid.end() ? nullptr : &m_entries[found->second];
@@ -134,17 +140,17 @@ namespace assets
         // 반영할 뿐이고, 이 함수의 목적은 그 판정과 무관하게 현재 내용을 검산하는
         // 것이다(InsertUncheckedForTest가 넣은 충돌도 여기서 드러나야 한다).
         std::map<std::vector<std::uint8_t>, std::size_t> seenInput;
-        std::map<Uuid::Uuid16, std::size_t> seenUuid;
+        std::map<uuid::uuid16, std::size_t> seenUuid;
         for (std::size_t index = 0; index < m_entries.size(); ++index)
         {
             const IdentityRegistryEntry& entry = m_entries[index];
-            const Uuid::Uuid16 derived =
+            const uuid::uuid16 derived =
                 DeriveUuidFromIdentityInputBytes(entry.canonicalInput);
             if (derived != entry.uuid)
             {
                 outIssues.push_back("recompute mismatch: " + entry.context
-                    + " stored " + Uuid::ToString(entry.uuid) + " derived "
-                    + Uuid::ToString(derived));
+                    + " stored " + uuid::to_string(entry.uuid) + " derived "
+                    + uuid::to_string(derived));
             }
             if (const auto dup = seenInput.find(entry.canonicalInput);
                 dup != seenInput.end())
@@ -160,7 +166,7 @@ namespace assets
             {
                 if (m_entries[dup->second].canonicalInput != entry.canonicalInput)
                 {
-                    outIssues.push_back("uuid collision " + Uuid::ToString(entry.uuid)
+                    outIssues.push_back("uuid collision " + uuid::to_string(entry.uuid)
                         + ": " + entry.context + " vs " + m_entries[dup->second].context);
                 }
             }

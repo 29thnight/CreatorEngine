@@ -1,9 +1,17 @@
-#include "../../Engine/Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "material_owner_checks.h"
 #include "MaterialGraphMeshSurface.h"
 #include "support/MaterialGraphScenePacket.h"
 #include "support/CookedMeshFixture.h"
-#include "PathFinder.h"
 #include "Texture.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
@@ -15,7 +23,7 @@
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "material_ibl_reference.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -222,8 +230,8 @@ namespace
     {
         Geometry result;
         auto& view = result.draw.modelMeshView;
-        Check(Uuid::TryParse("11111111-1111-8111-8111-111111111111", view.handle.modelId), "Model identity");
-        Check(Uuid::TryParse("22222222-2222-8222-8222-222222222222", view.handle.meshId), "Mesh identity");
+        Check(uuid::try_parse("11111111-1111-8111-8111-111111111111", view.handle.modelId), "Model identity");
+        Check(uuid::try_parse("22222222-2222-8222-8222-222222222222", view.handle.meshId), "Mesh identity");
         view.handle.generation = 1;
         view.vertexAttributeMask = mask;
         view.vertexStride = assets::StrideOf(mask);
@@ -2112,17 +2120,17 @@ namespace
 
     void Run(const std::filesystem::path& root)
     {
-        auto* paths = InternalPath::GetInstance();
-        paths->BaseProjectPath = root / "Dynamic_CPP";
-        paths->ShaderSourcePath = root / "Dynamic_CPP/Assets/Shaders";
-        paths->AssetAuthoringEnabled = true;
+        auto* paths = (&ce::paths::get_state());
+        paths->base_project_path = root / "Dynamic_CPP";
+        paths->shader_source_path = root / "Dynamic_CPP/Assets/Shaders";
+        paths->asset_authoring_enabled = true;
         const std::array products{Product(root, false), Product(root, true)};
         const auto table = LoadSheenTable(root / "Tools/blender/fixtures/principled-layered-5.1.1/sheen-ltc.csv");
         const Environment environmentColors{{{2, 1, .5}, {2, 1, .5}, {2, 1, .5}, {2, 1, .5}, {2, 1, .5}, {2, 1, .5}}};
         const auto image = Image(), cube = Cube(environmentColors);
         GenerationStore store;
         experiment::AssetId graph;
-        Check(Uuid::TryParse("11111111-1111-4111-8111-111111111111", graph.value), "Graph GUID");
+        Check(uuid::try_parse("11111111-1111-4111-8111-111111111111", graph.value), "Graph GUID");
         std::string error;
         std::array<own::shared_owner<const Instance>, 2> instances;
         for (unsigned i = 0; i < 2; ++i)

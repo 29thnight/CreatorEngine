@@ -1,8 +1,8 @@
 #include "AssetSetBuild.h"
-#include "../../Engine/Utility_Framework/ArtifactStoreGuard.h"
+#include "../../Engine/Utility_Framework/Packaging/ArtifactStoreGuard.h"
 
-#include "AuthoringParsedDocument.h"
-#include "AuthoringCookedDocument.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringCookedDocument.h"
 #include "Experiment/Cooked/ModelCookIdentity.h"
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/CookSupport.h"
@@ -16,12 +16,16 @@
 #include "Assets/AssetIdentityProfile.h"
 #include "Assets/ModelCpuGeometry.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <Windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 namespace AssetCooking
 {
@@ -68,7 +72,7 @@ namespace AssetCooking
 
         std::string Label(const ck::AssetIdentity& key)
         {
-            return Uuid::ToString(key.assetId.value);
+            return uuid::to_string(key.assetId.value);
         }
 
         void RequireMap(Authoring::ReadNode node, std::initializer_list<std::string_view> keys,
@@ -173,9 +177,9 @@ namespace AssetCooking
                     "; supported: Texture, ShaderMeta, Material, MaterialProgram, Model, Mesh, Skeleton, AnimationClip");
             }
             const auto text = Text(node, "assetId");
-            Uuid::Uuid16 parsed{};
-            if (!Uuid::TryParse(text, parsed) || Uuid::ToString(parsed) != text ||
-                (parsed.data[6] & 0xf0u) != 0x80u || (parsed.data[8] & 0xc0u) != 0x80u)
+            uuid::uuid16 parsed{};
+            if (!uuid::try_parse(text, parsed) || uuid::to_string(parsed) != text ||
+                (parsed.data_[6] & 0xf0u) != 0x80u || (parsed.data_[8] & 0xc0u) != 0x80u)
             {
                 Fail(name + ": assetId must be an already-authored canonical UUIDv8");
             }

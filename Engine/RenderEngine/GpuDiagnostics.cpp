@@ -1,12 +1,26 @@
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "GpuDiagnostics.h"
 #include "RHI/IRHIDeviceResources.h"
-#include "EngineResourceCensus.h"
-#include "LogSystem.h"
+#include "../Utility_Framework/Diagnostics/EngineResourceCensus.h"
+#include "../Utility_Framework/Diagnostics/LogSystem.h"
 
-#include "../Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
-#include <dxgi1_3.h>     // DXGIGetDebugInterface1 — dxgidebug.h 는 타입만 준다
-#include <dxgidebug.h>
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
+// DXGIGetDebugInterface1 — dxgidebug.h 는 타입만 준다
 
 #pragma comment(lib, "dxguid.lib")
 
@@ -185,8 +199,8 @@ void GpuDiagnostics::ReportLiveObjects()
     // ★ 이 계층이 여기 있는 이유: DXGI는 디바이스가 아니라 프로세스에 붙는다.
     //   IRHIDeviceResources에 두면 '디바이스가 죽은 뒤의 보고'라는, 그 인터페이스가
     //   답할 수 없는 질문이 된다.
-    Microsoft::WRL::ComPtr<IDXGIDebug> dxgiDebug;
-    if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(&dxgiDebug))))
+    winrt::com_ptr<IDXGIDebug> dxgiDebug;
+    if (SUCCEEDED(DXGIGetDebugInterface1(0, IID_PPV_ARGS(dxgiDebug.put()))))
     {
         dxgiDebug->ReportLiveObjects(DXGI_DEBUG_ALL, DXGI_DEBUG_RLO_IGNORE_INTERNAL);
     }

@@ -1,17 +1,20 @@
-﻿#pragma once
-#include "Ownership.h"
+﻿#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#pragma once
 #include "../Core/EnhancedLivePipelineDesc.h"
 #include "LiveViewScheduling.h"
 #include "../Temporal/TemporalMeasurementProvenance.h"
 #include "../Graph/EnhancedRenderGraph.h"
 #include "../../RHI/RHICommandProvenance.h"
 #include <stdint.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "../../FrameCameraSnapshot.h"
 #include "../../ShaderMetaHandle.h"
-#include "../../../Utility_Framework/Ownership.h"
-#include "../../../Utility_Framework/TypeTrait.h"
+#include "../../../Utility_Framework/Reflection/TypeTrait.h"
 
 // ID3D11ShaderResourceView 전방 선언이 여기 있었다 (E, 2026-08-09).
 // GetLiveDisplaySrv가 D4에서 사라진 뒤로 쓰는 선언이 없다.

@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // Unrun Windows runtime regression source. Link with the existing RenderEngine
 // and ownership/job-scheduler harness; no shader compilation or GPU is required.
 #include "../../Engine/RenderEngine/DataSystem.h"
@@ -5,7 +10,7 @@
 #include "../../Engine/RenderEngine/TextureFramePins.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedTexture.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -101,9 +106,9 @@ namespace
     experiment::AssetId Id(std::uint8_t byte)
     {
         experiment::AssetId id;
-        id.value.data[6] = 0x40u;
-        id.value.data[8] = 0x80u;
-        id.value.data[15] = byte;
+        id.value.data_[6] = 0x40u;
+        id.value.data_[8] = 0x80u;
+        id.value.data_[15] = byte;
         return id;
     }
 

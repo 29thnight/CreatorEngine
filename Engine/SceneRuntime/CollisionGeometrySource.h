@@ -1,15 +1,19 @@
 #pragma once
 
 #include "../Physics/PhysicsGeometry.h"
-#include "../Utility_Framework/Uuid.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include <mathematics/views.hpp>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace ce::physics
 {
 struct geometry_asset_key
 {
-    Uuid::Uuid16 asset;
+    uuid::uuid16 asset;
     std::uint64_t revision = 0;
     auto operator<=>(const geometry_asset_key&) const = default;
 };
@@ -41,7 +45,7 @@ struct CollisionGeometrySource
 
 inline result<void> ValidateCollisionGeometrySource(const CollisionGeometrySource& source)
 {
-    if (source.key.asset.IsNil() || !source.key.revision || source.form.valueless_by_exception())
+    if (source.key.asset.is_nil() || !source.key.revision || source.form.valueless_by_exception())
         return std::unexpected(error{error_code::invalid_argument, 0, "Collision geometry requires UUID and revision"});
 
     const auto finite = [](const math::vector3& point) {

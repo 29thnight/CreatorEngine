@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 // Pixel-level alpha composition of the cooked blended stream (light tiles + SceneHost).
 void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& device, ProbeRoots& roots,
                      ProbePipelines& pipelines, ProbeTextures& textures, ProbePool& pool,
@@ -45,7 +50,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
     const bool initialized = tiles.Initialize(context, error);
     Check(initialized, "Light tile initialization " + error);
     // Scene consumers must load the sealed bytecode, with no editor compilation.
-    InternalPath::GetInstance()->AssetAuthoringEnabled = false;
+    (&ce::paths::get_state())->asset_authoring_enabled = false;
     for (const auto& instance : instances) WaitSceneProgram(host, context, instance->generation);
     Check(host.ProgramStats().compileSubmissions == 0, "Graph Forward is source-free at consumption");
     const auto light = [] {
@@ -341,7 +346,7 @@ void RunForwardBlend(const std::filesystem::path& root, RecordingChangeDevice& d
     tiles.Shutdown();
     gbuffer.Shutdown();
     meshes.Shutdown();
-    InternalPath::GetInstance()->AssetAuthoringEnabled = true;
+    (&ce::paths::get_state())->asset_authoring_enabled = true;
     std::cout << "LX_BLENDED_BUCKET_OK runtime=" << runtime << " frames=" << frames << " sameShaderInstances=4 workers=0,1,4\n";
     std::cout << "LX_MATERIAL_FORWARD_BLEND_OK frames=" << frames << " pixels=" << pixels
               << " checks=" << checks << " graphCompiles=0 stream=true parallel=true overflowLights=65 validation=0\n";

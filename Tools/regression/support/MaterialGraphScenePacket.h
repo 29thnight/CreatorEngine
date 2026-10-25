@@ -1,6 +1,10 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../material_owner_checks.h"
-#include "../../../Engine/Utility_Framework/Ownership.h"
 
 #include "../../../Engine/RenderEngine/MaterialGraphSceneCoverage.h"
 #include "../../../Engine/RenderEngine/MaterialGraphIblBake.h"

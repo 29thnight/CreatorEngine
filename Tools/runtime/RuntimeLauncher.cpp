@@ -1,12 +1,25 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Distribution.h"
+#else
+import Creator.Core.Distribution;
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <shellapi.h>
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 #include <stdio.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "HostAbi.h"
 #include "CrashReporter.h"
-#include "../../Engine/Utility_Framework/EngineVersion.h"
-#include "../../Engine/Utility_Framework/ContentAbi.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.ContentAbi.h"
+#else
+import Creator.Core.ContentAbi;
+#endif
 
 namespace
 {
@@ -74,17 +87,17 @@ namespace
         if (!info || info->size != sizeof(CreatorHostInfoV1) || info->hostAbi != 1 || info->pointerBits != 64)
             return Fail(L"Host ABI mismatch", ERROR_REVISION_MISMATCH);
         if (!info->productName || !info->featureRelease || !info->engineVersion ||
-            strcmp(info->engineVersion, CreatorEngineVersion::Build) != 0 ||
-            strcmp(info->productName, CreatorEngineVersion::ProductName) != 0 ||
-            strcmp(info->featureRelease, CreatorEngineVersion::FeatureRelease) != 0 ||
-            info->localDevelopment != static_cast<unsigned>(CreatorEngineVersion::LocalDevelopment))
+            strcmp(info->engineVersion, ce::distribution::build) != 0 ||
+            strcmp(info->productName, ce::distribution::product_name) != 0 ||
+            strcmp(info->featureRelease, ce::distribution::feature_release) != 0 ||
+            info->localDevelopment != static_cast<unsigned>(ce::distribution::local_development))
             return Fail(L"Launcher and host engine versions differ", ERROR_REVISION_MISMATCH);
         auto getContentInfo = reinterpret_cast<CreatorHostGetContentInfo>(GetProcAddress(host, "CreatorHostGetContentInfoV1"));
         if (!getContentInfo) return Fail(L"Host content ABI entry point is missing", ERROR_PROC_NOT_FOUND);
         const auto* contentInfo = getContentInfo();
         if (!contentInfo || contentInfo->size != sizeof(CreatorHostContentInfoV1) ||
-            contentInfo->contentAbiVersion != CreatorContentAbi::Version || !contentInfo->contentAbi ||
-            strcmp(contentInfo->contentAbi, CreatorContentAbi::Token) != 0)
+            contentInfo->contentAbiVersion != ce::content_abi::version || !contentInfo->contentAbi ||
+            strcmp(contentInfo->contentAbi, ce::content_abi::token) != 0)
             return Fail(L"Launcher and host content ABIs differ", ERROR_REVISION_MISMATCH);
         if (argc == 2 && wcscmp(argv[1], L"--engine-info") == 0)
         {

@@ -217,7 +217,7 @@ void RunSceneShadow(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
     const auto product = ShadowDecalProduct(root, false);
     GenerationStore store;
     experiment::AssetId id;
-    Check(Uuid::TryParse("DDDDDDDD-DDDD-4DDD-8DDD-DDDDDDDDDDDD", id.value), "Shadow graph identity");
+    Check(uuid::try_parse("DDDDDDDD-DDDD-4DDD-8DDD-DDDDDDDDDDDD", id.value), "Shadow graph identity");
     std::string error;
     const auto generation = store.Load(
         id,

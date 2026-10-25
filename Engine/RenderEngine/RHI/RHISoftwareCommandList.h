@@ -1,7 +1,16 @@
 #pragma once
-#include "../../Utility_Framework/Ownership.h"
-#include "RHISoftwareCommandTypes.h"
 #include "../RenderArena.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Arena.h"
+#else
+import Creator.Core.Arena;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "RHISoftwareCommandTypes.h"
 #include <string_view>
 
 class RHISoftwareEncoder;

@@ -1,3 +1,9 @@
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 // Forward+ 자가 검증 (E5에서 EnhancedForwardPass.cpp 말미에서 분리 —
 // 프로덕션 패스 파일이 테스트 헤더(DX12TestTextureRegistration)를 물던
 // 역결합이 래칫의 상향 간선으로 드러났다).
@@ -12,8 +18,12 @@
 #include "RHI/DX12/DX12MeshCache.h"
 #include "Mesh.h"
 #include "RHI/RHIShaderCompiler.h"
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 // ── 자가 검증 ──
 //
@@ -23,7 +33,6 @@
 // 컬링이 안 도는 것이다(Forward+의 이득이 통째로 사라진다).
 bool DX12Test::RunForwardPlusTest(std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
 
     constexpr uint32_t kWidth = 128;
     constexpr uint32_t kHeight = 128;
@@ -98,11 +107,11 @@ bool DX12Test::RunForwardPlusTest(std::string& outLog)
         depthDesc.Format = DXGI_FORMAT_R32_FLOAT;
         depthDesc.SampleDesc.Count = 1;
 
-        ComPtr<ID3D12Resource> depth;
+        winrt::com_ptr<ID3D12Resource> depth;
         DX12TestTextureRegistration depthRegistration;
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&heap,
             D3D12_HEAP_FLAG_NONE, &depthDesc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&depth))))
+            nullptr, IID_PPV_ARGS(depth.put()))))
         {
             outLog += "[2/3] 깊이 생성 실패\n";
             forward.Shutdown();
@@ -110,7 +119,7 @@ bool DX12Test::RunForwardPlusTest(std::string& outLog)
             return false;
         }
 
-        depthRegistration.Register(resources, depth.Get());
+        depthRegistration.Register(resources, depth.get());
         if (!depthRegistration.IsValid())
         {
             outLog += "[2/3] 깊이 핸들 등록 실패\n";
@@ -146,7 +155,7 @@ bool DX12Test::RunForwardPlusTest(std::string& outLog)
                 }
 
                 D3D12_TEXTURE_COPY_LOCATION dst{};
-                dst.pResource = depth.Get();
+                dst.pResource = depth.get();
                 dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 
                 D3D12_TEXTURE_COPY_LOCATION src{};

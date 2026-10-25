@@ -26,7 +26,7 @@
 // hover 를 잃었던 자리다(테마가 `HeaderHovered` 와 `HeaderActive` 를 같은 값으로
 // 두었다). 그래서 축 색을 따로 두고, 검사가 **의미 색 셋과 다름**까지 단정한다.
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace editor::widgets
 {

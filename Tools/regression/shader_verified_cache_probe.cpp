@@ -1,7 +1,11 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "RHIShaderCompiler.h"
 #include "RHIShaderVerifiedCache.h"
-#include "PathFinder.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 using Verified = RHIShaderCompiler::VerifiedShader;
 static void Check(bool value,const char* name){if(!value)throw std::runtime_error(name);std::cout<<"CHECK "<<name<<'\n';}
@@ -20,7 +24,7 @@ int main(int argc,char** argv)try
  const auto repo=std::filesystem::absolute(argv[1]),work=std::filesystem::absolute(argv[2]);const std::string mode=argv[3];
  const auto root=work/"Assets/Shaders/DefaultPassShader",includes=work/"Includes";
  std::filesystem::create_directories(root);std::filesystem::create_directories(includes);
- auto* paths=InternalPath::GetInstance();paths->BaseProjectPath=repo/"Dynamic_CPP";paths->ShaderSourcePath=work/"Assets/Shaders";paths->AssetAuthoringEnabled=true;
+ auto* paths=(&ce::paths::get_state());paths->base_project_path=repo/"Dynamic_CPP";paths->shader_source_path=work/"Assets/Shaders";paths->asset_authoring_enabled=true;
  RHIShaderCompileOptions options;options.includeDirectories.push_back(includes);
  const std::string source=R"(#include "CacheLeaf.hlsli"
 #ifndef PROBE_SCALE

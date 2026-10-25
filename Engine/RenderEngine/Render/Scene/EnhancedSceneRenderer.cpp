@@ -1,11 +1,44 @@
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "../../RHI/RHISoftwareBatch.h"
-#include "../../../Utility_Framework/DynamicBitset.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.DynamicBitset.h"
+#else
+import Creator.Core.DynamicBitset;
+#endif
 #include <stdint.h>
 #include "../../../EngineDiagnostics/ProfileScope.h"
-#include "../../../Utility_Framework/WindowsApartment.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
 #include <stdio.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 #include "../Graph/ShadowCasterBounds.h"
 #include "EnhancedSceneRenderer.h"
 #include "PreparedViewInputPool.h"
@@ -14,8 +47,8 @@
 #include "../Passes/PostProcess/EnhancedTemporalUpscalePass.h"
 #include "EnhancedSceneRendererLiveDX12Adapter.h"
 #include "EnhancedPbrCapture.h"
-#include "RuntimeSettings.h"
-#include "../../../Utility_Framework/WarmupLedger.h"
+#include "../../../Utility_Framework/Runtime/RuntimeSettings.h"
+#include "../../../Utility_Framework/Runtime/WarmupLedger.h"
 
 #include "../Graph/EnhancedRenderGraph.h"
 #include "../Graph/EnhancedRenderPass.h"
@@ -72,15 +105,20 @@
 #include "../../BoneRegion.h" // kMaxBones
 #include "../../Mesh.h"
 #include "../../RenderState.h"
-#include "../../../Utility_Framework/PathFinder.h"
-#include "../../../Utility_Framework/JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 
 // ★ <d3d11_1.h> include가 여기 있었다 (E, 2026-08-09).
 //   공유 텍스처를 DX11에서 열어 SRV를 만들던 자리를 D4에서 걷은 뒤로 이
 //   파일에 DX11 타입이 하나도 남지 않았다.
-#include "../../../Utility_Framework/Contract.h"
-#include <wrl/wrappers/corewrappers.h>
-#include <dwmapi.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 #pragma comment(lib, "dwmapi.lib")
 #include <mathematics/transform.hpp>
 #include <mathematics/scalar.hpp>
@@ -368,7 +406,7 @@ namespace
     {
         ModelGenerationMix result;
         if (!input) return result;
-        std::vector<std::pair<Uuid::Uuid16, std::uint64_t>> drawn;
+        std::vector<std::pair<uuid::uuid16, std::uint64_t>> drawn;
         drawn.reserve(input->Draws().size());
         for (const auto& draw : input->Draws())
         {
@@ -410,8 +448,8 @@ namespace
         RHIModelMeshView mesh;
         MaterialPreviewSphere()
         {
-            Uuid::TryParse("e590a6f7-075f-8f70-83cb-3f427aa960bc", mesh.handle.modelId);
-            Uuid::TryParse("991d13a0-1288-8ac2-8777-f6f77fb8ed63", mesh.handle.meshId);
+            uuid::try_parse("e590a6f7-075f-8f70-83cb-3f427aa960bc", mesh.handle.modelId);
+            uuid::try_parse("991d13a0-1288-8ac2-8777-f6f77fb8ed63", mesh.handle.meshId);
             mesh.handle.generation = 1;
             mesh.vertexAttributeMask = assets::kCoreVertexAttributes;
             mesh.vertexStride = assets::StrideOf(mesh.vertexAttributeMask);
@@ -457,8 +495,8 @@ namespace
         RHIModelMeshView mesh;
         explicit MaterialPreviewFloor(unsigned color)
         {
-            Uuid::TryParse("e590a6f7-075f-8f70-83cb-3f427aa960bc", mesh.handle.modelId);
-            Uuid::TryParse(color ? "4a0c084a-ea1a-83a7-9cb4-c13acfe9c702" : "4a0c084a-ea1a-83a7-9cb4-c13acfe9c701", mesh.handle.meshId);
+            uuid::try_parse("e590a6f7-075f-8f70-83cb-3f427aa960bc", mesh.handle.modelId);
+            uuid::try_parse(color ? "4a0c084a-ea1a-83a7-9cb4-c13acfe9c702" : "4a0c084a-ea1a-83a7-9cb4-c13acfe9c701", mesh.handle.meshId);
             mesh.handle.generation = 1;
             mesh.vertexAttributeMask = assets::kCoreVertexAttributes;
             mesh.vertexStride = assets::StrideOf(mesh.vertexAttributeMask);
@@ -2021,10 +2059,10 @@ namespace
         uint64_t id{ 0 };
         uint64_t generation{ 0 };
         std::string selection;
-        file::path source;
-        file::path shaders;
-        file::path cache;
-        file::path project;
+        std::filesystem::path source;
+        std::filesystem::path shaders;
+        std::filesystem::path cache;
+        std::filesystem::path project;
         bool allowSourceProcessing{};
         bool updateSelection{ true };
     };
@@ -2036,7 +2074,7 @@ namespace
         own::shared_owner<const Texture> equirect;
         own::shared_owner<const Texture::CodecImage> equirectImage;
         std::optional<assets::EnvironmentIdentity> identity;
-        file::path cachePath;
+        std::filesystem::path cachePath;
     };
 
     // Workers own only this CPU mailbox, never LiveState, settings, or an RHI
@@ -2077,7 +2115,7 @@ namespace
             return false;
         }
         std::error_code fileError;
-        if (!file::is_regular_file(request.source, fileError))
+        if (!std::filesystem::is_regular_file(request.source, fileError))
         {
             error = "Select an existing HDR or cooked .ceibl environment";
             return false;
@@ -2097,7 +2135,7 @@ namespace
             // source-free package does not contain the shader recipe inputs.
             if (request.allowSourceProcessing)
             {
-                Hash::Sha256Digest recipe;
+                ce::hash::sha256_digest recipe;
                 if (!assets::EnvironmentRecipeIdentity(request.shaders,
                         cooked.cubeSize, cooked.brdfSize, recipe, error))
                 {
@@ -2161,9 +2199,9 @@ namespace
             error = "HDR source read failed";
             return false;
         }
-        Hash::Sha256 hash;
-        hash.Update(bytes.data(), bytes.size());
-        if (hash.Finish() != identity.source)
+        ce::hash::sha256 hash;
+        hash.update(bytes.data(), bytes.size());
+        if (hash.finish() != identity.source)
         {
             error = "HDR source changed during preparation; select it again";
             return false;
@@ -2262,11 +2300,11 @@ namespace
         EnvironmentPreparationRequest request;
         request.updateSelection = updateSelection;
         request.selection = selection;
-        request.source = file::absolute(file::path(selection));
-        request.shaders = PathFinder::ShaderPath() / "DefaultPassShader";
-        request.cache = PathFinder::CachePath() / "Environment";
-        request.project = PathFinder::BaseProjectPath();
-        request.allowSourceProcessing = PathFinder::IsAssetAuthoringEnabled();
+        request.source = std::filesystem::absolute(std::filesystem::path(selection));
+        request.shaders = ce::paths::shader_path() / "DefaultPassShader";
+        request.cache = ce::paths::cache_path() / "Environment";
+        request.project = ce::paths::base_project_path();
+        request.allowSourceProcessing = ce::paths::is_asset_authoring_enabled();
         EnhancedSceneRenderer::EnvironmentPreparationProgress progress;
         progress.activeRequests = 1;
         progress.phase = "Queued";
@@ -2709,7 +2747,7 @@ namespace
             const auto& request = retired->request;
             if (!preparation.accepting || preparation.generation != request.generation
                 || preparation.progress.requestId != request.id
-                || request.project != PathFinder::BaseProjectPath())
+                || request.project != ce::paths::base_project_path())
             {
                 preparation.progress.activeRequests = 0;
                 preparation.progress.phase = "Cancelled";
@@ -6244,10 +6282,10 @@ namespace
             // The offline engine-resource producer preserves the authored DDS
             // blocks/mips in this exact CECT payload. Only an authoring host may
             // use its original source before the first development-resource cook.
-            const auto path = PathFinder::EngineResourcePath("VolumetricFog/blueNoise.cetex");
-            const bool allowSourceProcessing = PathFinder::IsAssetAuthoringEnabled();
+            const auto path = ce::paths::engine_resource_path("VolumetricFog/blueNoise.cetex");
+            const bool allowSourceProcessing = ce::paths::is_asset_authoring_enabled();
             const auto authoringSource = allowSourceProcessing
-                ? PathFinder::Relative("VolumetricFog/blueNoise.dds") : file::path{};
+                ? ce::paths::relative("VolumetricFog/blueNoise.dds") : std::filesystem::path{};
             const auto finish = [preparation](std::exception_ptr failure)
             {
                 std::lock_guard lock(preparation->mutex);
@@ -6279,7 +6317,7 @@ namespace
                 {
                     auto inputPath = path;
                     std::error_code pathError;
-                    if (allowSourceProcessing && !file::exists(path, pathError) && !pathError)
+                    if (allowSourceProcessing && !std::filesystem::exists(path, pathError) && !pathError)
                     {
                         inputPath = authoringSource;
                     }
@@ -9469,7 +9507,7 @@ bool EnhancedSceneRenderer::InitializeRuntime(EnhancedLiveBackend backend,
         // Host가 뷰 요청에 실어 넘긴다. Core는 씬 오버레이 뷰 판정도 하지 않는다.
 
         state.skyBoxPath =
-            PathFinder::EngineResourcePath("Environment/forest.ceibl").string();
+            ce::paths::engine_resource_path("Environment/forest.ceibl").string();
         state.skyEquirect.reset();
         state.skyEquirectImage.reset();
         state.skyBoxDirty = true;
@@ -9599,7 +9637,7 @@ bool EnhancedSceneRenderer::SetSkyBoxPath(const std::string& path, std::string& 
         outError = "HDR 경로가 비어 있다";
         return false;
     }
-    const file::path source(path);
+    const std::filesystem::path source(path);
     if (source.extension() != ".hdr" && source.extension() != ".ceibl")
     {
         outError = "Select an HDR or cooked .ceibl environment";
@@ -10896,6 +10934,21 @@ void EnhancedSceneRenderer::TickLive(const EnhancedLiveFramePacket& inputFrame)
             totalPending = state.PendingGpuSubmissions();
             if (state.pbrCapture && state.pbrCapture->result.state == EnhancedPbrCaptureState::Recording)
                 state.pbrCapture->Fail(error);
+            // Program preparation is an explicit deferred result, not a failed
+            // frame. Preserve capture failure reporting above, and never defer
+            // a poisoned submission slot (which still requires teardown).
+            if (preparationDeferred && view->slots[renderSlot].fenceValue != UINT64_MAX)
+            {
+                ++state.framesIdle;
+                state.consecutiveFrameFailures = 0;
+                const std::string message = "Preparing frame: " + error;
+                if (state.reportedValidation.insert(message).second)
+                {
+                    Debug::PrintLog(spdlog::level::info, "[EnhancedRenderer] " + message);
+                    std::printf("[meteor.scene.frame] deferred reason=%s\n", error.c_str());
+                }
+                continue;
+            }
             // 한 프레임 실패로 렌더러를 접지 않는다.
             //
             // 예전에는 여기서 바로 TeardownPipeline + enabled=false 였고,

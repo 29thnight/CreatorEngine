@@ -24,7 +24,7 @@ $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
 $failures = @()
 
 # ── 양성 확인 1: Editor 소유자가 실재하고 Undo를 실제로 다룬다 ──
-$controller = Join-Path $repoRoot "Editor\EngineEntry\EditorPlayModeController.cpp"
+$controller = Join-Path $repoRoot "Editor\EngineEntry\Scene\EditorPlayModeController.cpp"
 if (-not (Test-Path -LiteralPath $controller)) {
     throw "EditorPlayModeController.cpp가 없다 — 아래 부재 단정이 전부 무의미해진다: $controller"
 }
@@ -61,7 +61,7 @@ if ($sceneManagerText -notmatch 'PlayModeEvent\.Broadcast\(true\)') {
 # 재유입을 여기서 막는다. 이관 경위를 설명하는 // 주석은 걸러낸다(그것까지
 # 세면 설명을 지워야 통과하는 게이트가 된다 — E3-4의 주석 관용 원칙).
 foreach ($rel in @("Engine\SceneRuntime\SceneManager.cpp", "Engine\SceneRuntime\SceneManager.h",
-                   "Engine\Utility_Framework\ReflectionFunction.h")) {
+                   "Engine\Utility_Framework\Reflection\ReflectionFunction.h")) {
     $path = Join-Path $repoRoot $rel
     $codeLines = Get-Content -LiteralPath $path -Encoding UTF8 |
         ForEach-Object { ($_ -split '//', 2)[0] }
@@ -121,24 +121,57 @@ foreach ($file in $playerSources) {
 # ⚠ 반드시 EndPlayTransaction 본문 안에서만 비교한다. AllDestroyMark는 이 파일에
 #   5번 나오고(종료·씬 교체 경로 등) 파일 전체에서 IndexOf를 쓰면 엉뚱한 등장과
 #   비교해 거짓 실패가 난다 — 이 게이트를 처음 쓸 때 실제로 그렇게 틀렸다.
-$fnStart = $sceneManagerText.IndexOf("void SceneManager::EndPlayTransaction()")
-if ($fnStart -lt 0) {
-    $failures += "EndPlayTransaction을 못 찾았다 — 순서 단정이 무의미해진다"
-} else {
-    $fnEnd = $sceneManagerText.IndexOf("`nvoid SceneManager::", $fnStart + 1)
-    if ($fnEnd -lt 0) { $fnEnd = $sceneManagerText.Length }
-    $body = $sceneManagerText.Substring($fnStart, $fnEnd - $fnStart)
+function Get-EndPlaySelectionFailure([string]$Source) {
+    # Keep offsets and newlines while removing comments and quoted literals.
+    $nonCodePattern = '(?s)//[^\r\n]*|/\*.*?\*/|"(?:\\.|[^"\\])*"|''(?:\\.|[^''\\])*'''
+    $code = [regex]::Replace($Source, $nonCodePattern, [System.Text.RegularExpressions.MatchEvaluator]{
+        param($cppMatch)
+        return [regex]::Replace($cppMatch.Value, '[^\r\n]', ' ')
+    })
+    $signature = [regex]::Match($code, '\bvoid\s+SceneManager::EndPlayTransaction\s*\(\s*\)\s*\{')
+    if (-not $signature.Success) { return 'EndPlayTransaction definition missing' }
+    $opening = $signature.Index + $signature.Length - 1
+    $depth = 0
+    $closing = -1
+    for ($index = $opening; $index -lt $code.Length; $index++) {
+        if ($code[$index] -eq '{') { $depth++ }
+        elseif ($code[$index] -eq '}') {
+            $depth--
+            if ($depth -eq 0) { $closing = $index; break }
+        }
+    }
+    if ($closing -lt 0) { return 'EndPlayTransaction closing brace missing' }
+    $body = $code.Substring($opening, $closing - $opening + 1)
+    $broadcast = [regex]::Match($body, '\bresetSelectedObjectEvent\s*\.\s*Broadcast\s*\(\s*\)\s*;')
+    $destroy = [regex]::Match($body, '\bAllDestroyMark\s*\(\s*(?:true|false)?\s*\)\s*;')
+    if (-not $broadcast.Success) { return 'Selection reset broadcast missing in EndPlayTransaction' }
+    if (-not $destroy.Success) { return 'AllDestroyMark call missing in EndPlayTransaction' }
+    if ($broadcast.Index -gt $destroy.Index) { return 'Selection reset follows AllDestroyMark' }
+    return $null
+}
 
-    $broadcastIdx = $body.IndexOf("resetSelectedObjectEvent.Broadcast();")
-    $destroyIdx = $body.IndexOf("AllDestroyMark();")
-    if ($broadcastIdx -lt 0) {
-        $failures += "정지 경로의 resetSelectedObjectEvent.Broadcast()가 사라졌다 — 정지 후 선택이 파괴된 엔티티를 가리킨다(실측: 크래시)"
-    } elseif ($destroyIdx -lt 0) {
-        $failures += "EndPlayTransaction 안에서 AllDestroyMark() 호출을 못 찾았다 — 순서 단정이 무의미해진다"
-    } elseif ($broadcastIdx -gt $destroyIdx) {
-        $failures += "선택 해제가 AllDestroyMark 뒤로 밀렸다 — 파괴된 엔티티를 가리키는 한 프레임이 생긴다(실측: 크래시)"
+# Positive/negative fixtures protect overload recognition and lexical masking.
+$selectionOrderCases = @(
+    @{ Name = 'no argument'; Valid = $true; Source = 'void SceneManager::EndPlayTransaction(){resetSelectedObjectEvent.Broadcast();scene->AllDestroyMark();}' },
+    @{ Name = 'true argument'; Valid = $true; Source = 'void SceneManager::EndPlayTransaction(){resetSelectedObjectEvent.Broadcast();scene->AllDestroyMark(true);}' },
+    @{ Name = 'false argument and spaces'; Valid = $true; Source = 'void SceneManager::EndPlayTransaction () { resetSelectedObjectEvent . Broadcast ( ); scene->AllDestroyMark ( false ); }' },
+    @{ Name = 'nested lambda'; Valid = $true; Source = 'void SceneManager::EndPlayTransaction(){End([]{resetSelectedObjectEvent.Broadcast();scene->AllDestroyMark(true);});}' },
+    @{ Name = 'literal braces'; Valid = $true; Source = 'void SceneManager::EndPlayTransaction(){Log("} {");resetSelectedObjectEvent.Broadcast();scene->AllDestroyMark(true);}' },
+    @{ Name = 'reversed order'; Valid = $false; Source = 'void SceneManager::EndPlayTransaction(){scene->AllDestroyMark(true);resetSelectedObjectEvent.Broadcast();}' },
+    @{ Name = 'commented broadcast'; Valid = $false; Source = 'void SceneManager::EndPlayTransaction(){/* resetSelectedObjectEvent.Broadcast(); */scene->AllDestroyMark(true);}' },
+    @{ Name = 'quoted destroy'; Valid = $false; Source = 'void SceneManager::EndPlayTransaction(){resetSelectedObjectEvent.Broadcast();Log("AllDestroyMark(true);");}' },
+    @{ Name = 'next function destroy'; Valid = $false; Source = 'void SceneManager::EndPlayTransaction(){resetSelectedObjectEvent.Broadcast();}bool Next(){scene->AllDestroyMark(true);return true;}' },
+    @{ Name = 'different method'; Valid = $false; Source = 'void SceneManager::EndPlayTransaction(){resetSelectedObjectEvent.Broadcast();scene->NotAllDestroyMark(true);}' }
+)
+foreach ($case in $selectionOrderCases) {
+    $fixtureFailure = Get-EndPlaySelectionFailure $case.Source
+    if (($null -eq $fixtureFailure) -ne $case.Valid) {
+        $failures += "Selection-order verifier self-test failed: $($case.Name)"
     }
 }
+$selectionFailure = Get-EndPlaySelectionFailure $sceneManagerText
+if ($null -ne $selectionFailure) { $failures += $selectionFailure }
+
 
 if ($failures.Count -gt 0) {
     "재생 정책 경계 실패 $($failures.Count)건:"

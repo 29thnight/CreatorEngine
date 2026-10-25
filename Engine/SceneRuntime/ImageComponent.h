@@ -1,7 +1,11 @@
 #pragma once
-#include "Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include <mathematics/vector2.hpp>
-#include "../Utility_Framework/Core.Minimal.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include <mathematics/color.hpp>
 #include "Component.h"
 #include "IRenderable.h"

@@ -1,4 +1,3 @@
-#include "../../Utility_Framework/Ownership.h"
 // Included beside full CPU geometry admission. No raw payload is fabricated.
 own::shared_owner<const assets::ModelMeshDescriptor> DecodeModelStreamDescriptor(
     model_cooked::ResolvedAssetEntry resolved, own::shared_owner<const assets::ModelSkeletonPayload> skeleton,

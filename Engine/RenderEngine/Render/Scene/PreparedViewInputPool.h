@@ -1,6 +1,10 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
-#include "../../../Utility_Framework/Ownership.h"
 #include <array>
 #include <cstddef>
 

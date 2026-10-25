@@ -1,5 +1,5 @@
 #include "TerrainMaterial.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 void TerrainMaterial::Initialize(uint32_t width, uint32_t height)
 {

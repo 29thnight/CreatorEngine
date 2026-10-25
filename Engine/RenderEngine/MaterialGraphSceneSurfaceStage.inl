@@ -1,4 +1,3 @@
-#include "../Utility_Framework/Ownership.h"
 // Stage implementations included by MaterialGraphSceneHost.cpp inside material_graph.
 SceneSurfaceTargets::Outputs SceneHost::VisibilityStage::Declare(const own::shared_owner<const Frame>& prepared,
                                                                  EnhancedRenderGraph& graph,

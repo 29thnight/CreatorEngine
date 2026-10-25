@@ -1,8 +1,11 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
-#include <Windows.h>
-
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // Client-space geometry shared by menu rendering and native caption hit testing.
 struct EditorTitleBarLayout

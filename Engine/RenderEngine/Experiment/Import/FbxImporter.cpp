@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
 #include "FbxImporter.h"
 #include "NormalGeneration.h"
 #include "TangentGeneration.h"
@@ -6,7 +11,7 @@
 
 #include "ufbx.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace experiment::importer
 {
@@ -377,8 +382,7 @@ namespace experiment::importer
     bool FbxImporter::CanImport(const std::filesystem::path& sourcePath) const
     {
         std::string extension = sourcePath.extension().string();
-        std::ranges::transform(extension, extension.begin(),
-            [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+        ce::strings::to_lower_in_place(extension);
         return extension == ".fbx";
     }
 

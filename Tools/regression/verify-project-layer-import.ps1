@@ -1,4 +1,4 @@
-param([ValidateSet('Debug','Release','Shipping','ASan','All')][string]$Configuration='All')
+﻿param([ValidateSet('Debug','Release','Shipping','ASan','All')][string]$Configuration='All')
 
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -14,9 +14,9 @@ foreach($config in $configs){
     $source=Join-Path $repo 'Tools/regression/project_layer_import_probe.cpp'
     $deps=Join-Path $repo 'vcpkg_installed/x64-windows/x64-windows'
     $lib=if($config -eq 'Debug'){Join-Path $deps 'debug'}else{$deps}
-    $sources=@('Engine/Utility_Framework/AuthoringParsedDocument.cpp','Engine/Utility_Framework/AuthoringCookedDocument.cpp','Engine/Utility_Framework/AuthoringRymlErrorPolicy.cpp','Engine/Utility_Framework/AuthoringScalarConvert.cpp')
+    $sources=@('Engine/Utility_Framework/Authoring/CookedDocumentTree.cpp','Engine/Utility_Framework/Authoring/AuthoringParsedDocument.cpp','Engine/Utility_Framework/Authoring/AuthoringCookedDocument.cpp','Engine/Utility_Framework/Authoring/AuthoringRymlErrorPolicy.cpp','Engine/Utility_Framework/Authoring/AuthoringScalarConvert.cpp')
     $sourceArgs=($sources | ForEach-Object {'"'+(Join-Path $repo $_)+'"'}) -join ' '
-    $cmd='call "'+$vcvars+'" >nul && cl /nologo /EHsc /std:c++latest /Zc:__cplusplus /utf-8 /W4 /WX '+$flags+' /DCE_SHIPPING='+$shipping+' /I"'+$repo+'/ThirdParty/Mathematics/include" /external:I"'+$deps+'/include" /external:W0 /Fo"'+$out+'/" /Fd"'+$out+'/compiler.pdb" /FS /Fe"'+$exe+'" "'+$source+'" '+$sourceArgs+' /link /LIBPATH:"'+$lib+'/lib" ryml.lib c4core.lib'
+    $cmd='call "'+$vcvars+'" >nul && cl /DCE_CONTRACT_STANDALONE=1 /nologo /EHsc /std:c++latest /Zc:__cplusplus /utf-8 /W4 /WX '+$flags+' /DCE_SHIPPING='+$shipping+' /I"'+$repo+'/ThirdParty/Mathematics/include" /external:I"'+$deps+'/include" /external:W0 /Fo"'+$out+'/" /Fd"'+$out+'/compiler.pdb" /FS /Fe"'+$exe+'" "'+$source+'" '+$sourceArgs+' /link /LIBPATH:"'+$lib+'/lib" ryml.lib c4core.lib'
     & $env:ComSpec /d /s /c $cmd *> "$out/build.log"
     if($LASTEXITCODE){Get-Content "$out/build.log" -Tail 30;throw "$config catalog compile failed"}
 
@@ -28,7 +28,11 @@ foreach($config in $configs){
     $fixture=$out
     foreach($dll in @('ryml.dll','c4core.dll')){if(Test-Path (Join-Path $lib ('bin/'+$dll))){Copy-Item (Join-Path $lib ('bin/'+$dll)) $out -Force}}
     # Frozen pre-cutover settings remain separate from the current tags-only project.
-    $inputRoot=Join-Path $PSScriptRoot 'fixtures/LegacyProjectLayers'
+    $inputRoot=Join-Path $out 'legacy-input'
+    New-Item -ItemType Directory -Force $inputRoot | Out-Null
+    foreach($name in @('TagManager','CollisionMatrix')) {
+        Copy-Item (Join-Path $PSScriptRoot ("fixtures/LegacyProjectLayers/"+$name+".legacy.txt")) (Join-Path $inputRoot ($name+".asset")) -Force
+    }
     $assetsRoot=Join-Path $repo 'Dynamic_CPP/Assets'
     $process=Start-Process $exe -ArgumentList ('"'+$inputRoot+'" "'+$fixture+'" "'+$assetsRoot+'"') -WindowStyle Hidden -PassThru -RedirectStandardOutput "$out/result.jsonl" -RedirectStandardError "$out/stderr.log"
     $handle=$process.Handle

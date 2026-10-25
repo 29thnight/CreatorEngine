@@ -1,23 +1,17 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
 #include "ClipDirectory.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace wave
 {
-    namespace
-    {
-        std::string LowerExtension(const std::filesystem::path& path)
-        {
-            std::string extension = path.extension().string();
-            std::transform(extension.begin(), extension.end(), extension.begin(),
-                [](unsigned char character) { return static_cast<char>(std::tolower(character)); });
-            return extension;
-        }
-    }
-
     bool IsSupportedClipExtension(const std::filesystem::path& path)
     {
-        const std::string extension = LowerExtension(path);
+        const std::string extension = ce::strings::to_lower((path).extension().string());
         return ".wav" == extension || ".mp3" == extension || ".flac" == extension;
     }
 

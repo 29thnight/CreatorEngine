@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "ContentsBrowserWindow.h"
 #include "EditorPanelCost.h"
 #include "BrowserDirectorySnapshot.h"
@@ -11,15 +16,15 @@
 #include "Entity.h"
 #include "Prefab.h"
 #include "PrefabUtility.h"
-#include "EditorImGuiTexture.h"
+#include "../EngineEntry/Presentation/EditorImGuiTexture.h"
 #include "BrowserThumbnailCache.h"
-#include "EditorPlatform.h"
-#include "EditorAssetDatabase.h"
+#include "../EngineEntry/Bootstrap/EditorPlatform.h"
+#include "../EngineEntry/Assets/EditorAssetDatabase.h"
 #include "EditorIcons.h"
 #include "EditorAssetDragPayload.h"
 #include "SoundGraphEditor.h"
 #include <float.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include <imgui_internal.h>
 
 std::string						ContentsBrowserWindow::selectedFileName{};
@@ -62,7 +67,7 @@ namespace
 
 	// 이름을 DeduceFileType으로 바꿨다. GetFileType은 Win32 fileapi.h가
 	// 이미 쓰는 이름이라, 에디터 TU에서 겹칠 이유를 남기지 않는다.
-	FileType DeduceFileType(const file::path& filepath)
+	FileType DeduceFileType(const std::filesystem::path& filepath)
 	{
         // Filtering and artwork must classify an extension identically.
         return EditorAssetPresentation::Get().ResolveFilePresentation(filepath.extension().string()).type;
@@ -102,11 +107,11 @@ void ContentsBrowserWindow::HandleSceneObjectDrop(const void* payload)
 	if (!objPtr) return;
 
 	Entity* obj = objPtr;
-	Prefab* prefab = PrefabUtilitys->CreatePrefab(obj, obj->m_name.ToString());
+	Prefab* prefab = PrefabUtilitys->CreatePrefab(obj, obj->m_name);
 	if (!prefab) return;
 
-	const file::path savePath =
-		PathFinder::RelativeToPrefab(obj->m_name.ToString() + ".prefab");
+	const std::filesystem::path savePath =
+		ce::paths::relative_to_prefab(obj->m_name + ".prefab");
 	PrefabUtilitys->SavePrefab(prefab, savePath.string());
 	EditorAssetDatabase::Get().CreateMeta(savePath);
 	// prefab은 PrefabUtility::m_createdPrefabs가 소유한다(비소유 포인터) — 여기서 지우지 않는다.
@@ -114,7 +119,7 @@ void ContentsBrowserWindow::HandleSceneObjectDrop(const void* payload)
 
 namespace
 {
-    std::string browser_utf8(const file::path& path)
+    std::string browser_utf8(const std::filesystem::path& path)
     {
         const auto utf8 = path.u8string();
         return { reinterpret_cast<const char*>(utf8.data()), utf8.size() };
@@ -168,7 +173,7 @@ namespace
     // 지금은 디스크를 만지지 않는 어휘 비교다. 이 물음("이 폴더가 프리팹 폴더인가")
     // 에는 그것으로 충분하다 — 양쪽 다 같은 `PathFinder` 뿌리에서 나오고, 트리는
     // 심볼릭 링크를 타지 않으므로 `equivalent` 의 링크 의미론이 필요 없다.
-    bool browser_same_path(const file::path& a, const file::path& b)
+    bool browser_same_path(const std::filesystem::path& a, const std::filesystem::path& b)
     {
         return ::editor::browser_same_directory(a, b);
     }
@@ -243,7 +248,7 @@ namespace
 
 // ══ PHASE 21 W2-B — 탐색 상태 ════════════════════════════════════════════════
 //
-// 착수 전의 이력은 `std::vector<file::path>` 였다. 경로만 들고 있어서 뒤로 가면
+// 착수 전의 이력은 `std::vector<std::filesystem::path>` 였다. 경로만 들고 있어서 뒤로 가면
 // 그 자리에서 찾던 검색어도, 고른 자산도, 내려 둔 스크롤도 사라졌다 — 계획서
 // 계약 4 가 요구한 *"해당 방문의 검색어·스크롤·선택을 복원한다"* 를 담을 칸이
 // 없었다. 그리고 최근·전체라는 가상 위치는 경로가 아니라서 들어갈 자리도 없었다.
@@ -269,7 +274,7 @@ namespace
 
     /// 캐시에 있으면 그것을(낡았으면 공유 예산 안에서 다시 훑는다), 없으면
     /// `budget` 이 남았을 때만 처음 훑는다. 둘 다 아니면 nullptr — 다음 프레임에 온다.
-    const editor::browser_directory_listing* browser_warm_listing(const file::path& folder, int& budget)
+    const editor::browser_directory_listing* browser_warm_listing(const std::filesystem::path& folder, int& budget)
     {
         if (editor::browser_cache_peek(folder)) return &editor::browser_cache_listing(folder);
         if (budget <= 0) return nullptr;
@@ -305,7 +310,7 @@ namespace editor::windows
     }
 }
 
-std::string ContentsBrowserWindow::RelativeUtf8(const file::path& path) const
+std::string ContentsBrowserWindow::RelativeUtf8(const std::filesystem::path& path) const
 {
     if (path.empty()) return {};
     const auto relative = path.lexically_relative(m_rootDirectory);
@@ -314,11 +319,11 @@ std::string ContentsBrowserWindow::RelativeUtf8(const file::path& path) const
     return { reinterpret_cast<const char*>(utf8.data()), utf8.size() };
 }
 
-bool ContentsBrowserWindow::Navigate(const file::path& directory)
+bool ContentsBrowserWindow::Navigate(const std::filesystem::path& directory)
 {
     std::error_code ec;
-    const auto target = file::canonical(directory, ec);
-    if (ec || !file::is_directory(target, ec))
+    const auto target = std::filesystem::canonical(directory, ec);
+    if (ec || !std::filesystem::is_directory(target, ec))
     {
         m_error = "Folder is unavailable: " + browser_utf8(directory);
         return false;
@@ -408,8 +413,8 @@ void ContentsBrowserWindow::JumpHistory(size_t index)
         // 지워진 위치는 뿌리 안의 가장 가까운 상위로 복구한다(계약 4). 디스크를
         // 묻는 것은 사람이 누른 이 한 번뿐이다.
         std::error_code ec;
-        file::path folder = target.directory;
-        while (!(file::is_directory(folder, ec) && !ec))
+        std::filesystem::path folder = target.directory;
+        while (!(std::filesystem::is_directory(folder, ec) && !ec))
         {
             ec.clear();
             const auto relative = folder.lexically_relative(m_rootDirectory);
@@ -435,7 +440,7 @@ void ContentsBrowserWindow::JumpHistory(size_t index)
     if (!recovered.empty()) m_error = std::move(recovered);
 }
 
-bool ContentsBrowserWindow::SelectAsset(const file::path& path)
+bool ContentsBrowserWindow::SelectAsset(const std::filesystem::path& path)
 {
     selectedMetaFilePath = path.string();
     selectedMetaFilePath += ".meta";
@@ -470,7 +475,7 @@ void ContentsBrowserWindow::ClearSelection()
 // 뿌리 기준 상대 경로로 적어 프로젝트를 옮겨도 산다. 쓰는 것은 목록이 **바뀐
 // 순간**뿐이다(프레임마다 쓰지 않는다).
 
-void ContentsBrowserWindow::RecordRecent(const file::path& path)
+void ContentsBrowserWindow::RecordRecent(const std::filesystem::path& path)
 {
     const auto existing = std::find(m_recents.begin(), m_recents.end(), path);
     if (existing == m_recents.begin() && !m_recents.empty()) return;
@@ -490,7 +495,7 @@ void ContentsBrowserWindow::LoadRecents()
     {
         if (!line.empty() && line.back() == '\r') line.pop_back();
         if (line.empty()) continue;
-        const file::path relative = file::u8path(line);
+        const std::filesystem::path relative = std::filesystem::u8path(line);
         // 뿌리 밖을 가리키는 줄은 받지 않는다 — 손으로 고친 파일이 두 번째 자산
         // 뿌리를 만들지 못하게 한다(계약 3).
         if (relative.is_absolute() || (!relative.empty() && *relative.begin() == "..")) continue;
@@ -502,7 +507,7 @@ void ContentsBrowserWindow::SaveRecents() const
 {
     if (m_recentsFile.empty()) return;
     std::error_code ec;
-    file::create_directories(m_recentsFile.parent_path(), ec);
+    std::filesystem::create_directories(m_recentsFile.parent_path(), ec);
     std::ofstream output(m_recentsFile, std::ios::binary | std::ios::trunc);
     if (!output) return;
     for (const auto& path : m_recents) output << RelativeUtf8(path) << '\n';
@@ -542,7 +547,7 @@ void ContentsBrowserWindow::CollectResults(std::vector<const editor::browser_dir
     }
     else if (m_scope == Scope::everything)
     {
-        std::vector<file::path> queue{ m_rootDirectory };
+        std::vector<std::filesystem::path> queue{ m_rootDirectory };
         for (size_t head = 0; head < queue.size(); ++head)
         {
             const auto* listing = browser_warm_listing(queue[head], budget);
@@ -610,8 +615,8 @@ void ContentsBrowserWindow::ApplyRequests()
         {
         case Kind::go_folder:
         {
-            const file::path relative = file::u8path(request.text);
-            const file::path target = request.text.empty() || request.text == "." ? m_rootDirectory
+            const std::filesystem::path relative = std::filesystem::u8path(request.text);
+            const std::filesystem::path target = request.text.empty() || request.text == "." ? m_rootDirectory
                 : relative.is_absolute() ? relative : m_rootDirectory / relative;
             if (!Navigate(target)) rejection = m_error;
             break;
@@ -647,7 +652,7 @@ void ContentsBrowserWindow::ApplyRequests()
                 == m_publishedResults.end())
                 rejection = "not among the visible results: " + request.text;
             else
-                SelectAsset((m_rootDirectory / file::u8path(request.text)).lexically_normal());
+                SelectAsset((m_rootDirectory / std::filesystem::u8path(request.text)).lexically_normal());
             break;
         case Kind::scroll:
             m_pendingScrollY = std::max(0.f, request.value);
@@ -709,14 +714,14 @@ void ContentsBrowserWindow::PublishSnapshot()
         payload && editor::asset_drag::carries_path(*payload))
     {
         snapshot.dragPayloadType = payload->DataType;
-        const file::path dragged = editor::asset_drag::path_of(*payload);
+        const std::filesystem::path dragged = editor::asset_drag::path_of(*payload);
         snapshot.dragPayloadPath = dragged.empty() ? std::string{} : RelativeUtf8(dragged);
     }
     std::lock_guard lock(g_browserMailboxMutex);
     g_browserSnapshot = std::move(snapshot);
 }
 
-void ContentsBrowserWindow::DrawFolderMenu(const file::path& directory)
+void ContentsBrowserWindow::DrawFolderMenu(const std::filesystem::path& directory)
 {
     if (ImGui::MenuItem("New Folder..."))
     {
@@ -751,7 +756,7 @@ void ContentsBrowserWindow::DrawFolderMenu(const file::path& directory)
     }
 }
 
-void ContentsBrowserWindow::OpenCreateDialog(CreateKind kind, const file::path& directory)
+void ContentsBrowserWindow::OpenCreateDialog(CreateKind kind, const std::filesystem::path& directory)
 {
     m_createKind = kind;
     m_folderTarget = directory;
@@ -760,17 +765,17 @@ void ContentsBrowserWindow::OpenCreateDialog(CreateKind kind, const file::path& 
     m_error.clear();
 }
 
-bool ContentsBrowserWindow::CanCreateSceneRenderProfileIn(const file::path& directory) const
+bool ContentsBrowserWindow::CanCreateSceneRenderProfileIn(const std::filesystem::path& directory) const
 {
     return !m_sceneRenderProfileDirectory.empty() && browser_same_path(directory, m_sceneRenderProfileDirectory);
 }
 
-bool ContentsBrowserWindow::CreateNamedAsset(CreateKind kind, const file::path& directory, std::string_view name)
+bool ContentsBrowserWindow::CreateNamedAsset(CreateKind kind, const std::filesystem::path& directory, std::string_view name)
 {
     // W2-B: 예전 Scene Render Profile 은 OS 저장 대화상자를 열고 반환값을 버렸다 — 취소도
     // 실패도 같은 침묵이었고 같은 이름이면 말없이 숫자가 붙었다. 이제 폴더 만들기와
     // 같은 길이다: 이름을 받고, 실패하면 이유를 대화상자에 남기고, 성공하면 보인다.
-    file::path created;
+    std::filesystem::path created;
     editor::browser_cache_invalidate();   // W7-1: 성공·실패 어느 쪽이든 디스크가 움직였을 수 있다
     if (CreateKind::folder == kind)
     {
@@ -835,7 +840,7 @@ void ContentsBrowserWindow::DrawFolderDialog()
     }
 }
 
-void ContentsBrowserWindow::ShowDirectoryTree(const file::path& directory)
+void ContentsBrowserWindow::ShowDirectoryTree(const std::filesystem::path& directory)
 {
     // W7-0: 이 함수는 재귀한다. 시간 구간은 바깥(DrawDirectoryPanel)이 잡고
     // 여기서는 **일의 수**만 센다. 스캔은 캐시가 실제로 디스크를 만졌을
@@ -846,7 +851,7 @@ void ContentsBrowserWindow::ShowDirectoryTree(const file::path& directory)
     // W7-1: 프레임마다 directory_iterator 를 돌리지 않는다. 목록은 스냅샷이
     // 주고, 정렬도 스캔할 때 한 번 해 둔 것이다.
     const editor::browser_directory_listing& listing = editor::browser_cache_listing(directory);
-    std::vector<file::path> children;
+    std::vector<std::filesystem::path> children;
     for (const auto& entry : listing.entries)
     {
         // ★ 목록은 폴더가 먼저다(스캔이 그렇게 세운다). 첫 파일에서 멈춘다 — 파일
@@ -978,7 +983,7 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFiles()
     ResultKey key;
     key.generation = editor::browser_cache_generation();
     key.scope = m_scope;
-    key.directory = m_scope == Scope::folder ? m_currentDirectory : file::path{};
+    key.directory = m_scope == Scope::folder ? m_currentDirectory : std::filesystem::path{};
     key.filter = m_filter.InputBuf;
     key.typeFilter = m_typeFilter;
     key.descending = m_sortDescending;
@@ -1121,7 +1126,7 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFiles()
     }
 }
 void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePresentation& presentation,
-										 const file::path& directory,
+										 const std::filesystem::path& directory,
 										 const std::string& fileName,
 										 std::uint64_t revision,
 										 const ImVec2& tileSize)
@@ -1194,7 +1199,7 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
             }
         }
 		// Delete 인라인 구현이 여기 있었다 — 트리 쪽과 **같은 코드의 복제**였고,
-		// 둘 다 확인도 Undo 도 없이 file::remove 를 불렀다. 선언 하나
+		// 둘 다 확인도 Undo 도 없이 std::filesystem::remove 를 불렀다. 선언 하나
 		// (editor_core_menus 의 delete_asset, confirm 붙음)가 둘을 대체한다.
 		if (ImGui::MenuItem("Open in File Explorer"))
 		{
@@ -1204,7 +1209,7 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
 		// 고른 채로 보여 준다(계약 5 — *"해당 위치 열기"*).
 		if (m_scope != Scope::folder && ImGui::MenuItem("Show in Folder"))
 		{
-			const file::path asset = directory;
+			const std::filesystem::path asset = directory;
 			if (Navigate(asset.parent_path())) SelectAsset(asset);
 		}
 		if (m_scope == Scope::folder && CanCreateSceneRenderProfileIn(m_currentDirectory)
@@ -1284,9 +1289,9 @@ void ContentsBrowserWindow::DrawFileTile(const EditorAssetPresentation::FilePres
 		// W2-B: payload 는 이름이 아니라 전체 경로다 — 받는 쪽이 유형 폴더에서
 		// 이름으로 다시 찾으면 같은 이름의 다른 파일이 열린다(EditorAssetDragPayload.h).
 		const char* payloadType = FileTypeToString(fileType);
-		if (directory.parent_path() == PathFinder::Relative("SpriteSheets"))
+		if (directory.parent_path() == ce::paths::relative("SpriteSheets"))
 			payloadType = "SPRITESHEET";
-		else if (directory.parent_path() == PathFinder::Relative("UI"))
+		else if (directory.parent_path() == ce::paths::relative("UI"))
 			payloadType = "UI_TEXTURE";
 		editor::asset_drag::set_payload(payloadType, directory);
 		ImGui::Text("Dragging %s", fileName.c_str());
@@ -1318,7 +1323,7 @@ void ContentsBrowserWindow::DrawBreadcrumb(float width)
         ImGui::PopStyleColor();
         return;
     }
-    std::vector<file::path> chain{ m_rootDirectory };
+    std::vector<std::filesystem::path> chain{ m_rootDirectory };
     auto path = m_rootDirectory;
     for (const auto& part : m_currentDirectory.lexically_relative(m_rootDirectory))
     {
@@ -1358,7 +1363,7 @@ void ContentsBrowserWindow::DrawBreadcrumb(float width)
             ImGui::SetNextItemWidth(editor::ThemePixels(300.f));
             if (ImGui::InputTextWithHint("##Path", "Assets-relative or absolute path", m_pathInput, sizeof(m_pathInput), ImGuiInputTextFlags_EnterReturnsTrue))
             {
-                const auto entered = file::u8path(m_pathInput);
+                const auto entered = std::filesystem::u8path(m_pathInput);
                 Navigate(entered.is_absolute() ? entered : m_rootDirectory / entered);
                 if (m_error.empty()) ImGui::CloseCurrentPopup();
             }
@@ -1511,7 +1516,7 @@ void ContentsBrowserWindow::Draw()
     // 걷어내는 변이가 게이트를 조용히 지나간다. 정상 상태의 델타는 0 이라
     // 슬롯 표본을 더럽히지 않는다(0 일 때는 신고조차 하지 않는다).
     const std::uint64_t rootProbesBefore = editor::browser_cache_get_stats().probes;
-    const auto rootSource = PathFinder::Relative();
+    const auto rootSource = ce::paths::relative();
     if (rootSource != m_rootSource)
     {
         m_rootSource = rootSource;
@@ -1525,9 +1530,9 @@ void ContentsBrowserWindow::Draw()
             // 비교가 조용히 안 맞는다 — RelativeToPrefab("") 은 끝에 구분자가
             // 붙은 날것이라 정확히 그 함정이다.
             std::error_code prefabError;
-            m_prefabDirectory = editor::browser_canonical(PathFinder::PrefabSourcePath(), prefabError);
+            m_prefabDirectory = editor::browser_canonical(ce::paths::prefab_source_path(), prefabError);
             std::error_code profileError;
-            m_sceneRenderProfileDirectory = editor::browser_canonical(PathFinder::SceneRenderProfilePath(), profileError);
+            m_sceneRenderProfileDirectory = editor::browser_canonical(ce::paths::scene_render_profile_path(), profileError);
             // 프로젝트가 바뀌면 이전 프로젝트의 이력·선택·범위를 쓰지 않는다(계약 6).
             m_currentDirectory.clear();
             m_scope = Scope::folder;

@@ -1,9 +1,19 @@
-#include "../../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "FsrBackendDX12.h"
 #if CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_DX12_SDK
 #include "../../DX12/DX12DeviceResources.h"
 #include "../../DX12/DX12Encoder.h"
-#include "../../../../Utility_Framework/StandardLibrary.h"
+#include "../../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -112,7 +122,7 @@ FsrFrameGeneratorDX12::~FsrFrameGeneratorDX12()
     if (!Shutdown().IsSuccess())
     {
         (void)new decltype(m_generator)(std::move(m_generator));
-        m_swapchain.Detach();
+        m_swapchain.detach();
         (void)new decltype(m_lifetime)(std::move(m_lifetime));
     }
 }
@@ -133,8 +143,8 @@ TemporalResult FsrFrameGeneratorDX12::Initialize(DX12DeviceResources& resources,
         native.description.Format != DXGI_FORMAT_R10G10B10A2_UNORM) ||
         (configuration.transferFunction == TemporalTransferFunction::Linear &&
         native.description.Format != DXGI_FORMAT_R16G16B16A16_FLOAT)) return Invalid();
-    Microsoft::WRL::ComPtr<ID3D12Device> queueDevice;
-    if (FAILED(native.gameQueue->GetDevice(IID_PPV_ARGS(&queueDevice))) || queueDevice.Get() != resources.GetDevice())
+    winrt::com_ptr<ID3D12Device> queueDevice;
+    if (FAILED(native.gameQueue->GetDevice(IID_PPV_ARGS(queueDevice.put()))) || queueDevice.get() != resources.GetDevice())
         return Invalid();
     result = m_generator->Initialize(MakeFsrBackendDeviceDX12(resources.GetDevice()), description, configuration,
         ffxGetSurfaceFormatDX12(native.description.Format), synchronization);
@@ -149,7 +159,7 @@ TemporalResult FsrFrameGeneratorDX12::Initialize(DX12DeviceResources& resources,
         const auto cleanup = m_generator->Shutdown();
         return !cleanup.IsSuccess() ? cleanup : (result.IsSuccess() ? Invalid() : result);
     }
-    m_swapchain.Attach(ffxGetDX12SwapchainPtr(swapchain));
+    m_swapchain.attach(ffxGetDX12SwapchainPtr(swapchain));
     DXGI_COLOR_SPACE_TYPE colorSpace = DXGI_COLOR_SPACE_RGB_FULL_G22_NONE_P709;
     if (configuration.transferFunction == TemporalTransferFunction::PQ)
     {
@@ -216,8 +226,8 @@ TemporalResult FsrFrameGeneratorDX12::Prepare(const TemporalFrameGenerationInput
     auto result = m_generator->Prepare(inputs.frame, resources);
     native->ResetState(commandList);
     if (!result.IsSuccess()) return result;
-    result = FsrResult(ffxRegisterFrameinterpolationUiResourceDX12(ffxGetSwapchainDX12(m_swapchain.Get()), ui, m_uiFlags));
-    if (result.IsSuccess()) result = m_generator->Configure(ffxGetSwapchainDX12(m_swapchain.Get()));
+    result = FsrResult(ffxRegisterFrameinterpolationUiResourceDX12(ffxGetSwapchainDX12(m_swapchain.get()), ui, m_uiFlags));
+    if (result.IsSuccess()) result = m_generator->Configure(ffxGetSwapchainDX12(m_swapchain.get()));
     m_canPresent = result.IsSuccess();
     return result;
 }
@@ -265,9 +275,9 @@ TemporalResult FsrFrameGeneratorDX12::DisableGeneration()
     // The SDK composes registered UI on real frames even with FG disabled.
     // Native-gate passthrough already contains UI, so remove that registration.
     const auto cleared = FsrResult(ffxRegisterFrameinterpolationUiResourceDX12(
-        ffxGetSwapchainDX12(m_swapchain.Get()), FfxResource{}, 0));
+        ffxGetSwapchainDX12(m_swapchain.get()), FfxResource{}, 0));
     if (!cleared.IsSuccess()) return cleared;
-    return m_generator->DisableGeneration(ffxGetSwapchainDX12(m_swapchain.Get()));
+    return m_generator->DisableGeneration(ffxGetSwapchainDX12(m_swapchain.get()));
 }
 
 TemporalResult FsrFrameGeneratorDX12::PresentRealFrame(uint32_t syncInterval, uint32_t flags,
@@ -302,7 +312,7 @@ TemporalResult FsrFrameGeneratorDX12::Shutdown()
     const auto result = m_generator->Shutdown();
     if (!result.IsSuccess()) return result;
     m_lifetime.reset();
-    m_swapchain.Reset();
+    m_swapchain = nullptr;
     m_resources = nullptr;
     m_pending = m_canPresent = false;
     return result;

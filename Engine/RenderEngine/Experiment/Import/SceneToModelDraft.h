@@ -4,7 +4,7 @@
 #include "../ModelData.h"
 #include "../../StandardMaterialProperty.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // ImportedScene(임포트 IR) → experiment::ModelDraft(런타임 데이터 모델) 변환.
 //

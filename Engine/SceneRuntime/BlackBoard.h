@@ -3,7 +3,11 @@
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
 #include "BlackBoardValue.h"
-#include "Delegate.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
 
 class Entity;
 class Transform;
@@ -57,7 +61,7 @@ private:
 
 	std::string m_name; // Name of the blackboard
 	std::unordered_map<std::string, BlackBoardValue> m_values;
-	//Core::Delegate<void, const std::string&> m_valueChangedDelegate; // 값 변경에 대한 델리게이트
+	//ce::delegate<void, const std::string&> m_valueChangedDelegate; // 값 변경에 대한 델리게이트
 
 	BlackBoardValue& GetOrCreate(const std::string& key);
 	const BlackBoardValue& GetChecked(const std::string& key, BlackBoardType expected) const;

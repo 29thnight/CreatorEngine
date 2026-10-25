@@ -1,15 +1,19 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "RHI/RHIShaderCompiler.h"
-#include "PathFinder.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 int main(int argc,char** argv) try
 {
     if(argc!=3) throw std::runtime_error("probe <repo> <generated-source>");
     const auto repo=std::filesystem::absolute(argv[1]);
-    auto* paths=InternalPath::GetInstance();
-    paths->BaseProjectPath=repo/"Dynamic_CPP";
-    paths->ShaderSourcePath=repo/"Dynamic_CPP/Assets/Shaders";
-    paths->AssetAuthoringEnabled=true;
+    auto* paths=(&ce::paths::get_state());
+    paths->base_project_path=repo/"Dynamic_CPP";
+    paths->shader_source_path=repo/"Dynamic_CPP/Assets/Shaders";
+    paths->asset_authoring_enabled=true;
     RHIShaderCompileOptions options;
     options.strictMath=true; options.fineDerivatives=true;
     options.quadOperations=true; options.bufferInt64Atomics=true;

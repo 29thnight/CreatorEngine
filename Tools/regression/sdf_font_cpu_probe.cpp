@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // Source-only regression fixture. Build/run explicitly after engine execution is
 // authorized; no graphics device or editor process is required.
 #include "FontAsset.h"
@@ -5,7 +10,7 @@
 #include "Interfaces/Navigation.h"
 
 #include <stdio.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {

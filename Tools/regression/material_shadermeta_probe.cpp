@@ -1,15 +1,24 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "../../Engine/RenderEngine/Texture.h"
 #include "material_owner_checks.h"
 #include "../../Engine/RenderEngine/MaterialGraphShaderMeta.h"
 #include "../../Engine/RenderEngine/MaterialGraphSceneCompiler.h"
 #include "../../Engine/RenderEngine/MaterialGraphRuntime.h"
 #include "../../Engine/RenderEngine/MaterialPropertyPacker.h"
-#include "../../Engine/Utility_Framework/AuthoringCookedDocument.h"
-#include "../../Engine/Utility_Framework/AuthoringParsedDocument.h"
-#include "../../Engine/Utility_Framework/AuthoringParseTelemetry.h"
-#include "../../Engine/Utility_Framework/PathFinder.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringCookedDocument.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringParseTelemetry.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -43,11 +52,11 @@ Id PinId(const LXGraph& graph, Id node, std::string_view identifier, Direction d
 void Run(const std::filesystem::path& repo, const std::filesystem::path& work)
 {
     std::filesystem::create_directories(work);
-    auto* paths = InternalPath::GetInstance();
-    paths->BaseProjectPath = repo / "Dynamic_CPP";
-    paths->ShaderSourcePath = repo / "Dynamic_CPP/Assets/Shaders";
-    paths->AssetAuthoringEnabled = true;
-    const auto shaderRoot = paths->ShaderSourcePath / "DefaultPassShader";
+    auto* paths = (&ce::paths::get_state());
+    paths->base_project_path = repo / "Dynamic_CPP";
+    paths->shader_source_path = repo / "Dynamic_CPP/Assets/Shaders";
+    paths->asset_authoring_enabled = true;
+    const auto shaderRoot = paths->shader_source_path / "DefaultPassShader";
     std::string error;
     const FileGuid guid{"11111111-1111-4111-8111-111111111111"};
     const std::string texture = "22222222-2222-4222-8222-222222222222";

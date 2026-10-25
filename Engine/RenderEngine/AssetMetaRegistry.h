@@ -1,6 +1,6 @@
 #pragma once
-#include "Core.Minimal.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 enum class AssetMetaRegistrationResult
 {
@@ -15,7 +15,7 @@ class AssetMetaRegistry
 {
 public:
     [[nodiscard]] AssetMetaRegistrationResult Register(
-		const FileGuid& guid, const file::path& path)
+		const FileGuid& guid, const std::filesystem::path& path)
     {
 		if (FileGuid{} == guid || path.empty())
 			return AssetMetaRegistrationResult::Invalid;
@@ -44,13 +44,13 @@ public:
         auto it = m_guidToPath.find(guid);
         if (it != m_guidToPath.end())
         {
-            file::path path = it->second;
+            std::filesystem::path path = it->second;
             m_guidToPath.erase(it);
             m_pathToGuid.erase(path);
         }
     }
 
-    void Unregister(const file::path& path)
+    void Unregister(const std::filesystem::path& path)
     {
 		std::unique_lock lock(m_mutex);
         auto it = m_pathToGuid.find(path);
@@ -62,14 +62,14 @@ public:
         }
     }
 
-    file::path GetPath(const FileGuid& guid) const
+    std::filesystem::path GetPath(const FileGuid& guid) const
     {
 		std::shared_lock lock(m_mutex);
         auto it = m_guidToPath.find(guid);
-        return it != m_guidToPath.end() ? it->second : file::path{};
+        return it != m_guidToPath.end() ? it->second : std::filesystem::path{};
     }
 
-    FileGuid GetGuid(const file::path& path) const
+    FileGuid GetGuid(const std::filesystem::path& path) const
     {
 		std::shared_lock lock(m_mutex);
         auto it = m_pathToGuid.find(path);
@@ -98,7 +98,7 @@ public:
         return m_guidToPath.contains(guid);
     }
 
-    bool Contains(const file::path& path) const
+    bool Contains(const std::filesystem::path& path) const
     {
 		std::shared_lock lock(m_mutex);
         return m_pathToGuid.contains(path);
@@ -113,6 +113,6 @@ public:
 
 private:
 	mutable std::shared_mutex m_mutex;
-    std::unordered_map<FileGuid, file::path> m_guidToPath;
-    std::unordered_map<file::path, FileGuid> m_pathToGuid;
+    std::unordered_map<FileGuid, std::filesystem::path> m_guidToPath;
+    std::unordered_map<std::filesystem::path, FileGuid> m_pathToGuid;
 };

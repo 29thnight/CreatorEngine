@@ -1,15 +1,25 @@
 #pragma once
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 
-#include <Windows.h>
-#include <d3d12.h>
-#include <dxgi1_6.h>
-#include <wrl/client.h>
-
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace MaterialProbe
 {
-using Microsoft::WRL::ComPtr;
 
 struct Float4
 {
@@ -57,20 +67,20 @@ class ComputeReadback final
                             unsigned fieldCount, const std::vector<TextureFixture>& texturesData = {},
                             const std::vector<SamplerFixture>& samplersData = {}, const BindingFixture& bindings = {})
     {
-        ComPtr<IDXGIFactory4> factory;
-        Require(CreateDXGIFactory2(0, IID_PPV_ARGS(&factory)), "CreateDXGIFactory2");
-        ComPtr<ID3D12Device> device;
+        winrt::com_ptr<IDXGIFactory4> factory;
+        Require(CreateDXGIFactory2(0, IID_PPV_ARGS(factory.put())), "CreateDXGIFactory2");
+        winrt::com_ptr<ID3D12Device> device;
         bool warp = false;
-        if (FAILED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&device))))
+        if (FAILED(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(device.put()))))
         {
-            ComPtr<IDXGIAdapter> adapter;
-            Require(factory->EnumWarpAdapter(IID_PPV_ARGS(&adapter)), "EnumWarpAdapter");
-            Require(D3D12CreateDevice(adapter.Get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&device)),
+            winrt::com_ptr<IDXGIAdapter> adapter;
+            Require(factory->EnumWarpAdapter(IID_PPV_ARGS(adapter.put())), "EnumWarpAdapter");
+            Require(D3D12CreateDevice(adapter.get(), D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(device.put())),
                     "D3D12CreateDevice WARP");
             warp = true;
         }
-        ComPtr<IDXGIAdapter1> selected;
-        Require(factory->EnumAdapterByLuid(device->GetAdapterLuid(), IID_PPV_ARGS(&selected)), "EnumAdapterByLuid");
+        winrt::com_ptr<IDXGIAdapter1> selected;
+        Require(factory->EnumAdapterByLuid(device->GetAdapterLuid(), IID_PPV_ARGS(selected.put())), "EnumAdapterByLuid");
         DXGI_ADAPTER_DESC1 adapterDescription{};
         Require(selected->GetDesc1(&adapterDescription), "GetDesc1");
         std::wcout << L"ADAPTER " << adapterDescription.Description << (warp ? L" (WARP)\n" : L" (hardware)\n");
@@ -111,19 +121,19 @@ class ComputeReadback final
         rootDescription.pParameters = parameters;
         rootDescription.NumStaticSamplers = static_cast<UINT>(samplers.size());
         rootDescription.pStaticSamplers = samplers.data();
-        ComPtr<ID3DBlob> rootBlob;
-        ComPtr<ID3DBlob> errors;
-        Require(D3D12SerializeRootSignature(&rootDescription, D3D_ROOT_SIGNATURE_VERSION_1, &rootBlob, &errors),
+        winrt::com_ptr<ID3DBlob> rootBlob;
+        winrt::com_ptr<ID3DBlob> errors;
+        Require(D3D12SerializeRootSignature(&rootDescription, D3D_ROOT_SIGNATURE_VERSION_1, rootBlob.put(), errors.put()),
                 "D3D12SerializeRootSignature");
-        ComPtr<ID3D12RootSignature> root;
+        winrt::com_ptr<ID3D12RootSignature> root;
         Require(device->CreateRootSignature(0, rootBlob->GetBufferPointer(), rootBlob->GetBufferSize(),
-                                            IID_PPV_ARGS(&root)),
+                                            IID_PPV_ARGS(root.put())),
                 "CreateRootSignature");
         D3D12_COMPUTE_PIPELINE_STATE_DESC pipelineDescription{};
-        pipelineDescription.pRootSignature = root.Get();
+        pipelineDescription.pRootSignature = root.get();
         pipelineDescription.CS = {code.data(), code.size()};
-        ComPtr<ID3D12PipelineState> pipeline;
-        Require(device->CreateComputePipelineState(&pipelineDescription, IID_PPV_ARGS(&pipeline)),
+        winrt::com_ptr<ID3D12PipelineState> pipeline;
+        Require(device->CreateComputePipelineState(&pipelineDescription, IID_PPV_ARGS(pipeline.put())),
                 "CreateComputePipelineState");
 
         const auto buffer = [&device](uint64_t bytes, D3D12_HEAP_TYPE heap, D3D12_RESOURCE_STATES state,
@@ -139,9 +149,9 @@ class ComputeReadback final
             description.SampleDesc.Count = 1;
             description.Layout = D3D12_TEXTURE_LAYOUT_ROW_MAJOR;
             description.Flags = flags;
-            ComPtr<ID3D12Resource> resource;
+            winrt::com_ptr<ID3D12Resource> resource;
             Require(device->CreateCommittedResource(&heapProperties, D3D12_HEAP_FLAG_NONE, &description, state, nullptr,
-                                                    IID_PPV_ARGS(&resource)),
+                                                    IID_PPV_ARGS(resource.put())),
                     "CreateCommittedResource");
             return resource;
         };
@@ -154,7 +164,7 @@ class ComputeReadback final
                               D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS);
         auto readback =
             buffer(outputBytes, D3D12_HEAP_TYPE_READBACK, D3D12_RESOURCE_STATE_COPY_DEST, D3D12_RESOURCE_FLAG_NONE);
-        ComPtr<ID3D12Resource> uniforms;
+        winrt::com_ptr<ID3D12Resource> uniforms;
         if (!bindings.uniforms.empty())
         {
             const auto size = (bindings.uniforms.size() + 255u) & ~std::size_t(255u);
@@ -177,29 +187,29 @@ class ComputeReadback final
 
         D3D12_COMMAND_QUEUE_DESC queueDescription{};
         queueDescription.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
-        ComPtr<ID3D12CommandQueue> queue;
-        Require(device->CreateCommandQueue(&queueDescription, IID_PPV_ARGS(&queue)), "CreateCommandQueue");
-        ComPtr<ID3D12CommandAllocator> allocator;
-        Require(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&allocator)),
+        winrt::com_ptr<ID3D12CommandQueue> queue;
+        Require(device->CreateCommandQueue(&queueDescription, IID_PPV_ARGS(queue.put())), "CreateCommandQueue");
+        winrt::com_ptr<ID3D12CommandAllocator> allocator;
+        Require(device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(allocator.put())),
                 "CreateCommandAllocator");
-        ComPtr<ID3D12GraphicsCommandList> commands;
-        Require(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator.Get(), pipeline.Get(),
-                                          IID_PPV_ARGS(&commands)),
+        winrt::com_ptr<ID3D12GraphicsCommandList> commands;
+        Require(device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, allocator.get(), pipeline.get(),
+                                          IID_PPV_ARGS(commands.put())),
                 "CreateCommandList");
-        commands->SetComputeRootSignature(root.Get());
+        commands->SetComputeRootSignature(root.get());
         commands->SetComputeRootShaderResourceView(0, inputs->GetGPUVirtualAddress());
         commands->SetComputeRootUnorderedAccessView(1, outputs->GetGPUVirtualAddress());
         if (uniforms)
             commands->SetComputeRootConstantBufferView(uniformRoot, uniforms->GetGPUVirtualAddress());
-        std::vector<ComPtr<ID3D12Resource>> textures, textureUploads;
-        ComPtr<ID3D12DescriptorHeap> textureHeap;
+        std::vector<winrt::com_ptr<ID3D12Resource>> textures, textureUploads;
+        winrt::com_ptr<ID3D12DescriptorHeap> textureHeap;
         if (!texturesData.empty())
         {
             D3D12_DESCRIPTOR_HEAP_DESC heap{};
             heap.Type = D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV;
             heap.NumDescriptors = static_cast<UINT>(texturesData.size());
             heap.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
-            Require(device->CreateDescriptorHeap(&heap, IID_PPV_ARGS(&textureHeap)), "Create texture descriptor heap");
+            Require(device->CreateDescriptorHeap(&heap, IID_PPV_ARGS(textureHeap.put())), "Create texture descriptor heap");
             auto handle = textureHeap->GetCPUDescriptorHandleForHeapStart();
             for (const auto& data : texturesData)
             {
@@ -214,10 +224,10 @@ class ComputeReadback final
                 description.SampleDesc.Count = 1;
                 D3D12_HEAP_PROPERTIES textureProperties{};
                 textureProperties.Type = D3D12_HEAP_TYPE_DEFAULT;
-                ComPtr<ID3D12Resource> texture;
+                winrt::com_ptr<ID3D12Resource> texture;
                 Require(device->CreateCommittedResource(&textureProperties, D3D12_HEAP_FLAG_NONE, &description,
                                                         D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-                                                        IID_PPV_ARGS(&texture)),
+                                                        IID_PPV_ARGS(texture.put())),
                         "Create fixture texture");
                 D3D12_PLACED_SUBRESOURCE_FOOTPRINT footprint{};
                 UINT64 uploadSize = 0;
@@ -245,15 +255,15 @@ class ComputeReadback final
                 }
                 upload->Unmap(0, nullptr);
                 D3D12_TEXTURE_COPY_LOCATION source{}, target{};
-                source.pResource = upload.Get();
+                source.pResource = upload.get();
                 source.Type = D3D12_TEXTURE_COPY_TYPE_PLACED_FOOTPRINT;
                 source.PlacedFootprint = footprint;
-                target.pResource = texture.Get();
+                target.pResource = texture.get();
                 target.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
                 commands->CopyTextureRegion(&target, 0, 0, 0, &source, nullptr);
                 D3D12_RESOURCE_BARRIER textureBarrier{};
                 textureBarrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                textureBarrier.Transition.pResource = texture.Get();
+                textureBarrier.Transition.pResource = texture.get();
                 textureBarrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
                 textureBarrier.Transition.StateAfter = D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE;
                 textureBarrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -263,30 +273,30 @@ class ComputeReadback final
                 view.ViewDimension = D3D12_SRV_DIMENSION_TEXTURE2D;
                 view.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
                 view.Texture2D.MipLevels = 1;
-                device->CreateShaderResourceView(texture.Get(), &view, handle);
+                device->CreateShaderResourceView(texture.get(), &view, handle);
                 handle.ptr += device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
                 textures.push_back(std::move(texture));
                 textureUploads.push_back(std::move(upload));
             }
-            ID3D12DescriptorHeap* heaps[]{textureHeap.Get()};
+            ID3D12DescriptorHeap* heaps[]{textureHeap.get()};
             commands->SetDescriptorHeaps(1, heaps);
             commands->SetComputeRootDescriptorTable(2, textureHeap->GetGPUDescriptorHandleForHeapStart());
         }
         commands->Dispatch(static_cast<UINT>(inputsData.size()), angleCount, 1);
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = outputs.Get();
+        barrier.Transition.pResource = outputs.get();
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_UNORDERED_ACCESS;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         commands->ResourceBarrier(1, &barrier);
-        commands->CopyResource(readback.Get(), outputs.Get());
+        commands->CopyResource(readback.get(), outputs.get());
         Require(commands->Close(), "Close command list");
-        ID3D12CommandList* lists[]{commands.Get()};
+        ID3D12CommandList* lists[]{commands.get()};
         queue->ExecuteCommandLists(1, lists);
-        ComPtr<ID3D12Fence> fence;
-        Require(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&fence)), "CreateFence");
-        Require(queue->Signal(fence.Get(), 1), "Signal");
+        winrt::com_ptr<ID3D12Fence> fence;
+        Require(device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(fence.put())), "CreateFence");
+        Require(queue->Signal(fence.get(), 1), "Signal");
         m_event = CreateEventW(nullptr, FALSE, FALSE, nullptr);
         if (!m_event)
         {

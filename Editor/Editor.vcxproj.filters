@@ -1,36 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <ItemGroup>
-    <ClInclude Include="EngineEntry\TextureSourceProcessing.h"><Filter>EngineEntry</Filter></ClInclude>
-    <ClInclude Include="EngineEntry\PhysicsShapeDocument.h">
-      <Filter>EngineEntry</Filter>
-    </ClInclude>
-
-    <ClCompile Include="EngineEntry\TerrainSourceProcessing.cpp"><Filter>EngineEntry</Filter></ClCompile>
-    <ClCompile Include="EngineEntry\TextureSourceProcessing.cpp"><Filter>EngineEntry</Filter></ClCompile>
-    <ClCompile Include="..\Engine\RenderEngine\Experiment\Cooked\TextureCooker.cpp"><Filter>EngineEntry</Filter></ClCompile>
-    <ClCompile Include="EngineGUIWindow\EditorWorkspaceStore.cpp">
-      <Filter>EngineGUIWindow</Filter>
-    </ClCompile>
-
-    <ClInclude Include="EngineGUIWindow\EditorWorkspaceStore.h">
-      <Filter>EngineGUIWindow</Filter>
-    </ClInclude>
-
-    <ClCompile Include="EngineGUIWindow\EditorWorkspaceFile.cpp">
-      <Filter>EngineGUIWindow</Filter>
-    </ClCompile>
-
-    <ClInclude Include="EngineGUIWindow\EditorWorkspaceFile.h">
-      <Filter>EngineGUIWindow</Filter>
-    </ClInclude>
-
-    <Filter Include="EditorWindow\Windows">
-      <UniqueIdentifier>{2b90ce17-45da-4f3a-9c6e-8d114a7be602}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="EditorWindow">
-      <UniqueIdentifier>{7f2c1a64-9b3e-4d51-8a07-2e5cb14d9f38}</UniqueIdentifier>
-    </Filter>
     <Filter Include="EditorMenu">
       <UniqueIdentifier>{3108037e-6e41-505a-b509-fe59ed743d0c}</UniqueIdentifier>
     </Filter>
@@ -49,244 +19,138 @@
     <Filter Include="EditorRender\Render\Passes\Editor">
       <UniqueIdentifier>{19e54859-9f21-54ef-b8cb-5a683c47bfa9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="EditorRuntime">
-      <UniqueIdentifier>{cdb32b50-e328-51b6-8712-a22f27f1065b}</UniqueIdentifier>
+    <Filter Include="EditorWindow">
+      <UniqueIdentifier>{7f2c1a64-9b3e-4d51-8a07-2e5cb14d9f38}</UniqueIdentifier>
     </Filter>
-    <Filter Include="EditorRuntime\Runtime">
-      <UniqueIdentifier>{e739c755-9bbf-5820-b95b-94047f3b4538}</UniqueIdentifier>
+    <Filter Include="EditorWindow\Windows">
+      <UniqueIdentifier>{2b90ce17-45da-4f3a-9c6e-8d114a7be602}</UniqueIdentifier>
     </Filter>
-    <Filter Include="EditorRuntime\Settings">
-      <UniqueIdentifier>{606718b7-bed5-579a-940f-8d1693fa7639}</UniqueIdentifier>
+    <Filter Include="EngineEntry">
+      <UniqueIdentifier>{E27BF0E1-63B6-5545-8BE4-C34C4222E7C9}</UniqueIdentifier>
     </Filter>
-    <Filter Include="EditorUI">
-      <UniqueIdentifier>{2c67431a-552f-5bec-b2c6-36a860ce6d20}</UniqueIdentifier>
+    <Filter Include="EngineEntry\Assets">
+      <UniqueIdentifier>{B58EB760-7493-5D5C-87C0-19B0C6A5ACF5}</UniqueIdentifier>
     </Filter>
-    <Filter Include="EditorUI\DrawHelper">
-      <UniqueIdentifier>{41c749f7-fbe7-56d3-96c0-a2e4cac172e3}</UniqueIdentifier>
+    <Filter Include="EngineEntry\Assets\Models">
+      <UniqueIdentifier>{98BACA5A-4F7C-5109-80FE-5C888FB1D524}</UniqueIdentifier>
     </Filter>
-    <Filter Include="EditorUI\Window">
-      <UniqueIdentifier>{8619023b-59a9-56a3-b07b-cd3054caea81}</UniqueIdentifier>
+    <Filter Include="EngineEntry\Assets\Physics">
+      <UniqueIdentifier>{4B0F2E6B-D144-5009-B43C-B4B982C44C9F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EngineEntry\Assets\Terrain">
+      <UniqueIdentifier>{1B48A1EC-976C-57EF-9B0C-0360B107E5CC}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EngineEntry\Assets\Textures">
+      <UniqueIdentifier>{A609EB1C-AC75-5BBF-A7C3-85D32672FC54}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EngineEntry\Bootstrap">
+      <UniqueIdentifier>{D4C307F8-A53D-5E47-8692-B568A90331A3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EngineEntry\Build">
+      <UniqueIdentifier>{7E367942-06E4-51E5-9FFA-8E3C01C27CF6}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EngineEntry\Commandlets">
+      <UniqueIdentifier>{808B2934-769C-530D-BE60-7FE214D78952}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EngineEntry\Commands">
+      <UniqueIdentifier>{5D4FC46B-2B1A-55A2-A3DB-22E3ACA8EBED}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EngineEntry\Diagnostics">
+      <UniqueIdentifier>{5E7EB44D-188C-5309-A0C3-EECB82C95CA0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EngineEntry\Editing">
+      <UniqueIdentifier>{802E068B-35F1-56BA-80CA-347D84EFCBBB}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EngineEntry\Presentation">
+      <UniqueIdentifier>{7E947C03-EE0E-55B3-96A2-ECB71F4E709A}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EngineEntry\Project">
+      <UniqueIdentifier>{8B3BECA3-98A8-5A82-B16A-7F8D351E6A5E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EngineEntry\Scene">
+      <UniqueIdentifier>{0E86940B-F3D0-5BBC-8D9C-72D4FA7819C8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EngineEntry\Scripting">
+      <UniqueIdentifier>{CC3F1824-AF40-561D-9B7C-CCE334B373A7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="EngineGUIWindow">
+      <UniqueIdentifier>{BDE6752F-5ACA-519B-9E60-82596E474805}</UniqueIdentifier>
     </Filter>
     <Filter Include="ImGuiHelper">
       <UniqueIdentifier>{199a6ee3-b77c-509b-a765-f3b11f3c051f}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ImGuiHelper\소스 파일">
-      <UniqueIdentifier>{e596aea8-f2f6-521d-afcc-07ea34bace54}</UniqueIdentifier>
+    <Filter Include="Shared">
+      <UniqueIdentifier>{6DC5966D-D290-5B29-82D5-3EEC52326F13}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ImGuiHelper\소스 파일\Blueprint">
-      <UniqueIdentifier>{16468d1f-58ed-5d6d-9e24-105f36260bf9}</UniqueIdentifier>
+    <Filter Include="Shared\Engine">
+      <UniqueIdentifier>{85C5BB4E-3AE4-5082-8B75-EBFD17CDF26A}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ImGuiHelper\소스 파일\CollapsingHeader">
-      <UniqueIdentifier>{f6450a7c-8152-53db-817f-b88ff4e9cf97}</UniqueIdentifier>
+    <Filter Include="Shared\Engine\RenderEngine">
+      <UniqueIdentifier>{6A4448C0-6D36-5986-A700-3587E025DA56}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ImGuiHelper\소스 파일\fonts">
-      <UniqueIdentifier>{dcec937e-cc56-50f3-ae48-65371e5eb097}</UniqueIdentifier>
+    <Filter Include="Shared\Engine\RenderEngine\Experiment">
+      <UniqueIdentifier>{58C67758-C3F2-5416-AF5C-DF90BC92664C}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ImGuiHelper\소스 파일\ImGuiHeader">
-      <UniqueIdentifier>{b14623ea-e6a3-5855-a6f5-641b14120b82}</UniqueIdentifier>
+    <Filter Include="Shared\Engine\RenderEngine\Experiment\Cooked">
+      <UniqueIdentifier>{443F67BF-C826-5AA2-B483-2F3787D8F872}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ImGuiHelper\소스 파일\NodeEditior">
-      <UniqueIdentifier>{2fcc9c5a-1853-5592-85b4-0af3756602dd}</UniqueIdentifier>
+    <Filter Include="Shared\Engine\RuntimeHost">
+      <UniqueIdentifier>{23BA86EF-B927-5F7A-B237-DCFB7FEF2D27}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ImGuiHelper\소스 파일\NodeEditorHelper">
-      <UniqueIdentifier>{f0e7616d-d7cb-572f-bc17-868f3f13639b}</UniqueIdentifier>
+    <Filter Include="Shared\Engine\RuntimeHost\CommandCore">
+      <UniqueIdentifier>{FB8308DD-6F65-5808-938F-8751D6ECF855}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ImGuiHelper\소스 파일\Profiler">
-      <UniqueIdentifier>{39734524-566a-5506-b33b-c907a4579ed6}</UniqueIdentifier>
+    <Filter Include="Shared\Lattice">
+      <UniqueIdentifier>{0BF5C63A-1120-5D9F-9733-F8B6C29730B0}</UniqueIdentifier>
     </Filter>
-    <Filter Include="ImGuiHelper\소스 파일\PropertyRow">
-      <UniqueIdentifier>{99444752-80d8-5f07-a9ed-a9bb0d7cbe32}</UniqueIdentifier>
+    <Filter Include="Shared\Lattice\Core">
+      <UniqueIdentifier>{2E55468D-F96A-55D6-B71D-5B058BBDD363}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\Lattice\ImGui">
+      <UniqueIdentifier>{329D6897-D915-5FAD-A7F5-504A998E7DD1}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="EngineEntry\EditorObjectOperations.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorScriptAuthoring.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorComponentCatalog.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorProjectOperations.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorDiagnostics.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\Commandlets\EditorCommandlets.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGizmoIconPass.h">
-      <Filter>EditorRender\Render\Passes\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGizmoLinePass.h">
-      <Filter>EditorRender\Render\Passes\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGridPass.h">
-      <Filter>EditorRender\Render\Passes\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.h">
-      <Filter>EditorRender\Render\Passes\Editor</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\BuildSettings.h">
-      <Filter>EditorRuntime\Settings</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandParser.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandDescriptor.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandDescriptorSeeds.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandRegistry.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandResult.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandSession.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\ConsoleCommandSystem.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorAssetDatabase.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorAssetPresentation.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorModelCollisionAsset.h" />
-    <ClInclude Include="EngineEntry\EditorModelCollisionGeometry.h" />
-    <ClInclude Include="EngineEntry\EditorModelPlacement.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorImGuiTexture.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorPlatform.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorPlayModeController.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorPreferences.h">
-      <Filter>EditorRuntime\Settings</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorSceneOverlayContributor.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorEntityIcons.h"><Filter>EditorRuntime\Runtime</Filter></ClInclude>
-    <ClInclude Include="EngineEntry\EditorSelectionHistory.h"><Filter>EditorRuntime\Runtime</Filter></ClInclude>
-    <ClInclude Include="EngineEntry\EditorSessionState.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorSettingsStore.h">
-      <Filter>EditorRuntime\Settings</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\GameBuilderSystem.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\GameObjectCommand.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\GizmoRenderer.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\PrefabEditor.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\ReflectionUndo.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\WinProcProxy.h">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorMenu\EditorMenuSurface.h">
-      <Filter>EditorMenu</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorMenu\EditorMenuSchema.h">
-      <Filter>EditorMenu</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorMenu\EditorMenuRegistry.h">
-      <Filter>EditorMenu</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorMenu\EditorMenuSelfTest.h">
-      <Filter>EditorMenu</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorMenu\EditorMenuDraw.h">
-      <Filter>EditorMenu</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorMenu\EditorMenuAudit.h">
-      <Filter>EditorMenu</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorMenu\EditorMenuTargets.h">
-      <Filter>EditorMenu</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorMenu\Menus\EditorCoreMenus.h">
-      <Filter>EditorMenu\Menus</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorMenu\RegisterEditorMenuManual.h">
-      <Filter>EditorMenu</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorWindow\EditorWindowSurface.h">
-      <Filter>EditorWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorWindow\EditorWindowSchema.h">
-      <Filter>EditorWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorWindow\EditorWindowRegistry.h">
-      <Filter>EditorWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorWindow\EditorWindowHost.h">
-      <Filter>EditorWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorWindow\EditorWindowSelfTest.h">
-      <Filter>EditorWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorWindow\EditorWindowAudit.h">
-      <Filter>EditorWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorWindow\EditorLayoutPreset.h">
-      <Filter>EditorWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorWindow\EditorChromeSnapshot.h">
-      <Filter>EditorWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EditorChromeProbe.h">
+    <ClCompile Include="EngineGUIWindow/InspectorIcon.cpp">
       <Filter>EngineGUIWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorWindow\RegisterEditorWindowManual.h">
-      <Filter>EditorWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorWindow\Windows\EditorStandardWindows.h">
-      <Filter>EditorWindow\Windows</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorWindow\Windows\EditorWindowBody.h">
-      <Filter>EditorWindow\Windows</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorWindow\Windows\EditorViewportWindows.h">
-      <Filter>EditorWindow\Windows</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorWindow\Windows\EditorToolboxWindows.h">
-      <Filter>EditorWindow\Windows</Filter>
-    </ClInclude>
-    <ClInclude Include="EditorWindow\Windows\EditorAnimatorWindows.h">
-      <Filter>EditorWindow\Windows</Filter>
-    </ClInclude>
-    <ClCompile Include="EditorMenu\EditorMenuRegistry.cpp">
-      <Filter>EditorMenu</Filter>
     </ClCompile>
-    <ClCompile Include="EditorMenu\EditorMenuSelfTest.cpp">
+    <ClCompile Include="..\Engine\RenderEngine\Experiment\Cooked\TextureCooker.cpp">
+      <Filter>Shared\Engine\RenderEngine\Experiment\Cooked</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandDescriptorSeeds.cpp">
+      <Filter>Shared\Engine\RuntimeHost\CommandCore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandParser.cpp">
+      <Filter>Shared\Engine\RuntimeHost\CommandCore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandRegistry.cpp">
+      <Filter>Shared\Engine\RuntimeHost\CommandCore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandResult.cpp">
+      <Filter>Shared\Engine\RuntimeHost\CommandCore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandSession.cpp">
+      <Filter>Shared\Engine\RuntimeHost\CommandCore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lattice\Core\LXDocument.cpp">
+      <Filter>Shared\Lattice\Core</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lattice\ImGui\LXCanvas.cpp">
+      <Filter>Shared\Lattice\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Lattice\ImGui\LXStyle.cpp">
+      <Filter>Shared\Lattice\ImGui</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorMenu\EditorMenuAudit.cpp">
       <Filter>EditorMenu</Filter>
     </ClCompile>
     <ClCompile Include="EditorMenu\EditorMenuDraw.cpp">
       <Filter>EditorMenu</Filter>
     </ClCompile>
-    <ClCompile Include="EditorMenu\EditorMenuAudit.cpp">
+    <ClCompile Include="EditorMenu\EditorMenuRegistry.cpp">
+      <Filter>EditorMenu</Filter>
+    </ClCompile>
+    <ClCompile Include="EditorMenu\EditorMenuSelfTest.cpp">
       <Filter>EditorMenu</Filter>
     </ClCompile>
     <ClCompile Include="EditorMenu\EditorMenuTargets.cpp">
@@ -294,227 +158,6 @@
     </ClCompile>
     <ClCompile Include="EditorMenu\Menus\EditorCoreMenus.cpp">
       <Filter>EditorMenu\Menus</Filter>
-    </ClCompile>
-    <ClCompile Include="EditorWindow\EditorWindowRegistry.cpp">
-      <Filter>EditorWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EditorWindow\EditorWindowHost.cpp">
-      <Filter>EditorWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EditorWindow\EditorWindowSelfTest.cpp">
-      <Filter>EditorWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EditorWindow\EditorWindowAudit.cpp">
-      <Filter>EditorWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EditorWindow\EditorLayoutPreset.cpp">
-      <Filter>EditorWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EditorWindow\EditorChromeSnapshot.cpp">
-      <Filter>EditorWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\EditorChromeProbe.cpp">
-      <Filter>EngineGUIWindow</Filter>
-    </ClCompile>
-    <ClCompile Include="EditorWindow\Windows\EditorStandardWindows.cpp">
-      <Filter>EditorWindow\Windows</Filter>
-    </ClCompile>
-    <ClCompile Include="EditorWindow\Windows\EditorWindowBody.cpp">
-      <Filter>EditorWindow\Windows</Filter>
-    </ClCompile>
-    <ClCompile Include="EditorWindow\Windows\EditorToolboxWindows.cpp">
-      <Filter>EditorWindow\Windows</Filter>
-    </ClCompile>
-    <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\BTEditorBridge.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EditorCameraRig.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EditorFontResources.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\EditorIconAlignment.h">
-      <Filter>ImGuiHelper</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\EditorTextFallback.h">
-      <Filter>ImGuiHelper</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EditorTheme.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EditorThemeSelfTest.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EditorRenderer.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EditorWindowChrome.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EditorWindowNames.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\AnimatorEditorWindows.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\ExternUI.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\GameViewWindow.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\HierarchyWindow.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\ICustomEditor.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\InspectorDrawer.h">
-      <Filter>EditorUI\DrawHelper</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\InspectorDrawerList.h">
-      <Filter>EditorUI\DrawHelper</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\InspectorIconList.h">
-      <Filter>EditorUI\DrawHelper</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\InspectorIcon.h">
-      <Filter>EditorUI\DrawHelper</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\InspectorDrawerMath.h">
-      <Filter>EditorUI\DrawHelper</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\InspectorWindow.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\MenuBarWindow.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\ReflectionImGuiHelper.h">
-      <Filter>EditorUI\DrawHelper</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\ReflectionTypedDraw.h">
-      <Filter>EditorUI\DrawHelper</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\ResourceCounterWindow.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\MemoryProfilerSnapshot.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\SceneViewWindow.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\SceneViewportOverlay.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EditorViewportCanvas.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\ViewportHostWindow.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EditorPanelCost.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\BrowserDirectorySnapshot.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\ContentBrowserControl.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\InspectorControl.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\InspectorLayoutFixture.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\EditorAssetDragPayload.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\BrowserThumbnailCache.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\HierarchyFlatten.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineGUIWindow\SettingsWindow.h">
-      <Filter>EditorUI\Window</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\BlueprintBuilder.h">
-      <Filter>ImGuiHelper\소스 파일\Blueprint</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\EditorIcons.h">
-      <Filter>ImGuiHelper</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\EditorSectionHeader.h">
-      <Filter>ImGuiHelper\소스 파일\CollapsingHeader</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\drawing.h">
-      <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\GlobalImGuiContext.h">
-      <Filter>ImGuiHelper\소스 파일\ImGuiHeader</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\HorizontalLayout.h">
-      <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\ImGui.h">
-      <Filter>ImGuiHelper\소스 파일\ImGuiHeader</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\NodeEditor.h">
-      <Filter>ImGuiHelper\소스 파일\NodeEditior</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\PinHelper.h">
-      <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\ProfilerHUD.h">
-      <Filter>ImGuiHelper\Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\EditorPropertyRow.h">
-      <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\EditorInspectorPanel.h">
-      <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\EditorAxisField3.h">
-      <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\EditorModeButton.h">
-      <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
-    </ClInclude>
-    <ClInclude Include="ImGuiHelper\widgets.h">
-      <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
-    </ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="EngineEntry\EditorObjectOperations.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\EditorScriptAuthoring.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\EditorProjectOperations.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\EditorDiagnostics.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineEntry\Commandlets\EditorCommandlets.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
     </ClCompile>
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedGizmoIconPass.cpp">
       <Filter>EditorRender\Render\Passes\Editor</Filter>
@@ -528,203 +171,727 @@
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.cpp">
       <Filter>EditorRender\Render\Passes\Editor</Filter>
     </ClCompile>
-    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandParser.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EditorWindow\EditorChromeSnapshot.cpp">
+      <Filter>EditorWindow</Filter>
     </ClCompile>
-    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandDescriptorSeeds.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EditorWindow\EditorLayoutPreset.cpp">
+      <Filter>EditorWindow</Filter>
     </ClCompile>
-    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandRegistry.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EditorWindow\EditorWindowAudit.cpp">
+      <Filter>EditorWindow</Filter>
     </ClCompile>
-    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandResult.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EditorWindow\EditorWindowHost.cpp">
+      <Filter>EditorWindow</Filter>
     </ClCompile>
-    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandSession.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EditorWindow\EditorWindowRegistry.cpp">
+      <Filter>EditorWindow</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EditorWindow\EditorWindowSelfTest.cpp">
+      <Filter>EditorWindow</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EditorWindow\Windows\EditorStandardWindows.cpp">
+      <Filter>EditorWindow\Windows</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EditorWindow\Windows\EditorToolboxWindows.cpp">
+      <Filter>EditorWindow\Windows</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\EditorModelPlacement.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EditorWindow\Windows\EditorWindowBody.cpp">
+      <Filter>EditorWindow\Windows</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\EditorImGuiTexture.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EngineEntry\Assets\EditorAssetDatabase.cpp">
+      <Filter>EngineEntry\Assets</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\EditorPlatform.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EngineEntry\Assets\EditorAssetPresentation.cpp">
+      <Filter>EngineEntry\Assets</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\EditorPlayModeController.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EngineEntry\Assets\Models\EditorModelPlacement.cpp">
+      <Filter>EngineEntry\Assets\Models</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\EditorSceneOverlayContributor.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EngineEntry\Assets\Terrain\TerrainSourceProcessing.cpp">
+      <Filter>EngineEntry\Assets\Terrain</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\EditorSettingsStore.cpp">
-      <Filter>EditorRuntime\Settings</Filter>
+    <ClCompile Include="EngineEntry\Assets\Textures\TextureSourceProcessing.cpp">
+      <Filter>EngineEntry\Assets\Textures</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\GameBuilderSystem.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EngineEntry\Bootstrap\EditorPlatform.cpp">
+      <Filter>EngineEntry\Bootstrap</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\GizmoRenderer.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EngineEntry\Bootstrap\WinProcProxy.cpp">
+      <Filter>EngineEntry\Bootstrap</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\PrefabEditor.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EngineEntry\Build\GameBuilderSystem.cpp">
+      <Filter>EngineEntry\Build</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\WinProcProxy.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+    <ClCompile Include="EngineEntry\Commandlets\EditorCommandlets.cpp">
+      <Filter>EngineEntry\Commandlets</Filter>
     </ClCompile>
-    <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp">
-      <Filter>EditorUI\Window</Filter>
+    <ClCompile Include="EngineEntry\Commands\AssetAuthoringCommands.cpp">
+      <Filter>EngineEntry\Commands</Filter>
     </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ContentsBrowserWindow.cpp">
-      <Filter>EditorUI\Window</Filter>
+    <ClCompile Include="EngineEntry\Commands\CommandResultJson.cpp">
+      <Filter>EngineEntry\Commands</Filter>
     </ClCompile>
-    <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp">
-      <Filter>EditorUI\DrawHelper</Filter>
+    <ClCompile Include="EngineEntry\Commands\CommandSupport.cpp">
+      <Filter>EngineEntry\Commands</Filter>
     </ClCompile>
-    <ClCompile Include="EngineGUIWindow\EditorCameraRig.cpp">
-      <Filter>EditorUI\Window</Filter>
+    <ClCompile Include="EngineEntry\Commands\ConsoleCommandSystem.cpp">
+      <Filter>EngineEntry\Commands</Filter>
     </ClCompile>
-    <ClCompile Include="EngineGUIWindow\EditorFontResources.cpp">
-      <Filter>EditorUI\Window</Filter>
+    <ClCompile Include="EngineEntry\Commands\CoreCommands.cpp">
+      <Filter>EngineEntry\Commands</Filter>
     </ClCompile>
-    <ClCompile Include="EngineGUIWindow\EditorTheme.cpp">
-      <Filter>EditorUI\Window</Filter>
+    <ClCompile Include="EngineEntry\Commands\DiagnosticsCommands.cpp">
+      <Filter>EngineEntry\Commands</Filter>
     </ClCompile>
-    <ClCompile Include="EngineGUIWindow\EditorThemeSelfTest.cpp">
-      <Filter>EditorUI\Window</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\EditorRenderer.cpp">
-      <Filter>EditorUI\Window</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\EditorWindowChrome.cpp">
-      <Filter>EditorUI\Window</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\EnhancedRenderDebugWindow.cpp">
-      <Filter>EditorUI\Window</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp">
-      <Filter>EditorUI\Window</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ViewportHostWindow.cpp">
-      <Filter>EditorUI\Window</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\EditorPanelCost.cpp">
-      <Filter>EditorUI\Window</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\EditorAssetDragPayload.cpp">
-      <Filter>EditorUI\Window</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\BrowserDirectorySnapshot.cpp">
-      <Filter>EditorUI\Window</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\BrowserThumbnailCache.cpp">
-      <Filter>EditorUI\Window</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\HierarchyFlatten.cpp">
-      <Filter>EditorUI\Window</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp">
-      <Filter>EditorUI\Window</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperAnimator.cpp">
-      <Filter>EditorUI\DrawHelper</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\AnimatorEditorWindows.cpp">
-      <Filter>EditorUI\DrawHelper</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperMeshRenderer.cpp">
-      <Filter>EditorUI\DrawHelper</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperPlayerInput.cpp">
-      <Filter>EditorUI\DrawHelper</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperRectTransformComponent.cpp">
-      <Filter>EditorUI\DrawHelper</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperTerrainComponent.cpp">
-      <Filter>EditorUI\DrawHelper</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp">
-      <Filter>EditorUI\Window</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp">
-      <Filter>EditorUI\Window</Filter>
-    </ClCompile>
-    <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp">
-      <Filter>EditorUI\Window</Filter>
+    <ClCompile Include="EngineEntry\Commands\EditorCommandServiceHost.cpp">
+      <Filter>EngineEntry\Commands</Filter>
     </ClCompile>
     <ClCompile Include="EngineEntry\Commands\MaterialGraphCommands.cpp">
-      <Filter>EditorRuntime\Runtime</Filter>
+      <Filter>EngineEntry\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\RenderDebugCommands.cpp">
+      <Filter>EngineEntry\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\RenderTestCommands.cpp">
+      <Filter>EngineEntry\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\SceneObjectCommands.cpp">
+      <Filter>EngineEntry\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Commands\ScriptUiAnimatorCommands.cpp">
+      <Filter>EngineEntry\Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Diagnostics\EditorDiagnostics.cpp">
+      <Filter>EngineEntry\Diagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Presentation\EditorImGuiTexture.cpp">
+      <Filter>EngineEntry\Presentation</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Project\EditorProjectOperations.cpp">
+      <Filter>EngineEntry\Project</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Project\EditorSettingsStore.cpp">
+      <Filter>EngineEntry\Project</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Scene\EditorObjectOperations.cpp">
+      <Filter>EngineEntry\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Scene\EditorPlayModeController.cpp">
+      <Filter>EngineEntry\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Scene\EditorSceneOverlayContributor.cpp">
+      <Filter>EngineEntry\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Scene\GizmoRenderer.cpp">
+      <Filter>EngineEntry\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Scene\PrefabEditor.cpp">
+      <Filter>EngineEntry\Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineEntry\Scripting\EditorScriptAuthoring.cpp">
+      <Filter>EngineEntry\Scripting</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\AnimatorEditorWindows.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\BrowserDirectorySnapshot.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\BrowserThumbnailCache.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ContentsBrowserWindow.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\DrawYamlNodeEditor.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorAssetDragPayload.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorCameraRig.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorChromeProbe.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorFontResources.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorPanelCost.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorRenderer.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorTheme.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorThemeSelfTest.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorWindowChrome.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorWorkspaceFile.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EditorWorkspaceStore.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\EnhancedRenderDebugWindow.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\GameViewWindow.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\HierarchyFlatten.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\HierarchyWindow.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperAnimator.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperMeshRenderer.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperPlayerInput.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperRectTransformComponent.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ImGuiDrawHelperTerrainComponent.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\InspectorWindow.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\MaterialGraphPresentation.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\MaterialGraphWindow.cpp">
+      <Filter>EngineGUIWindow</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\MemoryProfilerSnapshot.cpp">
-      <Filter>EditorUI\Window</Filter>
+      <Filter>EngineGUIWindow</Filter>
     </ClCompile>
-    <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp">
-      <Filter>EditorUI\Window</Filter>
+    <ClCompile Include="EngineGUIWindow\MenuBarWindow.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\OutputLogWindow.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ProfilerLiveDiagnosticsBridge.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ProfilerRenderingBridge.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ResourceCounterWindow.cpp">
+      <Filter>EngineGUIWindow</Filter>
     </ClCompile>
     <ClCompile Include="EngineGUIWindow\SceneViewportOverlay.cpp">
-      <Filter>EditorUI\Window</Filter>
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\SceneViewWindow.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\SoundGraphEditor.cpp">
+      <Filter>EngineGUIWindow</Filter>
+    </ClCompile>
+    <ClCompile Include="EngineGUIWindow\ViewportHostWindow.cpp">
+      <Filter>EngineGUIWindow</Filter>
     </ClCompile>
     <ClCompile Include="ImGuiHelper\BlueprintBuilder.cpp">
-      <Filter>ImGuiHelper\소스 파일\Blueprint</Filter>
+      <Filter>ImGuiHelper</Filter>
     </ClCompile>
     <ClCompile Include="ImGuiHelper\drawing.cpp">
-      <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
-    </ClCompile>
-    <ClCompile Include="ImGuiHelper\EditorSectionHeader.cpp">
-      <Filter>ImGuiHelper\소스 파일\CollapsingHeader</Filter>
-    </ClCompile>
-    <ClCompile Include="ImGuiHelper\EditorPropertyRow.cpp">
-      <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
-    </ClCompile>
-    <ClCompile Include="ImGuiHelper\EditorInspectorPanel.cpp">
-      <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
+      <Filter>ImGuiHelper</Filter>
     </ClCompile>
     <ClCompile Include="ImGuiHelper\EditorAxisField3.cpp">
-      <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
+      <Filter>ImGuiHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\EditorClipContract.cpp">
+      <Filter>ImGuiHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\EditorInspectorPanel.cpp">
+      <Filter>ImGuiHelper</Filter>
     </ClCompile>
     <ClCompile Include="ImGuiHelper\EditorModeButton.cpp">
-      <Filter>ImGuiHelper\소스 파일\PropertyRow</Filter>
+      <Filter>ImGuiHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\EditorNavContract.cpp">
+      <Filter>ImGuiHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\EditorPropertyRow.cpp">
+      <Filter>ImGuiHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\EditorSectionHeader.cpp">
+      <Filter>ImGuiHelper</Filter>
+    </ClCompile>
+    <ClCompile Include="ImGuiHelper\EditorStateContract.cpp">
+      <Filter>ImGuiHelper</Filter>
     </ClCompile>
     <ClCompile Include="ImGuiHelper\NodeEditor.cpp">
-      <Filter>ImGuiHelper\소스 파일\NodeEditior</Filter>
+      <Filter>ImGuiHelper</Filter>
     </ClCompile>
     <ClCompile Include="ImGuiHelper\ProfilerLauncher.cpp">
-      <Filter>ImGuiHelper\소스 파일\Profiler</Filter>
+      <Filter>ImGuiHelper</Filter>
     </ClCompile>
     <ClCompile Include="ImGuiHelper\widgets.cpp">
-      <Filter>ImGuiHelper\소스 파일\NodeEditorHelper</Filter>
+      <Filter>ImGuiHelper</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="EngineGUIWindow\MaterialGraphWindow.h" />
-    <ClInclude Include="EngineGUIWindow\MaterialGraphPresentation.h" />
-    <ClInclude Include="..\Lattice\Core\LXDocument.h" />
-    <ClInclude Include="..\Lattice\ImGui\LXCanvas.h" />
-    <ClInclude Include="..\Lattice\ImGui\LXNodeItems.h" />
-    <ClInclude Include="..\Lattice\ImGui\LXStyle.h" />
-    <ClCompile Include="EngineGUIWindow\MaterialGraphWindow.cpp" />
-    <ClCompile Include="EngineGUIWindow\MaterialGraphPresentation.cpp" />
-    <ClCompile Include="..\Lattice\Core\LXDocument.cpp" />
-    <ClCompile Include="..\Lattice\ImGui\LXCanvas.cpp" />
-    <ClCompile Include="..\Lattice\ImGui\LXStyle.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="EngineEntry\EditorProjectLayerSettings.h" />
-    <ClInclude Include="EngineEntry\CollisionGeometryAuthoring.h" />
-    <ClInclude Include="EngineEntry\UndoHistoryTransaction.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="EngineEntry\LegacyProjectLayerImport.h" />
+    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandDescriptor.h">
+      <Filter>Shared\Engine\RuntimeHost\CommandCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandDescriptorSeeds.h">
+      <Filter>Shared\Engine\RuntimeHost\CommandCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandParser.h">
+      <Filter>Shared\Engine\RuntimeHost\CommandCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandRegistry.h">
+      <Filter>Shared\Engine\RuntimeHost\CommandCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandResult.h">
+      <Filter>Shared\Engine\RuntimeHost\CommandCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandSession.h">
+      <Filter>Shared\Engine\RuntimeHost\CommandCore</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Lattice\Core\LXDocument.h">
+      <Filter>Shared\Lattice\Core</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Lattice\ImGui\LXCanvas.h">
+      <Filter>Shared\Lattice\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Lattice\ImGui\LXNodeItems.h">
+      <Filter>Shared\Lattice\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="..\Lattice\ImGui\LXStyle.h">
+      <Filter>Shared\Lattice\ImGui</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorMenu\EditorMenuAudit.h">
+      <Filter>EditorMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorMenu\EditorMenuDraw.h">
+      <Filter>EditorMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorMenu\EditorMenuRegistry.h">
+      <Filter>EditorMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorMenu\EditorMenuSchema.h">
+      <Filter>EditorMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorMenu\EditorMenuSelfTest.h">
+      <Filter>EditorMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorMenu\EditorMenuSurface.h">
+      <Filter>EditorMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorMenu\EditorMenuTargets.h">
+      <Filter>EditorMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorMenu\Menus\EditorCoreMenus.h">
+      <Filter>EditorMenu\Menus</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorMenu\RegisterEditorMenuManual.h">
+      <Filter>EditorMenu</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGizmoIconPass.h">
+      <Filter>EditorRender\Render\Passes\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGizmoLinePass.h">
+      <Filter>EditorRender\Render\Passes\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGridPass.h">
+      <Filter>EditorRender\Render\Passes\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.h">
+      <Filter>EditorRender\Render\Passes\Editor</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorWindow\EditorChromeSnapshot.h">
+      <Filter>EditorWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorWindow\EditorLayoutPreset.h">
+      <Filter>EditorWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorWindow\EditorWindowAudit.h">
+      <Filter>EditorWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorWindow\EditorWindowHost.h">
+      <Filter>EditorWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorWindow\EditorWindowRegistry.h">
+      <Filter>EditorWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorWindow\EditorWindowSchema.h">
+      <Filter>EditorWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorWindow\EditorWindowSelfTest.h">
+      <Filter>EditorWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorWindow\EditorWindowSurface.h">
+      <Filter>EditorWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorWindow\RegisterEditorWindowManual.h">
+      <Filter>EditorWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorWindow\Windows\EditorAnimatorWindows.h">
+      <Filter>EditorWindow\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorWindow\Windows\EditorStandardWindows.h">
+      <Filter>EditorWindow\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorWindow\Windows\EditorToolboxWindows.h">
+      <Filter>EditorWindow\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorWindow\Windows\EditorViewportWindows.h">
+      <Filter>EditorWindow\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="EditorWindow\Windows\EditorWindowBody.h">
+      <Filter>EditorWindow\Windows</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Assets\ConditionalAssetPublish.h">
+      <Filter>EngineEntry\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Assets\EditorAssetDatabase.h">
+      <Filter>EngineEntry\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Assets\EditorAssetPresentation.h">
+      <Filter>EngineEntry\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Assets\EditorEntityIcons.h">
+      <Filter>EngineEntry\Assets</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Assets\Models\CollisionGeometryAuthoring.h">
+      <Filter>EngineEntry\Assets\Models</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Assets\Models\EditorModelCollisionAsset.h">
+      <Filter>EngineEntry\Assets\Models</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Assets\Models\EditorModelCollisionGeometry.h">
+      <Filter>EngineEntry\Assets\Models</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Assets\Models\EditorModelPlacement.h">
+      <Filter>EngineEntry\Assets\Models</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Assets\Physics\PhysicsShapeDocument.h">
+      <Filter>EngineEntry\Assets\Physics</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Assets\Textures\TextureSourceProcessing.h">
+      <Filter>EngineEntry\Assets\Textures</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Bootstrap\EditorPlatform.h">
+      <Filter>EngineEntry\Bootstrap</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Bootstrap\WinProcProxy.h">
+      <Filter>EngineEntry\Bootstrap</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Build\BuildSettings.h">
+      <Filter>EngineEntry\Build</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Build\GameBuilderSystem.h">
+      <Filter>EngineEntry\Build</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Commandlets\EditorCommandlets.h">
+      <Filter>EngineEntry\Commandlets</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Commands\CommandRegistrar.h">
+      <Filter>EngineEntry\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Commands\CommandResultJson.h">
+      <Filter>EngineEntry\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Commands\CommandSupport.h">
+      <Filter>EngineEntry\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Commands\ConsoleCommandSystem.h">
+      <Filter>EngineEntry\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Commands\EditorCommandServiceHost.h">
+      <Filter>EngineEntry\Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Diagnostics\EditorDiagnostics.h">
+      <Filter>EngineEntry\Diagnostics</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Editing\EditorSelectionHistory.h">
+      <Filter>EngineEntry\Editing</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Editing\GameObjectCommand.h">
+      <Filter>EngineEntry\Editing</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Editing\ReflectionPropertyEdit.h">
+      <Filter>EngineEntry\Editing</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Editing\ReflectionUndo.h">
+      <Filter>EngineEntry\Editing</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Editing\UndoHistoryTransaction.h">
+      <Filter>EngineEntry\Editing</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Presentation\EditorImGuiTexture.h">
+      <Filter>EngineEntry\Presentation</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Project\EditorPreferences.h">
+      <Filter>EngineEntry\Project</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Project\EditorProjectLayerSettings.h">
+      <Filter>EngineEntry\Project</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Project\EditorProjectOperations.h">
+      <Filter>EngineEntry\Project</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Project\EditorSessionState.h">
+      <Filter>EngineEntry\Project</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Project\EditorSettingsStore.h">
+      <Filter>EngineEntry\Project</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Project\LegacyProjectLayerImport.h">
+      <Filter>EngineEntry\Project</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Scene\EditorObjectOperations.h">
+      <Filter>EngineEntry\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Scene\EditorPlayModeController.h">
+      <Filter>EngineEntry\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Scene\EditorSceneOverlayContributor.h">
+      <Filter>EngineEntry\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Scene\GizmoRenderer.h">
+      <Filter>EngineEntry\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Scene\PrefabEditor.h">
+      <Filter>EngineEntry\Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Scripting\EditorComponentCatalog.h">
+      <Filter>EngineEntry\Scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Scripting\EditorScriptAuthoring.h">
+      <Filter>EngineEntry\Scripting</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\AnimatorEditorWindows.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\AssetBundleWindow.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\BrowserDirectorySnapshot.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\BrowserThumbnailCache.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\BTEditorBridge.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ContentBrowserControl.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ContentsBrowserWindow.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorAssetDragPayload.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorCameraRig.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorChromeProbe.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorFontResources.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorPanelCost.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorRenderer.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorTheme.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorThemeSelfTest.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorViewportCanvas.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorWindowChrome.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorWindowNames.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorWorkspaceFile.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EditorWorkspaceStore.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\EnhancedRenderDebugWindow.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ExternUI.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\GameViewWindow.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\HierarchyFlatten.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\HierarchyWindow.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ICustomEditor.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorControl.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorDrawer.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorDrawerList.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorDrawerMath.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorIcon.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorIconList.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorLayoutFixture.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\InspectorWindow.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\MaterialGraphPresentation.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\MaterialGraphWindow.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\MemoryProfilerSnapshot.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\MenuBarWindow.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\OutputLogView.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\OutputLogWindow.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ProfilerLiveDiagnosticsBridge.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ProfilerRenderingBridge.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ProjectSettingWindow.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ReflectionImGuiHelper.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ReflectionTypedDraw.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ResourceCounterWindow.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\SceneViewportOverlay.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\SceneViewWindow.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\SettingsWindow.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\SoundGraphEditor.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineGUIWindow\ViewportHostWindow.h">
+      <Filter>EngineGUIWindow</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\BlueprintBuilder.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\drawing.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\EditorAxisField3.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\EditorClipContract.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\EditorIconAlignment.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\EditorIcons.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\EditorInspectorPanel.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\EditorModeButton.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\EditorNavContract.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\EditorPropertyRow.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\EditorSectionHeader.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\EditorStateContract.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\EditorTextFallback.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\GlobalImGuiContext.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\HorizontalLayout.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\ImGui.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\NodeEditor.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\PinHelper.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\ProfilerHUD.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\widgets.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -1,5 +1,9 @@
-#include "../Utility_Framework/Ownership.h"
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "Component.h"
 #include "AniTransition.h"
 #include "ConditionParameter.h"
@@ -8,7 +12,7 @@
 #include "AnimatorSystem.h"
 #include "../RenderEngine/LocalPose.h"
 #include <mathematics/matrix4x4.hpp>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 class AniTransition;
 class AvatarMask;
 class Animator;

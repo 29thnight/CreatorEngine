@@ -1,9 +1,14 @@
-﻿#pragma once
+﻿#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#pragma once
 #include "../../MaterialGraphSceneInput.h"
 #include "../Temporal/TemporalUpscalerHost.h"
 #include "../Temporal/TemporalMeasurementProvenance.h"
 #include "../Temporal/SpatialPostEffectsHost.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // Submission-committed, per logical view history. Preparing/aborting a frame does
 // not advance either the jitter sequence or previous object/skin/camera inputs.

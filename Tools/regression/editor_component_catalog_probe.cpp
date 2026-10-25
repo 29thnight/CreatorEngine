@@ -1,5 +1,5 @@
-#include "EditorComponentCatalog.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Editor/EngineEntry/Scripting/EditorComponentCatalog.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 int main()
 {

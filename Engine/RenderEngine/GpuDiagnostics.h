@@ -1,7 +1,7 @@
 #pragma once
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "RHI/IRHIDeviceResources.h"
-#include "EngineResourceCensus.h"
+#include "../Utility_Framework/Diagnostics/EngineResourceCensus.h"
 
 // GPU 진단 장부 (DX11 DeviceResources에서 이관, 2026-08-10).
 //

@@ -1,3 +1,9 @@
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 // Production shadow stages, independent rectangle depth oracle and lifecycle faults.
 void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipelines& pipelines,
     ProbeTextures& textures, ProbePool& pool, const own::shared_owner<const Instance>& sourceMaterial)
@@ -334,15 +340,15 @@ void RunShadowCorrectness(RecordingChangeDevice& device, ProbeRoots& roots, Prob
                 batchDesc.lifetimeToken = graph;
                 RHIRecordedBatch batch;
                 Check(graph->RecordParallel(pool, workers, batchDesc, batch, error), "GPU pending record " + error);
-                Microsoft::WRL::ComPtr<ID3D12Fence> gate;
-                Check(SUCCEEDED(device.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gate))), "GPU pending gate fence");
+                winrt::com_ptr<ID3D12Fence> gate;
+                Check(SUCCEEDED(device.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(gate.put()))), "GPU pending gate fence");
                 struct ReleaseGate
                 {
                     ID3D12Fence* fence;
                     ~ReleaseGate() { fence->Signal(1); }
-                } release{gate.Get()};
+                } release{gate.get()};
                 Check(GetRHISubmissionThread().ExecuteAndWait(&device, "shadow correctness GPU gate",
-                    [queue = device.GetCommandQueue(), gate](std::string&) { return SUCCEEDED(queue->Wait(gate.Get(), 1)); }, error), "GPU queue gate admission " + error);
+                    [queue = device.GetCommandQueue(), gate](std::string&) { return SUCCEEDED(queue->Wait(gate.get(), 1)); }, error), "GPU queue gate admission " + error);
                 RHISubmissionTicket ticket;
                 Check(GetRHISubmissionThread().EnqueueRecordedBatch(&device, device, std::move(batch), ticket, error), "GPU pending enqueue " + error);
                 const auto completion = ticket.GetRecordedBatch()->GetCompletionPoint();

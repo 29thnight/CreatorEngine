@@ -1,7 +1,10 @@
 #include "VulkanLoader.h"
-
-#include <Windows.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace VulkanApi
 {

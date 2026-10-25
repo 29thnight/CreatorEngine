@@ -1,15 +1,21 @@
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "ExperimentParity/ExperimentMaterialCookSelfTest.h"
 
 #include "Experiment/AssetIdentity.h"
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/MaterialCookProducer.h"
-#include "AuthoringCookedDocument.h"
-#include "AuthoringNodeEquality.h"
-#include "AuthoringParsedDocument.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringCookedDocument.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeEquality.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
 #include "Experiment/Cooked/ModelGenerationExportProducer.h" // MBC11
 #include "Assets/ModelAssetGeneration.h"
 #include "Assets/ModelSidecarV2.h"
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "Experiment/Cooked/TextureCookProducer.h"
 
 #include <process.h>
@@ -476,20 +482,20 @@ namespace RenderTest
         if (!loaded.Succeeded()) return false;
         const assets::ModelAssetGeneration& generation = *loaded.generation;
 
-        std::set<Uuid::Uuid16> embeddedIds;
+        std::set<uuid::uuid16> embeddedIds;
         for (const assets::ModelTextureAsset& texture : generation.Textures())
             embeddedIds.insert(texture.textureId);
-        std::set<Uuid::Uuid16> referencedTextures;
+        std::set<uuid::uuid16> referencedTextures;
         std::size_t materials = 0, shaderEdges = 0, textureEdges = 0;
         bool unresolvedTexture = false;
         for (const assets::ModelMaterialAsset& material : generation.Materials())
         {
             ++materials;
-            if (!material.shaderAssetId.IsNil()) ++shaderEdges;
+            if (!material.shaderAssetId.is_nil()) ++shaderEdges;
             for (const assets::ModelMaterialProperty& property : material.properties)
             {
                 const auto* handle = std::get_if<assets::ModelMaterialTexture>(&property.value);
-                if (nullptr == handle || handle->handle.textureId.IsNil()) continue;
+                if (nullptr == handle || handle->handle.textureId.is_nil()) continue;
                 ++textureEdges;
                 referencedTextures.insert(handle->handle.textureId);
                 if (!embeddedIds.contains(handle->handle.textureId)) unresolvedTexture = true;
@@ -504,7 +510,7 @@ namespace RenderTest
             "재질의 texture 의존이 generation closure 안에서 해소돼야 한다");
         // 반대 방향 — 뽑아 둔 embedded texture가 어떤 재질에서든 참조되는가.
         bool everyEmbeddedReferenced = true;
-        for (const Uuid::Uuid16& embedded : embeddedIds)
+        for (const uuid::uuid16& embedded : embeddedIds)
             if (!referencedTextures.contains(embedded)) everyEmbeddedReferenced = false;
         check.Check(everyEmbeddedReferenced,
             "generation의 embedded texture는 모두 어떤 재질의 의존이어야 한다");

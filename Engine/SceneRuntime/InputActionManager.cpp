@@ -1,11 +1,15 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "InputActionManager.h"
-#include "AuthoringParsedDocument.h"
-#include "AuthoringWriteNode.h"
+#include "../Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../Utility_Framework/Authoring/AuthoringWriteNode.h"
 #include "SceneManager.h"
-#include "PathFinder.h"
 #include "Interfaces/AssetAuthoringPort.h"
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 InputActionManager* InputActionManagers = nullptr;
 void InputActionManager::Update(float tick)
 {
@@ -106,7 +110,7 @@ void InputActionManager::LoadManager()
 {
 	ClearActionMaps();
 	namespace fs = std::filesystem;
-	const fs::path directory = PathFinder::InputMapPath();
+	const fs::path directory = ce::paths::input_map_path();
 	if (!fs::exists(directory) || !fs::is_directory(directory))
 	{
 		Debug::PrintLog(spdlog::level::warn, "Input map directory does not exist: "
@@ -176,7 +180,7 @@ bool InputActionManager::SaveMap(ActionMap* actionMap)
 
 	UncatalogedAuthoringRequest request{};
 	request.destinationPath =
-		PathFinder::InputMapPath(actionMap->m_name + ".inputmap");
+		ce::paths::input_map_path(actionMap->m_name + ".inputmap");
 	request.payload = document.Dump();
 	if (request.payload.empty()) return false;
 	if (request.payload.back() != '\n') request.payload.push_back('\n');

@@ -32,7 +32,7 @@ New-Item -ItemType Directory -Force -Path $output | Out-Null
 @{methods=$baseMethods;overrides=$overrides;methodCount=$baseMethods.Count} |
     ConvertTo-Json -Depth 4 | Set-Content (Join-Path $output 'coverage.json')
 $sources = @('Tools/regression/rhi_software_commands_probe.cpp',
-    'Engine/Utility_Framework/Arena.cpp',
+    'Engine/Utility_Framework/Memory/Arena.cpp',
     'Engine/RenderEngine/RenderArena.cpp', 'Engine/RenderEngine/RHI/RHISoftwareCommandList.cpp', 'Engine/RenderEngine/RHI/RHISoftwareEncoder.cpp',
     'Engine/RenderEngine/RHI/RHISoftwareBatch.cpp', 'Engine/RenderEngine/RHI/RHISoftwareRecorder.cpp')
 $quoted = ($sources | ForEach-Object { '"' + (Join-Path $repo $_) + '"' }) -join ' '

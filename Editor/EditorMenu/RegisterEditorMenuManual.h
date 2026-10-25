@@ -16,7 +16,7 @@
 
 #include "EditorMenuRegistry.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // 선언자 헤더는 여기에 include한다.
 #include "Menus/EditorCoreMenus.h"

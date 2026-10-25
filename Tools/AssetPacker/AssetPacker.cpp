@@ -1,8 +1,17 @@
-#include "Paklib.hpp"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Platform.Windows.Strings.h"
+#else
+import Creator.Platform.Windows.Strings;
+#endif
+#include "../../Engine/Utility_Framework/Packaging/Paklib.hpp"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
-#include <Windows.h>
-
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -350,7 +359,7 @@ namespace
             }
             else
             {
-                Fail("unknown command-line option: " + Pak::wide_to_utf8(arg));
+                Fail("unknown command-line option: " + ce::strings::wide_to_utf8(arg));
             }
         }
 
@@ -437,7 +446,7 @@ int wmain(int argc, wchar_t* argv[])
             {
                 Fail("duplicate virtual path: " + file.virtualPath);
             }
-            if (!uniqueWindowsPaths.insert(Pak::utf8_to_wide(file.virtualPath)).second)
+            if (!uniqueWindowsPaths.insert(ce::strings::utf8_to_wide(file.virtualPath)).second)
             {
                 Fail("case-insensitive Windows path collision: " + file.virtualPath);
             }

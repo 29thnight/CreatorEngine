@@ -1,10 +1,26 @@
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "AntiLag2DX12Adapter.h"
-#include <Windows.h>
-#include <d3d12.h>
-#include <dxgi1_6.h>
-#include <wrl/client.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 #ifndef CREATOR_ENABLE_ANTILAG2_SDK
 #define CREATOR_ENABLE_ANTILAG2_SDK 0
 #endif
@@ -14,7 +30,7 @@
 struct AntiLag2DX12Adapter::State
 {
     std::mutex mutex;
-    Microsoft::WRL::ComPtr<IDXGISwapChain> swapchain;
+    winrt::com_ptr<IDXGISwapChain> swapchain;
 #if CREATOR_ENABLE_ANTILAG2_SDK
     AMD::AntiLag2DX12::Context context{};
 #endif
@@ -77,7 +93,7 @@ TemporalResult AntiLag2DX12Adapter::BindFsrSwapchain(IDXGISwapChain* swapchain)
     if (!m_state->initialized || !swapchain) return { TemporalStatus::NotInitialized };
     struct PrivateData { AMD::AntiLag2DX12::Context* context; bool enabled; } data{ &m_state->context, true };
     const auto result = Result(swapchain->SetPrivateData(kAntiLagContext, sizeof(data), &data));
-    if (result.IsSuccess()) m_state->swapchain = swapchain;
+    if (result.IsSuccess()) m_state->swapchain.copy_from(swapchain);
     return result;
 #else
     return { TemporalStatus::SdkNotBuilt };
@@ -92,7 +108,7 @@ TemporalResult AntiLag2DX12Adapter::Shutdown()
     {
         const auto result = Result(m_state->swapchain->SetPrivateData(kAntiLagContext, 0, nullptr));
         if (!result.IsSuccess()) return result;
-        m_state->swapchain.Reset();
+        m_state->swapchain = nullptr;
     }
     if (m_state->initialized) AMD::AntiLag2DX12::DeInitialize(&m_state->context);
     m_state->initialized = false;

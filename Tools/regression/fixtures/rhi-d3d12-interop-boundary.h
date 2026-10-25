@@ -1,9 +1,13 @@
 #pragma once
 
-// CPU-only declarations for the small D3D12/DXGI/WRL surface used by the real
+// CPU-only declarations for the small D3D12/DXGI/com_ptr surface used by the real
 // Vulkan shared-image implementation and DX12 range lowering. They deliberately
 // do not emulate a Windows driver, GPU execution, or the native COM ABI.
-#include <windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 #include <atomic>
 #include <cstdint>
 #include <utility>
@@ -196,46 +200,54 @@ inline int CloseHandle(HANDLE handle)
     return 1;
 }
 
-namespace Microsoft::WRL
+namespace winrt
 {
     template<class T>
-    class ComPtr
+    class com_ptr
     {
       public:
-        ComPtr() = default;
-        ~ComPtr()
+        com_ptr() = default;
+        ~com_ptr()
         {
             if (m_pointer)
             {
                 m_pointer->Release();
             }
         }
-        ComPtr(const ComPtr& other) : m_pointer(other.m_pointer)
+        com_ptr(const com_ptr& other) : m_pointer(other.m_pointer)
         {
             if (m_pointer)
             {
                 m_pointer->AddRef();
             }
         }
-        ComPtr(ComPtr&& other) noexcept : m_pointer(std::exchange(other.m_pointer, nullptr)) {}
-        ComPtr& operator=(const ComPtr& other)
+        com_ptr(com_ptr&& other) noexcept : m_pointer(std::exchange(other.m_pointer, nullptr)) {}
+        com_ptr& operator=(const com_ptr& other)
         {
-            ComPtr copy(other);
+            com_ptr copy(other);
             std::swap(m_pointer, copy.m_pointer);
             return *this;
         }
-        ComPtr& operator=(ComPtr&& other) noexcept
+        com_ptr& operator=(com_ptr&& other) noexcept
         {
-            ComPtr moved(std::move(other));
+            com_ptr moved(std::move(other));
             std::swap(m_pointer, moved.m_pointer);
             return *this;
         }
-        T* Get() const { return m_pointer; }
+        T* get() const { return m_pointer; }
         T* operator->() const { return m_pointer; }
-        T** operator&() { return &m_pointer; }
+        T** put()
+        {
+            if (m_pointer)
+            {
+                m_pointer->Release();
+                m_pointer = nullptr;
+            }
+            return &m_pointer;
+        }
         explicit operator bool() const { return m_pointer != nullptr; }
 
       private:
         T* m_pointer{};
     };
-} // namespace Microsoft::WRL
+} // namespace winrt

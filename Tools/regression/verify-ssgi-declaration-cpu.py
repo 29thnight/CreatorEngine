@@ -9,6 +9,7 @@ malloc allocator-service shim. Allocation counts cover this CPU boundary after
 warmup, not native Editor/frame performance. No dependency is downloaded.
 """
 
+import runpy
 import argparse
 import hashlib
 import json
@@ -60,9 +61,9 @@ def main():
     if not compiler:
         parser.error("C++23 compiler unavailable")
     arena = [Path("Engine/RenderEngine") / name for name in ("RenderArena.cpp", "RenderArena.h", "RenderAllocator.h")]
-    arena += [Path("Engine/Utility_Framework") / name for name in
-              ("Arena.cpp", "Arena.h", "HeapAllocator.h", "Ownership.h", "LifetimeToken.h")]
+    arena += [Path(path) for path in ('Engine/Utility_Framework/Memory/Arena.cpp', )]
     arena += [Path("ThirdParty/ownership_cpp/include/own/ownership.hpp")]
+    arena = runpy.run_path(str(root / "Tools/build/generate-module-adapters.py"))["memory_source_inputs"](arena)
     probe = Path(__file__).with_name("ssgi_declaration_cpu_probe.cpp")
     inputs = [root / path for path in [SOURCE, HEADER, GRAPH] + arena]
     inputs += [probe, Path(__file__).resolve()]

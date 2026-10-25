@@ -131,8 +131,8 @@ VolumeGeometry VolumeBoxes(std::span<const std::array<float, 2>> depths, std::ui
 {
     VolumeGeometry geometry;
     auto& source = geometry.draw.modelMeshView;
-    Check(Uuid::TryParse("99999999-9999-8999-8999-999999999999", source.handle.modelId) &&
-              Uuid::TryParse("AAAAAAAA-AAAA-8AAA-8AAA-AAAAAAAAAAAA", source.handle.meshId),
+    Check(uuid::try_parse("99999999-9999-8999-8999-999999999999", source.handle.modelId) &&
+              uuid::try_parse("AAAAAAAA-AAAA-8AAA-8AAA-AAAAAAAAAAAA", source.handle.meshId),
           "Volume mesh identity");
     source.handle.generation = key;
     source.vertexAttributeMask = assets::kModelVertexMasks.front();
@@ -190,7 +190,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
     const std::array products{VolumeProduct(root, false, target), VolumeProduct(root, true, target)};
     GenerationStore store;
     experiment::AssetId graphId;
-    Check(Uuid::TryParse("BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB", graphId.value), "Volume graph identity");
+    Check(uuid::try_parse("BBBBBBBB-BBBB-4BBB-8BBB-BBBBBBBBBBBB", graphId.value), "Volume graph identity");
     std::string error;
     std::array<own::shared_owner<const Generation>, 2> generations;
     for (unsigned i = 0; i < 2; ++i)
@@ -313,7 +313,7 @@ void RunSceneVolume(RecordingChangeDevice& device, ProbeRoots& roots, ProbePipel
             plane(occluder, -1, 0, .4f, 8301);
             backdrop.draw.materialGraphInstance = background;
             backdrop.draw.materialGraphSlot = 73;
-            Check(Uuid::TryParse("CCCCCCCC-CCCC-8CCC-8CCC-CCCCCCCCCCCC", occluder.draw.modelMeshView.handle.meshId),
+            Check(uuid::try_parse("CCCCCCCC-CCCC-8CCC-8CCC-CCCCCCCCCCCC", occluder.draw.modelMeshView.handle.meshId),
                   "Volume METEOR occluder");
             occluder.draw.materialGraphInstance = background;
             occluder.draw.materialGraphSlot = 74;

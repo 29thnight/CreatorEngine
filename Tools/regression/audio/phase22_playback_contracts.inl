@@ -1,8 +1,8 @@
     // Included inside the probe's anonymous namespace; production files are linked unchanged.
     wave::ClipKey TestGuid(unsigned value)
     {
-        auto guid = Uuid::Parse("01234567-89ab-4cde-8fab-0123456789ab");
-        guid.data[15] = static_cast<std::uint8_t>(value);
+        auto guid = uuid::parse("01234567-89ab-4cde-8fab-0123456789ab");
+        guid.data_[15] = static_cast<std::uint8_t>(value);
         return wave::ClipKey::FromGuid(guid);
     }
 

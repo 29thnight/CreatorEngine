@@ -1,9 +1,11 @@
 #include "ProfileService.h"
 #include <stdio.h>
-#include "../Utility_Framework/StandardLibrary.h"
-
-#include <Windows.h>
-#include <psapi.h>
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 
 // 유니티 빌드 때문에 익명 네임스페이스를 쓰지 않는다(계획서 §14).

@@ -66,7 +66,7 @@ BEGIN
 END
 "@
 foreach ($entry in @(
-    @{ Path = 'Engine/Utility_Framework/EngineVersion.h'; Text = $header },
+    @{ Path = 'Engine/Utility_Framework/Runtime/EngineVersion.h'; Text = $header },
     @{ Path = 'EngineVersion.props'; Text = $properties },
     @{ Path = 'Tools/runtime/EngineVersion.rc'; Text = $resource }
 )) {

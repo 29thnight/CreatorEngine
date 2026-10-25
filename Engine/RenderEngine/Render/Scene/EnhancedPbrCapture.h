@@ -1,5 +1,10 @@
 #pragma once
-#include "DiagnosticDocument.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Authoring/DiagnosticDocument.h"
 
 #include "EnhancedSceneRenderer.h"
 #include "EnhancedCameraReplayInput.h"
@@ -7,7 +12,7 @@
 #include "EnhancedLatticeReplayInput.h"
 #include "../Temporal/TemporalRuntimeControl.h"
 #include "../Temporal/TemporalMeasurementProvenance.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 #include "../Core/EnhancedLivePipelineDesc.h"
 #include "../Passes/Geometry/SceneSurfaceTargets.h"
 #include "../Graph/EnhancedDrawSealLedger.h"

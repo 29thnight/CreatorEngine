@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // Local probe contract only. The implementation lives in MiniaudioBackend.cpp,
 // so the vendor header remains confined to that single translation unit.

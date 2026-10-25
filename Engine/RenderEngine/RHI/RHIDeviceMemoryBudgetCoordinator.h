@@ -2,7 +2,7 @@
 
 #include "RHIPersistentHeapPolicy.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 using RHIDeviceMemoryBudgetDomain = uint32_t;
 using RHIDeviceMemoryBudgetOwner = uint32_t;

@@ -56,8 +56,8 @@ function Get-CodeText([string]$Path) {
 }
 
 $liveCode    = Get-CodeText (Join-Path $repoRoot "Engine\RenderEngine\Render\Scene\EnhancedSceneRenderer.cpp")
-$contribCode = Get-CodeText (Join-Path $repoRoot "Editor\EngineEntry\EditorSceneOverlayContributor.cpp")
-$mainCode    = Get-CodeText (Join-Path $repoRoot "Editor\EngineEntry\EditorMain.cpp")
+$contribCode = Get-CodeText (Join-Path $repoRoot "Editor\EngineEntry\Scene\EditorSceneOverlayContributor.cpp")
+$mainCode    = Get-CodeText (Join-Path $repoRoot "Editor\EngineEntry\Bootstrap\EditorMain.cpp")
 
 # C-1. 존재해야 하는 것부터 — 기여자가 네 노드를 실제로 등록한다.
 foreach ($name in @('Grid', 'WireFrame', 'GizmoIcon', 'GizmoLine')) {
@@ -106,7 +106,7 @@ foreach ($playerFile in @('Player\PlayerMain.cpp', 'Player\PlayerApp.cpp')) {
 # C-5 (E4-5): 에디터 카메라 소유권 — Core는 카메라를 만들지도, 씬 오버레이
 # 뷰를 판정하지도 않는다. 존재 단정 먼저: Editor 세션이 카메라를 설치하고,
 # Editor Host가 뷰 요청에 오버레이를 선언한다.
-$appCode = Get-CodeText (Join-Path $repoRoot "Editor\EngineEntry\App.cpp")
+$appCode = Get-CodeText (Join-Path $repoRoot "Editor\EngineEntry\Bootstrap\App.cpp")
 # Camera 재설계(2026-08-24)부터 세션 설치 단위는 카메라가 아니라
 # EditorCameraRig다 — EditorMain이 rig를 만들어 세션에 설치하고,
 # EditorCamera() 접근은 rig 경유로 유지된다. 지키는 성질은 동일하다:

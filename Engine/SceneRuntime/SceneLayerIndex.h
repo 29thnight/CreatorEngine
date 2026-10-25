@@ -1,8 +1,17 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
 
 #include "EntityHandle.h"
-#include "../Utility_Framework/LayerCatalog.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.LayerCatalog.h"
+#else
+import Creator.Core.LayerCatalog;
+#endif
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // Scene owns this index and resolves returned handles; no Entity pointers are retained.
 class SceneLayerIndex final
@@ -21,7 +30,7 @@ class SceneLayerIndex final
         if (!entity.IsValid() || !entity.sceneId || entity.sceneId != m_scene)
             return std::unexpected(ce::layers::error::wrong_scene);
 
-        const auto* definition = catalog.Find(layer);
+        const auto* definition = catalog.find(layer);
         if (!definition)
             return std::unexpected(ce::layers::error::unknown_layer);
 
@@ -67,7 +76,7 @@ class SceneLayerIndex final
         if (auto valid = RequireOwner(); !valid)
             return std::unexpected(valid.error());
 
-        const auto* definition = catalog.Find(layer);
+        const auto* definition = catalog.find(layer);
         if (!definition)
             return std::unexpected(ce::layers::error::unknown_layer);
 

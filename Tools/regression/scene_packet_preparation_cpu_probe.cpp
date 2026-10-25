@@ -1,6 +1,11 @@
+#include "Engine/RenderEngine/RenderArena.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Arena.h"
+#else
+import Creator.Core.Arena;
+#endif
 // 실제 packet 작성/합류 본문을 실행한다. GPU plan/RHI만 작은 계약 fixture이다.
 #include "Engine/RenderEngine/MaterialGraphPreparationTasks.h"
-#include "Engine/RenderEngine/RenderArena.h"
 #include "BaselinePreparationTasks.h"
 #include <cstdlib>
 #include <iostream>

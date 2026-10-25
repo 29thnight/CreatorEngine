@@ -1,15 +1,24 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "SimulationTick.h"
 #include "SimulationExchange.h"
 #include "SceneObservation.h"
-#include "Ownership.h"
 #include "SceneGC.h"
 #include "Object.h"
 #include "AssetBundle.h"
-#include "ReflectionYml.h"
-#include "AuthoringDocument.h"
-#include "AuthoringNodeView.h" // D3-a-5
-#include "ClassProperty.h"
+#include "../Utility_Framework/Reflection/ReflectionYml.h"
+#include "../Utility_Framework/Authoring/AuthoringDocument.h"
+#include "../Utility_Framework/Authoring/AuthoringNodeView.h" // D3-a-5
+#include "../Utility_Framework/Reflection/ClassProperty.h"
 // Index만 필요한데 Entity.h 전체를 물지 않으려고 경량 헤더를 쓴다
 // (GameObjectIndex.h 상단 주석 참고). LoadIndexEntry/LoadIndexBatch가 이걸 쓴다.
 #include "GameObjectIndex.h"
@@ -17,7 +26,7 @@
 #include "ScenePhase.h"
 #include "SimulationSessionPolicy.h"
 #include "SoundSystem.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 class ProjectLayerSettings;
 struct project_layer_snapshot;
@@ -203,8 +212,7 @@ public:
 	void ToggleGamePaused();
 
 	bool IsEditorSceneLoaded() const { return m_sessionPolicy.RestoresAuthoring() && m_isSimulationSessionActive; }
-    InputActionManager* GetInputActionManager() { return m_inputActionManager; }
-    void SetInputActionManager(InputActionManager* inputActionManager) { m_inputActionManager = inputActionManager;}
+    InputActionManager* GetInputActionManager() { return m_inputActionManager.operator->(); }
 
     std::vector<MeshRenderer*> GetAllMeshRenderers() const;
     // GT frame sealing용. 활성 Scene의 mesh/foliage가 실제 소유한 Material을
@@ -229,16 +237,16 @@ public:
 	// ⚠ 선택 해제(resetSelectedObjectEvent)는 이쪽으로 오지 않는다. 이름과 달리 그것은
 	//   Editor 정책이 아니라 댕글링 방지 안전장치이고, AllDestroyMark 이전이라는 위치가
 	//   그 안전을 만든다 — 빼면 재생 정지에서 ACCESS_VIOLATION으로 죽는다(실측).
-	Core::Delegate<void, bool>          PlayModeEvent{};
+	ce::delegate<void, bool>          PlayModeEvent{};
     //for Game Logic
-    Core::Delegate<void, float>         InputEvent{};
+    ce::delegate<void, float>         InputEvent{};
     //for RenderEngine
-    Core::Delegate<void, float>         SceneRenderingEvent{};
-	Core::Delegate<void>                OnDrawGizmosEvent{};
-    Core::Delegate<void>                GUIRenderingEvent{};
-    Core::Delegate<void, float>         InternalAnimationUpdateEvent{};
+    ce::delegate<void, float>         SceneRenderingEvent{};
+	ce::delegate<void>                OnDrawGizmosEvent{};
+    ce::delegate<void>                GUIRenderingEvent{};
+    ce::delegate<void, float>         InternalAnimationUpdateEvent{};
     //Manager Events
-    Core::Delegate<void>                activeSceneChangedEvent{};
+    ce::delegate<void>                activeSceneChangedEvent{};
 
     // 활성 씬이 바뀌었음을 알린다. 프로파일러의 '길이 없는 사건'(§7.3)을
     // 함께 찍으므로 **이 함수를 거쳐야** 타임라인의 경계 띠에 남는다.
@@ -247,14 +255,14 @@ public:
     //   나중에 생기는 다섯째가 조용히 빠진다.
     void NotifyActiveSceneChanged();
 
-    Core::Delegate<void>                sceneLoadedEvent{};
-    Core::Delegate<void>                sceneUnloadedEvent{};
-    Core::Delegate<void>                newSceneCreatedEvent{};
-	Core::Delegate<void>                resetSelectedObjectEvent{};
-    Core::Delegate<void>                endOfFrameEvent{};
-	Core::Delegate<void>                resourceTrimEvent{};
+    ce::delegate<void>                sceneLoadedEvent{};
+    ce::delegate<void>                sceneUnloadedEvent{};
+    ce::delegate<void>                newSceneCreatedEvent{};
+	ce::delegate<void>                resetSelectedObjectEvent{};
+    ce::delegate<void>                endOfFrameEvent{};
+	ce::delegate<void>                resourceTrimEvent{};
 
-	Core::Delegate<void>                AssetLoadEvent{};
+	ce::delegate<void>                AssetLoadEvent{};
 
     std::atomic_bool                    m_isGameStart{ false };
     std::atomic_bool                    m_isGamePaused{ false };
@@ -267,7 +275,8 @@ public:
 	std::atomic_bool                    m_isInitialized{ false };
 	size_t 					            m_EditorSceneIndex{ 0 };
 
-    InputActionManager*                 m_inputActionManager{ nullptr };
+    void ReleaseInputActionManager() noexcept;
+    own::unique_owner<InputActionManager> m_inputActionManager{};
 private:
     wave::PlaybackService* m_audioPlayback{};
     SoundSystem::AssetResolver m_audioResolver;

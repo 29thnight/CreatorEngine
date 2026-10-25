@@ -21,10 +21,12 @@
     <UseDebugLibraries Condition="'$(Configuration)' == 'Debug'">true</UseDebugLibraries>
     <UseDebugLibraries Condition="'$(Configuration)' != 'Debug'">false</UseDebugLibraries>
     <AllProjectBMIsArePublic>true</AllProjectBMIsArePublic>
+    <CharacterSet>Unicode</CharacterSet>
     <EnableUnitySupport>false</EnableUnitySupport>
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <Import Project="..\..\Tools\build\WindowsAppSdk.props" />
+  <Import Project="..\..\Tools\build\WindowsSdkModules.props" />
   <Import Project="$(CreatorCppWinRTPackageRoot)build\native\Microsoft.Windows.CppWinRT.props" Condition="Exists('$(CreatorCppWinRTPackageRoot)build\native\Microsoft.Windows.CppWinRT.props')" />
   <PropertyGroup>
     <!-- Desktop VC projects do not always populate the versioned WinMD directory. -->
@@ -54,16 +56,48 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\Platform\WindowsSDK\Creator.WinAPI.h"><CompileAs>CompileAsHeaderUnit</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile><AdditionalOptions>/I&quot;$(SolutionDir)Tools\build\StdModuleHeaders&quot; %(AdditionalOptions)</AdditionalOptions><DisableSpecificWarnings>5260;%(DisableSpecificWarnings)</DisableSpecificWarnings></ClCompile>
+    <ClCompile Include="..\Platform\WindowsSDK\Creator.GraphicsSDK.h"><AdditionalIncludeDirectories>$(CreatorSdkDependencyIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories><CompileAs>CompileAsHeaderUnit</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile><AdditionalOptions>/I&quot;$(SolutionDir)Tools\build\StdModuleHeaders&quot; %(AdditionalOptions)</AdditionalOptions><DisableSpecificWarnings>5260;%(DisableSpecificWarnings)</DisableSpecificWarnings></ClCompile>
+    <ClCompile Include="..\Platform\WindowsSDK\Creator.LegacyGraphicsSDK.h"><CompileAs>CompileAsHeaderUnit</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile><AdditionalOptions>/I&quot;$(SolutionDir)Tools\build\StdModuleHeaders&quot; %(AdditionalOptions)</AdditionalOptions><DisableSpecificWarnings>5260;%(DisableSpecificWarnings)</DisableSpecificWarnings></ClCompile>
+    <ClCompile Include="..\Platform\WindowsSDK\Creator.AppRuntimeSDK.h"><CompileAs>CompileAsHeaderUnit</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile><AdditionalOptions>/I&quot;$(SolutionDir)Tools\build\StdModuleHeaders&quot; %(AdditionalOptions)</AdditionalOptions><DisableSpecificWarnings>5260;%(DisableSpecificWarnings)</DisableSpecificWarnings></ClCompile>
+    <ClCompile Include="..\Platform\WindowsSDK\Creator.GameInputSDK.h"><CompileAs>CompileAsHeaderUnit</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile><AdditionalIncludeDirectories>$(CreatorGameInputIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories><AdditionalOptions>/I&quot;$(SolutionDir)Tools\build\StdModuleHeaders&quot; %(AdditionalOptions)</AdditionalOptions><DisableSpecificWarnings>5260;%(DisableSpecificWarnings)</DisableSpecificWarnings></ClCompile>
+    <ClCompile Include="Core/Creator.Core.Delegate.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Concurrency/Creator.Concurrency.Jobs.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="External/Creator.EnkiTS.h"><CompileAs>CompileAsHeaderUnit</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile><PreprocessorDefinitions>ENKITS_DLL=1;%(PreprocessorDefinitions)</PreprocessorDefinitions><AdditionalIncludeDirectories>$(CreatorSdkDependencyIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories><AdditionalOptions>/I&quot;$(SolutionDir)Tools/build/StdModuleHeaders&quot; %(AdditionalOptions)</AdditionalOptions></ClCompile>
+    <ClCompile Include="Core/Creator.Core.Stopwatch.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.RingBuffer.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.BoundedMemory.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.Base64.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.ContentAbi.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Concurrency/Creator.Concurrency.JobGraph.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.LayerCatalog.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="External/Creator.Ownership.h"><CompileAs>CompileAsHeaderUnit</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile><AdditionalOptions>/I&quot;$(SolutionDir)Tools\build\StdModuleHeaders&quot; %(AdditionalOptions)</AdditionalOptions></ClCompile>
+    <ClCompile Include="External/Creator.MemoryProvider.h"><CompileAs>CompileAsHeaderUnit</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile><AdditionalOptions>/I&quot;$(SolutionDir)Tools\build\StdModuleHeaders&quot; %(AdditionalOptions)</AdditionalOptions></ClCompile>
+    <ClCompile Include="Core/Creator.Core.Ownership.ixx"><CompileAs>CompileAsCppModule</CompileAs><AdditionalOptions>/I&quot;$(SolutionDir)Engine\Contracts\External&quot; %(AdditionalOptions)</AdditionalOptions></ClCompile>
+    <ClCompile Include="Core/Creator.Core.HeapAllocator.ixx"><CompileAs>CompileAsCppModule</CompileAs><AdditionalOptions>/I&quot;$(SolutionDir)Engine\Contracts\External&quot; %(AdditionalOptions)</AdditionalOptions></ClCompile>
+    <ClCompile Include="Core/Creator.Core.Arena.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.LifetimeToken.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.Paths.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.Distribution.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Platform/Windows/Creator.Core.Paths.WinAPI.cpp"><CompileAs>CompileAsCpp</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.EngineMode.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.Progress.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.Uuid.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.Layers.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.DynamicBitset.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.WorkPartition.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.SpinLock.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.Sha256.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.Strings.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Platform/Windows/Creator.Platform.Windows.Strings.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.BitFlag.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
     <ClCompile Include="Creator.Contracts.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
-    <ClCompile Include="Creator.Concurrency.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
-    <ClCompile Include="Creator.Core.Window.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
-    <ClCompile Include="Creator.Platform.Windows.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
-    <ClInclude Include="ContractImplementation.h" />
-    <ClInclude Include="WindowsApartmentImplementation.h" />
-    <ClInclude Include="CoreWindowImplementation.h" />
-    <ClInclude Include="WindowsWindowImplementation.h" />
-    <ClInclude Include="AppWindowBackendDeclarations.h" />
-    <ClCompile Include="Creator.Platform.Windows.AppWindow.cpp"><CompileAs>CompileAsCpp</CompileAs></ClCompile>
+    <ClCompile Include="Concurrency/Creator.Concurrency.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Core/Creator.Core.Window.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Platform/Windows/Creator.Platform.Windows.ixx"><CompileAs>CompileAsCppModule</CompileAs></ClCompile>
+    <ClCompile Include="Platform/Windows/Creator.Platform.Windows.AppWindow.cpp"><CompileAs>CompileAsCpp</CompileAs></ClCompile>
+    <ClInclude Include="..\Platform\WindowsSDK\Creator.ComSupport.h" />
+    <ClInclude Include="Compiler/Creator.RotateIntrinsic.h" />
     <None Include="packages.config" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

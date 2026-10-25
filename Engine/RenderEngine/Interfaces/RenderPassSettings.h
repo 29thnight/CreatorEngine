@@ -1,6 +1,6 @@
 #pragma once
 #include <mathematics/vector3.hpp>
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "../../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "ShadowMapPassSetting.h"
 #include "DeferredPassSetting.h"
 #include "BloomSetting.h"

@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // Runs production LivePipelineDesc against the production graph. Only native
 // services and the platform-heavy frame-context payload are fixture boundaries.
 #include "Engine/RenderEngine/Render/Core/EnhancedLivePipelineDesc.h"

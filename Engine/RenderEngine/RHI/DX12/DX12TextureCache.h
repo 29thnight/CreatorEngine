@@ -1,11 +1,16 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // HashedGuid 정의. 유니티 빌드가 전이로 공급하던 것이라 단독 빌드에서 드러났다.
 // min/max 매크로를 이 구간에서만 걷어내는 이유는 DX12MeshCache.h의 같은 주석 참고.
 #pragma push_macro("min")
 #pragma push_macro("max")
 #undef min
 #undef max
-#include "TypeTrait.h"
+#include "../../../Utility_Framework/Reflection/TypeTrait.h"
 #pragma pop_macro("max")
 #pragma pop_macro("min")
 
@@ -16,9 +21,17 @@
 #include "../../TextureImage.h"
 #include "DX12PersistentHeap.h"
 #include "DX12ResourceEntries.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
-#include <d3d12.h>
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 
 // ★ 여기 있던 DirectX::ScratchImage 전방 선언과 그 사연을 걷었다(축 A).
 //

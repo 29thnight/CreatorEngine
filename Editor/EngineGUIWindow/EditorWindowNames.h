@@ -1,7 +1,7 @@
 #pragma once
 
 #include "EditorIcons.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // Workspace v1 IDs are independent of displayed labels, fonts and localization.
 // The exact previous bytes remain in legacy_names for lossless layout migration.

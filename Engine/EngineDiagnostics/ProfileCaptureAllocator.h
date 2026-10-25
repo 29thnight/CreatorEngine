@@ -1,10 +1,14 @@
 #pragma once
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(_WIN32)
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <Windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 #endif
 
 namespace ce

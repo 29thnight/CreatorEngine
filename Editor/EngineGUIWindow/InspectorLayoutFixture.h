@@ -13,11 +13,11 @@
 //
 // 긴 문자열·긴 맵 키는 일부러 넣었다 — 좁은 폭에서 잘리는지가 판정 대상이다.
 
-#include "Reflection.hpp"
+#include "../../Engine/Utility_Framework/Reflection/Reflection.hpp"
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace editor::inspector
 {

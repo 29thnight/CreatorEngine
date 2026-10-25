@@ -14,13 +14,13 @@ foreach ($config in $configs) {
     Copy-Item -LiteralPath (Join-Path $lib 'bin/enkiTS.dll') -Destination $out
     foreach ($mutant in @($false,$true)) {
         $name = if ($mutant) {'missing-barrier'} else {'worker-pool'}
-        $source = Join-Path $repo 'Engine/Utility_Framework/JobScheduler.cpp'
+        $source = Join-Path $repo 'Engine/Utility_Framework/Concurrency/JobScheduler.cpp'
         if ($mutant) {
             $text = [IO.File]::ReadAllText($source)
             $old = 'state_->done_.wait(lock, [this] { return state_->complete_; });'
             if (-not $text.Contains($old)) { throw 'Barrier mutation target missing' }
             $source = Join-Path $out 'MissingBarrier.cpp'
-            [IO.File]::WriteAllText($source, $text.Replace($old, '{}'))
+            [IO.File]::WriteAllText($source, $text.Replace($old, '{}').Replace('../../../Tools/build/ModuleAdapters/', ($repo.Replace('\','/') + '/Tools/build/ModuleAdapters/')))
         }
         $exe = Join-Path $out "$name.exe"
         $flags = if ($config -eq 'Debug') {'/MDd /Od /RTC1 /D_DEBUG'} else {'/MD /O2 /DNDEBUG'}
@@ -28,7 +28,7 @@ foreach ($config in $configs) {
             $flags + ' /I"' + (Join-Path $repo 'Engine/Utility_Framework') + '" /external:I"' +
             (Join-Path $dependencies 'include') + '" /external:W0 /Fo"' + $out +
             '/" /Fd"' + (Join-Path $out "$name.pdb") + '" /Fe"' + $exe + '" "' + $source +
-            '" "' + (Join-Path $repo 'Engine/Utility_Framework/ThreadPool.cpp') + '" "' + (Join-Path $PSScriptRoot 'worker_pool_probe.cpp') + '" /link /LIBPATH:"' + (Join-Path $lib 'lib') + '"'
+            '" "' + (Join-Path $repo 'Engine/Utility_Framework/Concurrency/ThreadPool.cpp') + '" "' + (Join-Path $PSScriptRoot 'worker_pool_probe.cpp') + '" /link /LIBPATH:"' + (Join-Path $lib 'lib') + '"'
         & $env:ComSpec /d /s /c $command
         if ($LASTEXITCODE -ne 0) { throw "$config $name compile failed" }
         $proc = Start-Process -FilePath $exe -WindowStyle Hidden -PassThru `

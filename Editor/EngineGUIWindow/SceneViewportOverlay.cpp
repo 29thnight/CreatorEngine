@@ -4,10 +4,10 @@
 #include "EditorIcons.h"
 #include "EditorWindowNames.h"
 #include "EditorWindowRegistry.h"
-#include "GizmoRenderer.h"
+#include "../EngineEntry/Scene/GizmoRenderer.h"
 #include "EnhancedRenderDebugWindow.h"
 #include "../../ThirdParty/ImViewGuizmo/ImViewGuizmo.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "EditorClipContract.h"
 #include "EditorStateContract.h"
 

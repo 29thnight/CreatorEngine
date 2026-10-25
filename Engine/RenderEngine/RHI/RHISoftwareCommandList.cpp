@@ -1,4 +1,8 @@
-#include "../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "RHISoftwareCommandList.h"
 
 RHISoftwareCommandArena::~RHISoftwareCommandArena() = default;
@@ -54,18 +58,18 @@ void* RHISoftwareCommandArena::Allocate(size_t bytes, size_t alignment, RHIComma
         m_resource = &m_storage->Resource(0);
     }
     const auto& state = m_resource->stats();
-    const size_t activeCapacity = state.activeCapacity;
-    const size_t activeBlocks = state.activeBlocks;
-    const size_t blockCount = state.blockCount;
+    const size_t activeCapacity = state.active_capacity;
+    const size_t activeBlocks = state.active_blocks;
+    const size_t blockCount = state.block_count;
     // Account and activate retained storage once per chunk, not per command.
     // Payload/command byte budgets remain exact in the owning command lists.
     const size_t capacity = (std::max)(size_t{65536}, bytes);
     auto* memory = static_cast<std::byte*>(m_resource->allocate(capacity, alignof(std::max_align_t)));
     m_cursor = memory + bytes;
     m_end = memory + capacity;
-    stats.allocatedBytes += state.activeCapacity - activeCapacity;
-    stats.arenaBlocks += state.activeBlocks - activeBlocks;
-    stats.arenaCacheHits += (state.activeBlocks - activeBlocks) - (state.blockCount - blockCount);
+    stats.allocatedBytes += state.active_capacity - activeCapacity;
+    stats.arenaBlocks += state.active_blocks - activeBlocks;
+    stats.arenaCacheHits += (state.active_blocks - activeBlocks) - (state.block_count - blockCount);
     return memory;
 }
 

@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 #include "Experiment/Cooked/CookedAssetCatalog.h"
 #include "Experiment/Cooked/CookedAudioClipSource.h"
 #include "Experiment/Cooked/PakAudioClipByteSource.h"
@@ -5,7 +10,7 @@
 #include "Audio/MiniaudioBackend.h"
 #include "Audio/NullAudioBackend.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -144,7 +149,7 @@ int wmain(int argc, wchar_t** argv)
         const ck::CookedAssetManifestEntry* entry = catalog.Find(clipId);
         Require(entry && entry->artifactPath == virtualPath
             && entry->byteSize == artifactBytes.size()
-            && entry->contentSha256 == Hash::Sha256::Compute(
+            && entry->contentSha256 == ce::hash::sha256::compute(
                 artifactBytes.data(), artifactBytes.size()),
             "CEMF audio entry differs from artifact");
 
@@ -316,7 +321,7 @@ int wmain(int argc, wchar_t** argv)
                 static_cast<std::streamsize>(streamBytes.size()));
         }
         ck::CookedAssetManifestEntry streamEntry = *entry;
-        streamEntry.contentSha256 = Hash::Sha256::Compute(
+        streamEntry.contentSha256 = ce::hash::sha256::compute(
             streamBytes.data(), streamBytes.size());
         ck::CookedAudioClipSource streamSource;
         Require(ck::OpenCookedAudioClipEntry(streamEntry,

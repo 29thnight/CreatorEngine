@@ -1,4 +1,23 @@
-#include "../Utility_Framework/DynamicBitset.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.DynamicBitset.h"
+#else
+import Creator.Core.DynamicBitset;
+#endif
 #include "PrefabUtility.h"
 #include "Interfaces/AssetAuthoringPort.h"
 #include "DataSystem.h"
@@ -11,14 +30,13 @@
 #include "MeshRenderer.h"
 #include "Object.h"
 #include "LifecycleTrace.h"
-#include "AuthoringNodeEquality.h" // D3-a-1: 구조 비교
-#include "AuthoringCookedDocument.h"
-#include "AuthoringDocumentAccess.h"
-#include "AuthoringParsedDocument.h"
-#include "ReflectionYml.h"
-#include "SerializationProfiler.h" // D0: 직렬화 기준선 계측
-#include "PathFinder.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Authoring/AuthoringNodeEquality.h" // D3-a-1: 구조 비교
+#include "../Utility_Framework/Authoring/AuthoringCookedDocument.h"
+#include "../Utility_Framework/Authoring/AuthoringDocumentAccess.h"
+#include "../Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../Utility_Framework/Reflection/ReflectionYml.h"
+#include "../Utility_Framework/Authoring/SerializationProfiler.h" // D0: 직렬화 기준선 계측
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -275,13 +293,13 @@ namespace
 			// 이 축소 삼단도 기록한다(C5). 여기는 즉시 소멸 경로라 Scene의 프레임 끝
 			// 정리와 순서가 다르고, 기록이 없으면 그 차이가 기준선에 안 보인다.
 			LIFECYCLE_TRACE(Lifecycle::Phase::OnEndSimulation, Lifecycle::Trace::TypeNameOf(comp.get()),
-				obj.m_name.ToString().c_str(), comp->GetInstanceID());
+				obj.m_name.c_str(), comp->GetInstanceID());
 			comp->OnEndSimulation();
 			LIFECYCLE_TRACE(Lifecycle::Phase::OnRemovingFromScene, Lifecycle::Trace::TypeNameOf(comp.get()),
-				obj.m_name.ToString().c_str(), comp->GetInstanceID());
+				obj.m_name.c_str(), comp->GetInstanceID());
 			comp->OnRemovingFromScene();
 			LIFECYCLE_TRACE(Lifecycle::Phase::OnUninitializing, Lifecycle::Trace::TypeNameOf(comp.get()),
-				obj.m_name.ToString().c_str(), comp->GetInstanceID());
+				obj.m_name.c_str(), comp->GetInstanceID());
 			comp->OnUninitializing();   // L3: 옛 OnDestroy — 브리지 철거로 이름이 정본으로 바뀌었다
 			if (scene)
 			{
@@ -385,7 +403,7 @@ void PrefabUtility::ApplyRecordedOverrides(Entity& obj)
 
 			std::string parseError;
 			std::optional<Authoring::WriteDocument> value;
-			if (PathFinder::IsAssetAuthoringEnabled())
+			if (ce::paths::is_asset_authoring_enabled())
 			{
 				value = Authoring::WriteDocument::ParseText(
 					ov.m_valueYaml, &parseError);
@@ -681,7 +699,7 @@ size_t PrefabUtility::UpdateInstances(const Prefab* prefab, const Scene* exclude
         // 따라 바뀌어 "무엇과 비교하는지"가 무너진다. 사유는 Prefab.cpp의 같은 자리.
         obj->m_prefabOriginal = Authoring::DocumentAccess::Clone(newData);
 
-        prefabInstanceUpdated.Broadcast(*obj);
+        prefabInstanceUpdated.broadcast(*obj);
         ++applied;
     }
 
@@ -797,10 +815,10 @@ bool PrefabUtility::SavePrefab(const Prefab* prefab, const std::string& path)
 
 Prefab* PrefabUtility::LoadPrefabFullPath(const std::string& path)
 {
-    if (path.empty() || !file::exists(path))
+    if (path.empty() || !std::filesystem::exists(path))
         return nullptr;
 	const FileGuid sourceIdentity = DataSystems->GetFileGuid(path);
-	file::path readPath(path);
+	std::filesystem::path readPath(path);
 	if (sourceIdentity != FileGuid{})
 	{
 		readPath = DataSystems->ResolveCatalogAssetPath(sourceIdentity);
@@ -810,7 +828,7 @@ Prefab* PrefabUtility::LoadPrefabFullPath(const std::string& path)
 			return nullptr;
 		}
 	}
-	else if (!PathFinder::IsAssetAuthoringEnabled())
+	else if (!ce::paths::is_asset_authoring_enabled())
 	{
 		Debug::PrintLog(spdlog::level::err, "Player prefab source identity 해석 실패: " + path);
 		return nullptr;
@@ -848,7 +866,7 @@ Prefab* PrefabUtility::LoadPrefabFullPath(const std::string& path)
 	}
 	prefab->SetFileGuid(identity);
 	const bool cooked = readPath.lexically_normal()
-		!= file::path(path).lexically_normal();
+		!= std::filesystem::path(path).lexically_normal();
 	std::printf("[prefab.document] source=%s guid=%s\n",
 		cooked ? "cooked" : "authoring", identity.ToString().c_str());
 
@@ -861,16 +879,16 @@ std::string PrefabUtility::CacheKey(const std::string& path)
 {
     // 같은 파일을 상대·절대 경로로 각각 열면 다른 항목이 되어 캐시가 무의미해진다.
     std::error_code ec;
-    const file::path canonical = file::weakly_canonical(file::path(path), ec);
+    const std::filesystem::path canonical = std::filesystem::weakly_canonical(std::filesystem::path(path), ec);
     std::string key = ec ? path : canonical.string();
-    std::ranges::transform(key, key.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+    ce::strings::to_lower_in_place(key);
     return key;
 }
 
 Prefab* PrefabUtility::LoadPrefab(const std::string& path)
 {
-    file::path filepath = PathFinder::Relative("Prefabs\\") / (path + ".prefab");
-    if (!file::exists(filepath))
+    std::filesystem::path filepath = ce::paths::relative("Prefabs\\") / (path + ".prefab");
+    if (!std::filesystem::exists(filepath))
 		return nullptr;
 
     auto prefab = LoadPrefabFullPath(filepath.string());

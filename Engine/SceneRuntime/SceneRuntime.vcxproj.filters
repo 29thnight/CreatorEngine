@@ -1,6 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <ItemGroup>
+    <Filter Include="Audio">
+      <UniqueIdentifier>{0E6BEF3A-DDED-592F-9817-9F2FC708E73F}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Bridges">
       <UniqueIdentifier>{062a314b-d80c-4c65-548a-1fed6b536574}</UniqueIdentifier>
     </Filter>
@@ -125,6 +128,9 @@
     <Filter Include="Classes\Resources\Sound">
       <UniqueIdentifier>{a2c4428d-0d20-4142-846f-1b2cba944fdf}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Headers">
+      <UniqueIdentifier>{B725EF81-F746-5E78-AE4F-6E7AB963D228}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Interfaces">
       <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
       <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
@@ -138,14 +144,8 @@
     <Filter Include="Managers\InputManager">
       <UniqueIdentifier>{6aebec6a-08e7-4d5c-8bad-45f93b7b5385}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Managers\InputManager\EngineReflect">
-      <UniqueIdentifier>{ca4d0a2a-f8f3-464b-845e-7e806c05ddf1}</UniqueIdentifier>
-    </Filter>
     <Filter Include="Managers\InputManager\Helper">
       <UniqueIdentifier>{d694ed34-b81e-4dee-8544-f2efb39a76f5}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Managers\PhysicsManager">
-      <UniqueIdentifier>{0540bf1d-a624-42a1-8866-71e4b6926ae0}</UniqueIdentifier>
     </Filter>
     <Filter Include="Managers\SceneManager">
       <UniqueIdentifier>{bdd71775-7937-4339-95ed-838af4423abe}</UniqueIdentifier>
@@ -165,8 +165,17 @@
     <Filter Include="Scene\Lifecycle">
       <UniqueIdentifier>{f12662e8-6060-2047-67c9-78fe102fcbe2}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Scene\Simulation">
+      <UniqueIdentifier>{B9539D96-0E71-5947-BE4A-EB652319DBF1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source">
+      <UniqueIdentifier>{4E4CEF7B-9925-5407-BE82-BEE1FF9E4EAD}</UniqueIdentifier>
+    </Filter>
     <Filter Include="Verify">
       <UniqueIdentifier>{5c1f764d-1a40-4c8e-7cfc-45c6d6751239}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Verify\Temporal">
+      <UniqueIdentifier>{1B264422-7B5D-5534-9D5E-3A4E0F3F9CB4}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
@@ -197,6 +206,45 @@
     <ClCompile Include="AniTransition.cpp">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClCompile>
+    <ClCompile Include="Audio\AudioCatalog.cpp">
+      <Filter>Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="Audio\AudioHost.cpp">
+      <Filter>Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="Audio\AudioProfileProvider.cpp">
+      <Filter>Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="Audio\AudioRuntime.cpp">
+      <Filter>Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="Audio\ClipDirectory.cpp">
+      <Filter>Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="Audio\EditorAudioClipCache.cpp">
+      <Filter>Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="Audio\MiniaudioBackend.cpp">
+      <Filter>Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="Audio\NullAudioBackend.cpp">
+      <Filter>Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="Audio\PlaybackService.cpp">
+      <Filter>Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="Audio\SoundAssetSerialization.cpp">
+      <Filter>Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="Audio\SoundGraph.cpp">
+      <Filter>Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="Audio\VoiceTable.cpp">
+      <Filter>Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="AudioListenerComponent.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
     <ClCompile Include="AvatarMask.cpp">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClCompile>
@@ -212,6 +260,9 @@
     <ClCompile Include="Canvas.cpp">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClCompile>
+    <ClCompile Include="CharacterMovementComponent.cpp">
+      <Filter>Scene</Filter>
+    </ClCompile>
     <ClCompile Include="ClrHost.cpp">
       <Filter>Managers\ScriptHost</Filter>
     </ClCompile>
@@ -220,6 +271,9 @@
     </ClCompile>
     <ClCompile Include="ComponentFactory.cpp">
       <Filter>Classes\Components\ComponentFactory</Filter>
+    </ClCompile>
+    <ClCompile Include="CookedSceneLoader.cpp">
+      <Filter>Source</Filter>
     </ClCompile>
     <ClCompile Include="DecalComponent.cpp">
       <Filter>Classes\Components\DecalComponent</Filter>
@@ -230,10 +284,10 @@
     <ClCompile Include="EnhancedGizmoSceneBinding.cpp">
       <Filter>Bridges</Filter>
     </ClCompile>
-    <ClCompile Include="EntityAuthoringRead.cpp">
+    <ClCompile Include="Entity.cpp">
       <Filter>Classes\GameObject</Filter>
     </ClCompile>
-    <ClCompile Include="Entity.cpp">
+    <ClCompile Include="EntityAuthoringRead.cpp">
       <Filter>Classes\GameObject</Filter>
     </ClCompile>
     <ClCompile Include="FoliageComponent.cpp">
@@ -275,6 +329,9 @@
     <ClCompile Include="ManagedAniBehavior.cpp">
       <Filter>Managers\ScriptHost</Filter>
     </ClCompile>
+    <ClCompile Include="ManagedAssembly.cpp">
+      <Filter>Managers\ScriptHost</Filter>
+    </ClCompile>
     <ClCompile Include="MaterialScriptBinding.cpp">
       <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
     </ClCompile>
@@ -290,8 +347,14 @@
     <ClCompile Include="Object.cpp">
       <Filter>Classes\Object</Filter>
     </ClCompile>
+    <ClCompile Include="PhysicsBodyComponent.cpp">
+      <Filter>Scene</Filter>
+    </ClCompile>
     <ClCompile Include="PlayerInput.cpp">
       <Filter>Classes\Components\InputComponent</Filter>
+    </ClCompile>
+    <ClCompile Include="PlayerInputSystem.cpp">
+      <Filter>Managers\InputManager</Filter>
     </ClCompile>
     <ClCompile Include="Prefab.cpp">
       <Filter>Classes\GameObject\Prefab</Filter>
@@ -314,14 +377,17 @@
     <ClCompile Include="RuntimeFrame.cpp">
       <Filter>Managers\SceneManager</Filter>
     </ClCompile>
-    <ClCompile Include="ScenePhysicsSimulation.cpp"><Filter>Scene</Filter></ClCompile>
-    <ClCompile Include="PhysicsBodyComponent.cpp"><Filter>Scene</Filter></ClCompile>
-    <ClCompile Include="CharacterMovementComponent.cpp"><Filter>Scene</Filter></ClCompile>
     <ClCompile Include="Scene.cpp">
       <Filter>Scene</Filter>
     </ClCompile>
     <ClCompile Include="SceneManager.cpp">
       <Filter>Managers\SceneManager</Filter>
+    </ClCompile>
+    <ClCompile Include="ScenePhysicsSimulation.cpp">
+      <Filter>Scene</Filter>
+    </ClCompile>
+    <ClCompile Include="SceneRenderProfileComponent.cpp">
+      <Filter>Classes\Components\Volume</Filter>
     </ClCompile>
     <ClCompile Include="ScriptComponent.cpp">
       <Filter>Classes\Components\ScriptComponent</Filter>
@@ -350,6 +416,12 @@
     <ClCompile Include="TagManager.cpp">
       <Filter>Managers\TagManager</Filter>
     </ClCompile>
+    <ClCompile Include="TemporalMotionFixture.cpp">
+      <Filter>Verify\Temporal</Filter>
+    </ClCompile>
+    <ClCompile Include="TemporalMotionFixtureAssets.cpp">
+      <Filter>Verify\Temporal</Filter>
+    </ClCompile>
     <ClCompile Include="Terrain.cpp">
       <Filter>Classes\Components\TerrainComponent</Filter>
     </ClCompile>
@@ -377,9 +449,6 @@
     <ClCompile Include="UITickSystem.cpp">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClCompile>
-    <ClCompile Include="SceneRenderProfileComponent.cpp">
-      <Filter>Classes\Components\Volume</Filter>
-    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="ActionMap.h">
@@ -397,22 +466,19 @@
     <ClInclude Include="AnimationBehviourFatory.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
+    <ClInclude Include="AnimationBudget.h">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
     <ClInclude Include="AnimationController.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="AnimationDiagnostics.h">
+      <Filter>Headers</Filter>
     </ClInclude>
     <ClInclude Include="AnimationPlayback.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
-    <ClInclude Include="AnimTaskList.h">
-      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
-    </ClInclude>
-    <ClInclude Include="AnimationBudget.h">
-      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
-    </ClInclude>
     <ClInclude Include="AnimationScheduler.h">
-      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
-    </ClInclude>
-    <ClInclude Include="TwoBoneIK.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
     <ClInclude Include="AnimationState.h">
@@ -424,6 +490,9 @@
     <ClInclude Include="AnimatorSystem.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
+    <ClInclude Include="AnimTaskList.h">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
     <ClInclude Include="AniTransition.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
     </ClInclude>
@@ -432,6 +501,66 @@
     </ClInclude>
     <ClInclude Include="ArticulationLoader.h">
       <Filter>Interfaces</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\AudioBackend.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\AudioCatalog.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\AudioHost.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\AudioProfileProvider.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\AudioRuntime.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\AudioService.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\AudioSourceInspection.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\AudioSourceValidation.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\AudioValues.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\ClipDirectory.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\EditorAudioClipCache.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\ListenerState.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\MiniaudioBackend.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\NullAudioBackend.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\PlaybackService.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\PlayRequest.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\SoundAssetSerialization.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\SoundGraph.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="Audio\VoiceTable.h">
+      <Filter>Audio</Filter>
+    </ClInclude>
+    <ClInclude Include="AudioListenerComponent.h">
+      <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="AvatarMask.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
@@ -472,17 +601,32 @@
     <ClInclude Include="CameraSystem.h">
       <Filter>Classes\Components\CameraComponent</Filter>
     </ClInclude>
-    <ClInclude Include="TweenManager.h">
-      <Filter>Managers</Filter>
-    </ClInclude>
     <ClInclude Include="Canvas.h">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
     <ClInclude Include="CanvasScaleMode.h">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
+    <ClInclude Include="CharacterMotionPolicy.h">
+      <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="CharacterMovementComponent.h">
+      <Filter>Scene</Filter>
+    </ClInclude>
     <ClInclude Include="ClrHost.h">
       <Filter>Managers\ScriptHost</Filter>
+    </ClInclude>
+    <ClInclude Include="CollisionGeometryCodec.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="CollisionGeometryIO.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="CollisionGeometryLibrary.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="CollisionGeometrySource.h">
+      <Filter>Headers</Filter>
     </ClInclude>
     <ClInclude Include="Component.h">
       <Filter>Classes\Components\ComponentBase</Filter>
@@ -492,6 +636,12 @@
     </ClInclude>
     <ClInclude Include="ConditionParameter.h">
       <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="CookedCollisionGeometry.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="CookedSceneLoader.h">
+      <Filter>Source</Filter>
     </ClInclude>
     <ClInclude Include="CurvePoint.h">
       <Filter>Classes\Resources\Sound</Filter>
@@ -508,11 +658,14 @@
     <ClInclude Include="EForceMode.h">
       <Filter>Classes\Components\PhysicsComponent</Filter>
     </ClInclude>
+    <ClInclude Include="Entity.h">
+      <Filter>Classes\GameObject</Filter>
+    </ClInclude>
     <ClInclude Include="EntityAuthoringRead.h">
       <Filter>Classes\GameObject</Filter>
     </ClInclude>
-    <ClInclude Include="Entity.h">
-      <Filter>Classes\GameObject</Filter>
+    <ClInclude Include="EntityLayerSchema.h">
+      <Filter>Headers</Filter>
     </ClInclude>
     <ClInclude Include="FoliageComponent.h">
       <Filter>Classes\Components\RenderableComponent\FoliageComponent</Filter>
@@ -583,16 +736,21 @@
     <ClInclude Include="ManagedAniBehavior.h">
       <Filter>Managers\ScriptHost</Filter>
     </ClInclude>
+    <ClInclude Include="ManagedAssembly.h">
+      <Filter>Managers\ScriptHost</Filter>
+    </ClInclude>
     <ClInclude Include="MaterialScriptBinding.h">
       <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
     </ClInclude>
     <ClInclude Include="MeshRenderer.h">
       <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
     </ClInclude>
+    <ClInclude Include="ModelCollisionGeometry.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
     <ClInclude Include="ModelConsumptionDiagnostics.h">
       <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
     </ClInclude>
-    <ClInclude Include="ModelCollisionGeometry.h" />
     <ClInclude Include="ModelSceneInstantiation.h">
       <Filter>Classes\Components\RenderableComponent\Mesh</Filter>
     </ClInclude>
@@ -602,8 +760,26 @@
     <ClInclude Include="Object.h">
       <Filter>Classes\Object</Filter>
     </ClInclude>
+    <ClInclude Include="PhysicsBodyComponent.h">
+      <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsLifecyclePolicy.h">
+      <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsPrimitivePreview.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsShapeDefinition.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="PhysicsTransformPolicy.h">
+      <Filter>Scene</Filter>
+    </ClInclude>
     <ClInclude Include="PlayerInput.h">
       <Filter>Classes\Components\InputComponent</Filter>
+    </ClInclude>
+    <ClInclude Include="PlayerInputSystem.h">
+      <Filter>Managers\InputManager</Filter>
     </ClInclude>
     <ClInclude Include="Prefab.h">
       <Filter>Classes\GameObject\Prefab</Filter>
@@ -614,6 +790,15 @@
     <ClInclude Include="PrefabUtility.h">
       <Filter>Classes\GameObject\PrefabUtility</Filter>
     </ClInclude>
+    <ClInclude Include="ProjectLayerSettings.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="ProjectLayerSettingsCodec.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="ProjectLayerSettingsIO.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
     <ClInclude Include="RectTransformComponent.h">
       <Filter>Classes\Components\Transform\2D</Filter>
     </ClInclude>
@@ -623,29 +808,47 @@
     <ClInclude Include="RuntimeFrame.h">
       <Filter>Managers\SceneManager</Filter>
     </ClInclude>
-    <ClInclude Include="AnimationDiagnostics.h" />
-    <ClInclude Include="ScenePhysicsSimulation.h"><Filter>Scene</Filter></ClInclude>
-    <ClInclude Include="PhysicsTransformPolicy.h"><Filter>Scene</Filter></ClInclude>
-    <ClInclude Include="PhysicsLifecyclePolicy.h"><Filter>Scene</Filter></ClInclude>
-    <ClInclude Include="SimulationSessionPolicy.h"><Filter>Scene</Filter></ClInclude>
-    <ClInclude Include="ScriptPhysicsABI.h" />
-    <ClInclude Include="PhysicsBodyComponent.h"><Filter>Scene</Filter></ClInclude>
-    <ClInclude Include="CharacterMovementComponent.h"><Filter>Scene</Filter></ClInclude>
     <ClInclude Include="Scene.h">
       <Filter>Scene</Filter>
     </ClInclude>
-    <ClInclude Include="CharacterMotionPolicy.h"><Filter>Scene</Filter></ClInclude>
-    <ClInclude Include="Scene.h">
-      <Filter>Scene</Filter>
+    <ClInclude Include="SceneGC.h">
+      <Filter>Scene\Lifecycle</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneLayerIndex.h">
+      <Filter>Headers</Filter>
     </ClInclude>
     <ClInclude Include="SceneManager.h">
       <Filter>Managers\SceneManager</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneObservation.h">
+      <Filter>Scene\Simulation</Filter>
+    </ClInclude>
+    <ClInclude Include="ScenePhysicsSimulation.h">
+      <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="SceneRenderProfileComponent.h">
+      <Filter>Classes\Components\Volume</Filter>
     </ClInclude>
     <ClInclude Include="ScriptComponent.h">
       <Filter>Classes\Components\ScriptComponent</Filter>
     </ClInclude>
     <ClInclude Include="ScriptObjectRegistry.h">
       <Filter>Managers\ScriptHost</Filter>
+    </ClInclude>
+    <ClInclude Include="ScriptPhysicsABI.h">
+      <Filter>Headers</Filter>
+    </ClInclude>
+    <ClInclude Include="SimulationExchange.h">
+      <Filter>Scene\Simulation</Filter>
+    </ClInclude>
+    <ClInclude Include="SimulationSessionPolicy.h">
+      <Filter>Scene</Filter>
+    </ClInclude>
+    <ClInclude Include="SimulationTick.h">
+      <Filter>Scene\Simulation</Filter>
+    </ClInclude>
+    <ClInclude Include="SimulationTickExecution.h">
+      <Filter>Scene\Simulation</Filter>
     </ClInclude>
     <ClInclude Include="Socket.h">
       <Filter>Classes\GameObject\Socket</Filter>
@@ -671,6 +874,12 @@
     <ClInclude Include="TagManager.h">
       <Filter>Managers\TagManager</Filter>
     </ClInclude>
+    <ClInclude Include="TemporalMotionFixture.h">
+      <Filter>Verify\Temporal</Filter>
+    </ClInclude>
+    <ClInclude Include="TemporalMotionFixtureAssets.h">
+      <Filter>Verify\Temporal</Filter>
+    </ClInclude>
     <ClInclude Include="Terrain.h">
       <Filter>Classes\Components\TerrainComponent</Filter>
     </ClInclude>
@@ -686,6 +895,12 @@
     <ClInclude Include="Transition.h">
       <Filter>Classes\GameAI\AIFramework\FSM</Filter>
     </ClInclude>
+    <ClInclude Include="TweenManager.h">
+      <Filter>Managers</Filter>
+    </ClInclude>
+    <ClInclude Include="TwoBoneIK.h">
+      <Filter>Classes\Components\RenderableComponent\Animation</Filter>
+    </ClInclude>
     <ClInclude Include="UIButton.h">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
@@ -698,9 +913,6 @@
     <ClInclude Include="UITickSystem.h">
       <Filter>Classes\Components\RenderableComponent\UI</Filter>
     </ClInclude>
-    <ClInclude Include="SceneRenderProfileComponent.h">
-      <Filter>Classes\Components\Volume</Filter>
-    </ClInclude>
     <ClInclude Include="WorldState.h">
       <Filter>Classes\GameAI\Core\BlackBoard</Filter>
     </ClInclude>
@@ -712,68 +924,5 @@
     <None Include="Entity.inl">
       <Filter>Classes\GameObject</Filter>
     </None>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="SceneLayerIndex.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="ProjectLayerSettings.h" />
-    <ClInclude Include="ProjectLayerSettingsCodec.h" />
-    <ClInclude Include="ProjectLayerSettingsIO.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="EntityLayerSchema.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="PhysicsPrimitivePreview.h" />
-    <ClInclude Include="PhysicsShapeDefinition.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="CollisionGeometrySource.h" />
-    <ClInclude Include="CollisionGeometryCodec.h" />
-    <ClInclude Include="CollisionGeometryLibrary.h" />
-    <ClInclude Include="CollisionGeometryIO.h" />
-    <ClInclude Include="CookedCollisionGeometry.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="Audio\AudioCatalog.cpp" />
-    <ClCompile Include="Audio\AudioHost.cpp" />
-    <ClCompile Include="Audio\AudioProfileProvider.cpp" />
-    <ClCompile Include="Audio\AudioRuntime.cpp" />
-    <ClCompile Include="Audio\ClipDirectory.cpp" />
-    <ClCompile Include="Audio\MiniaudioBackend.cpp" />
-    <ClCompile Include="Audio\NullAudioBackend.cpp" />
-    <ClCompile Include="Audio\PlaybackService.cpp" />
-    <ClCompile Include="Audio\SoundAssetSerialization.cpp" />
-    <ClCompile Include="Audio\SoundGraph.cpp" />
-    <ClCompile Include="Audio\VoiceTable.cpp" />
-    <ClCompile Include="AudioListenerComponent.cpp" />
-    <ClInclude Include="Audio\AudioBackend.h" />
-    <ClInclude Include="Audio\AudioCatalog.h" />
-    <ClInclude Include="Audio\AudioHost.h" />
-    <ClInclude Include="Audio\AudioProfileProvider.h" />
-    <ClInclude Include="Audio\AudioRuntime.h" />
-    <ClInclude Include="Audio\AudioService.h" />
-    <ClInclude Include="Audio\AudioValues.h" />
-    <ClInclude Include="Audio\ClipDirectory.h" />
-    <ClInclude Include="Audio\ListenerState.h" />
-    <ClInclude Include="Audio\MiniaudioBackend.h" />
-    <ClInclude Include="Audio\NullAudioBackend.h" />
-    <ClInclude Include="Audio\PlayRequest.h" />
-    <ClInclude Include="Audio\PlaybackService.h" />
-    <ClInclude Include="Audio\SoundAssetSerialization.h" />
-    <ClInclude Include="Audio\SoundGraph.h" />
-    <ClInclude Include="Audio\VoiceTable.h" />
-    <ClInclude Include="AudioListenerComponent.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="Audio\EditorAudioClipCache.cpp" />
-    <ClInclude Include="Audio\AudioSourceInspection.h" />
-    <ClInclude Include="Audio\AudioSourceValidation.h" />
-    <ClInclude Include="Audio\EditorAudioClipCache.h" />
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="CookedSceneLoader.cpp" />
-    <ClInclude Include="CookedSceneLoader.h" />
   </ItemGroup>
 </Project>

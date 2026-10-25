@@ -1,3 +1,14 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "AssetIdentity/AssetSidecarSchemaSelfTest.h"
 
 #include "Assets/AssetIdentityEpoch.h"
@@ -9,7 +20,7 @@
 #include "Experiment/Import/GltfImporter.h"
 #include "Experiment/Import/ImportedScene.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace RenderTest
 {
@@ -446,7 +457,7 @@ namespace RenderTest
             expectReject(tampered, assets::SidecarIssueCode::UnsupportedSchema, "schema 3");
             tampered = yaml;
             {
-                const std::string id = Uuid::ToString(doc.subAssets[0].assetId);
+                const std::string id = uuid::to_string(doc.subAssets[0].assetId);
                 std::string upper = id;
                 for (char& c : upper) c = static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
                 tampered.replace(tampered.find(id), id.size(), upper);
@@ -460,12 +471,12 @@ namespace RenderTest
             check.Check(!assets::ValidateModelSidecarV2Closure(forged, header, issues)
                 && HasIssue(issues, assets::SidecarIssueCode::DuplicateAssetId), "중복 assetId → 거부");
             forged = back;
-            forged.subAssets[2].assetId.data[15] ^= 0x01u;
+            forged.subAssets[2].assetId.data_[15] ^= 0x01u;
             issues.clear();
             check.Check(!assets::ValidateModelSidecarV2Closure(forged, header, issues)
                 && HasIssue(issues, assets::SidecarIssueCode::RecomputeMismatch), "subasset id 1비트 변조 → RecomputeMismatch");
             forged = back;
-            forged.assetId.data[0] ^= 0x01u;
+            forged.assetId.data_[0] ^= 0x01u;
             issues.clear();
             check.Check(!assets::ValidateModelSidecarV2Closure(forged, header, issues)
                 && HasIssue(issues, assets::SidecarIssueCode::RecomputeMismatch), "model id 변조 → RecomputeMismatch");
@@ -510,7 +521,7 @@ namespace RenderTest
             {
                 if (!it->is_regular_file(ec)) continue;
                 std::string ext = it->path().extension().string();
-                std::ranges::transform(ext, ext.begin(), [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
+                ce::strings::to_lower_in_place(ext);
                 if (ext == ".glb" || ext == ".gltf" || ext == ".fbx") sources.push_back(it->path());
             }
             std::ranges::sort(sources);
@@ -572,7 +583,7 @@ namespace RenderTest
                     {
                         assets::IdentityInput input;
                         input.domain = assets::kDomainSubAsset;
-                        input.namespaceBytes = std::span<const std::uint8_t>(sidecar.assetId.data);
+                        input.namespaceBytes = std::span<const std::uint8_t>(sidecar.assetId.data_);
                         input.kind = assets::ToKindName(r.kind);
                         input.stableKey = r.stableKey;
                         if (!global.Register(input, file + "/" + r.stableKey, r.assetId).Succeeded()) ++collisions;

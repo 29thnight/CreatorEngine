@@ -1,13 +1,23 @@
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "ModelSidecarV2.h"
 #include "AssetIdentityHex.h"
 #include "AssetIdentityRegistry.h"
 
-#include "AuthoringParsedDocument.h"
-#include "AuthoringCookedDocument.h"
-#include "AuthoringWriteNode.h"
-#include "Sha256.h"
+#include "../../Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../Utility_Framework/Authoring/AuthoringCookedDocument.h"
+#include "../../Utility_Framework/Authoring/AuthoringWriteNode.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace assets
 {
@@ -58,7 +68,7 @@ namespace assets
         }
 
         [[nodiscard]] bool ReadV8(const Authoring::ReadNode& parent, const char* key,
-            const std::string& context, Uuid::Uuid16& out, std::vector<SidecarIssue>& issues)
+            const std::string& context, uuid::uuid16& out, std::vector<SidecarIssue>& issues)
         {
             std::string text;
             if (!ReadScalar(parent, key, context, text, issues)) return false;
@@ -119,7 +129,7 @@ namespace assets
             }
 
             std::set<std::pair<SubAssetKind, std::string>> keys;
-            std::set<Uuid::Uuid16> ids{ doc.assetId };
+            std::set<uuid::uuid16> ids{ doc.assetId };
             for (std::size_t i = 0; i < doc.subAssets.size(); ++i)
             {
                 const ModelSubAssetRecord& r = doc.subAssets[i];
@@ -141,7 +151,7 @@ namespace assets
                 else if (!ids.insert(r.assetId).second)
                 {
                     AddIssue(issues, SidecarIssueCode::DuplicateAssetId, ctx + ".assetId",
-                        "assetId가 sidecar 안에서 중복됐다: " + Uuid::ToString(r.assetId));
+                        "assetId가 sidecar 안에서 중복됐다: " + uuid::to_string(r.assetId));
                 }
                 if (!r.fingerprint.empty() && !IsFingerprintText(r.fingerprint))
                 {
@@ -188,7 +198,7 @@ namespace assets
     std::string MakeSourceFingerprint(std::span<const std::uint8_t> bytes)
     {
         return std::string(kFingerprintPrefix)
-            + Hash::ToHex(Hash::Sha256::Compute(bytes.data(), bytes.size()));
+            + ce::hash::to_hex(ce::hash::sha256::compute(bytes.data(), bytes.size()));
     }
 
     std::string CreateModelAuthoringKey(std::string& outError)
@@ -337,7 +347,7 @@ namespace assets
         root.Child("identityProfile").SetScalar(document.identityProfile);
         root.Child("identityEpoch").SetScalar(document.identityEpoch);
         root.Child("authoringKey").SetScalar(document.authoringKey);
-        root.Child("assetId").SetScalar(Uuid::ToString(document.assetId));
+        root.Child("assetId").SetScalar(uuid::to_string(document.assetId));
         root.Child("generation").SetScalar(document.generation);
         root.Child("sourceFingerprint").SetScalar(document.sourceFingerprint);
 
@@ -349,7 +359,7 @@ namespace assets
             entry.SetMap();
             entry.Child("kind").SetScalar(std::string(ToKindName(record.kind)));
             entry.Child("stableKey").SetScalar(record.stableKey);
-            entry.Child("assetId").SetScalar(Uuid::ToString(record.assetId));
+            entry.Child("assetId").SetScalar(uuid::to_string(record.assetId));
             if (!record.binding.empty()) entry.Child("binding").SetScalar(record.binding);
             if (!record.name.empty()) entry.Child("name").SetScalar(record.name);
             if (!record.fingerprint.empty())
@@ -418,7 +428,7 @@ namespace assets
             const std::string ctx = "subAssets[" + std::to_string(i) + "]";
             IdentityInput input;
             input.domain = kDomainSubAsset;
-            input.namespaceBytes = std::span<const std::uint8_t>(document.assetId.data);
+            input.namespaceBytes = std::span<const std::uint8_t>(document.assetId.data_);
             input.kind = ToKindName(r.kind);
             input.stableKey = r.stableKey;
             const IdentityRegisterResult result = registry.Register(input, ctx, r.assetId);

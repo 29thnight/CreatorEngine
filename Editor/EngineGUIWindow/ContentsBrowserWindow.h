@@ -1,12 +1,12 @@
 #pragma once
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "../../Engine/Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "ImGui.h"
-#include "EditorAssetPresentation.h"
-#include "EditorSettingsStore.h"
-#include "AuthoringWriteNode.h"
+#include "../EngineEntry/Assets/EditorAssetPresentation.h"
+#include "../EngineEntry/Project/EditorSettingsStore.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringWriteNode.h"
 #include "ContentBrowserControl.h"
 #include "BrowserDirectorySnapshot.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // ── 콘텐츠 브라우저 (PHASE 4-3 슬라이스 2) ──
 //
@@ -48,18 +48,18 @@ private:
 	struct Visit
 	{
 		Scope scope{ Scope::folder };
-		file::path directory{};   ///< folder 범위에서만 뜻이 있다(정규형)
+		std::filesystem::path directory{};   ///< folder 범위에서만 뜻이 있다(정규형)
 		std::string search{};
-		file::path selected{};    ///< 떠날 때 고른 자산의 전체 경로
+		std::filesystem::path selected{};    ///< 떠날 때 고른 자산의 전체 경로
 		float scrollY{};
 	};
 
-	void ShowDirectoryTree(const file::path& directory);
+	void ShowDirectoryTree(const std::filesystem::path& directory);
 	void ShowCurrentDirectoryFiles();
 	void DrawScopeEntries();
     /// 모든 **폴더** 이동의 단일 입구(계약 3). 정상 이동은 검색어를 비운다.
     /// 실패하면 `m_error` 에 이유를 두고 거짓 — 현재 위치는 그대로다.
-    bool Navigate(const file::path& directory);
+    bool Navigate(const std::filesystem::path& directory);
     /// 가상 위치(최근·전체)로 간다. 폴더 이동과 같은 이력 규칙을 탄다.
     void NavigateScope(Scope scope);
     /// 이력의 다른 칸으로 간다 — 뒤로·앞으로·이력 메뉴가 전부 여기를 지난다.
@@ -69,30 +69,30 @@ private:
     void RestoreVisit(const Visit& visit);
     /// 자산을 고른다. 클릭·복원·CLI 가 같은 길을 쓴다. 메타를 읽는 데 성공하면
     /// 최근 항목에 올린다(인스펙터에 편집할 수 있게 올라갔다는 뜻이다).
-    bool SelectAsset(const file::path& path);
+    bool SelectAsset(const std::filesystem::path& path);
     void ClearSelection();
-    void RecordRecent(const file::path& path);
+    void RecordRecent(const std::filesystem::path& path);
     void LoadRecents();
     void SaveRecents() const;
     void CollectResults(std::vector<const editor::browser_directory_entry*>& out, size_t& supported);
-    std::string RelativeUtf8(const file::path& path) const;
+    std::string RelativeUtf8(const std::filesystem::path& path) const;
     void ApplyRequests();
     void PublishSnapshot();
     void DrawToolbar(bool collapsedTree);
     void DrawBreadcrumb(float width);
     void DrawDirectoryPanel();
-    void DrawFolderMenu(const file::path& directory);
+    void DrawFolderMenu(const std::filesystem::path& directory);
     void DrawFolderDialog();
-    void OpenCreateDialog(CreateKind kind, const file::path& directory);
+    void OpenCreateDialog(CreateKind kind, const std::filesystem::path& directory);
     /// Scene Render Profile 을 만들 수 있는 자리인가 — 폴더 메뉴·타일 메뉴·CLI 가 같은 술어를 쓴다.
-    bool CanCreateSceneRenderProfileIn(const file::path& directory) const;
+    bool CanCreateSceneRenderProfileIn(const std::filesystem::path& directory) const;
     /// 대화상자의 Create 와 CLI 가 지나는 유일한 생성 경로. 실패하면 `m_error` 에 이유를 둔다.
-    bool CreateNamedAsset(CreateKind kind, const file::path& directory, std::string_view name);
+    bool CreateNamedAsset(CreateKind kind, const std::filesystem::path& directory, std::string_view name);
     void DrawSearch(float width);
 	/// `revision` 은 목록 스캔이 담아 둔 원본 변경 표식이다(W7 썸네일 키).
 	/// 0 이면 썸네일을 묻지 않고 유형 아이콘에 머문다.
 	void DrawFileTile(const EditorAssetPresentation::FilePresentation& presentation,
-					  const file::path& directory,
+					  const std::filesystem::path& directory,
 					  const std::string& fileName,
 					  std::uint64_t revision,
 					  const ImVec2& tileSize = ImVec2(160, 160));
@@ -102,16 +102,16 @@ private:
 	void HandleSceneObjectDrop(const void* payload);
 
 	ImGuiTextFilter m_filter{};
-	file::path m_rootDirectory{};
+	std::filesystem::path m_rootDirectory{};
 	// W7-5: 뿌리를 만든 **날것 경로**. 이것이 그대로면 디스크에 다시 묻지 않는다.
-	file::path m_rootSource{};
+	std::filesystem::path m_rootSource{};
 	bool m_rootUsable{};
 	// W7-5: 정규형으로 **미리 풀어 둔** 특수 폴더. 트리 노드마다 equivalent 로
 	// 디스크에 묻던 것을 이 값과의 어휘 비교로 대신한다. 양쪽이 같은 정규형이라야
 	// 비교가 성립하므로 여기 담을 때 browser_canonical 을 거친다.
-	file::path m_prefabDirectory{};
-	file::path m_sceneRenderProfileDirectory{};
-	file::path		m_currentDirectory{};
+	std::filesystem::path m_prefabDirectory{};
+	std::filesystem::path m_sceneRenderProfileDirectory{};
+	std::filesystem::path		m_currentDirectory{};
 	Scope m_scope{ Scope::folder };
     std::vector<Visit> m_history;
     size_t m_historyIndex{};
@@ -124,12 +124,12 @@ private:
     float m_gridRowKey{ -2.f };
 
     // 최근 항목 — 프로젝트별, 개인 상태라 `Library/` 에 둔다(git 이 무시한다).
-    std::vector<file::path> m_recents;
-    file::path m_recentsFile{};
+    std::vector<std::filesystem::path> m_recents;
+    std::filesystem::path m_recentsFile{};
 
     /// 지금 고른 자산. 정적 `selectedMetaFilePath` 는 인스펙터가 쓰는 표기라
     /// 경로 비교용으로 따로 든다.
-    file::path m_selectedPath{};
+    std::filesystem::path m_selectedPath{};
 
     // 전체 자산·최근 항목이 이번 프레임에 확보한 폴더 수와 못 한 수. 순회
     // 상태를 프레임을 넘겨 들지 않는다 — 매 프레임 캐시에서 다시 모으므로
@@ -143,7 +143,7 @@ private:
     {
         std::uint64_t generation{};
         Scope scope{ Scope::folder };
-        file::path directory{};
+        std::filesystem::path directory{};
         std::string filter{};
         int typeFilter{ -1 };
         bool descending{};
@@ -172,7 +172,7 @@ private:
     int m_typeFilter{ -1 };
     bool m_sortDescending{};
     std::string m_error;
-    file::path m_folderTarget;
+    std::filesystem::path m_folderTarget;
     CreateKind m_createKind{ CreateKind::folder };
     bool m_openFolderDialog{};
     char m_folderName[256]{};

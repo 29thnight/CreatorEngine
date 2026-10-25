@@ -1,16 +1,27 @@
 #include "ExperimentParity/ExperimentTexturePipelineSelfTest.h"
-#include "../../../Engine/Utility_Framework/WindowsApartment.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
 
 #include "Experiment/Cooked/CookedTexture.h"
 #include "Experiment/Cooked/CookedTerrain.h"
 #include "Texture.h"
-
-#include <d3d11.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.LegacyGraphicsSDK.h"
+#else
+import "Creator.LegacyGraphicsSDK.h";
+#endif
 #include <DirectXTex.h>
-#include <objbase.h>
 
 #include <stdint.h>
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace RenderTest
 {

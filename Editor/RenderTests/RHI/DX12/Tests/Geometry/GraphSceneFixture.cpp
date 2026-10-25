@@ -1,3 +1,13 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "GraphSceneFixture.h"
 
 #include "Assets/AssetIdentityProfile.h"
@@ -7,12 +17,11 @@
 #include "DataSystem.h"
 #include "MaterialGraphSceneInput.h"
 #include "Mesh.h"
-#include "PathFinder.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/RHIShaderCompiler.h"
 #include "RHI/RHISubmissionThread.h"
 
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -59,7 +68,7 @@ bool GraphSceneFixture::Initialize(const EnhancedFrameContext& context, std::str
         if (!assigned) { error = "Fixture graph has no Alpha socket."; return false; }
     }
     m_generation = DataSystem::CompileMaterialGraphAuthoring(*source, FileGuid(std::string(kFixtureGraphGuid)),
-        PathFinder::RelativeToShader("DefaultPassShader"), PathFinder::CachePath("Lattice"), error);
+        ce::paths::relative_to_shader("DefaultPassShader"), ce::paths::cache_path("Lattice"), error);
     if (!m_generation)
     {
         error = "Default material graph compile: " + error;

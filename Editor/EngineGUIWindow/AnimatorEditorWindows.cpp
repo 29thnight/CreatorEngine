@@ -14,7 +14,7 @@
 // 나머지 세션 상태는 컨트롤러 창 본문의 함수 지역 static으로 남는다.
 
 
-#include "EditorObjectOperations.h"
+#include "../EngineEntry/Scene/EditorObjectOperations.h"
 #include "ReflectionImGuiHelper.h"
 #include "ReflectionTypedDraw.h"
 #include "ClrHost.h"
@@ -1083,7 +1083,7 @@ else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selecte
 		if(nullptr != state->behaviour)
 		{
 			FileGuid fileGuid = DataSystems->GetStemToGuid(state->behaviour->m_name);
-			file::path scriptFullPath = DataSystems->GetFilePath(fileGuid);
+			std::filesystem::path scriptFullPath = DataSystems->GetFilePath(fileGuid);
 			if (scriptFullPath.empty())
 			{
 				Debug::PrintLog(spdlog::level::err, "Script not found: " + state->behaviour->m_name);

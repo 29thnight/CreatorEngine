@@ -1,0 +1,121 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <ItemGroup>
+    <Filter Include="Shared">
+      <UniqueIdentifier>{5760B96B-536F-54E2-BB8A-FF62B2440EE4}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\Engine">
+      <UniqueIdentifier>{CBAB7BB7-6474-5A30-837E-1E28066FC1CD}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\Engine\EngineDiagnostics">
+      <UniqueIdentifier>{DDB9466F-7549-5B27-BD8F-3238C79D8B9D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\Engine\Physics">
+      <UniqueIdentifier>{C7C3773B-5E8C-571D-802A-583A2C17CB66}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\Engine\SceneRuntime">
+      <UniqueIdentifier>{6FE8530A-44D9-57C6-89A2-7E0CF73F88CF}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Source">
+      <UniqueIdentifier>{4AEA8112-E8C3-5767-8347-EEEA5358B580}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\EngineDiagnostics\ProfileAggregate.cpp">
+      <Filter>Shared\Engine\EngineDiagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\EngineDiagnostics\ProfileCapture.cpp">
+      <Filter>Shared\Engine\EngineDiagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\EngineDiagnostics\ProfileCaptureFile.cpp">
+      <Filter>Shared\Engine\EngineDiagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\EngineDiagnostics\ProfileMarker.cpp">
+      <Filter>Shared\Engine\EngineDiagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\EngineDiagnostics\ProfileReader.cpp">
+      <Filter>Shared\Engine\EngineDiagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\EngineDiagnostics\ProfileRecording.cpp">
+      <Filter>Shared\Engine\EngineDiagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\EngineDiagnostics\ProfileService.cpp">
+      <Filter>Shared\Engine\EngineDiagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\EngineDiagnostics\ProfileThreadStream.cpp">
+      <Filter>Shared\Engine\EngineDiagnostics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Physics\PhysicsScene.cpp">
+      <Filter>Shared\Engine\Physics</Filter>
+    </ClCompile>
+    <ClCompile Include="..\CameraSystem.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\CharacterMovementComponent.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ClrHost.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Component.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\CookedSceneLoader.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Entity.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\LifecycleRegistry.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\LifecycleTrace.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ManagedAssembly.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Object.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\PhysicsBodyComponent.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\RectTransformComponent.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Scene.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\SceneManager.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ScenePhysicsSimulation.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\SceneRenderProfileComponent.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ScriptComponent.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\ScriptObjectRegistry.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Socket.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\TagManager.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Transform.cpp">
+      <Filter>Shared\Engine\SceneRuntime</Filter>
+    </ClCompile>
+    <ClCompile Include="HeadlessScene.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+    <ClCompile Include="HeadlessTransfer.cpp">
+      <Filter>Source</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

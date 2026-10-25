@@ -1,5 +1,24 @@
-#include "../../Engine/Utility_Framework/Ownership.h"
-#include "../../Engine/Utility_Framework/DynamicBitset.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.DynamicBitset.h"
+#else
+import Creator.Core.DynamicBitset;
+#endif
 #include "Assets/QuantizedGeometry.h"
 #include "Assets/ModelCpuGeometry.h"
 #include "RHI/RHIShaderSource.h"
@@ -26,9 +45,8 @@
 #include "Render/Passes/Lighting/EnhancedVolumetricFogPass.h"
 #include "RHI/DX12/EnhancedIBLGenerator.h"
 #include <stdint.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "RHI/DX12/DX12MeshCache.h"
-#include "PathFinder.h"
 #include "Texture.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12CommandListPool.h"
@@ -47,7 +65,11 @@
 #ifdef _DEBUG
 #include <crtdbg.h>
 #endif
-#include <DbgHelp.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 #pragma comment(lib, "dbghelp.lib")
 
 namespace
@@ -459,8 +481,8 @@ Geometry MakeGeometry(bool nearClip, bool reverse)
 {
     Geometry geometry;
     auto& view = geometry.draw.modelMeshView;
-    Check(Uuid::TryParse("11111111-1111-8111-8111-111111111111", view.handle.modelId), "Model identity");
-    Check(Uuid::TryParse("22222222-2222-8222-8222-222222222222", view.handle.meshId), "Mesh identity");
+    Check(uuid::try_parse("11111111-1111-8111-8111-111111111111", view.handle.modelId), "Model identity");
+    Check(uuid::try_parse("22222222-2222-8222-8222-222222222222", view.handle.meshId), "Mesh identity");
     view.handle.generation = 1;
     view.vertexAttributeMask = assets::kModelVertexMasks.front();
     view.vertexStride = assets::StrideOf(view.vertexAttributeMask);
@@ -2241,9 +2263,9 @@ bool CookSceneProduct(LX::LXMaterialProgram program, const own::shared_owner<con
 {
     if (program.semanticKey.ends_with(SceneHostIdentity))
         program.semanticKey.resize(program.semanticKey.size() - SceneHostIdentity.size());
-    const auto* paths = InternalPath::GetInstance();
-    return CompileSceneProduct(program, paths->ShaderSourcePath / "DefaultPassShader",
-                               paths->CacheRoot / (name + ".slang"), {}, product, error,
+    const auto* paths = (&ce::paths::get_state());
+    return CompileSceneProduct(program, paths->shader_source_path / "DefaultPassShader",
+                               paths->cache_root / (name + ".slang"), {}, product, error,
                                source->description.graphId.value, RHIShaderCompiler::GetOutput());
 }
 
@@ -2252,11 +2274,11 @@ bool CookSceneProduct(LX::LXMaterialProgram program, const own::shared_owner<con
 VerifiedProduct CookedScene(const LX::LXMaterialProgram& program, const std::string& name,
                             std::optional<RHIShaderBinary> backend = std::nullopt)
 {
-    const auto* paths = InternalPath::GetInstance();
+    const auto* paths = (&ce::paths::get_state());
     VerifiedProduct product;
     std::string error;
-    const bool compiled = CompileSceneProduct(program, paths->ShaderSourcePath / "DefaultPassShader",
-                                              paths->CacheRoot / (name + ".slang"), {}, product, error, {}, backend);
+    const bool compiled = CompileSceneProduct(program, paths->shader_source_path / "DefaultPassShader",
+                                              paths->cache_root / (name + ".slang"), {}, product, error, {}, backend);
     Check(compiled, "Cook Scene product " + name + ": " + error);
     std::vector<uint8_t> bytes;
     CookedProgram restored;
@@ -2925,13 +2947,13 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     execution.encoder->CopyBufferToReadback(geometryReadback, frameGeometry->buffer);
                 }, true);
 #ifndef LX_PROBE_VULKAN
-            Microsoft::WRL::ComPtr<ID3D12QueryHeap> timer;
+            winrt::com_ptr<ID3D12QueryHeap> timer;
             RHIReadback timerReadback;
             std::uint64_t timerFrequency{};
             if (expanded == 2)
             {
                 const D3D12_QUERY_HEAP_DESC desc{D3D12_QUERY_HEAP_TYPE_TIMESTAMP, 2, 0};
-                Check(SUCCEEDED(device.GetDevice()->CreateQueryHeap(&desc, IID_PPV_ARGS(&timer))) &&
+                Check(SUCCEEDED(device.GetDevice()->CreateQueryHeap(&desc, IID_PPV_ARGS(timer.put()))) &&
                           SUCCEEDED(device.GetCommandQueue()->GetTimestampFrequency(&timerFrequency)) &&
                           device.CreateBufferReadback(16, timerReadback, error),
                       "Scene lookup GPU timer allocation");
@@ -2940,7 +2962,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     [timer](const auto& execution) {
                         static_cast<DX12Encoder&>(*execution.encoder)
                             .GetCommandList()
-                            ->EndQuery(timer.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 0);
+                            ->EndQuery(timer.get(), D3D12_QUERY_TYPE_TIMESTAMP, 0);
                     },
                     true);
             }
@@ -2986,8 +3008,8 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
                     "Probe.Scene.LookupTimerEnd", {},
                     [timer, timerReadback, &device](const auto& execution) {
                         auto* list = static_cast<DX12Encoder&>(*execution.encoder).GetCommandList();
-                        list->EndQuery(timer.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 1);
-                        list->ResolveQueryData(timer.Get(), D3D12_QUERY_TYPE_TIMESTAMP, 0, 2,
+                        list->EndQuery(timer.get(), D3D12_QUERY_TYPE_TIMESTAMP, 1);
+                        list->ResolveQueryData(timer.get(), D3D12_QUERY_TYPE_TIMESTAMP, 0, 2,
                                                device.Resolve(timerReadback.buffer), 0);
                     },
                     true);
@@ -3796,7 +3818,7 @@ void RunSceneComposition(RecordingChangeDevice& device, ProbeRoots& roots, Probe
         sceneGenerationPsoWorkers = NativePsoWorkers(pipelines) - psoWorkerBaseline;
         Check(sceneGenerationPsoWorkers > 0, "Native Scene PSO creation executes on pool workers");
     }
-    if (!PathFinder::IsAssetAuthoringEnabled())
+    if (!ce::paths::is_asset_authoring_enabled())
     {
         Check(host.ProgramStats().compileSubmissions == 0 && host.ProgramStats().workerExecutions == 0,
               "Cooked Scene runs and retires without a compiler job");
@@ -4303,11 +4325,11 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         job_scheduler& jobs;
         ~PreparationDrain() { jobs.shutdown(); }
     } preparationDrain{preparationJobs};
-    auto* paths = InternalPath::GetInstance();
-    paths->BaseProjectPath = root / "Dynamic_CPP";
-    paths->CacheRoot = root / "Build/Obj/MaterialProductProbe/SceneCache";
-    paths->ShaderSourcePath = root / "Dynamic_CPP/Assets/Shaders";
-    paths->AssetAuthoringEnabled = true;
+    auto* paths = (&ce::paths::get_state());
+    paths->base_project_path = root / "Dynamic_CPP";
+    paths->cache_root = root / "Build/Obj/MaterialProductProbe/SceneCache";
+    paths->shader_source_path = root / "Dynamic_CPP/Assets/Shaders";
+    paths->asset_authoring_enabled = true;
     const std::array products{Product(root, false), Product(root, true)};
     const std::array footprintProducts{Product(root, false, true), Product(root, true, true)};
     const auto table = LoadSheenTable(root / "Tools/blender/fixtures/principled-layered-5.1.1/sheen-ltc.csv");
@@ -4315,7 +4337,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
     const auto image = Image(), cube = Cube(environmentColors);
     const auto footprintColor = FootprintImage(false), footprintData = FootprintImage(true);
     experiment::AssetId graphId;
-    Check(Uuid::TryParse("11111111-1111-4111-8111-111111111111", graphId.value), "Graph GUID");
+    Check(uuid::try_parse("11111111-1111-4111-8111-111111111111", graphId.value), "Graph GUID");
     GenerationStore store;
     std::string error;
     std::array<own::shared_owner<const Instance>, 2> instances;
@@ -4447,7 +4469,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         {
             const char* idText = tier ? "33333333-3333-4333-8333-333333333333" : "11111111-1111-4111-8111-111111111111";
             experiment::AssetId id;
-            Check(Uuid::TryParse(idText, id.value), "Cooked fixture GUID");
+            Check(uuid::try_parse(idText, id.value), "Cooked fixture GUID");
             CookedProgram plain, packed;
             Check(catalog.OpenMaterialProgram(id, loose, {}, plain, error) &&
                       catalog.OpenMaterialProgram(id, mounted, {}, packed, error) &&
@@ -4482,7 +4504,7 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
                       error),
                   "Cooked Scene instance " + error);
         }
-        paths->AssetAuthoringEnabled = false;
+        paths->asset_authoring_enabled = false;
         RunSceneComposition(device, roots, pipelines, textures, pool, instances, cube, environmentColors, table);
         std::string validation;
         Check(device.DrainDebugMessages(validation) == 0, "Cooked Scene validation " + validation);
@@ -5178,10 +5200,10 @@ int main(int argc, char** argv)
         if (argc == 3 && std::string_view(argv[2]) == "--export-cook-fixtures")
         {
             const auto root = std::filesystem::absolute(argv[1]);
-            auto* paths = InternalPath::GetInstance();
-            paths->BaseProjectPath = root / "Dynamic_CPP";
-            paths->CacheRoot = root / "Build/Obj/MaterialProductProbe/SceneCache";
-            paths->ShaderSourcePath = root / "Dynamic_CPP/Assets/Shaders";
+            auto* paths = (&ce::paths::get_state());
+            paths->base_project_path = root / "Dynamic_CPP";
+            paths->cache_root = root / "Build/Obj/MaterialProductProbe/SceneCache";
+            paths->shader_source_path = root / "Dynamic_CPP/Assets/Shaders";
             Product(root, false);
             Product(root, true);
             std::cout << "LX_SCENE_COOK_FIXTURES_OK graphs=2\n";

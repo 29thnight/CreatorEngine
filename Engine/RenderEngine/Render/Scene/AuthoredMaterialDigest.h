@@ -3,7 +3,7 @@
 #include "../Graph/EnhancedMaterialSealIdentity.h"
 #include "../../Experiment/ModelData.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // W8 — 저작 정본(base + 인스턴스 override를 합성한 값 스냅샷)의 값 digest.
 //
@@ -17,7 +17,7 @@ namespace EnhancedAuthoredMaterialDigest
     inline void AppendAssetId(EnhancedSealDigest& digest,
         const experiment::AssetId& id) noexcept
     {
-        digest.Bytes(id.value.data.data(), id.value.data.size());
+        digest.Bytes(id.value.data_.data(), id.value.data_.size());
     }
 
     inline void AppendValue(EnhancedSealDigest& digest,

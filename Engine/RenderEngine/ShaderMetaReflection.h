@@ -3,7 +3,7 @@
 #include "RHI/RHIShaderReflection.h"
 #include "ShaderMeta.h"
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 struct ShaderMetaPropertyBinding
 {

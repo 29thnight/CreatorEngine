@@ -1,7 +1,11 @@
 #pragma once
-#include "Ownership.h"
-#include "AuthoringNodeView.h"
-#include "../Utility_Framework/Core.Minimal.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Authoring/AuthoringNodeView.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "Component.h"
 #include "IRenderable.h"
 //#include "IUpdatable.h"
@@ -13,7 +17,7 @@
 #include "../RenderEngine/LocalPose.h"
 #include "../RenderEngine/ClipSamplingCursor.h"
 #include "../RenderEngine/AssetDepot/AssetRequest.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include <mathematics/matrix4x4.hpp>
 #include "BoneRegion.h" // kMaxBones·BoneRegion
 

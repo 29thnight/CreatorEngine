@@ -1,5 +1,9 @@
 #pragma once
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // 보유층의 광원 프록시를 뷰가 쓸 형태로 고르고 옮겨 담는다.
 //
 // ★ 함수로 뽑은 이유. 이 변환이 라이브 러너와 자가 검증 두 곳에 손으로
@@ -14,8 +18,8 @@
 #include "../../FrameCameraSnapshot.h"
 
 #include <mathematics/frustum.hpp>
-#include "Mathematics.Intersect.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/Mathematics.Intersect.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 inline EnhancedLight MakeEnhancedLight(const LightRenderProxy& source)
 {

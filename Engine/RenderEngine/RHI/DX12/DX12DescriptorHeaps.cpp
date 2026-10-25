@@ -1,8 +1,12 @@
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "DX12DescriptorHeaps.h"
 #include "DX12PipelineLayoutTranslate.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -50,7 +54,7 @@ bool DX12DescriptorRecycler::Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_H
     }
 
     Shutdown();
-    m_device = device;
+    m_device.copy_from(device);
     m_type = type;
     m_descriptorsPerPage = descriptorsPerPage;
     m_initialVersions = initialVersions;
@@ -95,7 +99,7 @@ bool DX12DescriptorRecycler::EnsurePage(uint32_t slot, std::string& outError)
     desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 
     auto page = own::make_unique<Page>();
-    const HRESULT hr = m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&page->heap));
+    const HRESULT hr = m_device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(page->heap.put()));
     if (FAILED(hr))
     {
         outError = "디스크립터 page 생성 실패 " + DescHeapHrToString(hr);
@@ -136,7 +140,7 @@ void DX12DescriptorRecycler::Shutdown()
     m_activeVersion = {};
     m_pages.clear();
     m_versions.Reset();
-    m_device.Reset();
+    m_device = nullptr;
     m_incrementSize = 0;
     m_descriptorsPerPage = 0;
     m_initialVersions = 0;
@@ -282,7 +286,7 @@ bool DX12TargetViewHeap::Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_
     desc.NumDescriptors = capacity;
     desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
 
-    const HRESULT hr = device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_heap));
+    const HRESULT hr = device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(m_heap.put()));
     if (FAILED(hr))
     {
         outError = "타깃 뷰 힙 생성 실패 " + DescHeapHrToString(hr);
@@ -298,7 +302,7 @@ bool DX12TargetViewHeap::Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_
 
 void DX12TargetViewHeap::Shutdown()
 {
-    m_heap.Reset();
+    m_heap = nullptr;
     m_cpuBase = {};
     m_incrementSize = 0;
     m_capacity = 0;
@@ -335,11 +339,11 @@ bool DX12TargetViewHeap::Capture(ID3D12Device& device, Snapshot& result, std::st
         if (reusableHeap && reusableHeap->GetDesc().Type == desc.Type && reusableHeap->GetDesc().Flags == desc.Flags &&
             reusableHeap->GetDesc().NumDescriptors >= snapshot.count)
         {
-            snapshot.heap = reusableHeap;
+            snapshot.heap.copy_from(reusableHeap);
         }
         else
         {
-            const HRESULT hr = device.CreateDescriptorHeap(&desc, IID_PPV_ARGS(&snapshot.heap));
+            const HRESULT hr = device.CreateDescriptorHeap(&desc, IID_PPV_ARGS(snapshot.heap.put()));
             if (FAILED(hr))
             {
                 outError = "Target descriptor snapshot creation failed " + DescHeapHrToString(hr);
@@ -417,14 +421,14 @@ bool DX12SamplerHeap::Initialize(ID3D12Device* device, uint32_t capacity, std::s
     desc.NumDescriptors = capacity;
     desc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
 
-    const HRESULT hr = device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(&m_heap));
+    const HRESULT hr = device->CreateDescriptorHeap(&desc, IID_PPV_ARGS(m_heap.put()));
     if (FAILED(hr))
     {
         outError = "샘플러 힙 생성 실패 " + DescHeapHrToString(hr);
         return false;
     }
 
-    m_device = device;
+    m_device.copy_from(device);
     m_incrementSize = device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_SAMPLER);
     m_cpuBase = m_heap->GetCPUDescriptorHandleForHeapStart();
     m_gpuBase = m_heap->GetGPUDescriptorHandleForHeapStart();
@@ -442,8 +446,8 @@ void DX12SamplerHeap::Shutdown()
     std::lock_guard<std::mutex> guard(m_mutex);
     m_cache.clear();
     m_rangeCache.clear();
-    m_heap.Reset();
-    m_device.Reset();
+    m_heap = nullptr;
+    m_device = nullptr;
     m_capacity = 0;
     m_used = 0;
 }

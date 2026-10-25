@@ -1,5 +1,5 @@
 #pragma once
-#include "AuthoringNodeView.h"
+#include "../Utility_Framework/Authoring/AuthoringNodeView.h"
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector3.hpp>
 #include "Component.h"

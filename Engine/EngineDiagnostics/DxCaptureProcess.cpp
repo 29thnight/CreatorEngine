@@ -1,9 +1,12 @@
 #include "DxCaptureProcess.h"
 #include "DxCaptureSecurity.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
-#include <bcrypt.h>
-
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 #pragma comment(lib, "Advapi32.lib")
 #pragma comment(lib, "Bcrypt.lib")

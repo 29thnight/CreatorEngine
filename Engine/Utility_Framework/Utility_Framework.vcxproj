@@ -19,101 +19,69 @@
     </ProjectConfiguration>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ArtifactStoreGuard.h" />
-    <ClInclude Include="Ownership.h" />
-    <ClInclude Include="Arena.h" />
-    <ClInclude Include="HeapAllocator.h" />
-    <ClInclude Include="LinearArena.h" />
-    <ClInclude Include="StackArena.h" />
-    <ClInclude Include="FixedPool.h" />
-    <ClInclude Include="LifetimeToken.h" />
-    <ClInclude Include="BaseTypeDef.h" />
-    <ClInclude Include="Benchmark.hpp" />
-    <ClInclude Include="BitFlag.h" />
-    <ClInclude Include="ClassProperty.h" />
-    <ClInclude Include="MetaPolymorphic.h" />
-    <ClInclude Include="PakHelper.h" />
-    <ClInclude Include="AuthoringRymlErrorPolicy.h" />
-    <ClInclude Include="AuthoringParseTelemetry.h" />
-    <ClInclude Include="AuthoringScalarConvert.h" />
-    <ClInclude Include="AuthoringReadNode.h" />
-    <ClInclude Include="AuthoringParsedDocument.h" />
-    <ClInclude Include="AuthoringCookedDocument.h" />
-    <ClInclude Include="CookedDocumentTree.h" />
-    <ClInclude Include="AuthoringNodeView.h" />
-    <ClInclude Include="AuthoringNodeViewAccess.h" />
-    <ClInclude Include="AuthoringDocument.h" />
-    <ClInclude Include="AuthoringDocumentStorage.h" />
-    <ClInclude Include="DiagnosticDocument.h" />
-    <ClInclude Include="RuntimeResults.h" />
-    <ClInclude Include="AuthoringDocumentAccess.h" />
-    <ClInclude Include="AuthoringNodeEquality.h" />
-    <ClInclude Include="SerializationProfiler.h" />
-    <ClInclude Include="Core.Definition.h" />
-    <ClInclude Include="Core.Memory.hpp" />
-    <ClInclude Include="Core.Minimal.h" />
-    <ClInclude Include="Core.Property.h" />
-    <ClInclude Include="Core.Runtime.h" />
-    <ClInclude Include="ThreadPool.h" />
-    <ClInclude Include="JobScheduler.h" />
-    <ClInclude Include="JobGraph.h" />
-    <ClInclude Include="WorkPartition.h" />
-    <ClInclude Include="CoreWindow.h" />
-    <ClInclude Include="WindowsCoreWindow.h" />
-    <ClInclude Include="WindowsWindow.h" />
-    <ClInclude Include="WindowDesc.h" />
-    <ClInclude Include="WindowsApartment.h" />
-    <ClInclude Include="Delegate.h" />
-    <ClInclude Include="DirectXHelper.h" />
-    <ClInclude Include="DumpHandler.h" />
-    <ClInclude Include="FileDialog.h" />
-    <ClInclude Include="HashingString.h" />
-    <ClInclude Include="Paklib.hpp" />
-    <ClInclude Include="TypeIO.h" />
-    <ClInclude Include="LinkedListLib.hpp" />
-    <ClInclude Include="LogEntry.h" />
-    <ClInclude Include="LogGroup.h" />
-    <ClInclude Include="HtmlFileSink.h" />
-    <ClInclude Include="LogSink.h" />
-    <ClInclude Include="LogStore.h" />
-    <ClInclude Include="LogSystem.h" />
-    <ClInclude Include="Mathematics.Intersect.h" />
-    <ClInclude Include="MemoryPool.h" />
-    <ClInclude Include="MetaStateCommand.h" />
-    <ClInclude Include="PathFinder.h" />
-    <ClInclude Include="Reflection.hpp" />
-    <ClInclude Include="ReflectionFunction.h" />
-    <ClInclude Include="ReflgenAttributes.h" />
-    <ClInclude Include="ReflgenAuthoring.h" />
-    <ClInclude Include="ReflgenAuthoringSerializers.h" />
-    <ClInclude Include="ReflgenRuntime.h" />
-    <ClInclude Include="ReflectionRegister.h" />
-    <ClInclude Include="ReflectionType.h" />
-    <ClInclude Include="ReflectionYml.h" />
-    <ClInclude Include="PropertyChange.h" />
-    <ClInclude Include="RingBuffer.h" />
-    <ClInclude Include="SpinLock.h" />
-    <ClInclude Include="StringHelper.h" />
-    <ClInclude Include="TimeSystem.h" />
-    <ClInclude Include="Contract.h" />
-    <ClInclude Include="StandardLibrary.h" />
-    <ClInclude Include="ConcurrentQueue.h" />
-    <ClInclude Include="EngineMode.h" />
-    <ClInclude Include="EnginePaths.h" />
-    <ClInclude Include="RuntimeSettings.h" />
-    <ClInclude Include="TemporalProductSettings.h" />
-    <ClInclude Include="TemporalProductSettingsIO.h" />
-    <ClInclude Include="IObject.h" />
-    <ClInclude Include="ProgressSink.h" />
-    <ClInclude Include="TypeDefinition.h" />
-    <ClInclude Include="TypeTrait.h" />
-    <ClInclude Include="DynamicBitset.h" />
-    <ClInclude Include="Sha256.h" />
-      <ClInclude Include="EngineResourceCensus.h" />
-    <ClInclude Include="WarmupLedger.h" />
+    <ClInclude Include="Packaging/ArtifactStoreGuard.h" />
+    <ClInclude Include="Foundation/BaseTypeDef.h" />
+    <ClInclude Include="Reflection/ClassProperty.h" />
+    <ClInclude Include="Reflection/MetaPolymorphic.h" />
+    <ClInclude Include="Packaging/PakHelper.h" />
+    <ClInclude Include="Authoring/AuthoringRymlErrorPolicy.h" />
+    <ClInclude Include="Authoring/AuthoringParseTelemetry.h" />
+    <ClInclude Include="Authoring/AuthoringScalarConvert.h" />
+    <ClInclude Include="Authoring/AuthoringReadNode.h" />
+    <ClInclude Include="Authoring/AuthoringParsedDocument.h" />
+    <ClInclude Include="Authoring/AuthoringCookedDocument.h" />
+    <ClInclude Include="Authoring/CookedDocumentTree.h" />
+    <ClInclude Include="Authoring/AuthoringNodeView.h" />
+    <ClInclude Include="Authoring/AuthoringNodeViewAccess.h" />
+    <ClInclude Include="Authoring/AuthoringDocument.h" />
+    <ClInclude Include="Authoring/AuthoringDocumentStorage.h" />
+    <ClInclude Include="Authoring/DiagnosticDocument.h" />
+    <ClInclude Include="Runtime/RuntimeResults.h" />
+    <ClInclude Include="Authoring/AuthoringDocumentAccess.h" />
+    <ClInclude Include="Authoring/AuthoringNodeEquality.h" />
+    <ClInclude Include="Authoring/SerializationProfiler.h" />
+    <ClInclude Include="Foundation/Core.Definition.h" />
+    <ClInclude Include="Foundation/Core.Minimal.h" />
+    <ClInclude Include="Reflection/Core.Property.h" />
+    <ClInclude Include="Foundation/Core.Runtime.h" />
+    <ClInclude Include="../Platform/Windows/DirectXHelper.h" />
+    <ClInclude Include="../Platform/Windows/AppBackendWinAPI/AppBackendWinAPI.Crash.h" />
+    <ClInclude Include="../Platform/Windows/Crash/DumpHandler.h" />
+    <ClInclude Include="../Platform/Windows/FileDialog.h" />
+    <ClInclude Include="Packaging/Paklib.hpp" />
+    <ClInclude Include="Reflection/TypeIO.h" />
+    <ClInclude Include="Containers/LinkedListLib.hpp" />
+    <ClInclude Include="Diagnostics/LogEntry.h" />
+    <ClInclude Include="Diagnostics/LogGroup.h" />
+    <ClInclude Include="Diagnostics/HtmlFileSink.h" />
+    <ClInclude Include="Diagnostics/LogSink.h" />
+    <ClInclude Include="Diagnostics/LogStore.h" />
+    <ClInclude Include="Diagnostics/LogSystem.h" />
+    <ClInclude Include="Foundation/Mathematics.Intersect.h" />
+    <ClInclude Include="Reflection/MetaStateCommand.h" />
+    <ClInclude Include="Reflection/Reflection.hpp" />
+    <ClInclude Include="Reflection/ReflectionFunction.h" />
+    <ClInclude Include="Reflection/ReflgenAttributes.h" />
+    <ClInclude Include="Reflection/ReflgenAuthoring.h" />
+    <ClInclude Include="Reflection/ReflgenAuthoringSerializers.h" />
+    <ClInclude Include="Reflection/ReflgenRuntime.h" />
+    <ClInclude Include="Reflection/ReflectionRegister.h" />
+    <ClInclude Include="Reflection/ReflectionType.h" />
+    <ClInclude Include="Reflection/ReflectionYml.h" />
+    <ClInclude Include="Reflection/PropertyChange.h" />
+    <ClInclude Include="Time/TimeSystem.h" />
+    <ClInclude Include="Foundation/StandardLibrary.h" />
+    <ClInclude Include="Runtime/RuntimeSettings.h" />
+    <ClInclude Include="Runtime/TemporalProductSettings.h" />
+    <ClInclude Include="Runtime/TemporalProductSettingsIO.h" />
+    <ClInclude Include="Foundation/IObject.h" />
+    <ClInclude Include="Foundation/TypeDefinition.h" />
+    <ClInclude Include="Reflection/TypeTrait.h" />
+      <ClInclude Include="Diagnostics/EngineResourceCensus.h" />
+    <ClInclude Include="Runtime/WarmupLedger.h" />
 </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="Arena.cpp"><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Memory/Arena.cpp"><CompileAs>CompileAsCpp</CompileAs><PrecompiledHeader>NotUsing</PrecompiledHeader><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="..\..\ThirdParty\mimalloc\src\static.c">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <IncludeInUnityFile>false</IncludeInUnityFile>
@@ -126,40 +94,43 @@
       <Optimization>MaxSpeed</Optimization>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
     </ClCompile>
-    <ClCompile Include="ThreadPool.cpp">
+    <ClCompile Include="Concurrency/ThreadPool.cpp">
+      <AdditionalOptions>/I&quot;$(SolutionDir)Engine/Contracts/External&quot; %(AdditionalOptions)</AdditionalOptions>
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <PreprocessorDefinitions>ENKITS_DLL=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
     </ClCompile>
-    <ClCompile Include="JobScheduler.cpp">
+    <ClCompile Include="Concurrency/JobScheduler.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="AuthoringRymlErrorPolicy.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
-    <ClCompile Include="AuthoringScalarConvert.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
-    <ClCompile Include="AuthoringParsedDocument.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
-    <ClCompile Include="AuthoringCookedDocument.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
-    <ClCompile Include="CookedDocumentTree.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
-    <ClCompile Include="AuthoringDocument.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
-    <ClCompile Include="AuthoringDocumentAccess.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
-    <ClCompile Include="DiagnosticDocument.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
-    <ClCompile Include="AuthoringNodeEquality.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
-    <ClCompile Include="SerializationProfiler.cpp" />
-    <ClCompile Include="WindowsCoreWindow.cpp" />
-    <ClCompile Include="RuntimeSettings.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
-    <ClCompile Include="LogSystem.cpp" />
-    <ClCompile Include="TimeSystem.cpp" />
-    <ClCompile Include="ProgressSink.cpp" />
-    <ClCompile Include="ReflectionYml.cpp" />
-    <ClCompile Include="ReflgenRuntime.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
-    <ClCompile Include="TypeTrait.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
-    <ClCompile Include="WarmupLedger.cpp" />
+    <ClCompile Include="Authoring/AuthoringRymlErrorPolicy.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Authoring/AuthoringScalarConvert.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Authoring/AuthoringParsedDocument.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Authoring/AuthoringCookedDocument.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Authoring/CookedDocumentTree.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Authoring/AuthoringDocument.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Authoring/AuthoringDocumentAccess.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Authoring/DiagnosticDocument.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Authoring/AuthoringNodeEquality.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Authoring/SerializationProfiler.cpp" />
+    <ClCompile Include="../Platform/Windows/AppBackendWinAPI/Creator.AppBackend.WinAPI.ixx"><CompileAs>CompileAsCppModule</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="../Platform/Windows/AppBackendWinAPI/AppBackendWinAPI.Crash.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="../Platform/Windows/AppBackendWinAPI/AppBackendWinAPI.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Runtime/PathFinder.cpp"><CompileAs>CompileAsCpp</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Runtime/RuntimeSettings.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Diagnostics/LogSystem.cpp" />
+    <ClCompile Include="Time/TimeSystem.cpp" />
+    <ClCompile Include="Diagnostics/ProgressSink.cpp"><CompileAs>CompileAsCpp</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Reflection/ReflectionYml.cpp" />
+    <ClCompile Include="Reflection/ReflgenRuntime.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Reflection/TypeTrait.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="Runtime/WarmupLedger.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <None Include="Delegate.inl" />
-    <None Include="MemoryPool.inl" />
   </ItemGroup>
   <ItemGroup>
   </ItemGroup>
   <PropertyGroup Label="Globals">
+    <AllProjectBMIsArePublic>true</AllProjectBMIsArePublic>
     <VCProjectVersion>17.0</VCProjectVersion>
     <Keyword>Win32Proj</Keyword>
     <ProjectGuid>{9cec19f4-03b4-4563-8d42-6e4bfb0059bb}</ProjectGuid>
@@ -250,6 +221,8 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
+      <!-- Shared with HeadlessHost, whose /OPT:REF and /OPT:ICF link requires /Zi rather than /ZI. -->
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
       <WarningLevel>TurnOffAllWarnings</WarningLevel>
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>_DEBUG;_LIB;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -272,6 +245,10 @@
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
+      <!-- v145 /GL debug type records trigger LNK4020 (and /Z7 LNK1318).
+           Keep /O2 and full /Zi symbols; compile this library without LTCG IR. -->
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+      <WholeProgramOptimization>false</WholeProgramOptimization>
       <WarningLevel>TurnOffAllWarnings</WarningLevel>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
@@ -300,7 +277,5 @@
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>
   <ItemGroup>
-    <ClInclude Include="LayerTypes.h" />
-    <ClInclude Include="LayerCatalog.h" />
   </ItemGroup>
 </Project>

@@ -3,8 +3,11 @@
 #define main phase22_contract_main
 #include "../audio_voice_contract_probe.cpp"
 #undef main
-#include <windows.h>
-#include <psapi.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 int main(int argc, char** argv)
 {
@@ -12,7 +15,7 @@ int main(int argc, char** argv)
     {
         return 2;
     }
-    const auto work = file::absolute(argv[1]);
+    const auto work = std::filesystem::absolute(argv[1]);
     if (work.generic_string().find("/Build/Validation/") == std::string::npos)
     {
         std::fprintf(stderr, "Owned Build/Validation work directory required\n");

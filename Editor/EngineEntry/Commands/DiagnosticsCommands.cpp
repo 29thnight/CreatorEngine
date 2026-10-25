@@ -1,3 +1,14 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 // LC6 (PHASE 14.5) — Diagnostics 도메인 명령.
 //
 // `mem.*` · `gc.*` · `gpu.*` · `profile.*` · `dump.*` · `crash.*` · `pix.*` ·
@@ -38,12 +49,12 @@
 #include "CommandCore/CommandDescriptorSeeds.h"
 #include "EditorCommandServiceHost.h"        // LC4: 로컬 HTTP/JSON 서비스  // LC2: 토크나이저와 소유형 invocation
 #include "EditorCameraRig.h"
-#include "EditorSessionState.h"
+#include "../Project/EditorSessionState.h"
 #include "EngineBootstrap.h"
 #include "MemoryProfilerSnapshot.h"
 #include "ProfilerViewerProcess.h"
-#include "GameBuilderSystem.h"
-#include "EditorAssetDatabase.h"
+#include "../Build/GameBuilderSystem.h"
+#include "../Assets/EditorAssetDatabase.h"
 #include "Interfaces/AssetAuthoringPort.h"
 #include "Interfaces/FoliageInstance.h"
 #include <mathematics/color.hpp>
@@ -102,15 +113,18 @@
 #include "AIManager.h"
 #include "DataSystem.h"
 #include "GpuDiagnostics.h"
-#include "LogSystem.h"
-#include "PathFinder.h"
-#include "RuntimeSettings.h"
-#include "AuthoringNodeEquality.h" // D3-a-1: 저작 노드 구조 비교
-#include "AuthoringNodeViewAccess.h" // D3-a-5b
-#include "AuthoringParsedDocument.h"
-#include "AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
-#include "SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
-#include "WindowsCoreWindow.h"
+#include "../../../Engine/Utility_Framework/Diagnostics/LogSystem.h"
+#include "../../../Engine/Utility_Framework/Runtime/RuntimeSettings.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeEquality.h" // D3-a-1: 저작 노드 구조 비교
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-5b
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
+#include "../../../Engine/Utility_Framework/Authoring/SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.AppBackend.WinAPI.h"
+#else
+import Creator.AppBackend.WinAPI;
+#endif
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
@@ -118,7 +132,11 @@
 #include "ProfileScope.h"
 #include "ProfileCaptureFile.h"
 #include "DxCaptureService.h"
-#include "JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 #include "AssetIdentity/AssetIdentitySelfTest.h"
 #include "AssetIdentity/AssetSidecarSchemaSelfTest.h"
@@ -139,20 +157,24 @@
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
 #include "RHI/ScreenSizedResource.h"
-#include "ReflectionYml.h"
-#include "ReflectionUndo.h"
-#include "GameObjectCommand.h"
-#include "StringHelper.h"
+#include "../../../Engine/Utility_Framework/Reflection/ReflectionYml.h"
+#include "../Editing/ReflectionUndo.h"
+#include "../Editing/GameObjectCommand.h"
 #include "BlackBoard.h"
 #include "TagManager.h"
-#include <Windows.h>
-#include <psapi.h> // MBC11: peak working set
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+// MBC11: peak working set
 #include <crtdbg.h>
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
-#include <DbgHelp.h>
-#include <DXProgrammableCapture.h>
-#include <dxgidebug.h>
-#include <wrl/client.h>
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 #include "../../Engine/SceneRuntime/MeshRenderer.h"
 #include "../../Engine/RenderEngine/Material.h"
 
@@ -332,7 +354,7 @@ namespace
     //   의존성 측정의 사각지대였고, 빌드가 잡았다.
     // PIX가 주입된 실행에서만 DXGIGetDebugInterface1로 얻어진다. Begin/End는
     // DX12 커맨드 스트림에 원시 이벤트 payload를 쓰지 않는 정식 캡처 경계다.
-    Microsoft::WRL::ComPtr<IDXGraphicsAnalysis> g_pixGraphicsAnalysis;
+    winrt::com_ptr<IDXGraphicsAnalysis> g_pixGraphicsAnalysis;
 }
 
 namespace ConsoleCmd
@@ -420,10 +442,10 @@ namespace ConsoleCmd
             return stage.has_value() ? stage->entry : std::string("-");
         };
 
-        const file::path assetRoot = PathFinder::Relative();
-        std::vector<file::path> metaPaths;
+        const std::filesystem::path assetRoot = ce::paths::relative();
+        std::vector<std::filesystem::path> metaPaths;
         std::error_code walkError;
-        for (file::recursive_directory_iterator it(assetRoot, walkError), end;
+        for (std::filesystem::recursive_directory_iterator it(assetRoot, walkError), end;
             it != end && !walkError; it.increment(walkError))
         {
             if (!it->is_regular_file()) continue;
@@ -435,9 +457,9 @@ namespace ConsoleCmd
         std::sort(metaPaths.begin(), metaPaths.end());
 
         std::uint32_t parsed = 0;
-        for (const file::path& metaPath : metaPaths)
+        for (const std::filesystem::path& metaPath : metaPaths)
         {
-            std::string relative = file::relative(metaPath, assetRoot).generic_string();
+            std::string relative = std::filesystem::relative(metaPath, assetRoot).generic_string();
 
             // GUID는 파싱 의미론의 일부가 아니지만 nil이면 로더가 거부한다. 카탈로그가
             // 아는 것을 쓰되, 모르는 파일(자가 검증 fixture 등)은 sentinel로 대신한다 —
@@ -509,7 +531,7 @@ namespace ConsoleCmd
         // 기준 경로는 실재하는 fixture 옆이어야 한다 — `source` 해소가 파일 존재를
         // 확인하므로, 존재하지 않는 디렉터리를 쓰면 전부 "source 없음"으로 거부되어
         // 정작 재려던 사유가 가려진다.
-        const file::path rejectOrigin = assetRoot
+        const std::filesystem::path rejectOrigin = assetRoot
             / "Shaders" / "DefaultPassShader" / "SelfTest" / "RejectProbe.shadermeta";
         static const RejectCase kRejects[] = {
             { "duplicate-property",
@@ -594,8 +616,8 @@ namespace ConsoleCmd
             }
             else
             {
-                Microsoft::WRL::ComPtr<IDXGraphicsAnalysis> analysis;
-                const HRESULT hr = DXGIGetDebugInterface1(0, IID_PPV_ARGS(&analysis));
+                winrt::com_ptr<IDXGraphicsAnalysis> analysis;
+                const HRESULT hr = DXGIGetDebugInterface1(0, IID_PPV_ARGS(analysis.put()));
                 if (FAILED(hr))
                 {
                     std::printf("[CLI] pix.capture begin 실패 0x%08X — PIX/pixtool로 실행했는지 확인\n",
@@ -621,7 +643,7 @@ namespace ConsoleCmd
                 // PIX는 EndCapture 전에 캡처 범위의 GPU 작업 완료를 권장한다.
                 EnhancedSceneRenderer::WaitForLiveGpu();
                 g_pixGraphicsAnalysis->EndCapture();
-                g_pixGraphicsAnalysis.Reset();
+                g_pixGraphicsAnalysis = nullptr;
                 std::printf("[CLI] pix.capture end\n");
             }
         }
@@ -1474,12 +1496,12 @@ namespace ConsoleCmd
         size_t limit = 10;
         if (ctx.parts.size() > 2 || (ctx.parts.size() == 2 && (!ParseNumber(ctx.parts[1], limit) || limit == 0 || limit > 1000)))
             return InvalidArguments("dump.list/show [limit: 1..1000]");
-        const file::path directory = PathFinder::DumpPath();
+        const std::filesystem::path directory = ce::paths::dump_path();
         std::error_code error;
-        std::vector<std::pair<file::path, file::file_time_type>> dumps;
-        if (file::exists(directory, error))
+        std::vector<std::pair<std::filesystem::path, std::filesystem::file_time_type>> dumps;
+        if (std::filesystem::exists(directory, error))
         {
-            file::directory_iterator it(directory, error), end;
+            std::filesystem::directory_iterator it(directory, error), end;
             for (; !error && it != end; it.increment(error))
             {
                 if (!it->is_regular_file(error) || it->path().extension() != ".dmp") continue;
@@ -1494,7 +1516,7 @@ namespace ConsoleCmd
         for (size_t i = 0; i < dumps.size() && i < limit; ++i)
         {
             auto entry = CommandData::Object();
-            const auto bytes = file::file_size(dumps[i].first, error);
+            const auto bytes = std::filesystem::file_size(dumps[i].first, error);
             if (error) return Fail("dump.read_failed", error.message());
             entry.Set("path", CommandData::String(dumps[i].first.string())); entry.Set("bytes", CommandData::Int(bytes));
             entries.Append(std::move(entry));
@@ -1507,7 +1529,7 @@ namespace ConsoleCmd
             auto path = dumps.front().first; path.replace_extension(".txt");
             std::ifstream stream(path, std::ios::binary);
             if (!stream) return PreconditionFailed("dump.summary_missing", "No summary for latest dump: " + path.string());
-            const auto bytes = file::file_size(path, error);
+            const auto bytes = std::filesystem::file_size(path, error);
             if (error) return Fail("dump.read_failed", error.message());
             if (bytes > 1024 * 1024) return Fail("dump.summary_too_large", "Summary exceeds 1 MiB; read the artifact directly", std::move(data));
             std::string summary((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
@@ -1895,8 +1917,8 @@ namespace ConsoleCmd
         if (ctx.parts.size() != 1) return InvalidArguments("crash.status takes no arguments");
         auto data = CommandData::Object();
         data.Set("ready", CommandData::Bool(Log::HasCrashDumpWriter()));
-        data.Set("directory", CommandData::String(PathFinder::DumpPath().string()));
-        data.Set("unattended", CommandData::Bool(WindowsCoreWindow::IsUnattended()));
+        data.Set("directory", CommandData::String(ce::paths::dump_path().string()));
+        data.Set("unattended", CommandData::Bool(AppBackendWinAPI::IsUnattended()));
         return Ok({}, std::move(data));
     }
 

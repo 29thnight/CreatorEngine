@@ -1,5 +1,5 @@
 #pragma once
-#include "Core.Minimal.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include <mathematics/bounds.hpp>
 #include <mathematics/color.hpp>
 #include "LightProperty.h"

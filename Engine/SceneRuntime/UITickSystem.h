@@ -1,6 +1,6 @@
 #pragma once
-#include "ClassProperty.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Reflection/ClassProperty.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 class SpriteSheetComponent;
 class UIButton;

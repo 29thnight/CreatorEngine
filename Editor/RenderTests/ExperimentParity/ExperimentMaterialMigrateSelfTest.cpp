@@ -1,22 +1,31 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
 #include "../../../Tools/regression/gcce_probe_cleanup.h"
 
-#include "AuthoringNodeViewAccess.h" // D3-a-4
-#include "AuthoringParsedDocument.h"
-#include "AuthoringWriteNode.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-4
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringWriteNode.h"
 #include "DataSystem.h"
 #include "MeshRenderer.h"
 #include "Experiment/AssetIdentity.h"
 #include "Experiment/MaterialAuthoringCodec.h"
 #include "ExperimentMaterialMigration.h"
 #include "Material.h"
-#include "PathFinder.h" // S2b: 실자산 corpus 경로
-#include "ReflectionYml.h" // S2b: Meta::Serialize — 컴포넌트 embed 경로 실사
+#include "../../../Engine/Utility_Framework/Reflection/ReflectionYml.h" // S2b: Meta::Serialize — 컴포넌트 embed 경로 실사
 #include "RHI/RHIShaderSource.h"
 #include "ShaderMeta.h"
 #include "ShaderMetaReflection.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace RenderTest
 {
@@ -602,8 +611,8 @@ namespace RenderTest
             // 전환을 원리적으로 못 본다(전부 legacy 폴백이어도 28/28 초록).
             // corpus probe의 stable=yes도 형식을 안 본다. 실물 .asset이
             // canonical로 적히는지는 여기서만 잰다.
-            const file::path corpusPath =
-                PathFinder::Relative("Materials\\") / "ForwardWater.asset";
+            const std::filesystem::path corpusPath =
+                ce::paths::relative("Materials\\") / "ForwardWater.asset";
             Material corpusMaterial;
             bool corpusCanonical = false;
             if (std::filesystem::is_regular_file(corpusPath))

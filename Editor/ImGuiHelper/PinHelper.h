@@ -1,7 +1,7 @@
 #pragma once
 #include "imgui-node-editor/imgui_node_editor.h"
 #include "widgets.h"
-#include "Core.Minimal.h"
+#include "../../Engine/Utility_Framework/Foundation/Core.Minimal.h"
 
 const int m_PinIconSize = 24;
 namespace ed = ax::NodeEditor;

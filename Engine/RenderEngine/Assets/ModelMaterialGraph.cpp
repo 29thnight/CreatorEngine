@@ -1,10 +1,19 @@
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "ModelMaterialGraph.h"
 #include "../StandardMaterialProperty.h"
 #include "../../../Lattice/Material/LXMaterialCompiler.h"
-#include "AuthoringParsedDocument.h"
-
-#include <Windows.h>
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace assets
 {
@@ -125,7 +134,7 @@ struct Builder
             throw std::runtime_error("Material graph Scene transport currently requires UV0: " + std::string(property));
         const float y = row;
         const Id resource =
-            Parameter(property, label, PinType::Texture, Uuid::ToString(texture->assetId.value), colorSpace);
+            Parameter(property, label, PinType::Texture, uuid::to_string(texture->assetId.value), colorSpace);
         const Id sample = Node("LXTextureSample", -630, y);
         Connect(resource, sample, "Texture");
         asset.graph.SetSocketValue(Pin(sample, "Sampler"), Sampler(texture->sampler));
@@ -226,17 +235,17 @@ struct Builder
 };
 } // namespace
 
-Uuid::Uuid16 ModelMaterialGraphId(const Uuid::Uuid16& materialId)
+uuid::uuid16 ModelMaterialGraphId(const uuid::uuid16& materialId)
 {
     if (!IsUuidV8(materialId))
         return {};
-    return DeriveIdentity({"model-material", materialId.data, "shadergraph", "source"}).uuid;
+    return DeriveIdentity({"model-material", materialId.data_, "shadergraph", "source"}).uuid;
 }
 
-std::filesystem::path ModelMaterialGraphPath(const std::filesystem::path& assets, const Uuid::Uuid16& modelId,
-                                             const Uuid::Uuid16& materialId)
+std::filesystem::path ModelMaterialGraphPath(const std::filesystem::path& assets, const uuid::uuid16& modelId,
+                                             const uuid::uuid16& materialId)
 {
-    return assets / "Materials" / "Models" / Uuid::ToString(modelId) / (Uuid::ToString(materialId) + ".shadergraph");
+    return assets / "Materials" / "Models" / uuid::to_string(modelId) / (uuid::to_string(materialId) + ".shadergraph");
 }
 
 bool ModelMaterialGraphsPresent(const std::filesystem::path& assets, const ModelAssetGeneration& model)
@@ -250,7 +259,7 @@ bool ModelMaterialGraphsPresent(const std::filesystem::path& assets, const Model
     return true;
 }
 
-bool ModelMaterialGraphIdentityMatches(const std::filesystem::path& path, const Uuid::Uuid16& graphId)
+bool ModelMaterialGraphIdentityMatches(const std::filesystem::path& path, const uuid::uuid16& graphId)
 {
     if (!std::filesystem::is_regular_file(path) || !std::filesystem::is_regular_file(path.string() + ".meta"))
     {
@@ -258,7 +267,7 @@ bool ModelMaterialGraphIdentityMatches(const std::filesystem::path& path, const 
     }
     std::string error;
     const auto document = Authoring::ParsedDocument::ParseText(ReadText(path.string() + ".meta"), error);
-    return document && document.Root()["guid"].AsString() == Uuid::ToString(graphId);
+    return document && document.Root()["guid"].AsString() == uuid::to_string(graphId);
 }
 
 std::optional<LX::LXMaterialAsset> BuildModelMaterialGraph(const experiment::Material& material, std::string& error)
@@ -321,13 +330,13 @@ ModelMaterialGraphPublication::~ModelMaterialGraphPublication()
         return graph;
     }
 
-bool ModelMaterialGraphPublication::Prepare(const std::filesystem::path& assets, const Uuid::Uuid16& modelId,
+bool ModelMaterialGraphPublication::Prepare(const std::filesystem::path& assets, const uuid::uuid16& modelId,
                                             std::span<const experiment::Material> materials, std::string& error)
 {
     for (const auto& material : materials)
     {
         const auto graphId = ModelMaterialGraphId(material.assetId.value);
-        if (graphId.IsNil())
+        if (graphId.is_nil())
         {
             error = "Model material graph requires its UUIDv8 material identity";
             return false;
@@ -364,7 +373,7 @@ bool ModelMaterialGraphPublication::Prepare(const std::filesystem::path& assets,
             return false;
         }
         for (const auto& [destination, payload] :
-             std::array{std::pair{path, text}, std::pair{meta, "guid: " + Uuid::ToString(graphId) + "\n"}})
+             std::array{std::pair{path, text}, std::pair{meta, "guid: " + uuid::to_string(graphId) + "\n"}})
         {
             static std::atomic<std::uint64_t> serial{};
             const auto staging =

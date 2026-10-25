@@ -1,17 +1,21 @@
-#include "Core.Minimal.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/Core.Minimal.h"
 // Core.Minimal.h가 Reflection 사슬로 대신 끌어와 주던 것을 직접 든다.
 #include <imgui.h>
 #include "imgui_stdlib.h"
-#include "AuthoringWriteNode.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringWriteNode.h"
 #include "EditorPropertyRow.h"
 #include "ExternUI.h"
 #include "InspectorControl.h"
-#include "EditorAssetDatabase.h"
-#include "ConsoleCommandSystem.h"
-#include "FileDialog.h"
-#include "PathFinder.h"
+#include "../EngineEntry/Assets/EditorAssetDatabase.h"
+#include "../EngineEntry/Commands/ConsoleCommandSystem.h"
+#include "../../Engine/Platform/Windows/FileDialog.h"
 #include "Experiment/Cooked/TextureImportSettings.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 bool DrawTextureImportEditor(Authoring::WriteNode node, const std::filesystem::path& source)
 {

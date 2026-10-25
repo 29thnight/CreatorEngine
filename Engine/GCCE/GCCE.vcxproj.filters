@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <ItemGroup>
+    <Filter Include="Shared">
+      <UniqueIdentifier>{A47651E2-FF38-5B1F-8597-663EABEC2F42}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\ThirdParty">
+      <UniqueIdentifier>{3C62D44D-A10C-57C8-A51B-122F3D4FD1C5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\ThirdParty\GCCE">
+      <UniqueIdentifier>{CF1924DF-B142-5DAE-B445-903F388F18A5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\ThirdParty\GCCE\src">
+      <UniqueIdentifier>{C01A7368-18A2-51B3-8585-574236D443B9}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\ThirdParty\GCCE\src\block_allocator.cpp">
+      <Filter>Shared\ThirdParty\GCCE\src</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\ThirdParty\GCCE\src\domain.cpp">
+      <Filter>Shared\ThirdParty\GCCE\src</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\..\ThirdParty\GCCE\PROVENANCE.md">
+      <Filter>Shared\ThirdParty\GCCE</Filter>
+    </None>
+  </ItemGroup>
+</Project>

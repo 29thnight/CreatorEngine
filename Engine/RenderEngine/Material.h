@@ -1,11 +1,16 @@
 #pragma once
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "MaterialInfomation.h"
 #include "MaterialFlowInformation.h"
 // 직접 포함해야 한다. Texture.h를 거쳐 들어오길 기대하면 안 되는데,
 // Texture.h는 본문 전체가 #ifndef DYNAMICCPP_EXPORTS로 막혀 있어
 // 스크립트 DLL 빌드에서는 Diagnostics가 선언되지 않는다.
-#include "EngineResourceCensus.h"
+#include "../Utility_Framework/Diagnostics/EngineResourceCensus.h"
 #include "MaterialPropertyValue.h"
 #include "ShaderMetaHandle.h"
 #include "MaterialGraphRuntime.h"
@@ -14,7 +19,7 @@
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 struct ShaderMeta;
 struct ShaderMetaBindingLayout;

@@ -1,6 +1,22 @@
+#include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "RHI/DX12/DX12CommandListPool.h"
 #include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12Encoder.h"
@@ -8,7 +24,7 @@
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
 #include "RHI/RHIShaderCompiler.h"
-#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "RHI/DX12/DX12GpuProfiler.h"
 
 namespace Rg8QueueExecutionTests
@@ -156,9 +172,9 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             simultaneousDesc.Format = DXGI_FORMAT_R8G8B8A8_UNORM;
             simultaneousDesc.SampleDesc.Count = 1;
             simultaneousDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_SIMULTANEOUS_ACCESS;
-            Microsoft::WRL::ComPtr<ID3D12Resource> native;
+            winrt::com_ptr<ID3D12Resource> native;
             require(SUCCEEDED(device.GetDevice()->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE,
-                &simultaneousDesc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(&native))),
+                &simultaneousDesc, D3D12_RESOURCE_STATE_COMMON, nullptr, IID_PPV_ARGS(native.put()))),
                 "Simultaneous-access texture fixture creation failed.");
             const auto handle = device.RegisterTexture(native);
             const bool retained = device.DescribeTexture(handle).retainsExplicitStateOnGraphicsQueue;
@@ -237,14 +253,14 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                 {{imported, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite}}, clearTexture, true);
             graph->RequireImportedFinalState(imported, RHIResourceState::ShaderResource);
             require(graph->Compile(error), error);
-            Microsoft::WRL::ComPtr<ID3D12Fence> gate;
-            require(SUCCEEDED(device.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gate))), "Gate creation failed.");
+            winrt::com_ptr<ID3D12Fence> gate;
+            require(SUCCEEDED(device.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(gate.put()))), "Gate creation failed.");
             struct ReleaseGate
             {
                 ID3D12Fence* gate;
                 ~ReleaseGate() { gate->Signal(1); }
-            } release{gate.Get()};
-            require(service.EnqueueTestGate(graphics.queue, gate.Get(), 1, error), error);
+            } release{gate.get()};
+            require(service.EnqueueTestGate(graphics.queue, gate.get(), 1, error), error);
             EnhancedRenderGraph::QueueExecution execution;
             const auto measuredHints = graph->MeasuredQueueHints([&](const GpuPassTimingIdentity& identity)
             {
@@ -606,15 +622,15 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             const auto compiledOrder = graph->GetExecuteOrder();
             require(compiledOrder.front() == gbuffer.index,
                 "Overlap fixture did not preserve its authored independent-first order.");
-            Microsoft::WRL::ComPtr<ID3D12Fence> gate;
-            require(SUCCEEDED(device.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gate))),
+            winrt::com_ptr<ID3D12Fence> gate;
+            require(SUCCEEDED(device.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(gate.put()))),
                 "Overlap gate creation failed.");
             struct OverlapGateRelease
             {
                 ID3D12Fence* gate;
                 ~OverlapGateRelease() { gate->Signal(1); }
-            } gateRelease{gate.Get()};
-            require(overlapService.EnqueueTestGate(overlapGraphics.queue, gate.Get(), 1, error), error);
+            } gateRelease{gate.get()};
+            require(overlapService.EnqueueTestGate(overlapGraphics.queue, gate.get(), 1, error), error);
             EnhancedRenderGraph::QueueExecution execution;
             const bool accepted = graph->SubmitQueues(graph, overlapRecorder, overlapGraphics,
                 mode == OverlapCase::GraphicsReference ? nullptr : &overlapCompute,
@@ -1009,13 +1025,13 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
         EnhancedRenderGraph::QueueEndpoint frameGraphics, frameCompute;
         require(device.CreateQueue(RHIQueueKind::Graphics, frameGraphics.queue, error) &&
             device.CreateQueue(RHIQueueKind::Compute, frameCompute.queue, error), error);
-        Microsoft::WRL::ComPtr<ID3D12Fence> frameGate;
-        require(SUCCEEDED(device.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&frameGate))), "Frame gate creation failed.");
+        winrt::com_ptr<ID3D12Fence> frameGate;
+        require(SUCCEEDED(device.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(frameGate.put()))), "Frame gate creation failed.");
         struct FrameGateRelease
         {
             ID3D12Fence* fence;
             ~FrameGateRelease() { fence->Signal(2); }
-        } frameRelease{frameGate.Get()};
+        } frameRelease{frameGate.get()};
         struct FrameCleanup
         {
             DX12DeviceResources& device;
@@ -1029,8 +1045,8 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                 }
                 device.WaitForGpu();
             }
-        } frameCleanup{device, frameGate.Get()};
-        require(device.EnqueueQueueTestGate(frameGraphics.queue, frameGate.Get(), 1, error), error);
+        } frameCleanup{device, frameGate.get()};
+        require(device.EnqueueQueueTestGate(frameGraphics.queue, frameGate.get(), 1, error), error);
         std::vector<own::shared_owner<Storage>> frameStorage;
         std::vector<own::weak_owner<EnhancedRenderGraph>> frameGraphs;
         DX12CommandListPool framePreparation;
@@ -1149,7 +1165,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
         }
         frameStorage.clear();
         require(device.BeginFrame(error) && device.BeginQueueFrame(frameGraphics.queue, error), error);
-        require(device.EnqueueQueueTestGate(frameGraphics.queue, frameGate.Get(), 2, error), error);
+        require(device.EnqueueQueueTestGate(frameGraphics.queue, frameGate.get(), 2, error), error);
         auto abortGraph = own::make_shared<EnhancedRenderGraph>(device, RGSchedulingMode::ExplicitVersioned);
         abortGraph->AddPass("abort-pending-frame", {}, nullptr, true);
         require(abortGraph->Compile(error), error);

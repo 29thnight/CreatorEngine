@@ -7,7 +7,7 @@
 #include "DxCaptureSubmission.h"
 
 #include <stdio.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace dx_capture_control_fixtures
 {

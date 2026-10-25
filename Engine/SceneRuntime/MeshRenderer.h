@@ -1,7 +1,11 @@
 #pragma once
-#include "Ownership.h"
-#include "AuthoringNodeView.h"
-#include "Core.Minimal.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Authoring/AuthoringNodeView.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "Component.h"
 #include "Entity.h"
 #include "LightMapping.h"

@@ -1,3 +1,9 @@
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "RHI/DX12/EnhancedIBLGenerator.h"
 #include "RHI/RHIShaderCompiler.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -5,7 +11,7 @@
 #include "RHI/DX12/DX12RootSignatureCache.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // IBL 생성 체인 자가 검증 (PHASE 3-6).
 //
@@ -321,7 +327,6 @@ namespace
 
 bool DX12Test::RunIBLTest(std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
 
     outLog += "── IBL 생성 체인 검증 (PHASE 3-6) ──\n";
 
@@ -364,7 +369,7 @@ bool DX12Test::RunIBLTest(std::string& outLog)
     //
     // 구면 매핑에서 v=0이 +Y(천정)다. 반구가 갈려 있으면 조도·프리필터의
     // 방향 적분이 '어느 반구를 봤는가'로 검증된다.
-    ComPtr<ID3D12Resource> equirect;
+    winrt::com_ptr<ID3D12Resource> equirect;
     RHITextureHandle equirectHandle;
     {
         D3D12_HEAP_PROPERTIES defaultHeap{};
@@ -381,13 +386,13 @@ bool DX12Test::RunIBLTest(std::string& outLog)
 
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&defaultHeap,
             D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&equirect))))
+            nullptr, IID_PPV_ARGS(equirect.put()))))
         {
             outLog += "[2/5] equirect 생성 실패\n";
             resources.Shutdown();
             return false;
         }
-        equirectHandle = resources.RegisterExternalTexture(equirect.Get());
+        equirectHandle = resources.RegisterExternalTexture(equirect.get());
         if (!equirectHandle.IsValid())
         {
             outLog += "[2/5] equirect 핸들 등록 실패\n";
@@ -439,14 +444,14 @@ bool DX12Test::RunIBLTest(std::string& outLog)
         src.PlacedFootprint.Footprint.RowPitch = kRowPitch;
 
         D3D12_TEXTURE_COPY_LOCATION dst{};
-        dst.pResource = equirect.Get();
+        dst.pResource = equirect.get();
         dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 
         resources.GetCommandList()->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
 
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = equirect.Get();
+        barrier.Transition.pResource = equirect.get();
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;

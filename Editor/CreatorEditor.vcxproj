@@ -178,20 +178,20 @@ dotnet build "$(SolutionDir)GameScripts\GameScripts.fsproj" -c $(Configuration) 
     </PreBuildEvent>
 </ItemDefinitionGroup>
   <ItemGroup>
-    <ClInclude Include="EngineEntry\App.h" />
-    <ClInclude Include="EngineEntry\BootProgress.h" />
+    <ClInclude Include="EngineEntry\Bootstrap\App.h" />
+    <ClInclude Include="EngineEntry\Bootstrap\BootProgress.h" />
     <ClInclude Include="..\Engine\RuntimeHost\EngineBootstrap.h" />
     <ClInclude Include="..\Engine\RuntimeHost\EngineLaunchConfig.h" />
-    <ClInclude Include="EngineEntry\EditorMain.h" />
-    <ClInclude Include="EngineEntry\framework.h" />
-    <ClInclude Include="EngineEntry\ProgressWindow.h" />
-    <ClInclude Include="EngineEntry\Resource.h" />
-    <ClInclude Include="EngineEntry\targetver.h" />
+    <ClInclude Include="EngineEntry\Bootstrap\EditorMain.h" />
+    <ClInclude Include="EngineEntry\Bootstrap\framework.h" />
+    <ClInclude Include="EngineEntry\Bootstrap\ProgressWindow.h" />
+    <ClInclude Include="Resources\Windows\Resource.h" />
+    <ClInclude Include="EngineEntry\Bootstrap\targetver.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="EngineEntry\App.cpp" />
-    <ClCompile Include="EngineEntry\EditorMain.cpp" />
-    <ClCompile Include="EngineEntry\ShutdownFinalMarker.cpp">
+    <ClCompile Include="EngineEntry\Bootstrap\App.cpp" />
+    <ClCompile Include="EngineEntry\Bootstrap\EditorMain.cpp" />
+    <ClCompile Include="EngineEntry\Bootstrap\ShutdownFinalMarker.cpp">
       <!-- init_seg(lib)로 소멸 순서를 맞춘 표식이라 유니티 빌드에 합치면 안 된다.
            다른 TU와 묶이면 그 TU의 정적 객체까지 소멸 시점이 끌려간다. -->
       <IncludeInUnityFile>false</IncludeInUnityFile>
@@ -232,15 +232,15 @@ dotnet build "$(SolutionDir)GameScripts\GameScripts.fsproj" -c $(Configuration) 
     </ProjectReference>
   </ItemGroup>
   <ItemGroup>
-    <ResourceCompile Include="EngineEntry\Academy_4Q.rc" />
+    <ResourceCompile Include="Resources\Windows\Academy_4Q.rc" />
   </ItemGroup>
   <ItemGroup>
-    <Image Include="EngineEntry\Academy_4Q.ico" />
-    <Image Include="EngineEntry\small.ico" />
+    <Image Include="Resources\Windows\Academy_4Q.ico" />
+    <Image Include="Resources\Windows\small.ico" />
   </ItemGroup>
   <ItemDefinitionGroup>
     <Manifest>
-      <AdditionalManifestFiles>$(ProjectDir)EngineEntry\CreatorEditor.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
+      <AdditionalManifestFiles>$(ProjectDir)Resources\Windows\CreatorEditor.manifest;%(AdditionalManifestFiles)</AdditionalManifestFiles>
     </Manifest>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup>

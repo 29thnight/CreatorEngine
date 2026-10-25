@@ -1,4 +1,9 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 
 // experiment 모델 쿠킹 포맷 — 파일 레이아웃과 버전 규약.
 //
@@ -37,7 +42,7 @@
 #include "../VertexLayout.h"
 
 #include <stdint.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace experiment::cooked
 {
@@ -271,12 +276,12 @@ struct CookedAnimator final
     std::uint8_t present{};
     std::uint8_t pad[3]{};
     std::uint32_t defaultClip{}; // Index<Tag> 원값
-    Uuid::Uuid16 motionAssetId{};
+    uuid::uuid16 motionAssetId{};
 };
 
 struct CookedMetadata final
 {
-    Uuid::Uuid16 assetId{};
+    uuid::uuid16 assetId{};
     StringRef name{};
     StringRef sourcePath{};
     StringRef cookedPath{};

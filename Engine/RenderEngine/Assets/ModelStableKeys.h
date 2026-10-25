@@ -1,4 +1,9 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 // subasset stable key — ModelAssetBigBangCutoverPlan §2.3 (MBC2).
 //
 // stable key는 "원본 안에서 이 요소를 다음 임포트에도 같은 것으로 알아볼 근거"다.
@@ -31,7 +36,7 @@
 #include "AssetIdentityProfile.h"
 #include "../Experiment/Import/ImportedScene.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace assets
 {
@@ -60,7 +65,7 @@ namespace assets
     {
         SubAssetKind kind{ SubAssetKind::Material };
         std::string stableKey{};           // 신원 입력
-        Uuid::Uuid16 assetId{};            // DeriveSubAssetId(modelId, kind, stableKey)
+        uuid::uuid16 assetId{};            // DeriveSubAssetId(modelId, kind, stableKey)
         std::string binding{};             // 진단: 원본 안 위치(gltf/material/3) — 신원 아님
         std::string name{};                // 진단: 표시 이름
         std::string fingerprint{};         // `sha256:<64hex>` — authoring 재결합·stale 판정

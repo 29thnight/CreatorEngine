@@ -1,5 +1,5 @@
 #pragma once
-#include "ClassProperty.h"
+#include "../../Engine/Utility_Framework/Reflection/ClassProperty.h"
 #include <ImGui.h>
 
 class GlobalImGuiContext : public Singleton<GlobalImGuiContext>

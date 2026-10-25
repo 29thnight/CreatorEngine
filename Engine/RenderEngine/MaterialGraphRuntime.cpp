@@ -1,15 +1,30 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "MaterialGraphRuntime.h"
 #include "MaterialGraphShaderMeta.h"
 #include "MaterialPropertyPacker.h"
 #include "Assets/AssetIdentityProfile.h"
 #include "Experiment/Cooked/CookedAssetCatalog.h"
 #include "AssetDepot/MaterialAssetRuntime.h"
-#include "AuthoringReadNode.h"
-#include "AuthoringWriteNode.h"
+#include "../Utility_Framework/Authoring/AuthoringReadNode.h"
+#include "../Utility_Framework/Authoring/AuthoringWriteNode.h"
 
 #include <stdint.h>
-#include "../Utility_Framework/StandardLibrary.h"
-#include "../Utility_Framework/Contract.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 
 namespace material_graph
 {
@@ -702,7 +717,7 @@ namespace material_graph
                 error = "Material generation preparation was superseded or invalidated before publication.";
                 if (std::getenv("CE_TRACE_ASSET_INVALIDATION"))
                     std::printf("[asset.invalidate] graph-publish guid=%s ticket=%llu current=%llu\n",
-                        Uuid::ToString(prepared.m_owner->assetId.value).c_str(), prepared.m_requestGeneration,
+                        uuid::to_string(prepared.m_owner->assetId.value).c_str(), prepared.m_requestGeneration,
                         found == entries_.end() ? 0ull : found->second.requestGeneration);
                 if (invalidated) *invalidated = true;
                 return {};
@@ -1040,7 +1055,7 @@ namespace material_graph
             {
                 if (error.empty())
                 {
-                    error = "Material texture generation could not be loaded: " + Uuid::ToString(id.value);
+                    error = "Material texture generation could not be loaded: " + uuid::to_string(id.value);
                 }
                 return false;
             }
@@ -1079,8 +1094,8 @@ namespace material_graph
         node.SetMap();
         node.Child("lattice_material").SetScalar(1u);
         node.Child("name").SetScalar(document.name);
-        node.Child("assetId").SetScalar(Uuid::ToString(document.materialId.value));
-        node.Child("graphAssetId").SetScalar(Uuid::ToString(document.description.graphId.value));
+        node.Child("assetId").SetScalar(uuid::to_string(document.materialId.value));
+        node.Child("graphAssetId").SetScalar(uuid::to_string(document.description.graphId.value));
         node.Child("doubleSided").SetScalar(document.doubleSided);
         node.Child("blendMode").SetScalar(document.blendMode);
         auto parameters = document.description.parameters;
@@ -1126,7 +1141,7 @@ namespace material_graph
         {
             const auto entry = textureList.Append();
             entry.Child("id").SetScalar(texture.parameter);
-            entry.Child("guid").SetScalar(Uuid::ToString(texture.assetId.value));
+            entry.Child("guid").SetScalar(uuid::to_string(texture.assetId.value));
         }
         result.Assign(node);
         return true;
@@ -1148,7 +1163,7 @@ namespace material_graph
             InstanceDocument candidate;
             candidate.name = Scalar<std::string>(node["name"]);
             const auto materialId = Scalar<std::string>(node["assetId"]);
-            if (materialId != Uuid::ToString(Uuid::Uuid16{}) && !ParseTextureId(materialId, candidate.materialId))
+            if (materialId != uuid::to_string(uuid::uuid16{}) && !ParseTextureId(materialId, candidate.materialId))
             {
                 return Fail(error, "Invalid lattice material asset GUID.");
             }

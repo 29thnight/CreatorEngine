@@ -1,9 +1,13 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
-#include "Ownership.h"
 #include "Texture.h"
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // A recording's small texture descriptions and explicitly prepared image payloads.
 // Each kind is pinned once per stable runtime ID; descriptions do not imply pixels.

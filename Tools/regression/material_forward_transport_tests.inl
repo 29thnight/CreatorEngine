@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 // Independent alpha recurrence, identity refraction, and Beer-Lambert transport
 // across the real blended stream (light tiles + SceneHost), volume composed first.
 own::shared_owner<const Generation> ForwardTransportProduct(const std::filesystem::path& root, unsigned kind)
@@ -76,7 +81,7 @@ own::shared_owner<const Generation> ForwardTransportProduct(const std::filesyste
         WriteCookedProgram(product, {}, bytes, error) && ReadCookedProgram(bytes, {}, restored, error);
     Check(restoredOk, "Transport binary product round trip " + error);
     Generation generationValue;
-    Check(Uuid::TryParse("CCCCCCCC-CCCC-4CCC-8CCC-CCCCCCCCCCCC", generationValue.assetId.value),
+    Check(uuid::try_parse("CCCCCCCC-CCCC-4CCC-8CCC-CCCCCCCCCCCC", generationValue.assetId.value),
           "Transport graph identity");
     generationValue.generation = kind + 1;
     generationValue.cooked = std::move(restored);
@@ -123,7 +128,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
     const std::vector<EnhancedLight> manyLights(65, divided);
     const bool initialized = tiles.Initialize(context, error);
     Check(initialized, "Transport light tiles " + error);
-    InternalPath::GetInstance()->AssetAuthoringEnabled = false;
+    (&ce::paths::get_state())->asset_authoring_enabled = false;
     for (const auto& generation : generations)
     {
         WaitSceneProgram(host, context, generation);
@@ -582,7 +587,7 @@ void RunForwardTransport(const std::filesystem::path& root, RecordingChangeDevic
     tiles.Shutdown();
     gbuffer.Shutdown();
     meshes.Shutdown();
-    InternalPath::GetInstance()->AssetAuthoringEnabled = true;
+    (&ce::paths::get_state())->asset_authoring_enabled = true;
     if (versionedAcceptance)
     {
         std::cout << "RG5_MIXED_GPU_OK policies=3 frames=" << frames << " components=" << components

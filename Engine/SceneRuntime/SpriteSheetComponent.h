@@ -1,6 +1,10 @@
 #pragma once
-#include "Ownership.h"
-#include "../Utility_Framework/Core.Minimal.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "Component.h"
 #include "IRenderable.h"
 #include "UIComponent.h"
@@ -21,7 +25,7 @@ class [[reflgen::reflect]] SpriteSheetComponent : public meta::identity<SpriteSh
 public:
 	SpriteSheetComponent() = default;
 
-	void LoadSpriteSheet(const file::path& path);
+	void LoadSpriteSheet(const std::filesystem::path& path);
 	void OnDeserialized(); // CT6-d: 시트 로드 + 프리뷰 해제(구 팩토리 분기)
 
 

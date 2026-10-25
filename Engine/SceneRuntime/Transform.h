@@ -1,13 +1,13 @@
 #pragma once
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include "../Utility_Framework/Core.Minimal.h"
+#include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "Component.h"
 #include "TransformStore.h"
 #include <mathematics/quaternion.hpp>
 #include <mathematics/transform.hpp>
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 class RenderScene;
 class InspectorWindow;

@@ -1,11 +1,19 @@
 #pragma once
-#include "../../Utility_Framework/LifetimeToken.h"
-#include "../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
 #include "RHIResourceTypes.h"
 
 #include <stdint.h>
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // Transient descriptor의 네이티브 payload는 DX12 shader-visible heap page와
 // Vulkan descriptor pool로 서로 다르다. 공통 계층은 payload를 소유하지 않고,

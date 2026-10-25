@@ -1,7 +1,7 @@
 #pragma once
 
 #include "../../Render/Temporal/TemporalReconstruction.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #ifndef CREATOR_ENABLE_XESS_SDK
 #define CREATOR_ENABLE_XESS_SDK 0
@@ -21,7 +21,11 @@ inline std::string XeSSComponentVersion(const char* component, uint16_t major, u
 }
 
 #if defined(_WIN32) && (CREATOR_ENABLE_XESS_SDK || CREATOR_ENABLE_XESS_VULKAN_SDK)
-#include <Windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 // SDK-only loader. The host chooses an absolute, trusted deployment directory.
 // Do not search the working directory, PATH, or load unapproved downloaded code.

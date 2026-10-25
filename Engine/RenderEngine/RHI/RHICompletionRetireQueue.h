@@ -2,7 +2,7 @@
 
 #include "RHIResourceTypes.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // graphics queue의 completion point가 지나기 전까지 payload를 보관하는 공통 큐.
 //

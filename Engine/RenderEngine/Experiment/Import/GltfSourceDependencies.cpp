@@ -1,9 +1,14 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
 #include "GltfSourceDependencies.h"
 
 #include <fastgltf/core.hpp>
 #include <fastgltf/types.hpp>
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace experiment::importer
 {
@@ -11,13 +16,7 @@ namespace experiment::importer
     {
         namespace fs = std::filesystem;
 
-        [[nodiscard]] std::string ToLowerExtension(const fs::path& path)
-        {
-            std::string extension = path.extension().string();
-            std::ranges::transform(extension, extension.begin(),
-                [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-            return extension;
-        }
+
 
         // 원본 폴더 안에 머무는 상대 경로만 통과시킨다.
         //
@@ -57,7 +56,7 @@ namespace experiment::importer
     {
         GltfSourceDependencies result;
 
-        const std::string extension = ToLowerExtension(sourcePath);
+        const std::string extension = ce::strings::to_lower((sourcePath).extension().string());
         if (extension != ".gltf" && extension != ".glb") return result;
 
         auto data = fastgltf::GltfDataBuffer::FromPath(sourcePath);

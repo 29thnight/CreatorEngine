@@ -1,4 +1,9 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 // model sidecar schema v2 — ModelAssetBigBangCutoverPlan §3.1 (MBC2).
 //
 //   schemaVersion: 2
@@ -31,7 +36,7 @@
 #include "AssetIdentityEpoch.h"
 #include "ModelStableKeys.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace assets
 {
@@ -42,7 +47,7 @@ namespace assets
         std::string identityProfile{ kIdentityProfile };
         std::string identityEpoch{};
         std::string authoringKey{};        // exporter:<id> | authoring:<64hex>
-        Uuid::Uuid16 assetId{};
+        uuid::uuid16 assetId{};
         std::uint64_t generation{};
         std::string sourceFingerprint{};   // sha256:<64hex>
         std::vector<ModelSubAssetRecord> subAssets{};

@@ -1,10 +1,20 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Arena.h"
+#else
+import Creator.Core.Arena;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.HeapAllocator.h"
+#else
+import Creator.Core.HeapAllocator;
+#endif
 // Production Utility allocators, linked without RenderEngine or a graphics API.
 // GNU --wrap observes the real vendored mimalloc; no allocator shim is used.
-#include "../../Engine/Utility_Framework/Arena.h"
-#include "../../Engine/Utility_Framework/FixedPool.h"
-#include "../../Engine/Utility_Framework/HeapAllocator.h"
-#include "../../Engine/Utility_Framework/LinearArena.h"
-#include "../../Engine/Utility_Framework/StackArena.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.BoundedMemory.h"
+#else
+import Creator.Core.BoundedMemory;
+#endif
 
 #include <array>
 #include <atomic>
@@ -188,8 +198,8 @@ namespace
         allocation_probe::begin();
         void* normal = ::operator new(17);
         void* overAligned = ::operator new(128, std::align_val_t{64});
-        void* raw = mi_malloc(41);
-        void* heap = mi_malloc_aligned(128, 64);
+        void* raw = ce::heap::try_allocate(41);
+        void* heap = ce::heap::try_allocate_aligned(128, 64);
         const auto counts = allocation_probe::end();
         require(normal && overAligned && raw && heap, "Allocation observer setup failed.");
         require(counts.standard_calls == 2 && counts.standard_bytes == 145 && counts.mimalloc_calls == 2 &&
@@ -198,8 +208,8 @@ namespace
         require(mi_check_owned(raw) && mi_check_owned(heap), "The probe must use real mimalloc storage.");
         ::operator delete(normal);
         ::operator delete(overAligned, std::align_val_t{64});
-        mi_free(raw);
-        mi_free(heap);
+        ce::heap::deallocate(raw);
+        ce::heap::deallocate(heap);
 
         struct alignas(4096) item
         {
@@ -217,7 +227,7 @@ namespace
     void verify_retained_arena()
     {
         ce::arena_resource arena;
-        require(arena.stats().blockCount == 0 && arena.stats().usedBytes == 0,
+        require(arena.stats().block_count == 0 && arena.stats().used_bytes == 0,
                 "Arena construction eagerly allocated storage.");
         for (const size_t alignment : {size_t{1}, size_t{2}, size_t{8}, size_t{64}, size_t{4096}})
         {
@@ -237,12 +247,12 @@ namespace
         rejects<std::bad_alloc>([&] { (void)arena.allocate(1, 3); }, "Non-power-of-two alignment was accepted.");
         rejects<std::bad_alloc>([&] { (void)arena.allocate((std::numeric_limits<size_t>::max)(), 64); },
                                 "Arena byte overflow was accepted.");
-        require(arena.stats().usedBytes == before.usedBytes && arena.stats().blockCount == before.blockCount,
+        require(arena.stats().used_bytes == before.used_bytes && arena.stats().block_count == before.block_count,
                 "Rejected arena allocations mutated storage.");
         arena.reset();
-        require(arena.stats().usedBytes == 0 && arena.stats().activeBlocks == 0 &&
-                    arena.stats().retainedBytes == before.retainedBytes &&
-                    arena.stats().blockCount == before.blockCount,
+        require(arena.stats().used_bytes == 0 && arena.stats().active_blocks == 0 &&
+                    arena.stats().retained_bytes == before.retained_bytes &&
+                    arena.stats().block_count == before.block_count,
                 "Arena reset discarded retained storage or left active counters.");
         void* fast{};
         require(!arena.try_allocate(7, 8, fast), "An inactive block must enter the accounted slow path first.");
@@ -311,12 +321,12 @@ namespace
         rejects<std::runtime_error>([&] { objects.emplace<throws_on_construction>(failedDestructors, true); },
                                     "Object arena swallowed construction failure.");
         require(live == 2, "Construction failure changed existing object lifetime.");
-        const auto retained = objects.stats().retainedBytes;
+        const auto retained = objects.stats().retained_bytes;
         objects.reset();
         require(live == 0 && destroyed == 2 && order[0] == 2 && order[1] == 1,
                 "Object arena did not destroy captures in reverse order.");
         require(failedDestructors == 0, "Object arena registered a destructor for a failed constructor.");
-        require(objects.stats().retainedBytes == retained && objects.stats().usedBytes == 0,
+        require(objects.stats().retained_bytes == retained && objects.stats().used_bytes == 0,
                 "Object arena reset discarded retained blocks.");
         require(reinterpret_cast<uintptr_t>(objects.emplace<tracked>(3, live, order, destroyed)) == firstAddress,
                 "Object arena failed to reuse its first address.");

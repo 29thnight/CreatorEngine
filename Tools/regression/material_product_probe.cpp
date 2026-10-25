@@ -1,3 +1,19 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "../../Engine/RenderEngine/Texture.h"
 #include "support/MaterialPipelineSlot.h"
 #include "../../Engine/RenderEngine/MaterialGraphProduct.h"
@@ -8,13 +24,12 @@
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedTexture.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedAudioClipSource.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/PakAudioClipByteSource.h"
-#include "../../Engine/Utility_Framework/PathFinder.h"
 #include "material_probe_gpu.h"
 #include "material_runtime_tests.h"
 
 #include <stdint.h>
 #include <limits.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -47,7 +62,7 @@ class PipelineCache final : public IRenderPipelineCache
   public:
     PipelineCache()
     {
-        MaterialProbe::Require(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(&device_)),
+        MaterialProbe::Require(D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_12_0, IID_PPV_ARGS(device_.put())),
                                "Product graphics device");
         D3D12_DESCRIPTOR_RANGE range{D3D12_DESCRIPTOR_RANGE_TYPE_SRV, 1, TextureRegister, 0,
                                      D3D12_DESCRIPTOR_RANGE_OFFSET_APPEND};
@@ -63,11 +78,11 @@ class PipelineCache final : public IRenderPipelineCache
         sampler.MaxLOD = D3D12_FLOAT32_MAX;
         sampler.ShaderRegister = SamplerRegister;
         D3D12_ROOT_SIGNATURE_DESC desc{2, params, 1, &sampler, D3D12_ROOT_SIGNATURE_FLAG_NONE};
-        MaterialProbe::ComPtr<ID3DBlob> bytes, errors;
-        MaterialProbe::Require(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, &bytes, &errors),
+        winrt::com_ptr<ID3DBlob> bytes, errors;
+        MaterialProbe::Require(D3D12SerializeRootSignature(&desc, D3D_ROOT_SIGNATURE_VERSION_1, bytes.put(), errors.put()),
                                "Product graphics root serialization");
         MaterialProbe::Require(
-            device_->CreateRootSignature(0, bytes->GetBufferPointer(), bytes->GetBufferSize(), IID_PPV_ARGS(&root_)),
+            device_->CreateRootSignature(0, bytes->GetBufferPointer(), bytes->GetBufferSize(), IID_PPV_ARGS(root_.put())),
             "Product graphics root");
     }
     bool fail = false;
@@ -86,7 +101,7 @@ class PipelineCache final : public IRenderPipelineCache
         if (same && !pipelines_.empty())
             return {1};
         D3D12_GRAPHICS_PIPELINE_STATE_DESC native{};
-        native.pRootSignature = root_.Get();
+        native.pRootSignature = root_.get();
         native.VS = {desc.vsBytecode, desc.vsSize};
         native.PS = {desc.psBytecode, desc.psSize};
         native.BlendState.RenderTarget[0].RenderTargetWriteMask = D3D12_COLOR_WRITE_ENABLE_ALL;
@@ -102,8 +117,8 @@ class PipelineCache final : public IRenderPipelineCache
         native.NumRenderTargets = 1;
         native.RTVFormats[0] = DXGI_FORMAT_R16G16B16A16_FLOAT;
         native.SampleDesc.Count = 1;
-        MaterialProbe::ComPtr<ID3D12PipelineState> pipeline;
-        const auto status = device_->CreateGraphicsPipelineState(&native, IID_PPV_ARGS(&pipeline));
+        winrt::com_ptr<ID3D12PipelineState> pipeline;
+        const auto status = device_->CreateGraphicsPipelineState(&native, IID_PPV_ARGS(pipeline.put()));
         if (FAILED(status))
         {
             error = "D3D12 graphics PSO rejected compiled material";
@@ -122,9 +137,9 @@ class PipelineCache final : public IRenderPipelineCache
     std::uint32_t CollectRetiredPipelines(RHICompletionPoint) override { return 0; }
 
   private:
-    MaterialProbe::ComPtr<ID3D12Device> device_;
-    MaterialProbe::ComPtr<ID3D12RootSignature> root_;
-    std::vector<MaterialProbe::ComPtr<ID3D12PipelineState>> pipelines_;
+    winrt::com_ptr<ID3D12Device> device_;
+    winrt::com_ptr<ID3D12RootSignature> root_;
+    std::vector<winrt::com_ptr<ID3D12PipelineState>> pipelines_;
 };
 
 float Decode(float encoded)
@@ -193,10 +208,10 @@ float Decode(float encoded)
 
 void Run(const std::filesystem::path& root)
 {
-    auto* paths = InternalPath::GetInstance();
-    paths->BaseProjectPath = root / "Dynamic_CPP";
-    paths->ShaderSourcePath = root / "Dynamic_CPP/Assets/Shaders";
-    paths->AssetAuthoringEnabled = true;
+    auto* paths = (&ce::paths::get_state());
+    paths->base_project_path = root / "Dynamic_CPP";
+    paths->shader_source_path = root / "Dynamic_CPP/Assets/Shaders";
+    paths->asset_authoring_enabled = true;
     const auto directory = root / "Build/Obj/MaterialProductProbe";
     std::filesystem::create_directories(directory);
     const auto includeDirectory = root / "Dynamic_CPP/Assets/Shaders/DefaultPassShader/Includes";
@@ -821,7 +836,7 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
     Check(experiment::TryParseCanonicalAssetId("11111111-1111-4111-8111-111111111111", graphId) &&
               experiment::TryParseCanonicalAssetId("22222222-2222-4222-8222-222222222222", textureId),
           "Canonical asset identities");
-    asset.blackboard[2].value = Uuid::ToString(textureId.value);
+    asset.blackboard[2].value = uuid::to_string(textureId.value);
     const auto assetProgram = GenerateMaterialSlang(asset);
     Check(assetProgram.has_value(), "Generate canonical source graph");
     const auto assetHost = directory / "asset-bound.slang";
@@ -914,7 +929,7 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
     Check(manifestEvidence.good(), "Save asset catalog evidence");
     Check(asset.Save(directory / "fixture.shadergraph", &error), "Save source graph cook fixture");
     std::ofstream meta(directory / "fixture.shadergraph.meta");
-    meta << "guid: " << Uuid::ToString(graphId.value) << '\n';
+    meta << "guid: " << uuid::to_string(graphId.value) << '\n';
     const auto pakFile = directory / "material-program.pak";
     Pak::BuildOptions pakOptions;
     pakOptions.compress = false;

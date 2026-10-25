@@ -1,7 +1,7 @@
 #include "UIRenderProxy.h"
 #include "Texture.h"
 #include "SpriteSheet.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // 클리핑 계산은 UIClipping.h로 옮겼다. DX12 UI 패스가 같은 계산을
 // 해야 하는데, 두 곳에 따로 두면 하나가 틀려도 알 수 없다.

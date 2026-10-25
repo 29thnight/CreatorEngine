@@ -161,8 +161,8 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <!-- Register generated reflection before unity input discovery, including incremental builds. -->
-    <ClCompile Include="$(IntDir)reflgen/reflgen_SceneRuntime.cpp">
+    <!-- Register before unity discovery; the shared target deduplicates reflgen's late registration. -->
+    <ClCompile Include="$(IntDir)reflgen\reflgen_SceneRuntime.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
     </ClCompile>

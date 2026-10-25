@@ -4,10 +4,10 @@
 #include "Experiment/MaterialAuthoringCodec.h"
 #include "ShaderPermutationDomain.h"
 #include "RHI/ModelVertexInputLayout.h"
-#include "AuthoringCookedDocument.h"
-#include "AuthoringParsedDocument.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringCookedDocument.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace RenderTest
 {
@@ -31,7 +31,7 @@ namespace RenderTest
         experiment::AssetId CodeId(std::uint8_t value)
         {
             experiment::AssetId id;
-            id.value.data[6] = 0x40u; id.value.data[8] = 0x80u; id.value.data[15] = value;
+            id.value.data_[6] = 0x40u; id.value.data_[8] = 0x80u; id.value.data_[15] = value;
             return id;
         }
         std::string CodeIdText(std::uint8_t value) { return FileGuid{CodeId(value).value}.ToString(); }

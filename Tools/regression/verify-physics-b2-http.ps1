@@ -6,7 +6,7 @@ $exe=Get-Item -LiteralPath $EditorExe
 # The launcher stays unchanged when host implementation TUs relink the runtime DLL.
 $runtimePath=Join-Path $exe.DirectoryName 'CreatorEditor.runtime.dll'
 $implementation=if(Test-Path -LiteralPath $runtimePath){Get-Item -LiteralPath $runtimePath}else{$exe}
-$required=@('Editor/EngineEntry/EditorObjectOperations.cpp','Editor/EngineEntry/PhysicsShapeDocument.h','Editor/EngineEntry/Commands/SceneObjectCommands.cpp','Editor/EngineGUIWindow/InspectorWindow.cpp','Engine/SceneRuntime/PhysicsBodyComponent.h','Engine/SceneRuntime/Scene.cpp','Engine/SceneRuntime/PhysicsTransformPolicy.h','Engine/SceneRuntime/SceneManager.cpp','Engine/SceneRuntime/ScenePhysicsSimulation.cpp','Engine/SceneRuntime/Transform.cpp') | ForEach-Object {Get-Item (Join-Path $repo $_)}
+$required=@('Editor/EngineEntry/Scene/EditorObjectOperations.cpp','Editor/EngineEntry/Assets/Physics/PhysicsShapeDocument.h','Editor/EngineEntry/Commands/SceneObjectCommands.cpp','Editor/EngineGUIWindow/InspectorWindow.cpp','Engine/SceneRuntime/PhysicsBodyComponent.h','Engine/SceneRuntime/Scene.cpp','Engine/SceneRuntime/PhysicsTransformPolicy.h','Engine/SceneRuntime/SceneManager.cpp','Engine/SceneRuntime/ScenePhysicsSimulation.cpp','Engine/SceneRuntime/Transform.cpp') | ForEach-Object {Get-Item (Join-Path $repo $_)}
 if($required | Where-Object {$_.LastWriteTimeUtc -gt $implementation.LastWriteTimeUtc}){throw 'Fresh Editor build required; stale executable is not product evidence'}
 if(Get-Process CreatorEditor -ErrorAction SilentlyContinue){throw 'An Editor is already running; the gate needs its own session'}
 $id=[guid]::NewGuid().ToString('N')

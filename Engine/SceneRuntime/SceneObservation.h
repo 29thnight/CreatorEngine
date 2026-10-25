@@ -8,7 +8,7 @@
 #include <stdexcept>
 #include <string_view>
 #include <thread>
-#include "../Utility_Framework/PropertyChange.h"
+#include "../Utility_Framework/Reflection/PropertyChange.h"
 
 namespace Runtime
 {

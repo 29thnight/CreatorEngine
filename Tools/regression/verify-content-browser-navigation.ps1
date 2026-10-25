@@ -1,4 +1,4 @@
-﻿# Content Browser 탐색·신원·생성 경로 (PHASE 21 W2-B)
+# Content Browser 탐색·신원·생성 경로 (PHASE 21 W2-B)
 #
 # 왜 필요한가
 # ───────────
@@ -39,7 +39,7 @@
 #  12  ★ 브라우저 타일의 payload 는 `editor::asset_drag::set_payload` 하나다.
 #      `SetDragDropPayload` 를 직접 부르지 않는다
 #  13  ★ 브라우저 유형을 받는 자리의 **집합**이 기록과 같고, 그 전부가 `path_of` 로
-#      읽으며 `payload->Data` 를 직접 읽거나 `PathFinder::Relative` 로 경로를 다시
+#      읽으며 `payload->Data` 를 직접 읽거나 `ce::paths::relative` 로 경로를 다시
 #      짓지 않는다. 수를 세지 않고 (파일, 유형) 목록을 맞댄다 — 한 자리가 빠지고 다른
 #      자리가 늘어도 수는 같다
 #  14  이름만 저장하는 소비자(데칼 셋 · 스프라이트 시트 · 폴리지)는 다른 폴더의 동명
@@ -89,7 +89,7 @@ function Assert([bool]$ok, [string]$what) {
 # ═══════════════════════════════════════════════════════════════════════════
 $SourceRoot = (Resolve-Path -LiteralPath $SourceRoot).Path
 $browserCpp = Join-Path $SourceRoot "Editor\EngineGUIWindow\ContentsBrowserWindow.cpp"
-$databaseCpp = Join-Path $SourceRoot "Editor\EngineEntry\EditorAssetDatabase.cpp"
+$databaseCpp = Join-Path $SourceRoot "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp"
 $browserText = [IO.File]::ReadAllText($browserCpp)
 
 # 12 — payload 원천은 하나
@@ -137,7 +137,7 @@ foreach ($file in $editorSources) {
         $where = "$($file.Name):$($i + 1) $($m.Groups[1].Value)"
         Assert ($text -match 'asset_drag::path_of\s*\(') "13 $where 가 path_of 로 읽지 않는다"
         Assert (-not ($text -match '[Pp]ayload->Data')) "13 $where 가 payload->Data 를 직접 읽는다"
-        Assert (-not ($text -match 'PathFinder::Relative\s*\(')) "13 $where 가 PathFinder::Relative 로 경로를 다시 짓는다"
+        Assert (-not ($text -match '(?:PathFinder::Relative|ce::paths::relative)\s*\(')) "13 $where 가 ce::paths::relative 로 경로를 다시 짓는다"
         $blocks["$($file.Name):$($i + 1)"] = $text
     }
 }
@@ -186,7 +186,7 @@ $openDialogs = [regex]::Matches($browserText, 'OpenCreateDialog\(CreateKind::ren
 Assert ($openDialogs -eq 2) "15 Scene Render Profile 메뉴 둘이 같은 대화상자를 열지 않는다($openDialogs)"
 
 # 16 — Show in Folder
-Assert ($browserText -match '(?s)MenuItem\("Show in Folder"\)\)\s*\{\s*const file::path asset = directory;\s*if \(Navigate\(asset\.parent_path\(\)\)\) SelectAsset\(asset\);') `
+Assert ($browserText -match '(?s)MenuItem\("Show in Folder"\)\)\s*\{\s*const (?:std::filesystem|file)::path asset = directory;\s*if \(Navigate\(asset\.parent_path\(\)\)\) SelectAsset\(asset\);') `
     "16 Show in Folder 가 원래 폴더로 가서 그 자산을 고르지 않는다"
 
 # ═══════════════════════════════════════════════════════════════════════════

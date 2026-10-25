@@ -2,8 +2,8 @@
 // uses owner-thread polling; it never waits for cook or scene jobs on that thread.
 struct TextureReimportSceneProbe final
 {
-    file::path source;
-    file::path saved;
+    std::filesystem::path source;
+    std::filesystem::path saved;
     own::shared_owner<const Texture> oldTexture;
     own::shared_owner<const Texture::CodecImage> oldImage;
     own::shared_owner<const Texture> newTexture;
@@ -21,7 +21,7 @@ struct TextureReimportSceneProbe final
     Entity* prefabInstance{};
     Entity* prefabOverrideInstance{};
     RectTransformComponent* prefabEditRect{};
-    file::path prefabPath;
+    std::filesystem::path prefabPath;
     std::string prefabBefore;
 
     void Check(bool condition, const char* message)
@@ -342,18 +342,18 @@ static CommandCore::CommandResult Cmd_texture_reimport_scene_probe(const Console
         return InvalidArguments("assets.texture.reimportprobe <isolated-source> <isolated-scene>");
     }
     auto state = std::make_shared<TextureReimportSceneProbe>();
-    state->source = file::path(ctx.parts[1]);
-    state->saved = file::path(ctx.parts[2]);
+    state->source = std::filesystem::path(ctx.parts[1]);
+    state->saved = std::filesystem::path(ctx.parts[2]);
     const auto project = state->source.parent_path().parent_path().parent_path();
     if (state->source.filename() != "fixture.png"
-        || !file::exists(project / ".texture-reimport-probe")
+        || !std::filesystem::exists(project / ".texture-reimport-probe")
         || state->saved.parent_path() != project / "Assets" / "Scenes")
     {
         return PreconditionFailed("texture.reimportscene.isolation", "Use the marked isolated regression project");
     }
     std::ifstream input(state->source, std::ios::binary);
     state->originalBytes.assign(std::istreambuf_iterator<char>(input), {});
-    if (state->originalBytes.empty() || file::exists(state->saved))
+    if (state->originalBytes.empty() || std::filesystem::exists(state->saved))
     {
         return PreconditionFailed("texture.reimportscene.fixture", "Use fresh isolated source and scene paths");
     }

@@ -1,10 +1,10 @@
 #pragma once
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include "Core.Minimal.h"
+#include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector4.hpp>
 #include <stddef.h>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 cbuffer [[reflgen::reflect]] MaterialFlowInformation
 {

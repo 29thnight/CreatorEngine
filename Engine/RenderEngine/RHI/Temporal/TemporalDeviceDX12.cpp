@@ -1,7 +1,11 @@
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "TemporalDeviceDX12.h"
 #include "../../Render/Temporal/TemporalRuntimeControl.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -27,11 +31,11 @@ TemporalDeviceDX12::~TemporalDeviceDX12()
         retained->device = std::move(device);
         return;
     }
-    device.Reset();
-    nativeDevice.Reset();
-    adapter.Reset();
-    factory.Reset();
-    nativeFactory.Reset();
+    device = nullptr;
+    nativeDevice = nullptr;
+    adapter = nullptr;
+    factory = nullptr;
+    nativeFactory = nullptr;
     if (session) session->UnloadAfterNativeObjectsDestroyed();
 }
 bool HasTemporalDeviceDX12()
@@ -70,15 +74,15 @@ own::shared_owner<TemporalDeviceDX12> AcquireTemporalDeviceDX12(uint32_t flags,
             (control.playerLatencyHostRegistered && settings.requestedFrameGenerator == TemporalProvider::Dlss)));
     if (!useDlss)
     {
-        auto hr = CreateDXGIFactory2(flags, IID_PPV_ARGS(&owner->nativeFactory));
+        auto hr = CreateDXGIFactory2(flags, IID_PPV_ARGS(owner->nativeFactory.put()));
         if (FAILED(hr)) { result = { TemporalStatus::SdkFailure, hr }; return {}; }
         owner->factory = owner->nativeFactory;
         hr = adapterLuid.LowPart || adapterLuid.HighPart
-            ? owner->factory->EnumAdapterByLuid(adapterLuid, IID_PPV_ARGS(&owner->adapter))
+            ? owner->factory->EnumAdapterByLuid(adapterLuid, IID_PPV_ARGS(owner->adapter.put()))
             : owner->factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
-                IID_PPV_ARGS(&owner->adapter));
+                IID_PPV_ARGS(owner->adapter.put()));
         if (FAILED(hr)) { result = { TemporalStatus::SdkFailure, hr }; return {}; }
-        hr = D3D12CreateDevice(owner->adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&owner->nativeDevice));
+        hr = D3D12CreateDevice(owner->adapter.get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(owner->nativeDevice.put()));
         if (FAILED(hr)) { result = { TemporalStatus::SdkFailure, hr }; return {}; }
         owner->device = owner->nativeDevice;
         result = { TemporalStatus::Success };
@@ -100,27 +104,27 @@ own::shared_owner<TemporalDeviceDX12> AcquireTemporalDeviceDX12(uint32_t flags,
     init.loadDeepDvc = settings.spatialPost.deepDvcEnabled;
     result = owner->session->Initialize(init);
     if (!result.IsSuccess()) return {};
-    auto hr = CreateDXGIFactory2(flags, IID_PPV_ARGS(&owner->nativeFactory));
+    auto hr = CreateDXGIFactory2(flags, IID_PPV_ARGS(owner->nativeFactory.put()));
     if (FAILED(hr)) { result = { TemporalStatus::SdkFailure, hr }; return {}; }
-    void* proxy = owner->nativeFactory.Get();
+    void* proxy = owner->nativeFactory.get();
     result = owner->session->UpgradeDX12Interface(&proxy, DlssDX12ProxyKind::Factory);
     if (!result.IsSuccess()) return {};
     auto* proxyFactory = static_cast<IDXGIFactory*>(proxy);
-    hr = proxyFactory->QueryInterface(IID_PPV_ARGS(&owner->factory));
+    hr = proxyFactory->QueryInterface(IID_PPV_ARGS(owner->factory.put()));
     proxyFactory->Release();
     if (FAILED(hr)) { result = { TemporalStatus::SdkFailure, hr }; return {}; }
     hr = adapterLuid.LowPart || adapterLuid.HighPart
-        ? owner->factory->EnumAdapterByLuid(adapterLuid, IID_PPV_ARGS(&owner->adapter))
+        ? owner->factory->EnumAdapterByLuid(adapterLuid, IID_PPV_ARGS(owner->adapter.put()))
         : owner->factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
-            IID_PPV_ARGS(&owner->adapter));
+            IID_PPV_ARGS(owner->adapter.put()));
     if (FAILED(hr)) { result = { TemporalStatus::SdkFailure, hr }; return {}; }
-    hr = D3D12CreateDevice(owner->adapter.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&owner->nativeDevice));
+    hr = D3D12CreateDevice(owner->adapter.get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(owner->nativeDevice.put()));
     if (FAILED(hr)) { result = { TemporalStatus::SdkFailure, hr }; return {}; }
-    proxy = owner->nativeDevice.Get();
+    proxy = owner->nativeDevice.get();
     result = owner->session->UpgradeDX12Interface(&proxy, DlssDX12ProxyKind::Device);
     if (!result.IsSuccess()) return {};
-    owner->device.Attach(static_cast<ID3D12Device*>(proxy));
-    result = owner->session->BindDX12Device(owner->device.Get());
+    owner->device.attach(static_cast<ID3D12Device*>(proxy));
+    result = owner->session->BindDX12Device(owner->device.get());
     if (!result.IsSuccess()) return {};
     g_device = owner;
     return owner;

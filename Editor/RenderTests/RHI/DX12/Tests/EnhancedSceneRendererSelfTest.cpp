@@ -1,3 +1,25 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
+#include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #include "RHI/DX12/Tests/Geometry/GraphSceneFixture.h"
 #include "../../../../../Tools/regression/material_owner_checks.h"
@@ -73,15 +95,18 @@
 #include "DataSystem.h"
 #include "Assets/ModelAssetGeneration.h"
 #include <mathematics/transform.hpp>
-#include "PathFinder.h"
 // 자가 검증이 만드는 쿼드가 Vertex를 쓴다. 유니티 빌드에서는 같은 블롭의
 // 앞선 파일이 공급했다.
 #include "Mesh.h"
 
 #include <DirectXTex.h>
-#include "JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include <stdint.h>
-#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "RHI/RHIShaderCompiler.h"
 #include "Render/Passes/Lighting/EnhancedSSSPass.h"
 #include "Render/Passes/Lighting/EnhancedSSRPass.h"
@@ -1545,9 +1570,9 @@ passes:
                 return first;
             };
             const auto* first = exercise();
-            const auto retained = arena.stats().retainedBytes;
+            const auto retained = arena.stats().retained_bytes;
             arena.reset();
-            if (exercise() != first || arena.stats().retainedBytes != retained)
+            if (exercise() != first || arena.stats().retained_bytes != retained)
             {
                 error = "Declaration arena did not reuse its retained blocks";
                 return false;
@@ -2600,7 +2625,6 @@ passes:
 bool DX12Test::RunSelfTest(const std::string& outputPngPath,
     uint32_t frameCount, const std::string& texturePath, std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
 
     RHIShaderCompiler::ResetStats();
 
@@ -2786,7 +2810,7 @@ bool DX12Test::RunSelfTest(const std::string& outputPngPath,
     // 스테이징은 업로드 링에서 잘라 쓴다. 예전에는 텍스처마다 업로드 버퍼를
     // 새로 만들고 GPU가 다 읽을 때까지 살려 뒀는데(그래서 여기 ComPtr가 하나
     // 더 있었다), 씬을 이식하면 그 방식이 프레임당 수십~수백 건이 된다.
-    ComPtr<ID3D12Resource> texture;
+    winrt::com_ptr<ID3D12Resource> texture;
     {
         D3D12_HEAP_PROPERTIES defaultHeap{};
         defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -2802,7 +2826,7 @@ bool DX12Test::RunSelfTest(const std::string& outputPngPath,
 
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&defaultHeap,
             D3D12_HEAP_FLAG_NONE, &texDesc, D3D12_RESOURCE_STATE_COPY_DEST, nullptr,
-            IID_PPV_ARGS(&texture))))
+            IID_PPV_ARGS(texture.put()))))
         {
             outLog += "[2/4] 텍스처 생성 실패\n";
             return false;
@@ -2853,14 +2877,14 @@ bool DX12Test::RunSelfTest(const std::string& outputPngPath,
         src.PlacedFootprint.Footprint.RowPitch = rowPitch;
 
         D3D12_TEXTURE_COPY_LOCATION dstLoc{};
-        dstLoc.pResource = texture.Get();
+        dstLoc.pResource = texture.get();
         dstLoc.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
 
         resources.GetCommandList()->CopyTextureRegion(&dstLoc, 0, 0, 0, &src, nullptr);
 
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = texture.Get();
+        barrier.Transition.pResource = texture.get();
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
         barrier.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -2923,7 +2947,7 @@ bool DX12Test::RunSelfTest(const std::string& outputPngPath,
             outLog += "[3/4] descriptor page 할당 실패(구간 부족)\n";
             return false;
         }
-        resources.GetDevice()->CreateShaderResourceView(texture.Get(), nullptr, srvSlot.cpu);
+        resources.GetDevice()->CreateShaderResourceView(texture.get(), nullptr, srvSlot.cpu);
 
         // 힙 바인딩은 루트 테이블 설정보다 먼저(검증 레이어 규칙).
         // CBV/SRV/UAV 힙과 샘플러 힙은 종류가 달라 동시에 하나씩 바인딩된다.
@@ -3276,7 +3300,6 @@ namespace
 
 bool DX12Test::RunPsoCacheTest(const std::string& cacheFilePath, std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
 
     // 렌더는 하지 않는다 — 디바이스만 있으면 PSO 생성·캐시는 검증된다.
     DX12DeviceResources resources;
@@ -3910,7 +3933,7 @@ bool DX12Test::RunUploadSegmentTest(const std::string& modelPath, std::string& o
     // 닿는지는 복사해서 되읽어야만 알 수 있다.
     {
         constexpr uint32_t kBytes = 1024;
-        ComPtr<ID3D12Resource> destination;
+        winrt::com_ptr<ID3D12Resource> destination;
 
         D3D12_HEAP_PROPERTIES defaultHeap{};
         defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -3929,13 +3952,13 @@ bool DX12Test::RunUploadSegmentTest(const std::string& modelPath, std::string& o
         // 같지만, 힌트를 사실과 맞춰 두어야 경고가 쌓이지 않는다.
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&defaultHeap,
             D3D12_HEAP_FLAG_NONE, &bufferDesc, D3D12_RESOURCE_STATE_COMMON, nullptr,
-            IID_PPV_ARGS(&destination))))
+            IID_PPV_ARGS(destination.put()))))
         {
             outLog += "[6/7] 대상 버퍼 생성 실패\n";
             return false;
         }
 
-        DX12TestBufferRegistration destinationRegistration(resources, destination.Get());
+        DX12TestBufferRegistration destinationRegistration(resources, destination.get());
         if (!destinationRegistration.IsValid())
         {
             outLog += "[6/7] 대상 버퍼 핸들 등록 실패\n";
@@ -3963,12 +3986,12 @@ bool DX12Test::RunUploadSegmentTest(const std::string& modelPath, std::string& o
             bytes[i] = static_cast<uint8_t>((i * 7 + 13) & 0xFF);
         }
 
-        resources.GetCommandList()->CopyBufferRegion(destination.Get(), 0,
+        resources.GetCommandList()->CopyBufferRegion(destination.get(), 0,
             staging.resource, staging.offset, kBytes);
 
         D3D12_RESOURCE_BARRIER toSource{};
         toSource.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        toSource.Transition.pResource = destination.Get();
+        toSource.Transition.pResource = destination.get();
         toSource.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;  // 복사 대상으로 암묵 승격된 상태
         toSource.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_SOURCE;
         toSource.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -4185,7 +4208,7 @@ bool DX12Test::RunUploadSegmentTest(const std::string& modelPath, std::string& o
         }
         else
         {
-            const file::path scenePath = file::path(modelPath);
+            const std::filesystem::path scenePath = std::filesystem::path(modelPath);
             // MBC9 — typed generation이 유일한 모델 지오메트리 출처다(Assimp·legacy Mesh 은퇴).
             const assets::ModelAssetGeneration::Shared sceneModel =
                 DataSystems->LoadModelAssetGenerationByPath(scenePath.string());
@@ -4732,7 +4755,7 @@ static bool ValidateBase0LatticeReplay(std::string& error)
         experiment::TryParseCanonicalAssetId("22222222-2222-4222-8222-222222222222", textureId);
         LX::LXMaterialResource resource;
         resource.slot = 0;
-        resource.reference = Uuid::ToString(textureId.value);
+        resource.reference = uuid::to_string(textureId.value);
         resource.colorSpace = LX::LXColorSpace::Data;
         product.layout.textures.push_back(resource);
     }
@@ -4779,7 +4802,7 @@ static bool ValidateBase0LatticeReplay(std::string& error)
     mutation=sealed; mutation.draws[0].description.parameters[0].value=true; if(!rejectApply(mutation)) return false;
     mutation=sealed; mutation.draws[0].description.parameters[0].value=.25; if(!rejectApply(mutation)) return false; // shared slot conflict
     mutation=sealed; mutation.draws[0].description.parameters[0].value=.25;
-    mutation.draws[1].description.graphId.value.data[0]^=1; if(!rejectApply(mutation)) return false; // late rejection is atomic
+    mutation.draws[1].description.graphId.value.data_[0]^=1; if(!rejectApply(mutation)) return false; // late rejection is atomic
     for(auto& d:accepted.draws) d.description.parameters[0].value=.25;
     if(!accepted.Apply(graph,error) || material_graph_test::SamePinnedObject(graph[0].materialGraphInstance, source)
         || !material_graph_test::SamePinnedObject(graph[0].materialGraphInstance, graph[1].materialGraphInstance)
@@ -5691,7 +5714,6 @@ bool DX12Test::RunScreenResizeTest(std::string& outLog)
 
 bool DX12Test::RunParallelRecordTest(std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
 
     bool passed = true;
 
@@ -5853,13 +5875,13 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
         }
     }
 
-    ComPtr<ID3D12DescriptorHeap> rtvHeap;
+    winrt::com_ptr<ID3D12DescriptorHeap> rtvHeap;
     {
         D3D12_DESCRIPTOR_HEAP_DESC heapDesc{};
         heapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
         heapDesc.NumDescriptors = 1;
         if (FAILED(resources.GetDevice()->CreateDescriptorHeap(&heapDesc,
-            IID_PPV_ARGS(&rtvHeap))))
+            IID_PPV_ARGS(rtvHeap.put()))))
         {
             outLog += "[3/4] RTV 힙 생성 실패\n";
             resources.Shutdown();

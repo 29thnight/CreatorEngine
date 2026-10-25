@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "ScriptObjectRegistry.h"
 #include "Entity.h"
 #include "../RenderEngine/DataSystem.h"
@@ -11,7 +16,7 @@
 #include "../RenderEngine/Assets/ModelAnimationPayload.h"
 #include "../RenderEngine/Assets/ModelMeshDescriptor.h"
 #include "../RenderEngine/Assets/ModelSkeletonPayload.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 ScriptObjectRegistry& ScriptObjectRegistry::Get()
 {
@@ -245,8 +250,8 @@ namespace
         // platform Guid layout or depend on the CPU's integer endianness.
         for (std::size_t index = 0; index < 8u; ++index)
         {
-            result.value.data[index] = static_cast<std::uint8_t>(value.first >> (index * 8u));
-            result.value.data[index + 8u] = static_cast<std::uint8_t>(value.second >> (index * 8u));
+            result.value.data_[index] = static_cast<std::uint8_t>(value.first >> (index * 8u));
+            result.value.data_[index + 8u] = static_cast<std::uint8_t>(value.second >> (index * 8u));
         }
         return result;
     }
@@ -256,8 +261,8 @@ namespace
         ScriptAssetId result{};
         for (std::size_t index = 0; index < 8u; ++index)
         {
-            result.first |= static_cast<std::uint64_t>(value.value.data[index]) << (index * 8u);
-            result.second |= static_cast<std::uint64_t>(value.value.data[index + 8u]) << (index * 8u);
+            result.first |= static_cast<std::uint64_t>(value.value.data_[index]) << (index * 8u);
+            result.second |= static_cast<std::uint64_t>(value.value.data_[index + 8u]) << (index * 8u);
         }
         return result;
     }

@@ -1,13 +1,28 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "material_owner_checks.h"
 #include "support/MaterialGraphScenePacket.h"
-#include "PathFinder.h"
 #include "Texture.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12TextureCache.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -143,7 +158,7 @@ own::shared_owner<const Texture> TextureFixture(bool cube)
 
 struct QueueGate
 {
-    Microsoft::WRL::ComPtr<ID3D12Fence> fence;
+    winrt::com_ptr<ID3D12Fence> fence;
     ~QueueGate() { Release(); }
     void Release()
     {
@@ -189,14 +204,14 @@ class RejectingCache final : public IRenderPipelineCache
 
 void Run(const std::filesystem::path& root)
 {
-    auto* paths = InternalPath::GetInstance();
-    paths->BaseProjectPath = root / "Dynamic_CPP";
-    paths->ShaderSourcePath = root / "Dynamic_CPP/Assets/Shaders";
-    paths->AssetAuthoringEnabled = true;
+    auto* paths = (&ce::paths::get_state());
+    paths->base_project_path = root / "Dynamic_CPP";
+    paths->shader_source_path = root / "Dynamic_CPP/Assets/Shaders";
+    paths->asset_authoring_enabled = true;
     const std::array products{CompileFixture(root, false), CompileFixture(root, true)};
     GenerationStore store;
     experiment::AssetId graph;
-    Check(Uuid::TryParse("11111111-1111-4111-8111-111111111111", graph.value), "Graph ID");
+    Check(uuid::try_parse("11111111-1111-4111-8111-111111111111", graph.value), "Graph ID");
     std::string error;
     const auto generation = [&](bool layered) {
         return store.Load(
@@ -374,9 +389,9 @@ void Run(const std::filesystem::path& root)
         Check(!prepare(pipelines, currentEvaluation, coverage, environment, packet) && !packet,
               "No preparation outside frame");
         Check(SUCCEEDED(
-                  device.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(gate.fence.GetAddressOf()))),
+                  device.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(gate.fence.put()))),
               "Native queue gate fence");
-        Check(SUCCEEDED(device.GetCommandQueue()->Wait(gate.fence.Get(), 1)),
+        Check(SUCCEEDED(device.GetCommandQueue()->Wait(gate.fence.get(), 1)),
               "Block GPU execution without blocking CPU");
         std::array<std::weak_ptr<const SceneMaterialPacket>, 2> weak;
         std::array<RHIBufferHandle, 2> buffers;
@@ -492,11 +507,11 @@ void Run(const std::filesystem::path& root)
         currentEvaluation = evaluation(1.8f, false, 5);
         Check(prepare(pipelines, currentEvaluation, coverage, environment, packet), "Prepare partial submission");
         const auto partialRecording = device.GetCurrentUploadRecordingId();
-        gate.fence.Reset();
+        gate.fence = nullptr;
         Check(SUCCEEDED(
-                  device.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(gate.fence.GetAddressOf()))),
+                  device.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(gate.fence.put()))),
               "Partial submission queue gate");
-        Check(SUCCEEDED(device.GetCommandQueue()->Wait(gate.fence.Get(), 1)), "Block submitted prefix execution");
+        Check(SUCCEEDED(device.GetCommandQueue()->Wait(gate.fence.get(), 1)), "Block submitted prefix execution");
         Check(device.FlushCommandList(error), "Native successful partial submission");
         publish(partialRecording);
         Check(slot.Active() == packet, "Confirmed partial submission publishes its prepared generation");
@@ -559,11 +574,11 @@ void Run(const std::filesystem::path& root)
               "Candidate for explicit publication rejection");
         const auto rejectedBuffer = packet->ibl->Buffer();
         const std::weak_ptr rejectedOwner = packet;
-        gate.fence.Reset();
+        gate.fence = nullptr;
         Check(SUCCEEDED(
-                  device.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(gate.fence.GetAddressOf()))),
+                  device.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(gate.fence.put()))),
               "Rejected publication queue gate");
-        Check(SUCCEEDED(device.GetCommandQueue()->Wait(gate.fence.Get(), 1)), "Block rejected candidate execution");
+        Check(SUCCEEDED(device.GetCommandQueue()->Wait(gate.fence.get(), 1)), "Block rejected candidate execution");
         const auto rejectedRecording = device.GetCurrentUploadRecordingId();
         Check(device.EndFrame(error), "Recorded rejected candidate submission");
         Check(GetRHISubmissionThread().DrainSubmissions(&device, error),

@@ -1,3 +1,9 @@
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "Render/Passes/Lighting/EnhancedVolumetricFogPass.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
@@ -6,7 +12,7 @@
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // 볼류메트릭 포그 패스 자가 검증 (PHASE 3-6, 미구현 패스 이식 4차).
 //
@@ -56,7 +62,6 @@ namespace
 
 bool DX12Test::RunVolumetricFogTest(std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
 
     outLog += "── 볼류메트릭 포그 패스 검증 (PHASE 3-6) ──\n";
 
@@ -116,11 +121,11 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
     outLog += "[1/5] 셰이더 3종 컴파일·격자 3장(160x90x128) 생성 통과\n";
 
     // ── 합성 입력 ──
-    ComPtr<ID3D12Resource> sceneColor;
-    ComPtr<ID3D12Resource> sceneDepth;
-    ComPtr<ID3D12Resource> shadowMap;
-    ComPtr<ID3D12Resource> cloudMap;
-    ComPtr<ID3D12Resource> blueNoise;
+    winrt::com_ptr<ID3D12Resource> sceneColor;
+    winrt::com_ptr<ID3D12Resource> sceneDepth;
+    winrt::com_ptr<ID3D12Resource> shadowMap;
+    winrt::com_ptr<ID3D12Resource> cloudMap;
+    winrt::com_ptr<ID3D12Resource> blueNoise;
     DX12TestTextureRegistration colorRegistration;
     DX12TestTextureRegistration depthRegistration;
     DX12TestTextureRegistration shadowRegistration;
@@ -132,7 +137,7 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
         defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
 
         const auto makeTexture = [&](DXGI_FORMAT format, uint32_t width, uint32_t height,
-            uint32_t arraySize, ComPtr<ID3D12Resource>& out) -> bool
+            uint32_t arraySize, winrt::com_ptr<ID3D12Resource>& out) -> bool
         {
             D3D12_RESOURCE_DESC desc{};
             desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -145,7 +150,7 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
 
             return SUCCEEDED(resources.GetDevice()->CreateCommittedResource(&defaultHeap,
                 D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr, IID_PPV_ARGS(&out)));
+                nullptr, IID_PPV_ARGS(out.put())));
         };
 
         if (!makeTexture(DXGI_FORMAT_R16G16B16A16_FLOAT, kFogScreen, kFogScreen, 1, sceneColor) ||
@@ -159,11 +164,11 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
             return false;
         }
 
-        colorRegistration.Register(resources, sceneColor.Get());
-        depthRegistration.Register(resources, sceneDepth.Get());
-        shadowRegistration.Register(resources, shadowMap.Get());
-        cloudRegistration.Register(resources, cloudMap.Get());
-        noiseRegistration.Register(resources, blueNoise.Get());
+        colorRegistration.Register(resources, sceneColor.get());
+        depthRegistration.Register(resources, sceneDepth.get());
+        shadowRegistration.Register(resources, shadowMap.get());
+        cloudRegistration.Register(resources, cloudMap.get());
+        noiseRegistration.Register(resources, blueNoise.get());
         if (!colorRegistration.IsValid() || !depthRegistration.IsValid() ||
             !shadowRegistration.IsValid() || !cloudRegistration.IsValid() ||
             !noiseRegistration.IsValid())
@@ -222,7 +227,7 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
         bool ok = true;
 
         // 씬 색 — 회색.
-        ok = ok && upload(sceneColor.Get(), DXGI_FORMAT_R16G16B16A16_FLOAT,
+        ok = ok && upload(sceneColor.get(), DXGI_FORMAT_R16G16B16A16_FLOAT,
             kFogScreen, kFogScreen, 8, 0, [](uint32_t, uint32_t, void* texel)
         {
             auto* rgba = static_cast<uint16_t*>(texel);
@@ -231,7 +236,7 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
         });
 
         // 깊이 — 화면 전체가 같은 거리.
-        ok = ok && upload(sceneDepth.Get(), DXGI_FORMAT_R32_FLOAT,
+        ok = ok && upload(sceneDepth.get(), DXGI_FORMAT_R32_FLOAT,
             kFogScreen, kFogScreen, 4, 0, [](uint32_t, uint32_t, void* texel)
         {
             *static_cast<float*>(texel) = kFogSceneDepth;
@@ -241,12 +246,12 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
         // LESS_EQUAL이라 어떤 좌표든 '가려지지 않음'이 나온다.
         for (uint32_t slice = 0; slice < kShadowCascadeCount && ok; ++slice)
         {
-            ok = upload(shadowMap.Get(), DXGI_FORMAT_R32_FLOAT, 64, 64, 4, slice,
+            ok = upload(shadowMap.get(), DXGI_FORMAT_R32_FLOAT, 64, 64, 4, slice,
                 [](uint32_t, uint32_t, void* texel) { *static_cast<float*>(texel) = 1.f; });
         }
 
         // 구름 — 흰색. 원본 ②대로 이 값이 포그 밀도를 그대로 좌우한다.
-        ok = ok && upload(cloudMap.Get(), DXGI_FORMAT_R8G8B8A8_UNORM, 4, 4, 4, 0,
+        ok = ok && upload(cloudMap.get(), DXGI_FORMAT_R8G8B8A8_UNORM, 4, 4, 4, 0,
             [](uint32_t, uint32_t, void* texel)
         {
             auto* rgba = static_cast<uint8_t*>(texel);
@@ -254,7 +259,7 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
         });
 
         // 블루 노이즈 — 지터의 씨앗. 내용은 아무거나 되되 고르게 퍼져야 한다.
-        ok = ok && upload(blueNoise.Get(), DXGI_FORMAT_R8G8B8A8_UNORM, 64, 64, 4, 0,
+        ok = ok && upload(blueNoise.get(), DXGI_FORMAT_R8G8B8A8_UNORM, 64, 64, 4, 0,
             [](uint32_t x, uint32_t y, void* texel)
         {
             auto* rgba = static_cast<uint8_t*>(texel);
@@ -270,8 +275,8 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
             return false;
         }
 
-        ID3D12Resource* const sources[5] = { sceneColor.Get(), sceneDepth.Get(),
-            shadowMap.Get(), cloudMap.Get(), blueNoise.Get() };
+        ID3D12Resource* const sources[5] = { sceneColor.get(), sceneDepth.get(),
+            shadowMap.get(), cloudMap.get(), blueNoise.get() };
         D3D12_RESOURCE_BARRIER barriers[5]{};
         for (uint32_t i = 0; i < 5; ++i)
         {

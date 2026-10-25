@@ -2,8 +2,12 @@
 // No SDK acceptance, GPU lifetime, latency, performance or pixel claims.
 #include "../../Engine/RenderEngine/Render/Temporal/SpatialPostEffects.h"
 #include "../../Engine/RenderEngine/Render/Temporal/TemporalUpscalerHost.h"
-#include "../../Engine/Utility_Framework/Contract.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 int main()
 {

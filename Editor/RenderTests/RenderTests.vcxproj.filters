@@ -1,31 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <ItemGroup>
-    <ClInclude Include="RHI\DX12\Tests\RHISoftwareNativeTests.h" />
-    <ClCompile Include="ExperimentParity\ExperimentTexturePipelineSelfTest.cpp" />
-    <ClInclude Include="ExperimentParity\ExperimentTexturePipelineSelfTest.h" />
-    <ClInclude Include="Tasks\WorkerPoolSelfTest.h" />
-    <ClInclude Include="Tasks\SceneLoadJobsSelfTest.h" />
-    <ClInclude Include="Tasks\SceneGCSelfTest.h" />
-    <ClInclude Include="RHI\ParallelRecordingJobsSelfTest.h" />
-    <ClCompile Include="ExperimentParity\ExperimentCodeMaterialCodecSelfTest.cpp" />
-    <ClCompile Include="ExperimentParity\ExperimentAssetSetManifestSelfTest.cpp" />
-    <ClCompile Include="Tasks\WorkerPoolSelfTest.cpp" />
-    <ClCompile Include="Tasks\SceneLoadJobsSelfTest.cpp" />
-    <ClCompile Include="Tasks\SceneGCSelfTest.cpp" />
-    <ClInclude Include="Animation\AnimationBaselineProbe.h" />
-    <ClInclude Include="Animation\AnimationPlaybackSelfTest.h" />
-    <ClInclude Include="Animation\AnimationVisualProbe.h" />
-    <ClCompile Include="Animation\AnimationVisualProbe.cpp" />
-    <ClCompile Include="Animation\AnimationBaselineProbe.cpp" />
-    <ClCompile Include="Animation\AnimationPlaybackSelfTest.cpp" />
-  </ItemGroup>
-  <ItemGroup>
-    <Filter Include="ExperimentParity">
-      <UniqueIdentifier>{7c2f1b4a-9d63-4e8f-b1a5-2f04c8de6a11}</UniqueIdentifier>
+    <Filter Include="Animation">
+      <UniqueIdentifier>{5F05F007-463E-59B7-81BE-A6B0BACFE1F0}</UniqueIdentifier>
     </Filter>
     <Filter Include="AssetIdentity">
       <UniqueIdentifier>{4e8a1f27-6c3b-4d95-a0e2-9b7f3c5d1a86}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="ExperimentParity">
+      <UniqueIdentifier>{7c2f1b4a-9d63-4e8f-b1a5-2f04c8de6a11}</UniqueIdentifier>
     </Filter>
     <Filter Include="RHI">
       <UniqueIdentifier>{d1c5d20e-36ec-568f-80b0-e388f485aa93}</UniqueIdentifier>
@@ -57,8 +40,65 @@
     <Filter Include="RHI\Vulkan\Tests">
       <UniqueIdentifier>{5c1077f1-2f30-5132-ba2d-da9008913221}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Tasks">
+      <UniqueIdentifier>{D92C3E48-FDE9-5365-8BDC-846A81B65125}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="Animation\AnimationBaselineProbe.cpp">
+      <Filter>Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="Animation\AnimationPlaybackSelfTest.cpp">
+      <Filter>Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="Animation\AnimationVisualProbe.cpp">
+      <Filter>Animation</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetIdentity\AssetIdentitySelfTest.cpp">
+      <Filter>AssetIdentity</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetIdentity\AssetSidecarSchemaSelfTest.cpp">
+      <Filter>AssetIdentity</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetIdentity\ModelAssetGenerationSelfTest.cpp">
+      <Filter>AssetIdentity</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetIdentity\SceneModelGenerationSelfTest.cpp">
+      <Filter>AssetIdentity</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentAssetSetManifestSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentCatalogSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentCodeMaterialCodecSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentCookedSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentMaterialCookSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentMaterialMigrateSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentMaterialResolveSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentMaterialScriptSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentSceneCookSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentTexturePipelineSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
+    <ClCompile Include="ExperimentParity\ExperimentVertexLayoutSelfTest.cpp">
+      <Filter>ExperimentParity</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Editor\EnhancedGizmoIconTest.cpp">
       <Filter>RHI\DX12\Tests\Editor</Filter>
     </ClCompile>
@@ -77,55 +117,19 @@
     <ClCompile Include="RHI\DX12\Tests\EnhancedSceneRendererSelfTest.cpp">
       <Filter>RHI\DX12\Tests</Filter>
     </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentCookedSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentMaterialCookSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentMaterialResolveSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentMaterialMigrateSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentMaterialScriptSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentSceneCookSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="ExperimentParity\ExperimentCatalogSelfTest.cpp">
-      <Filter>ExperimentParity</Filter>
-    </ClCompile>
-    <ClCompile Include="AssetIdentity\AssetIdentitySelfTest.cpp">
-      <Filter>AssetIdentity</Filter>
-    </ClCompile>
-    <ClCompile Include="AssetIdentity\AssetSidecarSchemaSelfTest.cpp">
-      <Filter>AssetIdentity</Filter>
-    </ClCompile>
-    <ClCompile Include="AssetIdentity\ModelAssetGenerationSelfTest.cpp">
-      <Filter>AssetIdentity</Filter>
-    </ClCompile>
-    <ClCompile Include="AssetIdentity\SceneModelGenerationSelfTest.cpp">
-      <Filter>AssetIdentity</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\ShaderReflectionSelfTest.cpp">
-      <Filter>RHI</Filter>
-    </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedDecalTest.cpp">
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedBlendedStreamTest.cpp">
       <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedBlendedStreamTest.cpp">
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedDecalTest.cpp">
       <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedForwardPlusTest.cpp">
       <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Geometry\GraphSceneFixture.cpp">
+    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedSkinningTest.cpp">
       <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\DX12\Tests\Geometry\EnhancedSkinningTest.cpp">
+    <ClCompile Include="RHI\DX12\Tests\Geometry\GraphSceneFixture.cpp">
       <Filter>RHI\DX12\Tests\Geometry</Filter>
     </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\Lighting\EnhancedIBLTest.cpp">
@@ -152,16 +156,22 @@
     <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedPostChainTest.cpp">
       <Filter>RHI\DX12\Tests\PostProcess</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\DX12\Tests\PostProcess\EnhancedTemporalHistoryTest.cpp">
+      <Filter>RHI\DX12\Tests\PostProcess</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\DX12\Tests\UI\EnhancedUITest.cpp">
       <Filter>RHI\DX12\Tests\UI</Filter>
     </ClCompile>
-    <ClCompile Include="RHI\Vulkan\Tests\PbrSealLedgerTest.cpp">
-      <Filter>RHI\Vulkan\Tests</Filter>
+    <ClCompile Include="RHI\ShaderReflectionSelfTest.cpp">
+      <Filter>RHI</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\Tests\PbrCaptureCompare.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\Tests\PbrNormalPair.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\PbrSealLedgerTest.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
     <ClCompile Include="RHI\Vulkan\Tests\VulkanGizmoLineTest.cpp">
@@ -188,6 +198,9 @@
     <ClCompile Include="RHI\Vulkan\Tests\VulkanSSSTest.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
+    <ClCompile Include="RHI\Vulkan\Tests\VulkanTextureCodecTest.cpp">
+      <Filter>RHI\Vulkan\Tests</Filter>
+    </ClCompile>
     <ClCompile Include="RHI\Vulkan\Tests\VulkanUITest.cpp">
       <Filter>RHI\Vulkan\Tests</Filter>
     </ClCompile>
@@ -200,13 +213,25 @@
     <ClCompile Include="RHI\Vulkan\VulkanSelfTest.cpp">
       <Filter>RHI\Vulkan</Filter>
     </ClCompile>
+    <ClCompile Include="Tasks\SceneGCSelfTest.cpp">
+      <Filter>Tasks</Filter>
+    </ClCompile>
+    <ClCompile Include="Tasks\SceneLoadJobsSelfTest.cpp">
+      <Filter>Tasks</Filter>
+    </ClCompile>
+    <ClCompile Include="Tasks\WorkerPoolSelfTest.cpp">
+      <Filter>Tasks</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="RHI\DX12\Tests\DX12SelfTest.h">
-      <Filter>RHI\DX12\Tests</Filter>
+    <ClInclude Include="Animation\AnimationBaselineProbe.h">
+      <Filter>Animation</Filter>
     </ClInclude>
-    <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h">
-      <Filter>RHI\DX12\Tests</Filter>
+    <ClInclude Include="Animation\AnimationPlaybackSelfTest.h">
+      <Filter>Animation</Filter>
+    </ClInclude>
+    <ClInclude Include="Animation\AnimationVisualProbe.h">
+      <Filter>Animation</Filter>
     </ClInclude>
     <ClInclude Include="AssetIdentity\AssetIdentitySelfTest.h">
       <Filter>AssetIdentity</Filter>
@@ -223,11 +248,77 @@
     <ClInclude Include="AssetIdentity\SceneModelGenerationSelfTest.h">
       <Filter>AssetIdentity</Filter>
     </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentCatalogSelfTest.h">
+      <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentCookedSelfTest.h">
+      <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentMaterialCookSelfTest.h">
+      <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentMaterialMigrateSelfTest.h">
+      <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentMaterialResolveSelfTest.h">
+      <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentMaterialScriptSelfTest.h">
+      <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentSceneCookSelfTest.h">
+      <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentTexturePipelineSelfTest.h">
+      <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="ExperimentParity\ExperimentVertexLayoutSelfTest.h">
+      <Filter>ExperimentParity</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\Tests\DX12SelfTest.h">
+      <Filter>RHI\DX12\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\Tests\DX12TestTextureRegistration.h">
+      <Filter>RHI\DX12\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\Tests\EnhancedScreenRg5Tests.h">
+      <Filter>RHI\DX12\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\Tests\RenderQueueExecutionRg8Tests.h">
+      <Filter>RHI\DX12\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\Tests\RenderQueueScheduleRg8Tests.h">
+      <Filter>RHI\DX12\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\Tests\RHIQueueContractTests.h">
+      <Filter>RHI\DX12\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\Tests\RHIQueueNativeTests.h">
+      <Filter>RHI\DX12\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\Tests\RHIQueueOwnershipTests.h">
+      <Filter>RHI\DX12\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\DX12\Tests\RHISoftwareNativeTests.h">
+      <Filter>RHI\DX12\Tests</Filter>
+    </ClInclude>
+    <ClInclude Include="RHI\ParallelRecordingJobsSelfTest.h">
+      <Filter>RHI</Filter>
+    </ClInclude>
     <ClInclude Include="RHI\ShaderReflectionSelfTest.h">
       <Filter>RHI</Filter>
     </ClInclude>
     <ClInclude Include="RHI\Vulkan\VulkanSelfTest.h">
       <Filter>RHI\Vulkan</Filter>
+    </ClInclude>
+    <ClInclude Include="Tasks\SceneGCSelfTest.h">
+      <Filter>Tasks</Filter>
+    </ClInclude>
+    <ClInclude Include="Tasks\SceneLoadJobsSelfTest.h">
+      <Filter>Tasks</Filter>
+    </ClInclude>
+    <ClInclude Include="Tasks\WorkerPoolSelfTest.h">
+      <Filter>Tasks</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

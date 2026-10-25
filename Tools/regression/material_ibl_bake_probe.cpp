@@ -1,5 +1,14 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "MaterialGraphIblBake.h"
-#include "PathFinder.h"
 #include "Texture.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
@@ -8,7 +17,7 @@
 #include "RHI/RHIShaderCompiler.h"
 #include "material_ibl_reference.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -88,10 +97,10 @@ std::vector<IblBakePoint> Points()
 
 void Run(const std::filesystem::path& root)
 {
-    auto* paths = InternalPath::GetInstance();
-    paths->BaseProjectPath = root / "Dynamic_CPP";
-    paths->ShaderSourcePath = root / "Dynamic_CPP/Assets/Shaders";
-    paths->AssetAuthoringEnabled = true;
+    auto* paths = (&ce::paths::get_state());
+    paths->base_project_path = root / "Dynamic_CPP";
+    paths->shader_source_path = root / "Dynamic_CPP/Assets/Shaders";
+    paths->asset_authoring_enabled = true;
     const auto shaderRoot = root / "Dynamic_CPP/Assets/Shaders/DefaultPassShader";
     const auto table = LoadSheenTable(root / "Tools/blender/fixtures/principled-layered-5.1.1/sheen-ltc.csv");
     RHIShaderCompileOptions options;

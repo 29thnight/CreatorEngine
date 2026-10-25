@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "VulkanSelfTest.h"
 #include "RHI/ShaderReflectionSelfTest.h"
 #include "RHI/Vulkan/VulkanDeviceResources.h"
@@ -11,13 +16,15 @@
 #include "DataSystem.h"
 #include "Assets/ModelAssetGeneration.h"
 #include "Mesh.h" // Vertex(격리 쿼드)
-#include "PathFinder.h"
-
-#include <Windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 #include <DirectXTex.h>
 
 #include <stddef.h>
-#include "../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 using namespace VulkanApi;
 
@@ -173,7 +180,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, const std::string& mode
         return false;
     }
 
-    const file::path scenePath = file::path(modelPath);
+    const std::filesystem::path scenePath = std::filesystem::path(modelPath);
     // MBC9 — typed generation이 유일한 모델 지오메트리 출처다(Assimp·legacy Mesh 은퇴).
     const assets::ModelAssetGeneration::Shared sceneModel =
         DataSystems->LoadModelAssetGenerationByPath(scenePath.string());

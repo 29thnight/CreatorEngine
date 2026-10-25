@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "EditorRenderer.h"
 #include "EditorWorkspaceStore.h"
 #include "ViewportHostWindow.h"
@@ -12,20 +17,19 @@
 #include "RHI/IImGuiHost.h"
 #include "EditorFontResources.h"
 #include "EditorTheme.h"
-#include "EditorAssetPresentation.h"
-#include "EditorImGuiTexture.h"
-#include "EditorSettingsStore.h"
-#include "PathFinder.h"
+#include "../EngineEntry/Assets/EditorAssetPresentation.h"
+#include "../EngineEntry/Presentation/EditorImGuiTexture.h"
+#include "../EngineEntry/Project/EditorSettingsStore.h"
 #include "EditorWindowNames.h"
-#include "EditorSessionState.h"
+#include "../EngineEntry/Project/EditorSessionState.h"
 #include "SceneManager.h"
 #include "Scene.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
-#include "../../Engine/Utility_Framework/WarmupLedger.h"
+#include "../../Engine/Utility_Framework/Runtime/WarmupLedger.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -89,7 +93,7 @@ EditorRenderer::~EditorRenderer()
 
 void EditorRenderer::AddEditorFonts()
 {
-    ::editor::fonts::set_resource_root(PathFinder::EngineResourcePath());
+    ::editor::fonts::set_resource_root(ce::paths::engine_resource_path());
     // 폰트 자원은 `editor::fonts` 한 자리가 든다(PHASE 21 W1). 경로를 손으로
     // 적던 넷을 거기로 모았고, 파일이 없을 때 죽던 자리도 거기서 막는다.
     // 왜 죽었는지는 `EditorFontResources.h` 머리에 실측과 함께 적었다 —

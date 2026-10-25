@@ -1,4 +1,15 @@
 #pragma once
+#include "AnimationPaletteArena.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Arena.h"
+#else
+import Creator.Core.Arena;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // 그리는 프록시 계층. 예전에는 이 파일에 클래스가 하나뿐이었고
 // (`PrimitiveRenderProxy //아 각 타입별로 분리하고 싶다...`) 메시·지형·폴리지·
 // 데칼·스프라이트의 필드를 한 클래스가 전부 들고 타입 태그로 갈랐다.
@@ -14,9 +25,7 @@
 // 것의 공통)가 들고, 타입별 필드는 파생이 든다. ③은 As<T>()가 받는다 —
 // 태그가 맞을 때만 그 타입 포인터를 돌려주므로 태그와 필드가 한 자리에서
 // 함께 검사된다.
-#include "Ownership.h"
 #include "RenderProxy.h"
-#include "AnimationPaletteArena.h"
 #include "LightMapping.h"
 #include "BillboardType.h"
 #include "TerrainBuffers.h"
@@ -24,7 +33,7 @@
 #include "FoliageInstance.h"
 #include <mathematics/bounds.hpp>
 #include <mathematics/matrix4x4.hpp>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 enum class PrimitiveProxyType
 {

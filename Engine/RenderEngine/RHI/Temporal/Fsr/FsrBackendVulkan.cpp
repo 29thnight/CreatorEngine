@@ -1,5 +1,13 @@
-#include "../../../../Utility_Framework/LifetimeToken.h"
-#include "../../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "FsrBackendVulkan.h"
 #if CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_VULKAN_SDK
 #include "../../Vulkan/VulkanDeviceResources.h"

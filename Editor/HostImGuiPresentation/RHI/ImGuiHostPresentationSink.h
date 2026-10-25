@@ -1,4 +1,9 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
 #if defined(CE_PLAYER)
 #error "Editor ImGui presentation is unavailable to Player; use native RHI presentation."
@@ -6,7 +11,7 @@
 
 #include "IImGuiHost.h"
 #include "RHI/IDisplayPresentationSink.h"
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // Editor의 IImGuiHost를 Core의 표시 sink 계약 뒤로 위임한다.
 // Player는 native RHI 표시 경로를 사용하며 이 어댑터를 설치하지 않는다.

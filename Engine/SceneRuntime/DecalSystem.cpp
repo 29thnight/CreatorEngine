@@ -2,7 +2,7 @@
 #include "LifecycleTrace.h"
 #include "DecalComponent.h"
 #include "Entity.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 void DecalSystem::Register(DecalComponent* decal)
 {
@@ -44,7 +44,7 @@ void DecalSystem::Update(float tick)
         // 안 남기면 이관할수록 기준선의 커버리지가 조용히 준다(같은 문자열을 써야
         // 대조가 성립하므로 Lifecycle::Trace::TypeNameOf 공용 함수를 쓴다).
         LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(decal),
-            owner->m_name.ToString().c_str(), decal->GetInstanceID());
+            owner->m_name.c_str(), decal->GetInstanceID());
 
         // ── 이하 옛 DecalComponent::Update 본문 그대로(트랙 C3 이관) ──
         // owner->IsEnabled()는 위 공통 가드의 decal->IsEnabled()와는 다른

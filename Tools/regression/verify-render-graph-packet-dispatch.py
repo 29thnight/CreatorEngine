@@ -9,6 +9,7 @@ compiles the full production storage types. CPU timings are fixture timings.
 No dependencies are downloaded and no production source is edited.
 """
 
+import runpy
 import argparse
 import hashlib
 import json
@@ -77,11 +78,13 @@ def main():
     probe = Path(__file__).with_name("render_graph_packet_dispatch_probe.cpp")
     utility = Path("Engine/Utility_Framework")
     render = Path("Engine/RenderEngine")
-    mirrored = [utility / name for name in ("StandardLibrary.h", "JobScheduler.h", "JobScheduler.cpp",
-                "ThreadPool.h", "ThreadPool.cpp", "JobGraph.h", "Arena.cpp", "Arena.h", "HeapAllocator.h",
-                "Ownership.h", "LifetimeToken.h")]
+    mirrored = [utility / name for name in ("Foundation/StandardLibrary.h", "Concurrency/JobScheduler.cpp",
+                "Concurrency/ThreadPool.cpp", "Memory/Arena.cpp", )]
+    mirrored += [Path("Engine/Contracts/Concurrency/Creator.Concurrency.JobGraph.ixx"),
+                 Path("Tools/build/ModuleAdapters/Creator.Concurrency.JobGraph.h")]
     mirrored += [render / name for name in ("RenderArena.h", "RenderArena.cpp", "RenderAllocator.h")]
     mirrored += [Path("ThirdParty/ownership_cpp/include/own/ownership.hpp")]
+    mirrored = runpy.run_path(str(ROOT / "Tools/build/generate-module-adapters.py"))["memory_source_inputs"](mirrored)
     inputs = [ROOT / SOURCE, ROOT / HEADER, probe, Path(__file__).resolve()] + [ROOT / p for p in mirrored]
     snapshots = {path: path.read_bytes() for path in inputs}
     baseline_commit = subprocess.check_output(["git", "rev-parse", args.baseline_ref + "^{commit}"],
@@ -121,9 +124,9 @@ inline void mi_free(void* value) { std::free(value); }
         command = [compiler, "-std=c++23", "-O2", "-g", "-pthread", "-DCE_CONTRACT_STANDALONE=1",
                    "-DCE_SHIPPING=0", "-Wall", "-Wextra", "-Werror", "-Wno-unknown-pragmas",
                    "-I", str(target), "-I", str(mirror), "-I", str(include.parent),
-                   str(target / "probe.cpp"), str(mirror / utility / "JobScheduler.cpp"),
-                   str(mirror / utility / "ThreadPool.cpp"), str(mirror / render / "RenderArena.cpp"),
-                   str(mirror / utility / "Arena.cpp"),
+                   str(target / "probe.cpp"), str(mirror / utility / "Concurrency/JobScheduler.cpp"),
+                   str(mirror / utility / "Concurrency/ThreadPool.cpp"), str(mirror / render / "RenderArena.cpp"),
+                   str(mirror / utility / "Memory/Arena.cpp"),
                    str(enki / "TaskScheduler.cpp"), "-o", str(executable)]
         if args.sanitize:
             command += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-fno-sanitize-recover=all"]

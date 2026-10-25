@@ -6,7 +6,7 @@ allocators, resource/pipeline registries, common recorder/translator/FIFO and
 JobScheduler/enkiTS are the actual source. Vulkan function pointers are CPU mocks;
 this does not run a Vulkan device or validate rendered pixels. Shared-image
 construction and rollback use the actual VulkanSharedDisplayImage implementation;
-D3D12/DXGI/WRL declarations and calls are CPU mocks, not a Windows SDK or COM ABI
+D3D12/DXGI/com_ptr declarations and calls are CPU mocks, not a Windows SDK or COM ABI
 validation. DX12 exact subresource lowering uses the same declared native boundary.
 A mirrored header
 excludes unrelated texture-cache declarations/COM and trailing mesh declarations.
@@ -39,8 +39,8 @@ CPP = [VK / (name + '.cpp') for name in (
 CPP += [RHI / (name + '.cpp') for name in (
     'RHICommandTranslator', 'RHISoftwareCommandList', 'RHISoftwareEncoder',
     'RHISoftwareBatch', 'RHISoftwareRecorder', 'RHISubmissionThread', 'RHIDeviceMemoryBudgetCoordinator')]
-CPP += [Path('Engine/RenderEngine/RenderArena.cpp'), Path('Engine/Utility_Framework/JobScheduler.cpp'),
-        Path('Engine/Utility_Framework/ThreadPool.cpp'), Path('Engine/Utility_Framework/Arena.cpp')]
+CPP += [Path('Engine/RenderEngine/RenderArena.cpp'), Path('Engine/Utility_Framework/Concurrency/JobScheduler.cpp'),
+        Path('Engine/Utility_Framework/Concurrency/ThreadPool.cpp'), Path('Engine/Utility_Framework/Memory/Arena.cpp')]
 DEVICE_METHODS = ('Initialize', 'Shutdown', 'PrepareParallelSubmission', 'AcceptParallelSubmission',
                   'RejectNeverEnqueuedRecording', 'SubmitParallelCommandBuffers', 'FindMemoryType')
 SERVICE_METHODS = ('ReleaseTexture', 'DescribeTexture')
@@ -199,7 +199,7 @@ inline void OutputDebugStringA(const char*) {}
 ''')
         interop = root / 'Tools/regression/fixtures/rhi-d3d12-interop-boundary.h'
         (include / interop.name).write_bytes(snapshots[interop])
-        for native_header in ('d3d12.h', 'dxgi1_6.h', 'wrl/client.h'):
+        for native_header in ('d3d12.h', 'dxgi1_6.h', 'winrt/base.h'):
             destination = include / native_header
             destination.parent.mkdir(parents=True, exist_ok=True)
             destination.write_text('#include "rhi-d3d12-interop-boundary.h"\n')
@@ -212,6 +212,12 @@ inline void OutputDebugStringA(const char*) {}
                 continue
             out.parent.mkdir(parents=True, exist_ok=True)
             out.write_bytes(data)
+        # Native engine imports are SDK header units. The CPU mirror keeps the
+        # same include boundary while supplying only its declared API mocks.
+        for name in ('Creator.WinAPI.h', 'Creator.GraphicsSDK.h', 'Creator.ComSupport.h'):
+            boundary = mirror / 'Engine/Platform/WindowsSDK' / name
+            boundary.parent.mkdir(parents=True, exist_ok=True)
+            boundary.write_text('#pragma once\n#include <windows.h>\n#include "rhi-d3d12-interop-boundary.h"\n')
         allocator = mirror / 'ThirdParty/mimalloc/include/mimalloc.h'
         allocator.parent.mkdir(parents=True, exist_ok=True)
         allocator.write_text('''#pragma once

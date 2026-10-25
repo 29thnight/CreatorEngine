@@ -1,11 +1,16 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #if defined(CE_PLAYER)
 #error "Editor ImGui presentation is unavailable to Player; use native RHI presentation."
 #endif
 
 #include "RHI/RHIDisplayFrame.h"
 #include "Texture.h"
-#include "../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 
 // 사용자 텍스처 descriptor는 마지막 표시 이후 충분히 오래 사용되지 않을 때

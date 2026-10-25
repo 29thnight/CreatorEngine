@@ -1,3 +1,9 @@
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "ModelGenerationExportProducer.h"
 #include "CookedTexture.h"
 #include "TextureImportSettings.h"
@@ -5,12 +11,16 @@
 #include "../../Assets/ModelAssetGeneration.h"
 #include "../../Assets/ModelSidecarV2.h"
 #include "../../Assets/ModelMaterialGraph.h"
-#include "AuthoringCookedDocument.h"
-#include "AuthoringParsedDocument.h"
-#include "AuthoringWriteNode.h"
-#include "Sha256.h"
+#include "../../../Utility_Framework/Authoring/AuthoringCookedDocument.h"
+#include "../../../Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../../Utility_Framework/Authoring/AuthoringWriteNode.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace experiment::cooked
 {
@@ -89,7 +99,7 @@ namespace experiment::cooked
         }
 
         const std::filesystem::path generationPath = request.generationRoot
-            / Uuid::ToString(sidecar.assetId) / std::to_string(sidecar.generation);
+            / uuid::to_string(sidecar.assetId) / std::to_string(sidecar.generation);
         if (!std::filesystem::is_directory(generationPath, error) || error)
         {
             AddIssue(result, "generation", "게시된 generation이 없다(--author-model-asset "
@@ -139,7 +149,7 @@ namespace experiment::cooked
         product.embeddedTextureCount = loaded.generation->Textures().size();
         product.meshCount = loaded.generation->Meshes().size();
 
-        const std::string idText = Uuid::ToString(sidecar.assetId);
+        const std::string idText = uuid::to_string(sidecar.assetId);
         const std::string prefix = "Derived/Models/" + idText.substr(0, 2) + "/" + idText
             + "/" + std::to_string(sidecar.generation) + "/";
 
@@ -237,7 +247,7 @@ namespace experiment::cooked
             return result;
         }
         const auto recordRoot = recordDocument->Root();
-        recordRoot.Child("sidecarFingerprint").SetScalar("sha256:" + Hash::ToHex(sidecarDigest));
+        recordRoot.Child("sidecarFingerprint").SetScalar("sha256:" + ce::hash::to_hex(sidecarDigest));
         const auto subAssets = recordRoot.Child("subAssets");
         std::size_t cookedTextures{};
         for (std::size_t index = 0; index < subAssets.Size(); ++index)
@@ -250,7 +260,7 @@ namespace experiment::cooked
             const auto textureId = entry.Read()["assetId"].AsString();
             const auto texture = std::ranges::find_if(loaded.generation->Textures(), [&](const auto& value)
             {
-                return Uuid::ToString(value.textureId) == textureId;
+                return uuid::to_string(value.textureId) == textureId;
             });
             const auto originalPath = entry.Read()["artifactPath"].AsString();
             const auto originalFingerprint = entry.Read()["artifactFingerprint"].AsString();
@@ -261,7 +271,7 @@ namespace experiment::cooked
             Sha256Digest sourceDigest{};
             if (texture == loaded.generation->Textures().end() || textureFile == product.files.end() ||
                 !ComputeSha256(textureFile->bytes, sourceDigest, recordFailure) ||
-                originalFingerprint != "sha256:" + Hash::ToHex(sourceDigest))
+                originalFingerprint != "sha256:" + ce::hash::to_hex(sourceDigest))
             {
                 AddIssue(result, "generation.textures", "Generation texture snapshot/identity mismatch: " + textureId);
                 return result;
@@ -287,7 +297,7 @@ namespace experiment::cooked
             textureFile->artifactPath = prefix + cookedPath;
             textureFile->bytes = std::move(cookedBytes);
             entry.Child("artifactPath").SetScalar(cookedPath);
-            entry.Child("artifactFingerprint").SetScalar("sha256:" + Hash::ToHex(cookedDigest));
+            entry.Child("artifactFingerprint").SetScalar("sha256:" + ce::hash::to_hex(cookedDigest));
             ++cookedTextures;
         }
         if (cookedTextures != product.embeddedTextureCount ||
@@ -353,7 +363,7 @@ namespace experiment::cooked
         for (const assets::ModelTextureAsset& texture : loaded.generation->Textures())
         {
             const std::filesystem::path textureDirectory = prefix + "textures";
-            const std::string textureStem = Uuid::ToString(texture.textureId);
+            const std::string textureStem = uuid::to_string(texture.textureId);
             const auto matchesTexture = [&](const ModelGenerationExportFile& candidate) {
                 const std::filesystem::path path(candidate.artifactPath);
                 return path.parent_path() == textureDirectory && path.stem().string() == textureStem;

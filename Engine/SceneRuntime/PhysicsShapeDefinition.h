@@ -1,8 +1,18 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
 
 #include "CollisionGeometrySource.h"
 #include "ProjectLayerSettings.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include <mathematics/views.hpp>
 
 enum class PhysicsShapeKind : std::uint8_t
@@ -103,9 +113,9 @@ result<std::vector<ShapeInstance>> BuildPhysicsShapesImpl(std::span<const Physic
         {
             if (!definition.contactRole.empty())
             {
-                Uuid::Uuid16 role;
-                if (definition.contactRole.size() != 36 || !Uuid::TryParse(definition.contactRole, role) ||
-                    role.IsNil() || Uuid::ToString(role) != definition.contactRole)
+                uuid::uuid16 role;
+                if (definition.contactRole.size() != 36 || !uuid::try_parse(definition.contactRole, role) ||
+                    role.is_nil() || uuid::to_string(role) != definition.contactRole)
                     return std::unexpected(error{error_code::invalid_argument, 0, "Invalid contact role UUID"});
             }
 
@@ -190,8 +200,8 @@ result<std::vector<ShapeInstance>> BuildPhysicsShapesImpl(std::span<const Physic
             case PhysicsShapeKind::triangle_mesh:
             case PhysicsShapeKind::heightfield: {
                 geometry_asset_key key;
-                if (definition.geometryAsset.size() != 36 || !Uuid::TryParse(definition.geometryAsset, key.asset) ||
-                    key.asset.IsNil() || !definition.geometryRevision || !positiveVector(definition.geometryScale))
+                if (definition.geometryAsset.size() != 36 || !uuid::try_parse(definition.geometryAsset, key.asset) ||
+                    key.asset.is_nil() || !definition.geometryRevision || !positiveVector(definition.geometryScale))
                     return std::unexpected(error{error_code::invalid_argument, 0,
                                                  "Cooked shape requires asset UUID/revision and positive scale"});
 

@@ -1,6 +1,6 @@
 #pragma once
 #include "TemporalReconstruction.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // Separate from temporal reconstruction: NIS never supplies motion/history AA.
 enum class SpatialScalingMode : uint8_t { Off, NisScale, NisSharpen };

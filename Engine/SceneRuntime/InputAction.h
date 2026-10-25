@@ -1,8 +1,8 @@
 #pragma once
 #include <mathematics/vector2.hpp>
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include "Core.Minimal.h"
-#include "Core.Definition.h"
+#include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
+#include "../Utility_Framework/Foundation/Core.Definition.h"
 #include "KeyState.h"
 #include "InputManager.h"
 enum class ActionType

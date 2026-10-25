@@ -1,8 +1,18 @@
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "CookedAssetCatalog.h"
 #include "CookedAudioClipSource.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace experiment::cooked
 {
@@ -146,7 +156,7 @@ namespace experiment::cooked
         if (!Find(root))
         {
             outFailure = "root GUID가 catalog에 없다: "
-                + Uuid::ToString(root.value);
+                + uuid::to_string(root.value);
             return false;
         }
 
@@ -196,7 +206,7 @@ namespace experiment::cooked
                 //   아니라 도달 불가를 확인한 뒤 남긴 것이고, 그 사실을 여기
                 //   적어 둔다.
                 outFailure = "해소되지 않는 dependency: "
-                    + Uuid::ToString(frame.id.value);
+                    + uuid::to_string(frame.id.value);
                 outOrdered.clear();
                 return false;
             }
@@ -217,10 +227,10 @@ namespace experiment::cooked
     {
         [[nodiscard]] std::string MountedIdentityText(const AssetIdentity& identity)
         {
-            std::string text = Uuid::ToString(identity.assetId.value);
+            std::string text = uuid::to_string(identity.assetId.value);
             if (identity.subassetId.IsValid())
             {
-                text += "/" + Uuid::ToString(identity.subassetId.value);
+                text += "/" + uuid::to_string(identity.subassetId.value);
             }
             return text;
         }
@@ -243,7 +253,7 @@ namespace experiment::cooked
             const AssetSetManifest& manifest, const AssetSetEntry& entry)
         {
             return "mount " + std::to_string(mountId.value) + ", AssetSet "
-                + Uuid::ToString(manifest.assetSetId.value) + " revision " + std::to_string(manifest.revision)
+                + uuid::to_string(manifest.assetSetId.value) + " revision " + std::to_string(manifest.revision)
                 + ", " + manifest.blobs[entry.blobIndex].artifactPath;
         }
 

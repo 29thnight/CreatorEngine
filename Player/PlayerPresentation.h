@@ -1,10 +1,18 @@
 #include "../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
 #include "RHI/IDisplayPresentationSink.h"
-
-#include <Windows.h>
-#include "../Engine/Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace Player
 {

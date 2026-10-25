@@ -1,5 +1,19 @@
-#include "../../../Utility_Framework/LifetimeToken.h"
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "DX12QueueService.h"
 #include "DX12QueueBatchAdapter.h"
 #include "DX12QueueRecorder.h"
@@ -10,10 +24,13 @@
 #include "../../../EngineDiagnostics/ProfileScope.h"
 #include <stdint.h>
 #include <limits.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
-using Microsoft::WRL::ComPtr;
 namespace
 {
     class DX12ServiceQueue;
@@ -22,7 +39,7 @@ namespace
 
 struct DX12QueueServiceState
 {
-    ComPtr<ID3D12Device> device;
+    winrt::com_ptr<ID3D12Device> device;
     std::mutex admission;
     std::atomic<bool> active{true};
     uint64_t incarnation{AllocateRHIDeviceIncarnation()};
@@ -32,16 +49,16 @@ struct DX12QueueServiceState
     int testRejection{0};
     std::vector<own::shared_owner<DX12ServiceQueue>> queues;
     own::shared_owner<IRHITimelineFence> primaryTimeline;
-    ComPtr<ID3D12CommandQueue> primaryQueue;
-    std::vector<ComPtr<ID3D12Fence>> primaryWaits;
+    winrt::com_ptr<ID3D12CommandQueue> primaryQueue;
+    std::vector<winrt::com_ptr<ID3D12Fence>> primaryWaits;
 };
 
 namespace
 {
     struct DX12QueueRecordingStorage
     {
-        ComPtr<ID3D12CommandAllocator> allocator;
-        ComPtr<ID3D12GraphicsCommandList> list;
+        winrt::com_ptr<ID3D12CommandAllocator> allocator;
+        winrt::com_ptr<ID3D12GraphicsCommandList> list;
         own::unique_owner<DX12Encoder> encoder;
     };
 
@@ -101,7 +118,7 @@ namespace
             {
                 throw std::runtime_error("Queue encoder dropped a command.");
             }
-            encoder.ResetState((*leases)[target]->storage->list.Get());
+            encoder.ResetState((*leases)[target]->storage->list.get());
             return encoder;
         }
 
@@ -144,7 +161,7 @@ namespace
                     return false;
                 }
                 lease->closed = true;
-                lists[target] = lease->storage->list.Get();
+                lists[target] = lease->storage->list.get();
             }
             // One retirement owns all targets, in their original contiguous order.
             return DX12SealQueueRecording(queue, std::span(lists.data(), targetCount), leases, batch, error);
@@ -204,19 +221,19 @@ namespace
         RHIQueueIdentity identity;
         uint64_t recording{0};
         bool consumed{false};
-        ComPtr<ID3D12CommandAllocator> allocator;
-        ComPtr<ID3D12GraphicsCommandList> list;
-        std::array<ComPtr<ID3D12CommandList>, DX12QueueRecording::kMaxTargets> inlineLists;
-        std::vector<ComPtr<ID3D12CommandList>> sealedLists;
+        winrt::com_ptr<ID3D12CommandAllocator> allocator;
+        winrt::com_ptr<ID3D12GraphicsCommandList> list;
+        std::array<winrt::com_ptr<ID3D12CommandList>, DX12QueueRecording::kMaxTargets> inlineLists;
+        std::vector<winrt::com_ptr<ID3D12CommandList>> sealedLists;
         uint32_t sealedListCount{};
-        ComPtr<ID3D12Resource> source, destination;
+        winrt::com_ptr<ID3D12Resource> source, destination;
         ce::lifetime_token token;
         RHIQueueIdentity GetQueueIdentity() const override { return identity; }
         uint64_t GetRecordingId() const override { return recording; }
-        std::span<const ComPtr<ID3D12CommandList>> GetSealedLists() const
+        std::span<const winrt::com_ptr<ID3D12CommandList>> GetSealedLists() const
         {
             return sealedListCount <= inlineLists.size() ? std::span(inlineLists).first(sealedListCount)
-                                                         : std::span<const ComPtr<ID3D12CommandList>>(sealedLists);
+                                                         : std::span<const winrt::com_ptr<ID3D12CommandList>>(sealedLists);
         }
     };
 
@@ -224,7 +241,7 @@ namespace
     {
       public:
         own::shared_owner<DX12QueueServiceState> state;
-        ComPtr<ID3D12Fence> native;
+        winrt::com_ptr<ID3D12Fence> native;
         RHIQueueIdentity identity;
         std::atomic<uint64_t> issued{0};
         RHIQueueIdentity GetProducer() const override { return identity; }
@@ -247,13 +264,13 @@ namespace
     class DX12ServiceQueue final : public IRHICommandQueue
     {
     public:
-        ComPtr<ID3D12CommandQueue> native;
+        winrt::com_ptr<ID3D12CommandQueue> native;
         own::shared_owner<DX12ServiceTimeline> timeline;
         own::shared_owner<DX12QueueRecordingPool> recordingPool{own::make_shared<DX12QueueRecordingPool>()};
         // Keep waited fences alive until the entire service has drained. Resource
         // submission/retirement is intentionally not exposed by this primitive API.
         std::vector<own::shared_owner<DX12ServiceTimeline>> waits;
-        std::vector<ComPtr<ID3D12Fence>> testGates;
+        std::vector<winrt::com_ptr<ID3D12Fence>> testGates;
         struct Retirement
         {
             ce::pooled_owner<DX12ServiceBatch> batch;
@@ -281,7 +298,7 @@ namespace
                 return false;
             }
             const bool accepted = QueueOperation(timeline->state,
-                [&] { return native->Signal(timeline->native.Get(), value); }, error);
+                [&] { return native->Signal(timeline->native.get(), value); }, error);
             if (!accepted || timeline->native->GetCompletedValue() == UINT64_MAX ||
                 FAILED(timeline->state->device->GetDeviceRemovedReason()))
             {
@@ -320,7 +337,7 @@ namespace
                 waits.push_back(producer);
             }
             const bool accepted = QueueOperation(timeline->state,
-                [&] { return native->Wait(producer->native.Get(), point.value); }, error);
+                [&] { return native->Wait(producer->native.get(), point.value); }, error);
             if (!accepted || FAILED(timeline->state->device->GetDeviceRemovedReason()))
             {
                 // Retain even on device loss: native admission may already have occurred.
@@ -366,14 +383,14 @@ namespace
             const auto sealed = recording->GetSealedLists();
             if (sealed.empty())
             {
-                lists.push_back(recording->list.Get());
+                lists.push_back(recording->list.get());
             }
             else
             {
                 lists.reserve(sealed.size());
                 for (const auto& list : sealed)
                 {
-                    lists.push_back(list.Get());
+                    lists.push_back(list.get());
                 }
             }
             pending.push_back({recording, 0, ce::current_rhi_context}); // Own before native execution.
@@ -383,14 +400,14 @@ namespace
                 [&]
                 {
                     {
-                        const ce::dx_capture::submission_scope capture(native.Get(),
+                        const ce::dx_capture::submission_scope capture(native.get(),
                                                                        static_cast<uint32_t>(lists.size()),
                                                                        ce::dx_capture::current_submission_context());
                         RHICommandFailureScope::SetExecutionUncertain(true);
                         native->ExecuteCommandLists(static_cast<UINT>(lists.size()), lists.data());
                     }
                     executed = true;
-                    return rejection == 2 ? E_FAIL : native->Signal(timeline->native.Get(), value);
+                    return rejection == 2 ? E_FAIL : native->Signal(timeline->native.get(), value);
                 },
                 error);
             recording->consumed = executed;
@@ -489,14 +506,14 @@ namespace
         state->queues.clear();
         state->primaryTimeline.reset();
         state->primaryWaits.clear();
-        state->primaryQueue.Reset();
+        state->primaryQueue = nullptr;
     }
 }
 
 DX12QueueService::DX12QueueService(ID3D12Device* device)
     : state_(own::make_shared<DX12QueueServiceState>())
 {
-    state_->device = device;
+    state_->device.copy_from(device);
     state_->active.store(device != nullptr);
     if (device)
     {
@@ -544,9 +561,9 @@ bool DX12QueueService::CreateQueue(RHIQueueKind kind,
     D3D12_COMMAND_QUEUE_DESC desc{};
     desc.Type = kind == RHIQueueKind::Graphics ? D3D12_COMMAND_LIST_TYPE_DIRECT :
         kind == RHIQueueKind::Compute ? D3D12_COMMAND_LIST_TYPE_COMPUTE : D3D12_COMMAND_LIST_TYPE_COPY;
-    if (FAILED(state_->device->CreateCommandQueue(&desc, IID_PPV_ARGS(&result->native))) ||
+    if (FAILED(state_->device->CreateCommandQueue(&desc, IID_PPV_ARGS(result->native.put()))) ||
         FAILED(state_->device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
-            IID_PPV_ARGS(&result->timeline->native))))
+            IID_PPV_ARGS(result->timeline->native.put()))))
     {
         error = "Native queue/timeline creation failed.";
         return false;
@@ -561,9 +578,9 @@ bool DX12QueueService::ImportPrimaryCompletion(ID3D12Fence* fence, uint64_t valu
 {
     point = {};
     std::lock_guard lock(state_->admission);
-    ComPtr<ID3D12Device> device;
+    winrt::com_ptr<ID3D12Device> device;
     if (!state_->active.load() || !fence || value == 0 || value == UINT64_MAX ||
-        FAILED(fence->GetDevice(IID_PPV_ARGS(&device))) || device.Get() != state_->device.Get() ||
+        FAILED(fence->GetDevice(IID_PPV_ARGS(device.put()))) || device.get() != state_->device.get() ||
         FAILED(state_->device->GetDeviceRemovedReason()))
     {
         error = "Primary completion requires a live fence from this device.";
@@ -579,11 +596,11 @@ bool DX12QueueService::ImportPrimaryCompletion(ID3D12Fence* fence, uint64_t valu
         }
         timeline = own::make_shared<DX12ServiceTimeline>();
         timeline->state = state_;
-        timeline->native = fence;
+        timeline->native.copy_from(fence);
         timeline->identity = {state_->incarnation, state_->nextQueue++, RHIQueueKind::Graphics};
         state_->primaryTimeline = timeline;
     }
-    if (timeline->native.Get() != fence || value < timeline->issued.load())
+    if (timeline->native.get() != fence || value < timeline->issued.load())
     {
         error = "Primary completion fence changed or moved backwards.";
         return false;
@@ -599,18 +616,18 @@ bool DX12QueueService::GetPrimaryGraphicsQueue(ID3D12CommandQueue* primary,
     queue.reset();
     error.clear();
     std::lock_guard lock(state_->admission);
-    ComPtr<ID3D12Device> device;
+    winrt::com_ptr<ID3D12Device> device;
     if (!state_->active.load() || !primary || primary->GetDesc().Type != D3D12_COMMAND_LIST_TYPE_DIRECT ||
-        FAILED(primary->GetDevice(IID_PPV_ARGS(&device))) || device.Get() != state_->device.Get() ||
+        FAILED(primary->GetDevice(IID_PPV_ARGS(device.put()))) || device.get() != state_->device.get() ||
         FAILED(state_->device->GetDeviceRemovedReason()) ||
-        (state_->primaryQueue && state_->primaryQueue.Get() != primary))
+        (state_->primaryQueue && state_->primaryQueue.get() != primary))
     {
         error = "Primary graphics endpoint requires this device's live presentation queue.";
         return false;
     }
     for (const auto& endpoint : state_->queues)
     {
-        if (endpoint->native.Get() == primary)
+        if (endpoint->native.get() == primary)
         {
             if (endpoint->faulted)
             {
@@ -627,18 +644,18 @@ bool DX12QueueService::GetPrimaryGraphicsQueue(ID3D12CommandQueue* primary,
         return false;
     }
     auto endpoint = own::make_shared<DX12ServiceQueue>();
-    endpoint->native = primary;
+    endpoint->native.copy_from(primary);
     endpoint->timeline = own::make_shared<DX12ServiceTimeline>();
     endpoint->timeline->state = state_;
     endpoint->timeline->identity = {state_->incarnation, state_->nextQueue++, RHIQueueKind::Graphics};
     if (FAILED(state_->device->CreateFence(0, D3D12_FENCE_FLAG_NONE,
-        IID_PPV_ARGS(&endpoint->timeline->native))))
+        IID_PPV_ARGS(endpoint->timeline->native.put()))))
     {
         error = "Primary graphics timeline creation failed.";
         return false;
     }
     state_->queues.push_back(endpoint);
-    state_->primaryQueue = primary;
+    state_->primaryQueue.copy_from(primary);
     queue = std::move(endpoint);
     return true;
 }
@@ -650,7 +667,7 @@ ID3D12CommandQueue* DX12QueueService::NativeQueue(const own::shared_owner<IRHICo
     {
         return nullptr;
     }
-    return native->native.Get();
+    return native->native.get();
 }
 
 bool DX12QueueService::JoinPrimaryQueue(ID3D12CommandQueue* queue,
@@ -658,20 +675,20 @@ bool DX12QueueService::JoinPrimaryQueue(ID3D12CommandQueue* queue,
 {
     std::unique_lock lock(state_->admission);
     const auto producer = own::dynamic_owner_cast<DX12ServiceTimeline>(point.fence);
-    ComPtr<ID3D12Device> device;
+    winrt::com_ptr<ID3D12Device> device;
     if (!state_->active.load() || !queue || queue->GetDesc().Type != D3D12_COMMAND_LIST_TYPE_DIRECT ||
-        FAILED(queue->GetDevice(IID_PPV_ARGS(&device))) || device.Get() != state_->device.Get() ||
+        FAILED(queue->GetDevice(IID_PPV_ARGS(device.put()))) || device.get() != state_->device.get() ||
         !producer || producer->state.operator->() != state_.operator->() || !point.IsValid() ||
-        (state_->primaryQueue && state_->primaryQueue.Get() != queue) ||
+        (state_->primaryQueue && state_->primaryQueue.get() != queue) ||
         FAILED(state_->device->GetDeviceRemovedReason()))
     {
         error = "Primary join requires an issued completion from this device service.";
         return false;
     }
-    state_->primaryQueue = queue;
+    state_->primaryQueue.copy_from(queue);
     for (const auto& endpoint : state_->queues)
     {
-        if (endpoint->native.Get() == queue && endpoint->timeline.operator->() == producer.operator->())
+        if (endpoint->native.get() == queue && endpoint->timeline.operator->() == producer.operator->())
         {
             // Graph epilogue already joined compute. The primary frame suffix
             // follows it in FIFO order and retains the ordinary frame-slot fence.
@@ -679,12 +696,12 @@ bool DX12QueueService::JoinPrimaryQueue(ID3D12CommandQueue* queue,
         }
     }
     if (std::find_if(state_->primaryWaits.begin(), state_->primaryWaits.end(),
-        [&](const auto& fence) { return fence.Get() == producer->native.Get(); }) == state_->primaryWaits.end())
+        [&](const auto& fence) { return fence.get() == producer->native.get(); }) == state_->primaryWaits.end())
     {
         state_->primaryWaits.push_back(producer->native);
     }
     lock.unlock(); // Never hold admission while waiting behind an RHI-owned plan.
-    if (!QueueOperation(state_, [&] { return queue->Wait(producer->native.Get(), point.value); }, error))
+    if (!QueueOperation(state_, [&] { return queue->Wait(producer->native.get(), point.value); }, error))
     {
         error = "Primary queue GPU wait failed.";
         return false;
@@ -697,7 +714,7 @@ bool DX12QueueService::Shutdown(std::string& error)
     error.clear();
     std::vector<ce::pooled_owner<DX12ServiceBatch>> released;
     std::vector<own::shared_owner<DX12ServiceQueue>> queues;
-    ComPtr<ID3D12CommandQueue> primary;
+    winrt::com_ptr<ID3D12CommandQueue> primary;
     {
         std::lock_guard lock(state_->admission);
         state_->active.store(false);
@@ -721,7 +738,7 @@ bool DX12QueueService::Shutdown(std::string& error)
     // Final markers cover waits accepted after the last public Signal. Public
     // waits only accept already-issued signals, so this primitive API cannot
     // create a wait on a future, unissued value.
-    std::vector<std::pair<ComPtr<ID3D12Fence>, uint64_t>> markers;
+    std::vector<std::pair<winrt::com_ptr<ID3D12Fence>, uint64_t>> markers;
     markers.reserve(queues.size());
     for (const auto& queue : queues)
     {
@@ -729,9 +746,9 @@ bool DX12QueueService::Shutdown(std::string& error)
         {
             return release();
         }
-        ComPtr<ID3D12Fence> marker;
-        if (FAILED(state_->device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&marker))) ||
-            !QueueOperation(state_, [&] { return queue->native->Signal(marker.Get(), 1); }, error))
+        winrt::com_ptr<ID3D12Fence> marker;
+        if (FAILED(state_->device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(marker.put()))) ||
+            !QueueOperation(state_, [&] { return queue->native->Signal(marker.get(), 1); }, error))
         {
             if (FAILED(state_->device->GetDeviceRemovedReason()))
             {
@@ -745,9 +762,9 @@ bool DX12QueueService::Shutdown(std::string& error)
     const auto deadline = std::chrono::steady_clock::now() + std::chrono::seconds(30);
     if (primary && SUCCEEDED(state_->device->GetDeviceRemovedReason()))
     {
-        ComPtr<ID3D12Fence> marker;
-        if (FAILED(state_->device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&marker))) ||
-            !QueueOperation(state_, [&] { return primary->Signal(marker.Get(), 1); }, error))
+        winrt::com_ptr<ID3D12Fence> marker;
+        if (FAILED(state_->device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(marker.put()))) ||
+            !QueueOperation(state_, [&] { return primary->Signal(marker.get(), 1); }, error))
         {
             if (FAILED(state_->device->GetDeviceRemovedReason()))
             {
@@ -799,12 +816,12 @@ bool DX12QueueService::RecordBufferCopy(const own::shared_owner<IRHICommandQueue
         error = "Buffer recording requires this service's live queue and distinct resources.";
         return false;
     }
-    ComPtr<ID3D12Device> sourceDevice, destinationDevice;
+    winrt::com_ptr<ID3D12Device> sourceDevice, destinationDevice;
     D3D12_HEAP_PROPERTIES sourceHeap{}, destinationHeap{};
     D3D12_HEAP_FLAGS flags{};
-    if (FAILED(source->GetDevice(IID_PPV_ARGS(&sourceDevice))) ||
-        FAILED(destination->GetDevice(IID_PPV_ARGS(&destinationDevice))) ||
-        sourceDevice.Get() != recordingState->device.Get() || destinationDevice.Get() != recordingState->device.Get() ||
+    if (FAILED(source->GetDevice(IID_PPV_ARGS(sourceDevice.put()))) ||
+        FAILED(destination->GetDevice(IID_PPV_ARGS(destinationDevice.put()))) ||
+        sourceDevice.get() != recordingState->device.get() || destinationDevice.get() != recordingState->device.get() ||
         source->GetDesc().Dimension != D3D12_RESOURCE_DIMENSION_BUFFER ||
         destination->GetDesc().Dimension != D3D12_RESOURCE_DIMENSION_BUFFER ||
         source->GetDesc().Width < bytes || destination->GetDesc().Width < bytes ||
@@ -820,13 +837,13 @@ bool DX12QueueService::RecordBufferCopy(const own::shared_owner<IRHICommandQueue
     result->state = recordingState;
     result->identity = queue->GetIdentity();
     result->recording = recordingState->nextRecording++;
-    result->source = source;
-    result->destination = destination;
+        result->source.copy_from(source);
+        result->destination.copy_from(destination);
     result->token = std::move(lifetimeToken);
     const auto type = target->native->GetDesc().Type;
-    if (FAILED(recordingState->device->CreateCommandAllocator(type, IID_PPV_ARGS(&result->allocator))) ||
-        FAILED(recordingState->device->CreateCommandList(0, type, result->allocator.Get(), nullptr,
-            IID_PPV_ARGS(&result->list))))
+    if (FAILED(recordingState->device->CreateCommandAllocator(type, IID_PPV_ARGS(result->allocator.put()))) ||
+        FAILED(recordingState->device->CreateCommandList(0, type, result->allocator.get(), nullptr,
+            IID_PPV_ARGS(result->list.put()))))
     {
         error = "Native queue recording creation failed.";
         return false;
@@ -895,20 +912,20 @@ bool DX12SealQueueRecording(const own::shared_owner<IRHICommandQueue>& queue,
     }
     for (auto* list : lists)
     {
-        ComPtr<ID3D12Device> owner;
+        winrt::com_ptr<ID3D12Device> owner;
         if (!list || list->GetType() != target->native->GetDesc().Type ||
-            FAILED(list->GetDevice(IID_PPV_ARGS(&owner))) || owner.Get() != state->device.Get())
+            FAILED(list->GetDevice(IID_PPV_ARGS(owner.put()))) || owner.get() != state->device.get())
         {
             error = "Native list belongs to another device or queue kind.";
             return false;
         }
         if (lists.size() <= result->inlineLists.size())
         {
-            result->inlineLists[result->sealedListCount] = list;
+                    result->inlineLists[result->sealedListCount].copy_from(list);
         }
         else
         {
-            result->sealedLists.emplace_back(list);
+                    result->sealedLists.emplace_back().copy_from(list);
         }
         ++result->sealedListCount;
     }
@@ -963,7 +980,7 @@ bool DX12QueueRecorder::BeginRecording(const own::shared_owner<IRHICommandQueue>
     const auto target = own::dynamic_owner_cast<DX12ServiceQueue>(queue);
     if (!target || !token || targetCount == 0 || targetCount > workers_ ||
         targetCount > DX12QueueRecording::kMaxTargets ||
-        target->timeline->state->device.Get() != resources_.GetDevice() ||
+        target->timeline->state->device.get() != resources_.GetDevice() ||
         (queue->GetIdentity().kind != RHIQueueKind::Graphics && queue->GetIdentity().kind != RHIQueueKind::Compute))
     {
         error = "Queue encoder requires a matching graphics/compute device and pinned callback storage.";
@@ -1002,9 +1019,9 @@ bool DX12QueueRecorder::BeginRecording(const own::shared_owner<IRHICommandQueue>
         const auto type = target->native->GetDesc().Type;
         auto* device = resources_.GetDevice();
         const bool ready = reused
-            ? SUCCEEDED(storage->allocator->Reset()) && SUCCEEDED(storage->list->Reset(storage->allocator.Get(), nullptr))
-            : SUCCEEDED(device->CreateCommandAllocator(type, IID_PPV_ARGS(&storage->allocator))) &&
-                SUCCEEDED(device->CreateCommandList(0, type, storage->allocator.Get(), nullptr, IID_PPV_ARGS(&storage->list)));
+            ? SUCCEEDED(storage->allocator->Reset()) && SUCCEEDED(storage->list->Reset(storage->allocator.get(), nullptr))
+            : SUCCEEDED(device->CreateCommandAllocator(type, IID_PPV_ARGS(storage->allocator.put()))) &&
+                SUCCEEDED(device->CreateCommandList(0, type, storage->allocator.get(), nullptr, IID_PPV_ARGS(storage->list.put())));
         if (!ready)
         {
             error = "Queue allocator/list creation failed.";
@@ -1012,11 +1029,11 @@ bool DX12QueueRecorder::BeginRecording(const own::shared_owner<IRHICommandQueue>
         }
         if (!storage->encoder || !storage->encoder->UsesResources(&resources_))
         {
-            storage->encoder = own::make_unique<DX12Encoder>(storage->list.Get(), &resources_);
+            storage->encoder = own::make_unique<DX12Encoder>(storage->list.get(), &resources_);
         }
         else
         {
-            storage->encoder->ResetState(storage->list.Get());
+            storage->encoder->ResetState(storage->list.get());
         }
         (*result->leases)[index] = std::move(lease);
         ++result->targetCount;
@@ -1088,7 +1105,7 @@ bool DX12QueueService::EnqueueTestGate(const own::shared_owner<IRHICommandQueue>
         error = "Invalid test gate target.";
         return false;
     }
-    target->testGates.emplace_back(fence);
+        target->testGates.emplace_back().copy_from(fence);
     return QueueOperation(state_, [&] { return target->native->Wait(fence, value); }, error);
 }
 

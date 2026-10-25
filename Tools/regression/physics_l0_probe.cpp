@@ -1,10 +1,20 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.LayerCatalog.h"
+#else
+import Creator.Core.LayerCatalog;
+#endif
 #include "../../Engine/Physics/PhysicsScene.h"
 #include "../../Engine/Physics/PhysicsCollisionPolicy.h"
 #if !CE_SHIPPING
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
 #include "../../Engine/EngineDiagnostics/ProfileCaptureFile.h"
 #endif
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 using namespace ce::physics;
 
@@ -87,7 +97,7 @@ bool exercise(execution_preference execution)
 
     std::array<query_hit, 8> hits;
     query_filter query;
-    query.layers = layers->Find(*moving)->slot.Mask();
+    query.layers = layers->find(*moving)->slot.Mask();
     const auto selected = scene.raycast({0, 8, 0}, {0, -1, 0}, 20, hits, query);
     check(selected && selected->required_capacity == 1 && hits[0].body == *body, "query mask uses common slot space");
     auto hidden = policy.Snapshot()->Filter(*layers, *moving).value();

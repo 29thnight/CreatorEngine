@@ -60,8 +60,8 @@ def main():
         production_paths.append(task_path)
     scheduler_sources = []
     if args.benchmark:
-        scheduler_sources = [root / 'Engine/Utility_Framework/JobScheduler.cpp',
-                             root / 'Engine/Utility_Framework/ThreadPool.cpp',
+        scheduler_sources = [root / 'Engine/Utility_Framework/Concurrency/JobScheduler.cpp',
+                             root / 'Engine/Utility_Framework/Concurrency/ThreadPool.cpp',
                              args.enki_ts_root.resolve() / 'src/TaskScheduler.cpp']
         production_paths += scheduler_sources
     hashes = {path: hashlib.sha256(path.read_bytes()).hexdigest() for path in production_paths}

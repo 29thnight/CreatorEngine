@@ -1,10 +1,10 @@
-#include "EditorModelPlacement.h"
+#include "../EngineEntry/Assets/Models/EditorModelPlacement.h"
 #include "EditorTheme.h"
-#include "EditorObjectOperations.h"
-#include "ConsoleCommandSystem.h"
+#include "../EngineEntry/Scene/EditorObjectOperations.h"
+#include "../EngineEntry/Commands/ConsoleCommandSystem.h"
 #include "SceneViewWindow.h"
 #include "EditorAssetDragPayload.h"
-#include "ReflectionUndo.h"
+#include "../EngineEntry/Editing/ReflectionUndo.h"
 #include "EditorCameraRig.h"
 #include "RHI/ScreenSizedResource.h"
 #include "MeshRenderer.h"
@@ -12,28 +12,28 @@
 // 딸려 들어왔는데, 옥트리 계통을 걷으면서 그 경로가 끊겼다.
 #include "RenderScene.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
-#include "../../Engine/Utility_Framework/WarmupLedger.h"
-#include "GizmoRenderer.h"
+#include "../../Engine/Utility_Framework/Runtime/WarmupLedger.h"
+#include "../EngineEntry/Scene/GizmoRenderer.h"
 #include "ImGuizmo.h"
 #include "EditorIcons.h"
 #include "Scene.h"
 #include "Camera.h"
-#include "GameObjectCommand.h"
+#include "../EngineEntry/Editing/GameObjectCommand.h"
 #include "CameraComponent.h"
 #include "FoliageComponent.h"
 #include "RectTransformComponent.h"
 #include "LightComponent.h"
 #include "Entity.h"
 #include <float.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "DataSystem.h"
 #include "PrefabUtility.h"
 #include "Terrain.h"
-#include "EditorSessionState.h"
-#include "EditorAssetPresentation.h"
-#include "RuntimeSettings.h"
-#include "Mathematics.Intersect.h"
+#include "../EngineEntry/Project/EditorSessionState.h"
+#include "../EngineEntry/Assets/EditorAssetPresentation.h"
+#include "../../Engine/Utility_Framework/Runtime/RuntimeSettings.h"
+#include "../../Engine/Utility_Framework/Foundation/Mathematics.Intersect.h"
 #include "EditorWindowNames.h"
 #include "EditorWindowRegistry.h"
 #include "Windows/EditorViewportWindows.h"
@@ -514,7 +514,7 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
                     position = ray.origin + ray.direction * distance;
                 if (payload->IsDelivery() && scene)
                 {
-                    const file::path path = editor::asset_drag::path_of(*payload);
+                    const std::filesystem::path path = editor::asset_drag::path_of(*payload);
                     Editor::ModelPlacement::Get().Execute(scene->GetSceneId(), path.string(), position);
                 }
                 else
@@ -525,7 +525,7 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
             }
 			if (const ImGuiPayload* HDRPayload = ImGui::AcceptDragDropPayload("HDR"))
 			{
-				const file::path filepath = editor::asset_drag::path_of(*HDRPayload);
+				const std::filesystem::path filepath = editor::asset_drag::path_of(*HDRPayload);
 				std::string skyError;
 				if (!EnhancedSceneRenderer::SetSkyBoxPath(filepath.string(), skyError))
 				{
@@ -535,7 +535,7 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 
 			if (const ImGuiPayload* prefabPayload = ImGui::AcceptDragDropPayload("Prefab"))
 			{
-				const file::path filepath = editor::asset_drag::path_of(*prefabPayload);
+				const std::filesystem::path filepath = editor::asset_drag::path_of(*prefabPayload);
                 const auto sceneId = scene ? scene->GetSceneId() : 0;
                 ConsoleCommandSystem::Get().EnqueueEditorMutation([filepath, sceneId]
                 {

@@ -1,5 +1,16 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "SoundGraphEditor.h"
-#include "EditorAssetDatabase.h"
+#include "../EngineEntry/Assets/EditorAssetDatabase.h"
 #include "EditorAssetDragPayload.h"
 #include "EditorWindowRegistry.h"
 #include "BrowserDirectorySnapshot.h"
@@ -8,7 +19,7 @@
 #include "Audio/PlaybackService.h"
 #include <imgui.h>
 #include <imgui_stdlib.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace editor::sound_graph_editing
 {
@@ -89,13 +100,7 @@ namespace editor::sound_graph_editing
             return { reinterpret_cast<const char*>(utf8.data()), utf8.size() };
         }
 
-        std::string Extension(const std::filesystem::path& path)
-        {
-            auto extension = path.extension().string();
-            std::transform(extension.begin(), extension.end(), extension.begin(),
-                [](unsigned char value) { return static_cast<char>(std::tolower(value)); });
-            return extension;
-        }
+
 
         bool ReadText(const std::filesystem::path& path, std::string& text, std::string& error)
         {
@@ -165,13 +170,13 @@ namespace editor::sound_graph_editing
 
         bool IsAssetReference(const wave::ClipKey& key, wave::SoundSourceKind kind)
         {
-            Uuid::Uuid16 guid;
-            if (!key.IsGuid() || !Uuid::TryParse(key.Text(), guid) || !FileGuid(guid).IsRandomV4())
+            uuid::uuid16 guid;
+            if (!key.IsGuid() || !uuid::try_parse(key.Text(), guid) || !FileGuid(guid).IsRandomV4())
             {
                 return false;
             }
             const auto path = DataSystems->GetFilePath(FileGuid(guid));
-            const auto extension = Extension(path);
+            const auto extension = ce::strings::to_lower((path).extension().string());
             std::error_code error;
             if (path.empty() || !std::filesystem::is_regular_file(path, error) || error)
             {
@@ -194,8 +199,8 @@ namespace editor::sound_graph_editing
             auto text = key.Text();
             if (ImGui::InputText(label, &text))
             {
-                Uuid::Uuid16 guid;
-                key = Uuid::TryParse(text, guid) ? wave::ClipKey::FromGuid(guid) : wave::ClipKey(text);
+                uuid::uuid16 guid;
+                key = uuid::try_parse(text, guid) ? wave::ClipKey::FromGuid(guid) : wave::ClipKey(text);
                 changed = true;
             }
             if (ImGui::BeginDragDropTarget())
@@ -364,8 +369,8 @@ namespace editor::sound_graph_editing
                 }
                 if (session.m_preset.source.kind == wave::SoundSourceKind::Graph)
                 {
-                    Uuid::Uuid16 sourceID;
-                    if (!Uuid::TryParse(session.m_preset.source.asset.Text(), sourceID))
+                    uuid::uuid16 sourceID;
+                    if (!uuid::try_parse(session.m_preset.source.asset.Text(), sourceID))
                     {
                         session.m_message = "Invalid graph GUID.";
                         return false;
@@ -917,7 +922,7 @@ namespace editor::sound_graph_editing
 
     bool CanOpen(const std::filesystem::path& path)
     {
-        const auto extension = Extension(path);
+        const auto extension = ce::strings::to_lower((path).extension().string());
         return extension == ".soundgraph" || extension == ".soundpreset";
     }
 
@@ -931,7 +936,7 @@ namespace editor::sound_graph_editing
         }
         Session session;
         session.m_path = path;
-        session.m_isPreset = Extension(path) == ".soundpreset";
+        session.m_isPreset = ce::strings::to_lower((path).extension().string()) == ".soundpreset";
         session.m_guid = DataSystems->GetFileGuid(path);
         if (!session.m_guid.IsRandomV4())
         {
@@ -978,7 +983,7 @@ namespace editor::sound_graph_editing
         const auto extension = preset ? ".soundpreset" : ".soundgraph";
         auto filename = std::filesystem::path(std::u8string(
             reinterpret_cast<const char8_t*>(name.data()), name.size()));
-        if (Extension(filename) != extension)
+        if (ce::strings::to_lower((filename).extension().string()) != extension)
         {
             filename += extension;
         }
@@ -1030,8 +1035,8 @@ namespace editor::sound_graph_editing
     bool QueueAuthoringAcceptance(const std::filesystem::path& directory,
         std::string_view name, std::string_view clipGuid, std::string& error)
     {
-        Uuid::Uuid16 guid;
-        if (!Uuid::TryParse(clipGuid, guid) || !FileGuid(guid).IsRandomV4())
+        uuid::uuid16 guid;
+        if (!uuid::try_parse(clipGuid, guid) || !FileGuid(guid).IsRandomV4())
         {
             error = "A canonical clip GUID is required.";
             return false;
@@ -1079,8 +1084,8 @@ namespace editor::sound_graph_editing
             }
             else if (CreateAsset(acceptance->directory, acceptance->name, false, created, error))
             {
-                Uuid::Uuid16 clip;
-                Uuid::TryParse(acceptance->clipGuid, clip);
+                uuid::uuid16 clip;
+                uuid::try_parse(acceptance->clipGuid, clip);
                 g_session->m_graph.nodes.front().clip = wave::ClipKey::FromGuid(clip);
                 g_session->m_graph.nodes.front().gain = 0.001f;
                 g_session->m_dirty = true;

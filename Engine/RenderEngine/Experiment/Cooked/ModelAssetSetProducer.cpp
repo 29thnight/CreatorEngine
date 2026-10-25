@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../../Assets/ModelCpuGeometry.h"
 #include "ModelAssetSetProducer.h"
 #include "CookSupport.h"
@@ -11,12 +16,16 @@
 #include "../Import/MeshletBuilder.h"
 #include "../Import/MeshLodBuilder.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <Windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 namespace experiment::cooked
 {

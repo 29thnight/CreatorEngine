@@ -1,5 +1,5 @@
 #pragma once
-#include "Core.Definition.h"
+#include "../Utility_Framework/Foundation/Core.Definition.h"
 
 constexpr DWORD kKeyboardCount = 255;
 constexpr int kMouseCount = 3;

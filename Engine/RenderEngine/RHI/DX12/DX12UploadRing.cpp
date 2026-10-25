@@ -1,10 +1,24 @@
-#include "../../../Utility_Framework/LifetimeToken.h"
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "DX12UploadRing.h"
 
 #include "DX12ResourceTable.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -77,7 +91,7 @@ DX12UploadSegmentAllocator::Segment* DX12UploadSegmentAllocator::CreateSegment(u
 
     auto segment = own::make_unique<Segment>();
     HRESULT hr = m_device->CreateCommittedResource(
-        &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(&segment->buffer));
+        &heap, D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_GENERIC_READ, nullptr, IID_PPV_ARGS(segment->buffer.put()));
     if (FAILED(hr))
     {
         outError = "DX12 업로드 세그먼트 생성 실패 " + UploadSegmentsHrToString(hr);
@@ -97,7 +111,7 @@ DX12UploadSegmentAllocator::Segment* DX12UploadSegmentAllocator::CreateSegment(u
     segment->mapped = static_cast<uint8_t*>(mapped);
     segment->capacity = bytes;
     segment->large = large;
-    segment->handle = m_table->AddExternalBuffer(segment->buffer.Get());
+    segment->handle = m_table->AddExternalBuffer(segment->buffer.get());
     if (!segment->handle.IsValid())
     {
         segment->buffer->Unmap(0, nullptr);
@@ -306,7 +320,7 @@ void DX12UploadSegmentAllocator::ReleaseSegmentLocked(Segment& segment)
         segment.buffer->Unmap(0, nullptr);
     }
     segment.mapped = nullptr;
-    segment.buffer.Reset();
+    segment.buffer = nullptr;
 }
 
 void DX12UploadSegmentAllocator::TrimAvailableLocked(bool memoryPressure, uint64_t bytesNeeded)
@@ -597,7 +611,7 @@ ce::lifetime_token DX12UploadSegmentAllocator::PinRecording(uint64_t recordingId
     struct Lease
     {
         std::vector<ce::lifetime_token> segments;
-        std::vector<Microsoft::WRL::ComPtr<ID3D12Resource>> resources;
+        std::vector<winrt::com_ptr<ID3D12Resource>> resources;
     };
     auto result = own::make_shared<Lease>();
     for (const auto& segment : m_segments)
@@ -764,7 +778,7 @@ DX12UploadSegmentAllocator::Allocation DX12UploadSegmentAllocator::Allocate(uint
         Allocation result{};
         result.cpuAddress = slice.cpuAddress;
         result.gpuAddress = segment->buffer->GetGPUVirtualAddress() + slice.offset;
-        result.resource = segment->buffer.Get();
+        result.resource = segment->buffer.get();
         result.offset = slice.offset;
         result.size = slice.size;
         result.segment = static_cast<uint32_t>(i);

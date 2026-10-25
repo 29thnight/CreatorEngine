@@ -1,42 +1,35 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Distribution.h"
+#else
+import Creator.Core.Distribution;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Platform.Windows.Strings.h"
+#else
+import Creator.Platform.Windows.Strings;
+#endif
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
-#include <Windows.h>
-#include <DbgHelp.h>
-#include <commctrl.h>
-#include <commdlg.h>
-#include <TlHelp32.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "CrashReporter.h"
-#include "../../Engine/Utility_Framework/CrashReportProtocol.h"
-#include "../../Engine/Utility_Framework/EngineVersion.h"
-#include "../../Engine/Utility_Framework/ScriptApiVersion.h"
+#include "../../Engine/Platform/Windows/Crash/CrashReportProtocol.h"
+#include "../../Engine/Utility_Framework/Runtime/ScriptApiVersion.h"
 
 namespace
 {
     constexpr int kSaveInformation = 1001;
     constexpr DWORD kReportWaitMs = 15000;
 
-    std::wstring WideFromUtf8(const char* value)
-    {
-        if (!value) return {};
-        const int size = MultiByteToWideChar(CP_UTF8, 0, value, -1, nullptr, 0);
-        if (size <= 1) return {};
-        std::wstring result(static_cast<std::size_t>(size), L'\0');
-        MultiByteToWideChar(CP_UTF8, 0, value, -1, result.data(), size);
-        result.pop_back();
-        return result;
-    }
 
-    std::string Utf8FromWide(const std::wstring& value)
-    {
-        const int size = WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1,
-            nullptr, 0, nullptr, nullptr);
-        if (size <= 1) return {};
-        std::string result(static_cast<std::size_t>(size), '\0');
-        WideCharToMultiByte(CP_UTF8, 0, value.c_str(), -1,
-            result.data(), size, nullptr, nullptr);
-        result.pop_back();
-        return result;
-    }
+
+
 
     std::wstring Hex(std::uint64_t value, int digits)
     {
@@ -98,13 +91,13 @@ namespace
     {
         std::ofstream out(ReportPath(request), std::ios::binary | std::ios::trunc);
         if (!out) return;
-        out << "Product: " << CreatorEngineVersion::ProductName
-            << "\nEngineBuild: " << CreatorEngineVersion::Build
+        out << "Product: " << ce::distribution::product_name
+            << "\nEngineBuild: " << ce::distribution::build
             << "\nScriptApi: " << CreatorScriptApiVersion
             << "\nDumpWriterProcessId: " << GetCurrentProcessId()
             << "\nTargetProcessId: " << request.targetProcessId
             << "\nFaultThreadId: " << request.faultThreadId
-            << "\nCrashSignature: " << Utf8FromWide(signature)
+            << "\nCrashSignature: " << ce::strings::wide_to_utf8(signature)
             << "\nReason: " << request.reason << '\n';
         if (request.hasException)
             out << "ExceptionCode: 0x" << std::hex
@@ -385,14 +378,14 @@ namespace
         state.headerText = L"CreatorEngine error: " +
             (request.hasException
                 ? ExceptionName(request.exceptionRecord.ExceptionCode)
-                : WideFromUtf8(request.reason));
+                : ce::strings::utf8_to_wide(request.reason));
         const std::wstring reportId =
             std::filesystem::path(request.dumpPath).stem().wstring();
         std::wostringstream details;
         details << L"Crash signature: " << state.signature
             << L"\nLocal report ID: " << reportId
-            << L"\nEngine version: " << WideFromUtf8(CreatorEngineVersion::Build)
-            << L"\nReason: " << WideFromUtf8(request.reason);
+            << L"\nEngine version: " << ce::strings::utf8_to_wide(ce::distribution::build)
+            << L"\nReason: " << ce::strings::utf8_to_wide(request.reason);
         if (request.hasException)
             details << L"\nException: " <<
                 ExceptionName(request.exceptionRecord.ExceptionCode) << L" (" <<

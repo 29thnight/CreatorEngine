@@ -4,7 +4,7 @@
 #include "principled_thin_film_sensitivity.h"
 #include "principled_ggx_energy_tables.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace MaterialProbe::Reference
 {

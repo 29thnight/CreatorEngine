@@ -1,8 +1,12 @@
 #pragma once
-#include "Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../../TextureFramePins.h"
 #include <stddef.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #include <mathematics/color.hpp>
 #include <mathematics/matrix4x4.hpp>

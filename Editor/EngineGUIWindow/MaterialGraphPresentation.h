@@ -2,7 +2,7 @@
 
 #include "../../Lattice/Material/LXMaterialGraph.h"
 #include "../../Lattice/ImGui/LXCanvas.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace editor::material_editing
 {

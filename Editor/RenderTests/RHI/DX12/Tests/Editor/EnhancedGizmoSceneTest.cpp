@@ -1,3 +1,13 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "../../../../../../Engine/RenderEngine/RenderAllocator.h"
 #include "Render/Passes/Editor/EnhancedGridPass.h"
 #include "Render/Passes/Editor/EnhancedGizmoLinePass.h"
@@ -23,9 +33,8 @@
 // RHI/DX12에서 직접 들 수 없다(바인딩 헤더의 설명 참고).
 #include "EnhancedGizmoSceneBinding.h"
 #include "Texture.h"
-#include "../Utility_Framework/PathFinder.h"
 
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // Gizmo 계열 씬 연결 검증 (PHASE 3-6, Gizmo 계열 5차 슬라이스).
 //
@@ -146,7 +155,7 @@ bool DX12Test::RunGizmoSceneTest(std::string& outLog)
     // 콜라이더는 디버그 모드와 무관하게 수집한다 — 경로 검증이 목적이다
     // (실전 조립에서는 ShouldCollectGizmoColliders()가 판정한다).
     line.ResetLines();
-	const file::path iconPath = PathFinder::IconPath();
+	const std::filesystem::path iconPath = ce::paths::icon_path();
 	auto gizmoIcons = own::make_shared<EnhancedGizmoIconTextures>();
 	gizmoIcons->camera = Texture::LoadSharedFromPath(iconPath / L"CameraGizmo.png");
 	gizmoIcons->mainLight = Texture::LoadSharedFromPath(iconPath / L"MainLightGizmo.png");

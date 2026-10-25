@@ -1,4 +1,30 @@
-#include "../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+#include "RenderArena.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Arena.h"
+#else
+import Creator.Core.Arena;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "MaterialGraphSceneHost.h"
 #include "MaterialGraphGeometryContract.h"
 #include "MaterialGraphNativeAdmission.h"
@@ -8,16 +34,14 @@
 #include "MaterialGraphIndirectBatch.h"
 #include "MaterialGraphWork.h"
 #include "MaterialGraphPreparationTasks.h"
-#include "RenderArena.h"
 
-#include "PathFinder.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include "RHI/RHIShaderSource.h"
 
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace material_graph
 {
@@ -1676,7 +1700,7 @@ namespace material_graph
                 if (indexedReady && !preparation->nativeLogged && GetEnvironmentVariableA("CE_TRACE_SHADER_COMPILE", nullptr, 0)) {
                     preparation->nativeLogged=true;
                     std::printf("[material.prepare] graph=%s phase=indexed-ready elapsedMs=%.3f\n",
-                        Uuid::ToString(preparation->generation->assetId.value).c_str(),
+                        uuid::to_string(preparation->generation->assetId.value).c_str(),
                         std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-preparation->started).count());
                 }
                 if (program.meshEnabled)
@@ -1785,14 +1809,14 @@ namespace material_graph
                 }
                 if (GetEnvironmentVariableA("CE_TRACE_SHADER_COMPILE", nullptr, 0))
                     std::printf("[material.prepare] graph=%s phase=ready elapsedMs=%.3f mesh=%zu reconstruction=%zu\n",
-                        Uuid::ToString(preparation->generation->assetId.value).c_str(),
+                        uuid::to_string(preparation->generation->assetId.value).c_str(),
                         std::chrono::duration<double,std::milli>(std::chrono::steady_clock::now()-preparation->started).count(),
                         program.meshPipelines.size(), program.reconstructionPipelines.size());
                 programs_.push_back(std::move(preparation->program));
-                if (!PathFinder::IsAssetAuthoringEnabled())
+                if (!ce::paths::is_asset_authoring_enabled())
                 {
                     std::printf("[meteor.scene.program] source=cooked graph=%s ready=%zu sceneCompiles=%llu\n",
-                                Uuid::ToString(preparation->generation->assetId.value).c_str(), programs_.size(),
+                                uuid::to_string(preparation->generation->assetId.value).c_str(), programs_.size(),
                                 static_cast<unsigned long long>(stats_.compileSubmissions));
                     std::fflush(stdout);
                 }

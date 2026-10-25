@@ -1,12 +1,16 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "RHIShaderSource.h"
 
-#include "../../Utility_Framework/PathFinder.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 std::filesystem::path RHIShaderSource::Resolve(std::string_view name)
 {
-    return PathFinder::RelativeToShader(kFolder) / name;
+    return ce::paths::relative_to_shader(kFolder) / name;
 }
 
 bool RHIShaderSource::Load(std::string_view name, std::string& outText, std::string& outError)

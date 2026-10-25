@@ -1,4 +1,3 @@
-#include "../../../Utility_Framework/Ownership.h"
 // Current CEGE contains authenticated metadata and QMC2 pages only.
 namespace
 {

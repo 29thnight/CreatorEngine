@@ -1,10 +1,14 @@
 #pragma once
-#include "Ownership.h"
-#include "Core.Minimal.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../Utility_Framework/Foundation/Core.Minimal.h"
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector4.hpp>
 #include <stddef.h>
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #define MAX_TERRAIN_LAYERS 16
 

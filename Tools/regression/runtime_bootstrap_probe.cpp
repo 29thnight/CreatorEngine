@@ -1,11 +1,20 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // Unrun source fixture. Link the existing RenderEngine/Utility libraries.
 // No importer, shader compiler, graphics device or payload decoder is invoked.
 #include "../../Engine/RenderEngine/AssetDepot/RuntimeBootstrap.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/SceneCookProducer.h"
-#include "../../Engine/Utility_Framework/ContentAbi.h"
-#include "../../Engine/Utility_Framework/AuthoringParsedDocument.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.ContentAbi.h"
+#else
+import Creator.Core.ContentAbi;
+#endif
+#include "../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -17,9 +26,9 @@ namespace
     experiment::AssetId Id(unsigned char number)
     {
         experiment::AssetId id;
-        id.value.data[6] = 0x40u;
-        id.value.data[8] = 0x80u;
-        id.value.data[15] = number;
+        id.value.data_[6] = 0x40u;
+        id.value.data_[8] = 0x80u;
+        id.value.data_[15] = number;
         return id;
     }
     void Text(const std::filesystem::path& path, const std::string& value)
@@ -52,7 +61,7 @@ namespace
         Require(!AssetDepot::WriteRuntimeBootstrapReceipt(duplicate, text, error), "Conflicting expected kinds accepted");
 
         cooked::AssetSetManifest set;
-        set.assetSetId = Id(3); set.revision = 1; set.targetPlatform = "win-x64"; set.targetAbi = CreatorContentAbi::Token;
+        set.assetSetId = Id(3); set.revision = 1; set.targetPlatform = "win-x64"; set.targetAbi = ce::content_abi::token;
         cooked::AssetBlobRecord blob;
         blob.kind = texture.kind; blob.representation = 1; blob.schemaVersion = 1; blob.byteSize = 1;
         blob.targetPlatform = set.targetPlatform; blob.targetAbi = set.targetAbi;
@@ -61,7 +70,7 @@ namespace
         cooked::CookedAssetCatalog empty, catalog;
         std::vector<cooked::AssetManifestIssue> issues;
         Require(empty.WithMountedAssetSet(set, own::make_shared<const cooked::LooseArtifactByteSource>(root),
-            {1}, 1, {"win-x64", CreatorContentAbi::Token, {}}, catalog, issues), "Fixture mount metadata failed");
+            {1}, 1, {"win-x64", ce::content_abi::token, {}}, catalog, issues), "Fixture mount metadata failed");
         cooked::CookedAssetManifest legacy;
         cooked::CookedAssetManifestEntry scene;
         scene.assetId = Id(1); scene.kind = cooked::CookedAssetKind::Scene; scene.formatVersion = cooked::kSceneArtifactVersion;
@@ -88,8 +97,8 @@ namespace
         Require(!AssetDepot::ValidateRuntimeBootstrap(root, receipt.assetSetHashes, catalog, error), "Changed document identity accepted");
 
         const auto source = root / "Source/Scenes/Bootstrap.creator";
-        Text(source, "m_meshAssetId: " + Uuid::ToString(Id(4).value) + "\nm_modelGuid: " + Uuid::ToString(Id(5).value) + "\n");
-        Text(source.string() + ".meta", "guid: " + Uuid::ToString(Id(1).value) + "\n");
+        Text(source, "m_meshAssetId: " + uuid::to_string(Id(4).value) + "\nm_modelGuid: " + uuid::to_string(Id(5).value) + "\n");
+        Text(source.string() + ".meta", "guid: " + uuid::to_string(Id(1).value) + "\n");
         const auto product = cooked::BuildSceneCookProduct({source, root / "Source", true});
         Require(product.Succeeded() && product.product->bootstrapReferences.size() == 1u
             && product.product->bootstrapReferences.front().kind == cooked::CookedAssetKind::Mesh,
@@ -98,8 +107,8 @@ namespace
         Require(old.Succeeded() && old.product->bootstrapReferences.empty()
             && old.product->manifestEntry.dependencies == std::vector<experiment::AssetId>{Id(5)}, "Legacy document semantics changed");
 
-        const auto materialText = "ref: " + Uuid::ToString(Id(6).value)
-            + "\noverrides:\n  - name: colorMap\n    texture: {guid: " + Uuid::ToString(Id(2).value) + ", colorSpace: srgb}\n";
+        const auto materialText = "ref: " + uuid::to_string(Id(6).value)
+            + "\noverrides:\n  - name: colorMap\n    texture: {guid: " + uuid::to_string(Id(2).value) + ", colorSpace: srgb}\n";
         const auto has = [](const cooked::SceneCookProduct& value, experiment::AssetId id, cooked::CookedAssetKind kind)
         {
             return std::ranges::find(value.bootstrapReferences, cooked::TypedAssetReference{{id, {}}, kind})
@@ -129,7 +138,7 @@ namespace
             materialSet.blobs.front().artifactPath = "Derived/AssetBlobs/" + std::string(64u, '0') + "/" + std::string(64u, '0') + ".asset";
             cooked::CookedAssetCatalog materialOnly;
             Require(empty.WithMountedAssetSet(materialSet, own::make_shared<const cooked::LooseArtifactByteSource>(root),
-                {1}, 1, {"win-x64", CreatorContentAbi::Token, {}}, materialOnly, issues), "Material fixture metadata mount failed");
+                {1}, 1, {"win-x64", ce::content_abi::token, {}}, materialOnly, issues), "Material fixture metadata mount failed");
             Require(!AssetDepot::ValidateRuntimeBootstrap(root, captured.assetSetHashes, materialOnly, error),
                 "Missing override Texture was accepted with a present base Material");
         };
@@ -157,15 +166,15 @@ namespace
         const auto unrelated = cooked::BuildSceneCookProduct({source, root / "Source", true});
         Require(unrelated.Succeeded() && unrelated.product->bootstrapReferences.empty(),
             "An unrelated ref field was reinterpreted as a Material dependency");
-        Text(source, "m_Material: {schema: 1, assetId: " + Uuid::ToString(Id(6).value)
-            + ", shaderAssetId: " + Uuid::ToString(Id(7).value)
+        Text(source, "m_Material: {schema: 1, assetId: " + uuid::to_string(Id(6).value)
+            + ", shaderAssetId: " + uuid::to_string(Id(7).value)
             + ", name: Cloth, blendMode: opaque, properties: [], keywords: [], keywordSelections: []}\n");
         const auto inlineMaterial = cooked::BuildSceneCookProduct({source, root / "Source", true});
         Require(inlineMaterial.Succeeded() && has(*inlineMaterial.product, Id(6), cooked::CookedAssetKind::Material)
             && has(*inlineMaterial.product, Id(7), cooked::CookedAssetKind::ShaderMeta),
             "Inline authored Material identity needed for CodeProgram was omitted");
         Text(source, "m_Material: {schema: 1, assetId: 00000000-0000-0000-0000-000000000000, shaderAssetId: "
-            + Uuid::ToString(Id(7).value)
+            + uuid::to_string(Id(7).value)
             + ", name: Inline, blendMode: opaque, properties: [], keywords: [], keywordSelections: []}\n");
         const auto unboundInline = cooked::BuildSceneCookProduct({source, root / "Source", true});
         Require(!unboundInline.Succeeded() && !unboundInline.issues.empty()
@@ -174,9 +183,9 @@ namespace
         Require(cooked::BuildSceneCookProduct({source, root / "Source"}).Succeeded(),
             "Bootstrap-only inline Material restriction changed legacy mode");
 
-        const auto foliageType = "{m_modelGuid: " + Uuid::ToString(Id(5).value)
-            + ", m_meshAssetId: " + Uuid::ToString(Id(4).value)
-            + ", m_materialAssetId: " + Uuid::ToString(Id(6).value) + ", m_allowLegacySource: false}";
+        const auto foliageType = "{m_modelGuid: " + uuid::to_string(Id(5).value)
+            + ", m_meshAssetId: " + uuid::to_string(Id(4).value)
+            + ", m_materialAssetId: " + uuid::to_string(Id(6).value) + ", m_allowLegacySource: false}";
         Text(source, "m_foliageTypes: [" + foliageType + "]\n");
         const auto inlineFoliage = cooked::BuildSceneCookProduct({source, root / "Source", true});
         Require(inlineFoliage.Succeeded() && inlineFoliage.product->bootstrapReferences.size() == 3u
@@ -228,14 +237,14 @@ namespace
             }
             cooked::CookedAssetCatalog result;
             Require(empty.WithMountedAssetSet(selected, own::make_shared<const cooked::LooseArtifactByteSource>(root),
-                {1}, 1, {"win-x64", CreatorContentAbi::Token, {}}, result, issues), "Foliage reference fixture catalog failed");
+                {1}, 1, {"win-x64", ce::content_abi::token, {}}, result, issues), "Foliage reference fixture catalog failed");
             return result;
         };
         Require(allFound(foliageCatalog(-1, false)), "Complete Foliage typed union failed");
         for (int omitted = 0; omitted != 3; ++omitted)
             Require(!allFound(foliageCatalog(omitted, false)), "Missing explicit Foliage identity passed preflight");
         Require(!allFound(foliageCatalog(-1, true)), "Wrong-kind Foliage identity passed preflight");
-        Text(foliageSource, "FoliageAsset: {Types: [{m_modelGuid: " + Uuid::ToString(Id(5).value)
+        Text(foliageSource, "FoliageAsset: {Types: [{m_modelGuid: " + uuid::to_string(Id(5).value)
             + ", m_meshAssetId: 00000000-0000-0000-0000-000000000000, m_materialAssetId: 00000000-0000-0000-0000-000000000000}], Instances: []}\n");
         const auto defaultChildren = Authoring::ParsedDocument::ParseFile(foliageSource.string(), error);
         Require(defaultChildren && cooked::CollectFoliageBootstrapReferences(defaultChildren.Root(), foliageReferences, error)

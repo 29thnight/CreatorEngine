@@ -1,6 +1,10 @@
 // Platform boundaries for CPU graph fixtures. No worker jobs are dispatched by
 // these tests; an accidental worker wait is a failure, not a successful no-op.
-#include "Engine/Utility_Framework/JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include "ThirdParty/mimalloc/include/mimalloc.h"
 #include "render-graph-allocation-counters.h"
 #include <cstdlib>
@@ -175,12 +179,6 @@ void job_handle::wait() const
     {
         throw std::logic_error("Portable graph fixture does not execute worker jobs");
     }
-}
-uint64_t job_timestamp_ns() noexcept
-{
-    return static_cast<uint64_t>(
-        std::chrono::duration_cast<std::chrono::nanoseconds>(std::chrono::steady_clock::now().time_since_epoch())
-            .count());
 }
 thread_pool::thread_pool() = default;
 thread_pool::~thread_pool() = default;

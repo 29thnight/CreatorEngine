@@ -16,7 +16,7 @@ namespace EnhancedMaterialSeal
 {
     inline void AppendGuid(EnhancedSealDigest& digest, const FileGuid& guid) noexcept
     {
-        digest.Bytes(guid.m_guid.data.data(), guid.m_guid.data.size());
+        digest.Bytes(guid.m_guid.data_.data(), guid.m_guid.data_.size());
     }
 
     inline void AppendCoordinates(EnhancedSealDigest& digest,

@@ -1,7 +1,7 @@
 #pragma once
 #include "RHI/RHIFormat.h"
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // 텍스처의 CPU 픽셀 — 백엔드 중립 (축 A).
 //

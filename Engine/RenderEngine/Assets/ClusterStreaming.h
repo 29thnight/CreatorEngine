@@ -1,11 +1,19 @@
 #pragma once
-#include "../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "MeshletCompression.h"
-#include "../../Utility_Framework/DynamicBitset.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.DynamicBitset.h"
+#else
+import Creator.Core.DynamicBitset;
+#endif
 #include "ClusterTopologyPage.h"
 #include "../Experiment/MeshLodData.h"
 #include <stdint.h>
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace assets::cluster
 {
@@ -14,11 +22,7 @@ namespace assets::cluster
       public:
         using Page = own::shared_owner<const std::vector<std::byte>>;
         using Result = std::shared_future<Page>;
-        static PageIo& Shared()
-        {
-            static PageIo instance;
-            return instance;
-        }
+        static PageIo& Shared();
         Result Request(own::shared_owner<const Archive> archive, uint32_t page)
         {
             auto task = own::make_shared<std::packaged_task<Page()>>(

@@ -1,5 +1,5 @@
 ﻿#pragma once
-#include "Core.Minimal.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 
 class RenderPerformanceState : public Singleton<RenderPerformanceState>
 {

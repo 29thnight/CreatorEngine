@@ -1,11 +1,11 @@
-#include "LogSink.h"
-#include "LogSystem.h"
-#include "HtmlFileSink.h"
+#include "../../Engine/Utility_Framework/Diagnostics/LogSink.h"
+#include "../../Engine/Utility_Framework/Diagnostics/LogSystem.h"
+#include "../../Engine/Utility_Framework/Diagnostics/HtmlFileSink.h"
 #include "MenuBarWindow.h"
 #include "OutputLogView.h"
 #include <spdlog/logger.h>
 #include <stdio.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {

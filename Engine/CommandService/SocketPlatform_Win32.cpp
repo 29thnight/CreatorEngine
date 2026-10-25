@@ -15,10 +15,11 @@
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <winsock2.h>
-#include <ws2tcpip.h>
-#include <windows.h>
-#include <bcrypt.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 #pragma comment(lib, "Ws2_32.lib")
 #pragma comment(lib, "Bcrypt.lib")

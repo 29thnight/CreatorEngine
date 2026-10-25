@@ -9,7 +9,7 @@ $vcvars = Join-Path $VisualStudioInstallation 'VC/Auxiliary/Build/vcvars64.bat'
 $probe = Join-Path $PSScriptRoot 'editor_component_catalog_probe.cpp'
 $exe = Join-Path $work 'component_catalog_probe.exe'
 $object = Join-Path $work 'component_catalog_probe.obj'
-$command = 'call "' + $vcvars + '" >nul && cl.exe /nologo /EHsc /std:c++20 /utf-8 /W4 ' +
+$command = 'call "' + $vcvars + '" >nul && cl.exe /nologo /EHsc /std:c++20 /utf-8 /W4 /DCE_CONTRACT_STANDALONE=1 ' +
     '/I"' + (Join-Path $repo 'Editor/EngineEntry') + '" /Fo:"' + $object + '" /Fe:"' + $exe + '" "' + $probe + '"'
 & $env:ComSpec /d /s /c $command
 if ($LASTEXITCODE -ne 0) { throw 'Component catalog probe build failed.' }

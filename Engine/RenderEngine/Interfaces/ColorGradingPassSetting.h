@@ -1,6 +1,6 @@
 #pragma once
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include "Core.Minimal.h"
+#include "../../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "../../Utility_Framework/Foundation/Core.Minimal.h"
 
 struct [[reflgen::reflect]] ColorGradingPassSetting
 {
@@ -9,5 +9,5 @@ struct [[reflgen::reflect]] ColorGradingPassSetting
 
     bool isOn{ true };
     float lerp{ 0.f };
-    HashingString textureFilePath{"None"};
+    std::string textureFilePath{"None"};
 };

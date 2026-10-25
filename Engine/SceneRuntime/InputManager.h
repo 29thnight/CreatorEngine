@@ -1,8 +1,18 @@
 #pragma once
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector4.hpp>
-#include <GameInput.h>
-#include "ClassProperty.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.GameInputSDK.h"
+#else
+import "Creator.GameInputSDK.h";
+#endif
+#include "../Utility_Framework/Reflection/ClassProperty.h"
 #include "KeyState.h"
 #include "KeyArray.h"
 #include "KeyBitFlag.h"
@@ -10,7 +20,6 @@
 // GameInput API v3(GAMEINPUT_API_VERSION 3)ë¶€í„° ëª¨ë“  íƒ€ì…ì´
 // GameInput::v3 ë„¤ì„ìŠ¤í˜ì´ìŠ¤ ì•ˆìœ¼ë¡œ ë“¤ì–´ê°”ë‹¤(ì´ì „ ë²„ì „ì€ ì „ì—­ì´ì—ˆë‹¤).
 using namespace GameInput::v3;
-using namespace Microsoft::WRL;
 class InputManager : public Singleton<InputManager>
 {
 	friend class Singleton<InputManager>;
@@ -98,15 +107,15 @@ public:
 	math::vector4 vibrations[kMaxController]{};
 
 public:
-	ComPtr<IGameInput>				gameInput{};
+	winrt::com_ptr<IGameInput>				gameInput{};
 
 	KeyboardState					m_keyboardState{};
 	IGameInputDevice*				m_keyboardDevice{ nullptr };
 	std::vector<GameInputKeyState>	m_GameInputKeyStates{};
 	GameInputMouseState				m_GameInputMouseState{};
 	//ºñÆ® ÇÃ·¹±×ÀÇ Á¤¼ö¸¦ º¸¿©ÁÖÁö
-	KeyBitFlag                      m_curKeyStates{};
-	MouseBitFlag                    m_curMouseState{};
+	key_bit_flag                      m_curKeyStates{};
+	mouse_bit_flag                    m_curMouseState{};
 
 	math::vector2					m_gameViewPos{};
 	math::vector2					m_gameViewSize{};
@@ -129,7 +138,7 @@ private:
 
 public:
 	GameInputGamepadState			m_GameInputPadState[kMaxController]{};
-	GamePadBitFlag					m_curPadState[kMaxController]{};
+	gamepad_bit_flag					m_curPadState[kMaxController]{};
 	//ÆĞµå ÃÖ¼Ú°ª
 	float							deadZone = 0.24f;
 	float							triggerdeadZone = 0.1f;

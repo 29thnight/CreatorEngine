@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <ItemGroup>
+    <Filter Include="Cooking">
+      <UniqueIdentifier>{68192023-0B5D-5C4F-AEEE-4FF80C365AA0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared">
+      <UniqueIdentifier>{8D5D780E-E2B9-507D-A681-595F13C023BD}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\Editor">
+      <UniqueIdentifier>{4AEA3AC9-7C25-568C-9F39-EC06BE66B267}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\Editor\EngineEntry">
+      <UniqueIdentifier>{E46E47B3-E93D-5FE5-9F8D-D435ECDC14D0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\Engine">
+      <UniqueIdentifier>{954DF6ED-6CB1-54C4-A9B0-D4C38CEC8A6B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\Engine\RenderEngine">
+      <UniqueIdentifier>{39622281-F2A3-5A07-AE90-A15494032D1E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\Engine\RenderEngine\Experiment">
+      <UniqueIdentifier>{7BDC64DA-9EF4-58B3-A33D-C4E62F82A306}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\Engine\RenderEngine\Experiment\Cooked">
+      <UniqueIdentifier>{C23408E9-2696-5355-A239-3C8448F37EC5}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\Engine\SceneRuntime">
+      <UniqueIdentifier>{800CD51A-C9AF-5A97-86D0-73C93A68EC82}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\Engine\SceneRuntime\Audio">
+      <UniqueIdentifier>{550197A7-46A8-52B4-84CD-1A6869BF1436}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Editor\EngineEntry\Assets\Terrain\TerrainSourceProcessing.cpp">
+      <Filter>Shared\Editor\EngineEntry</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Editor\EngineEntry\Assets\Textures\TextureSourceProcessing.cpp">
+      <Filter>Shared\Editor\EngineEntry</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Engine\RenderEngine\Experiment\Cooked\TextureCooker.cpp">
+      <Filter>Shared\Engine\RenderEngine\Experiment\Cooked</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Engine\SceneRuntime\Audio\SoundAssetSerialization.cpp">
+      <Filter>Shared\Engine\SceneRuntime\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\Engine\SceneRuntime\Audio\SoundGraph.cpp">
+      <Filter>Shared\Engine\SceneRuntime\Audio</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetCooker.cpp">
+      <Filter>Cooking</Filter>
+    </ClCompile>
+    <ClCompile Include="AssetSetBuild.cpp">
+      <Filter>Cooking</Filter>
+    </ClCompile>
+    <ClCompile Include="AudioDecodeValidation.cpp">
+      <Filter>Cooking</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="AssetSetBuild.h">
+      <Filter>Cooking</Filter>
+    </ClInclude>
+    <ClInclude Include="CollisionGeometryCookProducer.h">
+      <Filter>Cooking</Filter>
+    </ClInclude>
+    <ClInclude Include="FontAssetCookSupport.h">
+      <Filter>Cooking</Filter>
+    </ClInclude>
+    <ClInclude Include="SoundAssetCookProducer.h">
+      <Filter>Cooking</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

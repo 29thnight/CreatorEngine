@@ -1,3 +1,14 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "../../../Engine/RenderEngine/RenderAllocator.h"
 #include "Animation/AnimationVisualProbe.h"
 #include "AnimationScheduler.h"
@@ -12,7 +23,7 @@
 #include "Scene.h"
 #include "SceneManager.h"
 #include "Socket.h"
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include <mathematics/transform.hpp>
 
 namespace RenderTest
@@ -79,7 +90,7 @@ namespace RenderTest
             { error = "Default material graph lacks a Principled base color socket"; return false; }
             material_graph::InstanceDescription description;
             // Fixed test identity, never a product asset.
-            if (!Uuid::TryParse("5e1f0c2a-6b7d-4c9e-8a31-2d4f6b8c0e17", description.graphId.value))
+            if (!uuid::try_parse("5e1f0c2a-6b7d-4c9e-8a31-2d4f6b8c0e17", description.graphId.value))
             { error = "Marker graph identity"; return false; }
             Material markerMaterial;
             if (!DataSystems->ConfigureMaterialGraphAuthoring(markerMaterial, *source, description, error))

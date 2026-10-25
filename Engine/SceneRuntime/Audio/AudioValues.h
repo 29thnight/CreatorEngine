@@ -1,7 +1,11 @@
 #pragma once
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
-#include "../../Utility_Framework/Uuid.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 
 // wave — 오디오 배선의 새 계층. vendor 타입이 이 헤더를 넘지 않는다.
 //
@@ -137,13 +141,13 @@ namespace wave
         ClipKey() = default;
         explicit ClipKey(std::string text) noexcept : m_text(std::move(text)) {}
 
-        [[nodiscard]] static ClipKey FromGuid(const Uuid::Uuid16& guid)
+        [[nodiscard]] static ClipKey FromGuid(const uuid::uuid16& guid)
         {
             ClipKey key;
-            if (!guid.IsNil())
+            if (!guid.is_nil())
             {
                 key.m_guid = guid;
-                key.m_text = Uuid::ToString(guid);
+                key.m_text = uuid::to_string(guid);
                 key.m_isGuid = true;
             }
             return key;
@@ -166,7 +170,7 @@ namespace wave
 
     private:
         std::string m_text;
-        Uuid::Uuid16 m_guid{};
+        uuid::uuid16 m_guid{};
         bool m_isGuid{ false };
     };
 

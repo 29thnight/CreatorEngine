@@ -1,18 +1,27 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.LayerCatalog.h"
+#else
+import Creator.Core.LayerCatalog;
+#endif
 #include "PhysicsTransformPolicy.h"
 #include "PhysicsLifecyclePolicy.h"
 #include "PhysicsBodyComponent.h"
 #include "Scene.h"
 #include "SceneManager.h"
 #include "Transform.h"
-#include "LogSystem.h"
-#include "AuthoringNodeViewAccess.h"
+#include "../Utility_Framework/Diagnostics/LogSystem.h"
+#include "../Utility_Framework/Authoring/AuthoringNodeViewAccess.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include "DataSystem.h"
 #include "CollisionGeometryIO.h"
-#include "PathFinder.h"
 #include "Experiment/Cooked/CookedAssetCatalog.h"
 #include "Experiment/Cooked/CookedAudioClipSource.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 using namespace ce::physics;
 
@@ -46,7 +55,7 @@ result<body_definition> PhysicsBodyComponent::CaptureDefinition(std::span<const 
         return std::unexpected(error{error_code::wrong_phase, 0, "Project layer settings are not bound"});
 
     const auto settings = project->Snapshot();
-    const auto* layer = settings->catalog.Find(GetOwner()->GetLayer());
+    const auto* layer = settings->catalog.find(GetOwner()->GetLayer());
     if (!layer)
         return std::unexpected(error{error_code::invalid_argument, 0, "Unknown entity layer"});
 
@@ -79,7 +88,7 @@ result<body_definition> PhysicsBodyComponent::CaptureDefinition(std::span<const 
 #if defined(CE_SCENE_HEADLESS)
         return std::unexpected(error{error_code::wrong_phase, 0, "Collision geometry asset provider is not installed"});
 #else
-        if (!PathFinder::IsAssetAuthoringEnabled())
+        if (!ce::paths::is_asset_authoring_enabled())
             return scene->m_collisionGeometry.ResolveCooked(key, [](geometry_asset_key expected) -> result<std::vector<std::byte>> {
                 const auto catalog = DataSystems->GetCookedCatalog();
                 if (!catalog)
@@ -97,11 +106,11 @@ result<body_definition> PhysicsBodyComponent::CaptureDefinition(std::span<const 
         return scene->m_collisionGeometry.Resolve(key, [](geometry_asset_key expected) {
             const auto path = DataSystems->ResolveCatalogAssetPath(FileGuid{expected.asset});
             auto current = CollisionGeometryIO::Read(path, expected);
-            if (current || path.empty() || !PathFinder::IsAssetAuthoringEnabled()) return current;
+            if (current || path.empty() || !ce::paths::is_asset_authoring_enabled()) return current;
 
             // Editor history is immutable and addressed by UUID/revision.
             // Player requires packaged closure; it never probes source archives.
-            return CollisionGeometryIO::Read(CollisionGeometryIO::RevisionPath(PathFinder::Relative(), expected),
+            return CollisionGeometryIO::Read(CollisionGeometryIO::RevisionPath(ce::paths::relative(), expected),
                                               expected);
         });
 #endif

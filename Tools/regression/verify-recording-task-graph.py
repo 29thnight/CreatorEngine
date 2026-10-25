@@ -7,6 +7,7 @@ performance are outside its scope; CE_CONTRACT_STANDALONE and CE_SHIPPING are se
 The deliberate wave-join mutation must fail the existing early-progress check.
 """
 
+import runpy
 import argparse
 import hashlib
 import json
@@ -36,11 +37,11 @@ def main():
     probe = ROOT / "Tools/regression/recording_task_graph_probe.cpp"
     inputs = [probe, ROOT / "Engine/RenderEngine/RHI/RHICommandRecordingJobs.h",
               ROOT / "Engine/RenderEngine/RHI/RHIRecordingTaskGraph.h",
-              ROOT / "Engine/Utility_Framework/JobScheduler.cpp",
-              ROOT / "Engine/Utility_Framework/JobScheduler.h",
-              ROOT / "Engine/Utility_Framework/ThreadPool.cpp",
-              ROOT / "Engine/Utility_Framework/ThreadPool.h",
+              ROOT / "Engine/Utility_Framework/Concurrency/JobScheduler.cpp",
+              ROOT / "Engine/Utility_Framework/Concurrency/ThreadPool.cpp",
               dependency / "TaskScheduler.h", dependency / "TaskScheduler.cpp"]
+
+    inputs = [ROOT / path if not path.is_absolute() else path for path in runpy.run_path(str(ROOT / "Tools/build/generate-module-adapters.py"))["jobs_source_inputs"](inputs)]
 
     def source_hashes():
         return {str(path.relative_to(ROOT) if path.is_relative_to(ROOT) else path):
@@ -58,8 +59,8 @@ def main():
             command = [compiler, "-std=c++23", "-O2", "-pthread", "-DCE_CONTRACT_STANDALONE=1", "-DCE_SHIPPING=1",
                        "-I", str(ROOT / "Engine/RenderEngine"), "-I", str(ROOT / "Engine/Utility_Framework"),
                        "-I", str(include.parent), str(probe),
-                       str(ROOT / "Engine/Utility_Framework/JobScheduler.cpp"),
-                       str(ROOT / "Engine/Utility_Framework/ThreadPool.cpp"),
+                       str(ROOT / "Engine/Utility_Framework/Concurrency/JobScheduler.cpp"),
+                       str(ROOT / "Engine/Utility_Framework/Concurrency/ThreadPool.cpp"),
                        str(dependency / "TaskScheduler.cpp"), "-o", str(executable)]
             if mutant:
                 command.append("-DRECORDING_WAVE_JOIN_MUTANT=1")

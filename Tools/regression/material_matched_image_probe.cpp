@@ -1,9 +1,29 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 // Reuse the native raster probe's device fixtures without changing its gates.
 #define main MaterialRasterProbeMain
 #include "material_raster_surface_probe.cpp"
 #undef main
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
-#include <DirectXPackedVector.h>
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 #include "RHI/DX12/EnhancedIBLGenerator.h"
 #include "Assets/CookedEnvironment.h"
 // Reads `error` only after `condition` ran. `Check(f(error), "label " + error)` builds
@@ -20,7 +40,7 @@ namespace
 struct MatchedPassTimer final : IRHIGpuProfiler
 {
     static constexpr unsigned capacity = 128;
-    Microsoft::WRL::ComPtr<ID3D12QueryHeap> heap;
+    winrt::com_ptr<ID3D12QueryHeap> heap;
     std::vector<std::string> names;
     uint32_t BeginPass(RHIEncoder& encoder, const std::string& name,
         const GpuPassTimingIdentity& = {}) override
@@ -28,13 +48,13 @@ struct MatchedPassTimer final : IRHIGpuProfiler
         Check(names.size() < capacity, "Matched pass timestamp capacity");
         const auto slot = static_cast<uint32_t>(names.size());
         names.push_back(name);
-        static_cast<DX12Encoder&>(encoder).GetCommandList()->EndQuery(heap.Get(),D3D12_QUERY_TYPE_TIMESTAMP,2*slot);
+        static_cast<DX12Encoder&>(encoder).GetCommandList()->EndQuery(heap.get(),D3D12_QUERY_TYPE_TIMESTAMP,2*slot);
         return slot;
     }
     void EndPass(RHIEncoder& encoder, uint32_t slot) override
     {
         Check(slot < names.size(), "Matched pass timestamp pairing");
-        static_cast<DX12Encoder&>(encoder).GetCommandList()->EndQuery(heap.Get(),D3D12_QUERY_TYPE_TIMESTAMP,2*slot+1);
+        static_cast<DX12Encoder&>(encoder).GetCommandList()->EndQuery(heap.get(),D3D12_QUERY_TYPE_TIMESTAMP,2*slot+1);
     }
 };
 
@@ -53,8 +73,8 @@ MatchedGeometry ReadMatchedGeometry(const std::filesystem::path& file)
     Check(count > 0 && count <= 1000000 && count % 3 == 0, "Matched sphere vertex count");
     MatchedGeometry result;
     auto& mesh = result.draw.modelMeshView;
-    Check(Uuid::TryParse("11111111-1111-8111-8111-111111111111", mesh.handle.modelId) &&
-              Uuid::TryParse("22222222-2222-8222-8222-222222222222", mesh.handle.meshId), "Matched geometry identity");
+    Check(uuid::try_parse("11111111-1111-8111-8111-111111111111", mesh.handle.modelId) &&
+              uuid::try_parse("22222222-2222-8222-8222-222222222222", mesh.handle.meshId), "Matched geometry identity");
     mesh.handle.generation = 1;
     mesh.vertexAttributeMask = assets::kModelVertexMasks.front();
     mesh.vertexStride = assets::StrideOf(mesh.vertexAttributeMask);
@@ -147,7 +167,7 @@ own::shared_owner<const Instance> MatchedInstance(const std::filesystem::path& r
                               output / (inputs.stem().string() + ".slang"), {}, product, error),
           "Matched complete Scene compiler ", error);
     experiment::AssetId id;
-    Check(Uuid::TryParse("33333333-3333-8333-8333-333333333333", id.value), "Matched graph identity");
+    Check(uuid::try_parse("33333333-3333-8333-8333-333333333333", id.value), "Matched graph identity");
     const auto generation = store.Load(id, [&](CookedProgram& cooked, std::string&) {
         cooked = {product, WriteMaterialProgramMetadata(product.program), BuildBoundSource(product.program)};
         return true;
@@ -165,20 +185,20 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
     auto& jobs = ce::get_job_scheduler();
     jobs.start(4);
     struct JobDrain { job_scheduler& jobs; ~JobDrain() { jobs.shutdown(); } } drainJobs{jobs};
-    auto* paths = InternalPath::GetInstance();
-    paths->BaseProjectPath = root / "Dynamic_CPP";
-    paths->CacheRoot = output / "ShaderCache";
-    paths->ShaderSourcePath = root / "Dynamic_CPP/Assets/Shaders";
-    auto shaderRoot = paths->ShaderSourcePath / "DefaultPassShader";
+    auto* paths = (&ce::paths::get_state());
+    paths->base_project_path = root / "Dynamic_CPP";
+    paths->cache_root = output / "ShaderCache";
+    paths->shader_source_path = root / "Dynamic_CPP/Assets/Shaders";
+    auto shaderRoot = paths->shader_source_path / "DefaultPassShader";
     if (const auto* overrideRoot = std::getenv("CREATOR_MAT9_SHADER_ROOT"))
     {
         shaderRoot = std::filesystem::absolute(overrideRoot);
         Check(std::filesystem::is_regular_file(shaderRoot / "Includes/PrincipledEnvironmentBake.slang"),
               "Matched diagnostic shader root");
-        paths->ShaderSourcePath = shaderRoot.parent_path();
+        paths->shader_source_path = shaderRoot.parent_path();
     }
     std::ofstream(output / "shader-root.txt") << shaderRoot.string() << '\n';
-    paths->AssetAuthoringEnabled = true;
+    paths->asset_authoring_enabled = true;
     RecordingChangeDevice device;
     std::string error;
     CheckWith(device.Initialize(64, 64, error), "Matched native device ", error);
@@ -335,7 +355,7 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
             irradianceHandle = hdri.GetIrradianceMap();
             prefilteredHandle = hdri.GetPrefilteredMap();
         }
-        Microsoft::WRL::ComPtr<ID3D12QueryHeap> timer;
+        winrt::com_ptr<ID3D12QueryHeap> timer;
         RHIReadback timerReadback;
         RHIReadback passTimerReadback;
         MatchedPassTimer passTimer;
@@ -343,11 +363,11 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         if (measureTiming)
         {
             const D3D12_QUERY_HEAP_DESC timerDesc{D3D12_QUERY_HEAP_TYPE_TIMESTAMP,2,0};
-            Check(SUCCEEDED(device.GetDevice()->CreateQueryHeap(&timerDesc,IID_PPV_ARGS(&timer))) &&
+            Check(SUCCEEDED(device.GetDevice()->CreateQueryHeap(&timerDesc,IID_PPV_ARGS(timer.put()))) &&
                 SUCCEEDED(device.GetCommandQueue()->GetTimestampFrequency(&timerFrequency)) &&
                 device.CreateBufferReadback(16,timerReadback,error),"Matched GPU timer");
             const D3D12_QUERY_HEAP_DESC passDesc{D3D12_QUERY_HEAP_TYPE_TIMESTAMP,2*MatchedPassTimer::capacity,0};
-            Check(SUCCEEDED(device.GetDevice()->CreateQueryHeap(&passDesc,IID_PPV_ARGS(&passTimer.heap))) &&
+            Check(SUCCEEDED(device.GetDevice()->CreateQueryHeap(&passDesc,IID_PPV_ARGS(passTimer.heap.put()))) &&
                   device.CreateBufferReadback(16*MatchedPassTimer::capacity,passTimerReadback,error),
                   "Matched pass GPU timers");
         }
@@ -424,15 +444,15 @@ void RunMatched(const std::filesystem::path& root, const std::filesystem::path& 
         if (measureTiming)
         {
             graph->SetProfiler(&passTimer);
-            static_cast<DX12Encoder&>(device.GetImmediateEncoder()).GetCommandList()->EndQuery(timer.Get(),D3D12_QUERY_TYPE_TIMESTAMP,0);
+            static_cast<DX12Encoder&>(device.GetImmediateEncoder()).GetCommandList()->EndQuery(timer.get(),D3D12_QUERY_TYPE_TIMESTAMP,0);
         }
         if (!graph->Execute(error)) throw std::runtime_error("Matched graph execute: " + error);
         if (measureTiming)
         {
             auto* list=static_cast<DX12Encoder&>(device.GetImmediateEncoder()).GetCommandList();
-            list->EndQuery(timer.Get(),D3D12_QUERY_TYPE_TIMESTAMP,1);
-            list->ResolveQueryData(timer.Get(),D3D12_QUERY_TYPE_TIMESTAMP,0,2,device.Resolve(timerReadback.buffer),0);
-            list->ResolveQueryData(passTimer.heap.Get(),D3D12_QUERY_TYPE_TIMESTAMP,0,
+            list->EndQuery(timer.get(),D3D12_QUERY_TYPE_TIMESTAMP,1);
+            list->ResolveQueryData(timer.get(),D3D12_QUERY_TYPE_TIMESTAMP,0,2,device.Resolve(timerReadback.buffer),0);
+            list->ResolveQueryData(passTimer.heap.get(),D3D12_QUERY_TYPE_TIMESTAMP,0,
                                    static_cast<UINT>(2*passTimer.names.size()),device.Resolve(passTimerReadback.buffer),0);
         }
         if (!device.EndFrame(error)) throw std::runtime_error("Matched frame submit: " + error);

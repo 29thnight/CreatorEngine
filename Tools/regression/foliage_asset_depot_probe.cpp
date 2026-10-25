@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "gcce_probe_cleanup.h"
 // Source-only integration fixture, intentionally not executed in this change.
 // Run in a dedicated initialized engine test host with a source-free CEMF3 set:
@@ -10,7 +15,7 @@
 #include "Assets/ModelGeometryPayload.h"
 #include "Experiment/Cooked/ArtifactByteSource.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace RenderTest
 {

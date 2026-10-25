@@ -2,8 +2,12 @@
 
 #include <mathematics/transform.hpp>
 
-#include "../Utility_Framework/StandardLibrary.h"
-#include "../Utility_Framework/Contract.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 
 namespace Animation
 {

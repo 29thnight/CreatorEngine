@@ -1,4 +1,8 @@
-#include "../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // 렌더 프록시의 컴포넌트 읽기 생성자들 (PHASE 4-2 C1).
 //
 // 프록시 "타입"은 렌더 소유(RenderEngine/PrimitiveRenderProxy.h ·
@@ -161,7 +165,7 @@ SpriteRenderProxy::SpriteRenderProxy(SpriteRenderer* component) :
     m_isEnabled = component->IsEnabled() && component->GetOwner() &&
         component->GetOwner()->IsEnabled();
     m_quadMesh = own::make_shared<Mesh>(
-        component->GetOwner()->m_name.ToString(),
+        component->GetOwner()->m_name,
         PrimitiveCreator::QuadVertices(),
         PrimitiveCreator::QuadIndices()
     );

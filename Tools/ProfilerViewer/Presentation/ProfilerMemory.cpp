@@ -1,10 +1,15 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
 #include "ProfilerView.h"
 
 #include "ProfilerLiveDiagnostics.h"
 #include "EditorIcons.h"
 #include "ImGui.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace editor::profiler_view
 {
@@ -333,16 +338,7 @@ namespace editor::profiler_view
 			return "Object";
 		}
 
-		bool contains_case_insensitive(const std::string& value, const char* query)
-		{
-			if (!query || !*query)
-			{
-				return true;
-			}
-			return std::search(value.begin(), value.end(), query, query + std::strlen(query),
-				[](char a, char b) { return std::tolower(static_cast<unsigned char>(a)) ==
-					std::tolower(static_cast<unsigned char>(b)); }) != value.end();
-		}
+
 
 		void draw_managed_summary(const snapshot& a, const snapshot* b)
 		{
@@ -558,8 +554,8 @@ namespace editor::profiler_view
 			{
 				const auto* object = objects.first ? objects.first : objects.second;
 				identity_unavailable |= !object->identity_valid;
-				if (contains_case_insensitive(object->name, view.search) ||
-					contains_case_insensitive(kind_name(key.kind), view.search))
+				if (ce::strings::contains_case_insensitive(object->name, view.search) ||
+					ce::strings::contains_case_insensitive(kind_name(key.kind), view.search))
 				{
 					rows.push_back(objects);
 				}

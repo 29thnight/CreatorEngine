@@ -2,7 +2,11 @@
 #include "DX12Format.h"
 #include "../RHIPipelineState.h"
 #include "../RHIPipelineLayout.h"
-#include <d3d12.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 
 // 중립 레이아웃·샘플러 어휘 → DX12 (V4).
 //

@@ -1,4 +1,3 @@
-#include "../Utility_Framework/Ownership.h"
 // Ordered layer resources, command production and capture raster.
 void SceneHost::LayerStage::DeclareForwardGBuffer(const own::shared_owner<const Frame>& prepared,
                                                   EnhancedRenderGraph& graph,

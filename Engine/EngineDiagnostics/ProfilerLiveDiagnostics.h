@@ -3,7 +3,7 @@
 #include "ProfilerRenderingDiagnostics.h"
 
 #include <stdint.h>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // Value-only wire model. Addresses are labels from the target, never handles
 // that the viewer can dereference or send back as a read request.

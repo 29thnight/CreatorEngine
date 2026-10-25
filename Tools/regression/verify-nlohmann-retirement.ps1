@@ -92,7 +92,7 @@ if ($legacyInput.Count -ne 0) {
 $terrainText = (Get-Content -LiteralPath `
     (Join-Path $repoRoot 'Engine\SceneRuntime\Terrain.cpp') -Raw) +
     (Get-Content -LiteralPath `
-    (Join-Path $repoRoot 'Editor\EngineEntry\EditorAssetDatabase.cpp') -Raw)
+    (Join-Path $repoRoot 'Editor\EngineEntry\Assets\EditorAssetDatabase.cpp') -Raw)
 if ($terrainText -match 'LoadEditorSplatMap_Compat|json::|\bjson\s+[A-Za-z_]') {
     $failures.Add('Terrain legacy JSON/compat path remains')
 }

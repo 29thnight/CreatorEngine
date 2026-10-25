@@ -1,9 +1,9 @@
 #pragma once
-#include "Core.Minimal.h"
-#include "TypeTrait.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
+#include "../Utility_Framework/Reflection/TypeTrait.h"
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector3.hpp>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // 보유층(RenderScene)에 등록되는 모든 프록시의 공통 조각.
 //

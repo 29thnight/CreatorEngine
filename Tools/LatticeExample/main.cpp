@@ -1,5 +1,31 @@
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Platform.Windows.Strings.h"
+#else
+import Creator.Platform.Windows.Strings;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "../../Lattice/Core/LXGraph.h"
-#include "../../Engine/Utility_Framework/WindowsApartment.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
 #include "../../Lattice/Core/LXDocument.h"
 #include "../../Lattice/Core/LXNodeDefinition.h"
 #include "../../Lattice/ImGui/LXCanvas.h"
@@ -11,15 +37,24 @@
 #include <imgui_internal.h>
 #include <imgui_impl_dx11.h>
 #include <imgui_impl_win32.h>
-
-#include <d3d11.h>
-#include <windows.h>
-#include <wincodec.h>
-#include <wrl/client.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.LegacyGraphicsSDK.h"
+#else
+import "Creator.LegacyGraphicsSDK.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 
 #include <stdio.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
-#include "../../Engine/Utility_Framework/Contract.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 #include <crtdbg.h>
 
 #pragma comment(lib, "d3d11.lib")
@@ -257,7 +292,6 @@ void ReleaseDevice()
 
 bool CaptureBackBuffer(const std::string& path)
 {
-    using Microsoft::WRL::ComPtr;
     const auto succeeded = [](HRESULT result, const char* operation) {
         if (FAILED(result))
         {
@@ -268,8 +302,8 @@ bool CaptureBackBuffer(const std::string& path)
         return true;
     };
 
-    ComPtr<ID3D11Texture2D> backBuffer;
-    if (!succeeded(gSwapChain->GetBuffer(0, IID_PPV_ARGS(backBuffer.GetAddressOf())), "GetBuffer"))
+    winrt::com_ptr<ID3D11Texture2D> backBuffer;
+    if (!succeeded(gSwapChain->GetBuffer(0, IID_PPV_ARGS(backBuffer.put())), "GetBuffer"))
     {
         return false;
     }
@@ -280,15 +314,15 @@ bool CaptureBackBuffer(const std::string& path)
     description.BindFlags = 0;
     description.CPUAccessFlags = D3D11_CPU_ACCESS_READ;
     description.MiscFlags = 0;
-    ComPtr<ID3D11Texture2D> staging;
-    if (!succeeded(gDevice->CreateTexture2D(&description, nullptr, staging.GetAddressOf()), "CreateTexture2D"))
+    winrt::com_ptr<ID3D11Texture2D> staging;
+    if (!succeeded(gDevice->CreateTexture2D(&description, nullptr, staging.put()), "CreateTexture2D"))
     {
         return false;
     }
-    gContext->CopyResource(staging.Get(), backBuffer.Get());
+    gContext->CopyResource(staging.get(), backBuffer.get());
 
     D3D11_MAPPED_SUBRESOURCE pixels{};
-    if (!succeeded(gContext->Map(staging.Get(), 0, D3D11_MAP_READ, 0, &pixels), "Map"))
+    if (!succeeded(gContext->Map(staging.get(), 0, D3D11_MAP_READ, 0, &pixels), "Map"))
     {
         return false;
     }
@@ -310,11 +344,11 @@ bool CaptureBackBuffer(const std::string& path)
 
     const ce::platform::windows::apartment_scope apartmentScope{ ce::platform::windows::apartment_model::current_or_mta };
     const HRESULT comResult = apartmentScope.result;
-    ComPtr<IWICImagingFactory> factory;
-    ComPtr<IWICStream> stream;
-    ComPtr<IWICBitmapEncoder> encoder;
-    ComPtr<IWICBitmapFrameEncode> frame;
-    ComPtr<IPropertyBag2> properties;
+    winrt::com_ptr<IWICImagingFactory> factory;
+    winrt::com_ptr<IWICStream> stream;
+    winrt::com_ptr<IWICBitmapEncoder> encoder;
+    winrt::com_ptr<IWICBitmapFrameEncode> frame;
+    winrt::com_ptr<IPropertyBag2> properties;
     bool saved = false;
     do
     {
@@ -324,19 +358,19 @@ bool CaptureBackBuffer(const std::string& path)
             break;
         }
         if (!succeeded(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
-                                        IID_PPV_ARGS(factory.GetAddressOf())),
+                                        IID_PPV_ARGS(factory.put())),
                        "Create WIC factory") ||
-            !succeeded(factory->CreateStream(stream.GetAddressOf()), "Create WIC stream"))
+            !succeeded(factory->CreateStream(stream.put()), "Create WIC stream"))
         {
             break;
         }
         const std::wstring widePath = std::filesystem::absolute(Utf8Path(path)).wstring();
         if (!succeeded(stream->InitializeFromFilename(widePath.c_str(), GENERIC_WRITE), "Open PNG stream") ||
-            !succeeded(factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, encoder.GetAddressOf()),
+            !succeeded(factory->CreateEncoder(GUID_ContainerFormatPng, nullptr, encoder.put()),
                        "Create PNG encoder") ||
-            !succeeded(encoder->Initialize(stream.Get(), WICBitmapEncoderNoCache), "Initialize PNG encoder") ||
-            !succeeded(encoder->CreateNewFrame(frame.GetAddressOf(), properties.GetAddressOf()), "Create PNG frame") ||
-            !succeeded(frame->Initialize(properties.Get()), "Initialize PNG frame") ||
+            !succeeded(encoder->Initialize(stream.get(), WICBitmapEncoderNoCache), "Initialize PNG encoder") ||
+            !succeeded(encoder->CreateNewFrame(frame.put(), properties.put()), "Create PNG frame") ||
+            !succeeded(frame->Initialize(properties.get()), "Initialize PNG frame") ||
             !succeeded(frame->SetSize(description.Width, description.Height), "Set PNG size"))
         {
             break;
@@ -360,12 +394,12 @@ bool CaptureBackBuffer(const std::string& path)
         saved = true;
     } while (false);
 
-    properties.Reset();
-    frame.Reset();
-    encoder.Reset();
-    stream.Reset();
-    factory.Reset();
-    gContext->Unmap(staging.Get(), 0);
+    properties = nullptr;
+    frame = nullptr;
+    encoder = nullptr;
+    stream = nullptr;
+    factory = nullptr;
+    gContext->Unmap(staging.get(), 0);
     return saved;
 }
 LRESULT WINAPI WindowProc(HWND window, UINT message, WPARAM wParam, LPARAM lParam)
@@ -1012,19 +1046,7 @@ bool LoadMaterialPreviewFont()
     return true;
 }
 
-bool MatchesSearch(const char* label, const char* query)
-{
-    if (!query[0])
-    {
-        return true;
-    }
-    std::string name = label;
-    std::string search = query;
-    const auto lower = [](unsigned char character) { return static_cast<char>(std::tolower(character)); };
-    std::transform(name.begin(), name.end(), name.begin(), lower);
-    std::transform(search.begin(), search.end(), search.begin(), lower);
-    return name.find(search) != std::string::npos;
-}
+
 
 bool StyleColor(const char* label, ImVec4& color)
 {
@@ -1143,7 +1165,7 @@ void DrawPortCreationPopup(LX::LXGraph& graph, LX::CanvasState& canvas, LX::LXDo
             for (int index = 0; index < 7; ++index)
             {
                 const LX::NodeSpec spec = Spec(index);
-                if (!MatchesSearch(spec.title.c_str(), canvas.creationQuery.data()))
+                if (!ce::strings::contains_case_insensitive(spec.title.c_str(), canvas.creationQuery.data()))
                 {
                     continue;
                 }
@@ -5439,7 +5461,7 @@ void DrawUI(LX::LXGraph& graph, LX::CanvasState& canvas, LX::LXStyleSheet& style
         bool categoryShown = false;
         for (const int index : indices)
         {
-            if (!MatchesSearch(names[index], search.data()))
+            if (!ce::strings::contains_case_insensitive(names[index], search.data()))
             {
                 continue;
             }
@@ -5480,7 +5502,7 @@ void DrawUI(LX::LXGraph& graph, LX::CanvasState& canvas, LX::LXStyleSheet& style
     bool groupHeading = false;
     for (const auto& [id, group] : graph.Groups())
     {
-        if (!MatchesSearch(group.name.c_str(), search.data()))
+        if (!ce::strings::contains_case_insensitive(group.name.c_str(), search.data()))
         {
             continue;
         }
@@ -6308,16 +6330,12 @@ int wmain(int argc, wchar_t** argv)
     arguments.reserve(argc);
     for (int index = 0; index < argc; ++index)
     {
-        const int bytes =
-            WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, argv[index], -1, nullptr, 0, nullptr, nullptr);
-        if (bytes <= 0)
+        std::string value;
+        if (!ce::strings::try_wide_to_utf8(std::wstring_view(argv[index]), value))
         {
             std::cerr << "Cannot decode command line path" << std::endl;
             return 4;
         }
-        std::string value(static_cast<std::size_t>(bytes), '\0');
-        WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, argv[index], -1, value.data(), bytes, nullptr, nullptr);
-        value.pop_back();
         arguments.push_back(std::move(value));
     }
     if (argc > 1 && arguments[1] == "--self-test")

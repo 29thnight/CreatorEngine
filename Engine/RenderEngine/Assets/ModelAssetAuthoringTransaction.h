@@ -1,4 +1,9 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 // PHASE 3.75 MBC3 — model identity의 유일한 디스크 writer.
 //
 // source decode, stable-key 결합, UUIDv8 closure, schema-v2 sidecar, cooked
@@ -9,7 +14,7 @@
 #include "AssetIdentityProfile.h"
 #include "ModelAssetPhaseTiming.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace assets
 {
@@ -41,7 +46,7 @@ namespace assets
 
         // Automatic recovery may rebuild derived files, never replace identity.
         // Nil leaves normal first-import behavior unchanged.
-        Uuid::Uuid16 expectedModelId{};
+        uuid::uuid16 expectedModelId{};
 
         // 회귀 검사의 단계별 원자성 검증에만 사용한다. 제품 호출은 None이다.
         ModelAuthoringFailurePoint failurePoint{ ModelAuthoringFailurePoint::None };
@@ -55,7 +60,7 @@ namespace assets
 
     struct ModelAssetAuthoringResult final
     {
-        Uuid::Uuid16 modelAssetId{};
+        uuid::uuid16 modelAssetId{};
         std::uint64_t generation{};
         std::filesystem::path sidecarPath{};
         std::filesystem::path generationPath{};

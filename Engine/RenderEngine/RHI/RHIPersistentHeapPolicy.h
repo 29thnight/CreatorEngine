@@ -1,6 +1,6 @@
 #pragma once
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 /// Persistent GPU buffer heap의 백엔드 중립 free-list 정책.
 ///

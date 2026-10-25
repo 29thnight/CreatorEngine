@@ -1,3 +1,9 @@
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "SceneCookProducer.h"
 #include "../MaterialAuthoringCodec.h"
 
@@ -5,10 +11,10 @@
 #include "TextureCookProducer.h"
 #include "../../Assets/AssetIdentityProfile.h" // PHASE 3.75 MBC8: UUIDv8 참조
 #include "../../MaterialGraphRuntime.h"
-#include "AuthoringCookedDocument.h"
-#include "AuthoringParsedDocument.h"
+#include "../../../Utility_Framework/Authoring/AuthoringCookedDocument.h"
+#include "../../../Utility_Framework/Authoring/AuthoringParsedDocument.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace experiment::cooked
 {
@@ -132,7 +138,7 @@ inline constexpr std::array<std::string_view, 2> kUnproducedGuidKeys{
                     return false;
                 }
             }
-            node.SetScalar(Uuid::ToString(id.value));
+            node.SetScalar(uuid::to_string(id.value));
             if (std::ranges::find(references, id) == references.end())
             {
                 references.push_back(id);

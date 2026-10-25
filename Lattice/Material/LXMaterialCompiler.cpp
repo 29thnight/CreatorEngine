@@ -1,7 +1,11 @@
 #include "LXMaterialCompiler.h"
-#include "../../Engine/Utility_Framework/Sha256.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace LX
 {
@@ -894,11 +898,11 @@ bool ComputeMaterialSourceKey(const LXMaterialAsset& asset, std::string& result,
             error = "Material source key requires a node definition registry.";
             return false;
         }
-        Hash::Sha256 hash;
+        ce::hash::sha256 hash;
         const auto append = [&](std::string_view value) {
             const auto length = std::to_string(value.size()) + ':';
-            hash.Update(length.data(), length.size());
-            hash.Update(value.data(), value.size());
+            hash.update(length.data(), length.size());
+            hash.update(value.data(), value.size());
         };
         append("lx.material.source/" + std::to_string(kMaterialSourceKeyVersion));
         append(std::to_string(LXMaterialProgram::CompilerVersion));
@@ -966,7 +970,7 @@ bool ComputeMaterialSourceKey(const LXMaterialAsset& asset, std::string& result,
                 }
             }
         }
-        result = Hash::ToHex(hash.Finish());
+        result = ce::hash::to_hex(hash.finish());
         return true;
     }
     catch (const std::exception& failure)

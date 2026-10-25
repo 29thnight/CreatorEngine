@@ -1,14 +1,26 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 
-#include "EngineMode.h"
-#include "EnginePaths.h"
-#include "WindowsWindow.h"
-#include "RuntimeSettings.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.EngineMode.h"
+#else
+import Creator.Core.EngineMode;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
+#include "../Utility_Framework/Runtime/RuntimeSettings.h"
 
 // Process-level composition data. The Editor and Player entry points build this value;
 // the common bootstrap only applies it. EngineRunMode remains transitional while
 // SceneManager and TagManager still consume the legacy global mode.
-using RuntimeContentPrepare = bool (*)(const EnginePaths& paths) noexcept;
+using RuntimeContentPrepare = bool (*)(const ce::paths::roots& paths) noexcept;
 using HostSettingsInitialize = bool (*)() noexcept;
 
 struct EngineLaunchConfig
@@ -23,7 +35,7 @@ struct EngineLaunchConfig
     const RuntimeRenderBackendPolicy renderBackendPolicy;
     EngineRunMode compatibilityRunMode{ EngineRunMode::Unset };
     const char* logSessionName{ "Engine" };
-    EnginePaths paths{};
+    ce::paths::roots paths{};
     RuntimeContentPrepare prepareRuntimeContent{};
     HostSettingsInitialize initializeHostSettings{};
     WindowsWindowDesc window{};

@@ -11,16 +11,16 @@ def reject(name,path,code,extra=None):
 for root in ['Engine/SceneRuntime','Engine/RenderEngine','Engine/Physics','Engine/RuntimeHost','Player','Engine/Network']:
     for payload in ['#include <yaml-cpp/yaml.h>','#include <nlohmann/json.hpp>','#include <ryml/ryml.hpp>','using Leak = ryml::NodeRef;']:
         reject(root+':'+payload,root+'/N1Injected.h',payload)
-reject('indirect-neutral','Engine/Utility_Framework/DiagnosticDocument.h','#include "N1Hidden.h"',{'Engine/Utility_Framework/N1Hidden.h':'using Hidden=ryml::Tree;'})
+reject('indirect-neutral','Engine/Utility_Framework/Authoring/DiagnosticDocument.h','#include "N1Hidden.h"',{'Engine/Utility_Framework/N1Hidden.h':'using Hidden=ryml::Tree;'})
 reject('indirect-runtime','Engine/SceneRuntime/N1Injected.cpp','#include "N1Hidden.h"',{'Engine/Utility_Framework/N1Hidden.h':'#include <c4/yml/tree.hpp>'})
 reject('network-facade','Engine/Network/N1Injected.h','#include "AuthoringDocument.h"')
 reject('network-diagnostic','Engine/Network/N1Injected.h','#include "DiagnosticDocument.h"')
 reject('network-type','Engine/Network/N1Injected.h','using Alias = Authoring::NodeView;')
-reject('macro-include','Engine/Utility_Framework/DiagnosticDocument.h','#define NEXT "ryml/ryml.hpp"\n#include NEXT')
+reject('macro-include','Engine/Utility_Framework/Authoring/DiagnosticDocument.h','#define NEXT "ryml/ryml.hpp"\n#include NEXT')
 reject('continued-include','Engine/SceneRuntime/N1Injected.cpp','#inc\\\nlude <ryml/ryml.hpp>')
 reject('forward-backend','Engine/SceneRuntime/N1Injected.h','namespace ryml { class Tree; }')
 reject('aliased-backend','Engine/SceneRuntime/N1Injected.cpp','namespace escape = nlohmann; using X = escape::json;')
-files=dict(original);del files['Engine/Utility_Framework/DiagnosticDocument.h']
+files=dict(original);del files['Engine/Utility_Framework/Authoring/DiagnosticDocument.h']
 try:check(files)
 except BoundaryError:cases.append({'name':'removed-neutral-registration','result':'rejected'})
 else:raise AssertionError('missing registration accepted')

@@ -1,6 +1,6 @@
 #pragma once
 #if defined(CE_PHYSICS_TESTING)
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 namespace ce::physics::test
 {
 // Standalone verifier only. Not compiled into the engine's Physics project.

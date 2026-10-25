@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
 // PHASE 14 P3 — 집계 표.
 //
 // Hierarchy 는 부모-자식 호출 트리, Flat 은 이름으로 전부 합친 것이다(§7.4).
@@ -5,7 +10,7 @@
 // 없다. 화면이 숫자를 만들면 그 숫자를 검사할 자리가 화면뿐이 된다.
 #include "ProfilerView.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "ImGui.h"
 #include "ProfileMarker.h"
@@ -25,10 +30,7 @@ namespace editor::profiler_view
 			if (threadFilter >= 0 && row.thread_slot != threadFilter) return false;
 			if (markerFilter[0] == '\0') return true;
 			const char* name = marker_name(reader().capture(), row.marker);
-			return std::search(name, name + std::strlen(name), markerFilter,
-				markerFilter + std::strlen(markerFilter),
-				[](unsigned char left, unsigned char right)
-				{ return std::tolower(left) == std::tolower(right); }) != name + std::strlen(name);
+			return ce::strings::contains_case_insensitive(name, markerFilter);
 		}
 
 		bool subtree_matches(std::span<const ce::aggregate_row> rows, std::uint32_t index)

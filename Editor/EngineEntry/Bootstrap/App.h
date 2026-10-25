@@ -1,0 +1,51 @@
+﻿#pragma once
+#include "../../Resources/Windows/Resource.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.AppBackend.WinAPI.h"
+#else
+import Creator.AppBackend.WinAPI;
+#endif
+#include "../../../Engine/Utility_Framework/Foundation/Core.Minimal.h"
+#include "EditorMain.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+
+namespace Core
+{
+	class App final : public Noncopyable
+	{
+	public:
+		App() = default;
+		~App() = default;
+		//App Func
+		void Initialize(AppBackendWinAPI& coreWindow, CoreWindow& window);
+		void Finalize();
+		void SetWindow(AppBackendWinAPI& coreWindow);
+        void RegisterHandler(AppBackendWinAPI& coreWindow);
+		void Load();
+		void Run(CoreWindow& window);
+		//Window Event Func
+		LRESULT Shutdown(HWND hWnd, WPARAM wParam, LPARAM lParam);
+		LRESULT ProcessRawInput(HWND hWnd, WPARAM wParam, LPARAM lParam);
+		LRESULT ImGuiKeyDownHandler(HWND hWnd, WPARAM wParam, LPARAM lParam);
+		LRESULT ImGuiKeyUpHandler(HWND hWnd, WPARAM wParam, LPARAM lParam);
+		LRESULT HandleCharEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
+		LRESULT HandleResizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
+		LRESULT HandleMaximizeEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
+		LRESULT HandleSettingWindowEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
+		LRESULT HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam);
+
+	private:
+		/// 이번 상태를 밀봉해 RenderThread에 발행한다. 반환은 넘긴 뷰의 수.
+		uint32_t							PublishRenderFrame();
+		/// 첫 그림이 설 때까지 프레임을 돌린다(창을 보여주기 전에만).
+		bool								WarmUpFirstRenderedFrame();
+
+        HWND								m_hWnd{ nullptr };
+		// DeviceResources(DX11) 멤버가 여기 있었다 (2026-08-10). 창은
+		// CoreWindow가, 디바이스는 DX12 쪽이 소유한다.
+		std::unique_ptr<Editor::EditorMain>	m_main;
+		bool								m_windowClosed{ false };
+		bool								m_windowVisible{ true };
+		bool								m_isMinimized{ false };
+	};
+}

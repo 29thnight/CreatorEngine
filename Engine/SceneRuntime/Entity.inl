@@ -1,7 +1,7 @@
 #pragma once
 #include "Entity.h"
 #include "Component.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 // ★ Scene.h를 include하지 말 것. 여기서 Scene이 필요한 자리는 전부
 //   EntityAt()(비템플릿, Entity.cpp에 정의)으로 우회한다.
 //   inl이 Scene.h를 물면 Scene.h → Entity.h → Entity.inl → Scene.h

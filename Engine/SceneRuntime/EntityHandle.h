@@ -1,5 +1,5 @@
 #pragma once
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // 씬 그래프 노드의 런타임 정체성 (SceneGraphRedesignPlan §2.3, 트랙 E1 → 트랙 W).
 //

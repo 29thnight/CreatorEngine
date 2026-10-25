@@ -1,3 +1,14 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "ExperimentParity/ExperimentMaterialResolveSelfTest.h"
 
 #include "DataSystem.h"
@@ -8,7 +19,7 @@
 #include "ShaderMeta.h"
 #include "Texture.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace RenderTest
 {
@@ -88,7 +99,7 @@ namespace RenderTest
                             if (cooked == id)
                             {
                                 return std::filesystem::path("Derived/Textures/")
-                                    / (Uuid::ToString(id.value) + ".png");
+                                    / (uuid::to_string(id.value) + ".png");
                             }
                         }
                         return std::filesystem::path{};

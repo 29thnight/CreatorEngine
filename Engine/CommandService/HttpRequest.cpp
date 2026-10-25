@@ -1,25 +1,19 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
 #include "HttpRequest.h"
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace CommandService
 {
     namespace
     {
-        std::string ToLower(std::string_view text)
-        {
-            std::string out(text);
-            std::transform(out.begin(), out.end(), out.begin(),
-                           [](unsigned char c) { return static_cast<char>(std::tolower(c)); });
-            return out;
-        }
 
-        std::string_view Trim(std::string_view text)
-        {
-            while (!text.empty() && (' ' == text.front() || '\t' == text.front())) text.remove_prefix(1);
-            while (!text.empty() && (' ' == text.back()  || '\t' == text.back()))  text.remove_suffix(1);
-            return text;
-        }
+
+
 
         HttpParseResult Reject(HttpParseStatus status, std::string error)
         {
@@ -54,7 +48,7 @@ namespace CommandService
 
     const std::string* HttpRequest::Header(std::string_view name) const
     {
-        const std::string wanted = ToLower(name);
+        const std::string wanted = ce::strings::to_lower(name);
         for (const HttpHeader& header : headers)
         {
             if (header.name == wanted) return &header.value;
@@ -137,8 +131,8 @@ namespace CommandService
             }
 
             HttpHeader header;
-            header.name  = ToLower(Trim(line.substr(0, colon)));
-            header.value = std::string(Trim(line.substr(colon + 1)));
+            header.name  = ce::strings::to_lower(ce::strings::trim_view(line.substr(0, colon), " \t"));
+            header.value = std::string(ce::strings::trim_view(line.substr(colon + 1), " \t"));
             if (header.name.empty()) return Reject(HttpParseStatus::BadRequest, "헤더 이름이 비었다");
             result.request.headers.push_back(std::move(header));
         }
@@ -186,7 +180,7 @@ namespace CommandService
 
         if (const std::string* connection = result.request.Header("connection"))
         {
-            const std::string lowered = ToLower(*connection);
+            const std::string lowered = ce::strings::to_lower(*connection);
             if (lowered.find("close") != std::string::npos)      result.request.keepAlive = false;
             else if (lowered.find("keep-alive") != std::string::npos) result.request.keepAlive = true;
         }

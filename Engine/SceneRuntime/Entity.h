@@ -1,9 +1,9 @@
 #pragma once
 #include "Object.h"
 #include "SceneGC.h"
-#include "../Utility_Framework/StandardLibrary.h"
-#include "AuthoringDocument.h"
-#include "AuthoringNodeView.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#include "../Utility_Framework/Authoring/AuthoringDocument.h"
+#include "../Utility_Framework/Authoring/AuthoringNodeView.h"
 #include "Component.h"
 #include "Transform.h"
 #include "GameObjectType.h"
@@ -11,7 +11,11 @@
 #include "EntityHandle.h"
 #include "PrefabOverride.h"
 #include "ScenePhase.h"
-#include "../Utility_Framework/LayerTypes.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
 
 class Scene;
 class Bone;
@@ -64,7 +68,6 @@ public:
     void gc_trace(gc::tracer& tracer) const;
 
 
-	const HashingString& GetHashedName() const noexcept { return m_name; }
 	const std::string& RemoveSuffixNumberTag() const;
 
 	void SetName(std::string_view name) { m_name = name; }
@@ -327,7 +330,7 @@ public:
 	std::vector<PrefabOverride> m_prefabOverrides{};
 
 public:
-    HashingString m_tag{ "Untagged" };
+    std::string m_tag{ "Untagged" };
     [[reflgen::hidden]]
     std::uint64_t m_layerId = ce::layers::default_layer.value;
 

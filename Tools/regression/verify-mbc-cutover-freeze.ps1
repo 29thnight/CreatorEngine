@@ -68,7 +68,7 @@ $surfaces = [ordered]@{
     'legacy-binding.m_hashingMesh'                 = 'm_hashingMesh'
     'assimp.include'                               = '#\s*include\s*[<"]assimp/'
     'pseudo-v5.DeterministicSubAssetId'            = 'DeterministicSubAssetId'
-    'pseudo-v5.Uuid::FromName-call'                = 'Uuid::FromName\s*\('
+    'pseudo-v5.Uuid::FromName-call'                = '(?:Uuid::FromName|uuid::from_name)\s*\('
     'legacy-bridge.ModelSceneBridge'               = 'ModelSceneBridge'
     'legacy-fallback.LoadModelViaExperiment'       = 'LoadModelViaExperiment'
     'diag.material.finalize'                       = '\[material\.finalize\]'
@@ -116,7 +116,7 @@ $sidecarWriterAllow = @(
 $testSeamPattern = 'DeriveIdentityWithProfile|InsertUncheckedForTest'
 $testSeamAllowPrefix = 'Engine\RenderEngine\Assets\'
 # ③ 새 계층이 legacy GUID를 namespace/key로 흘리지 않는다 — Assets/ 안에 FromName 0건.
-$assetsLayerForbidden = 'Uuid::FromName|IsAssetIdV4|CreateRandomV4'
+$assetsLayerForbidden = 'Uuid::FromName|uuid::from_name|IsAssetIdV4|CreateRandomV4'
 
 $hardFailures = New-Object System.Collections.Generic.List[string]
 $sidecarWriters = New-Object System.Collections.Generic.List[string]
@@ -194,7 +194,7 @@ foreach ($name in $hardZeroSurfaces) {
 #
 # This static gate checks the implementation's read-only contract. Command presence is
 # checked through runtime discovery and owned result fields by verify-editor-command-surface.
-$diagnosticSource = Join-Path $repoRoot 'Editor/EngineEntry/EditorDiagnostics.cpp'
+$diagnosticSource = Join-Path $repoRoot 'Editor/EngineEntry/Diagnostics/EditorDiagnostics.cpp'
 if (Test-Path -LiteralPath $diagnosticSource) {
     $console = Get-CodeText $diagnosticSource
     $animliveStart = $console.IndexOf('CommandCore::CommandResult AnimatorStatus(')

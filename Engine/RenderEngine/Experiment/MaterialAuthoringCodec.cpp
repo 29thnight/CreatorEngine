@@ -1,11 +1,17 @@
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "MaterialAuthoringCodec.h"
 
 #include "AssetIdentity.h"
 #include "../Assets/AssetIdentityProfile.h" // MBC7: UUIDv8 subasset 신원(재질·embedded texture)
-#include "AuthoringReadNode.h"
-#include "AuthoringWriteNode.h"
+#include "../../Utility_Framework/Authoring/AuthoringReadNode.h"
+#include "../../Utility_Framework/Authoring/AuthoringWriteNode.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace experiment
 {
@@ -16,7 +22,7 @@ namespace experiment
 
         [[nodiscard]] std::string GuidText(const AssetId& id)
         {
-            return id.IsValid() ? Uuid::ToString(id.value)
+            return id.IsValid() ? uuid::to_string(id.value)
                 : std::string(kNilGuidText);
         }
 

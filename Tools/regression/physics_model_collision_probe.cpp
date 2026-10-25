@@ -1,6 +1,6 @@
 #include "../../Engine/SceneRuntime/ModelCollisionGeometry.h"
-#include "../../Editor/EngineEntry/EditorModelCollisionAsset.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Editor/EngineEntry/Assets/Models/EditorModelCollisionAsset.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 int main(int argc, char** argv)
 {
@@ -63,8 +63,8 @@ int main(int argc, char** argv)
         check(argc == 2);
         const auto root = std::filesystem::path(argv[1]) / ("assets-" + std::to_string(GetCurrentProcessId()));
         std::filesystem::create_directories(root);
-        const auto model = Uuid::Parse("91ea9b44-13a6-8aec-99ec-0963eef7eaa1");
-        const auto mesh = Uuid::Parse("91ea9b44-13a6-8aec-99ec-0963eef7eaa2");
+        const auto model = uuid::parse("91ea9b44-13a6-8aec-99ec-0963eef7eaa1");
+        const auto mesh = uuid::parse("91ea9b44-13a6-8aec-99ec-0963eef7eaa2");
         ce::physics::triangle_mesh_source source{{{-2, 0, -3}, {4, 0, -3}, {0, 0, 5}}, {{0, 1, 2}}};
         auto prepared = Editor::PrepareModelCollisionAsset(root, model, mesh, source);
         check(prepared && !prepared->existing && FileGuid(prepared->source.key.asset).IsRandomV4());
@@ -92,11 +92,11 @@ int main(int argc, char** argv)
         encoded = ce::physics::CollisionGeometryCodec::Encode(prepared->source);
         write(prepared->destination, *encoded);
         const auto meta = std::filesystem::path(prepared->destination.string() + ".meta");
-        const auto badMeta = std::string("guid: ") + Uuid::ToString(mesh) + "\ngeometryRevision: 1\n";
+        const auto badMeta = std::string("guid: ") + uuid::to_string(mesh) + "\ngeometryRevision: 1\n";
         write(meta, badMeta);
         check(!Editor::PrepareModelCollisionAsset(root, model, mesh, source));
         const auto goodMeta =
-            std::string("guid: ") + Uuid::ToString(prepared->source.key.asset) + "\ngeometryRevision: 1\n";
+            std::string("guid: ") + uuid::to_string(prepared->source.key.asset) + "\ngeometryRevision: 1\n";
         write(meta, goodMeta);
         check(bool(Editor::PrepareModelCollisionAsset(root, model, mesh, source)));
         check(!Editor::PrepareModelCollisionAsset(root, {}, mesh, source));

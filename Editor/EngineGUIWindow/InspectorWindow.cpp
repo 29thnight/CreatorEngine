@@ -1,4 +1,30 @@
-#include "../EngineEntry/EditorProjectOperations.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.LayerCatalog.h"
+#else
+import Creator.Core.LayerCatalog;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
+#include "../EngineEntry/Project/EditorProjectOperations.h"
 #include "EditorTheme.h"
 #include "InspectorWindow.h"
 #include "InspectorControl.h"
@@ -6,7 +32,7 @@
 #include "InspectorLayoutFixture.h"
 #include <stdint.h>
 #include <float.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "EditorAssetDragPayload.h"
 
 #include "EditorInspectorPanel.h"
@@ -14,17 +40,17 @@
 #include "EditorWindowNames.h"
 #include "Windows/EditorStandardWindows.h"
 #include "EditorMenuDraw.h"
-#include "EditorObjectOperations.h"
-#include "EditorScriptAuthoring.h"
-#include "EditorPlatform.h"
-#include "EditorAssetPresentation.h"
-#include "GameObjectCommand.h"
+#include "../EngineEntry/Scene/EditorObjectOperations.h"
+#include "../EngineEntry/Scripting/EditorScriptAuthoring.h"
+#include "../EngineEntry/Bootstrap/EditorPlatform.h"
+#include "../EngineEntry/Assets/EditorAssetPresentation.h"
+#include "../EngineEntry/Editing/GameObjectCommand.h"
 #include "Animator.h"
 #include "PhysicsBodyComponent.h"
-#include "AuthoringNodeEquality.h"
-#include "AuthoringParsedDocument.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringNodeEquality.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
 #include "MeshRenderer.h"
-#include "EditorImGuiTexture.h"
+#include "../EngineEntry/Presentation/EditorImGuiTexture.h"
 #include "RenderScene.h"
 #include "Scene.h"
 #include "Object.h"
@@ -35,11 +61,10 @@
 #include "ImageComponent.h"
 #include "UIManager.h"
 #include "DataSystem.h"
-#include "EditorAssetDatabase.h"
+#include "../EngineEntry/Assets/EditorAssetDatabase.h"
 #include "ContentsBrowserWindow.h"
-#include "EditorSessionState.h"
-#include "PathFinder.h"
-#include "RuntimeSettings.h"
+#include "../EngineEntry/Project/EditorSessionState.h"
+#include "../../Engine/Utility_Framework/Runtime/RuntimeSettings.h"
 #include "Transform.h"
 #include "ComponentFactory.h"
 #include "ReflectionImGuiHelper.h"
@@ -48,7 +73,7 @@
 #include "EditorSectionHeader.h"
 #include "EditorAxisField3.h"
 #include "Terrain.h"
-#include "FileDialog.h"
+#include "../../Engine/Platform/Windows/FileDialog.h"
 #include "TagManager.h"
 #include "PlayerInput.h"
 #include "InputActionManager.h"
@@ -170,7 +195,7 @@ void draw_physics_shapes(PhysicsBodyComponent& body)
 
             const auto project = SceneManagers->ProjectLayers();
             const auto settings = project ? project->Snapshot() : nullptr;
-            const auto* layer = settings ? settings->catalog.Find(ce::layers::layer_id{shape.layerOverride}) : nullptr;
+            const auto* layer = settings ? settings->catalog.find(ce::layers::layer_id{shape.layerOverride}) : nullptr;
             const char* preview = shape.layerOverride == 0 ? "Inherit Entity Layer"
                                   : layer                  ? layer->name.c_str()
                                                            : "Missing Layer";
@@ -658,11 +683,11 @@ void InspectorWindow::DrawAddComponent(Entity* entity)
         }
         if (!status.source.empty())
         {
-            if (ImGui::SmallButton("Open script")) EditorPlatform::Get().OpenFile(file::u8path(status.source));
+            if (ImGui::SmallButton("Open script")) EditorPlatform::Get().OpenFile(std::filesystem::u8path(status.source));
             if (!status.log.empty())
             {
                 ImGui::SameLine();
-                if (ImGui::SmallButton("Build log")) EditorPlatform::Get().OpenFile(file::u8path(status.log));
+                if (ImGui::SmallButton("Build log")) EditorPlatform::Get().OpenFile(std::filesystem::u8path(status.log));
             }
         }
     }
@@ -693,7 +718,7 @@ void InspectorWindow::DrawAddComponent(Entity* entity)
         }
         ImGui::SameLine();
     }
-    ImGui::TextUnformatted(m_newScriptPage ? "New Script" : !SearchKey(m_componentSearch).empty() ? "Search Results"
+    ImGui::TextUnformatted(m_newScriptPage ? "New Script" : !ce::strings::to_lower_without_whitespace(m_componentSearch).empty() ? "Search Results"
         : m_componentCategory.empty() ? "Add Component" : m_componentCategory.c_str());
     ImGui::Separator();
     if (m_newScriptPage)
@@ -729,7 +754,7 @@ void InspectorWindow::DrawAddComponent(Entity* entity)
     // Browse results while keeping the search field ready for further typing.
     ImGui::SetItemKeyOwner(ImGuiKey_UpArrow);
     ImGui::SetItemKeyOwner(ImGuiKey_DownArrow);
-    const bool searching = !SearchKey(m_componentSearch).empty();
+    const bool searching = !ce::strings::to_lower_without_whitespace(m_componentSearch).empty();
     const bool categoryPage = !searching && m_componentCategory.empty();
     struct Row { std::string title; const Entry* entry{}; };
     std::vector<Row> rows;
@@ -982,7 +1007,7 @@ void InspectorWindow::DrawManagedScripts(ScriptComponent* script)
 		case ClrHost::ScriptFieldType::Object:
 		{
 			Entity* target = clr.GetFieldObject(instanceId, i);
-			const std::string label = (nullptr != target) ? target->m_name.ToString() : std::string("None (Entity)");
+			const std::string label = (nullptr != target) ? target->m_name : std::string("None (Entity)");
 			const float clearWidth = ImGui::GetFrameHeight();
 			const float gap = ImGui::GetStyle().ItemInnerSpacing.x;
 			ImGui::Button((label + "###ObjectValue").c_str(), ImVec2(ImMax(1.f, valueWidth - clearWidth - gap), 0.f));
@@ -1069,7 +1094,7 @@ Entity* InspectorWindow::DrawNavigation(Scene* scene, Entity* selected)
         {
             auto* entry = scene ? scene->Resolve(target) : nullptr;
             ImGui::SetTooltip("%s%s%s", direction < 0 ? "Previous selection" : "Next selection",
-                entry ? ": " : "", entry ? entry->m_name.ToString().c_str() : "");
+                entry ? ": " : "", entry ? entry->m_name.c_str() : "");
         }
     }
     ImGui::SameLine();
@@ -1144,7 +1169,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 	ImGui::TableNextColumn();
 	DrawEntityIcon(gameObject);
 	ImGui::TableNextColumn();
-	std::string name = gameObject->m_name.ToString();
+	std::string name = gameObject->m_name;
 	bool isEnabled = gameObject->IsEnabled();
 	ImGui::PushStyleColor(ImGuiCol_CheckMark, ImVec4(0.65f, 0.78f, 0.47f, 1.f));
 	ImGui::PushStyleColor(ImGuiCol_CheckboxSelectedBg, ImVec4(0.23f, 0.29f, 0.16f, 1.f));
@@ -1158,11 +1183,11 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
     const auto projectLayers = SceneManagers->ProjectLayers();
     const auto layerSnapshot = projectLayers ? projectLayers->Snapshot() : nullptr;
     auto& selectedTag = gameObject->m_tag;
-    const auto* selectedLayer = layerSnapshot ? layerSnapshot->catalog.Find(gameObject->GetLayer()) : nullptr;
+    const auto* selectedLayer = layerSnapshot ? layerSnapshot->catalog.find(gameObject->GetLayer()) : nullptr;
     const auto assignTag = [&](const std::string& tag) {
-        TagManagers->RemoveTagFromObject(selectedTag.ToString(), gameObject);
+        TagManagers->RemoveTagFromObject(selectedTag, gameObject);
         selectedTag = tag;
-		TagManagers->AddTagToObject(selectedTag.ToString(), gameObject);
+		TagManagers->AddTagToObject(selectedTag, gameObject);
     };
 
     // The tag button occupies the trailing part of the name field. Reserve that
@@ -1204,7 +1229,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 		ImGui::OpenPopup("##EntityTagPicker");
 	ImGui::PopStyleColor(2);
 	ImGui::PopStyleVar();
-	if (ImGui::IsItemHovered()) ImGui::SetTooltip("Tag: %s", selectedTag.ToString().c_str());
+	if (ImGui::IsItemHovered()) ImGui::SetTooltip("Tag: %s", selectedTag.c_str());
 	ImGui::PopStyleVar();
 	ImGui::EndGroup();
 
@@ -1300,7 +1325,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
                 if (result.IsSuccess())
                 {
                     const auto snapshot = projectLayers->Snapshot();
-                    const auto* added = snapshot->catalog.Find(newLayerName);
+                    const auto* added = snapshot->catalog.find(newLayerName);
                     if (added)
                         EditorObjectOperations::SetEntityLayer(gameObject->GetScene()->HandleOf(gameObject->m_index),
                                                                added->id);
@@ -1508,7 +1533,7 @@ static bool NameButton(const std::string& name, const char* id, float width)
 
 // 자산 칸: 이름을 보여 주는 버튼 하나. 버튼이 끌어 놓기 대상이다. 텍스처가 있으면
 // 앞에 줄 높이의 미리보기를 붙인다. 놓인 자산 경로를 돌려준다(없으면 빈 경로).
-static file::path DrawAssetSlot(const char* id, const own::shared_owner<const Texture>& texture, const char* emptyText,
+static std::filesystem::path DrawAssetSlot(const char* id, const own::shared_owner<const Texture>& texture, const char* emptyText,
 	const char* payloadType, float width)
 {
 	ImGui::PushID(id);
@@ -1524,7 +1549,7 @@ static file::path DrawAssetSlot(const char* id, const own::shared_owner<const Te
 	const std::string name = texture ? texture->m_name + texture->m_extension : std::string(emptyText);
 	NameButton(name, "###Slot", buttonWidth);
 
-	file::path dropped;
+	std::filesystem::path dropped;
 	if (DropTargetEnabled() && ImGui::BeginDragDropTarget())
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload(payloadType))
@@ -1579,8 +1604,8 @@ void InspectorWindow::ImGuiDrawHelperBT(BehaviorTreeComponent* BTComponent)
 	const auto pick = [](const wchar_t* filter, const wchar_t* title, std::string& name,
 		FileGuid& guid, const char* kind)
 	{
-		file::path filePath = ShowOpenFileDialog(filter, title,
-			PathFinder::Relative("BehaviorTree").wstring());
+		std::filesystem::path filePath = ShowOpenFileDialog(filter, title,
+			ce::paths::relative("BehaviorTree").wstring());
 		if (filePath.empty()) return;
 
 		name = filePath.stem().string();
@@ -1619,7 +1644,7 @@ void InspectorWindow::ImGuiDrawHelperRenderProfile(SceneRenderProfileComponent* 
 		{
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("SceneRenderProfile"))
 			{
-				const file::path filepath = editor::asset_drag::path_of(*payload);
+				const std::filesystem::path filepath = editor::asset_drag::path_of(*payload);
 				FileGuid guid = DataSystems->GetFileGuid(filepath);
 				if (guid != nullFileGuid)
 				{
@@ -1672,7 +1697,7 @@ void InspectorWindow::ImGuiDrawHelperRenderProfile(SceneRenderProfileComponent* 
 		{
 			if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("HDR"))
 			{
-				const file::path filepath = editor::asset_drag::path_of(*payload);
+				const std::filesystem::path filepath = editor::asset_drag::path_of(*payload);
 				FileGuid guid = DataSystems->GetFileGuid(filepath);
 				if (guid != nullFileGuid)
 				{
@@ -1774,7 +1799,7 @@ void InspectorWindow::ImGuiDrawHelperDecal(DecalComponent* decalComponent)
 	// 데칼은 이름만 저장하고 Textures 에서 다시 찾는다(DecalComponent.cpp).
 	const auto slot = [&](const char* label, const own::shared_owner<const Texture>& texture, const char* context)
 	{
-		const file::path dropped = DrawAssetSlot(label, texture, "None", "Texture", sheet.line(label));
+		const std::filesystem::path dropped = DrawAssetSlot(label, texture, "None", "Texture", sheet.line(label));
 		return !dropped.empty() && editor::asset_drag::lives_in(dropped, "Textures", context)
 			? dropped.filename().string() : std::string();
 	};
@@ -1822,7 +1847,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 		}
 	}
 
-	const file::path dropped = DrawAssetSlot("AddTexture", {},
+	const std::filesystem::path dropped = DrawAssetSlot("AddTexture", {},
 		count > 0 ? "Drag UI texture to add" : "No textures - drag UI texture", "UI_TEXTURE",
 		sheet.line("Add Texture"));
 	if (!dropped.empty())
@@ -1869,7 +1894,7 @@ void InspectorWindow::ImGuiDrawHelperImageComponent(ImageComponent* imageCompone
 	{
 		ImGui::PushID(label);
 		Entity* target = imageComponent->GetNextNavi(direction);
-		const std::string name = target ? target->m_name.ToString() : std::string("None (drag object)");
+		const std::string name = target ? target->m_name : std::string("None (drag object)");
 		NameButton(name, "###Target", sheet.line(label));
 		if (DropTargetEnabled() && ImGui::BeginDragDropTarget())
 		{
@@ -1895,7 +1920,7 @@ void InspectorWindow::ImGuiDrawHelperSpriteRenderer(SpriteRenderer* spriteRender
 	{
 		const editor::widgets::property_sheet sheet(m_layout, { "Sprite" });
 		const auto& sprite = spriteRenderer->GetSprite();
-		const file::path dropped = DrawAssetSlot("Sprite", sprite, "None (drag texture)",
+		const std::filesystem::path dropped = DrawAssetSlot("Sprite", sprite, "None (drag texture)",
 			"Texture", sheet.line("Sprite"));
 		if (!dropped.empty())
 		{
@@ -2289,8 +2314,8 @@ void InspectorWindow::Draw()
 	std::optional<Authoring::WriteDocument>& selectedNode{
 		ContentsBrowserWindow::selectedFileMetaNode };
 	bool isSelectedNode = selectedNode.has_value();
-	file::path selectedFileName{ ContentsBrowserWindow::selectedFileName };
-	file::path selectedMetaFilePath{ ContentsBrowserWindow::selectedMetaFilePath };
+	std::filesystem::path selectedFileName{ ContentsBrowserWindow::selectedFileName };
+	std::filesystem::path selectedMetaFilePath{ ContentsBrowserWindow::selectedMetaFilePath };
 
 	if (SceneManagers->IsSceneLoading())
 	{
@@ -2356,7 +2381,7 @@ void InspectorWindow::Draw()
     ImGui::BeginDisabled(editLocked);
 	if (scene && selectedSceneObject)
 	{
-		g_inspectorEntity = selectedSceneObject->m_name.ToString();
+		g_inspectorEntity = selectedSceneObject->m_name;
 		{
 			inspector_body_probe probe;
 			ImGuiDrawHelperGameObjectBaseInfo(selectedSceneObject);
@@ -2737,7 +2762,7 @@ void InspectorWindow::Draw()
 
         const auto importBeforeEdit = selectedNode->Dump();
 		const bool importOpen = ImGui::CollapsingHeader(stem.c_str(), ImGuiTreeNodeFlags_DefaultOpen);
-		file::path importSource = selectedMetaFilePath;
+		std::filesystem::path importSource = selectedMetaFilePath;
 		importSource.replace_extension();
 		const bool textureImport = EditorAssetDatabase::IsTextureSource(importSource);
 		{

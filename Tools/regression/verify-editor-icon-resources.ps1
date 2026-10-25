@@ -110,8 +110,8 @@ if ($deadPath.ExitCode -eq 0) {
 #    컴파일러가 안 봐 준다 — 파일을 지우거나 오타를 내면 런타임에 빈 텍스처가
 #    되고, 그 자리는 "아이콘이 없는 것"과 구분되지 않는다.
 $consumerFiles = @(
-    'Editor/EngineEntry/EditorAssetPresentation.cpp',
-    'Editor/EngineEntry/App.cpp',
+    'Editor/EngineEntry/Assets/EditorAssetPresentation.cpp',
+    'Editor/EngineEntry/Bootstrap/App.cpp',
     'Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedGizmoIconTest.cpp',
     'Editor/RenderTests/RHI/DX12/Tests/Editor/EnhancedGizmoSceneTest.cpp'
 )
@@ -144,7 +144,7 @@ $unused = @($diskFiles | Where-Object { -not $referenced.Contains($_) })
 #    2026-09-16 에 다섯 장이 새 그림으로 바뀌면서 1254x1254 원본이 그대로 실렸고
 #    dx12.gizmoicon 이 카메라 한 장만 크기를 보고 있어 나머지 넷은 아무도 못 봤다.
 #    이름은 제품 소비자(`gizmoIcons->x = loadIcon(L"...")`)에서 뽑는다.
-$presentation = Get-Content -LiteralPath (Join-Path $Root 'Editor/EngineEntry/EditorAssetPresentation.cpp') -Raw
+$presentation = Get-Content -LiteralPath (Join-Path $Root 'Editor/EngineEntry/Assets/EditorAssetPresentation.cpp') -Raw
 $gizmoIcons = @([regex]::Matches($presentation, 'gizmoIcons->\w+\s*=\s*loadIcon\(L"([^"]+)"\)') |
     ForEach-Object { $_.Groups[1].Value })
 Assert ($gizmoIcons.Count -ge 5) `

@@ -1,3 +1,18 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.HeapAllocator.h"
+#else
+import Creator.Core.HeapAllocator;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // Compiles the production recorder, translator, scheduler and submission FIFO.
 // Only the native device/encoder/fence boundary is a deterministic CPU fixture.
 #include "../../Engine/RenderEngine/RHI/IRenderDeviceServices.h"
@@ -147,16 +162,16 @@ namespace
         allocation_probe::begin();
         void* standard = ::operator new(17);
         void* aligned = ::operator new(128, std::align_val_t{64});
-        void* first = mi_malloc(41);
-        void* second = mi_malloc_aligned(128, 64);
+        void* first = ce::heap::try_allocate(41);
+        void* second = ce::heap::try_allocate_aligned(128, 64);
         const auto counts = allocation_probe::end();
         require(standard && aligned && first && second && counts[0] == 2 && counts[1] == 2,
                 "Allocation observation did not count the real standard/mimalloc API calls.");
         require(mi_check_owned(first) && mi_check_owned(second), "Mimalloc observation replaced the real allocator.");
         ::operator delete(standard);
         ::operator delete(aligned, std::align_val_t{64});
-        mi_free(first);
-        mi_free(second);
+        ce::heap::deallocate(first);
+        ce::heap::deallocate(second);
     }
 
     class ProbeValidator final : public IRHISoftwareCommandValidator

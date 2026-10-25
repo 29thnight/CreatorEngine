@@ -1,8 +1,12 @@
 #pragma once
 
 #include "../../RHI/IRenderDeviceServices.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
-#include "../../../Utility_Framework/Contract.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 
 // Pass-owned resources are retired against submission notifications. A resource
 // replaced during an open recording also waits for that recording's decision.

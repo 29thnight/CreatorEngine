@@ -1,12 +1,16 @@
 #include "MaterialGraphShaderMeta.h"
 #include "MaterialGraphProduct.h"
 
-#include "Sha256.h"
-#include "AuthoringCookedDocument.h"
-#include "AuthoringParsedDocument.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
+#include "../Utility_Framework/Authoring/AuthoringCookedDocument.h"
+#include "../Utility_Framework/Authoring/AuthoringParsedDocument.h"
 
 #include <stdint.h>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace material_graph
 {
@@ -37,7 +41,7 @@ std::string Quote(std::string_view text)
 
 std::string Digest(std::string_view text)
 {
-    return Hash::ToHex(Hash::Sha256::Compute(text.data(), text.size()));
+    return ce::hash::to_hex(ce::hash::sha256::compute(text.data(), text.size()));
 }
 
 const char* ColorSpace(LX::LXColorSpace value)

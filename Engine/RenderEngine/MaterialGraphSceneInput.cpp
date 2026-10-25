@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "MaterialGraphSceneInput.h"
 #include "Render/Graph/EnhancedDrawIdentity.h"
 #include "Material.h"
@@ -6,7 +11,7 @@
 #include "../EngineDiagnostics/ProfileScope.h"
 
 #include <stdint.h>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace material_graph
 {

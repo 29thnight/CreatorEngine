@@ -1,8 +1,18 @@
+#include "../../Engine/RenderEngine/RenderArena.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Arena.h"
+#else
+import Creator.Core.Arena;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../../Engine/RenderEngine/RHI/RHIDescriptorVersionPolicy.h"
 #include "../../Engine/RenderEngine/RHI/RHISoftwareEncoder.h"
 #include "../../Engine/RenderEngine/RHI/RHISoftwareRecorder.h"
 #include <iostream>
-#include "../../Engine/RenderEngine/RenderArena.h"
 
 namespace
 {
@@ -135,11 +145,11 @@ int main()
             };
             auto* alignedCapture = objects.emplace<AlignedCapture>();
             Require(reinterpret_cast<uintptr_t>(alignedCapture) % 4096 == 0, "Overaligned declaration capture failed.");
-            const auto retained = objects.stats().retainedBytes;
+            const auto retained = objects.stats().retained_bytes;
             objects.reset();
             Require(weak.expired() && destroyed == 2 && destruction[0] == 2 && destruction[1] == 1,
                     "Declaration captures were not destroyed in reverse order.");
-            Require(objects.stats().retainedBytes == retained && objects.stats().usedBytes == 0,
+            Require(objects.stats().retained_bytes == retained && objects.stats().used_bytes == 0,
                     "Declaration reset failed to retain raw blocks.");
             auto* recycled = objects.emplace<Capture>(own::shared_owner<int>{}, 3, &destruction, &destroyed);
             Require(reinterpret_cast<uintptr_t>(recycled) == address,
@@ -365,20 +375,20 @@ int main()
         auto gpuOwner = arenaLease;
         arenaLease.reset();
         auto overlap = arenaPool.Acquire();
-        Require(overlap.operator->() != originalSet && arenaResource.stats().usedBytes != 0,
+        Require(overlap.operator->() != originalSet && arenaResource.stats().used_bytes != 0,
                 "Live frame arena was reset while asynchronous owners remained.");
         rhiOwner.reset();
-        Require(arenaResource.stats().usedBytes != 0, "CPU completion reset a GPU-owned arena.");
+        Require(arenaResource.stats().used_bytes != 0, "CPU completion reset a GPU-owned arena.");
         gpuOwner.reset();
         auto recycled = arenaPool.Acquire();
         Require(recycled.operator->() == originalSet && recycled->Resource(0).stats().resets == 1 &&
-                    recycled->Resource(0).stats().usedBytes == 0 &&
-                    recycled->Resource(0).stats().retainedBytes == retained.retainedBytes,
+                    recycled->Resource(0).stats().used_bytes == 0 &&
+                    recycled->Resource(0).stats().retained_bytes == retained.retained_bytes,
                 "Last owner did not reset and retain arena blocks.");
         {
             ce::render_arena_vector<uint64_t> values{&recycled->Resource(0)};
             values.resize(20000, 0xdef);
-            Require(values.data() == firstBlock && recycled->Resource(0).stats().blockCount == retained.blockCount,
+            Require(values.data() == firstBlock && recycled->Resource(0).stats().block_count == retained.block_count,
                     "Next frame did not reuse retained arena storage.");
         }
         std::array<std::thread, ce::RenderArenaSet::DomainCount> writers;
@@ -433,7 +443,7 @@ int main()
             {
             }
             auto next = exceptionPool.Acquire();
-            Require(next.operator->() == failedSet && next->Resource(0).stats().usedBytes == 0,
+            Require(next.operator->() == failedSet && next->Resource(0).stats().used_bytes == 0,
                     "Early exit did not destroy containers before resetting arena storage.");
         }
         ProbeValidator validator;

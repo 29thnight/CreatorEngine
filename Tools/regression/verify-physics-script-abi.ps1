@@ -5,7 +5,7 @@ $out=Join-Path $repo 'Build/Obj/Phase19M0Script'
 New-Item -ItemType Directory -Force $out | Out-Null
 $cpp=Get-Content (Join-Path $repo 'Engine/SceneRuntime/ClrHost.cpp') -Raw
 $cs=Get-Content (Join-Path $repo 'ScriptCore/Native.cs') -Raw
-$versionHeader=Get-Content (Join-Path $repo 'Engine/Utility_Framework/ScriptApiVersion.h') -Raw
+$versionHeader=Get-Content (Join-Path $repo 'Engine/Utility_Framework/Runtime/ScriptApiVersion.h') -Raw
 $nativeVersion=[regex]::Match($versionHeader,'CreatorScriptApiVersion\s*=\s*(\d+)').Groups[1].Value
 $managedVersion=[regex]::Match($cs,'ExpectedVersion\s*=\s*(\d+)').Groups[1].Value
 if (!$nativeVersion -or $nativeVersion -ne $managedVersion) {

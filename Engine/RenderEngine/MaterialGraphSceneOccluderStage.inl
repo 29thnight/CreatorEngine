@@ -1,4 +1,3 @@
-#include "../Utility_Framework/Ownership.h"
 // Stage implementation included by MaterialGraphSceneHost.cpp inside material_graph.
 RGHandle SceneHost::OccluderStage::DeclareOccluder(const own::shared_owner<const Frame>& prepared,
                                                    EnhancedRenderGraph& graph, RGHandle geometry,

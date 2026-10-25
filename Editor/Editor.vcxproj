@@ -32,8 +32,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="EngineGUIWindow\SoundGraphEditor.h" />
-    <ClCompile Include="EngineEntry\TerrainSourceProcessing.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
-    <ClCompile Include="EngineEntry\TextureSourceProcessing.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="EngineGUIWindow/InspectorIcon.cpp" />
+    <ClCompile Include="EngineEntry\Assets\Terrain\TerrainSourceProcessing.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="EngineEntry\Assets\Textures\TextureSourceProcessing.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="..\Engine\RenderEngine\Experiment\Cooked\TextureCooker.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="EngineGUIWindow\SoundGraphEditor.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClInclude Include="EngineGUIWindow\ViewportHostWindow.h" />
@@ -63,14 +64,14 @@
     <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGizmoLinePass.h" />
     <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedGridPass.h" />
     <ClInclude Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.h" />
-    <ClInclude Include="EngineEntry\BuildSettings.h" />
-    <ClInclude Include="EngineEntry\EditorCommandServiceHost.h" />
-    <ClInclude Include="EngineEntry\EditorObjectOperations.h" />
-    <ClInclude Include="EngineEntry\PhysicsShapeDocument.h" />
-    <ClInclude Include="EngineEntry\EditorScriptAuthoring.h" />
-    <ClInclude Include="EngineEntry\EditorComponentCatalog.h" />
-    <ClInclude Include="EngineEntry\EditorProjectOperations.h" />
-    <ClInclude Include="EngineEntry\EditorDiagnostics.h" />
+    <ClInclude Include="EngineEntry\Build\BuildSettings.h" />
+    <ClInclude Include="EngineEntry\Commands\EditorCommandServiceHost.h" />
+    <ClInclude Include="EngineEntry\Scene\EditorObjectOperations.h" />
+    <ClInclude Include="EngineEntry\Assets\Physics\PhysicsShapeDocument.h" />
+    <ClInclude Include="EngineEntry\Scripting\EditorScriptAuthoring.h" />
+    <ClInclude Include="EngineEntry\Scripting\EditorComponentCatalog.h" />
+    <ClInclude Include="EngineEntry\Project\EditorProjectOperations.h" />
+    <ClInclude Include="EngineEntry\Diagnostics\EditorDiagnostics.h" />
     <ClInclude Include="EngineEntry\Commandlets\EditorCommandlets.h" />
     <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandParser.h" />
     <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandDescriptor.h" />
@@ -78,33 +79,33 @@
     <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandRegistry.h" />
     <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandResult.h" />
     <ClInclude Include="..\Engine\RuntimeHost\CommandCore\CommandSession.h" />
-    <ClInclude Include="EngineEntry\CommandResultJson.h" />
-    <ClInclude Include="EngineEntry\ConsoleCommandSystem.h" />
+    <ClInclude Include="EngineEntry\Commands\CommandResultJson.h" />
+    <ClInclude Include="EngineEntry\Commands\ConsoleCommandSystem.h" />
     <ClInclude Include="EngineEntry\Commands\CommandRegistrar.h" />
     <ClInclude Include="EngineEntry\Commands\CommandSupport.h" />
-    <ClInclude Include="EngineEntry\EditorAssetDatabase.h" />
-    <ClInclude Include="EngineEntry\ConditionalAssetPublish.h" />
-    <ClInclude Include="EngineEntry\TextureSourceProcessing.h" />
-    <ClInclude Include="EngineEntry\EditorAssetPresentation.h" />
-    <ClInclude Include="EngineEntry\EditorModelCollisionAsset.h" />
-    <ClInclude Include="EngineEntry\EditorModelCollisionGeometry.h" />
-    <ClInclude Include="EngineEntry\EditorModelPlacement.h" />
-    <ClInclude Include="EngineEntry\EditorImGuiTexture.h" />
-    <ClInclude Include="EngineEntry\EditorPlatform.h" />
-    <ClInclude Include="EngineEntry\EditorPlayModeController.h" />
-    <ClInclude Include="EngineEntry\EditorPreferences.h" />
-    <ClInclude Include="EngineEntry\EditorSceneOverlayContributor.h" />
-    <ClInclude Include="EngineEntry\EditorEntityIcons.h" />
-    <ClInclude Include="EngineEntry\EditorSelectionHistory.h" />
-    <ClInclude Include="EngineEntry\EditorSessionState.h" />
-    <ClInclude Include="EngineEntry\EditorSettingsStore.h" />
-    <ClInclude Include="EngineEntry\GameBuilderSystem.h" />
-    <ClInclude Include="EngineEntry\GameObjectCommand.h" />
-    <ClInclude Include="EngineEntry\GizmoRenderer.h" />
-    <ClInclude Include="EngineEntry\PrefabEditor.h" />
-    <ClInclude Include="EngineEntry\ReflectionUndo.h" />
-    <ClInclude Include="EngineEntry\ReflectionPropertyEdit.h" />
-    <ClInclude Include="EngineEntry\WinProcProxy.h" />
+    <ClInclude Include="EngineEntry\Assets\EditorAssetDatabase.h" />
+    <ClInclude Include="EngineEntry\Assets\ConditionalAssetPublish.h" />
+    <ClInclude Include="EngineEntry\Assets\Textures\TextureSourceProcessing.h" />
+    <ClInclude Include="EngineEntry\Assets\EditorAssetPresentation.h" />
+    <ClInclude Include="EngineEntry\Assets\Models\EditorModelCollisionAsset.h" />
+    <ClInclude Include="EngineEntry\Assets\Models\EditorModelCollisionGeometry.h" />
+    <ClInclude Include="EngineEntry\Assets\Models\EditorModelPlacement.h" />
+    <ClInclude Include="EngineEntry\Presentation\EditorImGuiTexture.h" />
+    <ClInclude Include="EngineEntry\Bootstrap\EditorPlatform.h" />
+    <ClInclude Include="EngineEntry\Scene\EditorPlayModeController.h" />
+    <ClInclude Include="EngineEntry\Project\EditorPreferences.h" />
+    <ClInclude Include="EngineEntry\Scene\EditorSceneOverlayContributor.h" />
+    <ClInclude Include="EngineEntry\Assets\EditorEntityIcons.h" />
+    <ClInclude Include="EngineEntry\Editing\EditorSelectionHistory.h" />
+    <ClInclude Include="EngineEntry\Project\EditorSessionState.h" />
+    <ClInclude Include="EngineEntry\Project\EditorSettingsStore.h" />
+    <ClInclude Include="EngineEntry\Build\GameBuilderSystem.h" />
+    <ClInclude Include="EngineEntry\Editing\GameObjectCommand.h" />
+    <ClInclude Include="EngineEntry\Scene\GizmoRenderer.h" />
+    <ClInclude Include="EngineEntry\Scene\PrefabEditor.h" />
+    <ClInclude Include="EngineEntry\Editing\ReflectionUndo.h" />
+    <ClInclude Include="EngineEntry\Editing\ReflectionPropertyEdit.h" />
+    <ClInclude Include="EngineEntry\Bootstrap\WinProcProxy.h" />
     <ClInclude Include="EditorMenu\EditorMenuSurface.h" />
     <ClInclude Include="EditorMenu\EditorMenuSchema.h" />
     <ClInclude Include="EditorMenu\EditorMenuRegistry.h" />
@@ -189,17 +190,17 @@
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedGizmoLinePass.cpp" />
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedGridPass.cpp" />
     <ClCompile Include="EditorRender\Render\Passes\Editor\EnhancedWireFramePass.cpp" />
-    <ClCompile Include="EngineEntry\EditorCommandServiceHost.cpp" />
-    <ClCompile Include="EngineEntry\EditorObjectOperations.cpp">
+    <ClCompile Include="EngineEntry\Commands\EditorCommandServiceHost.cpp" />
+    <ClCompile Include="EngineEntry\Scene\EditorObjectOperations.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="EngineEntry\EditorScriptAuthoring.cpp">
+    <ClCompile Include="EngineEntry\Scripting\EditorScriptAuthoring.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="EngineEntry\EditorProjectOperations.cpp">
+    <ClCompile Include="EngineEntry\Project\EditorProjectOperations.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="EngineEntry\EditorDiagnostics.cpp">
+    <ClCompile Include="EngineEntry\Diagnostics\EditorDiagnostics.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandParser.cpp" />
@@ -207,8 +208,8 @@
     <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandRegistry.cpp" />
     <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandResult.cpp" />
     <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandSession.cpp" />
-    <ClCompile Include="EngineEntry\CommandResultJson.cpp" />
-    <ClCompile Include="EngineEntry\ConsoleCommandSystem.cpp" />
+    <ClCompile Include="EngineEntry\Commands\CommandResultJson.cpp" />
+    <ClCompile Include="EngineEntry\Commands\ConsoleCommandSystem.cpp" />
     <!-- LC6(PHASE 14.5): 도메인 명령 TU.
          유니티에서 **일부러 뺀다.** §12 가 "include 는 각 TU 가 직접 소유한다"고
          못 박았는데, 유니티에 넣으면 앞 파일이 들여온 헤더에 기대도 통과한다 —
@@ -299,18 +300,18 @@
     <ClCompile Include="EditorWindow\Windows\EditorToolboxWindows.cpp">
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
-    <ClCompile Include="EngineEntry\EditorAssetDatabase.cpp" />
-    <ClCompile Include="EngineEntry\EditorAssetPresentation.cpp" />
-    <ClCompile Include="EngineEntry\EditorModelPlacement.cpp" />
-    <ClCompile Include="EngineEntry\EditorImGuiTexture.cpp" />
-    <ClCompile Include="EngineEntry\EditorPlatform.cpp" />
-    <ClCompile Include="EngineEntry\EditorPlayModeController.cpp" />
-    <ClCompile Include="EngineEntry\EditorSceneOverlayContributor.cpp" />
-    <ClCompile Include="EngineEntry\EditorSettingsStore.cpp" />
-    <ClCompile Include="EngineEntry\GameBuilderSystem.cpp" />
-    <ClCompile Include="EngineEntry\GizmoRenderer.cpp" />
-    <ClCompile Include="EngineEntry\PrefabEditor.cpp" />
-    <ClCompile Include="EngineEntry\WinProcProxy.cpp" />
+    <ClCompile Include="EngineEntry\Assets\EditorAssetDatabase.cpp" />
+    <ClCompile Include="EngineEntry\Assets\EditorAssetPresentation.cpp" />
+    <ClCompile Include="EngineEntry\Assets\Models\EditorModelPlacement.cpp" />
+    <ClCompile Include="EngineEntry\Presentation\EditorImGuiTexture.cpp" />
+    <ClCompile Include="EngineEntry\Bootstrap\EditorPlatform.cpp" />
+    <ClCompile Include="EngineEntry\Scene\EditorPlayModeController.cpp" />
+    <ClCompile Include="EngineEntry\Scene\EditorSceneOverlayContributor.cpp" />
+    <ClCompile Include="EngineEntry\Project\EditorSettingsStore.cpp" />
+    <ClCompile Include="EngineEntry\Build\GameBuilderSystem.cpp" />
+    <ClCompile Include="EngineEntry\Scene\GizmoRenderer.cpp" />
+    <ClCompile Include="EngineEntry\Scene\PrefabEditor.cpp" />
+    <ClCompile Include="EngineEntry\Bootstrap\WinProcProxy.cpp" />
     <ClCompile Include="EngineGUIWindow\AssetBundleWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\ContentsBrowserWindow.cpp" />
     <ClCompile Include="EngineGUIWindow\OutputLogWindow.cpp" />
@@ -513,12 +514,12 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="EngineEntry\EditorProjectLayerSettings.h" />
-    <ClInclude Include="EngineEntry\CollisionGeometryAuthoring.h" />
-    <ClInclude Include="EngineEntry\UndoHistoryTransaction.h" />
+    <ClInclude Include="EngineEntry\Project\EditorProjectLayerSettings.h" />
+    <ClInclude Include="EngineEntry\Assets\Models\CollisionGeometryAuthoring.h" />
+    <ClInclude Include="EngineEntry\Editing\UndoHistoryTransaction.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="EngineEntry\LegacyProjectLayerImport.h" />
+    <ClInclude Include="EngineEntry\Project\LegacyProjectLayerImport.h" />
   </ItemGroup>
   <!-- Librarian inputs are captured before late generator targets run. Keep the
        registration source in the evaluated project as well as in generator input. -->

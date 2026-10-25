@@ -1,5 +1,9 @@
-#include "../Engine/Utility_Framework/Ownership.h"
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 class ProjectLayerSettings;
 namespace wave
 {
@@ -7,9 +11,13 @@ namespace wave
     class PlaybackService;
     class AudioCatalog;
 }
-#include "Delegate.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
 
-#include "../Engine/Utility_Framework/StandardLibrary.h"
+#include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 
 class Scene;
@@ -113,9 +121,9 @@ namespace Player
         bool m_presentationStopped{false};
         bool m_finalized{false};
 
-		Core::DelegateHandle m_inputEventHandle;
-		Core::DelegateHandle m_newSceneCreatedHandle;
-		Core::DelegateHandle m_activeSceneChangedHandle;
+		ce::delegate_handle m_inputEventHandle;
+		ce::delegate_handle m_newSceneCreatedHandle;
+		ce::delegate_handle m_activeSceneChangedHandle;
 
 		std::thread m_presentationThread;
 		std::mutex m_presentationMutex;

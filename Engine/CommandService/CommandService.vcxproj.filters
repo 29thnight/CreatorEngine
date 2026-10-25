@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <ItemGroup>
+    <Filter Include="HTTP">
+      <UniqueIdentifier>{EA4F3991-5243-54AC-914E-41D0441CE3E1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Service">
+      <UniqueIdentifier>{5AA1A76C-5102-5DB6-8B85-C8353543C59C}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="CommandService.cpp">
+      <Filter>Service</Filter>
+    </ClCompile>
+    <ClCompile Include="HttpRequest.cpp">
+      <Filter>HTTP</Filter>
+    </ClCompile>
+    <ClCompile Include="JsonValue.cpp">
+      <Filter>Service</Filter>
+    </ClCompile>
+    <ClCompile Include="OperationTable.cpp">
+      <Filter>Service</Filter>
+    </ClCompile>
+    <ClCompile Include="ResultEnvelope.cpp">
+      <Filter>Service</Filter>
+    </ClCompile>
+    <ClCompile Include="ServiceEndpointFile.cpp">
+      <Filter>Service</Filter>
+    </ClCompile>
+    <ClCompile Include="SocketPlatform_Win32.cpp">
+      <Filter>Service</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="CommandGateway.h">
+      <Filter>Service</Filter>
+    </ClInclude>
+    <ClInclude Include="CommandService.h">
+      <Filter>Service</Filter>
+    </ClInclude>
+    <ClInclude Include="HttpRequest.h">
+      <Filter>HTTP</Filter>
+    </ClInclude>
+    <ClInclude Include="JsonValue.h">
+      <Filter>Service</Filter>
+    </ClInclude>
+    <ClInclude Include="OperationTable.h">
+      <Filter>Service</Filter>
+    </ClInclude>
+    <ClInclude Include="ResultEnvelope.h">
+      <Filter>Service</Filter>
+    </ClInclude>
+    <ClInclude Include="ServiceEndpointFile.h">
+      <Filter>Service</Filter>
+    </ClInclude>
+    <ClInclude Include="SocketPlatform.h">
+      <Filter>Service</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

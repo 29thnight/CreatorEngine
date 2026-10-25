@@ -1,66 +1,53 @@
 #pragma once
-#include "BitFlag.h"
+#include "../Utility_Framework/Foundation/BaseTypeDef.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.BitFlag.h"
+#else
+import Creator.Core.BitFlag;
+#endif
 
-struct KeyBitFlag
+struct key_bit_flag
 {
-    static constexpr size_t kBits = 256;
-    static constexpr size_t kChunks = kBits / 32;
+    static constexpr size_t bit_count = 256;
+    static constexpr size_t chunk_count = bit_count / 32;
 
-    BitFlag chunks[kChunks]{};
+    bit_flag chunks_[chunk_count]{};
 
-    void Set(uint8 key) noexcept
+    void set(uint8 key) noexcept { chunks_[key / 32].set(key % 32); }
+
+    void clear(uint8 key) noexcept { chunks_[key / 32].clear(key % 32); }
+
+    bool test(uint8 key) const noexcept { return chunks_[key / 32].test(key % 32); }
+
+    void reset()
     {
-        chunks[key / 32].Set(key % 32);
-    }
-
-    void Clear(uint8 key) noexcept
-    {
-        chunks[key / 32].Clear(key % 32);
-    }
-
-    bool Test(uint8 key) const noexcept
-    {
-        return chunks[key / 32].Test(key % 32);
-    }
-
-    void Reset()
-    {
-        for (auto& chunk : chunks)
+        for (auto& chunk : chunks_)
+        {
             chunk = 0;
+        }
     }
 };
 
-struct MouseBitFlag
+struct mouse_bit_flag
 {
-    flag m_flag = 0; // 32ºñÆ® Áß 3ºñÆ®¸¸ »ç¿ë
+    flag flag_ = 0; // 32ë¹„íŠ¸ ì¤‘ 3ë¹„íŠ¸ë§Œ ì‚¬ìš©
 
-    void Set(uint8 btn) noexcept
-    {
-        m_flag |= (1U << static_cast<flag>(btn));
-    }
+    void set(uint8 btn) noexcept { flag_ |= (1U << static_cast<flag>(btn)); }
 
-    void Clear(uint8 btn) noexcept
-    {
-        m_flag &= ~(1U << static_cast<flag>(btn));
-    }
+    void clear(uint8 btn) noexcept { flag_ &= ~(1U << static_cast<flag>(btn)); }
 
-    bool Test(uint8 btn) const noexcept
-    {
-        return (m_flag & (1U << static_cast<flag>(btn))) != 0;
-    }
+    bool test(uint8 btn) const noexcept { return (flag_ & (1U << static_cast<flag>(btn))) != 0; }
 
-    void Reset() noexcept
-    {
-        m_flag = 0;
-    }
+    void reset() noexcept { flag_ = 0; }
 };
 
-struct GamePadBitFlag 
+struct gamepad_bit_flag
 {
-    flag m_flag = 0;
+    flag flag_ = 0;
 
-    void Set(size_t index) noexcept { m_flag |= (1U << index); }
-    void Clear(size_t index) noexcept { m_flag &= ~(1U << index); }
-    bool Test(size_t index) const { return (m_flag & (1U << index)) != 0; }
-    void Reset() noexcept { m_flag = 0; }
+    void set(size_t index) noexcept { flag_ |= (1U << index); }
+    void clear(size_t index) noexcept { flag_ &= ~(1U << index); }
+    bool test(size_t index) const { return (flag_ & (1U << index)) != 0; }
+    void reset() noexcept { flag_ = 0; }
 };

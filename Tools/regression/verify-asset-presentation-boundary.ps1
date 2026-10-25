@@ -24,7 +24,7 @@ foreach ($runtimeFile in @("Engine\RenderEngine\DataSystem.h", "Engine\RenderEng
         'ImGui|RenderForEditer|SelectMat(?:e|a)rial|FileTypeIcon|kExtensionMap|(?:Small|small|extraSmall)Font|(?:Unknown|Texture|Model|Assets|Folder|Shader|Code|Camera|MainLight|PointLight|SpotLight|DirectionalLight)Icon|m_trasfarMaterial'
 }
 
-$presentation = "Editor\EngineEntry\EditorAssetPresentation.cpp"
+$presentation = "Editor\EngineEntry\Assets\EditorAssetPresentation.cpp"
 # PHASE 21 M4 2단계(d2b70402)부터 프레임은 창 선언이 열고, 이 파일은 본문만
 # 묶는다. 경로는 세 고리다: 본문 묶기 → 선언의 panel → 선언이 부르는 진입점.
 # 한 고리라도 빠지면 창은 목록에 없거나 빈 틀만 뜬다.

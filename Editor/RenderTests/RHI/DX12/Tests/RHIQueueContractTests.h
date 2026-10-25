@@ -1,8 +1,13 @@
 #include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "RHI/RHIQueueContract.h"
 #include <stdint.h>
-#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {

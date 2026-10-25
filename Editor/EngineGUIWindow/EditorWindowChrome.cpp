@@ -1,29 +1,27 @@
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Platform.Windows.Strings.h"
+#else
+import Creator.Platform.Windows.Strings;
+#endif
 #include "EditorWindowChrome.h"
 #include "EditorTheme.h"
 
-#include "EditorSettingsStore.h"
+#include "../EngineEntry/Project/EditorSettingsStore.h"
 
 #include <imgui.h>
 #include <imgui_internal.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
-#include <windowsx.h>
-
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
-    std::wstring WidenUtf8(const std::string& value)
-    {
-        if (value.empty()) return {};
-        const int required = MultiByteToWideChar(
-            CP_UTF8, 0, value.c_str(), static_cast<int>(value.size()),
-            nullptr, 0);
-        if (required <= 0) return {};
-        std::wstring wide(static_cast<std::size_t>(required), L'\0');
-        MultiByteToWideChar(CP_UTF8, 0, value.c_str(),
-            static_cast<int>(value.size()), wide.data(), required);
-        return wide;
-    }
+
 
     // 창 조작은 표시 스레드에서 부르므로 동기 ShowWindow가 아니라 게시로 넘긴다.
     // WndProc가 도는 메인 스레드가 실행한다.
@@ -37,7 +35,7 @@ namespace
 std::wstring ComposeEditorWindowTitle()
 {
     const std::wstring projectName =
-        WidenUtf8(EditorSettingsStore::Get().Build().GetProjectName());
+        ce::strings::utf8_to_wide(EditorSettingsStore::Get().Build().GetProjectName());
     if (projectName.empty()) return L"Creator Engine";
     return projectName + L" - Creator Engine";
 }
@@ -188,9 +186,11 @@ void EditorWindowChrome::DrawTitleBarTail(const EditorTitleBarLayout& layout, fl
     // ── 가운데 제목 ──
     const std::wstring wideTitle = ComposeEditorWindowTitle();
     char title[256]{};
-    WideCharToMultiByte(CP_UTF8, 0, wideTitle.c_str(),
-        static_cast<int>(wideTitle.size()), title,
-        static_cast<int>(sizeof(title) - 1), nullptr, nullptr);
+    const auto titleText = ce::strings::wide_to_utf8(wideTitle);
+    if (titleText.size() < sizeof(title))
+    {
+        std::memcpy(title, titleText.data(), titleText.size());
+    }
 
     ImDrawList* const drawList = ImGui::GetWindowDrawList();
     const ImVec2 titleSize = ImGui::CalcTextSize(title);

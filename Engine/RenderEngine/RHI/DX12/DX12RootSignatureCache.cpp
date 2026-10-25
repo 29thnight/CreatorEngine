@@ -1,8 +1,14 @@
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "DX12RootSignatureCache.h"
 #include "DX12PipelineLayoutTranslate.h"
 #include "DX12DeviceResources.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -105,7 +111,7 @@ bool DX12RootSignatureCache::Initialize(DX12DeviceResources* resources, std::str
     }
 
     m_resources = resources;
-    m_device = resources->GetDevice();
+    m_device.copy_from(resources->GetDevice());
     m_cache.clear();
     m_stats = Stats{};
     return true;
@@ -115,7 +121,7 @@ void DX12RootSignatureCache::Shutdown()
 {
     std::lock_guard<std::mutex> guard(m_mutex);
     m_cache.clear();
-    m_device.Reset();
+    m_device = nullptr;
     m_resources = nullptr;
 }
 
@@ -243,10 +249,10 @@ RHIPipelineLayoutHandle DX12RootSignatureCache::GetOrCreate(
         : D3D12_ROOT_SIGNATURE_FLAG_NONE;
 
     // 직렬화·생성은 락 밖에서 한다 — 다른 레이아웃의 생성을 막을 이유가 없다.
-    ComPtr<ID3DBlob> serialized;
-    ComPtr<ID3DBlob> errors;
+    winrt::com_ptr<ID3DBlob> serialized;
+    winrt::com_ptr<ID3DBlob> errors;
     HRESULT hr = D3D12SerializeRootSignature(&rootDesc, D3D_ROOT_SIGNATURE_VERSION_1,
-        &serialized, &errors);
+        serialized.put(), errors.put());
     if (FAILED(hr))
     {
         std::lock_guard<std::mutex> guard(m_mutex);
@@ -256,9 +262,9 @@ RHIPipelineLayoutHandle DX12RootSignatureCache::GetOrCreate(
         return {};
     }
 
-    ComPtr<ID3D12RootSignature> signature;
+    winrt::com_ptr<ID3D12RootSignature> signature;
     hr = m_device->CreateRootSignature(0, serialized->GetBufferPointer(),
-        serialized->GetBufferSize(), IID_PPV_ARGS(&signature));
+        serialized->GetBufferSize(), IID_PPV_ARGS(signature.put()));
     if (FAILED(hr))
     {
         std::lock_guard<std::mutex> guard(m_mutex);
@@ -283,7 +289,7 @@ RHIPipelineLayoutHandle DX12RootSignatureCache::GetOrCreate(
     //   (RHIPipelineState.h 의 ★). 그 안정성이 여기 이 인자 하나에 걸려 있다.
     CacheEntry entry{};
     entry.signature = signature;
-    entry.handle = m_resources->RegisterPipelineLayout(signature.Get(), hash, desc.allowInputAssembler);
+    entry.handle = m_resources->RegisterPipelineLayout(signature.get(), hash, desc.allowInputAssembler);
     if (!entry.handle.IsValid())
     {
         ++m_stats.failures;

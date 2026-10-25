@@ -1,5 +1,20 @@
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "PreparationWorker.h"
-#include "../../Engine/Utility_Framework/WindowsApartment.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
 #include "ViewerArguments.h"
 #include "ViewerWindowChrome.h"
 #include "ProfilerViewerResources.h"
@@ -7,19 +22,22 @@
 #include "ProfilerViewerClient.h"
 #include "EditorFontResources.h"
 #include "EditorTheme.h"
-
-#include <Windows.h>
-#include <d3d11.h>
-#include <shellapi.h>
-#include <shlobj.h>
-#include <wrl/client.h>
-#include <wincodec.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.LegacyGraphicsSDK.h"
+#else
+import "Creator.LegacyGraphicsSDK.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 
 #include <imgui.h>
 #include <imgui_impl_dx11.h>
 #include <imgui_impl_win32.h>
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND, UINT, WPARAM, LPARAM);
 
@@ -27,7 +45,6 @@ namespace ce::profiler_viewer
 {
     namespace
     {
-        using Microsoft::WRL::ComPtr;
         constexpr wchar_t window_class[] = L"CreatorEngine.ProfilerViewer";
 
         std::string utf8(const std::filesystem::path& path)
@@ -186,16 +203,16 @@ namespace ce::profiler_viewer
                     editor::fonts::clear_loaded_fonts();
                     ImGui::DestroyContext();
                 }
-                target_.Reset();
-                brand_texture_.Reset();
+                target_ = nullptr;
+                brand_texture_ = nullptr;
                 if (context_)
                 {
                     context_->ClearState();
                     context_->Flush();
                 }
-                swapchain_.Reset();
-                context_.Reset();
-                device_.Reset();
+                swapchain_ = nullptr;
+                context_ = nullptr;
+                device_ = nullptr;
                 if (window_)
                 {
                     if (fully_initialized_)
@@ -278,7 +295,7 @@ namespace ce::profiler_viewer
                     throw std::runtime_error("ProfilerViewer Win32 ImGui backend initialization failed.");
                 }
                 platform_initialized_ = true;
-                if (!ImGui_ImplDX11_Init(device_.Get(), context_.Get()))
+                if (!ImGui_ImplDX11_Init(device_.get(), context_.get()))
                 {
                     throw std::runtime_error("ProfilerViewer D3D11 ImGui backend initialization failed.");
                 }
@@ -353,7 +370,7 @@ namespace ce::profiler_viewer
                     if (resize_width_ != 0 && resize_height_ != 0)
                     {
                         context_->OMSetRenderTargets(0, nullptr, nullptr);
-                        target_.Reset();
+                        target_ = nullptr;
                         check(swapchain_->ResizeBuffers(0, resize_width_, resize_height_, DXGI_FORMAT_UNKNOWN, 0), "D3D11 resize");
                         resize_width_ = resize_height_ = 0;
                         create_target();
@@ -370,7 +387,7 @@ namespace ce::profiler_viewer
                     ImGui::Render();
                     const auto color = editor::ThemeColorValue(editor::ThemeColor::Canvas);
                     const float clear[]{ color.x, color.y, color.z, color.w };
-                    ID3D11RenderTargetView* target = target_.Get();
+                    ID3D11RenderTargetView* target = target_.get();
                     context_->OMSetRenderTargets(1, &target, nullptr);
                     context_->ClearRenderTargetView(target, clear);
                     ImGui_ImplDX11_RenderDrawData(ImGui::GetDrawData());
@@ -412,7 +429,7 @@ namespace ce::profiler_viewer
                     if (ImGui::BeginChild("##ProfilerNavigation", { rail, size.y }, ImGuiChildFlags_None, fixed))
                     {
                         editor::profiler_view::draw_navigation(
-                            ImTextureRef(reinterpret_cast<ImTextureID>(brand_texture_.Get())));
+                            ImTextureRef(reinterpret_cast<ImTextureID>(brand_texture_.get())));
                     }
                     ImGui::EndChild();
                     ImGui::PopStyleColor();
@@ -546,27 +563,27 @@ namespace ce::profiler_viewer
                 {
                     throw std::runtime_error("Cannot load the embedded ProfilerViewer artwork.");
                 }
-                ComPtr<IWICImagingFactory> factory;
+                winrt::com_ptr<IWICImagingFactory> factory;
                 check(CoCreateInstance(CLSID_WICImagingFactory, nullptr, CLSCTX_INPROC_SERVER,
-                    IID_PPV_ARGS(factory.GetAddressOf())), "Profiler icon imaging factory");
-                ComPtr<IWICStream> stream;
-                check(factory->CreateStream(stream.GetAddressOf()), "Profiler icon stream");
+                    IID_PPV_ARGS(factory.put())), "Profiler icon imaging factory");
+                winrt::com_ptr<IWICStream> stream;
+                check(factory->CreateStream(stream.put()), "Profiler icon stream");
                 check(stream->InitializeFromMemory(bytes, size), "Profiler icon resource stream");
-                ComPtr<IWICBitmapDecoder> decoder;
+                winrt::com_ptr<IWICBitmapDecoder> decoder;
                 check(factory->CreateDecoder(GUID_ContainerFormatPng, &GUID_VendorMicrosoft,
-                    decoder.GetAddressOf()), "Profiler icon PNG decoder");
-                check(decoder->Initialize(stream.Get(), WICDecodeMetadataCacheOnLoad), "Profiler icon PNG decode");
-                ComPtr<IWICBitmapFrameDecode> frame;
-                check(decoder->GetFrame(0, frame.GetAddressOf()), "Profiler icon frame");
+                    decoder.put()), "Profiler icon PNG decoder");
+                check(decoder->Initialize(stream.get(), WICDecodeMetadataCacheOnLoad), "Profiler icon PNG decode");
+                winrt::com_ptr<IWICBitmapFrameDecode> frame;
+                check(decoder->GetFrame(0, frame.put()), "Profiler icon frame");
                 UINT width = 0, height = 0;
                 check(frame->GetSize(&width, &height), "Profiler icon dimensions");
                 if (width == 0 || height == 0 || width > 2048 || height > 2048)
                 {
                     throw std::runtime_error("Embedded ProfilerViewer artwork has invalid dimensions.");
                 }
-                ComPtr<IWICFormatConverter> rgba;
-                check(factory->CreateFormatConverter(rgba.GetAddressOf()), "Profiler icon format converter");
-                check(rgba->Initialize(frame.Get(), GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone,
+                winrt::com_ptr<IWICFormatConverter> rgba;
+                check(factory->CreateFormatConverter(rgba.put()), "Profiler icon format converter");
+                check(rgba->Initialize(frame.get(), GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone,
                     nullptr, 0.0, WICBitmapPaletteTypeCustom), "Profiler icon RGBA conversion");
                 const UINT stride = width * 4;
                 std::vector<BYTE> pixels(static_cast<std::size_t>(stride) * height);
@@ -582,10 +599,10 @@ namespace ce::profiler_viewer
                 description.Usage = D3D11_USAGE_IMMUTABLE;
                 description.BindFlags = D3D11_BIND_SHADER_RESOURCE;
                 const D3D11_SUBRESOURCE_DATA initial{ pixels.data(), stride, 0 };
-                ComPtr<ID3D11Texture2D> texture;
-                check(device_->CreateTexture2D(&description, &initial, texture.GetAddressOf()),
+                winrt::com_ptr<ID3D11Texture2D> texture;
+                check(device_->CreateTexture2D(&description, &initial, texture.put()),
                     "Profiler icon texture");
-                check(device_->CreateShaderResourceView(texture.Get(), nullptr, brand_texture_.GetAddressOf()),
+                check(device_->CreateShaderResourceView(texture.get(), nullptr, brand_texture_.put()),
                     "Profiler icon texture view");
             }
 
@@ -623,8 +640,8 @@ namespace ce::profiler_viewer
                 {
                     return D3D11CreateDeviceAndSwapChain(nullptr, type, nullptr, 0, levels,
                         static_cast<UINT>(std::size(levels)), D3D11_SDK_VERSION, &description,
-                        swapchain_.ReleaseAndGetAddressOf(), device_.ReleaseAndGetAddressOf(), nullptr,
-                        context_.ReleaseAndGetAddressOf());
+                        swapchain_.put(), device_.put(), nullptr,
+                        context_.put());
                 };
                 HRESULT result = create(D3D_DRIVER_TYPE_HARDWARE);
                 if (FAILED(result))
@@ -632,17 +649,17 @@ namespace ce::profiler_viewer
                     result = create(D3D_DRIVER_TYPE_WARP);
                 }
                 check(result, "ProfilerViewer D3D11 device/swapchain initialization");
-                ComPtr<IDXGIFactory> factory;
-                check(swapchain_->GetParent(IID_PPV_ARGS(&factory)), "DXGI factory lookup");
+                winrt::com_ptr<IDXGIFactory> factory;
+                check(swapchain_->GetParent(IID_PPV_ARGS(factory.put())), "DXGI factory lookup");
                 check(factory->MakeWindowAssociation(window_, DXGI_MWA_NO_ALT_ENTER), "DXGI window association");
                 create_target();
             }
 
             void create_target()
             {
-                ComPtr<ID3D11Texture2D> buffer;
-                check(swapchain_->GetBuffer(0, IID_PPV_ARGS(&buffer)), "D3D11 backbuffer lookup");
-                check(device_->CreateRenderTargetView(buffer.Get(), nullptr, target_.ReleaseAndGetAddressOf()), "D3D11 render target creation");
+                winrt::com_ptr<ID3D11Texture2D> buffer;
+                check(swapchain_->GetBuffer(0, IID_PPV_ARGS(buffer.put())), "D3D11 backbuffer lookup");
+                check(device_->CreateRenderTargetView(buffer.get(), nullptr, target_.put()), "D3D11 render target creation");
             }
 
             static LRESULT CALLBACK window_proc(HWND window, UINT message, WPARAM wparam, LPARAM lparam)
@@ -742,11 +759,11 @@ namespace ce::profiler_viewer
             window_chrome chrome_;
             std::filesystem::path settings_root_;
             std::string ini_path_;
-            ComPtr<ID3D11Device> device_;
-            ComPtr<ID3D11DeviceContext> context_;
-            ComPtr<IDXGISwapChain> swapchain_;
-            ComPtr<ID3D11RenderTargetView> target_;
-            ComPtr<ID3D11ShaderResourceView> brand_texture_;
+            winrt::com_ptr<ID3D11Device> device_;
+            winrt::com_ptr<ID3D11DeviceContext> context_;
+            winrt::com_ptr<IDXGISwapChain> swapchain_;
+            winrt::com_ptr<ID3D11RenderTargetView> target_;
+            winrt::com_ptr<ID3D11ShaderResourceView> brand_texture_;
             preparation_worker worker_;
             preparation_worker diagnostics_worker_;
             client source_;

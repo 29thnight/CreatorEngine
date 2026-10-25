@@ -1,5 +1,9 @@
-#include "../../Editor/EngineEntry/TextureGenerationHash.h"
-#include "../../Engine/Utility_Framework/Sha256.h"
+#include "../../Editor/EngineEntry/Assets/Textures/TextureGenerationHash.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 
 int main()
 {
@@ -13,17 +17,17 @@ int main()
         hash.Update(nullptr, 0);
         for (std::size_t offset = 0; offset < bytes.size(); offset += chunk)
             hash.Update(bytes.data() + offset, (std::min)(chunk, bytes.size() - offset));
-        Hash::Sha256Digest output{};
+        ce::hash::sha256_digest output{};
         std::string failure;
         check(hash.Finish(output, failure) && failure.empty());
-        check(output == Hash::Sha256::Compute(bytes.data(), bytes.size()));
+        check(output == ce::hash::sha256::compute(bytes.data(), bytes.size()));
         return output;
     };
     const std::vector<std::uint8_t> empty;
-    check(Hash::ToHex(digest(empty, 1)) ==
+    check(ce::hash::to_hex(digest(empty, 1)) ==
         "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
     const std::array<std::uint8_t, 3> abc{ 'a', 'b', 'c' };
-    check(Hash::ToHex(digest(abc, 1)) ==
+    check(ce::hash::to_hex(digest(abc, 1)) ==
         "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     for (const std::size_t size : { 55u, 56u, 63u, 64u, 65u, 65535u, 65536u, 65537u, 1000000u })
     {
@@ -36,7 +40,7 @@ int main()
     }
     // An invalid CNG state must not return a digest that callers could accept.
     TextureGenerationHash finished;
-    Hash::Sha256Digest output{};
+    ce::hash::sha256_digest output{};
     std::string failure;
     check(finished.Finish(output, failure));
     finished.Update(abc.data(), abc.size());

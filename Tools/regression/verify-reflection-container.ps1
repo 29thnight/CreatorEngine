@@ -38,9 +38,9 @@ $ErrorActionPreference = 'Stop'
 
 $repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))
 $probe = Join-Path $PSScriptRoot 'reflection_container_probe.cpp'
-$containerHeader = Join-Path $repoRoot 'Engine\Utility_Framework\ReflectionContainer.h'
-$typedYml = Join-Path $repoRoot 'Engine\Utility_Framework\ReflectionTypedYml.h'
-$typeTrait = Join-Path $repoRoot 'Engine\Utility_Framework\TypeTrait.h'
+$containerHeader = Join-Path $repoRoot 'Engine\Utility_Framework\Reflection\ReflectionContainer.h'
+$typedYml = Join-Path $repoRoot 'Engine\Utility_Framework\Reflection\ReflectionTypedYml.h'
+$typeTrait = Join-Path $repoRoot 'Engine\Utility_Framework\Reflection\TypeTrait.h'
 
 foreach ($required in @($probe, $containerHeader, $typedYml, $typeTrait)) {
     if (-not (Test-Path -LiteralPath $required -PathType Leaf)) {
@@ -113,7 +113,7 @@ if (-not (@($typedYmlCode | Where-Object { $_ -match 'concept\s+SerializedAsKeye
 #    reflgen 도입 P5: 반영 타입의 YAML 은 reflgen 직렬화가 Authoring writer(ReflgenAuthoring.h)로 쓴다. 규칙은 그
 #    writer 의 한 자리(Open — begin_array·begin_object 가 같이 지난다)에 있다: 크기 0 이면 `~`. 두 갈래가 한 함수를
 #    지나고, 규칙이 그 함수에 한 번 있는지를 본다.
-$authoringCode = Get-CodeLines (Join-Path $repoRoot 'Engine\Utility_Framework\ReflgenAuthoring.h')
+$authoringCode = Get-CodeLines (Join-Path $repoRoot 'Engine\Utility_Framework\Reflection\ReflgenAuthoring.h')
 $emptyRuleCount = @($authoringCode | Where-Object { $_ -match 'if \(0 == size && !record\)' }).Count
 $sharedOpen = @($authoringCode | Where-Object { $_ -match 'void begin_array\(std::size_t size\) override \{ Open\(size, false\); \}' }).Count -eq 1 -and
               @($authoringCode | Where-Object { $_ -match 'void begin_object\(std::size_t size\) override \{ Open\(size, true\); \}' }).Count -eq 1

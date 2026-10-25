@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // Unrun regression source. Requires the same catalog/manifest objects as
 // asset_set_catalog_probe.cpp. This probe never deletes/repackages real content;
 // all mutation is confined to its newly-created temporary fixture directory.
@@ -8,7 +13,7 @@
 #else
 #include <errno.h>
 #include <stdio.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include <sys/wait.h>
 #endif
 
@@ -164,9 +169,9 @@ namespace
     experiment::AssetId Id(std::uint8_t seed)
     {
         experiment::AssetId id;
-        id.value.data[6] = 0x40u;
-        id.value.data[8] = 0x80u;
-        id.value.data[15] = seed;
+        id.value.data_[6] = 0x40u;
+        id.value.data_[8] = 0x80u;
+        id.value.data_[15] = seed;
         return id;
     }
 

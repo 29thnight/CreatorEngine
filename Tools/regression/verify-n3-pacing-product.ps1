@@ -29,7 +29,7 @@ $floor=Join-Path $out 'floor.json'
 '[ {"shapeId":12,"kind":0,"halfExtent":[20,0.5,20]} ]'|Set-Content $floor -Encoding utf8
 $exe="$repo/Bin/x64-$Configuration/Editor/CreatorEditor.exe"
 $runtime=Join-Path (Split-Path $exe) 'CreatorEditor.runtime.dll'
-foreach($source in @('Editor/EngineGUIWindow/ViewportHostWindow.cpp','Editor/EngineEntry/App.cpp','Editor/EngineEntry/EditorPreferences.h','Editor/EngineEntry/Commands/N3PacingCapture.h','Editor/EngineEntry/Commands/RenderTestCommands.cpp','Editor/EngineEntry/Commands/RenderDebugCommands.cpp','Engine/SceneRuntime/CharacterMovementComponent.cpp','Engine/SceneRuntime/CameraComponent.h','Engine/SceneRuntime/Scene.cpp','Engine/SceneRuntime/Scene.h','Engine/SceneRuntime/ScenePhysicsSimulation.cpp','Engine/SceneRuntime/ScenePhysicsSimulation.h','Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h')){
+foreach($source in @('Editor/EngineGUIWindow/ViewportHostWindow.cpp','Editor/EngineEntry/Bootstrap/App.cpp','Editor/EngineEntry/Project/EditorPreferences.h','Editor/EngineEntry/Commands/N3PacingCapture.h','Editor/EngineEntry/Commands/RenderTestCommands.cpp','Editor/EngineEntry/Commands/RenderDebugCommands.cpp','Engine/SceneRuntime/CharacterMovementComponent.cpp','Engine/SceneRuntime/CameraComponent.h','Engine/SceneRuntime/Scene.cpp','Engine/SceneRuntime/Scene.h','Engine/SceneRuntime/ScenePhysicsSimulation.cpp','Engine/SceneRuntime/ScenePhysicsSimulation.h','Engine/RenderEngine/Render/Scene/EnhancedPbrCapture.h')){
  if((Get-Item "$repo/$source").LastWriteTimeUtc -gt (Get-Item $runtime).LastWriteTimeUtc){throw "Fresh N3 runtime build required: $source"}
 }
 $managedDll="$repo/Bin/x64-$Configuration/Managed/Scripts/GameScripts.dll"

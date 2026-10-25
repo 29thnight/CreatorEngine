@@ -1,5 +1,16 @@
+#include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
 namespace
 {
@@ -13,8 +24,8 @@ namespace
         bool SubmitRecordedCommands(uint32_t, std::span<const uint32_t> order,
             RHICompletionPoint completion, std::string& error) override
         {
-            Microsoft::WRL::ComPtr<ID3D12Device5> device;
-            if (FAILED(resources->GetDevice()->QueryInterface(IID_PPV_ARGS(&device))))
+            winrt::com_ptr<ID3D12Device5> device;
+            if (FAILED(resources->GetDevice()->QueryInterface(IID_PPV_ARGS(device.put()))))
             {
                 error = "RG7 device removal interface unavailable";
                 return false;
@@ -41,7 +52,7 @@ namespace
         Rg7DeviceLossPool pool;
         own::shared_owner<EnhancedRenderGraph> graph;
         own::weak_owner<EnhancedRenderGraph> retained;
-        Microsoft::WRL::ComPtr<ID3D12Fence> gate;
+        winrt::com_ptr<ID3D12Fence> gate;
         std::string error;
         const auto cleanup = [&]
         {
@@ -64,13 +75,13 @@ namespace
         };
         try
         {
-            Microsoft::WRL::ComPtr<IDXGIFactory6> factory;
-            Microsoft::WRL::ComPtr<IDXGIAdapter1> warp, preferred;
+            winrt::com_ptr<IDXGIFactory6> factory;
+            winrt::com_ptr<IDXGIAdapter1> warp, preferred;
             DXGI_ADAPTER_DESC1 warpDesc{}, preferredDesc{};
-            if (FAILED(CreateDXGIFactory2(0, IID_PPV_ARGS(&factory))) ||
-                FAILED(factory->EnumWarpAdapter(IID_PPV_ARGS(&warp))) ||
+            if (FAILED(CreateDXGIFactory2(0, IID_PPV_ARGS(factory.put()))) ||
+                FAILED(factory->EnumWarpAdapter(IID_PPV_ARGS(warp.put()))) ||
                 FAILED(factory->EnumAdapterByGpuPreference(0, DXGI_GPU_PREFERENCE_HIGH_PERFORMANCE,
-                    IID_PPV_ARGS(&preferred))) || FAILED(warp->GetDesc1(&warpDesc)) ||
+                    IID_PPV_ARGS(preferred.put()))) || FAILED(warp->GetDesc1(&warpDesc)) ||
                 FAILED(preferred->GetDesc1(&preferredDesc)) ||
                 (warpDesc.AdapterLuid.LowPart == preferredDesc.AdapterLuid.LowPart &&
                  warpDesc.AdapterLuid.HighPart == preferredDesc.AdapterLuid.HighPart))
@@ -79,7 +90,7 @@ namespace
             }
             if (!resources.Initialize(32, 32, error, warpDesc.AdapterLuid) ||
                 !pool.Initialize(resources, 2, 3, error) ||
-                FAILED(resources.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&gate))))
+                FAILED(resources.GetDevice()->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(gate.put()))))
             {
                 throw std::runtime_error("RG7 WARP initialization failed " + error);
             }
@@ -87,7 +98,7 @@ namespace
             auto& submission = GetRHISubmissionThread();
             if (!submission.ExecuteAndWait(&resources, "RG7 WARP GPU gate", [&resources, gate](std::string&)
             {
-                return SUCCEEDED(resources.GetCommandQueue()->Wait(gate.Get(), 1));
+                return SUCCEEDED(resources.GetCommandQueue()->Wait(gate.get(), 1));
             }, error) || !resources.BeginFrame(error))
             {
                 throw std::runtime_error(error);

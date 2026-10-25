@@ -1,6 +1,6 @@
 #pragma once
 #include <mathematics/vector2.hpp>
-#include "../Utility_Framework/Core.Minimal.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include <mathematics/rect.hpp>
 #include "Component.h"
 #include "UIManager.h"

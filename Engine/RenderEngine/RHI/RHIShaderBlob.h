@@ -1,12 +1,18 @@
 #pragma once
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // 컴파일된 셰이더 바이트코드 — 백엔드 중립 (V5).
 //
 // ── 왜 이것이 필요한가 ──
 //
 // 소스는 §7.2.3 에서 파일이 됐고 컴파일은 RHIShaderCompiler 한 곳으로
-// 모였다. 그런데 **결과**가 아직 `ComPtr<ID3DBlob>` 이라, 패스 39곳이
+// 모였다. 그런데 **결과**가 아직 `winrt::com_ptr<ID3DBlob>` 이라, 패스 39곳이
 // 그 타입을 들고 다닌다(실측 66건). 즉 컴파일러를 갈아 끼워도 패스가
 // 안 따라온다 — 경계가 반쪽이다.
 //

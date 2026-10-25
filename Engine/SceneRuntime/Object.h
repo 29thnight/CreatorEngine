@@ -1,10 +1,9 @@
 #pragma once
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include "MetaPolymorphic.h"
-#include "Core.Minimal.h"
-#include "IObject.h"
-#include "TypeTrait.h"
-#include "HashingString.h"
+#include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "../Utility_Framework/Reflection/MetaPolymorphic.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
+#include "../Utility_Framework/Foundation/IObject.h"
+#include "../Utility_Framework/Reflection/TypeTrait.h"
 
 namespace Meta { struct EditorObjectIdentity; }
 class RenderScene;
@@ -40,8 +39,8 @@ public:
     size_t GetInstanceID() const override final { return m_instanceID.m_ID_Data; }
     void MakeInstanceID() { TypeTrait::GUIDCreator::EraseGUID(m_instanceID); m_instanceID = make_guid(); }
 	HashedGuid GetTypeID() const override final { return m_typeID; }
-    std::string ToString() const override final { return m_name.ToString(); }
-    const HashingString& GetHashedName() const noexcept { return m_name; }
+    std::string ToString() const override final { return m_name; }
+    const std::string& GetName() const noexcept { return m_name; }
 
     virtual void Destroy();
     bool IsDestroyMark() const { return m_destroyMark; }
@@ -66,7 +65,7 @@ public:
     // `EditorObjectOperations::Rename` 을 거쳐 씬의 이름 유일성까지
     // 맞춘다. 리플렉션 경로에서 직접 쓰면 그 단계를 건너뛴다.
     [[reflgen::readonly, creator::debug_only]]
-    HashingString           m_name{ "Object" };
+    std::string           m_name{ "Object" };
 protected:
 	[[reflgen::ignore]]
 	HashedGuid              m_typeID{ type_guid(Object) };

@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 // Exact-source CEAC -> miniaudio resident/stream integration; no Pak substitute.
 #include "Audio/AudioRuntime.h"
 #include "Audio/MiniaudioBackend.h"
@@ -5,7 +10,7 @@
 #include "Experiment/Cooked/CookedAudioClipSource.h"
 
 #include <stdio.h>
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -60,7 +65,7 @@ namespace
         std::ifstream stream(input, std::ios::binary);
         std::vector<char> raw{ std::istreambuf_iterator<char>(stream), {} };
         header.payloadBytes = raw.size();
-        header.payloadSha256 = Hash::Sha256::Compute(raw.data(), raw.size());
+        header.payloadSha256 = ce::hash::sha256::compute(raw.data(), raw.size());
         auto encoded = ck::WriteAudioClipHeader(header);
         memory = std::make_shared<MemoryArtifact>();
         memory->bytes.assign(encoded.begin(), encoded.end());
@@ -68,14 +73,14 @@ namespace
         {
             memory->bytes.push_back(std::byte(static_cast<unsigned char>(byte)));
         }
-        const experiment::AssetId id{ Uuid::Parse("01234567-89ab-4cde-8fab-0123456789ab") };
+        const experiment::AssetId id{ uuid::parse("01234567-89ab-4cde-8fab-0123456789ab") };
         ck::CookedAssetManifestEntry entry;
         entry.assetId = id;
         entry.kind = ck::CookedAssetKind::AudioClip;
         entry.formatVersion = ck::kAudioClipArtifactVersion;
         entry.byteSize = memory->bytes.size();
         entry.artifactPath = ck::MakeDerivedAudioClipArtifactPath(id);
-        entry.contentSha256 = Hash::Sha256::Compute(memory->bytes.data(), memory->bytes.size());
+        entry.contentSha256 = ce::hash::sha256::compute(memory->bytes.data(), memory->bytes.size());
         memory->path = entry.artifactPath;
         ck::CookedAudioClipSource source;
         std::string error;

@@ -1,7 +1,16 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.SpinLock.h"
+#else
+import Creator.Core.SpinLock;
+#endif
 #pragma once
-#include "Ownership.h"
-#include "Core.Minimal.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "../RenderEngine/AssetDepot/AssetLink.h"
 #include "../RenderEngine/AssetDepot/AssetRequest.h"
 
@@ -243,7 +252,7 @@ private:
 	// AI 잡 스레드(Scene::m_AIJob) 문제로 뮤텍스를 남겼다 — 정확히는, 코드
 	// 추적으로 QueueAITick/FlushAITicks 경로(BehaviorTreeComponent::InternalAIUpdate)
 	// 는 이 레지스트리를 건드리지 않는다는 것까지는 확인했다(int/float만 담아
-	// SpinLock으로 보호되는 별도 큐로 넘긴다). ClrHost.h의 "관리 코드 호출은
+	// spin_lock으로 보호되는 별도 큐로 넘긴다). ClrHost.h의 "관리 코드 호출은
 	// 게임 스레드로 한정한다" 불변식과 합치면 제거해도 될 근거가 있지만, 그
 	// 근거는 정적 추적일 뿐 실측(빌드·동시성 스트레스)이 아니다 — 이번 슬라이스는
 	// 빌드가 금지라 실측할 수 없었다. "필요 시 유지" 쪽으로 보수적으로 남긴다.

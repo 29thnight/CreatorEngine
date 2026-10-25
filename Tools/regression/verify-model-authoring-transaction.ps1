@@ -217,7 +217,7 @@ createdAt: 2026-09-02T00:00:00Z
     if ($allProductText -match 'DeterministicSubAssetId|--refresh-model-identities') {
         Add-Failure 'pseudo-v5/legacy model identity writer 표면이 남았다.'
     }
-    $editorPath = Join-Path $root 'Editor\EngineEntry\EditorAssetDatabase.cpp'
+    $editorPath = Join-Path $root 'Editor\EngineEntry\Assets\EditorAssetDatabase.cpp'
     $cookerPath = Join-Path $root 'Tools\AssetCooker\AssetCooker.cpp'
     $editorText = [IO.File]::ReadAllText($editorPath)
     $cookerText = [IO.File]::ReadAllText($cookerPath)

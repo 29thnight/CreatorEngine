@@ -1,6 +1,15 @@
-#include "../Utility_Framework/Ownership.h"
-#include "GpuGeometryVisibility.h"
 #include "RenderArena.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Arena.h"
+#else
+import Creator.Core.Arena;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "GpuGeometryVisibility.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include "MaterialGraphMeshSurface.h"
 #include "MaterialGraphSceneAccess.h"
@@ -11,7 +20,7 @@
 
 #include <stddef.h>
 #include <stdint.h>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {

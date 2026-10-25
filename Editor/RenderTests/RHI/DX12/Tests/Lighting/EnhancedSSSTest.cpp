@@ -1,3 +1,9 @@
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "Render/Passes/Lighting/EnhancedSSSPass.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
@@ -6,7 +12,7 @@
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // SSS 패스 자가 검증 (PHASE 3-6, 미구현 패스 이식 1차).
 //
@@ -71,7 +77,6 @@ namespace
 
 bool DX12Test::RunSSSTest(std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
 
     outLog += "── SSS 패스 검증 (PHASE 3-6) ──\n";
 
@@ -125,15 +130,15 @@ bool DX12Test::RunSSSTest(std::string& outLog)
     constexpr uint32_t kPointY = 128;
     constexpr uint32_t kStepX = 190;   // 오른쪽 점의 10픽셀 오른쪽에 계단
 
-    ComPtr<ID3D12Resource> colorSource;
-    ComPtr<ID3D12Resource> depthSource;
+    winrt::com_ptr<ID3D12Resource> colorSource;
+    winrt::com_ptr<ID3D12Resource> depthSource;
     DX12TestTextureRegistration colorRegistration;
     DX12TestTextureRegistration depthRegistration;
     {
         D3D12_HEAP_PROPERTIES defaultHeap{};
         defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
 
-        const auto makeTexture = [&](DXGI_FORMAT format, ComPtr<ID3D12Resource>& out) -> bool
+        const auto makeTexture = [&](DXGI_FORMAT format, winrt::com_ptr<ID3D12Resource>& out) -> bool
         {
             D3D12_RESOURCE_DESC desc{};
             desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -146,7 +151,7 @@ bool DX12Test::RunSSSTest(std::string& outLog)
 
             return SUCCEEDED(resources.GetDevice()->CreateCommittedResource(&defaultHeap,
                 D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr, IID_PPV_ARGS(&out)));
+                nullptr, IID_PPV_ARGS(out.put())));
         };
 
         if (!makeTexture(DXGI_FORMAT_R16G16B16A16_FLOAT, colorSource) ||
@@ -157,8 +162,8 @@ bool DX12Test::RunSSSTest(std::string& outLog)
             return false;
         }
 
-        colorRegistration.Register(resources, colorSource.Get());
-        depthRegistration.Register(resources, depthSource.Get());
+        colorRegistration.Register(resources, colorSource.get());
+        depthRegistration.Register(resources, depthSource.get());
         if (!colorRegistration.IsValid() || !depthRegistration.IsValid())
         {
             outLog += "[2/4] 입력 텍스처 핸들 등록 실패\n";
@@ -210,7 +215,7 @@ bool DX12Test::RunSSSTest(std::string& outLog)
             src.PlacedFootprint.Footprint.RowPitch = kColorPitch;
 
             D3D12_TEXTURE_COPY_LOCATION dst{};
-            dst.pResource = colorSource.Get();
+            dst.pResource = colorSource.get();
             dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
             resources.GetCommandList()->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
         }
@@ -249,7 +254,7 @@ bool DX12Test::RunSSSTest(std::string& outLog)
             src.PlacedFootprint.Footprint.RowPitch = kDepthPitch;
 
             D3D12_TEXTURE_COPY_LOCATION dst{};
-            dst.pResource = depthSource.Get();
+            dst.pResource = depthSource.get();
             dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
             resources.GetCommandList()->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
         }
@@ -258,7 +263,7 @@ bool DX12Test::RunSSSTest(std::string& outLog)
         for (uint32_t i = 0; i < 2; ++i)
         {
             barriers[i].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[i].Transition.pResource = (0 == i) ? colorSource.Get() : depthSource.Get();
+            barriers[i].Transition.pResource = (0 == i) ? colorSource.get() : depthSource.get();
             barriers[i].Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
             barriers[i].Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
             barriers[i].Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;

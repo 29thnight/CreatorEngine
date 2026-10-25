@@ -1,10 +1,14 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "NodeEditor.h"
-#include "PathFinder.h"
 namespace ed = ax::NodeEditor;
 void NodeEditor::MakeEdit(std::string filePath)
 {
     
-     file::path filepath = PathFinder::NodeEditorPath(filePath);
+     std::filesystem::path filepath = ce::paths::node_editor_path(filePath);
      std::string  _filepath= filepath.string();
     //std::string _filepath = "NodeEditor\\" + filePath;
     if (!m_nodeContext || m_filePath != _filepath)
@@ -262,7 +266,7 @@ void NodeEditor::MakeNewLink(int* returnIndex)
 void NodeEditor::ReNameJson(std::string filepath)
 {
 
-    file::path __filepath = PathFinder::NodeEditorPath(filepath);
+    std::filesystem::path __filepath = ce::paths::node_editor_path(filepath);
     std::string  _filepath = __filepath.string();
    // std::string _filepath = "NodeEditor\\" + filepath;
 

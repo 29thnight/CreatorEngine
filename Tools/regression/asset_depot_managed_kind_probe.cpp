@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // Unrun source fixture for a dedicated engine test host. Not a standalone build
 // target: include this source in a harness with a source-free v3 mount containing
 // at least one root of every registered kind, plus graph/code programs and
@@ -7,7 +12,7 @@
 #include "../../Engine/SceneRuntime/ScriptObjectRegistry.h"
 #include "../../Engine/RenderEngine/DataSystem.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace script_asset_probe
 {

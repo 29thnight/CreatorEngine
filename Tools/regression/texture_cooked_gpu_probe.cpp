@@ -1,3 +1,13 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "DataSystem.h"
 #include "Experiment/Cooked/ArtifactByteSource.h"
 #include "Experiment/Cooked/CookedTexture.h"
@@ -17,8 +27,7 @@
 #include "RHI/RHIShaderCompiler.h"
 #include "RHI/RHISubmissionThread.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
-#include "PathFinder.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -145,9 +154,9 @@ namespace
     experiment::AssetId Id(uint8_t value)
     {
         experiment::AssetId result;
-        result.value.data[6] = 0x40;
-        result.value.data[8] = 0x80;
-        result.value.data[15] = value;
+        result.value.data_[6] = 0x40;
+        result.value.data_[8] = 0x80;
+        result.value.data_[15] = value;
         return result;
     }
 
@@ -314,11 +323,11 @@ int main(int argc, char** argv)
         VerifyImageIdentity();
         const std::filesystem::path root = argv[1];
         const auto repo = std::filesystem::path(argv[2]).parent_path().parent_path().parent_path();
-        auto* paths = InternalPath::GetInstance();
-        paths->BaseProjectPath = repo / "Dynamic_CPP";
-        paths->ShaderSourcePath = repo / "Dynamic_CPP/Assets/Shaders";
-        paths->CacheRoot = root / "Cache";
-        paths->AssetAuthoringEnabled = false;
+        auto* paths = (&ce::paths::get_state());
+        paths->base_project_path = repo / "Dynamic_CPP";
+        paths->shader_source_path = repo / "Dynamic_CPP/Assets/Shaders";
+        paths->cache_root = root / "Cache";
+        paths->asset_authoring_enabled = false;
         ce::get_job_scheduler().start(2);
         auto& data = *DataSystem::GetInstance();
         std::string error;

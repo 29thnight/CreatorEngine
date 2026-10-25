@@ -1,5 +1,5 @@
 #pragma once
-#include "Core.Minimal.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "ActionMap.h"
 #include "PlayerInput.h"
 class InputActionManager //: public Singleton<InputActionManager>

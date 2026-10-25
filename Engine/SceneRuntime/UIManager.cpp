@@ -1,5 +1,10 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "UIManager.h"
-#include "../Utility_Framework/TimeSystem.h"
+#include "../Utility_Framework/Time/TimeSystem.h"
 #include "SceneManager.h"
 #include "Scene.h"
 #include "Canvas.h"
@@ -10,7 +15,7 @@
 #include "RectTransformComponent.h"
 #include "SpriteSheetComponent.h"
 #include "RHI/ScreenSizedResource.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -264,7 +269,7 @@ Entity* UIManager::MakeButton(std::string_view name, const own::shared_owner<con
     return MakeButton(name, texture, clickfun, Pos, canvas);
 }
 
-Entity* UIManager::MakeText(std::string_view name, file::path FontName, Entity* canvas, math::vector2 Pos)
+Entity* UIManager::MakeText(std::string_view name, std::filesystem::path FontName, Entity* canvas, math::vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -307,7 +312,7 @@ Entity* UIManager::MakeText(std::string_view name, file::path FontName, Entity* 
 	return newText;
 }
 
-Entity* UIManager::MakeText(std::string_view name, file::path FontName, std::string_view canvasname, math::vector2 Pos)
+Entity* UIManager::MakeText(std::string_view name, std::filesystem::path FontName, std::string_view canvasname, math::vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -323,7 +328,7 @@ Entity* UIManager::MakeText(std::string_view name, file::path FontName, std::str
     return MakeText(name, FontName, canvas, Pos);
 }
 
-Entity* UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, Entity* canvas, math::vector2 Pos)
+Entity* UIManager::MakeSpriteSheet(std::string_view name, const std::filesystem::path& spriteSheetPath, Entity* canvas, math::vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -363,7 +368,7 @@ Entity* UIManager::MakeSpriteSheet(std::string_view name, const file::path& spri
     return newSpriteSheet;
 }
 
-Entity* UIManager::MakeSpriteSheet(std::string_view name, const file::path& spriteSheetPath, std::string_view canvasname, math::vector2 Pos)
+Entity* UIManager::MakeSpriteSheet(std::string_view name, const std::filesystem::path& spriteSheetPath, std::string_view canvasname, math::vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -596,7 +601,7 @@ void UIManager::Update()
 				// 경고는 컴포넌트당 한 번만 — 매 프레임 재시도라 그대로 두면 로그가 폭주한다.
 				// 이름조차 없는 미연결 UI는 경고하지 않는다(런타임에 갓 만든 정상 상태).
 				ui->m_canvasLinkLogged = true;
-				Debug::PrintLog(spdlog::level::warn, "UI '" + owner->m_name.ToString() +
+				Debug::PrintLog(spdlog::level::warn, "UI '" + owner->m_name +
 					"' 가 캔버스 '" + ui->m_ownerCanvasName + "' 를 찾지 못했습니다.");
 			}
 		};

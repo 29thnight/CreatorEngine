@@ -1,7 +1,7 @@
 #pragma once
 #include <mathematics/vector3.hpp>
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 #include <mathematics/transform.hpp>
 
 struct [[reflgen::reflect]] FoliageInstance

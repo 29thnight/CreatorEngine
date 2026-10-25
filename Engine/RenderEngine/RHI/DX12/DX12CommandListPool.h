@@ -1,8 +1,31 @@
 #pragma once
-#include "../../../Utility_Framework/Ownership.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
-#include <d3d12.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 
 #include "../RHIParallelCommandPool.h"
 
@@ -57,13 +80,11 @@ class DX12CommandListPool : public IRHIParallelCommandPool
     ID3D12GraphicsCommandList* Get(uint32_t worker) const;
 
   private:
-    template<typename T>
-    using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     struct Slot
     {
-        ComPtr<ID3D12CommandAllocator> allocator;
-        ComPtr<ID3D12GraphicsCommandList> list;
+        winrt::com_ptr<ID3D12CommandAllocator> allocator;
+        winrt::com_ptr<ID3D12GraphicsCommandList> list;
         bool opened{false};
         bool translationBegun{false};
     };
@@ -79,7 +100,7 @@ class DX12CommandListPool : public IRHIParallelCommandPool
     bool SubmitRecordedCommands(uint32_t frameSlot, std::span<const uint32_t> workerOrder,
                                 RHICompletionPoint completion, std::string& outError) override;
 
-    ComPtr<ID3D12Device> m_device;
+    winrt::com_ptr<ID3D12Device> m_device;
     DX12DeviceResources* m_resources{nullptr};
     own::shared_owner<const DX12RecordingResources> m_recordingResources;
     std::vector<own::unique_owner<DX12Encoder>> m_encoders;

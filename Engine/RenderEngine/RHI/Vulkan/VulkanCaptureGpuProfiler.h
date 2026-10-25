@@ -5,7 +5,7 @@
 #include "../RHISoftwareEncoder.h"
 #include "../RHIProfilingContext.h"
 #include <stdio.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // One diagnostic submission. Query ownership never borrows the interactive
 // profiler's ring slot. Destruction waits for device completion on abort too.

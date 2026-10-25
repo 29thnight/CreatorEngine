@@ -1,12 +1,12 @@
 #pragma once
 #include "Object.h"
 #include "SceneGC.h"
-#include "../Utility_Framework/StandardLibrary.h"
-#include "TypeTrait.h"
-#include "Reflection.hpp"
-#include "MetaPolymorphic.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#include "../Utility_Framework/Reflection/TypeTrait.h"
+#include "../Utility_Framework/Reflection/Reflection.hpp"
+#include "../Utility_Framework/Reflection/MetaPolymorphic.h"
 #include "RenderProxyDirty.h"
-#include "../Utility_Framework/PropertyChange.h"
+#include "../Utility_Framework/Reflection/PropertyChange.h"
 
 
 class Entity;

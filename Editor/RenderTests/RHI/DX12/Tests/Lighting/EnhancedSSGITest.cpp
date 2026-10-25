@@ -1,4 +1,10 @@
-﻿// SSGI 자가 검증 (E5에서 EnhancedSSGIPass.cpp 말미에서 분리 — 위와 같은 역결합).
+﻿#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
+// SSGI 자가 검증 (E5에서 EnhancedSSGIPass.cpp 말미에서 분리 — 위와 같은 역결합).
 #include "Render/Passes/Lighting/EnhancedSSGIPass.h"
 #include "Render/Scene/EnhancedTemporalViewState.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -10,8 +16,12 @@
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "Render/Passes/Lighting/EnhancedSSGIShaders.h"
 #include "RHI/RHIShaderCompiler.h"
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 namespace
 {
@@ -33,7 +43,6 @@ namespace
 // 컴파일 자체가 안 돈다. 그래서 부르는 자리를 만든다.
 bool DX12Test::RunSSGITest(std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
 
     constexpr uint32_t kWidth = 256;
     constexpr uint32_t kHeight = 256;
@@ -225,11 +234,11 @@ bool DX12Test::RunSSGITest(std::string& outLog)
         depthDesc.SampleDesc.Count = 1;
         depthDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_UNORDERED_ACCESS;
 
-        ComPtr<ID3D12Resource> depth;
+        winrt::com_ptr<ID3D12Resource> depth;
         DX12TestTextureRegistration depthRegistration;
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&heap,
             D3D12_HEAP_FLAG_NONE, &depthDesc,
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&depth))))
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(depth.put()))))
         {
             outLog += "[3/3] 깊이 텍스처 생성 실패\n";
             ssgi.Shutdown();
@@ -245,11 +254,11 @@ bool DX12Test::RunSSGITest(std::string& outLog)
         D3D12_RESOURCE_DESC normalDesc = depthDesc;
         normalDesc.Format = DXGI_FORMAT_R16G16B16A16_FLOAT;
 
-        ComPtr<ID3D12Resource> testNormal;
+        winrt::com_ptr<ID3D12Resource> testNormal;
         DX12TestTextureRegistration normalRegistration;
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&heap,
             D3D12_HEAP_FLAG_NONE, &normalDesc,
-            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(&testNormal))))
+            D3D12_RESOURCE_STATE_UNORDERED_ACCESS, nullptr, IID_PPV_ARGS(testNormal.put()))))
         {
             outLog += "[3/3] 테스트 노멀 생성 실패\n";
             ssgi.Shutdown();
@@ -257,8 +266,8 @@ bool DX12Test::RunSSGITest(std::string& outLog)
             return false;
         }
 
-        depthRegistration.Register(resources, depth.Get());
-        normalRegistration.Register(resources, testNormal.Get());
+        depthRegistration.Register(resources, depth.get());
+        normalRegistration.Register(resources, testNormal.get());
         if (!depthRegistration.IsValid() || !normalRegistration.IsValid())
         {
             outLog += "[3/3] 입력 텍스처 핸들 등록 실패\n";

@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "Render/Passes/UI/EnhancedUIPass.h"
 #include "Texture.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -9,7 +14,7 @@
 // DeviceState.h include가 여기 있었다 (E, 2026-08-09).
 // 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // UI 패스 자가 검증 (PHASE 3-6).
 //

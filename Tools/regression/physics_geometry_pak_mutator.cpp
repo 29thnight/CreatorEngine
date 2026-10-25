@@ -1,6 +1,6 @@
-#include "../../Engine/Utility_Framework/Paklib.hpp"
+#include "../../Engine/Utility_Framework/Packaging/Paklib.hpp"
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedAssetManifest.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 int main(int argc, char** argv)
 {
@@ -29,7 +29,7 @@ int main(int argc, char** argv)
             throw std::runtime_error("Input CEMF invalid");
 
         auto target = std::ranges::find_if(manifest.entries, [&](const auto& entry) {
-            return Uuid::ToString(entry.assetId.value) == argv[4] &&
+            return uuid::to_string(entry.assetId.value) == argv[4] &&
                    entry.kind == ck::CookedAssetKind::CollisionGeometry;
         });
         if (target == manifest.entries.end())

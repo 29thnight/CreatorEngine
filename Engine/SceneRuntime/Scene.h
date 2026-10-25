@@ -1,13 +1,31 @@
-#include "../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "LightProperty.h"
 #include "SceneGC.h"
 #include "GameObjectType.h"
 #include "GameObjectIndex.h"
 #include "EntityHandle.h"
-#include "AuthoringNodeView.h" // D3-a-5
+#include "../Utility_Framework/Authoring/AuthoringNodeView.h" // D3-a-5
 #include "SystemSchedule.h"
-#include "JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include "CameraSystem.h"
 #include "SoundSystem.h"
 #include "../RenderEngine/AssetBundle.h"
@@ -29,7 +47,7 @@
 // (EntityAt 우회 — Entity.inl 상단 주석 참고). 이 자급자족은
 // HeaderSelfSufficiency.cpp가 상시 검증한다.
 #include "Entity.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 #pragma region forward_decl
 // LifecycleRegistry.h를 여기서 포함하지 않는 이유:
@@ -810,7 +828,7 @@ public:
 	static gc::root_ref<Scene> LoadScene(gc::domain& domain, std::string_view name);
 
     size_t m_buildIndex{ 0 };
-	HashingString m_sceneName;
+	std::string m_sceneName;
 	AssetBundle m_requiredLoadAssetsBundle{};
 
 public:
@@ -1229,7 +1247,7 @@ public:
 	// 쓰는 값과 같다 — 외부 소비자가 핸들을 직접 짜맞출 일이 생기면(현재는
 	// 없다) 여기서 얻는다.
 	uint32_t GetSceneId() const { return m_sceneId; }
-	const HashingString& GetSceneName() const noexcept { return m_sceneName; }
+	const std::string& GetSceneName() const noexcept { return m_sceneName; }
 
     [[reflgen::ignore]]
     Entity*					m_selectedEntity = nullptr;
@@ -1243,5 +1261,5 @@ public:
 	std::vector<Entity*>	m_simulationSelection;
 
     [[reflgen::ignore]]
-    Core::DelegateHandle		resetObjHandle{};
+    ce::delegate_handle		resetObjHandle{};
 };

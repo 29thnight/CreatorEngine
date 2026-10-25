@@ -1,6 +1,10 @@
 #pragma once
 
-#include "../../../Utility_Framework/JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include "../../../EngineDiagnostics/ProfileScope.h"
 
 // 합류 지원은 소유자 스레드에서도 풀 작업을 실행한다. 같은 mutex의 재진입은

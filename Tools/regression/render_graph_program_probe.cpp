@@ -1,3 +1,13 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "fixtures/render-graph-portable-services.h"
 #include "fixtures/render-graph-portable-queues.h"
 #include "Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.h"

@@ -1,3 +1,13 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "Render/Passes/Editor/EnhancedGizmoIconPass.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
@@ -6,11 +16,10 @@
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "Texture.h"
-#include "PathFinder.h"
 // DeviceState.h include가 여기 있었다 (E, 2026-08-09).
 // 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // 기즈모 아이콘 패스 자가 검증 (PHASE 3-6, Gizmo 계열 3차 슬라이스).
 //
@@ -98,7 +107,6 @@ namespace
 
 bool DX12Test::RunGizmoIconTest(std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
 
     outLog += "── 기즈모 아이콘 패스 검증 (PHASE 3-6, Gizmo 계열) ──\n";
 
@@ -106,7 +114,7 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
 
     // 라이브 경로와 같은 파일 로더를 거친다. CreateFromPixels 더미로 검사하면
     // CameraIcon 연결이 다시 nullptr로 퇴행하거나 WIC 알파가 사라져도 통과한다.
-    const file::path cameraIconPath = PathFinder::IconPath() / L"CameraGizmo.png";
+    const std::filesystem::path cameraIconPath = ce::paths::icon_path() / L"CameraGizmo.png";
     own::shared_owner<const Texture> cameraIcon(Texture::LoadFormPath(cameraIconPath));
     if (!cameraIcon || cameraIcon->GetImageDescription().IsEmpty())
     {
@@ -495,7 +503,7 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
         own::shared_owner<const Texture> compressedIcon =
             Texture::LoadSharedFromPath(cameraIconPath, /*isCompress*/ true);
         own::shared_owner<const Texture> blockNoise = Texture::LoadSharedFromPath(
-            PathFinder::Relative("VolumetricFog\\blueNoise.dds"));
+            ce::paths::relative("VolumetricFog\\blueNoise.dds"));
         const uint8_t bgraPixel[4] = { 32u, 64u, 128u, 255u };   // B, G, R, A
         own::shared_owner<const Texture> bgraTexture(Texture::CreateFromPixels(
             1, 1, "dx12_codec_bgra", RHIFormat::BGRA8Unorm, bgraPixel));

@@ -1,11 +1,32 @@
-﻿#include "PhysicsTransformPolicy.h"
-#include "../Utility_Framework/TimeSystem.h"
+﻿#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.LayerCatalog.h"
+#else
+import Creator.Core.LayerCatalog;
+#endif
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
+#include "PhysicsTransformPolicy.h"
+#include "../Utility_Framework/Time/TimeSystem.h"
 #include "Scene.h"
 #include "TemporalMotionFixture.h"
 #include "PhysicsBodyComponent.h"
 #include "CharacterMovementComponent.h"
-#include "AuthoringNodeViewAccess.h" // D3-a-5
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-5
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "LifecycleRegistry.h"
 #include "SceneRenderProfileComponent.h"
 #include "LifecycleTrace.h"
@@ -359,7 +380,7 @@ void Scene::gc_trace(gc::tracer& tracer) const
 void Scene::InitializeManaged()
 {
     gc::begin_cleanup_obligation(root_from_this());
-    resetObjHandle = SceneManagers->resetSelectedObjectEvent.AddRaw(this, &Scene::ResetSelectedEntity);
+    resetObjHandle = SceneManagers->resetSelectedObjectEvent.add_raw(this, &Scene::ResetSelectedEntity);
 #if !defined(CE_SCENE_HEADLESS)
     m_soundSystem.Bind(*this, SceneManagers->AudioPlayback(), SceneManagers->AudioResolver());
 #endif
@@ -1658,7 +1679,7 @@ Entity* Scene::AddEntity(gc::root_ref<Entity> sceneObject)
     }
     if (!sceneObject->SetLayer(sceneObject->GetLayer()))
         throw std::runtime_error("Invalid incoming entity layer");
-    std::string uniqueName = GenerateUniqueEntityName(sceneObject->GetHashedName().ToString());
+    std::string uniqueName = GenerateUniqueEntityName(sceneObject->GetName());
 
     sceneObject->SetName(uniqueName);
     sceneObject->m_ownerScene = this;
@@ -1684,9 +1705,9 @@ Entity* Scene::AddEntity(gc::root_ref<Entity> sceneObject)
         root->AttachChildIndex(added->m_index);
     }
 
-    if (!added->m_tag.ToString().empty())
+    if (!added->m_tag.empty())
     {
-        TagManagers->AddTagToObject(added->m_tag.ToString(), added);
+        TagManagers->AddTagToObject(added->m_tag, added);
     }
 
     if (!added->SetLayer(added->GetLayer()))
@@ -1830,9 +1851,9 @@ Entity* Scene::CreateEntity(std::string_view name, GameObjectType type, Entity::
         // 표기가 옛 값으로 남으면 그대로 쌍불일치가 된다.
         created->SetParentIndex(parentObj->m_index);
     }
-    if (!created->m_tag.ToString().empty())
+    if (!created->m_tag.empty())
     {
-        TagManager::GetInstance()->AddTagToObject(created->m_tag.ToString(), created);
+        TagManager::GetInstance()->AddTagToObject(created->m_tag, created);
     }
 
     if (!created->SetLayer(created->GetLayer()))
@@ -1969,9 +1990,9 @@ void Scene::DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransf
 		transfer.oldRootIndex = node->GetRootIndex();
 
         // 태그/레이어에서 분리 (원 씬 검색에서 빠지도록)
-        if (!node->m_tag.ToString().empty())
+        if (!node->m_tag.empty())
         {
-            TagManager::GetInstance()->RemoveTagFromObject(node->m_tag.ToString(), node);
+            TagManager::GetInstance()->RemoveTagFromObject(node->m_tag, node);
         }
 
         if (Transform* transform = node->GetComponent<Transform>())
@@ -1985,7 +2006,7 @@ void Scene::DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransf
             if (!component) continue;
             LIFECYCLE_TRACE(Lifecycle::Phase::OnRemovingFromScene,
                 Lifecycle::Trace::TypeNameOf(component.get()),
-                node->m_name.ToString().c_str(), component->GetInstanceID());
+                node->m_name.c_str(), component->GetInstanceID());
             // 명시 통지는 없앴다 — ScriptComponent가 이 훅을 오버라이드하므로 위
             // 호출 하나가 이송과 파괴 양쪽을 덮는다(트랙 L · L3 완결). 파괴 경로에서
             // 관리 측 TearDown과 겹치는 문제는 관리 측 '축소 전달됨' 상태가 가른다.
@@ -2042,8 +2063,8 @@ Entity::Index Scene::AttachExistingEntity(gc::root_ref<Entity> go, Entity::Index
     Entity* object = go.get();
 
     // 이 씬 기준 유니크 네임 보장
-    if (Entity* existed = GetEntity(object->GetHashedName().ToString()); existed)
-		object->SetName(MakeUniqueName(object->GetHashedName().ToString()));
+    if (Entity* existed = GetEntity(object->GetName()); existed)
+		object->SetName(MakeUniqueName(object->GetName()));
 
     // 이 씬에 소속
 	object->m_ownerScene = this;
@@ -2062,8 +2083,8 @@ Entity::Index Scene::AttachExistingEntity(gc::root_ref<Entity> go, Entity::Index
 	}
 
     // Tag/Layer 재등록
-    if (!object->m_tag.ToString().empty())
-        TagManager::GetInstance()->AddTagToObject(object->m_tag.ToString(), object);
+    if (!object->m_tag.empty())
+        TagManager::GetInstance()->AddTagToObject(object->m_tag, object);
 
     if (!object->SetLayer(object->GetLayer()))
         throw std::runtime_error("Invalid entity layer membership");
@@ -2107,7 +2128,7 @@ Entity::Index Scene::AttachExistingEntity(gc::root_ref<Entity> go, Entity::Index
         if (!component) continue;
         LIFECYCLE_TRACE(Lifecycle::Phase::OnAddedToScene,
             Lifecycle::Trace::TypeNameOf(component.get()),
-			object->m_name.ToString().c_str(), component->GetInstanceID());
+			object->m_name.c_str(), component->GetInstanceID());
         // 명시 통지는 없앴다 — ScriptComponent가 이 훅을 오버라이드하므로 위 호출
         // 하나가 이송과 신규 생성 양쪽을 덮는다(트랙 L · L3 잔여 2단계).
         // 대칭짝인 DetachEntityHierarchy 쪽은 아직 명시 통지가 남아 있다:
@@ -2180,10 +2201,9 @@ Scene::AttachExistingEntityHierarchy(std::vector<DetachedEntityTransfer>& object
 
 Entity* Scene::GetEntity(std::string_view name)
 {
-    HashingString hashedName(name);
     for (auto& obj : m_Entities)
     {
-        if (obj && obj->GetHashedName() == hashedName)
+        if (obj && obj->GetName() == name)
         {
 			return obj.get();
         }
@@ -2198,7 +2218,7 @@ void Scene::DestroyEntity(Entity* sceneObject)
         return;
     }
 
-    RemoveEntityName(sceneObject->GetHashedName().ToString());
+    RemoveEntityName(sceneObject->GetName());
 
     sceneObject->Destroy();
 }
@@ -2210,7 +2230,7 @@ void Scene::DestroyEntity(Entity::Index index)
         Entity* obj = m_Entities[index].get();
         if (nullptr != obj)
         {
-            RemoveEntityName(obj->GetHashedName().ToString());
+            RemoveEntityName(obj->GetName());
             obj->Destroy();
         }
     }
@@ -2780,7 +2800,7 @@ void Scene::DrainPendingPhases()
 
         component->MarkLifecycleState(Component::State_Initialized);
         LIFECYCLE_TRACE(Lifecycle::Phase::OnInitialized, Lifecycle::Trace::TypeNameOf(component),
-            owner->m_name.ToString().c_str(), component->GetInstanceID());
+            owner->m_name.c_str(), component->GetInstanceID());
         component->OnInitialized();
 
         // Scene 진입 통지(트랙 L1) — phase catch-up. 지금 엔티티는 생성과 동시에
@@ -2791,7 +2811,7 @@ void Scene::DrainPendingPhases()
         if (owner->m_scenePhase >= ScenePhase::InScene)
         {
             LIFECYCLE_TRACE(Lifecycle::Phase::OnAddedToScene, Lifecycle::Trace::TypeNameOf(component),
-                owner->m_name.ToString().c_str(), component->GetInstanceID());
+                owner->m_name.c_str(), component->GetInstanceID());
             component->OnAddedToScene();
         }
 
@@ -2825,7 +2845,7 @@ void Scene::DrainPendingPhases()
 
         component->MarkLifecycleState(Component::State_SimulationBegun);
         LIFECYCLE_TRACE(Lifecycle::Phase::OnBeginSimulation, Lifecycle::Trace::TypeNameOf(component),
-            owner->m_name.ToString().c_str(), component->GetInstanceID());
+            owner->m_name.c_str(), component->GetInstanceID());
         component->OnBeginSimulation();
     }
 }
@@ -2994,7 +3014,7 @@ void Scene::FlushPendingDestroy()
         // ToString()은 값을 돌려주므로 그 c_str()을 const char*에 담으면 문장이
         // 끝나는 순간 뜬다. 실제로 기록에 빈 이름이 찍혀 드러났다 — 크래시가 아니라
         // '이름만 비는' 모습이라 눈으로는 알아채기 어려운 종류다.
-        const std::string ownerName = (nullptr != owner) ? owner->m_name.ToString() : std::string("?");
+        const std::string ownerName = (nullptr != owner) ? owner->m_name : std::string("?");
 
         // 파괴 직전 축소(트랙 L1) — 실제 파괴 앞에 Simulation 종료·씬 이탈을 먼저
         // 통지한다. 셋 다 기록한다(C5): 예전에는 "대응하는 옛 훅이 없다"는 이유로
@@ -3267,7 +3287,7 @@ ce::physics::result<void> Scene::CommitPhysicsLayers()
             if (!component || !component->GetOwner())
                 return std::unexpected(error{error_code::invalid_argument, 0, "Invalid physics layer owner"});
 
-            const auto* layer = settings->catalog.Find(component->GetOwner()->GetLayer());
+            const auto* layer = settings->catalog.find(component->GetOwner()->GetLayer());
             if (!layer)
                 return std::unexpected(error{error_code::invalid_argument, 0, "Unknown or retired entity layer"});
 
@@ -3278,7 +3298,7 @@ ce::physics::result<void> Scene::CommitPhysicsLayers()
         {
             if (!component || !component->GetOwner())
                 return std::unexpected(error{error_code::invalid_argument, 0, "Invalid character layer owner"});
-            const auto* layer = settings->catalog.Find(component->GetOwner()->GetLayer());
+            const auto* layer = settings->catalog.find(component->GetOwner()->GetLayer());
             if (!layer) return std::unexpected(error{error_code::invalid_argument, 0, "Unknown or retired character layer"});
             m_physicsLayerAssignments.push_back({binding, layer->id});
         }
@@ -4024,7 +4044,7 @@ void Scene::RemoveEntityName(const std::string_view& name)
 void Scene::RenameEntity(Entity& entity, std::string_view name)
 {
     RequireManagedMutable();
-    RemoveEntityName(entity.GetHashedName().ToString());
+    RemoveEntityName(entity.GetName());
     m_entityNameSet.emplace(name);
     entity.SetName(name);
 }
@@ -4105,7 +4125,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
         localVisited.emplace();
         visited = &*localVisited;
     }
-    if (!TryEnterTraversal(*visited, objIndex, depth, "[Transform] 월드 행렬 갱신 순회", obj->m_name.ToString()))
+    if (!TryEnterTraversal(*visited, objIndex, depth, "[Transform] 월드 행렬 갱신 순회", obj->m_name))
     {
         return;
     }
@@ -4391,7 +4411,7 @@ void Scene::LayoutUINode(Entity* obj, const math::rect& parentRect,
     // (1920x1080에서는 배율이 마침 1이라 증상이 없어, 해상도를 바꿔야만 드러난다.)
     // 계층에 순환이 있어도, 깊이가 비정상적으로 깊어져도 여기서 멈춘다
     // (TryEnterTraversal — UpdateModelRecursive와 공유하는 가드, Scene.h 참고).
-    if (!TryEnterTraversal(visited, obj, depth, "[UI] 레이아웃 순회", obj->m_name.ToString()))
+    if (!TryEnterTraversal(visited, obj, depth, "[UI] 레이아웃 순회", obj->m_name))
     {
         return;
     }
@@ -4867,7 +4887,7 @@ bool Scene::PrepareAnimatedBoneRead(Entity& boneEntity)
 	const bool promoted = !bone->m_runtimeObserved;
 	if (promoted)
 		Debug::PrintLog(spdlog::level::info,
-			"[animation.observed-bone] promoted " + boneEntity.m_name.ToString());
+			"[animation.observed-bone] promoted " + boneEntity.m_name);
 	bone->m_runtimeObserved = true;
 	using State = TransformExecutionGraphState;
 	const EntityHandle ownerHandle = HandleOf(owner->m_index);
@@ -5678,7 +5698,7 @@ void Scene::AddCanvas(Entity* canvas)
 
     // 키는 **실제 이름**이다. 요청한 이름이 아니라 CreateEntity가 충돌 회피로
     // 확정한 이름을 써야 한다 — 갈라지면 개명된 캔버스를 이름으로 못 찾는다.
-    const std::string name = canvas->m_name.ToString();
+    const std::string name = canvas->m_name;
 
     CanvasMap[name] = handle;
 

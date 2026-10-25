@@ -4,7 +4,7 @@
 
 #include "EditorMenuTargets.h"
 
-#include "EditorObjectOperations.h"
+#include "../EngineEntry/Scene/EditorObjectOperations.h"
 #include "SceneManager.h"
 #include "Scene.h"
 #include "Entity.h"

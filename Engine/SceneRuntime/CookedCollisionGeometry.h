@@ -1,8 +1,13 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 
 #include "CollisionGeometryCodec.h"
 #include "../Physics/PhysicsScene.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace ce::physics
 {
@@ -74,7 +79,7 @@ class CookedCollisionGeometry final
             std::uint64_t previous = 0;
             for (const auto& record : records)
             {
-                if (record.key.asset.IsNil() || record.key.asset != records.front().key.asset ||
+                if (record.key.asset.is_nil() || record.key.asset != records.front().key.asset ||
                     record.key.revision <= previous || record.payload.empty() || !record.source_hash ||
                     static_cast<unsigned>(record.kind) > 2 || record.payload.size() > max_bytes - 24 ||
                     size > max_bytes - 24 - record.payload.size())
@@ -90,7 +95,7 @@ class CookedCollisionGeometry final
             Put(bytes, format_version, 4);
             Put(bytes, PhysicsScene::sdk_version(), 4);
             Put(bytes, 0x01000801, 4); // policy 1, Windows x64, little endian
-            for (auto byte : records.front().key.asset.data)
+            for (auto byte : records.front().key.asset.data_)
                 Put(bytes, byte, 1);
             Put(bytes, records.size(), 4);
             for (const auto& record : records)
@@ -114,7 +119,7 @@ class CookedCollisionGeometry final
     {
         try
         {
-            if (bytes.size() < 68 || bytes.size() > max_bytes || expected.asset.IsNil() || !expected.revision)
+            if (bytes.size() < 68 || bytes.size() > max_bytes || expected.asset.is_nil() || !expected.revision)
                 return Invalid();
 
             std::size_t end = bytes.size() - 8;
@@ -127,8 +132,8 @@ class CookedCollisionGeometry final
                 Get(bytes, cursor, 4) != PhysicsScene::sdk_version() || Get(bytes, cursor, 4) != 0x01000801)
                 return Invalid();
 
-            Uuid::Uuid16 id;
-            for (auto& byte : id.data)
+            uuid::uuid16 id;
+            for (auto& byte : id.data_)
                 byte = static_cast<std::uint8_t>(Get(bytes, cursor, 1));
             if (id != expected.asset)
                 return Invalid();

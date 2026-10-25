@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // 리플렉션 컨테이너 값 왕복 계약 (range 일반화 · 런타임 축)
 //
 // ── 분류 게이트가 못 보는 것 ────────────────────────────────────────────
@@ -22,10 +27,10 @@
 // 현재 소스다. 링크되는 Utility_Framework.lib 는 로거·레지스트리·ryml 경계 같은
 // 비템플릿 곁다리만 공급한다 — 그쪽이 낡아도 판정 축은 낡지 않는다.
 
-#include "ReflectionTypedYml.h"
-#include "AuthoringParsedDocument.h"
+#include "../../Engine/Utility_Framework/Reflection/ReflectionTypedYml.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -145,7 +150,7 @@ namespace
 
         // ★ 음성 축. 이 둘이 시퀀스로 새면 range 일반화가 무너진 것이다.
         std::string m_name{};
-        file::path m_path{};
+        std::filesystem::path m_path{};
 
         std::vector<int> m_vectorInt{};
         std::vector<std::string> m_vectorString{};
@@ -177,7 +182,7 @@ namespace
         // 이름에 컨테이너로 오해될 만한 것을 일부러 넣지 않는다 — 평범한 문자열이
         // 새는지를 보는 것이 요점이다.
         f.m_name = "authored name";
-        f.m_path = file::path("Assets/Probe/thing.asset");
+        f.m_path = std::filesystem::path("Assets/Probe/thing.asset");
 
         f.m_vectorInt = { 3, -1, 42 };
         f.m_vectorString = { "alpha", "beta gamma", "" };

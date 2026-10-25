@@ -1,18 +1,32 @@
-﻿#include "EngineRuntimePaths.h"
-#include "../Utility_Framework/TimeSystem.h"
-#include "ScriptApiVersion.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.SpinLock.h"
+#else
+import Creator.Core.SpinLock;
+#endif
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
+#include "../Utility_Framework/Time/TimeSystem.h"
+#include "../Utility_Framework/Runtime/ScriptApiVersion.h"
 #include "ClrHost.h"
 #include "ManagedAssembly.h"
 #include "ProfileScope.h"
 #include "MaterialScriptBinding.h"
-#include "PathFinder.h"
 #include "Entity.h"
 #include "ScriptComponent.h"
 #include "PhysicsBodyComponent.h"
 #include "CharacterMovementComponent.h"
 #include "ScriptPhysicsABI.h"
 #include <stddef.h>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "Transform.h"
 #include "SceneManager.h"
 #include "Scene.h"
@@ -37,8 +51,11 @@
 #include <nethost.h>
 #include <coreclr_delegates.h>
 #include <hostfxr.h>
-
-#include <windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 // nethost.lib는 get_hostfxr_path 하나만 제공하는 얇은 import 라이브러리다.
 // 헤더·lib·DLL은 ThirdParty\DotNetHost\에 고정한 사본이고, 경로는 EngineOutput.props의
@@ -674,7 +691,7 @@ namespace
 		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
 		if (nullptr == object) return 0;
 
-		const std::string name = object->m_name.ToString();
+		const std::string name = object->m_name;
 		const int length = static_cast<int>(std::min<size_t>(name.size(), static_cast<size_t>(capacity)));
 		std::memcpy(buffer, name.data(), length);
 		return length;
@@ -1143,8 +1160,8 @@ namespace
 
     wave::ClipKey AudioKey(AudioAssetId asset)
     {
-        Uuid::Uuid16 guid;
-        std::memcpy(guid.data.data(), &asset, sizeof(asset));
+        uuid::uuid16 guid;
+        std::memcpy(guid.data_.data(), &asset, sizeof(asset));
         return wave::ClipKey::FromGuid(guid);
     }
 
@@ -1402,10 +1419,10 @@ namespace
         const auto& text = settings.sourceKind == wave::SoundSourceKind::Clip ? settings.clipKey :
             (settings.sourceKind == wave::SoundSourceKind::Preset ? settings.soundPresetKey : settings.soundGraphKey);
         const auto key = sound->GetOwner()->GetScene()->Sounds().ResolveAsset(text, settings.sourceKind);
-        Uuid::Uuid16 guid;
-        if (Uuid::TryParse(key.Text(), guid))
+        uuid::uuid16 guid;
+        if (uuid::try_parse(key.Text(), guid))
         {
-            std::memcpy(output, guid.data.data(), sizeof(*output));
+            std::memcpy(output, guid.data_.data(), sizeof(*output));
         }
         return static_cast<int>(settings.sourceKind);
     }
@@ -2410,8 +2427,8 @@ namespace
             std::string value(role);
             if (!value.empty())
             {
-                Uuid::Uuid16 parsed;
-                if (value.size() != 36 || !Uuid::TryParse(value, parsed) || parsed.IsNil() || Uuid::ToString(parsed) != value)
+                uuid::uuid16 parsed;
+                if (value.size() != 36 || !uuid::try_parse(value, parsed) || parsed.is_nil() || uuid::to_string(parsed) != value)
                 {
                     return PhysicsFailure(ce::physics::error_code::invalid_argument);
                 }
@@ -3244,7 +3261,7 @@ ClrHost& ClrHost::Get()
 	return instance;
 }
 
-bool ClrHost::BindEntryPoints(const file::path& assemblyPath)
+bool ClrHost::BindEntryPoints(const std::filesystem::path& assemblyPath)
 {
 	const std::wstring assembly = assemblyPath.wstring();
 	const wchar_t* typeName = L"CreatorEngine.Bootstrap, ScriptCore";
@@ -3348,14 +3365,14 @@ bool ClrHost::Initialize()
 {
 	if (m_ready) return true;
 
-	// 관리 어셈블리 위치는 Host가 EnginePaths로 결정한다. 개발 빌드는 Editor와
+	// 관리 어셈블리 위치는 Host가 ce::paths::roots로 결정한다. 개발 빌드는 Editor와
 	// Player가 구성별 공통 Managed를 쓰고, 패키지는 Player 옆 Managed를 쓴다.
-	const file::path baseDir = PathFinder::ManagedPath();
+	const std::filesystem::path baseDir = ce::paths::managed_path();
 
-	const file::path assemblyPath = baseDir / L"ScriptCore.dll";
-	const file::path configPath   = baseDir / L"ScriptCore.runtimeconfig.json";
+	const std::filesystem::path assemblyPath = baseDir / L"ScriptCore.dll";
+	const std::filesystem::path configPath   = baseDir / L"ScriptCore.runtimeconfig.json";
 
-	if (!file::exists(assemblyPath) || !file::exists(configPath))
+	if (!std::filesystem::exists(assemblyPath) || !std::filesystem::exists(configPath))
 	{
 		// 스크립트 없이도 에디터는 떠야 한다. 경고만 남기고 비활성 상태로 둔다.
 		Debug::PrintLog(spdlog::level::warn, "[CLR] ScriptCore.dll을 찾을 수 없어 스크립트 계층을 건너뜁니다: "
@@ -3364,7 +3381,7 @@ bool ClrHost::Initialize()
 	}
 
     std::string loaderError;
-    if (!g_managedAssembly.Open(assemblyPath, ResolveEngineRuntimeDirectory() / L"DotNet", loaderError))
+    if (!g_managedAssembly.Open(assemblyPath, ce::paths::resolve_runtime_directory() / L"DotNet", loaderError))
     {
         Debug::PrintLog(spdlog::level::err, "[CLR] " + loaderError);
         return false;
@@ -3387,8 +3404,8 @@ bool ClrHost::Initialize()
 
 	// 게임 스크립트 어셈블리를 언로드 가능한 컨텍스트에 올린다.
 	// 없어도 엔진은 동작한다 — 스크립트만 비어 있을 뿐이다.
-	const file::path scriptsPath = baseDir / L"Scripts" / L"GameScripts.dll";
-	if (file::exists(scriptsPath))
+	const std::filesystem::path scriptsPath = baseDir / L"Scripts" / L"GameScripts.dll";
+	if (std::filesystem::exists(scriptsPath))
 	{
 		const auto pathUtf8 = scriptsPath.u8string();
 		const std::string utf8(pathUtf8.begin(), pathUtf8.end());
@@ -3693,7 +3710,7 @@ void ClrHost::QueueAITick(int instanceId, float deltaTime)
 	if (!m_ready || instanceId < 0) return;
 
     // Scene의 게임 스레드 적용 경로가 생산자지만 큐의 기존 동기화 계약은 유지한다.
-	SpinLock lock(m_aiTickFlag);
+	spin_lock lock(m_aiTickFlag);
 	m_aiTicks.push_back(ScriptAITick{ instanceId, deltaTime });
 }
 
@@ -3708,7 +3725,7 @@ void ClrHost::FlushAITicks()
     // 스왑 구간만 잠그고 관리 측 호출 중에는 큐 잠금을 보유하지 않는다.
 	std::vector<ScriptAITick> batch;
 	{
-		SpinLock lock(m_aiTickFlag);
+		spin_lock lock(m_aiTickFlag);
 		batch.swap(m_aiTicks);
 	}
 
@@ -3865,7 +3882,7 @@ void ClrHost::QueueScriptMessage(int instanceId, std::string_view methodName)
 	message.name[methodName.size()] = '\0';
 
 	// 애니메이션 잡이 스레드 풀에서 키프레임 이벤트를 쏟아내므로 담는 쪽은 보호한다.
-	SpinLock lock(m_scriptMessageFlag);
+	spin_lock lock(m_scriptMessageFlag);
 	m_scriptMessages.push_back(message);
 }
 
@@ -3875,7 +3892,7 @@ void ClrHost::FlushScriptMessages()
 	// 스왑 구간만 잠근다 — 관리 측 호출까지 잠그면 잡 스레드가 그동안 막힌다.
 	std::vector<ScriptMessage> batch;
 	{
-		SpinLock lock(m_scriptMessageFlag);
+		spin_lock lock(m_scriptMessageFlag);
 		batch.swap(m_scriptMessages);
 	}
 

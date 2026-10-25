@@ -1,3 +1,9 @@
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "RHI/DX12/DX12Format.h"
 #include "Render/Passes/PostProcess/EnhancedPostChainPass.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -7,9 +13,12 @@
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/RHIEncoder.h"
-
-#include <d3dcompiler.h>
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Engine/Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "RHI/RHIShaderCompiler.h"
 
 #pragma comment(lib, "d3dcompiler.lib")
@@ -51,7 +60,6 @@ namespace
 
 bool DX12Test::RunPostChainTest(std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
 
     outLog += "── 포스트 체인 검증 (PHASE 3-6) ──\n";
 
@@ -91,7 +99,7 @@ bool DX12Test::RunPostChainTest(std::string& outLog)
     outLog += "[1/4] 셰이더 컴파일·PSO 생성 통과(임계·다운·업·Uber·FXAA)\n";
 
     // ── 입력 HDR ──
-    ComPtr<ID3D12Resource> hdr;
+    winrt::com_ptr<ID3D12Resource> hdr;
     DX12TestTextureRegistration hdrHandleTable;
     {
         D3D12_HEAP_PROPERTIES heap{};
@@ -109,14 +117,14 @@ bool DX12Test::RunPostChainTest(std::string& outLog)
 
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&heap,
             D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_UNORDERED_ACCESS,
-            nullptr, IID_PPV_ARGS(&hdr))))
+            nullptr, IID_PPV_ARGS(hdr.put()))))
         {
             outLog += "[2/4] HDR 생성 실패\n";
             post.Shutdown();
             resources.Shutdown();
             return false;
         }
-        hdrHandleTable.Register(resources, hdr.Get());
+        hdrHandleTable.Register(resources, hdr.get());
     }
 
     if (!hdrHandleTable.IsValid())
@@ -138,7 +146,7 @@ bool DX12Test::RunPostChainTest(std::string& outLog)
 
         const auto root = rootSignatures.GetOrCreate(rootDesc, error);
         RHIShaderBlob blob;
-        ComPtr<ID3DBlob> errors;
+        winrt::com_ptr<ID3DBlob> errors;
         if (!root.IsValid() ||
             !RHIShaderCompiler::CompileFile(kPostSceneShaderFile, "CSMain", "cs_5_0", blob, error))
         {

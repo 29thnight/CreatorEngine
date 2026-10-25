@@ -1,17 +1,24 @@
-#include "../../../Utility_Framework/Ownership.h"
-#include "RuntimeResults.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Runtime/RuntimeResults.h"
 #include "../Temporal/XeSSUpscaler.h"
 #include "../../Render/Temporal/TemporalRuntimeControl.h"
 #include <stdint.h>
 #include <stdio.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 #include "VulkanDeviceResources.h"
 #include "VulkanCommandBufferPool.h"
 #include "../RHIRecordedBatch.h"
 #include "../RHICommandFailure.h"
 #include "VulkanPipelineCache.h"
-
-#include <Windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 using namespace VulkanApi;
 

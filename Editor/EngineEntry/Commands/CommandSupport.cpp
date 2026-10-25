@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "CommandSupport.h"
 
 // ★ 이 TU 는 유니티 빌드에서 빠져 있다(`IncludeInUnityFile=false`).
@@ -6,9 +11,8 @@
 //   기대면 청크가 재편될 때 조용히 깨진다. §12 가 "include 는 각 TU 가 직접
 //   소유한다"고 못 박은 이유이고, 유니티에서 빼 두면 그 규칙이 **평상시
 //   빌드마다** 검사된다. 아무도 안 돌리는 별도 빌드 모드에 맡기지 않는다.
-#include "PathFinder.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace ConsoleCmd
 {
@@ -18,7 +22,7 @@ namespace ConsoleCmd
         std::filesystem::path output(requestedPath);
         if (output.is_relative())
         {
-            output = PathFinder::TestArtifactPath(category) / output;
+            output = ce::paths::test_artifact_path(category) / output;
         }
         output = output.lexically_normal();
         std::error_code error{};
@@ -26,12 +30,5 @@ namespace ConsoleCmd
         return output.string();
     }
 
-    std::string TrimLine(const std::string& text)
-    {
-        static constexpr const char* kBlank = " \t\r\n";
-        const auto begin = text.find_first_not_of(kBlank);
-        if (begin == std::string::npos) return {};
-        const auto end = text.find_last_not_of(kBlank);
-        return text.substr(begin, end - begin + 1);
-    }
+
 }

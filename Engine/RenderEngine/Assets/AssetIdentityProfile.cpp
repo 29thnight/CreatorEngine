@@ -1,13 +1,32 @@
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Platform.Windows.Strings.h"
+#else
+import Creator.Platform.Windows.Strings;
+#endif
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 // RenderEngine 자신은 프로젝트 루트를 include 경로에 두지 않는다(소비자 쪽이
 // `$(SolutionDir)Engine\RenderEngine\`를 더한다). 그래서 계층 안에서는 상대
 // include, 밖(RenderTests·AssetCooker)에서는 `Assets/...`다 — Experiment와 같은 규칙.
 #include "AssetIdentityProfile.h"
 
-#include "Sha256.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
-#include <Windows.h>
-
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #pragma comment(lib, "normaliz.lib")
 
@@ -165,20 +184,19 @@ namespace assets
         // UTF-8 → UTF-16. 잘 형성됐다는 전제(IsWellFormedUtf8 뒤에 부른다).
         [[nodiscard]] bool ToWide(std::string_view text, std::wstring& out) noexcept
         {
-            if (text.size() > static_cast<std::size_t>((std::numeric_limits<int>::max)()))
+            if (text.empty())
+            {
                 return false;
-            const int needed = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-                text.data(), static_cast<int>(text.size()), nullptr, 0);
-            if (needed <= 0) return false;
+            }
             try
             {
-                out.assign(static_cast<std::size_t>(needed), L'\0');
+                return ce::strings::try_utf8_to_wide(text, out);
             }
-            catch (...) { return false; }
-            const int written = ::MultiByteToWideChar(CP_UTF8, MB_ERR_INVALID_CHARS,
-                text.data(), static_cast<int>(text.size()), out.data(), needed);
-            return written == needed;
-        }
+            catch (...)
+            {
+                return false;
+            }
+    }
 
         [[nodiscard]] bool IsAscii(std::string_view text) noexcept
         {
@@ -236,16 +254,16 @@ namespace assets
         return BuildWithProfile(kIdentityProfile, input, out, outIssue, outContext);
     }
 
-    Uuid::Uuid16 DeriveUuidFromIdentityInputBytes(
+    uuid::uuid16 DeriveUuidFromIdentityInputBytes(
         std::span<const std::uint8_t> canonicalInput) noexcept
     {
-        const Hash::Sha256Digest digest =
-            Hash::Sha256::Compute(canonicalInput.data(), canonicalInput.size());
+        const ce::hash::sha256_digest digest =
+            ce::hash::sha256::compute(canonicalInput.data(), canonicalInput.size());
 
-        Uuid::Uuid16 uuid;
-        std::memcpy(uuid.data.data(), digest.data(), kUuidBytes);
-        uuid.data[6] = static_cast<std::uint8_t>((uuid.data[6] & 0x0Fu) | 0x80u);
-        uuid.data[8] = static_cast<std::uint8_t>((uuid.data[8] & 0x3Fu) | 0x80u);
+        uuid::uuid16 uuid;
+        std::memcpy(uuid.data_.data(), digest.data(), kUuidBytes);
+        uuid.data_[6] = static_cast<std::uint8_t>((uuid.data_[6] & 0x0Fu) | 0x80u);
+        uuid.data_[8] = static_cast<std::uint8_t>((uuid.data_[8] & 0x3Fu) | 0x80u);
         return uuid;
     }
 
@@ -271,7 +289,7 @@ namespace assets
         return DeriveIdentity(input);
     }
 
-    IdentityDerivation DeriveSubAssetId(const Uuid::Uuid16& modelId,
+    IdentityDerivation DeriveSubAssetId(const uuid::uuid16& modelId,
         SubAssetKind kind, std::string_view stableKey) noexcept
     {
         IdentityDerivation result;
@@ -290,7 +308,7 @@ namespace assets
         }
         IdentityInput input;
         input.domain = kDomainSubAsset;
-        input.namespaceBytes = std::span<const std::uint8_t>(modelId.data);
+        input.namespaceBytes = std::span<const std::uint8_t>(modelId.data_);
         input.kind = kindName;
         input.stableKey = stableKey;
         return DeriveIdentity(input);
@@ -413,22 +431,9 @@ namespace assets
             return false;
         }
 
-        const int needed = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
-            normalized.c_str(), static_cast<int>(normalized.size()), nullptr, 0,
-            nullptr, nullptr);
-        if (needed <= 0)
+        if (!ce::strings::try_wide_to_utf8(normalized, out))
         {
             outError = "UTF-16 -> UTF-8 conversion failed";
-            return false;
-        }
-        out.assign(static_cast<std::size_t>(needed), '\0');
-        const int written = ::WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS,
-            normalized.c_str(), static_cast<int>(normalized.size()), out.data(),
-            needed, nullptr, nullptr);
-        if (written != needed)
-        {
-            out.clear();
-            outError = "UTF-16 -> UTF-8 conversion truncated";
             return false;
         }
         return true;

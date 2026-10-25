@@ -1,13 +1,17 @@
 #pragma once
 #include "../TextureImage.h"
-#include "Sha256.h"
-#include "../../Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace assets
 {
 struct EnvironmentIdentity
 {
-    Hash::Sha256Digest source{}, recipe{};
+    ce::hash::sha256_digest source{}, recipe{};
     bool operator==(const EnvironmentIdentity&) const = default;
 };
 struct CookedEnvironment
@@ -27,9 +31,9 @@ struct CookedEnvironment
 };
 bool BuildEnvironmentImportance(CookedEnvironment& value, std::string& error);
 bool EnvironmentRecipeIdentity(const std::filesystem::path& shaders, uint32_t cubeSize,
-    uint32_t brdfSize, Hash::Sha256Digest& result, std::string& error);
+    uint32_t brdfSize, ce::hash::sha256_digest& result, std::string& error);
 bool EnvironmentSourceIdentity(const std::filesystem::path& source,
-    Hash::Sha256Digest& result, std::string& error);
+    ce::hash::sha256_digest& result, std::string& error);
 std::string EnvironmentCacheName(const EnvironmentIdentity& identity);
 bool ReadCookedEnvironment(const std::filesystem::path& file, CookedEnvironment& result, std::string& error,
     const EnvironmentIdentity* expected = nullptr);

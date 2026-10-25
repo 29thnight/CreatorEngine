@@ -1,5 +1,5 @@
 #pragma once
-#include "ReflectionUndo.h" // MakeCustomChangeCommand — 에디터 층 Undo(E1-6 이관)
+#include "../EngineEntry/Editing/ReflectionUndo.h" // MakeCustomChangeCommand — 에디터 층 Undo(E1-6 이관)
 
 // 백엔드 중립 ImTextureID 변환(구현은 RenderEngine/EditorImGuiTexture.cpp).
 // 이 헤더는 Utility_Framework 소속이라 RenderEngine 헤더를 못 끌어온다 —
@@ -9,13 +9,13 @@ namespace EditorImGuiTexture
 {
     unsigned long long From(const Texture* texture);
 }
-#include "ReflectionFunction.h"
+#include "../../Engine/Utility_Framework/Reflection/ReflectionFunction.h"
 // ReflectionFunction.h가 imgui를 대신 끌어와 주고 있었다 — 정작 그쪽은
 // ImGui 심볼을 하나도 쓰지 않으면서 UF 전체를 imgui에 묶고 있었다.
 // 실제로 쓰는 여기서 직접 든다.
 #include <imgui.h>
-#include "ReflectionRegister.h"
-#include "ReflgenRuntime.h"
+#include "../../Engine/Utility_Framework/Reflection/ReflectionRegister.h"
+#include "../../Engine/Utility_Framework/Reflection/ReflgenRuntime.h"
 #include "SceneManager.h"
 // GetActiveScene()->GetEntity(...) 호출이 Scene 완전 타입을 요구한다.
 // 예전에는 Entity.h → Entity.inl → Scene.h 전이로 우연히 왔지만
@@ -27,9 +27,9 @@ namespace EditorImGuiTexture
 // 쓰는데, 예전에는 유니티 블롭의 다른 파일을 거쳐 전이적으로 딸려 왔다.
 // (이 헤더가 코어에 있으면서 ScriptBinder를 참조하는 것 자체는 4-3에서 해소할 부채다)
 #include "Entity.h"
-#include "TypeTrait.h"
+#include "../../Engine/Utility_Framework/Reflection/TypeTrait.h"
 #include "InputManager.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 using namespace TypeTrait;
 namespace Meta

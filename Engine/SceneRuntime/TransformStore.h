@@ -1,7 +1,7 @@
 #pragma once
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector4.hpp>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // SceneGraphRedesignPlan.md §4 트랙 S, S1 — 계층·트랜스폼 파생 데이터의 유일한
 // 정본(SoA).

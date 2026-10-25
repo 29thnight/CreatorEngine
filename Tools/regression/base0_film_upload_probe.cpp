@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/Vulkan/VulkanCommandBufferPool.h"
 #include "RHI/Vulkan/VulkanPipelineCache.h"
@@ -5,8 +10,7 @@
 #include "RHI/RHISubmissionThread.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "MaterialGraphThinFilmSensitivity.h"
-#include "PathFinder.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 int main(int argc, char** argv)
 {
@@ -15,11 +19,11 @@ int main(int argc, char** argv)
         if (argc != 2) throw std::runtime_error("shader absolute path required");
         std::cout << std::unitbuf;
         const auto repo = std::filesystem::path(argv[1]).parent_path().parent_path().parent_path();
-        auto* paths = InternalPath::GetInstance();
-        paths->BaseProjectPath = repo / "Dynamic_CPP";
-        paths->ShaderSourcePath = repo / "Dynamic_CPP/Assets/Shaders";
-        paths->CacheRoot = repo / "Build/Obj/RenderBase0/FilmUploadProbe/Cache";
-        paths->AssetAuthoringEnabled = true;
+        auto* paths = (&ce::paths::get_state());
+        paths->base_project_path = repo / "Dynamic_CPP";
+        paths->shader_source_path = repo / "Dynamic_CPP/Assets/Shaders";
+        paths->cache_root = repo / "Build/Obj/RenderBase0/FilmUploadProbe/Cache";
+        paths->asset_authoring_enabled = true;
         std::string error;
         RHIShaderCompiler::VerifiedShader shader;
         RHIShaderCompileOptions options; options.strictMath = true;

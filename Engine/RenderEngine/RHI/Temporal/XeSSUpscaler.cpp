@@ -1,8 +1,12 @@
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "XeSSUpscaler.h"
 
 #include <stdint.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #if defined(_WIN32) && (CREATOR_ENABLE_XESS_SDK || CREATOR_ENABLE_XESS_VULKAN_SDK)
 #include <xess/xess.h>

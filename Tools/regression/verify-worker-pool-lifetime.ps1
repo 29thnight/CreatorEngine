@@ -26,20 +26,20 @@ foreach ($mutant in @($true, $false)) {
     $name = if ($mutant) {'early-delete'} else {'worker-pool'}
     $variant = Join-Path $out $name
     New-Item -ItemType Directory -Force -Path $variant | Out-Null
-    $worker = Join-Path $repo 'Engine/Utility_Framework/ThreadPool.cpp'
+    $worker = Join-Path $repo 'Engine/Utility_Framework/Concurrency/ThreadPool.cpp'
     if ($mutant) {
         $text = [IO.File]::ReadAllText($worker)
         $retain = 'std::atomic<unsigned> references_{2};'
         $release = 'submitted->release_submission();'
         if (-not $text.Contains($retain) -or -not $text.Contains($release)) { throw 'Lifetime mutation target missing' }
         $worker = Join-Path $variant 'WorkerPoolEarlyDelete.cpp'
-        [IO.File]::WriteAllText($worker, $text.Replace($retain, 'std::atomic<unsigned> references_{1};').Replace($release, ''))
+        [IO.File]::WriteAllText($worker, $text.Replace($retain, 'std::atomic<unsigned> references_{1};').Replace($release, '').Replace('../../../Tools/build/ModuleAdapters/', ($repo.Replace('\','/') + '/Tools/build/ModuleAdapters/')).Replace('../../Contracts/External/', ($repo.Replace('\','/') + '/Engine/Contracts/External/')).Replace('../../Platform/WindowsSDK/', ($repo.Replace('\','/') + '/Engine/Platform/WindowsSDK/')))
     }
     $exe = Join-Path $variant 'probe.exe'
     $command = 'call "' + $vcRoot + '/Auxiliary/Build/vcvars64.bat" >nul && cl /nologo /EHsc /std:c++latest /utf-8 /Zi /Od /MD /fsanitize=address /DWORKER_POOL_LIFETIME_STRESS /DCE_CONTRACT_STANDALONE ' +
         '/I"' + (Join-Path $repo 'Engine/Utility_Framework') + '" /I"' + (Join-Path $dependencies 'include') + '" /I"' + $sourceDir + '" ' +
         '/Fo"' + $variant + '/" /Fd"' + $variant + '/probe.pdb" /Fe"' + $exe + '" "' + $worker + '" "' +
-        (Join-Path $repo 'Engine/Utility_Framework/JobScheduler.cpp') + '" "' + (Join-Path $PSScriptRoot 'worker_pool_probe.cpp') + '" "' + $scheduler + '" /link /NODEFAULTLIB:enkiTS.lib'
+        (Join-Path $repo 'Engine/Utility_Framework/Concurrency/JobScheduler.cpp') + '" "' + (Join-Path $PSScriptRoot 'worker_pool_probe.cpp') + '" "' + $scheduler + '" /link /NODEFAULTLIB:enkiTS.lib'
     & $env:ComSpec /d /s /c $command
     if ($LASTEXITCODE -ne 0) { throw "$name ASan build failed" }
     Copy-Item -LiteralPath (Join-Path $compiler.FullName 'bin/Hostx64/x64/clang_rt.asan_dynamic-x86_64.dll') -Destination $variant

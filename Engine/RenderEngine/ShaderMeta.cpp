@@ -1,10 +1,14 @@
 #include "ShaderMeta.h"
 
-#include "AuthoringParsedDocument.h"
-#include "AuthoringCookedDocument.h"
-#include "Sha256.h"
+#include "../Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../Utility_Framework/Authoring/AuthoringCookedDocument.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -566,7 +570,7 @@ namespace
         }
         const auto text = *sourceBytes;
         if (text.empty() || text.size() > 16u * 1024u * 1024u ||
-            Hash::ToHex(Hash::Sha256::Compute(text.data(), text.size())) != generated.sourceSha256)
+            ce::hash::to_hex(ce::hash::sha256::compute(text.data(), text.size())) != generated.sourceSha256)
             return Fail(context, "generated source SHA-256 mismatch", outError);
         meta.generatedMaterial = std::move(generated);
         return true;
@@ -664,12 +668,12 @@ bool ShaderMetaLoader::LoadFile(const std::filesystem::path& documentPath,
         {
             return false;
         }
-        Hash::Sha256 hash;
+        ce::hash::sha256 hash;
         const auto origin = candidate.originPath.generic_u8string();
-        const auto documentDigest = Hash::Sha256::Compute(canonical.data(), canonical.size());
-        hash.Update(documentDigest.data(), documentDigest.size());
-        hash.Update(origin.data(), origin.size());
-        *outDocumentDigest = hash.Finish();
+        const auto documentDigest = ce::hash::sha256::compute(canonical.data(), canonical.size());
+        hash.update(documentDigest.data(), documentDigest.size());
+        hash.update(origin.data(), origin.size());
+        *outDocumentDigest = hash.finish();
     }
     outMeta = std::move(candidate);
     return true;

@@ -1,15 +1,15 @@
 ﻿#pragma once
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "ProjectionType.h"
-#include "ClassProperty.h"
+#include "../Utility_Framework/Reflection/ClassProperty.h"
 // Sizef를 쓴다. 예전에는 DeviceResources.h가 전이로 공급했는데 그 파일이
 // 사라졌다(2026-08-10) — 정의가 있는 곳에서 직접 든다.
-#include "TypeDefinition.h"
+#include "../Utility_Framework/Foundation/TypeDefinition.h"
 #include "FrameCameraSnapshot.h"
 #include <mathematics/frustum.hpp>
 #include <mathematics/quaternion.hpp>
 #include <mathematics/vector2.hpp>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 // ID3D11DeviceContext·ID3D11Buffer 전방 선언이 여기 있었다 (E, 2026-08-09).
 // 뷰/투영/캐스케이드 상수 버퍼와 UpdateBuffer 삼형제가 D4에서 사라졌다.
 // 카메라 한 대의 값 상태. 소유권·활성 뷰 선택·렌더 슬롯 배정은 이 타입의

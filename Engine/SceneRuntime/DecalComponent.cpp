@@ -1,3 +1,19 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "DecalComponent.h"
 #include "DecalSystem.h"
 #include "Texture.h"
@@ -5,7 +21,7 @@
 #include "RenderScene.h"
 #include "Scene.h"
 #include "DataSystem.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 void DecalComponent::OnInitialized()
 {
@@ -87,7 +103,7 @@ void DecalComponent::SetDecalTexture(const std::string_view& fileName)
 
 void DecalComponent::SetDecalTexture(const FileGuid& fileGuid)
 {
-    const auto reference = fileGuid == FileGuid{} ? std::string{} : Uuid::ToString(fileGuid.m_guid);
+    const auto reference = fileGuid == FileGuid{} ? std::string{} : uuid::to_string(fileGuid.m_guid);
     SetDecalTexture(std::string_view(reference));
 }
 
@@ -100,7 +116,7 @@ void DecalComponent::SetNormalTexture(const std::string_view& fileName)
 
 void DecalComponent::SetNormalTexture(const FileGuid& fileGuid)
 {
-    const auto reference = fileGuid == FileGuid{} ? std::string{} : Uuid::ToString(fileGuid.m_guid);
+    const auto reference = fileGuid == FileGuid{} ? std::string{} : uuid::to_string(fileGuid.m_guid);
     SetNormalTexture(std::string_view(reference));
 }
 
@@ -113,7 +129,7 @@ void DecalComponent::SetORMTexture(const std::string_view& fileName)
 
 void DecalComponent::SetORMTexture(const FileGuid& fileGuid)
 {
-    const auto reference = fileGuid == FileGuid{} ? std::string{} : Uuid::ToString(fileGuid.m_guid);
+    const auto reference = fileGuid == FileGuid{} ? std::string{} : uuid::to_string(fileGuid.m_guid);
     SetORMTexture(std::string_view(reference));
 }
 
@@ -136,7 +152,7 @@ void DecalComponent::RequestTexture(std::string_view reference, std::size_t slot
     const auto catalog = DataSystems->GetCookedCatalog();
     m_textureResolverRevisions[slot] = catalog ? catalog->ResolverRevision() : 0u;
     FileGuid guid;
-    const bool logicalIdentity = Uuid::TryParse(reference, guid.m_guid);
+    const bool logicalIdentity = uuid::try_parse(reference, guid.m_guid);
     if (logicalIdentity && guid == FileGuid{})
     {
         owner.reset();
@@ -148,13 +164,13 @@ void DecalComponent::RequestTexture(std::string_view reference, std::size_t slot
     {
         // Compatibility is a registry lookup, never a source file load. Offline
         // scene cooking lowers these filename fields to canonical logical IDs.
-        const auto path = PathFinder::Relative("Textures\\") / file::path(reference).filename();
+        const auto path = ce::paths::relative("Textures\\") / std::filesystem::path(reference).filename();
         guid = DataSystems->GetFileGuid(path.lexically_normal());
     }
     const AssetDepot::AssetLink<Texture> link{ { experiment::AssetId{ guid.m_guid }, {} } };
     if (!link.IsValid())
     {
-        m_textureRetryOnRevision[slot] = PathFinder::IsAssetAuthoringEnabled();
+        m_textureRetryOnRevision[slot] = ce::paths::is_asset_authoring_enabled();
         Debug::PrintLog(spdlog::level::err, "Decal texture has no registered identity: " + std::string(reference));
         return;
     }

@@ -1,13 +1,23 @@
-#include "../../Utility_Framework/DynamicBitset.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.DynamicBitset.h"
+#else
+import Creator.Core.DynamicBitset;
+#endif
 #include "ModelStableKeys.h"
 #include "AssetIdentityHex.h"
 
-#include "Sha256.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
-#include <Windows.h>
-#include <bcrypt.h>
-
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #pragma comment(lib, "bcrypt.lib")
 
@@ -65,7 +75,7 @@ namespace assets
                 U32(static_cast<std::uint32_t>(bits >> 32));
                 U32(static_cast<std::uint32_t>(bits));
             }
-            void Bytes(const void* data, std::size_t size) { m_sha.Update(data, size); }
+            void Bytes(const void* data, std::size_t size) { m_sha.update(data, size); }
             template <typename T>
             void Pod(const std::vector<T>& values)
             {
@@ -74,11 +84,11 @@ namespace assets
             }
             [[nodiscard]] std::string Finish()
             {
-                return std::string(kFingerprintPrefix) + Hash::ToHex(m_sha.Finish());
+                return std::string(kFingerprintPrefix) + ce::hash::to_hex(m_sha.finish());
             }
 
         private:
-            Hash::Sha256 m_sha;
+            ce::hash::sha256 m_sha;
         };
 
         void Slot(FingerprintBuilder& fp, const im::TextureSlot& slot,

@@ -1,8 +1,15 @@
 // Real Winsock/HTTP service, with a controlled gateway and no engine/GPU host.
+#ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
+#endif
+#ifndef NOMINMAX
 #define NOMINMAX
-#include <winsock2.h>
-#include <ws2tcpip.h>
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 #include "../../Engine/CommandService/CommandService.h"
 #include "../../Engine/CommandService/JsonValue.h"
 

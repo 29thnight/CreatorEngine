@@ -1,4 +1,9 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // 등록 함수(reflgen::generated::register_<모듈>)의 번역 단위가 맨 앞에 include 하는 엔진 header — Directory.Build.targets
 // 의 ReflgenRegistrationHeaders. 세 모듈(RenderEngine·SceneRuntime·Editor)의 등록 번역 단위가 모두 include 하므로 셋이 다
 // 여는 자리(RenderEngine)에 둔다.
@@ -12,5 +17,5 @@
 //      (VerifyReflectRegistration, RegisterReflectManual.h)가 타입과 필드를 적고 멈춘다.
 //   ② 반영 header 가 전방 선언만 하는 필드 타입의 정의 — 서술된 타입이 여기서 불완전하면 그 서술(생성된 describe())이
 //      실체화되며 컴파일이 멈춘다. 새로 생기면 그 타입의 header 를 여기에 더한다.
-#include "ReflectionTypedYml.h"
+#include "../Utility_Framework/Reflection/ReflectionTypedYml.h"
 #include "Material.h" // MeshRenderer::m_Material(own::shared_owner<Material>) — MeshRenderer.h 는 전방 선언만 한다

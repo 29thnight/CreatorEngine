@@ -1,9 +1,18 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 #include "CookedEnvironment.h"
 #include "../RHI/DX12/EnhancedIBLGenerator.h"
 #include "../Experiment/Cooked/CookedAssetManifest.h"
 #include "../../EngineDiagnostics/ProfileScope.h"
-#include "../../Utility_Framework/StandardLibrary.h"
-#include <Windows.h>
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 namespace assets
 {
@@ -15,7 +24,7 @@ constexpr char kEnvironmentFloatMagic[8]{'C','E','I','B','L','0','0','3'};
 constexpr char kEnvironmentHalfMagic[8]{'C','E','I','B','L','0','0','2'};
 constexpr char kEnvironmentLegacyMagic[8]{'C','E','I','B','L','0','0','1'};
 constexpr uint64_t kEnvironmentMaxBytes = 512ull * 1024 * 1024;
-std::string EnvironmentHex(const Hash::Sha256Digest& value)
+std::string EnvironmentHex(const ce::hash::sha256_digest& value)
 {
     constexpr char digits[] = "0123456789abcdef";
     std::string result;
@@ -164,21 +173,21 @@ bool BuildEnvironmentImportance(CookedEnvironment& value, std::string& error)
     error.clear(); return true;
 }
 
-bool EnvironmentSourceIdentity(const std::filesystem::path& source, Hash::Sha256Digest& result, std::string& error)
+bool EnvironmentSourceIdentity(const std::filesystem::path& source, ce::hash::sha256_digest& result, std::string& error)
 {
     ce::profile_scope profile{ ce::marker<"Environment.SourceIdentity">() };
     std::ifstream input(source, std::ios::binary);
     if (!input) return EnvironmentError(error, "Environment source missing: " + source.string());
-    Hash::Sha256 hash;
+    ce::hash::sha256 hash;
     std::array<char, 65536> chunk;
-    while (input) { input.read(chunk.data(), chunk.size()); hash.Update(chunk.data(), size_t(input.gcount())); }
+    while (input) { input.read(chunk.data(), chunk.size()); hash.update(chunk.data(), size_t(input.gcount())); }
     if (!input.eof()) return EnvironmentError(error, "Environment source read failed");
-    result = hash.Finish(); error.clear(); return true;
+    result = hash.finish(); error.clear(); return true;
 }
 
 // 셰이더는 텍스트다. Git 의 core.autocrlf 체크아웃처럼 줄바꿈만 다른 사본이 같은
 // 조리법으로 판정되도록 CRLF 를 LF 로 맞춰 해시한다. LF 파일의 지문은 바뀌지 않는다.
-static bool EnvironmentShaderTextIdentity(const std::filesystem::path& source, Hash::Sha256Digest& result, std::string& error)
+static bool EnvironmentShaderTextIdentity(const std::filesystem::path& source, ce::hash::sha256_digest& result, std::string& error)
 {
     std::ifstream input(source, std::ios::binary);
     if (!input) return EnvironmentError(error, "Environment shader missing: " + source.string());
@@ -188,13 +197,13 @@ static bool EnvironmentShaderTextIdentity(const std::filesystem::path& source, H
     normalized.reserve(text.size());
     for (size_t i = 0; i < text.size(); ++i)
         if (!('\r' == text[i] && i + 1 < text.size() && '\n' == text[i + 1])) normalized.push_back(text[i]);
-    Hash::Sha256 hash;
-    hash.Update(normalized.data(), normalized.size());
-    result = hash.Finish(); error.clear(); return true;
+    ce::hash::sha256 hash;
+    hash.update(normalized.data(), normalized.size());
+    result = hash.finish(); error.clear(); return true;
 }
 
 bool EnvironmentRecipeIdentity(const std::filesystem::path& shaders, uint32_t cubeSize,
-    uint32_t brdfSize, Hash::Sha256Digest& result, std::string& error)
+    uint32_t brdfSize, ce::hash::sha256_digest& result, std::string& error)
 {
     ce::profile_scope profile{ ce::marker<"Environment.RecipeIdentity">() };
     if (!EnvironmentSizes(cubeSize, brdfSize)) return EnvironmentError(error, "Invalid environment cook sizes");
@@ -204,18 +213,18 @@ bool EnvironmentRecipeIdentity(const std::filesystem::path& shaders, uint32_t cu
     std::set<std::filesystem::path> files;
     for (const auto* stage : stages)
         if (!EnvironmentCollectShader(shaders / stage, shaders, files, error)) return false;
-    Hash::Sha256 hash;
+    ce::hash::sha256 hash;
     constexpr char recipe[] = "ce.environment.v5;source-rgba32f-mip0;cube-prefilter-rgba32f;irradiance-brdf-rgba16f;linear-rec709;E-over-pi;D3D-cube;MIS1024;prefilter6;envMips7;sceneCDF-mip0-rgba32f-banks1024+4096";
-    hash.Update(recipe, sizeof(recipe));
-    hash.Update(&cubeSize, sizeof(cubeSize)); hash.Update(&brdfSize, sizeof(brdfSize));
+    hash.update(recipe, sizeof(recipe));
+    hash.update(&cubeSize, sizeof(cubeSize)); hash.update(&brdfSize, sizeof(brdfSize));
     for (const auto& file : files)
     {
         const auto relative = file.lexically_relative(shaders).generic_string();
-        Hash::Sha256Digest digest;
+        ce::hash::sha256_digest digest;
         if (!EnvironmentShaderTextIdentity(file, digest, error)) return false;
-        hash.Update(relative.data(), relative.size()); hash.Update(digest.data(), digest.size());
+        hash.update(relative.data(), relative.size()); hash.update(digest.data(), digest.size());
     }
-    result = hash.Finish(); error.clear(); return true;
+    result = hash.finish(); error.clear(); return true;
 }
 
 std::string EnvironmentCacheName(const EnvironmentIdentity& identity)
@@ -233,11 +242,11 @@ bool ReadCookedEnvironment(const std::filesystem::path& file, CookedEnvironment&
     if (size < 112 || uint64_t(size) > kEnvironmentMaxBytes) return EnvironmentError(error, "Invalid cooked environment size");
     input.seekg(0);
     std::array<char, 8> magic;
-    Hash::Sha256Digest digest;
+    ce::hash::sha256_digest digest;
     input.read(magic.data(), magic.size()); input.read(reinterpret_cast<char*>(digest.data()), digest.size());
     std::vector<std::byte> body(size_t(size)-40);
     input.read(reinterpret_cast<char*>(body.data()), body.size());
-    Hash::Sha256Digest actual;
+    ce::hash::sha256_digest actual;
     const bool legacy = std::memcmp(magic.data(), kEnvironmentLegacyMagic, 8) == 0;
     const bool halfRadiance = legacy || std::memcmp(magic.data(), kEnvironmentHalfMagic, 8) == 0;
     const bool denseProposal = std::memcmp(magic.data(), kEnvironmentMagic, 8) == 0;
@@ -348,7 +357,7 @@ bool WriteCookedEnvironment(const std::filesystem::path& file, const CookedEnvir
     }
     const auto& sourceSlice=*value.source.Find(0,0);
     body.insert(body.end(),sourceSlice.pixels,sourceSlice.pixels+sourceSlice.slicePitch);
-    Hash::Sha256Digest digest;
+    ce::hash::sha256_digest digest;
     if (!experiment::cooked::ComputeSha256(body,digest,error)) return false;
     std::error_code ec;
     std::filesystem::create_directories(file.parent_path(),ec);

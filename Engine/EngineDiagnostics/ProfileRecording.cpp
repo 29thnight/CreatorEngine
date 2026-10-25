@@ -1,11 +1,15 @@
 #include "ProfileCaptureFile.h"
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 #ifdef _WIN32
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
-#include <Windows.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 #endif
 
 // 유니티 빌드에서 다른 파일의 내부 함수와 충돌하지 않도록 이름 있는 네임스페이스를 쓴다.

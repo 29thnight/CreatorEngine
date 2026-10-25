@@ -1,29 +1,38 @@
-#include "../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Stopwatch.h"
+#else
+import Creator.Core.Stopwatch;
+#endif
 #include "BehaviorTreeComponent.h"
 #include "DataSystem.h"
 #include "BTGraphFlatten.h"
 #include "BTBuildGraphAuthoring.h"
 #include "ClrHost.h"
 #include "SceneManager.h"
-#include "AuthoringParsedDocument.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 void BehaviorTreeComponent::Initialize()
 {
 	if (m_BlackBoardGuid != nullFileGuid)
 	{
 		//TODO: 블랙보드 인스턴스 생성 준비
-		m_pBlackboard = new BlackBoard();
+		m_blackboard = own::make_unique<BlackBoard>();
 
-		file::path blackBoardPath = DataSystems->GetFilePath(m_BlackBoardGuid);
-		if (!file::exists(blackBoardPath))
+		std::filesystem::path blackBoardPath = DataSystems->GetFilePath(m_BlackBoardGuid);
+		if (!std::filesystem::exists(blackBoardPath))
 		{
 			Debug::PrintLog(spdlog::level::err, "Blackboard File not Exists");
 		}
 		else
 		{
 			std::string _blackBoardName = blackBoardPath.stem().string();
-			m_pBlackboard->Deserialize(_blackBoardName);
+			m_blackboard->Deserialize(_blackBoardName);
 		}
 
 	}
@@ -75,11 +84,7 @@ void BehaviorTreeComponent::InternalAIUpdate(float deltaSecond)
 
 void BehaviorTreeComponent::OnUninitializing()
 {
-	if (m_pBlackboard)
-	{
-		/*m_pBlackboard = nullptr;*/
-		Memory::SafeDelete(m_pBlackboard);
-	}
+    m_blackboard.reset();
 	// 관리 측 트리도 함께 내린다. 남기면 Running 상태가 다음 씬으로 샌다.
 	if (m_treeInstanceId >= 0)
 	{
@@ -126,7 +131,7 @@ void BehaviorTreeComponent::SendGraphToManaged(const BTBuildGraph& graph)
 	// 저작 블랙보드를 함께 실어 보낸다. 이걸 빠뜨리면 관리 측 트리가 빈 블랙보드로
 	// 시작해 노드가 읽는 값이 전부 기본값이 된다 — 기존 BT 에셋이 다르게 움직인다.
 	std::vector<ClrHost::ScriptBBEntry> entries;
-	if (nullptr != m_pBlackboard) entries = BTFlatten::FlattenBlackBoard(*m_pBlackboard);
+	if (nullptr != m_blackboard) entries = BTFlatten::FlattenBlackBoard(*m_blackboard);
 
 	// 노드가 몇 개든, 블랙보드 항목이 몇 개든 경계 통과는 한 번이다.
 	m_treeInstanceId = ClrHost::Get().CreateBehaviorTree(
@@ -144,7 +149,7 @@ void BehaviorTreeComponent::SendGraphToManaged(const BTBuildGraph& graph)
 
 void BehaviorTreeComponent::GraphToBuild()
 {
-	Benchmark bm;
+	ce::stopwatch bm;
 	own::shared_owner<BTBuildGraph> cachedGraph = AIManagers->GetBTBuildGraphCache(m_BehaviorTreeGuid);
 	if (cachedGraph)
 	{
@@ -152,8 +157,8 @@ void BehaviorTreeComponent::GraphToBuild()
 	}
 	else
 	{
-		file::path BTpath = DataSystems->GetFilePath(m_BehaviorTreeGuid);
-		if (!BTpath.empty() && file::exists(BTpath))
+		std::filesystem::path BTpath = DataSystems->GetFilePath(m_BehaviorTreeGuid);
+		if (!BTpath.empty() && std::filesystem::exists(BTpath))
 		{
 			own::shared_owner<BTBuildGraph> graph = own::make_shared<BTBuildGraph>();
 			std::string parseError;
@@ -183,5 +188,5 @@ void BehaviorTreeComponent::GraphToBuild()
 			Debug::PrintLog(spdlog::level::err, "Behavior Tree file does not exist: " + BTpath.string());
 		}
 	}
-	Debug::PrintLog(spdlog::level::info, "Behavior Tree Build Time: {} ms\n", bm.GetElapsedTime());
+	Debug::PrintLog(spdlog::level::info, "Behavior Tree Build Time: {} ms\n", bm.elapsed_milliseconds());
 }

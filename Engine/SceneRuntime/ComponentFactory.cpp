@@ -1,7 +1,7 @@
 #include "ComponentFactory.h"
-#include "SerializationProfiler.h" // D0: 직렬화 기준선 계측
+#include "../Utility_Framework/Authoring/SerializationProfiler.h" // D0: 직렬화 기준선 계측
 #include "ProfileScope.h"
-#include "AuthoringNodeViewAccess.h" // D3-a-4
+#include "../Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-4
 #include "LifecycleRegistry.h"
 #include "Entity.h"
 #include "Transform.h"
@@ -169,7 +169,7 @@ void ComponentFactory::LoadComponent(Entity* obj, const Authoring::NodeView& vie
         // 없이 return하던 자리라 어떤 오브젝트에서 어떤 노드가 버려졌는지
         // 남긴다.
         Debug::PrintLog(spdlog::level::err, "ComponentFactory::LoadComponent: 컴포넌트 타입을 확정하지 못해 노드를 버림 - GameObject \""
-            + obj->GetHashedName().ToString() + "\"");
+            + obj->GetName() + "\"");
         return;
     }
     // 컴포넌트 종류별로 적재 시간을 가른다. 이름이 실행 중에만 정해지므로 등록 표를 쓴다.

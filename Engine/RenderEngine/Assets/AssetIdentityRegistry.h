@@ -1,4 +1,9 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 // 신원 충돌 registry — ModelAssetBigBangCutoverPlan §2.4 (MBC1).
 //
 //   `(profile, epoch, modelAuthoringKey, kind, stableKey) ↔ UUID`는 전 corpus에서
@@ -19,7 +24,7 @@
 
 #include "AssetIdentityProfile.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace assets
 {
@@ -36,7 +41,7 @@ namespace assets
     struct IdentityRegisterResult final
     {
         IdentityRegisterOutcome outcome{ IdentityRegisterOutcome::InvalidInput };
-        Uuid::Uuid16 uuid{};                 // 유도값(InvalidInput이면 nil)
+        uuid::uuid16 uuid{};                 // 유도값(InvalidInput이면 nil)
         std::string conflictingContext{};    // Duplicate/Collision/Mismatch의 상대
         IdentityIssue issue{ IdentityIssue::None }; // InvalidInput 사유
         std::string message{};
@@ -50,7 +55,7 @@ namespace assets
     struct IdentityRegistryEntry final
     {
         std::vector<std::uint8_t> canonicalInput{};
-        Uuid::Uuid16 uuid{};
+        uuid::uuid16 uuid{};
         std::string context{}; // 진단용 — 어느 sidecar/어느 subasset이었나
     };
 
@@ -60,24 +65,24 @@ namespace assets
         // writer 경로. 입력에서 유도해 등록한다. claimed가 nil이 아니면 유도값과
         // 대조하고 다르면 RecomputeMismatch로 거부한다(등록하지 않는다).
         [[nodiscard]] IdentityRegisterResult Register(const IdentityInput& input,
-            std::string context, const Uuid::Uuid16& claimed = {});
+            std::string context, const uuid::uuid16& claimed = {});
 
         // 이미 유도한 값을 등록한다 — 바이트열과 UUID의 재유도 일치를 먼저 확인하고
         // (불일치면 RecomputeMismatch) tuple/UUID 충돌만 판정한다. 검사 도구가
         // sidecar에 적힌 값을 그대로 넣을 때 쓴다.
         [[nodiscard]] IdentityRegisterResult RegisterDerived(
-            std::vector<std::uint8_t> canonicalInput, const Uuid::Uuid16& uuid,
+            std::vector<std::uint8_t> canonicalInput, const uuid::uuid16& uuid,
             std::string context);
 
         // ★ 검사 전용 — 재유도 대조 없이 넣는다. UUID 충돌 분기(다른 tuple, 같은
         //   UUID)는 실제 SHA-256 충돌 없이는 만들 수 없으므로, selftest가 이 seam으로
         //   충돌 상태를 조립해 판정 코드를 태운다. 제품 writer는 부르지 않는다.
         void InsertUncheckedForTest(std::vector<std::uint8_t> canonicalInput,
-            const Uuid::Uuid16& uuid, std::string context);
+            const uuid::uuid16& uuid, std::string context);
 
-        [[nodiscard]] bool Contains(const Uuid::Uuid16& uuid) const noexcept;
+        [[nodiscard]] bool Contains(const uuid::uuid16& uuid) const noexcept;
         [[nodiscard]] const IdentityRegistryEntry* Find(
-            const Uuid::Uuid16& uuid) const noexcept;
+            const uuid::uuid16& uuid) const noexcept;
         [[nodiscard]] std::size_t Size() const noexcept { return m_entries.size(); }
         [[nodiscard]] std::span<const IdentityRegistryEntry> Entries() const noexcept
         {
@@ -92,11 +97,11 @@ namespace assets
 
     private:
         [[nodiscard]] IdentityRegisterResult Insert(
-            std::vector<std::uint8_t> canonicalInput, const Uuid::Uuid16& uuid,
+            std::vector<std::uint8_t> canonicalInput, const uuid::uuid16& uuid,
             std::string context);
 
         std::vector<IdentityRegistryEntry> m_entries{};
         std::map<std::vector<std::uint8_t>, std::size_t> m_byInput{};
-        std::map<Uuid::Uuid16, std::size_t> m_byUuid{};
+        std::map<uuid::uuid16, std::size_t> m_byUuid{};
     };
 }

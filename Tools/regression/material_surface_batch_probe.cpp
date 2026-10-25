@@ -1,5 +1,14 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "MaterialGraphSurfaceBatch.h"
-#include "PathFinder.h"
 #include "Texture.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
@@ -7,7 +16,7 @@
 #include "RHI/DX12/DX12TextureCache.h"
 #include "material_ibl_reference.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -218,10 +227,10 @@ struct Drain
 
 void Run(const std::filesystem::path& root)
 {
-    auto* paths = InternalPath::GetInstance();
-    paths->BaseProjectPath = root / "Dynamic_CPP";
-    paths->ShaderSourcePath = root / "Dynamic_CPP/Assets/Shaders";
-    paths->AssetAuthoringEnabled = true;
+    auto* paths = (&ce::paths::get_state());
+    paths->base_project_path = root / "Dynamic_CPP";
+    paths->shader_source_path = root / "Dynamic_CPP/Assets/Shaders";
+    paths->asset_authoring_enabled = true;
     const std::array products{Product(root, false), Product(root, true)};
     const auto table = LoadSheenTable(root / "Tools/blender/fixtures/principled-layered-5.1.1/sheen-ltc.csv");
     const Environment uniform{{{2, 1, .5}, {2, 1, .5}, {2, 1, .5}, {2, 1, .5}, {2, 1, .5}, {2, 1, .5}}};
@@ -230,7 +239,7 @@ void Run(const std::filesystem::path& root)
     const std::array environments{Cube(uniform), Cube(directional)};
     GenerationStore store;
     experiment::AssetId graph;
-    Check(Uuid::TryParse("11111111-1111-4111-8111-111111111111", graph.value), "Graph GUID");
+    Check(uuid::try_parse("11111111-1111-4111-8111-111111111111", graph.value), "Graph GUID");
     std::array<own::shared_owner<const Generation>, 2> generations;
     std::string error;
     for (unsigned i = 0; i < 2; ++i)

@@ -1,4 +1,8 @@
-#include "../../../../../../Engine/Utility_Framework/DynamicBitset.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.DynamicBitset.h"
+#else
+import Creator.Core.DynamicBitset;
+#endif
 #include "RHI/DX12/DX12Format.h"
 #include "Render/Passes/Geometry/SceneSurfaceTargets.h"
 #include "Render/Passes/Geometry/EnhancedShadowPass.h"
@@ -17,7 +21,7 @@
 // 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 
 #include <stdint.h>
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include <mathematics/transform.hpp>
 
 namespace material_graph
@@ -262,7 +266,6 @@ namespace
 
 bool DX12Test::RunSkinningTest(std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
 
     outLog += "── 스키닝 검증 (GBuffer · 그림자, PHASE 3-6) ──\n";
 

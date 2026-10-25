@@ -9,7 +9,7 @@
 #include "Experiment/Import/MeshletBuilder.h"
 #include "Experiment/Import/MeshLodBuilder.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -33,9 +33,9 @@ namespace
     experiment::AssetId V8(std::uint8_t seed)
     {
         experiment::AssetId id;
-        id.value.data[0] = seed;
-        id.value.data[6] = 0x80u;
-        id.value.data[8] = 0x80u;
+        id.value.data_[0] = seed;
+        id.value.data_[6] = 0x80u;
+        id.value.data_[8] = 0x80u;
         return id;
     }
 

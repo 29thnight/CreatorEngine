@@ -32,6 +32,8 @@
       <PreprocessorDefinitions>CE_SCENE_HEADLESS=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <FunctionLevelLinking>true</FunctionLevelLinking>
+      <!-- Match HeadlessHost: retain PDB symbols without /ZI Edit and Continue directives. -->
+      <DebugInformationFormat Condition="'$(Configuration)' == 'Debug'">ProgramDatabase</DebugInformationFormat>
       <AdditionalOptions>/utf-8 /bigobj %(AdditionalOptions)</AdditionalOptions>
       <AdditionalIncludeDirectories>$(SolutionDir)Engine\SceneRuntime;$(SolutionDir)Engine\RenderEngine;$(SolutionDir)Engine\RenderEngine\Interfaces;$(SolutionDir)Engine\Physics;$(SolutionDir)ThirdParty\mimalloc\include;$(SolutionDir)Engine\Utility_Framework;$(SolutionDir)Engine\EngineDiagnostics;$(SolutionDir)ThirdParty\Mathematics\include;$(SolutionDir)ThirdParty\DotNetHost\include;$(_ZVcpkgCurrentInstalledDir)include\physx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>

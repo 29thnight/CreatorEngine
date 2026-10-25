@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 // LC6 (PHASE 14.5) — Renderer 라이브 조회·조정 명령.
 //
 // 도는 렌더러의 상태를 읽거나 바꾼다. 격리 씬을 세우지 않고, 산출물을 남기지
@@ -49,23 +54,23 @@
 #include "CommandRegistrar.h"
 #include <stdint.h>
 #include <stdio.h>
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "EnhancedRenderDebugWindow.h"
 #include "SceneViewportOverlay.h"
 #include "RHI/RHIValidationLedger.h"
 #include "CommandSupport.h"
-#include "EditorObjectOperations.h"
+#include "../Scene/EditorObjectOperations.h"
 #include "CommandCore/CommandSession.h" // LC1: 결과 누적과 process exit code
 #include "CommandCore/CommandParser.h"
 #include "CommandCore/CommandRegistry.h"       // LC3: descriptor snapshot
 #include "CommandCore/CommandDescriptorSeeds.h"
 #include "EditorCommandServiceHost.h"        // LC4: 로컬 HTTP/JSON 서비스  // LC2: 토크나이저와 소유형 invocation
 #include "EditorCameraRig.h"
-#include "EditorSessionState.h"
-#include "EditorSettingsStore.h"
+#include "../Project/EditorSessionState.h"
+#include "../Project/EditorSettingsStore.h"
 #include "EngineBootstrap.h"
-#include "GameBuilderSystem.h"
-#include "EditorAssetDatabase.h"
+#include "../Build/GameBuilderSystem.h"
+#include "../Assets/EditorAssetDatabase.h"
 #include "Interfaces/AssetAuthoringPort.h"
 #include "Interfaces/FoliageInstance.h"
 #include <mathematics/color.hpp>
@@ -124,15 +129,18 @@
 #include "AIManager.h"
 #include "DataSystem.h"
 #include "GpuDiagnostics.h"
-#include "LogSystem.h"
-#include "PathFinder.h"
-#include "RuntimeSettings.h"
-#include "AuthoringNodeEquality.h" // D3-a-1: 저작 노드 구조 비교
-#include "AuthoringNodeViewAccess.h" // D3-a-5b
-#include "AuthoringParsedDocument.h"
-#include "AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
-#include "SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
-#include "WindowsCoreWindow.h"
+#include "../../../Engine/Utility_Framework/Diagnostics/LogSystem.h"
+#include "../../../Engine/Utility_Framework/Runtime/RuntimeSettings.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeEquality.h" // D3-a-1: 저작 노드 구조 비교
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-5b
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
+#include "../../../Engine/Utility_Framework/Authoring/SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.AppBackend.WinAPI.h"
+#else
+import Creator.AppBackend.WinAPI;
+#endif
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
@@ -158,19 +166,23 @@
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
 #include "RHI/ScreenSizedResource.h"
-#include "ReflectionYml.h"
-#include "ReflectionUndo.h"
-#include "GameObjectCommand.h"
-#include "StringHelper.h"
+#include "../../../Engine/Utility_Framework/Reflection/ReflectionYml.h"
+#include "../Editing/ReflectionUndo.h"
+#include "../Editing/GameObjectCommand.h"
 #include "BlackBoard.h"
 #include "TagManager.h"
-#include <Windows.h>
-#include <psapi.h> // MBC11: peak working set
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+// MBC11: peak working set
 #include <crtdbg.h>
-#include <DbgHelp.h>
-#include <DXProgrammableCapture.h>
-#include <dxgidebug.h>
-#include <wrl/client.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 #include "../../Engine/SceneRuntime/MeshRenderer.h"
 #include "../../Engine/RenderEngine/Material.h"
 

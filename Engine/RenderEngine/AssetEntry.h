@@ -1,6 +1,6 @@
 #pragma once
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include "Core.Minimal.h"
+#include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 
 enum class ManagedAssetType
 {
@@ -19,7 +19,7 @@ struct [[reflgen::reflect]] AssetEntry
 {
    public:
 	AssetEntry() = default;
-	AssetEntry(ManagedAssetType assetTypeID, const file::path& assetName)
+	AssetEntry(ManagedAssetType assetTypeID, const std::filesystem::path& assetName)
 		: assetTypeID((int)assetTypeID), assetName(assetName.string()) {
 	}
 	~AssetEntry() = default;

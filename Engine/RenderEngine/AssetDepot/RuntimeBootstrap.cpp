@@ -1,8 +1,23 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "RuntimeBootstrap.h"
-#include "../../Utility_Framework/ContentAbi.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.ContentAbi.h"
+#else
+import Creator.Core.ContentAbi;
+#endif
 #include "../Assets/AssetIdentityProfile.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -83,7 +98,7 @@ namespace AssetDepot
                 || std::adjacent_find(hashes.begin(), hashes.end()) != hashes.end())
                 throw std::runtime_error("Bootstrap requires 1..64 distinct sets and 1..16384 documents.");
             std::ostringstream output;
-            output << "CEBR1\nwin-x64\n" << CreatorContentAbi::Token << "\nlegacy "
+            output << "CEBR1\nwin-x64\n" << ce::content_abi::token << "\nlegacy "
                 << HashText(receipt.legacyManifestSha256) << '\n';
             for (const auto& hash : hashes)
             {
@@ -94,7 +109,7 @@ namespace AssetDepot
             std::size_t references{};
             for (auto& document : documents)
             {
-                const auto id = Uuid::ToString(document.assetId.value);
+                const auto id = uuid::to_string(document.assetId.value);
                 if (ParseId(id) != document.assetId || !experiment::IsAssetIdV4(document.assetId)
                     || !identities.insert(document.assetId).second)
                     throw std::runtime_error("Invalid or repeated bootstrap document UUID.");
@@ -107,11 +122,11 @@ namespace AssetDepot
                 {
                     if (++references > MaxReferences || !ExternalKind(reference.kind)
                         || reference.key.subassetId != experiment::AssetId{}
-                        || ParseId(Uuid::ToString(reference.key.assetId.value)) != reference.key.assetId
+                        || ParseId(uuid::to_string(reference.key.assetId.value)) != reference.key.assetId
                         || !kinds.emplace(reference.key.assetId, reference.kind).second)
                         throw std::runtime_error("Invalid, conflicting or excessive bootstrap references.");
                     output << "reference " << id << ' ' << static_cast<unsigned>(reference.kind)
-                        << ' ' << Uuid::ToString(reference.key.assetId.value) << '\n';
+                        << ' ' << uuid::to_string(reference.key.assetId.value) << '\n';
                 }
             }
             auto candidate = output.str();
@@ -142,7 +157,7 @@ namespace AssetDepot
                 if (!std::getline(input, value)) throw std::runtime_error("Truncated bootstrap receipt.");
                 return value;
             };
-            if (line() != "CEBR1" || line() != "win-x64" || line() != CreatorContentAbi::Token)
+            if (line() != "CEBR1" || line() != "win-x64" || line() != ce::content_abi::token)
                 throw std::runtime_error("Unsupported bootstrap format/platform/installed content ABI.");
             RuntimeBootstrapReceipt result;
             const auto legacy = line();
@@ -250,7 +265,7 @@ namespace AssetDepot
                     if (legacy.Find(reference.key.assetId)
                         || candidate.Find(reference, resolved) != cooked::AssetLookupStatus::Found)
                         throw std::runtime_error("Bootstrap typed external reference is missing, ambiguous or has the wrong kind: "
-                            + Uuid::ToString(reference.key.assetId.value));
+                            + uuid::to_string(reference.key.assetId.value));
                 }
             }
             return true;

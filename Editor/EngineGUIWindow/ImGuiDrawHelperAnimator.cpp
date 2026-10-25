@@ -4,7 +4,7 @@
 // 않다 — 셸이 프레임을 소유하므로 AnimatorEditorWindows.cpp로 갔다. 여기
 // 남은 것은 인스펙터 안에 그리는 접힘머리와, 그 창들을 여는 단추뿐이다.
 
-#include "EditorObjectOperations.h"
+#include "../EngineEntry/Scene/EditorObjectOperations.h"
 #include "ReflectionImGuiHelper.h"
 #include "ReflectionTypedDraw.h"
 #include "ClrHost.h"
@@ -23,7 +23,7 @@
 #include "imgui_stdlib.h"
 #include "SceneManager.h"
 #include <limits.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -224,7 +224,7 @@ void ImGuiDrawHelperAnimator(Animator* animator)
 	const int clipCount = static_cast<int>(animator->GetClipCount());
 	const int selectedClip = static_cast<int>(animator->GetSelectedClipIndex());
 	const bool validClip = selectedClip >= 0 && selectedClip < clipCount;
-	const file::path modelPath = DataSystems->GetFilePath(animator->m_Motion);
+	const std::filesystem::path modelPath = DataSystems->GetFilePath(animator->m_Motion);
 	if (animator->TypedSkeleton())
 		ImGui::Text("Model: %s", modelPath.empty() ? "Bound model"
 			: modelPath.filename().string().c_str());

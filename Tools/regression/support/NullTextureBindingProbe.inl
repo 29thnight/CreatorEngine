@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 // material_mesh_surface_probe.cpp의 익명 namespace 안에서 포함한다.
 void VerifyNullTextureBindings(const std::filesystem::path& requestedRoot)
 {
@@ -9,10 +14,10 @@ void VerifyNullTextureBindings(const std::filesystem::path& requestedRoot)
     static_assert(BindlessTextureCapacity == kSlotCount);
 
     const auto root = std::filesystem::absolute(requestedRoot);
-    auto* paths = InternalPath::GetInstance();
-    paths->BaseProjectPath = root / "Dynamic_CPP";
-    paths->ShaderSourcePath = root / "Dynamic_CPP/Assets/Shaders";
-    paths->AssetAuthoringEnabled = true;
+    auto* paths = (&ce::paths::get_state());
+    paths->base_project_path = root / "Dynamic_CPP";
+    paths->shader_source_path = root / "Dynamic_CPP/Assets/Shaders";
+    paths->asset_authoring_enabled = true;
     const auto shaderFile = root / "Build/Obj/MaterialProductProbe/null-texture-bindings.slang";
     std::filesystem::create_directories(shaderFile.parent_path());
     {

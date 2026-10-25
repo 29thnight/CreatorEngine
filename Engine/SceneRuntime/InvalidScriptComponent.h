@@ -1,5 +1,5 @@
 #pragma once
-#include "Core.Minimal.h"
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "Component.h"
 
 class [[reflgen::reflect]] InvalidScriptComponent : public meta::identity<InvalidScriptComponent, Component>

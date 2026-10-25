@@ -107,11 +107,11 @@ def inspect_host():
 
 
 def inspect_editor_policy():
-    app = read(ROOT / "Editor/EngineEntry/App.cpp")
-    main = read(ROOT / "Editor/EngineEntry/EditorMain.cpp")
+    app = read(ROOT / "Editor/EngineEntry/Bootstrap/App.cpp")
+    main = read(ROOT / "Editor/EngineEntry/Bootstrap/EditorMain.cpp")
     launch = read(ROOT / "Engine/RuntimeHost/EngineLaunchConfig.h")
     bootstrap = read(ROOT / "Engine/RuntimeHost/EngineBootstrap.h")
-    settings = read(ROOT / "Engine/Utility_Framework/RuntimeSettings.cpp")
+    settings = read(ROOT / "Engine/Utility_Framework/Runtime/RuntimeSettings.cpp")
     require("RuntimeRenderBackendPolicy::FixedDX12" in app, "Editor does not select its build-fixed policy")
     require("GetRenderBackend" not in app and "GetRenderBackend" not in main,
             "Editor bootstrap still reads/checks a runtime backend")

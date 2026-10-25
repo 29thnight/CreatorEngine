@@ -1,10 +1,16 @@
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
 #include "CookedSceneLoader.h"
 #include "Scene.h"
 #include "Transform.h"
 #include "ScriptComponent.h"
 #include "PhysicsBodyComponent.h"
 #include "CharacterMovementComponent.h"
-#include "../Utility_Framework/CookedDocumentTree.h"
+#include "../Utility_Framework/Authoring/CookedDocumentTree.h"
 
 namespace
 {

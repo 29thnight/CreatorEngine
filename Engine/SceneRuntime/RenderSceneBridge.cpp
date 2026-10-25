@@ -1,4 +1,8 @@
-#include "../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // RenderScene의 컴포넌트 접점 구현 (PHASE 4-2 C1).
 //
 // Register/Update/Unregister/InvaildCheck/MakeProxyCommand 계열은 게임플레이

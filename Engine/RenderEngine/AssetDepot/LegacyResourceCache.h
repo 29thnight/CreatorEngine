@@ -1,8 +1,12 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
-#include "../../Utility_Framework/Ownership.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // Internal migration support for the existing synchronous loaders. Each
 // DataSystem map entry owns its weak current index and bounded cache retention;

@@ -1,5 +1,14 @@
 // experiment 합성 계약 probe — 에디터 없이 도는 단독 실행 파일
-#include "../../Engine/Utility_Framework/WindowsApartment.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
 //
 // ★ 여기 있는 검사들은 원래 `experiment.*` CLI 명령이었다. 명령이 아니어야 하는
 //   이유는 하나다 — **엔진 프로세스가 필요 없다.** 씬도, 디바이스도, registry 도
@@ -49,12 +58,14 @@
 #include "ExperimentParity/ExperimentVertexLayoutSelfTest.h"
 #include "ExperimentParity/ExperimentWeldSelfTest.h"
 #include "FontCookContract.h"
-
-#include <d3d11.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.LegacyGraphicsSDK.h"
+#else
+import "Creator.LegacyGraphicsSDK.h";
+#endif
 #include <DirectXTex.h>
-#include <objbase.h>
 #include <stdio.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {

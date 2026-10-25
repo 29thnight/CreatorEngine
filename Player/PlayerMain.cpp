@@ -1,6 +1,35 @@
-#include "../Engine/Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "ProjectLayerSettingsIO.h"
-#include "../Engine/Utility_Framework/WindowsApartment.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
 #include "PlayerMain.h"
 #include "ModelConsumptionDiagnostics.h"
 #include "PlayerDdolProbe.h"
@@ -15,11 +44,14 @@
 #include "PlayerPresentation.h"
 #include "RHI/ScreenSizedResource.h"
 #include "ClrHost.h"
-#include "WindowsCoreWindow.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.AppBackend.WinAPI.h"
+#else
+import Creator.AppBackend.WinAPI;
+#endif
 #include "DataSystem.h"
 #include "EngineBootstrap.h"
 #include "InputManager.h"
-#include "PathFinder.h"
 #include "Scene.h"
 #include "CharacterMovementComponent.h"
 #include "PhysicsBodyComponent.h"
@@ -35,17 +67,17 @@
 #include "Experiment/Cooked/CookedAssetCatalog.h"
 #include "Experiment/Cooked/CookedAudioClipSource.h"
 #include "TagManager.h"
-#include "TimeSystem.h"
+#include "../Engine/Utility_Framework/Time/TimeSystem.h"
 #include "UIManager.h"
-#include "RuntimeSettings.h"
-#include "AuthoringParseTelemetry.h"
-#include "SerializationProfiler.h"
+#include "../Engine/Utility_Framework/Runtime/RuntimeSettings.h"
+#include "../Engine/Utility_Framework/Authoring/AuthoringParseTelemetry.h"
+#include "../Engine/Utility_Framework/Authoring/SerializationProfiler.h"
 #if !CE_SHIPPING
 #include "ProfileService.h"
 #endif
 
 #include <stdio.h>
-#include "../Engine/Utility_Framework/StandardLibrary.h"
+#include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 // 스모크 판정 마커("Scene loaded:")를 여기서 찍는다(E3-6). 전이 include에 기대지
 // 않는다 — 이 저장소는 그 함정으로 비유니티 빌드가 두 번 깨졌다.
 // 파이프라인 노드 목록을 줄 단위로 쪼갠다(E4 게이트).
@@ -55,7 +87,7 @@ namespace
 	/// 창 핸들. 디바이스가 아니라 창이 창을 안다(2026-08-10).
 	HWND PlayerWindowHandle()
 	{
-		auto* window = WindowsCoreWindow::GetForCurrentInstance();
+		auto* window = AppBackendWinAPI::GetForCurrentInstance();
 		return (nullptr == window) ? nullptr : window->GetHandle();
 	}
 
@@ -152,7 +184,7 @@ void Player::PlayerMain::Initialize()
         throw std::runtime_error("Player simulation policy must be configured before startup");
 
 	TagManagers->Initialize();
-    const auto layers = ProjectLayerSettingsIO::Read(PathFinder::ProjectSettingPath(ProjectLayerSettingsIO::filename));
+    const auto layers = ProjectLayerSettingsIO::Read(ce::paths::project_setting_path(ProjectLayerSettingsIO::filename));
     m_projectLayers = own::make_shared<ProjectLayerSettings>();
     if (!layers || !m_projectLayers->Restore(*layers) || !SceneManagers->BindProjectLayerSettings(m_projectLayers))
         throw std::runtime_error("Player requires valid CLYR project layers before scene startup");
@@ -204,9 +236,9 @@ void Player::PlayerMain::Initialize()
 
 	// 에디터의 같은 자리 델리게이트는 새 씬에 기본 카메라·라이트를 저작한다.
 	// 플레이어의 씬은 파일에서 오므로 렌더 씬 갱신만 한다.
-    m_newSceneCreatedHandle = newSceneCreatedEvent.AddLambda(
+    m_newSceneCreatedHandle = newSceneCreatedEvent.add_lambda(
         []() { EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene()); });
-    m_activeSceneChangedHandle = activeSceneChangedEvent.AddLambda(
+    m_activeSceneChangedHandle = activeSceneChangedEvent.add_lambda(
         []() { EnhancedSceneRenderer::SetActiveScene(SceneManagers->GetActiveScene()); });
 
     RECT presentationRect{};
@@ -250,8 +282,8 @@ void Player::PlayerMain::Initialize()
     {
         std::string error;
         const auto resolved = m_audioCatalog->ResolveLegacyClip(key, error);
-        Uuid::Uuid16 guid;
-        if (!Uuid::TryParse(resolved, guid))
+        uuid::uuid16 guid;
+        if (!uuid::try_parse(resolved, guid))
         {
             if (!key.empty())
             {
@@ -273,7 +305,7 @@ void Player::PlayerMain::Initialize()
     }
 	SceneManagers->CreateScene();
 
-    m_inputEventHandle = InputEvent.AddLambda([](float) {
+    m_inputEventHandle = InputEvent.add_lambda([](float) {
 		UIManagers->Update();
 	});
 
@@ -291,7 +323,7 @@ void Player::PlayerMain::Initialize()
         SerializationProfile::SetEnabled(true);
     }
     const auto sceneName = RuntimeSettings::Get().GetStartupSceneName();
-    m_startupScenePath = PathFinder::Relative("Scenes").append(sceneName).string();
+    m_startupScenePath = ce::paths::relative("Scenes").append(sceneName).string();
     m_startupScene = SceneManagers->LoadSceneAsync(m_startupScenePath);
 
 	// ★ 컴파일 여부를 **항상** 찍는다.
@@ -868,7 +900,7 @@ void Player::PlayerMain::Update()
         {
             if (!m_smokeReloadStarted)
             {
-                auto path = PathFinder::Relative("Scenes");
+                auto path = ce::paths::relative("Scenes");
                 if (g_smoke.reloadDestination.empty())
                 path.append(RuntimeSettings::Get().GetStartupSceneName());
                 else

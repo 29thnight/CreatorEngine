@@ -1,8 +1,17 @@
-#include "../Utility_Framework/Ownership.h"
 #pragma once
-#include "../Utility_Framework/Core.Minimal.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include <mathematics/matrix4x4.hpp>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 class RenderScene;
 class Animator;
@@ -62,9 +71,9 @@ private:
         const AnimatorAnimationBinding& binding);
     void FinalizeBindingQuality(Animator& animator,
         const AnimatorAnimationBinding& binding);
-	Core::DelegateHandle m_sceneLoadedHandle;
-	Core::DelegateHandle m_sceneUnloadedHandle;
-    Core::DelegateHandle m_AnimationUpdateHandle;
+	ce::delegate_handle m_sceneLoadedHandle;
+	ce::delegate_handle m_sceneUnloadedHandle;
+    ce::delegate_handle m_AnimationUpdateHandle;
     uint32 m_objectSize{};
 	mutable std::mutex m_animatorMutex;
 	// Raw pointers remain valid through Update's in-frame job wait. The mutex

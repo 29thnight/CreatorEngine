@@ -65,7 +65,7 @@ function Assert([bool]$condition, [string]$message) {
 }
 
 # ── 심각도 집합을 제품 파일에서 뽑는다 ──────────────────────────────────────
-$sinkPath = Join-Path $repo 'Engine\Utility_Framework\HtmlFileSink.h'
+$sinkPath = Join-Path $repo 'Engine\Utility_Framework\Diagnostics\HtmlFileSink.h'
 if (-not (Test-Path -LiteralPath $sinkPath)) { throw "HtmlFileSink.h 를 찾지 못했다: $sinkPath" }
 $sinkText = Get-Content -LiteralPath $sinkPath -Raw
 $severeMatch = [regex]::Match($sinkText, "return\s+lv\s*===\s*'(?<a>\w+)'\s*\|\|\s*lv\s*===\s*'(?<b>\w+)'\s*\|\|\s*lv\s*===\s*'(?<c>\w+)'")
@@ -87,9 +87,9 @@ Assert ($severe -contains 'error' -and $severe -contains 'critical') `
 # pak 런타임 정리 경로라 기동 한 바퀴에서 한 번도 안 돈다. 자극할 수 없는 것을
 # 런타임 단정으로 적으면 미자극이 초록으로 읽힌다 — 그래서 소스에서 본다.
 $wrappers = @(
-    @{ File = 'Engine\Utility_Framework\PakHelper.h';          Name = 'RuntimeCleanupError' }
-    @{ File = 'Engine\Utility_Framework\PakHelper.h';          Name = 'RuntimeCleanupInfo' }
-    @{ File = 'Editor\EngineEntry\EditorSettingsStore.cpp';    Name = 'ReportSettingsError' }
+    @{ File = 'Engine\Utility_Framework\Packaging\PakHelper.h';          Name = 'RuntimeCleanupError' }
+    @{ File = 'Engine\Utility_Framework\Packaging\PakHelper.h';          Name = 'RuntimeCleanupInfo' }
+    @{ File = 'Editor\EngineEntry\Project\EditorSettingsStore.cpp';    Name = 'ReportSettingsError' }
 )
 foreach ($wrapper in $wrappers) {
     $wrapperPath = Join-Path $repo $wrapper.File

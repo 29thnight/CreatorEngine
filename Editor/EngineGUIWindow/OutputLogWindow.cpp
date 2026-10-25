@@ -2,10 +2,10 @@
 #include "OutputLogWindow.h"
 #include "EditorTheme.h"
 #include "EditorIcons.h"
-#include "EditorPlatform.h"
-#include "LogSystem.h"
+#include "../EngineEntry/Bootstrap/EditorPlatform.h"
+#include "../../Engine/Utility_Framework/Diagnostics/LogSystem.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {

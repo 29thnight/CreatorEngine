@@ -1,5 +1,10 @@
 #pragma once
-#include "Core.Minimal.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
+#else
+import Creator.Core.Delegate;
+#endif
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "Transform.h"
 #include <mathematics/matrix4x4.hpp>
 class Entity;
@@ -31,7 +36,7 @@ public:
     math::matrix4x4 m_boneMatrix{};
     SocketTransform transform;
 
-    Core::DelegateHandle m_activeSceneChangedEventHandle{};
+    ce::delegate_handle m_activeSceneChangedEventHandle{};
 
     std::vector<HashedGuid> AttachObejctIndex;
     std::vector<Entity*> AttachObjects;

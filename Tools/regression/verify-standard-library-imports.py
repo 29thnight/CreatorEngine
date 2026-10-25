@@ -20,8 +20,7 @@ thread tuple type_traits typeindex typeinfo unordered_map unordered_set utility
 valarray variant vector version
 """.split())
 ADAPTERS = {
-    "Engine/Utility_Framework/StandardLibrary.h",
-    "Engine/Utility_Framework/Contract.h",
+    "Engine/Utility_Framework/Foundation/StandardLibrary.h",
 }
 EXCLUDED = re.compile(r"ThirdParty|External|external|vendor|imgui|ImGuizmo|plf_colony|/Saved/")
 
@@ -49,11 +48,11 @@ def main():
         for match in re.finditer(r'^\s*#\s*include\s*<([^>]+)>', text, re.M):
             if match[1] in STANDARD_HEADERS:
                 failures.append(f"{name}: direct standard header <{match[1]}>")
-    facade = (ROOT / "Engine/Utility_Framework/StandardLibrary.h").read_text(encoding="utf-8")
+    facade = (ROOT / "Engine/Utility_Framework/Foundation/StandardLibrary.h").read_text(encoding="utf-8")
     if "import std;" not in facade or "CE_CONTRACT_STANDALONE" not in facade:
         failures.append("Standard-library module/parser adapter is missing")
     for path in FORWARDERS.iterdir():
-        if path.is_file() and "Engine/Utility_Framework/StandardLibrary.h" not in path.read_text(encoding="utf-8"):
+        if path.is_file() and "Engine/Utility_Framework/Foundation/StandardLibrary.h" not in path.read_text(encoding="utf-8"):
             failures.append(f"{path.name}: external include must forward to the module facade")
     if failures:
         raise SystemExit("\n".join(failures))

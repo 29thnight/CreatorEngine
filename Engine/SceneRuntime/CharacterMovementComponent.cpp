@@ -4,9 +4,9 @@
 #include "Scene.h"
 #include "SceneManager.h"
 #include "Transform.h"
-#include "LogSystem.h"
-#include "AuthoringNodeViewAccess.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Diagnostics/LogSystem.h"
+#include "../Utility_Framework/Authoring/AuthoringNodeViewAccess.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 using namespace ce::physics;
 

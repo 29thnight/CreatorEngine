@@ -1,13 +1,25 @@
 #pragma once
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 
 
 #include "../RHIPersistentHeapPolicy.h"
 #include "../RHIDeviceMemoryBudgetCoordinator.h"
-
-#include <d3d12.h>
-#include <dxgi1_4.h>
-#include <wrl/client.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 /// DEFAULT buffer용 ID3D12Heap + placed resource adapter.
 /// resource object는 Allocation이 소유하고, heap block은 resource를 먼저 놓은 뒤
@@ -17,7 +29,7 @@ class DX12PersistentHeap
 public:
     struct Allocation
     {
-        Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+        winrt::com_ptr<ID3D12Resource> resource;
         RHIPersistentHeapAllocation block;
         uint64_t allocationBytes{ 0 };
         bool dedicated{ false };
@@ -28,7 +40,7 @@ public:
         Allocation(const Allocation&) = delete;
         Allocation& operator=(const Allocation&) = delete;
 
-        bool IsValid() const { return nullptr != resource.Get(); }
+        bool IsValid() const { return nullptr != resource.get(); }
     };
 
     bool Initialize(ID3D12Device* device, IDXGIAdapter1* adapter,
@@ -83,9 +95,9 @@ private:
         Allocation& outAllocation, std::string& outError);
 
     ID3D12Device* m_device{ nullptr };
-    Microsoft::WRL::ComPtr<IDXGIAdapter3> m_adapter;
+    winrt::com_ptr<IDXGIAdapter3> m_adapter;
     RHIPersistentHeapPolicy m_policy;
-    std::unordered_map<uint64_t, Microsoft::WRL::ComPtr<ID3D12Heap>> m_segments;
+    std::unordered_map<uint64_t, winrt::com_ptr<ID3D12Heap>> m_segments;
     RHIDeviceMemoryBudgetCoordinator* m_budgetCoordinator{ nullptr };
     RHIDeviceMemoryBudgetOwner m_budgetOwner{ 0 };
     uint64_t m_softBudgetBytes{ 0 };

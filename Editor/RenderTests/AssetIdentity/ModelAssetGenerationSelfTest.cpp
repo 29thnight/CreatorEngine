@@ -1,3 +1,19 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "AssetIdentity/ModelAssetGenerationSelfTest.h"
 #include "../../../Tools/regression/gcce_probe_cleanup.h"
 #include "Texture.h"
@@ -11,7 +27,7 @@
 #include "Render/Graph/EnhancedDrawIdentity.h"
 #include "Render/Scene/EnhancedDrawReplayInput.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace RenderTest
 {
@@ -66,7 +82,7 @@ namespace RenderTest
         {
             auto source = own::make_shared<MetadataOnlyMeshSource>();
             auto descriptor = own::make_shared<assets::ModelMeshDescriptor>();
-            Uuid::TryParse("00000001-0000-8000-8000-000000000001", descriptor->meshId);
+            uuid::try_parse("00000001-0000-8000-8000-000000000001", descriptor->meshId);
             descriptor->origin.entry.asset = {
                 { experiment::AssetId{ descriptor->meshId }, {} },
                 experiment::cooked::CookedAssetKind::Mesh };
@@ -100,7 +116,7 @@ namespace RenderTest
             payload->mesh.indices = { 0u, 1u, 2u };
             RHIModelMeshView view;
             check.Check(BuildRHIModelMeshView(*descriptor, view) && view.IsMetadataComplete()
-                && !view.IsComplete() && !view.SourceMesh() && view.handle.modelId.IsNil(),
+                && !view.IsComplete() && !view.SourceMesh() && view.handle.modelId.is_nil(),
                 "granular metadata view needs neither parent model ID nor CPU geometry");
             check.Check(BuildRHIModelMeshView(*descriptor, *payload, view) && view.IsComplete()
                 && view.SourceMesh() == &payload->mesh,
@@ -125,7 +141,7 @@ namespace RenderTest
             check.Check(!forged.SourceMesh() && !forged.IsComplete(),
                 "granular source rejects a forged pointer even with matching identity");
             auto other = own::make_shared<assets::ModelMeshDescriptor>(*descriptor);
-            Uuid::TryParse("00000002-0000-8000-8000-000000000002", other->meshId);
+            uuid::try_parse("00000002-0000-8000-8000-000000000002", other->meshId);
             other->origin.entry.asset.key.assetId = experiment::AssetId{ other->meshId };
             const auto firstKey = assets::MakeModelMeshHandle(*descriptor);
             const auto secondKey = assets::MakeModelMeshHandle(*other);
@@ -183,7 +199,7 @@ namespace RenderTest
         [[nodiscard]] assets::ModelAssetGenerationLoadResult Load(
             const std::filesystem::path& header,
             const std::filesystem::path& generationPath,
-            const Uuid::Uuid16& modelId, std::uint64_t generation,
+            const uuid::uuid16& modelId, std::uint64_t generation,
             const std::filesystem::path& canonical = {})
         {
             assets::ModelAssetGenerationLoadRequest request;
@@ -235,7 +251,7 @@ namespace RenderTest
         // its immutable generation files stay in the project's normal Library.
         void VerifyRuntimeReload(GenerationChecker& check,
             const std::filesystem::path& onePath,
-            const std::filesystem::path& twoPath, const Uuid::Uuid16& modelId,
+            const std::filesystem::path& twoPath, const uuid::uuid16& modelId,
             ModelGenerationReport& report)
         {
             const auto currents = DataSystems->SnapshotCurrentModelAssetGenerations();
@@ -443,7 +459,7 @@ namespace RenderTest
         //   이기를 요구했다. 살아 있는 프로젝트에는 103 개가 있어 그 전제가 설 수
         //   없었고, 그래서 이 검사는 호출자 0 으로 죽어 있었다. 재는 것은 번호가
         //   아니라 원자성이므로 대상 모델을 인자로 받는다.
-        Uuid::Uuid16 modelId{};
+        uuid::uuid16 modelId{};
         check.Check(assets::TryParseCanonicalUuidV8(modelIdText, modelId),
             "인자 modelId 가 canonical UUIDv8");
         const std::filesystem::path modelDirectory = generationRoot / modelIdText;
@@ -809,7 +825,7 @@ namespace RenderTest
             && snapshot.misses >= 1u,
             "read-only cache snapshot 계수");
 
-        outLog += "  generation model=" + Uuid::ToString(modelId)
+        outLog += "  generation model=" + uuid::to_string(modelId)
             + " meshes=" + std::to_string(second->Meshes().size())
             + " materials=" + std::to_string(second->Materials().size())
             + " textures=" + std::to_string(second->Textures().size())
@@ -865,9 +881,7 @@ namespace RenderTest
                 }
                 if (!iterator->is_regular_file()) continue;
                 std::string extension = iterator->path().extension().string();
-                std::ranges::transform(extension, extension.begin(),
-                    [](unsigned char value)
-                    { return static_cast<char>(std::tolower(value)); });
+                ce::strings::to_lower_in_place(extension);
                 if (extension == ".fbx" || extension == ".gltf"
                     || extension == ".glb" || extension == ".obj")
                 {
@@ -879,7 +893,7 @@ namespace RenderTest
         check.Check(sources.size() >= 14u, "MBC4 model corpus 14개 이상 발견");
 
         assets::ModelAssetGenerationCache cache;
-        std::set<Uuid::Uuid16> modelIds;
+        std::set<uuid::uuid16> modelIds;
         std::size_t loadedCount = 0u;
         std::size_t meshCount = 0u;
         std::size_t materialCount = 0u;

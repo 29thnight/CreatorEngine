@@ -1,12 +1,16 @@
 #pragma once
-#include "Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "EnhancedDrawReplayInput.h"
 #include "../../MaterialGraphRuntime.h"
 #include "../../Texture.h"
 #include "../../TextureFramePins.h"
 #include <stdint.h>
 #include <stdio.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // Lattice instance slice only. Resolve an exact current immutable program and
 // texture closure; store typed parameter IDs/values, never uniform byte offsets.
@@ -84,7 +88,7 @@ struct EnhancedLatticeReplayInput
         { auto n=Number(); if(n>maximum) throw std::runtime_error("Lattice replay count exceeds budget"); return static_cast<uint32_t>(n); }
         experiment::AssetId Asset()
         {
-            experiment::AssetId id; Block(id.value.data);
+            experiment::AssetId id; Block(id.value.data_);
             if(!experiment::IsAssetIdV4(id) && !assets::IsUuidV8(id.value)) throw std::runtime_error("invalid Lattice replay asset ID");
             return id;
         }
@@ -127,14 +131,14 @@ struct EnhancedLatticeReplayInput
         Writer w; w.Block(kMagic); w.Number(1); w.Number(draws.size());
         for(const auto& d:draws)
         {
-            w.Block(d.geometryIds); w.Block(d.description.graphId.value.data); w.Number(d.program,8);
+            w.Block(d.geometryIds); w.Block(d.description.graphId.value.data_); w.Number(d.program,8);
             w.Number(d.coverage.flags); w.Float(d.coverage.cutoff); w.Float(d.coverage.baseAlpha);
             w.Number(d.description.parameters.size());
             for(const auto& p:d.description.parameters) { w.Number(p.id,8); w.Value(p.value); }
             w.Number(d.description.textures.size());
-            for(const auto& t:d.description.textures) { w.Number(t.parameter,8); w.Block(t.assetId.value.data); }
+            for(const auto& t:d.description.textures) { w.Number(t.parameter,8); w.Block(t.assetId.value.data_); }
             w.Number(d.textures.size());
-            for(const auto& t:d.textures) { w.Number(t.slot); w.Number(t.colorSpace); w.Block(t.assetId.value.data); w.Number(t.content,8); }
+            for(const auto& t:d.textures) { w.Number(t.slot); w.Number(t.colorSpace); w.Block(t.assetId.value.data_); w.Number(t.content,8); }
         }
         w.Number(EnhancedCameraReplayInput::Checksum(w.bytes),8); return std::move(w.bytes);
     }

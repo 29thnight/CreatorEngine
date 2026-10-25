@@ -1,7 +1,7 @@
 #include "SoundAssetCookProducer.h"
-#include "AuthoringParseTelemetry.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringParseTelemetry.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -15,8 +15,8 @@ namespace
     }
     experiment::AssetId Id(unsigned suffix)
     {
-        auto value = Uuid::Parse("12345678-abcd-4abc-8def-123456789000");
-        value.data[15] = static_cast<std::uint8_t>(suffix);
+        auto value = uuid::parse("12345678-abcd-4abc-8def-123456789000");
+        value.data_[15] = static_cast<std::uint8_t>(suffix);
         return { value };
     }
     experiment::cooked::CookedAssetManifestEntry Entry(unsigned suffix,
@@ -68,7 +68,7 @@ namespace
 int main()
 {
     namespace ck = experiment::cooked;
-    const auto clipText = Uuid::ToString(Id(1u).value);
+    const auto clipText = uuid::to_string(Id(1u).value);
     ck::CookedAssetManifest manifest;
     manifest.entries = { Entry(1u, ck::CookedAssetKind::AudioClip), Entry(2u, ck::CookedAssetKind::SoundGraph),
         Entry(3u, ck::CookedAssetKind::SoundPreset) };
@@ -78,8 +78,8 @@ int main()
     const auto beforeParses = Authoring::GetTextParseTelemetry().calls;
 
     auto component = Sound();
-    component.Root().Child("soundGraphKey").SetString(Uuid::ToString(Id(2u).value));
-    component.Root().Child("soundPresetKey").SetString(Uuid::ToString(Id(3u).value));
+    component.Root().Child("soundGraphKey").SetString(uuid::to_string(Id(2u).value));
+    component.Root().Child("soundPresetKey").SetString(uuid::to_string(Id(3u).value));
     component.Root().Child("sourceKind").SetString("Clip");
     component.Root().Child("customProperties").Child("clipKey").SetString("unrelated nested value");
     Check(Rewrite(component, manifest, aliases, dependencies, error), "SoundComponent UUID rewrites all audio asset references");

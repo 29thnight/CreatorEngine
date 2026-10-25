@@ -31,10 +31,10 @@
 // 값이 실제로 왕복하는지는 이 게이트의 축이 아니다 — 그쪽은
 // `verify-reflection-container-roundtrip.ps1` 이 제품 바이너리로 든다.
 
-#include "ReflectionContainer.h"
-#include "TypeTrait.h"
+#include "../../Engine/Utility_Framework/Reflection/ReflectionContainer.h"
+#include "../../Engine/Utility_Framework/Reflection/TypeTrait.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 using namespace meta::container;
 

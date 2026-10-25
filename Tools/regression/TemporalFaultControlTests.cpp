@@ -1,7 +1,11 @@
 // Source-only CPU control-contract fixture. Not compiled/executed in this change.
 // These calls test ownership/receipts, not SDK availability or live fallback.
 #include "../../Engine/RenderEngine/Render/Temporal/TemporalRuntimeControl.h"
-#include "../../Engine/Utility_Framework/Contract.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 
 int main()
 {

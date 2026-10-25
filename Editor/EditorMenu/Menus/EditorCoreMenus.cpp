@@ -17,18 +17,18 @@
 
 #include "EditorCoreMenus.h"
 
-#include "ConsoleCommandSystem.h"
+#include "../../EngineEntry/Commands/ConsoleCommandSystem.h"
 #include "Assets/ModelAssetAuthoringTransaction.h"
 #include "ImGui.h"
-#include "Core.Minimal.h"
+#include "../../../Engine/Utility_Framework/Foundation/Core.Minimal.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace editor::menus
 {
     namespace
     {
-        std::string model_source_argument(const file::path& path)
+        std::string model_source_argument(const std::filesystem::path& path)
         {
             const auto utf8 = path.u8string();
             return { reinterpret_cast<const char*>(utf8.data()), utf8.size() };
@@ -100,13 +100,13 @@ namespace editor::menus
     {
         if (target.path.empty()) return false;
         std::error_code error;
-        const file::path meta = file::path(target.path).concat(".meta");
-        return file::exists(meta, error);
+        const std::filesystem::path meta = std::filesystem::path(target.path).concat(".meta");
+        return std::filesystem::exists(meta, error);
     }
 
     void copy_meta_path(const asset_target& target)
     {
-        put_on_clipboard(file::path(target.path).concat(".meta").string(), ".meta 경로");
+        put_on_clipboard(std::filesystem::path(target.path).concat(".meta").string(), ".meta 경로");
     }
 
     bool is_model_source(const asset_target& target)
@@ -161,7 +161,7 @@ namespace editor::menus
         }
 
         std::error_code error;
-        if (!file::remove(target.path, error) || error)
+        if (!std::filesystem::remove(target.path, error) || error)
         {
             Debug::PrintLog(spdlog::level::err, "[메뉴] 삭제 실패: " + target.path.string() +
                             " (" + error.message() + ")");
@@ -171,11 +171,11 @@ namespace editor::menus
 
         if (".cpp" != target.path.extension()) return;
 
-        file::path header = target.path;
+        std::filesystem::path header = target.path;
         header.replace_extension(".h");
-        if (!file::exists(header, error)) return;
+        if (!std::filesystem::exists(header, error)) return;
 
-        if (!file::remove(header, error) || error)
+        if (!std::filesystem::remove(header, error) || error)
         {
             Debug::PrintLog(spdlog::level::err, "[메뉴] 짝 헤더 삭제 실패: " + header.string());
             return;

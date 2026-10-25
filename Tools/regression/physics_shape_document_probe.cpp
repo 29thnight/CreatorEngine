@@ -1,9 +1,9 @@
-#include "../../Editor/EngineEntry/PhysicsShapeDocument.h"
-#include "AuthoringWriteNode.h"
-#include "AuthoringCookedDocument.h"
+#include "../../Editor/EngineEntry/Assets/Physics/PhysicsShapeDocument.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringWriteNode.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringCookedDocument.h"
 #include "../../Engine/Physics/PhysicsSensorPairs.h"
 #include <stdint.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 int main(int argc, char** argv)
 {
     std::size_t checks = 0;

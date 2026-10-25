@@ -8,6 +8,7 @@ This tests CPU ownership, byte identity, ordering and allocations; it is not a n
 Editor, GPU, or end-to-end frame-time measurement. No dependencies are downloaded.
 """
 
+import runpy
 import argparse
 import hashlib
 import json
@@ -83,12 +84,12 @@ def main():
     if not compiler:
         parser.error("C++23 compiler unavailable")
     arena = [Path("Engine/RenderEngine") / name for name in ("RenderArena.cpp", "RenderArena.h", "RenderAllocator.h")]
-    arena += [Path("Engine/Utility_Framework") / name for name in
-              ("Arena.cpp", "Arena.h", "HeapAllocator.h", "Ownership.h", "LifetimeToken.h")]
+    arena += [Path(path) for path in ('Engine/Utility_Framework/Memory/Arena.cpp', )]
     arena += [Path("ThirdParty/ownership_cpp/include/own/ownership.hpp")]
-    scheduler = [Path("Engine/Utility_Framework") / name for name in
-                 ("JobScheduler.cpp", "JobScheduler.h", "ThreadPool.cpp", "ThreadPool.h")]
+    scheduler = [Path(path) for path in ('Engine/Utility_Framework/Concurrency/JobScheduler.cpp', 'Engine/Utility_Framework/Concurrency/ThreadPool.cpp')]
+    scheduler = runpy.run_path(str(root / "Tools/build/generate-module-adapters.py"))["jobs_source_inputs"](scheduler)
     probe = Path(__file__).with_name("scene_packet_preparation_cpu_probe.cpp")
+    arena = runpy.run_path(str(root / "Tools/build/generate-module-adapters.py"))["memory_source_inputs"](arena)
     inputs = [root / path for path in [HOST, HELPER, INDIRECT] + arena + scheduler]
     inputs += [probe, Path(__file__).resolve(), enki / "TaskScheduler.cpp", enki / "TaskScheduler.h"]
     snapshots = {path: path.read_bytes() for path in inputs}
@@ -144,7 +145,7 @@ inline void* mi_malloc_aligned(size_t size, size_t alignment)
         command = [compiler, "-std=c++23", "-O2", "-g", "-pthread", "-DCE_CONTRACT_STANDALONE=1", "-DCE_SHIPPING=1",
                    "-I", str(target), "-I", str(mirror), "-I", str(root), str(compiled_probe),
                    *[str(mirror / path) for path in arena if path.suffix == ".cpp"],
-                   str(root / scheduler[0]), str(root / scheduler[2]),
+                   *[str(root / path) for path in scheduler if path.suffix == ".cpp"],
                    str(enki / "TaskScheduler.cpp"), "-o", str(executable)]
         if args.sanitize != "none":
             command += ["-fsanitize=" + ("address,undefined" if args.sanitize == "address" else "thread"),

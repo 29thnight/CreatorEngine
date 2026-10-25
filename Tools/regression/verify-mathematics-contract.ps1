@@ -59,7 +59,7 @@ $sceneRuntimeInclude = Join-Path $repoRoot 'Engine\SceneRuntime'
 $utilityFrameworkInclude = Join-Path $repoRoot 'Engine\Utility_Framework'
 $tweenManagerHeader = Join-Path $sceneRuntimeInclude 'TweenManager.h'
 $mathematicsIntersectHeader = Join-Path $repoRoot `
-    'Engine\Utility_Framework\Mathematics.Intersect.h'
+    'Engine\Utility_Framework\Foundation\Mathematics.Intersect.h'
 $provenance = Join-Path $repoRoot 'ThirdParty\Mathematics\PROVENANCE.md'
 $props = Join-Path $repoRoot 'Directory.Build.props'
 $targets = Join-Path $repoRoot 'Directory.Build.targets'

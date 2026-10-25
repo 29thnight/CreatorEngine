@@ -1,11 +1,24 @@
-#include "../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../Assets/ModelCpuGeometryPayload.h"
 #include "ModelAssetRuntime.h"
 #include "../DataSystem.h"
 #include "../Assets/ModelAnimationSampler.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
-#include "../../Utility_Framework/Contract.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 
 namespace
 {
@@ -360,7 +373,7 @@ namespace
         const model_cooked::ResolvedAssetEntry& resolved,
         own::shared_owner<const assets::ModelSkeletonStorage> storage, std::string& failure)
     {
-        if (!storage || !storage->skeleton.skeletonId.IsNil() || !HasNoHardDependencies(resolved))
+        if (!storage || !storage->skeleton.skeletonId.is_nil() || !HasNoHardDependencies(resolved))
         {
             failure = "Skeleton logical generation has incompatible decoded storage or dependencies.";
             return {};
@@ -377,7 +390,7 @@ namespace
     {
         // This validation runs for EVERY logical wrapper, including raw-cache
         // hits. Sharing read/decode must not share another alias's hard closure.
-        if (!storage || !skeleton || !storage->clip.animationId.IsNil()
+        if (!storage || !skeleton || !storage->clip.animationId.is_nil()
             || !ValidateClipDependency(resolved, skeleton->origin)
             || storage->skeletonAssetId != skeleton->origin.entry.asset.key.assetId
             || storage->requiredBoneCount != skeleton->skeleton.bones.size()

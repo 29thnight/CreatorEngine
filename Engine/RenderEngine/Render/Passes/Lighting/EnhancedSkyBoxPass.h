@@ -1,8 +1,12 @@
 #pragma once
 #include <mathematics/vector4.hpp>
 #include "../../../RHI/RHIFormat.h"
-#include "../../../../Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
+#include "../../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 #include "../../Graph/EnhancedRenderPass.h"
 

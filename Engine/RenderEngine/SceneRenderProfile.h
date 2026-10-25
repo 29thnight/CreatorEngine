@@ -1,5 +1,5 @@
 #pragma once
-#include "Reflection.hpp" // CT3: was transitive via Core.Minimal.h
+#include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "RenderPassSettings.h"
 
 struct [[reflgen::reflect]] SceneRenderProfile

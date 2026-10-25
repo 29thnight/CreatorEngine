@@ -1,6 +1,14 @@
-#include "JobScheduler.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
 #include <enkiTS/TaskScheduler.h>
+#else
+import "Creator.EnkiTS.h";
+#endif
 
 int main()
 {

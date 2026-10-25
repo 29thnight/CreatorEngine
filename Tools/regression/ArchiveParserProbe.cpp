@@ -1,8 +1,8 @@
 #include "ArchiveSchemaFixture.h"
-#include "DiagnosticDocument.h"
-#include "ReflgenAuthoring.h"
-#include "AuthoringCookedDocument.h"
-#include "AuthoringParsedDocument.h"
+#include "../../Engine/Utility_Framework/Authoring/DiagnosticDocument.h"
+#include "../../Engine/Utility_Framework/Reflection/ReflgenAuthoring.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringCookedDocument.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
 #include <reflgen/serial/serializer.h>
 #include <fstream>
 #include <iostream>

@@ -1,3 +1,14 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "../../../../Engine/EngineDiagnostics/ProfileScope.h"
 #include "ImGuiDx12Shell.h"
 
@@ -11,9 +22,13 @@
 
 #include <imgui.h>
 #include <imgui_impl_dx12.h>
-#include <wrl/client.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 #include <stdio.h>
-#include "../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
 namespace
@@ -23,7 +38,6 @@ namespace
 
 struct ImGuiDx12Shell::Impl
 {
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     bool active{ false };
     std::atomic<bool> sharedGpuImages{false};
@@ -55,7 +69,7 @@ struct ImGuiDx12Shell::Impl
     // ImGui_ImplDX12의 Srv{Alloc,Free}Fn 콜백이 이 할당기를 쓰고,
     // RegisterTexture/OpenSharedTexture의 사용자 텍스처도 같은 힙을 쓴다 —
     // 힙이 하나여야 SetDescriptorHeaps가 프레임에 한 번으로 끝난다.
-    ComPtr<ID3D12DescriptorHeap> srvHeap;
+    winrt::com_ptr<ID3D12DescriptorHeap> srvHeap;
     uint32_t srvIncrement{ 0 };
     std::vector<uint32_t> srvFreeList;
 
@@ -78,7 +92,7 @@ struct ImGuiDx12Shell::Impl
     // 공유 핸들 → (열린 리소스, ImTextureID).
     struct SharedEntry
     {
-        ComPtr<ID3D12Resource> resource;
+        winrt::com_ptr<ID3D12Resource> resource;
         // 생산 측 종료 뒤 핸들 값이 재사용될 수 있으므로 lease 소유자로 식별한다.
         // 캐시 자체가 강한 참조를 가지면 슬롯 재사용을 막으므로 약한 참조만 둔다.
         own::weak_owner<RHIDisplayConsumerLease> m_consumerLease;
@@ -90,13 +104,13 @@ struct ImGuiDx12Shell::Impl
     struct DisplayUse
     {
         own::shared_owner<RHIDisplayConsumerLease> m_lease;
-        ComPtr<ID3D12Resource> m_resource;
+        winrt::com_ptr<ID3D12Resource> m_resource;
     };
     std::vector<DisplayUse> m_pendingDisplayUses;
     RHICompletionRetireQueue<std::vector<DisplayUse>> m_displayUseRetireQueue;
 
     void RetainDisplayUse(own::shared_owner<RHIDisplayConsumerLease> consumerLease,
-        const ComPtr<ID3D12Resource>& resource)
+        const winrt::com_ptr<ID3D12Resource>& resource)
     {
         for (const DisplayUse& use : m_pendingDisplayUses)
         {
@@ -162,7 +176,7 @@ struct ImGuiDx12Shell::Impl
 
     struct CpuFrameEntry
     {
-        ComPtr<ID3D12Resource> resource;
+        winrt::com_ptr<ID3D12Resource> resource;
         D3D12_CPU_DESCRIPTOR_HANDLE cpu{};
         uint64_t textureId{ 0 };
         uint32_t width{ 0 };
@@ -206,7 +220,7 @@ struct ImGuiDx12Shell::Impl
     struct RetiredDescriptor
     {
         uint64_t textureId{ 0 };
-        ComPtr<ID3D12Resource> resource;
+        winrt::com_ptr<ID3D12Resource> resource;
     };
     RHICompletionRetireQueue<RetiredDescriptor> retireQueue;
     std::vector<RetiredDescriptor> pendingFrameRetirements;
@@ -248,7 +262,7 @@ struct ImGuiDx12Shell::Impl
     }
 
     void RetireDescriptor(uint64_t textureId, uint64_t completionValue,
-        ComPtr<ID3D12Resource> resource = {})
+        winrt::com_ptr<ID3D12Resource> resource = {})
     {
         if (0 == textureId || textureId == fallbackTextureId) return;
         retireQueue.Enqueue(RHICompletionPoint{ completionValue },
@@ -261,7 +275,7 @@ struct ImGuiDx12Shell::Impl
             [&](RetiredDescriptor& retired)
             {
                 FreeSlot(D3D12_GPU_DESCRIPTOR_HANDLE{ retired.textureId });
-                retired.resource.Reset();
+                retired.resource = nullptr;
             });
     }
 
@@ -330,7 +344,7 @@ struct ImGuiDx12Shell::Impl
                 entry.height != frame.height;
             if (recreate)
             {
-                Impl::ComPtr<ID3D12Resource> replacement;
+                winrt::com_ptr<ID3D12Resource> replacement;
                 D3D12_HEAP_PROPERTIES heap{};
                 heap.Type = D3D12_HEAP_TYPE_DEFAULT;
                 D3D12_RESOURCE_DESC desc{};
@@ -343,7 +357,7 @@ struct ImGuiDx12Shell::Impl
                 desc.SampleDesc.Count = 1;
                 if (FAILED(impl.resources.GetDevice()->CreateCommittedResource(&heap,
                     D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                    nullptr, IID_PPV_ARGS(&replacement))))
+                    nullptr, IID_PPV_ARGS(replacement.put()))))
                 {
                     outError = "RHI CPU 프레임 표시 텍스처 생성 실패";
                     impl.resources.AbortFrame();
@@ -399,7 +413,7 @@ struct ImGuiDx12Shell::Impl
             {
                 D3D12_RESOURCE_BARRIER toCopy{};
                 toCopy.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                toCopy.Transition.pResource = entry.resource.Get();
+                toCopy.Transition.pResource = entry.resource.get();
                 toCopy.Transition.StateBefore = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
                 toCopy.Transition.StateAfter = D3D12_RESOURCE_STATE_COPY_DEST;
                 toCopy.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -416,13 +430,13 @@ struct ImGuiDx12Shell::Impl
             source.PlacedFootprint.Footprint.Depth = 1;
             source.PlacedFootprint.Footprint.RowPitch = uploadPitch;
             D3D12_TEXTURE_COPY_LOCATION destination{};
-            destination.pResource = entry.resource.Get();
+            destination.pResource = entry.resource.get();
             destination.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
             commandList->CopyTextureRegion(&destination, 0, 0, 0, &source, nullptr);
 
             D3D12_RESOURCE_BARRIER toRead{};
             toRead.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            toRead.Transition.pResource = entry.resource.Get();
+            toRead.Transition.pResource = entry.resource.get();
             toRead.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
             toRead.Transition.StateAfter = D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
             toRead.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -438,7 +452,7 @@ struct ImGuiDx12Shell::Impl
                 srv.Shader4ComponentMapping = D3D12_DEFAULT_SHADER_4_COMPONENT_MAPPING;
                 srv.Texture2D.MipLevels = 1;
                 impl.resources.GetDevice()->CreateShaderResourceView(
-                    entry.resource.Get(), &srv, entry.cpu);
+                    entry.resource.get(), &srv, entry.cpu);
             }
         }
         return true;
@@ -481,7 +495,7 @@ bool ImGuiDx12Shell::Initialize(void* windowHandle, uint32_t width, uint32_t hei
         heapDesc.NumDescriptors = kShellSrvHeapSize;
         heapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_SHADER_VISIBLE;
         if (FAILED(impl.resources.GetDevice()->CreateDescriptorHeap(
-            &heapDesc, IID_PPV_ARGS(&impl.srvHeap))))
+            &heapDesc, IID_PPV_ARGS(impl.srvHeap.put()))))
         {
             outError = "ImGui SRV 힙 생성 실패";
             return false;
@@ -500,7 +514,7 @@ bool ImGuiDx12Shell::Initialize(void* windowHandle, uint32_t width, uint32_t hei
     impl.initInfo.CommandQueue = impl.resources.GetCommandQueue();
     impl.initInfo.NumFramesInFlight = DX12DeviceResources::kFrameCount;
     impl.initInfo.RTVFormat = DXGI_FORMAT_R8G8B8A8_UNORM;
-    impl.initInfo.SrvDescriptorHeap = impl.srvHeap.Get();
+    impl.initInfo.SrvDescriptorHeap = impl.srvHeap.get();
     impl.initInfo.UserData = &impl;
     impl.initInfo.SrvDescriptorAllocFn =
         [](ImGui_ImplDX12_InitInfo* info, D3D12_CPU_DESCRIPTOR_HANDLE* outCpu,
@@ -781,13 +795,13 @@ uint64_t ImGuiDx12Shell::OpenSharedTexture(void* sharedHandleValue,
     // 별도 디바이스에서 핸들을 여는 성공 여부로 디바이스 간 호환성을 확인한다.
     // 열린 리소스와 생산자 lease를 모두 소비자 GPU 완료까지 보관한다.
     if (FAILED(impl.resources.GetDevice()->OpenSharedHandle(sharedHandle,
-        IID_PPV_ARGS(&entry.resource))))
+        IID_PPV_ARGS(entry.resource.put()))))
     {
         return impl.fallbackTextureId;
     }
 
     const D3D12_RESOURCE_DESC desc = entry.resource->GetDesc();
-    entry.textureId = impl.CreateSrvSlot(entry.resource.Get(), desc.Format,
+    entry.textureId = impl.CreateSrvSlot(entry.resource.get(), desc.Format,
         static_cast<uint32_t>(desc.MipLevels));
     if (0 == entry.textureId)
     {
@@ -886,7 +900,7 @@ bool ImGuiDx12Shell::RenderAndPresent(std::string& outError,
     commandList->ClearRenderTargetView(rtv, kClear, 0, nullptr);
     commandList->OMSetRenderTargets(1, &rtv, FALSE, nullptr);
 
-    ID3D12DescriptorHeap* heaps[] = { impl.srvHeap.Get() };
+    ID3D12DescriptorHeap* heaps[] = { impl.srvHeap.get() };
     commandList->SetDescriptorHeaps(1, heaps);
 
     {
@@ -1045,16 +1059,16 @@ void ImGuiDx12Shell::Shutdown()
     impl.retireQueue.Drain([&](Impl::RetiredDescriptor& retired)
         {
             impl.FreeSlot(D3D12_GPU_DESCRIPTOR_HANDLE{ retired.textureId });
-            retired.resource.Reset();
+            retired.resource = nullptr;
         });
     for (Impl::RetiredDescriptor& retired : impl.pendingFrameRetirements)
     {
         impl.FreeSlot(D3D12_GPU_DESCRIPTOR_HANDLE{ retired.textureId });
-        retired.resource.Reset();
+        retired.resource = nullptr;
     }
     impl.pendingFrameRetirements.clear();
     impl.textureCache.Shutdown();
-    impl.srvHeap.Reset();
+    impl.srvHeap = nullptr;
     impl.resources.Shutdown();
     impl.frameIndex = 0;
     impl.frameError.clear();

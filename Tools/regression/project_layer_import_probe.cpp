@@ -1,5 +1,10 @@
-#include "../../Editor/EngineEntry/LegacyProjectLayerImport.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.LayerCatalog.h"
+#else
+import Creator.Core.LayerCatalog;
+#endif
+#include "../../Editor/EngineEntry/Project/LegacyProjectLayerImport.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "../../Engine/SceneRuntime/EntityLayerSchema.h"
 
 namespace
@@ -59,17 +64,24 @@ int main(int argc, char** argv)
     const auto output = fixture / "migrated.celayers";
     write(output, std::string_view(reinterpret_cast<const char*>(bytes->data()), bytes->size()));
     const auto reloaded = ProjectLayerSettingsIO::Read(output);
-    check(reloaded && reloaded->catalog.ActiveMask() == imported->catalog.ActiveMask() &&
+    check(reloaded && reloaded->catalog.active_mask() == imported->catalog.active_mask() &&
               reloaded->policy.matrix == imported->policy.matrix,
           "real project migration file round trip");
 
     std::size_t entity_count = 0, asset_count = 0;
+    std::filesystem::path current_asset;
     std::function<void(Authoring::ReadNode)> visit = [&](Authoring::ReadNode node) {
         if (!node.IsMap() && !node.IsSequence())
             return;
         if (node["m_layerId"] || node["m_tag"])
         {
-            check(bool(ce::layers::ReadEntityLayer(node, imported->catalog)),
+            const auto layer = ce::layers::ReadEntityLayer(node, imported->catalog);
+            if (!layer)
+            {
+                std::cerr << "Invalid entity layer in " << current_asset << ", error="
+                          << static_cast<int>(layer.error()) << '\n';
+            }
+            check(bool(layer),
                   "real migrated entity uses registered ID");
             ++entity_count;
         }
@@ -81,6 +93,7 @@ int main(int argc, char** argv)
         if (!asset.is_regular_file() ||
             (asset.path().extension() != ".creator" && asset.path().extension() != ".prefab"))
             continue;
+        current_asset = asset.path();
         const auto document = Authoring::ParsedDocument::ParseFile(asset.path().string(), parse_error);
         check(bool(document), "native parser accepts migrated authoring asset");
         visit(document.Root());

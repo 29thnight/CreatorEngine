@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // Unrun source fixture for a dedicated engine host. No standalone main/target.
 // Suspend scheduler dispatch (not worker-side waits) around Begin and Replace;
 // resume normal dispatch and tick Poll/ PollReplacement on the host thread.
@@ -5,7 +10,7 @@
 #include "../../Engine/RenderEngine/DataSystem.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedModelSubAssetCodec.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace model_animation_storage_probe
 {
@@ -32,9 +37,9 @@ namespace model_animation_storage_probe
     experiment::AssetId Id(std::uint8_t seed)
     {
         experiment::AssetId id;
-        id.value.data[0] = seed;
-        id.value.data[6] = 0x80u;
-        id.value.data[8] = 0x80u;
+        id.value.data_[0] = seed;
+        id.value.data_[6] = 0x80u;
+        id.value.data_[8] = 0x80u;
         return id;
     }
 
@@ -262,7 +267,7 @@ namespace model_animation_storage_probe
             const auto cb = m_clipB.Snapshot().asset;
             const auto different = m_different.Snapshot().asset;
             Require(a && b && ca && cb && different, "Ready sibling missing");
-            Require(&*a != &*b && &*a->storage == &*b->storage && a->skeleton.skeletonId.IsNil(), "Skeleton sharing boundary");
+            Require(&*a != &*b && &*a->storage == &*b->storage && a->skeleton.skeletonId.is_nil(), "Skeleton sharing boundary");
             Require(a->origin.entry.asset == Link<Skeleton>(1u).ToReference()
                 && b->origin.entry.asset == Link<Skeleton>(2u).ToReference()
                 && a->origin.blob.artifactPath != b->origin.blob.artifactPath, "Skeleton exact origins merged");

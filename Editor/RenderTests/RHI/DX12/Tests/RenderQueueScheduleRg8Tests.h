@@ -1,9 +1,14 @@
 #include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "Render/Graph/EnhancedGpuMeasurementHistory.h"
-#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 bool DX12Test::RunQueueScheduleTest(std::string& outLog)
 {

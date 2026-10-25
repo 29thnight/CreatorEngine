@@ -1,20 +1,25 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "ExternUI.h"
 #include "ImGui.h"
-#include "EditorSessionState.h"
+#include "../EngineEntry/Project/EditorSessionState.h"
 #include "DataSystem.h"
 #include "Scene.h"
 #include "EditorAssetDragPayload.h"
 #include "Assets/ModelAssetGeneration.h" // MBC9
-#include "EditorImGuiTexture.h"
+#include "../EngineEntry/Presentation/EditorImGuiTexture.h"
 #include "Terrain.h"
-#include "FileDialog.h"
+#include "../../Engine/Platform/Windows/FileDialog.h"
 #include "FoliageComponent.h"
 #include "EditorIcons.h"
-#include "EditorObjectOperations.h"
+#include "../EngineEntry/Scene/EditorObjectOperations.h"
 #include "EditorPropertyRow.h"
 #include "EditorTheme.h"
 #include "imgui_stdlib.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 
 namespace
@@ -46,7 +51,7 @@ namespace
 	{
 		if (ImGui::Button("Load Mask Texture", ImVec2(ImGui::GetContentRegionAvail().x, 0.f)))
 		{
-			file::path maskTexture = ShowOpenFileDialog(L"");
+			std::filesystem::path maskTexture = ShowOpenFileDialog(L"");
 			terrainComponent->SetBrushMaskTexture(brush, maskTexture);
 		}
 		if (brush->m_masks.empty()) return;
@@ -111,7 +116,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 	int preheight = terrainComponent->m_height;
 	int editWidth = terrainComponent->m_width;
 	int editHeight = terrainComponent->m_height;
-	file::path terrainAssetPath = terrainComponent->m_terrainTargetPath;
+	std::filesystem::path terrainAssetPath = terrainComponent->m_terrainTargetPath;
 	FileGuid& terrainAssetGuid = terrainComponent->m_trrainAssetGuid;
 	if (terrainAssetGuid == nullFileGuid && !terrainAssetPath.empty())
 	{
@@ -169,7 +174,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 			const float half = ImMax(1.f, (ImGui::GetContentRegionAvail().x - gap) * 0.5f);
 			if (ImGui::Button(EditorIcon::Label<EditorIcon::Add, " Add">, ImVec2(half, 0.f)))
 			{
-				file::path diffuseFile = ShowOpenFileDialog(L"");
+				std::filesystem::path diffuseFile = ShowOpenFileDialog(L"");
 				if (!diffuseFile.empty())
 				{
 					std::wstring diffuseFileName = diffuseFile.filename();
@@ -247,7 +252,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 		{
 		case 0:
 		{
-			file::path savePath = ShowSaveFileDialog(L"", L"Save File", PathFinder::Relative("Terrain\\"));
+			std::filesystem::path savePath = ShowSaveFileDialog(L"", L"Save File", ce::paths::relative("Terrain\\"));
 			if (savePath != L"") {
 				std::wstring folderPath = savePath.parent_path().wstring();
 				std::wstring fileName = savePath.stem().wstring();
@@ -257,7 +262,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 		}
 		case 1:
 		{
-			file::path loadPath = ShowOpenFileDialog(L"");
+			std::filesystem::path loadPath = ShowOpenFileDialog(L"");
 			if (!loadPath.empty())
 			{
 				terrainComponent->Load(loadPath);
@@ -302,7 +307,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 	{
 		if (const ImGuiPayload* payload = ImGui::AcceptDragDropPayload("Model"))
 		{
-			const file::path filepath = editor::asset_drag::path_of(*payload);
+			const std::filesystem::path filepath = editor::asset_drag::path_of(*payload);
             const FileGuid droppedGuid = DataSystems->GetFileGuid(filepath);
             if (droppedGuid == nullFileGuid)
             {
@@ -331,30 +336,30 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 	ImGui::SeparatorText("Foliage Asset");
 	if (ImGui::Button("Save Foliage", ImVec2(ImGui::GetContentRegionAvail().x, 0.f)))
 	{
-		file::path foliageDir = PathFinder::Relative("Foliage\\");
-		if (!file::exists(foliageDir))
+		std::filesystem::path foliageDir = ce::paths::relative("Foliage\\");
+		if (!std::filesystem::exists(foliageDir))
 		{
-			if (!file::create_directories(foliageDir))
+			if (!std::filesystem::create_directories(foliageDir))
 			{
 				std::cerr << "Failed to create Foliage directory." << std::endl;
 				return;
 			}
 		}
 
-		file::path savePath = ShowSaveFileDialog(L"", L"Save File", foliageDir);
+		std::filesystem::path savePath = ShowSaveFileDialog(L"", L"Save File", foliageDir);
 		// 취소하면 빈 경로가 돌아온다. 예전에는 그대로 넘겨 확장자만
 		// 붙은 ".foliage" 파일이 실행 폴더에 생겼다. 바로 위 Save
 		// Terrain과 같이 지역 가드로 거른다 — 여기서 함수를 return하면
 		// 같은 프레임의 남은 브러시 UI가 통째로 빠진다.
 		if (!savePath.empty())
 		{
-			file::path assetName = savePath.filename();
+			std::filesystem::path assetName = savePath.filename();
 			if (0 == _wcsicmp(assetName.extension().c_str(), L".foliage"))
 			{
 				assetName = assetName.stem();
 			}
 
-			const file::path directory = savePath.has_parent_path()
+			const std::filesystem::path directory = savePath.has_parent_path()
 				? savePath.parent_path() : foliageDir;
 			foliage->SaveFoliageAsset(directory, assetName.wstring());
 		}

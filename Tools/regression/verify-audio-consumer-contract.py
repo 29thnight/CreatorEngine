@@ -104,7 +104,7 @@ def main():
     managed_names = re.findall(r"delegate\* unmanaged<[^;]+>\s+(\w+)\s*;", managed_table)
     assert native_names == managed_names, "Native/managed API table order mismatch"
     native_version = re.search(r"CreatorScriptApiVersion\s*=\s*(\d+)",
-        (ROOT / "Engine/Utility_Framework/ScriptApiVersion.h").read_text()).group(1)
+        (ROOT / "Engine/Utility_Framework/Runtime/ScriptApiVersion.h").read_text()).group(1)
     managed_version = re.search(r"ExpectedVersion\s*=\s*(\d+)", managed).group(1)
     assert native_version == managed_version, "Native/managed API version mismatch"
     audio_names = [name for name in native_names if name.startswith(("Audio_", "AudioListener_", "Sound_"))]
@@ -131,7 +131,7 @@ def main():
     scene = (ROOT / "Engine/SceneRuntime/Scene.h").read_text(encoding="utf-8-sig")
     assert re.search(r"\[\[reflgen::ignore\]\]\s+SoundSystem m_soundSystem", scene)
     assert "class SoundSystem final" in (ROOT / "Engine/SceneRuntime/SoundSystem.h").read_text()
-    for host in ["Editor/EngineEntry/EditorMain.cpp", "Player/PlayerMain.cpp"]:
+    for host in ["Editor/EngineEntry/Bootstrap/EditorMain.cpp", "Player/PlayerMain.cpp"]:
         text = (ROOT / host).read_text(encoding="utf-8-sig")
         for expected in ["BindAudioPlayback(nullptr)", "m_audioPlayback->Shutdown()", "m_audioHost->Shutdown()",
                          "m_audioHost->Update(", "m_audioPlayback->Update()", "PublishAudioProfile("]:
@@ -148,11 +148,11 @@ def main():
                 shutil.copyfile(ROOT / "Engine/SceneRuntime" / (name + "." + extension), target / (name + "." + extension))
         shutil.copyfile(ROOT / "Engine/SceneRuntime/SoundDefinition.h", target / "SoundDefinition.h")
         shutil.copyfile(ROOT / "Tools/regression/audio_consumer_contract_probe.cpp", target / "probe.cpp")
-        (target / "Contract.h").write_text('#include "' + (ROOT / "Engine/Utility_Framework/Contract.h").as_posix() + '"\n')
+        (target / "Contract.h").write_text('#include "' + (ROOT / "Tools/build/ModuleAdapters/Creator.Contracts.h").as_posix() + '"\n')
         (target / "CreatorContractConfig.h").write_text(
             "#pragma once\nnamespace ce::contract_detail { inline constexpr bool assertions_enabled = true; }\n")
         probe_text = (target / "probe.cpp").read_text()
-        (target / "probe.cpp").write_text(probe_text.replace("../../Engine/Utility_Framework/Contract.h", "Contract.h"))
+        (target / "probe.cpp").write_text(probe_text.replace("../build/ModuleAdapters/Creator.Contracts.h", "Contract.h"))
         command = [compiler, "-std=c++20", "-DCE_CONTRACT_STANDALONE=1", "-Wno-attributes", "-I", str(target), "-I", str(ROOT / "Engine/SceneRuntime"),
                    "-I", str(ROOT / "ThirdParty/Mathematics/include")]
         command += [str(target / name) for name in ["probe.cpp", "SoundComponent.cpp", "SoundSystem.cpp", "AudioListenerComponent.cpp"]]
@@ -191,7 +191,8 @@ SoundComponent* ResolveSound(ScriptObjectHandle handle) {
 }
 """
         glue += "    struct AudioAssetId" + abi_structs + "    bool AudioApiEntered()" + abi_functions
-        glue += (ROOT / "Tools/regression/audio_managed_contract_probe.cpp").read_text()
+        glue += (ROOT / "Tools/regression/audio_managed_contract_probe.cpp").read_text().replace(
+            "../build/ModuleAdapters/Creator.Contracts.h", "Contract.h")
         (target / "abi.cpp").write_text(glue)
         abi_command = [str(target / "abi.cpp") if part == str(target / "probe.cpp") else
                        str(target / "abi_probe") if part == str(target / "probe") else part for part in command]

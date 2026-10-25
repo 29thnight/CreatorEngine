@@ -1,9 +1,25 @@
+#include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "RHIQueueContractTests.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include <stdint.h>
-#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 bool DX12Test::RunQueueNativeTest(std::string& outLog)
 {
@@ -80,15 +96,15 @@ bool DX12Test::RunQueueNativeTest(std::string& outLog)
         device.Shutdown();
 
         // Real removal on a separate WARP device; never remove the Editor's device.
-        Microsoft::WRL::ComPtr<IDXGIFactory4> factory;
-        Microsoft::WRL::ComPtr<IDXGIAdapter> warp;
-        Microsoft::WRL::ComPtr<ID3D12Device> nativeDevice;
-        Microsoft::WRL::ComPtr<ID3D12Device5> removable;
-        require(SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(&factory))) &&
-            SUCCEEDED(factory->EnumWarpAdapter(IID_PPV_ARGS(&warp))) &&
-            SUCCEEDED(D3D12CreateDevice(warp.Get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(&nativeDevice))) &&
-            SUCCEEDED(nativeDevice.As(&removable)), "WARP removal fixture creation failed.");
-        DX12QueueService lost(nativeDevice.Get());
+        winrt::com_ptr<IDXGIFactory4> factory;
+        winrt::com_ptr<IDXGIAdapter> warp;
+        winrt::com_ptr<ID3D12Device> nativeDevice;
+        winrt::com_ptr<ID3D12Device5> removable;
+        require(SUCCEEDED(CreateDXGIFactory1(IID_PPV_ARGS(factory.put()))) &&
+            SUCCEEDED(factory->EnumWarpAdapter(IID_PPV_ARGS(warp.put()))) &&
+            SUCCEEDED(D3D12CreateDevice(warp.get(), D3D_FEATURE_LEVEL_11_0, IID_PPV_ARGS(nativeDevice.put()))) &&
+            SUCCEEDED(ce::platform::windows::QueryComInterface(nativeDevice, removable)), "WARP removal fixture creation failed.");
+        DX12QueueService lost(nativeDevice.get());
         own::shared_owner<IRHICommandQueue> lostQueue;
         RHITimelinePoint lostPoint;
         require(lost.CreateQueue(RHIQueueKind::Copy, lostQueue, error) &&

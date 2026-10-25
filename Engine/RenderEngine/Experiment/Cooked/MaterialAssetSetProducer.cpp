@@ -1,12 +1,17 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
 #include "MaterialAssetSetProducer.h"
 
 #include "CookedMaterialProgram.h"
 #include "../../Assets/AssetIdentityProfile.h"
-#include "AuthoringParsedDocument.h"
-#include "AuthoringCookedDocument.h"
+#include "../../../Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../../Utility_Framework/Authoring/AuthoringCookedDocument.h"
 #include "../MaterialAuthoringCodec.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 
 namespace experiment::cooked
@@ -251,18 +256,7 @@ namespace experiment::cooked
                 {
                     return Fail(failure, "Code source has an unterminated block comment.");
                 }
-                const auto trim = [](std::string_view text)
-                {
-                    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.front())))
-                    {
-                        text.remove_prefix(1);
-                    }
-                    while (!text.empty() && std::isspace(static_cast<unsigned char>(text.back())))
-                    {
-                        text.remove_suffix(1);
-                    }
-                    return text;
-                };
+
                 for (std::size_t position = 0; position < source.size();)
                 {
                     if (source[position] == '\"' || source[position] == '\'')
@@ -303,13 +297,13 @@ namespace experiment::cooked
                 while (begin < source.size())
                 {
                     const auto end = source.find('\n', begin);
-                    auto text = trim(std::string_view(source).substr(begin, end == source.npos ? source.size() - begin : end - begin));
+                    auto text = ce::strings::trim_view(std::string_view(source).substr(begin, end == source.npos ? source.size() - begin : end - begin));
                     begin = end == source.npos ? source.size() : end + 1u;
                     if (text.empty() || text.front() != '#')
                     {
                         continue;
                     }
-                    text.remove_prefix(1u); text = trim(text);
+                    text.remove_prefix(1u); text = ce::strings::trim_view(text);
                     std::size_t count{};
                     while (count < text.size() && (std::isalnum(static_cast<unsigned char>(text[count])) || text[count] == '_'))
                     {
@@ -324,13 +318,13 @@ namespace experiment::cooked
                     {
                         continue;
                     }
-                    text = trim(text.substr(count));
+                    text = ce::strings::trim_view(text.substr(count));
                     if (text.size() < 3u || (text.front() != '\"' && text.front() != '<'))
                     {
                         return Fail(failure, "Code recipe requires literal include paths; macro includes cannot prove source closure.");
                     }
                     const auto quoteEnd = text.find(text.front() == '<' ? '>' : '\"', 1u);
-                    if (quoteEnd == text.npos || !trim(text.substr(quoteEnd + 1u)).empty())
+                    if (quoteEnd == text.npos || !ce::strings::trim_view(text.substr(quoteEnd + 1u)).empty())
                     {
                         return Fail(failure, "Code recipe include directive is malformed.");
                     }

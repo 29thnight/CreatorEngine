@@ -1,10 +1,10 @@
 #pragma once
 
 #include "MaterialGraphRuntime.h"
-#include "AuthoringReadNode.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringReadNode.h"
 #include "Experiment/Cooked/CookedAssetCatalog.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace material_cook
 {

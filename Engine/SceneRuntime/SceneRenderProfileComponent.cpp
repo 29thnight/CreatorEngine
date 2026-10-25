@@ -1,8 +1,8 @@
 ﻿#include "SceneRenderProfileComponent.h"
 #include "SceneManager.h"
 #include "DataSystem.h"
-#include "RuntimeSettings.h"
-#include "AuthoringParsedDocument.h"
+#include "../Utility_Framework/Runtime/RuntimeSettings.h"
+#include "../Utility_Framework/Authoring/AuthoringParsedDocument.h"
 
 void SceneRenderProfileComponent::OnInitialized()
 {
@@ -16,8 +16,8 @@ void SceneRenderProfileComponent::OnInitialized()
         if (m_renderProfileGuid == nullFileGuid)
             return;
 
-        file::path path = DataSystems->GetFilePath(m_renderProfileGuid);
-        if (!path.empty() && file::exists(path))
+        std::filesystem::path path = DataSystems->GetFilePath(m_renderProfileGuid);
+        if (!path.empty() && std::filesystem::exists(path))
         {
             std::string parseError;
             const Authoring::ParsedDocument document = Authoring::ParsedDocument::ParseFile(path.string(), parseError);
@@ -64,8 +64,8 @@ void SceneRenderProfileComponent::LoadProfile(FileGuid profileGuid)
     if (profileGuid == nullFileGuid)
         return;
     m_renderProfileGuid = profileGuid;
-    file::path path = DataSystems->GetFilePath(m_renderProfileGuid);
-    if (!path.empty() && file::exists(path))
+    std::filesystem::path path = DataSystems->GetFilePath(m_renderProfileGuid);
+    if (!path.empty() && std::filesystem::exists(path))
     {
         std::string parseError;
         const Authoring::ParsedDocument document = Authoring::ParsedDocument::ParseFile(path.string(), parseError);

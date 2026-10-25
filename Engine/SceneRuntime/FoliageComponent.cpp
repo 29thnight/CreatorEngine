@@ -1,3 +1,13 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "FoliageComponent.h"
 #include "FoliageSystem.h"
 #include "FoliageCulling.h"
@@ -8,14 +18,14 @@
 #include "Material.h"
 #include "DataSystem.h"
 #include "Interfaces/AssetAuthoringPort.h"
-#include "AuthoringParsedDocument.h"
+#include "../Utility_Framework/Authoring/AuthoringParsedDocument.h"
 #include "SceneManager.h"
 #include "RenderScene.h"
 #include "Terrain.h"
 #include "Scene.h"
-#include "Mathematics.Intersect.h"
+#include "../Utility_Framework/Foundation/Mathematics.Intersect.h"
 #include <mathematics/transform.hpp>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 struct FoliageComponent::AssetBinding
 {
@@ -142,7 +152,7 @@ void FoliageComponent::OnUninitializing()
     }
 }
 
-void FoliageComponent::SaveFoliageAsset(const file::path& directory,
+void FoliageComponent::SaveFoliageAsset(const std::filesystem::path& directory,
 	const std::wstring& name)
 {
 	// 빈 시퀀스를 명시적으로 만든다. 손대지 않은 노드를 그대로 흘리면
@@ -248,7 +258,7 @@ void FoliageComponent::RebindFoliageType(uint32 typeID)
     experiment::cooked::ResolvedAssetEntry resolved;
     const bool mounted = catalog && catalog->Find(link.ToReference(), resolved)
         != experiment::cooked::AssetLookupStatus::NotMounted;
-    if (mounted || !type.m_allowLegacySource || !PathFinder::IsAssetAuthoringEnabled())
+    if (mounted || !type.m_allowLegacySource || !ce::paths::is_asset_authoring_enabled())
     {
         // A wrong-kind/unsupported/missing record stays an explicit typed error.
         binding->model = DataSystems->RequestAsync(link);

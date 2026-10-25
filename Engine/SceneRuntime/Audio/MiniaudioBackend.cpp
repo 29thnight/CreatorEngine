@@ -1,11 +1,15 @@
-#include "../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "MiniaudioBackend.h"
 #include "AudioSourceInspection.h"
 #include "AudioSourceValidation.h"
 #include "../../RenderEngine/Experiment/Cooked/CookedAudioClipSource.h"
 
 #include <stdio.h>
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #if defined(WAVE_AUDIO_PROBE)
 #include "../../../Tools/regression/audio_fixture_decoder.h"

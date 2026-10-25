@@ -9,6 +9,7 @@ the whole engine or measure Windows Debug/native/GPU/frame performance.
 No dependencies are downloaded and no production source is modified.
 """
 
+import runpy
 import argparse
 import hashlib
 import json
@@ -129,10 +130,10 @@ def main():
                 ("RenderArena.h", "RenderArena.cpp", "RenderAllocator.h")]
     mirrored += [Path("Engine/RenderEngine/RHI") / name for name in
                  ("RHIHandle.h", "RHIResourceState.h", "RHIFormat.h", "RHISubresourceRange.h")]
-    mirrored += [Path("Engine/Utility_Framework") / name for name in
-                 ("StandardLibrary.h", "DynamicBitset.h", "Arena.cpp", "Arena.h", "HeapAllocator.h",
-                  "Ownership.h", "LifetimeToken.h")]
+    mirrored += [Path(path) for path in ('Engine/Utility_Framework/Foundation/StandardLibrary.h', 'Engine/Utility_Framework/Memory/Arena.cpp', )]
+    mirrored += [Path("Tools/build/ModuleAdapters/Creator.Core.DynamicBitset.h")]
     mirrored += [Path("ThirdParty/ownership_cpp/include/own/ownership.hpp")]
+    mirrored = runpy.run_path(str(root / "Tools/build/generate-module-adapters.py"))["memory_source_inputs"](mirrored)
     probe = Path(__file__).with_name("render_graph_declaration_storage_probe.cpp")
     paths = [root / HEADER, root / SOURCE, probe, Path(__file__).resolve()] + [root / path for path in mirrored]
     snapshots = {path: path.read_bytes() for path in paths}
@@ -181,7 +182,7 @@ inline void mi_free(void* pointer) { graph_declaration_free(pointer); }
         command = [compiler, "-std=c++23", "-O2", "-g", "-pthread", "-DCE_CONTRACT_STANDALONE=1",
                    "-DCE_SHIPPING=1", "-Wall", "-Wextra", "-Werror", "-I", str(target), "-I", str(mirror),
                    str(target / "probe.cpp"), str(mirror / "Engine/RenderEngine/RenderArena.cpp"),
-                   str(mirror / "Engine/Utility_Framework/Arena.cpp"),
+                   str(mirror / "Engine/Utility_Framework/Memory/Arena.cpp"),
                    "-o", str(executable)]
         if args.sanitize:
             command += ["-fsanitize=address,undefined", "-fno-omit-frame-pointer", "-fno-sanitize-recover=all"]

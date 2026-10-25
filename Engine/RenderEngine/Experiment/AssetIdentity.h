@@ -1,8 +1,13 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 
 #include "ModelData.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace experiment
 {
@@ -11,21 +16,21 @@ namespace experiment
     [[nodiscard]] inline bool IsAssetIdV4(const AssetId& id) noexcept
     {
         return id.IsValid()
-            && (id.value.data[6] & 0xf0u) == 0x40u
-            && (id.value.data[8] & 0xc0u) == 0x80u;
+            && (id.value.data_[6] & 0xf0u) == 0x40u
+            && (id.value.data_[8] & 0xc0u) == 0x80u;
     }
 
-    // 이번 리팩터링은 legacy 표기 호환을 두지 않는다. Uuid::TryParse가 읽을 수
+    // 이번 리팩터링은 legacy 표기 호환을 두지 않는다. uuid::try_parse가 읽을 수
     // 있는 대문자/brace/무하이픈 표기도 .meta/manifest 정본으로는 거부하고,
     // 소문자 8-4-4-4-12 UUIDv4만 받는다.
     [[nodiscard]] inline bool TryParseCanonicalAssetId(
         std::string_view text, AssetId& out) noexcept
     {
-        Uuid::Uuid16 parsed{};
-        if (!Uuid::TryParse(text, parsed)) return false;
+        uuid::uuid16 parsed{};
+        if (!uuid::try_parse(text, parsed)) return false;
 
         AssetId candidate{ parsed };
-        if (!IsAssetIdV4(candidate) || Uuid::ToString(parsed) != text)
+        if (!IsAssetIdV4(candidate) || uuid::to_string(parsed) != text)
             return false;
 
         out = candidate;

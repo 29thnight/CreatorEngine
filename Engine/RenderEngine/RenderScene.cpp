@@ -1,7 +1,11 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.SpinLock.h"
+#else
+import Creator.Core.SpinLock;
+#endif
 #include "RenderScene.h"
 // ImGuiRegister.h include는 죽어 있었다(E4-6a 실측 — ImGui:: 사용 0건). 걷었다.
-#include "Benchmark.hpp"
-#include "TimeSystem.h"
+#include "../Utility_Framework/Time/TimeSystem.h"
 #include "DataSystem.h"
 #include "PrimitiveRenderProxy.h"
 #include "LightRenderProxy.h"
@@ -13,16 +17,16 @@ RenderScene::~RenderScene()
 void RenderScene::Finalize()
 {
 	{
-		SpinLock lightLock(m_lightProxyMapFlag);
+		spin_lock lightLock(m_lightProxyMapFlag);
 		m_lightProxyMap.clear();
 	}
 	{
-		SpinLock uiLock(m_uiProxyMapFlag);
+		spin_lock uiLock(m_uiProxyMapFlag);
 		m_uiProxyMap.clear();
 	}
 
 	{
-		SpinLock lock(m_proxyMapFlag);
+		spin_lock lock(m_proxyMapFlag);
 		m_proxyMap.clear();
 	}
 }
@@ -35,15 +39,15 @@ bool RenderScene::BeginProxyFrame(uint64_t sceneEpoch)
 	// epoch가 바뀌는 프레임 경계에서만 기존 씬 저장소를 한꺼번에 접는다.
 	// producer의 SetScene/OnUninitializing은 이 맵들을 직접 만지지 않는다.
 	{
-		SpinLock lock(m_proxyMapFlag);
+		spin_lock lock(m_proxyMapFlag);
 		m_proxyMap.clear();
 	}
 	{
-		SpinLock lock(m_lightProxyMapFlag);
+		spin_lock lock(m_lightProxyMapFlag);
 		m_lightProxyMap.clear();
 	}
 	{
-		SpinLock lock(m_uiProxyMapFlag);
+		spin_lock lock(m_uiProxyMapFlag);
 		m_uiProxyMap.clear();
 	}
 	m_consumedSceneEpoch = sceneEpoch;
@@ -71,17 +75,17 @@ RenderScene::ResourceCounts RenderScene::GetResourceCounts()
 
 	{
 		// 프록시 맵을 조작하는 다른 경로와 동일한 락 규약을 따른다.
-		SpinLock lock(m_proxyMapFlag);
+		spin_lock lock(m_proxyMapFlag);
 		counts.proxies = m_proxyMap.size();
 	}
 
 	{
-		SpinLock lock(m_lightProxyMapFlag);
+		spin_lock lock(m_lightProxyMapFlag);
 		counts.lightProxies = m_lightProxyMap.size();
 	}
 
 	{
-		SpinLock lock(m_uiProxyMapFlag);
+		spin_lock lock(m_uiProxyMapFlag);
 		counts.uiProxies = m_uiProxyMap.size();
 	}
 
@@ -91,7 +95,7 @@ RenderScene::ResourceCounts RenderScene::GetResourceCounts()
 RenderScene::ProxySnapshot RenderScene::GetPrimitiveProxySnapshot()
 {
 	ProxySnapshot snapshot;
-	SpinLock lock(m_proxyMapFlag);
+	spin_lock lock(m_proxyMapFlag);
 	snapshot.reserve(m_proxyMap.size());
 	for (const auto& [guid, proxy] : m_proxyMap)
 	{
@@ -115,7 +119,7 @@ void RenderScene::CopyLightProxySnapshot(LightProxySnapshot& snapshot)
 {
     // Drop previous owners before taking the map lock; retain vector capacity.
     snapshot.clear();
-    SpinLock lock(m_lightProxyMapFlag);
+    spin_lock lock(m_lightProxyMapFlag);
     snapshot.reserve(m_lightProxyMap.size());
     for (const auto& [guid, proxy] : m_lightProxyMap)
     {
@@ -132,7 +136,7 @@ void RenderScene::CopyLightProxySnapshot(LightProxySnapshot& snapshot)
 RenderScene::UIProxySnapshot RenderScene::GetUIProxySnapshot()
 {
 	UIProxySnapshot snapshot;
-	SpinLock lock(m_uiProxyMapFlag);
+	spin_lock lock(m_uiProxyMapFlag);
 	snapshot.reserve(m_uiProxyMap.size());
 	for (const auto& [guid, proxy] : m_uiProxyMap)
 	{
@@ -145,7 +149,7 @@ RenderScene::UIProxySnapshot RenderScene::GetUIProxySnapshot()
 RenderScene::UIDrawSnapshot RenderScene::GetUIDrawSnapshot()
 {
     UIDrawSnapshot snapshot;
-    SpinLock lock(m_uiProxyMapFlag);
+    spin_lock lock(m_uiProxyMapFlag);
     snapshot.reserve(m_uiProxyMap.size());
     for (const auto& [guid, proxy] : m_uiProxyMap)
     {

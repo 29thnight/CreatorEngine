@@ -1,10 +1,16 @@
-﻿#include "DX12MeshCache.h"
+﻿#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
+#include "DX12MeshCache.h"
 #include "DX12DeviceResources.h"
 #include "../RHIModelMeshletUpload.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
 #include "../../Mesh.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 DX12MeshCache::~DX12MeshCache()
 {
@@ -260,23 +266,25 @@ void DX12MeshCache::RecordBufferUpload(const void* data, uint64_t bytes,
     // together before the first copy; recording this batch has no failure path.
     memcpy(staging.cpuAddress, data, static_cast<size_t>(bytes));
 
+    winrt::com_ptr<ID3D12Resource> retainedSource;
+    retainedSource.copy_from(stagingResource);
     m_resources->RecordImmediateNative([target = destination.resource,
-        source = Microsoft::WRL::ComPtr<ID3D12Resource>(stagingResource), offset = staging.offset,
+        source = std::move(retainedSource), offset = staging.offset,
         aliasingRequired = destination.block.requiresAliasingBarrier, bytes, finalState](ID3D12GraphicsCommandList* commandList)
     {
         if (aliasingRequired)
         {
             D3D12_RESOURCE_BARRIER aliasing{};
             aliasing.Type = D3D12_RESOURCE_BARRIER_TYPE_ALIASING;
-            aliasing.Aliasing.pResourceAfter = target.Get();
+            aliasing.Aliasing.pResourceAfter = target.get();
             commandList->ResourceBarrier(1, &aliasing);
         }
-        commandList->CopyBufferRegion(target.Get(), 0,
-            source.Get(), offset, bytes);
+        commandList->CopyBufferRegion(target.get(), 0,
+            source.get(), offset, bytes);
 
         D3D12_RESOURCE_BARRIER barrier{};
         barrier.Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-        barrier.Transition.pResource = target.Get();
+        barrier.Transition.pResource = target.get();
         barrier.Transition.StateBefore = D3D12_RESOURCE_STATE_COPY_DEST;
         barrier.Transition.StateAfter = finalState;
         barrier.Transition.Subresource = D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES;
@@ -506,12 +514,12 @@ DX12MeshCache::Entry DX12MeshCache::UploadResolved(HashedGuid legacyKey,
     // Register every handle before recording any copies. Optional allocation or
     // registration failure cannot leave native commands pointing at freed data.
     buffers.entry.vertices = RHIBufferSlice::Whole(
-        m_resources->RegisterExternalBuffer(buffers.vertexBuffer.resource.Get()));
+        m_resources->RegisterExternalBuffer(buffers.vertexBuffer.resource.get()));
     buffers.entry.vertices.size = vertexBytes;
     buffers.entry.vertexStride = vertexStride;
     buffers.entry.vertexAttributeMask = attributeMask;
     buffers.entry.indices = RHIBufferSlice::Whole(
-        m_resources->RegisterExternalBuffer(buffers.indexBuffer.resource.Get()));
+        m_resources->RegisterExternalBuffer(buffers.indexBuffer.resource.get()));
     buffers.entry.indices.size = indexBytes;
     buffers.entry.indexFormat = RHIFormat::R32Uint;
     buffers.entry.indexCount = indexCount;
@@ -525,7 +533,7 @@ DX12MeshCache::Entry DX12MeshCache::UploadResolved(HashedGuid legacyKey,
     if (withMeshlets)
     {
         buffers.entry.meshlets.data = RHIBufferSlice::Whole(
-            m_resources->RegisterExternalBuffer(buffers.meshletBuffer.resource.Get()));
+            m_resources->RegisterExternalBuffer(buffers.meshletBuffer.resource.get()));
         if (!buffers.entry.meshlets.data.IsValid())
         {
             m_persistentHeap.Release(buffers.meshletBuffer);
@@ -574,7 +582,7 @@ DX12MeshCache::Entry DX12MeshCache::UploadResolved(HashedGuid legacyKey,
                 ++m_stats.coarseLodFallbacks;
                 break;
             }
-            binding.indices = RHIBufferSlice::Whole(m_resources->RegisterExternalBuffer(indexAllocation.resource.Get()));
+            binding.indices = RHIBufferSlice::Whole(m_resources->RegisterExternalBuffer(indexAllocation.resource.get()));
             if (!binding.indices.IsValid())
             {
                 m_persistentHeap.Release(indexAllocation);
@@ -605,7 +613,7 @@ DX12MeshCache::Entry DX12MeshCache::UploadResolved(HashedGuid legacyKey,
                 else
                 {
                     binding.meshlets.data = RHIBufferSlice::Whole(
-                        m_resources->RegisterExternalBuffer(meshletAllocation.resource.Get()));
+                        m_resources->RegisterExternalBuffer(meshletAllocation.resource.get()));
                     if (!binding.meshlets.data.IsValid())
                     {
                         discardLodMeshlets();

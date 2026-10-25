@@ -1,10 +1,19 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "EnhancedIBLGenerator.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
 #include "../RHIEncoder.h"
 
-#include "../../../Utility_Framework/Contract.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 #include <stdint.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 #include "../RHIShaderCompiler.h"
 #include "../../Texture.h"
 #include "../IRenderTextureCache.h"

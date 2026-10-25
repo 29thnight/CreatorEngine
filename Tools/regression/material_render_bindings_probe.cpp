@@ -1,9 +1,24 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "material_owner_checks.h"
 #include "support/MaterialPipelineSlot.h"
 #include "MaterialGraphRenderBindings.h"
 #include "MaterialGraphTransientBufferPool.h"
 #include "MaterialGraphPreparationTasks.h"
-#include "PathFinder.h"
 #include "Texture.h"
 #include "TextureFramePins.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -11,7 +26,7 @@
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/DX12/DX12TextureCache.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -189,10 +204,10 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
 
     void Run(const std::filesystem::path& root)
     {
-        auto* paths = InternalPath::GetInstance();
-        paths->BaseProjectPath = root / "Dynamic_CPP";
-        paths->ShaderSourcePath = root / "Dynamic_CPP/Assets/Shaders";
-        paths->AssetAuthoringEnabled = true;
+        auto* paths = (&ce::paths::get_state());
+        paths->base_project_path = root / "Dynamic_CPP";
+        paths->shader_source_path = root / "Dynamic_CPP/Assets/Shaders";
+        paths->asset_authoring_enabled = true;
         const auto product = CompileFixture(root);
         {
             BindingLayout reflected;
@@ -232,7 +247,7 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
         }
         GenerationStore store;
         experiment::AssetId graph;
-        Check(Uuid::TryParse("11111111-1111-4111-8111-111111111111", graph.value), "Graph identity");
+        Check(uuid::try_parse("11111111-1111-4111-8111-111111111111", graph.value), "Graph identity");
         std::string error;
         const auto generation = store.Load(
             graph,
@@ -262,7 +277,7 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
             resource.colorSpace = LXColorSpace::Data;
         }
         experiment::AssetId normalGraph;
-        Check(Uuid::TryParse("33333333-3333-4333-8333-333333333333", normalGraph.value), "Normal graph identity");
+        Check(uuid::try_parse("33333333-3333-4333-8333-333333333333", normalGraph.value), "Normal graph identity");
         const auto normalGeneration = store.Load(
             normalGraph,
             [&](CookedProgram& cooked, std::string&)
@@ -547,7 +562,7 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
         {
             // Actual COM owner, independent registrations. Readers retain their own
             // handles while other workers grow/reuse the registry concurrently.
-            Microsoft::WRL::ComPtr<ID3D12Resource> resource;
+            winrt::com_ptr<ID3D12Resource> resource;
             D3D12_HEAP_PROPERTIES heap{};
             heap.Type = D3D12_HEAP_TYPE_DEFAULT;
             D3D12_RESOURCE_DESC desc{};
@@ -557,10 +572,10 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
             desc.SampleDesc.Count = 1;
             Check(SUCCEEDED(device.GetDevice()->CreateCommittedResource(&heap, D3D12_HEAP_FLAG_NONE, &desc,
                                                                         D3D12_RESOURCE_STATE_COMMON, nullptr,
-                                                                        IID_PPV_ARGS(&resource))),
+                                                                        IID_PPV_ARGS(resource.put()))),
                   "Actual resource for concurrent texture registry");
             DX12ResourceTable registry;
-            const auto pinned = registry.AddExternalTexture(resource.Get());
+            const auto pinned = registry.AddExternalTexture(resource.get());
             std::atomic<bool> valid{true};
             for (unsigned round = 0; round < 16; ++round)
             {
@@ -576,8 +591,8 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
                             for (auto& handle : handles[worker])
                             {
                                 handle = registry.AddTexture(resource);
-                                if (!handle.IsValid() || registry.Resolve(handle) != resource.Get() ||
-                                    registry.Resolve(pinned) != resource.Get())
+                                if (!handle.IsValid() || registry.Resolve(handle) != resource.get() ||
+                                    registry.Resolve(pinned) != resource.get())
                                 {
                                     valid.store(false, std::memory_order_relaxed);
                                 }

@@ -12,6 +12,22 @@
 - 포매팅 정본은 저장소 .clang-format이다. 현재는 InsertBraces=true, Allman 중괄호, 공백 4칸과 NamespaceIndentation=All을 사용한다. 이전의 짧은 if/for 또는 namespace 들여쓰기 생략 예시는 현행 규약으로 사용하지 않는다.
 - 포인터·참조는 타입 왼쪽 정렬이다. 엔진 공개 객체와 기반 라이브러리의 기존 명명 책임은 구분하되, 소스 포맷 충돌은 현재 .clang-format을 우선한다.
 
+### 유틸리티 명명 이행 — 2026-10-24
+
+- 비트 값 타입은 `bit_flag`이고 API는 `set`, `clear`, `toggle`, `test`다. 입력 상태의 값 타입도 `key_bit_flag`, `mouse_bit_flag`, `gamepad_bit_flag`로 적는다. 멤버는 `flag_`, `chunks_`처럼 후치 `_`를 사용한다.
+- UUID 도구는 `uuid` 네임스페이스의 `uuid16`, `sha1`, `parse`, `try_parse`, `to_string`, `from_name`, `nil`을 사용한다. 바이트 저장 멤버는 `data_`이고 기존 16바이트 배치를 유지한다. 파일과 모듈 이름은 `Creator.Core.Uuid.ixx`·`Creator.Core.BitFlag.ixx`처럼 기존 PascalCase를 유지한다.
+- `HashingString`은 제거했다. 객체 이름·태그·씬 이름·색보정 경로는 표시와 직렬화에 원문이 필요하므로 `std::string`으로 보관한다. 이름 검색은 `string_view`와 직접 비교하며, 별도의 소유 문자열·해시 캐시 타입을 만들지 않는다. Inspector의 필수 문자열 정책은 해당 필드에 적용한다.
+- `DynamicBitset`·`WorkPartition`·`SpinLock`의 정본은 `Creator.Core.*` 모듈이다. API는 `ce::dynamic_bitset`, `ce::partition_contiguous_work`, `spin_lock`이며 내부 멤버도 `blocks_`, `size_`, `bits_per_block_`, `lock_`로 적는다. 네임스페이스 내부에 포함되는 `.inl`은 이를 포함하는 `.cpp`가 전역에서 모듈을 직접 import한다.
+- SHA-256은 `Creator.Core.Sha256`의 `ce::hash::sha256`·`sha256_digest`·`to_hex`가 정본이다. 문자열 연산은 `Creator.Core.Strings`의 `ce::strings`로 모으고 UTF-8/UTF-16·ANSI 변환은 `Creator.Platform.Windows.Strings`가 맡는다. HTTP 공백·탭, CLI trim 문자 집합, ASCII 전용 대소문자 처리와 엄격한 Unicode 검증은 해당 공용 API로 구분한다. 지역 복제 구현이나 이전 이름의 전달 별칭을 두지 않는다.
+- 경과 시간 도구는 `Creator.Core.Stopwatch`의 `ce::stopwatch`·`elapsed_milliseconds()`를 사용한다. 순환 저장 컨테이너는 `Creator.Core.RingBuffer`의 `ce::ring_buffer`이며 `is_clear()`는 비어 있음이 아니라 clear 알림 상태다. `acknowledge_clear()`가 알림을 해제하고 push는 알림을 해제하지 않는다.
+- 고정 용량 메모리 도구 `ce::linear_arena`, `ce::stack_arena`, `ce::fixed_pool`은 `Creator.Core.BoundedMemory`가 정본이다. 내부 멤버와 상수는 `used_bytes_`, `slots_`, `bits_per_word_`처럼 후치 `_`와 snake_case를 사용한다. 스택 체크포인트와 선형 아레나의 friend 관계는 같은 모듈 안에서 유지한다.
+- Base64는 `Creator.Core.Base64`의 `ce::base64::encode`·`decode`를 사용한다. 콘텐츠 ABI 상수는 `Creator.Core.ContentAbi`의 `ce::content_abi::version`·`token`이며 기존 wire 값은 유지한다. 독립 정적 CRT 런처도 동일한 ABI 모듈 소스를 자기 표준 라이브러리 모듈과 함께 빌드한다.
+- 작업 그래프의 `job_graph_node`·`job_graph_node_timing`·`job_graph_diagnostics`·`job_timestamp_ns`는 `Creator.Concurrency.JobGraph`가 정본이며 기존 snake_case를 유지한다. `Creator.Core.LayerCatalog`의 값 조회 타입 `catalog_snapshot`은 `find`·`active_mask`를 사용한다. 프로젝트 상태 소유자인 `LayerCatalog`의 엔진 API는 PascalCase를 유지한다.
+- 진행률 게시 도구는 `Creator.Core.Progress`의 `ce::progress::sink`·`get_sink`·`launch`·`set_title`·`set_status`·`set_progress`·`close`를 사용한다. 상태는 별도 모듈 구현 단위 한 곳에서 소유한다. `Creator.Core.EngineMode`의 `EngineMode`·`EngineRunMode`는 엔진 실행 상태 API이므로 PascalCase를 유지한다.
+- 경로 도구는 `Creator.Core.Paths`의 `ce::paths::roots`·`initialize`·`relative`·`runtime_data_path` 등을 사용한다. 경로 필드는 snake_case이고 레지스트리는 구현 단위 한 곳에서 소유한다. 배포 정보는 `Creator.Core.Distribution`의 `ce::distribution::identity`·`current_identity`·`read_metadata_file` 및 버전 상수를 직접 사용한다. 생성 버전 헤더는 모듈의 생성 입력으로만 유지한다.
+- 메모리·소유권은 `Creator.Core.Ownership`·`HeapAllocator`·`Arena`·`LifetimeToken`을 직접 import한다. `own::`의 외부 라이브러리 타입 정체성과 설정은 헤더 유닛으로 유지한다. 아레나 통계는 `retained_bytes`·`block_count`·`active_blocks`·`active_capacity`·`used_bytes`로 적는다. 소유 객체는 `own::unique_owner`·`make_unique`로 관리하며 관찰 포인터와 구분한다.
+- 이전 이름의 타입·함수 별칭은 두지 않는다. 아래 과거 이행 계획 중 위 내용과 겹치는 부분은 이 현행 계약이 우선한다.
+
 ### 해당 구현에서 확인한 선언·소유 경계
 
 - [Engine/SceneRuntime/Entity.h:39](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Entity.h#L39) — `Entity(Scene* scene, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex);`

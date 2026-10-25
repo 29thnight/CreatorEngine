@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
+  <ItemGroup>
+    <Filter Include="Cooking">
+      <UniqueIdentifier>{3E387911-FB88-537D-BA13-6B5219442F4B}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared">
+      <UniqueIdentifier>{41916D3F-F564-5BD4-88C3-BFD018C0CAB1}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\Editor">
+      <UniqueIdentifier>{C42EEA57-CF64-5C60-BEC6-64A0D85D3ABA}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\Editor\EngineEntry">
+      <UniqueIdentifier>{3D38743F-9CB6-5332-80AE-659EA3146D0E}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\..\Editor\EngineEntry\Assets\Textures\TextureSourceProcessing.cpp">
+      <Filter>Shared\Editor\EngineEntry</Filter>
+    </ClCompile>
+    <ClCompile Include="EnvironmentCooker.cpp">
+      <Filter>Cooking</Filter>
+    </ClCompile>
+  </ItemGroup>
+</Project>

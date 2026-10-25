@@ -15,7 +15,7 @@ void RunObjectSpaceInstances(RecordingChangeDevice& device, ProbeRoots& roots, P
     Check(asset.graph.Connect(Pin(asset.graph,bsdf,"BSDF",Direction::Output),Pin(asset.graph,out,"Surface",Direction::Input)).has_value(),"Object surface link");
     const auto program=GenerateMaterialSlang(asset); Check(bool(program),"Object material generation");
     auto product = CookedScene(*program, "object-space-instances", backend);
-    Generation value; Check(Uuid::TryParse("EEEEEEEE-EEEE-4EEE-8EEE-EEEEEEEEEEEE",value.assetId.value),"Object material id");
+    Generation value; Check(uuid::try_parse("EEEEEEEE-EEEE-4EEE-8EEE-EEEEEEEEEEEE",value.assetId.value),"Object material id");
     value.generation=1; value.cooked={std::move(product),{}, {}};
     const auto generation=own::make_shared<const Generation>(std::move(value));
     own::shared_owner<const Instance> instance;

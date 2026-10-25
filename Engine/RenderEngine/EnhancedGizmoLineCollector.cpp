@@ -2,7 +2,7 @@
 
 #include <mathematics/scalar.hpp>
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // ── 도형 → 선 (DX11 GizmoLinePass의 이식 — 세그먼트 수까지 그대로) ──
 //

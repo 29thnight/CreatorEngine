@@ -1,9 +1,13 @@
 // Configure through ContractProbeConfiguration.ps1 before standalone compilation.
 // Normal run verifies evaluation counts. "assert-fail" must terminate only when
 // assertions_enabled is true; "enforce-fail" and "throw" terminate in both modes.
-#include "../../Engine/Utility_Framework/Contract.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 constexpr bool ConstantEvaluation()
 {

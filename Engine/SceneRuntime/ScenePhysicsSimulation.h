@@ -1,9 +1,14 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
 #include "SimulationTick.h"
 #include "../Physics/PhysicsScene.h"
 #include "ProjectLayerSettings.h"
 #include "CharacterMotionPolicy.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // Scene-owned runtime. Registration is authoring membership; no SDK scene exists in editor mode.
 class ScenePhysicsSimulation final

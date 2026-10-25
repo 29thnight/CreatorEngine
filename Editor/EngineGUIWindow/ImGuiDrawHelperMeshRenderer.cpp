@@ -1,3 +1,19 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "MeshRenderer.h"
 #include "ProfileScope.h"
 #include "MaterialGraphWindow.h"
@@ -8,26 +24,29 @@
 // 앞선 파일이 대신 공급했고, 폴더에 파일 하나가 늘어 블롭 구성이 바뀌자
 // 드러났다 — 전이 include에 기대면 무관한 파일 추가가 빌드를 깬다.
 #include "Material.h"
-#include "EditorObjectOperations.h"
+#include "../EngineEntry/Scene/EditorObjectOperations.h"
 #include "Assets/ModelAssetGeneration.h" // PHASE 3.75 MBC8: typed 정본 read-only 표시
 #include "MaterialScriptBinding.h"
 #include "MaterialPropertyPacker.h"
 #include "ShaderMeta.h"
 #include "StandardMaterialProperty.h"
 #include "ReflectionTypedDraw.h"
-#include "EditorImGuiTexture.h"
+#include "../EngineEntry/Presentation/EditorImGuiTexture.h"
 #include "ReflectionImGuiHelper.h"
 #include "DataSystem.h"
-#include "EditorAssetDatabase.h"
-#include "EditorAssetPresentation.h"
+#include "../EngineEntry/Assets/EditorAssetDatabase.h"
+#include "../EngineEntry/Assets/EditorAssetPresentation.h"
 #include "SceneManager.h"
 #include "EditorIcons.h"
 #include "ExternUI.h"
 #include "EditorPropertyRow.h"
 #include "imgui_stdlib.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
-#include "PathFinder.h"
-#include <d3d11shader.h>
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 #ifndef YAML_CPP_API
 #define YAML_CPP_API __declspec(dllimport)
 #endif /* YAML_CPP_STATIC_DEFINE */
@@ -133,7 +152,7 @@ namespace
         const auto refresh = [&] {
             assets.clear();
             std::error_code ec;
-            const auto root = PathFinder::RelativeToMaterial("");
+            const auto root = ce::paths::relative_to_material("");
             for (std::filesystem::recursive_directory_iterator it(root, ec), end; it != end && !ec; it.increment(ec))
             {
                 if (it->is_regular_file(ec) && it->path().extension() == ".asset")
@@ -167,7 +186,7 @@ namespace
             {
                 for (const auto& path : assets)
                 {
-                    const auto caption = std::filesystem::relative(path, PathFinder::RelativeToMaterial("")).replace_extension().generic_string();
+                    const auto caption = std::filesystem::relative(path, ce::paths::relative_to_material("")).replace_extension().generic_string();
                     if (!filter.PassFilter(caption.c_str()))
                     {
                         continue;
@@ -205,7 +224,7 @@ namespace
             ImGui::EndCombo();
         }
         ImGui::SameLine();
-        ImGui::BeginDisabled(!renderer.m_Material || !PathFinder::IsAssetAuthoringEnabled());
+        ImGui::BeginDisabled(!renderer.m_Material || !ce::paths::is_asset_authoring_enabled());
         if (ImGui::Button("+##SaveMaterialAsset", ImVec2{button, button}))
         {
             name = std::filesystem::path(label).filename().string() + " Copy";
@@ -236,7 +255,7 @@ namespace
             }
             if (ImGui::Button("Save Copy"))
             {
-                const auto path = PathFinder::RelativeToMaterial("") / (name + ".asset");
+                const auto path = ce::paths::relative_to_material("") / (name + ".asset");
                 const bool valid = !name.empty() && name != "." && name != ".." &&
                     name.find_first_of("<>:\"/\\|?*") == std::string::npos && name.back() != '.' && name.back() != ' ' &&
                     std::ranges::none_of(name, [](unsigned char c) { return c < 32; });
@@ -391,7 +410,7 @@ void ImGuiDrawHelperMeshRenderer(MeshRenderer* meshRenderer)
         if (const auto& generation = meshRenderer->m_modelGeneration)
         {
             const assets::ModelAssetGenerationIdentity& identity = generation->Identity();
-            ReadOnlyLine(sheet, "Model", Uuid::ToString(identity.modelId));
+            ReadOnlyLine(sheet, "Model", uuid::to_string(identity.modelId));
             ReadOnlyLine(sheet, "Mesh", meshRenderer->m_meshAssetId.ToString());
             ReadOnlyLine(sheet, "Generation",
                          std::to_string(identity.generation) + " · epoch " + identity.identityEpoch);
@@ -704,7 +723,7 @@ namespace
             if (const ImGuiPayload* payload =
                 ImGui::AcceptDragDropPayload("Texture"))
             {
-                const file::path filepath = editor::asset_drag::path_of(*payload);
+                const std::filesystem::path filepath = editor::asset_drag::path_of(*payload);
                 if (filepath.filename().empty())
                 {
                     Debug::PrintLog(spdlog::level::info, "Empty Texture File Name");

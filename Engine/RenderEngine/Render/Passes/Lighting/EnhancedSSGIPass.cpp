@@ -7,7 +7,7 @@
 #include "../../Scene/EnhancedSceneRenderer.h"
 #include "EnhancedSSGIShaders.h"
 
-#include "../../../../Utility_Framework/StandardLibrary.h"
+#include "../../../../Utility_Framework/Foundation/StandardLibrary.h"
 #include "../../../RHI/RHIShaderCompiler.h"
 
 // 남은 단계(순서대로 채운다):

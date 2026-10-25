@@ -1,3 +1,19 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "../Engine/RenderEngine/RenderAllocator.h"
 #include "PlayerTemporalDX12.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -10,15 +26,17 @@
 #include "ProfileScope.h"
 
 #include <stdint.h>
-#include "../Engine/Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
+#include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
 namespace Player
 {
     namespace
     {
-        template<class T>
-        using ComPtr = Microsoft::WRL::ComPtr<T>;
         constexpr auto kReadState =
             D3D12_RESOURCE_STATE_NON_PIXEL_SHADER_RESOURCE | D3D12_RESOURCE_STATE_PIXEL_SHADER_RESOURCE;
         bool Report(TemporalResult result, const char* operation, std::string& error)
@@ -64,7 +82,7 @@ namespace Player
         bool antiLagActive{false};
         std::array<bool, 4> failedProviders{};
         std::string failureReason;
-        ComPtr<IDXGISwapChain3> dlssSwapchain;
+        winrt::com_ptr<IDXGISwapChain3> dlssSwapchain;
         HANDLE finalEvent{nullptr};
         struct Pins
         {
@@ -72,7 +90,7 @@ namespace Player
             TemporalProvider presenterProvider{TemporalProvider::None};
             uint32_t presenterInterpolatedFrameCount{0};
             uint64_t presenterGeneration{0};
-            std::array<ComPtr<ID3D12Resource>, 4> textures;
+            std::array<winrt::com_ptr<ID3D12Resource>, 4> textures;
             std::array<RHITextureHandle, 4> handles{};
         };
         own::shared_owner<Pins> pins;
@@ -155,7 +173,7 @@ namespace Player
             {
                 return xess->GetSwapChain();
             }
-            return dlssSwapchain.Get();
+            return dlssSwapchain.get();
         }
 
         bool QueueIdle(std::string& error)
@@ -197,7 +215,7 @@ namespace Player
             for (size_t index = 0; index < barriers.size(); ++index)
             {
                 barriers[index].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-                barriers[index].Transition = {pins->textures[index].Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+                barriers[index].Transition = {pins->textures[index].get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
                                               kReadState, D3D12_RESOURCE_STATE_COPY_DEST};
             }
             resources.GetCommandList()->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
@@ -502,7 +520,7 @@ namespace Player
         // Its backbuffer must therefore contain HUD-less color. Other proxies take
         // the normal complete game image and use separate UI only for interpolation.
         return m_state->selected == TemporalProvider::Fsr && m_state->pins && !m_state->pins->packet.nativeGateActive
-                   ? m_state->pins->textures[0].Get()
+                   ? m_state->pins->textures[0].get()
                    : nullptr;
     }
 
@@ -799,14 +817,14 @@ namespace Player
             }
             if (provider == TemporalProvider::Dlss && state.dlss)
             {
-                ComPtr<IDXGISwapChain1> chain;
+                winrt::com_ptr<IDXGISwapChain1> chain;
                 HRESULT created = state.resources.GetFactory()->CreateSwapChainForHwnd(
-                    state.resources.GetCommandQueue(), window, &description, nullptr, nullptr, &chain);
+        state.resources.GetCommandQueue(), window, &description, nullptr, nullptr, chain.put());
                 if (FAILED(created))
                     return {TemporalStatus::SdkFailure, created};
-                if (FAILED(chain.As(&state.dlssSwapchain)))
+                if (FAILED(ce::platform::windows::QueryComInterface(chain, state.dlssSwapchain)))
                     return {TemporalStatus::SdkFailure};
-                auto result = state.dlss->BindPlayerSwapchain(state.dlssSwapchain.Get(), state.configuration,
+                auto result = state.dlss->BindPlayerSwapchain(state.dlssSwapchain.get(), state.configuration,
                                                               DlssPacingOwner::Streamline);
                 if (result.IsSuccess())
                     result = CreateDlssDX12FrameGenerator(state.resources, state.dlss, state.configuration, drain,
@@ -861,7 +879,7 @@ namespace Player
 #if CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_DX12_SDK
             state.fsr = nullptr;
 #endif
-            state.dlssSwapchain.Reset();
+            state.dlssSwapchain = nullptr;
             if (state.selected != TemporalProvider::Fsr && fsr.frameGeneration.IsSuccess() &&
                 state.configuration.interpolatedFrameCount == 1 &&
                 !state.failedProviders[static_cast<size_t>(TemporalProvider::Fsr)])
@@ -886,7 +904,7 @@ namespace Player
 #if CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_DX12_SDK
             state.fsr = nullptr;
 #endif
-            state.dlssSwapchain.Reset();
+            state.dlssSwapchain = nullptr;
             state.selected = TemporalProvider::None;
             state.Publish(created, "Temporal proxy creation failed; real-frame fallback");
             return true;
@@ -1248,7 +1266,7 @@ namespace Player
         {
             const auto extent = index < 2 ? packet.frame.displayExtent : packet.frame.renderExtent;
             if (!packet.sharedHandles[index] || FAILED(state.resources.GetDevice()->OpenSharedHandle(
-                                                    packet.sharedHandles[index], IID_PPV_ARGS(&pins->textures[index]))))
+                                                    packet.sharedHandles[index], IID_PPV_ARGS(pins->textures[index].put()))))
             {
                 error = "Could not open all temporal display resources on the Player device";
                 return false;
@@ -1264,7 +1282,7 @@ namespace Player
         }
         for (size_t index = 0; index < pins->handles.size(); ++index)
         {
-            pins->handles[index] = state.resources.RegisterExternalTexture(pins->textures[index].Get());
+            pins->handles[index] = state.resources.RegisterExternalTexture(pins->textures[index].get());
             if (!pins->handles[index].IsValid())
             {
                 for (const auto handle : pins->handles)
@@ -1327,7 +1345,7 @@ namespace Player
         for (size_t index = 0; index < barriers.size(); ++index)
         {
             barriers[index].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
-            barriers[index].Transition = {state.pins->textures[index].Get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
+            barriers[index].Transition = {state.pins->textures[index].get(), D3D12_RESOURCE_BARRIER_ALL_SUBRESOURCES,
                                           D3D12_RESOURCE_STATE_COPY_DEST, kReadState};
         }
         commands->ResourceBarrier(static_cast<UINT>(barriers.size()), barriers.data());
@@ -1702,7 +1720,7 @@ namespace Player
             }
         }
         state.latencyFrame = 0;
-        state.dlssSwapchain.Reset();
+        state.dlssSwapchain = nullptr;
         if (state.UsesDlssToken())
         {
             state.dlss->SetPlayerFrameTokenOwnership(false);

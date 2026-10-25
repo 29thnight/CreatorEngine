@@ -1,4 +1,3 @@
-#include "../Utility_Framework/Ownership.h"
 // A descriptor-only partition. Original connectivity remains in QMC2 pages;
 // local logical vertex ranges deliberately do not weld across meshlets.
 bool MeshSurfacePlan::BuildStreamed(const EnhancedDrawItem& draw, const SurfaceView& view,

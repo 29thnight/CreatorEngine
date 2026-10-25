@@ -3,7 +3,7 @@
 #include "../../Engine/EngineDiagnostics/ProfileService.h"
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
 #include "../../Engine/EngineDiagnostics/ProfileCaptureFile.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 using namespace ce::physics;
 static_assert(!std::is_convertible_v<body_handle, character_handle>);

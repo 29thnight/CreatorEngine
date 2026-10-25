@@ -1,17 +1,21 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12RootSignatureCache.h"
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/RHIShaderCompiler.h"
-#include "PathFinder.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 static void Check(bool value,const char* name) { if(!value)throw std::runtime_error(name); std::cout<<"CHECK "<<name<<'\n'; }
 int main(int argc,char** argv) try {
     Check(argc==3,"repository and private output arguments");
     const auto repo=std::filesystem::absolute(argv[1]),output=std::filesystem::absolute(argv[2]);
     std::filesystem::create_directories(output);
-    auto* paths=InternalPath::GetInstance(); paths->BaseProjectPath=repo/"Dynamic_CPP";
-    paths->ShaderSourcePath=repo/"Dynamic_CPP/Assets/Shaders"; paths->CacheRoot=output/"cache"; paths->AssetAuthoringEnabled=true;
+    auto* paths=(&ce::paths::get_state()); paths->base_project_path=repo/"Dynamic_CPP";
+    paths->shader_source_path=repo/"Dynamic_CPP/Assets/Shaders"; paths->cache_root=output/"cache"; paths->asset_authoring_enabled=true;
     const auto source=output/"mesh.slang";
     { std::ofstream file(source); file<<R"(
 struct Vertex { float4 position : SV_Position; };

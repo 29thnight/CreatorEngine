@@ -1,12 +1,17 @@
 #pragma once
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 struct ImGuiPayload;
 
 // PHASE 21 W2-B — 콘텐츠 브라우저에서 끌어 온 자산의 **신원**.
 //
 // 예전 payload 는 파일 이름뿐이었고, 받는 자리 17곳이 저마다
-// `PathFinder::Relative("<유형 폴더>\\") / 이름` 으로 경로를 다시 지었다. 전체 자산·
+// `ce::paths::relative("<유형 폴더>\\") / 이름` 으로 경로를 다시 지었다. 전체 자산·
 // 최근 항목에서는 유형 폴더 밖 파일도 끌 수 있어서 `Animation/Cha_Mon_5.fbx` 를
 // 끌면 `Models/Cha_Mon_5.fbx` 가 열렸다. 이름은 신원이 아니다.
 //
@@ -35,7 +40,7 @@ namespace editor::asset_drag
     /// 아니면 빈 경로 — 어느 경우에도 던지지 않는다.
     std::filesystem::path path_of(const ImGuiPayload& payload);
 
-    /// `path` 가 `PathFinder::Relative(folder)` 바로 아래에 있는가. 아니면
+    /// `path` 가 `ce::paths::relative(folder)` 바로 아래에 있는가. 아니면
     /// `consumer` 이름과 함께 오류를 남기고 거짓.
     bool lives_in(const std::filesystem::path& path, std::string_view folder, std::string_view consumer);
 }

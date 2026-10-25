@@ -1,3 +1,9 @@
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "Render/Passes/Lighting/EnhancedSSRPass.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
@@ -6,7 +12,7 @@
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // SSR 패스 자가 검증 (PHASE 3-6, 미구현 패스 이식 3차).
 //
@@ -81,7 +87,6 @@ namespace
 
 bool DX12Test::RunSSRTest(std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
 
     outLog += "── SSR 패스 검증 (PHASE 3-6) ──\n";
 
@@ -134,13 +139,13 @@ bool DX12Test::RunSSRTest(std::string& outLog)
     outLog += "[1/5] 셰이더 컴파일·PSO 생성 통과\n";
 
     // ── 합성 입력 ──
-    ComPtr<ID3D12Resource> colorSource;
-    ComPtr<ID3D12Resource> depthSource;
-    ComPtr<ID3D12Resource> metalRoughSource;
-    ComPtr<ID3D12Resource> normalSource;
-    ComPtr<ID3D12Resource> bitmaskZero;
-    ComPtr<ID3D12Resource> bitmaskCorner;
-    ComPtr<ID3D12Resource> bitmaskExceptCorner;
+    winrt::com_ptr<ID3D12Resource> colorSource;
+    winrt::com_ptr<ID3D12Resource> depthSource;
+    winrt::com_ptr<ID3D12Resource> metalRoughSource;
+    winrt::com_ptr<ID3D12Resource> normalSource;
+    winrt::com_ptr<ID3D12Resource> bitmaskZero;
+    winrt::com_ptr<ID3D12Resource> bitmaskCorner;
+    winrt::com_ptr<ID3D12Resource> bitmaskExceptCorner;
     DX12TestTextureRegistration colorRegistration;
     DX12TestTextureRegistration depthRegistration;
     DX12TestTextureRegistration metalRoughRegistration;
@@ -153,7 +158,7 @@ bool DX12Test::RunSSRTest(std::string& outLog)
         D3D12_HEAP_PROPERTIES defaultHeap{};
         defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
 
-        const auto makeTexture = [&](DXGI_FORMAT format, ComPtr<ID3D12Resource>& out) -> bool
+        const auto makeTexture = [&](DXGI_FORMAT format, winrt::com_ptr<ID3D12Resource>& out) -> bool
         {
             D3D12_RESOURCE_DESC desc{};
             desc.Dimension = D3D12_RESOURCE_DIMENSION_TEXTURE2D;
@@ -166,7 +171,7 @@ bool DX12Test::RunSSRTest(std::string& outLog)
 
             return SUCCEEDED(resources.GetDevice()->CreateCommittedResource(&defaultHeap,
                 D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                nullptr, IID_PPV_ARGS(&out)));
+                nullptr, IID_PPV_ARGS(out.put())));
         };
 
         if (!makeTexture(DXGI_FORMAT_R16G16B16A16_FLOAT, colorSource) ||
@@ -182,13 +187,13 @@ bool DX12Test::RunSSRTest(std::string& outLog)
             return false;
         }
 
-        colorRegistration.Register(resources, colorSource.Get());
-        depthRegistration.Register(resources, depthSource.Get());
-        metalRoughRegistration.Register(resources, metalRoughSource.Get());
-        normalRegistration.Register(resources, normalSource.Get());
-        bitmaskZeroRegistration.Register(resources, bitmaskZero.Get());
-        bitmaskCornerRegistration.Register(resources, bitmaskCorner.Get());
-        bitmaskExceptCornerRegistration.Register(resources, bitmaskExceptCorner.Get());
+        colorRegistration.Register(resources, colorSource.get());
+        depthRegistration.Register(resources, depthSource.get());
+        metalRoughRegistration.Register(resources, metalRoughSource.get());
+        normalRegistration.Register(resources, normalSource.get());
+        bitmaskZeroRegistration.Register(resources, bitmaskZero.get());
+        bitmaskCornerRegistration.Register(resources, bitmaskCorner.get());
+        bitmaskExceptCornerRegistration.Register(resources, bitmaskExceptCorner.get());
         if (!colorRegistration.IsValid() || !depthRegistration.IsValid() ||
             !metalRoughRegistration.IsValid() || !normalRegistration.IsValid() ||
             !bitmaskZeroRegistration.IsValid() || !bitmaskCornerRegistration.IsValid() ||
@@ -284,7 +289,7 @@ bool DX12Test::RunSSRTest(std::string& outLog)
         (void)half;
 
         // 색 — 왼쪽 절반 검정, 오른쪽 절반 초록. 반사해 올 원본이다.
-        bool ok = uploadHalf4(colorSource.Get(), [](uint32_t x, uint32_t, float (&rgba)[4])
+        bool ok = uploadHalf4(colorSource.get(), [](uint32_t x, uint32_t, float (&rgba)[4])
         {
             const bool green = (x >= kSsrGreenStartX);
             rgba[0] = 0.f;
@@ -295,7 +300,7 @@ bool DX12Test::RunSSRTest(std::string& outLog)
 
         // 금속거칠기 — .r이 금속도(위 절반 1 · 아래 절반 0), .g가 거칠기.
         // GBuffer 배치가 (metallic, roughness, occlusion, ior)다.
-        ok = ok && uploadHalf4(metalRoughSource.Get(), [](uint32_t, uint32_t y, float (&rgba)[4])
+        ok = ok && uploadHalf4(metalRoughSource.get(), [](uint32_t, uint32_t y, float (&rgba)[4])
         {
             rgba[0] = (y < kSsrHeight / 2) ? 1.f : 0.f;
             rgba[1] = 0.5f;
@@ -306,7 +311,7 @@ bool DX12Test::RunSSRTest(std::string& outLog)
         // 노멀 — 반사 광선을 오른쪽으로 거의 수평하게, 아주 조금 아래로
         // 보내는 값. N = (-0.7247, 0, 0.6890)을 인코딩했다.
         // reflect((0,0,1), N) = (0.9986, 0, 0.0506)이 된다.
-        ok = ok && uploadHalf4(normalSource.Get(), [](uint32_t, uint32_t, float (&rgba)[4])
+        ok = ok && uploadHalf4(normalSource.get(), [](uint32_t, uint32_t, float (&rgba)[4])
         {
             rgba[0] = -0.7247f * 0.5f + 0.5f;
             rgba[1] = 0.f * 0.5f + 0.5f;
@@ -315,16 +320,16 @@ bool DX12Test::RunSSRTest(std::string& outLog)
         });
 
         // 깊이 — 화면 전체가 평면(0.5). 월드 z로는 5다.
-        ok = ok && uploadRaw32(depthSource.Get(), DXGI_FORMAT_R32_FLOAT,
+        ok = ok && uploadRaw32(depthSource.get(), DXGI_FORMAT_R32_FLOAT,
             [](uint32_t, uint32_t) { float d = 0.5f; uint32_t bits; memcpy(&bits, &d, 4); return bits; });
 
         // 비트마스크 셋 — 전부 0 / (0,0)만 / (0,0)만 빼고 전부.
         constexpr uint32_t kTerrainBit = 1u << 9;
-        ok = ok && uploadRaw32(bitmaskZero.Get(), DXGI_FORMAT_R32_UINT,
+        ok = ok && uploadRaw32(bitmaskZero.get(), DXGI_FORMAT_R32_UINT,
             [](uint32_t, uint32_t) { return 0u; });
-        ok = ok && uploadRaw32(bitmaskCorner.Get(), DXGI_FORMAT_R32_UINT,
+        ok = ok && uploadRaw32(bitmaskCorner.get(), DXGI_FORMAT_R32_UINT,
             [](uint32_t x, uint32_t y) { return (0 == x && 0 == y) ? kTerrainBit : 0u; });
-        ok = ok && uploadRaw32(bitmaskExceptCorner.Get(), DXGI_FORMAT_R32_UINT,
+        ok = ok && uploadRaw32(bitmaskExceptCorner.get(), DXGI_FORMAT_R32_UINT,
             [](uint32_t x, uint32_t y) { return (0 == x && 0 == y) ? 0u : kTerrainBit; });
 
         if (!ok)
@@ -334,9 +339,9 @@ bool DX12Test::RunSSRTest(std::string& outLog)
             return false;
         }
 
-        ID3D12Resource* const sources[7] = { colorSource.Get(), depthSource.Get(),
-            metalRoughSource.Get(), normalSource.Get(), bitmaskZero.Get(),
-            bitmaskCorner.Get(), bitmaskExceptCorner.Get() };
+        ID3D12Resource* const sources[7] = { colorSource.get(), depthSource.get(),
+            metalRoughSource.get(), normalSource.get(), bitmaskZero.get(),
+            bitmaskCorner.get(), bitmaskExceptCorner.get() };
         D3D12_RESOURCE_BARRIER barriers[7]{};
         for (uint32_t i = 0; i < 7; ++i)
         {

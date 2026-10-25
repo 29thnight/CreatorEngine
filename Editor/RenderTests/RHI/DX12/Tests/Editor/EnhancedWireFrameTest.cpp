@@ -1,4 +1,14 @@
-#include "Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "Render/Passes/Editor/EnhancedWireFramePass.h"
 #include "RHI/DX12/DX12DeviceResources.h"
 #include "RHI/DX12/DX12PSOManager.h"
@@ -9,7 +19,7 @@
 #include "Mesh.h"
 #include "MaterialGraphSceneInput.h"
 
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include <mathematics/transform.hpp>
 
 // 와이어프레임 패스 자가 검증 (PHASE 3-6, Gizmo 계열 4차 슬라이스).
@@ -89,7 +99,6 @@ namespace
 
 bool DX12Test::RunWireFrameTest(std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
 
     outLog += "── 와이어프레임 패스 검증 (PHASE 3-6, Gizmo 계열) ──\n";
 
@@ -523,8 +532,8 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
         instance->generation = generation;
         instance->description.graphId = generation->assetId;
         RHIModelMeshView model{};
-        Uuid::TryParse("11111111-1111-8111-8111-111111111111", model.handle.modelId);
-        Uuid::TryParse("22222222-2222-8222-8222-222222222222", model.handle.meshId);
+        uuid::try_parse("11111111-1111-8111-8111-111111111111", model.handle.modelId);
+        uuid::try_parse("22222222-2222-8222-8222-222222222222", model.handle.meshId);
         model.handle.generation = skin + 1;
         model.vertexData = packedVertices.data();
         model.vertexBytes = packedVertices.size();

@@ -1,11 +1,12 @@
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "Object.h"
-#include "AuthoringNodeViewAccess.h" // D3-a-5
+#include "../Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-5
 #include "EntityAuthoringRead.h" // D3-a-2: 저작 읽기 어댑터
 #include "Entity.h"
 #include "ComponentFactory.h"
 #include "PrefabUtility.h"
 #include "SceneManager.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 // (E) 원 씬 컬렉션/이벤트에서 안전하게 분리하기 위해 컴포넌트 타입 참조 추가
 #include "Scene.h"
 #include "LightComponent.h"
@@ -133,26 +134,26 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 			const Authoring::ReadNode sourceNode = sourceDocument.Root().Read();
 			const std::string cloneName = !requestedName.empty()
 				? std::string(requestedName)
-				: source->m_name.ToString() + "_Clone";
+				: source->m_name + "_Clone";
 
 			Entity* clone = scene->CreateEntity(
 				cloneName, EntityAuthoring::InferCreationType(sourceNode));
 			if (!clone) return nullptr;
 
 			const HashedGuid newInstanceID = clone->m_instanceID;
-			const HashingString newHashedName = clone->m_name;
+			const std::string newName = clone->m_name;
 			const Entity::Index newIndex = clone->m_index;
 			const Entity::Index sourceRootIndex = source->GetRootIndex();
 
 			Meta::Deserialize(clone, sourceNode);
 			clone->m_instanceID = newInstanceID;
-			clone->m_name = newHashedName;
+			clone->m_name = newName;
 			clone->m_index = newIndex;
 			sourceToClone[source->m_index] = newIndex;
 			rootFixups.push_back({ clone, sourceRootIndex });
 
-            if (!clone->m_tag.ToString().empty())
-                TagManager::GetInstance()->AddTagToObject(clone->m_tag.ToString(), clone);
+            if (!clone->m_tag.empty())
+                TagManager::GetInstance()->AddTagToObject(clone->m_tag, clone);
 
             if (!clone->SetLayer(clone->GetLayer()))
                 throw std::runtime_error("Invalid entity layer membership");
@@ -178,7 +179,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 				Entity* child = scene->TryGetEntity(childIndex);
 				if (!child) continue;
 
-				Entity* childClone = self(self, child, child->m_name.ToString());
+				Entity* childClone = self(self, child, child->m_name);
 				if (!childClone) continue;
 
 				scene->Reparent(scene->HandleOf(childClone->m_index),
@@ -222,7 +223,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
     if (!newName.empty())
         cloneObj->m_name = newName;
     else
-        cloneObj->m_name = original->m_name.ToString() + "_Clone";
+        cloneObj->m_name = original->m_name + "_Clone";
 
     return cloneObj;
 

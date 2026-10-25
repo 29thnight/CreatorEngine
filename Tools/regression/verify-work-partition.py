@@ -16,9 +16,9 @@ def main():
     parser.add_argument("--output", type=Path)
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[2]
-    header = root / "Engine/Utility_Framework/WorkPartition.h"
+    header = root / "Engine/Contracts/Core/Creator.Core.WorkPartition.ixx"
     probe = Path(__file__).with_name("work_partition_probe.cpp")
-    inputs = (header, header.with_name("StandardLibrary.h"), probe)
+    inputs = (header, root / "Tools/build/ModuleAdapters/Creator.Core.WorkPartition.h", root / "Engine/Utility_Framework/Foundation/StandardLibrary.h", probe)
     hashes = {path: hashlib.sha256(path.read_bytes()).hexdigest() for path in inputs}
     with tempfile.TemporaryDirectory(prefix="creator-work-partition-") as directory:
         executable = Path(directory) / "work-partition"

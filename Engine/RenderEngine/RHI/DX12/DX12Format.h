@@ -1,5 +1,9 @@
 #pragma once
-#include <dxgiformat.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 
 #include "../RHIFormat.h"
 

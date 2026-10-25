@@ -3,7 +3,7 @@ extern "C" bool ce_physics_wake_probe();
 #endif
 #include "../../Engine/SceneRuntime/ScenePhysicsSimulation.h"
 #include "../../Engine/SceneRuntime/PhysicsTransformPolicy.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "../../Engine/Physics/PhysicsTestHooks.h"
 #if !CE_SHIPPING
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"

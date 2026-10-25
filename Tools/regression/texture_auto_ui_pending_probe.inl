@@ -12,13 +12,13 @@ static CommandCore::CommandResult Cmd_texture_auto_ui_pending_probe(const Consol
     {
         return InvalidArguments("assets.texture.pendingprobe <isolated-source> <close|shutdown|conflict|conflictshutdown|delete|corrupt|deleteshutdown|corruptshutdown|soak|nativeclose|conflictnativeclose>");
     }
-    const auto source = file::path(ctx.parts[1]);
+    const auto source = std::filesystem::path(ctx.parts[1]);
     const auto project = source.parent_path().parent_path().parent_path();
-    if (source.filename() != "fixture.png" || !file::exists(project / ".texture-auto-ui-race"))
+    if (source.filename() != "fixture.png" || !std::filesystem::exists(project / ".texture-auto-ui-race"))
     {
         return PreconditionFailed("texture.pending.isolation", "Use the marked isolated UI regression project");
     }
-    const auto sidecar = file::path(source.string() + ".meta");
+    const auto sidecar = std::filesystem::path(source.string() + ".meta");
     const auto read = [sidecar]
     {
         std::ifstream stream(sidecar, std::ios::binary);
@@ -69,7 +69,7 @@ static CommandCore::CommandResult Cmd_texture_auto_ui_pending_probe(const Consol
                 if (mode == "delete" || mode == "deleteshutdown")
                 {
                     std::error_code failure;
-                    if (!file::remove(sidecar, failure) || failure)
+                    if (!std::filesystem::remove(sidecar, failure) || failure)
                     {
                         return Fail("texture.pending.external", "Could not remove isolated metadata");
                     }
@@ -133,7 +133,7 @@ static CommandCore::CommandResult Cmd_texture_auto_ui_pending_probe(const Consol
             }
             if (mode == "nativeclose" || mode == "conflictnativeclose")
             {
-                const auto* window = WindowsCoreWindow::GetForCurrentInstance();
+                const auto* window = AppBackendWinAPI::GetForCurrentInstance();
                 const HWND handle = window ? window->GetHandle() : nullptr;
                 if (!handle || !::PostMessageW(handle, WM_CLOSE, 0, 0))
                 {
@@ -171,7 +171,7 @@ static CommandCore::CommandResult Cmd_texture_auto_ui_pending_probe(const Consol
             {
                 return Fail("texture.pending.overwrite", "Pending UI edit overwrote external settings");
             }
-            if (mode == "delete" && file::exists(sidecar))
+            if (mode == "delete" && std::filesystem::exists(sidecar))
             {
                 return Fail("texture.pending.recreated", "Deleted metadata was silently recreated");
             }

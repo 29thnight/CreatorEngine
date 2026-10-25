@@ -1,10 +1,15 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
 #include "CharacterMovementComponent.h"
 #include "PhysicsBodyComponent.h"
 #include "Scene.h"
 #include "Transform.h"
 #include <stdio.h>
-#include "../Engine/Utility_Framework/StandardLibrary.h"
+#include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace Player
 {

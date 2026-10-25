@@ -4,7 +4,7 @@
 
 #include <mathematics/tween.hpp>
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // Mathematics의 tween<T>는 값·시간·재생 정책만 소유한다. 엔진 target과 완료
 // 통지는 Scene 수명에 묶인 이 manager가 별도 slot에 보관한다. target은 raw

@@ -1,7 +1,11 @@
 // GPU가 없는 환경에서 실제 선언 본문의 게시·소유 스레드·바이트 배치 경계를 검사한다.
 // RHI 값 타입과 대상 본문은 제품 소스이며 native 장치·그래프 경계만 대체한다.
 #include "RHI/RHIResourceTypes.h"
-#include "JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
 
 namespace Probe

@@ -1,12 +1,20 @@
 #pragma once
-#include "../../Utility_Framework/LifetimeToken.h"
-#include "../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "RHIResourceTypes.h"
 
 #include "../FrameCameraSnapshot.h"
 #include "../Render/Temporal/TemporalReconstruction.h"
 #include "../Render/Temporal/TemporalMeasurementProvenance.h"
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // CPU 표시 브리지도 픽셀과 카메라를 같은 값 묶음으로 운반한다. Host가
 // 업로드한 프레임의 신원을 돌려주어야 최신 RT 완료 결과와 섞이지 않는다.

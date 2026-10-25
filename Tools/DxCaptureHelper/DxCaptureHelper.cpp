@@ -1,9 +1,12 @@
 #include "DxCaptureTransport.h"
 #include "DxTimingCollector.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
 
-#include <Windows.h>
-
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 #if !CE_DX_TIMING_CAPTURE || CE_SHIPPING
 #error CreatorDxCaptureHelper requires an explicitly enabled, non-shipping Deep Capture build.

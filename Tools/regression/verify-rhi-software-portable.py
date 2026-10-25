@@ -30,8 +30,8 @@ PRODUCTION = [
     "Engine/RenderEngine/RHI/RHICommandTranslator.cpp",
     "Engine/RenderEngine/RHI/RHISubmissionThread.cpp",
     "Engine/RenderEngine/RenderArena.cpp",
-    "Engine/Utility_Framework/ThreadPool.cpp",
-    "Engine/Utility_Framework/JobScheduler.cpp",
+    "Engine/Utility_Framework/Concurrency/ThreadPool.cpp",
+    "Engine/Utility_Framework/Concurrency/JobScheduler.cpp",
 ]
 PROBE = "Tools/regression/rhi_software_translation_probe.cpp"
 COMMAND_PROBE = "Tools/regression/rhi_software_commands_probe.cpp"
@@ -58,7 +58,7 @@ namespace ce
 
 def production_sources(root: Path) -> list[str]:
     # Preserve comparisons with revisions before the Utility extraction.
-    utility_arena = "Engine/Utility_Framework/Arena.cpp"
+    utility_arena = "Engine/Utility_Framework/Memory/Arena.cpp"
     return [*PRODUCTION, *([utility_arena] if (root / utility_arena).is_file() else [])]
 
 
@@ -196,8 +196,8 @@ def build_and_run(source: Path, build: Path, compiler: str, sanitize: bool, benc
     result["structured_failure_available"] = structured_failure
     if commands_probe:
         selected = ["Engine/RenderEngine/RenderArena.cpp", *PRODUCTION[:4]]
-        if (source / "Engine/Utility_Framework/Arena.cpp").is_file():
-            selected.append("Engine/Utility_Framework/Arena.cpp")
+        if (source / "Engine/Utility_Framework/Memory/Arena.cpp").is_file():
+            selected.append("Engine/Utility_Framework/Memory/Arena.cpp")
         old_command = [compiler, *flags, *sanitize_flags, str(source / COMMAND_PROBE),
                        *[str(source / path) for path in selected], str(build / "mimalloc.o"),
                        "-o", str(build / "commands")]

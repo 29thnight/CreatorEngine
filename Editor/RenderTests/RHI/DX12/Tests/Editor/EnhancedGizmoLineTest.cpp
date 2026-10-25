@@ -5,7 +5,7 @@
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // 기즈모 라인 패스 자가 검증 (PHASE 3-6, Gizmo 계열 2차 슬라이스).
 //
@@ -81,7 +81,6 @@ namespace
 
 bool DX12Test::RunGizmoLineTest(std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
 
     outLog += "── 기즈모 라인 패스 검증 (PHASE 3-6, Gizmo 계열) ──\n";
 

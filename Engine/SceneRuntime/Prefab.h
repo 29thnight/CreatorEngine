@@ -1,9 +1,9 @@
 #pragma once
-#include "AuthoringDocument.h"
-#include "AuthoringNodeView.h" // D3-a-5b
+#include "../Utility_Framework/Authoring/AuthoringDocument.h"
+#include "../Utility_Framework/Authoring/AuthoringNodeView.h" // D3-a-5b
 #include "Object.h"
 #include "Entity.h"
-#include "ReflectionYml.h"
+#include "../Utility_Framework/Reflection/ReflectionYml.h"
 #include "SceneManager.h"
 #include "ComponentFactory.h"
 

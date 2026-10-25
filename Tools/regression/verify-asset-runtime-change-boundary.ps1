@@ -44,13 +44,13 @@ Assert-Matches "Engine\RenderEngine\DataSystem.cpp" `
     'm_retiredTextureGenerations\.emplace_back\(std::move\(generation\)\)'
 
 # Editor는 source/meta 게시 뒤에만 reload/upsert/remove를 발행한다.
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'const FileGuid guid = CreateMetaLocked\(destination\);[\s\S]*RuntimeAssetChangeKind::ContentReload'
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'RuntimeAssetChangeKind::CatalogUpsert'
-Assert-Matches "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'RuntimeAssetChangeKind::Removed'
-Assert-DoesNotMatch "Editor\EngineEntry\EditorAssetDatabase.cpp" `
+Assert-DoesNotMatch "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'RegisterFileGuid\(|UnregisterFilePath\('
 Assert-DoesNotMatch "Engine\SceneRuntime\PrefabUtility.cpp" `
     'RegisterFileGuid\('

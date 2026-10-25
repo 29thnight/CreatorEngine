@@ -4,7 +4,7 @@
 #include "AnimationController.h"
 #include "ConditionParameter.h"
 #include "Entity.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 void AnimatorSystem::RequireOwnerThread() const
 {
@@ -130,7 +130,7 @@ void AnimatorSystem::Update(float tick)
         // 안 남기면 이관할수록 기준선의 커버리지가 조용히 준다(같은 문자열을 써야
         // 대조가 성립하므로 Lifecycle::Trace::TypeNameOf 공용 함수를 쓴다).
         LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(animator),
-            owner->m_name.ToString().c_str(), animator->GetInstanceID());
+            owner->m_name.c_str(), animator->GetInstanceID());
 
         // ── 이하 옛 Animator::Update 본문 그대로(트랙 C3 이관) ──
         if (animator->m_animationControllers.empty()) continue;

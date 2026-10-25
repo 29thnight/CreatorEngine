@@ -1,12 +1,17 @@
 #pragma once
-#include "Core.Minimal.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "FoliageType.h"
 #include "FoliageInstance.h"
 #include "TerrainBuffers.h"
 #include "Component.h"
 #include "AssetDepot/AssetRequest.h"
 #include <mathematics/frustum.hpp>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 class TerrainComponent;
 class [[reflgen::reflect]] FoliageComponent : public meta::identity<FoliageComponent, Component>
@@ -37,7 +42,7 @@ public:
 
 	// 저작 게시는 Editor Host가 소유한다. 여기서는 YAML payload만 만들고
 	// 목적 경로 확정·원자적 쓰기·meta 생성은 AssetAuthoringPort 너머에서 끝난다.
-	void SaveFoliageAsset(const file::path& directory, const std::wstring& name);
+	void SaveFoliageAsset(const std::filesystem::path& directory, const std::wstring& name);
 	void LoadFoliageAsset(FileGuid assetGuid);
 
     void AddFoliageType(const FoliageType& type);

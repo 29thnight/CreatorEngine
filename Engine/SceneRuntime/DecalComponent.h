@@ -1,9 +1,13 @@
 #pragma once
-#include "Ownership.h"
-#include "Core.Minimal.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "Component.h"
 #include "AssetDepot/AssetRequest.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 class Texture;
 class [[reflgen::reflect]] DecalComponent : public meta::identity<DecalComponent, Component>

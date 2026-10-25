@@ -5,10 +5,18 @@
 #include "Assets/AssetIdentityRegistry.h"
 #include "Experiment/AssetIdentity.h"                 // IsAssetIdV4 — legacy 판정과의 배타성
 #include "Experiment/Cooked/CookedAssetManifest.h"   // BCrypt ComputeSha256 — 독립 대조군
-#include "Sha256.h"
-#include "Uuid.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace RenderTest
 {
@@ -76,7 +84,7 @@ namespace RenderTest
         }
 
         [[nodiscard]] bool BcryptSha256(std::span<const std::uint8_t> bytes,
-            Hash::Sha256Digest& out, std::string& error)
+            ce::hash::sha256_digest& out, std::string& error)
         {
             experiment::cooked::Sha256Digest digest{};
             const std::span<const std::byte> view{
@@ -101,24 +109,24 @@ namespace RenderTest
         for (const vec::ShaVector& v : vec::kShaVectors)
         {
             const std::vector<std::uint8_t> input = FromHex(v.inputHex);
-            const Hash::Sha256Digest digest =
-                Hash::Sha256::Compute(input.data(), input.size());
-            check.Check(Hash::ToHex(digest) == v.sha256Hex,
+            const ce::hash::sha256_digest digest =
+                ce::hash::sha256::compute(input.data(), input.size());
+            check.Check(ce::hash::to_hex(digest) == v.sha256Hex,
                 std::string("KAT ") + v.name);
         }
         {
             // million 'a' — 블록 경계를 15,625번 넘는다. 스트리밍 Update로 넣어
             // 버퍼 이월 경로도 태운다.
-            Hash::Sha256 sha;
+            ce::hash::sha256 sha;
             const std::string chunk(4099, 'a'); // 64의 배수가 아닌 조각
             std::size_t remaining = 1'000'000u;
             while (remaining > 0)
             {
                 const std::size_t take = remaining < chunk.size() ? remaining : chunk.size();
-                sha.Update(chunk.data(), take);
+                sha.update(chunk.data(), take);
                 remaining -= take;
             }
-            check.Check(Hash::ToHex(sha.Finish()) == vec::kMillionASha256,
+            check.Check(ce::hash::to_hex(sha.finish()) == vec::kMillionASha256,
                 "KAT million 'a' (스트리밍)");
         }
         {
@@ -130,14 +138,14 @@ namespace RenderTest
                 std::vector<std::uint8_t> buffer(length);
                 for (std::size_t i = 0; i < length; ++i)
                     buffer[i] = static_cast<std::uint8_t>((i * 31u + length * 7u + 3u) & 0xFFu);
-                Hash::Sha256Digest reference{};
+                ce::hash::sha256_digest reference{};
                 if (!BcryptSha256(buffer, reference, bcryptError))
                 {
                     bcryptAvailable = false;
                     break;
                 }
                 ++total;
-                if (Hash::Sha256::Compute(buffer.data(), buffer.size()) == reference)
+                if (ce::hash::sha256::compute(buffer.data(), buffer.size()) == reference)
                     ++agreed;
             }
             check.Check(bcryptAvailable, "BCrypt 대조군 사용 가능 (" + bcryptError + ")");
@@ -171,24 +179,24 @@ namespace RenderTest
             {
                 check.Check(built && bytes == FromHex(v.inputHex),
                     std::string("입력 바이트열 ") + v.name);
-                const Hash::Sha256Digest digest =
-                    Hash::Sha256::Compute(bytes.data(), bytes.size());
-                check.Check(Hash::ToHex(digest) == v.sha256Hex,
+                const ce::hash::sha256_digest digest =
+                    ce::hash::sha256::compute(bytes.data(), bytes.size());
+                check.Check(ce::hash::to_hex(digest) == v.sha256Hex,
                     std::string("입력 SHA-256 ") + v.name);
                 const assets::IdentityDerivation derived = assets::DeriveIdentity(input);
                 check.Check(derived.Succeeded()
-                    && Uuid::ToString(derived.uuid) == v.uuid,
+                    && uuid::to_string(derived.uuid) == v.uuid,
                     std::string("DeriveIdentity ") + v.name + " = " + v.uuid);
             }
             const assets::IdentityDerivation withProfile =
                 assets::DeriveIdentityWithProfile(v.profile, input);
             check.Check(withProfile.Succeeded()
-                && Uuid::ToString(withProfile.uuid) == v.uuid,
+                && uuid::to_string(withProfile.uuid) == v.uuid,
                 std::string("DeriveIdentityWithProfile ") + v.name);
             check.Check(assets::IsUuidV8(withProfile.uuid),
                 std::string("version 8·variant 10 ") + v.name);
 
-            Uuid::Uuid16 parsed{};
+            uuid::uuid16 parsed{};
             check.Check(assets::TryParseCanonicalUuidV8(v.uuid, parsed)
                 && parsed == withProfile.uuid,
                 std::string("canonical 왕복 ") + v.name);
@@ -201,7 +209,7 @@ namespace RenderTest
             check.Check(again.uuid == withProfile.uuid && third.uuid == withProfile.uuid,
                 std::string("결정성 ") + v.name);
 
-            if (report) report->vectors.push_back({v.name, Uuid::ToString(withProfile.uuid)});
+            if (report) report->vectors.push_back({v.name, uuid::to_string(withProfile.uuid)});
             seenUuids.insert(v.uuid);
             seenInputs.insert(v.inputHex);
             outLog += std::string("    vector ") + v.name + " = " + v.uuid + "\n";
@@ -246,7 +254,7 @@ namespace RenderTest
                 const assets::IdentityDerivation v0AsV1 =
                     assets::DeriveIdentity(MakeInput(*v0, v0Ns));
                 check.Check(v0AsV1.Succeeded()
-                    && Uuid::ToString(v0AsV1.uuid) == alpha->uuid,
+                    && uuid::to_string(v0AsV1.uuid) == alpha->uuid,
                     "v0 벡터 입력을 v1 프로필로 유도 = model.alpha");
             }
         }
@@ -262,7 +270,7 @@ namespace RenderTest
                 assets::DeriveModelId(seed, "authoring/alpha");
             const auto* alpha = FindVector("model.alpha");
             check.Check(model.Succeeded() && alpha
-                && Uuid::ToString(model.uuid) == alpha->uuid,
+                && uuid::to_string(model.uuid) == alpha->uuid,
                 "DeriveModelId = model.alpha 벡터");
 
             struct KindCase final
@@ -283,7 +291,7 @@ namespace RenderTest
                 const auto* v = FindVector(c.vectorName);
                 const assets::IdentityDerivation sub =
                     assets::DeriveSubAssetId(model.uuid, c.kind, c.key);
-                check.Check(v && sub.Succeeded() && Uuid::ToString(sub.uuid) == v->uuid,
+                check.Check(v && sub.Succeeded() && uuid::to_string(sub.uuid) == v->uuid,
                     std::string("DeriveSubAssetId(") + assets::ToKindName(c.kind).data()
                     + ") = " + c.vectorName);
             }
@@ -301,7 +309,7 @@ namespace RenderTest
                 "'model'은 subasset kind가 아니다");
 
             // legacy v4 GUID를 namespace로 넘기면 값에서 막힌다.
-            Uuid::Uuid16 legacyV4 = Uuid::Parse("68b21a01-958e-44ed-8820-a2b9aa289587");
+            uuid::uuid16 legacyV4 = uuid::parse("68b21a01-958e-44ed-8820-a2b9aa289587");
             const assets::IdentityDerivation fromV4 = assets::DeriveSubAssetId(
                 legacyV4, assets::SubAssetKind::Material, "material/x");
             check.Check(!fromV4.Succeeded()
@@ -321,7 +329,7 @@ namespace RenderTest
                 assets::IdentityIssue expected, const char* label)
             {
                 const assets::IdentityDerivation d = assets::DeriveIdentity(input);
-                check.Check(!d.Succeeded() && d.issue == expected && d.uuid.IsNil(),
+                check.Check(!d.Succeeded() && d.issue == expected && d.uuid.is_nil(),
                     std::string(label) + " → " + std::string(assets::ToString(expected))
                     + " (실제 " + std::string(assets::ToString(d.issue)) + ")");
             };
@@ -376,16 +384,16 @@ namespace RenderTest
         // ── 6. legacy 표기·판정과의 배타성 ────────────────────────────────────
         outLog += "  [6] legacy 배타\n";
         {
-            Uuid::Uuid16 out{};
+            uuid::uuid16 out{};
             check.Check(!assets::TryParseCanonicalUuidV8(
                 "68b21a01-958e-44ed-8820-a2b9aa289587", out), "v4 표기 거부");
-            const Uuid::Uuid16 v5 = Uuid::FromName(
-                Uuid::Parse("68b21a01-958e-44ed-8820-a2b9aa289587"), "gltf/material/0");
-            check.Check(!assets::TryParseCanonicalUuidV8(Uuid::ToString(v5), out),
+            const uuid::uuid16 v5 = uuid::from_name(
+                uuid::parse("68b21a01-958e-44ed-8820-a2b9aa289587"), "gltf/material/0");
+            check.Check(!assets::TryParseCanonicalUuidV8(uuid::to_string(v5), out),
                 "v5(SHA-1) 표기 거부");
             // pseudo v5-as-v4(현 ModelIdentityRefresher 방식)도 v8이 아니다.
-            Uuid::Uuid16 pseudo = v5;
-            pseudo.data[6] = static_cast<std::uint8_t>((pseudo.data[6] & 0x0Fu) | 0x40u);
+            uuid::uuid16 pseudo = v5;
+            pseudo.data_[6] = static_cast<std::uint8_t>((pseudo.data_[6] & 0x0Fu) | 0x40u);
             check.Check(!assets::IsUuidV8(pseudo) && experiment::IsAssetIdV4({ pseudo }),
                 "pseudo v5-as-v4는 v8이 아니다(legacy 판정에는 걸린다)");
 
@@ -403,17 +411,17 @@ namespace RenderTest
                 check.Check(!assets::TryParseCanonicalUuidV8(
                     std::string(alpha->uuid) + " ", out), "꼬리 공백 거부");
 
-                Uuid::Uuid16 v8 = Uuid::Parse(alpha->uuid);
+                uuid::uuid16 v8 = uuid::parse(alpha->uuid);
                 check.Check(!experiment::IsAssetIdV4({ v8 }),
                     "v8은 legacy IsAssetIdV4에 걸리지 않는다(두 세계가 겹치지 않음)");
-                Uuid::Uuid16 badVariant = v8;
-                badVariant.data[8] = static_cast<std::uint8_t>(badVariant.data[8] & 0x3Fu);
+                uuid::uuid16 badVariant = v8;
+                badVariant.data_[8] = static_cast<std::uint8_t>(badVariant.data_[8] & 0x3Fu);
                 check.Check(!assets::IsUuidV8(badVariant), "variant 비트 훼손 → v8 아님");
-                Uuid::Uuid16 badVersion = v8;
-                badVersion.data[6] = static_cast<std::uint8_t>((badVersion.data[6] & 0x0Fu) | 0x40u);
+                uuid::uuid16 badVersion = v8;
+                badVersion.data_[6] = static_cast<std::uint8_t>((badVersion.data_[6] & 0x0Fu) | 0x40u);
                 check.Check(!assets::IsUuidV8(badVersion), "version nibble 훼손 → v8 아님");
             }
-            check.Check(!assets::IsUuidV8(Uuid::Nil()), "nil은 v8이 아니다");
+            check.Check(!assets::IsUuidV8(uuid::nil()), "nil은 v8이 아니다");
         }
 
         // ── 7. bit 설정 — digest와의 관계를 256건에서 단정 ────────────────────
@@ -431,15 +439,15 @@ namespace RenderTest
                 assets::IdentityIssue issue{};
                 std::string context;
                 if (!assets::BuildIdentityInputBytes(input, bytes, issue, context)) continue;
-                const Hash::Sha256Digest digest =
-                    Hash::Sha256::Compute(bytes.data(), bytes.size());
-                const Uuid::Uuid16 uuid = assets::DeriveUuidFromIdentityInputBytes(bytes);
+                const ce::hash::sha256_digest digest =
+                    ce::hash::sha256::compute(bytes.data(), bytes.size());
+                const uuid::uuid16 uuid = assets::DeriveUuidFromIdentityInputBytes(bytes);
                 bool same = assets::IsUuidV8(uuid);
                 for (std::size_t b = 0; b < 16; ++b)
                 {
-                    if (b == 6) same = same && (uuid.data[6] & 0x0Fu) == (digest[6] & 0x0Fu);
-                    else if (b == 8) same = same && (uuid.data[8] & 0x3Fu) == (digest[8] & 0x3Fu);
-                    else same = same && uuid.data[b] == digest[b];
+                    if (b == 6) same = same && (uuid.data_[6] & 0x0Fu) == (digest[6] & 0x0Fu);
+                    else if (b == 8) same = same && (uuid.data_[8] & 0x3Fu) == (digest[8] & 0x3Fu);
+                    else same = same && uuid.data_[b] == digest[b];
                 }
                 if (same) ++ok;
             }
@@ -460,7 +468,7 @@ namespace RenderTest
                 const std::vector<std::uint8_t> ns = FromHex(v.namespaceHex);
                 const assets::IdentityInput input = MakeInput(v, ns);
                 const assets::IdentityRegisterResult r =
-                    registry.Register(input, v.name, Uuid::Parse(v.uuid));
+                    registry.Register(input, v.name, uuid::parse(v.uuid));
                 if (r.Succeeded()) ++registered;
                 else if (r.outcome == assets::IdentityRegisterOutcome::DuplicateTuple)
                 {
@@ -496,29 +504,29 @@ namespace RenderTest
                 const std::vector<std::uint8_t> alphaNs = FromHex(alpha->namespaceHex);
                 const assets::IdentityRegisterResult r = fresh.Register(
                     MakeInput(*beta, betaNs), "beta-with-alpha-uuid",
-                    Uuid::Parse(alpha->uuid));
+                    uuid::parse(alpha->uuid));
                 check.Check(r.outcome == assets::IdentityRegisterOutcome::RecomputeMismatch
-                    && Uuid::ToString(r.uuid) == beta->uuid && fresh.Size() == 0u,
+                    && uuid::to_string(r.uuid) == beta->uuid && fresh.Size() == 0u,
                     "sidecar 주장값 ≠ 재유도 → RecomputeMismatch, 미등록");
 
                 const assets::IdentityRegisterResult r2 = fresh.RegisterDerived(
-                    FromHex(beta->inputHex), Uuid::Parse(alpha->uuid), "derived-mismatch");
+                    FromHex(beta->inputHex), uuid::parse(alpha->uuid), "derived-mismatch");
                 check.Check(r2.outcome == assets::IdentityRegisterOutcome::RecomputeMismatch,
                     "RegisterDerived도 재유도 대조를 한다");
                 const assets::IdentityRegisterResult r3 = fresh.RegisterDerived(
-                    FromHex(beta->inputHex), Uuid::Parse(beta->uuid), "derived-ok");
+                    FromHex(beta->inputHex), uuid::parse(beta->uuid), "derived-ok");
                 check.Check(r3.Succeeded() && fresh.Size() == 1u
-                    && fresh.Contains(Uuid::Parse(beta->uuid)),
+                    && fresh.Contains(uuid::parse(beta->uuid)),
                     "RegisterDerived 정상 등록");
-                const assets::IdentityRegistryEntry* found = fresh.Find(Uuid::Parse(beta->uuid));
+                const assets::IdentityRegistryEntry* found = fresh.Find(uuid::parse(beta->uuid));
                 check.Check(found && found->context == "derived-ok", "Find가 context를 되돌린다");
-                check.Check(!fresh.Contains(Uuid::Parse(alpha->uuid)), "미등록 UUID는 Contains false");
+                check.Check(!fresh.Contains(uuid::parse(alpha->uuid)), "미등록 UUID는 Contains false");
 
                 // UUID 충돌 — 실제 SHA-256 충돌은 만들 수 없으므로 test seam으로
                 // 조립한다: 다른 바이트열에 alpha의 UUID를 붙여 두고 alpha를 등록.
                 assets::IdentityRegistry forged;
                 forged.InsertUncheckedForTest(FromHex(beta->inputHex),
-                    Uuid::Parse(alpha->uuid), "forged-collision");
+                    uuid::parse(alpha->uuid), "forged-collision");
                 const assets::IdentityRegisterResult r4 = forged.Register(
                     MakeInput(*alpha, alphaNs), "model.alpha");
                 check.Check(r4.outcome == assets::IdentityRegisterOutcome::UuidCollision

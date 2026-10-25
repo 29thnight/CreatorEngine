@@ -1,8 +1,12 @@
-#include "PathFinder.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "RHI/RHIShaderCompiler.h"
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/Vulkan/VulkanPipelineCache.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 int main(int argc, char** argv)
 {
@@ -14,11 +18,11 @@ int main(int argc, char** argv)
         const std::string mode(argv[4]);
         if (mode != "normal" && mode != "disable-opt" && mode != "compile-only")
             throw std::runtime_error("Unknown probe mode");
-        auto* paths = InternalPath::GetInstance();
-        paths->BaseProjectPath = repo / "Dynamic_CPP";
-        paths->ShaderSourcePath = shader.parent_path().parent_path();
-        paths->CacheRoot = output / "Cache";
-        paths->AssetAuthoringEnabled = true;
+        auto* paths = (&ce::paths::get_state());
+        paths->base_project_path = repo / "Dynamic_CPP";
+        paths->shader_source_path = shader.parent_path().parent_path();
+        paths->cache_root = output / "Cache";
+        paths->asset_authoring_enabled = true;
         std::filesystem::create_directories(output);
         RHIShaderCompileOptions options;
         options.strictMath = true;

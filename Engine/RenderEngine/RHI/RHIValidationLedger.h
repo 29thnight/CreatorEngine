@@ -33,7 +33,7 @@
 // 프레임마다 도는 자리지만 레이어가 꺼져 있으면 `DrainDebugMessages` 가 큐 포인터
 // 하나를 보고 즉시 돌아오므로 이 잠금까지 오지 않는다.
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace rhi::validation
 {

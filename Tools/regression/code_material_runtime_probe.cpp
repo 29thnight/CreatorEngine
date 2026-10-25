@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 // Unrun source fixture. A dedicated engine host mounts a source-free v3 set
 // containing the supplied authored/code and graph roots, runs its normal job
 // scheduler, calls Begin once and Poll once per owner tick. No pending wait,
@@ -9,7 +14,7 @@
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedCodeMaterial.h"
 #include "../../Engine/RenderEngine/LXMaterialPipeline.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace code_material_runtime_probe
 {

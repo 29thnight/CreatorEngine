@@ -2,9 +2,13 @@
 // It performs no shader compilation, texture decode or GPU submission.
 #include "../../Engine/RenderEngine/AssetDepot/AssetSetActivation.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedTexture.h"
-#include "../../Engine/Utility_Framework/ContentAbi.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.ContentAbi.h"
+#else
+import Creator.Core.ContentAbi;
+#endif
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -49,9 +53,9 @@ namespace
     experiment::AssetId Id(unsigned char value)
     {
         experiment::AssetId id;
-        id.value.data[6] = 0x40u;
-        id.value.data[8] = 0x80u;
-        id.value.data[15] = value;
+        id.value.data_[6] = 0x40u;
+        id.value.data_[8] = 0x80u;
+        id.value.data_[15] = value;
         return id;
     }
 
@@ -69,7 +73,7 @@ namespace
         manifest.assetSetId = Id(1u);
         manifest.revision = 1u;
         manifest.targetPlatform = "win-x64";
-        manifest.targetAbi = CreatorContentAbi::Token;
+        manifest.targetAbi = ce::content_abi::token;
         cooked::AssetBlobRecord blob;
         Require(cooked::ComputeSha256(payload, blob.contentSha256, failure), "Blob hash failed");
         blob.byteSize = payload.size();
@@ -106,7 +110,7 @@ namespace
         Write(setRoot / "Derived/asset-set-manifest.cemf", encoded.bytes);
         Write(setRoot / blob.artifactPath, payload);
         const auto policy = root / "Derived/asset-set-activation.ceas";
-        const auto good = std::string("CEAS1\nwin-x64\n") + CreatorContentAbi::Token + "\n" + manifestHash + "\n";
+        const auto good = std::string("CEAS1\nwin-x64\n") + ce::content_abi::token + "\n" + manifestHash + "\n";
         Text(policy, good);
         Require(AssetDepot::ReadConfiguredAssetSets(root, inputs, failure) && inputs.size() == 1u
             && inputs.front().manifest.assetSetId == manifest.assetSetId, "Configured set was not captured");
@@ -123,7 +127,7 @@ namespace
         Write(root / "AssetSets" / wrongHash / "Derived/asset-set-manifest.cemf", wrongBytes.bytes);
         Text(policy, "CEAS1\nwin-x64\nwrong-host-abi\n" + wrongHash + "\n");
         Require(!AssetDepot::ReadConfiguredAssetSets(root, inputs, failure), "Self-asserted host content ABI accepted");
-        Text(policy, std::string("CEAS1\nwin-x64\n") + CreatorContentAbi::Token + "\n../outside\n");
+        Text(policy, std::string("CEAS1\nwin-x64\n") + ce::content_abi::token + "\n../outside\n");
         Require(!AssetDepot::ReadConfiguredAssetSets(root, inputs, failure) && inputs.size() == 1u,
             "Traversal was accepted or failure destroyed the prior parse result");
         Text(policy, good + manifestHash + "\n");

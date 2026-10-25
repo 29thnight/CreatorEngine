@@ -7,7 +7,7 @@
 #include "VulkanRenderTargetTable.h"   // 5c-4c — `VulkanRenderTargetBinding` 이 여기로 갔다
 
 #include <stdint.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 class VulkanPipelineCache;
 class VulkanResourceTable;

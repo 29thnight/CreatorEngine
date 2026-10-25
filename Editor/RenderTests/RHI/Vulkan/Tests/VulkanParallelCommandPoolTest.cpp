@@ -1,3 +1,13 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #include "../VulkanSelfTest.h"
 #include "RHI/ParallelRecordingJobsSelfTest.h"
@@ -6,7 +16,7 @@
 #include "RHI/RHISubmissionThread.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 
-#include "../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {

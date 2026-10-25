@@ -1,7 +1,11 @@
 // Standalone TR0 provenance, display association and scoped exclusion regression.
 #include "../../Engine/RenderEngine/Render/Temporal/TemporalMeasurementProvenance.h"
 #include "../../Engine/RenderEngine/Render/Temporal/TemporalRuntimeControl.h"
-#include "../../Engine/Utility_Framework/Contract.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 
 int main()
 {

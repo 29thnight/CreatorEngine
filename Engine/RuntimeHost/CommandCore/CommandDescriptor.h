@@ -22,7 +22,7 @@
 // 서명이 요구하지 않으면 아무도 안 쓴다. 지금 78 개가 help 에 없는 이유가 그것이다.
 // 새 명령은 descriptor 없이 등록할 수 없다(§13 LC3 완료 기준).
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace CommandCore
 {

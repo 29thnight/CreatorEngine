@@ -2,7 +2,7 @@
 #include "../../Engine/EngineDiagnostics/DxCaptureSecurity.h"
 
 #include <stdint.h>
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 #pragma comment(lib, "Advapi32.lib")
 

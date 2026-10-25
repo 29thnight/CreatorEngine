@@ -17,8 +17,8 @@ def source(path):
 
 class EditorGcOwnerContracts(unittest.TestCase):
     def test_command_owner_is_fixed_before_presentation_starts(self):
-        header = source("Editor/EngineEntry/ConsoleCommandSystem.h")
-        app = source("Editor/EngineEntry/App.cpp")
+        header = source("Editor/EngineEntry/Commands/ConsoleCommandSystem.h")
+        app = source("Editor/EngineEntry/Bootstrap/App.cpp")
         self.assertIn("const std::thread::id m_gameThread", header)
         startup = app[app.index("void Core::App::Run()") :]
         self.assertLess(startup.index("(void)ConsoleCommandSystem::Get();"),
@@ -26,7 +26,7 @@ class EditorGcOwnerContracts(unittest.TestCase):
         self.assertIn("cli.Pump([this] { return m_main->LockSceneStructure(); });", app)
 
     def test_structural_entry_points_dispatch_before_borrowing(self):
-        operations = source("Editor/EngineEntry/EditorObjectOperations.cpp")
+        operations = source("Editor/EngineEntry/Scene/EditorObjectOperations.cpp")
         for name in ("Create", "Delete", "Duplicate", "Parent", "MoveRelative",
                      "AddComponent", "AddManagedScript", "RemoveComponent", "UndoRedo"):
             with self.subTest(operation=name):
@@ -39,7 +39,7 @@ class EditorGcOwnerContracts(unittest.TestCase):
         self.assertIn("[guid, name, sceneId]", operations)
 
     def test_undo_replay_dispatches_without_changing_value_commit_semantics(self):
-        undo = source("Editor/EngineEntry/ReflectionUndo.h")
+        undo = source("Editor/EngineEntry/Editing/ReflectionUndo.h")
         for name in ("Undo", "Redo"):
             self.assertRegex(undo, rf"void {name}\(\)\s*\{{\s*"
                              r"if \(!ConsoleCommandSystem::Get\(\).IsGameThread\(\)\)")
@@ -59,7 +59,7 @@ class EditorGcOwnerContracts(unittest.TestCase):
         self.assertNotIn("std::span<Entity* const>(m_clipboard", hierarchy)
 
     def test_prefab_lifetime_is_managed_on_owner(self):
-        prefab = source("Editor/EngineEntry/PrefabEditor.cpp")
+        prefab = source("Editor/EngineEntry/Scene/PrefabEditor.cpp")
         self.assertEqual(prefab.count("!ConsoleCommandSystem::Get().IsGameThread()"), 2)
         self.assertIn("SceneManagers->AdoptScene(", prefab)
         self.assertIn("Scene::CreateNewScene(SceneManagers->ManagedDomain(),", prefab)
@@ -68,7 +68,7 @@ class EditorGcOwnerContracts(unittest.TestCase):
 
     def test_owned_gpu_commands_have_explicit_unfenced_contract(self):
         registrar = source("Editor/EngineEntry/Commands/CommandRegistrar.h")
-        commands = source("Editor/EngineEntry/ConsoleCommandSystem.cpp")
+        commands = source("Editor/EngineEntry/Commands/ConsoleCommandSystem.cpp")
         diagnostics = source("Editor/EngineEntry/Commands/DiagnosticsCommands.cpp")
         self.assertIn("SceneAccess access = SceneAccess::BorrowLiveState", registrar)
         self.assertIn("it->second.sceneAccess == ConsoleCmd::SceneAccess::BorrowLiveState", commands)
@@ -89,7 +89,7 @@ class EditorGcOwnerContracts(unittest.TestCase):
         self.assertNotIn("SoundComponent* m_clipPickerTarget", inspector_header)
 
     def test_queue_is_nonblocking_and_shutdown_closes_admission(self):
-        commands = source("Editor/EngineEntry/ConsoleCommandSystem.cpp")
+        commands = source("Editor/EngineEntry/Commands/ConsoleCommandSystem.cpp")
         queue = commands[commands.index("ConsoleCommandSystem::EnqueueEditorMutation(") :
                          commands.index("void ConsoleCommandSystem::Pump(")]
         self.assertIn('result.code = "editor.queued"', queue)

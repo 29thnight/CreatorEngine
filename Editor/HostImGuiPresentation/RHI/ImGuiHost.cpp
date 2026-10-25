@@ -1,16 +1,29 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "../../../Engine/EngineDiagnostics/ProfileScope.h"
 #include "IImGuiHost.h"
 #include "ImGuiWin32Cursor.h"
 #include "DX12/ImGuiDx12Shell.h"
 #include "GlobalImGuiContext.h"
-#include "LogSystem.h"
-#include "../../../Engine/Utility_Framework/PathFinder.h"
-#include "../../../Engine/Utility_Framework/WarmupLedger.h"
+#include "../../../Engine/Utility_Framework/Diagnostics/LogSystem.h"
+#include "../../../Engine/Utility_Framework/Runtime/WarmupLedger.h"
 
 #include <imgui.h>
 #include <imgui_impl_win32.h>
-#include <Windows.h>
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -73,7 +86,7 @@ namespace
             // io.ConfigFlags |= ImGuiConfigFlags_ViewportsEnable;
             io.ConfigDpiScaleFonts = true;
             static const std::string kIniPath =
-                PathFinder::ConfigPath("imgui.ini").string();
+                ce::paths::config_path("imgui.ini").string();
             io.IniFilename = kIniPath.c_str();
 
             if (!ImGui_ImplWin32_Init(hwnd))

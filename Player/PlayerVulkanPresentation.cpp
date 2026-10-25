@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../Engine/RenderEngine/RenderAllocator.h"
 #include "PlayerPresentation.h"
 #include "Render/Temporal/TemporalRuntimeControl.h"
@@ -5,7 +10,7 @@
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 
 #include <stdio.h>
-#include "../Engine/Utility_Framework/StandardLibrary.h"
+#include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace Player
 {

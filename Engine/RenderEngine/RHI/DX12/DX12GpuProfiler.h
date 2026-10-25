@@ -1,8 +1,26 @@
 #pragma once
-#include "../../../Utility_Framework/Ownership.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
-#include <d3d12.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 
 #include "../IRHIGpuProfiler.h"
 #include "../RHICommandProvenance.h"
@@ -118,7 +136,7 @@ class DX12GpuProfiler : public IRHIGpuProfiler
                     std::string& outError);
     void Shutdown();
 
-    bool IsInitialized() const { return nullptr != m_queryHeap.Get(); }
+    bool IsInitialized() const { return nullptr != m_queryHeap.get(); }
 
     /// 제출 하나를 열고 그 제출의 표를 돌려준다. 링 슬롯은 여기서 고른다 —
     /// 링 산술이 한 자리에만 있어야 부르는 쪽과 읽는 쪽이 갈라지지 않는다.
@@ -191,8 +209,6 @@ class DX12GpuProfiler : public IRHIGpuProfiler
 
   private:
     uint32_t ReservePass(const std::string& name, const GpuPassTimingIdentity& identity);
-    template<typename T>
-    using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     struct PassRecord
     {
@@ -226,12 +242,12 @@ class DX12GpuProfiler : public IRHIGpuProfiler
 
     // 큐를 붙잡아 둔다. 표본을 다시 뜨려면 필요하고, 주파수만 받아 두고
     // 놓아 버리면 그 뒤로는 두 시계를 맞출 수단이 없다.
-    ComPtr<ID3D12CommandQueue> m_queue;
+    winrt::com_ptr<ID3D12CommandQueue> m_queue;
     ClockCalibration m_calibration;
     std::string m_calibrationError;
 
-    ComPtr<ID3D12QueryHeap> m_queryHeap;
-    ComPtr<ID3D12Resource> m_readback;
+    winrt::com_ptr<ID3D12QueryHeap> m_queryHeap;
+    winrt::com_ptr<ID3D12Resource> m_readback;
 
     uint32_t m_maxPassesPerFrame{0};
     uint32_t m_frameCount{0};

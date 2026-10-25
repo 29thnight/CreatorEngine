@@ -1,6 +1,10 @@
-#include "../Utility_Framework/Ownership.h"
 #pragma once
-#include "../Utility_Framework/Core.Minimal.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "Component.h"
 //#include "IOnDestroy.h"
 //#include "IAwakable.h"
@@ -119,7 +123,7 @@ public:
 
 private:
 
-    bool LoadEditorHeightMap(file::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out);
+    bool LoadEditorHeightMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out);
 
     bool LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector<std::vector<float>>& out);
 public:

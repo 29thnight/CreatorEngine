@@ -1,11 +1,44 @@
-#include "../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "Assets/ModelCpuGeometryPayload.h"
-#include "../Utility_Framework/WindowsApartment.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Platform.Windows.h"
+#else
+import Creator.Platform.Windows;
+#endif
 #include "DataSystem.h"
 #include "Experiment/Cooked/CookedCodeMaterial.h"
 #include "Experiment/Cooked/CookedTexture.h"
 #include "Experiment/Cooked/MaterialAssetSetCodec.h"
-#include "../Utility_Framework/Contract.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 #include "AssetDepot/LegacyResourceCharges.h"
 
 #include "Experiment/Cooked/CookedAssetCatalog.h" // I7-C1 (MBC9: ExperimentModelMigration.cpp에서 이주)
@@ -20,24 +53,35 @@
 #include "Mesh.h"
 #include "Texture.h"
 #include "FontAsset.h"
-#include "Sha256.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 #include "../EngineDiagnostics/ProfileScope.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 
-#include "AuthoringBase64.h"
-#include "Benchmark.hpp"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Base64.h"
+#else
+import Creator.Core.Base64;
+#endif
 // SceneManager.h가 여기 있었다. LoadAssetBundle이 씬 매니저가 들고 있던
 // 스레드풀을 빌려 쓰느라 층 3이 층 4를 올려다봤다. 풀의 소유를 층 1로
 // 내리면서(현재 JobScheduler.h) 그 이유가 사라졌다 — PHASE 4-3 슬라이스 3.
-#include "JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 // Meta::Serialize / Deserialize. SceneManager.h가 ReflectionYml.h를 대신
 // 끌어와 주던 자리다 — 빌려 쓰던 것을 직접 든다.
-#include "ReflectionYml.h"
-#include "AuthoringParsedDocument.h"
-#include "AuthoringCookedDocument.h"
-#include "SerializationProfiler.h" // D0: 부팅 catalog 파싱 기준선
-#include "AuthoringNodeViewAccess.h" // D3-a-5b
+#include "../Utility_Framework/Reflection/ReflectionYml.h"
+#include "../Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../Utility_Framework/Authoring/AuthoringCookedDocument.h"
+#include "../Utility_Framework/Authoring/SerializationProfiler.h" // D0: 부팅 catalog 파싱 기준선
+#include "../Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-5b
 #include "ShaderMeta.h"
 #include "ShaderPermutationDomain.h"
 #include "StandardMaterialProperty.h"
@@ -48,12 +92,10 @@
 #include "Assets/ModelSidecarV2.h"
 #include "RHI/RHIFormat.h" // MBC7: generation embedded texture 포맷
 
-#include <Windows.h>
-
 // 검색 함수
-bool HasImageFile(const file::path& directory)
+bool HasImageFile(const std::filesystem::path& directory)
 {
-	for (const auto& entry : file::directory_iterator(directory))
+	for (const auto& entry : std::filesystem::directory_iterator(directory))
 	{
 		if (entry.is_regular_file())
 		{
@@ -140,32 +182,25 @@ namespace
         ce::platform::windows::apartment_scope m_scope{ ce::platform::windows::apartment_model::current_or_mta };
     };
 
-	std::string Lowercase(std::string value)
-	{
-		std::ranges::transform(value, value.begin(), [](unsigned char character)
-		{
-			return static_cast<char>(std::tolower(character));
-		});
-		return value;
-	}
 
-	RuntimeAssetType ResolveRuntimeAssetType(const file::path& path)
+
+	RuntimeAssetType ResolveRuntimeAssetType(const std::filesystem::path& path)
 	{
-		const std::string extension = Lowercase(path.extension().string());
+		const std::string extension = ce::strings::to_lower(path.extension().string());
 		if (extension == ".fbx" || extension == ".gltf" ||
 			extension == ".glb" || extension == ".obj")
 		{
 			return RuntimeAssetType::Model;
 		}
 
-		const std::string parent = Lowercase(path.parent_path().filename().string());
+		const std::string parent = ce::strings::to_lower(path.parent_path().filename().string());
 		if (extension == ".asset")
 		{
 			if (parent == "models") return RuntimeAssetType::Model;
             for (auto folder = path.parent_path(); !folder.empty() && folder != folder.parent_path();
                  folder = folder.parent_path())
             {
-                if (Lowercase(folder.filename().string()) == "materials")
+                if (ce::strings::to_lower(folder.filename().string()) == "materials")
                 {
                     return RuntimeAssetType::Material;
                 }
@@ -191,9 +226,9 @@ namespace
         return RuntimeAssetType::CatalogOnly;
 	}
 
-    file::path MaterialSourcePath(std::string_view name)
+    std::filesystem::path MaterialSourcePath(std::string_view name)
     {
-        file::path requested(name);
+        std::filesystem::path requested(name);
         if (requested.is_absolute())
         {
             return requested.lexically_normal();
@@ -201,57 +236,57 @@ namespace
         // Relative strings retain the legacy asset-name contract, including
         // names containing dots or ending in .asset. GUID loads use full paths.
         requested += ".asset";
-        return (PathFinder::Relative("Materials") / requested).lexically_normal();
+        return (ce::paths::relative("Materials") / requested).lexically_normal();
     }
 
-    std::string MaterialCacheKey(const file::path& path)
+    std::string MaterialCacheKey(const std::filesystem::path& path)
     {
         std::error_code error;
-        const auto absolute = file::absolute(path, error).lexically_normal();
+        const auto absolute = std::filesystem::absolute(path, error).lexically_normal();
         if (error)
         {
             return path.lexically_normal().generic_string();
         }
-        const auto root = file::absolute(PathFinder::Relative("Materials"), error).lexically_normal();
-        const auto relative = error ? file::path{} : absolute.lexically_relative(root);
+        const auto root = std::filesystem::absolute(ce::paths::relative("Materials"), error).lexically_normal();
+        const auto relative = error ? std::filesystem::path{} : absolute.lexically_relative(root);
         auto key = !relative.empty() && *relative.begin() != ".." ? relative : absolute;
         key.replace_extension();
         return key.generic_string();
     }
 
-	file::path ResolveRuntimeAssetPath(std::string_view requestedPath,
+	std::filesystem::path ResolveRuntimeAssetPath(std::string_view requestedPath,
 		std::string_view fallbackDirectory)
 	{
-		const file::path requested(requestedPath);
+		const std::filesystem::path requested(requestedPath);
 		std::error_code error;
-		if (file::is_regular_file(requested, error) && !error) return requested;
+		if (std::filesystem::is_regular_file(requested, error) && !error) return requested;
 		// G2 — 폴더를 가진 상대 경로는 Assets 기준 신원이다(TextureCacheKey 가 만든다).
 		// 이름만 온 요청만 유형 폴더에서 다시 찾는다.
 		if (requested.is_relative() && requested.has_parent_path())
 		{
-			const file::path underAssets = PathFinder::Relative() / requested;
+			const std::filesystem::path underAssets = ce::paths::relative() / requested;
 			error.clear();
-			if (file::is_regular_file(underAssets, error) && !error) return underAssets;
+			if (std::filesystem::is_regular_file(underAssets, error) && !error) return underAssets;
 		}
-		return PathFinder::Relative(std::string(fallbackDirectory)) / requested.filename();
+		return ce::paths::relative(std::string(fallbackDirectory)) / requested.filename();
 	}
 
-    file::path normalize_font_path(const file::path& path)
+    std::filesystem::path normalize_font_path(const std::filesystem::path& path)
     {
         std::error_code error;
-        const auto canonical = file::weakly_canonical(path, error);
+        const auto canonical = std::filesystem::weakly_canonical(path, error);
         if (!error)
         {
             return canonical.lexically_normal();
         }
-        return file::absolute(path).lexically_normal();
+        return std::filesystem::absolute(path).lexically_normal();
     }
 
-    file::path resolve_font_path(std::string_view requestedPath, const DataSystem& data)
+    std::filesystem::path resolve_font_path(std::string_view requestedPath, const DataSystem& data)
     {
         if (requestedPath.empty())
         {
-            return normalize_font_path(PathFinder::EngineResourcePath("Fonts/Runtime/Inter-Regular.ttf"));
+            return normalize_font_path(ce::paths::engine_resource_path("Fonts/Runtime/Inter-Regular.ttf"));
         }
         if (requestedPath.size() == 36u && requestedPath[8] == '-' && requestedPath[13] == '-'
             && requestedPath[18] == '-' && requestedPath[23] == '-')
@@ -264,7 +299,7 @@ namespace
             }
             return normalize_font_path(resolved);
         }
-        const file::path requested(std::u8string(requestedPath.begin(), requestedPath.end()));
+        const std::filesystem::path requested(std::u8string(requestedPath.begin(), requestedPath.end()));
         if (requested.is_absolute())
         {
             return normalize_font_path(requested);
@@ -274,38 +309,38 @@ namespace
         // Never redirect a missing A/font.ttf to an unrelated B/font.ttf.
         if (requested.has_parent_path())
         {
-            const auto underAssets = PathFinder::Relative() / requested;
-            if (file::is_regular_file(underAssets, error))
+            const auto underAssets = ce::paths::relative() / requested;
+            if (std::filesystem::is_regular_file(underAssets, error))
             {
                 return normalize_font_path(underAssets);
             }
             error.clear();
-            const auto underResources = PathFinder::EngineResourcePath() / requested;
-            if (file::is_regular_file(underResources, error))
+            const auto underResources = ce::paths::engine_resource_path() / requested;
+            if (std::filesystem::is_regular_file(underResources, error))
             {
                 return normalize_font_path(underResources);
             }
             return normalize_font_path(underAssets);
         }
-        for (const auto& candidate : { PathFinder::Relative("Fonts") / requested,
-            PathFinder::Relative("Font") / requested,
-            PathFinder::EngineResourcePath("Fonts/Runtime") / requested })
+        for (const auto& candidate : { ce::paths::relative("Fonts") / requested,
+            ce::paths::relative("Font") / requested,
+            ce::paths::engine_resource_path("Fonts/Runtime") / requested })
         {
             error.clear();
-            if (file::is_regular_file(candidate, error))
+            if (std::filesystem::is_regular_file(candidate, error))
             {
                 return normalize_font_path(candidate);
             }
         }
-        return normalize_font_path(PathFinder::Relative("Fonts") / requested);
+        return normalize_font_path(ce::paths::relative("Fonts") / requested);
     }
 
-    std::string font_cache_key(const file::path& path, FileGuid guid)
+    std::string font_cache_key(const std::filesystem::path& path, FileGuid guid)
     {
         const auto utf8Path = normalize_font_path(path).generic_u8string();
         std::string normalized(utf8Path.begin(), utf8Path.end());
 #ifdef _WIN32
-        normalized = Lowercase(std::move(normalized));
+        ce::strings::to_lower_in_place(normalized);
 #endif
         return guid.ToString() + "|" + normalized;
     }
@@ -314,11 +349,11 @@ namespace
 	// 같은 이름의 다른 확장자가 한 칸을 나눠 먼저 온 쪽이 이겼다.
 	// Assets 안이면 그 기준 상대 경로(저장해도 기계를 옮겨도 같은 파일로 돌아온다),
 	// 밖이면 절대 경로. 적재·은퇴·번들 보존이 모두 이 함수 하나로 키를 만든다.
-	std::string TextureCacheKey(const file::path& path)
+	std::string TextureCacheKey(const std::filesystem::path& path)
 	{
-		const file::path absolute = file::absolute(path).lexically_normal();
-		const file::path assets = file::absolute(PathFinder::Relative()).lexically_normal();
-		const file::path relative = absolute.lexically_relative(assets);
+		const std::filesystem::path absolute = std::filesystem::absolute(path).lexically_normal();
+		const std::filesystem::path assets = std::filesystem::absolute(ce::paths::relative()).lexically_normal();
+		const std::filesystem::path relative = absolute.lexically_relative(assets);
 		if (!relative.empty() && *relative.begin() != "..")
 			return relative.generic_string();
 		return absolute.generic_string();
@@ -341,9 +376,9 @@ namespace
         }
     }
 
-	std::string MaterialTextureKeyPrefix(const file::path& path)
+	std::string MaterialTextureKeyPrefix(const std::filesystem::path& path)
 	{
-		return "material:" + file::absolute(path).lexically_normal().generic_string() + ":";
+		return "material:" + std::filesystem::absolute(path).lexically_normal().generic_string() + ":";
 	}
 
 	std::string_view TextureFallbackDirectory(DataSystem::TextureFileType type)
@@ -363,10 +398,10 @@ namespace
     FileGuid RegisteredTextureGuid(DataSystem& data, std::string_view name,
         DataSystem::TextureFileType type)
     {
-        const file::path requested(name);
+        const std::filesystem::path requested(name);
         const std::array candidates{ requested,
-            requested.is_relative() ? PathFinder::Relative() / requested : requested,
-            PathFinder::Relative(std::string(TextureFallbackDirectory(type))) / requested.filename() };
+            requested.is_relative() ? ce::paths::relative() / requested : requested,
+            ce::paths::relative(std::string(TextureFallbackDirectory(type))) / requested.filename() };
         for (const auto& candidate : candidates)
         {
             const auto guid = data.GetFileGuid(candidate);
@@ -379,7 +414,7 @@ namespace
     }
 
 	bool RegisterAssetMeta(AssetMetaRegistry& registry, const FileGuid& guid,
-		const file::path& path)
+		const std::filesystem::path& path)
 	{
 		const AssetMetaRegistrationResult result = registry.Register(guid, path);
 		if (AssetMetaRegistrationResult::Registered == result
@@ -414,8 +449,8 @@ namespace
 struct DataSystem::PreparedRuntimeAsset
 {
     FileGuid guid;
-    file::path path;
-    file::path projectRoot;
+    std::filesystem::path path;
+    std::filesystem::path projectRoot;
     RuntimeAssetType type{};
     std::uint64_t epoch{};
     std::uint64_t resolverRevision{};
@@ -432,7 +467,7 @@ struct DataSystem::PreparedRuntimeAsset
 
 struct DataSystem::SceneAssetPreparation
 {
-    file::path projectRoot;
+    std::filesystem::path projectRoot;
     std::string name;
     std::uint64_t epoch{};
     std::uint64_t resolverRevision{};
@@ -447,7 +482,7 @@ struct DataSystem::SceneAssetPreparation
     std::map<FileGuid, AssetDepot::AssetRequest<experiment::Material>> authoredRequests;
     std::map<FileGuid, AssetDepot::AssetRequest<material_graph::Generation>> programRequests;
     std::vector<own::shared_owner<const material_graph::Generation>> programPins;
-    std::map<FileGuid, file::path> graphPaths;
+    std::map<FileGuid, std::filesystem::path> graphPaths;
     std::vector<std::vector<std::byte>> materialDocuments;
     AssetBundle resources;
     // Written only by the resource worker and retained through the caller's
@@ -582,7 +617,7 @@ job_handle DataSystem::SubmitAssetWorkLocked(job_group work,
 }
 
 own::shared_owner<DataSystem::PreparedRuntimeAsset> DataSystem::PrepareRuntimeAsset(
-    FileGuid guid, const file::path& path, RuntimeAssetType type,
+    FileGuid guid, const std::filesystem::path& path, RuntimeAssetType type,
     std::optional<std::uint64_t> expectedEpoch,
     std::optional<std::uint64_t> expectedResolverRevision)
 {
@@ -640,7 +675,7 @@ own::shared_owner<DataSystem::PreparedRuntimeAsset> DataSystem::PrepareRuntimeAs
     auto asset = own::make_shared<PreparedRuntimeAsset>();
     asset->guid = guid;
     asset->path = path;
-    asset->projectRoot = PathFinder::Relative();
+    asset->projectRoot = ce::paths::relative();
     asset->type = type;
     asset->epoch = m_assetPreparationEpoch;
     asset->resolverRevision = m_assetDepotRevision;
@@ -732,7 +767,7 @@ bool DataSystem::PublishRuntimeAsset(const own::shared_owner<PreparedRuntimeAsse
         ? own::shared_owner<PreparedRuntimeAsset>{} : found->second.lock();
     if (asset->cancelled.load(std::memory_order_acquire) ||
         m_assetPreparationStopping || m_assetInvalidationDepth != 0 || asset->epoch != m_assetPreparationEpoch || asset->resolverRevision != m_assetDepotRevision ||
-        asset->projectRoot != PathFinder::Relative() ||
+        asset->projectRoot != ce::paths::relative() ||
         !current || current.borrow().operator->() != asset.borrow().operator->())
     {
         error = "Asset changed while preparing the scene: " + asset->path.string();
@@ -809,8 +844,8 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
     namespace cooked = experiment::cooked;
     auto asset = own::make_shared<PreparedRuntimeAsset>();
     asset->guid = FileGuid{ link.identity.assetId.value };
-    asset->path = Uuid::ToString(link.identity.assetId.value);
-    asset->projectRoot = PathFinder::Relative();
+    asset->path = uuid::to_string(link.identity.assetId.value);
+    asset->projectRoot = ce::paths::relative();
     asset->type = RuntimeAssetType::Model;
     asset->granularModel = true;
     asset->colliderPolicy = colliderPolicy;
@@ -1081,7 +1116,7 @@ bool DataSystem::ReadPreparedModelScene(const ModelPreparation& preparation,
         if (!preparation || !preparation->granularModel || !preparation->work.is_complete() ||
             m_assetPreparationStopping || m_assetInvalidationDepth != 0u ||
             preparation->epoch != m_assetPreparationEpoch || preparation->resolverRevision != m_assetDepotRevision ||
-            preparation->projectRoot != PathFinder::Relative() || preparation->cancelled.load(std::memory_order_acquire))
+            preparation->projectRoot != ce::paths::relative() || preparation->cancelled.load(std::memory_order_acquire))
         {
             error = "Typed model preparation is incomplete or invalidated.";
             return false;
@@ -1182,7 +1217,7 @@ AssetDepot::AssetRequest<Material> DataSystem::RequestLegacyModelMaterialAsync(
             m_assetPreparationStopping ? Error::ShuttingDown : Error::RevisionChanged, {});
         return request;
     }
-    if (!PathFinder::IsAssetAuthoringEnabled() || !generation || !generation->FindMaterial(materialId.m_guid))
+    if (!ce::paths::is_asset_authoring_enabled() || !generation || !generation->FindMaterial(materialId.m_guid))
     {
         complete(Status::Failed, Error::InvalidLink, "Legacy foliage material requires an existing authoring model.");
         return request;
@@ -1263,7 +1298,7 @@ AssetDepot::AssetRequest<Material> DataSystem::RequestLegacyModelMaterialAsync(
 
 DataSystem::ModelPreparation DataSystem::PrepareModelAssetByPath(std::string_view path, bool allowMounted)
 {
-    Uuid::Uuid16 explicitIdentity;
+    uuid::uuid16 explicitIdentity;
     if (assets::TryParseCanonicalUuidV8(path, explicitIdentity))
     {
         if (!allowMounted)
@@ -1289,7 +1324,7 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetByPath(std::string_vie
     auto guid = registry ? registry->GetGuid(source) : FileGuid{};
     if (guid == FileGuid{} && registry)
     {
-        guid = registry->GetFilenameToGuid(file::path(path).filename().string());
+        guid = registry->GetFilenameToGuid(std::filesystem::path(path).filename().string());
     }
     if (guid == FileGuid{} || !assets::IsUuidV8(guid.m_guid))
     {
@@ -1302,7 +1337,7 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetByPath(std::string_vie
         experiment::cooked::ResolvedAssetEntry resolved;
         const AssetDepot::AssetLink<assets::ModelAnimationDescriptor> link{
             { experiment::AssetId{ guid.m_guid }, {} } };
-        if (!PathFinder::IsAssetAuthoringEnabled() || m_assetPreparationStopping
+        if (!ce::paths::is_asset_authoring_enabled() || m_assetPreparationStopping
             || m_assetInvalidationDepth != 0u || epoch != m_assetPreparationEpoch
             || resolverRevision != m_assetDepotRevision
             || (m_cookedCatalog && m_cookedCatalog->Find(link.ToReference(), resolved)
@@ -1329,7 +1364,7 @@ assets::ModelAssetGeneration::Shared DataSystem::ReadPreparedModel(
     if (!preparation || m_assetPreparationStopping || m_assetInvalidationDepth != 0 ||
         preparation->cancelled.load(std::memory_order_acquire) || preparation->epoch != m_assetPreparationEpoch ||
         preparation->resolverRevision != m_assetDepotRevision ||
-        preparation->projectRoot != PathFinder::Relative() || !preparation->work.is_complete())
+        preparation->projectRoot != ce::paths::relative() || !preparation->work.is_complete())
     {
         error = "Model preparation is incomplete or invalidated.";
         return {};
@@ -1371,10 +1406,10 @@ bool DataSystem::PublishPreparedModel(const ModelPreparation& preparation, std::
 }
 
 own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAssets(
-    const Authoring::ReadNode& root, const AssetBundle& bundle, const file::path& scene)
+    const Authoring::ReadNode& root, const AssetBundle& bundle, const std::filesystem::path& scene)
 {
     auto preparation = own::make_shared<SceneAssetPreparation>();
-    preparation->projectRoot = PathFinder::Relative();
+    preparation->projectRoot = ce::paths::relative();
     preparation->name = scene.filename().string();
     preparation->resources = bundle;
     {
@@ -1394,9 +1429,9 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
     }
     // Follow current scene/material/prefab references, including the first open.
     // Historical ScenePreload lists are not a correctness dependency.
-    std::map<FileGuid, file::path> models;
+    std::map<FileGuid, std::filesystem::path> models;
     std::unordered_set<FileGuid> seen, requestedMeshes;
-    std::vector<std::pair<FileGuid, file::path>> documents;
+    std::vector<std::pair<FileGuid, std::filesystem::path>> documents;
     const auto discover = [&](FileGuid guid, bool meshReference = false)
     {
         if (guid == FileGuid{} || (!seen.insert(guid).second && !meshReference))
@@ -1485,9 +1520,9 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
                 preparation->resources.AddAsset(entry);
             }
         }
-        const auto extension = Lowercase(path.extension().string());
+        const auto extension = ce::strings::to_lower(path.extension().string());
         if (extension == ".prefab" || (extension == ".asset" && type != RuntimeAssetType::Model) ||
-            (extension == ".shadergraph" && PathFinder::IsAssetAuthoringEnabled()))
+            (extension == ".shadergraph" && ce::paths::is_asset_authoring_enabled()))
         {
             documents.emplace_back(guid, path);
         }
@@ -1503,15 +1538,15 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
             return;
         }
         FileGuid guid;
-        const bool canonicalIdentity = Uuid::TryParse(reference, guid.m_guid);
+        const bool canonicalIdentity = uuid::try_parse(reference, guid.m_guid);
         if (!canonicalIdentity)
         {
-            if (!PathFinder::IsAssetAuthoringEnabled())
+            if (!ce::paths::is_asset_authoring_enabled())
             {
                 throw std::runtime_error("Cooked decal texture reference must be a GUID: " + reference);
             }
             // Match DecalComponent exactly; a global basename match is ambiguous.
-            guid = GetFileGuid(PathFinder::Relative("Textures\\") / file::path(reference).filename());
+            guid = GetFileGuid(ce::paths::relative("Textures\\") / std::filesystem::path(reference).filename());
         }
         if (guid == FileGuid{})
         {
@@ -1537,7 +1572,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
                 RequestTextureAsyncFromSnapshot(link, variant, preparation->catalog, preparation->epoch));
         }
         else if (status == experiment::cooked::AssetLookupStatus::TypeMismatch
-            || !PathFinder::IsAssetAuthoringEnabled())
+            || !ce::paths::is_asset_authoring_enabled())
         {
             throw std::runtime_error("Decal texture is absent or has the wrong cooked asset kind: " + guid.ToString());
         }
@@ -1562,7 +1597,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
         if (node.IsScalar())
         {
             FileGuid guid;
-            if (Uuid::TryParse(node.AsString(), guid.m_guid))
+            if (uuid::try_parse(node.AsString(), guid.m_guid))
             {
                 discover(guid);
             }
@@ -1575,7 +1610,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
             if (meshNode && meshNode.IsScalar())
             {
                 FileGuid meshId;
-                if (Uuid::TryParse(meshNode.AsString(), meshId.m_guid))
+                if (uuid::try_parse(meshNode.AsString(), meshId.m_guid))
                 {
                     const AssetDepot::AssetLink<assets::ModelMeshDescriptor> link{
                         { experiment::AssetId{ meshId.m_guid }, {} } };
@@ -1599,7 +1634,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
                 property && property.IsScalar() && texture && texture.IsScalar())
             {
                 FileGuid guid;
-                if (Uuid::TryParse(texture.AsString(), guid.m_guid) && guid != FileGuid{} && preparation->catalog)
+                if (uuid::try_parse(texture.AsString(), guid.m_guid) && guid != FileGuid{} && preparation->catalog)
                 {
                     const AssetDepot::AssetLink<Texture> textureLink{ { experiment::AssetId{ guid.m_guid }, {} } };
                     experiment::cooked::ResolvedAssetEntry resolved;
@@ -1643,7 +1678,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
                 if (key == "m_valueYaml" && entry.value.IsScalar() && !entry.value.Scalar().empty())
                 {
                     std::string error;
-                    auto document = PathFinder::IsAssetAuthoringEnabled()
+                    auto document = ce::paths::is_asset_authoring_enabled()
                         ? Authoring::WriteDocument::ParseText(entry.value.AsString(), &error)
                         : Authoring::DecodeCookedDocumentTextEnvelope(entry.value.Scalar(), error);
                     if (!document)
@@ -1686,7 +1721,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
                         {
                             if (texture.IsScalar() && !texture.Scalar().empty())
                             {
-                                AssetEntry asset(ManagedAssetType::UITexture, file::path(texture.AsString()));
+                                AssetEntry asset(ManagedAssetType::UITexture, std::filesystem::path(texture.AsString()));
                                 if (!preparation->resources.ContainsAsset(asset))
                                 {
                                     preparation->resources.AddAsset(asset);
@@ -1710,7 +1745,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
                         entry.value.IsScalar() && !entry.value.Scalar().empty())
                     {
                         AssetEntry asset(key == "m_SpritePath" ? ManagedAssetType::Texture : ManagedAssetType::SpriteSheet,
-                            file::path(entry.value.AsString()));
+                            std::filesystem::path(entry.value.AsString()));
                         if (!preparation->resources.ContainsAsset(asset))
                         {
                             preparation->resources.AddAsset(asset);
@@ -1719,7 +1754,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
                     if (key == "graphAssetId" && entry.value.IsScalar())
                     {
                         FileGuid guid;
-                        if (Uuid::TryParse(entry.value.AsString(), guid.m_guid) && guid != FileGuid{})
+                        if (uuid::try_parse(entry.value.AsString(), guid.m_guid) && guid != FileGuid{})
                         {
                             preparation->graphPaths.emplace(guid, GetFilePath(guid));
                             material_graph::InstanceDocument instance;
@@ -1751,7 +1786,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
         auto guid = GetFileGuid(path);
         if (guid == FileGuid{} && type == ManagedAssetType::Model)
         {
-            guid = GetFilenameToGuid(file::path(entry.assetName).filename().string());
+            guid = GetFilenameToGuid(std::filesystem::path(entry.assetName).filename().string());
         }
         if (guid == FileGuid{} && type == ManagedAssetType::Model)
         {
@@ -1767,13 +1802,13 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
     for (std::size_t index = 0; index < documents.size(); ++index)
     {
         const auto [guid, path] = documents[index];
-        const auto resolved = Lowercase(path.extension().string()) == ".shadergraph"
+        const auto resolved = ce::strings::to_lower(path.extension().string()) == ".shadergraph"
             ? path : ResolveCatalogAssetPath(guid);
         std::string error;
         const auto document = Authoring::ParsedDocument::ParseFile(resolved.string(), error);
         if (!document)
         {
-            if (PathFinder::IsAssetAuthoringEnabled() && Lowercase(path.extension().string()) == ".shadergraph")
+            if (ce::paths::is_asset_authoring_enabled() && ce::strings::to_lower(path.extension().string()) == ".shadergraph")
             {
                 Debug::PrintLog(spdlog::level::warn, "Graph dependency discovery failed; material construction will recover: "
                     + path.string() + " " + error);
@@ -1826,7 +1861,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
         std::lock_guard lock(m_assetPreparationMutex);
         if (!publish || m_assetPreparationStopping || m_assetInvalidationDepth != 0 ||
             preparation->epoch != m_assetPreparationEpoch || preparation->resolverRevision != m_assetDepotRevision ||
-            preparation->projectRoot != PathFinder::Relative())
+            preparation->projectRoot != ce::paths::relative())
         {
             preparation->cancelled.store(true, std::memory_order_release);
         }
@@ -1948,9 +1983,9 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
             for (const auto& material : asset->model->Materials())
             {
                 const FileGuid graph(assets::ModelMaterialGraphId(material.materialId));
-                preparation->graphPaths.insert_or_assign(graph, PathFinder::IsAssetAuthoringEnabled()
+                preparation->graphPaths.insert_or_assign(graph, ce::paths::is_asset_authoring_enabled()
                     ? assets::ModelMaterialGraphPath(preparation->projectRoot, asset->model->Identity().modelId,
-                        material.materialId) : file::path{});
+                        material.materialId) : std::filesystem::path{});
             }
         }
         for (const auto& [guid, path] : preparation->graphPaths)
@@ -2042,7 +2077,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
         {
             if (!PublishRuntimeAsset(asset, error))
             {
-                if (!PathFinder::IsAssetAuthoringEnabled())
+                if (!ce::paths::is_asset_authoring_enabled())
                 {
                     return finish(error);
                 }
@@ -2266,7 +2301,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                 std::string failure;
                 if (!ConfigureMaterialGraph(material, description, failure))
                 {
-                    if (!PathFinder::IsAssetAuthoringEnabled())
+                    if (!ce::paths::is_asset_authoring_enabled())
                     {
                         throw std::runtime_error(failure);
                     }
@@ -2291,7 +2326,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                     break;
                 case ManagedAssetType::Material:
                 {
-                    const auto materialName = file::path(entry.assetName).stem().string();
+                    const auto materialName = std::filesystem::path(entry.assetName).stem().string();
                     const auto loaded = LoadMaterialShared(std::string_view(materialName));
                     if (!loaded)
                     {
@@ -2522,7 +2557,7 @@ DataSystem::SceneAssetHandoff DataSystem::BeginSceneAssetHandoff(
         return {};
     }
     if (m_assetInvalidationDepth != 0u || preparation->epoch != m_assetPreparationEpoch
-        || preparation->resolverRevision != m_assetDepotRevision || preparation->projectRoot != PathFinder::Relative())
+        || preparation->resolverRevision != m_assetDepotRevision || preparation->projectRoot != ce::paths::relative())
     {
         status = AssetDepot::AssetRequestStatus::Stale;
         return {};
@@ -2555,7 +2590,7 @@ bool DataSystem::IsSceneAssetPreparationOutdated(
     std::lock_guard lock(m_assetPreparationMutex);
     // The same conditions BeginSceneAssetHandoff reports as Stale, excluding
     // shutdown: an asset invalidation or mount moved past this preparation.
-    return !m_assetPreparationStopping && preparation->projectRoot == PathFinder::Relative()
+    return !m_assetPreparationStopping && preparation->projectRoot == ce::paths::relative()
         && (m_assetInvalidationDepth != 0u || preparation->epoch != m_assetPreparationEpoch
             || preparation->resolverRevision != m_assetDepotRevision);
 }
@@ -2572,7 +2607,7 @@ bool DataSystem::IsSceneAssetPreparationCurrent(
         && !preparation->cancelled.load(std::memory_order_acquire)
         && preparation->epoch == m_assetPreparationEpoch
         && preparation->resolverRevision == m_assetDepotRevision
-        && preparation->projectRoot == PathFinder::Relative();
+        && preparation->projectRoot == ce::paths::relative();
 }
 
 own::shared_owner<TextureFramePins> DataSystem::SceneTextureImagePins(
@@ -2707,12 +2742,12 @@ void DataSystem::Initialize()
         m_assetMetaRegistry = std::move(registry);
         m_assetPreparationStopping = false;
     }
-	const bool authoring = PathFinder::IsAssetAuthoringEnabled();
+	const bool authoring = ce::paths::is_asset_authoring_enabled();
 	if (authoring)
 	{
 		// Editor는 source catalog가 정본이다. efsw change publication도 이 표를
 		// 갱신하므로 부팅 때 sidecar를 읽는 기존 계약을 유지한다.
-		LoadAssetCatalog(PathFinder::Relative());
+		LoadAssetCatalog(ce::paths::relative());
 	}
 
 	// D5 cutover — packaged Player는 CEMF source identity table을 정본으로 삼고
@@ -2721,7 +2756,7 @@ void DataSystem::Initialize()
 	const auto cookedCatalogStart = std::chrono::steady_clock::now();
 	std::string cookedCatalogError;
 	const bool mounted = MountCookedCatalog(
-		PathFinder::Relative(), cookedCatalogError);
+		ce::paths::relative(), cookedCatalogError);
 	if (!mounted && !cookedCatalogError.empty())
 	{
 		if (!authoring)
@@ -2749,7 +2784,7 @@ void DataSystem::Initialize()
 			sourceAssets);
 	}
     std::string activationFailure;
-    if (!MountConfiguredAssetSets(PathFinder::Relative(), activationFailure))
+    if (!MountConfiguredAssetSets(ce::paths::relative(), activationFailure))
     {
         throw std::runtime_error("Configured AssetSet activation failed: " + activationFailure);
     }
@@ -2801,10 +2836,10 @@ void DataSystem::Finalize()
 
 }
 
-void DataSystem::LoadAssetCatalog(const file::path& root)
+void DataSystem::LoadAssetCatalog(const std::filesystem::path& root)
 {
     const auto registry = SnapshotAssetMetaRegistry();
-    if (!registry || !file::exists(root))
+    if (!registry || !std::filesystem::exists(root))
     {
         return;
     }
@@ -2816,9 +2851,9 @@ void DataSystem::LoadAssetCatalog(const file::path& root)
 	uint64_t parsedMetaCount = 0;
 
 	std::error_code error;
-	file::recursive_directory_iterator iterator(
-		root, file::directory_options::skip_permission_denied, error);
-	const file::recursive_directory_iterator end;
+	std::filesystem::recursive_directory_iterator iterator(
+		root, std::filesystem::directory_options::skip_permission_denied, error);
+	const std::filesystem::recursive_directory_iterator end;
 	while (iterator != end)
 	{
 		if (error)
@@ -2828,13 +2863,13 @@ void DataSystem::LoadAssetCatalog(const file::path& root)
 			continue;
 		}
 
-		const file::directory_entry& entry = *iterator;
+		const std::filesystem::directory_entry& entry = *iterator;
 		if (entry.is_regular_file(error) && !error &&
 			entry.path().extension() == ".meta")
 		{
-			file::path targetPath = entry.path();
+			std::filesystem::path targetPath = entry.path();
 			targetPath.replace_extension();
-			if (file::exists(targetPath))
+			if (std::filesystem::exists(targetPath))
 			{
 				std::string parseError;
 				const Authoring::ParsedDocument document =
@@ -2931,16 +2966,16 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
 	// 경로뿐이고 Editor는 마운트 없이 Library(저작 정본)를 읽는다. 어느 쪽도 실패하면
 	// 다른 쪽으로 우회하지 않는다(§0.1-4 — silent fallback 0).
 	assets::ModelAssetGenerationLoadRequest request;
-	request.identityHeaderPath = PathFinder::ProjectSettingPath("AssetIdentity.asset");
+	request.identityHeaderPath = ce::paths::project_setting_path("AssetIdentity.asset");
 	request.expectedModelId = guid.m_guid;
-    if (PathFinder::IsAssetAuthoringEnabled())
-        request.decodedTextureCacheRoot = PathFinder::CachePath("ModelTextures");
-	const file::path cookedRecord = catalog && !cookedStale
-        ? catalog->ResolveArtifactPath(experiment::AssetId{ guid.m_guid }) : file::path{};
+    if (ce::paths::is_asset_authoring_enabled())
+        request.decodedTextureCacheRoot = ce::paths::cache_path("ModelTextures");
+	const std::filesystem::path cookedRecord = catalog && !cookedStale
+        ? catalog->ResolveArtifactPath(experiment::AssetId{ guid.m_guid }) : std::filesystem::path{};
 	const bool fromCatalog = !cookedRecord.empty()
-		&& cookedRecord.filename() == file::path("generation.asset");
+		&& cookedRecord.filename() == std::filesystem::path("generation.asset");
 	std::string sourceLabel;
-    const file::path sourcePath = registry ? registry->GetPath(guid) : file::path{};
+    const std::filesystem::path sourcePath = registry ? registry->GetPath(guid) : std::filesystem::path{};
 	if (fromCatalog)
 	{
 		request.generationPath = cookedRecord.parent_path();
@@ -2950,9 +2985,9 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
 	else
 	{
 		if (sourcePath.empty()) return {};
-		file::path sidecarPath = sourcePath;
+		std::filesystem::path sidecarPath = sourcePath;
 		sidecarPath += ".meta";
-		request.generationRoot = PathFinder::DynamicSolutionPath(
+		request.generationRoot = ce::paths::dynamic_solution_path(
 			"Library/ModelAssetGenerations");
 		request.canonicalSidecarPath = sidecarPath;
 		sourceLabel = sourcePath.string();
@@ -2973,7 +3008,7 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
 		// Uncooked loads/reloads may ask the Editor to repair derived data, then
 		// retry this strict reader exactly once. Callers release authoring locks
 		// before applying a reload; the repair itself never calls this loader.
-		if (allowEditorRecovery && PathFinder::IsAssetAuthoringEnabled() && !sourcePath.empty()
+		if (allowEditorRecovery && ce::paths::is_asset_authoring_enabled() && !sourcePath.empty()
 			&& AssetAuthoringPort::RecoverModel(sourcePath, guid))
         {
             if (fromCatalog)
@@ -3005,8 +3040,8 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadAndPublishModelAssetGenerat
     }
     // Authoring graphs are required even when an Editor project mounts a
     // previously cooked geometry generation. Player needs only the cooked closure.
-    if (PathFinder::IsAssetAuthoringEnabled() && !sourcePath.empty() &&
-        !assets::ModelMaterialGraphsPresent(PathFinder::Relative(""), *loaded.generation))
+    if (ce::paths::is_asset_authoring_enabled() && !sourcePath.empty() &&
+        !assets::ModelMaterialGraphsPresent(ce::paths::relative(""), *loaded.generation))
     {
         Debug::PrintLog(spdlog::level::err,
                         "Model material graphs are missing; retain geometry and create editable default graphs.");
@@ -3149,7 +3184,7 @@ namespace
 }
 
 own::shared_owner<const Texture> DataSystem::ResolveModelGenerationTexture(
-	const assets::ModelAssetGeneration& generation, const Uuid::Uuid16& textureId)
+	const assets::ModelAssetGeneration& generation, const uuid::uuid16& textureId)
 {
     std::uint64_t loadEpoch;
     {
@@ -3511,7 +3546,7 @@ own::shared_owner<const Material> DataSystem::FindCachedMaterial(FileGuid guid)
 own::shared_owner<const Material> DataSystem::AdoptAuthoringMaterialOwner(
     own::shared_owner<const Material> material)
 {
-    if (!material || !PathFinder::IsAssetAuthoringEnabled() || !material->HasMaterialGraph())
+    if (!material || !ce::paths::is_asset_authoring_enabled() || !material->HasMaterialGraph())
     {
         return material;
     }
@@ -3545,7 +3580,7 @@ bool DataSystem::ReloadMaterialAsset(FileGuid guid, std::string& error)
     const auto path = GetFilePath(guid);
     const auto document = Authoring::ParsedDocument::ParseFile(path.string(), error);
     material_graph::InstanceDocument authored;
-    if (!PathFinder::IsAssetAuthoringEnabled() || !document ||
+    if (!ce::paths::is_asset_authoring_enabled() || !document ||
         !material_graph::ReadInstanceDocument(document.Root(), authored,
             error) || authored.materialId.value != guid.m_guid)
     {
@@ -3568,11 +3603,11 @@ bool DataSystem::ReloadMaterialAsset(FileGuid guid, std::string& error)
     {
         return false;
     }
-    const auto shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader");
+    const auto shaderDirectory = ce::paths::relative_to_shader("DefaultPassShader");
     if (!generation || !CanReuseMaterialGraphAuthoring(*generation, sourceKey, shaderDirectory, error))
     {
         generation = CompileMaterialGraphAuthoring(*source, graphGuid,
-            shaderDirectory, PathFinder::CachePath("Lattice"), error);
+            shaderDirectory, ce::paths::cache_path("Lattice"), error);
     }
     if (!generation)
     {
@@ -3599,7 +3634,7 @@ bool DataSystem::PublishMaterialAsset(own::shared_owner<Material> candidate,
     {
         published->reset();
     }
-    if (!PathFinder::IsAssetAuthoringEnabled() || !candidate || !candidate->HasMaterialGraph() ||
+    if (!ce::paths::is_asset_authoring_enabled() || !candidate || !candidate->HasMaterialGraph() ||
         !candidate->m_fileGuid.IsRandomV4() || (expectedCurrent && std::addressof(*candidate) == std::addressof(*expectedCurrent)))
     {
         error = "Apply requires an isolated, valid material asset with its own UUIDv4 identity.";
@@ -3657,7 +3692,7 @@ bool DataSystem::PublishMaterialGraphGeneration(
     decltype(Materials) updated;
     std::uint64_t revision{}, epoch{}, resolverRevision{};
     bool targetFound = false;
-    file::path targetPath;
+    std::filesystem::path targetPath;
     if (candidate)
     {
         targetPath = GetFilePath(candidate->m_fileGuid);
@@ -3665,7 +3700,7 @@ bool DataSystem::PublishMaterialGraphGeneration(
         {
             targetPath = MaterialSourcePath(candidate->m_name);
         }
-        if (Lowercase(targetPath.extension().string()) != ".asset")
+        if (ce::strings::to_lower(targetPath.extension().string()) != ".asset")
         {
             error = "Material identity resolves to a non-material asset.";
             return false;
@@ -3878,8 +3913,8 @@ void DataSystem::SynchronizeLegacyMaterialProperties(Material& material) const
             return FileGuid{};
         }
 
-		const file::path filename = file::path(textureName).filename();
-		const file::path materialPath = PathFinder::Relative("Materials\\") / filename;
+		const std::filesystem::path filename = std::filesystem::path(textureName).filename();
+		const std::filesystem::path materialPath = ce::paths::relative("Materials\\") / filename;
 		if (const FileGuid exact = registry->GetGuid(materialPath);
 			exact != FileGuid{})
 		{
@@ -3916,7 +3951,7 @@ void DataSystem::SynchronizeLegacyMaterialProperties(Material& material) const
 		if (runtimeTexture && !runtimeTexture->m_name.empty())
 		{
 			runtimeTextureSelected = true;
-			file::path runtimeName(runtimeTexture->m_name);
+			std::filesystem::path runtimeName(runtimeTexture->m_name);
 			if (!runtimeName.has_extension() && !runtimeTexture->m_extension.empty())
 				runtimeName += runtimeTexture->m_extension;
 			legacyName = runtimeName.filename().string();
@@ -3924,7 +3959,7 @@ void DataSystem::SynchronizeLegacyMaterialProperties(Material& material) const
 		}
 		else if (guid != FileGuid{} && registry)
 		{
-			const file::path path = registry->GetPath(guid);
+			const std::filesystem::path path = registry->GetPath(guid);
 			if (!path.empty()) legacyName = path.filename().string();
 		}
 		else
@@ -4098,7 +4133,7 @@ bool DataSystem::SerializeMaterialPayload(Material& material,
 		entry.SetMap();
 		entry.Child("name").SetScalar(name);
 		entry.Child("data").SetScalar(
-			Authoring::Base64::Encode(data.data(), data.size()));
+			ce::base64::encode(data.data(), data.size()));
 	}
 	outNode.Assign(node);
 	return true;
@@ -4118,7 +4153,7 @@ namespace
 constexpr std::array<char, 8> kMaterialGraphCacheMagic{'L','X','S','C','A','C','H','3'};
 constexpr std::uint32_t kMaterialGraphCacheMaxDependencies = 4096;
 
-std::string MaterialGraphCacheHeader(std::string_view sourceKey, const file::path& shaderDirectory,
+std::string MaterialGraphCacheHeader(std::string_view sourceKey, const std::filesystem::path& shaderDirectory,
                                     std::optional<RHIShaderBinary> backend, std::string& error, bool fastPreview = false)
 {
     error.clear();
@@ -4153,58 +4188,58 @@ std::string MaterialGraphCacheHeader(std::string_view sourceKey, const file::pat
     return header;
 }
 
-bool HashMaterialGraphDependency(const file::path& path, Hash::Sha256Digest& result)
+bool HashMaterialGraphDependency(const std::filesystem::path& path, ce::hash::sha256_digest& result)
 {
     std::ifstream stream(path, std::ios::binary);
     if (!stream) return false;
-    Hash::Sha256 hash;
+    ce::hash::sha256 hash;
     std::array<char, 65536> chunk;
     while (stream)
     {
         stream.read(chunk.data(), chunk.size());
-        hash.Update(chunk.data(), static_cast<std::size_t>(stream.gcount()));
+        hash.update(chunk.data(), static_cast<std::size_t>(stream.gcount()));
     }
     if (!stream.eof()) return false;
-    result = hash.Finish();
+    result = hash.finish();
     return true;
 }
 
 // 셰이더 폴더 안의 파일은 상대 경로로 적어 프로젝트를 옮겨도 캐시가 산다.
 // 폴더 밖이면 절대 경로로 남긴다(그 경우만 위치에 묶인다).
-std::string MaterialGraphDependencyKey(const file::path& dependency, const file::path& canonicalShaderDirectory)
+std::string MaterialGraphDependencyKey(const std::filesystem::path& dependency, const std::filesystem::path& canonicalShaderDirectory)
 {
     std::error_code ignored;
-    file::path canonical = std::filesystem::weakly_canonical(dependency, ignored);
+    std::filesystem::path canonical = std::filesystem::weakly_canonical(dependency, ignored);
     if (ignored)
     {
         canonical = dependency.lexically_normal();
     }
-    const file::path relative = canonical.lexically_relative(canonicalShaderDirectory);
+    const std::filesystem::path relative = canonical.lexically_relative(canonicalShaderDirectory);
     if (!relative.empty() && *relative.begin() != "..") return relative.generic_string();
     return canonical.generic_string();
 }
 
-using MaterialGraphDependencyDigests = std::vector<std::pair<std::string, Hash::Sha256Digest>>;
+using MaterialGraphDependencyDigests = std::vector<std::pair<std::string, ce::hash::sha256_digest>>;
 
 std::string MaterialGraphEnvironmentKey(std::string_view header, const MaterialGraphDependencyDigests& dependencies)
 {
-    Hash::Sha256 hash;
+    ce::hash::sha256 hash;
     const auto append = [&](std::string_view value) {
         const auto length = std::to_string(value.size()) + ':';
-        hash.Update(length.data(), length.size());
-        hash.Update(value.data(), value.size());
+        hash.update(length.data(), length.size());
+        hash.update(value.data(), value.size());
     };
     append(header);
     append(std::to_string(dependencies.size()));
     for (const auto& [key, digest] : dependencies)
     {
         append(key);
-        hash.Update(digest.data(), digest.size());
+        hash.update(digest.data(), digest.size());
     }
-    return Hash::ToHex(hash.Finish());
+    return ce::hash::to_hex(hash.finish());
 }
 
-bool CaptureMaterialGraphDependencies(std::span<const file::path> paths, const file::path& shaderDirectory,
+bool CaptureMaterialGraphDependencies(std::span<const std::filesystem::path> paths, const std::filesystem::path& shaderDirectory,
                                       MaterialGraphDependencyDigests& result, std::string& error)
 {
     result.clear();
@@ -4223,7 +4258,7 @@ bool CaptureMaterialGraphDependencies(std::span<const file::path> paths, const f
     result.reserve(paths.size());
     for (const auto& path : paths)
     {
-        Hash::Sha256Digest digest{};
+        ce::hash::sha256_digest digest{};
         if (!HashMaterialGraphDependency(path, digest))
         {
             error = "Material include dependency cannot be read: " + path.string();
@@ -4244,15 +4279,15 @@ bool CaptureMaterialGraphDependencies(std::span<const file::path> paths, const f
     return true;
 }
 
-bool MaterialGraphDependenciesResolve(std::span<const file::path> dependencies, const file::path& shaderDirectory,
-                                      const file::path& sourceDirectory, const file::path& nextCacheDirectory = {})
+bool MaterialGraphDependenciesResolve(std::span<const std::filesystem::path> dependencies, const std::filesystem::path& shaderDirectory,
+                                      const std::filesystem::path& sourceDirectory, const std::filesystem::path& nextCacheDirectory = {})
 {
     if (sourceDirectory.empty())
     {
         return false;
     }
     // 공통 include뿐 아니라 생성 소스 옆/상위 경로도 원래 RHI 검사와 같은 후보로 확인한다.
-    std::vector<file::path> includeDirectories{shaderDirectory / "Includes", sourceDirectory};
+    std::vector<std::filesystem::path> includeDirectories{shaderDirectory / "Includes", sourceDirectory};
     if (!nextCacheDirectory.empty())
     {
         // 기존 직접 생성 경로에서 다음 요청의 isolated scratch 경로로 옮기는 경우도 포함한다.
@@ -4261,8 +4296,8 @@ bool MaterialGraphDependenciesResolve(std::span<const file::path> dependencies, 
     return RHIShaderCompiler::CanReuseDependencyResolution(dependencies, includeDirectories);
 }
 
-bool ReadMaterialGraphCache(const file::path& path, std::string_view sourceKey, std::string_view header,
-                            const file::path& shaderDirectory, const file::path& sourceDirectory,
+bool ReadMaterialGraphCache(const std::filesystem::path& path, std::string_view sourceKey, std::string_view header,
+                            const std::filesystem::path& shaderDirectory, const std::filesystem::path& sourceDirectory,
                             material_graph::CookedProgram& result)
 {
     const bool package = path.parent_path().filename() == "Preview" && path.parent_path().parent_path().filename() == "EditorResources";
@@ -4285,7 +4320,7 @@ bool ReadMaterialGraphCache(const file::path& path, std::string_view sourceKey, 
     file.read(reinterpret_cast<char*>(&dependencyCount), sizeof(dependencyCount));
     if (!file || dependencyCount == 0 || dependencyCount > kMaterialGraphCacheMaxDependencies) return false;
     MaterialGraphDependencyDigests dependencies;
-    std::vector<file::path> paths;
+    std::vector<std::filesystem::path> paths;
     dependencies.reserve(dependencyCount);
     paths.reserve(dependencyCount);
     for (std::uint32_t index = 0; index < dependencyCount; ++index)
@@ -4294,12 +4329,12 @@ bool ReadMaterialGraphCache(const file::path& path, std::string_view sourceKey, 
         file.read(reinterpret_cast<char*>(&keySize), sizeof(keySize));
         if (!file || keySize == 0 || keySize > 4096) return false;
         std::string key(keySize, '\0');
-        Hash::Sha256Digest expected{};
+        ce::hash::sha256_digest expected{};
         file.read(key.data(), static_cast<std::streamsize>(key.size()));
         file.read(reinterpret_cast<char*>(expected.data()), static_cast<std::streamsize>(expected.size()));
         if (!file) return miss("file");
-        const file::path stored(key);
-        Hash::Sha256Digest actual{};
+        const std::filesystem::path stored(key);
+        ce::hash::sha256_digest actual{};
         if (!HashMaterialGraphDependency(stored.is_absolute() ? stored : shaderDirectory / stored, actual) ||
             actual != expected)
             return miss("dependency");
@@ -4337,7 +4372,7 @@ bool ReadMaterialGraphCache(const file::path& path, std::string_view sourceKey, 
     return true;
 }
 
-void WriteMaterialGraphCache(const file::path& path, std::string_view header,
+void WriteMaterialGraphCache(const std::filesystem::path& path, std::string_view header,
                              const MaterialGraphDependencyDigests& dependencies,
                              const material_graph::VerifiedProduct& product)
 {
@@ -4347,7 +4382,7 @@ void WriteMaterialGraphCache(const file::path& path, std::string_view header,
     std::string error;
     if (!material_graph::WriteCookedProgram(product, {}, bytes, error)) return;
     static std::atomic<std::uint64_t> serial{};
-    const file::path staging = path.string() + ".stage-" + std::to_string(GetCurrentProcessId()) +
+    const std::filesystem::path staging = path.string() + ".stage-" + std::to_string(GetCurrentProcessId()) +
                                "-" + std::to_string(++serial);
     {
         std::ofstream file(staging, std::ios::binary | std::ios::trunc);
@@ -4387,9 +4422,9 @@ void WriteMaterialGraphCache(const file::path& path, std::string_view header,
 // never depends on that file because the header identifies its canonical source
 // and compiler recipe before source generation.
 bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, material_graph::CookedProgram& result,
-                              std::string& error, const file::path& shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader"),
-                              const file::path& requestedCacheDirectory = PathFinder::CachePath("Lattice"),
-                              const file::path& scratchDirectory = {}, bool fastPreview = false, bool packageBuild = false)
+                              std::string& error, const std::filesystem::path& shaderDirectory = ce::paths::relative_to_shader("DefaultPassShader"),
+                              const std::filesystem::path& requestedCacheDirectory = ce::paths::cache_path("Lattice"),
+                              const std::filesystem::path& scratchDirectory = {}, bool fastPreview = false, bool packageBuild = false)
 {
     ce::profile_scope profile{ ce::marker<"Material.CompileAuthoring">() };
     error.clear();
@@ -4398,8 +4433,8 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
     char* isolatedRoot{};
     std::size_t isolatedLength{};
     _dupenv_s(&isolatedRoot, &isolatedLength, "CE_MATERIAL_CACHE_ROOT");
-    const file::path cacheDirectory = !packageBuild && isolatedRoot && *isolatedRoot
-        ? file::path(isolatedRoot) / (fastPreview ? "Preview" : "Source") : requestedCacheDirectory;
+    const std::filesystem::path cacheDirectory = !packageBuild && isolatedRoot && *isolatedRoot
+        ? std::filesystem::path(isolatedRoot) / (fastPreview ? "Preview" : "Source") : requestedCacheDirectory;
     std::free(isolatedRoot);
     std::string sourceKey;
     std::optional<ce::profile_scope> step{ std::in_place, ce::marker<"Material.SourceKey">() };
@@ -4414,7 +4449,7 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
     {
         return false;
     }
-    const auto sourceRevision = Hash::ToHex(Hash::Sha256::Compute(cacheHeader.data(), cacheHeader.size()));
+    const auto sourceRevision = ce::hash::to_hex(ce::hash::sha256::compute(cacheHeader.data(), cacheHeader.size()));
     const auto source = (scratchDirectory.empty() ? cacheDirectory : scratchDirectory) /
                         (guid.ToString() + "-" + sourceRevision + ".slang");
     std::error_code filesystemError;
@@ -4436,8 +4471,8 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
     {
         wchar_t executable[32768]{};
         const auto length = GetModuleFileNameW(nullptr, executable, static_cast<DWORD>(std::size(executable)));
-        const file::path packageDirectory = length && length < std::size(executable)
-            ? file::path(executable).parent_path() / "EditorResources/Preview" : file::path{};
+        const std::filesystem::path packageDirectory = length && length < std::size(executable)
+            ? std::filesystem::path(executable).parent_path() / "EditorResources/Preview" : std::filesystem::path{};
         if (!packageDirectory.empty() &&
             ReadMaterialGraphCache(packageDirectory / (guid.ToString() + ".slang.scene-cache"),
                 sourceKey, cacheHeader, shaderDirectory, packageDirectory, result) &&
@@ -4501,8 +4536,8 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
 }
 
 bool DataSystem::CanReuseMaterialGraphAuthoring(const material_graph::Generation& generation,
-    std::string_view sourceKey, const file::path& shaderDirectory, std::string& error,
-    const file::path& cacheDirectory)
+    std::string_view sourceKey, const std::filesystem::path& shaderDirectory, std::string& error,
+    const std::filesystem::path& cacheDirectory)
 {
     error.clear();
     if (sourceKey.empty() || generation.authoringSourceKey != sourceKey ||
@@ -4521,7 +4556,7 @@ bool DataSystem::CanReuseMaterialGraphAuthoring(const material_graph::Generation
         return false;
     }
     const auto header = MaterialGraphCacheHeader(sourceKey, shaderDirectory, backend, error);
-    const auto nextCacheDirectory = cacheDirectory.empty() ? PathFinder::CachePath("Lattice") : cacheDirectory;
+    const auto nextCacheDirectory = cacheDirectory.empty() ? ce::paths::cache_path("Lattice") : cacheDirectory;
     if (header.empty() || !MaterialGraphDependenciesResolve(product.dependencies, shaderDirectory,
         generation.cooked.authoringSourceDirectory, nextCacheDirectory))
     {
@@ -4536,17 +4571,17 @@ bool DataSystem::CanReuseMaterialGraphAuthoring(const material_graph::Generation
 }
 
 own::shared_owner<const material_graph::Generation> DataSystem::CompileMaterialGraphAuthoring(
-    const LX::LXMaterialAsset& asset, FileGuid graphGuid, const file::path& shaderDirectory,
-    const file::path& cacheDirectory, std::string& error)
+    const LX::LXMaterialAsset& asset, FileGuid graphGuid, const std::filesystem::path& shaderDirectory,
+    const std::filesystem::path& cacheDirectory, std::string& error)
 {
     const auto isolatedDirectory = cacheDirectory / ("authoring-" + FileGuid::CreateRandomV4().ToString());
     struct Cleanup
     {
-        file::path directory;
+        std::filesystem::path directory;
         ~Cleanup()
         {
             std::error_code ignored;
-            file::remove_all(directory, ignored);
+            std::filesystem::remove_all(directory, ignored);
         }
     } cleanup{isolatedDirectory};
     // Scene products retain verified bytecode, reflection, generated source and
@@ -4560,8 +4595,8 @@ own::shared_owner<const material_graph::Generation> DataSystem::CompileMaterialG
 }
 
 own::shared_owner<const material_graph::Generation> DataSystem::CompileEditorPreviewMaterial(
-    const LX::LXMaterialAsset& asset, FileGuid graphGuid, const file::path& shaderDirectory,
-    const file::path& cacheDirectory, std::string& error, bool packageBuild)
+    const LX::LXMaterialAsset& asset, FileGuid graphGuid, const std::filesystem::path& shaderDirectory,
+    const std::filesystem::path& cacheDirectory, std::string& error, bool packageBuild)
 {
     // A fixed stand-in has no editable draft or catalog publication. Serialize
     // its producer so simultaneous placements share a stable verified disk product.
@@ -4582,7 +4617,7 @@ own::shared_owner<const material_graph::Generation> DataSystem::LoadMaterialGrap
     // invalidating the enclosing model. Rejoin the new graph request locally.
     for (unsigned attempt = 0; attempt != 3; ++attempt)
     {
-        if (!reload && PathFinder::IsAssetAuthoringEnabled())
+        if (!reload && ce::paths::is_asset_authoring_enabled())
         {
             std::lock_guard admissionLock(m_assetPreparationMutex);
             if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
@@ -4639,7 +4674,7 @@ own::shared_owner<const material_graph::Generation> DataSystem::LoadMaterialGrap
         }
         if (recording)
         {
-            if (file::path sourcePath = GetMaterialGraphSourcePath(guid); !sourcePath.empty())
+            if (std::filesystem::path sourcePath = GetMaterialGraphSourcePath(guid); !sourcePath.empty())
             {
                 std::lock_guard lock(m_sceneMaterialMutex);
                 if (m_recordingSceneMaterials) m_sceneMaterials.emplace_back(guid, std::move(sourcePath));
@@ -4648,8 +4683,8 @@ own::shared_owner<const material_graph::Generation> DataSystem::LoadMaterialGrap
         const auto prepared = material_graph::GenerationStore::Prepare(
             request,
             [this, guid](material_graph::CookedProgram& result, std::string& failure) {
-                const file::path sourcePath =
-                    PathFinder::IsAssetAuthoringEnabled() ? GetMaterialGraphSourcePath(guid) : file::path{};
+                const std::filesystem::path sourcePath =
+                    ce::paths::is_asset_authoring_enabled() ? GetMaterialGraphSourcePath(guid) : std::filesystem::path{};
                 return LoadMaterialGraphProgram(guid, sourcePath, result, failure);
             },
             error);
@@ -4674,20 +4709,20 @@ own::shared_owner<const material_graph::Generation> DataSystem::LoadMaterialGrap
     return {};
 }
 
-bool DataSystem::LoadMaterialGraphProgram(FileGuid guid, const file::path& sourcePath,
+bool DataSystem::LoadMaterialGraphProgram(FileGuid guid, const std::filesystem::path& sourcePath,
                                           material_graph::CookedProgram& result, std::string& failure) const
 {
     const experiment::AssetId id{guid.m_guid};
     const auto catalog = GetCookedCatalog();
-    if (!catalog && !PathFinder::IsAssetAuthoringEnabled())
+    if (!catalog && !ce::paths::is_asset_authoring_enabled())
     {
         failure = "LX graph requires a mounted, verified cooked material catalog.";
         return false;
     }
     std::optional<LX::LXMaterialAsset> source;
-    if (PathFinder::IsAssetAuthoringEnabled())
+    if (ce::paths::is_asset_authoring_enabled())
     {
-        if (Lowercase(sourcePath.extension().string()) != ".shadergraph")
+        if (ce::strings::to_lower(sourcePath.extension().string()) != ".shadergraph")
         {
             failure = "LX graph GUID does not resolve to its authoring source.";
             return false;
@@ -4719,40 +4754,40 @@ namespace
 {
 // 프로젝트 안의 경로는 프로젝트 기준 상대 경로로 바꾼다. 프로젝트 폴더를 옮기거나 복사해도
 // 목록 이름과 목록 안의 경로가 그대로 맞는다. 프로젝트 밖이면 절대 경로를 그대로 둔다.
-file::path ProjectRelative(const file::path& path)
+std::filesystem::path ProjectRelative(const std::filesystem::path& path)
 {
     std::error_code ignored;
-    const auto root = std::filesystem::weakly_canonical(PathFinder::Relative(), ignored);
+    const auto root = std::filesystem::weakly_canonical(ce::paths::relative(), ignored);
     const auto canonical = std::filesystem::weakly_canonical(
-        path.is_absolute() ? path : PathFinder::Relative() / path, ignored);
+        path.is_absolute() ? path : ce::paths::relative() / path, ignored);
     auto relative = canonical.lexically_relative(root);
     if (relative.empty() || *relative.begin() == "..") return canonical;
     return relative;
 }
 
 // 장면 경로마다 목록 하나. 이름이 같은 장면이 다른 폴더에 있어도 섞이지 않게 경로 해시로 이름 짓는다.
-file::path SceneMaterialListPath(const file::path& scene)
+std::filesystem::path SceneMaterialListPath(const std::filesystem::path& scene)
 {
     // 한글 경로도 코드 페이지 변환 없이 다루도록 UTF-8 로 키를 만든다.
     const auto utf8 = ProjectRelative(scene).generic_u8string();
-    const auto key = Lowercase(std::string(utf8.begin(), utf8.end()));
+    const auto key = ce::strings::to_lower(std::string_view(reinterpret_cast<const char*>(utf8.data()), utf8.size()));
     std::uint64_t hash = 14695981039346656037ull;
     for (const unsigned char c : key) hash = (hash ^ c) * 1099511628211ull;
     std::ostringstream name;
     name << std::hex << std::setw(16) << std::setfill('0') << hash << ".txt";
-    return PathFinder::CachePath("Lattice") / "ScenePreload" / name.str();
+    return ce::paths::cache_path("Lattice") / "ScenePreload" / name.str();
 }
 
 constexpr std::size_t kMaxSceneMaterials = 4096;
 } // namespace
 
-void DataSystem::PrewarmSceneMaterials(const file::path& scene)
+void DataSystem::PrewarmSceneMaterials(const std::filesystem::path& scene)
 {
     if (thread_pool::is_worker_thread())
     {
         throw std::logic_error("Scene material prewarm requires the scene owner thread.");
     }
-    if (!PathFinder::IsAssetAuthoringEnabled())
+    if (!ce::paths::is_asset_authoring_enabled())
     {
         return;
     }
@@ -4769,7 +4804,7 @@ void DataSystem::PrewarmSceneMaterials(const file::path& scene)
         m_sceneMaterials.clear();
     }
     ce::profile_scope profile{ ce::marker<"Material.Prewarm">() };
-    std::vector<std::pair<FileGuid, file::path>> graphs;
+    std::vector<std::pair<FileGuid, std::filesystem::path>> graphs;
     {
         std::ifstream list(SceneMaterialListPath(scene), std::ios::binary);
         std::string line;
@@ -4777,11 +4812,11 @@ void DataSystem::PrewarmSceneMaterials(const file::path& scene)
         {
             const auto tab = line.find('\t');
             FileGuid guid;
-            if (tab == std::string::npos || !Uuid::TryParse(line.substr(0, tab), guid.m_guid)) continue;
+            if (tab == std::string::npos || !uuid::try_parse(line.substr(0, tab), guid.m_guid)) continue;
             // 이미 세대가 있으면 엔티티 적재가 컴파일하지 않는다.
             if (m_materialGraphGenerations.Current(experiment::AssetId{guid.m_guid})) continue;
-            file::path source(std::u8string(line.begin() + tab + 1, line.end()));
-            if (source.is_relative()) source = PathFinder::Relative() / source;
+            std::filesystem::path source(std::u8string(line.begin() + tab + 1, line.end()));
+            if (source.is_relative()) source = ce::paths::relative() / source;
             graphs.emplace_back(guid, std::move(source));
         }
     }
@@ -4848,9 +4883,9 @@ void DataSystem::PrewarmSceneMaterials(const file::path& scene)
     }
 }
 
-void DataSystem::CommitSceneMaterials(const file::path& scene)
+void DataSystem::CommitSceneMaterials(const std::filesystem::path& scene)
 {
-    std::vector<std::pair<FileGuid, file::path>> graphs;
+    std::vector<std::pair<FileGuid, std::filesystem::path>> graphs;
     {
         std::lock_guard lock(m_sceneMaterialMutex);
         if (!m_recordingSceneMaterials) return;
@@ -4884,7 +4919,7 @@ std::vector<assets::ModelAssetGeneration::Shared> DataSystem::SnapshotPreparedMo
         return {};
     }
     auto current = m_modelAssetGenerations.SnapshotCurrent();
-    std::map<Uuid::Uuid16, assets::ModelAssetGeneration::Shared> byModel;
+    std::map<uuid::uuid16, assets::ModelAssetGeneration::Shared> byModel;
     for (auto& model : current)
     {
         byModel.emplace(model->Identity().modelId, std::move(model));
@@ -4915,7 +4950,7 @@ std::vector<assets::ModelAssetGeneration::Shared> DataSystem::SnapshotPreparedMo
     return result;
 }
 
-file::path DataSystem::GetMaterialGraphSourcePath(FileGuid guid) const
+std::filesystem::path DataSystem::GetMaterialGraphSourcePath(FileGuid guid) const
 {
     const auto registered = GetFilePath(guid);
     if (!registered.empty())
@@ -4926,9 +4961,9 @@ file::path DataSystem::GetMaterialGraphSourcePath(FileGuid guid) const
         {
             if (assets::ModelMaterialGraphId(material.materialId) == guid.m_guid)
             {
-                const auto path = assets::ModelMaterialGraphPath(PathFinder::Relative(""), model->Identity().modelId,
+                const auto path = assets::ModelMaterialGraphPath(ce::paths::relative(""), model->Identity().modelId,
                                                                  material.materialId);
-                return assets::ModelMaterialGraphIdentityMatches(path, guid.m_guid) ? path : file::path{};
+                return assets::ModelMaterialGraphIdentityMatches(path, guid.m_guid) ? path : std::filesystem::path{};
             }
         }
     }
@@ -5046,7 +5081,7 @@ bool DataSystem::ConfigureEditableDefaultMaterialGraph(Material& material, std::
             return false;
         }
     }
-    if (!PathFinder::IsAssetAuthoringEnabled())
+    if (!ce::paths::is_asset_authoring_enabled())
     {
         error = std::string(cause);
         return false;
@@ -5057,7 +5092,7 @@ bool DataSystem::ConfigureEditableDefaultMaterialGraph(Material& material, std::
         return false;
     }
     const FileGuid guid = FileGuid::CreateRandomV4();
-    const auto path = PathFinder::RelativeToMaterial("") / ("Recovered_" + guid.ToString() + ".shadergraph");
+    const auto path = ce::paths::relative_to_material("") / ("Recovered_" + guid.ToString() + ".shadergraph");
     if (AssetAuthoringPort::WriteTextAssetWithMeta(path, LX::LXMaterialArchive::Write(*graph), guid) != guid)
     {
         error = "Cannot publish editable default graph: " + path.string();
@@ -5091,20 +5126,20 @@ bool DataSystem::ConfigureMaterialGraphAuthoring(Material& material, const LX::L
                                                  const material_graph::InstanceDescription& description,
                                                  std::string& error)
 {
-    if (!PathFinder::IsAssetAuthoringEnabled())
+    if (!ce::paths::is_asset_authoring_enabled())
     {
         error = "Material graph authoring requires an Editor project.";
         return false;
     }
     auto generation = CompileMaterialGraphAuthoring(asset, FileGuid(description.graphId.value),
-        PathFinder::RelativeToShader("DefaultPassShader"), PathFinder::CachePath("Lattice"), error);
+        ce::paths::relative_to_shader("DefaultPassShader"), ce::paths::cache_path("Lattice"), error);
     return generation && ConfigureMaterialGraph(material, std::move(generation), description, error);
 }
 
 bool DataSystem::ConfigureMaterialGraph(Material& material, const material_graph::InstanceDescription& description,
                                         std::string& error, bool reload, const assets::ModelAssetGeneration* model)
 {
-    if (reload && PathFinder::IsAssetAuthoringEnabled())
+    if (reload && ce::paths::is_asset_authoring_enabled())
     {
         const auto source = LX::LXMaterialAsset::Load(GetMaterialGraphSourcePath(FileGuid(description.graphId.value)),
             LX::CreateMaterialDefinitions(), &error);
@@ -5113,7 +5148,7 @@ bool DataSystem::ConfigureMaterialGraph(Material& material, const material_graph
             return false;
         }
         auto generation = CompileMaterialGraphAuthoring(*source, FileGuid(description.graphId.value),
-            PathFinder::RelativeToShader("DefaultPassShader"), PathFinder::CachePath("Lattice"), error);
+            ce::paths::relative_to_shader("DefaultPassShader"), ce::paths::cache_path("Lattice"), error);
         return generation && ConfigureMaterialGraph(material, std::move(generation), description, error, model);
     }
     auto generation = LoadMaterialGraphGeneration(FileGuid(description.graphId.value), error, reload);
@@ -5192,12 +5227,12 @@ bool DataSystem::ConfigureMaterialGraph(Material& material,
         }
         const auto* entry = catalog ? catalog->Find(id) : nullptr;
         if ((entry && entry->kind != experiment::cooked::CookedAssetKind::Texture) ||
-            (!entry && !PathFinder::IsAssetAuthoringEnabled()))
+            (!entry && !ce::paths::is_asset_authoring_enabled()))
         {
             failure = "LX texture override is not a cooked Texture asset: " + textureGuid.ToString();
             return {};
         }
-        const file::path path = ResolveCatalogAssetPath(textureGuid);
+        const std::filesystem::path path = ResolveCatalogAssetPath(textureGuid);
         if (path.empty())
         {
             failure = "LX texture GUID has no registered asset path: " + textureGuid.ToString();
@@ -5261,7 +5296,7 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
             {
                 return false;
             }
-            if (!persistRecovery && PathFinder::IsAssetAuthoringEnabled())
+            if (!persistRecovery && ce::paths::is_asset_authoring_enabled())
             {
                 Debug::PrintLog(spdlog::level::warn, "Inline material prewarm deferred recovery to its owner: " + error);
                 return true;
@@ -5399,7 +5434,10 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
 					return false;
 				const std::string encoded = entry["data"].AsString();
 				std::vector<std::uint8_t> binary;
-				if (!Authoring::Base64::Decode(encoded, binary)) return false;
+				if (!ce::base64::decode(encoded, binary))
+				{
+				    return false;
+				}
 				material.m_cbufferValues.emplace(std::move(name), std::move(binary));
 			}
 		}
@@ -5541,7 +5579,7 @@ void DataSystem::FinalizeMaterialRuntime(Material& material)
 		if (value != material.m_propertyValues.end()
 			&& value->m_textureGuid != FileGuid{})
 		{
-			const file::path path = GetFilePath(value->m_textureGuid);
+			const std::filesystem::path path = GetFilePath(value->m_textureGuid);
 			if (!path.empty()) texture = LoadSharedMaterialTexture(path.string(), compress, srgb);
 		}
 		if (!texture && !name.empty())
@@ -5582,7 +5620,7 @@ void DataSystem::FinalizeMaterialRuntime(Material& material)
 
 		// MBC9 — 임베디드(subasset) GUID는 registry에 경로가 없다. 그 owner는
 		// MeshRenderer::BindModelGeneration이 generation closure에서 묶는다.
-		const file::path path = GetFilePath(value.m_textureGuid);
+		const std::filesystem::path path = GetFilePath(value.m_textureGuid);
 		if (path.empty()) continue;
 		own::shared_owner<const Texture> texture = LoadSharedMaterialTexture(path.string(), false);
 		if (!texture) continue;
@@ -5592,11 +5630,11 @@ void DataSystem::FinalizeMaterialRuntime(Material& material)
 
 own::shared_owner<const Material> DataSystem::LoadMaterial(std::string_view name)
 {
-    const file::path sourcePath = MaterialSourcePath(name);
+    const std::filesystem::path sourcePath = MaterialSourcePath(name);
     const std::string materialName = MaterialCacheKey(sourcePath);
     const auto pathGuid = GetFileGuid(sourcePath);
-    const auto guid = pathGuid != FileGuid{} ? pathGuid : GetStemToGuid(file::path(name).stem().string());
-    if (PathFinder::IsAssetAuthoringEnabled() && guid != FileGuid{})
+    const auto guid = pathGuid != FileGuid{} ? pathGuid : GetStemToGuid(std::filesystem::path(name).stem().string());
+    if (ce::paths::is_asset_authoring_enabled() && guid != FileGuid{})
     {
         if (auto accepted = FindCachedMaterial(guid))
         {
@@ -5644,11 +5682,11 @@ own::shared_owner<const Material> DataSystem::LoadMaterial(std::string_view name
             }
         }
     }
-    if (!file::exists(sourcePath))
+    if (!std::filesystem::exists(sourcePath))
     {
 		return nullptr;
     }
-	file::path loadPath = sourcePath;
+	std::filesystem::path loadPath = sourcePath;
 	FileGuid assetGuid = GetFileGuid(sourcePath);
 	if (assetGuid != FileGuid{})
 	{
@@ -5778,8 +5816,8 @@ own::shared_owner<const experiment::Material> DataSystem::LoadAuthoredMaterialSh
         }
 	}
 
-	const file::path sourcePath = GetFilePath(assetGuid);
-	const file::path path = ResolveCatalogAssetPath(assetGuid);
+	const std::filesystem::path sourcePath = GetFilePath(assetGuid);
+	const std::filesystem::path path = ResolveCatalogAssetPath(assetGuid);
 	if (path.empty()) return nullptr;
 
 	// I5-D5c1 — 문서 파싱은 **기존 payload 디코더 하나**만 쓴다. 여기서 YAML
@@ -5827,12 +5865,12 @@ own::shared_owner<const Material> DataSystem::LoadMaterialShared(FileGuid guid)
         return current;
     }
     const auto path = GetFilePath(guid);
-    if (path.empty() || Lowercase(path.extension().string()) != ".asset")
+    if (path.empty() || ce::strings::to_lower(path.extension().string()) != ".asset")
     {
         return {};
     }
     std::error_code error;
-    const auto absolute = file::absolute(path, error);
+    const auto absolute = std::filesystem::absolute(path, error);
     if (error)
     {
         return {};
@@ -5879,7 +5917,7 @@ own::shared_owner<const Texture> DataSystem::LoadTextureGUID(FileGuid guid)
     // GUID resolution and the path-loader handoff are one current lookup. Do
     // not accept an old resolved path merely because the inner loader started
     // after a remount and therefore observed its newer resolver revision.
-    const file::path texturePath = ResolveCatalogAssetPath(guid);
+    const std::filesystem::path texturePath = ResolveCatalogAssetPath(guid);
     if (texturePath.empty())
     {
         return {};
@@ -5953,7 +5991,7 @@ own::shared_owner<const Texture> DataSystem::LoadSharedTexture(std::string_view 
         return owner;
     }
     // Only the explicitly transitional loose-source path performs pathname I/O.
-    const file::path assetPath = ResolveRuntimeAssetPath(filePath, TextureFallbackDirectory(type));
+    const std::filesystem::path assetPath = ResolveRuntimeAssetPath(filePath, TextureFallbackDirectory(type));
     const std::string sourceKey = TextureCacheKey(assetPath);
     const std::string key = TextureRoleCacheKey(sourceKey, type);
 	DataContainer<Texture>& cache = TextureCacheFor(type);
@@ -6027,12 +6065,12 @@ own::shared_owner<const Texture> DataSystem::LoadSharedMaterialTexture(std::stri
 	// `Assets/Materials/<guid>.png`를 찾다 실패했다(실측 — cooked 소비의
 	// 실장애물이 resolver가 아니라 이 한 줄이었다). 이름만 오는 legacy
 	// 호출(재질의 텍스처 이름 필드)은 예전 규약 그대로 간다.
-	file::path destination = file::path(filePath);
+	std::filesystem::path destination = std::filesystem::path(filePath);
 	std::error_code destinationError;
 	if (!destination.is_absolute()
-		|| !file::is_regular_file(destination, destinationError))
+		|| !std::filesystem::is_regular_file(destination, destinationError))
 	{
-		destination = PathFinder::Relative("Materials\\")
+		destination = ce::paths::relative("Materials\\")
 			/ destination.filename();
 	}
     const auto guid = GetFileGuid(destination);
@@ -6154,9 +6192,9 @@ own::shared_owner<Material> DataSystem::CreateMaterial()
     return material;
 }
 
-own::shared_owner<FontAsset> DataSystem::LoadFontFile(const file::path& path, std::string& error) const
+own::shared_owner<FontAsset> DataSystem::LoadFontFile(const std::filesystem::path& path, std::string& error) const
 {
-    const auto extension = Lowercase(path.extension().string());
+    const auto extension = ce::strings::to_lower(path.extension().string());
     if (extension != ".ttf" && extension != ".otf")
     {
         error = "SDF fonts require TTF/OTF; legacy .spritefont binaries are not supported: " + path.string();
@@ -6167,7 +6205,7 @@ own::shared_owner<FontAsset> DataSystem::LoadFontFile(const file::path& path, st
     {
         return {};
     }
-    const auto fallback = normalize_font_path(PathFinder::EngineResourcePath("Fonts/Runtime/NanumGothic-Regular.ttf"));
+    const auto fallback = normalize_font_path(ce::paths::engine_resource_path("Fonts/Runtime/NanumGothic-Regular.ttf"));
     if (path != fallback)
     {
         std::string fallbackError;
@@ -6271,7 +6309,7 @@ std::size_t DataSystem::SnapshotFontCount() const
     return m_fonts.size();
 }
 
-bool DataSystem::ReloadCachedFont(const file::path& source, FileGuid guid, std::string& error)
+bool DataSystem::ReloadCachedFont(const std::filesystem::path& source, FileGuid guid, std::string& error)
 {
     try
     {
@@ -6339,7 +6377,7 @@ own::shared_owner<AssetMetaRegistry> DataSystem::SnapshotAssetMetaRegistry() con
     return m_assetMetaRegistry;
 }
 
-FileGuid DataSystem::GetFileGuid(const file::path& filepath) const
+FileGuid DataSystem::GetFileGuid(const std::filesystem::path& filepath) const
 {
     const auto registry = SnapshotAssetMetaRegistry();
     return registry ? registry->GetGuid(filepath) : FileGuid{};
@@ -6420,7 +6458,7 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
         }
     }
 
-    if (change.kind == RuntimeAssetChangeKind::ContentReload && PathFinder::IsAssetAuthoringEnabled())
+    if (change.kind == RuntimeAssetChangeKind::ContentReload && ce::paths::is_asset_authoring_enabled())
     {
         {
             std::lock_guard admissionLock(m_assetPreparationMutex);
@@ -6461,14 +6499,14 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
                 // Self-save and duplicate watcher events preserve accepted owner
                 // identity, including unsaved material defaults already applied.
                 std::string sourceKey;
-                const auto shaderDirectory = PathFinder::RelativeToShader("DefaultPassShader");
+                const auto shaderDirectory = ce::paths::relative_to_shader("DefaultPassShader");
                 if (LX::ComputeMaterialSourceKey(*source, sourceKey, error) &&
                     CanReuseMaterialGraphAuthoring(*current, sourceKey, shaderDirectory, error))
                 {
                     return true;
                 }
                 const auto generation = CompileMaterialGraphAuthoring(*source, guid,
-                    shaderDirectory, PathFinder::CachePath("Lattice"), error);
+                    shaderDirectory, ce::paths::cache_path("Lattice"), error);
                 if (generation && PublishMaterialGraphGeneration(generation, current, {}, {}, error))
                 {
                     return true;
@@ -6689,7 +6727,7 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
 }
 
 void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
-	const file::path& path, FileGuid guid, bool remove)
+	const std::filesystem::path& path, FileGuid guid, bool remove)
 {
     const auto registry = SnapshotAssetMetaRegistry();
 	if (RuntimeAssetType::Auto == assetType)
@@ -6856,10 +6894,10 @@ FileGuid DataSystem::GetStemToGuid(const std::string& stem) const
 	return registry ? registry->GetStemToGuid(stem) : FileGuid{};
 }
 
-file::path DataSystem::GetFilePath(FileGuid fileguid) const
+std::filesystem::path DataSystem::GetFilePath(FileGuid fileguid) const
 {
     const auto registry = SnapshotAssetMetaRegistry();
-	return registry ? registry->GetPath(fileguid) : file::path{};
+	return registry ? registry->GetPath(fileguid) : std::filesystem::path{};
 }
 
 own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBundle(const AssetBundle& bundle)
@@ -6970,8 +7008,8 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
     {
         const auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
         // Keep authored UTF-8 font references out of the native narrow path constructor.
-        const file::path name = type == ManagedAssetType::SpriteFont
-            ? file::path{} : file::path(entry.assetName);
+        const std::filesystem::path name = type == ManagedAssetType::SpriteFont
+            ? std::filesystem::path{} : std::filesystem::path(entry.assetName);
         const std::string fontReference = entry.assetName;
         jobs.add([this, request, type, name, fontReference]
         {
@@ -7215,7 +7253,7 @@ void DataSystem::RetainAssets(const AssetBundle& bundle)
 			key = TextureCacheKey(ResolveRuntimeAssetPath(entry.assetName, TextureFallbackDirectory(TextureFileType::SpriteSheet)));
 			break;
 		default:
-			key = file::path(entry.assetName).stem().string();
+			key = std::filesystem::path(entry.assetName).stem().string();
 			break;
 		}
 		m_retainedAssets[entry.assetTypeID].insert(std::move(key));
@@ -7304,7 +7342,7 @@ void DataSystem::UnloadUnusedAssets()
 // 쪽이 이어져 있지 않았다**: resolver는 `nullptr` catalog로 불렸고
 // `ModelLoadRequest::cookedPath`는 늘 비어 있었다(실측 texCooked=0). 그래서
 // cooked 경로가 제품에서 한 번도 돌지 않았다 — 이 함수가 그 입구다.
-bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
+bool DataSystem::MountCookedCatalog(const std::filesystem::path& derivedRoot,
 	std::string& outError)
 {
 	outError.clear();
@@ -7333,10 +7371,10 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
         expectedEpoch = m_assetPreparationEpoch;
         registryForFreshness = m_assetMetaRegistry;
     }
-	const file::path manifestPath =
+	const std::filesystem::path manifestPath =
 		derivedRoot / "Derived" / "asset-manifest.cemf";
 	std::error_code errorCode;
-	if (!file::is_regular_file(manifestPath, errorCode))
+	if (!std::filesystem::is_regular_file(manifestPath, errorCode))
 	{
 		// 미게시는 실패가 아니다 — 에디터 작업 트리에는 Derived가 없다.
 		// 조용히 두면 resolver·모델 로드가 예전처럼 source로 간다.
@@ -7385,7 +7423,7 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 	// Packaged Player에는 `.meta`가 없다. CEMF v2의 source identity table로
 	// AssetMetaRegistry 전체를 새로 만든 뒤 한 번에 교체한다. Editor는 watcher가
 	// 갱신하는 source registry가 정본이므로 optional cooked mount가 건드리지 않는다.
-	const bool authoring = PathFinder::IsAssetAuthoringEnabled();
+	const bool authoring = ce::paths::is_asset_authoring_enabled();
 	own::shared_owner<AssetMetaRegistry> packagedRegistry;
 	if (!authoring)
 	{
@@ -7399,7 +7437,7 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 		for (const experiment::cooked::AssetSourceManifestEntry& source
 			: catalog->SourceAssets())
 		{
-			const file::path sourcePath = catalog->ResolveSourcePath(source.assetId);
+			const std::filesystem::path sourcePath = catalog->ResolveSourcePath(source.assetId);
 			const auto* cooked = catalog->Find(source.assetId);
             // Generated graph metadata/source and bytecode live in the v3
             // artifact. Player keeps the source identity, not an authoring file.
@@ -7415,16 +7453,16 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
             {
                 const auto artifactPath = catalog->ResolveArtifactPath(source.assetId);
                 std::error_code artifactError;
-                cookedTexture = file::is_regular_file(artifactPath, artifactError) && !artifactError;
+                cookedTexture = std::filesystem::is_regular_file(artifactPath, artifactError) && !artifactError;
                 if (cookedTexture)
                 {
-                    const auto artifactSize = file::file_size(artifactPath, artifactError);
+                    const auto artifactSize = std::filesystem::file_size(artifactPath, artifactError);
                     cookedTexture = !artifactError && artifactSize == cooked->byteSize;
                 }
             }
 			std::error_code sourceError;
 			if (sourcePath.empty()
-				|| (!cookedGraph && !cookedTexture && (!file::is_regular_file(sourcePath, sourceError) || sourceError)))
+				|| (!cookedGraph && !cookedTexture && (!std::filesystem::is_regular_file(sourcePath, sourceError) || sourceError)))
 			{
 				outError = "CEMF source asset이 package에 없다: "
 					+ source.sourcePath;
@@ -7459,22 +7497,22 @@ bool DataSystem::MountCookedCatalog(const file::path& derivedRoot,
 		{
 			FileGuid guid;
 			guid.m_guid = entry.assetId.value;
-			const file::path sourcePath = registryForFreshness
-				? registryForFreshness->GetPath(guid) : file::path{};
+			const std::filesystem::path sourcePath = registryForFreshness
+				? registryForFreshness->GetPath(guid) : std::filesystem::path{};
 			if (sourcePath.empty()) continue;
 			std::error_code sourceError;
-			if (!file::is_regular_file(sourcePath, sourceError)) continue;
-			const file::path artifact = catalog->ResolveArtifactPath(entry.assetId);
+			if (!std::filesystem::is_regular_file(sourcePath, sourceError)) continue;
+			const std::filesystem::path artifact = catalog->ResolveArtifactPath(entry.assetId);
 			std::error_code artifactError;
 			if (artifact.empty()
-				|| !file::is_regular_file(artifact, artifactError))
+				|| !std::filesystem::is_regular_file(artifact, artifactError))
 			{
 				// 표에는 있는데 파일이 없다 — 낡음보다 나쁘다. 같이 끊는다.
 				stale.insert(guid);
 				continue;
 			}
-			const auto sourceTime = file::last_write_time(sourcePath, sourceError);
-			const auto artifactTime = file::last_write_time(artifact, artifactError);
+			const auto sourceTime = std::filesystem::last_write_time(sourcePath, sourceError);
+			const auto artifactTime = std::filesystem::last_write_time(artifact, artifactError);
 			if (sourceError || artifactError) continue;
 			if (artifactTime < sourceTime) stale.insert(guid);
 		}
@@ -7531,7 +7569,7 @@ DataSystem::GetCookedCatalog() const
 	return m_cookedCatalog;
 }
 
-file::path DataSystem::ResolveCookedArtifact(
+std::filesystem::path DataSystem::ResolveCookedArtifact(
 	const experiment::AssetId& assetId) const
 {
 	std::lock_guard lock(m_cookedCatalogMutex);
@@ -7542,18 +7580,18 @@ file::path DataSystem::ResolveCookedArtifact(
 	return m_cookedCatalog->ResolveArtifactPath(assetId);
 }
 
-file::path DataSystem::ResolveCatalogAssetPath(FileGuid assetGuid) const
+std::filesystem::path DataSystem::ResolveCatalogAssetPath(FileGuid assetGuid) const
 {
 	if (FileGuid{} == assetGuid) return {};
 	experiment::AssetId assetId{ assetGuid.m_guid };
-	if (file::path cooked = ResolveCookedArtifact(assetId); !cooked.empty())
+	if (std::filesystem::path cooked = ResolveCookedArtifact(assetId); !cooked.empty())
 		return cooked;
 
 	// Editor owns authoring recovery and stale-source fallback. A packaged Player
 	// has no such authority: if a produced asset is absent/stale in CEMF, make the
 	// caller fail instead of making source files an accidental runtime contract.
-	return PathFinder::IsAssetAuthoringEnabled()
-		? GetFilePath(assetGuid) : file::path{};
+	return ce::paths::is_asset_authoring_enabled()
+		? GetFilePath(assetGuid) : std::filesystem::path{};
 }
 
 std::size_t DataSystem::CookedCatalogStaleCount() const
@@ -7590,7 +7628,7 @@ assets::ModelAssetGeneration::Shared DataSystem::LoadModelAssetGenerationByPath(
         resolverRevision = m_assetDepotRevision;
         registry = SnapshotAssetMetaRegistry();
     }
-    const file::path path = ResolveRuntimeAssetPath(filePath, "Models\\");
+    const std::filesystem::path path = ResolveRuntimeAssetPath(filePath, "Models\\");
     auto guid = registry ? registry->GetGuid(path) : FileGuid{};
     if (guid == FileGuid{} && registry)
     {
@@ -7642,9 +7680,9 @@ assets::ModelAssetGeneration::Shared DataSystem::FindModelAssetGenerationByStem(
 
 bool DataSystem::ReadModelCreateMeshCollider(FileGuid guid) const
 {
-	const file::path sourcePath = GetFilePath(guid);
+	const std::filesystem::path sourcePath = GetFilePath(guid);
 	if (sourcePath.empty()) return false;
-	file::path sidecarPath = sourcePath;
+	std::filesystem::path sidecarPath = sourcePath;
 	sidecarPath += ".meta";
 	std::string parseError;
 	const Authoring::ParsedDocument document =
@@ -7658,7 +7696,7 @@ bool DataSystem::ReadModelCreateMeshCollider(FileGuid guid) const
 
 own::shared_owner<const Material> DataSystem::LoadMaterialByGuid(FileGuid guid)
 {
-    if (PathFinder::IsAssetAuthoringEnabled())
+    if (ce::paths::is_asset_authoring_enabled())
     {
         if (auto accepted = FindCachedMaterial(guid))
         {

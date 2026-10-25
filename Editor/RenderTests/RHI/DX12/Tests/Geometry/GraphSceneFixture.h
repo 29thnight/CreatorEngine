@@ -1,4 +1,9 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
 #include "MaterialGraphSceneHost.h"
 #include "RHI/RHISubmissionThread.h"
@@ -7,7 +12,7 @@
 #include "Render/Passes/Geometry/SceneSurfaceTargets.h"
 #include "Render/Passes/Geometry/EnhancedShadowPass.h"
 
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 class DX12DeviceResources;
 struct Vertex;

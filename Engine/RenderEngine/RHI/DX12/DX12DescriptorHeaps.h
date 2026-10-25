@@ -1,11 +1,33 @@
 #pragma once
-#include "../../../Utility_Framework/LifetimeToken.h"
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "../RHIPipelineLayout.h"
 #include "../RHIDescriptorVersionPolicy.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
-#include <d3d12.h>
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 
 /// 불투명 테이블 값 → DX12 GPU 디스크립터 핸들 (A-5b).
 ///
@@ -93,7 +115,7 @@ class DX12DescriptorRecycler
 
     struct RecordingLease
     {
-        Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> heap;
+        winrt::com_ptr<ID3D12DescriptorHeap> heap;
         ce::lifetime_token reuseLease;
         uint64_t version{};
         bool IsValid() const { return heap && reuseLease && version != 0; }
@@ -124,7 +146,7 @@ class DX12DescriptorRecycler
                     uint32_t initialVersions, std::string& outError);
     void Shutdown();
 
-    bool IsInitialized() const { return nullptr != m_device.Get(); }
+    bool IsInitialized() const { return nullptr != m_device.get(); }
 
     void Collect(RHICompletionPoint completed);
     bool BeginRecording(uint64_t recordingId, std::string& outError);
@@ -137,7 +159,7 @@ class DX12DescriptorRecycler
     // 엉뚱한 텍스처가 보이는 식으로만 드러난다.
     Allocation Allocate(uint32_t count);
 
-    ID3D12DescriptorHeap* GetHeap() const { return (nullptr != m_activePage) ? m_activePage->heap.Get() : nullptr; }
+    ID3D12DescriptorHeap* GetHeap() const { return (nullptr != m_activePage) ? m_activePage->heap.get() : nullptr; }
     uint32_t GetDescriptorsPerPage() const { return m_descriptorsPerPage; }
     uint32_t GetInitialVersionCount() const { return m_initialVersions; }
     uint32_t GetRecordingUsed() const
@@ -162,19 +184,17 @@ class DX12DescriptorRecycler
     }
 
   private:
-    template<typename T>
-    using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     struct Page
     {
-        ComPtr<ID3D12DescriptorHeap> heap;
+        winrt::com_ptr<ID3D12DescriptorHeap> heap;
         D3D12_CPU_DESCRIPTOR_HANDLE cpuBase{};
         D3D12_GPU_DESCRIPTOR_HANDLE gpuBase{};
         std::atomic<uint32_t> cursor{0};
         bool sealed{};
     };
 
-    ComPtr<ID3D12Device> m_device;
+    winrt::com_ptr<ID3D12Device> m_device;
     D3D12_DESCRIPTOR_HEAP_TYPE m_type{D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV};
     std::vector<own::unique_owner<Page>> m_pages;
     RHIDescriptorVersionPolicy m_versions;
@@ -221,7 +241,7 @@ class DX12TargetViewHeap
 
     struct Snapshot
     {
-        Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> heap;
+        winrt::com_ptr<ID3D12DescriptorHeap> heap;
         D3D12_CPU_DESCRIPTOR_HANDLE cpuBase{};
         uint32_t count{};
         uint32_t incrementSize{};
@@ -252,7 +272,7 @@ class DX12TargetViewHeap
     bool Initialize(ID3D12Device* device, D3D12_DESCRIPTOR_HEAP_TYPE type, uint32_t capacity, std::string& outError);
     void Shutdown();
 
-    bool IsInitialized() const { return nullptr != m_heap.Get(); }
+    bool IsInitialized() const { return nullptr != m_heap.get(); }
 
     void BeginFrame();
 
@@ -275,10 +295,8 @@ class DX12TargetViewHeap
     Stats GetStats() const;
 
   private:
-    template<typename T>
-    using ComPtr = Microsoft::WRL::ComPtr<T>;
 
-    ComPtr<ID3D12DescriptorHeap> m_heap;
+    winrt::com_ptr<ID3D12DescriptorHeap> m_heap;
     D3D12_CPU_DESCRIPTOR_HANDLE m_cpuBase{};
     uint32_t m_incrementSize{0};
     uint32_t m_capacity{0};
@@ -309,7 +327,7 @@ class DX12SamplerHeap
     bool Initialize(ID3D12Device* device, uint32_t capacity, std::string& outError);
     void Shutdown();
 
-    bool IsInitialized() const { return nullptr != m_heap.Get(); }
+    bool IsInitialized() const { return nullptr != m_heap.get(); }
 
     // 같은 설정이면 같은 핸들을 돌려준다. 실패하면 ptr이 0인 핸들.
     D3D12_GPU_DESCRIPTOR_HANDLE GetOrCreate(const RHISamplerDesc& desc);
@@ -327,16 +345,14 @@ class DX12SamplerHeap
 
     static uint64_t ComputeHash(const RHISamplerDesc& desc);
 
-    ID3D12DescriptorHeap* GetHeap() const { return m_heap.Get(); }
+    ID3D12DescriptorHeap* GetHeap() const { return m_heap.get(); }
     Stats GetStats() const;
     size_t GetCachedCount() const;
 
   private:
-    template<typename T>
-    using ComPtr = Microsoft::WRL::ComPtr<T>;
 
-    ComPtr<ID3D12Device> m_device;
-    ComPtr<ID3D12DescriptorHeap> m_heap;
+    winrt::com_ptr<ID3D12Device> m_device;
+    winrt::com_ptr<ID3D12DescriptorHeap> m_heap;
     D3D12_CPU_DESCRIPTOR_HANDLE m_cpuBase{};
     D3D12_GPU_DESCRIPTOR_HANDLE m_gpuBase{};
     uint32_t m_incrementSize{0};

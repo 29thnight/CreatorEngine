@@ -1,18 +1,39 @@
 #pragma once
-#include "../../../Utility_Framework/LifetimeToken.h"
-#include "../../../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "../IRenderDeviceServices.h"
 #include "../IRHIDeviceResources.h"
 #include "../../Render/Temporal/TemporalReconstruction.h"
 #include "DX12QueueService.h"
 #include <stdint.h>
-#include "../../../Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
-#include <d3d12.h>
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 #include <tuple>
 
 #include "../ScreenSizedResource.h"
-#include <dxgi1_6.h>
 
 #include "DX12UploadRing.h"
 #include "DX12DescriptorHeaps.h"
@@ -30,9 +51,9 @@ struct DX12RecordingResources
     DX12DescriptorRecycler::RecordingLease descriptors;
     DX12TargetViewHeap::Snapshot renderTargets;
     DX12TargetViewHeap::Snapshot depthTargets;
-    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> samplers;
+    winrt::com_ptr<ID3D12DescriptorHeap> samplers;
     ce::lifetime_token uploads;
-    Microsoft::WRL::ComPtr<ID3D12DescriptorHeap> clearDescriptors;
+    winrt::com_ptr<ID3D12DescriptorHeap> clearDescriptors;
     uint32_t descriptorCount{};
     uint32_t descriptorIncrement{};
     uint32_t clearCapacity{};
@@ -138,7 +159,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     /// 백엔드 중립이고 이쪽은 그 구독자다.
     bool Resize(uint32_t width, uint32_t height, std::string& outError) override;
 
-    bool IsInitialized() const override { return nullptr != m_device.Get(); }
+    bool IsInitialized() const override { return nullptr != m_device.get(); }
 
     // 이번 프레임의 얼로케이터를 준비하고(필요 시 펜스 대기) 커맨드 리스트를 연다.
     bool BeginFrame(std::string& outError) override;
@@ -175,7 +196,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     {
         if (!m_deferredImmediate)
         {
-            function(m_commandList.Get());
+            function(m_commandList.get());
             return;
         }
         std::string error;
@@ -253,11 +274,11 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     // Optional raw Present return for evidence. E_PENDING means no native call
     // was reached; the bool retains the existing occlusion/deferred semantics.
     bool Present(std::string& outError, HRESULT* nativeResult);
-    bool HasSwapChain() const override { return nullptr != m_swapChain.Get(); }
+    bool HasSwapChain() const override { return nullptr != m_swapChain.get(); }
     uint32_t GetBackBufferIndex() const override;
     ID3D12Resource* GetBackBuffer(uint32_t index) const
     {
-        return (index < kFrameCount) ? m_backBuffers[index].Get() : nullptr;
+        return (index < kFrameCount) ? m_backBuffers[index].get() : nullptr;
     }
     D3D12_CPU_DESCRIPTOR_HANDLE GetBackBufferRtv(uint32_t index) const;
 
@@ -288,11 +309,11 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     void AppendDeviceRemovedReport(HRESULT operationResult, std::string& outError) const;
 
     bool DetachSwapChain(std::string& outError);
-    IDXGIFactory6* GetFactory() const { return m_factory.Get(); }
+    IDXGIFactory6* GetFactory() const { return m_factory.get(); }
     own::shared_owner<DlssTemporalAdapter> GetTemporalDlssSession() const;
     TemporalResult GetTemporalBootstrapResult() const { return m_temporalBootstrapResult; }
     bool HasTemporalSharedDevice() const { return static_cast<bool>(m_temporalDevice); }
-    ID3D12Device* GetDevice() const { return m_device.Get(); }
+    ID3D12Device* GetDevice() const { return m_device.get(); }
     bool EncodeIndirectBuffer(const RHIBufferSlice& slice, uint64_t& payload) const override
     {
         const auto entry = DescribeNativeBuffer(slice.buffer);
@@ -315,7 +336,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
         payload = {uint32_t(address), uint32_t(address >> 32), uint32_t(slice.size), uint32_t(DXGI_FORMAT_R32_UINT)};
         return true;
     }
-    IDXGIAdapter1* GetAdapter() const { return m_adapter.Get(); }
+    IDXGIAdapter1* GetAdapter() const { return m_adapter.get(); }
     RHIDeviceMemoryBudgetCoordinator& GetPersistentMemoryBudgetCoordinator() { return m_persistentMemoryBudget; }
     const RHIDeviceMemoryBudgetCoordinator& GetPersistentMemoryBudgetCoordinator() const
     {
@@ -327,9 +348,9 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     }
 
     // 타임스탬프 주파수를 얻으려면 큐가 필요하다(큐마다 다를 수 있다).
-    ID3D12CommandQueue* GetCommandQueue() const { return m_queue.Get(); }
-    ID3D12GraphicsCommandList* GetCommandList() const { return m_commandList.Get(); }
-    ID3D12Resource* GetRenderTarget() const { return m_renderTarget.Get(); }
+    ID3D12CommandQueue* GetCommandQueue() const { return m_queue.get(); }
+    ID3D12GraphicsCommandList* GetCommandList() const { return m_commandList.get(); }
+    ID3D12Resource* GetRenderTarget() const { return m_renderTarget.get(); }
     D3D12_CPU_DESCRIPTOR_HANDLE GetRtvHandle() const { return m_rtvHandle; }
     /// 프레임 리드백. 오프스크린 결과를 픽셀로 꺼내 보는 자가 검증이 쓴다.
     const RHIReadback& GetFrameReadback() const { return m_frameReadback; }
@@ -470,11 +491,11 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     //   여럿인데, 핸들의 유효 범위는 그보다 길다(패스 소유 리소스는 프레임을
     //   넘긴다). 수명 정책은 바뀌지 않는다 — ComPtr이 하던 참조 세기를 표가
     //   그대로 든다(RhiBoundaryPlan.md §7.2.1 ③).
-    RHITextureHandle RegisterTexture(Microsoft::WRL::ComPtr<ID3D12Resource> resource)
+    RHITextureHandle RegisterTexture(winrt::com_ptr<ID3D12Resource> resource)
     {
         return m_resourceTable.AddTexture(std::move(resource));
     }
-    RHIBufferHandle RegisterBuffer(Microsoft::WRL::ComPtr<ID3D12Resource> resource)
+    RHIBufferHandle RegisterBuffer(winrt::com_ptr<ID3D12Resource> resource)
     {
         return m_resourceTable.AddBuffer(std::move(resource));
     }
@@ -514,9 +535,9 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
 
     RHIIndirectDrawCapabilities GetIndirectDrawCapabilities() const override
     {
-        const bool available = nullptr != m_drawIndexedIndirectSignature.Get();
-        return {available, available || nullptr != m_drawIndirectSignature.Get(),
-                nullptr != m_drawIndirectSignature.Get()};
+        const bool available = nullptr != m_drawIndexedIndirectSignature.get();
+        return {available, available || nullptr != m_drawIndirectSignature.get(),
+                nullptr != m_drawIndirectSignature.get()};
     }
     RHIAtomicCapabilities GetAtomicCapabilities() const override { return m_atomicCapabilities; }
     RHISubresourceCapabilities GetSubresourceCapabilities() const override { return {true, false, true}; }
@@ -536,11 +557,11 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     bool IsAtomicMin64Buffer(RHIBufferHandle buffer) const override;
     RHIMeshShaderCapabilities GetMeshShaderCapabilities() const override { return m_meshShaderCapabilities; }
     RHIShaderArrayCapabilities GetShaderArrayCapabilities() const override { return m_shaderArrayCapabilities; }
-    ID3D12CommandSignature* GetDispatchMeshIndirectSignature() const { return m_dispatchMeshIndirectSignature.Get(); }
-    ID3D12CommandSignature* GetDispatchIndirectSignature() const { return m_dispatchIndirectSignature.Get(); }
+    ID3D12CommandSignature* GetDispatchMeshIndirectSignature() const { return m_dispatchMeshIndirectSignature.get(); }
+    ID3D12CommandSignature* GetDispatchIndirectSignature() const { return m_dispatchIndirectSignature.get(); }
     ID3D12CommandSignature* GetMaterialBatchSignature(ID3D12RootSignature*, std::span<const uint32_t>, bool indexed);
-    ID3D12CommandSignature* GetDrawIndirectSignature() const { return m_drawIndirectSignature.Get(); }
-    ID3D12CommandSignature* GetDrawIndexedIndirectSignature() const { return m_drawIndexedIndirectSignature.Get(); }
+    ID3D12CommandSignature* GetDrawIndirectSignature() const { return m_drawIndirectSignature.get(); }
+    ID3D12CommandSignature* GetDrawIndexedIndirectSignature() const { return m_drawIndexedIndirectSignature.get(); }
 
     /// 버퍼의 GPU 주소 (A-4). 인코더의 드로우 루프가 쓴다 — 근거는 표에 있다.
     D3D12_GPU_VIRTUAL_ADDRESS ResolveGpuAddress(RHIBufferHandle handle) const
@@ -599,8 +620,6 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     bool CreateBufferReadback(uint64_t bytes, RHIReadback& outReadback, std::string& outError) override;
 
   private:
-    template<typename T>
-    using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     RHIUploadMemoryBudget QueryUploadMemoryBudget() const;
     void RefreshUploadBudget();
@@ -618,26 +637,26 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
 
     TemporalResult m_temporalBootstrapResult;
     own::shared_owner<TemporalDeviceDX12> m_temporalDevice;
-    ComPtr<IDXGIFactory6> m_factory;
-    ComPtr<IDXGIAdapter1> m_adapter;
+    winrt::com_ptr<IDXGIFactory6> m_factory;
+    winrt::com_ptr<IDXGIAdapter1> m_adapter;
     own::unique_owner<DX12MemorySamplingSession> m_memorySampling;
-    ComPtr<ID3D12Device> m_device;
+    winrt::com_ptr<ID3D12Device> m_device;
     own::unique_owner<DX12QueueService> m_queueService;
     bool m_queueFrameActive{false};
     bool m_queueFrameJoined{false};
     void DrainAbortedQueueFrame();
     bool FlushCommandListImpl(bool preserveRecording, std::string& outError);
-    ComPtr<ID3D12CommandSignature> m_drawIndirectSignature;
-    ComPtr<ID3D12CommandSignature> m_drawIndexedIndirectSignature;
-    ComPtr<ID3D12CommandSignature> m_dispatchMeshIndirectSignature;
-    ComPtr<ID3D12CommandSignature> m_dispatchIndirectSignature;
+    winrt::com_ptr<ID3D12CommandSignature> m_drawIndirectSignature;
+    winrt::com_ptr<ID3D12CommandSignature> m_drawIndexedIndirectSignature;
+    winrt::com_ptr<ID3D12CommandSignature> m_dispatchMeshIndirectSignature;
+    winrt::com_ptr<ID3D12CommandSignature> m_dispatchIndirectSignature;
     // Ascending unique root slots have an exact allocation-free representation:
     // native root identity, occupied slots, CBV slots, indexed/mesh command kind.
     using MaterialBatchSignatureKey = std::tuple<uintptr_t, uint64_t, uint64_t, bool>;
     struct MaterialBatchSignature
     {
-        ComPtr<ID3D12RootSignature> root;
-        ComPtr<ID3D12CommandSignature> signature;
+        winrt::com_ptr<ID3D12RootSignature> root;
+        winrt::com_ptr<ID3D12CommandSignature> signature;
     };
     static uint64_t NextMaterialBatchSignatureGeneration();
     uint64_t m_meshBatchSignatureGeneration{NextMaterialBatchSignatureGeneration()};
@@ -649,13 +668,13 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     // W8-3: 검증 레이어가 붙은 경우에만 채워진다. 들고 있어야 드레인이
     // 매 프레임 QueryInterface 를 다시 하지 않고, 꾼 실행의 비용이
     // 포인터 하나 검사로 끝난다.
-    ComPtr<ID3D12InfoQueue> m_infoQueue;
-    ComPtr<ID3D12CommandQueue> m_queue;
-    std::array<ComPtr<ID3D12CommandAllocator>, kFrameCount> m_allocators;
+    winrt::com_ptr<ID3D12InfoQueue> m_infoQueue;
+    winrt::com_ptr<ID3D12CommandQueue> m_queue;
+    std::array<winrt::com_ptr<ID3D12CommandAllocator>, kFrameCount> m_allocators;
     std::array<uint64_t, kFrameCount> m_frameFenceValues{};
     std::array<RHISubmissionTicket, kFrameCount> m_frameSubmissionTickets;
-    std::array<std::vector<ComPtr<ID3D12GraphicsCommandList>>, kFrameCount> m_retiredCommandLists;
-    ComPtr<ID3D12GraphicsCommandList> m_commandList;
+    std::array<std::vector<winrt::com_ptr<ID3D12GraphicsCommandList>>, kFrameCount> m_retiredCommandLists;
+    winrt::com_ptr<ID3D12GraphicsCommandList> m_commandList;
 
     /// 지금 열린 리스트에 붙은 인코더 (A-3). 리스트를 Reset 할 때마다 다시
     /// 만든다 — 인코더가 기억하는 디스크립터 힙 바인딩이 Reset 으로 풀리므로,
@@ -683,7 +702,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     bool SubmitPendingImmediate(bool preserveRecording, bool endFrame, std::string& error);
     void AbortPendingImmediate();
 
-    ComPtr<ID3D12Fence> m_fence;
+    winrt::com_ptr<ID3D12Fence> m_fence;
     HANDLE m_fenceEvent{nullptr};
     uint64_t m_nextFenceValue{1};
     uint64_t m_lastAdmittedFenceValue{0};
@@ -691,21 +710,21 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     bool m_submissionClient{false};
     RHILifecycleResult m_lastLifecycleResult{};
 
-    ComPtr<ID3D12DescriptorHeap> m_rtvHeap;
+    winrt::com_ptr<ID3D12DescriptorHeap> m_rtvHeap;
     D3D12_CPU_DESCRIPTOR_HANDLE m_rtvHandle{};
-    ComPtr<ID3D12Resource> m_renderTarget;
+    winrt::com_ptr<ID3D12Resource> m_renderTarget;
     RHIReadback m_frameReadback;
 
     // 스왑체인(셸 전용 — AttachSwapChain을 부른 인스턴스만 갖는다).
-    ComPtr<IDXGISwapChain3> m_swapChain;
+    winrt::com_ptr<IDXGISwapChain3> m_swapChain;
     UINT m_swapChainFlags{0};
     HANDLE m_frameLatencyWaitableObject{nullptr};
     bool m_frameLatencyReady{false};
     // allocator·백버퍼 링과 별개로 미완료 호스트 프레임은 하나만 허용한다.
     RHISubmissionTicket m_hostSubmissionTicket;
     uint64_t m_hostFenceValue{0};
-    std::array<ComPtr<ID3D12Resource>, kFrameCount> m_backBuffers;
-    ComPtr<ID3D12DescriptorHeap> m_backBufferRtvHeap;
+    std::array<winrt::com_ptr<ID3D12Resource>, kFrameCount> m_backBuffers;
+    winrt::com_ptr<ID3D12DescriptorHeap> m_backBufferRtvHeap;
     uint32_t m_backBufferRtvSize{0};
 
     DX12UploadSegmentAllocator m_uploadAllocator;
@@ -720,7 +739,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     // 복사 원본은 CPU 전용 힙이어야 한다. 초기화 뒤 worker가 읽기만 하며,
     // recording 합류 뒤 종료/재초기화할 때만 해제한다. 준비 실패 시 count=0으로
     // 기존 뷰 생성 경로를 유지하고 프레임마다 다시 할당하지 않는다.
-    ComPtr<ID3D12DescriptorHeap> m_nullTextureDescriptorHeap;
+    winrt::com_ptr<ID3D12DescriptorHeap> m_nullTextureDescriptorHeap;
     D3D12_CPU_DESCRIPTOR_HANDLE m_nullTextureDescriptor{};
     uint32_t m_nullTextureDescriptorCount{0};
 

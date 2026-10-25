@@ -19,8 +19,8 @@ foreach ($mutant in @($false, $true))
         ' /I"' + "$repo/Engine/Utility_Framework" + '" /I"' + "$repo/Engine/RenderEngine" +
         '" /external:I"' + "$dependencies/include" + '" /external:W0 /Fo"' + $out +
         '/" /Fd"' + "$out/$name.pdb" + '" /Fe"' + "$out/$name.exe" + '" "' +
-        "$repo/Engine/Utility_Framework/JobScheduler.cpp" + '" "' +
-        "$repo/Engine/Utility_Framework/ThreadPool.cpp" + '" "' +
+        "$repo/Engine/Utility_Framework/Concurrency/JobScheduler.cpp" + '" "' +
+        "$repo/Engine/Utility_Framework/Concurrency/ThreadPool.cpp" + '" "' +
         "$PSScriptRoot/recording_task_graph_probe.cpp" + '" /link /LIBPATH:"' + "$lib/lib" + '"'
     & $env:ComSpec /d /s /c $command
     if ($LASTEXITCODE) { throw 'Recording task graph probe compilation failed.' }

@@ -9,9 +9,9 @@
 
 #pragma once
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
-#include "Core.Definition.h"
+#include "../Utility_Framework/Foundation/Core.Definition.h"
 #include "Navigation.h"
 #include <mathematics/vector2.hpp>
 

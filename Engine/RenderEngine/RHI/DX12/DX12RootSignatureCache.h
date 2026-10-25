@@ -1,9 +1,23 @@
 #pragma once
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "../IRenderPipelineCache.h"
 #include "DX12ResourceEntries.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
-#include <d3d12.h>
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 
 // 전방 선언. 유니티 빌드에서는 옆 파일이 넣어 주어 가려져 있었다(비유니티 점검).
 class DX12DeviceResources;
@@ -54,7 +68,7 @@ public:
     bool Initialize(DX12DeviceResources* resources, std::string& outError);
     void Shutdown();
 
-    bool IsInitialized() const { return nullptr != m_device.Get(); }
+    bool IsInitialized() const { return nullptr != m_device.get(); }
 
     // 같은 레이아웃이면 같은 객체와 같은 핸들을 돌려준다.
     RHIPipelineLayoutHandle GetOrCreate(const RHIPipelineLayoutDesc& desc, std::string& outError) override;
@@ -67,18 +81,17 @@ public:
     size_t GetCachedCount() const;
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     /// 같은 레이아웃을 두 번 물으면 **같은 핸들**이 나와야 한다. 매번 새 칸을
     /// 발급하면 표가 무한히 자라고, 무엇보다 desc 해시가 달라져 PSO 캐시가 논다.
     struct CacheEntry
     {
-        ComPtr<ID3D12RootSignature> signature;
+        winrt::com_ptr<ID3D12RootSignature> signature;
         RHIPipelineLayoutHandle     handle;
     };
 
     class DX12DeviceResources* m_resources{ nullptr };
-    ComPtr<ID3D12Device> m_device;
+    winrt::com_ptr<ID3D12Device> m_device;
 
     mutable std::mutex m_mutex;
     std::unordered_map<uint64_t, CacheEntry> m_cache;

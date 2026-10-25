@@ -1,13 +1,17 @@
-#include "../Utility_Framework/Ownership.h"
 #pragma once
-#include "ClassProperty.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Reflection/ClassProperty.h"
 #include "../RenderEngine/LocalPose.h"
 #include "../RenderEngine/BoneRegion.h"
 #include "../RenderEngine/ClipSamplingCursor.h"
 #include "AnimTaskList.h"
 #include <mathematics/matrix4x4.hpp>
 #include <stdint.h>
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 class Animator;
 class AnimationController;

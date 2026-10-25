@@ -1,10 +1,20 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Layers.h"
+#else
+import Creator.Core.Layers;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.LayerCatalog.h"
+#else
+import Creator.Core.LayerCatalog;
+#endif
 #include "../../Engine/SceneRuntime/PhysicsShapeDefinition.h"
 #include "../../Engine/SceneRuntime/ScenePhysicsSimulation.h"
 #if !CE_SHIPPING
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
 #include "../../Engine/EngineDiagnostics/ProfileCaptureFile.h"
 #endif
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 using namespace ce::physics;
 

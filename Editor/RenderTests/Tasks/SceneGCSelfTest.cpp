@@ -5,7 +5,11 @@
 #include "Entity.h"
 #include "LifecycleRegistry.h"
 #include "ScriptObjectRegistry.h"
-#include "JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include "Terrain.h"
 #include "LightComponent.h"
 #include "SpriteRenderer.h"
@@ -16,9 +20,9 @@
 #include "FoliageComponent.h"
 #include "DecalComponent.h"
 #include "Animator.h"
-#include "../../EngineEntry/ReflectionPropertyEdit.h"
+#include "../../EngineEntry/Editing/ReflectionPropertyEdit.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {

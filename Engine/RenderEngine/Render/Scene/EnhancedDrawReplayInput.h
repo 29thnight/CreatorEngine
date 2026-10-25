@@ -27,13 +27,13 @@ struct EnhancedDrawReplayInput
         if (mesh.handle.domain == assets::ModelMeshDomain::Granular)
         {
             const auto& asset = mesh.handle.asset.key;
-            std::copy(asset.assetId.value.data.begin(), asset.assetId.value.data.end(), result.begin());
-            std::copy(asset.subassetId.value.data.begin(), asset.subassetId.value.data.end(), result.begin() + 16);
+            std::copy(asset.assetId.value.data_.begin(), asset.assetId.value.data_.end(), result.begin());
+            std::copy(asset.subassetId.value.data_.begin(), asset.subassetId.value.data_.end(), result.begin() + 16);
         }
         else
         {
-            std::copy(mesh.handle.modelId.data.begin(), mesh.handle.modelId.data.end(), result.begin());
-            std::copy(mesh.handle.meshId.data.begin(), mesh.handle.meshId.data.end(), result.begin() + 16);
+            std::copy(mesh.handle.modelId.data_.begin(), mesh.handle.modelId.data_.end(), result.begin());
+            std::copy(mesh.handle.meshId.data_.begin(), mesh.handle.meshId.data_.end(), result.begin() + 16);
         }
         return result;
     }

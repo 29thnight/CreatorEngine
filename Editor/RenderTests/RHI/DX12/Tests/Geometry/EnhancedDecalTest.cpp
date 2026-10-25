@@ -1,3 +1,14 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "RHI/DX12/DX12Format.h"
 #include "Render/Passes/Geometry/EnhancedDecalPass.h"
 #include "RHI/DX12/DX12DeviceResources.h"
@@ -12,7 +23,7 @@
 // DeviceState.h include가 여기 있었다 (E, 2026-08-09).
 // 이 파일에서 DirectX11:: 심볼을 쓰는 코드가 0이다.
 
-#include "../../../../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // 데칼 패스 자가 검증 (PHASE 3-6, 미구현 패스 이식 2차).
 //
@@ -110,7 +121,7 @@ namespace
 
     /// 화면 전체를 한 색으로 채운 반정밀도 GBuffer 타깃 하나를 만든다.
     bool CreateDecalTarget(DX12DeviceResources& resources, const float rgba[4],
-        Microsoft::WRL::ComPtr<ID3D12Resource>& out)
+        winrt::com_ptr<ID3D12Resource>& out)
     {
         D3D12_HEAP_PROPERTIES defaultHeap{};
         defaultHeap.Type = D3D12_HEAP_TYPE_DEFAULT;
@@ -127,7 +138,7 @@ namespace
 
         if (FAILED(resources.GetDevice()->CreateCommittedResource(&defaultHeap,
             D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-            nullptr, IID_PPV_ARGS(&out))))
+            nullptr, IID_PPV_ARGS(out.put()))))
         {
             return false;
         }
@@ -158,7 +169,7 @@ namespace
         src.PlacedFootprint.Footprint.RowPitch = pitch;
 
         D3D12_TEXTURE_COPY_LOCATION dst{};
-        dst.pResource = out.Get();
+        dst.pResource = out.get();
         dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
         resources.GetCommandList()->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
         return true;
@@ -167,7 +178,6 @@ namespace
 
 bool DX12Test::RunDecalTest(std::string& outLog)
 {
-    using Microsoft::WRL::ComPtr;
 
     outLog += "── 데칼 패스 검증 (PHASE 3-6) ──\n";
 
@@ -222,10 +232,10 @@ bool DX12Test::RunDecalTest(std::string& outLog)
     outLog += "[1/5] 셰이더 컴파일·채널 조합 7종 PSO 생성 통과\n";
 
     // ── 합성 GBuffer와 데칼 텍스처 ──
-    ComPtr<ID3D12Resource> gbufferDiffuse;
-    ComPtr<ID3D12Resource> gbufferNormal;
-    ComPtr<ID3D12Resource> gbufferOrm;
-    ComPtr<ID3D12Resource> gbufferDepth;
+    winrt::com_ptr<ID3D12Resource> gbufferDiffuse;
+    winrt::com_ptr<ID3D12Resource> gbufferNormal;
+    winrt::com_ptr<ID3D12Resource> gbufferOrm;
+    winrt::com_ptr<ID3D12Resource> gbufferDepth;
     DX12TestTextureRegistration diffuseRegistration;
     DX12TestTextureRegistration normalRegistration;
     DX12TestTextureRegistration ormRegistration;
@@ -320,7 +330,7 @@ bool DX12Test::RunDecalTest(std::string& outLog)
 
             if (FAILED(resources.GetDevice()->CreateCommittedResource(&defaultHeap,
                 D3D12_HEAP_FLAG_NONE, &desc, D3D12_RESOURCE_STATE_COPY_DEST,
-                &clearValue, IID_PPV_ARGS(&gbufferDepth))))
+                &clearValue, IID_PPV_ARGS(gbufferDepth.put()))))
             {
                 outLog += "[2/5] 깊이 생성 실패\n";
                 resources.Shutdown();
@@ -357,14 +367,14 @@ bool DX12Test::RunDecalTest(std::string& outLog)
             src.PlacedFootprint.Footprint.RowPitch = depthPitch;
 
             D3D12_TEXTURE_COPY_LOCATION dst{};
-            dst.pResource = gbufferDepth.Get();
+            dst.pResource = gbufferDepth.get();
             dst.Type = D3D12_TEXTURE_COPY_TYPE_SUBRESOURCE_INDEX;
             resources.GetCommandList()->CopyTextureRegion(&dst, 0, 0, 0, &src, nullptr);
         }
 
         D3D12_RESOURCE_BARRIER barriers[4]{};
-        ID3D12Resource* const targets[4] = { gbufferDiffuse.Get(), gbufferNormal.Get(),
-            gbufferOrm.Get(), gbufferDepth.Get() };
+        ID3D12Resource* const targets[4] = { gbufferDiffuse.get(), gbufferNormal.get(),
+            gbufferOrm.get(), gbufferDepth.get() };
         for (uint32_t i = 0; i < 4; ++i)
         {
             barriers[i].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -387,10 +397,10 @@ bool DX12Test::RunDecalTest(std::string& outLog)
         outLog += "[2/5] 합성 GBuffer(표면 + 하늘) · 데칼 텍스처 3종 준비 완료\n";
     }
 
-    diffuseRegistration.Register(resources, gbufferDiffuse.Get());
-    normalRegistration.Register(resources, gbufferNormal.Get());
-    ormRegistration.Register(resources, gbufferOrm.Get());
-    depthRegistration.Register(resources, gbufferDepth.Get());
+    diffuseRegistration.Register(resources, gbufferDiffuse.get());
+    normalRegistration.Register(resources, gbufferNormal.get());
+    ormRegistration.Register(resources, gbufferOrm.get());
+    depthRegistration.Register(resources, gbufferDepth.get());
     if (!diffuseRegistration.IsValid() || !normalRegistration.IsValid() ||
         !ormRegistration.IsValid() || !depthRegistration.IsValid())
     {

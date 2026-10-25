@@ -1,11 +1,20 @@
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include "EditorCameraRig.h"
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "ProfileScope.h"
-#include <wrl/client.h>
-#include <GameInput.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Engine/Platform/WindowsSDK/Creator.GameInputSDK.h"
+#else
+import "Creator.GameInputSDK.h";
+#endif
 #include "ImGui.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include <mathematics/transform.hpp>
 
 #pragma comment(lib, "GameInput.lib")
@@ -46,8 +55,8 @@ namespace editor::camera_diagnostics
 
 struct EditorCameraRig::PresentationInput
 {
-    Microsoft::WRL::ComPtr<GameInput::v3::IGameInput> gameInput;
-    Microsoft::WRL::ComPtr<GameInput::v3::IGameInputDevice> mouseDevice;
+    winrt::com_ptr<GameInput::v3::IGameInput> gameInput;
+    winrt::com_ptr<GameInput::v3::IGameInputDevice> mouseDevice;
     GameInput::v3::GameInputMouseState previousMouse{};
     std::chrono::steady_clock::time_point previousSample{};
     std::array<bool, 256> keys{};
@@ -110,7 +119,7 @@ void EditorCameraRig::BeginPresentationFrame(bool applicationFocused)
     if (!input.initialized)
     {
         input.initialized = true;
-        const HRESULT result = GameInputCreate(input.gameInput.GetAddressOf());
+        const HRESULT result = GameInputCreate(input.gameInput.put());
         if (FAILED(result))
         {
             std::printf("[EditorCameraInput] GameInput creation failed: 0x%08lX\n",
@@ -144,16 +153,16 @@ void EditorCameraRig::BeginPresentationFrame(bool applicationFocused)
         return;
     }
 
-    Microsoft::WRL::ComPtr<IGameInputReading> reading;
-    if (SUCCEEDED(input.gameInput->GetCurrentReading(GameInputKindMouse, nullptr, reading.GetAddressOf())) && reading)
+    winrt::com_ptr<IGameInputReading> reading;
+    if (SUCCEEDED(input.gameInput->GetCurrentReading(GameInputKindMouse, nullptr, reading.put())) && reading)
     {
         GameInputMouseState mouse{};
         if (reading->GetMouseState(&mouse))
         {
-            Microsoft::WRL::ComPtr<IGameInputDevice> device;
-            reading->GetDevice(device.GetAddressOf());
+            winrt::com_ptr<IGameInputDevice> device;
+            reading->GetDevice(device.put());
             const std::uint64_t timestamp = reading->GetTimestamp();
-            if (continuousFocus && hadMouse && device.Get() == input.mouseDevice.Get() &&
+            if (continuousFocus && hadMouse && device.get() == input.mouseDevice.get() &&
                 timestamp >= input.mouseTimestamp)
             {
                 // ImGui 논리 픽셀이 아니라 장치의 누적 이동량이다. DPI와 무관하게
@@ -171,9 +180,9 @@ void EditorCameraRig::BeginPresentationFrame(bool applicationFocused)
         }
     }
 
-    reading.Reset();
+    reading = nullptr;
     if (SUCCEEDED(input.gameInput->GetCurrentReading(
-            GameInputKindKeyboard, nullptr, reading.GetAddressOf())) && reading)
+            GameInputKindKeyboard, nullptr, reading.put())) && reading)
     {
         std::array<GameInputKeyState, 256> keys{};
         const std::uint32_t count = reading->GetKeyState(static_cast<std::uint32_t>(keys.size()), keys.data());

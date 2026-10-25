@@ -1,10 +1,15 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.LayerCatalog.h"
+#else
+import Creator.Core.LayerCatalog;
+#endif
 #include "../../Engine/SceneRuntime/ScenePhysicsSimulation.h"
 #include "../../Engine/SceneRuntime/SimulationSessionPolicy.h"
 #if !CE_SHIPPING
 #include "../../Engine/EngineDiagnostics/ProfileScope.h"
 #include "../../Engine/EngineDiagnostics/ProfileCaptureFile.h"
 #endif
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 using namespace ce::physics;
 
@@ -75,10 +80,10 @@ void exercise_layers(execution_preference execution)
         tick();
     check(session.Read(*body)->transform.position.y > .8f, "project allowed pair actually collides");
 
-    const auto slotBeforeRename = project.Snapshot()->catalog.Find(moving)->slot;
+    const auto slotBeforeRename = project.Snapshot()->catalog.find(moving)->slot;
     check(bool(project.Change([&](auto& catalog, auto&) { return catalog.Rename(moving, "RenamedMoving"); }))
               && bool(session.CommitLayers(*project.Snapshot(), assignments)), "layer rename commits by stable ID");
-    check(project.Snapshot()->catalog.Find(moving)->slot == slotBeforeRename && session.Handle(*body) == identity,
+    check(project.Snapshot()->catalog.find(moving)->slot == slotBeforeRename && session.Handle(*body) == identity,
           "rename preserves slot and SDK body identity");
 
     const auto before = project.Snapshot();
@@ -131,7 +136,7 @@ void exercise_layers(execution_preference execution)
 
     std::array<query_hit, 8> hits;
     query_filter query;
-    query.layers = project.Snapshot()->catalog.Find(moving)->slot.Mask();
+    query.layers = project.Snapshot()->catalog.find(moving)->slot.Mask();
     check(session.Runtime()->raycast({0, 8, 0}, {0, -1, 0}, 20, hits, query)->required_capacity == 1,
           "runtime query selects common layer slot");
     assignments[1].layer = ce::layers::default_layer;

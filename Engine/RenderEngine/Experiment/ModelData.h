@@ -1,6 +1,15 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
-#include "Uuid.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "VertexLayout.h"
 #include "MeshletData.h"
 #include "MeshLodData.h"
@@ -16,8 +25,7 @@
 #include <mathematics/vector4.hpp>
 
 #include <stddef.h>
-#include "../../Utility_Framework/StandardLibrary.h"
-#include "../../Utility_Framework/Ownership.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace AssetDepot
 {
@@ -77,9 +85,9 @@ namespace experiment
 	// FileGuid::m_guid와 명시적으로 왕복한다.
 	struct AssetId final
 	{
-		Uuid::Uuid16 value{};
+		uuid::uuid16 value{};
 
-		[[nodiscard]] bool IsValid() const noexcept { return !value.IsNil(); }
+		[[nodiscard]] bool IsValid() const noexcept { return !value.is_nil(); }
 		friend auto operator<=>(const AssetId&, const AssetId&) noexcept = default;
 	};
 

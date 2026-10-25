@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 // LC6 (PHASE 14.5) — Core 도메인 명령.
 //
 // `help` · `quit` · `wait` · `commands.*` · `cli.*` · `log.*` · `lifecycle.*` ·
@@ -31,7 +36,7 @@
 #include "EditorClipContract.h"
 #include "EditorStateContract.h"    // PHASE 21 W2-1: 키보드 탐색 계약
 #include "EditorNavContract.h"    // PHASE 21 W2-1: 키보드 탐색 계약
-#include "EditorPlayModeController.h"
+#include "../Scene/EditorPlayModeController.h"
 #include "EditorWindowHost.h"       // PHASE 21 M4: editor.windows 덤프
 #include "EditorWindowAudit.h"
 #include "EditorWindowRegistry.h"   // W7-0: editor.window 요청 창구
@@ -42,7 +47,7 @@
 #include "EditorThemeSelfTest.h"
 
 #include <stdio.h>
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "RegisterEditorMenuManual.h"
 #include "CommandSupport.h"
 
@@ -57,10 +62,10 @@
 #include "SceneViewportOverlay.h"
 #include "EnhancedRenderDebugWindow.h"
 #include "EditorWindowNames.h"
-#include "EditorSessionState.h"
+#include "../Project/EditorSessionState.h"
 #include "EngineBootstrap.h"
-#include "GameBuilderSystem.h"
-#include "EditorAssetDatabase.h"
+#include "../Build/GameBuilderSystem.h"
+#include "../Assets/EditorAssetDatabase.h"
 #include "Interfaces/AssetAuthoringPort.h"
 #include "Interfaces/FoliageInstance.h"
 #include <mathematics/color.hpp>
@@ -119,15 +124,18 @@
 #include "AIManager.h"
 #include "DataSystem.h"
 #include "GpuDiagnostics.h"
-#include "LogSystem.h"
-#include "PathFinder.h"
-#include "RuntimeSettings.h"
-#include "AuthoringNodeEquality.h" // D3-a-1: 저작 노드 구조 비교
-#include "AuthoringNodeViewAccess.h" // D3-a-5b
-#include "AuthoringParsedDocument.h"
-#include "AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
-#include "SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
-#include "WindowsCoreWindow.h"
+#include "../../../Engine/Utility_Framework/Diagnostics/LogSystem.h"
+#include "../../../Engine/Utility_Framework/Runtime/RuntimeSettings.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeEquality.h" // D3-a-1: 저작 노드 구조 비교
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-5b
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../../Engine/Utility_Framework/Authoring/AuthoringRymlErrorPolicy.h" // D3-b-1: ryml abort → 예외 정책
+#include "../../../Engine/Utility_Framework/Authoring/SerializationProfiler.h" // D0(SerializationPlan): 직렬화 기준선 계측
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.AppBackend.WinAPI.h"
+#else
+import Creator.AppBackend.WinAPI;
+#endif
 #include "Render/Scene/EnhancedSceneRenderer.h"
 #include "RHI/DX12/Tests/DX12SelfTest.h"
 #include "RHI/Vulkan/VulkanSelfTest.h"
@@ -152,19 +160,23 @@
 #include "ExperimentParity/ExperimentResolverSelfTest.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
 #include "RHI/ScreenSizedResource.h"
-#include "ReflectionYml.h"
-#include "ReflectionUndo.h"
-#include "GameObjectCommand.h"
-#include "StringHelper.h"
+#include "../../../Engine/Utility_Framework/Reflection/ReflectionYml.h"
+#include "../Editing/ReflectionUndo.h"
+#include "../Editing/GameObjectCommand.h"
 #include "BlackBoard.h"
 #include "TagManager.h"
-#include <Windows.h>
-#include <psapi.h> // MBC11: peak working set
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+// MBC11: peak working set
 #include <crtdbg.h>
-#include <DbgHelp.h>
-#include <DXProgrammableCapture.h>
-#include <dxgidebug.h>
-#include <wrl/client.h>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Engine/Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 #include "../../Engine/SceneRuntime/MeshRenderer.h"
 #include "../../Engine/RenderEngine/Material.h"
 
@@ -528,7 +540,7 @@ namespace ConsoleCmd
 
         // Resize the host window even when it is hidden for an offscreen probe.
         // Active/visible window lookup loses that window and can select a dialog.
-        const auto* window = WindowsCoreWindow::GetForCurrentInstance();
+        const auto* window = AppBackendWinAPI::GetForCurrentInstance();
         const HWND hwnd = window ? window->GetHandle() : nullptr;
         if (nullptr == hwnd) { std::printf("[CLI] 창 핸들 없음\n"); return PreconditionFailed("window.unavailable", "No editor window"); }
 
@@ -587,7 +599,7 @@ namespace ConsoleCmd
         data.Set("height", CommandData::Int(clientH));
         // The screen-size bus follows the rendered viewport. Retain its legacy
         // fields and report the actual host client rect separately for restore.
-        const auto* window = WindowsCoreWindow::GetForCurrentInstance();
+        const auto* window = AppBackendWinAPI::GetForCurrentInstance();
         RECT hostClient{};
         const bool hostKnown = window && ::GetClientRect(window->GetHandle(), &hostClient);
         data.Set("hostClientKnown", CommandData::Bool(hostKnown));

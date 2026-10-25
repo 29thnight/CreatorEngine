@@ -204,7 +204,7 @@ void editor::HierarchyFlatView::Rebuild(Scene* scene, const ImGuiTextFilter& fil
 			Entity* obj = entityAt(index);
 			if (!obj) continue;
 
-			if (!m_matched[index] && filter.PassFilter(obj->m_name.ToString().c_str()))
+			if (!m_matched[index] && filter.PassFilter(obj->m_name.c_str()))
 				m_matched[index] = 1;
 
 			if (!m_matched[index]) continue;

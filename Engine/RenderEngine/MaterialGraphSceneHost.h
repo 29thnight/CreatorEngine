@@ -1,5 +1,9 @@
 #pragma once
-#include "../Utility_Framework/Ownership.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
 // METEOR — Material Expression & Topology Editor for Optimized Rendering.
 // The scene renderer that draws LX materials: geometry transform, culling,
@@ -24,10 +28,14 @@
 #include "GpuGeometryOcclusion.h"
 #include "Render/Passes/Geometry/SceneSurfaceTargets.h"
 #include "Render/Graph/EnhancedForwardLighting.h"
-#include "JobScheduler.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
 #include "RHI/RHISubmissionThread.h"
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace material_graph
 {

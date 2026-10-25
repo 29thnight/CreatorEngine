@@ -3,7 +3,7 @@
 #include "CameraComponent.h"
 #include "Entity.h"
 #include "Scene.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 void CameraComponent::OnAddedToScene()
 {
@@ -77,7 +77,7 @@ void CameraSystem::Update(float tick, const std::function<void()>& midTraversalP
         // (같은 문자열을 써야 대조가 성립하므로 Lifecycle::Trace::TypeNameOf
         // 공용 함수를 쓴다).
         LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(camera),
-            owner->m_name.ToString().c_str(), camera->GetInstanceID());
+            owner->m_name.c_str(), camera->GetInstanceID());
 
 		// 자세는 소비 시점에 Entity Transform에서 값으로 해석한다. 이 틱은 기존
 		// 생명주기 순서·재진입 시험의 발화점만 보존하며 공유 Camera를 갱신하지 않는다.

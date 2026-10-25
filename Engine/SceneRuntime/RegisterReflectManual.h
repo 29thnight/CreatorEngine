@@ -8,11 +8,11 @@
 //
 // CT6-c: 목록을 X-매크로로 공유화 - 런타임 등록(여기)과 에디터 typed
 // Draw 등록(InspectorWindow.cpp)이 같은 목록을 소비한다. 두 벌 유지 금지.
-#include "Reflection.hpp"
-#include "ReflectionTypedYml.h" // CT6-a: typed 직렬화 썽크 등록
-#include "ReflgenRuntime.h"     // 런타임 타입 등록소(Meta::Types)
-#include "LogSystem.h"          // VerifyReflectRegistration — critical 로그 후 abort
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Reflection/Reflection.hpp"
+#include "../Utility_Framework/Reflection/ReflectionTypedYml.h" // CT6-a: typed 직렬화 썽크 등록
+#include "../Utility_Framework/Reflection/ReflgenRuntime.h"     // 런타임 타입 등록소(Meta::Types)
+#include "../Utility_Framework/Diagnostics/LogSystem.h"          // VerifyReflectRegistration — critical 로그 후 abort
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "MeshRenderer.h"
 #include "LightMapping.h"
 #include "ShadowMapPassSetting.h"

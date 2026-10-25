@@ -13,7 +13,7 @@ param(
 #   도 건드리지 않는다.
 #
 # ★★ **선례 셋과 다른 점이 하나 있다.** `verify-authoring-base64.ps1` ·
-#   `verify-hashing-string.ps1` · `verify-mathematics-contract.ps1` 은 probe 하나만
+#   `verify-string-storage.ps1` · `verify-mathematics-contract.ps1` 은 probe 하나만
 #   컴파일해 링크 없이 돈다. 이쪽은 `Mesh` · `MeshOptimizer` · `Core::TimeSystem` ·
 #   `Material` · `Texture` · rapidyaml 의 **정의**를 요구해서 엔진 정적 라이브러리를
 #   링크한다.

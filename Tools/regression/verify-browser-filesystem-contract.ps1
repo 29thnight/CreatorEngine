@@ -241,7 +241,7 @@ foreach ($h in $equivalentHits) { Write-Host ("    {0}  x{1}" -f $h.Path, $h.Cou
 # 면제된 자리가 사라졌는데 목록이 남으면, 다음에 같은 이름의 새 호출이 조용히
 # 그 자리를 물려받는다.
 $exempt = @{
-    'Editor/EngineEntry/EditorAssetDatabase.cpp' =
+    'Editor/EngineEntry/Assets/EditorAssetDatabase.cpp' =
         '임포트할 때 원본과 대상이 같은 파일인지 보는 자리(CopyImportedFile). 여기서는 ' +
         'equivalent 의 "디스크에서 같은 파일" 의미론이 바로 필요한 것이고(제자리 임포트는 ' +
         'copy_file 이 자기 자신 위에 복사해 실패한다), 임포트 1 회당 1 회지 프레임당이 ' +

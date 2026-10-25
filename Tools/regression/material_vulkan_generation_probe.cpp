@@ -1,11 +1,20 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "MaterialGraphSceneHost.h"
 #include "MaterialGraphSurfaceBatch.h"
-#include "PathFinder.h"
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/Vulkan/VulkanPipelineCache.h"
 #include "RHI/Vulkan/VulkanEncoder.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #ifdef _DEBUG
 #include <crtdbg.h>
 #endif
@@ -244,11 +253,11 @@ void CheckScenePrograms(const std::filesystem::path& root, VulkanDeviceResources
 
 void Run(const std::filesystem::path& root)
 {
-    auto* paths = InternalPath::GetInstance();
-    paths->BaseProjectPath = root / "Dynamic_CPP";
-    paths->ShaderSourcePath = root / "Dynamic_CPP/Assets/Shaders";
-    paths->CacheRoot = root / "Build/Obj/MaterialProductProbe/VulkanSceneCache";
-    paths->AssetAuthoringEnabled = true;
+    auto* paths = (&ce::paths::get_state());
+    paths->base_project_path = root / "Dynamic_CPP";
+    paths->shader_source_path = root / "Dynamic_CPP/Assets/Shaders";
+    paths->cache_root = root / "Build/Obj/MaterialProductProbe/VulkanSceneCache";
+    paths->asset_authoring_enabled = true;
     RHIShaderCompiler::ScopedOutput output(RHIShaderBinary::SpirV);
     const auto file = root / "Build/Obj/MaterialProductProbe/vulkan-async-draw.slang";
     std::ofstream(file, std::ios::binary | std::ios::trunc)

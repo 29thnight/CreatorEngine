@@ -2,7 +2,7 @@
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedAssetCatalog.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/PakAudioClipByteSource.h"
 #include "../AssetCooker/CollisionGeometryCookProducer.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 int main(int argc, char** argv)
 {
@@ -20,7 +20,7 @@ int main(int argc, char** argv)
         if (argc != 2 && argc != 3)
             return 2;
         const std::filesystem::path root(argv[1]);
-        const auto uuid = Uuid::Parse("91ea9b44-13a6-4aec-99ec-0963eef7eaa1");
+        const auto uuid = uuid::parse("91ea9b44-13a6-4aec-99ec-0963eef7eaa1");
         auto cooker = PhysicsScene::create();
         check(bool(cooker));
         // Small physical objects must keep their authored metre units while cooking.
@@ -106,7 +106,7 @@ int main(int argc, char** argv)
         writeSource(sources.back(), sourcePath);
         {
             std::ofstream meta(sourcePath.string() + ".meta");
-            meta << "guid: " << Uuid::ToString(uuid) << "\ngeometryRevision: 3\n";
+            meta << "guid: " << uuid::to_string(uuid) << "\ngeometryRevision: 3\n";
         }
         for (const auto& source : sources)
             writeSource(source, CollisionGeometryIO::RevisionPath(sourceRoot, source.key));
@@ -129,7 +129,7 @@ int main(int argc, char** argv)
         check(!geometry_cook::Build(sourceRoot, sourcePath));
         {
             std::ofstream meta(sourcePath.string() + ".meta");
-            meta << "guid: " << Uuid::ToString(uuid) << "\n";
+            meta << "guid: " << uuid::to_string(uuid) << "\n";
         }
         {
             std::ofstream bad(CollisionGeometryIO::RevisionPath(sourceRoot, sources.front().key), std::ios::binary);
@@ -138,7 +138,7 @@ int main(int argc, char** argv)
         check(!geometry_cook::Build(sourceRoot, sourcePath));
         std::filesystem::remove_all(sourceRoot);
 
-        const std::string path = "Derived/CollisionGeometry/91/" + Uuid::ToString(uuid) + ".cepg";
+        const std::string path = "Derived/CollisionGeometry/91/" + uuid::to_string(uuid) + ".cepg";
         ck::CookedAssetManifest manifest;
         ck::CookedAssetManifestEntry entry;
         entry.assetId = {uuid};

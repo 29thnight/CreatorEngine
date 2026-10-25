@@ -4,7 +4,7 @@
 #include "../../Engine/SceneRuntime/CollisionGeometryIO.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookSupport.h"
 #include "../../Engine/RenderEngine/Experiment/Cooked/CookedAssetManifest.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace geometry_cook
 {
@@ -101,7 +101,7 @@ inline ce::physics::result<Product> Build(const std::filesystem::path& root, con
         product.entry.assetId = id;
         product.entry.kind = ck::CookedAssetKind::CollisionGeometry;
         product.entry.formatVersion = CookedCollisionGeometry::format_version;
-        const auto uuid = Uuid::ToString(id.value);
+        const auto uuid = uuid::to_string(id.value);
         product.entry.artifactPath = "Derived/CollisionGeometry/" + uuid.substr(0, 2) + "/" + uuid + ".cepg";
         product.entry.byteSize = product.bytes.size();
         if (!ck::ComputeSha256(product.bytes, product.entry.contentSha256, failure))

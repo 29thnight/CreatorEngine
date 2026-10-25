@@ -1,6 +1,6 @@
 #include "ProfileAggregate.h"
 
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // 유니티 빌드 때문에 익명 네임스페이스를 쓰지 않는다(계획서 §14).
 namespace ce::detail::profile_aggregate_impl

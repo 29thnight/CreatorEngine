@@ -4,7 +4,7 @@
 #include "../Assets/ModelVertexLayout.h"
 #include "RHIShaderPermutation.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // PHASE 3.75 MBC6 — ModelAssetGeneration 정점 마스크에서 RHI 입력 레이아웃과
 // shader permutation을 함께 유도하는 제품 경계.

@@ -1,10 +1,19 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../DataSystem.h"
 #include "AssetSetActivation.h"
 #include "RuntimeBootstrap.h"
-#include "../../Utility_Framework/ContentAbi.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.ContentAbi.h"
+#else
+import Creator.Core.ContentAbi;
+#endif
 #include "../Experiment/Cooked/CookedAssetCatalog.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -67,7 +76,7 @@ namespace AssetDepot
         {
             constexpr std::string_view activationPath = "Derived/asset-set-activation.ceas";
             std::error_code error;
-            if (!file::exists(assetRoot / activationPath, error))
+            if (!std::filesystem::exists(assetRoot / activationPath, error))
             {
                 if (error)
                 {
@@ -95,7 +104,7 @@ namespace AssetDepot
                 throw std::runtime_error("Unsupported AssetSet activation format/platform.");
             }
             const auto abi = line();
-            if (abi != CreatorContentAbi::Token)
+            if (abi != ce::content_abi::token)
             {
                 throw std::runtime_error("AssetSet activation differs from the installed host content ABI.");
             }
@@ -133,7 +142,7 @@ namespace AssetDepot
                     throw std::runtime_error(detail);
                 }
                 input.options.expectedTargetPlatform = "win-x64";
-                input.options.expectedTargetAbi = CreatorContentAbi::Token;
+                input.options.expectedTargetAbi = ce::content_abi::token;
                 inputs.push_back(std::move(input));
             }
             if (inputs.empty())
@@ -200,7 +209,7 @@ namespace AssetDepot
     }
 }
 
-bool DataSystem::MountConfiguredAssetSets(const file::path& assetRoot, std::string& failure)
+bool DataSystem::MountConfiguredAssetSets(const std::filesystem::path& assetRoot, std::string& failure)
 {
     failure.clear();
     try

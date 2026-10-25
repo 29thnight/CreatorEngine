@@ -11,7 +11,7 @@
 //   ② 보이지 않는 뷰의 그림을 계속 만들었다. 창이 둘이면 "지금 무엇이 보이는가"
 //      를 아무도 답하지 않으므로 제작자(`App.cpp`)가 둘 다 밀봉할 수밖에 없었다.
 //      모드가 생기면 그 물음에 답이 생긴다 — 그것이 아래 view demand 다.
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace editor::windows
 {

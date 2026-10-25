@@ -1,12 +1,22 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 
 #include "../../Engine/SceneRuntime/Audio/SoundAssetSerialization.h"
 #include "Experiment/Cooked/CookedAssetManifest.h"
 #include "Experiment/Cooked/SceneCookProducer.h"
 #include "Assets/AudioClipSourceMetadata.h"
-#include "AuthoringCookedDocument.h"
+#include "../../Engine/Utility_Framework/Authoring/AuthoringCookedDocument.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace sound_cook
 {
@@ -18,14 +28,7 @@ namespace sound_cook
         std::vector<std::byte> bytes;
     };
 
-    inline std::string Lower(std::string value)
-    {
-        std::ranges::transform(value, value.begin(), [](unsigned char letter)
-        {
-            return static_cast<char>(letter >= 'A' && letter <= 'Z' ? letter + ('a' - 'A') : letter);
-        });
-        return value;
-    }
+
 
     inline bool Build(const std::filesystem::path& root, ck::CookedAssetManifest& manifest,
         std::set<std::string>& artifactPaths, std::vector<Product>& products, std::string& error)
@@ -54,7 +57,7 @@ namespace sound_cook
             if (product.entry.artifactPath.empty() || !artifactPaths.insert(product.entry.artifactPath).second
                 || !ck::ComputeSha256(product.bytes, product.entry.contentSha256, error))
             {
-                error = "Invalid or duplicate sound artifact: " + Uuid::ToString(id.value) + " " + error;
+                error = "Invalid or duplicate sound artifact: " + uuid::to_string(id.value) + " " + error;
                 return false;
             }
             manifest.entries.push_back(product.entry);
@@ -64,7 +67,7 @@ namespace sound_cook
         for (const auto& source : manifest.sourceAssets)
         {
             const auto path = root / std::filesystem::path(std::u8string(source.sourcePath.begin(), source.sourcePath.end()));
-            const auto extension = Lower(path.extension().string());
+            const auto extension = ce::strings::ascii_to_lower(path.extension().string());
             if (extension != ".soundgraph" && extension != ".soundpreset")
             {
                 continue;
@@ -149,7 +152,7 @@ namespace sound_cook
                 if (preset.source.kind != wave::SoundSourceKind::Graph || graph == graphs.end()
                     || !wave::ResolveGraphParameters(*graph->second, preset.parameters, resolved, error))
                 {
-                    error = "SoundPreset graph/parameters are invalid: " + Uuid::ToString(id.value) + " " + error;
+                    error = "SoundPreset graph/parameters are invalid: " + uuid::to_string(id.value) + " " + error;
                     return false;
                 }
             }
@@ -246,7 +249,7 @@ namespace sound_cook
                     experiment::AssetId id;
                     if (!experiment::TryParseCanonicalAssetId(text, id) && index == 0u)
                     {
-                        const auto alias = aliases.find(Lower(text));
+                        const auto alias = aliases.find(ce::strings::ascii_to_lower(text));
                         if (alias == aliases.end() || alias->second.empty())
                         {
                             error = "Missing or ambiguous legacy audio basename: " + text;
@@ -313,8 +316,8 @@ namespace sound_cook
             }
             const auto stemUtf8 = std::filesystem::path(
                 std::u8string(source.sourcePath.begin(), source.sourcePath.end())).stem().u8string();
-            const auto stem = Lower(std::string(stemUtf8.begin(), stemUtf8.end()));
-            const auto guid = Uuid::ToString(source.assetId.value);
+            const auto stem = ce::strings::ascii_to_lower(std::string_view(reinterpret_cast<const char*>(stemUtf8.data()), stemUtf8.size()));
+            const auto guid = uuid::to_string(source.assetId.value);
             const auto [found, inserted] = aliases.emplace(stem, guid);
             if (!inserted && found->second != guid)
             {

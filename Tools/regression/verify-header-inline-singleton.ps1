@@ -82,9 +82,7 @@ for ($i = 0; $i -lt $negatives.Count; $i++) {
 # 여기 넣으려면 "그 헤더를 include하는 모든 TU가 같은 모듈 안에 있다"를 근거로
 # 적어야 한다. 소비가 모듈 밖으로 한 번이라도 나가면 허용 대상이 아니다.
 $allowed = @{
-    'Engine\EngineDiagnostics\Profiler.h' =
-        'GetTLSUnsafe — EngineDiagnostics 내부 private 소비뿐이라 엔진 DLL 1개 안에 갇힌다(§10.4).'
-    'Editor\EngineEntry\EditorSessionState.h' =
+    'Editor\EngineEntry\Project\EditorSessionState.h' =
         'Get — 소비가 Editor\EngineEntry·EngineGUIWindow뿐이고 Player는 쓰지 않는다. 축 B에서 Editor는 호스트셸(exe)에 남으므로 경계를 넘지 않는다.'
     'Editor\EngineGUIWindow\ReflectionImGuiHelper.h' =
         'TypedDraw::Registry — 소비가 EngineGUIWindow뿐이다(SceneRuntime/Entity.h의 언급은 주석 한 줄). 위와 같은 이유로 exe 내부.'

@@ -2,7 +2,7 @@
 #include "RHIHandle.h"
 #include "RHISubresourceRange.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // 리소스 상태 — 백엔드 중립 (PHASE 3-1 재정의, V3).
 //

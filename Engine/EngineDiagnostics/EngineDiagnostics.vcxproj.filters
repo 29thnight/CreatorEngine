@@ -1,32 +1,135 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <ItemGroup>
-    <Filter Include="Header Files">
-      <UniqueIdentifier>{93995380-89bd-4b04-88eb-625fbe52ebfb}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    <Filter Include="Capture">
+      <UniqueIdentifier>{874DE447-0C09-55E9-B7F9-7DDC914B7F73}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Source Files">
-      <UniqueIdentifier>{4fc737f1-c7a5-4376-a066-2a32d752a2ff}</UniqueIdentifier>
-      <Extensions>cpp;c;cc;cxx;c++;cppm;ixx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    <Filter Include="Capture\DX12">
+      <UniqueIdentifier>{39C61477-F47D-5CD0-8C91-382B649562E3}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Profiling">
+      <UniqueIdentifier>{F1B3EF8F-C31D-5BDE-8B99-7509E584C857}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ProfileCaptureAllocator.h"><Filter>Header Files</Filter></ClInclude>
-    <ClInclude Include="ProfilerViewerProtocol.h"><Filter>Header Files</Filter></ClInclude>
-    <ClInclude Include="ProfilerViewerProcess.h"><Filter>Header Files</Filter></ClInclude>
-    <ClInclude Include="ProfilerViewerClient.h"><Filter>Header Files</Filter></ClInclude>
-    <ClInclude Include="ProfilerViewerTransport.h"><Filter>Header Files</Filter></ClInclude>
-    <ClInclude Include="ProfilerLiveDiagnostics.h"><Filter>Header Files</Filter></ClInclude>
-    <ClInclude Include="ProfilerRenderingDiagnostics.h"><Filter>Header Files</Filter></ClInclude>
-    <ClInclude Include="ProfileRenderMeasurement.h"><Filter>Header Files</Filter></ClInclude>
-    <ClInclude Include="ProfileRhiContext.h"><Filter>Header Files</Filter></ClInclude>
-  </ItemGroup>
-  <ItemGroup>
-    <ClCompile Include="ProfilerViewerProcess.cpp"><Filter>Source Files</Filter></ClCompile>
-    <ClCompile Include="ProfilerLiveDiagnostics.cpp"><Filter>Source Files</Filter></ClCompile>
-    <ClCompile Include="ProfilerRenderingDiagnostics.cpp"><Filter>Source Files</Filter></ClCompile>
-    <ClCompile Include="ProfileRecording.cpp">
-      <Filter>Source Files</Filter>
+    <ClCompile Include="DxCaptureFile.cpp">
+      <Filter>Capture\DX12</Filter>
     </ClCompile>
+    <ClCompile Include="DxCaptureProcess.cpp">
+      <Filter>Capture\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="DxCaptureService.cpp">
+      <Filter>Capture\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="DxCaptureSubmission.cpp">
+      <Filter>Capture\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="ProfileAggregate.cpp">
+      <Filter>Profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="ProfileCapture.cpp">
+      <Filter>Profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="ProfileCaptureFile.cpp">
+      <Filter>Profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="ProfileMarker.cpp">
+      <Filter>Profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="ProfileReader.cpp">
+      <Filter>Profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="ProfileRecording.cpp">
+      <Filter>Profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="ProfilerLiveDiagnostics.cpp">
+      <Filter>Profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="ProfilerRenderingDiagnostics.cpp">
+      <Filter>Profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="ProfilerViewerProcess.cpp">
+      <Filter>Profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="ProfileService.cpp">
+      <Filter>Profiling</Filter>
+    </ClCompile>
+    <ClCompile Include="ProfileThreadStream.cpp">
+      <Filter>Profiling</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="DxCaptureFile.h">
+      <Filter>Capture\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="DxCaptureProcess.h">
+      <Filter>Capture\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="DxCaptureProtocol.h">
+      <Filter>Capture\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="DxCaptureSecurity.h">
+      <Filter>Capture\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="DxCaptureService.h">
+      <Filter>Capture\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="DxCaptureSubmission.h">
+      <Filter>Capture\DX12</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfileAggregate.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfileCapture.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfileCaptureAllocator.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfileCaptureFile.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfileEvent.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfileMarker.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfileReader.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfileRenderMeasurement.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfileRhiContext.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfilerLiveDiagnostics.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfilerRenderingDiagnostics.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfilerViewerClient.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfilerViewerProcess.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfilerViewerProtocol.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfilerViewerTransport.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfileScope.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfileService.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
+    <ClInclude Include="ProfileThreadStream.h">
+      <Filter>Profiling</Filter>
+    </ClInclude>
   </ItemGroup>
 </Project>

@@ -1,73 +1,79 @@
-﻿<?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<?xml version="1.0" encoding="utf-8"?>
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <ItemGroup>
-    <Filter Include="App">
-      <UniqueIdentifier>{7966f049-6a6f-4755-8982-91de26816bc2}</UniqueIdentifier>
+    <Filter Include="EngineEntry">
+      <UniqueIdentifier>{9E57A5BB-ED2C-5D47-B779-564099A4B7FE}</UniqueIdentifier>
     </Filter>
-    <Filter Include="EditorMain">
-      <UniqueIdentifier>{dbc999e4-84fd-41ad-be7e-08bca0d45eee}</UniqueIdentifier>
+    <Filter Include="EngineEntry\Bootstrap">
+      <UniqueIdentifier>{9EB25827-EF28-5469-8120-0D62C073CEBE}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Window">
-      <UniqueIdentifier>{1e1443b4-3acb-4b35-9d82-37003d91fcfd}</UniqueIdentifier>
+    <Filter Include="Resources">
+      <UniqueIdentifier>{DD4727C7-BCD4-5672-9DED-B5E8B99E6484}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Window\ProgressWindow">
-      <UniqueIdentifier>{b76f6103-4d5e-46b0-b281-74a88bbc0d51}</UniqueIdentifier>
+    <Filter Include="Resources\Windows">
+      <UniqueIdentifier>{B96C8ED4-DA6D-59D7-ABEE-DBAE2C1AED88}</UniqueIdentifier>
     </Filter>
-    <Filter Include="리소스 파일">
-      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
-      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    <Filter Include="Shared">
+      <UniqueIdentifier>{039E404C-C15B-5C3F-82CB-5F9ECFCEE157}</UniqueIdentifier>
     </Filter>
-    <Filter Include="헤더 파일">
-      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
-      <Extensions>h;hh;hpp;hxx;h++;hm;inl;inc;ipp;xsd</Extensions>
+    <Filter Include="Shared\Engine">
+      <UniqueIdentifier>{B4CE4596-BC34-58AD-A21B-EEE76EADAA14}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\Engine\RuntimeHost">
+      <UniqueIdentifier>{F44B221A-2731-55F9-B663-1C55D189CD87}</UniqueIdentifier>
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="EngineEntry\App.cpp">
-      <Filter>App</Filter>
+    <ClCompile Include="EngineEntry\Bootstrap\App.cpp">
+      <Filter>EngineEntry\Bootstrap</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\EditorMain.cpp">
-      <Filter>EditorMain</Filter>
+    <ClCompile Include="EngineEntry\Bootstrap\EditorMain.cpp">
+      <Filter>EngineEntry\Bootstrap</Filter>
     </ClCompile>
-    <ClCompile Include="EngineEntry\ShutdownFinalMarker.cpp">
-      <Filter>App</Filter>
+    <ClCompile Include="EngineEntry\Bootstrap\ShutdownFinalMarker.cpp">
+      <Filter>EngineEntry\Bootstrap</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="EngineEntry\App.h">
-      <Filter>App</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\BootProgress.h">
-      <Filter>Window\ProgressWindow</Filter>
-    </ClInclude>
-    <ClInclude Include="EngineEntry\EditorMain.h">
-      <Filter>EditorMain</Filter>
-    </ClInclude>
     <ClInclude Include="..\Engine\RuntimeHost\EngineBootstrap.h">
-      <Filter>App</Filter>
+      <Filter>Shared\Engine\RuntimeHost</Filter>
     </ClInclude>
     <ClInclude Include="..\Engine\RuntimeHost\EngineLaunchConfig.h">
-      <Filter>App</Filter>
+      <Filter>Shared\Engine\RuntimeHost</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\framework.h">
-      <Filter>헤더 파일</Filter>
+    <ClInclude Include="EngineEntry\Bootstrap\App.h">
+      <Filter>EngineEntry\Bootstrap</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\ProgressWindow.h">
-      <Filter>Window\ProgressWindow</Filter>
+    <ClInclude Include="EngineEntry\Bootstrap\BootProgress.h">
+      <Filter>EngineEntry\Bootstrap</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\Resource.h">
-      <Filter>헤더 파일</Filter>
+    <ClInclude Include="EngineEntry\Bootstrap\EditorMain.h">
+      <Filter>EngineEntry\Bootstrap</Filter>
     </ClInclude>
-    <ClInclude Include="EngineEntry\targetver.h">
-      <Filter>헤더 파일</Filter>
+    <ClInclude Include="EngineEntry\Bootstrap\framework.h">
+      <Filter>EngineEntry\Bootstrap</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Bootstrap\ProgressWindow.h">
+      <Filter>EngineEntry\Bootstrap</Filter>
+    </ClInclude>
+    <ClInclude Include="EngineEntry\Bootstrap\targetver.h">
+      <Filter>EngineEntry\Bootstrap</Filter>
+    </ClInclude>
+    <ClInclude Include="Resources\Windows\Resource.h">
+      <Filter>Resources\Windows</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <Image Include="EngineEntry\Academy_4Q.ico">
-      <Filter>리소스 파일</Filter>
+    <Image Include="Resources\Windows\Academy_4Q.ico">
+      <Filter>Resources\Windows</Filter>
     </Image>
-    <Image Include="EngineEntry\small.ico">
-      <Filter>리소스 파일</Filter>
+    <Image Include="Resources\Windows\small.ico">
+      <Filter>Resources\Windows</Filter>
     </Image>
+  </ItemGroup>
+  <ItemGroup>
+    <ResourceCompile Include="Resources\Windows\Academy_4Q.rc">
+      <Filter>Resources\Windows</Filter>
+    </ResourceCompile>
   </ItemGroup>
 </Project>

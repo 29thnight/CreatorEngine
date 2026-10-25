@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
+#else
+import Creator.Core.Strings;
+#endif
 #pragma once
 
 // Output Log 3단계 — 화면이 쓰는 상태. ImGui 를 알지 못한다.
@@ -26,9 +31,9 @@
 // 검색 · 복사 · 상세는 언제나 원문을 본다. 평탄화한 문자열을 저장소나 그룹에
 // 되돌려 쓰지 않는다.
 
-#include "LogStore.h"
+#include "../../Engine/Utility_Framework/Diagnostics/LogStore.h"
 
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace editor
 {
@@ -235,7 +240,7 @@ namespace editor
             m_dirty = false;
             m_rows.clear();
 
-            const std::string needle = ToAsciiLower(filter.search);
+            const std::string needle = ce::strings::ascii_to_lower(filter.search);
             if (filter.collapse)
             {
                 // 첫 발생 순서(= groupId 오름차순)로 둔다. 최근 순으로 다시
@@ -270,16 +275,7 @@ namespace editor
             return group == nullptr ? std::string() : FlattenForRow(group->message);
         }
 
-        static std::string ToAsciiLower(std::string_view text)
-        {
-            std::string lowered(text);
-            for (char& character : lowered)
-            {
-                if (character >= 'A' && character <= 'Z')
-                    character = static_cast<char>(character - 'A' + 'a');
-            }
-            return lowered;
-        }
+
 
     private:
         static bool Passes(const LogGroup& group, spdlog::level::level_enum minimumLevel,
@@ -290,8 +286,8 @@ namespace editor
             // 이상만 지난다.
             if (group.level < minimumLevel) return false;
             if (loweredNeedle.empty()) return true;
-            return ToAsciiLower(group.message).find(loweredNeedle) != std::string::npos ||
-                ToAsciiLower(group.loggerName).find(loweredNeedle) != std::string::npos;
+            return ce::strings::ascii_to_lower(group.message).find(loweredNeedle) != std::string::npos ||
+                ce::strings::ascii_to_lower(group.loggerName).find(loweredNeedle) != std::string::npos;
         }
 
         std::map<std::uint64_t, LogGroup> m_groups;

@@ -1,23 +1,107 @@
 <?xml version="1.0" encoding="utf-8"?>
-<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+<Project xmlns="http://schemas.microsoft.com/developer/msbuild/2003" ToolsVersion="4.0">
   <ItemGroup>
-    <ClCompile Include="PlayerApp.cpp" />
-    <ClCompile Include="PlayerMain.cpp" />
-    <ClCompile Include="PlayerDX12Presentation.cpp" />
-    <ClCompile Include="PlayerTemporalDX12.cpp" />
-    <ClCompile Include="PlayerVulkanPresentation.cpp" />
+    <Filter Include="Commands">
+      <UniqueIdentifier>{FAB1753C-CE5F-58A0-A16B-CD3E55388E0F}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Presentation">
+      <UniqueIdentifier>{F46D6978-6150-567D-956F-54FABC914899}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Presentation\DX12">
+      <UniqueIdentifier>{2E94879F-ABC4-5074-A6E1-5DC8EED36F8D}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Presentation\Vulkan">
+      <UniqueIdentifier>{CCD295B5-69E9-5538-89B3-1B3D5BD6CE94}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Runtime">
+      <UniqueIdentifier>{26A850A4-88AA-5E3F-8B62-B53D096C2F71}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared">
+      <UniqueIdentifier>{9AF3FFA6-B805-5973-BDF9-B0221D1B95A8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Shared\CommandCore">
+      <UniqueIdentifier>{30ADA8DD-3EB8-5E68-98A5-FAEC1BAB4C4E}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Validation">
+      <UniqueIdentifier>{3DCACD6F-513B-5C9D-AC21-A904FA7703B8}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="Validation\ForbiddenIncludes">
+      <UniqueIdentifier>{0E5ABFD5-2731-57BD-A482-CE72D6F28BBF}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="PlayerApp.h" />
-    <ClInclude Include="PlayerMain.h" />
-    <ClInclude Include="PlayerPresentation.h" />
-    <ClInclude Include="PlayerTemporalDX12.h" />
-    <ClInclude Include="PlayerDdolProbe.h" />
+    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandDescriptorSeeds.cpp">
+      <Filter>Shared\CommandCore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandParser.cpp">
+      <Filter>Shared\CommandCore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandRegistry.cpp">
+      <Filter>Shared\CommandCore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandResult.cpp">
+      <Filter>Shared\CommandCore</Filter>
+    </ClCompile>
+    <ClCompile Include="..\Engine\RuntimeHost\CommandCore\CommandSession.cpp">
+      <Filter>Shared\CommandCore</Filter>
+    </ClCompile>
+    <ClCompile Include="PlayerApp.cpp">
+      <Filter>Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="PlayerCommands.cpp">
+      <Filter>Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="PlayerCommandService.cpp">
+      <Filter>Commands</Filter>
+    </ClCompile>
+    <ClCompile Include="PlayerDX12Presentation.cpp">
+      <Filter>Presentation\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="PlayerMain.cpp">
+      <Filter>Runtime</Filter>
+    </ClCompile>
+    <ClCompile Include="PlayerTemporalDX12.cpp">
+      <Filter>Presentation\DX12</Filter>
+    </ClCompile>
+    <ClCompile Include="PlayerVulkanPresentation.cpp">
+      <Filter>Presentation\Vulkan</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <!-- Poison headers are not ClInclude inputs: reflgen must not parse them. -->
-    <None Include="ForbiddenIncludes\imgui.h" />
-    <None Include="ForbiddenIncludes\imgui_internal.h" />
-    <None Include="PlayerBoundary.targets" />
+    <ClInclude Include="ForbiddenIncludes\DirectXTex.h">
+      <Filter>Validation\ForbiddenIncludes</Filter>
+    </ClInclude>
+    <ClInclude Include="PlayerApp.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="PlayerCommands.h">
+      <Filter>Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="PlayerCommandService.h">
+      <Filter>Commands</Filter>
+    </ClInclude>
+    <ClInclude Include="PlayerDdolProbe.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="PlayerMain.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="PlayerPresentation.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="PlayerTemporalDX12.h">
+      <Filter>Presentation\DX12</Filter>
+    </ClInclude>
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="ForbiddenIncludes\imgui.h">
+      <Filter>Validation\ForbiddenIncludes</Filter>
+    </None>
+    <None Include="ForbiddenIncludes\imgui_internal.h">
+      <Filter>Validation\ForbiddenIncludes</Filter>
+    </None>
+    <None Include="PlayerBoundary.targets">
+      <Filter>Runtime</Filter>
+    </None>
   </ItemGroup>
 </Project>

@@ -1,0 +1,39 @@
+tags:
+  - Untagged
+  - Respawn
+  - Finish
+  - MainCamera
+  - Player
+  - GameController
+  - ShootTag
+  - Wall
+  - PlayerMoveSound
+  - PlayerActionSound
+  - PlayerDamageSound
+  - PlayerSpecialActionSound
+  - CriticalMark
+  - normalModel
+  - breakModel
+  - Ground
+  - Asis
+  - Host
+  - Target
+  - Effect
+  - Boss
+layers:
+  - Default
+  - TransparentFX
+  - Ignore RayCast
+  - Water
+  - UI
+  - Player
+  - PlayerDash
+  - Asis
+  - EntityResource
+  - Entityitem
+  - Enemy
+  - Rock
+  - PlayerBullet
+  - EnemyBullet
+  - EnemyHome
+  - Ground

@@ -5,8 +5,8 @@ must not acquire their backend transitively. Binary parser linkage is N9 scope.
 import argparse, hashlib, json, pathlib, re, sys
 EXTENSIONS={'.h','.hpp','.inl','.ixx','.cpp','.inc'}
 RUNTIME=('Player/','Engine/RuntimeHost/','Engine/SceneRuntime/','Engine/RenderEngine/','Engine/Physics/','Engine/Network/')
-NEUTRAL=('Engine/Utility_Framework/DiagnosticDocument.h','Engine/Utility_Framework/AuthoringDocument.h',
- 'Engine/Utility_Framework/AuthoringNodeView.h','Engine/Utility_Framework/TypeTrait.h',
+NEUTRAL=('Engine/Utility_Framework/Authoring/DiagnosticDocument.h','Engine/Utility_Framework/Authoring/AuthoringDocument.h',
+ 'Engine/Utility_Framework/Authoring/AuthoringNodeView.h','Engine/Utility_Framework/Reflection/TypeTrait.h',
  'Engine/SceneRuntime/ComponentFactory.h','Engine/SceneRuntime/SceneObservation.h','Tools/regression/ArchiveSchemaFixture.h')
 FACADES={'Engine/Utility_Framework/'+name for name in ('AuthoringReadNode.h','AuthoringWriteNode.h',
  'AuthoringParsedDocument.h','AuthoringNodeViewAccess.h','AuthoringDocumentAccess.h','AuthoringCookedDocument.h',

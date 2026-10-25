@@ -1,10 +1,10 @@
 // First edit is real Inspector input; subsequent cycles exercise the same queue
 // through the asset-service API inside the live Editor frame loop.
 static CommandCore::CommandResult StartTextureAutomaticSaveSoak(const ConsoleCommandContext& ctx,
-    const file::path& source, const file::path& sidecar, const std::string& before)
+    const std::filesystem::path& source, const std::filesystem::path& sidecar, const std::string& before)
 {
     using namespace CommandCore;
-    const auto read = [](const file::path& path)
+    const auto read = [](const std::filesystem::path& path)
     {
         std::ifstream stream(path, std::ios::binary);
         return std::string(std::istreambuf_iterator<char>(stream), {});
@@ -107,7 +107,7 @@ static CommandCore::CommandResult StartTextureAutomaticSaveSoak(const ConsoleCom
             if (kind == 2u)
             {
                 std::error_code error;
-                if (!file::remove(sidecar, error) || error)
+                if (!std::filesystem::remove(sidecar, error) || error)
                 {
                     return Fail("texture.soak.delete", "Could not delete isolated metadata");
                 }
@@ -154,7 +154,7 @@ static CommandCore::CommandResult StartTextureAutomaticSaveSoak(const ConsoleCom
         }
         if (phase == 1 && kind != 0u)
         {
-            if (read(sidecar) != external || (kind == 2u && file::exists(sidecar)) || database.AutomaticSaveError(sidecar).empty())
+            if (read(sidecar) != external || (kind == 2u && std::filesystem::exists(sidecar)) || database.AutomaticSaveError(sidecar).empty())
             {
                 return Fail("texture.soak.overwrite", "Pending save lost the external state or rejection diagnostic");
             }

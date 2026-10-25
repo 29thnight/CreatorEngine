@@ -5,8 +5,8 @@
 #include "CurvePoint.h"
 #include "EditorPropertyRow.h" // 배치 계약 (W2-I2)
 #include "EntityHandle.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
-#include "EditorComponentCatalog.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#include "../EngineEntry/Scripting/EditorComponentCatalog.h"
 
 class Entity;
 class InspectorWindow

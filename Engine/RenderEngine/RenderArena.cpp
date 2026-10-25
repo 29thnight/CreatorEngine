@@ -1,4 +1,9 @@
 #include "RenderArena.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Arena.h"
+#else
+import Creator.Core.Arena;
+#endif
 #include <algorithm>
 #include <atomic>
 #include <stdexcept>
@@ -19,7 +24,7 @@ namespace ce
         size_t bytes{};
         for (const auto& resource : m_resources)
         {
-            bytes += resource.stats().retainedBytes;
+            bytes += resource.stats().retained_bytes;
         }
         return bytes;
     }

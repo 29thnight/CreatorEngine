@@ -1,3 +1,13 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
+#else
+import Creator.Concurrency.Jobs;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "MaterialAssetRuntime.h"
 #include "../DataSystem.h"
 #include "../Experiment/Cooked/CookedShaderMeta.h"
@@ -8,8 +18,12 @@
 #include "../ExperimentMaterialMigration.h"
 #include "LegacyResourceCharges.h"
 
-#include "../../Utility_Framework/StandardLibrary.h"
-#include "../../Utility_Framework/Contract.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 
 namespace
 {

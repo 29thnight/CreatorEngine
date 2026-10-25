@@ -1,8 +1,19 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "CommandRegistrar.h"
 #include "CommandSupport.h"
 #include "ConsoleCommandSystem.h"
-#include "EditorObjectOperations.h"
-#include "ReflectionUndo.h"
+#include "../Scene/EditorObjectOperations.h"
+#include "../Editing/ReflectionUndo.h"
 #include "SceneManager.h"
 #include "Scene.h"
 #include "MeshRenderer.h"
@@ -10,7 +21,7 @@
 #include "DataSystem.h"
 #include "MaterialGraphWindow.h"
 
-#include "../../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace ConsoleCmd
 {
@@ -128,7 +139,7 @@ CommandResult MaterialGraph(const ConsoleCommandContext& context)
     if (parts[2] == "bind" && parts.size() == 4)
     {
         material_graph::InstanceDescription description;
-        if (!Uuid::TryParse(parts[3], description.graphId.value))
+        if (!uuid::try_parse(parts[3], description.graphId.value))
         {
             return InvalidArguments("Graph GUID is invalid");
         }

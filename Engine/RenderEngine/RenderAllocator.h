@@ -1,7 +1,19 @@
 #pragma once
-#include "../Utility_Framework/Ownership.h"
-#include "../Utility_Framework/HeapAllocator.h"
-#include "../Utility_Framework/LifetimeToken.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
+#else
+import Creator.Core.LifetimeToken;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.HeapAllocator.h"
+#else
+import Creator.Core.HeapAllocator;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include <limits>
 #include <memory>
 #include <new>
@@ -34,14 +46,14 @@ namespace ce
 
     struct render_object_allocator : own::allocator_interface<render_object_allocator>
     {
-        void* do_allocate(size_t size, size_t alignment) { return mi_malloc_aligned(size, alignment); }
-        void do_deallocate(void* pointer, size_t, size_t) noexcept { mi_free(pointer); }
+        void* do_allocate(size_t size, size_t alignment) { return ce::heap::try_allocate_aligned(size, alignment); }
+        void do_deallocate(void* pointer, size_t, size_t) noexcept { ce::heap::deallocate(pointer); }
     };
     inline own::allocator_ref render_owner_allocator()
     {
         return {nullptr,
-                [](void*, size_t size, size_t alignment) -> void* { return mi_malloc_aligned(size, alignment); },
-                [](void*, void* pointer, size_t, size_t) noexcept { mi_free(pointer); }};
+                [](void*, size_t size, size_t alignment) -> void* { return ce::heap::try_allocate_aligned(size, alignment); },
+                [](void*, void* pointer, size_t, size_t) noexcept { ce::heap::deallocate(pointer); }};
     }
     template<typename T>
     using render_unique_ptr = own::unique_owner<T, render_object_allocator>;

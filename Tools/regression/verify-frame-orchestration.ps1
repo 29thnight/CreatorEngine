@@ -74,7 +74,7 @@ if ($pausingIndex -lt 0) {
 
 # ── 양성 확인 2: 두 Host가 primitive를 부른다 ──
 $hosts = @(
-    @{ Rel = "Editor\EngineEntry\EditorMain.cpp"; Name = "Editor" },
+    @{ Rel = "Editor\EngineEntry\Bootstrap\EditorMain.cpp"; Name = "Editor" },
     @{ Rel = "Player\PlayerMain.cpp";      Name = "Player" }
 )
 $hostTexts = @{}

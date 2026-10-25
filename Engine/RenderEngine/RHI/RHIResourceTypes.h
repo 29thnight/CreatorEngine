@@ -1,6 +1,12 @@
 #pragma once
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Platform/WindowsSDK/Creator.ComSupport.h"
+#else
+import winrt_base;
+#endif
 #include <stddef.h>
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "RHIFormat.h"
 #include "RHIHandle.h"
@@ -333,7 +339,7 @@ struct RHISamplerTable
 //
 // R2a가 셰이더 가시 테이블(SRV/UAV)을 걷었고, 여기가 그 나머지다. 성격이
 // 달라 인터페이스도 다르다: RTV/DSV는 shader-visible recycler가 아니라 **패스마다 자기
-// 힙**에서 왔다. 헤더 14개가 ComPtr<ID3D12DescriptorHeap>을 들고 Initialize에서
+// 힙**에서 왔다. 헤더 14개가 winrt::com_ptr<ID3D12DescriptorHeap>을 들고 Initialize에서
 // 만들고 Shutdown에서 놓았으며, 매 프레임 같은 칸에 뷰를 다시 만들었다.
 //
 // ★ 이 반복이 R2a가 없앤 것보다 조용히 틀리기 쉽다. 깊이가 그렇다 —
@@ -1020,7 +1026,7 @@ struct RHIReadbackImage
 struct RHIReadback
 {
     /// ★ 포인터에서 핸들로 (5a). 여기가 이 파일에서 **유일하게 중립이 아니던
-    ///   자리**였다(`ComPtr<ID3D12Resource>`), 그리고 그 한 필드 때문에
+    ///   자리**였다(`winrt::com_ptr<ID3D12Resource>`), 그리고 그 한 필드 때문에
     ///   인코더의 리드백 넷이 Vulkan 이 구현할 수 없는 서명이었다 —
     ///   `CopyToReadback(const RHIReadback&, ...)` 이 이 구조체를 값으로 받는다.
     ///

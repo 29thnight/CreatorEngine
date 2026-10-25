@@ -1,10 +1,23 @@
 #pragma once
-#include "../Utility_Framework/Ownership.h"
-#include "Core.Minimal.h"
 #include "AnimationPaletteArena.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Arena.h"
+#else
+import Creator.Core.Arena;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "ProxyCommand.h"
-#include "../Utility_Framework/ConcurrentQueue.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Concurrency.h"
+#else
+import Creator.Concurrency;
+#endif
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 
 

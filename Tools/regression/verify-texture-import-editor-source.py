@@ -16,7 +16,7 @@ def source(path):
 
 class TextureImportEditorContracts(unittest.TestCase):
     def test_typed_settings_preserve_identity_and_exclude_sampler(self):
-        database = source("Editor/EngineEntry/EditorAssetDatabase.cpp")
+        database = source("Editor/EngineEntry/Assets/EditorAssetDatabase.cpp")
         writer = database.split("void EditorAssetDatabase::WriteTextureImportSettings(", 1)[1]
         writer = writer.split("bool EditorAssetDatabase::SetTextureImportSettingsAndReimport", 1)[0]
         for field in ("colorSpace", "compression", "mipPolicy", "maxDimension", "normalMap",
@@ -35,7 +35,7 @@ class TextureImportEditorContracts(unittest.TestCase):
         self.assertNotIn("QueueSceneLoad(", inspector)
 
     def test_cook_is_scheduled_and_never_waited_on_game_thread(self):
-        database = source("Editor/EngineEntry/EditorAssetDatabase.cpp")
+        database = source("Editor/EngineEntry/Assets/EditorAssetDatabase.cpp")
         importer = database.split("struct TextureImportWork final", 1)[1]
         importer = importer.split("bool SetModelMeshletsAndReimport", 1)[0]
         self.assertIn("get_job_scheduler().submit_after", importer)
@@ -50,7 +50,7 @@ class TextureImportEditorContracts(unittest.TestCase):
         self.assertNotIn("std::mutex", admission)
 
     def test_old_work_is_superseded_and_publication_uses_existing_mount(self):
-        database = source("Editor/EngineEntry/EditorAssetDatabase.cpp")
+        database = source("Editor/EngineEntry/Assets/EditorAssetDatabase.cpp")
         moved = database.split("void HandleMoved(", 1)[1].split("bool TargetStillExists", 1)[0]
         self.assertIn("InvalidateTextureImportLocked(oldSource)", moved)
         self.assertIn("ReloadChangedTexture(newSource)", moved)

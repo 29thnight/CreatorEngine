@@ -1,8 +1,13 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
+#else
+import Creator.Core.Sha256;
+#endif
 #pragma once
 
 #include "../../Assets/AudioClipSourceMetadata.h"
 
-#include "../../../Utility_Framework/StandardLibrary.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace experiment::cooked
 {
@@ -22,7 +27,7 @@ namespace experiment::cooked
         std::uint64_t frameCount{};
         std::uint64_t payloadOffset{ kAudioClipHeaderBytes };
         std::uint64_t payloadBytes{};
-        Hash::Sha256Digest payloadSha256{};
+        ce::hash::sha256_digest payloadSha256{};
     };
 
     [[nodiscard]] inline std::array<std::byte, kAudioClipHeaderBytes>

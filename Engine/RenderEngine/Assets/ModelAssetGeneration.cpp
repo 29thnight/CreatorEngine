@@ -1,23 +1,42 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "ModelAssetGeneration.h"
 #include "ModelMeshDescriptor.h"
 #include "ModelAnimationSampler.h"
 #include "ModelGenerationStreaming.h"
 
 #include <stdint.h>
-#include "../../Utility_Framework/StandardLibrary.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "ModelSidecarV2.h"
-#include "AuthoringParsedDocument.h"
-#include "AuthoringCookedDocument.h"
+#include "../../Utility_Framework/Authoring/AuthoringParsedDocument.h"
+#include "../../Utility_Framework/Authoring/AuthoringCookedDocument.h"
 #include "../Experiment/Cooked/CookedModelCodec.h"
 #include "../Experiment/ModelLoader.h"
 #include "../Texture.h"
 #include "../Experiment/Cooked/CookedTexture.h"
-#include "PathFinder.h"
 #include "../../EngineDiagnostics/ProfileScope.h"
 #include "../Interfaces/AssetAuthoringPort.h"
 
-#include "../../Utility_Framework/Contract.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Contracts.h"
+#else
+import Creator.Contracts;
+#endif
 
 namespace assets
 {
@@ -43,7 +62,7 @@ namespace assets
         {
             SubAssetKind kind{ SubAssetKind::Mesh };
             std::string stableKey{};
-            Uuid::Uuid16 assetId{};
+            uuid::uuid16 assetId{};
             std::filesystem::path artifactPath{};
             std::string artifactFingerprint{};
         };
@@ -52,7 +71,7 @@ namespace assets
         {
             std::string identityProfile{};
             std::string identityEpoch{};
-            Uuid::Uuid16 assetId{};
+            uuid::uuid16 assetId{};
             std::uint64_t generation{};
             std::string sourceFingerprint{};
             std::string sidecarFingerprint{};
@@ -203,7 +222,7 @@ namespace assets
                 failure = "generation record subAssets sequence가 없다.";
                 return false;
             }
-            std::set<Uuid::Uuid16> ids;
+            std::set<uuid::uuid16> ids;
             for (std::size_t index = 0; index < subAssets.Size(); ++index)
             {
                 const Authoring::ReadNode node = subAssets.At(index);
@@ -515,7 +534,7 @@ namespace assets
                 {
                     return false;
                 }
-                if (!mesh.materialId.IsNil()
+                if (!mesh.materialId.is_nil()
                     && std::ranges::none_of(materials,
                         [&](const ModelMaterialAsset& material)
                         { return material.materialId == mesh.materialId; }))
@@ -741,14 +760,14 @@ namespace assets
     }
 
     const ModelMeshAsset* ModelAssetGeneration::FindMesh(
-        const Uuid::Uuid16& meshId) const noexcept
+        const uuid::uuid16& meshId) const noexcept
     {
         const auto found = std::ranges::find(meshes_, meshId, &ModelMeshAsset::meshId);
         return found != meshes_.end() ? &*found : nullptr;
     }
 
     const ModelMaterialAsset* ModelAssetGeneration::FindMaterial(
-        const Uuid::Uuid16& materialId) const noexcept
+        const uuid::uuid16& materialId) const noexcept
     {
         const auto found = std::ranges::find(
             materials_, materialId, &ModelMaterialAsset::materialId);
@@ -756,7 +775,7 @@ namespace assets
     }
 
     const ModelTextureAsset* ModelAssetGeneration::FindTexture(
-        const Uuid::Uuid16& textureId) const noexcept
+        const uuid::uuid16& textureId) const noexcept
     {
         const auto found = std::ranges::find(
             textures_, textureId, &ModelTextureAsset::textureId);
@@ -825,7 +844,7 @@ namespace assets
                 return result;
             }
             generationPath = request.generationRoot
-                / Uuid::ToString(sidecar.assetId)
+                / uuid::to_string(sidecar.assetId)
                 / std::to_string(sidecar.generation);
         }
 
@@ -853,7 +872,7 @@ namespace assets
                     : sidecarIssues.front().message);
             return result;
         }
-        if ((!request.expectedModelId.IsNil()
+        if ((!request.expectedModelId.is_nil()
                 && request.expectedModelId != sidecar.assetId)
             || (request.expectedGeneration != 0u
                 && request.expectedGeneration != sidecar.generation))
@@ -971,17 +990,17 @@ namespace assets
             return result;
         }
 
-        std::set<Uuid::Uuid16> embeddedTextureIds;
+        std::set<uuid::uuid16> embeddedTextureIds;
         for (const ModelSubAssetRecord* texture : textureRecords)
             embeddedTextureIds.insert(texture->assetId);
 
-        std::map<Uuid::Uuid16, ModelTextureColorSpace> textureColorSpaces;
+        std::map<uuid::uuid16, ModelTextureColorSpace> textureColorSpaces;
         std::vector<ModelMaterialAsset> materials;
         materials.reserve(draft.materials.size());
         for (std::size_t index = 0; index < draft.materials.size(); ++index)
         {
             experiment::Material& source = draft.materials[index];
-            const Uuid::Uuid16 materialId = materialRecords[index]->assetId;
+            const uuid::uuid16 materialId = materialRecords[index]->assetId;
             if (source.assetId.value != materialId)
             {
                 AddIssue(result, ModelAssetGenerationIssueCode::ClosureMismatch,
@@ -1197,13 +1216,13 @@ namespace assets
                 ? color->second : ModelTextureColorSpace::Linear;
             const bool cookedTexture = std::filesystem::path(generationRecord->artifactPath).extension() == ".cetex";
             std::filesystem::path decodedCache;
-            if (!cookedTexture && PathFinder::IsAssetAuthoringEnabled()
+            if (!cookedTexture && ce::paths::is_asset_authoring_enabled()
                 && !request.decodedTextureCacheRoot.empty())
             {
                 const auto digest = generationRecord->artifactFingerprint.substr(
                     generationRecord->artifactFingerprint.find(':') + 1);
                 decodedCache = request.decodedTextureCacheRoot /
-                    (Uuid::ToString(texture.textureId) + "-" + digest +
+                    (uuid::to_string(texture.textureId) + "-" + digest +
                      (colorSpace == ModelTextureColorSpace::Srgb ? "-srgb.ceim" : "-linear.ceim"));
             }
             textureStep.reset();
@@ -1212,7 +1231,7 @@ namespace assets
             textureStep.reset();
             if (!cached) textureStep.emplace(ce::marker<"ModelGen.TextureDecode">());
             if (!cached && !CopyTexturePixels(encoded, colorSpace, texture, failure, cookedTexture,
-                request.allowSourceTextureProcessing || PathFinder::IsAssetAuthoringEnabled()))
+                request.allowSourceTextureProcessing || ce::paths::is_asset_authoring_enabled()))
             {
                 AddIssue(result, ModelAssetGenerationIssueCode::TextureDecodeFailed,
                     "textures." + textureRecord->stableKey, failure);
@@ -1455,7 +1474,7 @@ namespace assets
     }
 
     ModelAssetGeneration::Shared ModelAssetGenerationCache::ResolveCurrent(
-        const Uuid::Uuid16& modelId) const
+        const uuid::uuid16& modelId) const
     {
         std::vector<ModelAssetGeneration::Shared> released;
         std::lock_guard lock(mutex_);
@@ -1515,7 +1534,7 @@ namespace assets
     }
 
     ModelAssetGeneration::Shared ModelAssetGenerationCache::Retire(
-        const Uuid::Uuid16& modelId, ModelAssetGenerationHandle* outRetiredHandle)
+        const uuid::uuid16& modelId, ModelAssetGenerationHandle* outRetiredHandle)
     {
         if (outRetiredHandle)
         {

@@ -1,3 +1,8 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
+#else
+import Creator.Core.Ownership;
+#endif
 #include "../DataSystem.h"
 #include "../Experiment/Cooked/CookedAssetCatalog.h"
 #include "../Experiment/Cooked/CookedTexture.h"
@@ -8,8 +13,12 @@
 #include "../Experiment/Cooked/CookedCodeMaterial.h"
 
 
-#include "../../Utility_Framework/StandardLibrary.h"
-#include "../../Utility_Framework/ContentAbi.h"
+#include "../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Tools/build/ModuleAdapters/Creator.Core.ContentAbi.h"
+#else
+import Creator.Core.ContentAbi;
+#endif
 
 bool DataSystem::PublishAuthoredTexture(const RuntimeAssetChange& change)
 {
@@ -52,7 +61,7 @@ bool DataSystem::PublishAuthoredTexture(const RuntimeAssetChange& change)
     }
     cooked::AssetSetMountOptions options;
     options.expectedTargetPlatform = "win-x64";
-    options.expectedTargetAbi = CreatorContentAbi::Token;
+    options.expectedTargetAbi = ce::content_abi::token;
     const auto reference = publication->manifest.entries.front().asset;
     const auto catalog = GetCookedCatalog();
     cooked::ResolvedAssetEntry previous;

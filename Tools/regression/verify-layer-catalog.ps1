@@ -1,4 +1,4 @@
-param([ValidateSet('Debug','Release','Shipping','ASan','All')][string]$Configuration='All')
+﻿param([ValidateSet('Debug','Release','Shipping','ASan','All')][string]$Configuration='All')
 
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
@@ -12,7 +12,7 @@ foreach($config in $configs){
     $shipping=if($config -eq 'Shipping'){1}else{0}
     $exe=Join-Path $out 'layer-catalog.exe'
     $source=Join-Path $repo 'Tools/regression/layer_catalog_probe.cpp'
-    $cmd='call "'+$vcvars+'" >nul && cl /nologo /EHsc /std:c++latest /Zc:__cplusplus /utf-8 /W4 /WX '+$flags+' /DCE_SHIPPING='+$shipping+' /I"'+$repo+'/ThirdParty/Mathematics/include" /Fo"'+$out+'/" /Fd"'+$out+'/compiler.pdb" /FS /Fe"'+$exe+'" "'+$source+'"'
+    $cmd='call "'+$vcvars+'" >nul && cl /DCE_CONTRACT_STANDALONE=1 /nologo /EHsc /std:c++latest /Zc:__cplusplus /utf-8 /W4 /WX '+$flags+' /DCE_SHIPPING='+$shipping+' /I"'+$repo+'/ThirdParty/Mathematics/include" /Fo"'+$out+'/" /Fd"'+$out+'/compiler.pdb" /FS /Fe"'+$exe+'" "'+$source+'"'
     & $env:ComSpec /d /s /c $cmd *> "$out/build.log"
     if($LASTEXITCODE){Get-Content "$out/build.log" -Tail 30;throw "$config catalog compile failed"}
 

@@ -13,7 +13,7 @@
 #pragma push_macro("max")
 #undef min
 #undef max
-#include "TypeTrait.h"
+#include "../../../Utility_Framework/Reflection/TypeTrait.h"
 #pragma pop_macro("max")
 #pragma pop_macro("min")
 
@@ -22,9 +22,17 @@
 #include "../RHIAssetEvictionPolicy.h"
 #include "DX12PersistentHeap.h"
 #include "DX12ResourceEntries.h"
-#include "../../../Utility_Framework/StandardLibrary.h"
-#include <wrl/client.h>
-#include <d3d12.h>
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
+#else
+import "Creator.WinAPI.h";
+#endif
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../../Platform/WindowsSDK/Creator.GraphicsSDK.h"
+#else
+import "Creator.GraphicsSDK.h";
+#endif
 
 class Mesh;
 class DX12DeviceResources;
@@ -132,7 +140,6 @@ public:
     size_t GetCachedCount() const { return m_entries.size() + m_modelEntries.size(); }
 
 private:
-    template <typename T> using ComPtr = Microsoft::WRL::ComPtr<T>;
 
     struct Buffers
     {

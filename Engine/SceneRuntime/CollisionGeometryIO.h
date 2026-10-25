@@ -1,7 +1,12 @@
 #pragma once
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 
 #include "CollisionGeometryCodec.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace ce::physics
 {
@@ -12,7 +17,7 @@ class CollisionGeometryIO final
 
     static std::filesystem::path RevisionPath(const std::filesystem::path& assetRoot, geometry_asset_key key)
     {
-        return assetRoot / "Derived" / "CollisionGeometry" / Uuid::ToString(key.asset) /
+        return assetRoot / "Derived" / "CollisionGeometry" / uuid::to_string(key.asset) /
                (std::to_string(key.revision) + extension);
     }
 

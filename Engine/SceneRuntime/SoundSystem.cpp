@@ -1,3 +1,9 @@
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
+#else
+import Creator.Core.Uuid;
+#endif
 #include "SoundSystem.h"
 #include "AudioListenerComponent.h"
 #include "CameraComponent.h"
@@ -6,7 +12,7 @@
 #include "Entity.h"
 #include "Scene.h"
 #include "Transform.h"
-#include "../Utility_Framework/StandardLibrary.h"
+#include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 void SoundSystem::Bind(Scene& scene, wave::PlaybackService* playback, AssetResolver resolver)
 {
@@ -91,8 +97,8 @@ void SoundSystem::OwnerRemoved(std::uint64_t ownerId)
 
 wave::ClipKey SoundSystem::ResolveAsset(std::string_view text, wave::SoundSourceKind kind) const
 {
-    Uuid::Uuid16 guid;
-    if (Uuid::TryParse(text, guid) && !guid.IsNil())
+    uuid::uuid16 guid;
+    if (uuid::try_parse(text, guid) && !guid.is_nil())
     {
         return wave::ClipKey::FromGuid(guid);
     }
@@ -235,7 +241,7 @@ void SoundSystem::Update(float tick, bool recordLifecycle)
         if (recordLifecycle && sound->IsEnabled())
         {
             LIFECYCLE_TRACE(Lifecycle::Phase::Update, Lifecycle::Trace::TypeNameOf(sound),
-                sound->GetOwner()->m_name.ToString().c_str(), sound->GetInstanceID());
+                sound->GetOwner()->m_name.c_str(), sound->GetInstanceID());
         }
         sound->TickUpdate(tick);
     }
@@ -250,7 +256,7 @@ void SoundSystem::LateUpdate(float tick)
             continue;
         }
         LIFECYCLE_TRACE(Lifecycle::Phase::LateUpdate, Lifecycle::Trace::TypeNameOf(sound),
-            sound->GetOwner()->m_name.ToString().c_str(), sound->GetInstanceID());
+            sound->GetOwner()->m_name.c_str(), sound->GetInstanceID());
         sound->TickLateUpdate(tick);
     }
 }

@@ -1,9 +1,13 @@
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "EditorAssetDragPayload.h"
 #include "BrowserDirectorySnapshot.h"
-#include "PathFinder.h"
-#include "LogSystem.h"
+#include "../../Engine/Utility_Framework/Diagnostics/LogSystem.h"
 #include "ImGui.h"
-#include "../../Engine/Utility_Framework/StandardLibrary.h"
+#include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace
 {
@@ -112,7 +116,7 @@ namespace editor::asset_drag
         std::error_code folderError;
         const std::filesystem::path parent = path.empty() ? std::filesystem::path{}
             : editor::browser_canonical(path.parent_path(), pathError);
-        const std::filesystem::path expected = editor::browser_canonical(PathFinder::Relative(folder), folderError);
+        const std::filesystem::path expected = editor::browser_canonical(ce::paths::relative(folder), folderError);
         if (!path.empty() && !pathError && !folderError && editor::browser_same_directory(parent, expected))
             return true;
 

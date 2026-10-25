@@ -86,7 +86,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\Editor\EngineEntry\TextureSourceProcessing.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="..\..\Editor\EngineEntry\Assets\Textures\TextureSourceProcessing.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="EnvironmentCooker.cpp" />
 
   </ItemGroup>

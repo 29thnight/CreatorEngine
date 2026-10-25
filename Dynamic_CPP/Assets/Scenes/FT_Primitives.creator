@@ -20,14 +20,6 @@ m_Entities:
         rotation: {x: 0, y: 0, z: 0, w: 1}
         scale: {x: 1, y: 1, z: 1, w: 1}
         m_parentID: 4294967295
-      - ScriptComponent: 18288371625365795113
-        m_typeUUID: 16beda95-3967-4d95-838b-b9e6694b6609
-        m_name: ScriptComponent
-        m_instanceID: 3679412051
-        m_isEnabled: true
-        m_FileID: 00000000-0000-0000-0000-000000000000
-        m_scriptType: PackageSmokeProbe
-        m_fieldData: ~
     m_isStatic: false
     m_parentIndex: -1
     m_rootIndex: 0
