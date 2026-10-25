@@ -6,6 +6,16 @@
 class TagManager : public Singleton<TagManager>
 {
   private:
+    // Keys remain owning strings. Heterogeneous lookup respects view bounds
+    // without allocating a temporary string, including for embedded nulls.
+    struct TagHash
+    {
+        using is_transparent = void;
+        size_t operator()(std::string_view tag) const noexcept
+        {
+            return std::hash<std::string_view>{}(tag);
+        }
+    };
     friend Singleton<TagManager>;
     TagManager() = default;
     ~TagManager() = default;
@@ -31,7 +41,7 @@ class TagManager : public Singleton<TagManager>
         {
             return 0;
         }
-        auto it = m_tagMap.find(tag.data());
+        auto it = m_tagMap.find(tag);
         if (it != m_tagMap.end())
         {
             return it->second;
@@ -49,7 +59,7 @@ class TagManager : public Singleton<TagManager>
             return {};
         }
 
-        auto it = m_taggedObjects.find(tag.data());
+        auto it = m_taggedObjects.find(tag);
         if (it != m_taggedObjects.end())
         {
             return it->second;
@@ -64,7 +74,7 @@ class TagManager : public Singleton<TagManager>
             return nullptr;
         }
 
-        auto it = m_taggedObjects.find(tag.data());
+        auto it = m_taggedObjects.find(tag);
         if (it != m_taggedObjects.end() && !it->second.empty())
         {
             return it->second[0];
@@ -90,9 +100,9 @@ class TagManager : public Singleton<TagManager>
     //   다르므로(D3-b-2b-0: 21건) yaml-cpp가 읽던 파일을 ryml이 거부할 수 있고,
     //   그 순간 저장이 손실을 확정한다. 그래서 로드 성공 여부를 기억한다.
     bool m_loadSucceeded{false};
-    std::unordered_map<std::string, size_t> m_tagMap{};
+    std::unordered_map<std::string, size_t, TagHash, std::equal_to<>> m_tagMap{};
     std::vector<std::string> m_tags{};
-    std::unordered_map<std::string, std::vector<Entity*>> m_taggedObjects{};
+    std::unordered_map<std::string, std::vector<Entity*>, TagHash, std::equal_to<>> m_taggedObjects{};
 };
 
 static auto TagManagers = TagManager::GetInstance();

@@ -145,7 +145,7 @@ bool TagManager::Save()
 // 거치지 않고 컨테이너를 직접 채운다.
 void TagManager::SetTagDefinitions(const std::vector<std::string>& tags)
 {
-    std::unordered_map<std::string, size_t> indices;
+    decltype(m_tagMap) indices;
     for (size_t index = 0; index < tags.size(); ++index)
         indices.emplace(tags[index], index);
     m_tags = tags;
@@ -159,10 +159,16 @@ void TagManager::AddTag(std::string_view tag)
         return; // Avoid adding empty tags
     }
 
-    if (m_tagMap.find(tag.data()) == m_tagMap.end())
+    if (m_tagMap.find(tag) == m_tagMap.end())
     {
-        m_tags.push_back(tag.data());
-        m_tagMap[tag.data()] = m_tags.size() - 1;
+        // Acquire an owning key before vector growth can invalidate an input
+        // view into m_tags. Existing tags take the allocation-free lookup path.
+        auto [it, inserted] = m_tagMap.try_emplace(std::string(tag), m_tags.size());
+        if (inserted)
+        {
+            try { m_tags.push_back(it->first); }
+            catch (...) { m_tagMap.erase(it); throw; }
+        }
     }
 }
 
@@ -173,10 +179,11 @@ void TagManager::RemoveTag(std::string_view tag)
         return; // Avoid adding empty tags
     }
 
-    auto it = m_tagMap.find(tag.data());
+    auto it = m_tagMap.find(tag);
     if (it != m_tagMap.end())
     {
-        m_tags.erase(std::remove(m_tags.begin(), m_tags.end(), tag.data()), m_tags.end());
+        // The map key stays valid while vector compaction may invalidate tag.
+        m_tags.erase(std::remove(m_tags.begin(), m_tags.end(), it->first), m_tags.end());
         m_tagMap.erase(it);
     }
 }
@@ -188,7 +195,7 @@ bool TagManager::HasTag(std::string_view tag) const
         return false;
     }
 
-    auto it = m_tagMap.find(tag.data());
+    auto it = m_tagMap.find(tag);
     return it != m_tagMap.end();
 }
 
@@ -199,10 +206,10 @@ void TagManager::AddTagToObject(std::string_view tag, Entity* object)
         return;
     }
 
-    auto it = m_tagMap.find(tag.data());
+    auto it = m_tagMap.find(tag);
     if (it != m_tagMap.end())
     {
-        m_taggedObjects[tag.data()].push_back(object);
+        m_taggedObjects[it->first].push_back(object);
     }
     else
     {
@@ -220,7 +227,7 @@ void TagManager::RemoveTagFromObject(std::string_view tag, Entity* object)
         return;
     }
 
-    auto it = m_taggedObjects.find(tag.data());
+    auto it = m_taggedObjects.find(tag);
     if (it != m_taggedObjects.end())
     {
         it->second.erase(std::remove(it->second.begin(), it->second.end(), object), it->second.end());
