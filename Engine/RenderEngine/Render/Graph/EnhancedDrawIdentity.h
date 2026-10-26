@@ -44,18 +44,29 @@ namespace enhanced_draw
         struct Identity
         {
             size_t key{};
-            assets::ModelMeshHandle mesh;
+            const assets::ModelMeshHandle* mesh{};
         };
-        // Only copied identity values persist; no draw pointer escapes validation.
+        // Scratch retains capacity, never ownership or a borrowed draw after validation.
         static thread_local std::vector<Identity> storage;
         storage.resize(draws.size());
+        struct BorrowedIdentities
+        {
+            std::vector<Identity>& entries;
+            ~BorrowedIdentities()
+            {
+                for (auto& entry : std::span(entries.data(), entries.size()))
+                {
+                    entry.mesh = nullptr;
+                }
+            }
+        } borrowed{storage};
         size_t count{};
         for (const auto& draw : draws)
         {
             const auto key = GeometryKey(draw);
             if (key)
             {
-                storage[count++] = {key, draw.modelMeshView.handle};
+                storage[count++] = {key, &draw.modelMeshView.handle};
             }
         }
         auto identities = std::span(storage.data(), count);
@@ -65,8 +76,8 @@ namespace enhanced_draw
         {
             const auto& current = identities[index];
             const auto& previous = identities[index - 1];
-            if (current.key == previous.key && (current.mesh.IsValid() != previous.mesh.IsValid() ||
-                                                (current.mesh.IsValid() && current.mesh != previous.mesh)))
+            if (current.key == previous.key && (current.mesh->IsValid() != previous.mesh->IsValid() ||
+                                                (current.mesh->IsValid() && *current.mesh != *previous.mesh)))
             {
                 error = "Geometry batching hash collides with a different complete mesh identity.";
                 return false;

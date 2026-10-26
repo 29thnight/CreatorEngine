@@ -37,7 +37,35 @@ defs.push(...[["패킷 계획 재사용", "MaterialPacketPlanReuse", "#177d67"],
 phaseGroups.preparation.push("MaterialPacketPlanReuse","MaterialPacketPlanBuild");
 defs.push(...[["METEOR.Scene.Geometry", "RenderDeclare.METEOR.Scene.Geometry", "#177487"], ["METEOR.Scene.Cull.First", "RenderDeclare.METEOR.Scene.Cull.First", "#177487"], ["METEOR.Scene.Occluder", "RenderDeclare.METEOR.Scene.Occluder", "#177487"], ["METEOR.Scene.Cull.Final", "RenderDeclare.METEOR.Scene.Cull.Final", "#177487"], ["METEOR.Scene.LayerWork", "RenderDeclare.METEOR.Scene.LayerWork", "#177487"], ["METEOR.Shadow.StaticCache", "RenderDeclare.METEOR.Shadow.StaticCache", "#966000"], ["METEOR.Shadow.Cull.First", "RenderDeclare.METEOR.Shadow.Cull.First", "#966000"], ["METEOR.Shadow.Occluder", "RenderDeclare.METEOR.Shadow.Occluder", "#966000"], ["METEOR.Shadow.Cull.Final", "RenderDeclare.METEOR.Shadow.Cull.Final", "#966000"], ["METEOR.Shadow.Raster", "RenderDeclare.METEOR.Shadow.Raster", "#966000"], ["METEOR.Shadow.History", "RenderDeclare.METEOR.Shadow.History", "#966000"], ["METEOR.Scene.Visibility", "RenderDeclare.METEOR.Scene.Visibility", "#177487"], ["METEOR.Scene.MaterialWork", "RenderDeclare.METEOR.Scene.MaterialWork", "#177487"], ["METEOR.Scene.SurfaceResolve", "RenderDeclare.METEOR.Scene.SurfaceResolve", "#177487"], ["METEOR.Scene.Decal", "RenderDeclare.METEOR.Scene.Decal", "#177487"], ["METEOR.Scene.History", "RenderDeclare.METEOR.Scene.History", "#177487"], ["METEOR.Scene.Color", "RenderDeclare.METEOR.Scene.Color", "#177487"], ["METEOR.Scene.Volume", "RenderDeclare.METEOR.Scene.Volume", "#177487"], ["METEOR.Scene.Blended", "RenderDeclare.METEOR.Scene.Blended", "#177487"]]);
 phaseGroups.declare.push(...["RenderDeclare.METEOR.Scene.Geometry", "RenderDeclare.METEOR.Scene.Cull.First", "RenderDeclare.METEOR.Scene.Occluder", "RenderDeclare.METEOR.Scene.Cull.Final", "RenderDeclare.METEOR.Scene.LayerWork", "RenderDeclare.METEOR.Shadow.StaticCache", "RenderDeclare.METEOR.Shadow.Cull.First", "RenderDeclare.METEOR.Shadow.Occluder", "RenderDeclare.METEOR.Shadow.Cull.Final", "RenderDeclare.METEOR.Shadow.Raster", "RenderDeclare.METEOR.Shadow.History", "RenderDeclare.METEOR.Scene.Visibility", "RenderDeclare.METEOR.Scene.MaterialWork", "RenderDeclare.METEOR.Scene.SurfaceResolve", "RenderDeclare.METEOR.Scene.Decal", "RenderDeclare.METEOR.Scene.History", "RenderDeclare.METEOR.Scene.Color", "RenderDeclare.METEOR.Scene.Volume", "RenderDeclare.METEOR.Scene.Blended"]);
-async function loadDataset(id){let v=++version;$('status').textContent='선택한 측정 JSON을 여는 중…';window.CETimelineReady=false;const entry=MANIFEST.find(item=>item.id===id);if(!entry)throw Error('측정 항목 없음: '+id);let value=await readDatasetJson(entry.cpu||id+'.json');if(entry.windows)value.windows=entry.windows;if(entry.traceUtc)value.traceUtc=entry.traceUtc;hydrateDataset(value);if(v!==version)return;D=value;await attachGpuData(D);if(v!==version)return;for(const z of defs){if(z[1]==='MaterialSceneDrawsPrepare')z[0]='Draw 전체';if(z[1]==='MaterialSceneDrawPrepare')z[0]='Draw 준비'}D.laneList=Object.values(D.lanes);for(let l of D.laneList){l.minDepth=Math.min(...l.scopes.slice(0,5000).map(x=>x[3]),0);l.maxDepth=l.scopes.reduce((a,x)=>Math.max(a,x[3]),0)}setupFrames();chooseFrame('median');$('status').textContent=`${id} · ${D.nativeEvents.toLocaleString()} CPU 스코프 · 뷰 구간 ${D.measurements.length}개 · ${D.laneList.length} TID · ${D.etwAvailable?'ETW 상태 있음':'비추적: OS 상태 없음'} · t=0 ${D.traceUtc||'CEPROF 첫 프레임'} · CPU·GPU QPC 시간축 ms · GPU ${D.gpu.events.length.toLocaleString()} spans`;$('sources').innerHTML=`<a href="${escapeHtml(sourceUrl(D.source))}">원본 .ceprof</a>${D.etwSource?' · <a href="'+escapeHtml(sourceUrl(D.etwSource))+'">원본 ETL</a>':''}<br>CEPROF SHA256 ${D.nativeSha256}<br>QPC ${D.hz}Hz · 부분 스코프 ${D.partialScopeCount}개 · 중복 제거 ${D.duplicateScopesRemoved}개`;window.CETimelineReady=true;window.CETimelineDataId=id}
+async function loadDataset(id) {
+    const requestedVersion = ++version;
+    $('status').textContent = '측정 데이터 JSON을 읽는 중…';
+    window.CETimelineReady = false;
+    const entry = MANIFEST.find(item => item.id === id);
+    if (!entry) throw Error('측정 항목 없음: ' + id);
+    const value = await readDatasetJson(entry.cpu || id + '.json');
+    if (entry.windows) value.windows = entry.windows;
+    if (entry.traceUtc) value.traceUtc = entry.traceUtc;
+    hydrateDataset(value);
+    if (requestedVersion !== version) return;
+    D = value;
+    await attachGpuData(D);
+    if (requestedVersion !== version) return;
+    D.laneList = Object.values(D.lanes);
+    for (const lane of D.laneList) {
+        lane.minDepth = Math.min(...lane.scopes.slice(0, 5000).map(scope => scope[3]), 0);
+        lane.maxDepth = lane.scopes.reduce((maximum, scope) => Math.max(maximum, scope[3]), 0);
+    }
+    setupFrames();
+    chooseFrame('median');
+    const gpuStatus = D.gpu.summary.available === false ? 'GPU timestamp 미수집' : `GPU ${D.gpu.events.length.toLocaleString()} spans`;
+    $('status').textContent = `${id} · CPU 이벤트 ${D.nativeEvents.toLocaleString()}개 · 뷰 구간 ${D.measurements.length}개 · ${D.laneList.length} TID · ${D.etwAvailable ? 'ETW 상태 포함' : 'OS 상태 미수집'} · QPC 정렬 · ${gpuStatus}`;
+    const sourceLabel = D.sourceLabel || '원본 CEPROF';
+    const sourceHash = D.nativeSha256 ? 'CEPROF SHA256 ' + D.nativeSha256 : 'Frame JSON SHA256 ' + D.frameBoundarySourceSha256;
+    $('sources').innerHTML = `<a href="${escapeHtml(sourceUrl(D.source))}">${escapeHtml(sourceLabel)}</a>${D.etwSource ? ' · <a href="' + escapeHtml(sourceUrl(D.etwSource)) + '">원본 ETL</a>' : ''}<br>${sourceHash}<br>QPC ${D.hz}Hz · 부분 스코프 ${D.partialScopeCount}개 · 중복 제거 ${D.duplicateScopesRemoved}개`;
+    window.CETimelineReady = true;
+    window.CETimelineDataId = id;
+}
 function drawOverview(){let {ctx,w,h}=canvas('overview',80);ctx.clearRect(0,0,w,h);let x=t=>(t-D.begin)/(D.end-D.begin)*w;ctx.fillStyle=ink();ctx.fillText(`전체 ${fmt(D.end-D.begin)}ms`,4,13);for(let z of D.windows){ctx.fillStyle=z.name==='off'?'#8b9299':'#34734f';ctx.fillRect(x(z.begin),18,Math.max(1,x(z.end)-x(z.begin)),13);ctx.fillStyle=ink();ctx.fillText(z.name+' '+fmt(z.end-z.begin)+'ms',Math.max(4,x(z.begin)),44)}for(let m of D.measurements){ctx.fillStyle=m[3]===2?'#177487':'#966000';ctx.fillRect(x(m[0]),m[3]===2?62:51,Math.max(.6,x(m[0]+m[1])-x(m[0])),8)}ctx.strokeStyle='#a13d31';ctx.lineWidth=2;ctx.strokeRect(x(A),16,Math.max(2,x(B)-x(A)),58)}
 function grid(ctx,w,h,left=170){ctx.strokeStyle='#9aa1a64f';ctx.fillStyle=ink();for(let i=0;i<=5;i++){let x=left+(w-left)*i/5;ctx.beginPath();ctx.moveTo(x,20);ctx.lineTo(x,h);ctx.stroke();ctx.fillText(fmt(A+(B-A)*i/5),Math.min(w-64,x+2),13)}ctx.fillText('t · ms',8,13)}
 function phaseAllowed(p){let view=Number($('view').value);return !view||p[3]===view||[5,6,7,8].includes(p[2])}
@@ -46,10 +74,10 @@ function drawPhases(){let mode=$('detail').value,indices=defs.map((_,i)=>i).filt
 function intervalStats(l,a,b){let s=[0,0,0,0,0],dpc=0;for(let z of ranged(l.states,a,b)){let left=Math.max(a,z[0]),right=Math.min(b,z[0]+z[1]);s[z[2]]+=Math.max(0,right-left);if(z[2]===1){for(let d of ranged(D.dpc[String(z[3])]||[],left,right))dpc+=overlap(left,right,d[0],d[0]+d[1])}}return {s,dpc}}
 
 function stateStats(l){let s=[0,0,0,0,0],dpc=0;for(let z of ranged(l.states,A,B)){let a=Math.max(A,z[0]),b=Math.min(B,z[0]+z[1]);s[z[2]]+=Math.max(0,b-a);if(z[2]===1){for(let d of ranged(D.dpc[String(z[3])]||[],a,b))dpc+=overlap(a,b,d[0],d[0]+d[1])}}return {s,dpc}}
-function drawThreads(){let all=$('allThreads').checked,full=$('allScopes').checked,query=$('search').value.toLowerCase();visibleLanes=D.laneList.filter(l=>all||l.scopes.length||l.names.some(x=>/RenderThread|JobWorker|Dispatcher|Presentation|MainThread|Collector/.test(x)));visibleLanes.sort((a,b)=>{const rank=l=>{let n=l.names.join(' ');return n.includes('RenderThread')?0:/Worker/.test(n)?1:n.includes('Dispatcher')?2:n.includes('Presentation')?3:4};return rank(a)-rank(b)||a.tid-b.tid});let layouts=[],height=24;for(let l of visibleLanes){let scopes=ranged(l.scopes,A,B,l.maxDuration).filter(z=>{let n=D.markers[z[2]];return (!query||n.toLowerCase().includes(query))&&(full||query||defs.some(x=>x[1]===n)||n==='RenderThreadFrame'||n==='RenderGraphBuild'||n.startsWith('RenderCommandRecord.Worker'))});let min=scopes.reduce((a,z)=>Math.min(a,z[3]),65535),max=scopes.reduce((a,z)=>Math.max(a,z[3]),min);let h=Math.max(36,Math.min(210,26+(max-min+1)*10));layouts.push({l,scopes,min,y:height,h});height+=h}let {ctx,w}=canvas('threads',height+5);ctx.clearRect(0,0,w,height+5);grid(ctx,w,height+5);threadHits=[];let x=t=>170+(t-A)/(B-A)*(w-170),rows=[];for(let row of layouts){let {l,y,h,scopes,min}=row;ctx.fillStyle=ink();let title=labelLane(l);ctx.fillText(title.length>21?title.slice(0,20)+'…':title,5,y+11);ctx.fillText('TID '+l.tid,5,y+26);let seen=new Set();for(let z of ranged(l.states,A,B)){let left=x(Math.max(A,z[0])),width=Math.max(.7,x(Math.min(B,z[0]+z[1]))-left);let key=Math.floor(left)+':'+z[2];if(!seen.has(key)){ctx.fillStyle=stateColors[z[2]];ctx.fillRect(left,y,width,10);seen.add(key)}threadHits.push({x:left,y,w:width,h:10,text:`${title} · TID ${l.tid}\n${stateNames[z[2]]}${z[2]===1?' · CPU '+z[3]:''}\n${fmt(z[0])} → ${fmt(z[0]+z[1])} ms\n원래 ${fmt(z[1])}ms · 현재 범위 ${fmt(overlap(A,B,z[0],z[0]+z[1]))}ms`})}if(!D.etwAvailable){ctx.fillStyle='#90969d';ctx.fillRect(170,y,w-170,9)}seen.clear();for(let z of scopes){let name=D.markers[z[2]],phase=defs.findIndex(t=>t[1]===name),left=x(Math.max(A,z[0])),width=Math.max(.7,x(Math.min(B,z[0]+z[1]))-left),top=y+14+Math.min(17,z[3]-min)*10;let key=Math.floor(left)+':'+top+':'+phase;if(!seen.has(key)){ctx.fillStyle=phase>=0?defs[phase][2]:'#55717c';ctx.globalAlpha=z[4]&3?.45:.9;ctx.fillRect(left,top,width,8);ctx.globalAlpha=1;seen.add(key)}threadHits.push({x:left,y:top,w:width,h:8,text:`${name}\n${title} · TID ${l.tid} · depth ${z[3]} · flags ${z[4]}\n${fmt(z[0])} → ${fmt(z[0]+z[1])} ms\n전체 ${fmt(z[1])}ms · 현재 범위 ${fmt(overlap(A,B,z[0],z[0]+z[1]))}ms\nCPU tick ${z[5]} / task ${z[6]}${z[4]&3?'\n부분 스코프: 캡처 경계가 잘렸을 수 있음':''}`})}ctx.strokeStyle='#9aa1a633';ctx.beginPath();ctx.moveTo(0,y+h-2);ctx.lineTo(w,y+h-2);ctx.stroke();if(D.etwAvailable){let st=stateStats(l);rows.push(`<tr title="${escapeHtml(title)}"><td>${l.tid}</td><td>${fmt(st.s[1])}</td><td>${fmt(st.s[2])}</td><td>${fmt(st.s[3])}</td><td>${fmt(st.s[0])}</td><td>${fmt(st.dpc)}</td></tr>`)}}$('stateStats').querySelector('tbody').innerHTML=D.etwAvailable?rows.join(''):'<tr><td colspan="6">비추적 기록 · ETW 상태 없음</td></tr>';window.CETimelineVisibleThreads=layouts.length}
-function draw(){if(!D)return;drawOverview();drawPhases();drawGpuTimeline();drawThreads();window.CETimelineRange=[A,B];drawRhiIdentity()}
-function hit(canvasId,event){let c=$(canvasId),rect=c.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top,list=canvasId==='phases'?phaseHits:threadHits;for(let i=list.length-1;i>=0;i--){let h=list[i];if(x>=h.x&&x<=h.x+Math.max(2,h.w)&&y>=h.y&&y<=h.y+h.h)return h.text}return null}
-for(let id of ['phases','threads']){$(id).addEventListener('mousemove',e=>{let text=hit(id,e);if(!text){$('tip').style.display='none';return}$('tip').textContent=text;$('tip').style.display='block';$('tip').style.left=Math.max(4,Math.min(innerWidth-340,e.clientX+12))+'px';$('tip').style.top=Math.max(4,Math.min(innerHeight-200,e.clientY+12))+'px'});$(id).addEventListener('mouseleave',()=>$('tip').style.display='none');$(id).addEventListener('click',e=>{let t=hit(id,e);if(t)$('inspect').textContent=t});$(id).addEventListener('wheel',e=>{if(!e.ctrlKey||!D)return;e.preventDefault();let c=$(id),x=(e.clientX-c.getBoundingClientRect().left-170)/(c.clientWidth-170),center=A+(B-A)*Math.max(0,Math.min(1,x)),span=(B-A)*(e.deltaY>0?1.4:.7);setRange(center-span/2,center+span/2)},{passive:false})}
+function drawThreads(){let all=$('allThreads').checked,full=$('allScopes').checked,query=$('search').value.toLowerCase();visibleLanes=D.laneList.filter(l=>all||l.scopes.length||l.names.some(x=>/RenderThread|JobWorker|Dispatcher|Presentation|MainThread|Collector|Creator\.RHI\./.test(x)));visibleLanes.sort((a,b)=>{const rank=l=>{let n=l.names.join(' ');return n.includes('RenderThread')?0:/Worker/.test(n)?1:n.includes('Dispatcher')?2:n.includes('Presentation')?3:4};return rank(a)-rank(b)||a.tid-b.tid});let layouts=[],height=24;for(let l of visibleLanes){let scopes=ranged(l.scopes,A,B,l.maxDuration).filter(z=>{let n=D.markers[z[2]];return (!query||n.toLowerCase().includes(query))&&(full||query||defs.some(x=>x[1]===n)||n==='RenderThreadFrame'||n==='RenderGraphBuild'||n.startsWith('RenderCommandRecord.Worker'))});let min=scopes.reduce((a,z)=>Math.min(a,z[3]),65535),max=scopes.reduce((a,z)=>Math.max(a,z[3]),min);let h=Math.max(36,Math.min(210,26+(max-min+1)*10));layouts.push({l,scopes,min,y:height,h});height+=h}let {ctx,w}=canvas('threads',height+5);ctx.clearRect(0,0,w,height+5);grid(ctx,w,height+5);threadHits=[];let x=t=>170+(t-A)/(B-A)*(w-170),rows=[];for(let row of layouts){let {l,y,h,scopes,min}=row;ctx.fillStyle=ink();let title=labelLane(l);ctx.fillText(title.length>21?title.slice(0,20)+'…':title,5,y+11);ctx.fillText('TID '+l.tid,5,y+26);let seen=new Set();for(let z of ranged(l.states,A,B)){let left=x(Math.max(A,z[0])),width=Math.max(.7,x(Math.min(B,z[0]+z[1]))-left);let key=Math.floor(left)+':'+z[2];if(!seen.has(key)){ctx.fillStyle=stateColors[z[2]];ctx.fillRect(left,y,width,10);seen.add(key)}threadHits.push({x:left,y,w:width,h:10,text:`${title} · TID ${l.tid}\n${stateNames[z[2]]}${z[2]===1?' · CPU '+z[3]:''}\n${fmt(z[0])} → ${fmt(z[0]+z[1])} ms\n원래 ${fmt(z[1])}ms · 현재 범위 ${fmt(overlap(A,B,z[0],z[0]+z[1]))}ms`})}if(!D.etwAvailable){ctx.fillStyle='#90969d';ctx.fillRect(170,y,w-170,9)}seen.clear();for(let z of scopes){let name=D.markers[z[2]],phase=defs.findIndex(t=>t[1]===name),left=x(Math.max(A,z[0])),width=Math.max(.7,x(Math.min(B,z[0]+z[1]))-left),top=y+14+Math.min(17,z[3]-min)*10;let key=Math.floor(left)+':'+top+':'+phase;if(!seen.has(key)){ctx.fillStyle=phase>=0?defs[phase][2]:'#55717c';ctx.globalAlpha=z[4]&3?.45:.9;ctx.fillRect(left,top,width,8);ctx.globalAlpha=1;seen.add(key)}threadHits.push({x:left,y:top,w:width,h:8,text:`${name}\n${title} · TID ${l.tid} · depth ${z[3]} · flags ${z[4]}\n${fmt(z[0])} → ${fmt(z[0]+z[1])} ms\n전체 ${fmt(z[1])}ms · 현재 범위 ${fmt(overlap(A,B,z[0],z[0]+z[1]))}ms\nCPU tick ${z[5]} / task ${z[6]}${z[4]&3?'\n부분 스코프: 캡처 경계가 잘렸을 수 있음':''}`})}ctx.strokeStyle='#9aa1a633';ctx.beginPath();ctx.moveTo(0,y+h-2);ctx.lineTo(w,y+h-2);ctx.stroke();if(D.etwAvailable){let st=stateStats(l);rows.push(`<tr title="${escapeHtml(title)}"><td>${l.tid}</td><td>${fmt(st.s[1])}</td><td>${fmt(st.s[2])}</td><td>${fmt(st.s[3])}</td><td>${fmt(st.s[0])}</td><td>${D.dpcAvailable === false ? '미수집' : fmt(st.dpc)}</td></tr>`)}}$('stateStats').querySelector('tbody').innerHTML=D.etwAvailable?rows.join(''):'<tr><td colspan="6">비추적 기록 · ETW 상태 없음</td></tr>';window.CETimelineVisibleThreads=layouts.length}
+function draw(){if(!D)return;drawOverview();drawPhases();drawGpuTimeline();drawThreads();window.CETimelineRange=[A,B];drawRhiIdentity();drawReadyOwners()}
+function hit(canvasId,event){let c=$(canvasId),rect=c.getBoundingClientRect(),x=event.clientX-rect.left,y=event.clientY-rect.top,list=canvasId==='phases'?phaseHits:canvasId==='contention'?contentionHits:threadHits;for(let i=list.length-1;i>=0;i--){let h=list[i];if(x>=h.x&&x<=h.x+Math.max(2,h.w)&&y>=h.y&&y<=h.y+h.h)return h.text}return null}
+for(let id of ['phases','threads','contention']){$(id).addEventListener('mousemove',e=>{let text=hit(id,e);if(!text){$('tip').style.display='none';return}$('tip').textContent=text;$('tip').style.display='block';$('tip').style.left=Math.max(4,Math.min(innerWidth-340,e.clientX+12))+'px';$('tip').style.top=Math.max(4,Math.min(innerHeight-200,e.clientY+12))+'px'});$(id).addEventListener('mouseleave',()=>$('tip').style.display='none');$(id).addEventListener('click',e=>{let t=hit(id,e);if(t)$('inspect').textContent=t});$(id).addEventListener('wheel',e=>{if(!e.ctrlKey||!D)return;e.preventDefault();let c=$(id),x=(e.clientX-c.getBoundingClientRect().left-170)/(c.clientWidth-170),center=A+(B-A)*Math.max(0,Math.min(1,x)),span=(B-A)*(e.deltaY>0?1.4:.7);setRange(center-span/2,center+span/2)},{passive:false})}
 let overviewDown=null;$('overview').addEventListener('pointerdown',e=>{overviewDown=e.offsetX;$('overview').setPointerCapture(e.pointerId)});$('overview').addEventListener('pointerup',e=>{if(!D||overviewDown===null)return;let w=$('overview').clientWidth,map=x=>D.begin+Math.max(0,Math.min(w,x))/w*(D.end-D.begin),a=map(overviewDown),b=map(e.offsetX);if(Math.abs(e.offsetX-overviewDown)<4)setRange(b-(B-A)/2,b+(B-A)/2);else setRange(Math.min(a,b),Math.max(a,b));overviewDown=null});
 $('dataset').onchange=()=>loadDataset($('dataset').value).catch(fail);$('unit').onchange=()=>{setupFrames();chooseFrame('median')};$('frame').onchange=()=>{let z=frames[Number($('frame').value)];if(z)setRange(z[0],z[0]+z[1])};$('median').onclick=()=>chooseFrame('median');$('worst').onclick=()=>chooseFrame('worst');$('full').onclick=()=>setRange(D.begin,D.end);$('apply').onclick=()=>setRange(Number($('start').value),Number($('start').value)+Number($('span').value));for(let b of document.querySelectorAll('[data-span]'))b.onclick=()=>{let center=(A+B)/2,span=Number(b.dataset.span);setRange(center-span/2,center+span/2)};for(let id of ['view','allThreads','allScopes','detail'])$(id).onchange=draw;let searchTimer;$('search').oninput=()=>{clearTimeout(searchTimer);searchTimer=setTimeout(draw,180)};let resizeTimer;addEventListener('resize',()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(draw,150)});function fail(e){$('status').textContent='데이터 오류: '+e.message;console.error(e)}
 
@@ -60,6 +88,24 @@ defs.push(...[]);
 phaseGroups.preparation.push(...[]);
 
 defs.push(...[["RHI 소프트웨어 번역", "RHISoftwareTranslate", "#177487"], ["RHI 작업 실행", "RHIExecuteWork", "#746047"], ["DX12 제출 접수", "DX12EnqueueCommands", "#966000"]]);
+defs.push(['기하 준비·연속 인덱스', 'MaterialSceneGeometryPreparation', '#24765e']);
+phaseGroups.scene.push('MaterialSceneGeometryPreparation');
+phaseGroups.mesh.push('MaterialSceneGeometryPreparation');
+defs.push(['피드백 되읽기 생성', 'GeometryFeedbackReadbackCreate', '#a46a2c']);
+phaseGroups.scene.push('GeometryFeedbackReadbackCreate');
+phaseGroups.mesh.push('GeometryFeedbackReadbackCreate');
+defs.push(['요청 순서 미스 재구성', 'MaterialClusterRequestSort', '#a46a2c']);
+phaseGroups.mesh.push('MaterialClusterRequestSort');
+phaseGroups.scene.push('MaterialClusterRequestSort');
+defs.push(...[
+    ['테스트 입력 준비 포함', 'GeometryScaleFixtureSeal', '#6b737c'],
+    ['Scene 입력 봉인', 'MaterialSceneInputSeal', '#24765e'],
+    ['기하 identity 검증', 'MaterialSceneSealGeometryIdentities', '#966000'],
+    ['descriptor·payload pin 검증', 'MaterialSceneSealPinValidation', '#966000'],
+    ['불변 기하 계획·pose 바인딩', 'MaterialMeshPlanForScene', '#177487']
+]);
+phaseGroups.seal = ['GeometryScaleFixtureSeal', 'MaterialSceneInputSeal', 'MaterialSceneSealGeometryIdentities',
+    'MaterialSceneSealPinValidation', 'MaterialMeshPlanForScene'];
 phaseGroups.rhi=["RenderCommandRecord", "RenderSubmit", "RHISoftwareTranslate", "RHIExecuteWork", "DX12EnqueueCommands"];
 
 
@@ -186,7 +232,7 @@ function drawGpuTimeline() {
         const last = intervals.reduce((value, interval) => Math.max(value, interval[1]), -Infinity);
         return `Q${queue}: 계측 합집합 ${fmt(gpuUnion(intervals))}ms / 첫~마지막 폭 ${fmt(last-first)}ms`;
     }).join(' · ');
-    $('gpuStatus').textContent = `${D.gpu.events.length.toLocaleString()} 원본 GPU spans · 범위 내 ${records.length}개 · ` +
+    $('gpuStatus').textContent = D.gpu.summary.available === false ? D.gpu.summary.reason : `${D.gpu.events.length.toLocaleString()} 원본 GPU spans · 범위 내 ${records.length}개 · ` +
         `${D.gpu.summary.exactProvenanceMatches.toLocaleString()} exact 귀속 · ` + queueText;
     window.CETimelineGpu = {dataset: D.id, total: D.gpu.events.length, visible: records.length,
         queues: [...queueIntervals.keys()], exactMatches: D.gpu.summary.exactProvenanceMatches};
@@ -250,7 +296,7 @@ async function readDatasetJson(path) {
         if (!file) throw Error('선택한 폴더에 JSON이 없습니다: ' + path);
         return JSON.parse(await file.text());
     }
-    const response = await fetch(new URL(path, manifestLocation));
+    const response = await fetch(new URL(path, manifestLocation), { cache: 'no-store' });
     if (!response.ok) throw Error('JSON 읽기 실패: ' + response.status + ' ' + path);
     return response.json();
 }
@@ -275,7 +321,7 @@ function hydrateDataset(data) {
         }
         return lo - 1;
     };
-    const phases = [], loops = [];
+    const phases = [], loops = [...(data.frameBoundaries || [])];
     for (const lane of Object.values(data.lanes)) {
         for (const scope of lane.scopes) {
             const [start, duration, marker] = scope;
@@ -361,3 +407,23 @@ async function bootViewer() {
     }
 }
 bootViewer().catch(fail);
+
+let contentionHits = [];
+function drawReadyOwners() {
+    const o=D.readyOwners,section=$('readyOwnership');
+    if(!section)return;
+    section.style.display=o?'block':'none';
+    contentionHits=[];
+    if(!o)return;
+    const labels={render:'렌더',worker:'엔진 워커·배정',rhi_submission:'RHI 제출',rhi_translation:'RHI 번역',same_process_other:'동일 프로세스 기타',external:'외부',idle:'Idle',unknown:'미확인'};
+    const colors={render:'#28785d',worker:'#355ba2',rhi_submission:'#177487',rhi_translation:'#775c9c',same_process_other:'#6b737c',idle:'#b0b0b0',unknown:'#909090'};
+    const height=50+o.cores*26,{ctx,w}=canvas('contention',height);
+    ctx.clearRect(0,0,w,height);grid(ctx,w,height);
+    const x=t=>170+(t-A)/(B-A)*(w-170),totals=new Map();let ready=0,cpuTotal=0,external=0;
+    ctx.fillStyle=ink();ctx.fillText('렌더 Ready',5,30);
+    for(let c=0;c<o.cores;c++)ctx.fillText('CPU '+c,5,58+c*26);
+    for(const z of o.ready){const d=overlap(A,B,z[0],z[0]+z[1]);if(!d)continue;ready+=d;ctx.fillStyle='#b47a0a';const left=x(Math.max(A,z[0])),width=Math.max(.7,x(Math.min(B,z[0]+z[1]))-left);ctx.fillRect(left,22,width,11);contentionHits.push({x:left,y:22,w:width,h:11,text:`렌더 TID ${o.mainTid} · Prepare Ready\n${fmt(z[0])} → ${fmt(z[0]+z[1])} ms · ${fmt(z[1])}ms`});}
+    for(const z of o.occupancy){const d=overlap(A,B,z[0],z[0]+z[1]);if(!d)continue;const actor=o.actors[z[3]];cpuTotal+=d;if(actor.category==='external')external+=d;let row=totals.get(z[3]);if(!row){row={actor,ms:0,priorities:new Set()};totals.set(z[3],row)}row.ms+=d;row.priorities.add(z[4]);const left=x(Math.max(A,z[0])),width=Math.max(.7,x(Math.min(B,z[0]+z[1]))-left),y=49+z[2]*26;ctx.fillStyle=actor.category==='external'?`hsl(${25+(z[3]*37)%45} 58% 45%)`:colors[actor.category];ctx.fillRect(left,y,width,13);contentionHits.push({x:left,y,w:width,h:13,text:`CPU ${z[2]} · ${labels[actor.category]}\n${actor.image} · PID ${actor.pid} · TID ${actor.tid}\n${actor.name||'이름 미수집'} · 동적 우선순위 ${z[4]}\n${fmt(z[0])} → ${fmt(z[0]+z[1])} ms · 전체 ${fmt(z[1])} CPU-ms`});}
+    $('readyOwnerStatus').textContent=`렌더 TID ${o.mainTid} · Ready ${fmt(ready)} wall-ms · ${o.cores} CPU 점유 합 ${fmt(cpuTotal)} CPU-ms · 외부 ${(cpuTotal?external/cpuTotal*100:0).toFixed(2)}%`;
+    $('readyOwnerRows').innerHTML=[...totals.values()].sort((a,b)=>b.ms-a.ms).slice(0,24).map(r=>`<tr><td>${labels[r.actor.category]}</td><td>${r.actor.pid??'미확인'} · ${escapeHtml(r.actor.image)}</td><td>${r.actor.tid} · ${escapeHtml(r.actor.name||'이름 미수집')}</td><td>${[...r.priorities].sort((a,b)=>a-b).join(', ')}</td><td>${fmt(r.ms)}</td></tr>`).join('')||'<tr><td colspan="5">현재 범위에 Prepare Ready 없음</td></tr>';
+}

@@ -34,6 +34,7 @@ import Creator.Core.Uuid;
 #include "MaterialGraphIndirectBatch.h"
 #include "MaterialGraphWork.h"
 #include "MaterialGraphPreparationTasks.h"
+#include "MaterialGraphGeometryPreparationIndex.h"
 
 #include "../EngineDiagnostics/ProfileScope.h"
 #include "RHI/RHIShaderSource.h"
@@ -556,6 +557,53 @@ namespace material_graph
             };
             std::vector<Key> m_keys;
             std::vector<Entry> m_entries;
+            std::vector<SceneFrameGeometry::Record> m_geometryRecords;
+            std::vector<SceneGpuData::Record> m_sceneRecords;
+            uint32_t m_nextPrimitive{};
+            bool m_recordsValid{}, m_recordsReused{};
+            template<class Draws>
+            bool PrepareRecords(const Draws& draws, const SceneViewInput& input)
+            {
+                if (draws.size() >= UINT32_MAX - 1ull)
+                {
+                    return false;
+                }
+                bool matches = m_recordsValid && m_geometryRecords.size() == 1 + draws.size();
+                for (size_t i = 0; matches && i < draws.size(); ++i)
+                {
+                    matches = m_geometryRecords[1 + i].meshletCount == draws[i].geometry->MeshletCount();
+                }
+                m_recordsReused = matches;
+                if (matches)
+                {
+                    return true;
+                }
+                m_recordsValid = false;
+                m_geometryRecords.clear();
+                m_sceneRecords.clear();
+                m_geometryRecords.resize(1 + draws.size());
+                m_sceneRecords.resize(1 + draws.size());
+                m_nextPrimitive = 1;
+                for (const auto& entry : m_entries)
+                {
+                    const auto index = 1 + entry.m_output;
+                    auto& record = m_geometryRecords[index];
+                    record.chunkIndex = static_cast<uint32_t>(entry.m_chunk);
+                    record.meshletCount = draws[entry.m_output].geometry->MeshletCount();
+                    record.vertexCount = static_cast<uint32_t>(
+                        input.Draws()[entry.m_input].geometry->Chunks()[entry.m_chunk].input->Count());
+                    if (record.meshletCount > (UINT32_MAX >> 7) ||
+                        !SceneVisibilityContract::Reserve(record.meshletCount, m_nextPrimitive,
+                                                          record.identity.reserved[1], record.identity.reserved[2]))
+                    {
+                        return false;
+                    }
+                    m_sceneRecords[index].surface = {0u, static_cast<uint32_t>(index), record.chunkIndex,
+                                                     record.meshletCount};
+                }
+                m_recordsValid = true;
+                return true;
+            }
             bool m_valid{};
             bool Prepare(const SceneViewInput& input, std::span<const own::shared_owner<const Program>> programs,
                          bool shadows)
@@ -578,6 +626,7 @@ namespace material_graph
                     return true;
                 }
                 m_valid = false;
+                m_recordsValid = false;
                 m_keys.resize(draws.size());
                 m_entries.clear();
                 for (size_t i = 0; i < draws.size(); ++i)
@@ -2254,38 +2303,8 @@ namespace material_graph
         }
         const auto preparedChunks = static_cast<std::size_t>(chunkCount);
         candidate->draws.resize(preparedChunks);
-        geometryTable->records.resize(1 + preparedChunks);
         geometryTable->geometry.resize(1 + preparedChunks);
-        sceneData->records.resize(1 + preparedChunks);
         sceneData->recordPages.resize(1 + preparedChunks, UINT32_MAX);
-        // One producer per exact sealed geometry/pose input within this frame.
-        // The owners remain pinned by the input and output arrays during lookup.
-        ce::render_arena_vector<std::pair<const MeshSurfaceInput*, own::shared_owner<const MeshSurfaceBatch>>>
-            preparedGeometry{&scratch.m_storage->Resource(0)};
-        preparedGeometry.reserve(preparedChunks * 2);
-        const auto prepareGeometry = [&](const own::shared_owner<const MeshSurfaceInput>& source,
-                                         own::shared_owner<const MeshSurfaceBatch>& output)
-        {
-            if (const auto found = std::ranges::find(
-                    preparedGeometry, source.operator->(),
-                    &std::pair<const MeshSurfaceInput*, own::shared_owner<const MeshSurfaceBatch>>::first);
-                found != preparedGeometry.end())
-            {
-                output = found->second;
-                return true;
-            }
-            if (!geometry_.Prepare(*device_, source, output, error, true,
-                                   candidate->input->View().temporalFrame.realFrameId
-                                       ? candidate->input->View().temporalFrame.realFrameId
-                                       : candidate->input->View().frameId,
-                                   candidate->input->View().viewId, true, true, budget.clusterStreaming))
-            {
-                return false;
-            }
-            preparedGeometry.emplace_back(source.operator->(), output);
-            return true;
-        };
-
         // 뷰에서 고정된 행렬과 조명 필드는 한 번 구성한다. Prepare가 소유한 작업 상수에서
         // draw별 ID, coverage, owner와 chunk별 현재/이전 world를 빠짐없이 덮어쓴다.
         SceneConstants viewConstants{};
@@ -2472,45 +2491,97 @@ namespace material_graph
         {
             return Fail(error, "METEOR caster plan differs from the sealed chunk layout.");
         }
-        for (const auto& entry : casterPlan.m_entries)
         {
-            const auto inputIndex = entry.m_input;
-            const auto chunkIndex = entry.m_chunk;
-            const auto outputIndex = entry.m_output;
-            const auto& draw = candidate->input->Draws()[inputIndex];
-            const auto& chunk = draw.geometry->Chunks()[chunkIndex];
-            auto& item = candidate->draws[outputIndex];
-            item.program = drawPrograms[inputIndex];
-            item.blended = entry.m_blended;
-            item.inputIndex = inputIndex;
-            item.geometryRecord = static_cast<uint32_t>(1 + outputIndex);
-            item.doubleSided = entry.m_doubleSided;
-            item.shadowEnabled = entry.m_shadowEnabled;
-            if (!prepareGeometry(chunk.input, item.geometry))
+            ce::profile_scope geometryProfile{ce::marker<"MaterialSceneGeometryPreparation">()};
+            struct GeometrySlots
             {
-                return false;
+                std::size_t current{}, previous{};
+            };
+            // These borrows and indices are local to Prepare. The sealed input owns
+            // every source; Frame::Draw and its graph consumers own every result.
+            // Domain 0 has one writer and its lease cannot reset while tasks use it.
+            auto* resource = &scratch.m_storage->Resource(0);
+            ce::render_arena_vector<GeometrySlots> geometrySlots(preparedChunks, resource);
+            const auto maximumInputs = preparedChunks * 2;
+            ce::render_arena_vector<GeometryPreparationIndex::Entry> indexStorage(
+                GeometryPreparationIndex::StorageSize(maximumInputs), resource);
+            GeometryPreparationIndex index{indexStorage, maximumInputs};
+            ce::render_arena_vector<const own::shared_owner<const MeshSurfaceInput>*> sources{resource};
+            ce::render_arena_vector<own::shared_owner<const MeshSurfaceBatch>> preparedGeometry{resource};
+            sources.reserve(maximumInputs);
+            preparedGeometry.reserve(maximumInputs);
+            const auto sourceSlot = [&](const own::shared_owner<const MeshSurfaceInput>& source)
+            {
+                const auto found = index.FindOrAdd(source.operator->());
+                if (found.inserted)
+                {
+                    sources.push_back(&source);
+                }
+                return found.index;
+            };
+            for (const auto& entry : casterPlan.m_entries)
+            {
+                const auto& draw = candidate->input->Draws()[entry.m_input];
+                const auto& source = draw.geometry->Chunks()[entry.m_chunk].input;
+                auto& slots = geometrySlots[entry.m_output];
+                slots.current = sourceSlot(source);
+                slots.previous = slots.current;
+                if (draw.previousGeometry && draw.previousGeometry.operator->() != draw.geometry.operator->() &&
+                    entry.m_chunk < draw.previousGeometry->Chunks().size())
+                {
+                    slots.previous = sourceSlot(draw.previousGeometry->Chunks()[entry.m_chunk].input);
+                }
             }
-            if (draw.previousGeometry && draw.previousGeometry.operator->() != draw.geometry.operator->() &&
-                chunkIndex < draw.previousGeometry->Chunks().size())
+            for (const auto* source : sources)
             {
-                if (!prepareGeometry(draw.previousGeometry->Chunks()[chunkIndex].input, item.previousGeometry))
+                own::shared_owner<const MeshSurfaceBatch> output;
+                if (!geometry_.Prepare(*device_, *source, output, error, true,
+                                       candidate->input->View().temporalFrame.realFrameId
+                                           ? candidate->input->View().temporalFrame.realFrameId
+                                           : candidate->input->View().frameId,
+                                       candidate->input->View().viewId, true, true, budget.clusterStreaming))
                 {
                     return false;
                 }
+                preparedGeometry.push_back(std::move(output));
             }
-            else
+            for (const auto& entry : casterPlan.m_entries)
             {
-                item.previousGeometry = item.geometry;
-            }
-            shadowChunkIndices[outputIndex] = static_cast<std::uint32_t>(chunkIndex);
-            if (item.shadowEnabled)
-            {
-                // A separate value snapshot: the worker never reads Draw records
-                // while their material bindings and scene records are being filled.
-                candidate->shadowDraws.push_back(item);
+                const auto inputIndex = entry.m_input;
+                const auto chunkIndex = entry.m_chunk;
+                const auto outputIndex = entry.m_output;
+                auto& item = candidate->draws[outputIndex];
+                item.program = drawPrograms[inputIndex];
+                item.blended = entry.m_blended;
+                item.inputIndex = inputIndex;
+                item.geometryRecord = static_cast<uint32_t>(1 + outputIndex);
+                item.doubleSided = entry.m_doubleSided;
+                item.shadowEnabled = entry.m_shadowEnabled;
+                const auto slots = geometrySlots[outputIndex];
+                item.geometry = preparedGeometry[slots.current];
+                item.previousGeometry = preparedGeometry[slots.previous];
+                shadowChunkIndices[outputIndex] = static_cast<std::uint32_t>(chunkIndex);
+                if (item.shadowEnabled)
+                {
+                    // A separate value snapshot: the worker never reads Draw records
+                    // while their material bindings and scene records are being filled.
+                    candidate->shadowDraws.push_back(item);
+                }
             }
         }
-
+        if (!casterPlan.PrepareRecords(candidate->draws, *candidate->input))
+        {
+            return Fail(error, "METEOR cached primitive layout exceeds the visibility address contract.");
+        }
+        ce::profile_instant(casterPlan.m_recordsReused ? ce::marker<"MaterialSceneDrawRecords.Reuse">()
+                                                       : ce::marker<"MaterialSceneDrawRecords.Build">());
+        // Copy only CPU values; no frame/descriptor/GPU owners enter this cache.
+        // Each published frame owns its own arrays through asynchronous retirement.
+        geometryTable->records.assign(casterPlan.m_geometryRecords.data(),
+                                      casterPlan.m_geometryRecords.data() + casterPlan.m_geometryRecords.size());
+        geometryTable->nextPrimitiveAddress = casterPlan.m_nextPrimitive;
+        sceneData->records.assign(casterPlan.m_sceneRecords.data(),
+                                  casterPlan.m_sceneRecords.data() + casterPlan.m_sceneRecords.size());
         if (preparedChunks && !visibility_.PrepareMeshletPipelines(context, error))
         {
             return false;
@@ -3046,49 +3117,26 @@ namespace material_graph
             nextDrawPhase(ce::marker<"MaterialSceneDrawChunks">());
             for (const auto& chunk : draw.geometry->Chunks())
             {
-                Frame::Draw item;
-                item.program = program;
-                item.blended = ordered;
-                item.inputIndex = static_cast<std::size_t>(&draw - candidate->input->Draws().data());
+                const auto chunkIndex = static_cast<std::size_t>(&chunk - draw.geometry->Chunks().data());
+                const auto outputIndex = candidate->inputRanges[inputIndex].first + chunkIndex;
+                auto& item = candidate->draws[outputIndex];
                 item.bindings = bindings;
                 item.shadowEnabled = shadowEnabled;
                 item.shadowConstants = shadowConstants;
-
                 item.visibleOwner = visibleOwner;
-
-                item.doubleSided = (draw.coverage.flags & EnhancedMaterialCoverage::DoubleSided) != 0;
-                const auto chunkIndex = static_cast<std::size_t>(&chunk - draw.geometry->Chunks().data());
-                const auto outputIndex = candidate->inputRanges[inputIndex].first + chunkIndex;
-                item.geometry = candidate->draws[outputIndex].geometry;
-                item.previousGeometry = candidate->draws[outputIndex].previousGeometry;
-                item.cameraMeshletBin = candidate->draws[outputIndex].cameraMeshletBin;
                 const auto& cpuChunk = scratch.m_chunks[outputIndex];
                 constants.geometryIdentity = cpuChunk.identity;
-                if (geometryTable->records.size() >= UINT32_MAX || item.geometry->MeshletCount() > (UINT32_MAX >> 7))
-                {
-                    return Fail(error, "METEOR visibility address exceeds its frame geometry contract.");
-                }
                 ce::profile_scope chunkRecordProfile{ce::marker<"MaterialSceneChunkRecordUpload">()};
-                SceneFrameGeometry::Record record;
+                auto& record = geometryTable->records[item.geometryRecord];
+                constants.geometryIdentity.reserved[0] = item.geometryRecord;
+                constants.geometryIdentity.reserved[1] = record.identity.reserved[1];
+                constants.geometryIdentity.reserved[2] = record.identity.reserved[2];
                 record.identity = constants.geometryIdentity;
-                record.chunkIndex = static_cast<uint32_t>(chunkIndex);
+                record.identity.reserved[0] = 0;
                 record.owner = constants.owner;
-                record.meshletCount = item.geometry->MeshletCount();
-                record.vertexCount = static_cast<uint32_t>(chunk.input->Count());
                 std::copy(cpuChunk.worldColumns.begin(), cpuChunk.worldColumns.end(), record.worldColumns);
                 constants.world = cpuChunk.world;
                 constants.previousWorld = cpuChunk.previousWorld;
-                constants.geometryIdentity.reserved[0] = static_cast<uint32_t>(1 + outputIndex);
-                item.geometryRecord = constants.geometryIdentity.reserved[0];
-                if (!SceneVisibilityContract::Reserve(record.meshletCount, geometryTable->nextPrimitiveAddress,
-                                                      constants.geometryIdentity.reserved[1],
-                                                      constants.geometryIdentity.reserved[2]))
-                {
-                    return Fail(error,
-                                "METEOR frame primitive address capacity exceeded; no truncated visibility IDs.");
-                }
-                record.identity.reserved[1] = constants.geometryIdentity.reserved[1];
-                record.identity.reserved[2] = constants.geometryIdentity.reserved[2];
                 constants.padding[0] = ordered ? 1u : 0u;
                 item.constants =
                     ordered ? device_->UploadConstants(&constants, sizeof(constants)) : sceneData->viewConstants;
@@ -3101,8 +3149,6 @@ namespace material_graph
                 {
                     return Fail(error, "METEOR per-chunk geometry constants allocation failed.");
                 }
-                record.identity.reserved[0] = 0;
-                geometryTable->records[1 + outputIndex] = record;
                 geometryTable->geometry[1 + outputIndex] = item.geometry;
                 auto& gpuRecord = sceneData->records[item.geometryRecord];
                 gpuRecord.identity = constants.geometryIdentity;
@@ -3110,11 +3156,9 @@ namespace material_graph
                 gpuRecord.previousWorldColumns = cpuChunk.previousWorldColumns;
                 gpuRecord.material = {materialOffsets.first, materialOffsets.second, constants.owner,
                                       constants.coverage};
-                gpuRecord.surface = {std::bit_cast<uint32_t>(constants.cutoff), item.geometryRecord,
-                                     static_cast<uint32_t>(chunkIndex), record.meshletCount};
-                gpuRecord.history = {constants.temporalHistoryValid,
-                                     item.geometry.operator->() != item.previousGeometry.operator->() ? 1u : 0u,
-                                     UINT32_MAX, 0u};
+                gpuRecord.surface[0] = std::bit_cast<uint32_t>(constants.cutoff);
+                gpuRecord.history[0] = constants.temporalHistoryValid;
+                gpuRecord.history[1] = item.geometry.operator->() != item.previousGeometry.operator->() ? 1u : 0u;
                 // CPU seals geometry/material command ranges; compute selects
                 // cooked replacement groups and compacts meshlets. Ordered lists
                 // preserve the source primitive and layer order.
@@ -3139,8 +3183,6 @@ namespace material_graph
                                     ? "METEOR blended surface requires supported cooked meshlets; reimport the asset."
                                     : "METEOR opaque surface requires supported cooked meshlets; reimport the asset.");
                 }
-
-                candidate->draws[outputIndex] = std::move(item);
             }
         }
         nextPreparationPhase(ce::marker<"MaterialSceneGeometryPublish">());

@@ -1,0 +1,423 @@
+{
+  "schema": 1,
+  "configuration": "Debug",
+  "sourceHead": "d6c79afa97aa51620c033cc5a5845068c19b3902",
+  "buildLogs": [
+    "after-build-final.log",
+    "editor-build-final.log"
+  ],
+  "basicDx12": {
+    "basic-same": {
+      "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine",
+      "auditMode": null,
+      "passed": true,
+      "gpuValidation": "off",
+      "runs": [
+        {
+          "exitCode": 0,
+          "passed": true,
+          "missingMarkers": [],
+          "timedOut": false,
+          "gpuValidationCoverageNotices": 0,
+          "mode": "--geometry-preparation-scale-only"
+        }
+      ],
+      "configuration": "Debug",
+      "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe",
+      "sourceStable": true,
+      "auditRepeats": null,
+      "validationMode": "basic"
+    },
+    "basic-distinct": {
+      "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine",
+      "auditMode": null,
+      "passed": true,
+      "gpuValidation": "off",
+      "runs": [
+        {
+          "exitCode": 0,
+          "passed": true,
+          "missingMarkers": [],
+          "timedOut": false,
+          "gpuValidationCoverageNotices": 0,
+          "mode": "--geometry-preparation-scale-only"
+        }
+      ],
+      "configuration": "Debug",
+      "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe",
+      "sourceStable": true,
+      "auditRepeats": null,
+      "validationMode": "basic"
+    },
+    "lifetime-regression": {
+      "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine",
+      "auditMode": null,
+      "passed": true,
+      "gpuValidation": "off",
+      "runs": [
+        {
+          "exitCode": 0,
+          "passed": true,
+          "missingMarkers": [],
+          "timedOut": false,
+          "gpuValidationCoverageNotices": 0,
+          "mode": "--cluster-streaming-only"
+        },
+        {
+          "exitCode": 0,
+          "passed": true,
+          "missingMarkers": [],
+          "timedOut": false,
+          "gpuValidationCoverageNotices": 0,
+          "mode": "--shadow-correctness-only"
+        },
+        {
+          "exitCode": 0,
+          "passed": true,
+          "missingMarkers": [],
+          "timedOut": false,
+          "gpuValidationCoverageNotices": 0,
+          "mode": "--skinned-cluster-lod-only"
+        }
+      ],
+      "configuration": "Debug",
+      "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe",
+      "sourceStable": true,
+      "auditRepeats": null,
+      "validationMode": "basic"
+    }
+  },
+  "gpuBasedValidation": false,
+  "sourceIdentities": [
+    {
+      "path": "Engine/RenderEngine/MaterialGraphMeshSurface.cpp",
+      "sha256": "c81b927c10a08160deedcdb02ce8ccda34a3bce530c68cd068a892e314cf2680"
+    },
+    {
+      "path": "Engine/RenderEngine/GpuGeometryVisibility.cpp",
+      "sha256": "35b77d61b303aec3439f1b1dfadc3b3e6f861e54a6137e86dcbdae8e7a0c6e79"
+    },
+    {
+      "path": "Engine/RenderEngine/MaterialGraphSceneHost.cpp",
+      "sha256": "25e977343fc25224694e381a329f85a376a66a4f1f7d7afed511f55a29b87b57"
+    },
+    {
+      "path": "Tools/regression/support/GeometryPreparationScaleProbe.inl",
+      "sha256": "19b6ef52d80963f5463b66b2cc662253ebb4a0bb94396083d9cbd408fd8dc0e2"
+    }
+  ],
+  "sourceBeforeSha256": "3c34fe5817dfb0dcc688e448cfd14519fbf6d7780635db57804b4394217d3b69",
+  "binarySha256": {
+    "before": "809d9e9c73cdc6e26224162675ec37844f7913b621e4a066f096e8b752f4d51a",
+    "after": "10afe13d2f2293baea2f00603005d699f5083aed2ff4a492a96fb18df3496806"
+  },
+  "commonFixtureSha256": "19b6ef52d80963f5463b66b2cc662253ebb4a0bb94396083d9cbd408fd8dc0e2",
+  "cpuRegression": {
+    "passed": true,
+    "log": "request-cache-cpu-final.log",
+    "actualProductionCacheBody": true,
+    "inputAndProfilerProtocolFixtures": true,
+    "stableKeys": 2048,
+    "generations": 3,
+    "budgetPressureInsertions": 4096,
+    "ordering": true,
+    "ties": true,
+    "intrusiveLinks": true,
+    "expiry": true,
+    "duplicateLease": true,
+    "recreatedLedger": true,
+    "interleavedRecordings": true,
+    "retainedOwner": true,
+    "extractedCacheSha256": "0bfc2ac0d64dce44d2fa5309aeb80ff7c4b66ee127119eb1ffead56686b17eff",
+    "extractedLeaseSha256": "adcdd0515d5e157b044b0a58c06c8986406f4a564e84c1bb5e6a5456a7abafbc"
+  },
+  "cacheRegression": {
+    "schema": 1,
+    "passed": true,
+    "evidence": [
+      {
+        "name": "before-same-a-on",
+        "frames": 8,
+        "requestMissesPerFrame": [
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024
+        ],
+        "requestLookupCallsPerFrame": 1025,
+        "staticCacheCallsPerFrame": 1025,
+        "readbackCreationPerFrame": 0
+      },
+      {
+        "name": "after-same-a-on",
+        "frames": 8,
+        "requestMissesPerFrame": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "requestLookupCallsPerFrame": 1025,
+        "staticCacheCallsPerFrame": 1025,
+        "readbackCreationPerFrame": 0
+      },
+      {
+        "name": "after-same-b-on",
+        "frames": 8,
+        "requestMissesPerFrame": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "requestLookupCallsPerFrame": 1025,
+        "staticCacheCallsPerFrame": 1025,
+        "readbackCreationPerFrame": 0
+      },
+      {
+        "name": "before-same-b-on",
+        "frames": 8,
+        "requestMissesPerFrame": [
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024
+        ],
+        "requestLookupCallsPerFrame": 1025,
+        "staticCacheCallsPerFrame": 1025,
+        "readbackCreationPerFrame": 0
+      },
+      {
+        "name": "before-distinct-a-on",
+        "frames": 8,
+        "requestMissesPerFrame": [
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024
+        ],
+        "requestLookupCallsPerFrame": 1025,
+        "staticCacheCallsPerFrame": 1025,
+        "readbackCreationPerFrame": 0
+      },
+      {
+        "name": "after-distinct-a-on",
+        "frames": 8,
+        "requestMissesPerFrame": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "requestLookupCallsPerFrame": 1025,
+        "staticCacheCallsPerFrame": 1025,
+        "readbackCreationPerFrame": 0
+      },
+      {
+        "name": "after-distinct-b-on",
+        "frames": 8,
+        "requestMissesPerFrame": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "requestLookupCallsPerFrame": 1025,
+        "staticCacheCallsPerFrame": 1025,
+        "readbackCreationPerFrame": 0
+      },
+      {
+        "name": "before-distinct-b-on",
+        "frames": 8,
+        "requestMissesPerFrame": [
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024,
+          1024
+        ],
+        "requestLookupCallsPerFrame": 1025,
+        "staticCacheCallsPerFrame": 1025,
+        "readbackCreationPerFrame": 0
+      }
+    ]
+  },
+  "basicCaptureCheck": [
+    {
+      "case": "same",
+      "complete": true,
+      "losses": {},
+      "counts": {
+        "MaterialClusterRequestSort": 0,
+        "MeshPrepareStaticCache": 4100,
+        "GeometryFeedbackReadbackCreate": 0
+      },
+      "frames": 4
+    },
+    {
+      "case": "distinct",
+      "complete": true,
+      "losses": {},
+      "counts": {
+        "MaterialClusterRequestSort": 0,
+        "MeshPrepareStaticCache": 4100,
+        "GeometryFeedbackReadbackCreate": 0
+      },
+      "frames": 4
+    }
+  ],
+  "traces": [
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "before-same-a-on"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "after-same-a-on"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "after-same-b-on"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "before-same-b-on"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "before-same-a-off"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "after-same-a-off"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "after-same-b-off"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "before-same-b-off"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "before-distinct-a-on"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "after-distinct-a-on"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "after-distinct-b-on"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "before-distinct-b-on"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "before-distinct-a-off"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "after-distinct-a-off"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "after-distinct-b-off"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "before-distinct-b-off"
+    }
+  ],
+  "measurement": {
+    "runs": 16,
+    "warmupFrames": 8,
+    "measuredFrames": 8,
+    "draws": 1024,
+    "uniqueMeshes": [
+      1,
+      64
+    ],
+    "visibleDraws": 1,
+    "recordingWorkers": 4,
+    "order": "ABBA",
+    "estimator": "mean of two per-run medians",
+    "displayFps": false,
+    "synchronousGpuReadback": true,
+    "gpuTimestampsCollected": false
+  },
+  "lifetime": {
+    "residencyPrepareStillPerInput": true,
+    "allRevisionAndBudgetChecksRetained": true,
+    "lookupHintsWeak": true,
+    "uniqueStrongLeasePerLedger": true,
+    "recreatedLedgerSerialChecked": true,
+    "completionAbortRejectionProtocolRetained": true,
+    "arenaResetBoundaryUnchanged": true
+  },
+  "requestCache": {
+    "chargedBudgetBytes": 8388608,
+    "chargeIncludes": "request payload + key + entry + 64-byte node allowance",
+    "fixed1024EntryLimitRemoved": true,
+    "victimSelection": "O(1) intrusive tail",
+    "dictionaryLookupAndVictimFind": "O(log N)",
+    "distanceScratchRetained": true
+  },
+  "staticCache": {
+    "classificationOncePerRecordingWhenPoolExists": true,
+    "coldAndRevisionFallback": true,
+    "exactIdentityHint": true,
+    "weakHintExpiryTrimmed": true
+  },
+  "wholeVerificationFrameReducedInAllConditions": true
+}

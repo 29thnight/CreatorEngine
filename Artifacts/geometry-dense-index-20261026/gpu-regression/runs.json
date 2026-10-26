@@ -1,0 +1,12 @@
+{
+  "exitCode": -1,
+  "mode": "--object-space-dx12-only",
+  "timedOut": false,
+  "passed": false,
+  "missingMarkers": [
+    "METEOR_OBJECT_SPACE_INSTANCES_OK frames=9 worlds=4 poses=2 partitions=3 sharedFrames=9 reuseFrames=3",
+    "METEOR_COLD_SKIN_OK frames=9 rawPayload=0 cpuConnectivity=0 bulkReads=0 validation=0",
+    "METEOR_OBJECT_SPACE_DX12_OK cold=1 validation=0"
+  ],
+  "gpuValidationCoverageNotices": 0
+}

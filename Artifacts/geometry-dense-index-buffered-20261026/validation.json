@@ -1,0 +1,286 @@
+{
+  "schema": 1,
+  "summary": "Debug Probe·Editor 빌드, 연속 인덱스 419만 회 회귀, 1,024개 배치 기본 DX12 검증, 포즈·가시성·그림자 수명 회귀 통과. 최종 16회 ETW 이벤트·버퍼 유실 0.",
+  "configuration": "Debug",
+  "sourceHead": "d6c79afa97aa51620c033cc5a5845068c19b3902",
+  "builds": {
+    "probe": true,
+    "editor": true,
+    "logs": [
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\geometry-dense-index-20261026\\after-build-final.log",
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\geometry-dense-index-20261026\\editor-build.log",
+      "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\geometry-dense-index-20261026\\basic-fixture-build.log"
+    ]
+  },
+  "cpuIndex": {
+    "passed": true,
+    "frames": 128,
+    "maximumUniqueInputs": 8192,
+    "checks": 4194304,
+    "reusedStorage": true,
+    "nullRejected": true,
+    "overflowRejected": true
+  },
+  "runtime": [
+    {
+      "path": "Artifacts\\geometry-dense-index-20261026\\basic-regression\\verdict.json",
+      "validationMode": "basic",
+      "passed": true,
+      "gpuValidation": "off",
+      "auditMode": null,
+      "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe",
+      "sourceStable": true,
+      "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine",
+      "auditRepeats": null,
+      "configuration": "Debug",
+      "runs": [
+        {
+          "missingMarkers": [],
+          "exitCode": 0,
+          "timedOut": false,
+          "mode": "--object-space-dx12-only",
+          "gpuValidationCoverageNotices": 0,
+          "passed": true
+        },
+        {
+          "missingMarkers": [],
+          "exitCode": 0,
+          "timedOut": false,
+          "mode": "--hybrid-visibility-only",
+          "gpuValidationCoverageNotices": 0,
+          "passed": true
+        },
+        {
+          "missingMarkers": [],
+          "exitCode": 0,
+          "timedOut": false,
+          "mode": "--shadow-correctness-only",
+          "gpuValidationCoverageNotices": 0,
+          "passed": true
+        }
+      ]
+    },
+    {
+      "path": "Artifacts\\geometry-dense-index-20261026\\basic-fixed-scale-same\\verdict.json",
+      "sourceStable": true,
+      "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine",
+      "validationMode": "basic",
+      "gpuValidation": "off",
+      "auditMode": null,
+      "auditRepeats": null,
+      "runs": [
+        {
+          "exitCode": 0,
+          "mode": "--geometry-preparation-scale-only",
+          "gpuValidationCoverageNotices": 0,
+          "missingMarkers": [],
+          "passed": true,
+          "timedOut": false
+        }
+      ],
+      "configuration": "Debug",
+      "passed": true,
+      "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe"
+    },
+    {
+      "path": "Artifacts\\geometry-dense-index-20261026\\basic-fixed-scale-distinct\\verdict.json",
+      "sourceStable": true,
+      "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine",
+      "validationMode": "basic",
+      "gpuValidation": "off",
+      "auditMode": null,
+      "auditRepeats": null,
+      "runs": [
+        {
+          "exitCode": 0,
+          "mode": "--geometry-preparation-scale-only",
+          "gpuValidationCoverageNotices": 0,
+          "missingMarkers": [],
+          "passed": true,
+          "timedOut": false
+        }
+      ],
+      "configuration": "Debug",
+      "passed": true,
+      "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe"
+    }
+  ],
+  "regressionMarkers": [
+    "METEOR_HYBRID_VISIBILITY_OK frames=24 cases=8 partitions=3 validation=0 hwPixels=5976 swPixels=666 occluderPixels=11400 historyFrames=0",
+    "METEOR_OBJECT_SPACE_INSTANCES_OK frames=9 worlds=4 poses=2 partitions=3 sharedFrames=9 reuseFrames=3 weightedBones=2 normalAndMotionPixels=3192 validation=0",
+    "METEOR_OBJECT_SPACE_INSTANCES_OK frames=9 worlds=4 poses=2 partitions=3 sharedFrames=9 reuseFrames=3 weightedBones=2 normalAndMotionPixels=3192 validation=0",
+    "METEOR_SHADOW_CORRECTNESS_OK frames=77 views=2 recovered=4 gpuOmissionRejected=2 aborts=2 submissionRejections=1 budgetRejections=4 withheldCompletionCases=2 nativeGpuPendingCases=1 predictionCases=8 predictionRecovered=2 predictionVersionRejects=6 predictionHistoryRejects=2 pixels=208208 validation=0",
+    "METEOR_SHADOW_CORRECTNESS_OK frames=77 views=2 recovered=4 gpuOmissionRejected=2 aborts=2 submissionRejections=1 budgetRejections=4 withheldCompletionCases=2 nativeGpuPendingCases=1 predictionCases=8 predictionRecovered=2 predictionVersionRejects=6 predictionHistoryRejects=2 pixels=208208 validation=0",
+    "METEOR_SHADOW_DEVICE_RECREATION_OK devices=2 validation=0"
+  ],
+  "measurements": {
+    "runs": 16,
+    "order": "ABBA per mesh/recording condition",
+    "measuredFrames": 128,
+    "warmFrames": 128,
+    "draws": 1024,
+    "distinctMeshes": [
+      1,
+      64
+    ],
+    "visibleInstances": 1,
+    "validation": "off during performance recording",
+    "profile": "Tools/profiling-validation/GeometryPreparation.wprp",
+    "bufferKiB": 1024,
+    "buffers": 512,
+    "etw": [
+      {
+        "name": "before-same-a-on",
+        "losses": {
+          "Buffers": 0,
+          "Events": 0
+        }
+      },
+      {
+        "name": "after-same-a-on",
+        "losses": {
+          "Buffers": 0,
+          "Events": 0
+        }
+      },
+      {
+        "name": "after-same-b-on",
+        "losses": {
+          "Buffers": 0,
+          "Events": 0
+        }
+      },
+      {
+        "name": "before-same-b-on",
+        "losses": {
+          "Buffers": 0,
+          "Events": 0
+        }
+      },
+      {
+        "name": "before-same-a-off",
+        "losses": {
+          "Buffers": 0,
+          "Events": 0
+        }
+      },
+      {
+        "name": "after-same-a-off",
+        "losses": {
+          "Buffers": 0,
+          "Events": 0
+        }
+      },
+      {
+        "name": "after-same-b-off",
+        "losses": {
+          "Buffers": 0,
+          "Events": 0
+        }
+      },
+      {
+        "name": "before-same-b-off",
+        "losses": {
+          "Buffers": 0,
+          "Events": 0
+        }
+      },
+      {
+        "name": "before-distinct-a-on",
+        "losses": {
+          "Buffers": 0,
+          "Events": 0
+        }
+      },
+      {
+        "name": "after-distinct-a-on",
+        "losses": {
+          "Buffers": 0,
+          "Events": 0
+        }
+      },
+      {
+        "name": "after-distinct-b-on",
+        "losses": {
+          "Buffers": 0,
+          "Events": 0
+        }
+      },
+      {
+        "name": "before-distinct-b-on",
+        "losses": {
+          "Buffers": 0,
+          "Events": 0
+        }
+      },
+      {
+        "name": "before-distinct-a-off",
+        "losses": {
+          "Buffers": 0,
+          "Events": 0
+        }
+      },
+      {
+        "name": "after-distinct-a-off",
+        "losses": {
+          "Buffers": 0,
+          "Events": 0
+        }
+      },
+      {
+        "name": "after-distinct-b-off",
+        "losses": {
+          "Buffers": 0,
+          "Events": 0
+        }
+      },
+      {
+        "name": "before-distinct-b-off",
+        "losses": {
+          "Buffers": 0,
+          "Events": 0
+        }
+      }
+    ],
+    "gpuTimestampCollected": false,
+    "displayFpsMeasurement": false,
+    "synchronousGpuCompletionAndPixelOracle": true
+  },
+  "codeIdentity": {
+    "beforeSceneHostSha256": "75319030c297126c53510777ba4f2e2ca759f5f471cb99eb3b965aa06039ff22",
+    "afterSceneHostSha256": "25e977343fc25224694e381a329f85a376a66a4f1f7d7afed511f55a29b87b57",
+    "indexHeaderSha256": "f48f39813e5698a876112a35cd66d2340bf3dee1e687ff8d9455937b72f46327",
+    "benchmarkFixtureSha256": "9603e4096a0baa8825ab816dea0f3648bbe120615c9f4166d56a1a67ffa74c1f",
+    "correctnessFixtureSha256": "19b6ef52d80963f5463b66b2cc662253ebb4a0bb94396083d9cbd408fd8dc0e2",
+    "fixtureOnlyCorrection": "AO optimized clear color is white, matching the existing clear; outside measured Prepare. Both archived measurement binaries retain the same original fixture.",
+    "verifiedCorrectnessFixtureBeforeFormattingSha256": "3e210def2092fe159bb067d1bd040410a3fb886d9ccb31e2895ea9f2777673f5",
+    "finalFormattingOnlyVerified": true
+  },
+  "lifetime": {
+    "cpuIndexScope": "Prepare only; input owners stay in sealed SceneViewInput",
+    "scratch": "Work RenderArenaPool lease; local containers die and CPU jobs join before reset; no index/pointer storage escapes",
+    "gpu": "Frame/graph result owners and existing RHI upload/descriptor/completion ownership unchanged",
+    "regressionCoverage": "withheld completion, native pending GPU, aborted/rejected submissions, two device generations"
+  },
+  "limitations": {
+    "fullGpuBasedValidation": {
+      "completed": false,
+      "diagnostic": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\geometry-dense-index-20261026\\gpu-live-stack.txt",
+      "reason": "Stopped during prolonged NVIDIA GPU-based-validation shader compilation; basic API/pixel/lifetime tests passed"
+    },
+    "initialGeneralProfile": {
+      "primaryAcceptance": false,
+      "root": "C:\\Users\\lance\\source\\CreatorEngine\\Artifacts\\geometry-dense-index-20261026",
+      "lostEventsConfirmed": 1668,
+      "trace": "after-same-b-on/kernel.etl",
+      "reason": "Replaced by uniform loss-free buffered CPU ETW; raw initial data retained"
+    }
+  },
+  "performance": {
+    "geometryBookkeepingReduced": true,
+    "prepareReducedInAllFinalConditions": true,
+    "wholeVerificationFrameReducedInAllConditions": false,
+    "estimator": "mean of two per-run medians, 8 frames each; no confidence interval claim"
+  },
+  "scope": "Only item 1 changed; plan/request/feedback-readback/transform cache policies unchanged"
+}

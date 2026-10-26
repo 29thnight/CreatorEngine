@@ -1,0 +1,61 @@
+{
+  "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe",
+  "sourceStable": true,
+  "auditRepeats": null,
+  "validationMode": "basic",
+  "configuration": "Debug",
+  "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine",
+  "passed": true,
+  "auditMode": null,
+  "gpuValidation": "off",
+  "runs": [
+    {
+      "passed": true,
+      "gpuValidationCoverageNotices": 0,
+      "exitCode": 0,
+      "timedOut": false,
+      "missingMarkers": [],
+      "mode": "--cluster-streaming-only"
+    },
+    {
+      "passed": true,
+      "gpuValidationCoverageNotices": 0,
+      "exitCode": 0,
+      "timedOut": false,
+      "missingMarkers": [],
+      "mode": "--shadow-correctness-only"
+    },
+    {
+      "passed": true,
+      "gpuValidationCoverageNotices": 0,
+      "exitCode": 0,
+      "timedOut": false,
+      "missingMarkers": [],
+      "mode": "--skinned-cluster-lod-only"
+    },
+    {
+      "passed": true,
+      "gpuValidationCoverageNotices": 0,
+      "exitCode": 0,
+      "timedOut": false,
+      "missingMarkers": [],
+      "mode": "--object-space-dx12-only"
+    },
+    {
+      "passed": true,
+      "gpuValidationCoverageNotices": 0,
+      "exitCode": 0,
+      "timedOut": false,
+      "missingMarkers": [],
+      "mode": "--hybrid-visibility-only"
+    },
+    {
+      "passed": true,
+      "gpuValidationCoverageNotices": 0,
+      "exitCode": 0,
+      "timedOut": false,
+      "missingMarkers": [],
+      "mode": "--primitive-cache-only"
+    }
+  ]
+}

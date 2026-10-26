@@ -1,12 +1,12 @@
-﻿#Requires -Version 7.0
+#Requires -Version 7.0
 param(
     [ValidateSet('Debug','Release')][string]$Configuration='Release',
     [Parameter(Mandatory)][string]$OutputDirectory,
     [Parameter(Mandatory)][ValidateSet('--shadow-decal-only','--subsurface-only','--refraction-only','--refraction-film-only','--volume-only',
         '--forward-blend','--rg5-mixed','--rg5-decal','--rg5-reference','--scene-only','--lx-meshlet-only',
-        '--temporal-transmission-only','--shadow-correctness-only','--skinned-cluster-lod-only','--cluster-lod-only','--object-space-only','--object-space-dx12-only','--atomic-reduction-only','--hybrid-visibility-only','--visibility-reconstruction-only','--hw-visibility-only','--cluster-streaming-only','--cluster-storage-only','--quantized-geometry-only','--geometry-access-only','--decal-only','--forward-transport','--meshlet-dispatch-only','--meshlet-hzb-only','--material-bucket-only','--temporal-bucket-only','--layer-bucket-only','--primitive-cache-only')][string[]]$Modes,
+        '--temporal-transmission-only','--shadow-correctness-only','--skinned-cluster-lod-only','--cluster-lod-only','--object-space-only','--object-space-dx12-only','--geometry-preparation-scale-only','--atomic-reduction-only','--hybrid-visibility-only','--visibility-reconstruction-only','--hw-visibility-only','--cluster-streaming-only','--cluster-storage-only','--quantized-geometry-only','--geometry-access-only','--decal-only','--forward-transport','--meshlet-dispatch-only','--meshlet-hzb-only','--material-bucket-only','--temporal-bucket-only','--layer-bucket-only','--primitive-cache-only')][string[]]$Modes,
     [ValidateRange(60,1800)][int]$TimeoutSeconds=1200,
-    [ValidateSet('gpu','off')][string]$Validation='gpu',
+    [ValidateSet('gpu','basic','off')][string]$Validation='gpu',
     [string]$ProbeExecutable='',
     [string]$SourceRoot=''
 )
@@ -62,6 +62,7 @@ try
         '--skinned-cluster-lod-only'=@('METEOR_SKIN_DEPTH_REGRESSION_OK focusedPixels=4','METEOR_SKIN_LOD_AUDIT_ALL_OK','METEOR_SKIN_LOD_BOUND_OK poses=6 malformed=2','METEOR_SKINNED_COARSE_SCENE_OK frames=32 poses=2 partitions=2','METEOR_STREAMING_FEEDBACK_OK frames=32 sparse=1 stableBuffers=1 completedGpuDemand=1 validation=0','METEOR_SPARSE_IDLE_SCENE_OK emptyViews=1 productPool=1 pressureTrim=1 validation=0')
         '--cluster-lod-only'=@('METEOR_CLUSTER_DEPTH_REGRESSION_OK focusedPixels=4','METEOR_CLUSTER_LOD_OK frames=32 partitions=2 malformed=9','METEOR_PRODUCTION_SHARED_QUEUE_OK headers=224 cameraFrames=32 shadowFrames=32 sharedReads=192 validation=0')
         '--object-space-only'=@('METEOR_OBJECT_SPACE_INSTANCES_OK frames=9 worlds=4 poses=2 partitions=3 sharedFrames=9 reuseFrames=3','METEOR_COLD_SKIN_OK frames=9 rawPayload=0 cpuConnectivity=0 bulkReads=0 validation=0')
+        '--geometry-preparation-scale-only'=@('GEOMETRY_SCALE_OK')
         '--object-space-dx12-only'=@('METEOR_OBJECT_SPACE_INSTANCES_OK frames=9 worlds=4 poses=2 partitions=3 sharedFrames=9 reuseFrames=3','METEOR_COLD_SKIN_OK frames=9 rawPayload=0 cpuConnectivity=0 bulkReads=0 validation=0','METEOR_OBJECT_SPACE_DX12_OK cold=1 validation=0')
         '--hybrid-visibility-only'=@('METEOR_HYBRID_VISIBILITY_OK frames=24 cases=8 partitions=3 validation=0')
         '--atomic-reduction-only'=@('METEOR_ATOMIC_REDUCTION_OK permutations=24 frames=6 validation=0')
@@ -116,6 +117,7 @@ try
         $missing=@($required[$mode]|Where-Object {$log -notmatch ('(?m)^'+[regex]::Escape($_)+'(?: |\r?$)')})
         $passed=!$timedOut -and $proc.ExitCode -eq 0 -and !$missing.Count -and
             $log -match ('GPUValidation='+$(if($Validation -eq 'gpu'){'on'}else{'off'})) -and $log -notmatch 'PROBE_CHECK_FAIL|RASTER_SURFACE_FAIL'
+        if($Validation -eq 'basic'){$passed=$passed -and $log -match 'DebugLayer=on GPUValidation=off'}
         $coverageNotices=[regex]::Matches($log,'(?m)^DX12_GBV_COVERAGE_LIMIT id=1044 ').Count
         $runs+=@{mode=$mode;passed=$passed;exitCode=$proc.ExitCode;timedOut=$timedOut;missingMarkers=$missing;
             gpuValidationCoverageNotices=$coverageNotices}
@@ -127,7 +129,7 @@ try
     $after|ConvertTo-Json -Depth 4|Set-Content "$out/identity-after.json"
     $stable=($before|ConvertTo-Json -Depth 4 -Compress) -eq ($after|ConvertTo-Json -Depth 4 -Compress)
     $passed=$stable -and $runs.Count -eq $Modes.Count -and @($runs|Where-Object {!$_.passed}).Count -eq 0
-    @{passed=$passed;configuration=$Configuration;sourceStable=$stable;sourceRoot=$source;probeExecutable=$exe;
+    @{passed=$passed;configuration=$Configuration;validationMode=$Validation;sourceStable=$stable;sourceRoot=$source;probeExecutable=$exe;
         auditRepeats=$env:CREATOR_SKIN_LOD_AUDIT_REPEATS;auditMode=$env:CREATOR_SKIN_LOD_AUDIT_MODE;gpuValidation=$(if($Validation -eq 'gpu'){'on'}else{'off'});runs=$runs}|
         ConvertTo-Json -Depth 6|Set-Content "$out/verdict.json"
     if(!$passed){throw "METEOR material probe gate failed: $out"}

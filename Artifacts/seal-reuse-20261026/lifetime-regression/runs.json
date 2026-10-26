@@ -1,0 +1,58 @@
+[
+  {
+    "passed": true,
+    "timedOut": false,
+    "mode": "--cluster-streaming-only",
+    "missingMarkers": [],
+    "gpuValidationCoverageNotices": 0,
+    "exitCode": 0
+  },
+  {
+    "passed": true,
+    "timedOut": false,
+    "mode": "--shadow-correctness-only",
+    "missingMarkers": [],
+    "gpuValidationCoverageNotices": 0,
+    "exitCode": 0
+  },
+  {
+    "passed": true,
+    "timedOut": false,
+    "mode": "--skinned-cluster-lod-only",
+    "missingMarkers": [],
+    "gpuValidationCoverageNotices": 0,
+    "exitCode": 0
+  },
+  {
+    "passed": true,
+    "timedOut": false,
+    "mode": "--object-space-dx12-only",
+    "missingMarkers": [],
+    "gpuValidationCoverageNotices": 0,
+    "exitCode": 0
+  },
+  {
+    "passed": true,
+    "timedOut": false,
+    "mode": "--hybrid-visibility-only",
+    "missingMarkers": [],
+    "gpuValidationCoverageNotices": 0,
+    "exitCode": 0
+  },
+  {
+    "passed": true,
+    "timedOut": false,
+    "mode": "--primitive-cache-only",
+    "missingMarkers": [],
+    "gpuValidationCoverageNotices": 0,
+    "exitCode": 0
+  },
+  {
+    "passed": true,
+    "timedOut": false,
+    "mode": "--scene-only",
+    "missingMarkers": [],
+    "gpuValidationCoverageNotices": 0,
+    "exitCode": 0
+  }
+]

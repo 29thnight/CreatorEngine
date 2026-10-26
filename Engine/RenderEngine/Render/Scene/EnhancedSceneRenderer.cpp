@@ -20,6 +20,7 @@ import Creator.Core.Sha256;
 import Creator.Core.Uuid;
 #endif
 #include "../../RHI/RHISoftwareBatch.h"
+#include "../../RenderThreadScheduling.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.DynamicBitset.h"
 #else
@@ -8910,6 +8911,11 @@ namespace
         {
             renderThread = std::thread([this]
             {
+                const ce::render::scheduling_scope scheduling{ce::render::thread_role::render};
+                if (scheduling.error())
+                {
+                    Debug::PrintLog(spdlog::level::warn, "[RenderThread] Games registration failed error={}", scheduling.error());
+                }
                 const ce::platform::windows::apartment_scope apartmentScope{ ce::platform::windows::apartment_model::mta };
                 const HRESULT comResult = apartmentScope.result;
                 {

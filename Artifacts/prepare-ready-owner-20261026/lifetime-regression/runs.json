@@ -1,0 +1,50 @@
+[
+  {
+    "timedOut": false,
+    "passed": true,
+    "exitCode": 0,
+    "mode": "--cluster-streaming-only",
+    "gpuValidationCoverageNotices": 0,
+    "missingMarkers": []
+  },
+  {
+    "timedOut": false,
+    "passed": true,
+    "exitCode": 0,
+    "mode": "--shadow-correctness-only",
+    "gpuValidationCoverageNotices": 0,
+    "missingMarkers": []
+  },
+  {
+    "timedOut": false,
+    "passed": true,
+    "exitCode": 0,
+    "mode": "--skinned-cluster-lod-only",
+    "gpuValidationCoverageNotices": 0,
+    "missingMarkers": []
+  },
+  {
+    "timedOut": false,
+    "passed": true,
+    "exitCode": 0,
+    "mode": "--object-space-dx12-only",
+    "gpuValidationCoverageNotices": 0,
+    "missingMarkers": []
+  },
+  {
+    "timedOut": false,
+    "passed": true,
+    "exitCode": 0,
+    "mode": "--hybrid-visibility-only",
+    "gpuValidationCoverageNotices": 0,
+    "missingMarkers": []
+  },
+  {
+    "timedOut": false,
+    "passed": true,
+    "exitCode": 0,
+    "mode": "--primitive-cache-only",
+    "gpuValidationCoverageNotices": 0,
+    "missingMarkers": []
+  }
+]

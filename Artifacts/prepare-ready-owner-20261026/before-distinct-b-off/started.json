@@ -1,0 +1,200 @@
+{
+  "draws": 1024,
+  "uniqueMeshes": "64",
+  "recording": "off",
+  "executableSha256": "A30B8E48E380255AA1483BD710001434F4B0B1964DE5FFE81F6325E2920AD2BA",
+  "processId": 14580,
+  "foregroundPid": 9168,
+  "utc": "2026-10-26T04:25:12.6012951Z",
+  "threadSnapshots": [
+    {
+      "basePriority": 8,
+      "currentPriority": 8,
+      "name": "Creator.Render",
+      "tid": 31196
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 8,
+      "name": "",
+      "tid": 45756
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 8,
+      "name": "",
+      "tid": 37420
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 8,
+      "name": "",
+      "tid": 37412
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 9,
+      "name": "Creator.JobWorker.1",
+      "tid": 29648
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 9,
+      "name": "Creator.JobWorker.2",
+      "tid": 13584
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 9,
+      "name": "Creator.JobWorker.3",
+      "tid": 33356
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 9,
+      "name": "Creator.JobWorker.4",
+      "tid": 7284
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 9,
+      "name": "Creator.JobDispatcher",
+      "tid": 41140
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 8,
+      "name": "",
+      "tid": 43068
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 8,
+      "name": "",
+      "tid": 40076
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 8,
+      "name": "",
+      "tid": 47356
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 8,
+      "name": "",
+      "tid": 47804
+    },
+    {
+      "basePriority": 1,
+      "currentPriority": 2,
+      "name": "D3D Background Thread 0",
+      "tid": 22516
+    },
+    {
+      "basePriority": 1,
+      "currentPriority": 2,
+      "name": "D3D Background Thread 1",
+      "tid": 30516
+    },
+    {
+      "basePriority": 1,
+      "currentPriority": 2,
+      "name": "D3D Background Thread 2",
+      "tid": 47568
+    },
+    {
+      "basePriority": 1,
+      "currentPriority": 2,
+      "name": "D3D Background Thread 3",
+      "tid": 33952
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 8,
+      "name": "",
+      "tid": 17092
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 9,
+      "name": "Creator.RHI.Translation",
+      "tid": 4600
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 9,
+      "name": "Creator.RHI.Submission",
+      "tid": 43912
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 9,
+      "name": "Creator.JobWorker.1",
+      "tid": 22140
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 9,
+      "name": "Creator.JobWorker.2",
+      "tid": 8576
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 9,
+      "name": "Creator.JobWorker.3",
+      "tid": 42600
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 9,
+      "name": "Creator.JobWorker.4",
+      "tid": 41812
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 9,
+      "name": "Creator.JobDispatcher",
+      "tid": 38000
+    },
+    {
+      "basePriority": 8,
+      "currentPriority": 8,
+      "name": "",
+      "tid": 39460
+    }
+  ],
+  "qpc": 9130222965362,
+  "affinityMask": "255",
+  "threadIds": [
+    31196,
+    45756,
+    37420,
+    37412,
+    29648,
+    13584,
+    33356,
+    7284,
+    41140,
+    43068,
+    40076,
+    47356,
+    47804,
+    22516,
+    30516,
+    47568,
+    33952,
+    17092,
+    4600,
+    43912,
+    22140,
+    8576,
+    42600,
+    41812,
+    38000,
+    39460
+  ],
+  "processPriorityClass": "Normal",
+  "logicalProcessors": 8,
+  "hz": 10000000
+}

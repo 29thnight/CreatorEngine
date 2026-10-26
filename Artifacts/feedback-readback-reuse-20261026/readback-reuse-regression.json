@@ -1,0 +1,200 @@
+{
+  "schema": 1,
+  "passed": true,
+  "scenario": "1024 admitted draws, 1 or 64 immutable meshes",
+  "checks": "All threads, every measured frame, complete ON capture; OFF has no scope events",
+  "evidence": [
+    {
+      "name": "before-same-a-on",
+      "expectedPerFrame": 896,
+      "actualPerFrame": [
+        896,
+        896,
+        896,
+        896,
+        896,
+        896,
+        896,
+        896
+      ],
+      "createWallMsPerFrame": [
+        324.9437,
+        329.07309999999967,
+        235.12609999999995,
+        336.5038000000003,
+        213.04349999999982,
+        235.55539999999996,
+        237.96440000000024,
+        217.07439999999988
+      ]
+    },
+    {
+      "name": "after-same-a-on",
+      "expectedPerFrame": 0,
+      "actualPerFrame": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "createWallMsPerFrame": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "after-same-b-on",
+      "expectedPerFrame": 0,
+      "actualPerFrame": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "createWallMsPerFrame": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "before-same-b-on",
+      "expectedPerFrame": 896,
+      "actualPerFrame": [
+        896,
+        896,
+        896,
+        896,
+        896,
+        896,
+        896,
+        896
+      ],
+      "createWallMsPerFrame": [
+        306.8906,
+        244.08220000000009,
+        241.3751999999998,
+        243.39979999999994,
+        234.75700000000035,
+        248.04430000000022,
+        242.78129999999985,
+        216.50669999999985
+      ]
+    },
+    {
+      "name": "before-distinct-a-on",
+      "expectedPerFrame": 896,
+      "actualPerFrame": [
+        896,
+        896,
+        896,
+        896,
+        896,
+        896,
+        896,
+        896
+      ],
+      "createWallMsPerFrame": [
+        306.2493999999992,
+        243.86329999999995,
+        237.14659999999964,
+        265.8748999999999,
+        228.57329999999988,
+        229.9623,
+        237.08459999999985,
+        207.48460000000006
+      ]
+    },
+    {
+      "name": "after-distinct-a-on",
+      "expectedPerFrame": 0,
+      "actualPerFrame": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "createWallMsPerFrame": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "after-distinct-b-on",
+      "expectedPerFrame": 0,
+      "actualPerFrame": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "createWallMsPerFrame": [
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0,
+        0.0
+      ]
+    },
+    {
+      "name": "before-distinct-b-on",
+      "expectedPerFrame": 896,
+      "actualPerFrame": [
+        896,
+        896,
+        896,
+        896,
+        896,
+        896,
+        896,
+        896
+      ],
+      "createWallMsPerFrame": [
+        293.6009000000001,
+        249.1755999999996,
+        227.90840000000009,
+        311.2767999999997,
+        263.5815999999999,
+        262.36379999999986,
+        313.70050000000055,
+        224.016
+      ]
+    }
+  ]
+}

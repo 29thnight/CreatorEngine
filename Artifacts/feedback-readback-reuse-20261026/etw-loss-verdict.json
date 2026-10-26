@@ -1,0 +1,82 @@
+[
+  {
+    "buffers": 0,
+    "events": 0,
+    "name": "before-same-a-on"
+  },
+  {
+    "buffers": 0,
+    "events": 0,
+    "name": "after-same-a-on"
+  },
+  {
+    "buffers": 0,
+    "events": 0,
+    "name": "after-same-b-on"
+  },
+  {
+    "buffers": 0,
+    "events": 0,
+    "name": "before-same-b-on"
+  },
+  {
+    "buffers": 0,
+    "events": 0,
+    "name": "before-same-a-off"
+  },
+  {
+    "buffers": 0,
+    "events": 0,
+    "name": "after-same-a-off"
+  },
+  {
+    "buffers": 0,
+    "events": 0,
+    "name": "after-same-b-off"
+  },
+  {
+    "buffers": 0,
+    "events": 0,
+    "name": "before-same-b-off"
+  },
+  {
+    "buffers": 0,
+    "events": 0,
+    "name": "before-distinct-a-on"
+  },
+  {
+    "buffers": 0,
+    "events": 0,
+    "name": "after-distinct-a-on"
+  },
+  {
+    "buffers": 0,
+    "events": 0,
+    "name": "after-distinct-b-on"
+  },
+  {
+    "buffers": 0,
+    "events": 0,
+    "name": "before-distinct-b-on"
+  },
+  {
+    "buffers": 0,
+    "events": 0,
+    "name": "before-distinct-a-off"
+  },
+  {
+    "buffers": 0,
+    "events": 0,
+    "name": "after-distinct-a-off"
+  },
+  {
+    "buffers": 0,
+    "events": 0,
+    "name": "after-distinct-b-off"
+  },
+  {
+    "buffers": 0,
+    "events": 0,
+    "name": "before-distinct-b-off"
+  }
+]

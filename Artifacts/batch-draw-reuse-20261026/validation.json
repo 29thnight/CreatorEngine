@@ -1,0 +1,521 @@
+{
+  "schema": 1,
+  "configuration": "Debug",
+  "sourceHead": "d6c79afa97aa51620c033cc5a5845068c19b3902",
+  "buildLogs": [
+    "after-build-final.log",
+    "editor-build-final.log",
+    "sampling-build.log"
+  ],
+  "basicDx12": {
+    "basic-same": {
+      "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe",
+      "sourceStable": true,
+      "auditRepeats": null,
+      "validationMode": "basic",
+      "configuration": "Debug",
+      "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine",
+      "passed": true,
+      "auditMode": null,
+      "gpuValidation": "off",
+      "runs": [
+        {
+          "passed": true,
+          "gpuValidationCoverageNotices": 0,
+          "exitCode": 0,
+          "timedOut": false,
+          "missingMarkers": [],
+          "mode": "--geometry-preparation-scale-only"
+        }
+      ]
+    },
+    "basic-distinct": {
+      "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe",
+      "sourceStable": true,
+      "auditRepeats": null,
+      "validationMode": "basic",
+      "configuration": "Debug",
+      "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine",
+      "passed": true,
+      "auditMode": null,
+      "gpuValidation": "off",
+      "runs": [
+        {
+          "passed": true,
+          "gpuValidationCoverageNotices": 0,
+          "exitCode": 0,
+          "timedOut": false,
+          "missingMarkers": [],
+          "mode": "--geometry-preparation-scale-only"
+        }
+      ]
+    },
+    "lifetime-regression": {
+      "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe",
+      "sourceStable": true,
+      "auditRepeats": null,
+      "validationMode": "basic",
+      "configuration": "Debug",
+      "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine",
+      "passed": true,
+      "auditMode": null,
+      "gpuValidation": "off",
+      "runs": [
+        {
+          "passed": true,
+          "gpuValidationCoverageNotices": 0,
+          "exitCode": 0,
+          "timedOut": false,
+          "missingMarkers": [],
+          "mode": "--cluster-streaming-only"
+        },
+        {
+          "passed": true,
+          "gpuValidationCoverageNotices": 0,
+          "exitCode": 0,
+          "timedOut": false,
+          "missingMarkers": [],
+          "mode": "--shadow-correctness-only"
+        },
+        {
+          "passed": true,
+          "gpuValidationCoverageNotices": 0,
+          "exitCode": 0,
+          "timedOut": false,
+          "missingMarkers": [],
+          "mode": "--skinned-cluster-lod-only"
+        },
+        {
+          "passed": true,
+          "gpuValidationCoverageNotices": 0,
+          "exitCode": 0,
+          "timedOut": false,
+          "missingMarkers": [],
+          "mode": "--object-space-dx12-only"
+        },
+        {
+          "passed": true,
+          "gpuValidationCoverageNotices": 0,
+          "exitCode": 0,
+          "timedOut": false,
+          "missingMarkers": [],
+          "mode": "--hybrid-visibility-only"
+        },
+        {
+          "passed": true,
+          "gpuValidationCoverageNotices": 0,
+          "exitCode": 0,
+          "timedOut": false,
+          "missingMarkers": [],
+          "mode": "--primitive-cache-only"
+        }
+      ]
+    }
+  },
+  "gpuBasedValidation": false,
+  "sourceIdentities": [
+    {
+      "path": "Engine/RenderEngine/MaterialGraphMeshSurface.cpp",
+      "sha256": "9d9b9e2e034bf90630abadf665a6d291d90c3750b4739c660e9ab26896672cac"
+    },
+    {
+      "path": "Engine/RenderEngine/MaterialGraphMeshSurface.h",
+      "sha256": "0ef76c0f000e28ec1d1d5ea762453bc69e45edb11366f3346165c2ad77bc8436"
+    },
+    {
+      "path": "Engine/RenderEngine/MaterialGraphSceneHost.cpp",
+      "sha256": "54a2473b4eecc188b57660e2d9299146bede0f7f100955b80035ab09a0571714"
+    }
+  ],
+  "sourceBeforeSha256": {
+    "MaterialGraphMeshSurface.cpp": "c81b927c10a08160deedcdb02ce8ccda34a3bce530c68cd068a892e314cf2680",
+    "MaterialGraphMeshSurface.h": "c14ed5e77ece47d1ef2bfbe1f3b5ba4b83cf3aff4950bd525076f433c5341465",
+    "MaterialGraphSceneHost.cpp": "25e977343fc25224694e381a329f85a376a66a4f1f7d7afed511f55a29b87b57"
+  },
+  "binarySha256": {
+    "before": "10afe13d2f2293baea2f00603005d699f5083aed2ff4a492a96fb18df3496806",
+    "after": "d8eaa9dd4a834fb55912ad142044a021efd1b97236472b980ae53b3fbcebf349"
+  },
+  "measurement": {
+    "runs": 16,
+    "warmupFrames": 8,
+    "measuredFrames": 8,
+    "draws": 1024,
+    "uniqueMeshes": [
+      1,
+      64
+    ],
+    "visibleDraws": 1,
+    "recordingWorkers": 4,
+    "order": "ABBA",
+    "estimator": "mean of two per-run medians",
+    "displayFps": false,
+    "synchronousGpuReadback": true,
+    "gpuTimestampsCollected": false,
+    "commonTimedInstrumentation": true,
+    "newAfterInstantPerFrame": 1,
+    "ownerScopeBoundaryChanged": true,
+    "ownerNestedInLookupAfter": true
+  },
+  "reuseRegression": {
+    "schema": 1,
+    "passed": true,
+    "evidence": [
+      {
+        "name": "before-same-a-on",
+        "instanceBatchObjectsPerFrame": 1025,
+        "readbackCreates": 0,
+        "requestMisses": 0,
+        "recordCounters": {
+          "MaterialSceneDrawRecords.Reuse": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "MaterialSceneDrawRecords.Build": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "name": "after-same-a-on",
+        "instanceBatchObjectsPerFrame": 1025,
+        "readbackCreates": 0,
+        "requestMisses": 0,
+        "recordCounters": {
+          "MaterialSceneDrawRecords.Reuse": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "MaterialSceneDrawRecords.Build": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "name": "after-same-b-on",
+        "instanceBatchObjectsPerFrame": 1025,
+        "readbackCreates": 0,
+        "requestMisses": 0,
+        "recordCounters": {
+          "MaterialSceneDrawRecords.Reuse": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "MaterialSceneDrawRecords.Build": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "name": "before-same-b-on",
+        "instanceBatchObjectsPerFrame": 1025,
+        "readbackCreates": 0,
+        "requestMisses": 0,
+        "recordCounters": {
+          "MaterialSceneDrawRecords.Reuse": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "MaterialSceneDrawRecords.Build": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "name": "before-distinct-a-on",
+        "instanceBatchObjectsPerFrame": 1025,
+        "readbackCreates": 0,
+        "requestMisses": 0,
+        "recordCounters": {
+          "MaterialSceneDrawRecords.Reuse": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "MaterialSceneDrawRecords.Build": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "name": "after-distinct-a-on",
+        "instanceBatchObjectsPerFrame": 1025,
+        "readbackCreates": 0,
+        "requestMisses": 0,
+        "recordCounters": {
+          "MaterialSceneDrawRecords.Reuse": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "MaterialSceneDrawRecords.Build": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "name": "after-distinct-b-on",
+        "instanceBatchObjectsPerFrame": 1025,
+        "readbackCreates": 0,
+        "requestMisses": 0,
+        "recordCounters": {
+          "MaterialSceneDrawRecords.Reuse": [
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1,
+            1
+          ],
+          "MaterialSceneDrawRecords.Build": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      },
+      {
+        "name": "before-distinct-b-on",
+        "instanceBatchObjectsPerFrame": 1025,
+        "readbackCreates": 0,
+        "requestMisses": 0,
+        "recordCounters": {
+          "MaterialSceneDrawRecords.Reuse": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ],
+          "MaterialSceneDrawRecords.Build": [
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0,
+            0
+          ]
+        }
+      }
+    ],
+    "baselineHasRecordCounters": false,
+    "afterNewInstantPerFrame": 1
+  },
+  "traces": [
+    {
+      "events": 0,
+      "buffers": 0,
+      "name": "before-same-a-on"
+    },
+    {
+      "events": 0,
+      "buffers": 0,
+      "name": "after-same-a-on"
+    },
+    {
+      "events": 0,
+      "buffers": 0,
+      "name": "after-same-b-on"
+    },
+    {
+      "events": 0,
+      "buffers": 0,
+      "name": "before-same-b-on"
+    },
+    {
+      "events": 0,
+      "buffers": 0,
+      "name": "before-same-a-off"
+    },
+    {
+      "events": 0,
+      "buffers": 0,
+      "name": "after-same-a-off"
+    },
+    {
+      "events": 0,
+      "buffers": 0,
+      "name": "after-same-b-off"
+    },
+    {
+      "events": 0,
+      "buffers": 0,
+      "name": "before-same-b-off"
+    },
+    {
+      "events": 0,
+      "buffers": 0,
+      "name": "before-distinct-a-on"
+    },
+    {
+      "events": 0,
+      "buffers": 0,
+      "name": "after-distinct-a-on"
+    },
+    {
+      "events": 0,
+      "buffers": 0,
+      "name": "after-distinct-b-on"
+    },
+    {
+      "events": 0,
+      "buffers": 0,
+      "name": "before-distinct-b-on"
+    },
+    {
+      "events": 0,
+      "buffers": 0,
+      "name": "before-distinct-a-off"
+    },
+    {
+      "events": 0,
+      "buffers": 0,
+      "name": "after-distinct-a-off"
+    },
+    {
+      "events": 0,
+      "buffers": 0,
+      "name": "after-distinct-b-off"
+    },
+    {
+      "events": 0,
+      "buffers": 0,
+      "name": "before-distinct-b-off"
+    }
+  ],
+  "sampling": {
+    "passed": true,
+    "log": "sampling.stdout.log"
+  },
+  "requestCacheAndLeaseCpu": {
+    "passed": true,
+    "log": "request-cache-cpu-final.log"
+  },
+  "lifetime": {
+    "instanceWrapperStillPerInput": true,
+    "wrapperObjectsPerFrame": 1025,
+    "perInstanceInputAndTransformsRetained": true,
+    "sharedProducerRetained": true,
+    "publishedRecordArraysIndependent": true,
+    "cachedRecordsCpuValuesOnly": true,
+    "pendingAndGpuCompletionUnchanged": true,
+    "arenaResetBoundaryUnchanged": true
+  },
+  "records": {
+    "invalidatesOn": [
+      "immutable topology identity",
+      "program",
+      "flags",
+      "queue",
+      "shadow enable",
+      "meshlet capacity"
+    ],
+    "dynamicFields": [
+      "world",
+      "previousWorld",
+      "owner",
+      "material",
+      "cutoff",
+      "temporal history",
+      "geometry owners",
+      "frame descriptors"
+    ],
+    "primitiveAddressStart": 1,
+    "retainedVectorCapacity": true,
+    "cachedRecordPayloadBytesPerEntry": 352,
+    "cachedRecordPayloadBytesAt1024": 360800
+  },
+  "samples": {
+    "lazyOnlyForRecordSamples": true,
+    "defaultUnusedDebugVectorProxyRemoved": true
+  },
+  "wholeVerificationFrameReducedInAllConditions": false
+}

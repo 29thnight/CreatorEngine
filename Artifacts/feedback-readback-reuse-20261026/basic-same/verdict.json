@@ -1,0 +1,21 @@
+{
+  "passed": true,
+  "configuration": "Debug",
+  "auditMode": null,
+  "auditRepeats": null,
+  "validationMode": "basic",
+  "sourceStable": true,
+  "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe",
+  "runs": [
+    {
+      "gpuValidationCoverageNotices": 0,
+      "mode": "--geometry-preparation-scale-only",
+      "passed": true,
+      "timedOut": false,
+      "missingMarkers": [],
+      "exitCode": 0
+    }
+  ],
+  "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine",
+  "gpuValidation": "off"
+}

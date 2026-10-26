@@ -1,0 +1,142 @@
+{
+  "schema": 1,
+  "passed": true,
+  "evidence": [
+    {
+      "name": "before-same-a-on",
+      "frames": 8,
+      "requestMissesPerFrame": [
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      "requestLookupCallsPerFrame": 1025,
+      "staticCacheCallsPerFrame": 1025,
+      "readbackCreationPerFrame": 0
+    },
+    {
+      "name": "after-same-a-on",
+      "frames": 8,
+      "requestMissesPerFrame": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "requestLookupCallsPerFrame": 1025,
+      "staticCacheCallsPerFrame": 1025,
+      "readbackCreationPerFrame": 0
+    },
+    {
+      "name": "after-same-b-on",
+      "frames": 8,
+      "requestMissesPerFrame": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "requestLookupCallsPerFrame": 1025,
+      "staticCacheCallsPerFrame": 1025,
+      "readbackCreationPerFrame": 0
+    },
+    {
+      "name": "before-same-b-on",
+      "frames": 8,
+      "requestMissesPerFrame": [
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      "requestLookupCallsPerFrame": 1025,
+      "staticCacheCallsPerFrame": 1025,
+      "readbackCreationPerFrame": 0
+    },
+    {
+      "name": "before-distinct-a-on",
+      "frames": 8,
+      "requestMissesPerFrame": [
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      "requestLookupCallsPerFrame": 1025,
+      "staticCacheCallsPerFrame": 1025,
+      "readbackCreationPerFrame": 0
+    },
+    {
+      "name": "after-distinct-a-on",
+      "frames": 8,
+      "requestMissesPerFrame": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "requestLookupCallsPerFrame": 1025,
+      "staticCacheCallsPerFrame": 1025,
+      "readbackCreationPerFrame": 0
+    },
+    {
+      "name": "after-distinct-b-on",
+      "frames": 8,
+      "requestMissesPerFrame": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "requestLookupCallsPerFrame": 1025,
+      "staticCacheCallsPerFrame": 1025,
+      "readbackCreationPerFrame": 0
+    },
+    {
+      "name": "before-distinct-b-on",
+      "frames": 8,
+      "requestMissesPerFrame": [
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024,
+        1024
+      ],
+      "requestLookupCallsPerFrame": 1025,
+      "staticCacheCallsPerFrame": 1025,
+      "readbackCreationPerFrame": 0
+    }
+  ]
+}

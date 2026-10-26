@@ -261,6 +261,7 @@
     <ClCompile Include="RHI\Vulkan\VulkanRecordingResources.cpp" />
     <ClCompile Include="RHI\Vulkan\VulkanSoftwareCommandValidator.cpp" />
     <ClCompile Include="RHI\RHICommandTranslator.cpp" />
+    <ClCompile Include="RenderThreadScheduling.cpp" />
     <ClCompile Include="RHI\RHISubmissionThread.cpp" />
     <ClCompile Include="RHI\ScreenSizedResource.cpp" />
     <ClCompile Include="RHI\RHIShaderCompiler.cpp" />
@@ -962,6 +963,7 @@
     <ClInclude Include="RHI\RHIRecordingDiagnostics.h" />
     <ClInclude Include="RHI\RHIRecordedBatch.h" />
     <ClInclude Include="RHI\RHISubmissionThread.h" />
+    <ClInclude Include="RenderThreadScheduling.h" />
     <ClInclude Include="TextureImage.h" />
     <ClInclude Include="RHI\RHIResourceTypes.h" />
     <ClInclude Include="RHI\RHISharedSparsePagePool.h" />

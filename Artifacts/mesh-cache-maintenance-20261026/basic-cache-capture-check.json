@@ -1,0 +1,24 @@
+[
+  {
+    "case": "same",
+    "complete": true,
+    "losses": {},
+    "counts": {
+      "MaterialClusterRequestSort": 0,
+      "MeshPrepareStaticCache": 4100,
+      "GeometryFeedbackReadbackCreate": 0
+    },
+    "frames": 4
+  },
+  {
+    "case": "distinct",
+    "complete": true,
+    "losses": {},
+    "counts": {
+      "MaterialClusterRequestSort": 0,
+      "MeshPrepareStaticCache": 4100,
+      "GeometryFeedbackReadbackCreate": 0
+    },
+    "frames": 4
+  }
+]

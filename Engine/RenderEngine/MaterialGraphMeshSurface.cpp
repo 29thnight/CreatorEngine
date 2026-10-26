@@ -96,36 +96,84 @@ namespace material_graph
     // frame/view revisions alone would discard it even for a stationary camera.
     struct MeshSurfaceRequestCache
     {
+        MeshSurfaceRequestCache() = default;
+        MeshSurfaceRequestCache(const MeshSurfaceRequestCache&) = delete;
+        MeshSurfaceRequestCache& operator=(const MeshSurfaceRequestCache&) = delete;
         using Key = std::tuple<std::uintptr_t, std::uint64_t, std::uint64_t, std::array<std::uint32_t, 16>,
                                std::array<std::uint32_t, 4>>;
         struct Entry
         {
             own::weak_owner<const MeshSurfaceInput> identity;
             own::shared_owner<const std::vector<std::uint32_t>> requests;
-            std::uint64_t generation{}, lastUse{};
+            std::uint64_t generation{}, charge{};
+            const Key* key{};
+            Entry* previous{};
+            Entry* next{};
         };
         std::map<Key, Entry> entries;
-        std::uint64_t bytes{}, clock{};
+        std::vector<double> distances;
+        Entry* newest{};
+        Entry* oldest{};
+        std::uint64_t bytes{};
         static constexpr std::uint64_t maxBytes = 8ull << 20;
-        static constexpr std::size_t maxEntries = 1024;
 
+        void Unlink(Entry& entry)
+        {
+            if (entry.previous)
+            {
+                entry.previous->next = entry.next;
+            }
+            else
+            {
+                newest = entry.next;
+            }
+            if (entry.next)
+            {
+                entry.next->previous = entry.previous;
+            }
+            else
+            {
+                oldest = entry.previous;
+            }
+        }
+        void Touch(Entry& entry)
+        {
+            entry.previous = nullptr;
+            entry.next = newest;
+            if (newest)
+            {
+                newest->previous = &entry;
+            }
+            else
+            {
+                oldest = &entry;
+            }
+            newest = &entry;
+        }
+        void Erase(std::map<Key, Entry>::iterator entry)
+        {
+            bytes -= entry->second.charge;
+            Unlink(entry->second);
+            entries.erase(entry);
+        }
         void Trim(std::uint64_t generation)
         {
-            std::erase_if(entries,
-                          [&](const auto& item)
-                          {
-                              if (!item.second.identity.expired() && generation - item.second.generation <= 2)
-                              {
-                                  return false;
-                              }
-                              bytes -= item.second.requests->size() * sizeof(std::uint32_t);
-                              return true;
-                          });
+            for (auto entry = entries.begin(); entry != entries.end();)
+            {
+                if (entry->second.identity.expired() || generation - entry->second.generation > 2)
+                {
+                    Erase(entry++);
+                }
+                else
+                {
+                    ++entry;
+                }
+            }
         }
 
         own::shared_owner<const std::vector<std::uint32_t>> Acquire(
-            const own::shared_owner<const MeshSurfaceInput>& identity, const MeshSurfaceInput& input, std::uint64_t view,
-            std::uint64_t generation)
+            const own::shared_owner<const MeshSurfaceInput>& identity, const MeshSurfaceInput& input,
+            std::uint64_t view, std::uint64_t generation)
         {
             const Key key{reinterpret_cast<std::uintptr_t>(identity.operator->()), view, input.View().sceneEpoch,
                           std::bit_cast<std::array<std::uint32_t, 16>>(input.World()),
@@ -137,18 +185,18 @@ namespace material_graph
                 if (own::identity(found->second.identity) == own::identity(identity))
                 {
                     found->second.generation = generation;
-                    found->second.lastUse = ++clock;
+                    Unlink(found->second);
+                    Touch(found->second);
                     return found->second.requests;
                 }
-                bytes -= found->second.requests->size() * sizeof(std::uint32_t);
-                entries.erase(found);
+                Erase(found);
             }
 
             ce::profile_scope sortProfile{ce::marker<"MaterialClusterRequestSort">()};
             const auto count = input.Hierarchy().groupCount ? input.Hierarchy().groupCount : 1;
             const auto& groups = input.Hierarchy().groups;
             auto requests = own::make_shared<std::vector<std::uint32_t>>(count);
-            std::vector<double> distances(count);
+            distances.assign(count, 0.);
             for (std::uint32_t group = 0; group < count; ++group)
             {
                 (*requests)[group] = group;
@@ -172,18 +220,23 @@ namespace material_graph
             // old ascending group priority when distances tie.
             std::stable_sort(requests->begin(), requests->end(),
                              [&](auto a, auto b) { return distances[a] < distances[b]; });
-            const auto charge = requests->size() * sizeof(std::uint32_t);
+            // Charge keys, ownership metadata and a conservative tree-node
+            // allowance as well as payload. Small requests cannot grow unchecked.
+            const auto charge = requests->size() * sizeof(std::uint32_t) + sizeof(Key) + sizeof(Entry) + 64u;
             if (charge <= maxBytes)
             {
-                while (!entries.empty() && (entries.size() >= maxEntries || bytes + charge > maxBytes))
+                while (oldest && charge > maxBytes - bytes)
                 {
-                    const auto oldest =
-                        std::ranges::min_element(entries, {}, [](const auto& item) { return item.second.lastUse; });
-                    bytes -= oldest->second.requests->size() * sizeof(std::uint32_t);
-                    entries.erase(oldest);
+                    // Intrusive links select the victim without scanning every key.
+                    Erase(entries.find(*oldest->key));
                 }
-                entries.emplace(key, Entry{identity, requests, generation, ++clock});
-                bytes += charge;
+                const auto [inserted, fresh] = entries.emplace(key, Entry{identity, requests, generation, charge});
+                if (fresh)
+                {
+                    inserted->second.key = &inserted->first;
+                    Touch(inserted->second);
+                    bytes += charge;
+                }
             }
             return requests;
         }
@@ -195,7 +248,7 @@ namespace material_graph
         own::shared_owner<const MeshSurfaceInput> identity;
         own::shared_owner<const assets::cluster::ResidentSet> residency;
         own::shared_owner<const assets::cluster::ResidentSet> requestedResidency;
-        uint64_t admissionTiles{};
+        uint64_t admissionTiles{}, lastLeasedRecording{}, lastLeaseSerial{};
         bool budgetLimited{};
         own::shared_owner<MeshletSparseStorage> sparse;
         std::vector<std::pair<RHIBufferSlice, RHIBufferSlice>> sparseCopies;
@@ -234,9 +287,17 @@ namespace material_graph
         IRenderDeviceServices& device;
         mutable std::mutex mutex;
         std::vector<own::shared_owner<MeshSurfaceStaticBuffers>> entries;
+        std::map<const MeshSurfaceInput*, own::weak_owner<MeshSurfaceStaticBuffers>> lookup;
+        std::uint64_t maintenanceRecording{};
         // Guarded by mutex; reuse storage while checking every current owner.
         std::vector<std::pair<MeshletSparseStorage*, bool>> idleScratch;
-        std::map<std::uint64_t, std::vector<own::shared_owner<MeshSurfaceStaticBuffers>>> recordings;
+        struct RecordingOwners
+        {
+            std::uint64_t serial{};
+            std::vector<own::shared_owner<MeshSurfaceStaticBuffers>> owners;
+        };
+        std::map<std::uint64_t, RecordingOwners> recordings;
+        std::uint64_t leaseSerial{};
         struct ProvisionalEntry
         {
             own::shared_owner<MeshSurfaceStaticBuffers> entry;
@@ -267,7 +328,7 @@ namespace material_graph
             {
                 auto& submission = provisional[recording];
                 submission.completion = completion;
-                for (auto& entry : found->second)
+                for (auto& entry : found->second.owners)
                 {
                     if (std::ranges::none_of(submission.entries,
                                              [&](const auto& prior) { return prior.entry.operator->() == entry.operator->(); }))
@@ -402,6 +463,57 @@ namespace material_graph
             return idleScratch.empty() ? own::shared_owner<RHISharedSparsePagePool>{}
                                        : idleScratch.front().first->pool;
         }
+        bool MaintainSparsePool(std::uint64_t recording, std::string& error)
+        {
+            own::shared_owner<RHISharedSparsePagePool> pool;
+            {
+                std::lock_guard lock(mutex);
+                if (maintenanceRecording == recording)
+                {
+                    return true;
+                }
+                pool = ClassifySparsePool();
+            }
+            // Mapping completion may call listeners; do not hold their mutex.
+            if (pool && !pool->Tick(recording, error))
+            {
+                return false;
+            }
+            if (pool)
+            {
+                std::lock_guard lock(mutex);
+                maintenanceRecording = recording;
+            }
+            return true;
+        }
+        bool HasLease(std::uint64_t recording, const MeshSurfaceStaticBuffers& entry) const
+        {
+            const auto found = recordings.find(recording);
+            return found != recordings.end() && entry.lastLeasedRecording == recording &&
+                   entry.lastLeaseSerial == found->second.serial;
+        }
+        void Retain(std::uint64_t recording, const own::shared_owner<MeshSurfaceStaticBuffers>& entry)
+        {
+            if (HasLease(recording, *entry))
+            {
+                return;
+            }
+            const auto [found, inserted] = recordings.try_emplace(recording);
+            if (inserted)
+            {
+                found->second.serial = ++leaseSerial;
+            }
+            auto& owners = found->second.owners;
+            if (std::ranges::none_of(owners,
+                                     [&](const auto& prior) { return prior.operator->() == entry.operator->(); }))
+            {
+                owners.push_back(entry);
+            }
+            entry->lastLeasedRecording = recording;
+            // A submitted/aborted ledger can be recreated with the same id.
+            // An old hint must never suppress the new ledger's strong lease.
+            entry->lastLeaseSerial = found->second.serial;
+        }
         void TrimIdle()
         {
             std::unique_lock lock(mutex);
@@ -421,15 +533,15 @@ namespace material_graph
                     ++it;
                 }
             }
-            const auto pool = ClassifySparsePool();
+            std::erase_if(lookup, [](const auto& hint) { return hint.second.expired(); });
             lock.unlock();
-            // A mapping wait must not hold the cache listener mutex.
             std::string error;
-            if (pool && !pool->Tick(device.GetCurrentUploadRecordingId(), error))
+            if (!MaintainSparsePool(device.GetCurrentUploadRecordingId(), error))
             {
                 throw std::runtime_error(error);
             }
         }
+
         bool Acquire(own::shared_owner<const MeshSurfaceInput> identity,
                      own::shared_owner<MeshSurfaceStaticBuffers>& result, std::string& error,
                      own::shared_owner<const assets::cluster::ResidentSet> residency = {})
@@ -447,36 +559,59 @@ namespace material_graph
                 identity->StreamedTopology() ? 16 : std::uint64_t(geometry.indexCount) * sizeof(std::uint32_t),
                 residency ? 16 : identity->Lods().size_bytes(), sizeof(RHIMeshletBufferHeader)};
             auto bytes = sizes[0] + sizes[1] + sizes[2] + sizes[3];
-            own::shared_owner<RHISharedSparsePagePool> pool;
-            {
-                std::lock_guard lock(mutex);
-                pool = ClassifySparsePool();
-            }
-            if (pool && !pool->Tick(recording, error))
+            if (!MaintainSparsePool(recording, error))
             {
                 return false;
             }
             {
                 std::lock_guard lock(mutex);
-                for (const auto& entry : std::span(entries))
+                const auto matches = [&](const auto& entry)
+                {
+                    const auto& requested = entry->requestedResidency ? entry->requestedResidency : entry->residency;
+                    return entry->identity.operator->() == identity.operator->() &&
+                           bool(requested) == bool(residency) &&
+                           (!residency || (requested->revision == residency->revision &&
+                                           requested->residentLimit == residency->residentLimit &&
+                                           requested->residencyAlignment == residency->residencyAlignment)) &&
+                           (!entry->budgetLimited || (!entry->sparse->pool->CanGrow() &&
+                                                      entry->admissionTiles == entry->sparse->pool->AdmissibleTiles(
+                                                                                   entry->sparse->allocation))) &&
+                           entry->prepared && (!entry->sparse || entry->sparseRevision == entry->sparse->Revision()) &&
+                           ((entry->state == RHIUploadTransactionState::Resident && entry->usable) ||
+                            (entry->state == RHIUploadTransactionState::Recording && entry->recording == recording));
+                };
+                const auto pin = [&](const auto& entry)
                 {
                     if (sparseClusters && entry->identity.operator->() == identity.operator->() && entry->sparse)
                     {
                         sparseStorage = entry->sparse;
-                        sparseStorage->SetEvictable(false);
+                        if (!HasLease(recording, *entry))
+                        {
+                            sparseStorage->SetEvictable(false);
+                        }
                     }
-                    const auto& requested = entry->requestedResidency ? entry->requestedResidency : entry->residency;
-                    if (entry->identity.operator->() == identity.operator->() && bool(requested) == bool(residency) &&
-                        (!residency || (requested->revision == residency->revision &&
-                                        requested->residentLimit == residency->residentLimit &&
-                                        requested->residencyAlignment == residency->residencyAlignment)) &&
-                        (!entry->budgetLimited || (!entry->sparse->pool->CanGrow() && entry->admissionTiles ==
-                            entry->sparse->pool->AdmissibleTiles(entry->sparse->allocation))) &&
-                        entry->prepared && (!entry->sparse || entry->sparseRevision == entry->sparse->Revision()) &&
-                        ((entry->state == RHIUploadTransactionState::Resident && entry->usable) ||
-                         (entry->state == RHIUploadTransactionState::Recording && entry->recording == recording)))
+                };
+                if (const auto found = lookup.find(identity.operator->()); found != lookup.end())
+                {
+                    if (auto entry = found->second.lock())
                     {
-                        recordings[recording].push_back(entry);
+                        pin(entry);
+                        if (matches(entry))
+                        {
+                            Retain(recording, entry);
+                            ++stats.hits;
+                            result = std::move(entry);
+                            return true;
+                        }
+                    }
+                }
+                for (const auto& entry : std::span(entries))
+                {
+                    pin(entry);
+                    if (matches(entry))
+                    {
+                        Retain(recording, entry);
+                        lookup[identity.operator->()] = entry;
                         ++stats.hits;
                         result = entry;
                         return true;
@@ -529,8 +664,9 @@ namespace material_graph
             if (sparseClusters)
             {
                 entry->sparse = sparseStorage ? sparseStorage : own::make_shared<MeshletSparseStorage>(device);
-                const bool admitted = entry->sparse->PrepareResidentCut(sparsePayload, topology.bytes,
-                    entry->residency, entry->identity->Hierarchy().groups, entry->admissionTiles, entry->budgetLimited,
+                const bool admitted = entry->sparse->PrepareResidentCut(
+                    sparsePayload, topology.bytes, entry->residency, entry->identity->Hierarchy().groups,
+                    entry->admissionTiles, entry->budgetLimited,
                     [&](const assets::cluster::ResidentSet& cut)
                     {
                         topology.bytes.clear();
@@ -549,7 +685,8 @@ namespace material_graph
                         sparsePayload.packets.clear();
                         AppendClusterTopology(topology, *entry->identity, cut, &sparsePayload);
                         return true;
-                    }, error);
+                    },
+                    error);
                 if (!admitted)
                 {
                     return false;
@@ -677,7 +814,8 @@ namespace material_graph
             {
                 std::lock_guard lock(mutex);
                 entries.push_back(entry);
-                recordings[recording].push_back(entry);
+                lookup[entry->identity.operator->()] = entry;
+                Retain(recording, entry);
                 stats.residentBytes += bytes;
                 entry->prepared = true;
                 ++stats.uploads;
@@ -1606,7 +1744,7 @@ namespace material_graph
             const auto& point = points[i];
             const auto& eye = input_->View().eye;
             if (!Finite(std::bit_cast<std::array<float, 20>>(point)) || point.position[3] != 0 ||
-                point.uvLod[3] != (IsSampled() ? samples_[i].lod : input_->Lods()[i]) ||
+                point.uvLod[3] != (IsSampled() ? (*samples_)[i].lod : input_->Lods()[i]) ||
                 !Direction(point.normal.data()) || !ValidSurfaceTangentPair(point) ||
                 std::hypot(double(eye[0]) - point.position[0], double(eye[1]) - point.position[1],
                            double(eye[2]) - point.position[2]) <= 1e-10)
@@ -1750,35 +1888,47 @@ namespace material_graph
         {
             return Fail(error, "Mesh surface transform needs a sealed input on its initialized device in a recording.");
         }
-        nextDetail(ce::marker<"MeshPrepareOwner">());
-        auto candidate = own::make_shared<MeshSurfaceBatch>(MeshSurfaceBatch::ConstructionKey{});
-        candidate->device_ = &device;
-        candidate->input_ = std::move(input);
-        candidate->count_ = candidate->input_->Count();
-        candidate->recordingId_ = device.GetCurrentUploadRecordingId();
-        candidate->auditRealFrame_ = auditRealFrame;
-        candidate->auditView_ = auditView;
-        candidate->descriptorVersion_ = device.GetDescriptorVersionToken();
-        candidate->pipeline_ = pipeline_;
-        candidate->objectSpace_ = objectSpace;
-        candidate->directClusters_ =
-            directClusters && objectSpace && candidate->input_->ClusterArchive() && candidate->input_->ClusterStream();
-        if (candidate->input_->StreamedTopology() && !candidate->directClusters_)
+        const auto recording = device.GetCurrentUploadRecordingId();
+        const auto descriptorVersion = device.GetDescriptorVersionToken();
+        const bool useDirectClusters =
+            directClusters && objectSpace && input->ClusterArchive() && input->ClusterStream();
+        if (input->StreamedTopology() && !useDirectClusters)
         {
             return Fail(error, "Streamed connectivity requires direct GPU cluster consumption.");
         }
+        own::shared_owner<MeshSurfaceStaticBuffers> staticBuffers;
+        own::shared_owner<const assets::cluster::ResidentSet> residency;
+        const auto makeCandidate = [&]()
+        {
+            ce::profile_scope allocation{ce::marker<"MeshPrepareOwner">()};
+            auto candidate = own::make_shared<MeshSurfaceBatch>(MeshSurfaceBatch::ConstructionKey{});
+            candidate->device_ = &device;
+            candidate->input_ = std::move(input);
+            candidate->count_ = candidate->input_->Count();
+            candidate->recordingId_ = recording;
+            candidate->auditRealFrame_ = auditRealFrame;
+            candidate->auditView_ = auditView;
+            candidate->descriptorVersion_ = descriptorVersion;
+            candidate->pipeline_ = pipeline_;
+            candidate->objectSpace_ = objectSpace;
+            candidate->directClusters_ = useDirectClusters;
+            candidate->staticBuffers_ = std::move(staticBuffers);
+            candidate->clusterResidency_ = std::move(residency);
+            candidate->lastUsedGeneration_ = cacheStatic ? cacheGeneration_ : 0;
+            return candidate;
+        };
         nextDetail(ce::marker<"MeshPrepareIdentity">());
-        auto identity = candidate->input_;
+        auto identity = input;
         while (identity->staticOwner_)
         {
             identity = identity->staticOwner_;
         }
-        if (cacheStatic || candidate->directClusters_)
+        if (cacheStatic || useDirectClusters)
         {
-            BeginFrame(candidate->recordingId_);
+            BeginFrame(recording);
         }
         nextDetail(ce::marker<"MeshPrepareClusters">());
-        if (candidate->directClusters_)
+        if (useDirectClusters)
         {
             if (!requestCache_)
             {
@@ -1787,7 +1937,7 @@ namespace material_graph
             own::shared_owner<const std::vector<std::uint32_t>> requests;
             {
                 ce::profile_scope requestProfile{ce::marker<"MeshClusterRequests">()};
-                requests = requestCache_->Acquire(identity, *candidate->input_, auditView, cacheGeneration_);
+                requests = requestCache_->Acquire(identity, *input, auditView, cacheGeneration_);
             }
             auto budget = clusterBudget;
             const auto tileBytes = device.SparseBufferTileBytes();
@@ -1798,38 +1948,35 @@ namespace material_graph
             if (device.StreamingMemoryPressure())
             {
                 budget.residentBytes =
-                    (std::min)(budget.residentBytes,
-                               candidate->input_->ClusterStream()->PinnedBytes(budget.residencyAlignment));
+                    (std::min)(budget.residentBytes, input->ClusterStream()->PinnedBytes(budget.residencyAlignment));
             }
             ce::profile_scope residencyProfile{ce::marker<"MeshClusterResidencyPrepare">()};
-            candidate->clusterResidency_ =
-                candidate->input_->ClusterStream()->Prepare(candidate->recordingId_, *requests, budget);
+            residency = input->ClusterStream()->Prepare(recording, *requests, budget);
         }
-        const auto& source = *candidate->input_;
+        const auto& source = *input;
         nextDetail(ce::marker<"MeshPrepareStaticCache">());
         if (cacheStatic)
         {
-            candidate->lastUsedGeneration_ = cacheGeneration_;
             if (!staticCache_)
             {
                 staticCache_ = own::make_shared<MeshSurfaceStaticCache>(device);
             }
-            if (!staticCache_->Acquire(std::move(identity), candidate->staticBuffers_, error,
-                                       candidate->clusterResidency_))
+            if (!staticCache_->Acquire(std::move(identity), staticBuffers, error, residency))
             {
                 return false;
             }
             // Every consumer sees the cut actually installed in GPU metadata.
-            candidate->clusterResidency_ = candidate->staticBuffers_->residency;
+            residency = staticBuffers->residency;
             nextDetail(ce::marker<"MeshPrepareTransformLookup">());
-            if (candidate->staticBuffers_ && bufferPool_)
+            if (staticBuffers && bufferPool_)
             {
                 for (const auto& previous : std::span(transformedCache_))
                 {
                     const auto& prior = *previous->input_;
                     // One geometry/pose has one immutable output. Object-space
                     // instances keep separate world matrices and share its producer.
-                    if (previous->staticBuffers_.operator->() != candidate->staticBuffers_.operator->() || previous->pipeline_.operator->() != pipeline_.operator->() ||
+                    if (previous->staticBuffers_.operator->() != staticBuffers.operator->() ||
+                        previous->pipeline_.operator->() != pipeline_.operator->() ||
                         previous->objectSpace_ != objectSpace ||
                         (!objectSpace && std::memcmp(&prior.World(), &source.World(), sizeof(math::matrix4x4)) != 0) ||
                         prior.Bones().size() != source.Bones().size() ||
@@ -1838,8 +1985,8 @@ namespace material_graph
                     {
                         continue;
                     }
-                    const bool sameRecording = previous->recordingId_ == candidate->recordingId_ &&
-                                               previous->descriptorVersion_ == candidate->descriptorVersion_;
+                    const bool sameRecording =
+                        previous->recordingId_ == recording && previous->descriptorVersion_ == descriptorVersion;
                     // A fresh producer in this recording may be shared before it
                     // executes. Older recordings require a completed immutable output.
                     // Preparation has no graph identity. Once declared, a fresh
@@ -1855,6 +2002,7 @@ namespace material_graph
                     {
                         continue;
                     }
+                    auto candidate = makeCandidate();
                     candidate->transformedOwner_ = previous;
                     candidate->buffer_ = previous->buffer_;
                     candidate->bufferBytes_ = previous->BufferBytes();
@@ -1864,8 +2012,8 @@ namespace material_graph
                         candidate->declarationOwner_ = previous;
                     }
                     else if (const auto declaration = previous->reuseDeclaration_.lock();
-                             declaration && declaration->recordingId_ == candidate->recordingId_ &&
-                             declaration->descriptorVersion_ == candidate->descriptorVersion_ &&
+                             declaration && declaration->recordingId_ == recording &&
+                             declaration->descriptorVersion_ == descriptorVersion &&
                              !declaration->HasGraphDeclaration())
                     {
                         candidate->declarationOwner_ = declaration;
@@ -1882,6 +2030,7 @@ namespace material_graph
                 }
             }
         }
+        auto candidate = makeCandidate();
         nextDetail(ce::marker<"MeshPrepareOutput">());
         RHIBufferDesc description;
         description.bytes = candidate->Count() * sizeof(SurfacePoint);
@@ -2656,7 +2805,7 @@ namespace material_graph
         candidate->input_ = vertices->Input();
         candidate->source_ = std::move(vertices);
         candidate->samplePipeline_ = samplerPipeline_;
-        candidate->samples_.assign(samples.begin(), samples.end());
+        candidate->samples_ = own::make_unique<std::vector<MeshSurfaceSample>>(samples.begin(), samples.end());
         candidate->count_ = static_cast<std::uint32_t>(samples.size());
         candidate->recordingId_ = device.GetCurrentUploadRecordingId();
         const auto descriptorVersion = device.GetDescriptorVersionToken();
@@ -2684,7 +2833,7 @@ namespace material_graph
                         "Mesh surface sample allocation changed recording/descriptors; retain and retry the source.");
         }
         std::memcpy(indices.cpuAddress, geometry.indexData, indexBytes);
-        std::memcpy(requests.cpuAddress, candidate->samples_.data(), samples.size_bytes());
+        std::memcpy(requests.cpuAddress, candidate->samples_->data(), samples.size_bytes());
         auto& encoder = device.GetImmediateEncoder();
         const RHIBufferTransition before{candidate->buffer_, RHIResourceState::Common,
                                          RHIResourceState::UnorderedAccess};

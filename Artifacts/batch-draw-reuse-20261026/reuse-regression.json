@@ -1,0 +1,232 @@
+{
+  "schema": 1,
+  "passed": true,
+  "evidence": [
+    {
+      "name": "before-same-a-on",
+      "instanceBatchObjectsPerFrame": 1025,
+      "readbackCreates": 0,
+      "requestMisses": 0,
+      "recordCounters": {
+        "MaterialSceneDrawRecords.Reuse": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "MaterialSceneDrawRecords.Build": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "after-same-a-on",
+      "instanceBatchObjectsPerFrame": 1025,
+      "readbackCreates": 0,
+      "requestMisses": 0,
+      "recordCounters": {
+        "MaterialSceneDrawRecords.Reuse": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "MaterialSceneDrawRecords.Build": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "after-same-b-on",
+      "instanceBatchObjectsPerFrame": 1025,
+      "readbackCreates": 0,
+      "requestMisses": 0,
+      "recordCounters": {
+        "MaterialSceneDrawRecords.Reuse": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "MaterialSceneDrawRecords.Build": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "before-same-b-on",
+      "instanceBatchObjectsPerFrame": 1025,
+      "readbackCreates": 0,
+      "requestMisses": 0,
+      "recordCounters": {
+        "MaterialSceneDrawRecords.Reuse": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "MaterialSceneDrawRecords.Build": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "before-distinct-a-on",
+      "instanceBatchObjectsPerFrame": 1025,
+      "readbackCreates": 0,
+      "requestMisses": 0,
+      "recordCounters": {
+        "MaterialSceneDrawRecords.Reuse": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "MaterialSceneDrawRecords.Build": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "after-distinct-a-on",
+      "instanceBatchObjectsPerFrame": 1025,
+      "readbackCreates": 0,
+      "requestMisses": 0,
+      "recordCounters": {
+        "MaterialSceneDrawRecords.Reuse": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "MaterialSceneDrawRecords.Build": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "after-distinct-b-on",
+      "instanceBatchObjectsPerFrame": 1025,
+      "readbackCreates": 0,
+      "requestMisses": 0,
+      "recordCounters": {
+        "MaterialSceneDrawRecords.Reuse": [
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1,
+          1
+        ],
+        "MaterialSceneDrawRecords.Build": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    },
+    {
+      "name": "before-distinct-b-on",
+      "instanceBatchObjectsPerFrame": 1025,
+      "readbackCreates": 0,
+      "requestMisses": 0,
+      "recordCounters": {
+        "MaterialSceneDrawRecords.Reuse": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "MaterialSceneDrawRecords.Build": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ]
+      }
+    }
+  ],
+  "baselineHasRecordCounters": false,
+  "afterNewInstantPerFrame": 1
+}

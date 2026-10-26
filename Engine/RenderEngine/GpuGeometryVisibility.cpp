@@ -1,4 +1,4 @@
-#include "RenderArena.h"
+﻿#include "RenderArena.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Arena.h"
 #else
@@ -186,6 +186,7 @@ struct GpuGeometryVisibility::BufferPool
     std::vector<Entry> free;
     std::vector<RHIReadback> freeReadbacks;
     std::uint64_t readbackBytes{};
+    std::uint64_t readbackStorageBytes{};
     std::uint64_t cachedBytes{};
     bool closed{};
     explicit BufferPool(IRenderDeviceServices& value) : device(value) { free.reserve(64); }
@@ -194,7 +195,9 @@ struct GpuGeometryVisibility::BufferPool
     {
         std::lock_guard lock(mutex);
         if (closed)
+        {
             return VisibilityFail(error, "Geometry visibility buffer pool is closed.");
+        }
         const auto found = std::ranges::find_if(
             free, [&](const auto& entry) { return entry.bytes == bytes && entry.indirect == indirect; });
         if (found != free.end())
@@ -239,6 +242,14 @@ struct GpuGeometryVisibility::BufferPool
         }
         freeReadbacks.clear();
         readbackBytes = 0;
+        readbackStorageBytes = 0;
+    }
+    static std::uint64_t ReadbackStorageBytes(std::uint64_t bytes)
+    {
+        // DX12 committed buffers consume at least one 64 KiB allocation. Bound
+        // retained storage as well as payload, even for four-byte feedback.
+        constexpr std::uint64_t alignment = 64ull << 10;
+        return bytes / alignment * alignment + (bytes % alignment ? alignment : 0);
     }
     bool AcquireReadback(std::uint64_t bytes, RHIReadback& result, std::string& error)
     {
@@ -253,7 +264,10 @@ struct GpuGeometryVisibility::BufferPool
         {
             result = *found;
             readbackBytes -= bytes;
-            freeReadbacks.erase(found);
+            readbackStorageBytes -= ReadbackStorageBytes(bytes);
+            // Cache order carries no ownership or submission ordering.
+            *found = freeReadbacks.back();
+            freeReadbacks.pop_back();
             return true;
         }
         ce::profile_scope allocationProfile{ce::marker<"GeometryFeedbackReadbackCreate">()};
@@ -267,10 +281,18 @@ struct GpuGeometryVisibility::BufferPool
         }
         std::lock_guard lock(mutex);
         constexpr std::uint64_t budget = 8ull << 20;
-        if (!closed && reusable && freeReadbacks.size() < 128 && readback.sliceBytes <= budget - readbackBytes)
+        constexpr std::uint64_t storageBudget = 128ull << 20;
+        const auto storageBytes = ReadbackStorageBytes(readback.sliceBytes);
+        // Return is reached only after the owning Frame is released. Its
+        // completion ledger decides reusable; pending GPU owners never enter here.
+        // Keep the completed working set instead of discarding everything past
+        // 128 objects. Both budgets apply to idle resources, not in-flight owners.
+        if (!closed && reusable && readback.sliceBytes <= budget - readbackBytes &&
+            storageBytes <= storageBudget - readbackStorageBytes)
         {
             freeReadbacks.push_back(readback);
             readbackBytes += readback.sliceBytes;
+            readbackStorageBytes += storageBytes;
         }
         else
         {

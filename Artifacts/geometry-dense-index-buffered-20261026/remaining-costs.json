@@ -1,0 +1,94 @@
+{
+  "readbackPoolCountLimit": 128,
+  "readbackPoolByteLimit": 8388608,
+  "requestCacheEntryLimit": 1024,
+  "fixtureMaximumCurrentAndPreviousWorldKeys": 1025,
+  "findings": [
+    {
+      "case": "same",
+      "build": "before",
+      "feedbackReadbacks": [
+        {
+          "name": "before-same-a-on",
+          "createCalls": 7168,
+          "callsPerFrame": 896.0,
+          "totalMs": 2400.3186,
+          "meanMsPerFrame": 300.039825
+        },
+        {
+          "name": "before-same-b-on",
+          "createCalls": 7168,
+          "callsPerFrame": 896.0,
+          "totalMs": 2242.3479,
+          "meanMsPerFrame": 280.2934875
+        }
+      ],
+      "cameraVisibilityTaskP50Mean": 279.4906
+    },
+    {
+      "case": "same",
+      "build": "after",
+      "feedbackReadbacks": [
+        {
+          "name": "after-same-a-on",
+          "createCalls": 7168,
+          "callsPerFrame": 896.0,
+          "totalMs": 2031.7636,
+          "meanMsPerFrame": 253.97045
+        },
+        {
+          "name": "after-same-b-on",
+          "createCalls": 7168,
+          "callsPerFrame": 896.0,
+          "totalMs": 2155.4332,
+          "meanMsPerFrame": 269.42915
+        }
+      ],
+      "cameraVisibilityTaskP50Mean": 260.178275
+    },
+    {
+      "case": "distinct",
+      "build": "before",
+      "feedbackReadbacks": [
+        {
+          "name": "before-distinct-a-on",
+          "createCalls": 7168,
+          "callsPerFrame": 896.0,
+          "totalMs": 2118.5109,
+          "meanMsPerFrame": 264.8138625
+        },
+        {
+          "name": "before-distinct-b-on",
+          "createCalls": 7168,
+          "callsPerFrame": 896.0,
+          "totalMs": 2145.633,
+          "meanMsPerFrame": 268.204125
+        }
+      ],
+      "cameraVisibilityTaskP50Mean": 251.86740000000003
+    },
+    {
+      "case": "distinct",
+      "build": "after",
+      "feedbackReadbacks": [
+        {
+          "name": "after-distinct-a-on",
+          "createCalls": 7168,
+          "callsPerFrame": 896.0,
+          "totalMs": 1984.7953,
+          "meanMsPerFrame": 248.0994125
+        },
+        {
+          "name": "after-distinct-b-on",
+          "createCalls": 7168,
+          "callsPerFrame": 896.0,
+          "totalMs": 1952.2991,
+          "meanMsPerFrame": 244.0373875
+        }
+      ],
+      "cameraVisibilityTaskP50Mean": 248.57195000000002
+    }
+  ],
+  "feedbackSource": "Engine/RenderEngine/GpuGeometryVisibility.cpp:243-280",
+  "requestSource": "Engine/RenderEngine/MaterialGraphMeshSurface.cpp:98-183"
+}

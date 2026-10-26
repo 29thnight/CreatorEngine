@@ -1,0 +1,1244 @@
+{
+  "schema": 1,
+  "method": "16 frames per case and recording condition, arithmetic means; subscopes restricted to MaterialGraphScenePrepare and inclusive",
+  "rootQpcEtw": [
+    {
+      "case": "same",
+      "recording": "on",
+      "frames": 16,
+      "wallMs": 161.30175,
+      "runningMs": 156.38055624999993,
+      "readyMs": 1.742199999999972,
+      "waitingMs": 3.1802750000001687,
+      "unknownMs": 0.00013124999994928999
+    },
+    {
+      "case": "same",
+      "recording": "off",
+      "frames": 16,
+      "wallMs": 133.26012500000002,
+      "runningMs": 129.79869999999994,
+      "readyMs": 0.5295687500000748,
+      "waitingMs": 2.9330812499999146,
+      "unknownMs": 0.0003375000000076511
+    },
+    {
+      "case": "distinct",
+      "recording": "on",
+      "frames": 16,
+      "wallMs": 179.31875,
+      "runningMs": 175.12100625000076,
+      "readyMs": 0.871699999999759,
+      "waitingMs": 3.3267749999995466,
+      "unknownMs": 0.0005499999999791783
+    },
+    {
+      "case": "distinct",
+      "recording": "off",
+      "frames": 16,
+      "wallMs": 168.62,
+      "runningMs": 164.48819375000002,
+      "readyMs": 1.0754437499999607,
+      "waitingMs": 3.0574187500000107,
+      "unknownMs": 0.0004937500000039563
+    }
+  ],
+  "mainThreadDetails": [
+    {
+      "case": "same",
+      "frames": 16,
+      "mainThreadScopes": {
+        "MaterialGraphScenePrepare": {
+          "wallMs": 161.28496875000002,
+          "runningMs": 156.3623624999999,
+          "readyMs": 1.742199999999972,
+          "waitingMs": 3.1802750000001687,
+          "unknownMs": 0.00013124999994928999,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneFrameSetup": {
+          "wallMs": 1.0813562499999998,
+          "runningMs": 1.0277874999999836,
+          "readyMs": 0.05352500000001825,
+          "waitingMs": 0.0,
+          "unknownMs": 4.374999999967599e-05,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneEffectsPrepare": {
+          "wallMs": 0.6240625000000001,
+          "runningMs": 0.2316000000000189,
+          "readyMs": 0.020699999999985508,
+          "waitingMs": 0.37176250000000266,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialLookupPrepare": {
+          "wallMs": 0.0767125,
+          "runningMs": 0.07623749999999685,
+          "readyMs": 0.00047500000000866294,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialLookupPoolAcquire": {
+          "wallMs": 0.0189375,
+          "runningMs": 0.01846249999997518,
+          "readyMs": 0.00047500000000866294,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneGeometryTableSetup": {
+          "wallMs": 0.54626875,
+          "runningMs": 0.5458437499999924,
+          "readyMs": 0.0004249999999998977,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneCasterSnapshot": {
+          "wallMs": 127.9215625,
+          "runningMs": 126.58595624999988,
+          "readyMs": 1.2781375000000281,
+          "waitingMs": 0.057381250000132056,
+          "unknownMs": 8.7499999949614e-05,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneCasterPlanReuse": {
+          "wallMs": 0.0,
+          "runningMs": 0.0,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneGeometryPreparation": {
+          "wallMs": 126.44214375,
+          "runningMs": 125.1085249999999,
+          "readyMs": 1.2761500000000368,
+          "waitingMs": 0.057381250000132056,
+          "unknownMs": 8.7499999949614e-05,
+          "callsPerFrame": 1.0
+        },
+        "MaterialMeshGpuPrepare": {
+          "wallMs": 122.85329374999945,
+          "runningMs": 121.56865624999814,
+          "readyMs": 1.2271687500000104,
+          "waitingMs": 0.057381250000132056,
+          "unknownMs": 8.7499999949614e-05,
+          "callsPerFrame": 1025.0
+        },
+        "MeshPrepareValidate": {
+          "wallMs": 0.8443000000001638,
+          "runningMs": 0.8376312499935983,
+          "readyMs": 0.006668750000009105,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1025.0
+        },
+        "MeshPrepareOwner": {
+          "wallMs": 3.933712499999952,
+          "runningMs": 3.892262500000797,
+          "readyMs": 0.0281812499999603,
+          "waitingMs": 0.013225000000005593,
+          "unknownMs": 4.3749999974807e-05,
+          "callsPerFrame": 1025.0
+        },
+        "MeshPrepareIdentity": {
+          "wallMs": 1.0821875000000505,
+          "runningMs": 1.0707499999790322,
+          "readyMs": 0.01143749999999688,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1025.0
+        },
+        "MeshPrepareClusters": {
+          "wallMs": 96.49490624999927,
+          "runningMs": 95.571768750002,
+          "readyMs": 0.8857250000000381,
+          "waitingMs": 0.03741250000011398,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1025.0
+        },
+        "MeshClusterRequests": {
+          "wallMs": 89.12286250000022,
+          "runningMs": 88.30515000000297,
+          "readyMs": 0.7803000000000422,
+          "waitingMs": 0.03741250000011398,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1025.0
+        },
+        "MaterialClusterRequestSort": {
+          "wallMs": 73.56683124999948,
+          "runningMs": 72.8749249999971,
+          "readyMs": 0.6544937499999648,
+          "waitingMs": 0.03741250000011398,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1024.0
+        },
+        "MeshClusterResidencyPrepare": {
+          "wallMs": 3.458056250000156,
+          "runningMs": 3.403050000014775,
+          "readyMs": 0.05500625000003723,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1025.0
+        },
+        "MeshPrepareStaticCache": {
+          "wallMs": 10.97423124999859,
+          "runningMs": 10.836400000004012,
+          "readyMs": 0.13104375000002033,
+          "waitingMs": 0.006743750000012483,
+          "unknownMs": 4.3749999974807e-05,
+          "callsPerFrame": 1025.0
+        },
+        "MeshPrepareTransformLookup": {
+          "wallMs": 3.5141937500002167,
+          "runningMs": 3.501662500008214,
+          "readyMs": 0.012531249999975458,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1025.0
+        },
+        "MaterialSceneCameraPrepare": {
+          "wallMs": 3.7321750000000002,
+          "runningMs": 1.9172062499999676,
+          "readyMs": 0.06972500000000181,
+          "waitingMs": 1.745243750000009,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "GeometryHistoryPrepare": {
+          "wallMs": 3.1590125,
+          "runningMs": 1.3489874999999696,
+          "readyMs": 0.06478124999999935,
+          "waitingMs": 1.745243750000009,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "GeometryOcclusionLayoutReuse": {
+          "wallMs": 0.0023875000000000003,
+          "runningMs": 0.0023874999999478064,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 2.0
+        },
+        "GeometryHistoryCreate": {
+          "wallMs": 3.1216312500000005,
+          "runningMs": 1.3116062499999916,
+          "readyMs": 0.06478124999999935,
+          "waitingMs": 1.745243750000009,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "DX12CreateTexture": {
+          "wallMs": 2.9722625,
+          "runningMs": 1.163256250000071,
+          "readyMs": 0.06376249999998507,
+          "waitingMs": 1.745243750000009,
+          "unknownMs": 0.0,
+          "callsPerFrame": 5.0
+        },
+        "MaterialSceneCameraDispatch": {
+          "wallMs": 0.084825,
+          "runningMs": 0.07285625000001517,
+          "readyMs": 0.011968749999994088,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneDrawBindingsJoin": {
+          "wallMs": 0.01571875,
+          "runningMs": 0.014943750000039557,
+          "readyMs": 0.0007749999999973056,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneJoinAssist": {
+          "wallMs": 0.06082500000000002,
+          "runningMs": 0.05995000000004502,
+          "readyMs": 0.0008749999999970726,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 5.0
+        },
+        "MaterialSceneDrawsPrepare": {
+          "wallMs": 9.06343125,
+          "runningMs": 8.962087500000054,
+          "readyMs": 0.09596249999997397,
+          "waitingMs": 0.005381249999985016,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneDrawPrepare": {
+          "wallMs": 8.30352499999991,
+          "runningMs": 8.225656250001064,
+          "readyMs": 0.07248749999998161,
+          "waitingMs": 0.005381249999985016,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1024.0
+        },
+        "MaterialSceneDrawChunks": {
+          "wallMs": 6.416587499999821,
+          "runningMs": 6.35353125000233,
+          "readyMs": 0.05767499999993575,
+          "waitingMs": 0.005381249999985016,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1024.0
+        },
+        "MaterialSceneChunkRecordUpload": {
+          "wallMs": 3.4117250000001307,
+          "runningMs": 3.379943750013215,
+          "readyMs": 0.026399999999977553,
+          "waitingMs": 0.005381249999985016,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1024.0
+        },
+        "MaterialSceneGeometryPublish": {
+          "wallMs": 0.2590625,
+          "runningMs": 0.2588875000000037,
+          "readyMs": 0.0001750000000058094,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "SceneBufferPoolAcquire": {
+          "wallMs": 0.08641875000000006,
+          "runningMs": 0.08641874999989696,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 11.0
+        },
+        "SceneBufferPoolLookup": {
+          "wallMs": 0.04791874999999997,
+          "runningMs": 0.04791874999996537,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 11.0
+        },
+        "SceneBufferPoolAcquireLock": {
+          "wallMs": 0.011131249999999994,
+          "runningMs": 0.01113125000006221,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 11.0
+        },
+        "SceneBufferPoolReuse": {
+          "wallMs": 0.0,
+          "runningMs": 0.0,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 14.0
+        },
+        "MaterialSceneCameraJoin": {
+          "wallMs": 0.022143749999999997,
+          "runningMs": 0.022043750000012352,
+          "readyMs": 9.999999999976694e-05,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneSurfaceStagesPrepare": {
+          "wallMs": 2.2639062500000002,
+          "runningMs": 2.2314874999999947,
+          "readyMs": 0.032418750000006824,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneShadowSetupJoin": {
+          "wallMs": 0.028606249999999996,
+          "runningMs": 0.017762499999989245,
+          "readyMs": 0.010843749999999375,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneIndirectCommandsPrepare": {
+          "wallMs": 11.887150000000004,
+          "runningMs": 11.810737500000025,
+          "readyMs": 0.07641249999998934,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneIndirectPrepare": {
+          "wallMs": 11.8484125,
+          "runningMs": 11.771999999999986,
+          "readyMs": 0.07641249999998934,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialScenePacketGroupsPrepare": {
+          "wallMs": 0.8705874999999998,
+          "runningMs": 0.8694937500000393,
+          "readyMs": 0.0010937499999954525,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 3.0
+        },
+        "MaterialScenePacketGroups.Reuse": {
+          "wallMs": 0.0,
+          "runningMs": 0.0,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 3.0
+        },
+        "SceneBufferPoolReturn": {
+          "wallMs": 0.10344999999999967,
+          "runningMs": 0.10345000000026694,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 22.0
+        },
+        "SceneBufferPoolReturnLock": {
+          "wallMs": 0.0181875,
+          "runningMs": 0.01818750000055047,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 22.0
+        },
+        "MaterialSceneTilePacketPrepare": {
+          "wallMs": 0.50395625,
+          "runningMs": 0.4793812499999959,
+          "readyMs": 0.024575000000012892,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialPacketPlanReuse": {
+          "wallMs": 0.0,
+          "runningMs": 0.0,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialScenePacketPlanUpload": {
+          "wallMs": 0.0034187500000000003,
+          "runningMs": 0.0034187500000140147,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialScenePacketOutputBindings": {
+          "wallMs": 0.01671875,
+          "runningMs": 0.016718750000038085,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneShadowJoin": {
+          "wallMs": 0.0028312500000000004,
+          "runningMs": 0.0028312499999874063,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialScenePacketJoin": {
+          "wallMs": 0.0187,
+          "runningMs": 0.018700000000006156,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneFinalizePrepare": {
+          "wallMs": 1.0489437499999998,
+          "runningMs": 1.0424875000000462,
+          "readyMs": 0.006456249999985175,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialPassReadPlanAcquire": {
+          "wallMs": 0.91123125,
+          "runningMs": 0.9047749999999848,
+          "readyMs": 0.006456249999985175,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialPassReadPlanBuild": {
+          "wallMs": 0.90739375,
+          "runningMs": 0.9009375000000297,
+          "readyMs": 0.006456249999985175,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialScenePublishAndRelease": {
+          "wallMs": 2.7224625000000002,
+          "runningMs": 1.6257624999999365,
+          "readyMs": 0.09619374999998337,
+          "waitingMs": 1.00050625000004,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialFrameRetirement": {
+          "wallMs": 0.01959375,
+          "runningMs": 0.01959374999998964,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialFrameReplace": {
+          "wallMs": 2.30473125,
+          "runningMs": 1.2080312499999604,
+          "readyMs": 0.09619374999998337,
+          "waitingMs": 1.00050625000004,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        }
+      }
+    },
+    {
+      "case": "distinct",
+      "frames": 16,
+      "mainThreadScopes": {
+        "MaterialGraphScenePrepare": {
+          "wallMs": 179.30392500000002,
+          "runningMs": 175.10490000000078,
+          "readyMs": 0.871699999999759,
+          "waitingMs": 3.3267749999995466,
+          "unknownMs": 0.0005499999999791783,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneFrameSetup": {
+          "wallMs": 1.0995375000000003,
+          "runningMs": 1.0963749999999504,
+          "readyMs": 0.0031625000000072845,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneEffectsPrepare": {
+          "wallMs": 0.6424937499999999,
+          "runningMs": 0.2167312500000751,
+          "readyMs": 0.01303750000001358,
+          "waitingMs": 0.4127249999999272,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialLookupPrepare": {
+          "wallMs": 0.07204999999999998,
+          "runningMs": 0.07133750000000916,
+          "readyMs": 0.0007125000000005599,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialLookupPoolAcquire": {
+          "wallMs": 0.015625,
+          "runningMs": 0.015625000000007105,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneGeometryTableSetup": {
+          "wallMs": 0.48435000000000006,
+          "runningMs": 0.4843500000000187,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneCasterSnapshot": {
+          "wallMs": 148.78735,
+          "runningMs": 148.1421062500001,
+          "readyMs": 0.6179187499999816,
+          "waitingMs": 0.027068749999926922,
+          "unknownMs": 0.00025624999997830855,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneCasterPlanReuse": {
+          "wallMs": 0.0,
+          "runningMs": 0.0,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneGeometryPreparation": {
+          "wallMs": 147.39463125,
+          "runningMs": 146.74938750000015,
+          "readyMs": 0.6179187499999816,
+          "waitingMs": 0.027068749999926922,
+          "unknownMs": 0.00025624999997830855,
+          "callsPerFrame": 1.0
+        },
+        "MaterialMeshGpuPrepare": {
+          "wallMs": 144.2124687499981,
+          "runningMs": 143.57381249999725,
+          "readyMs": 0.6113312499999974,
+          "waitingMs": 0.027068749999926922,
+          "unknownMs": 0.00025624999997830855,
+          "callsPerFrame": 1025.0
+        },
+        "MeshPrepareValidate": {
+          "wallMs": 0.745593750000194,
+          "runningMs": 0.7439062499704097,
+          "readyMs": 0.0016875000000027285,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1025.0
+        },
+        "MeshPrepareOwner": {
+          "wallMs": 3.6192562499999434,
+          "runningMs": 3.603106250017875,
+          "readyMs": 0.009181249999933527,
+          "waitingMs": 0.006968749999998636,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1025.0
+        },
+        "MeshPrepareIdentity": {
+          "wallMs": 0.9480874999999208,
+          "runningMs": 0.9469249999364973,
+          "readyMs": 0.0011625000000208274,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1025.0
+        },
+        "MeshPrepareClusters": {
+          "wallMs": 80.294025000001,
+          "runningMs": 80.01459375000488,
+          "readyMs": 0.26818749999995894,
+          "waitingMs": 0.011112500000024284,
+          "unknownMs": 0.0001312499999812644,
+          "callsPerFrame": 1025.0
+        },
+        "MeshClusterRequests": {
+          "wallMs": 73.39786249999987,
+          "runningMs": 73.1507687500013,
+          "readyMs": 0.2358499999999477,
+          "waitingMs": 0.011112500000024284,
+          "unknownMs": 0.0001312499999812644,
+          "callsPerFrame": 1025.0
+        },
+        "MaterialClusterRequestSort": {
+          "wallMs": 65.20289374999986,
+          "runningMs": 64.97135624999376,
+          "readyMs": 0.2202937499999127,
+          "waitingMs": 0.011112500000024284,
+          "unknownMs": 0.0001312499999812644,
+          "callsPerFrame": 1024.0
+        },
+        "MeshClusterResidencyPrepare": {
+          "wallMs": 3.4700437500001216,
+          "runningMs": 3.444650000000726,
+          "readyMs": 0.025393749999995663,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1025.0
+        },
+        "MeshPrepareStaticCache": {
+          "wallMs": 49.22543750000022,
+          "runningMs": 48.916837500006515,
+          "readyMs": 0.2996125000000731,
+          "waitingMs": 0.008987499999904003,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1025.0
+        },
+        "MeshPrepareTransformLookup": {
+          "wallMs": 3.9970812500000843,
+          "runningMs": 3.9673750000051893,
+          "readyMs": 0.02970625000001803,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1025.0
+        },
+        "MaterialSceneCameraPrepare": {
+          "wallMs": 3.5360749999999994,
+          "runningMs": 1.651093750000097,
+          "readyMs": 0.057006249999943734,
+          "waitingMs": 1.8278437499999072,
+          "unknownMs": 0.00013124999999902798,
+          "callsPerFrame": 1.0
+        },
+        "GeometryHistoryPrepare": {
+          "wallMs": 3.1329125000000007,
+          "runningMs": 1.247931250000132,
+          "readyMs": 0.057006249999943734,
+          "waitingMs": 1.8278437499999072,
+          "unknownMs": 0.00013124999999902798,
+          "callsPerFrame": 1.0
+        },
+        "GeometryOcclusionLayoutReuse": {
+          "wallMs": 0.0020749999999999996,
+          "runningMs": 0.002074999999969407,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 2.0
+        },
+        "GeometryHistoryCreate": {
+          "wallMs": 3.1018125000000007,
+          "runningMs": 1.2168312500001761,
+          "readyMs": 0.057006249999943734,
+          "waitingMs": 1.8278437499999072,
+          "unknownMs": 0.00013124999999902798,
+          "callsPerFrame": 1.0
+        },
+        "DX12CreateTexture": {
+          "wallMs": 2.9686999999999992,
+          "runningMs": 1.0837687500001287,
+          "readyMs": 0.057006249999943734,
+          "waitingMs": 1.8278437499999072,
+          "unknownMs": 8.125000000092086e-05,
+          "callsPerFrame": 5.0
+        },
+        "MaterialSceneCameraDispatch": {
+          "wallMs": 0.06153749999999999,
+          "runningMs": 0.059143750000039574,
+          "readyMs": 0.002393749999999528,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneDrawBindingsJoin": {
+          "wallMs": 0.01380625,
+          "runningMs": 0.012437500000025636,
+          "readyMs": 0.0013687500000010289,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneJoinAssist": {
+          "wallMs": 0.051400000000000015,
+          "runningMs": 0.05003125000001063,
+          "readyMs": 0.0013687500000010289,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 5.0
+        },
+        "MaterialSceneDrawsPrepare": {
+          "wallMs": 8.38770625,
+          "runningMs": 8.361681249999975,
+          "readyMs": 0.02051249999999527,
+          "waitingMs": 0.005349999999989308,
+          "unknownMs": 0.00016250000000184173,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneDrawPrepare": {
+          "wallMs": 7.787056250000171,
+          "runningMs": 7.764175000005999,
+          "readyMs": 0.01741250000002026,
+          "waitingMs": 0.005349999999989308,
+          "unknownMs": 0.00011874999999861302,
+          "callsPerFrame": 1024.0
+        },
+        "MaterialSceneDrawChunks": {
+          "wallMs": 6.214968750000029,
+          "runningMs": 6.19585000000929,
+          "readyMs": 0.013650000000012597,
+          "waitingMs": 0.005349999999989308,
+          "unknownMs": 0.00011874999999861302,
+          "callsPerFrame": 1024.0
+        },
+        "MaterialSceneChunkRecordUpload": {
+          "wallMs": 3.74741250000005,
+          "runningMs": 3.73052500000383,
+          "readyMs": 0.01153749999999576,
+          "waitingMs": 0.005349999999989308,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1024.0
+        },
+        "MaterialSceneGeometryPublish": {
+          "wallMs": 0.20761875,
+          "runningMs": 0.2076187500000195,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "SceneBufferPoolAcquire": {
+          "wallMs": 0.07365625000000009,
+          "runningMs": 0.07365625000008436,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 11.0
+        },
+        "SceneBufferPoolLookup": {
+          "wallMs": 0.04041874999999999,
+          "runningMs": 0.04041874999999706,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 11.0
+        },
+        "SceneBufferPoolAcquireLock": {
+          "wallMs": 0.009006250000000007,
+          "runningMs": 0.009006249999828242,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 11.0
+        },
+        "SceneBufferPoolReuse": {
+          "wallMs": 0.0,
+          "runningMs": 0.0,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 14.0
+        },
+        "MaterialSceneCameraJoin": {
+          "wallMs": 0.01751875,
+          "runningMs": 0.01751875000006109,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneSurfaceStagesPrepare": {
+          "wallMs": 2.00065,
+          "runningMs": 1.9953437499999573,
+          "readyMs": 0.005306249999975421,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneShadowSetupJoin": {
+          "wallMs": 0.014068750000000001,
+          "runningMs": 0.014068749999982089,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneIndirectCommandsPrepare": {
+          "wallMs": 10.456112499999998,
+          "runningMs": 10.424731250000058,
+          "readyMs": 0.029943749999986835,
+          "waitingMs": 0.0014374999999944293,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneIndirectPrepare": {
+          "wallMs": 10.423643750000002,
+          "runningMs": 10.392262499999987,
+          "readyMs": 0.029943749999986835,
+          "waitingMs": 0.0014374999999944293,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialScenePacketGroupsPrepare": {
+          "wallMs": 0.7983062500000003,
+          "runningMs": 0.7958375000000188,
+          "readyMs": 0.00246874999999136,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 3.0
+        },
+        "MaterialScenePacketGroups.Reuse": {
+          "wallMs": 0.0,
+          "runningMs": 0.0,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 3.0
+        },
+        "SceneBufferPoolReturn": {
+          "wallMs": 0.09430624999999969,
+          "runningMs": 0.09430625000013748,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 22.0
+        },
+        "SceneBufferPoolReturnLock": {
+          "wallMs": 0.01691249999999998,
+          "runningMs": 0.01691250000039446,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 22.0
+        },
+        "MaterialSceneTilePacketPrepare": {
+          "wallMs": 0.37595625000000005,
+          "runningMs": 0.3722249999999896,
+          "readyMs": 0.0022937500000068667,
+          "waitingMs": 0.0014374999999944293,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialPacketPlanReuse": {
+          "wallMs": 0.0,
+          "runningMs": 0.0,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialScenePacketPlanUpload": {
+          "wallMs": 0.00313125,
+          "runningMs": 0.003131250000055985,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialScenePacketOutputBindings": {
+          "wallMs": 0.012537499999999998,
+          "runningMs": 0.011600000000029809,
+          "readyMs": 0.0009374999999920419,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneShadowJoin": {
+          "wallMs": 0.0024125,
+          "runningMs": 0.002412500000001927,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialScenePacketJoin": {
+          "wallMs": 0.015037499999999999,
+          "runningMs": 0.01503750000002313,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialSceneFinalizePrepare": {
+          "wallMs": 1.005825,
+          "runningMs": 1.0054375000000206,
+          "readyMs": 0.00038749999998799467,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialPassReadPlanAcquire": {
+          "wallMs": 0.8114250000000001,
+          "runningMs": 0.8110374999999657,
+          "readyMs": 0.00038749999998799467,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialPassReadPlanBuild": {
+          "wallMs": 0.8080375000000002,
+          "runningMs": 0.8076500000000166,
+          "readyMs": 0.00038749999998799467,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialScenePublishAndRelease": {
+          "wallMs": 2.59176875,
+          "runningMs": 1.4173875000003697,
+          "readyMs": 0.1220312499998677,
+          "waitingMs": 1.0523499999998016,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialFrameRetirement": {
+          "wallMs": 0.016206250000000002,
+          "runningMs": 0.01620624999999265,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        },
+        "MaterialFrameReplace": {
+          "wallMs": 2.26210625,
+          "runningMs": 1.087725000000347,
+          "readyMs": 0.1220312499998677,
+          "waitingMs": 1.0523499999998016,
+          "unknownMs": 0.0,
+          "callsPerFrame": 1.0
+        }
+      }
+    }
+  ],
+  "source": "analysis.json and timeline/after-*-on.json; no new capture",
+  "gpuTimestampCollected": false,
+  "allThreadWorkAndExclusiveGaps": [
+    {
+      "case": "same",
+      "frames": 16,
+      "sourceIdentities": [
+        {
+          "name": "after-same-a-on",
+          "nativeSha256": "86bec09ded4083fc40e75ccf9bf9b3bea0b91ae328e0fd0485d690fb21b8db77",
+          "etwSource": "after-same-a-on\\kernel.etl"
+        },
+        {
+          "name": "after-same-b-on",
+          "nativeSha256": "df6a4cff002dfef8c9377c96921a60701d4ca0b4f2e747b35b09dd72cc77f49f",
+          "etwSource": "after-same-b-on\\kernel.etl"
+        }
+      ],
+      "scopes": {
+        "MaterialSceneDrawBindingsJoin": {
+          "callsPerFrame": 1.0,
+          "wallMs": 0.01571875,
+          "unknownMs": 0.0,
+          "runningMs": 0.014943750000039557,
+          "readyMs": 0.0007749999999973056,
+          "waitingMs": 0.0,
+          "terminatedMs": 0.0
+        },
+        "MaterialSceneCameraJoin": {
+          "callsPerFrame": 1.0,
+          "wallMs": 0.022143749999999997,
+          "unknownMs": 0.0,
+          "runningMs": 0.022043750000012352,
+          "readyMs": 9.999999999976694e-05,
+          "waitingMs": 0.0,
+          "terminatedMs": 0.0
+        },
+        "MaterialSceneShadowJoin": {
+          "callsPerFrame": 1.0,
+          "wallMs": 0.0028312500000000004,
+          "unknownMs": 0.0,
+          "runningMs": 0.0028312499999874063,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "terminatedMs": 0.0
+        },
+        "MaterialScenePacketJoin": {
+          "callsPerFrame": 1.0,
+          "wallMs": 0.0187,
+          "unknownMs": 0.0,
+          "runningMs": 0.018700000000006156,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "terminatedMs": 0.0
+        },
+        "MaterialSceneDrawBindingsTask": {
+          "callsPerFrame": 1.0,
+          "wallMs": 15.734787500000001,
+          "unknownMs": 0.0,
+          "runningMs": 15.721062499999995,
+          "readyMs": 0.012025000000019048,
+          "waitingMs": 0.0016999999999853799,
+          "terminatedMs": 0.0
+        },
+        "MaterialSceneDrawBindingsPrepare": {
+          "callsPerFrame": 1024.0,
+          "wallMs": 15.077950000001003,
+          "unknownMs": 0.0,
+          "runningMs": 15.066068749998905,
+          "readyMs": 0.010493750000017066,
+          "waitingMs": 0.0013875000000069804,
+          "terminatedMs": 0.0
+        },
+        "MaterialSceneCameraVisibilityTask": {
+          "callsPerFrame": 1.0,
+          "wallMs": 5.147687500000001,
+          "unknownMs": 0.0,
+          "runningMs": 5.1370249999999995,
+          "readyMs": 0.010662499999975594,
+          "waitingMs": 0.0,
+          "terminatedMs": 0.0
+        },
+        "MaterialScenePacketTask": {
+          "callsPerFrame": 2.0,
+          "wallMs": 0.5231312499999999,
+          "unknownMs": 0.0,
+          "runningMs": 0.4891687500000348,
+          "readyMs": 0.012881249999972866,
+          "waitingMs": 0.02108124999997152,
+          "terminatedMs": 0.0
+        },
+        "MaterialScenePacketPrepare": {
+          "callsPerFrame": 2.0,
+          "wallMs": 0.49314375,
+          "unknownMs": 0.0,
+          "runningMs": 0.45918125000002874,
+          "readyMs": 0.012881249999972866,
+          "waitingMs": 0.02108124999997152,
+          "terminatedMs": 0.0
+        }
+      },
+      "exclusiveUninstrumented": {
+        "MaterialSceneIndirectPrepare": {
+          "wallMs": 10.413612499999795,
+          "unknownMs": 0.0,
+          "runningMs": 10.362868749999814,
+          "readyMs": 0.05074374999998099,
+          "waitingMs": 0.0,
+          "terminatedMs": 0.0
+        },
+        "MaterialFrameReplace": {
+          "wallMs": 2.24000624999986,
+          "unknownMs": 0.0,
+          "runningMs": 1.1433062499998368,
+          "readyMs": 0.09619374999998337,
+          "waitingMs": 1.00050625000004,
+          "terminatedMs": 0.0
+        }
+      },
+      "cacheEventsPerFrame": {
+        "MaterialScenePacketRecords.Reuse": 2.0,
+        "MaterialPacketPlanReuse": 3.0,
+        "MaterialScenePacketGroups.Reuse": 3.0
+      }
+    },
+    {
+      "case": "distinct",
+      "frames": 16,
+      "sourceIdentities": [
+        {
+          "name": "after-distinct-a-on",
+          "nativeSha256": "f0b8163ace52e0f98c343287c99098aba69cc8a1c3e72fa60ddfb14a69d23853",
+          "etwSource": "after-distinct-a-on\\kernel.etl"
+        },
+        {
+          "name": "after-distinct-b-on",
+          "nativeSha256": "d1356a2867252a189e8601ac6e3bb39f23509916accdf65e86d9aa4d2d4a54cc",
+          "etwSource": "after-distinct-b-on\\kernel.etl"
+        }
+      ],
+      "scopes": {
+        "MaterialSceneDrawBindingsJoin": {
+          "callsPerFrame": 1.0,
+          "wallMs": 0.01380625,
+          "unknownMs": 0.0,
+          "runningMs": 0.012437500000025636,
+          "readyMs": 0.0013687500000010289,
+          "waitingMs": 0.0,
+          "terminatedMs": 0.0
+        },
+        "MaterialSceneCameraJoin": {
+          "callsPerFrame": 1.0,
+          "wallMs": 0.01751875,
+          "unknownMs": 0.0,
+          "runningMs": 0.01751875000006109,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "terminatedMs": 0.0
+        },
+        "MaterialSceneShadowJoin": {
+          "callsPerFrame": 1.0,
+          "wallMs": 0.0024125,
+          "unknownMs": 0.0,
+          "runningMs": 0.002412500000001927,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "terminatedMs": 0.0
+        },
+        "MaterialScenePacketJoin": {
+          "callsPerFrame": 1.0,
+          "wallMs": 0.015037499999999999,
+          "unknownMs": 0.0,
+          "runningMs": 0.01503750000002313,
+          "readyMs": 0.0,
+          "waitingMs": 0.0,
+          "terminatedMs": 0.0
+        },
+        "MaterialSceneDrawBindingsTask": {
+          "callsPerFrame": 1.0,
+          "wallMs": 14.83030625,
+          "unknownMs": 0.0,
+          "runningMs": 14.809849999999992,
+          "readyMs": 0.02025000000004873,
+          "waitingMs": 0.00020624999999085958,
+          "terminatedMs": 0.0
+        },
+        "MaterialSceneDrawBindingsPrepare": {
+          "callsPerFrame": 1024.0,
+          "wallMs": 14.217056250001574,
+          "unknownMs": 0.0,
+          "runningMs": 14.196599999997295,
+          "readyMs": 0.02025000000004873,
+          "waitingMs": 0.00020624999999085958,
+          "terminatedMs": 0.0
+        },
+        "MaterialScenePacketTask": {
+          "callsPerFrame": 2.0,
+          "wallMs": 0.40831249999999997,
+          "unknownMs": 0.0,
+          "runningMs": 0.3951875000000733,
+          "readyMs": 0.006356250000060015,
+          "waitingMs": 0.006768750000006207,
+          "terminatedMs": 0.0
+        },
+        "MaterialScenePacketPrepare": {
+          "callsPerFrame": 2.0,
+          "wallMs": 0.379725,
+          "unknownMs": 0.0,
+          "runningMs": 0.366600000000016,
+          "readyMs": 0.006356250000060015,
+          "waitingMs": 0.006768750000006207,
+          "terminatedMs": 0.0
+        },
+        "MaterialSceneCameraVisibilityTask": {
+          "callsPerFrame": 1.0,
+          "wallMs": 4.1151125,
+          "unknownMs": 0.0,
+          "runningMs": 4.112343750000047,
+          "readyMs": 0.0017874999999776264,
+          "waitingMs": 0.0009812499999952706,
+          "terminatedMs": 0.0
+        }
+      },
+      "exclusiveUninstrumented": {
+        "MaterialSceneIndirectPrepare": {
+          "wallMs": 9.20184374999993,
+          "unknownMs": 0.0,
+          "runningMs": 9.176662499999942,
+          "readyMs": 0.02518124999998861,
+          "waitingMs": 0.0,
+          "terminatedMs": 0.0
+        },
+        "MaterialFrameReplace": {
+          "wallMs": 2.19788749999989,
+          "unknownMs": 0.0,
+          "runningMs": 1.0235062500002208,
+          "readyMs": 0.1220312499998677,
+          "waitingMs": 1.0523499999998016,
+          "terminatedMs": 0.0
+        }
+      },
+      "cacheEventsPerFrame": {
+        "MaterialScenePacketRecords.Reuse": 2.0,
+        "MaterialPacketPlanReuse": 3.0,
+        "MaterialScenePacketGroups.Reuse": 3.0
+      }
+    }
+  ],
+  "findings": {
+    "requestCache": {
+      "callsPerFrame": 1025,
+      "missScopesPerFrame": 1024,
+      "maxEntries": 1024,
+      "workingSetWithPreviousWorld": 1025,
+      "eviction": "full min_element scan"
+    },
+    "staticCache": {
+      "classificationBeforeLookup": true,
+      "sharedPoolTickAlreadyOncePerRecording": true,
+      "hitRecordsAppendDuplicateOwner": true
+    },
+    "history": {
+      "texturesCreatedPerFrame": 5,
+      "fixtureDeclaresHistory": false,
+      "unrecordedHistoryReturnedReusable": false
+    },
+    "excluded": [
+      "MaterialSceneInputSeal",
+      "MaterialMeshPlanForScene"
+    ],
+    "runningDefinition": "CPU residency; includes allocator, cache and lock implementation work; DPC not separately collected"
+  }
+}

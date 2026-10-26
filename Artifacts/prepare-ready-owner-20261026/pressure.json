@@ -1,0 +1,1 @@
+{"schema":1,"pressureThreads":8,"pressurePriorityRelative":2,"burstMs":300,"samples":[{"games":false,"signalToHandlerMs":262.937},{"games":true,"signalToHandlerMs":0.0115},{"games":true,"signalToHandlerMs":0.0101},{"games":false,"signalToHandlerMs":173.1}],"priorityRestored":true}

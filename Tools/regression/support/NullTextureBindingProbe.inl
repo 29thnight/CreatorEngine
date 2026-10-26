@@ -1,8 +1,3 @@
-#if defined(CE_CONTRACT_STANDALONE)
-#include "../../build/ModuleAdapters/Creator.Core.Paths.h"
-#else
-import Creator.Core.Paths;
-#endif
 // material_mesh_surface_probe.cpp의 익명 namespace 안에서 포함한다.
 void VerifyNullTextureBindings(const std::filesystem::path& requestedRoot)
 {

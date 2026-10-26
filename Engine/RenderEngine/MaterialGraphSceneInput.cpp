@@ -23,6 +23,17 @@ namespace material_graph
             return false;
         }
 
+        bool MatchesMeshDescriptor(const assets::ModelMeshHandle& handle, const assets::ModelMeshDescriptor& descriptor)
+        {
+            const auto& origin = descriptor.origin;
+            // Compare the exact MakeModelMeshHandle value without allocating its blob owner.
+            return handle.modelId == uuid::uuid16{} && handle.generation == 0 &&
+                   handle.domain == assets::ModelMeshDomain::Granular && handle.meshId == descriptor.meshId &&
+                   handle.asset == origin.entry.asset && handle.Blob() == origin.blob &&
+                   handle.resolverRevision == origin.resolverRevision && handle.mountId == origin.mountId.value &&
+                   handle.assetSetId == origin.assetSetId && handle.manifestRevision == origin.manifestRevision;
+        }
+
         bool Finite(std::span<const float> values)
         {
             return std::ranges::all_of(values,
@@ -102,9 +113,12 @@ namespace material_graph
             return Fail(error,
                         "Scene graph input needs an identified frame/view, invertible finite camera and draw budget.");
         }
-        if (!enhanced_draw::ValidateGeometryIdentities(draws, error))
         {
-            return false;
+            ce::profile_scope identityProfile{ce::marker<"MaterialSceneSealGeometryIdentities">()};
+            if (!enhanced_draw::ValidateGeometryIdentities(draws, error))
+            {
+                return false;
+            }
         }
         // Asset identity and draw ordering do not distinguish independently
         // moving objects. Reject ambiguous correspondence instead of selecting
@@ -237,55 +251,57 @@ namespace material_graph
                 return Fail(error, "Scene draw has a non-finite sorting depth.");
             }
             input.mesh = geometry.handle;
-            if (geometry.handle.domain == assets::ModelMeshDomain::Granular)
             {
-                if (!candidate->modelPins_ || (!geometry.StreamMetadata() && !geometryPins))
+                ce::profile_scope pinProfile{ce::marker<"MaterialSceneSealPinValidation">()};
+                if (geometry.handle.domain == assets::ModelMeshDomain::Granular)
                 {
-                    return Fail(error, "Scene graph granular geometry needs descriptor and CPU-use pin tables.");
-                }
-                const auto& pins = candidate->modelPins_->meshes;
-                const auto pin =
-                    std::ranges::find_if(pins, [&](const auto& owner)
-                                         { return owner && assets::MakeModelMeshHandle(*owner) == input.mesh; });
-                if (pin == pins.end() || &**pin != geometry.sourceDescriptor)
-                {
-                    return Fail(error, "Scene graph descriptor has no exact owner in its frame pin table.");
-                }
-                if (const auto* stream = geometry.StreamMetadata())
-                {
-                    if (stream != (*pin)->streamMetadata.operator->())
+                    if (!candidate->modelPins_ || (!geometry.StreamMetadata() && !geometryPins))
                     {
-                        return Fail(error, "Scene graph thin metadata has no exact descriptor provenance.");
+                        return Fail(error, "Scene graph granular geometry needs descriptor and CPU-use pin tables.");
                     }
+                    const auto& pins = candidate->modelPins_->meshes;
+                    const auto pin = std::ranges::find_if(
+                        pins, [&](const auto& owner) { return owner && MatchesMeshDescriptor(input.mesh, *owner); });
+                    if (pin == pins.end() || &**pin != geometry.sourceDescriptor)
+                    {
+                        return Fail(error, "Scene graph descriptor has no exact owner in its frame pin table.");
+                    }
+                    if (const auto* stream = geometry.StreamMetadata())
+                    {
+                        if (stream != (*pin)->streamMetadata.operator->())
+                        {
+                            return Fail(error, "Scene graph thin metadata has no exact descriptor provenance.");
+                        }
+                    }
+                    else
+                    {
+                        const auto payload = std::ranges::find_if(geometryPins->entries, [&](const auto& entry)
+                                                                  { return entry.handle == input.mesh; });
+                        if (payload == geometryPins->entries.end() || !payload->payload ||
+                            &*payload->payload != geometry.sourcePayload || !payload->payload->Matches(**pin) ||
+                            geometry.SourceMesh() != &payload->payload->mesh)
+                        {
+                            return Fail(error,
+                                        "Scene graph geometry has no exact CPU payload provenance in its pin tables.");
+                        }
+                    }
+                    input.modelPinIndex = static_cast<std::size_t>(pin - pins.begin());
                 }
                 else
                 {
-                    const auto payload = std::ranges::find_if(geometryPins->entries, [&](const auto& entry)
-                                                              { return entry.handle == input.mesh; });
-                    if (payload == geometryPins->entries.end() || !payload->payload ||
-                        &*payload->payload != geometry.sourcePayload || !payload->payload->Matches(**pin) ||
-                        geometry.SourceMesh() != &payload->payload->mesh)
+                    input.model = {geometry.handle.modelId, geometry.handle.generation};
+                    if (candidate->modelPins_)
                     {
-                        return Fail(error,
-                                    "Scene graph geometry has no exact CPU payload provenance in its pin tables.");
+                        const auto& pins = candidate->modelPins_->generations;
+                        const auto pin = std::ranges::find_if(pins, [&](const auto& owner)
+                                                              { return owner && owner->Handle() == input.model; });
+                        if (pin == pins.end())
+                        {
+                            return Fail(error,
+                                        "Scene graph geometry has no exact model generation in its frame pin table.");
+                        }
+                        input.modelPinIndex = static_cast<std::size_t>(pin - pins.begin());
                     }
-                }
-                input.modelPinIndex = static_cast<std::size_t>(pin - pins.begin());
-            }
-            else
-            {
-                input.model = {geometry.handle.modelId, geometry.handle.generation};
-                if (candidate->modelPins_)
-                {
-                    const auto& pins = candidate->modelPins_->generations;
-                    const auto pin = std::ranges::find_if(pins, [&](const auto& owner)
-                                                          { return owner && owner->Handle() == input.model; });
-                    if (pin == pins.end())
-                    {
-                        return Fail(error,
-                                    "Scene graph geometry has no exact model generation in its frame pin table.");
-                    }
-                    input.modelPinIndex = static_cast<std::size_t>(pin - pins.begin());
                 }
             }
             input.materialSlot = draw.materialGraphSlot;

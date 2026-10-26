@@ -1,0 +1,26 @@
+[
+  {
+    "exitCode": 0,
+    "passed": true,
+    "missingMarkers": [],
+    "timedOut": false,
+    "gpuValidationCoverageNotices": 0,
+    "mode": "--cluster-streaming-only"
+  },
+  {
+    "exitCode": 0,
+    "passed": true,
+    "missingMarkers": [],
+    "timedOut": false,
+    "gpuValidationCoverageNotices": 0,
+    "mode": "--shadow-correctness-only"
+  },
+  {
+    "exitCode": 0,
+    "passed": true,
+    "missingMarkers": [],
+    "timedOut": false,
+    "gpuValidationCoverageNotices": 0,
+    "mode": "--skinned-cluster-lod-only"
+  }
+]

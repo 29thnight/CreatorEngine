@@ -1,0 +1,48 @@
+{
+  "schema": 1,
+  "passed": true,
+  "identicalTimedMarkers": true,
+  "exactSealQpcBoundaries": true,
+  "evidence": [
+    {
+      "name": "before-same-a-on",
+      "frames": 8,
+      "sealCalls": 1,
+      "identityValidationCalls": 1,
+      "pinValidationCalls": 1024,
+      "planCalls": 1024,
+      "requestMisses": 0,
+      "readbackCreates": 0
+    },
+    {
+      "name": "after-same-a-on",
+      "frames": 8,
+      "sealCalls": 1,
+      "identityValidationCalls": 1,
+      "pinValidationCalls": 1024,
+      "planCalls": 1024,
+      "requestMisses": 0,
+      "readbackCreates": 0
+    },
+    {
+      "name": "after-same-b-on",
+      "frames": 8,
+      "sealCalls": 1,
+      "identityValidationCalls": 1,
+      "pinValidationCalls": 1024,
+      "planCalls": 1024,
+      "requestMisses": 0,
+      "readbackCreates": 0
+    },
+    {
+      "name": "before-same-b-on",
+      "frames": 8,
+      "sealCalls": 1,
+      "identityValidationCalls": 1,
+      "pinValidationCalls": 1024,
+      "planCalls": 1024,
+      "requestMisses": 0,
+      "readbackCreates": 0
+    }
+  ]
+}

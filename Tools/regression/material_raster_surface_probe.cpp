@@ -26,6 +26,9 @@ import Creator.Core.DynamicBitset;
 #include "RHI/RHIModelMeshletUpload.h"
 #include "RHI/RHISharedSparsePagePool.h"
 #include "material_owner_checks.h"
+#include "../../Engine/EngineDiagnostics/ProfileService.h"
+#include "../../Engine/EngineDiagnostics/ProfileScope.h"
+#include "../../Engine/EngineDiagnostics/ProfileCaptureFile.h"
 #include "MaterialGraphRasterSurface.h"
 #include "Render/Passes/Geometry/EnhancedShadowPass.h"
 #include "Render/Graph/ShadowCasterBounds.h"
@@ -33,6 +36,7 @@ import Creator.Core.DynamicBitset;
 #include "support/CookedMeshFixture.h"
 #include "MaterialGraphSceneInput.h"
 #include "MaterialGraphSceneHost.h"
+#include "RenderThreadScheduling.h"
 #include "MaterialGraphSceneAccess.h"
 #include "MaterialGraphIndirectBatch.h"
 #include "MaterialGraphSceneCompiler.h"
@@ -534,6 +538,7 @@ CookedMeshLibrary cookedMeshes;
 bool SealScene(const SceneInputView& view, std::span<const EnhancedDrawItem> draws, const SceneInputBudget& budget,
                own::shared_owner<const SceneViewInput>& result, std::string& error, const SceneViewInput* previous = nullptr)
 {
+    ce::profile_scope fixtureProfile{ce::marker<"GeometryScaleFixtureSeal">()};
     std::vector<EnhancedDrawItem> cooked(draws.begin(), draws.end());
     for (auto& draw : cooked)
         Check(cookedMeshes.Resolve(draw.modelMeshView, draw.modelMeshView, error), "Fixture meshlet cooking " + error);
@@ -1141,6 +1146,78 @@ void RunSceneInputFailures(const std::array<own::shared_owner<const Instance>, 2
     std::string error;
     const bool sealed = SealScene(view, {&draw, 1}, {}, accepted, error);
     Check(sealed, "Scene input seal " + error);
+    {
+        auto pinnedDraw = draw;
+        Check(cookedMeshes.Resolve(draw.modelMeshView, pinnedDraw.modelMeshView, error), "Seal pin regression cook");
+        auto pins = own::make_shared<assets::ModelAssetGenerationPins>();
+        assets::ModelGeometryPreparationPins payloadPins;
+        cookedMeshes.Pin(std::span(&pinnedDraw, 1), *pins, payloadPins);
+        own::shared_owner<const SceneViewInput> pinned;
+        Check(SceneViewInput::Seal(view, {&pinnedDraw, 1}, {}, pinned, error, pins, {}, &payloadPins),
+              "Exact descriptor values seal");
+        auto equivalent = pinnedDraw;
+        equivalent.modelMeshView.handle.blob =
+            own::make_shared<const experiment::cooked::AssetBlobRecord>(equivalent.modelMeshView.handle.Blob());
+        Check(SceneViewInput::Seal(view, {&equivalent, 1}, {}, pinned, error, pins, {}, &payloadPins),
+              "Equal blob values with distinct owners seal");
+        for (unsigned field = 0; field < 10; ++field)
+        {
+            auto invalid = pinnedDraw;
+            auto& handle = invalid.modelMeshView.handle;
+            switch (field)
+            {
+            case 0:
+                handle.modelId = handle.meshId;
+                break;
+            case 1:
+                ++handle.generation;
+                break;
+            case 2:
+                ++handle.resolverRevision;
+                break;
+            case 3:
+                ++handle.mountId;
+                break;
+            case 4:
+                ++handle.manifestRevision;
+                break;
+            case 5:
+                handle.assetSetId.value = handle.meshId;
+                break;
+            default:
+            {
+                auto blob = own::make_shared<experiment::cooked::AssetBlobRecord>(handle.Blob());
+                if (field == 6)
+                {
+                    ++blob->byteSize;
+                }
+                if (field == 7)
+                {
+                    ++blob->representation;
+                }
+                if (field == 8)
+                {
+                    blob->artifactPath += ".mismatch";
+                }
+                if (field == 9)
+                {
+                    blob->contentSha256[0] ^= 1;
+                }
+                handle.blob = std::move(blob);
+                break;
+            }
+            }
+            pinned.reset();
+            Check(!SceneViewInput::Seal(view, {&invalid, 1}, {}, pinned, error, pins, {}, &payloadPins) && !pinned,
+                  "Changed full descriptor identity is rejected " + std::to_string(field));
+        }
+        auto nextView = view;
+        ++nextView.frameId;
+        Check(SceneViewInput::Seal(nextView, {&pinnedDraw, 1}, {}, pinned, error, pins, {}, &payloadPins),
+              "Seal scratch is reusable after rejection");
+        std::cout << "METEOR_SEAL_PIN_VALUES_OK mismatches=10 equalBlobOwner=1 scratchReuse=1\n";
+    }
+
     {
         std::array historyDraws{draw, draw};
         historyDraws[0].temporalObjectId = 101;
@@ -4323,6 +4400,7 @@ void RunMeshletDispatchBoundaries(RecordingChangeDevice& device, ProbeRoots& roo
 #include "support/HybridVisibilityProbe.inl"
 #include "support/ColdGeometryProbe.inl"
 #include "support/ObjectSpaceInstanceProbe.inl"
+#include "support/GeometryPreparationScaleProbe.inl"
 #include "support/SkinLodErrorProbe.inl"
 #include "support/ClusterLodProbe.inl"
 #include "support/ShadowCorrectnessProbe.inl"
@@ -4333,6 +4411,11 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
 #ifdef LX_PROBE_VULKAN
     RHIShaderCompiler::ScopedOutput nativeOutput(RHIShaderBinary::SpirV);
 #endif
+    if (mode == "--geometry-preparation-scale-only")
+    {
+        thread_pool::set_worker_hooks({{}, [](unsigned) { ce::profiler().unregister_thread(); },
+                                       [] { ce::profiler().publish_thread(); }});
+    }
     auto& preparationJobs = ce::get_job_scheduler();
     preparationJobs.start(4);
     struct PreparationDrain
@@ -4586,6 +4669,12 @@ void Run(const std::filesystem::path& root, std::string_view mode = {}, const st
         return;
     }
     if (mode == "--cluster-lod-only") { RunClusterLod(device, roots, pipelines, textures, pool, instances[0]); ShutdownNative(device, roots, pipelines, textures, pool); return; }
+    if (mode == "--geometry-preparation-scale-only")
+    {
+        RunGeometryPreparationScale(device, roots, pipelines, textures, pool, recordingJobs, instances[0]);
+        ShutdownNative(device, roots, pipelines, textures, pool);
+        return;
+    }
     if (mode == "--object-space-dx12-only")
     {
         RunObjectSpaceInstances(device, roots, pipelines, textures, pool, false, RHIShaderBinary::Dxil);
@@ -5288,6 +5377,7 @@ int main(int argc, char** argv)
                     std::string_view(argv[2]) == "--skinned-cluster-lod-only" ||
                     std::string_view(argv[2]) == "--cluster-lod-only" ||
                     std::string_view(argv[2]) == "--object-space-only" ||
+                    std::string_view(argv[2]) == "--geometry-preparation-scale-only" ||
                     std::string_view(argv[2]) == "--object-space-dx12-only" ||
                     std::string_view(argv[2]) == "--hybrid-visibility-only" ||
                     std::string_view(argv[2]) == "--atomic-reduction-only" ||

@@ -1,0 +1,14 @@
+[
+  {
+    "case": "same",
+    "complete": true,
+    "losses": {},
+    "creationScopes": 0
+  },
+  {
+    "case": "distinct",
+    "complete": true,
+    "losses": {},
+    "creationScopes": 0
+  }
+]

@@ -1,0 +1,18 @@
+[
+  {
+    "timedOut": false,
+    "exitCode": 0,
+    "gpuValidationCoverageNotices": 0,
+    "mode": "--cluster-streaming-only",
+    "passed": true,
+    "missingMarkers": []
+  },
+  {
+    "timedOut": false,
+    "exitCode": 0,
+    "gpuValidationCoverageNotices": 0,
+    "mode": "--shadow-correctness-only",
+    "passed": true,
+    "missingMarkers": []
+  }
+]

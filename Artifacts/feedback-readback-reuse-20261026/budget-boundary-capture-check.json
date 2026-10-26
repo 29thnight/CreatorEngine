@@ -1,0 +1,16 @@
+{
+  "passed": true,
+  "draws": 2049,
+  "measuredFrames": 4,
+  "creationScopes": 4,
+  "expectedPerFrame": 1,
+  "idleCapacity": 2048,
+  "complete": true,
+  "losses": {},
+  "actualPerFrame": [
+    1,
+    1,
+    1,
+    1
+  ]
+}

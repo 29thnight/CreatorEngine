@@ -1,0 +1,8 @@
+{
+  "passed": true,
+  "timedOut": false,
+  "mode": "--geometry-preparation-scale-only",
+  "missingMarkers": [],
+  "gpuValidationCoverageNotices": 0,
+  "exitCode": 0
+}

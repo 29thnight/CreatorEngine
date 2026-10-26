@@ -1,0 +1,151 @@
+{
+  "schema": 1,
+  "title": "기하 준비 연속 인덱스 · Debug 전후 ETW",
+  "report": "../index.html",
+  "datasets": [
+    {
+      "id": "before-same-a-on",
+      "variant": "before-same-a-on",
+      "mode": "etw",
+      "label": "변경 전 · 동일 1종 · A · 기록 ON",
+      "cpu": "before-same-a-on.json",
+      "gpu": "before-same-a-on-gpu.json",
+      "events": 175259
+    },
+    {
+      "id": "after-same-a-on",
+      "variant": "after-same-a-on",
+      "mode": "etw",
+      "label": "변경 후 · 동일 1종 · A · 기록 ON",
+      "cpu": "after-same-a-on.json",
+      "gpu": "after-same-a-on-gpu.json",
+      "events": 175259
+    },
+    {
+      "id": "after-same-b-on",
+      "variant": "after-same-b-on",
+      "mode": "etw",
+      "label": "변경 후 · 동일 1종 · B · 기록 ON",
+      "cpu": "after-same-b-on.json",
+      "gpu": "after-same-b-on-gpu.json",
+      "events": 175259
+    },
+    {
+      "id": "before-same-b-on",
+      "variant": "before-same-b-on",
+      "mode": "etw",
+      "label": "변경 전 · 동일 1종 · B · 기록 ON",
+      "cpu": "before-same-b-on.json",
+      "gpu": "before-same-b-on-gpu.json",
+      "events": 175259
+    },
+    {
+      "id": "before-same-a-off",
+      "variant": "before-same-a-off",
+      "mode": "etw",
+      "label": "변경 전 · 동일 1종 · A · 기록 OFF",
+      "cpu": "before-same-a-off.json",
+      "gpu": "before-same-a-off-gpu.json",
+      "events": 0
+    },
+    {
+      "id": "after-same-a-off",
+      "variant": "after-same-a-off",
+      "mode": "etw",
+      "label": "변경 후 · 동일 1종 · A · 기록 OFF",
+      "cpu": "after-same-a-off.json",
+      "gpu": "after-same-a-off-gpu.json",
+      "events": 0
+    },
+    {
+      "id": "after-same-b-off",
+      "variant": "after-same-b-off",
+      "mode": "etw",
+      "label": "변경 후 · 동일 1종 · B · 기록 OFF",
+      "cpu": "after-same-b-off.json",
+      "gpu": "after-same-b-off-gpu.json",
+      "events": 0
+    },
+    {
+      "id": "before-same-b-off",
+      "variant": "before-same-b-off",
+      "mode": "etw",
+      "label": "변경 전 · 동일 1종 · B · 기록 OFF",
+      "cpu": "before-same-b-off.json",
+      "gpu": "before-same-b-off-gpu.json",
+      "events": 0
+    },
+    {
+      "id": "before-distinct-a-on",
+      "variant": "before-distinct-a-on",
+      "mode": "etw",
+      "label": "변경 전 · 64종 · A · 기록 ON",
+      "cpu": "before-distinct-a-on.json",
+      "gpu": "before-distinct-a-on-gpu.json",
+      "events": 177779
+    },
+    {
+      "id": "after-distinct-a-on",
+      "variant": "after-distinct-a-on",
+      "mode": "etw",
+      "label": "변경 후 · 64종 · A · 기록 ON",
+      "cpu": "after-distinct-a-on.json",
+      "gpu": "after-distinct-a-on-gpu.json",
+      "events": 177779
+    },
+    {
+      "id": "after-distinct-b-on",
+      "variant": "after-distinct-b-on",
+      "mode": "etw",
+      "label": "변경 후 · 64종 · B · 기록 ON",
+      "cpu": "after-distinct-b-on.json",
+      "gpu": "after-distinct-b-on-gpu.json",
+      "events": 177779
+    },
+    {
+      "id": "before-distinct-b-on",
+      "variant": "before-distinct-b-on",
+      "mode": "etw",
+      "label": "변경 전 · 64종 · B · 기록 ON",
+      "cpu": "before-distinct-b-on.json",
+      "gpu": "before-distinct-b-on-gpu.json",
+      "events": 177779
+    },
+    {
+      "id": "before-distinct-a-off",
+      "variant": "before-distinct-a-off",
+      "mode": "etw",
+      "label": "변경 전 · 64종 · A · 기록 OFF",
+      "cpu": "before-distinct-a-off.json",
+      "gpu": "before-distinct-a-off-gpu.json",
+      "events": 0
+    },
+    {
+      "id": "after-distinct-a-off",
+      "variant": "after-distinct-a-off",
+      "mode": "etw",
+      "label": "변경 후 · 64종 · A · 기록 OFF",
+      "cpu": "after-distinct-a-off.json",
+      "gpu": "after-distinct-a-off-gpu.json",
+      "events": 0
+    },
+    {
+      "id": "after-distinct-b-off",
+      "variant": "after-distinct-b-off",
+      "mode": "etw",
+      "label": "변경 후 · 64종 · B · 기록 OFF",
+      "cpu": "after-distinct-b-off.json",
+      "gpu": "after-distinct-b-off-gpu.json",
+      "events": 0
+    },
+    {
+      "id": "before-distinct-b-off",
+      "variant": "before-distinct-b-off",
+      "mode": "etw",
+      "label": "변경 전 · 64종 · B · 기록 OFF",
+      "cpu": "before-distinct-b-off.json",
+      "gpu": "before-distinct-b-off-gpu.json",
+      "events": 0
+    }
+  ]
+}

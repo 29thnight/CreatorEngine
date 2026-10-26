@@ -264,7 +264,7 @@ namespace material_graph
         const own::shared_owner<const MeshSurfaceInput>& Input() const { return input_; }
         const SurfaceView& View() const override { return input_->View(); }
         std::uint32_t Count() const override { return count_; }
-        bool IsSampled() const { return !samples_.empty(); }
+        bool IsSampled() const { return samples_ && !samples_->empty(); }
         std::uint64_t RecordingId() const override { return recordingId_; }
         bool IsValidated() const override { return validated_; }
         bool IsReadyForEvaluation() const override
@@ -351,7 +351,7 @@ namespace material_graph
         mutable RHIResourceState bufferState_{RHIResourceState::Common};
         own::shared_owner<const MeshSurfaceInput> input_;
         own::shared_owner<const MeshSurfaceBatch> source_;
-        std::vector<MeshSurfaceSample> samples_;
+        own::unique_owner<std::vector<MeshSurfaceSample>> samples_;
         std::uint32_t count_{};
         std::uint64_t recordingId_{}, auditRealFrame_{}, auditView_{};
         std::uint64_t descriptorVersion_{};

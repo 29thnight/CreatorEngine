@@ -9,6 +9,7 @@ import Creator.Core.LifetimeToken;
 import Creator.Core.Ownership;
 #endif
 #include "RHISubmissionThread.h"
+#include "../RenderThreadScheduling.h"
 #include "../../EngineDiagnostics/ProfileScope.h"
 
 #include "IRHIDeviceResources.h"
@@ -273,6 +274,7 @@ struct RHISubmissionThread::Impl
 
     void RunPreparations()
     {
+        const ce::render::scheduling_scope scheduling{ce::render::thread_role::translation};
         ce::profiler().register_thread("[RHITranslation]", ce::track_kind::command_thread, 2);
         for (;;)
         {
@@ -439,6 +441,11 @@ struct RHISubmissionThread::Impl
 
     void Run()
     {
+        const ce::render::scheduling_scope scheduling{ce::render::thread_role::submission};
+        if (scheduling.error())
+        {
+            std::fprintf(stderr, "[RHI scheduling] Games registration failed error=%u\n", scheduling.error());
+        }
         ce::profiler().register_thread("[RHIThread]", ce::track_kind::command_thread, 1);
         {
             std::lock_guard lock(mutex);

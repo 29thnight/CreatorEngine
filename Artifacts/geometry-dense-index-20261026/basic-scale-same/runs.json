@@ -1,0 +1,10 @@
+{
+  "missingMarkers": [
+    "GEOMETRY_SCALE_OK"
+  ],
+  "exitCode": 1,
+  "mode": "--geometry-preparation-scale-only",
+  "timedOut": false,
+  "passed": false,
+  "gpuValidationCoverageNotices": 0
+}

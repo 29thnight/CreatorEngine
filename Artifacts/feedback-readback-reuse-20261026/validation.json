@@ -1,0 +1,465 @@
+{
+  "schema": 1,
+  "configuration": "Debug",
+  "sourceHead": "d6c79afa97aa51620c033cc5a5845068c19b3902",
+  "builds": {
+    "probePassed": true,
+    "editorPassed": true,
+    "logs": [
+      "after-build.log",
+      "editor-build.log"
+    ]
+  },
+  "basicDx12": {
+    "basic-same": {
+      "passed": true,
+      "configuration": "Debug",
+      "auditMode": null,
+      "auditRepeats": null,
+      "validationMode": "basic",
+      "sourceStable": true,
+      "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe",
+      "runs": [
+        {
+          "gpuValidationCoverageNotices": 0,
+          "mode": "--geometry-preparation-scale-only",
+          "passed": true,
+          "timedOut": false,
+          "missingMarkers": [],
+          "exitCode": 0
+        }
+      ],
+      "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine",
+      "gpuValidation": "off"
+    },
+    "basic-distinct": {
+      "validationMode": "basic",
+      "auditRepeats": null,
+      "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine",
+      "sourceStable": true,
+      "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe",
+      "runs": [
+        {
+          "passed": true,
+          "mode": "--geometry-preparation-scale-only",
+          "exitCode": 0,
+          "missingMarkers": [],
+          "gpuValidationCoverageNotices": 0,
+          "timedOut": false
+        }
+      ],
+      "passed": true,
+      "auditMode": null,
+      "configuration": "Debug",
+      "gpuValidation": "off"
+    },
+    "lifetime-regression": {
+      "gpuValidation": "off",
+      "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe",
+      "auditMode": null,
+      "runs": [
+        {
+          "timedOut": false,
+          "exitCode": 0,
+          "gpuValidationCoverageNotices": 0,
+          "mode": "--cluster-streaming-only",
+          "passed": true,
+          "missingMarkers": []
+        },
+        {
+          "timedOut": false,
+          "exitCode": 0,
+          "gpuValidationCoverageNotices": 0,
+          "mode": "--shadow-correctness-only",
+          "passed": true,
+          "missingMarkers": []
+        }
+      ],
+      "passed": true,
+      "auditRepeats": null,
+      "configuration": "Debug",
+      "sourceStable": true,
+      "validationMode": "basic",
+      "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine"
+    },
+    "budget-boundary": {
+      "sourceRoot": "C:\\Users\\lance\\source\\CreatorEngine",
+      "runs": [
+        {
+          "passed": true,
+          "missingMarkers": [],
+          "mode": "--geometry-preparation-scale-only",
+          "exitCode": 0,
+          "timedOut": false,
+          "gpuValidationCoverageNotices": 0
+        }
+      ],
+      "validationMode": "basic",
+      "sourceStable": true,
+      "probeExecutable": "C:\\Users\\lance\\source\\CreatorEngine\\Bin\\x64-Debug\\Tools\\MaterialRasterSurfaceProbe\\MaterialRasterSurfaceProbe.exe",
+      "gpuValidation": "off",
+      "auditRepeats": null,
+      "passed": true,
+      "auditMode": null,
+      "configuration": "Debug"
+    }
+  },
+  "gpuBasedValidation": false,
+  "sourceIdentities": [
+    {
+      "path": "Engine/RenderEngine/GpuGeometryVisibility.cpp",
+      "sha256": "35b77d61b303aec3439f1b1dfadc3b3e6f861e54a6137e86dcbdae8e7a0c6e79"
+    },
+    {
+      "path": "Engine/RenderEngine/MaterialGraphSceneHost.cpp",
+      "sha256": "25e977343fc25224694e381a329f85a376a66a4f1f7d7afed511f55a29b87b57"
+    },
+    {
+      "path": "Tools/regression/support/GeometryPreparationScaleProbe.inl",
+      "sha256": "19b6ef52d80963f5463b66b2cc662253ebb4a0bb94396083d9cbd408fd8dc0e2"
+    }
+  ],
+  "commonFixtureSha256": "19b6ef52d80963f5463b66b2cc662253ebb4a0bb94396083d9cbd408fd8dc0e2",
+  "sourceBeforeSha256": "58e8a504d31b3676ce7dbb5e692be7eb89e805b2a457fb82ac0d3a35c892a263",
+  "binarySha256": {
+    "before": "72e6874590952693e6a593ca33f22386c82f22d39179af8095ee3233dee80caa",
+    "after": "809d9e9c73cdc6e26224162675ec37844f7913b621e4a066f096e8b752f4d51a"
+  },
+  "reuseRegression": {
+    "schema": 1,
+    "passed": true,
+    "scenario": "1024 admitted draws, 1 or 64 immutable meshes",
+    "checks": "All threads, every measured frame, complete ON capture; OFF has no scope events",
+    "evidence": [
+      {
+        "name": "before-same-a-on",
+        "expectedPerFrame": 896,
+        "actualPerFrame": [
+          896,
+          896,
+          896,
+          896,
+          896,
+          896,
+          896,
+          896
+        ],
+        "createWallMsPerFrame": [
+          324.9437,
+          329.07309999999967,
+          235.12609999999995,
+          336.5038000000003,
+          213.04349999999982,
+          235.55539999999996,
+          237.96440000000024,
+          217.07439999999988
+        ]
+      },
+      {
+        "name": "after-same-a-on",
+        "expectedPerFrame": 0,
+        "actualPerFrame": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "createWallMsPerFrame": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "name": "after-same-b-on",
+        "expectedPerFrame": 0,
+        "actualPerFrame": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "createWallMsPerFrame": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "name": "before-same-b-on",
+        "expectedPerFrame": 896,
+        "actualPerFrame": [
+          896,
+          896,
+          896,
+          896,
+          896,
+          896,
+          896,
+          896
+        ],
+        "createWallMsPerFrame": [
+          306.8906,
+          244.08220000000009,
+          241.3751999999998,
+          243.39979999999994,
+          234.75700000000035,
+          248.04430000000022,
+          242.78129999999985,
+          216.50669999999985
+        ]
+      },
+      {
+        "name": "before-distinct-a-on",
+        "expectedPerFrame": 896,
+        "actualPerFrame": [
+          896,
+          896,
+          896,
+          896,
+          896,
+          896,
+          896,
+          896
+        ],
+        "createWallMsPerFrame": [
+          306.2493999999992,
+          243.86329999999995,
+          237.14659999999964,
+          265.8748999999999,
+          228.57329999999988,
+          229.9623,
+          237.08459999999985,
+          207.48460000000006
+        ]
+      },
+      {
+        "name": "after-distinct-a-on",
+        "expectedPerFrame": 0,
+        "actualPerFrame": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "createWallMsPerFrame": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "name": "after-distinct-b-on",
+        "expectedPerFrame": 0,
+        "actualPerFrame": [
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0,
+          0
+        ],
+        "createWallMsPerFrame": [
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "name": "before-distinct-b-on",
+        "expectedPerFrame": 896,
+        "actualPerFrame": [
+          896,
+          896,
+          896,
+          896,
+          896,
+          896,
+          896,
+          896
+        ],
+        "createWallMsPerFrame": [
+          293.6009000000001,
+          249.1755999999996,
+          227.90840000000009,
+          311.2767999999997,
+          263.5815999999999,
+          262.36379999999986,
+          313.70050000000055,
+          224.016
+        ]
+      }
+    ]
+  },
+  "budgetBoundary": {
+    "passed": true,
+    "draws": 2049,
+    "measuredFrames": 4,
+    "creationScopes": 4,
+    "expectedPerFrame": 1,
+    "idleCapacity": 2048,
+    "complete": true,
+    "losses": {},
+    "actualPerFrame": [
+      1,
+      1,
+      1,
+      1
+    ]
+  },
+  "traces": [
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "before-same-a-on"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "after-same-a-on"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "after-same-b-on"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "before-same-b-on"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "before-same-a-off"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "after-same-a-off"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "after-same-b-off"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "before-same-b-off"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "before-distinct-a-on"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "after-distinct-a-on"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "after-distinct-b-on"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "before-distinct-b-on"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "before-distinct-a-off"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "after-distinct-a-off"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "after-distinct-b-off"
+    },
+    {
+      "buffers": 0,
+      "events": 0,
+      "name": "before-distinct-b-off"
+    }
+  ],
+  "measurement": {
+    "runs": 16,
+    "warmupFramesPerRun": 8,
+    "measuredFramesPerRun": 8,
+    "totalMeasuredFrames": 128,
+    "totalWarmAndMeasuredFrames": 256,
+    "draws": 1024,
+    "uniqueMeshes": [
+      1,
+      64
+    ],
+    "visibleDraws": 1,
+    "recordingWorkers": 4,
+    "configurations": [
+      "ON",
+      "OFF"
+    ],
+    "order": "ABBA",
+    "estimator": "mean of two per-run medians",
+    "displayFps": false,
+    "synchronousGpuReadback": true
+  },
+  "lifetime": {
+    "unchangedCompletionLedger": true,
+    "noPendingBufferReturnedEarly": true,
+    "arenaBoundaryUnchanged": true,
+    "noGpuHandleInResettableArena": true
+  },
+  "idlePool": {
+    "payloadBudgetBytes": 8388608,
+    "accountingAlignmentBytes": 65536,
+    "storageBudgetBytes": 134217728,
+    "scope": "per visibility buffer pool, idle resources only",
+    "smallBufferCapacity": 2048,
+    "smallBufferWorkingSet1024Bytes": 67108864,
+    "oldSmallBufferRetentionBytes": 8388608,
+    "accountingIsProcessMemoryMeasurement": false
+  },
+  "wholeVerificationFrameReducedInAllConditions": true
+}

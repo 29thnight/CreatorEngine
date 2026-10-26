@@ -1,0 +1,26 @@
+[
+  {
+    "missingMarkers": [],
+    "exitCode": 0,
+    "timedOut": false,
+    "mode": "--object-space-dx12-only",
+    "gpuValidationCoverageNotices": 0,
+    "passed": true
+  },
+  {
+    "missingMarkers": [],
+    "exitCode": 0,
+    "timedOut": false,
+    "mode": "--hybrid-visibility-only",
+    "gpuValidationCoverageNotices": 0,
+    "passed": true
+  },
+  {
+    "missingMarkers": [],
+    "exitCode": 0,
+    "timedOut": false,
+    "mode": "--shadow-correctness-only",
+    "gpuValidationCoverageNotices": 0,
+    "passed": true
+  }
+]
