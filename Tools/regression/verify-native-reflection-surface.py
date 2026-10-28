@@ -14,6 +14,7 @@ import importlib.util
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -27,6 +28,27 @@ def require(condition: bool, message: str) -> None:
         raise RuntimeError(message)
 
 
+def diagnostic_excerpt(text: str) -> str:
+    lines = text.splitlines()
+    if len(lines) <= 160:
+        return text
+    # Keep setup context and the final summary, plus the first and last actual
+    # errors. A cascade of template diagnostics must not hide its first cause.
+    selected = set(range(40)) | set(range(len(lines) - 40, len(lines)))
+    errors = [index for index, line in enumerate(lines)
+              if re.search(r"\berror\b|\bFAILED:|\bTraceback\b", line, re.IGNORECASE)]
+    for index in errors[:3] + errors[-3:]:
+        selected.update(range(max(0, index - 3), min(len(lines), index + 10)))
+    excerpt: list[str] = []
+    previous = -1
+    for index in sorted(selected):
+        if index > previous + 1:
+            excerpt.append(f"... {index - previous - 1} log lines omitted; see the full artifact log ...")
+        excerpt.append(lines[index])
+        previous = index
+    return "\n".join(excerpt)
+
+
 def run(command: list[str], *, cwd: Path, log: Path) -> str:
     log.parent.mkdir(parents=True, exist_ok=True)
     log.with_suffix(log.suffix + ".command.json").write_text(json.dumps(command, indent=2), encoding="utf-8")
@@ -35,7 +57,7 @@ def run(command: list[str], *, cwd: Path, log: Path) -> str:
         result = subprocess.run(command, cwd=cwd, stdout=output, stderr=subprocess.STDOUT, text=True)
     text = log.read_text(encoding="utf-8", errors="replace")
     if result.returncode:
-        print("\n".join(text.splitlines()[-160:]), flush=True)
+        print(diagnostic_excerpt(text), flush=True)
         raise RuntimeError(f"{log.name} failed ({result.returncode}); full log: {log}")
     return text
 
@@ -126,7 +148,7 @@ def compiler_arguments(path: Path) -> list[str]:
 
 
 def compile_source(source: Path, arguments: list[str], *, engine: Path, work: Path,
-                   configuration: str, name: str, injections: list[Path] = ()) -> None:
+                   configuration: str, name: str, injections: list[Path] = ()) -> Path:
     output = work / "objects" / (name + ".obj")
     output.parent.mkdir(parents=True, exist_ok=True)
     flags = ["/nologo", "/c", "/EHsc", "/bigobj", "/utf-8", "/permissive-", "/Zc:__cplusplus",
@@ -138,6 +160,28 @@ def compile_source(source: Path, arguments: list[str], *, engine: Path, work: Pa
     response.write_text("\n".join(subprocess.list2cmdline([argument]) for argument in command), encoding="utf-8-sig")
     run(["cl.exe", "@" + str(response)], cwd=engine, log=work / "logs" / (name + ".log"))
     require(output.is_file() and output.stat().st_size > 0, f"Compiler did not create {output}.")
+    return output
+
+
+def compile_surfaces(engine: Path, work: Path, generated: dict[str, Path], configuration: str) -> list[dict]:
+    inputs = [(module + "-registration", directory / ("reflgen_" + module + ".cpp"),
+               directory / ("reflgen_" + module + ".args"), [])
+              for module, directory in generated.items()]
+    inputs.append(("ScriptReflectionBindings", engine / "Engine/SceneRuntime/ScriptReflectionBindings.cpp",
+                   generated["SceneRuntime"] / "reflgen_SceneRuntime.args",
+                   [directory / ("reflgen_" + module + ".h") for module, directory in generated.items()]))
+    results: list[dict] = []
+    for name, source, arguments, injections in inputs:
+        result = {"name": name, "source": str(source), "log": str(work / "logs" / (name + ".log"))}
+        try:
+            output = compile_source(source, compiler_arguments(arguments), engine=engine, work=work,
+                                    configuration=configuration, name=name, injections=injections)
+            result.update(status="success", object=output.name)
+        except RuntimeError as error:
+            result.update(status="failure", error=str(error))
+            print(f"SURFACE_SOURCE_FAILED {name}: {error}", flush=True)
+        results.append(result)
+    return results
 
 
 def main() -> None:
@@ -229,25 +273,22 @@ def main() -> None:
                for header in declaration["headers"] for record in header["classes"]}
     require(expected <= classes, "Generated descriptors omit components: " + str(sorted(expected - classes)))
 
-    for module, directory in generated.items():
-        arguments = compiler_arguments(directory / ("reflgen_" + module + ".args"))
-        compile_source(directory / ("reflgen_" + module + ".cpp"), arguments, engine=engine, work=work,
-                       configuration=args.configuration, name=module + "-registration")
-    scene_arguments = compiler_arguments(generated["SceneRuntime"] / "reflgen_SceneRuntime.args")
-    compile_source(engine / "Engine/SceneRuntime/ScriptReflectionBindings.cpp", scene_arguments,
-                   engine=engine, work=work, configuration=args.configuration, name="ScriptReflectionBindings",
-                   injections=[generated[module] / ("reflgen_" + module + ".h") for module in modules])
+    compilations = compile_surfaces(engine, work, generated, args.configuration)
+    failures = [item["name"] for item in compilations if item["status"] != "success"]
     result = {
-        "result": "NATIVE_REFLECTION_SURFACE_COMPILE_OK", "configuration": args.configuration,
+        "result": "NATIVE_REFLECTION_SURFACE_COMPILE_FAILED" if failures else "NATIVE_REFLECTION_SURFACE_COMPILE_OK",
+        "configuration": args.configuration,
         "scope": "Actual engine generation and object compilation; no Editor link or runtime execution",
         "modules": list(modules), "components": len(expected), "generated_records": len(classes),
         "annotated_native_headers": len(owned_headers),
         "annotated_native_declarations": sum(record["declarations"] for record in owned_headers),
-        "objects": [path.name for path in sorted((work / "objects").glob("*.obj"))],
+        "objects": [item["object"] for item in compilations if item["status"] == "success"],
+        "compilations": compilations,
         "vcpkg_baseline": baseline, "cppwinrt_sha256": cppwinrt_hash,
     }
     (work / "result.json").write_text(json.dumps(result, indent=2), encoding="utf-8")
     print(json.dumps(result), flush=True)
+    require(not failures, "Native reflection surface compilation failed: " + ", ".join(failures))
 
 
 if __name__ == "__main__":
