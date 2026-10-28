@@ -26,8 +26,10 @@ import Creator.Core.Ownership;
 // Complete forward-only public values in every canonical descriptor TU. A
 // pointer to an incomplete type would otherwise quietly acquire an opaque view.
 #include "MaterialGraphShaderMeta.h"
+#include "Experiment/MaterialInstance.h"
 #include "AssetDepot/MaterialAssetRuntime.h"
 #include "AssetDepot/TextureAssetRuntime.h"
 #include "FontAsset.h"
 #include "Assets/ModelMeshDescriptor.h"
 #include "Assets/ModelAnimationDescriptor.h"
+#include "../SceneRuntime/TweenManager.h"

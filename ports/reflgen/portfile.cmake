@@ -18,8 +18,8 @@ set(VCPKG_BUILD_TYPE release) # 생성기는 도구이고 라이브러리는 헤
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO 29thnight/reflgen_cpp
-    REF 344a9ecc7d361e5b7781b849647e5116a6ad1017
-    SHA512 50aacc5c2dbd99e94f873597fac37a80796962be1bb4cded224b9eb961a2887b38b403f8b12cb6bbdcba9ae5945efdda76480b1fa6d79ae5269fb42216ee304b
+    REF f220e805f674fe2074f2c9e530d7d4cbf06daf41
+    SHA512 8ca1436f63495bd3cb65f470643c724259eac38a50ab7c0bdc9853ad8bc477b89528beb5dcffb7f4a44365f1fc7a15b2ec367e4a4a85c0ccd51162fd2ddf359c
     HEAD_REF main
 )
 # REFLGEN_SOURCE_END
