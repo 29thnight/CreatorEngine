@@ -90,10 +90,12 @@ jobs:
           "revision=$($match.Groups[1].Value)" >> $env:GITHUB_OUTPUT
           $manifest = Get-Content vcpkg.json -Raw | ConvertFrom-Json
           "vcpkg=$($manifest.'builtin-baseline')" >> $env:GITHUB_OUTPUT
+      - uses: actions/checkout@v4
         with:
           repository: 29thnight/reflgen_cpp
           ref: ${{ steps.reflgen.outputs.revision }}
           path: Build/ReflectionDependency
+      - uses: actions/checkout@v4
         with:
           repository: microsoft/vcpkg
           ref: ${{ steps.reflgen.outputs.vcpkg }}
