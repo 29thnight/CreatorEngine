@@ -26,12 +26,25 @@ namespace editor::clipping
         };
         ce::dynamic_array<open_widget> g_openWidgets;
 
-        void remember(ce::dynamic_array<std::string>& names, const char* name)
+        void remember(ce::dynamic_array<ce::utf8_string>& names, const char* name)
         {
-            if (nullptr == name) return;
-            if (std::find(names.begin(), names.end(), name) != names.end()) return;
-            if (names.size() >= kTrackedNames) return;
-            names.emplace_back(name);
+            if (nullptr == name)
+            {
+                return;
+            }
+            const ce::utf8_string_view value(name);
+            for (const auto& existing : names)
+            {
+                if (existing.view() == value)
+                {
+                    return;
+                }
+            }
+            if (names.size() >= kTrackedNames)
+            {
+                return;
+            }
+            names.emplace_back(value);
         }
     }
 

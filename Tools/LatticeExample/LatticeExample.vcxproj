@@ -91,6 +91,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="MaterialGraphTests.h" />
+    <ClInclude Include="..\..\Editor\ImGuiHelper\Utf8Text.h" />
+    <ClInclude Include="..\..\Editor\ImGuiHelper\Utf16Text.h" />
     <ClInclude Include="..\..\Lattice\Material\LXMaterialGraph.h" />
     <ClInclude Include="..\..\Lattice\Material\LXMaterialIR.h" />
     <ClInclude Include="..\..\Lattice\Material\LXMaterialExecution.h" />

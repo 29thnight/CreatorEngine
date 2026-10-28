@@ -72,7 +72,7 @@ namespace
 
     // 벽시계 시:분:초.밀리. 날짜는 안 적는다 — 한 세션 안에서 읽는 값이고,
     // 카드 둘째 줄은 좁다.
-    std::string ClockText(spdlog::log_clock::time_point timestamp)
+    ce::utf8_string ClockText(spdlog::log_clock::time_point timestamp)
     {
         using namespace std::chrono;
         const auto since = timestamp.time_since_epoch();
@@ -81,13 +81,13 @@ namespace
         char buffer[16]{};
         std::snprintf(buffer, sizeof(buffer), "%02lld:%02lld:%02lld.%03lld",
             ofDay / 3600000LL, (ofDay / 60000LL) % 60LL, (ofDay / 1000LL) % 60LL, ofDay % 1000LL);
-        return std::string(buffer);
+        return ce::utf8_string(ce::utf8_string_view(buffer));
     }
 
     // 메시지 안의 Windows 경로. 옛 화면은 아무 줄이나 **한 번 누르면** 이것을
     // 찾아 파일을 열었다 — 읽으려고 고른 것만으로 편집기가 떴다. 여기서는
     // 상세 영역의 버튼으로만 연다.
-    std::string FindWindowsPath(std::string_view message)
+    ce::utf8_string_view FindWindowsPath(std::string_view message)
     {
         for (std::size_t index = 0; index + 2 < message.size(); ++index)
         {
@@ -99,9 +99,9 @@ namespace
                 message[end] != '\t' && message[end] != '\0')
                 ++end;
             while (end > index && message[end - 1] == ' ') --end;
-            return std::string(message.substr(index, end - index));
+            return ce::utf8_string_view(message.data() + index, end - index);
         }
-        return std::string();
+        return {};
     }
 }
 
@@ -110,7 +110,11 @@ namespace editor
     bool OutputLogWindow::CountChip(const char* icon, std::uint64_t count,
         spdlog::level::level_enum level, bool active, const char* tooltip)
     {
-        const std::string label = std::string(icon) + " " + std::to_string(count);
+        ce::utf8_string label{ce::utf8_string_view(icon)};
+        label.append(" ");
+        char countText[32]{};
+        std::snprintf(countText, sizeof(countText), "%llu", static_cast<unsigned long long>(count));
+        label.append(countText);
         ImGui::PushStyleColor(ImGuiCol_Text, LevelColor(level));
         ImGui::PushStyleColor(ImGuiCol_Button,
             active ? LevelTint(level) : ImVec4(0.0f, 0.0f, 0.0f, 0.0f));
@@ -266,11 +270,16 @@ namespace editor
                 const bool selected = selection.groupId == row.groupId &&
                     selection.sequence == row.sequence;
 
-                std::string badge;
+                ce::utf8_string badge;
                 if (m_filter.collapse && row.repeatCount > 1)
-                    badge = std::to_string(row.repeatCount);
+                {
+                    char countText[32]{};
+                    std::snprintf(countText, sizeof(countText), "%llu",
+                                  static_cast<unsigned long long>(row.repeatCount));
+                    badge.assign(countText);
+                }
                 const float badgeWidth = badge.empty()
-                    ? 0.0f : MeasureText(badge) + style.FramePadding.x * 4.0f;
+                    ? 0.0f : MeasureText(std::string_view(badge.data(), badge.size())) + style.FramePadding.x * 4.0f;
 
                 ImGui::PushID(index);
 
@@ -398,13 +407,20 @@ namespace editor
             // 끊긴다. 저장소의 원문은 그대로 남는다.
             ImGui::SetClipboardText(group->message.c_str());
         }
-        const std::string path = FindWindowsPath(group->message);
+        const ce::utf8_string_view path = FindWindowsPath(group->message);
         if (!path.empty())
         {
             ImGui::SameLine();
             if (ImGui::Button(EditorIcon::Label<EditorIcon::Folder, " Open File">))
-                EditorPlatform::Get().OpenFile(path);
-            if (ImGui::IsItemHovered()) ImGui::SetTooltip("%s", path.c_str());
+            {
+                EditorPlatform::Get().OpenFile(std::filesystem::path(std::string(path.data(), path.size())));
+            }
+            if (ImGui::IsItemHovered())
+            {
+                ImGui::BeginTooltip();
+                ImGui::TextUnformatted(path.data(), path.data() + path.size());
+                ImGui::EndTooltip();
+            }
         }
         ImGui::SameLine();
         ImGui::SeparatorEx(ImGuiSeparatorFlags_Vertical);

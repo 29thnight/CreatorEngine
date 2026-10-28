@@ -273,7 +273,7 @@ MenuBarWindow::MenuBarWindow(std::mutex& sceneStructureMutex)
 
 void MenuBarWindow::RenderMenuBar()
 {
-    static std::string viewerError;
+    static ce::utf8_string viewerError;
     if (auto error = editor::take_profiler_viewer_error(); !error.empty())
     {
         viewerError = std::move(error);

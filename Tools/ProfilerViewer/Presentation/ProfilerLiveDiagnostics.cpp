@@ -51,7 +51,7 @@ namespace editor::profiler_view
             clock::time_point raw_received_at{};
             clock::time_point animation_requested_at{};
             clock::time_point command_requested_at{};
-            std::string status;
+            ce::utf8_string status;
             bool connected{};
             bool stopped{};
             int refreshed_frame{ -1 };
@@ -123,14 +123,14 @@ namespace editor::profiler_view
                         if (value.pending_command_id != 0 &&
                             value.decoded->last_command_id == value.pending_command_id)
                         {
-                            value.status = value.decoded->last_command_accepted ? "" :
-                                "The target rejected the diagnostic request; refresh the selection and retry.";
+                            value.status.assign(value.decoded->last_command_accepted ? "" :
+                                "The target rejected the diagnostic request; refresh the selection and retry.");
                             value.pending_command_id = 0;
                         }
                     }
                     else
                     {
-                        value.status = "A diagnostic snapshot could not be prepared; retaining the last valid snapshot.";
+                        value.status.assign("A diagnostic snapshot could not be prepared; retaining the last valid snapshot.");
                     }
                 }
             }
@@ -168,7 +168,7 @@ namespace editor::profiler_view
                 clock::now() - value.command_requested_at > std::chrono::seconds(2))
             {
                 value.pending_command_id = 0;
-                value.status = "No diagnostic acknowledgement was received; refresh the target and retry.";
+                value.status.assign("No diagnostic acknowledgement was received; refresh the target and retry.");
             }
         }
 
@@ -191,7 +191,7 @@ namespace editor::profiler_view
             {
                 if (show_status)
                 {
-                    value.status = "Target disconnected or its command queue is full; retry when connected.";
+                    value.status.assign("Target disconnected or its command queue is full; retry when connected.");
                 }
                 return false;
             }
@@ -199,7 +199,7 @@ namespace editor::profiler_view
             {
                 value.pending_command_id = command.command_id;
                 value.command_requested_at = clock::now();
-                value.status = "Diagnostic request queued for the target.";
+                value.status.assign("Diagnostic request queued for the target.");
             }
             return true;
         }

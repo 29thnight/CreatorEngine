@@ -77,34 +77,61 @@ namespace Diagnostics
 	}
 
 	// "Texture:12, Mesh:3, ..." 형태로 만든다. 0인 항목은 생략한다.
-	inline std::string FormatSnapshot(const ResourceSnapshot& snapshot)
+	inline ce::utf8_string FormatSnapshot(const ResourceSnapshot& snapshot)
 	{
-		std::string text;
+		ce::utf8_string text;
 		for (size_t i = 0; i < snapshot.counts.size(); ++i)
 		{
-			if (snapshot.counts[i] == 0) continue;
-			if (!text.empty()) text += ", ";
-			text += std::string(kEngineResourceNames[i]) + ":" + std::to_string(snapshot.counts[i]);
+			if (snapshot.counts[i] == 0)
+			{
+				continue;
+			}
+			if (!text.empty())
+			{
+				text.append(", ");
+			}
+			const auto name = kEngineResourceNames[i];
+			text.append(ce::utf8_string_view(name.data(), name.size()));
+			char count[32]{};
+			std::snprintf(count, sizeof(count), ":%lld", static_cast<long long>(snapshot.counts[i]));
+			text.append(count);
 		}
-		return text.empty() ? std::string("없음") : text;
+		if (text.empty())
+		{
+			text.assign("없음");
+		}
+		return text;
 	}
 
 	// "Texture:12(+3), Mesh:3(0), ..." 형태. 증감이 0이어도 현재값은 보여준다.
-	inline std::string FormatDelta(const ResourceSnapshot& current, const ResourceSnapshot& baseline)
+	inline ce::utf8_string FormatDelta(const ResourceSnapshot& current, const ResourceSnapshot& baseline)
 	{
-		std::string text;
+		ce::utf8_string text;
 		for (size_t i = 0; i < current.counts.size(); ++i)
 		{
 			const int64_t delta = current.counts[i] - baseline.counts[i];
-			if (current.counts[i] == 0 && delta == 0) continue;
+			if (current.counts[i] == 0 && delta == 0)
+			{
+				continue;
+			}
 
-			if (!text.empty()) text += ", ";
-			text += std::string(kEngineResourceNames[i]) + ":" + std::to_string(current.counts[i]);
-			text += (delta > 0) ? "(+" + std::to_string(delta) + ")"
-				 : (delta < 0) ? "(" + std::to_string(delta) + ")"
-				 : "(0)";
+			if (!text.empty())
+			{
+				text.append(", ");
+			}
+			const auto name = kEngineResourceNames[i];
+			text.append(ce::utf8_string_view(name.data(), name.size()));
+			char counts[64]{};
+			std::snprintf(counts, sizeof(counts), ":%lld(%s%lld)",
+				static_cast<long long>(current.counts[i]), delta > 0 ? "+" : "",
+				static_cast<long long>(delta));
+			text.append(counts);
 		}
-		return text.empty() ? std::string("없음") : text;
+		if (text.empty())
+		{
+			text.assign("없음");
+		}
+		return text;
 	}
 
 	// 상속만 하면 생성자가 몇 개든 정확히 세어진다.

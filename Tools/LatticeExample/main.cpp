@@ -31,6 +31,8 @@ import Creator.Platform.Windows;
 #include "../../Lattice/ImGui/LXCanvas.h"
 #include "MaterialGraphTests.h"
 #include "../../Editor/EngineGUIWindow/MaterialGraphPresentation.h"
+#include "../../Editor/ImGuiHelper/Utf8Text.h"
+#include "../../Editor/ImGuiHelper/Utf16Text.h"
 #include "../../Editor/ImGuiHelper/EditorIconAlignment.h"
 
 #include <imgui.h>
@@ -4798,7 +4800,7 @@ bool MaterialNodeMenuInteractionTest()
     io.Fonts->SetTexID(static_cast<ImTextureID>(1));
     const auto definitions = LX::CreateMaterialDefinitions();
     const auto entries = editor::material_editing::MaterialNodeMenuEntries(definitions, "Reroute");
-    std::string search = "Reroute";
+    ce::utf8_string search{ce::utf8_string_view("Reroute")};
     std::optional<std::string> selected;
     const auto frame = [&](bool open) {
         ImGui::NewFrame();
@@ -4875,6 +4877,25 @@ bool MaterialNodeMenuInteractionTest()
 
 bool SelfTest()
 {
+    const auto verifyInputResize = [](int (*callback)(ImGuiInputTextCallbackData*))
+    {
+        ce::utf8_string buffer{ce::utf8_string_view("hello")};
+        ImGuiInputTextCallbackData data{};
+        data.EventFlag = ImGuiInputTextFlags_CallbackResize;
+        data.UserData = &buffer;
+        data.Buf = buffer.data();
+        data.BufTextLen = 5;
+        data.BufSize = 1024;
+        callback(&data);
+        return data.Buf == buffer.data() && buffer.capacity() >= 1023 && buffer.size() == 5 &&
+            buffer.view() == ce::utf8_string_view("hello");
+    };
+    if (!verifyInputResize(editor::text::detail::ResizeUtf8Input) ||
+        !verifyInputResize(editor::text::detail::ResizeInput))
+    {
+        std::cerr << "ImGui string resize did not preserve the requested buffer" << std::endl;
+        return false;
+    }
     if (!RunMaterialGraphTests())
     {
         return false;
@@ -6255,7 +6276,7 @@ void DrawProductMaterialPreview()
     static auto items = editor::material_editing::MaterialItems(asset.Definitions());
     static LX::CanvasState canvas;
     static std::string materialName = "Material";
-    static std::string nodeSearch;
+    static ce::utf8_string nodeSearch;
     if (!document)
     {
         const auto surface = asset.CreateNode("ShaderNodeBsdfPrincipled", 260.0f, 160.0f);

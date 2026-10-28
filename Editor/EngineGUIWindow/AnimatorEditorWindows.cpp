@@ -654,8 +654,10 @@ if (controller != nullptr && GetControllerNodeEditor(controller)->m_selectedType
 	preInspectorIndex = linkIndex;
 	ImGui::Text("Transitions");
 	ImGui::Separator();
-	std::string fromNode = GetControllerNodeEditor(controller)->Links[linkIndex]->fromNode->name;
-	std::string toNode = GetControllerNodeEditor(controller)->Links[linkIndex]->toNode->name;
+	const auto& fromName = GetControllerNodeEditor(controller)->Links[linkIndex]->fromNode->name;
+	const auto& toName = GetControllerNodeEditor(controller)->Links[linkIndex]->toNode->name;
+	std::string fromNode(fromName.data(), fromName.size());
+	std::string toNode(toName.data(), toName.size());
 	auto transitions = controller->FindState(fromNode)->FindTransitions(toNode);
 
 	if (!transitions.empty())
@@ -835,7 +837,7 @@ else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selecte
 			if (ImGui::IsItemDeactivatedAfterEdit())
 			{
 				// 실제 변경 적용은 입력 완료 시점에만 수행
-				nodeEdtior->Nodes[nodeEdtior->seletedCurNodeIndex]->name = buffer;
+				nodeEdtior->Nodes[nodeEdtior->seletedCurNodeIndex]->name.assign(buffer);
 
 				for (auto& st : controller->StateVec)
 				{

@@ -113,7 +113,7 @@ namespace editor::profiler_view
 			ImGui::EndCombo();
 		}
 
-		std::string bytes_label(std::uint64_t bytes)
+		ce::utf8_string bytes_label(std::uint64_t bytes)
 		{
 			char text[48]{};
 			if (bytes >= 1024ull * 1024ull * 1024ull)
@@ -132,7 +132,7 @@ namespace editor::profiler_view
 			{
 				std::snprintf(text, sizeof(text), "%llu B", static_cast<unsigned long long>(bytes));
 			}
-			return text;
+			return ce::utf8_string(ce::utf8_string_view(text));
 		}
 
 		void metric_row(const char* name, std::uint64_t value, bool available,
@@ -246,7 +246,9 @@ namespace editor::profiler_view
 				ImGui::SetTooltip("%s · %s (%.1f%%)", part.label, bytes_label(part.bytes).c_str(),
 					100.0 * static_cast<double>(part.bytes) / total);
 			}
-			const std::string totalText = "합계 " + bytes_label(total);
+			ce::utf8_string totalText{ce::utf8_string_view("합계 ")};
+			const auto formattedTotal = bytes_label(total);
+			totalText.append(formattedTotal.view());
 			ImGui::SetCursorPosX(ImGui::GetCursorPosX() + (std::max)(0.0f,
 				ImGui::GetContentRegionAvail().x - ImGui::CalcTextSize(totalText.c_str()).x));
 			ImGui::TextDisabled("%s", totalText.c_str());

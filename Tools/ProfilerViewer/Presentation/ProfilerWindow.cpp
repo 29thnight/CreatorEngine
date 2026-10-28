@@ -196,7 +196,7 @@ namespace editor::profiler_view::capture_integrity
     struct stop_details
     {
         std::weak_ptr<const ce::capture_session> capture_;
-        ce::fixed_array<std::string, 6> counters_;
+        ce::fixed_array<ce::utf8_string, 6> counters_;
         std::optional<double> admitted_gpu_;
         ce::dynamic_array<std::uint16_t> timed_out_threads_;
         ce::dynamic_array<const ce::profile_event*> open_scopes_;
@@ -214,7 +214,10 @@ namespace editor::profiler_view::capture_integrity
         }
         cached = {};
         cached.capture_ = capture;
-        cached.counters_.fill("not recorded");
+        for (auto& counter : cached.counters_)
+        {
+            counter.assign("not recorded");
+        }
         if (!capture || capture->frames().empty())
         {
             return cached;
@@ -222,7 +225,7 @@ namespace editor::profiler_view::capture_integrity
 
         // Decode only the immutable final frame, once per capture. Never walk
         // the retained recording or resolve file IDs through the live registry.
-        constexpr ce::fixed_array<std::string_view, 6> names = {
+        const ce::fixed_array<ce::utf8_string_view, 6> names = {
             "Capture.UnackedCpuStreams", "Capture.OpenScopesAtStop", "Capture.PendingGpuSubmissions",
             "Capture.FailedGpuSubmissions", "Capture.StopDrainMilliseconds", "Capture.AdmittedGpuSubmissions"
         };
@@ -236,11 +239,12 @@ namespace editor::profiler_view::capture_integrity
             }
             for (std::size_t index = 0; index < names.size(); ++index)
             {
-                if (descriptor->name == names[index])
+                const auto name = names[index];
+                if (descriptor->name == std::string_view(name.data(), name.size()))
                 {
                     char value[64];
                     std::snprintf(value, sizeof(value), index == 4 ? "%.3f ms" : "%.0f", sample.value);
-                    cached.counters_[index] = value;
+                    cached.counters_[index].assign(value);
                     if (index == 5)
                     {
                         cached.admitted_gpu_ = sample.value;

@@ -21,7 +21,7 @@ namespace editor::material_editing
     ce::dynamic_array<MaterialNodeMenuEntry> MaterialNodeMenuEntries(const LX::LXMaterialDefinitions& definitions,
                                                                std::string_view search = {});
     std::optional<std::string> DrawMaterialNodeAddMenu(const LX::LXMaterialDefinitions& definitions,
-        std::string& search);
+        ce::utf8_string& search);
 
     enum class MaterialBarAction
     {

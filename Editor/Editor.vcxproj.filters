@@ -848,6 +848,12 @@
     <ClInclude Include="ImGuiHelper\EditorIconAlignment.h">
       <Filter>ImGuiHelper</Filter>
     </ClInclude>
+    <ClInclude Include="ImGuiHelper\Utf8Text.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
+    <ClInclude Include="ImGuiHelper\Utf16Text.h">
+      <Filter>ImGuiHelper</Filter>
+    </ClInclude>
     <ClInclude Include="ImGuiHelper\EditorIcons.h">
       <Filter>ImGuiHelper</Filter>
     </ClInclude>

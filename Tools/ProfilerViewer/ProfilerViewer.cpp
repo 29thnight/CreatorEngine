@@ -48,10 +48,19 @@ namespace ce::profiler_viewer
     {
         constexpr wchar_t window_class[] = L"CreatorEngine.ProfilerViewer";
 
-        std::string utf8(const std::filesystem::path& path)
+        ce::utf8_string utf8(const std::filesystem::path& path)
         {
             const auto value = path.u8string();
-            return std::string(value.begin(), value.end());
+            ce::utf8_string result;
+            result.resize_and_overwrite(value.size(), [&](char* destination, size_t length)
+            {
+                if (length != 0)
+                {
+                    std::memcpy(destination, value.data(), length);
+                }
+                return length;
+            });
+            return result;
         }
 
         void check(HRESULT result, const char* operation)
@@ -276,7 +285,7 @@ namespace ce::profiler_viewer
                 io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard;
                 // The native window owns geometry. Do not create engine docking
                 // surfaces or secondary platform windows in this standalone host.
-                ini_path_ = settings_root_.empty() ? std::string{} : utf8(settings_root_ / L"imgui.ini");
+                ini_path_ = settings_root_.empty() ? ce::utf8_string{} : utf8(settings_root_ / L"imgui.ini");
                 io.IniFilename = ini_path_.empty() ? nullptr : ini_path_.c_str();
                 io.LogFilename = nullptr;
                 editor::fonts::set_resource_root(executable_directory() / L"Resources");
@@ -759,7 +768,7 @@ namespace ce::profiler_viewer
             window_settings settings_;
             window_chrome chrome_;
             std::filesystem::path settings_root_;
-            std::string ini_path_;
+            ce::utf8_string ini_path_;
             winrt::com_ptr<ID3D11Device> device_;
             winrt::com_ptr<ID3D11DeviceContext> context_;
             winrt::com_ptr<IDXGISwapChain> swapchain_;

@@ -17,7 +17,7 @@ enum class SelectedType
 struct Node
 {
 	int id;
-	std::string name;
+	ce::utf8_string name;
 };
 
 struct NodeLink

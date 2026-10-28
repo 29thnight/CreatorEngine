@@ -1821,10 +1821,13 @@ namespace ConsoleCmd
         data.Set("truncated", CommandData::Int(static_cast<long long>(view.truncated)));
         data.Set("unbalanced", CommandData::Int(static_cast<long long>(view.unbalanced)));
 
-        const auto names = [](const ce::dynamic_array<std::string>& source)
+        const auto names = [](const ce::dynamic_array<ce::utf8_string>& source)
         {
             auto array = CommandData::Array();
-            for (const std::string& name : source) array.Append(CommandData::String(name));
+            for (const auto& name : source)
+            {
+                array.Append(CommandData::String(std::string(name.data(), name.size())));
+            }
             return array;
         };
         data.Set("measuredWidgets", names(view.measuredWidgets));
@@ -1847,21 +1850,33 @@ namespace ConsoleCmd
         {
             std::string summary = "칸보다 넓은 글자를 자르지 않은 신고 " +
                 std::to_string(view.overflowFrames) + " 건";
-            if (!view.overflowWidgets.empty()) summary += ": " + view.overflowWidgets.front();
+            if (!view.overflowWidgets.empty())
+            {
+                summary += ": ";
+                summary.append(view.overflowWidgets.front().data(), view.overflowWidgets.front().size());
+            }
             return Fail("editor.clipping.overflow", summary, std::move(data));
         }
         if (0 != view.silentFrames)
         {
             std::string summary = "잘라 놓고 전체를 돌려주지 않은 신고 " +
                 std::to_string(view.silentFrames) + " 건";
-            if (!view.silentWidgets.empty()) summary += ": " + view.silentWidgets.front();
+            if (!view.silentWidgets.empty())
+            {
+                summary += ": ";
+                summary.append(view.silentWidgets.front().data(), view.silentWidgets.front().size());
+            }
             return Fail("editor.clipping.silent_truncation", summary, std::move(data));
         }
         if (0 != view.unbalanced)
         {
             std::string summary = "클립 스택이 균형을 잃은 횟수 " +
                 std::to_string(view.unbalanced) + " 회";
-            if (!view.unbalancedWidgets.empty()) summary += ": " + view.unbalancedWidgets.front();
+            if (!view.unbalancedWidgets.empty())
+            {
+                summary += ": ";
+                summary.append(view.unbalancedWidgets.front().data(), view.unbalancedWidgets.front().size());
+            }
             return Fail("editor.clipping.unbalanced", summary, std::move(data));
         }
         return Ok("잘라 그리기 계약 위반 0", std::move(data));

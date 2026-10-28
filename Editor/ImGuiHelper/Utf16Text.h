@@ -27,6 +27,7 @@ namespace editor::text
             auto& buffer = *static_cast<ce::utf8_string*>(data->UserData);
             if (data->EventFlag == ImGuiInputTextFlags_CallbackResize)
             {
+                buffer.reserve(static_cast<size_t>(data->BufSize - 1));
                 buffer.resize_and_overwrite(static_cast<size_t>(data->BufTextLen),
                                             [](char*, size_t n) noexcept { return n; });
                 data->Buf = buffer.data();

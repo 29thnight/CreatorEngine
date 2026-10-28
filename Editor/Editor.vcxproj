@@ -138,6 +138,8 @@
     <ClInclude Include="EngineGUIWindow\EditorCameraRig.h" />
     <ClInclude Include="EngineGUIWindow\EditorFontResources.h" />
     <ClInclude Include="ImGuiHelper\EditorIconAlignment.h" />
+    <ClInclude Include="ImGuiHelper\Utf8Text.h" />
+    <ClInclude Include="ImGuiHelper\Utf16Text.h" />
     <ClInclude Include="ImGuiHelper\EditorTextFallback.h" />
     <ClInclude Include="EngineGUIWindow\EditorTheme.h" />
     <ClInclude Include="EngineGUIWindow\EditorThemeSelfTest.h" />

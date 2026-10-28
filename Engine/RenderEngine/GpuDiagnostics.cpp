@@ -65,7 +65,7 @@ namespace
             // 디버그 레이어를 못 쓰는 실행 중에는 엔진이 직접 센 에셋 수로 대신한다.
             Debug::PrintLog(spdlog::level::info, std::format("[GPU 진단] {} · VRAM {}MB / {}MB · 엔진 에셋 {}",
                 label, census.vramUsedMB, census.vramBudgetMB,
-                Diagnostics::FormatSnapshot(Diagnostics::CaptureResourceSnapshot())));
+                Diagnostics::FormatSnapshot(Diagnostics::CaptureResourceSnapshot()).c_str()));
             return;
         }
 
@@ -97,7 +97,7 @@ namespace
             // 실행 중 경로. 씬을 오갔을 때 이 에셋 수가 제자리로 돌아오는지가 핵심 지표다.
             Debug::PrintLog(spdlog::level::info, std::format("[GPU 진단] {} · VRAM {}MB ({:+}MB) · 엔진 에셋 {}",
                 label, current.vramUsedMB, vramDelta,
-                Diagnostics::FormatDelta(resources, g_baselineResources)));
+                Diagnostics::FormatDelta(resources, g_baselineResources).c_str()));
 
             g_baselineCensus = current;
             g_baselineResources = resources;
@@ -118,7 +118,7 @@ namespace
 
         Debug::PrintLog(spdlog::level::info, std::format("[GPU 진단] {} · 라이브 객체 {}개 ({:+}) · VRAM {}MB ({:+}MB) · 엔진 에셋 {}",
             label, current.totalObjects, objectDelta, current.vramUsedMB, vramDelta,
-            Diagnostics::FormatDelta(resources, g_baselineResources)));
+            Diagnostics::FormatDelta(resources, g_baselineResources).c_str()));
 
         if (increased.empty())
         {

@@ -16,13 +16,13 @@ namespace ce::detail::marker_registry_impl
 	{
 		std::mutex                                     lock;
 		ce::dynamic_array<marker_desc>                       descs;
-		ce::engine_node_map<std::string, marker_id>     by_name;
+		ce::string_hash_map<marker_id>                   by_name;
 
 		// 런타임 이름의 보관소. deque 인 이유는 **주소가 고정**되어야 하기
 		// 때문이다 — vector<string> 은 재할당 때 원소를 옮기고, 짧은 문자열은
 		// 버퍼가 객체 안에 있어(SSO) 같이 움직인다. 그러면 표가 들고 있는
 		// c_str() 가 통째로 엉뚱한 곳을 가리킨다.
-		ce::segmented_deque<std::string>                        owned_names;
+		ce::segmented_deque<ce::utf8_string>            owned_names;
 	};
 
 	// 함수 지역 static — 첫 호출에서 선다. 마커 슬롯의 동적 초기화가 어느
@@ -59,19 +59,19 @@ namespace ce
 			// 같은 이름은 같은 id 다. 슬롯이 이름마다 하나라 보통은 여기서
 			// 한 번만 지나가지만, 이름을 공유하는 서로 다른 kind 가 들어오면
 			// 표를 나눠야 하므로 키에 kind 를 섞는다.
-			std::string key(desc.name ? desc.name : "");
+			ce::utf8_string key(ce::utf8_string_view(desc.name ? desc.name : ""));
 			key.push_back('#');
 			key.push_back(static_cast<char>('0' + static_cast<int>(desc.kind)));
 
-			const auto found = reg.by_name.find(key);
-			if (found != reg.by_name.end())
+			const auto* found = reg.by_name.find(key);
+			if (found)
 			{
-				return found->second;
+				return *found;
 			}
 
 			const marker_id id = static_cast<marker_id>(reg.descs.size());
 			reg.descs.push_back(desc);
-			reg.by_name.emplace(std::move(key), id);
+			reg.by_name.try_emplace(std::move(key), id);
 			return id;
 		}
 	}
@@ -113,21 +113,21 @@ namespace ce
         registry& reg = get();
         std::lock_guard<std::mutex> guard(reg.lock);
         ensure_sentinel(reg);
-        std::string key(name);
+        ce::utf8_string key(ce::utf8_string_view(name.data(), name.size()));
         key.push_back('#');
         key.push_back(static_cast<char>('0' + static_cast<int>(kind)));
         marker_id id{};
-        if (const auto found = reg.by_name.find(key); found != reg.by_name.end())
+        if (const auto* found = reg.by_name.find(key))
         {
-            id = found->second;
+            id = *found;
         }
         else
         {
-            reg.owned_names.emplace_back(name);
+            reg.owned_names.emplace_back(ce::utf8_string_view(name.data(), name.size()));
             const char* stable = reg.owned_names.back().c_str();
             id = static_cast<marker_id>(reg.descs.size());
             reg.descs.push_back(marker_desc{stable, nullptr, 0, kind});
-            reg.by_name.emplace(std::move(key), id);
+            reg.by_name.try_emplace(std::move(key), id);
         }
         if (empty)
         {

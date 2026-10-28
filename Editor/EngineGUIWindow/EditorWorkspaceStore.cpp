@@ -35,7 +35,8 @@ namespace editor
         name_dialog nameDialog{ name_dialog::none };
         ce::string nameText;
         ce::utf16_input_state nameInput;
-        std::string deleteTarget;
+        ce::string deleteTarget;
+        ce::utf8_conversion_cache deleteTargetUtf8;
         /// 지금 화면 구성의 지문. 뷰포트 좌표를 믿어도 되는지를 이것 하나로 가른다.
         ///
         /// 모니터의 **가상 데스크톱 사각형**만 쓴다 — 장치 이름이나 핸들은 케이블을
@@ -170,7 +171,13 @@ namespace editor
                 nameText.clear();
             nameDialog=name_dialog::rename;
         }
-        if(ImGui::MenuItem("Delete Workspace...")) deleteTarget=status.name;
+        if (ImGui::MenuItem("Delete Workspace..."))
+        {
+            if (!ce::to_utf16(ce::utf8_string_view(status.name.data(), status.name.size()), deleteTarget))
+            {
+                deleteTarget.clear();
+            }
+        }
         ImGui::EndDisabled();
         ImGui::Separator();
         if(ImGui::MenuItem("Save Workspace")) request_workspace_action(workspace_action::save);
@@ -220,13 +227,17 @@ namespace editor
         if(!deleteTarget.empty()) ImGui::OpenPopup("Delete Workspace");
         if(ImGui::BeginPopupModal("Delete Workspace",nullptr,ImGuiWindowFlags_AlwaysAutoResize))
         {
-            ImGui::Text("Delete the workspace \"%s\"?",deleteTarget.c_str());
+            const auto converted = deleteTargetUtf8.update(deleteTarget.view());
+            ImGui::Text("Delete the workspace \"%s\"?", converted ? deleteTargetUtf8.c_str() : "");
             ImGui::TextUnformatted("A backup is kept next to it; the layout on screen stays.");
+            ImGui::BeginDisabled(!converted);
             if(ImGui::Button("Delete"))
             {
-                request_workspace_action(workspace_action::delete_named,deleteTarget);
+                const auto& name = deleteTargetUtf8.text();
+                request_workspace_action(workspace_action::delete_named, std::string(name.data(), name.size()));
                 deleteTarget.clear(); ImGui::CloseCurrentPopup();
             }
+            ImGui::EndDisabled();
             ImGui::SameLine();
             if(ImGui::Button("Cancel")) { deleteTarget.clear(); ImGui::CloseCurrentPopup(); }
             ImGui::EndPopup();

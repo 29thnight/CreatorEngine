@@ -1,5 +1,6 @@
 #pragma once
 
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace editor
@@ -14,5 +15,5 @@ namespace editor
     void pump_profiler_viewer();
     void shutdown_profiler_viewer();
     bool profiler_viewer_running();
-    std::string take_profiler_viewer_error();
+    ce::utf8_string take_profiler_viewer_error();
 }

@@ -11,7 +11,7 @@ namespace editor
     namespace
     {
         std::atomic_uint32_t requested_page{ 0 };
-        std::string launch_error;
+        ce::utf8_string launch_error;
         std::uint64_t observed_failure = 0;
     }
 
@@ -44,14 +44,15 @@ namespace editor
         }
         else if (request && !process.open_or_focus(request == 2 ? 1u : 0u, scale_milli))
         {
-            launch_error = process.status().message;
+            const auto status = process.status();
+            launch_error.assign(ce::utf8_string_view(status.message.data(), status.message.size()));
         }
         process.pump();
         const auto status = process.status();
         if (status.failure_revision != observed_failure)
         {
             observed_failure = status.failure_revision;
-            launch_error = status.message;
+            launch_error.assign(ce::utf8_string_view(status.message.data(), status.message.size()));
         }
     }
 
@@ -68,7 +69,7 @@ namespace editor
         return ce::profiler_viewer::viewer_process().status().running;
     }
 
-    std::string take_profiler_viewer_error()
+    ce::utf8_string take_profiler_viewer_error()
     {
         return std::exchange(launch_error, {});
     }

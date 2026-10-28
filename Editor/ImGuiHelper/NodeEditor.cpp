@@ -51,7 +51,7 @@ void NodeEditor::EndEdit()
 void NodeEditor::MakeNode(std::string nodeName)
 {
 	Node* newNode = new Node();
-	newNode->name = nodeName;
+	newNode->name.assign(ce::utf8_string_view(nodeName.data(), nodeName.size()));
     newNode->id = startNodeId++;
 	Nodes.push_back(newNode);
 }
@@ -88,7 +88,7 @@ void NodeEditor::DrawNode(int* selectedNodeIndex)
         auto& node = Nodes[i];
         ed::NodeId nodeID = node->id;
 		ed::BeginNode(nodeID);
-		ImGui::Text(node->name.c_str());
+		ImGui::TextUnformatted(node->name.data(), node->name.data() + node->name.size());
 		ed::EndNode();
 
 
@@ -330,8 +330,10 @@ Node* NodeEditor::FindNode(std::string nodeName)
 {
     for (auto& node : Nodes)
     {
-        if (node->name == nodeName)
+        if (node->name.view() == ce::utf8_string_view(nodeName.data(), nodeName.size()))
+        {
             return node;
+        }
     }
 }
 

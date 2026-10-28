@@ -187,7 +187,7 @@ namespace ce
         }
         m_controlAppliedCv.notify_all();
 
-        std::string abandonedNames;
+        ce::utf8_string abandonedNames;
         {
             std::lock_guard<std::mutex> guard(m_streamLock);
             for (std::size_t i = 0; i < m_streams.size(); ++i)
@@ -201,9 +201,10 @@ namespace ce
                 {
                     if (!abandonedNames.empty())
                     {
-                        abandonedNames += ", ";
+                        abandonedNames.append(", ");
                     }
-                    abandonedNames += m_threadInfo[i].name;
+                    const auto& name = m_threadInfo[i].name;
+                    abandonedNames.append(ce::utf8_string_view(name.data(), name.size()));
                 }
 
                 destroy_stream_locked(i);
@@ -1662,16 +1663,20 @@ namespace ce
         // existing reader retains their names, producer slots and exact bounded counts.
         if (pendingGpu != 0 || failedGpu != 0)
         {
-            std::string reason = pendingGpu != 0 ? "GPU drain deadline expired" : "GPU submission incomplete";
+            ce::utf8_string reason(ce::utf8_string_view(
+                pendingGpu != 0 ? "GPU drain deadline expired" : "GPU submission incomplete"));
             if (failedGpu != 0)
             {
                 std::lock_guard<std::mutex> guard(m_gpuIssueLock);
                 if (!m_gpuIssueLastError.empty())
                 {
-                    reason = m_gpuIssueLastError;
+                    reason.assign(ce::utf8_string_view(m_gpuIssueLastError.data(), m_gpuIssueLastError.size()));
                 }
             }
-            const marker_id issue = intern_runtime_marker("Capture.Incomplete.Gpu: " + reason, marker_kind::instant);
+            ce::utf8_string markerName(ce::utf8_string_view("Capture.Incomplete.Gpu: "));
+            markerName.append(reason.view());
+            const marker_id issue = intern_runtime_marker(
+                std::string_view(markerName.data(), markerName.size()), marker_kind::instant);
             std::uint32_t slot = 0;
             {
                 std::lock_guard<std::mutex> guard(m_streamLock);

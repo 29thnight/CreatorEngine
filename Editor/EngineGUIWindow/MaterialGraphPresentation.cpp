@@ -5,6 +5,7 @@
 #include "MaterialGraphPresentation.h"
 #include "../../Lattice/Core/LXNodeDefinition.h"
 #include "../ImGuiHelper/EditorIcons.h"
+#include "../ImGuiHelper/Utf8Text.h"
 #include <imgui_stdlib.h>
 #include <float.h>
 #include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
@@ -238,10 +239,10 @@ ce::dynamic_array<MaterialNodeMenuEntry> MaterialNodeMenuEntries(const LX::LXMat
     return entries;
 }
 
-std::optional<std::string> DrawMaterialNodeAddMenu(const LX::LXMaterialDefinitions& definitions, std::string& search)
+std::optional<std::string> DrawMaterialNodeAddMenu(const LX::LXMaterialDefinitions& definitions, ce::utf8_string& search)
 {
-    ImGui::InputTextWithHint("##node_search", "Search nodes...", &search);
-    const auto entries = MaterialNodeMenuEntries(definitions, search);
+    editor::text::InputTextWithHintUtf8("##node_search", "Search nodes...", search);
+    const auto entries = MaterialNodeMenuEntries(definitions, std::string_view(search.data(), search.size()));
     std::optional<std::string> selected;
     const auto drawEntry = [&](const MaterialNodeMenuEntry& entry) {
         // Labels describe the node; the registered type owns the widget identity.

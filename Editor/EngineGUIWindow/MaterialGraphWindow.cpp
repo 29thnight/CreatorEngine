@@ -174,7 +174,7 @@ namespace editor::material_editing
             CanvasState canvas;
             std::string name;
             std::string message;
-            std::string search;
+            ce::utf8_string search;
             std::string diskPayload;
             std::uint64_t uiFrames = 0;
             std::uint64_t defaultsSourceRevision = std::numeric_limits<std::uint64_t>::max();
