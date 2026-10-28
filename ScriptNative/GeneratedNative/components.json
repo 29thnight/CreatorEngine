@@ -1,0 +1,191 @@
+[
+  {
+    "cppName": "Animator",
+    "schemaName": "Animator",
+    "viewType": "CreatorEngine.NativeTypes.AnimatorView",
+    "viewName": "AnimatorView",
+    "file": "Components/AnimatorView.fs"
+  },
+  {
+    "cppName": "AudioListenerComponent",
+    "schemaName": "AudioListenerComponent",
+    "viewType": "CreatorEngine.NativeTypes.AudioListenerComponentView",
+    "viewName": "AudioListenerComponentView",
+    "file": "Components/AudioListenerComponentView.fs"
+  },
+  {
+    "cppName": "BehaviorTreeComponent",
+    "schemaName": "BehaviorTreeComponent",
+    "viewType": "CreatorEngine.NativeTypes.BehaviorTreeComponentView",
+    "viewName": "BehaviorTreeComponentView",
+    "file": "Components/BehaviorTreeComponentView.fs"
+  },
+  {
+    "cppName": "BoneComponent",
+    "schemaName": "BoneComponent",
+    "viewType": "CreatorEngine.NativeTypes.BoneComponentView",
+    "viewName": "BoneComponentView",
+    "file": "Components/BoneComponentView.fs"
+  },
+  {
+    "cppName": "CameraComponent",
+    "schemaName": "CameraComponent",
+    "viewType": "CreatorEngine.NativeTypes.CameraComponentView",
+    "viewName": "CameraComponentView",
+    "file": "Components/CameraComponentView.fs"
+  },
+  {
+    "cppName": "Canvas",
+    "schemaName": "Canvas",
+    "viewType": "CreatorEngine.NativeTypes.CanvasView",
+    "viewName": "CanvasView",
+    "file": "Components/CanvasView.fs"
+  },
+  {
+    "cppName": "CharacterMovementComponent",
+    "schemaName": "CharacterMovementComponent",
+    "viewType": "CreatorEngine.NativeTypes.CharacterMovementComponentView",
+    "viewName": "CharacterMovementComponentView",
+    "file": "Components/CharacterMovementComponentView.fs"
+  },
+  {
+    "cppName": "DecalComponent",
+    "schemaName": "DecalComponent",
+    "viewType": "CreatorEngine.NativeTypes.DecalComponentView",
+    "viewName": "DecalComponentView",
+    "file": "Components/DecalComponentView.fs"
+  },
+  {
+    "cppName": "FoliageComponent",
+    "schemaName": "FoliageComponent",
+    "viewType": "CreatorEngine.NativeTypes.FoliageComponentView",
+    "viewName": "FoliageComponentView",
+    "file": "Components/FoliageComponentView.fs"
+  },
+  {
+    "cppName": "ImageComponent",
+    "schemaName": "ImageComponent",
+    "viewType": "CreatorEngine.NativeTypes.ImageComponentView",
+    "viewName": "ImageComponentView",
+    "file": "Components/ImageComponentView.fs"
+  },
+  {
+    "cppName": "InvalidScriptComponent",
+    "schemaName": "InvalidScriptComponent",
+    "viewType": "CreatorEngine.NativeTypes.InvalidScriptComponentView",
+    "viewName": "InvalidScriptComponentView",
+    "file": "Components/InvalidScriptComponentView.fs"
+  },
+  {
+    "cppName": "LightComponent",
+    "schemaName": "LightComponent",
+    "viewType": "CreatorEngine.NativeTypes.LightComponentView",
+    "viewName": "LightComponentView",
+    "file": "Components/LightComponentView.fs"
+  },
+  {
+    "cppName": "MeshRenderer",
+    "schemaName": "MeshRenderer",
+    "viewType": "CreatorEngine.NativeTypes.MeshRendererView",
+    "viewName": "MeshRendererView",
+    "file": "Components/MeshRendererView.fs"
+  },
+  {
+    "cppName": "PhysicsBodyComponent",
+    "schemaName": "PhysicsBodyComponent",
+    "viewType": "CreatorEngine.NativeTypes.PhysicsBodyComponentView",
+    "viewName": "PhysicsBodyComponentView",
+    "file": "Components/PhysicsBodyComponentView.fs"
+  },
+  {
+    "cppName": "PlayerInputComponent",
+    "schemaName": "PlayerInputComponent",
+    "viewType": "CreatorEngine.NativeTypes.PlayerInputComponentView",
+    "viewName": "PlayerInputComponentView",
+    "file": "Components/PlayerInputComponentView.fs"
+  },
+  {
+    "cppName": "RectTransformComponent",
+    "schemaName": "RectTransformComponent",
+    "viewType": "CreatorEngine.NativeTypes.RectTransformComponentView",
+    "viewName": "RectTransformComponentView",
+    "file": "Components/RectTransformComponentView.fs"
+  },
+  {
+    "cppName": "SceneRenderProfileComponent",
+    "schemaName": "SceneRenderProfileComponent",
+    "viewType": "CreatorEngine.NativeTypes.SceneRenderProfileComponentView",
+    "viewName": "SceneRenderProfileComponentView",
+    "file": "Components/SceneRenderProfileComponentView.fs"
+  },
+  {
+    "cppName": "ScriptComponent",
+    "schemaName": "ScriptComponent",
+    "viewType": "CreatorEngine.NativeTypes.ScriptComponentView",
+    "viewName": "ScriptComponentView",
+    "file": "Components/ScriptComponentView.fs"
+  },
+  {
+    "cppName": "SoundComponent",
+    "schemaName": "SoundComponent",
+    "viewType": "CreatorEngine.NativeTypes.SoundComponentView",
+    "viewName": "SoundComponentView",
+    "file": "Components/SoundComponentView.fs"
+  },
+  {
+    "cppName": "SpriteRenderer",
+    "schemaName": "SpriteRenderer",
+    "viewType": "CreatorEngine.NativeTypes.SpriteRendererView",
+    "viewName": "SpriteRendererView",
+    "file": "Components/SpriteRendererView.fs"
+  },
+  {
+    "cppName": "SpriteSheetComponent",
+    "schemaName": "SpriteSheetComponent",
+    "viewType": "CreatorEngine.NativeTypes.SpriteSheetComponentView",
+    "viewName": "SpriteSheetComponentView",
+    "file": "Components/SpriteSheetComponentView.fs"
+  },
+  {
+    "cppName": "StateMachineComponent",
+    "schemaName": "StateMachineComponent",
+    "viewType": "CreatorEngine.NativeTypes.StateMachineComponentView",
+    "viewName": "StateMachineComponentView",
+    "file": "Components/StateMachineComponentView.fs"
+  },
+  {
+    "cppName": "TerrainComponent",
+    "schemaName": "TerrainComponent",
+    "viewType": "CreatorEngine.NativeTypes.TerrainComponentView",
+    "viewName": "TerrainComponentView",
+    "file": "Components/TerrainComponentView.fs"
+  },
+  {
+    "cppName": "TextComponent",
+    "schemaName": "TextComponent",
+    "viewType": "CreatorEngine.NativeTypes.TextComponentView",
+    "viewName": "TextComponentView",
+    "file": "Components/TextComponentView.fs"
+  },
+  {
+    "cppName": "Transform",
+    "schemaName": "Transform",
+    "viewType": "CreatorEngine.NativeTypes.TransformView",
+    "viewName": "TransformView",
+    "file": "Components/TransformView.fs"
+  },
+  {
+    "cppName": "UIButton",
+    "schemaName": "UIButton",
+    "viewType": "CreatorEngine.NativeTypes.UIButtonView",
+    "viewName": "UIButtonView",
+    "file": "Components/UIButtonView.fs"
+  },
+  {
+    "cppName": "UIComponent",
+    "schemaName": "UIComponent",
+    "viewType": "CreatorEngine.NativeTypes.UIComponentView",
+    "viewName": "UIComponentView",
+    "file": "Components/UIComponentView.fs"
+  }
+]

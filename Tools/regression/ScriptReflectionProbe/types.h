@@ -6,10 +6,14 @@
 #include "../../../Engine/Utility_Framework/Reflection/ScriptReflectionOwnership.h"
 #include "../../../Engine/Utility_Framework/Reflection/ScriptReflectionContainers.h"
 #include <array>
+#include <expected>
 #include <map>
 #include <optional>
 #include <set>
+#include <span>
 #include <string>
+#include <tuple>
+#include <variant>
 #include <vector>
 
 namespace reflection_probe
@@ -57,6 +61,26 @@ namespace reflection_probe
         int value = 71;
     };
 
+    struct [[reflgen::reflect("ScriptComponent"), reflgen::public_methods]] Script
+    {
+        std::string m_scriptType = "ProbeScript";
+        std::vector<std::string> m_fieldData{"one", "two"};
+        bool enabled = true;
+        bool IsEnabled() const { return enabled; }
+        void SetEnabled(bool value) { enabled = value; }
+        int GetInstanceId() const { return 101; }
+        bool HasInstance() const { return true; }
+        std::uint64_t InitializationAttempts() const { return 1; }
+    };
+
+    struct [[reflgen::reflect("InvalidScriptComponent"), reflgen::public_methods]] InvalidScript
+    {
+        std::string m_errorMessage = "missing probe script";
+        bool enabled = true;
+        bool IsEnabled() const { return enabled; }
+        void SetEnabled(bool value) { enabled = value; }
+    };
+
     struct [[reflgen::reflect("ProbeComponent"), reflgen::public_methods]] Component : Base
     {
         ce::string title{u"한글 \U0001F3B9"};
@@ -81,11 +105,15 @@ namespace reflection_probe
         std::array<int, 3> fixed{1, 2, 3};
         std::set<int> readonlySet{3, 5};
         std::vector<bool> bits{true, false};
+        std::tuple<int, Settings, std::string> tuple{5, Settings{}, "tuple"};
+        std::variant<Settings, int> choice{Settings{33, 0.5f, "choice"}};
+        std::expected<int, Settings> outcome{std::unexpected(Settings{44, 0.75f, "error"})};
         Mode mode = Mode::Running;
         const int constant = 19;
         [[reflgen::readonly]] Settings locked;
         Cycle cycle;
         int calls = 0;
+        mutable int lookupCalls = 0;
 
         [[reflgen::reflect]] int Increase(int amount) { ++calls; settings.count += amount; return settings.count; }
         [[reflgen::reflect]] void Adjust(int& value) const { value += settings.count; }
@@ -94,6 +122,17 @@ namespace reflection_probe
         [[reflgen::reflect]] Aliased EchoAliased(Aliased value) const { return value; }
         [[reflgen::reflect]] int Choose(int value) const { return value + 10; }
         [[reflgen::reflect]] int Choose(float value) const { return static_cast<int>(value) + 20; }
+        [[reflgen::reflect]] int ChooseSpan(std::span<int> values) const { return 100 + static_cast<int>(values.size()); }
+        [[reflgen::reflect]] int ChooseSpan(std::span<const int> values) const { return 200 + static_cast<int>(values.size()); }
+        [[reflgen::reflect]] int FillSpan(std::span<int> values) const
+        {
+            for (auto& value : values) value += 10;
+            return static_cast<int>(values.size());
+        }
+        [[reflgen::reflect]] void FillSettings(std::span<Settings> values) const
+        {
+            for (auto& value : values) ++value.count;
+        }
         [[reflgen::reflect]] Settings& GetSettings() { return settings; }
         [[reflgen::reflect]] const Settings& GetReadOnlySettings() const { return settings; }
         [[reflgen::reflect]] Settings SnapshotSettings() const { return settings; }
@@ -105,6 +144,31 @@ namespace reflection_probe
         [[reflgen::reflect]] void ResizeItems(int size) { items.resize(static_cast<std::size_t>(size)); }
         [[reflgen::reflect]] void EraseNamed(const std::string& key) { named.erase(key); }
         [[reflgen::reflect]] void ClearOptional() { optional.reset(); }
+        [[reflgen::reflect]] void SwitchChoice() { choice = 91; }
+        [[reflgen::reflect]] void SucceedOutcome() { outcome = 92; }
+        [[reflgen::reflect]] const Settings* FindSettings(const std::string& name) const
+        {
+            ++lookupCalls;
+            const auto found = named.find(name);
+            return found == named.end() ? nullptr : &found->second;
+        }
         [[reflgen::reflect]] void RawArgument(int* value) { if (value) ++*value; }
+        [[reflgen::reflect]] void UnsafeRecord(Cycle value) { if (value.next) ++value.next->value; }
+    };
+}
+
+// The provider explicitly approves this lookup's borrowed pointer, mirroring
+// the engine's reflected-object pointer policy. Arbitrary pointer inputs remain
+// non-deserializable and the selected object can never be made writable.
+namespace reflgen
+{
+    template<> struct runtime_value_traits<const reflection_probe::Settings*>
+    {
+        static constexpr value_shape shape = value_shape::pointer;
+        using children = type_list<reflection_probe::Settings>;
+        static constexpr bool mutable_borrow = false;
+        static constexpr bool deserializable = false;
+        static constexpr bool assignment_safe = false;
+        static const reflection_probe::Settings* get(const reflection_probe::Settings* const& value) { return value; }
     };
 }

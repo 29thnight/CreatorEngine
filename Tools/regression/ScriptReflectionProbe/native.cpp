@@ -19,6 +19,8 @@ namespace
     std::unique_ptr<reflection_probe::Component> component;
     reflection_probe::PhysicsBody physicsBody;
     reflection_probe::CharacterMovement characterMovement;
+    reflection_probe::Script script;
+    reflection_probe::InvalidScript invalidScript;
     bool physicsEnabled = false;
     std::uint64_t instance = FirstInstance;
     std::uint32_t generation = 3;
@@ -36,7 +38,9 @@ namespace
                 &reflgen::type_descriptor_of<reflection_probe::Base>(),
                 &reflgen::type_descriptor_of<reflection_probe::Component>(),
                 &reflgen::type_descriptor_of<reflection_probe::PhysicsBody>(),
-                &reflgen::type_descriptor_of<reflection_probe::CharacterMovement>()};
+                &reflgen::type_descriptor_of<reflection_probe::CharacterMovement>(),
+                &reflgen::type_descriptor_of<reflection_probe::Script>(),
+                &reflgen::type_descriptor_of<reflection_probe::InvalidScript>()};
         };
         result.components = [owner] {
             if (owner.index != 7 || owner.generation != generation)
@@ -57,6 +61,10 @@ namespace
                         &physicsBody, instance, {}, alive});
                     values.push_back({&reflgen::type_descriptor_of<reflection_probe::CharacterMovement>(),
                         &characterMovement, instance, {}, alive});
+                    values.push_back({&reflgen::type_descriptor_of<reflection_probe::Script>(),
+                        &script, instance, {}, alive});
+                    values.push_back({&reflgen::type_descriptor_of<reflection_probe::InvalidScript>(),
+                        &invalidScript, instance, {}, alive});
                 }
             }
             return values;
@@ -96,6 +104,8 @@ PROBE_EXPORT ScriptApiTable* ProbeReflectionTable()
     instance = FirstInstance;
     notifications = 0;
     physicsEnabled = false;
+    script = {};
+    invalidScript = {};
     lastField.clear();
     responses.clear();
     table = {};

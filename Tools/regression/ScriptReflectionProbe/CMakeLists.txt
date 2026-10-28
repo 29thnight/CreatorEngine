@@ -24,7 +24,9 @@ endif()
 
 add_custom_command(
     OUTPUT "${generated}/reflgen_script_reflection_probe.h" "${generated}/reflgen_script_reflection_probe.cpp" "${generated}/types.reflgen.h"
+        "${generated}/reflgen_script_reflection_probe.declarations.json"
     COMMAND "${REFLGEN_EXECUTABLE}" --module script_reflection_probe --output "${generated}"
+        --declarations-json "${generated}/reflgen_script_reflection_probe.declarations.json"
         --registration-header "${CMAKE_CURRENT_SOURCE_DIR}/types.h" "${CMAKE_CURRENT_SOURCE_DIR}/types.h" -- ${clang_arguments}
     DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/types.h" "${REFLGEN_EXECUTABLE}"
     VERBATIM)
@@ -56,5 +58,6 @@ add_test(NAME script_reflection_fsharp
     COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/run_probe.py"
         --dotnet "${DOTNET_EXECUTABLE}" --generator "${REFLGEN_EXECUTABLE}"
         --library "$<TARGET_FILE:ScriptReflectionProvider>" --configuration "$<CONFIG>"
+        --declarations "${generated}/reflgen_script_reflection_probe.declarations.json"
         --work "${CMAKE_CURRENT_BINARY_DIR}/managed/$<CONFIG>")
 set_tests_properties(script_reflection_fsharp PROPERTIES TIMEOUT 180)

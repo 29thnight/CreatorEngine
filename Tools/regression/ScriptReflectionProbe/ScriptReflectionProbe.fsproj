@@ -6,5 +6,6 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
   <ItemGroup><ProjectReference Include="../../../ScriptNative/ScriptNative.fsproj" /></ItemGroup>
-  <ItemGroup><Compile Include="Program.fs" /></ItemGroup>
+  <Import Project="$(ScriptReflectionGeneratedProps)" Condition="'$(ScriptReflectionGeneratedProps)' != ''" />
+  <ItemGroup><Compile Include="TypedSupportTests.fs" /><Compile Include="TypedFacadeTests.fs" /><Compile Include="Program.fs" /></ItemGroup>
 </Project>

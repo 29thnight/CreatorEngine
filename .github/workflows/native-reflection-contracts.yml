@@ -116,6 +116,8 @@ jobs:
           $dependency = Join-Path $env:GITHUB_WORKSPACE 'Build/ReflectionDependency'
           $generatorBuild = Join-Path $env:RUNNER_TEMP 'ReflectionGenerator'
           $probeBuild = Join-Path $env:RUNNER_TEMP 'NativeReflectionContracts'
+          python Tools/build/generate-fsharp-native-facades.py --check
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake -S $dependency -B $generatorBuild -G Ninja -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Release -DREFLGEN_BUILD_TESTS=OFF -DREFLGEN_BUILD_EXAMPLES=OFF -DREFLGEN_BUILD_IFC=OFF
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           cmake --build $generatorBuild --target reflgen_cli --parallel 4

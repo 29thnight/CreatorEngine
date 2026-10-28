@@ -250,6 +250,14 @@ def main() -> None:
             if source.is_file() and source.suffix in (".h", ".cpp", ".args", ".rsp", ".json", ".tsv", ".dependencies"):
                 shutil.copy2(source, artifact / source.name)
 
+    # Compare typed F# files with fresh native declarations from both owning
+    # modules. A stale checked-in snapshot must not silently omit a new member.
+    facade_command = [sys.executable, str(engine / "Tools/build/generate-fsharp-native-facades.py"),
+                      "--engine", str(engine), "--check"]
+    for module, directory in generated.items():
+        facade_command.extend(["--declarations", str(directory / ("reflgen_" + module + ".declarations.json"))])
+    run(facade_command, cwd=engine, log=work / "logs/typed-facades.log")
+
     # Prove the complete production component inventory was extracted, including
     # inherited bases. Source markers alone are never accepted as this gate.
     inventory_path = engine / "Tools/regression/verify-native-reflection-inventory.py"

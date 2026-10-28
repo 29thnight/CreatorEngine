@@ -4,6 +4,7 @@ open System.Runtime.InteropServices
 open System.Text
 open System.Text.Json
 open CreatorEngine
+open CreatorEngine.NativeTypes
 open CreatorEngine.Native
 open CreatorEngine.Native.reflgen_creator_script_native
 
@@ -257,16 +258,35 @@ let main _ =
 
     let threadError = System.Threading.Tasks.Task.Run(fun () -> rejected (fun () -> reflected.["inherited"].Read<int>() |> ignore) "worker access rejected").Result
     check (threadError = "wrong_thread") "worker rejection is explicit"
+    let staleTypedPath = TypedSupportTests.run check rejected reflected
+    let staleTypedGetter = TypedFacadeTests.run check rejected entity
     ProbeReflectionEnablePhysics()
     let body = wrapper<PhysicsBodyComponent> owner reflected.InstanceId
     let movement = wrapper<CharacterMovementComponent> owner reflected.InstanceId
+    let factories = typeof<ScriptComponent>.Assembly.GetType("CreatorEngine.ReflectedComponentBindings", true)
+    factories.GetMethod("Register", BindingFlags.Static ||| BindingFlags.Public ||| BindingFlags.NonPublic).Invoke(null, [||]) |> ignore
+    let script = entity.GetComponent<ScriptComponent>()
+    let invalidScript = entity.GetComponent<InvalidScriptComponent>()
+    check (not (isNull script) && script.IsPresent && script.ScriptType = "ProbeScript") "script wrapper factory resolves the native instance"
+    check (script.HasInstance && script.ManagedInstanceId = 101 && script.InitializationAttempts = 1UL) "script wrapper native method surface"
+    script.ScriptType <- "GeneratedScript"
+    script.FieldData <- [|"한글"; "data"|]
+    script.Enabled <- false
+    check (script.ScriptType = "GeneratedScript" && script.FieldData = [|"한글"; "data"|] && not script.Enabled) "script wrapper native field and enabled mutation"
+    check (not (isNull invalidScript) && invalidScript.IsPresent && invalidScript.ErrorMessage = "missing probe script") "invalid script wrapper factory resolves native placeholder"
+    check (script.Native.m_scriptType = "GeneratedScript" && invalidScript.Native.m_errorMessage = "missing probe script") "new wrappers expose the generated named Native surface"
     check (body.Reflected.InstanceId = body.ComponentId && body.Reflected.["value"].Read<int>() = 61) "physics wrapper reflection preserves its captured native identity"
     check (movement.Reflected.InstanceId = movement.ComponentId && movement.Reflected.["value"].Read<int>() = 71) "character wrapper reflection preserves its captured native identity"
     let oldNested = reflected.["settings"].["count"]
     ProbeReflectionReplace()
+    rejected staleTypedPath "typed field view rejects removed or replaced component identity" |> ignore
+    rejected staleTypedGetter "generated typed getter rejects removed or replaced component identity" |> ignore
     rejected (fun () -> oldNested.Read<int>() |> ignore) "old component view is rejected after remove/re-add" |> ignore
     rejected (fun () -> body.Reflected |> ignore) "stale physics wrapper cannot retarget a replacement component" |> ignore
     rejected (fun () -> movement.Reflected |> ignore) "stale character wrapper cannot retarget a replacement component" |> ignore
+    check (not script.IsPresent && not invalidScript.IsPresent) "new reflected wrapper presence honors captured instance identity"
+    rejected (fun () -> script.Native.m_scriptType |> ignore) "script typed wrapper rejects replacement instance" |> ignore
+    rejected (fun () -> invalidScript.Native.m_errorMessage |> ignore) "invalid script typed wrapper rejects replacement instance" |> ignore
     let replacement = entity.GetNativeComponent("ProbeComponent")
     check (replacement.InstanceId <> reflected.InstanceId && replacement.["settings"].["count"].Read<int>() = 7) "replacement has a fresh identity"
     let replacementBody = wrapper<PhysicsBodyComponent> owner replacement.InstanceId

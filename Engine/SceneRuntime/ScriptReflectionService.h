@@ -337,7 +337,9 @@ namespace ce::script::reflection
                     {"returnType", public_type_name(method.result())}, {"parameters", std::move(parameters)},
                     {"callable", method.is_serialized_invocable()},
                     {"reason", method.serialized_unavailable_reason()},
-                    {"canBorrow", method.can_borrow_result()}, {"isConst", method.is_const()}});
+                    {"canBorrow", method.can_borrow_result()},
+                    {"canBorrowWithArguments", method.can_borrow_result_with_arguments()},
+                    {"borrowReason", method.borrow_unavailable_reason()}, {"isConst", method.is_const()}});
             }
         }
         for (const auto& child : value.children()) children.emplace_back(public_type_name(child.value()));
@@ -398,9 +400,10 @@ namespace ce::script::reflection
             const auto* dereference = segment.find("deref");
             const auto* methodName = segment.find("method");
             const auto* signature = segment.find("signature");
+            const auto* arguments = segment.find("arguments");
             if ((member != nullptr) + (index != nullptr) + (key != nullptr) + (dereference != nullptr)
-                + (methodName != nullptr) != 1 || fields.size() != (signature ? 2u : 1u)
-                || (signature && !methodName))
+                + (methodName != nullptr) != 1 || fields.size() != 1u + (signature ? 1u : 0u) + (arguments ? 1u : 0u)
+                || ((signature || arguments) && !methodName))
                 throw protocol_error("invalid_request", "a path segment must select exactly one field, index, key, deref or method");
             if (!current) throw protocol_error("null_value", "cannot traverse a null native value");
             if (member)
@@ -450,12 +453,26 @@ namespace ce::script::reflection
                 const auto& method = find_method(*type, methodName->as_string(),
                     signature ? signature->as_string() : std::string_view{});
                 if (!method.can_borrow_result())
-                    throw protocol_error("unsupported", "this method does not return a borrowable or retained value");
+                    throw protocol_error("unsupported", std::string(method.borrow_unavailable_reason()));
                 if (!current.is_writable() && !method.is_const())
                     throw protocol_error("read_only", "cannot call a mutable getter through a read-only path");
                 if (rootField.empty()) rootField = "*";
-                auto next = current.is_writable() ? method.borrow_result(current.mutable_data())
-                    : method.borrow_result(current.data());
+                reflgen::value_view next;
+                if (arguments)
+                {
+                    const auto argumentText = json_text(*arguments);
+                    reflgen::json::reader in(argumentText, MaximumPathLength + 16);
+                    next = current.is_writable() ? method.borrow_result(current.mutable_data(), in)
+                        : method.borrow_result(current.data(), in);
+                    in.finish();
+                }
+                else
+                {
+                    if (!method.parameters().empty())
+                        throw protocol_error("invalid_request", "this native lookup requires arguments");
+                    next = current.is_writable() ? method.borrow_result(current.mutable_data())
+                        : method.borrow_result(current.data());
+                }
                 next.retain_parent(current);
                 current = std::move(next);
             }

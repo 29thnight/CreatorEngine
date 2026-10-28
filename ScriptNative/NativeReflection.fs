@@ -115,6 +115,8 @@ type NativeMethodDescriptor internal (metadata: JsonElement) =
     member _.Parameters = ReflectionJson.array "parameters" metadata |> Array.map NativeParameterDescriptor
     member _.CanInvoke = ReflectionJson.flag "callable" metadata
     member _.CanBorrowResult = ReflectionJson.flag "canBorrow" metadata
+    member _.CanBorrowWithArguments = ReflectionJson.flag "canBorrowWithArguments" metadata
+    member _.BorrowUnavailableReason = ReflectionJson.text "borrowReason" metadata
     member _.UnavailableReason = ReflectionJson.text "reason" metadata
     member _.Metadata = metadata.Clone()
 
@@ -147,19 +149,19 @@ type NativeInvocationResult internal (response: JsonElement) =
 /// A live path rooted in a specific native component instance.
 /// Every access resolves the entity generation, component instance, and the complete path again.
 /// No native address is retained across calls or container reallocations.
-type NativeValue internal (owner: ObjectHandle, component: string, instance: uint64,
+type NativeValue internal (owner: ObjectHandle, componentName: string, instance: uint64,
                            path: Dictionary<string, obj> array) =
     member internal _.Owner = owner
-    member internal _.ComponentName = component
+    member internal _.ComponentName = componentName
     member internal _.NativeInstance = instance
     member internal _.Path = path
     member internal _.Request(operation: string, extras: (string * obj) list) =
-        let request = ReflectionJson.fields [ "op", box operation; "component", box component;
+        let request = ReflectionJson.fields [ "op", box operation; "component", box componentName;
                                              "instance", box instance; "path", box path ]
         for name, value in extras do request.Add(name, value)
         NativeReflectionTransport.execute owner request
     member private _.Append(name: string, value: obj) =
-        NativeValue(owner, component, instance, Array.append path [| ReflectionJson.fields [ name, value ] |])
+        NativeValue(owner, componentName, instance, Array.append path [| ReflectionJson.fields [ name, value ] |])
     member this.Field(name: string) =
         ArgumentException.ThrowIfNullOrEmpty(name)
         this.Append("field", box name)
@@ -175,11 +177,25 @@ type NativeValue internal (owner: ObjectHandle, component: string, instance: uin
     member this.Borrow(methodName: string) =
         ArgumentException.ThrowIfNullOrEmpty(methodName)
         this.Append("method", box methodName)
+    /// Resolve a const native lookup with serialized arguments on each access.
+    /// Argument-bearing results are read-only because they can refer to temporary argument storage.
+    member _.Borrow(methodName: string, [<ParamArray>] arguments: obj array) =
+        ArgumentException.ThrowIfNullOrEmpty(methodName)
+        ArgumentNullException.ThrowIfNull(arguments)
+        let segment = ReflectionJson.fields [ "method", box methodName; "arguments", box arguments ]
+        NativeValue(owner, componentName, instance, Array.append path [| segment |])
     member _.BorrowOverload(methodName: string, signature: string) =
         ArgumentException.ThrowIfNullOrEmpty(methodName)
         ArgumentException.ThrowIfNullOrEmpty(signature)
         let segment = ReflectionJson.fields [ "method", box methodName; "signature", box signature ]
-        NativeValue(owner, component, instance, Array.append path [| segment |])
+        NativeValue(owner, componentName, instance, Array.append path [| segment |])
+    member _.BorrowOverload(methodName: string, signature: string, [<ParamArray>] arguments: obj array) =
+        ArgumentException.ThrowIfNullOrEmpty(methodName)
+        ArgumentException.ThrowIfNullOrEmpty(signature)
+        ArgumentNullException.ThrowIfNull(arguments)
+        let segment = ReflectionJson.fields [ "method", box methodName; "signature", box signature;
+                                             "arguments", box arguments ]
+        NativeValue(owner, componentName, instance, Array.append path [| segment |])
     member this.Item
         with get (name: string) = this.Field(name)
     member this.Item

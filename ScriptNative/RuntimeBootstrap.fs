@@ -22,6 +22,7 @@ type internal NativeServices() =
         CameraBindings.Register()
         LightBindings.Register()
         ExtraBindings.Register()
+        ReflectedComponentBindings.Register()
         AnimatorBindings.Register()
         UIBindings.Register()
         MeshBindings.Register()
