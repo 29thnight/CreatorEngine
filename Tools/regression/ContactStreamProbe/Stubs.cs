@@ -19,6 +19,8 @@ internal static unsafe class ContactProbeHost
     [UnmanagedCallersOnly] private static int IsAlive(ObjectHandle owner) => 1;
     [UnmanagedCallersOnly] private static int Asset(AssetLinkABI* link, uint kind, TextureAssetVariantABI* variant, AssetToken* token) => -1;
     [UnmanagedCallersOnly] private static void Cut(ObjectHandle owner) { }
+    [UnmanagedCallersOnly] private static int ExtraGet(ObjectHandle owner, int kind) => 0;
+    [UnmanagedCallersOnly] private static void ExtraSet(ObjectHandle owner, int kind, int enabled) { }
     [UnmanagedCallersOnly] private static int Status(SimulationStatus* status) { *status = default; return 0; }
     [UnmanagedCallersOnly] private static int Submit(ulong epoch, ulong tick, uint kind, byte* payload, int count, ulong* sequence) => 1;
     [UnmanagedCallersOnly] private static int Read(ulong epoch, ulong tick, SimulationSnapshot* snapshot, byte* payload, int count) => 7;
@@ -35,7 +37,10 @@ internal static unsafe class ContactProbeHost
             Camera_NotifyCameraCut = &Cut,
             Simulation_Status = &Status,
             Simulation_Submit = &Submit,
-            Simulation_Read = &Read
+            Simulation_Read = &Read,
+            ExtraComponent_Exists = &ExtraGet,
+            ExtraComponent_GetEnabled = &ExtraGet,
+            ExtraComponent_SetEnabled = &ExtraSet
         };
         if (!Native.Bind(&api)) throw new Exception("Native contact probe contract did not bind.");
         ScriptFactory.Initialize();

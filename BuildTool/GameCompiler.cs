@@ -13,6 +13,15 @@ internal static class GameCompiler
         "FSharp.Core.dll"
     ];
     public static readonly string[] ManagedFiles = [.. CoreFiles, "Scripts/GameScripts.dll", "Scripts/GameScripts.deps.json", "Scripts/GameScripts.dll.engine.json", "Scripts/FSharp.Core.dll", "Scripts/CreatorEngine.FSharp.Runtime.dll"];
+    public static readonly string[] NativeCoreFiles =
+    [
+        "CreatorEngine.NativeBindings.dll", "CreatorEngine.NativeBindings.deps.json", "CreatorEngine.NativeBindings.runtimeconfig.json",
+        "CreatorEngine.AudioValues.dll", "FSharp.Core.dll"
+    ];
+    internal static bool UsesNative(EngineDistribution engine) => engine.Manifest["scriptBackend"]?.GetValue<string>() == "fsharp-native";
+    internal static string[] Files(bool native) => native
+        ? [.. NativeCoreFiles, "FSharpNative/Scripts/GameScripts.dll", "FSharpNative/Scripts/GameScripts.deps.json", "FSharpNative/Scripts/GameScripts.dll.engine.json", "FSharpNative/Scripts/FSharp.Core.dll", "FSharpNative/Scripts/CreatorEngine.FSharp.Runtime.dll"]
+        : ManagedFiles;
     // Keep both input identities open without write/delete sharing until the
     // exact copied bytes are checked. Never bless changed bytes with a new receipt.
     internal static string CopyPrebuiltAssembly(EngineDistribution engine, string prebuilt, string assembly)
@@ -71,12 +80,14 @@ internal static class GameCompiler
         Paths.Disjoint(output, Paths.Canonical(Path.Combine(project, "ProjectSetting"), true));
         Directory.CreateDirectory(output);
         using var compileLock = new FileStream(Paths.Child(output, ".compile.lock"), FileMode.OpenOrCreate, FileAccess.ReadWrite, FileShare.None);
-        var work = Paths.Child(output, ".compiler-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(Path.Combine(work, "Scripts"));
-        var assembly = Path.Combine(work, "Scripts/GameScripts.dll");
+        var native = UsesNative(engine);
+        var scripts = native ? "FSharpNative/Scripts" : "Scripts";
+        var work = Paths.Child(output, ".compiler-" + Guid.NewGuid().ToString("N")); Directory.CreateDirectory(Path.Combine(work, scripts));
+        var assembly = Path.Combine(work, scripts, "GameScripts.dll");
         try
         {
-            foreach (var name in CoreFiles) Paths.Copy(Path.Combine(engine.BinaryRoot, "Managed", name), Path.Combine(work, name));
-            Paths.Copy(Path.Combine(engine.Root, "Scripting/FSharpRuntime/CreatorEngine.FSharp.Runtime.dll"), Path.Combine(work, "Scripts/CreatorEngine.FSharp.Runtime.dll"));
+            foreach (var name in native ? NativeCoreFiles : CoreFiles) Paths.Copy(Path.Combine(engine.BinaryRoot, "Managed", name), Path.Combine(work, name));
+            Paths.Copy(Path.Combine(engine.Root, "Scripting/FSharpRuntime/CreatorEngine.FSharp.Runtime.dll"), Path.Combine(work, scripts, "CreatorEngine.FSharp.Runtime.dll"));
             string? prebuiltHash = null;
             if (prebuilt.Length > 0)
             {
@@ -88,10 +99,11 @@ internal static class GameCompiler
                 var sources = ReadFSharpSources(sourceRoot);
                 static string Quote(string path) => path;
                 var arguments = new List<string> { "--target:library", "--targetprofile:netcore", "--langversion:10.0", "--noframework", "--simpleresolution", "--deterministic+",
-                    "--out:" + Quote(assembly), "-r:" + Quote(Path.Combine(work, "ScriptCore.dll")),
-                    "-r:" + Quote(Path.Combine(work, "Scripts/CreatorEngine.FSharp.Runtime.dll")),
+                    "--out:" + Quote(assembly), "-r:" + Quote(Path.Combine(work, native ? "CreatorEngine.NativeBindings.dll" : "ScriptCore.dll")),
+                    "-r:" + Quote(Path.Combine(work, scripts, "CreatorEngine.FSharp.Runtime.dll")),
                     "-r:" + Quote(Path.Combine(engine.Root, "Scripting/FSharpReferences/FSharp.Core.dll")),
                     "--pathmap:" + Quote(project + "=/_/Project," + work + "=/_/Build") };
+                if (native) arguments.Add("-r:" + Quote(Path.Combine(work, "CreatorEngine.AudioValues.dll")));
                 arguments.AddRange(configuration == "Debug" ? ["--define:DEBUG", "--define:TRACE", "--debug:portable", "--optimize-"] : ["--define:TRACE", "--optimize+"]);
                 arguments.AddRange(Paths.Files(Path.Combine(engine.Root, "Scripting/References")).Where(p => p.EndsWith(".dll", StringComparison.OrdinalIgnoreCase)).Order(StringComparer.Ordinal).Select(p => "-r:" + Quote(p)));
                 arguments.AddRange(sources.Select(Quote));
@@ -105,12 +117,12 @@ internal static class GameCompiler
 
             }
             var fsharpCore = Path.Combine(engine.Root, "Scripting/FSharpReferences/FSharp.Core.dll");
-            var deployedCore = Path.Combine(work, "Scripts/FSharp.Core.dll");
+            var deployedCore = Path.Combine(work, scripts, "FSharp.Core.dll");
             if (!File.Exists(deployedCore)) Paths.Copy(fsharpCore, deployedCore);
             else if (Metadata.Hash(deployedCore) != Metadata.Hash(fsharpCore))
                 throw new BuildException("Compiler copied an unexpected FSharp.Core identity.");
             Metadata.Write(assembly + ".engine.json", new { schemaVersion = 1, engineBuildId = engine.Manifest.Text("buildId"), scriptApi = engine.Manifest.Int("scriptApi"), sha256 = prebuiltHash ?? Metadata.Hash(assembly) });
-            Metadata.Write(Path.Combine(work, "Scripts/GameScripts.deps.json"), new
+            Metadata.Write(Path.Combine(work, scripts, "GameScripts.deps.json"), new
             {
                 runtimeTarget = new { name = ".NETCoreApp,Version=v10.0", signature = "" }, compilationOptions = new { },
                 targets = new Dictionary<string, object> { [".NETCoreApp,Version=v10.0"] = new Dictionary<string, object> { ["GameScripts/1.0.0"] = new { runtime = new Dictionary<string, object> { ["GameScripts.dll"] = new { } } } } },
@@ -119,7 +131,8 @@ internal static class GameCompiler
             context.Cancellation.ThrowIfCancellationRequested();
             if (prebuiltHash != null && Metadata.Hash(assembly) != prebuiltHash)
                 throw new BuildException("Prebuilt GameScripts.dll changed before publication.");
-            foreach (var relative in ManagedFiles.Concat(File.Exists(Path.Combine(work, "Scripts/GameScripts.pdb")) ? ["Scripts/GameScripts.pdb"] : Array.Empty<string>()))
+            var symbols = scripts + "/GameScripts.pdb";
+            foreach (var relative in Files(native).Concat(File.Exists(Path.Combine(work, symbols)) ? [symbols] : Array.Empty<string>()))
             {
                 var source = Paths.Child(work, relative); var destination = Paths.Child(output, relative);
                 if (File.Exists(destination) && Metadata.Hash(destination) == Metadata.Hash(source)) continue;

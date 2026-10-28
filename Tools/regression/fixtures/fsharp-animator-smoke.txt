@@ -1,0 +1,10 @@
+wait 60
+scene.new FSharpAnimatorProbe
+wait 30
+object.create AnimSubject Empty
+component.add AnimSubject Animator
+script.add AnimSubject AnimatorProbe
+play
+wait 120
+log.flush
+quit

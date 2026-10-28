@@ -11,6 +11,8 @@ unsafe class Program
     [UnmanagedCallersOnly] static int IsAlive(ObjectHandle handle) => Alive.Contains(handle) ? 1 : 0;
     [UnmanagedCallersOnly] static int Asset(AssetLinkABI* l, uint k, TextureAssetVariantABI* v, AssetToken* t) => -1;
     [UnmanagedCallersOnly] static void Cut(ObjectHandle h) { }
+    [UnmanagedCallersOnly] static int ExtraGet(ObjectHandle h, int kind) => 0;
+    [UnmanagedCallersOnly] static void ExtraSet(ObjectHandle h, int kind, int enabled) { }
     [UnmanagedCallersOnly] static int TickStatus(SimulationStatus* s) { *s = default; return 0; }
     [UnmanagedCallersOnly] static int Submit(ulong e, ulong t, uint k, byte* p, int n, ulong* s) { *s = 0; return 1; }
     [UnmanagedCallersOnly] static int Read(ulong e, ulong t, SimulationSnapshot* s, byte* p, int n) { *s = default; return 7; }
@@ -41,7 +43,8 @@ unsafe class Program
         var api = new ScriptApiTable { Version = Native.ExpectedVersion, StructSize = sizeof(ScriptApiTable),
             Entity_IsAlive = &IsAlive, Asset_RequestTyped = &Asset, Asset_TryAcquireTyped = &Asset,
             Camera_NotifyCameraCut = &Cut, PrintLog = &Log,
-            Simulation_Status = &TickStatus, Simulation_Submit = &Submit, Simulation_Read = &Read };
+            Simulation_Status = &TickStatus, Simulation_Submit = &Submit, Simulation_Read = &Read,
+            ExtraComponent_Exists = &ExtraGet, ExtraComponent_GetEnabled = &ExtraGet, ExtraComponent_SetEnabled = &ExtraSet };
         --api.Version;
         Check(!Native.Bind(&api), "previous host contract version rejected");
         ++api.Version;

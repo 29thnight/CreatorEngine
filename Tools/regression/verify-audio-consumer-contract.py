@@ -97,8 +97,9 @@ STUBS = {'Component.h': '#pragma once\n'
 
 def main():
     native = (ROOT / "Engine/SceneRuntime/ClrHost.cpp").read_text(encoding="utf-8-sig")
+    native_header = (ROOT / "Engine/SceneRuntime/ScriptApiTable.h").read_text(encoding="utf-8-sig")
     managed = (ROOT / "ScriptCore/Native.cs").read_text(encoding="utf-8-sig")
-    native_table = native.split("struct ScriptApiTable", 1)[1].split("ScriptApiTable g_apiTable", 1)[0]
+    native_table = native_header.split("struct ScriptApiTable", 1)[1].split("\n\t};", 1)[0]
     managed_table = managed.split("internal static unsafe class Native", 1)[0]
     native_names = re.findall(r"\(__stdcall\*\s*(\w+)\)", native_table)
     managed_names = re.findall(r"delegate\* unmanaged<[^;]+>\s+(\w+)\s*;", managed_table)
@@ -111,8 +112,8 @@ def main():
     for name in audio_names:
         assert re.search(r"g_apiTable\." + name + r"\s*=\s*&Api_" + name + r"\s*;", native), name
         assert re.search(r"\bApi_" + name + r"\s*\([^;]*?\)\s*\{", native, re.S), name
-    settings_native = native.split("    struct AudioPlaySettings", 1)[1].split("    struct AudioParameter", 1)[0]
-    audio_cs = (ROOT / "ScriptCore/Audio.cs").read_text()
+    settings_native = native_header.split("    struct AudioPlaySettings", 1)[1].split("    struct AudioParameter", 1)[0]
+    audio_cs = (ROOT / "ScriptCore/Audio.cs").read_text(encoding="utf-8-sig")
     settings_managed = audio_cs.split("public struct AudioPlaySettings", 1)[1].split("[StructLayout", 1)[0]
     native_types = re.findall(r"\b(float|int|std::uint32_t)\s+\w+\s*;", settings_native)
     managed_types = re.findall(r"public\s+(float|int|uint|AudioBus|AudioRolloff|AudioOwnerDestroyedPolicy)\s+\w+\s*(?:=[^;]+)?;", settings_managed)
@@ -124,13 +125,13 @@ def main():
     for relative in ["Engine/SceneRuntime/SoundComponent.h", "Engine/SceneRuntime/SoundDefinition.h",
                      "Engine/SceneRuntime/SoundSystem.h", "Engine/SceneRuntime/AudioListenerComponent.h",
                      "ScriptCore/SoundComponent.cs", "ScriptCore/Audio.cs"]:
-        assert not re.search(r"FMOD|fmod|ma_sound|ma_engine|BackendVoiceId", (ROOT / relative).read_text()), relative
-    component = (ROOT / "Engine/SceneRuntime/SoundComponent.cpp").read_text()
+        assert not re.search(r"FMOD|fmod|ma_sound|ma_engine|BackendVoiceId", (ROOT / relative).read_text(encoding="utf-8-sig")), relative
+    component = (ROOT / "Engine/SceneRuntime/SoundComponent.cpp").read_text(encoding="utf-8-sig")
     assert "PlayAttached(" not in component, "Emitter must preserve authored spatial blend"
     assert "request.loopOverride = false;" in component, "One-shots must override looping presets"
     scene = (ROOT / "Engine/SceneRuntime/Scene.h").read_text(encoding="utf-8-sig")
     assert re.search(r"\[\[reflgen::ignore\]\]\s+SoundSystem m_soundSystem", scene)
-    assert "class SoundSystem final" in (ROOT / "Engine/SceneRuntime/SoundSystem.h").read_text()
+    assert "class SoundSystem final" in (ROOT / "Engine/SceneRuntime/SoundSystem.h").read_text(encoding="utf-8-sig")
     for host in ["Editor/EngineEntry/Bootstrap/EditorMain.cpp", "Player/PlayerMain.cpp"]:
         text = (ROOT / host).read_text(encoding="utf-8-sig")
         for expected in ["BindAudioPlayback(nullptr)", "m_audioPlayback->Shutdown()", "m_audioHost->Shutdown()",
@@ -147,14 +148,16 @@ def main():
             for extension in ["h", "cpp"]:
                 shutil.copyfile(ROOT / "Engine/SceneRuntime" / (name + "." + extension), target / (name + "." + extension))
         shutil.copyfile(ROOT / "Engine/SceneRuntime/SoundDefinition.h", target / "SoundDefinition.h")
+        definition = (target / "SoundDefinition.h").read_text(encoding="utf-8-sig")
+        (target / "SoundDefinition.h").write_text(definition.replace('../Utility_Framework/Reflection/Reflection.hpp', 'Reflection.hpp'), encoding="utf-8")
         shutil.copyfile(ROOT / "Tools/regression/audio_consumer_contract_probe.cpp", target / "probe.cpp")
         (target / "Contract.h").write_text('#include "' + (ROOT / "Tools/build/ModuleAdapters/Creator.Contracts.h").as_posix() + '"\n')
         (target / "CreatorContractConfig.h").write_text(
             "#pragma once\nnamespace ce::contract_detail { inline constexpr bool assertions_enabled = true; }\n")
         probe_text = (target / "probe.cpp").read_text()
         (target / "probe.cpp").write_text(probe_text.replace("../build/ModuleAdapters/Creator.Contracts.h", "Contract.h"))
-        command = [compiler, "-std=c++20", "-DCE_CONTRACT_STANDALONE=1", "-Wno-attributes", "-I", str(target), "-I", str(ROOT / "Engine/SceneRuntime"),
-                   "-I", str(ROOT / "ThirdParty/Mathematics/include")]
+        command = [compiler, "-std=c++23", "-DCE_CONTRACT_STANDALONE=1", "-Wno-attributes", "-I", str(target), "-I", str(ROOT / "Engine/SceneRuntime"),
+                   "-I", str(ROOT / "ThirdParty/Mathematics/include"), "-I", str(ROOT / "vcpkg_installed/x64-windows/x64-windows/include")]
         command += [str(target / name) for name in ["probe.cpp", "SoundComponent.cpp", "SoundSystem.cpp", "AudioListenerComponent.cpp"]]
         command += [str(ROOT / "Engine/SceneRuntime/Audio" / name) for name in ["PlaybackService.cpp", "SoundGraph.cpp"]]
         command += ["-o", str(target / "probe")]
@@ -162,7 +165,7 @@ def main():
         subprocess.run([str(target / "probe")], check=True)
         # Compile the actual native binding implementation separately. Windows
         # calling convention, CLR loading and real Entity/Scene remain outside this probe.
-        abi_structs = native.split("    struct AudioAssetId", 1)[1].split("\tstruct ScriptApiTable", 1)[0]
+        abi_structs = native_header.split("    struct AudioAssetId", 1)[1].split("\tstruct ScriptApiTable", 1)[0]
         abi_functions = native.split("    bool AudioApiEntered()", 1)[1].split("\t// ── Animator ──", 1)[0]
         preamble = (target / "probe.cpp").read_text().split("int main()", 1)[0]
         glue = preamble + r"""

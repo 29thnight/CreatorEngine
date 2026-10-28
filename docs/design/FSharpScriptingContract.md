@@ -1,5 +1,7 @@
 # F# 단독 저작·네이티브 컴포넌트 계약 — 2026-10-23
 
+> 2026-10-29 전환: 현재 제품의 바인딩은 `ScriptNative/ScriptNative.fsproj`가 만드는 `CreatorEngine.NativeBindings.dll`이다. reflgen이 API 46의 네이티브 테이블을 F#으로 바인딩하며, Editor의 저작 프로젝트는 `ScriptNative.GameScripts/ScriptNative.GameScripts.fsproj`다. 엔진 배포와 Headless 스테이징은 이 경로를 사용한다. `ScriptCore` 경로는 `CreatorLegacyScriptBaseline=true`로 별도 빌드한 비교 도구에서만 선택할 수 있다. 배포 도구의 비교 빌드는 `--legacy-script-baseline --build`를 명시한다. 아래 API45 및 ScriptCore 관련 설명은 이전 계약의 기록이다. 전환 작업과 수용 조건은 [F# 네이티브 바인딩 전환 계획](../plans/FSharpNativeBindingMigrationPlan.md)을 따른다.
+
 ## 현재 결정
 
 게임 스크립트와 공통 관리 실행기는 F#으로 구현한다. `ScriptRuntime/ScriptRuntime.fsproj`가 `CreatorEngine.ManagedRuntime.dll`을 만들며, 팩토리·인스턴스/틱 멤버십·생명주기 실행·구독 정리·await 재개 큐·접촉 라우팅·collectible 로더·애니메이션/BT 등록과 인스턴스·진단 호출·GC 정책을 소유한다. C# ScriptCore에는 네이티브 함수 포인터·ABI 값 형식·공개 바인딩 타입과 전달 진입점을 남긴다. C# 바인딩에는 별도의 스크립트 실행 목록이나 생명주기 실행기를 두지 않는다.
@@ -57,3 +59,8 @@ hot tick에서는 seq/list/closure 생성, 반복 GetComponent, 작은 native �
 ## 수용 경계
 
 [API45 실행 기록](../analysis/FSharpManagedRuntimeAcceptance20261023.md)을 따른다. API43/OnUpdate와 API44/override 기록은 이전 단계의 수용이며 API45의 코드 신원 증명이 아니다. 새 source identity·관리 gate·실제 제품 gate를 구분한다. 전체 기존 fixture 이주·shader/일반 모델 cook·IDE·NativeAOT·다른 플랫폼·장시간 reload·일반 성능 예산은 자동 완료하지 않는다.
+# API 47 native component additions
+
+The native and managed tables now use API 47. `BoneComponent.Pinned` and
+`ResolvedBoneIndex`, and the `DecalComponent` animation fields, use native
+component accessors. Other native component members are not yet fully bound.

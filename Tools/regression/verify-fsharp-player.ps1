@@ -1,5 +1,5 @@
 [CmdletBinding()]
-param([Parameter(Mandatory)][string]$EngineDistribution)
+param([Parameter(Mandatory)][string]$EngineDistribution, [ValidateSet('Debug','Release')][string]$Configuration = 'Release', [string]$ProbeSource = '', [switch]$TextureFixture)
 $ErrorActionPreference='Stop'
 $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $out=Join-Path $repo ('Build/Verification/FSharp/Player-'+[guid]::NewGuid().ToString('N'))
@@ -11,12 +11,40 @@ Copy-Item "$repo/Tools/regression/fixtures/PhysicsCharacterPlayer.creator*" "$pr
 $scene="$project/Assets/Scenes/PhysicsCharacterPlayer.creator"
 $content=(Get-Content $scene -Raw).Replace('m_scriptType: CharacterPlayerProbe','m_scriptType: FSharpNativePlayerProbe')
 [IO.File]::WriteAllText($scene,$content,[Text.UTF8Encoding]::new($false))
-Copy-Item "$repo/GameScripts/FSharpNativePlayerProbe.fs" "$project/Assets/Script"
+if (!$ProbeSource) { $ProbeSource = "$repo/GameScripts/FSharpNativePlayerProbe.fs" }
+Copy-Item -LiteralPath $ProbeSource -Destination "$project/Assets/Script/FSharpNativePlayerProbe.fs"
+if ($TextureFixture) {
+    New-Item -ItemType Directory -Force "$project/Assets/Materials" | Out-Null
+    Copy-Item -LiteralPath "$repo/Dynamic_CPP/Assets/Materials/Cube_Mat_BaseColor.png", "$repo/Dynamic_CPP/Assets/Materials/Cube_Mat_BaseColor.png.meta" -Destination "$project/Assets/Materials"
+}
 Set-Content "$project/Assets/Script/compile.order" 'FSharpNativePlayerProbe.fs' -Encoding utf8
-$tool=Join-Path $EngineDistribution 'Bin/x64-Release/Tools/CreatorBuildTool/CreatorBuildTool.exe'
+$tool=Join-Path $EngineDistribution "Bin/x64-$Configuration/Tools/CreatorBuildTool/CreatorBuildTool.exe"
 & $tool select-engine --engine-distribution $EngineDistribution --project $project *> "$out/select.log"
 if($LASTEXITCODE){throw 'F# fixture engine selection failed'}
-& $tool package-game --repository $repo --config Release --project $project --stage-root "$out/Staging" --input-mode Project --startup-scene PhysicsCharacterPlayer.creator --engine-distribution $EngineDistribution --smoke-frames 360 --smoke-timeout-sec 300 *> "$out/package.log"
+$assetSetArgs = @()
+if ($TextureFixture) {
+    $definition = @'
+schemaVersion: 1
+assetSetId: 22222222-2222-4222-8222-222222222222
+revision: 1
+inclusion: HardAndLoadable
+target: { platform: win-x64, abi: creator-content-v1 }
+settings: { textureEncoding: GPUReady }
+roots:
+  - { assetId: eeadbf9a-d493-4ace-8a78-b5fb9711f1cf, kind: Texture }
+assets:
+  - { assetId: eeadbf9a-d493-4ace-8a78-b5fb9711f1cf, kind: Texture, source: Materials/Cube_Mat_BaseColor.png, dependencies: [] }
+'@
+    $definitionPath = Join-Path $out 'texture-set.asset'
+    [IO.File]::WriteAllText($definitionPath, $definition, [Text.UTF8Encoding]::new($false))
+    $assetSet = Join-Path $out 'TextureSet'
+    & $tool build-asset-set --engine-distribution $EngineDistribution --project $project --asset-set $definitionPath --output $assetSet *> "$out/asset-set.log"
+    if ($LASTEXITCODE) { throw "Texture AssetSet build failed: $out/asset-set.log" }
+    $list = Join-Path $out 'asset-sets.txt'
+    [IO.File]::WriteAllText($list, "$assetSet`n", [Text.UTF8Encoding]::new($false))
+    $assetSetArgs = @('--asset-set-list', $list)
+}
+& $tool package-game --repository $repo --config $Configuration --project $project --stage-root "$out/Staging" --input-mode Project --startup-scene PhysicsCharacterPlayer.creator --engine-distribution $EngineDistribution --smoke-frames 360 --smoke-timeout-sec 300 @assetSetArgs *> "$out/package.log"
 if($LASTEXITCODE){throw "F# package failed: $out/package.log"}
 $pointer=Get-Content "$out/Staging/Project.current.json" -Raw|ConvertFrom-Json
 if($pointer.verification -ne 'passed'){throw 'F# package smoke failed'}
@@ -41,5 +69,6 @@ try {
  foreach($file in Get-ChildItem $stage -Recurse -File){if(!$before.ContainsKey($file.FullName) -or $before[$file.FullName] -ne (Get-FileHash $file.FullName).Hash){throw 'F# package changed during runtime acceptance'}}
  if(@(Get-ChildItem $stage -Recurse -File).Count -ne $before.Count){throw 'F# package file set changed'}
 } finally {if(!$p.HasExited){$p.Kill();$p.WaitForExit()}}
-@{result='FSHARP_PLAYER_PRODUCT_OK';stage=$stage;evidence=$out;scope='Release primitive CCT cooked Player; F# sole primary, fixed tick/native query/read/write';marker=@($ok|ForEach-Object {$_.Line})}|ConvertTo-Json -Depth 5|Set-Content "$out/result.json" -Encoding utf8
+$scope = if ($TextureFixture) { "$Configuration cooked Player; F# AssetSet request, texture descriptor, and release" } else { "$Configuration primitive CCT cooked Player; F# sole primary, fixed tick/native query/read/write" }
+@{result='FSHARP_PLAYER_PRODUCT_OK';stage=$stage;evidence=$out;scope=$scope;marker=@($ok|ForEach-Object {$_.Line})}|ConvertTo-Json -Depth 5|Set-Content "$out/result.json" -Encoding utf8
 "FSHARP_PLAYER_PRODUCT_OK evidence=$out"

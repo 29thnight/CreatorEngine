@@ -2,6 +2,14 @@ using System.Diagnostics;
 using System.Text.Json.Nodes;
 using CreatorBuildTool;
 
+if (args.Length == 2 && args[0] == "--native-api-check")
+{
+    var version = EnginePublisher.ReadManagedApiVersion(Path.GetFullPath(args[1]), true);
+    if (version != 47) throw new Exception($"Unexpected native F# API version: {version}");
+    Console.WriteLine($"FSHARP_NATIVE_METADATA_OK version={version}");
+    return 0;
+}
+
 if (args.Length == 3 && args[0] == "--validate-cooked")
 {
     var cooked = AssetCooking.Validate(Path.GetFullPath(args[1]), int.Parse(args[2]));
@@ -32,6 +40,7 @@ async Task RejectAsync(Func<Task> action, string message)
 using var context = new BuildContext(new Options(["help"]), CancellationToken.None);
 try
 {
+    Check(new Options(["publish-engine", "--legacy-script-baseline", "--build"]).Flag("legacy-script-baseline"), "Legacy comparison flag was not accepted");
     Check(GameCompiler.ManagedFiles.Contains("Scripts/FSharp.Core.dll") && GameCompiler.ManagedFiles.Contains("Scripts/CreatorEngine.FSharp.Runtime.dll"), "F# private runtime closure omitted from package file list");
     Check(GameCompiler.CoreFiles.Contains("CreatorEngine.ManagedRuntime.dll")
         && GameCompiler.CoreFiles.Contains("CreatorEngine.ManagedRuntime.deps.json")

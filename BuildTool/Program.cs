@@ -15,7 +15,7 @@ internal static class Program
             {
                 case "help":
                     context.Log("CreatorBuildTool: publish-engine | compile-game | package-game | build-asset-set | build-runtime-bootstrap | verify-engine | select-engine | open-project\n" +
-                        "  publish-engine --repository PATH --config Debug|Release [--output-root PATH] [--build] [--shipping] [--no-pointer]\n" +
+                        "  publish-engine --repository PATH --config Debug|Release [--output-root PATH] [--build] [--shipping] [--no-pointer] [--legacy-script-baseline --build]\n" +
                         "  compile-game --engine-distribution PATH --project PATH --output PATH [--config Release] [--prebuilt-assembly FILE]\n" +
                         "  package-game --engine-distribution PATH --project PATH [--config Debug] [--stage-root PATH]\n" +
                         "    [--input-mode Project|Workspace|Tracked] [--startup-scene NAME.creator] [--render-backend dx12|vulkan]\n" +
@@ -80,7 +80,7 @@ internal sealed class BuildException(string message) : Exception(message);
 internal sealed class Options
 {
     private readonly Dictionary<string, string> values = new(StringComparer.OrdinalIgnoreCase);
-    private static readonly HashSet<string> Switches = new(["build", "shipping", "buildnative", "skipverify", "smokeoffscreen", "selectengine", "json", "nopointer"], StringComparer.OrdinalIgnoreCase);
+    private static readonly HashSet<string> Switches = new(["build", "shipping", "buildnative", "skipverify", "smokeoffscreen", "selectengine", "json", "nopointer", "legacyscriptbaseline"], StringComparer.OrdinalIgnoreCase);
     private static readonly HashSet<string> Names = new(["repository", "config", "outputroot", "output", "project", "developmentproject",
         "enginedistribution", "prebuiltassembly", "gamescriptsassembly", "stageroot", "inputmode", "startupscene", "renderbackend",
         "smokeframes", "smokepromotions", "smoketimeoutsec", "logpath", "target", "assetlist", "assetset", "artifactcache", "assetsetlist", "assetsetabi", "contentmode", "bootstraproot"], StringComparer.OrdinalIgnoreCase);

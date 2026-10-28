@@ -140,9 +140,8 @@
       <ManifestFile>$(IntDir)$(TargetName)$(TargetExt).manifest</ManifestFile>
     </Link>
     <PreBuildEvent>
-      <Command>echo [ScriptCore] 관리 어셈블리 빌드
-dotnet build "$(SolutionDir)ScriptRuntime\ScriptRuntime.fsproj" -c $(Configuration) --nologo -v quiet
-dotnet build "$(SolutionDir)GameScripts\GameScripts.fsproj" -c $(Configuration) --nologo -v quiet</Command>
+      <Command>echo [FSharpNative] 관리 어셈블리 빌드
+dotnet build "$(SolutionDir)ScriptNative.GameScripts\ScriptNative.GameScripts.fsproj" -c $(Configuration) --nologo -v quiet</Command>
     </PreBuildEvent>
 </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
@@ -172,9 +171,8 @@ dotnet build "$(SolutionDir)GameScripts\GameScripts.fsproj" -c $(Configuration) 
       <ManifestFile>$(IntDir)$(TargetName)$(TargetExt).manifest</ManifestFile>
     </Link>
     <PreBuildEvent>
-      <Command>echo [ScriptCore] 관리 어셈블리 빌드
-dotnet build "$(SolutionDir)ScriptRuntime\ScriptRuntime.fsproj" -c $(Configuration) --nologo -v quiet
-dotnet build "$(SolutionDir)GameScripts\GameScripts.fsproj" -c $(Configuration) --nologo -v quiet</Command>
+      <Command>echo [FSharpNative] 관리 어셈블리 빌드
+dotnet build "$(SolutionDir)ScriptNative.GameScripts\ScriptNative.GameScripts.fsproj" -c $(Configuration) --nologo -v quiet</Command>
     </PreBuildEvent>
 </ItemDefinitionGroup>
   <ItemGroup>

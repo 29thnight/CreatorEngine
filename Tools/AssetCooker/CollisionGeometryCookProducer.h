@@ -11,8 +11,8 @@ namespace geometry_cook
 struct Product
 {
     experiment::cooked::CookedAssetManifestEntry entry;
-    std::vector<std::byte> bytes;
-    std::vector<std::uint64_t> revisions;
+    ce::dynamic_array<std::byte> bytes;
+    ce::dynamic_array<std::uint64_t> revisions;
 };
 
 inline ce::physics::result<Product> Build(const std::filesystem::path& root, const std::filesystem::path& sourcePath)
@@ -31,7 +31,7 @@ inline ce::physics::result<Product> Build(const std::filesystem::path& root, con
         if (size <= 0 || size > static_cast<std::streamoff>(CollisionGeometryCodec::max_bytes))
             return std::unexpected(error{error_code::invalid_argument, 0, "Geometry source size invalid"});
 
-        std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+        ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(size));
         input.seekg(0);
         if (!input.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size())))
             return std::unexpected(error{error_code::invalid_argument, 0, "Geometry source read failed"});
@@ -79,7 +79,7 @@ inline ce::physics::result<Product> Build(const std::filesystem::path& root, con
             return std::unexpected(cooker.error());
 
         Product product;
-        std::vector<cooked_geometry_record> records;
+        ce::dynamic_array<cooked_geometry_record> records;
         for (const auto& [revision, source] : sources)
         {
             auto cooked = CookedCollisionGeometry::Cook(**cooker, source);

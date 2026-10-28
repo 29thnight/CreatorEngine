@@ -2,6 +2,7 @@
 param(
     [Parameter(Mandatory)][string]$EngineDistribution,
     [Parameter(Mandatory)][string]$FormatFixtures,
+    [ValidateSet('Debug','Release')][string]$Configuration = 'Release',
     [string]$Work = ''
 )
 
@@ -12,7 +13,7 @@ if (!$Work) { $Work = Join-Path $repo ('Build/Verification/CliConsumers/Fixtures
 $Work = [IO.Path]::GetFullPath($Work)
 if (Test-Path -LiteralPath $Work) { throw 'Use a new fixture directory' }
 New-Item -ItemType Directory -Path $Work | Out-Null
-$tool = Join-Path $EngineDistribution 'Bin/x64-Release/Tools/CreatorBuildTool/CreatorBuildTool.exe'
+$tool = Join-Path $EngineDistribution "Bin/x64-$Configuration/Tools/CreatorBuildTool/CreatorBuildTool.exe"
 $stages = [ordered]@{}
 
 foreach ($kind in @('Jobs', 'Audio')) {
@@ -64,7 +65,7 @@ audioClip:
     if ($LASTEXITCODE) { throw "Fixture engine selection failed: $kind" }
     $stageRoot = Join-Path $Work "$kind/Staging"
     $smokeFrames = if ($kind -eq 'Jobs') { 120 } else { 600 }
-    & $tool package-game --repository $repo --config Release --project $project --stage-root $stageRoot `
+    & $tool package-game --repository $repo --config $Configuration --project $project --stage-root $stageRoot `
         --input-mode Project --startup-scene $sceneName --engine-distribution $EngineDistribution --render-backend dx12 `
         --smoke-frames $smokeFrames --smoke-timeout-sec 300 *> "$Work/$kind/package.log"
     if ($LASTEXITCODE) { throw "Fixture packaging failed: $Work/$kind/package.log" }

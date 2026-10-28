@@ -27,8 +27,8 @@ inline bool ValidateInstances(const Authoring::ReadNode& node, const Programs& p
             error = "Lattice material references a graph outside the cooked MaterialProgram closure.";
             return false;
         }
-        std::vector<std::uint8_t> uniforms;
-        std::vector<LX::LXMaterialDiagnostic> diagnostics;
+        ce::dynamic_array<std::uint8_t> uniforms;
+        ce::dynamic_array<LX::LXMaterialDiagnostic> diagnostics;
         if (!material_graph::PrepareUniforms(graph->second.layout, document.description.parameters, uniforms,
                                              diagnostics))
         {

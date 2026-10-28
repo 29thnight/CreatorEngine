@@ -160,6 +160,9 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(CreatorLegacyScriptBaseline)'=='true'">
+    <ClCompile><PreprocessorDefinitions>CREATOR_LEGACY_SCRIPT_BASELINE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <!-- Register before unity discovery; the shared target deduplicates reflgen's late registration. -->
     <ClCompile Include="$(IntDir)reflgen\reflgen_SceneRuntime.cpp">
@@ -232,6 +235,13 @@
       <IncludeInUnityFile>false</IncludeInUnityFile>
     </ClCompile>
     <ClCompile Include="ClrHost.cpp" />
+    <ClCompile Include="ScriptEntityBindings.cpp" />
+    <ClCompile Include="ScriptTransformBindings.cpp" />
+    <ClCompile Include="ScriptInputBindings.cpp" />
+    <ClCompile Include="$(ScriptNativeProofDir)\reflgen_creator_script_native.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
     <ClCompile Include="ManagedAssembly.cpp" />
     <ClCompile Include="ManagedAniBehavior.cpp" />
     <ClCompile Include="ScriptComponent.cpp" />
@@ -347,6 +357,11 @@
     <ClInclude Include="CharacterMotionPolicy.h" />
     <ClInclude Include="Socket.h" />
     <ClInclude Include="ClrHost.h" />
+    <ClInclude Include="ScriptBindingValues.h" />
+    <ClInclude Include="ScriptBindingRegistry.h" />
+    <ClInclude Include="ScriptPhysicsValues.h" />
+    <ClInclude Include="ScriptApiTable.h" />
+    <ClInclude Include="SimulationExchangeABI.h" />
     <ClInclude Include="ManagedAssembly.h" />
     <ClInclude Include="SimulationTickExecution.h" />
     <ClInclude Include="ManagedAniBehavior.h" />
@@ -420,6 +435,12 @@
     <ClInclude Include="SceneGC.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <PropertyGroup>
+    <ScriptNativeProofDir>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntDir)', 'ScriptNative'))</ScriptNativeProofDir>
+  </PropertyGroup>
+  <Target Name="GenerateScriptNativeProof" BeforeTargets="SetModuleDependencies;ClCompile" DependsOnTargets="$(_EngineRequireReflgenAfter)" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="dotnet msbuild &quot;$(MSBuildProjectDirectory)\..\..\ScriptNative\ScriptNative.fsproj&quot; /t:GenerateScriptNativeBindings /p:Configuration=$(Configuration) /p:ScriptNativeOutput=&quot;$(ScriptNativeProofDir)&quot; /nologo /v:quiet" />
+  </Target>
   <Import Project="EngineModeReflection.targets" />
   <ImportGroup Label="ExtensionTargets">
   </ImportGroup>

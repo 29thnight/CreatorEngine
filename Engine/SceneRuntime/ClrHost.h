@@ -29,6 +29,7 @@ public:
 	void Shutdown();
 
 	bool IsReady() const { return m_ready; }
+    bool UsesFSharpNative() const { return m_useFSharp; }
     std::uint64_t ManagedErrorCount() const noexcept;
     std::uint64_t SimulationBatchCount() const noexcept { return m_simulationBatches; }
     bool AreScriptsLoaded() const { return m_scriptsLoaded; }
@@ -484,6 +485,12 @@ private:
 	~ClrHost() = default;
 
 	bool BindEntryPoints(const std::filesystem::path& assemblyPath);
+	bool m_useFSharp{ false };
+	using FSharpBindFn = int(__stdcall*)(void*, std::size_t, std::uint64_t, int);
+	using FSharpStartFn = int(__stdcall*)();
+	FSharpBindFn m_fnFSharpBind{ nullptr };
+	FSharpStartFn m_fnFSharpStart{ nullptr };
+	FSharpStartFn m_fnFSharpUnbind{ nullptr };
 
 	bool m_ready{ false };
     bool m_scriptsLoaded{ false };

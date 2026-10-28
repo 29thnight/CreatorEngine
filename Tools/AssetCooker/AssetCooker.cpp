@@ -92,14 +92,14 @@ namespace
         std::string toolFingerprint{};
         // MBC11 — 게시된 generation 루트. 비우면 <asset-root>/../Library/ModelAssetGenerations.
         std::filesystem::path generationRoot{};
-        std::vector<std::filesystem::path> models{};
-        std::vector<std::filesystem::path> textures{};
-        std::vector<std::filesystem::path> shaderMetas{};
-        std::vector<std::filesystem::path> shaderGraphs{};
+        ce::dynamic_array<std::filesystem::path> models{};
+        ce::dynamic_array<std::filesystem::path> textures{};
+        ce::dynamic_array<std::filesystem::path> shaderMetas{};
+        ce::dynamic_array<std::filesystem::path> shaderGraphs{};
         std::filesystem::path materialProgramRoot{};
         std::filesystem::path materialShaderRoot{};
-        std::vector<std::filesystem::path> materials{};
-        std::vector<std::filesystem::path> scenes{};
+        ce::dynamic_array<std::filesystem::path> materials{};
+        ce::dynamic_array<std::filesystem::path> scenes{};
         std::string identityEpoch{};
         assets::ModelAuthoringFailurePoint modelAuthoringFailurePoint{};
         std::optional<bool> buildMeshlets{};
@@ -135,7 +135,7 @@ namespace
     // Keep large projects below CreateProcessW's command-line limit. This is a
     // token file, not shell syntax: spaces and backslashes are preserved verbatim.
     [[nodiscard]] bool ReadArgumentsFile(const std::filesystem::path& path,
-        std::vector<std::wstring>& tokens, std::string& failure)
+        ce::dynamic_array<std::wstring>& tokens, std::string& failure)
     {
         std::error_code error;
         const auto size = std::filesystem::file_size(path, error);
@@ -701,7 +701,7 @@ namespace
     }
 
     [[nodiscard]] bool ReadBinaryFile(const std::filesystem::path& path,
-        std::vector<std::byte>& out, std::string& failure)
+        ce::dynamic_array<std::byte>& out, std::string& failure)
     {
         std::ifstream stream(LongPath(path), std::ios::binary);
         if (!stream)
@@ -800,7 +800,7 @@ namespace
         settings.colorSpace = ck::TextureColorSpace::Source;
         settings.compression = ck::TextureCompression::None;
         settings.mipPolicy = ck::TextureMipPolicy::PreserveAuthored;
-        std::vector<std::byte> artifact;
+        ce::dynamic_array<std::byte> artifact;
         TextureImage decoded;
         std::string failure;
         if (!ck::CookTexture(source, settings, artifact, failure)
@@ -837,7 +837,7 @@ namespace
 
         auto temporary = output;
         temporary += ".tmp-" + std::to_string(_getpid());
-        std::vector<std::byte> persisted;
+        ce::dynamic_array<std::byte> persisted;
         TextureImage verified;
         if (!WriteBinaryFile(temporary, artifact, failure)
             || !ReadBinaryFile(temporary, persisted, failure) || persisted != artifact
@@ -892,7 +892,7 @@ namespace
             return 2;
         }
 
-        std::vector<std::filesystem::path> paths;
+        ce::dynamic_array<std::filesystem::path> paths;
         error.clear();
         for (const std::filesystem::directory_entry& item :
             std::filesystem::recursive_directory_iterator(root,
@@ -916,9 +916,9 @@ namespace
         struct Encoded final
         {
             std::filesystem::path path;
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
         };
-        std::vector<Encoded> encoded;
+        ce::dynamic_array<Encoded> encoded;
         encoded.reserve(paths.size());
         std::uint64_t totalBytes{};
         for (const std::filesystem::path& path : paths)
@@ -989,7 +989,7 @@ namespace
             }
             if (item.path.extension() == ".terrain")
             {
-                std::vector<std::byte> persisted;
+                ce::dynamic_array<std::byte> persisted;
                 ck::CookedTerrainView verified;
                 if (!ReadBinaryFile(temporary, persisted, writeError) || persisted != item.bytes
                     || !ck::ReadCookedTerrain(persisted, verified, writeError))
@@ -1038,11 +1038,11 @@ namespace
 
     [[nodiscard]] bool BuildSourceIdentityTable(
         const std::filesystem::path& assetRoot,
-        std::vector<ck::AssetSourceManifestEntry>& outEntries,
-        std::vector<AudioSourceInput>& outAudios,
+        ce::dynamic_array<ck::AssetSourceManifestEntry>& outEntries,
+        ce::dynamic_array<AudioSourceInput>& outAudios,
         std::string& failure)
     {
-        std::vector<std::filesystem::path> sidecars;
+        ce::dynamic_array<std::filesystem::path> sidecars;
         std::error_code error;
         std::filesystem::recursive_directory_iterator iterator(
             assetRoot, std::filesystem::directory_options::skip_permission_denied,
@@ -1101,8 +1101,8 @@ namespace
         }
         std::ranges::sort(sidecars);
 
-        std::vector<ck::AssetSourceManifestEntry> entries;
-        std::vector<AudioSourceInput> audios;
+        ce::dynamic_array<ck::AssetSourceManifestEntry> entries;
+        ce::dynamic_array<AudioSourceInput> audios;
         entries.reserve(sidecars.size());
         for (const std::filesystem::path& sidecar : sidecars)
         {
@@ -1241,7 +1241,7 @@ namespace
         std::span<const AudioSourceInput> inputs,
         std::set<std::string>& artifactPaths,
         ck::CookedAssetManifest& manifest,
-        std::vector<AudioCookProduct>& products,
+        ce::dynamic_array<AudioCookProduct>& products,
         std::string& failure)
     {
         for (const AudioSourceInput& input : inputs)
@@ -1308,7 +1308,7 @@ namespace
             AudioCookProduct product{};
             product.source = input.source;
             product.artifactPath = path;
-            product.header = header;
+            std::ranges::copy(header, product.header.begin());
             product.payloadSha256 = metadata.payloadSha256;
             product.payloadBytes = metadata.payloadBytes;
             product.manifestEntry.assetId = input.assetId;
@@ -1453,7 +1453,7 @@ namespace
         }
 
         const bool bootstrap = arguments.mode == Arguments::Mode::BuildRuntimeBootstrap;
-        std::vector<ck::AssetSetMountInput> bootstrapSets;
+        ce::dynamic_array<ck::AssetSetMountInput> bootstrapSets;
         AssetDepot::RuntimeBootstrapReceipt bootstrapReceipt;
         ck::CookedAssetCatalog bootstrapCatalog;
         if (bootstrap)
@@ -1468,7 +1468,7 @@ namespace
             }
             std::uint64_t mount{};
             for (auto& input : bootstrapSets) input.mountId.value = ++mount;
-            std::vector<ck::AssetManifestIssue> issues;
+            ce::dynamic_array<ck::AssetManifestIssue> issues;
             const ck::CookedAssetCatalog empty;
             if (!empty.WithMountedAssetSets(bootstrapSets, mount, bootstrapCatalog, issues))
             {
@@ -1521,7 +1521,7 @@ namespace
         }
 
         // MBC11 — 모델은 굽지 않고 게시된 generation을 검증해 내보낸다.
-        std::vector<ck::ModelGenerationExportProduct> products;
+        ce::dynamic_array<ck::ModelGenerationExportProduct> products;
         products.reserve(arguments.models.size());
         error.clear();
         const std::filesystem::path generationRoot = arguments.generationRoot.empty()
@@ -1577,7 +1577,7 @@ namespace
             products.push_back(std::move(product));
         }
 
-        std::vector<ck::TextureCookProduct> textureProducts;
+        ce::dynamic_array<ck::TextureCookProduct> textureProducts;
         textureProducts.reserve(arguments.textures.size());
         std::uint64_t totalTextureBytes = 0u;
 
@@ -1610,7 +1610,7 @@ namespace
             textureProducts.push_back(std::move(product));
         }
 
-        std::vector<ck::ShaderMetaCookProduct> shaderMetaProducts;
+        ce::dynamic_array<ck::ShaderMetaCookProduct> shaderMetaProducts;
         shaderMetaProducts.reserve(arguments.shaderMetas.size());
         std::uint64_t totalShaderMetaBytes = 0u;
 
@@ -1640,7 +1640,7 @@ namespace
             shaderMetaProducts.push_back(std::move(product));
         }
 
-        std::vector<ck::MaterialProgramCookProduct> materialProgramProducts;
+        ce::dynamic_array<ck::MaterialProgramCookProduct> materialProgramProducts;
         const material_graph::Budget materialBudget;
         material_cook::Programs materialPrograms;
         auto graphInputs = arguments.shaderGraphs;
@@ -1723,7 +1723,7 @@ namespace
                     std::cerr << "asset-cooker error: verified material program is missing, oversized or outside its root.\n";
                     return 3;
                 }
-                std::vector<std::byte> programBytes;
+                ce::dynamic_array<std::byte> programBytes;
                 material_graph::CookedProgram verified;
                 if (!ck::ReadBinaryFile(programPath, programBytes) ||
                     !material_graph::ReadCookedProgram(
@@ -1760,7 +1760,7 @@ namespace
             materialPrograms.emplace(graphId, std::move(verifiedProduct));
         }
 
-        std::vector<ck::MaterialCookProduct> materialProducts;
+        ce::dynamic_array<ck::MaterialCookProduct> materialProducts;
         materialProducts.reserve(arguments.materials.size());
         std::uint64_t totalStandaloneMaterialBytes = 0u;
 
@@ -1790,7 +1790,7 @@ namespace
             materialProducts.push_back(std::move(product));
         }
 
-        std::vector<ck::SceneCookProduct> sceneProducts;
+        ce::dynamic_array<ck::SceneCookProduct> sceneProducts;
         sceneProducts.reserve(arguments.scenes.size());
         std::uint64_t totalSceneBytes = 0u;
         std::size_t totalScenes = 0u;
@@ -1828,7 +1828,7 @@ namespace
             sceneProducts.push_back(std::move(product));
         }
 
-        std::vector<geometry_cook::Product> geometryProducts;
+        ce::dynamic_array<geometry_cook::Product> geometryProducts;
         for (std::filesystem::recursive_directory_iterator iterator(assetRoot), end; iterator != end; ++iterator)
         {
             const auto relative = iterator->path().lexically_relative(assetRoot);
@@ -1856,7 +1856,7 @@ namespace
             const auto document = Authoring::ParsedDocument::ParseFilePath(source, error);
             if (!document) return 3;
 
-            std::vector<Authoring::ReadNode> pending{document.Root()};
+            ce::dynamic_array<Authoring::ReadNode> pending{document.Root()};
             while (!pending.empty())
             {
                 const auto node = pending.back();
@@ -1908,7 +1908,7 @@ namespace
                 foliageBytes += size;
                 std::string failure;
                 const auto document = Authoring::ParsedDocument::ParseFilePath(item.path(), failure);
-                std::vector<ck::TypedAssetReference> references;
+                ce::dynamic_array<ck::TypedAssetReference> references;
                 if (!document || !ck::CollectFoliageBootstrapReferences(document.Root(), references, failure))
                 {
                     std::cerr << "asset-cooker error: invalid bootstrap Foliage document: " << item.path()
@@ -1942,7 +1942,7 @@ namespace
                         std::cerr << "asset-cooker error: bootstrap MaterialProgram missing/oversized.\n";
                         return 3;
                     }
-                    std::vector<std::byte> bytes(static_cast<std::size_t>(resolved.blob.byteSize));
+                    ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(resolved.blob.byteSize));
                     ck::Sha256Digest digest{};
                     material_graph::CookedProgram program;
                     if (!ck::CaptureArtifactSource(resolved.byteSource, resolved.blob.artifactPath, failure)
@@ -1974,7 +1974,7 @@ namespace
         }
 
         std::string sourceIdentityFailure;
-        std::vector<AudioSourceInput> audioInputs;
+        ce::dynamic_array<AudioSourceInput> audioInputs;
         if (!BuildSourceIdentityTable(assetRoot, manifest.sourceAssets,
             audioInputs,
             sourceIdentityFailure))
@@ -1982,7 +1982,7 @@ namespace
             std::cerr << "asset-cooker error: " << sourceIdentityFailure << '\n';
             return 3;
         }
-        std::vector<AudioCookProduct> audioProducts;
+        ce::dynamic_array<AudioCookProduct> audioProducts;
         if (!BuildAudioCookProducts(audioInputs, artifactPaths, manifest,
             audioProducts, sourceIdentityFailure))
         {
@@ -1993,7 +1993,7 @@ namespace
         {
             totalArtifactBytes += product.manifestEntry.byteSize;
         }
-        std::vector<sound_cook::Product> soundProducts;
+        ce::dynamic_array<sound_cook::Product> soundProducts;
         if (!sound_cook::Build(assetRoot, manifest, artifactPaths, soundProducts, sourceIdentityFailure)
             || !sound_cook::RewriteScenes(sceneProducts, manifest, sourceIdentityFailure)
             || !font_cook::RewriteScenes(sceneProducts, manifest, assetRoot, sourceIdentityFailure))
@@ -2012,7 +2012,7 @@ namespace
         }
         // Audio runtime uses cooked GUID entries only. The source identity
         // table must not become a Player fallback to authoring audio paths.
-        std::erase_if(manifest.sourceAssets, [&](const auto& source)
+        ce::erase_if(manifest.sourceAssets, [&](const auto& source)
         {
             const auto* entry = manifest.Find(source.assetId);
             return entry && (entry->kind == ck::CookedAssetKind::AudioClip
@@ -2048,7 +2048,7 @@ namespace
                         return 3;
                     }
                     document.references.push_back(reference);
-                    std::erase(scene.manifestEntry.dependencies, reference.key.assetId);
+                    ce::erase(scene.manifestEntry.dependencies, reference.key.assetId);
                 }
                 // Only explicitly checked external document edges leave v2.
                 // Its remaining local dependency rules are exactly unchanged.
@@ -2106,7 +2106,7 @@ namespace
                     std::cerr << "asset-cooker error: " << failure << '\n';
                     return 5;
                 }
-                std::vector<std::byte> persisted;
+                ce::dynamic_array<std::byte> persisted;
                 if (!ReadBinaryFile(artifactFile, persisted, failure)
                     || persisted != file.bytes)
                 {
@@ -2130,7 +2130,7 @@ namespace
             // 게시 전 재판독. pass-through 라 "디코드"할 것이 없으므로 바이트가
             // 그대로 돌아오는지를 본다 — 이게 이 artifact 에 대해 확인할 수 있는
             // 전부이고, 확인할 수 없는 것을 확인한 척하지 않는다.
-            std::vector<std::byte> persisted;
+            ce::dynamic_array<std::byte> persisted;
             if (!ReadBinaryFile(artifactFile, persisted, failure))
             {
                 std::cerr << "asset-cooker error: " << failure << '\n';
@@ -2154,7 +2154,7 @@ namespace
                 return 5;
             }
 
-            std::vector<std::byte> persisted;
+            ce::dynamic_array<std::byte> persisted;
             if (!ReadBinaryFile(artifactFile, persisted, failure))
             {
                 std::cerr << "asset-cooker error: " << failure << '\n';
@@ -2195,7 +2195,7 @@ namespace
                 return 5;
             }
 
-            std::vector<std::byte> persisted;
+            ce::dynamic_array<std::byte> persisted;
             if (!ReadBinaryFile(artifactFile, persisted, failure))
             {
                 std::cerr << "asset-cooker error: " << failure << '\n';
@@ -2219,7 +2219,7 @@ namespace
                 return 5;
             }
 
-            std::vector<std::byte> persisted;
+            ce::dynamic_array<std::byte> persisted;
             if (!ReadBinaryFile(artifactFile, persisted, failure))
             {
                 std::cerr << "asset-cooker error: " << failure << '\n';
@@ -2268,14 +2268,14 @@ namespace
             return 5;
         }
 
-        std::vector<std::byte> persistedManifest;
+        ce::dynamic_array<std::byte> persistedManifest;
         if (!ReadBinaryFile(manifestFile, persistedManifest, failure))
         {
             std::cerr << "asset-cooker error: " << failure << '\n';
             return 5;
         }
         ck::CookedAssetManifest restoredManifest;
-        std::vector<ck::AssetManifestIssue> manifestIssues;
+        ce::dynamic_array<ck::AssetManifestIssue> manifestIssues;
         if (!ck::ReadAssetManifest(persistedManifest,
             restoredManifest, manifestIssues)
             || restoredManifest.entries.size() != manifest.entries.size()
@@ -2428,7 +2428,7 @@ namespace
             // MBC11 — 모델 generation 레코드(kind Model, generation.asset)가 이름 붙인
             // 디렉터리 안의 파일(model.cemc·sidecar.meta·textures/*)은 레코드의 폐포다.
             // 레코드 리더가 파일 지문으로 검증하므로 manifest가 따로 이름 붙이지 않는다.
-            std::vector<std::string> closurePrefixes;
+            ce::dynamic_array<std::string> closurePrefixes;
             for (const ck::CookedAssetManifestEntry& entry
                 : restoredManifest.entries)
             {
@@ -2721,8 +2721,8 @@ int wmain(int argc, wchar_t** argv)
     const HRESULT comInit = apartmentScope.result;
     Arguments arguments;
     std::string failure;
-    std::vector<std::wstring> tokens;
-    std::vector<wchar_t*> tokenPointers;
+    ce::dynamic_array<std::wstring> tokens;
+    ce::dynamic_array<wchar_t*> tokenPointers;
     if (argc > 1 && std::wstring_view(argv[1]) == L"--arguments-file")
     {
         tokens.emplace_back(argv[0]);

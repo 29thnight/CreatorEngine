@@ -52,7 +52,7 @@ namespace AssetCooking
             std::string source{};
             std::string verifiedProgram{};
             experiment::AssetId codeProgram{};
-            std::vector<ck::AssetDependency> dependencies{};
+            ce::dynamic_array<ck::AssetDependency> dependencies{};
         };
 
         struct AssetSet final
@@ -61,7 +61,7 @@ namespace AssetCooking
             std::uint64_t revision{};
             std::string targetPlatform{};
             std::string targetAbi{};
-            std::vector<ck::TypedAssetReference> roots{};
+            ce::dynamic_array<ck::TypedAssetReference> roots{};
             std::map<ck::AssetIdentity, AssetSource> sources{};
         };
 
@@ -244,14 +244,14 @@ namespace AssetCooking
             }
         }
 
-        std::vector<std::byte> Read(const std::filesystem::path& path, std::uint64_t limit = kMaxSourceBytes)
+        ce::dynamic_array<std::byte> Read(const std::filesystem::path& path, std::uint64_t limit = kMaxSourceBytes)
         {
             NoReparse(path);
             if (!std::filesystem::is_regular_file(path) || std::filesystem::file_size(path) > limit)
             {
                 Fail("Missing or oversized AssetSet input: " + path.string());
             }
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
             if (!ck::ReadBinaryFile(path, bytes) || bytes.empty() || bytes.size() > limit)
             {
                 Fail("Cannot read nonempty AssetSet input: " + path.string());
@@ -291,7 +291,7 @@ namespace AssetCooking
             HANDLE handle{ INVALID_HANDLE_VALUE };
             BY_HANDLE_FILE_INFORMATION identity{};
             FILE_BASIC_INFO basic{};
-            std::vector<std::byte> bytes{};
+            ce::dynamic_array<std::byte> bytes{};
             std::string digest{};
 
             CapturedFile() = default;
@@ -310,7 +310,7 @@ namespace AssetCooking
                 left.nFileSizeHigh == right.nFileSizeHigh && left.nFileSizeLow == right.nFileSizeLow;
         }
 
-        std::vector<std::byte> ReadCaptured(HANDLE handle, std::uint64_t limit,
+        ce::dynamic_array<std::byte> ReadCaptured(HANDLE handle, std::uint64_t limit,
             const std::filesystem::path& path)
         {
             LARGE_INTEGER size{};
@@ -321,7 +321,7 @@ namespace AssetCooking
             {
                 Fail("Cannot size/seek bounded captured input: " + path.string());
             }
-            std::vector<std::byte> bytes(static_cast<std::size_t>(size.QuadPart));
+            ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(size.QuadPart));
             std::size_t offset{};
             while (offset != bytes.size())
             {
@@ -548,7 +548,7 @@ namespace AssetCooking
         std::set<ck::AssetIdentity> IncludeClosure(const AssetSet& definition)
         {
             std::set<ck::AssetIdentity> included;
-            std::vector<ck::TypedAssetReference> pending = definition.roots;
+            ce::dynamic_array<ck::TypedAssetReference> pending = definition.roots;
             while (!pending.empty())
             {
                 const auto reference = pending.back();
@@ -591,8 +591,8 @@ namespace AssetCooking
                 std::size_t next{};
             };
             std::map<ck::AssetIdentity, State> states;
-            std::vector<ck::AssetIdentity> componentStack;
-            std::vector<Frame> frames;
+            ce::dynamic_array<ck::AssetIdentity> componentStack;
+            ce::dynamic_array<Frame> frames;
             std::size_t nextIndex = 1u;
             const auto enter = [&](const ck::AssetIdentity& key)
             {
@@ -635,7 +635,7 @@ namespace AssetCooking
                     const auto key = frame.key;
                     if (state.low == state.index)
                     {
-                        std::vector<ck::AssetIdentity> component;
+                        ce::dynamic_array<ck::AssetIdentity> component;
                         do
                         {
                             const auto member = componentStack.back();
@@ -750,7 +750,7 @@ namespace AssetCooking
             case ck::CookedAssetKind::Mesh:
             {
                 ck::ModelGeometryArtifact value;
-                std::vector<std::string> warnings;
+                ce::dynamic_array<std::string> warnings;
                 valid = extension == ".cege" && ck::ExpandModelGeometryPages(bytes, value, failure, &warnings);
                 if (valid && !warnings.empty())
                 {
@@ -886,8 +886,8 @@ namespace AssetCooking
 
         struct PreparedArtifact final
         {
-            std::vector<std::byte> bytes{};
-            std::vector<std::byte> cpuGeometryBytes{};
+            ce::dynamic_array<std::byte> bytes{};
+            ce::dynamic_array<std::byte> cpuGeometryBytes{};
             std::string extension{};
             std::string inputDigest{};
             std::string importKey{};
@@ -902,13 +902,13 @@ namespace AssetCooking
 
         // Length framing, including every string, makes source-authored path
         // tokens and dependency inventories unambiguous without delimiter rules.
-        void ReceiptNumber(std::vector<std::byte>& bytes, std::uint64_t value)
+        void ReceiptNumber(ce::dynamic_array<std::byte>& bytes, std::uint64_t value)
         {
             for (unsigned index = 0; index < 8u; ++index)
                 bytes.push_back(static_cast<std::byte>((value >> (8u * index)) & 0xffu));
         }
 
-        void ReceiptText(std::vector<std::byte>& bytes, std::string_view value)
+        void ReceiptText(ce::dynamic_array<std::byte>& bytes, std::string_view value)
         {
             ReceiptNumber(bytes, value.size());
             const auto span = std::as_bytes(std::span(value.data(), value.size()));
@@ -1021,7 +1021,7 @@ namespace AssetCooking
             return text;
         }
 
-        void AppendInput(std::vector<std::byte>& bytes, const InputCapture& capture,
+        void AppendInput(ce::dynamic_array<std::byte>& bytes, const InputCapture& capture,
             const std::filesystem::path& path, const CapturedFile& input)
         {
             ReceiptText(bytes, InputPath(capture, path));
@@ -1033,7 +1033,7 @@ namespace AssetCooking
             std::span<const ck::TypedAssetReference> selections, const InputCapture& initial,
             std::string_view toolFingerprint)
         {
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
             ReceiptText(bytes, kImportReceiptVersion);
             ReceiptText(bytes, kBuildVersion);
             ReceiptText(bytes, toolFingerprint); // verified binary/compiler/native dependency closure
@@ -1096,7 +1096,7 @@ namespace AssetCooking
 
         std::string CapturedImportKey(const InputCapture& capture, std::string_view recipeKey)
         {
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
             ReceiptText(bytes, kImportReceiptVersion);
             ReceiptText(bytes, recipeKey);
             ReceiptNumber(bytes, capture.files.size());
@@ -1114,7 +1114,7 @@ namespace AssetCooking
         struct PendingReceipt final
         {
             std::filesystem::path path{};
-            std::vector<std::byte> bytes{};
+            ce::dynamic_array<std::byte> bytes{};
         };
 
         bool ReuseImport(const AssetSet& definition, std::span<const ck::TypedAssetReference> selections,
@@ -1125,7 +1125,7 @@ namespace AssetCooking
             NoReparse(directory);
             if (!std::filesystem::exists(directory)) return false;
             if (!std::filesystem::is_directory(directory)) Fail("Import receipt index is not a directory: " + directory.string());
-            std::vector<std::filesystem::path> candidates;
+            ce::dynamic_array<std::filesystem::path> candidates;
             for (const auto& entry : std::filesystem::directory_iterator(directory))
             {
                 if (candidates.size() >= 256u) Fail("Import receipt index exceeds 256 bounded candidates: " + directory.string());
@@ -1371,8 +1371,8 @@ namespace AssetCooking
             // not merely before/after file observations (which can miss A-B-A).
             const auto capturedDocument = Authoring::ParsedDocument::ParseText(
                 { reinterpret_cast<const char*>(sourceInput.data()), sourceInput.size() }, failure);
-            std::vector<std::byte> capturedArtifact;
-            std::vector<ck::ModelIdentityIssue> identityIssues;
+            ce::dynamic_array<std::byte> capturedArtifact;
+            ce::dynamic_array<ck::ModelIdentityIssue> identityIssues;
             experiment::AssetId capturedId;
             experiment::AssetId capturedShaderId;
             if (!capturedDocument ||
@@ -1430,7 +1430,7 @@ namespace AssetCooking
             const auto& sourceInput = capture.Capture(source, ck::kMaterialGraphSourceMaxBytes).bytes;
             const auto& metaInput = capture.Capture(metaPath, ck::kMaterialAssetSetMetaMaxBytes).bytes;
             std::filesystem::path verifiedPath;
-            std::vector<std::byte> verifiedInput;
+            ce::dynamic_array<std::byte> verifiedInput;
             ck::MaterialAssetSetCookResult cooked;
             if (program || authored.codeProgram.IsValid())
             {
@@ -1441,11 +1441,11 @@ namespace AssetCooking
                 }
                 verifiedInput = capture.Capture(verifiedPath, ck::kMaterialProgramAssetSetMaxBytes).bytes;
             }
-            std::vector<ck::CodeProgramCapturedInput> codeInputs;
+            ce::dynamic_array<ck::CodeProgramCapturedInput> codeInputs;
             if (codeProgram || authored.codeProgram.IsValid())
             {
                 ck::CodeProgram bundle;
-                std::vector<ck::AssetDependency> edges;
+                ce::dynamic_array<ck::AssetDependency> edges;
                 std::string failure;
                 if (!ck::ReadVerifiedCodeProgram(verifiedInput, bundle, edges, failure))
                 {
@@ -1511,10 +1511,10 @@ namespace AssetCooking
         std::map<ck::AssetIdentity, PreparedArtifact> PrepareSources(const AssetSet& definition,
             const std::set<ck::AssetIdentity>& included, const std::filesystem::path& assetRoot,
             const std::filesystem::path& cache, std::string_view toolFingerprint,
-            std::vector<PendingReceipt>& receipts, AssetSetBuildResult& metrics)
+            ce::dynamic_array<PendingReceipt>& receipts, AssetSetBuildResult& metrics)
         {
             std::map<ck::AssetIdentity, PreparedArtifact> result;
-            std::map<std::string, std::vector<ck::TypedAssetReference>> modelSelections;
+            std::map<std::string, ce::dynamic_array<ck::TypedAssetReference>> modelSelections;
             for (const auto& identity : included)
             {
                 const auto& authored = definition.sources.at(identity);
@@ -1533,7 +1533,7 @@ namespace AssetCooking
                 capture.Capture(metaPath, kMaxDefinitionBytes);
                 if (!authored.verifiedProgram.empty())
                     capture.Capture(assetRoot / std::filesystem::u8path(authored.verifiedProgram), ck::kMaterialProgramAssetSetMaxBytes);
-                const std::vector<ck::TypedAssetReference> selections{ authored.asset };
+                const ce::dynamic_array<ck::TypedAssetReference> selections{ authored.asset };
                 const auto recipeKey = ImportRecipeKey(definition, selections, capture, toolFingerprint);
                 if (ReuseImport(definition, selections, capture, cache, recipeKey, result))
                 {
@@ -1557,7 +1557,7 @@ namespace AssetCooking
                 const auto& sourceInput = capture.Capture(source).bytes;
                 const auto& metaInput = capture.Capture(metaPath, kMaxDefinitionBytes).bytes;
                 experiment::AssetId capturedTextureId;
-                std::vector<ck::ModelIdentityIssue> identityIssues;
+                ce::dynamic_array<ck::ModelIdentityIssue> identityIssues;
                 if (!ck::ReadAssetIdFromMeta(
                     { reinterpret_cast<const char*>(metaInput.data()), metaInput.size() }, capturedTextureId, identityIssues) ||
                     capturedTextureId != identity.assetId)
@@ -1566,7 +1566,7 @@ namespace AssetCooking
                 }
                 ck::TextureCookProductRequest textureRequest{ source, assetRoot };
                 textureRequest.captureSource = [&](const std::filesystem::path& path,
-                    std::vector<std::byte>& bytes, std::string& failure)
+                    ce::dynamic_array<std::byte>& bytes, std::string& failure)
                 {
                     try
                     {
@@ -1640,7 +1640,7 @@ namespace AssetCooking
                 // attempted dependency. No successful import has unrecorded
                 // negative probes or a fallback search outside this callback.
                 request.captureSource = [&](const std::filesystem::path& path,
-                    std::vector<std::byte>& bytes, std::string& failure)
+                    ce::dynamic_array<std::byte>& bytes, std::string& failure)
                 {
                     try
                     {
@@ -1921,7 +1921,7 @@ namespace AssetCooking
                 Fail("Cannot reserve new AssetSet candidate directory");
             }
             DirectoryScope candidateScope{ candidate };
-            std::vector<PendingReceipt> receipts;
+            ce::dynamic_array<PendingReceipt> receipts;
             const auto prepared = PrepareSources(definition, included, assetRoot, cache,
                 request.toolFingerprint, receipts, result);
             definitionCapture.Verify();
@@ -2061,7 +2061,7 @@ namespace AssetCooking
             const auto manifestPath = candidate / "Derived" / "asset-set-manifest.cemf";
             WriteNew(manifestPath, written.bytes);
             ck::AssetSetManifest readback;
-            std::vector<ck::AssetManifestIssue> issues;
+            ce::dynamic_array<ck::AssetManifestIssue> issues;
             const auto manifestBytes = Read(manifestPath, ck::kAssetSetManifestMaxBytes);
             if (manifestBytes != written.bytes || !ck::ReadAssetSetManifest(manifestBytes, readback, issues))
             {

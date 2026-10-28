@@ -48,6 +48,9 @@
       <AdditionalDependencies>nethost.lib;PhysX_64.lib;PhysXCommon_64.lib;PhysXFoundation_64.lib;PhysXCooking_64.lib;PhysXExtensions_static_64.lib;PhysXCharacterKinematic_static_64.lib;PhysXPvdSDK_static_64.lib;psapi.lib;%(AdditionalDependencies)</AdditionalDependencies>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(CreatorLegacyScriptBaseline)'=='true'">
+    <ClCompile><PreprocessorDefinitions>CREATOR_LEGACY_SCRIPT_BASELINE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+  </ItemDefinitionGroup>
   <ItemGroup>
     <ClCompile Include="..\Scene.cpp" />
     <ClCompile Include="..\SceneManager.cpp" />
@@ -60,6 +63,12 @@
     <ClCompile Include="..\ScriptComponent.cpp" />
     <ClCompile Include="..\ScriptObjectRegistry.cpp" />
     <ClCompile Include="..\ClrHost.cpp" />
+    <ClCompile Include="$(ScriptNativeProofDir)\reflgen_creator_script_native.cpp">
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+    </ClCompile>
+    <ClCompile Include="..\ScriptEntityBindings.cpp" />
+    <ClCompile Include="..\ScriptTransformBindings.cpp" />
     <ClCompile Include="..\PhysicsBodyComponent.cpp" />
     <ClCompile Include="..\CharacterMovementComponent.cpp" />
     <ClCompile Include="..\TagManager.cpp" />
@@ -90,4 +99,10 @@
     <ProjectReference Include="..\..\Utility_Framework\Utility_Framework.vcxproj"><Project>{9CEC19F4-03B4-4563-8D42-6E4BFB0059BB}</Project></ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+  <PropertyGroup>
+    <ScriptNativeProofDir>$([MSBuild]::NormalizePath('$(MSBuildProjectDirectory)', '$(IntDir)', 'ScriptNative'))</ScriptNativeProofDir>
+  </PropertyGroup>
+  <Target Name="GenerateScriptNativeProof" BeforeTargets="SetModuleDependencies;ClCompile" DependsOnTargets="$(_EngineRequireReflgenAfter)" Condition="'$(DesignTimeBuild)' != 'true'">
+    <Exec Command="dotnet msbuild &quot;$(MSBuildProjectDirectory)\..\..\..\ScriptNative\ScriptNative.fsproj&quot; /t:GenerateScriptNativeBindings /p:Configuration=$(Configuration) /p:ScriptNativeOutput=&quot;$(ScriptNativeProofDir)&quot; /nologo /v:quiet" />
+  </Target>
 </Project>

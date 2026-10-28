@@ -31,7 +31,7 @@ var assembly = typeof(Physics).Assembly;
 var native = assembly.GetType("CreatorEngine.Native", true)!;
 var version = native.GetField("ExpectedVersion", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)!;
 var apiVersion = (int)version.GetRawConstantValue()!;
-Check(apiVersion == 45, "current host ABI version: F# runtime and static lifecycle registration");
+Check(apiVersion == 47, "current host ABI version includes extra component bindings");
 // Validate the current physics PODs and append-only host table together.
 // The camera-cut slot follows the v40 physics extensions without moving them.
 var apiTable = assembly.GetType("CreatorEngine.ScriptApiTable", true)!;
@@ -52,8 +52,11 @@ Check(Offset("Simulation_Status") == Offset("Camera_NotifyCameraCut") + IntPtr.S
 Check(Offset("Simulation_Submit") == Offset("Simulation_Status") + IntPtr.Size &&
     Offset("Simulation_Read") == Offset("Simulation_Submit") + IntPtr.Size,
     "v43 bounded command and snapshot copy entries are contiguous");
-Check(Marshal.SizeOf(apiTable) == Offset("Simulation_Read") + IntPtr.Size,
-    "full current API table includes simulation exchange");
+Check(Offset("ExtraComponent_Exists") == Offset("Simulation_Read") + IntPtr.Size &&
+    Offset("ExtraComponent_GetEnabled") == Offset("ExtraComponent_Exists") + IntPtr.Size &&
+    Offset("ExtraComponent_SetEnabled") == Offset("ExtraComponent_GetEnabled") + IntPtr.Size &&
+    Marshal.SizeOf(apiTable) == Offset("ExtraComponent_SetEnabled") + IntPtr.Size,
+    "v46 extra component slots follow simulation exchange");
 Check(Marshal.SizeOf<SimulationStatus>() == 32 && Marshal.SizeOf<SimulationSnapshot>() == 32,
     "v43 simulation value layouts");
 var bodyRemove = apiTable.GetField("Body_Remove")!.FieldType;

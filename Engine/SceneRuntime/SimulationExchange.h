@@ -1,5 +1,6 @@
 #include "../Containers/ContainerAPI.h"
 #pragma once
+#include "SimulationExchangeABI.h"
 #include <array>
 #include <cstdint>
 #include <cstring>
@@ -17,16 +18,6 @@ namespace Runtime
     {
         Ok, Inactive, StaleEpoch, InvalidArgument, Late, TooFar, Full,
         NoSnapshot, SnapshotGap, BufferTooSmall, WrongThread, Busy, Failed
-    };
-    struct TickStatus
-    {
-        std::uint64_t epoch{}, committed{}, executing{};
-        std::uint32_t queued{}, active{};
-    };
-    struct TickSnapshotHeader
-    {
-        std::uint64_t epoch{}, tick{};
-        std::uint32_t applied{}, rejected{}, bytes{}, schema{};
     };
     struct TickCommand
     {

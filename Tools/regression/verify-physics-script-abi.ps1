@@ -4,6 +4,7 @@ $repo=[IO.Path]::GetFullPath((Join-Path $PSScriptRoot '../..'))
 $out=Join-Path $repo 'Build/Obj/Phase19M0Script'
 New-Item -ItemType Directory -Force $out | Out-Null
 $cpp=Get-Content (Join-Path $repo 'Engine/SceneRuntime/ClrHost.cpp') -Raw
+$nativeHeader=Get-Content (Join-Path $repo 'Engine/SceneRuntime/ScriptApiTable.h') -Raw
 $cs=Get-Content (Join-Path $repo 'ScriptCore/Native.cs') -Raw
 $versionHeader=Get-Content (Join-Path $repo 'Engine/Utility_Framework/Runtime/ScriptApiVersion.h') -Raw
 $nativeVersion=[regex]::Match($versionHeader,'CreatorScriptApiVersion\s*=\s*(\d+)').Groups[1].Value
@@ -11,7 +12,7 @@ $managedVersion=[regex]::Match($cs,'ExpectedVersion\s*=\s*(\d+)').Groups[1].Valu
 if (!$nativeVersion -or $nativeVersion -ne $managedVersion) {
     throw 'Native/managed API version differs'
 }
-$nativeTable=[regex]::Match($cpp,'(?s)struct ScriptApiTable\s*\{(.*?)\n\s*\};').Groups[1].Value
+$nativeTable=[regex]::Match($nativeHeader,'(?s)struct ScriptApiTable\s*\{(.*?)\n\s*\};').Groups[1].Value
 $managedTable=[regex]::Match($cs,'(?s)struct ScriptApiTable\s*\{(.*?)\n\}').Groups[1].Value
 $nativeNames=@([regex]::Matches($nativeTable,'__stdcall\*\s*(\w+)') | ForEach-Object { $_.Groups[1].Value })
 $managedNames=@([regex]::Matches($managedTable,'delegate\* unmanaged<[^;]+>\s+(\w+)\s*;') | ForEach-Object { $_.Groups[1].Value })

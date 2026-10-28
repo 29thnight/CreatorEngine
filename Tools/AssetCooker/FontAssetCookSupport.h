@@ -204,7 +204,7 @@ namespace font_cook
         return true;
     }
 
-    inline bool RewriteScenes(std::vector<ck::SceneCookProduct>& scenes, ck::CookedAssetManifest& manifest,
+    inline bool RewriteScenes(std::span<ck::SceneCookProduct> scenes, ck::CookedAssetManifest& manifest,
         const std::filesystem::path& assetRoot, std::string& error)
     {
         References references{ assetRoot, {}, {} };

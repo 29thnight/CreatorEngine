@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <FSharpCoreImplicitPackageVersion>10.0.112</FSharpCoreImplicitPackageVersion>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <CreatorFSharpToolsRoot Condition="'$(CreatorFSharpToolsRoot)' == ''">$(MSBuildThisFileDirectory)../../../../FSharp_Tool_Pakage_for_CreatorEngine</CreatorFSharpToolsRoot>
+  </PropertyGroup>
+  <ItemGroup><ProjectReference Include="../../../ScriptNative/ScriptNative.fsproj" /></ItemGroup>
+  <ItemGroup>
+    <Compile Include="../../../Dynamic_CPP/Assets/Script/FSharpNativeMover.fs" Link="FSharpNativeMover.fs" />
+    <Compile Include="../../../Dynamic_CPP/Assets/Script/Phase22ProductAudioProbe.fs" Link="Phase22ProductAudioProbe.fs" />
+  </ItemGroup>
+  <Import Project="$(CreatorFSharpToolsRoot)/src/CreatorEngine.FSharp.Build/build/CreatorEngine.FSharp.Build.targets" />
+</Project>

@@ -486,6 +486,9 @@
       <GenerateDebugInformation>true</GenerateDebugInformation>
     </Link>
   </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(CreatorLegacyScriptBaseline)'=='true'">
+    <ClCompile><PreprocessorDefinitions>CREATOR_LEGACY_SCRIPT_BASELINE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions></ClCompile>
+  </ItemDefinitionGroup>
   <ItemDefinitionGroup>
     <ClCompile>
       <AdditionalIncludeDirectories>$(SolutionDir)Engine\RuntimeHost\;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>

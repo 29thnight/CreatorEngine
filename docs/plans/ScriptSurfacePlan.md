@@ -1,5 +1,7 @@
 # 스크립트 표면 재설계 (PHASE 9.5)
 
+> 2026-10-29 전환: 제품 기본 스크립트 바인딩은 API 46의 F# 네이티브 바인딩이다. 아래 API45 및 ScriptCore 유지 결정은 이전 단계의 기록이며, 새 전환과 수용 조건은 [F# 네이티브 바인딩 전환 계획](FSharpNativeBindingMigrationPlan.md)을 따른다.
+
 <!-- plan-summary: 2026-10-23: F# 단독 저작·공통 관리 런타임, 필요한 일반 멤버만 작성하고 생성기가 정적으로 등록한다. API45 OnTickSimulate(dt) 고정 틱과 수명·세대 핸들·실패 hot reload 보존을 유지한다. -->
 
 > 2026-10-23 최신 결정: 게임 저작과 공통 관리 실행기는 F#이다. 컴포넌트 생명주기는 **override 없는 일반 멤버 → 생성기의 정적 콜백 등록**, 고정 틱은 **OnTickSimulate(dt), Script API45**다. ScriptCore의 C# 코드는 네이티브 ABI·값 형식·바인딩 진입점으로 유지한다. 수명·세대 핸들·실패 reload 보존은 유지한다. [현재 계약](../design/FSharpScriptingContract.md)과 [API45 수용 기록](../analysis/FSharpManagedRuntimeAcceptance20261023.md)을 따른다. 아래 API43/44·C# 기본 저작 기록은 이전 단계이며 OnSimulate·Scope.Delay·simulation CE는 복원하지 않는다.

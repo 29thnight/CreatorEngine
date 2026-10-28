@@ -266,6 +266,15 @@
     <ClCompile Include="ClrHost.cpp">
       <Filter>Managers\ScriptHost</Filter>
     </ClCompile>
+    <ClCompile Include="ScriptEntityBindings.cpp">
+      <Filter>Managers\ScriptHost</Filter>
+    </ClCompile>
+    <ClCompile Include="ScriptTransformBindings.cpp">
+      <Filter>Managers\ScriptHost</Filter>
+    </ClCompile>
+    <ClCompile Include="ScriptInputBindings.cpp">
+      <Filter>Managers\ScriptHost</Filter>
+    </ClCompile>
     <ClCompile Include="Component.cpp">
       <Filter>Classes\Components\ComponentBase</Filter>
     </ClCompile>
@@ -616,6 +625,21 @@
     <ClInclude Include="ClrHost.h">
       <Filter>Managers\ScriptHost</Filter>
     </ClInclude>
+      <ClInclude Include="ScriptBindingValues.h">
+        <Filter>Managers\ScriptHost</Filter>
+      </ClInclude>
+      <ClInclude Include="ScriptBindingRegistry.h">
+        <Filter>Managers\ScriptHost</Filter>
+      </ClInclude>
+      <ClInclude Include="ScriptPhysicsValues.h">
+        <Filter>Managers\ScriptHost</Filter>
+      </ClInclude>
+      <ClInclude Include="ScriptApiTable.h">
+        <Filter>Managers\ScriptHost</Filter>
+      </ClInclude>
+      <ClInclude Include="SimulationExchangeABI.h">
+        <Filter>Managers\ScriptHost</Filter>
+      </ClInclude>
     <ClInclude Include="CollisionGeometryCodec.h">
       <Filter>Headers</Filter>
     </ClInclude>

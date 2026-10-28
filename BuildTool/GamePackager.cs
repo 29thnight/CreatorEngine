@@ -138,7 +138,7 @@ internal static class GamePackager
                 localDevelopment = engine.Manifest.Bool("localDevelopment"), payloadDigest = engine.Manifest.Text("payloadDigest"), hostAbi = engine.Manifest.Int("hostAbi"), scriptApi = engine.Manifest.Int("scriptApi"), configuration = config, shipping, developmentBuild = !shipping });
             Metadata.Write(Path.Combine(candidate, "engine.runtime.json"), runtimeMetadata); rootFiles.Add("engine.runtime.json");
             File.WriteAllText(Path.Combine(candidate, "engine.runtime.info"), Metadata.Info(engine.Manifest)); rootFiles.Add("engine.runtime.info");
-            foreach (var relative in GameCompiler.ManagedFiles) Paths.Copy(Paths.Child(managed, relative), Paths.Child(candidate, "Managed/" + relative));
+            foreach (var relative in GameCompiler.Files(GameCompiler.UsesNative(engine))) Paths.Copy(Paths.Child(managed, relative), Paths.Child(candidate, "Managed/" + relative));
             var runtimePaths = rootFiles.Concat(Paths.Files(Path.Combine(candidate, "Managed")).Select(p => Paths.Relative(candidate, p))).ToArray();
             var runtimeEntries = Metadata.Entries(candidate, runtimePaths); var runtimeDigest = Metadata.Digest(runtimeEntries);
             context.Log("[5/6 Pak]", "stage");

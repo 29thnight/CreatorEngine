@@ -298,6 +298,13 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<ObjectHandle, int, int> ExtraComponent_Exists;
     public delegate* unmanaged<ObjectHandle, int, int> ExtraComponent_GetEnabled;
     public delegate* unmanaged<ObjectHandle, int, int, void> ExtraComponent_SetEnabled;
+    public delegate* unmanaged<ObjectHandle, int> Bone_GetPinned;
+    public delegate* unmanaged<ObjectHandle, int, void> Bone_SetPinned;
+    public delegate* unmanaged<ObjectHandle, int> Bone_GetResolvedIndex;
+    public delegate* unmanaged<ObjectHandle, int, int> Decal_GetInt;
+    public delegate* unmanaged<ObjectHandle, int, int, void> Decal_SetInt;
+    public delegate* unmanaged<ObjectHandle, int, float> Decal_GetFloat;
+    public delegate* unmanaged<ObjectHandle, int, float, void> Decal_SetFloat;
 }
 
 /// <summary>엔진 API 접근점. 표를 정적으로 들고 있어 호출 비용을 최소화한다.</summary>
@@ -305,7 +312,7 @@ internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
     // v42 requires the fixed-tick OnTickSimulate bootstrap entry point (table layout unchanged).
-    public const int ExpectedVersion = 46;
+    public const int ExpectedVersion = 47;
 
     internal static bool HasExtraComponent(ObjectHandle handle, int kind)
         => Entered() && _api.ExtraComponent_Exists != null && _api.ExtraComponent_Exists(handle, kind) != 0;

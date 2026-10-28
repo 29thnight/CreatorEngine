@@ -21,7 +21,8 @@
 # 실행: pwsh -NoProfile -File Tools\regression\verify-bt-smoke.ps1
 param(
     [string]$Exe = (Join-Path $PSScriptRoot "..\..\Bin\x64-Debug\Editor\CreatorEditor.exe"),
-    [string]$Work = $env:TEMP
+    [string]$Work = $env:TEMP,
+    [string]$ProjectRoot = ''
 )
 
 $exeDir = [System.IO.Path]::GetDirectoryName($Exe)
@@ -39,7 +40,9 @@ if (-not (Test-Path $template)) { "시나리오가 없다: $template"; exit 1 }
 # .bt/.blackboard 자체는 폐기 대상이 아니다 — 저작 자산(프리팹·씬)이 아니라 손으로
 # 만든 게이트 픽스처다(시나리오 머리말 참고).
 $repoRoot = Split-Path (Split-Path $PSScriptRoot -Parent) -Parent
-$btDir = Join-Path $repoRoot "Dynamic_CPP\Assets\BehaviorTree"
+if (!$ProjectRoot) { $ProjectRoot = Join-Path $repoRoot 'Dynamic_CPP' }
+$ProjectRoot = [IO.Path]::GetFullPath($ProjectRoot)
+$btDir = Join-Path $ProjectRoot "Assets\BehaviorTree"
 
 function Read-MetaGuid([string]$metaPath) {
     if (-not (Test-Path $metaPath)) { return $null }
@@ -56,10 +59,10 @@ if ([string]::IsNullOrWhiteSpace($btGuid) -or [string]::IsNullOrWhiteSpace($bbGu
 }
 
 # 프리팹 픽스처는 매 실행 CLI로 다시 만든다 — 잔재를 미리 지운다(.gitignore 대상).
-$prefabDir = Join-Path $repoRoot "Dynamic_CPP\Assets\Prefabs"
+$prefabDir = Join-Path $ProjectRoot "Assets\Prefabs"
 foreach ($p in @((Join-Path $prefabDir "BTSmokeProbe.prefab"),
                  (Join-Path $prefabDir "BTSmokeProbe.prefab.meta"))) {
-    if (Test-Path $p) { Remove-Item $p -Force }
+    if (Test-Path -LiteralPath $p) { throw "BT fixture path already exists: $p" }
 }
 
 $script = Join-Path $Work "bt_smoke_resolved.txt"
@@ -69,7 +72,7 @@ if (-not (Test-Path $script)) { "시나리오가 없다: $script"; exit 1 }
 
 $outPath = Join-Path $Work "bt_smoke.out"
 $resultPath = Join-Path $Work 'bt_smoke.results.jsonl'
-$proc = Start-Process -FilePath $Exe -ArgumentList @('--commandlet-script', ('"'+$script+'"'), '--result-file', ('"'+$resultPath+'"')) `
+$proc = Start-Process -FilePath $Exe -ArgumentList @('--development-project', ('"'+$ProjectRoot+'"'), '--commandlet-script', ('"'+$script+'"'), '--result-file', ('"'+$resultPath+'"')) `
     -WorkingDirectory $exeDir -WindowStyle Hidden `
     -RedirectStandardOutput $outPath `
     -RedirectStandardError (Join-Path $Work "bt_smoke.err") -PassThru
@@ -178,7 +181,7 @@ if ($statusRows.Count -lt 3) {
 # 자식 순서가 지켜졌다.
 # 프로브의 로그는 stdout이 아니라 엔진 로그로 간다(Native.Log → 로그 시스템).
 # bt.status는 printf로 stdout에도 찍지만 스크립트 쪽 로그는 그렇지 않다.
-$logDir = Join-Path $exeDir "Saved\Log"
+$logDir = Join-Path $ProjectRoot "Saved\Editor\Log"
 $editorLog = Get-ChildItem (Join-Path $logDir "Editor_*.html") -ErrorAction SilentlyContinue |
              Sort-Object LastWriteTime -Descending | Select-Object -First 1
 $logText = if ($editorLog) { (Get-Content $editorLog.FullName -Raw) -replace '<[^>]+>', '' } else { '' }

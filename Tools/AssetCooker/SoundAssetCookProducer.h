@@ -25,17 +25,17 @@ namespace sound_cook
     struct Product final
     {
         ck::CookedAssetManifestEntry entry;
-        std::vector<std::byte> bytes;
+        ce::dynamic_array<std::byte> bytes;
     };
 
 
 
     inline bool Build(const std::filesystem::path& root, ck::CookedAssetManifest& manifest,
-        std::set<std::string>& artifactPaths, std::vector<Product>& products, std::string& error)
+        std::set<std::string>& artifactPaths, ce::dynamic_array<Product>& products, std::string& error)
     {
         std::unordered_set<wave::ClipKey> clips;
         std::unordered_map<wave::ClipKey, own::shared_owner<const wave::SoundGraphProgram>> graphs;
-        std::vector<std::pair<experiment::AssetId, wave::SoundPreset>> presets;
+        ce::dynamic_array<std::pair<experiment::AssetId, wave::SoundPreset>> presets;
         for (const auto& entry : manifest.entries)
         {
             if (entry.kind == ck::CookedAssetKind::AudioClip)
@@ -44,7 +44,7 @@ namespace sound_cook
             }
         }
         const auto publish = [&](const experiment::AssetId& id, bool graph,
-            std::vector<std::byte> bytes, std::vector<experiment::AssetId> dependencies)
+            ce::dynamic_array<std::byte> bytes, ce::dynamic_array<experiment::AssetId> dependencies)
         {
             Product product;
             product.entry.assetId = id;
@@ -110,7 +110,7 @@ namespace sound_cook
                 error = path.string() + ": " + error;
                 return false;
             }
-            std::vector<experiment::AssetId> dependencies;
+            ce::dynamic_array<experiment::AssetId> dependencies;
             for (const auto& node : definition.nodes)
             {
                 if (node.kind == wave::SoundNodeKind::Clip)
@@ -127,7 +127,7 @@ namespace sound_cook
                     }
                 }
             }
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
             if (!wave::CookSoundGraph(definition, bytes, error)
                 || !publish(source.assetId, true, std::move(bytes), std::move(dependencies)))
             {
@@ -162,7 +162,7 @@ namespace sound_cook
                 error = "SoundPreset source identity is invalid";
                 return false;
             }
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
             if (!wave::CookSoundPreset(preset, bytes, error)
                 || !publish(id, false, std::move(bytes), { dependency }))
             {
@@ -174,7 +174,7 @@ namespace sound_cook
 
     inline bool RewriteSceneNode(Authoring::WriteNode node, const ck::CookedAssetManifest& manifest,
         const std::unordered_map<std::string, std::string>& aliases,
-        std::vector<experiment::AssetId>& dependencies, std::string& error, std::uint32_t depth = 0u,
+        ce::dynamic_array<experiment::AssetId>& dependencies, std::string& error, std::uint32_t depth = 0u,
         bool soundComponentContext = false)
     {
         if (depth > 256u)
@@ -276,7 +276,7 @@ namespace sound_cook
                 }
             }
             // Gather names before edits; WriteNode::Child may relocate ryml storage.
-            std::vector<std::string> names;
+            ce::dynamic_array<std::string> names;
             for (const auto item : node.Read().Map())
             {
                 names.push_back(item.key.AsString());
@@ -302,7 +302,7 @@ namespace sound_cook
         return true;
     }
 
-    inline bool RewriteScenes(std::vector<ck::SceneCookProduct>& scenes,
+    inline bool RewriteScenes(ce::dynamic_array<ck::SceneCookProduct>& scenes,
         ck::CookedAssetManifest& manifest, std::string& error)
     {
         std::ranges::sort(manifest.entries, {}, &ck::CookedAssetManifestEntry::assetId);

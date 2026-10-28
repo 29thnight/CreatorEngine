@@ -136,7 +136,7 @@ int main()
             return static_cast<bool>((playback.RegisterGraph(graphKey, graph)));
         },
         "playback.RegisterGraph(graphKey,graph)");
-    AudioAssetId graphAsset{}; std::memcpy(&graphAsset,graphGuid.data.data(),sizeof(graphAsset));
+    AudioAssetId graphAsset{}; std::memcpy(&graphAsset,graphGuid.data_.data(),sizeof(graphAsset));
     AudioParameter parameters[]={{"enabled",0,1,0,nullptr},{"variant",1,2,0,nullptr},
         {"gain",2,0,0.2f,nullptr},{"surface",3,0,0,"wood"}};
     const auto graphHandle=Api_Audio_Play(world,graphAsset,2,0,{}, {}, nullptr,parameters,4);

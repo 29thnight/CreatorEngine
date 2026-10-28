@@ -50,7 +50,7 @@ public:
     bool LoadClip(const wave::ClipKey&,const std::filesystem::path&) override { return true; }
     bool LoadCookedClip(const experiment::cooked::CookedAudioClipSource&) override { return true; }
     void UnloadClip(const wave::ClipKey&) override {}
-    std::vector<wave::ClipKey> ListClipKeys() const override { return {key}; }
+    ce::dynamic_array<wave::ClipKey> ListClipKeys() const override { return {key}; }
     void Update(float) override {}
 };
 

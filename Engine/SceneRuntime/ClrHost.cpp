@@ -26,6 +26,8 @@ import Creator.Core.Uuid;
 #include "PhysicsBodyComponent.h"
 #include "CharacterMovementComponent.h"
 #include "ScriptPhysicsABI.h"
+#include "ScriptApiTable.h"
+#include "ScriptBindingRegistry.h"
 #include <stddef.h>
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "Transform.h"
@@ -57,7 +59,6 @@ import Creator.Core.Uuid;
 #include "Terrain.h"
 #include "../RenderEngine/Material.h"
 #include "../RenderEngine/DataSystem.h"
-#include "InputManager.h"
 
 #include <nethost.h>
 #include <coreclr_delegates.h>
@@ -73,6 +74,8 @@ import "Creator.WinAPI.h";
 // DotNetHost*Dir 한 곳에서 관리한다. SDK가 설치한 팩 버전과는 더 이상 묶이지 않는다.
 #pragma comment(lib, "nethost.lib")
 
+extern "C" std::uint64_t __cdecl reflgen_creator_script_native_abi_fingerprint();
+
 namespace
 {
 	// ── 관리 코드에 넘기는 엔진 API 표 ──
@@ -82,359 +85,9 @@ namespace
 	// 필드를 추가하면 kApiVersion을 반드시 올린다.
 	constexpr int kApiVersion = CreatorScriptApiVersion;
 
-	using Float3 = ce::script::vector3;
+	using namespace ce::script::binding;
     std::thread::id g_physicsApiOwner;
 
-	// 쿼터니언 전용. math::vector4와 배치가 같아 그대로 오간다.
-	struct Float4 { float x, y, z, w; };
-
-	// UI 좌표·화면 크기용. math::vector2와 배치가 같다.
-	struct Float2 { float x, y; };
-
-    struct AudioAssetId
-    {
-        std::uint64_t first;
-        std::uint64_t second;
-    };
-    struct AudioPlaySettings
-    {
-        float volume;
-        float pitch;
-        int priority;
-        int loop;
-        int bus;
-        float spatialBlend;
-        float minimumDistance;
-        float maximumDistance;
-        int rolloff;
-        int useReverbSend;
-        float reverbSendDecibels;
-        int ownerPolicy;
-        std::uint32_t concurrencyGroup;
-        int preemptSameClip;
-        int allowVirtualization;
-    };
-    struct AudioParameter
-    {
-        const char* name;
-        int type;
-        int integer;
-        float number;
-        const char* text;
-    };
-    static_assert(sizeof(AudioParameter) == 32u);
-    struct AudioPlaybackCompletion
-    {
-        std::uint64_t playback;
-        std::uint64_t scope;
-        std::uint64_t ownerId;
-        int reason;
-    };
-    static_assert(sizeof(AudioAssetId) == 16u);
-    static_assert(sizeof(AudioPlaySettings) == 60u);
-
-	struct ScriptApiTable
-	{
-		int version;
-		int structSize;
-
-		void (__stdcall* PrintLog)(int level, const char* message,
-			const char* file, int line, const char* member);
-
-		ScriptObjectHandle (__stdcall* Entity_FindByName)(const char* name);
-		int  (__stdcall* Entity_IsAlive)(ScriptObjectHandle handle);
-		int  (__stdcall* Entity_GetName)(ScriptObjectHandle handle, char* buffer, int capacity);
-		void (__stdcall* Entity_SetEnabled)(ScriptObjectHandle handle, int enabled);
-
-		// 스크립트 컴포넌트 하나의 활성 상태. 오브젝트 전체(Entity_SetEnabled)와 달리
-		// 이 스크립트만 켜고 끈다 — 관리 측 Component.Enabled의 setter가 이것을 부르고,
-		// OnEnable/OnDisable 훅은 그 결과로 네이티브가 되돌려 준다(드라이버 단일화).
-		// owner를 함께 받는 이유: instanceId만으로는 어느 Entity의 컴포넌트인지 알 수
-		// 없고, 역맵을 두면 그 맵이 dangling의 새 원천이 된다.
-		int  (__stdcall* Script_SetEnabled)(ScriptObjectHandle owner, int instanceId, int enabled);
-
-		// 계층 접근. 실측에서 m_childrenIndices 76 · Entity::FindIndex 100 ·
-		// m_parentIndex 32로, 남은 어떤 컴포넌트 래퍼보다 큰 표면이다.
-		int  (__stdcall* Entity_GetChildCount)(ScriptObjectHandle handle);
-		ScriptObjectHandle (__stdcall* Entity_GetChild)(ScriptObjectHandle handle, int index);
-		ScriptObjectHandle (__stdcall* Entity_GetParent)(ScriptObjectHandle handle);
-		ScriptObjectHandle (__stdcall* Entity_FindByIndex)(int index);
-		int  (__stdcall* Entity_GetIndex)(ScriptObjectHandle handle);
-
-		// ★ S3부터 Transform은 없을 수 있다 — UI/Canvas는 RectTransformComponent만 갖는다.
-		//
-		// 이 하나가 없으면 관리 측은 부재를 표현할 방법이 아예 없다. 그러면 C#이
-		// Transform을 잡아 값을 쓰는 순간 Entity::Transform_()가 공유 더미로 떨어지고
-		// (Entity.cpp MissingTransformFallback) 오브젝트 이름당 로그 한 줄만 남긴 채
-		// 값이 사라진다 — 크래시도 예외도 없어 스크립트 쪽에서는 성공과 구분되지 않는다.
-		// 다른 컴포넌트의 *_Exists와 같은 역할이고, 그것들과 달리 늦게 생긴 이유는
-		// 승격(S1-b) 전에는 Transform이 GameObject의 값 멤버라 부재가 없었기 때문이다.
-		int    (__stdcall* Transform_Exists)(ScriptObjectHandle handle);
-
-		Float3 (__stdcall* Transform_GetLocalPosition)(ScriptObjectHandle handle);
-		void   (__stdcall* Transform_SetLocalPosition)(ScriptObjectHandle handle, Float3 position);
-		Float3 (__stdcall* Transform_GetWorldPosition)(ScriptObjectHandle handle);
-
-		// 회전·스케일·방향축. 실측에서 Transform 획득이 154회로 전체 1위인데
-		// 위치만 열려 있어 이동·조준 코드가 통째로 막혀 있었다.
-		Float4 (__stdcall* Transform_GetLocalRotation)(ScriptObjectHandle handle);
-		void   (__stdcall* Transform_SetLocalRotation)(ScriptObjectHandle handle, Float4 rotation);
-		Float3 (__stdcall* Transform_GetLocalScale)(ScriptObjectHandle handle);
-		void   (__stdcall* Transform_SetLocalScale)(ScriptObjectHandle handle, Float3 scale);
-
-		void   (__stdcall* Transform_AddLocalPosition)(ScriptObjectHandle handle, Float3 delta);
-		void   (__stdcall* Transform_AddLocalRotation)(ScriptObjectHandle handle, Float4 delta);
-
-		void   (__stdcall* Transform_SetWorldPosition)(ScriptObjectHandle handle, Float3 position);
-		Float4 (__stdcall* Transform_GetWorldRotation)(ScriptObjectHandle handle);
-		void   (__stdcall* Transform_SetWorldRotation)(ScriptObjectHandle handle, Float4 rotation);
-		Float3 (__stdcall* Transform_GetWorldScale)(ScriptObjectHandle handle);
-		void   (__stdcall* Transform_SetWorldScale)(ScriptObjectHandle handle, Float3 scale);
-
-		Float3 (__stdcall* Transform_GetForward)(ScriptObjectHandle handle);
-		Float3 (__stdcall* Transform_GetRight)(ScriptObjectHandle handle);
-		Float3 (__stdcall* Transform_GetUp)(ScriptObjectHandle handle);
-
-		int  (__stdcall* Prefab_Exists)(const char* name);
-		ScriptObjectHandle (__stdcall* Prefab_Instantiate)(const char* prefabName, const char* instanceName);
-		void (__stdcall* Entity_Destroy)(ScriptObjectHandle handle);
-
-		unsigned long long (__stdcall* Engine_GetFrameCount)();
-
-		int  (__stdcall* Sound_Exists)(ScriptObjectHandle handle);
-		void (__stdcall* Sound_Play)(ScriptObjectHandle handle);
-		void (__stdcall* Sound_Stop)(ScriptObjectHandle handle);
-		void (__stdcall* Sound_Pause)(ScriptObjectHandle handle, int pause);
-		int  (__stdcall* Sound_IsPlaying)(ScriptObjectHandle handle);
-		void (__stdcall* Sound_PlayOneShot)(ScriptObjectHandle handle);
-		int  (__stdcall* Sound_GetClipKey)(ScriptObjectHandle handle, char* buffer, int capacity);
-		void (__stdcall* Sound_SetClipKey)(ScriptObjectHandle handle, const char* value);
-		float (__stdcall* Sound_GetVolume)(ScriptObjectHandle handle);
-		void (__stdcall* Sound_SetVolume)(ScriptObjectHandle handle, float value);
-		float (__stdcall* Sound_GetPitch)(ScriptObjectHandle handle);
-		void (__stdcall* Sound_SetPitch)(ScriptObjectHandle handle, float value);
-
-		// Animator (실측 122회 — 그 중 SetParameter만 94회다)
-		int   (__stdcall* Animator_Exists)(ScriptObjectHandle handle);
-		int   (__stdcall* Animator_HasParameter)(ScriptObjectHandle handle, const char* name);
-		void  (__stdcall* Animator_SetBool)(ScriptObjectHandle handle, const char* name, int value);
-		void  (__stdcall* Animator_SetFloat)(ScriptObjectHandle handle, const char* name, float value);
-		void  (__stdcall* Animator_SetInt)(ScriptObjectHandle handle, const char* name, int value);
-		void  (__stdcall* Animator_SetTrigger)(ScriptObjectHandle handle, const char* name);
-		void  (__stdcall* Animator_ResetTrigger)(ScriptObjectHandle handle, const char* name);
-		int   (__stdcall* Animator_GetBool)(ScriptObjectHandle handle, const char* name);
-		float (__stdcall* Animator_GetFloat)(ScriptObjectHandle handle, const char* name);
-		int   (__stdcall* Animator_GetInt)(ScriptObjectHandle handle, const char* name);
-		void  (__stdcall* Animator_SetUseLayer)(ScriptObjectHandle handle, int layerIndex, int useLayer);
-		void  (__stdcall* Animator_StopAnimation)(ScriptObjectHandle handle, float duration);
-
-		// RectTransformComponent (획득 28회 · SetAnchoredPosition만 39회)
-		int    (__stdcall* Rect_Exists)(ScriptObjectHandle handle);
-		Float2 (__stdcall* Rect_GetAnchoredPosition)(ScriptObjectHandle handle);
-		void   (__stdcall* Rect_SetAnchoredPosition)(ScriptObjectHandle handle, Float2 position);
-		Float2 (__stdcall* Rect_GetSizeDelta)(ScriptObjectHandle handle);
-		void   (__stdcall* Rect_SetSizeDelta)(ScriptObjectHandle handle, Float2 size);
-		Float2 (__stdcall* Rect_GetPivot)(ScriptObjectHandle handle);
-		void   (__stdcall* Rect_SetPivot)(ScriptObjectHandle handle, Float2 pivot);
-
-		// ImageComponent (획득 48회 · SetTexture 39 · color 46)
-		int    (__stdcall* Image_Exists)(ScriptObjectHandle handle);
-		void   (__stdcall* Image_SetTexture)(ScriptObjectHandle handle, int index);
-		int    (__stdcall* Image_GetTextureCount)(ScriptObjectHandle handle);
-		Float4 (__stdcall* Image_GetColor)(ScriptObjectHandle handle);
-		void   (__stdcall* Image_SetColor)(ScriptObjectHandle handle, Float4 color);
-		float  (__stdcall* Image_GetClipPercent)(ScriptObjectHandle handle);
-		void   (__stdcall* Image_SetClipPercent)(ScriptObjectHandle handle, float percent);
-		void   (__stdcall* Image_SetNativeSize)(ScriptObjectHandle handle);
-
-		// 카메라 — 주 카메라 기준 질의. 월드→스크린 변환을 손으로 하는 파일이
-		// 11개나 되어 한 번에 접는다. 이 셋은 핸들을 받지 않는다(전역 접근점).
-		int    (__stdcall* Camera_PrimaryExists)();
-		Float2 (__stdcall* Camera_GetScreenSize)();
-		Float3 (__stdcall* Camera_WorldToScreenPoint)(Float3 world);
-
-		// CameraComponent — 오브젝트에 붙은 카메라 하나를 가리킨다(저작 20건).
-		//
-		// LightComponent와 달리 dirty를 발행하지 않는다. 카메라는 렌더 프록시를
-		// 쓰지 않고(Scene.cpp의 Kind 열거에 Camera가 없다) 매 프레임
-		// CaptureFrameSnapshot으로 읽히므로, 값을 바꾸면 다음 프레임에 그대로 반영된다.
-		//
-		// 위치·방향은 여기 없다 — CameraComponent::ResolveCamera가 Transform에서
-		// 매번 유도한다. 카메라를 움직이려면 Transform을 옮기는 것이 정본이다.
-		int    (__stdcall* Camera_Exists)(ScriptObjectHandle handle);
-		float  (__stdcall* Camera_GetFov)(ScriptObjectHandle handle);
-		void   (__stdcall* Camera_SetFov)(ScriptObjectHandle handle, float degrees);
-		float  (__stdcall* Camera_GetNearPlane)(ScriptObjectHandle handle);
-		void   (__stdcall* Camera_SetNearPlane)(ScriptObjectHandle handle, float value);
-		float  (__stdcall* Camera_GetFarPlane)(ScriptObjectHandle handle);
-		void   (__stdcall* Camera_SetFarPlane)(ScriptObjectHandle handle, float value);
-		int    (__stdcall* Camera_IsPrimary)(ScriptObjectHandle handle);
-		void   (__stdcall* Camera_SetPrimary)(ScriptObjectHandle handle, int primary);
-		ScriptObjectHandle (__stdcall* Camera_GetPrimaryHandle)();
-
-		// LightComponent. 저작 자산에 30개가 있는데 스크립트가 만질 길이 없었다.
-		//
-		// setter는 전부 LightComponent의 writer를 거친다 — 필드에 직접 대입하면
-		// dirty가 서지 않아 LightRenderProxy가 낡은 채 남는다(LightComponent.h 주석).
-		int    (__stdcall* Light_Exists)(ScriptObjectHandle handle);
-		Float4 (__stdcall* Light_GetColor)(ScriptObjectHandle handle);
-		void   (__stdcall* Light_SetColor)(ScriptObjectHandle handle, Float4 color);
-		float  (__stdcall* Light_GetIntensity)(ScriptObjectHandle handle);
-		void   (__stdcall* Light_SetIntensity)(ScriptObjectHandle handle, float intensity);
-		float  (__stdcall* Light_GetRange)(ScriptObjectHandle handle);
-		void   (__stdcall* Light_SetRange)(ScriptObjectHandle handle, float range);
-		float  (__stdcall* Light_GetSpotAngle)(ScriptObjectHandle handle);
-		void   (__stdcall* Light_SetSpotAngle)(ScriptObjectHandle handle, float degrees);
-		int    (__stdcall* Light_GetLightType)(ScriptObjectHandle handle);
-		void   (__stdcall* Light_SetLightType)(ScriptObjectHandle handle, int type);
-		int    (__stdcall* Light_GetLightStatus)(ScriptObjectHandle handle);
-		void   (__stdcall* Light_SetLightStatus)(ScriptObjectHandle handle, int status);
-
-		// MeshRenderer + Material. 스크립트가 만지는 것은 사실상 셋뿐이다 —
-		// 재질 사본 만들기(6회) · 셰이더 상수 넣기(24회) · 베이스 색 알파.
-		int   (__stdcall* Mesh_Exists)(ScriptObjectHandle handle);
-		void  (__stdcall* Mesh_InstantiateMaterial)(ScriptObjectHandle handle, const char* newName);
-		int   (__stdcall* Mesh_GetMaterialName)(ScriptObjectHandle handle, char* buffer, int capacity);
-		int   (__stdcall* Mesh_SetMaterialFloat)(ScriptObjectHandle handle, const char* name, float value);
-		int   (__stdcall* Mesh_SetMaterialInt)(ScriptObjectHandle handle, const char* name, int value);
-		Float4 (__stdcall* Mesh_GetBaseColor)(ScriptObjectHandle handle);
-		void  (__stdcall* Mesh_SetBaseColor)(ScriptObjectHandle handle, Float4 color);
-
-		// 입력. 실측 43회인데 스크립트에서 아무것도 받을 수 없던 표면이다.
-		//
-		// 개별 술어(Down/Pressed/Released)를 따로 열지 않고 상태값을 통째로 넘긴다.
-		// 경계 왕복이 한 번으로 줄고, 무엇보다 엔진의 Pressed가 첫 프레임을 제외한다는
-		// 함정을 C# 쪽에서 정확히 조합해 감출 수 있다.
-		int   (__stdcall* Input_GetKeyState)(int key);
-		int   (__stdcall* Input_GetMouseButtonState)(int button);
-		int   (__stdcall* Input_GetControllerButtonState)(int index, int button);
-		int   (__stdcall* Input_IsAnyKeyPressed)();
-
-		Float2 (__stdcall* Input_GetMousePosition)();
-		Float2 (__stdcall* Input_GetMouseDelta)();
-		int   (__stdcall* Input_GetWheelDelta)();
-		void  (__stdcall* Input_SetCursorVisible)(int visible);
-
-		int   (__stdcall* Input_IsControllerConnected)(int index);
-		int   (__stdcall* Input_IsControllerTriggerL)(int index);
-		int   (__stdcall* Input_IsControllerTriggerR)(int index);
-		Float2 (__stdcall* Input_GetControllerThumbL)(int index);
-		Float2 (__stdcall* Input_GetControllerThumbR)(int index);
-
-        std::uint64_t (__stdcall* Body_Find)(ScriptObjectHandle owner);
-        std::uint64_t (__stdcall* Character_Find)(ScriptObjectHandle owner);
-        int (__stdcall* Character_Read)(ScriptObjectHandle owner, std::uint64_t instance, ce::script::physics_character_state* state);
-        int (__stdcall* Character_Velocity)(ScriptObjectHandle owner, std::uint64_t instance, Float3 velocity);
-        int (__stdcall* Character_Teleport)(ScriptObjectHandle owner, std::uint64_t instance, Float3 position);
-        int (__stdcall* Character_Jump)(ScriptObjectHandle owner, std::uint64_t instance);
-        int (__stdcall* Character_Force)(ScriptObjectHandle owner, std::uint64_t instance, Float3 velocity, double seconds);
-        int (__stdcall* Character_CancelForce)(ScriptObjectHandle owner, std::uint64_t instance);
-        int (__stdcall* Body_Read)(ScriptObjectHandle owner, std::uint64_t instance, ce::script::physics_body_state* state);
-        int (__stdcall* Body_Velocity)(ScriptObjectHandle owner, std::uint64_t instance, Float3 linear, Float3 angular);
-        int (__stdcall* Body_Force)(ScriptObjectHandle owner, std::uint64_t instance, Float3 linear, Float3 angular, int mode);
-        int (__stdcall* Body_ShapeCount)(ScriptObjectHandle owner, std::uint64_t instance, int* count);
-        int (__stdcall* Body_ShapeRead)(ScriptObjectHandle owner, std::uint64_t instance, int index, ce::script::physics_shape_state* shape);
-        int (__stdcall* Body_ShapeFlags)(ScriptObjectHandle owner, std::uint64_t instance, unsigned int shape, int sensor, int queryEnabled);
-        int (__stdcall* Physics_Query)(ScriptObjectHandle sceneAnchor, int kind, Float3 origin, Float3 direction,
-            float distanceOrRadius, unsigned int layers, int includeSensors, ce::script::physics_hit* hits,
-            int capacity, ce::script::physics_query_result* result);
-
-        int (__stdcall* Physics_QueryBatch)(ScriptObjectHandle anchor, const ce::script::physics_query_request* requests,
-            int count, ce::script::physics_hit* hits, int capacity, ce::script::physics_batch_result* results);
-
-		// TextComponent (SetMessage 16 · SetAlpha 6)
-		int   (__stdcall* Text_Exists)(ScriptObjectHandle handle);
-		int   (__stdcall* Text_GetMessage)(ScriptObjectHandle handle, char* buffer, int capacity);
-		void  (__stdcall* Text_SetMessage)(ScriptObjectHandle handle, const char* message);
-		Float4 (__stdcall* Text_GetColor)(ScriptObjectHandle handle);
-		void  (__stdcall* Text_SetColor)(ScriptObjectHandle handle, Float4 color);
-		float (__stdcall* Text_GetAlpha)(ScriptObjectHandle handle);
-		void  (__stdcall* Text_SetAlpha)(ScriptObjectHandle handle, float alpha);
-		float (__stdcall* Text_GetFontSize)(ScriptObjectHandle handle);
-		void  (__stdcall* Text_SetFontSize)(ScriptObjectHandle handle, float size);
-		Float2 (__stdcall* Text_GetRelativePosition)(ScriptObjectHandle handle);
-		void  (__stdcall* Text_SetRelativePosition)(ScriptObjectHandle handle, Float2 position);
-
-		// UIComponent 공통. Image·Text가 함께 쓰므로 기반 타입으로 찾는다.
-		int   (__stdcall* Ui_GetOrder)(ScriptObjectHandle handle);
-		void  (__stdcall* Ui_SetOrder)(ScriptObjectHandle handle, int order);
-
-		// Canvas
-		int   (__stdcall* Canvas_Exists)(ScriptObjectHandle handle);
-		int   (__stdcall* Canvas_GetOrder)(ScriptObjectHandle handle);
-		void  (__stdcall* Canvas_SetOrder)(ScriptObjectHandle handle, int order);
-		int   (__stdcall* Canvas_GetName)(ScriptObjectHandle handle, char* buffer, int capacity);
-		void  (__stdcall* Canvas_SetName)(ScriptObjectHandle handle, const char* name);
-
-		// UI 내비게이션·버튼·Image 잔여 (IsNavigationThis 5 · SetNavLock 5 · curindex 5 · rotate 4)
-		int   (__stdcall* Ui_IsSelected)(ScriptObjectHandle handle);
-		int   (__stdcall* Ui_IsNavLocked)(ScriptObjectHandle handle);
-		void  (__stdcall* Ui_SetNavLock)(ScriptObjectHandle handle, int locked);
-		ScriptObjectHandle (__stdcall* UiNav_GetSelected)();
-		void  (__stdcall* UiNav_SetSelected)(ScriptObjectHandle handle);
-
-		int   (__stdcall* Button_Exists)(ScriptObjectHandle handle);
-		int   (__stdcall* Button_ConsumeClicked)(ScriptObjectHandle handle);
-
-		int   (__stdcall* Image_GetTextureIndex)(ScriptObjectHandle handle);
-		float (__stdcall* Image_GetRotation)(ScriptObjectHandle handle);
-		void  (__stdcall* Image_SetRotation)(ScriptObjectHandle handle, float rotation);
-
-		// 레이아웃 검증용 — 계산된 최종 사각형(x, y, width, height)을 그대로 읽는다.
-		Float4 (__stdcall* Rect_GetWorldRect)(ScriptObjectHandle handle);
-		// Camera.WorldToScreenPoint와 같은 좌상단 원점 화면 픽셀 좌표.
-		Float2 (__stdcall* Rect_GetScreenPosition)(ScriptObjectHandle handle);
-		void   (__stdcall* Rect_SetScreenPosition)(ScriptObjectHandle handle, Float2 position);
-
-		std::uint32_t (__stdcall* Profiler_Register)(const char* name);
-		void (__stdcall* Profiler_Begin)(std::uint32_t marker);
-		void (__stdcall* Profiler_End)();
-        std::uint64_t (__stdcall* Audio_GetScope)(int kind);
-        std::uint64_t (__stdcall* Audio_Play)(std::uint64_t scope, AudioAssetId asset, int sourceKind, int mode, Float3 position, ScriptObjectHandle owner, const AudioPlaySettings* settings, const AudioParameter* parameters, int parameterCount);
-        void (__stdcall* Audio_Control)(std::uint64_t playback, int operation, float gain, float pitch);
-        int (__stdcall* Audio_State)(std::uint64_t playback);
-        void (__stdcall* Audio_SetTransform)(std::uint64_t playback, Float3 position, Float3 velocity);
-        int (__stdcall* Audio_SetParameter)(std::uint64_t playback, const char* name, int type, int integer, float number, const char* text);
-        int (__stdcall* Audio_TakeCompletion)(AudioPlaybackCompletion* completion);
-        std::uint64_t (__stdcall* Sound_PlayInstance)(ScriptObjectHandle owner, int oneShot);
-        void (__stdcall* Sound_GetSettings)(ScriptObjectHandle owner, AudioPlaySettings* settings);
-        void (__stdcall* Sound_SetSettings)(ScriptObjectHandle owner, const AudioPlaySettings* settings);
-        int (__stdcall* Sound_GetSource)(ScriptObjectHandle owner, AudioAssetId* asset);
-        void (__stdcall* Sound_SetSource)(ScriptObjectHandle owner, AudioAssetId asset, int kind);
-        int (__stdcall* AudioListener_Exists)(ScriptObjectHandle owner);
-        int (__stdcall* AudioListener_GetActive)(ScriptObjectHandle owner);
-        void (__stdcall* AudioListener_SetActive)(ScriptObjectHandle owner, int active);
-        void (__stdcall* Audio_SetBusVolume)(int bus, float gain);
-        int (__stdcall* Audio_LastError)(char* buffer, int capacity);
-        int (__stdcall* Audio_Configure)(std::uint32_t id, int cap, int policy, int group);
-        int (__stdcall* Audio_SetReverbPreset)(int preset);
-        // Append-only v34 AssetDepot ABI. All ownership stays in this module.
-        int (__stdcall* Asset_Request)(const ScriptAssetLink* link, const ScriptTextureAssetVariant* variant, int residentOnly, ScriptAssetToken* token);
-        int (__stdcall* Asset_Snapshot)(ScriptAssetToken token, ScriptAssetRequestSnapshot* snapshot, char* message, int capacity);
-        int (__stdcall* Asset_AcquireResult)(ScriptAssetToken request, ScriptAssetToken* owner);
-        int (__stdcall* Asset_Cancel)(ScriptAssetToken request);
-        int (__stdcall* Asset_Release)(ScriptAssetToken token);
-        int (__stdcall* Asset_ReadTexture)(ScriptAssetToken token, ScriptTextureDescriptor* descriptor);
-        int (__stdcall* Asset_ListRoots)(std::uint64_t mount, std::uint32_t kind, ScriptAssetLink* links, int capacity, int* count);
-        // Append-only v35: concrete-view selection never changes serialized links.
-        int (__stdcall* Asset_RequestTyped)(const ScriptAssetLink* link, std::uint32_t concreteType, const ScriptTextureAssetVariant* variant, ScriptAssetToken* token);
-        int (__stdcall* Asset_TryAcquireTyped)(const ScriptAssetLink* link, std::uint32_t concreteType, const ScriptTextureAssetVariant* variant, ScriptAssetToken* token);
-        // Preserve the v40 physics entries before appending new slots.
-        int (__stdcall* Body_Remove)(ScriptObjectHandle owner, std::uint64_t instance);
-        int (__stdcall* Body_ShapeRole)(ScriptObjectHandle owner, std::uint64_t instance, unsigned int shape, const char* role);
-        // Append-only v41: explicit same-camera discontinuities.
-        void (__stdcall* Camera_NotifyCameraCut)(ScriptObjectHandle handle);
-        int (__stdcall* Simulation_Status)(Runtime::TickStatus* status);
-        int (__stdcall* Simulation_Submit)(std::uint64_t epoch, std::uint64_t tick, std::uint32_t kind, const std::byte* payload, int bytes, std::uint64_t* sequence);
-        int (__stdcall* Simulation_Read)(std::uint64_t epoch, std::uint64_t after, Runtime::TickSnapshotHeader* header, std::byte* payload, int capacity);
-        int (__stdcall* ExtraComponent_Exists)(ScriptObjectHandle handle, int kind);
-        int (__stdcall* ExtraComponent_GetEnabled)(ScriptObjectHandle handle, int kind);
-        void (__stdcall* ExtraComponent_SetEnabled)(ScriptObjectHandle handle, int kind, int enabled);
-
-	};
-
-    static_assert(offsetof(ScriptApiTable, Simulation_Status)
-        == offsetof(ScriptApiTable, Camera_NotifyCameraCut) + sizeof(decltype(ScriptApiTable::Camera_NotifyCameraCut)));
     int __stdcall Api_Simulation_Status(Runtime::TickStatus* status)
     {
         if (!status) return static_cast<int>(Runtime::TickResult::InvalidArgument);
@@ -470,7 +123,7 @@ namespace
     static_assert(offsetof(ScriptApiTable, Camera_NotifyCameraCut)
         == offsetof(ScriptApiTable, Body_ShapeRole) + sizeof(decltype(ScriptApiTable::Body_ShapeRole)));
     static_assert(sizeof(ScriptApiTable)
-        == offsetof(ScriptApiTable, ExtraComponent_SetEnabled) + sizeof(decltype(ScriptApiTable::ExtraComponent_SetEnabled)));
+        == offsetof(ScriptApiTable, Decal_SetFloat) + sizeof(decltype(ScriptApiTable::Decal_SetFloat)));
 
 	ScriptApiTable g_apiTable{};
 
@@ -679,97 +332,6 @@ namespace
 		Debug::PrintLog(logLevel, message, where);
 	}
 
-	ScriptObjectHandle __stdcall Api_Entity_FindByName(const char* name)
-	{
-		if (nullptr == name) return {};
-
-		Scene* scene = SceneManagers->GetActiveScene();
-		if (nullptr == scene) return {};
-
-		auto object = scene->GetEntity(name);
-		if (!object) return {};
-
-		return ScriptObjectRegistry::Get().Register(object);
-	}
-
-	int __stdcall Api_Entity_IsAlive(ScriptObjectHandle handle)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		return (nullptr != object && !object->IsDestroyMark()) ? 1 : 0;
-	}
-
-	int __stdcall Api_Entity_GetName(ScriptObjectHandle handle, char* buffer, int capacity)
-	{
-		if (nullptr == buffer || capacity <= 0) return 0;
-
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return 0;
-
-		const std::string name = object->m_name;
-		const int length = static_cast<int>(std::min<size_t>(name.size(), static_cast<size_t>(capacity)));
-		std::memcpy(buffer, name.data(), length);
-		return length;
-	}
-
-	void __stdcall Api_Entity_SetEnabled(ScriptObjectHandle handle, int enabled)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr != object)
-		{
-			object->SetEnabled(0 != enabled);
-		}
-	}
-
-	/// 스크립트 컴포넌트 하나만 켜고 끈다(PHASE 9 트랙 L · 활성 축).
-	///
-	/// ── 왜 역맵을 두지 않는가 ──
-	///
-	/// instanceId → ScriptComponent* 맵을 들면 파괴·핫리로드·재생 왕복마다 그 맵을
-	/// 정확히 걷어야 하고, 한 번이라도 놓치면 dangling을 역참조한다. 관리 측은 이미
-	/// 자기 Entity 핸들을 들고 있으므로, 그 오브젝트의 ScriptComponent들만 훑어
-	/// id로 고르면 새 상태를 만들지 않는다 — QueueManagedCollision이 쓰는 것과 같은
-	/// 관용구다. 오브젝트 하나의 스크립트 수는 한 자리라 선형 탐색으로 충분하다.
-	///
-	/// 돌려주는 값은 "실제로 그 컴포넌트를 찾아 적용했는가"다. 0이면 관리 측이
-	/// 국소 폴백으로 내려가고 경고를 남긴다 — 조용히 무시되면 스크립트가 자기를
-	/// 껐는데 계속 도는, 이 슬라이스가 고치려는 바로 그 증상이 다시 생긴다.
-	int __stdcall Api_Script_SetEnabled(ScriptObjectHandle owner, int instanceId, int enabled)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(owner);
-		if (nullptr == object) return 0;
-
-		for (ScriptComponent* script : object->GetComponents<ScriptComponent>())
-		{
-			if (nullptr == script || script->GetInstanceId() != instanceId) continue;
-
-			// Component::SetEnabled가 전이일 때만 OnEnable/OnDisable을 부르고,
-			// ScriptComponent의 그 override가 관리 측으로 되돌려 준다. 여기서
-			// 훅을 직접 부르지 않는 것이 요점이다 — 드라이버가 하나여야 한다.
-			script->SetEnabled(0 != enabled);
-			return 1;
-		}
-		return 0;
-	}
-
-	/// C#의 setter 직후 GetWorld* 계약을 packed targeted pull에 연결한다.
-	/// Scene은 target의 parentExec chain만 정방향 계산하며 global dirty-root queue와
-	/// 자식 전파 신호를 소비하지 않는다.
-	void EnsureResolved(Entity* object)
-	{
-		if (nullptr == object) return;
-		Scene* scene = object->GetScene();
-		if (scene)
-		{
-			scene->EnsureResolved(scene->HandleOf(object->m_index));
-			return;
-		}
-
-		// Scene 밖의 리플렉션 임시 객체는 packed identity가 없으므로 기존 로컬
-		// fallback을 유지한다.
-		Transform& transform = object->Transform_();
-		transform.SetAndDecomposeMatrix(transform.UpdateWorldMatrix());
-	}
-
 	// ── 계층 ──
 	//
 	// 엔진은 오브젝트를 인덱스로 잇는다(m_childrenIndices·m_parentIndex).
@@ -822,189 +384,6 @@ namespace
 
 	// Transform_()를 부르지 않는다 — 그것은 부재 시 더미를 돌려주므로 여기서 쓰면
 	// 언제나 "있다"가 되어 검사가 아무것도 말하지 않게 된다. HasTransform()을 직접 본다.
-	int __stdcall Api_Transform_Exists(ScriptObjectHandle handle)
-	{
-		const Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		return (nullptr != object && object->HasTransform()) ? 1 : 0;
-	}
-
-	Float3 __stdcall Api_Transform_GetLocalPosition(ScriptObjectHandle handle)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return {};
-
-		const auto& p = object->Transform_().GetPositionValue();
-		return { p.x, p.y, p.z };
-	}
-
-	void __stdcall Api_Transform_SetLocalPosition(ScriptObjectHandle handle, Float3 position)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return;
-
-		object->Transform_().SetPosition(
-			{ position.x, position.y, position.z }, TransformWriteReason::Script);
-	}
-
-	Float3 __stdcall Api_Transform_GetWorldPosition(ScriptObjectHandle handle)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return {};
-
-		EnsureResolved(object);
-
-		const math::vector3 world = object->Transform_().GetWorldPosition();
-		return { world.x, world.y, world.z };
-	}
-
-	// 아래 Transform API는 전부 같은 모양이다 — 핸들을 풀고, 없으면 무해한 기본값.
-	// 엔진 setter들이 내부에서 SetDirty를 부르므로 여기서 따로 표시할 것은 없다.
-
-
-	Float4 __stdcall Api_Transform_GetLocalRotation(ScriptObjectHandle handle)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return { 0.f, 0.f, 0.f, 1.f };   // 단위 쿼터니언
-
-		const auto& r = object->Transform_().GetRotationValue();
-		return { r.x, r.y, r.z, r.w };
-	}
-
-	void __stdcall Api_Transform_SetLocalRotation(ScriptObjectHandle handle, Float4 rotation)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return;
-
-		object->Transform_().SetRotation(
-			{ rotation.x, rotation.y, rotation.z, rotation.w },
-			TransformWriteReason::Script);
-	}
-
-	Float3 __stdcall Api_Transform_GetLocalScale(ScriptObjectHandle handle)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return { 1.f, 1.f, 1.f };
-
-		const auto& s = object->Transform_().GetScaleValue();
-		return { s.x, s.y, s.z };
-	}
-
-	void __stdcall Api_Transform_SetLocalScale(ScriptObjectHandle handle, Float3 scale)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return;
-
-		object->Transform_().SetScale(
-			{ scale.x, scale.y, scale.z }, TransformWriteReason::Script);
-	}
-
-	void __stdcall Api_Transform_AddLocalPosition(ScriptObjectHandle handle, Float3 delta)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return;
-
-		object->Transform_().AddPosition(
-			{ delta.x, delta.y, delta.z }, TransformWriteReason::Script);
-	}
-
-	void __stdcall Api_Transform_AddLocalRotation(ScriptObjectHandle handle, Float4 delta)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return;
-
-		object->Transform_().AddRotation(
-			{ delta.x, delta.y, delta.z, delta.w }, TransformWriteReason::Script);
-	}
-
-	void __stdcall Api_Transform_SetWorldPosition(ScriptObjectHandle handle, Float3 position)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return;
-
-		EnsureResolved(object);
-
-		object->Transform_().SetWorldPosition(
-			{ position.x, position.y, position.z }, TransformWriteReason::Script);
-	}
-
-	Float4 __stdcall Api_Transform_GetWorldRotation(ScriptObjectHandle handle)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return { 0.f, 0.f, 0.f, 1.f };
-
-		EnsureResolved(object);
-
-		const math::quaternion q = object->Transform_().GetWorldQuaternion();
-		return { q.x, q.y, q.z, q.w };
-	}
-
-	void __stdcall Api_Transform_SetWorldRotation(ScriptObjectHandle handle, Float4 rotation)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return;
-
-		EnsureResolved(object);
-
-		object->Transform_().SetWorldRotation(
-			{ rotation.x, rotation.y, rotation.z, rotation.w },
-			TransformWriteReason::Script);
-	}
-
-	Float3 __stdcall Api_Transform_GetWorldScale(ScriptObjectHandle handle)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return { 1.f, 1.f, 1.f };
-
-		EnsureResolved(object);
-
-		const math::vector3 s = object->Transform_().GetWorldScale();
-		return { s.x, s.y, s.z };
-	}
-
-	void __stdcall Api_Transform_SetWorldScale(ScriptObjectHandle handle, Float3 scale)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return;
-
-		EnsureResolved(object);
-
-		object->Transform_().SetWorldScale(
-			{ scale.x, scale.y, scale.z }, TransformWriteReason::Script);
-	}
-
-	Float3 __stdcall Api_Transform_GetForward(ScriptObjectHandle handle)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return { 0.f, 0.f, 1.f };
-
-		EnsureResolved(object);
-
-		const math::vector3 v = object->Transform_().GetForward();
-		return { v.x, v.y, v.z };
-	}
-
-	Float3 __stdcall Api_Transform_GetRight(ScriptObjectHandle handle)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return { 1.f, 0.f, 0.f };
-
-		EnsureResolved(object);
-
-		const math::vector3 v = object->Transform_().GetRight();
-		return { v.x, v.y, v.z };
-	}
-
-	Float3 __stdcall Api_Transform_GetUp(ScriptObjectHandle handle)
-	{
-		Entity* object = ScriptObjectRegistry::Get().Resolve(handle);
-		if (nullptr == object) return { 0.f, 1.f, 0.f };
-
-		EnsureResolved(object);
-
-		const math::vector3 v = object->Transform_().GetUp();
-		return { v.x, v.y, v.z };
-	}
-
 	int __stdcall Api_Prefab_Exists(const char* name)
 	{
 		if (nullptr == name) return 0;
@@ -2102,120 +1481,6 @@ namespace
 		}
 	}
 
-	// ── 입력 ──
-	//
-	// 엔진의 KeyState 전이는 Idle → Down(첫 프레임) → Pressed(유지) → Released(뗀 프레임)다.
-	// Pressed가 첫 프레임을 포함하지 않는 것이 함정이라, 상태를 그대로 넘겨
-	// "눌려 있는가"를 C#에서 Down|Pressed로 정확히 조합하게 한다.
-
-	// 스크립트는 게임 소비처다 — 소유가 아닌 프레임에는 장치가 조용한 것처럼
-	// 보인다(W5 관문, InputManager.h). 위치는 그대로 준다: 위치는 상태가 아니라
-	// 사실이고, 그것으로 무엇을 할지는 버튼 상태가 정한다.
-	static bool GameInputOwned()
-	{
-		return InputManagement->IsGameInputOwned();
-	}
-
-	int __stdcall Api_Input_GetKeyState(int key)
-	{
-		if (key < 0 || key >= kKeyboardCount) return static_cast<int>(KeyState::Idle);
-		if (!GameInputOwned()) return static_cast<int>(KeyState::Idle);
-		return static_cast<int>(InputManagement->m_keyboardState.GetKeyState(static_cast<size_t>(key)));
-	}
-
-	int __stdcall Api_Input_GetMouseButtonState(int button)
-	{
-		if (button < 0 || button >= static_cast<int>(MouseKey::MAX)) return static_cast<int>(KeyState::Idle);
-		if (!GameInputOwned()) return static_cast<int>(KeyState::Idle);
-
-		// 마우스 상태는 private이라 술어 셋으로 되짚는다.
-		const MouseKey key = static_cast<MouseKey>(button);
-		if (InputManagement->IsMouseButtonDown(key))     return static_cast<int>(KeyState::Down);
-		if (InputManagement->IsMouseButtonPressed(key))  return static_cast<int>(KeyState::Pressed);
-		if (InputManagement->IsMouseButtonReleased(key)) return static_cast<int>(KeyState::Released);
-		return static_cast<int>(KeyState::Idle);
-	}
-
-	int __stdcall Api_Input_GetControllerButtonState(int index, int button)
-	{
-		if (index < 0 || button < 0 || button >= static_cast<int>(ControllerButton::MAX))
-		{
-			return static_cast<int>(KeyState::Idle);
-		}
-
-		const DWORD pad = static_cast<DWORD>(index);
-		const ControllerButton btn = static_cast<ControllerButton>(button);
-
-		if (!GameInputOwned()) return static_cast<int>(KeyState::Idle);
-		if (InputManagement->IsControllerButtonDown(pad, btn))     return static_cast<int>(KeyState::Down);
-		if (InputManagement->IsControllerButtonPressed(pad, btn))  return static_cast<int>(KeyState::Pressed);
-		if (InputManagement->IsControllerButtonReleased(pad, btn)) return static_cast<int>(KeyState::Released);
-		return static_cast<int>(KeyState::Idle);
-	}
-
-	int __stdcall Api_Input_IsAnyKeyPressed()
-	{
-		if (!GameInputOwned()) return 0;
-		return InputManagement->IsAnyKeyPressed() ? 1 : 0;
-	}
-
-	Float2 __stdcall Api_Input_GetMousePosition()
-	{
-		const auto p = InputManagement->GetMousePos();
-		return { p.x, p.y };
-	}
-
-	Float2 __stdcall Api_Input_GetMouseDelta()
-	{
-		if (!GameInputOwned()) return {};
-		const auto d = InputManagement->GetMouseDelta();
-		return { d.x, d.y };
-	}
-
-	int __stdcall Api_Input_GetWheelDelta()
-	{
-		if (!GameInputOwned()) return 0;
-		return static_cast<int>(InputManagement->GetWheelDelta());
-	}
-
-	void __stdcall Api_Input_SetCursorVisible(int visible)
-	{
-		if (0 != visible) InputManagement->ShowCursor();
-		else              InputManagement->HideCursor();
-	}
-
-	int __stdcall Api_Input_IsControllerConnected(int index)
-	{
-		if (index < 0) return 0;
-		return InputManagement->IsControllerConnected(static_cast<DWORD>(index)) ? 1 : 0;
-	}
-
-	int __stdcall Api_Input_IsControllerTriggerL(int index)
-	{
-		if (index < 0 || !GameInputOwned()) return 0;
-		return InputManagement->IsControllerTriggerL(static_cast<DWORD>(index)) ? 1 : 0;
-	}
-
-	int __stdcall Api_Input_IsControllerTriggerR(int index)
-	{
-		if (index < 0 || !GameInputOwned()) return 0;
-		return InputManagement->IsControllerTriggerR(static_cast<DWORD>(index)) ? 1 : 0;
-	}
-
-	Float2 __stdcall Api_Input_GetControllerThumbL(int index)
-	{
-		if (index < 0 || !GameInputOwned()) return {};
-		const auto v = InputManagement->GetControllerThumbL(static_cast<DWORD>(index));
-		return { v.x, v.y };
-	}
-
-	Float2 __stdcall Api_Input_GetControllerThumbR(int index)
-	{
-		if (index < 0 || !GameInputOwned()) return {};
-		const auto v = InputManagement->GetControllerThumbR(static_cast<DWORD>(index));
-		return { v.x, v.y };
-	}
-
     // Physics ABI: owner generation + component identity, explicit failures, no legacy adapters.
     bool PhysicsApiEntered() { return g_physicsApiOwner == std::this_thread::get_id(); }
 
@@ -2398,9 +1663,14 @@ namespace
             return PhysicsFailure(ce::physics::error_code::invalid_argument);
         const auto& shape = body->Shapes()[index];
         const auto& rotation = shape.localRotation;
+        const auto role = ce::physics::ContactRoleValue(shape.contactRole);
         *output = {shape.shapeId, static_cast<int>(shape.kind), shape.sensor, shape.queryEnabled, shape.layerOverride,
                    shape.radius, shape.halfHeight, ScriptVector(shape.halfExtent), ScriptVector(shape.localPosition),
-                   {rotation.x, rotation.y, rotation.z, rotation.w}, ce::physics::ContactRoleValue(shape.contactRole)};
+                   {rotation.x, rotation.y, rotation.z, rotation.w}, {role.a, role.b, role.c, {}}};
+        for (std::size_t i = 0; i < 8; ++i)
+        {
+            output->role.d[i] = role.d[i];
+        }
         return 0;
     }
 
@@ -2986,6 +2256,94 @@ namespace
         if (auto* component = ResolveExtraComponent(handle, kind)) component->SetEnabled(enabled != 0);
     }
 
+    int __stdcall Api_Bone_GetPinned(ScriptObjectHandle handle)
+    {
+        auto* bone = static_cast<BoneComponent*>(ResolveExtraComponent(handle, 1));
+        return bone != nullptr && bone->m_bPinned ? 1 : 0;
+    }
+
+    void __stdcall Api_Bone_SetPinned(ScriptObjectHandle handle, int pinned)
+    {
+        auto* bone = static_cast<BoneComponent*>(ResolveExtraComponent(handle, 1));
+        if (bone != nullptr)
+        {
+            bone->m_bPinned = pinned != 0;
+            bone->OnPropertyChanged("m_bPinned", Meta::PropertyChangeSource::Script);
+        }
+    }
+
+    int __stdcall Api_Bone_GetResolvedIndex(ScriptObjectHandle handle)
+    {
+        auto* bone = static_cast<BoneComponent*>(ResolveExtraComponent(handle, 1));
+        return bone != nullptr ? bone->GetResolvedBoneIndex() : -1;
+    }
+
+    int __stdcall Api_Decal_GetInt(ScriptObjectHandle handle, int field)
+    {
+        auto* decal = static_cast<DecalComponent*>(ResolveExtraComponent(handle, 2));
+        if (decal == nullptr)
+        {
+            return 0;
+        }
+        switch (field)
+        {
+        case 0: return static_cast<int>(decal->sliceX);
+        case 1: return static_cast<int>(decal->sliceY);
+        case 2: return decal->sliceNumber;
+        case 3: return decal->useAnimation ? 1 : 0;
+        case 4: return decal->isLoop ? 1 : 0;
+        default: return 0;
+        }
+    }
+
+    void __stdcall Api_Decal_SetInt(ScriptObjectHandle handle, int field, int value)
+    {
+        auto* decal = static_cast<DecalComponent*>(ResolveExtraComponent(handle, 2));
+        if (decal == nullptr)
+        {
+            return;
+        }
+        const char* name = nullptr;
+        switch (field)
+        {
+        case 0: decal->sliceX = static_cast<uint32>(value); name = "sliceX"; break;
+        case 1: decal->sliceY = static_cast<uint32>(value); name = "sliceY"; break;
+        case 2: decal->sliceNumber = value; name = "sliceNumber"; break;
+        case 3: decal->useAnimation = value != 0; name = "useAnimation"; break;
+        case 4: decal->isLoop = value != 0; name = "isLoop"; break;
+        default: return;
+        }
+        decal->OnPropertyChanged(name, Meta::PropertyChangeSource::Script);
+    }
+
+    float __stdcall Api_Decal_GetFloat(ScriptObjectHandle handle, int field)
+    {
+        auto* decal = static_cast<DecalComponent*>(ResolveExtraComponent(handle, 2));
+        if (decal == nullptr)
+        {
+            return 0.0f;
+        }
+        return field == 0 ? decal->slicePerSeconds : field == 1 ? decal->timer : 0.0f;
+    }
+
+    void __stdcall Api_Decal_SetFloat(ScriptObjectHandle handle, int field, float value)
+    {
+        auto* decal = static_cast<DecalComponent*>(ResolveExtraComponent(handle, 2));
+        if (decal == nullptr)
+        {
+            return;
+        }
+        if (field == 0)
+        {
+            decal->slicePerSeconds = value;
+            decal->OnPropertyChanged("slicePerSeconds", Meta::PropertyChangeSource::Script);
+        }
+        else if (field == 1)
+        {
+            decal->timer = value;
+        }
+    }
+
 	void FillApiTable()
 	{
 #if defined(CE_SCENE_HEADLESS)
@@ -2993,37 +2351,14 @@ namespace
 		g_apiTable.version    = kApiVersion;
 		g_apiTable.structSize = static_cast<int>(sizeof(ScriptApiTable));
 		g_apiTable.PrintLog                    = &Api_PrintLog;
-		g_apiTable.Entity_FindByName       = &Api_Entity_FindByName;
-		g_apiTable.Entity_IsAlive          = &Api_Entity_IsAlive;
-		g_apiTable.Entity_GetName          = &Api_Entity_GetName;
-		g_apiTable.Entity_SetEnabled       = &Api_Entity_SetEnabled;
-		g_apiTable.Script_SetEnabled       = &Api_Script_SetEnabled;
 		g_apiTable.Entity_GetChildCount    = &Api_Entity_GetChildCount;
 		g_apiTable.Entity_GetChild         = &Api_Entity_GetChild;
 		g_apiTable.Entity_GetParent        = &Api_Entity_GetParent;
 		g_apiTable.Entity_FindByIndex      = &Api_Entity_FindByIndex;
 		g_apiTable.Entity_GetIndex         = &Api_Entity_GetIndex;
-		g_apiTable.Transform_Exists            = &Api_Transform_Exists;
-		g_apiTable.Transform_GetLocalPosition  = &Api_Transform_GetLocalPosition;
-		g_apiTable.Transform_SetLocalPosition  = &Api_Transform_SetLocalPosition;
 		g_apiTable.Simulation_Status = &Api_Simulation_Status;
         g_apiTable.Simulation_Submit = &Api_Simulation_Submit;
         g_apiTable.Simulation_Read = &Api_Simulation_Read;
-        g_apiTable.Transform_GetWorldPosition  = &Api_Transform_GetWorldPosition;
-		g_apiTable.Transform_GetLocalRotation  = &Api_Transform_GetLocalRotation;
-		g_apiTable.Transform_SetLocalRotation  = &Api_Transform_SetLocalRotation;
-		g_apiTable.Transform_GetLocalScale     = &Api_Transform_GetLocalScale;
-		g_apiTable.Transform_SetLocalScale     = &Api_Transform_SetLocalScale;
-		g_apiTable.Transform_AddLocalPosition  = &Api_Transform_AddLocalPosition;
-		g_apiTable.Transform_AddLocalRotation  = &Api_Transform_AddLocalRotation;
-		g_apiTable.Transform_SetWorldPosition  = &Api_Transform_SetWorldPosition;
-		g_apiTable.Transform_GetWorldRotation  = &Api_Transform_GetWorldRotation;
-		g_apiTable.Transform_SetWorldRotation  = &Api_Transform_SetWorldRotation;
-		g_apiTable.Transform_GetWorldScale     = &Api_Transform_GetWorldScale;
-		g_apiTable.Transform_SetWorldScale     = &Api_Transform_SetWorldScale;
-		g_apiTable.Transform_GetForward        = &Api_Transform_GetForward;
-		g_apiTable.Transform_GetRight          = &Api_Transform_GetRight;
-		g_apiTable.Transform_GetUp             = &Api_Transform_GetUp;
 		g_apiTable.Entity_Destroy          = &Api_Entity_Destroy;
         g_apiTable.Engine_GetFrameCount = &Api_Engine_GetFrameCount;
         g_apiTable.Body_Find = &Api_Body_Find;
@@ -3060,37 +2395,14 @@ namespace
 		g_apiTable.structSize = static_cast<int>(sizeof(ScriptApiTable));
 
 		g_apiTable.PrintLog                    = &Api_PrintLog;
-		g_apiTable.Entity_FindByName       = &Api_Entity_FindByName;
-		g_apiTable.Entity_IsAlive          = &Api_Entity_IsAlive;
-		g_apiTable.Entity_GetName          = &Api_Entity_GetName;
-		g_apiTable.Entity_SetEnabled       = &Api_Entity_SetEnabled;
-		g_apiTable.Script_SetEnabled       = &Api_Script_SetEnabled;
 		g_apiTable.Entity_GetChildCount    = &Api_Entity_GetChildCount;
 		g_apiTable.Entity_GetChild         = &Api_Entity_GetChild;
 		g_apiTable.Entity_GetParent        = &Api_Entity_GetParent;
 		g_apiTable.Entity_FindByIndex      = &Api_Entity_FindByIndex;
 		g_apiTable.Entity_GetIndex         = &Api_Entity_GetIndex;
-		g_apiTable.Transform_Exists            = &Api_Transform_Exists;
-		g_apiTable.Transform_GetLocalPosition  = &Api_Transform_GetLocalPosition;
-		g_apiTable.Transform_SetLocalPosition  = &Api_Transform_SetLocalPosition;
 		g_apiTable.Simulation_Status = &Api_Simulation_Status;
         g_apiTable.Simulation_Submit = &Api_Simulation_Submit;
         g_apiTable.Simulation_Read = &Api_Simulation_Read;
-        g_apiTable.Transform_GetWorldPosition  = &Api_Transform_GetWorldPosition;
-		g_apiTable.Transform_GetLocalRotation  = &Api_Transform_GetLocalRotation;
-		g_apiTable.Transform_SetLocalRotation  = &Api_Transform_SetLocalRotation;
-		g_apiTable.Transform_GetLocalScale     = &Api_Transform_GetLocalScale;
-		g_apiTable.Transform_SetLocalScale     = &Api_Transform_SetLocalScale;
-		g_apiTable.Transform_AddLocalPosition  = &Api_Transform_AddLocalPosition;
-		g_apiTable.Transform_AddLocalRotation  = &Api_Transform_AddLocalRotation;
-		g_apiTable.Transform_SetWorldPosition  = &Api_Transform_SetWorldPosition;
-		g_apiTable.Transform_GetWorldRotation  = &Api_Transform_GetWorldRotation;
-		g_apiTable.Transform_SetWorldRotation  = &Api_Transform_SetWorldRotation;
-		g_apiTable.Transform_GetWorldScale     = &Api_Transform_GetWorldScale;
-		g_apiTable.Transform_SetWorldScale     = &Api_Transform_SetWorldScale;
-		g_apiTable.Transform_GetForward        = &Api_Transform_GetForward;
-		g_apiTable.Transform_GetRight          = &Api_Transform_GetRight;
-		g_apiTable.Transform_GetUp             = &Api_Transform_GetUp;
 		g_apiTable.Prefab_Exists               = &Api_Prefab_Exists;
 		g_apiTable.Prefab_Instantiate          = &Api_Prefab_Instantiate;
 		g_apiTable.Entity_Destroy          = &Api_Entity_Destroy;
@@ -3193,20 +2505,7 @@ namespace
 		g_apiTable.Mesh_SetMaterialInt         = &Api_Mesh_SetMaterialInt;
 		g_apiTable.Mesh_GetBaseColor           = &Api_Mesh_GetBaseColor;
 		g_apiTable.Mesh_SetBaseColor           = &Api_Mesh_SetBaseColor;
-
-		g_apiTable.Input_GetKeyState              = &Api_Input_GetKeyState;
-		g_apiTable.Input_GetMouseButtonState      = &Api_Input_GetMouseButtonState;
-		g_apiTable.Input_GetControllerButtonState = &Api_Input_GetControllerButtonState;
-		g_apiTable.Input_IsAnyKeyPressed          = &Api_Input_IsAnyKeyPressed;
-		g_apiTable.Input_GetMousePosition         = &Api_Input_GetMousePosition;
-		g_apiTable.Input_GetMouseDelta            = &Api_Input_GetMouseDelta;
-		g_apiTable.Input_GetWheelDelta            = &Api_Input_GetWheelDelta;
-		g_apiTable.Input_SetCursorVisible         = &Api_Input_SetCursorVisible;
-		g_apiTable.Input_IsControllerConnected    = &Api_Input_IsControllerConnected;
-		g_apiTable.Input_IsControllerTriggerL     = &Api_Input_IsControllerTriggerL;
-		g_apiTable.Input_IsControllerTriggerR     = &Api_Input_IsControllerTriggerR;
-		g_apiTable.Input_GetControllerThumbL      = &Api_Input_GetControllerThumbL;
-		g_apiTable.Input_GetControllerThumbR      = &Api_Input_GetControllerThumbR;
+		ce::script::binding::RegisterInputApi(g_apiTable);
 
         g_apiTable.Body_Find = &Api_Body_Find;
         g_apiTable.Character_Find = &Api_Character_Find;
@@ -3297,9 +2596,18 @@ namespace
 
 #endif
 
+        ce::script::binding::RegisterEntityApi(g_apiTable);
+        ce::script::binding::RegisterTransformApi(g_apiTable);
         g_apiTable.ExtraComponent_Exists = &Api_ExtraComponent_Exists;
         g_apiTable.ExtraComponent_GetEnabled = &Api_ExtraComponent_GetEnabled;
         g_apiTable.ExtraComponent_SetEnabled = &Api_ExtraComponent_SetEnabled;
+        g_apiTable.Bone_GetPinned = &Api_Bone_GetPinned;
+        g_apiTable.Bone_SetPinned = &Api_Bone_SetPinned;
+        g_apiTable.Bone_GetResolvedIndex = &Api_Bone_GetResolvedIndex;
+        g_apiTable.Decal_GetInt = &Api_Decal_GetInt;
+        g_apiTable.Decal_SetInt = &Api_Decal_SetInt;
+        g_apiTable.Decal_GetFloat = &Api_Decal_GetFloat;
+        g_apiTable.Decal_SetFloat = &Api_Decal_SetFloat;
 
 	}
 
@@ -3316,7 +2624,13 @@ ClrHost& ClrHost::Get()
 bool ClrHost::BindEntryPoints(const std::filesystem::path& assemblyPath)
 {
 	const std::wstring assembly = assemblyPath.wstring();
-	const wchar_t* typeName = L"CreatorEngine.Bootstrap, ScriptCore";
+#if defined(CREATOR_LEGACY_SCRIPT_BASELINE)
+	const wchar_t* typeName = m_useFSharp
+        ? L"CreatorEngine.Native.RuntimeBootstrap, CreatorEngine.NativeBindings"
+        : L"CreatorEngine.Bootstrap, ScriptCore";
+#else
+	const wchar_t* typeName = L"CreatorEngine.Native.RuntimeBootstrap, CreatorEngine.NativeBindings";
+#endif
 
 	auto bindFrom = [&](const wchar_t* owningType, const wchar_t* method, void** out) -> bool
 	{
@@ -3337,7 +2651,35 @@ bool ClrHost::BindEntryPoints(const std::filesystem::path& assemblyPath)
 	};
 
 	void* fn = nullptr;
-	if (!bind(L"Initialize", &fn))       return false;  m_fnInitialize = reinterpret_cast<InitializeFn>(fn);
+	if (m_useFSharp)
+    {
+        const wchar_t* nativeType = L"CreatorEngine.Native.NativeBootstrap, CreatorEngine.NativeBindings";
+        if (!bindFrom(nativeType, L"Initialize", &fn))
+        {
+            return false;
+        }
+        m_fnFSharpBind = reinterpret_cast<FSharpBindFn>(fn);
+        if (!bindFrom(nativeType, L"Shutdown", &fn))
+        {
+            return false;
+        }
+        m_fnFSharpUnbind = reinterpret_cast<FSharpStartFn>(fn);
+        if (!bind(L"Initialize", &fn))
+        {
+            return false;
+        }
+        m_fnFSharpStart = reinterpret_cast<FSharpStartFn>(fn);
+    }
+#if defined(CREATOR_LEGACY_SCRIPT_BASELINE)
+    else
+    {
+        if (!bind(L"Initialize", &fn))
+        {
+            return false;
+        }
+        m_fnInitialize = reinterpret_cast<InitializeFn>(fn);
+    }
+#endif
 	if (!bind(L"Shutdown", &fn))         return false;  m_fnShutdown = reinterpret_cast<ShutdownFn>(fn);
 	if (!bind(L"FlushRegistrations", &fn)) return false;  m_fnFlushRegistrations = reinterpret_cast<NoArgumentFn>(fn);
 	if (!bind(L"OnTickSimulate", &fn)) return false; m_fnUpdate = reinterpret_cast<TickFn>(fn);
@@ -3366,7 +2708,13 @@ bool ClrHost::BindEntryPoints(const std::filesystem::path& assemblyPath)
 	// 성격이 스크립트 수명이 아니라 런타임 정책이라 진입점 묶음을 나눴다.
 	// 선택 바인딩이라 이것이 없는 어셈블리에서는 GC 연동만 조용히 꺼진다.
 	{
-		const wchar_t* gcType = L"CreatorEngine.GcControl, ScriptCore";
+#if defined(CREATOR_LEGACY_SCRIPT_BASELINE)
+		const wchar_t* gcType = m_useFSharp
+            ? L"CreatorEngine.Native.GcControl, CreatorEngine.NativeBindings"
+            : L"CreatorEngine.GcControl, ScriptCore";
+#else
+		const wchar_t* gcType = L"CreatorEngine.Native.GcControl, CreatorEngine.NativeBindings";
+#endif
 		if (bindFrom(gcType, L"CollectNow", &fn))     m_fnGcCollectNow     = reinterpret_cast<NoArgumentFn>(fn);
 		if (bindFrom(gcType, L"SetLatencyMode", &fn)) m_fnGcSetLatencyMode = reinterpret_cast<GcLatencyFn>(fn);
 		if (bindFrom(gcType, L"GetStats", &fn))       m_fnGcGetStats       = reinterpret_cast<GcStatsFn>(fn);
@@ -3420,14 +2768,26 @@ bool ClrHost::Initialize()
 	// 관리 어셈블리 위치는 Host가 ce::paths::roots로 결정한다. 개발 빌드는 Editor와
 	// Player가 구성별 공통 Managed를 쓰고, 패키지는 Player 옆 Managed를 쓴다.
 	const std::filesystem::path baseDir = ce::paths::managed_path();
+#if defined(CREATOR_LEGACY_SCRIPT_BASELINE)
+	wchar_t fsharpMode[2]{};
+	const DWORD fsharpModeLength = GetEnvironmentVariableW(L"CREATOR_FSHARP_NATIVE", fsharpMode, 2);
+	m_useFSharp = !(fsharpModeLength == 1 && fsharpMode[0] == L'0');
+#else
+	m_useFSharp = true;
+#endif
 
-	const std::filesystem::path assemblyPath = baseDir / L"ScriptCore.dll";
-	const std::filesystem::path configPath   = baseDir / L"ScriptCore.runtimeconfig.json";
+#if defined(CREATOR_LEGACY_SCRIPT_BASELINE)
+	const std::filesystem::path assemblyPath = baseDir / (m_useFSharp ? L"CreatorEngine.NativeBindings.dll" : L"ScriptCore.dll");
+	const std::filesystem::path configPath = baseDir / (m_useFSharp ? L"CreatorEngine.NativeBindings.runtimeconfig.json" : L"ScriptCore.runtimeconfig.json");
+#else
+	const std::filesystem::path assemblyPath = baseDir / L"CreatorEngine.NativeBindings.dll";
+	const std::filesystem::path configPath = baseDir / L"CreatorEngine.NativeBindings.runtimeconfig.json";
+#endif
 
 	if (!std::filesystem::exists(assemblyPath) || !std::filesystem::exists(configPath))
 	{
 		// 스크립트 없이도 에디터는 떠야 한다. 경고만 남기고 비활성 상태로 둔다.
-		Debug::PrintLog(spdlog::level::warn, "[CLR] ScriptCore.dll을 찾을 수 없어 스크립트 계층을 건너뜁니다: "
+		Debug::PrintLog(spdlog::level::warn, "[CLR] 관리 어셈블리를 찾을 수 없어 스크립트 계층을 건너뜁니다: "
 			+ assemblyPath.string());
 		return false;
 	}
@@ -3443,7 +2803,30 @@ bool ClrHost::Initialize()
 
 	FillApiTable();
     ScriptObjectRegistry::Get().BeginAssetSession(DataSystem::GetIfAlive());
-	const int initResult = m_fnInitialize(&g_apiTable);
+    int initResult = 0;
+    if (m_useFSharp)
+    {
+#if defined(CE_SCENE_HEADLESS)
+        constexpr int headless = 1;
+#else
+        constexpr int headless = 0;
+#endif
+        initResult = m_fnFSharpBind(&g_apiTable, sizeof(g_apiTable), reflgen_creator_script_native_abi_fingerprint(), headless);
+        if (initResult == 0)
+        {
+            initResult = m_fnFSharpStart();
+            if (initResult != 0)
+            {
+                m_fnFSharpUnbind();
+            }
+        }
+    }
+#if defined(CREATOR_LEGACY_SCRIPT_BASELINE)
+    else
+    {
+        initResult = m_fnInitialize(&g_apiTable);
+    }
+#endif
 	if (0 != initResult)
 	{
         ScriptObjectRegistry::Get().EndAssetSession();
@@ -3456,7 +2839,13 @@ bool ClrHost::Initialize()
 
 	// 게임 스크립트 어셈블리를 언로드 가능한 컨텍스트에 올린다.
 	// 없어도 엔진은 동작한다 — 스크립트만 비어 있을 뿐이다.
-	const std::filesystem::path scriptsPath = baseDir / L"Scripts" / L"GameScripts.dll";
+#if defined(CREATOR_LEGACY_SCRIPT_BASELINE)
+	const std::filesystem::path scriptsPath = m_useFSharp
+        ? baseDir / L"FSharpNative" / L"Scripts" / L"GameScripts.dll"
+        : baseDir / L"Scripts" / L"GameScripts.dll";
+#else
+	const std::filesystem::path scriptsPath = baseDir / L"FSharpNative" / L"Scripts" / L"GameScripts.dll";
+#endif
 	if (std::filesystem::exists(scriptsPath))
 	{
 		const auto pathUtf8 = scriptsPath.u8string();
@@ -3546,7 +2935,7 @@ ClrHost::InvokeResult ClrHost::InvokeCallableStatic(const std::string& typeName,
 	{
 		result.outcome = InvokeOutcome::NotBound;
 		result.reason  = m_ready
-			? "이 ScriptCore 어셈블리에는 InvokeCallable 진입점이 없다"
+			? "이 스크립트 런타임 어셈블리에는 InvokeCallable 진입점이 없다"
 			: "CLR 이 준비되지 않았다";
 		return result;
 	}
@@ -3601,6 +2990,10 @@ void ClrHost::Shutdown()
     }
 
 	if (nullptr != m_fnShutdown) m_fnShutdown();
+    if (m_useFSharp && m_fnFSharpUnbind)
+    {
+        m_fnFSharpUnbind();
+    }
     ScriptObjectRegistry::Get().EndAssetSession();
 
 	m_ready = false;
@@ -3697,7 +3090,11 @@ bool ClrHost::TickUpdate(float fixedDelta)
     if (!m_ready) return true;
     if (!m_fnUpdate) return false;
     ++m_simulationBatches;
-    const int count = m_fnUpdate(fixedDelta);
+    int count = 0;
+    {
+        ce::profile_scope scope{ce::marker<"Script.FixedTick">()};
+        count = m_fnUpdate(fixedDelta);
+    }
     if (count < 0) return false;
     m_lastActiveCount = count;
     return true;

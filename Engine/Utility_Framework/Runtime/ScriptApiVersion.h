@@ -1,7 +1,7 @@
 #pragma once
 
 // Shared by the native API table and the compiled host identity query.
-inline constexpr int CreatorScriptApiVersion = 46;
+inline constexpr int CreatorScriptApiVersion = 47;
 
 // v42 requires the managed OnTickSimulate(float fixedDelta) entry point; old hosts must reject it.
 // v43 appends bounded simulation status/command/snapshot copy APIs.
