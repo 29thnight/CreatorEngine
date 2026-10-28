@@ -199,11 +199,13 @@ namespace AssetDepotRegression
         [System.Runtime.InteropServices.UnmanagedCallersOnly] static int TickStatusStub(SimulationStatus* s) { *s = default; return 0; }
         [System.Runtime.InteropServices.UnmanagedCallersOnly] static int TickSubmitStub(ulong e, ulong t, uint k, byte* p, int n, ulong* s) { *s = 0; return 1; }
         [System.Runtime.InteropServices.UnmanagedCallersOnly] static int TickReadStub(ulong e, ulong t, SimulationSnapshot* s, byte* p, int n) { *s = default; return 7; }
+        [System.Runtime.InteropServices.UnmanagedCallersOnly] static int ExtraGetStub(ObjectHandle owner, int kind) => 0;
+        [System.Runtime.InteropServices.UnmanagedCallersOnly] static void ExtraSetStub(ObjectHandle owner, int kind, int enabled) { }
         internal static void VerifyVersionAndTypedEntries()
         {
             Require(!Native.IsReady, "ABI fixture requires a fresh isolated managed session");
             var table = new ScriptApiTable { Version = 34, StructSize = sizeof(ScriptApiTable) };
-            Require(Native.ExpectedVersion == 45, "Fixture expects ABI 45 with the F# runtime and static lifecycle contract");
+            Require(Native.ExpectedVersion == 48, "Fixture expects ABI 48 with the appended native reflection transport");
             Require(!Native.Bind(&table), "A legacy version 34 table bound to the current managed API");
             table.Version = Native.ExpectedVersion;
             Require(!Native.Bind(&table), "Missing typed entries were accepted");
@@ -216,9 +218,13 @@ namespace AssetDepotRegression
             table.Simulation_Status = &TickStatusStub;
             table.Simulation_Submit = &TickSubmitStub;
             table.Simulation_Read = &TickReadStub;
+            Require(!Native.Bind(&table), "Missing extra component entries were accepted");
+            table.ExtraComponent_Exists = &ExtraGetStub;
+            table.ExtraComponent_GetEnabled = &ExtraGetStub;
+            table.ExtraComponent_SetEnabled = &ExtraSetStub;
             table.Asset_Request = &LegacyRequestStub;
             table.StructSize = sizeof(ScriptApiTable) - IntPtr.Size;
-            Require(!Native.Bind(&table), "A truncated simulation exchange table was accepted");
+            Require(!Native.Bind(&table), "A truncated current ABI table was accepted");
             table.StructSize = sizeof(ScriptApiTable);
             table.Version = 36;
             Require(!Native.Bind(&table), "The pre-merge camera-only ABI 36 was accepted");
@@ -227,7 +233,7 @@ namespace AssetDepotRegression
             table.Version = Native.ExpectedVersion + 1;
             Require(!Native.Bind(&table), "An unknown future table version was accepted");
             table.Version = Native.ExpectedVersion;
-            Require(Native.Bind(&table), "Complete current ABI table failed to bind");
+            Require(Native.Bind(&table), "Current ABI table with all required entries failed to bind");
             try
             {
                 _requestCalls = 0;

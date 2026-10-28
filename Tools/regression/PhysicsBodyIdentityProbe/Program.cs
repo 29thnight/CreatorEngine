@@ -20,6 +20,8 @@ unsafe class Program
     [UnmanagedCallersOnly] static int TickStatus(SimulationStatus* s) { *s = default; return 0; }
     [UnmanagedCallersOnly] static int Submit(ulong e, ulong t, uint k, byte* p, int n, ulong* s) { *s = 0; return 1; }
     [UnmanagedCallersOnly] static int TickRead(ulong e, ulong t, SimulationSnapshot* s, byte* p, int n) { *s = default; return 7; }
+    [UnmanagedCallersOnly] static int ExtraGet(ObjectHandle owner, int kind) => 0;
+    [UnmanagedCallersOnly] static void ExtraSet(ObjectHandle owner, int kind, int enabled) { }
     static void Main()
     {
         // Real managed wrappers and unmanaged ABI calls; the native registry is modeled here.
@@ -35,7 +37,10 @@ unsafe class Program
             Asset_RequestTyped = &AssetUnavailable,
             Asset_TryAcquireTyped = &AssetUnavailable,
             Camera_NotifyCameraCut = &CameraCut,
-            Simulation_Status = &TickStatus, Simulation_Submit = &Submit, Simulation_Read = &TickRead
+            Simulation_Status = &TickStatus, Simulation_Submit = &Submit, Simulation_Read = &TickRead,
+            ExtraComponent_Exists = &ExtraGet,
+            ExtraComponent_GetEnabled = &ExtraGet,
+            ExtraComponent_SetEnabled = &ExtraSet
         };
         Check(Native.Bind(&api), "bind current ABI");
 
