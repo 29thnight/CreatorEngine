@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -136,7 +137,7 @@ namespace material_graph
         candidate->volume_ = std::move(volume);
         if (!candidate->volume_)
         {
-            const std::array<std::byte, SceneVolumeConstantsBytes> empty{};
+            const ce::fixed_array<std::byte, SceneVolumeConstantsBytes> empty{};
             candidate->emptyVolumeConstants_ = device_->UploadConstants(empty.data(), empty.size());
             candidate->emptyVolumeBuffer_ = device_->AllocateUpload({48, RHIUploadUsage::Raw, 16});
             if (!candidate->emptyVolumeConstants_.IsValid() || !candidate->emptyVolumeBuffer_.IsWritable())
@@ -214,7 +215,7 @@ namespace material_graph
         }
     }
 
-    const std::array<RGHandle, 2>& SceneRefractionFrame::DeclareInputs(EnhancedRenderGraph& graph) const
+    const ce::fixed_array<RGHandle, 2>& SceneRefractionFrame::DeclareInputs(EnhancedRenderGraph& graph) const
     {
         if (graph_)
         {
@@ -231,7 +232,7 @@ namespace material_graph
         return graphInputs_;
     }
 
-    std::array<RGHandle, 2> SceneRefractionFrame::DeclareCaptureOutputs(EnhancedRenderGraph& graph) const
+    ce::fixed_array<RGHandle, 2> SceneRefractionFrame::DeclareCaptureOutputs(EnhancedRenderGraph& graph) const
     {
         CheckCurrent(graph);
         if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
@@ -299,12 +300,12 @@ namespace material_graph
         const auto backgroundColor = backgroundColor_;
         const auto backgroundDepth = backgroundDepth_;
         const auto owner = self_.lock();
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+        ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> uses{
             {owners, RHIResourceState::ShaderResource, readAccess},
             {backgroundColor_, RHIResourceState::ShaderResource, readAccess},
             {backgroundDepth_, RHIResourceState::ShaderResource, readAccess},
             {graphSamples_, RHIResourceState::UnorderedAccess, writeAccess}};
-        std::array<RHIBindingDesc, 17> descriptions;
+        ce::fixed_array<RHIBindingDesc, 17> descriptions;
         for (unsigned i = 0; i < 11; ++i)
         {
             uses.push_back({lookup.GraphInputs(graph)[i], RHIResourceState::ShaderResource, readAccess});
@@ -349,7 +350,7 @@ namespace material_graph
                 encoder.SetPipeline(RHIBindPoint::Compute, owner->bake_->GetHandle());
                 encoder.SetBindings(RHIBindPoint::Compute, 1, table);
                 encoder.SetBindings(RHIBindPoint::Compute, 2, owner->outputs_);
-                const std::array<RHIBindingDesc, 2> emptyLights{
+                const ce::fixed_array<RHIBindingDesc, 2> emptyLights{
                     RHIBindingDesc::SrvArray({}, RHIFormat::R32Float, 3).OrNull(),
                     RHIBindingDesc::SrvCube({}, RHIFormat::RGBA16Float, 1).OrNull()};
                 const auto volumeLights = owner->device_->CreateBindings(

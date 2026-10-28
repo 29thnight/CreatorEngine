@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "JsonValue.h"
 
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -36,7 +37,7 @@ namespace CommandService
         if (Kind::Object != m_kind) { m_kind = Kind::Object; m_object.clear(); }
 
         const auto found = std::find_if(m_object.begin(), m_object.end(),
-            [&key](const std::pair<std::string, JsonValue>& field) { return field.first == key; });
+            [&key](const ce::pair<std::string, JsonValue>& field) { return field.first == key; });
         if (found != m_object.end()) { found->second = std::move(value); return; }
         m_object.emplace_back(std::move(key), std::move(value));
     }

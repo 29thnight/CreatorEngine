@@ -1,5 +1,5 @@
 export module Creator.AppBackend.WinAPI;
-
+export import "Creator.Containers.h";
 import std;
 import "Creator.WinAPI.h";
 export import Creator.Platform.Windows;
@@ -9,7 +9,7 @@ export enum class AppCrashDumpMode { Mini, Full };
 export class AppBackendWinAPI final : public Core::IWindowBackend
 {
 public:
-    using MessageHandler = std::function<LRESULT(HWND, WPARAM, LPARAM)>;
+    using MessageHandler = ce::owned_func<LRESULT(HWND, WPARAM, LPARAM)>;
 
     AppBackendWinAPI(HINSTANCE instance, const WindowsWindowDesc& desc);
     ~AppBackendWinAPI() override;

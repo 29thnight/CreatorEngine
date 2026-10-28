@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "ExperimentParity/ExperimentTexturePipelineSelfTest.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
@@ -49,7 +50,7 @@ namespace RenderTest
             }
         };
 
-        void TexturePipelinePut32(std::vector<std::byte>& bytes, std::size_t offset, std::uint32_t value)
+        void TexturePipelinePut32(ce::dynamic_array<std::byte>& bytes, std::size_t offset, std::uint32_t value)
         {
             for (std::size_t index = 0u; index < 4u; ++index)
             {
@@ -59,10 +60,10 @@ namespace RenderTest
 
         // Small DX10 DDS authoring fixture: explicit little-endian bytes rather
         // than saving the same runtime representation that is under test.
-        std::vector<std::byte> TexturePipelineDds(std::uint32_t width, std::uint32_t height,
+        ce::dynamic_array<std::byte> TexturePipelineDds(std::uint32_t width, std::uint32_t height,
             std::uint32_t levels, std::uint32_t arraySize = 1u, bool cube = false, bool hdr = false)
         {
-            std::vector<std::byte> bytes(148u);
+            ce::dynamic_array<std::byte> bytes(148u);
             TexturePipelinePut32(bytes, 0u, 0x20534444u);
             TexturePipelinePut32(bytes, 4u, 124u);
             TexturePipelinePut32(bytes, 8u, 0x100fu | (levels > 1u ? 0x20000u : 0u));
@@ -110,13 +111,13 @@ namespace RenderTest
 
         bool TexturePipelineCook(std::span<const std::byte> source,
             const experiment::cooked::TextureImportSettings& settings, TextureImage& image,
-            std::vector<std::byte>& artifact, std::string& failure, experiment::cooked::CookedTextureInfo* info = nullptr)
+            ce::dynamic_array<std::byte>& artifact, std::string& failure, experiment::cooked::CookedTextureInfo* info = nullptr)
         {
             return experiment::cooked::CookTexture(source, settings, artifact, failure)
                 && experiment::cooked::DecodeCookedTexture(artifact, image, failure, info);
         }
 
-        void TexturePipelineTerrain(TexturePipelineChecker& check, const std::vector<std::byte>& texture)
+        void TexturePipelineTerrain(TexturePipelineChecker& check, const ce::dynamic_array<std::byte>& texture)
         {
             namespace ck = experiment::cooked;
             if (texture.empty())
@@ -124,13 +125,13 @@ namespace RenderTest
                 check.Check(false, "terrain fixture needs a valid embedded CECT image");
                 return;
             }
-            const std::array<std::uint32_t, 4> heightBits{ 0x80000000u, 0x3f800001u, 0xbe99999au, 0x42c80000u };
-            std::vector<std::byte> heights(16u);
+            const ce::fixed_array<std::uint32_t, 4> heightBits{ 0x80000000u, 0x3f800001u, 0xbe99999au, 0x42c80000u };
+            ce::dynamic_array<std::byte> heights(16u);
             for (std::size_t index = 0u; index < heightBits.size(); ++index)
             {
                 TexturePipelinePut32(heights, index * 4u, heightBits[index]);
             }
-            const std::array<std::byte, 4> gray{ std::byte{ 0 }, std::byte{ 1 }, std::byte{ 127 }, std::byte{ 255 } };
+            const ce::fixed_array<std::byte, 4> gray{ std::byte{ 0 }, std::byte{ 1 }, std::byte{ 127 }, std::byte{ 255 } };
             ck::CookedTerrainView source;
             source.terrainId = 91u;
             source.width = 2u;
@@ -141,7 +142,7 @@ namespace RenderTest
             source.heights = heights;
             source.layers[0] = { 41u, 1.25f, "Layer one", "Stone/original.png", gray, texture };
             source.layers[1] = { 7u, -2.0f, "Layer two", "Grass/original.png", gray, texture };
-            std::vector<std::byte> artifact;
+            ce::dynamic_array<std::byte> artifact;
             std::string failure;
             ck::CookedTerrainView decoded;
             const bool read = ck::EncodeCookedTerrain(source, artifact, failure)
@@ -164,7 +165,7 @@ namespace RenderTest
                     && std::ranges::equal(layer.gray, gray) && std::ranges::equal(layer.texture, texture);
             }
             check.Check(exact, "terrain preserves float bits, gray8, layer identity/name/tiling/reference and embedded CECT bytes");
-            const auto reject = [&](std::vector<std::byte> bytes, const char* message)
+            const auto reject = [&](ce::dynamic_array<std::byte> bytes, const char* message)
             {
                 ck::CookedTerrainView invalid;
                 check.Check(!ck::ReadCookedTerrain(bytes, invalid, failure) && invalid.width == 0u, message);
@@ -242,12 +243,12 @@ namespace RenderTest
         settings.colorSpace = ck::TextureColorSpace::Srgb;
         settings.mipPolicy = ck::TextureMipPolicy::GenerateFull;
         auto checker = TexturePipelineDds(2u, 2u, 1u);
-        const std::array<std::uint8_t, 16u> checkerPixels{
+        const ce::fixed_array<std::uint8_t, 16u> checkerPixels{
             0u, 0u, 0u, 0u, 255u, 255u, 255u, 64u,
             0u, 0u, 0u, 128u, 255u, 255u, 255u, 255u };
         std::memcpy(checker.data() + 148u, checkerPixels.data(), checkerPixels.size());
         TextureImage srgb;
-        std::vector<std::byte> srgbArtifact;
+        ce::dynamic_array<std::byte> srgbArtifact;
         ck::CookedTextureInfo info;
         const bool srgbCooked = TexturePipelineCook(checker, settings, srgb, srgbArtifact, failure, &info);
         check.Check(srgbCooked, "sRGB fixture cooks and decodes");
@@ -267,7 +268,7 @@ namespace RenderTest
         }
         settings.colorSpace = ck::TextureColorSpace::Linear;
         TextureImage linear;
-        std::vector<std::byte> linearArtifact;
+        ce::dynamic_array<std::byte> linearArtifact;
         const bool linearCooked = TexturePipelineCook(checker, settings, linear, linearArtifact, failure);
         check.Check(linearCooked, "linear fixture cooks");
         if (linearCooked)
@@ -285,7 +286,7 @@ namespace RenderTest
         settings.colorSpace = ck::TextureColorSpace::Srgb;
         settings.mipPolicy = ck::TextureMipPolicy::PreserveAuthored;
         TextureImage gray;
-        std::vector<std::byte> grayArtifact;
+        ce::dynamic_array<std::byte> grayArtifact;
         const bool grayCooked = TexturePipelineCook(graySource, settings, gray, grayArtifact, failure);
         check.Check(grayCooked && gray.Format() == RHIFormat::RGBA8UnormSrgb
             && gray.Find(0u, 0u)->pixels[0] == std::byte{ 128 },
@@ -301,7 +302,7 @@ namespace RenderTest
         if (jpegEncoded)
         {
             TextureImage jpeg;
-            std::vector<std::byte> jpegArtifact;
+            ce::dynamic_array<std::byte> jpegArtifact;
             check.Check(TexturePipelineCook(std::span<const std::byte>(
                 reinterpret_cast<const std::byte*>(jpegBytes.GetBufferPointer()), jpegBytes.GetBufferSize()),
                 settings, jpeg, jpegArtifact, failure) && jpeg.Width() == 2u && jpeg.Height() == 2u,
@@ -310,7 +311,7 @@ namespace RenderTest
         settings.mipPolicy = ck::TextureMipPolicy::PreserveAuthored;
         const auto authored = TexturePipelineDds(8u, 4u, 2u, 2u);
         TextureImage partial;
-        std::vector<std::byte> partialArtifact;
+        ce::dynamic_array<std::byte> partialArtifact;
         settings.colorSpace = ck::TextureColorSpace::Source;
         const bool partialCooked = TexturePipelineCook(authored, settings, partial, partialArtifact, failure);
         check.Check(partialCooked, "authored partial array chain cooks");
@@ -332,7 +333,7 @@ namespace RenderTest
         }
         settings.mipPolicy = ck::TextureMipPolicy::GenerateFull;
         TextureImage completed;
-        std::vector<std::byte> completedArtifact;
+        ce::dynamic_array<std::byte> completedArtifact;
         const bool completedCooked = TexturePipelineCook(authored, settings, completed, completedArtifact, failure);
         check.Check(completedCooked && completed.MipLevels() == 4u,
             "explicit GenerateFull appends the missing tail of an authored partial chain");
@@ -352,7 +353,7 @@ namespace RenderTest
         settings.mipPolicy = ck::TextureMipPolicy::PreserveAuthored;
         settings.maxDimension = 4u;
         TextureImage resized;
-        std::vector<std::byte> resizedArtifact;
+        ce::dynamic_array<std::byte> resizedArtifact;
         const bool resizedCooked = TexturePipelineCook(authored, settings, resized, resizedArtifact, failure);
         check.Check(resizedCooked && resized.Width() == 4u && resized.Height() == 2u && resized.MipLevels() == 2u,
             "maxDimension respects aspect ratio and retains the authored partial mip count");
@@ -360,7 +361,7 @@ namespace RenderTest
         settings.mipPolicy = ck::TextureMipPolicy::GenerateFull;
         const auto hdrSource = TexturePipelineDds(2u, 2u, 1u, 1u, false, true);
         TextureImage hdr;
-        std::vector<std::byte> hdrArtifact;
+        ce::dynamic_array<std::byte> hdrArtifact;
         const bool hdrCooked = TexturePipelineCook(hdrSource, settings, hdr, hdrArtifact, failure);
         check.Check(hdrCooked && hdr.Format() == RHIFormat::RGBA32Float && hdr.MipLevels() == 2u,
             "HDR remains floating-point through mip generation");
@@ -372,7 +373,7 @@ namespace RenderTest
                 "HDR values outside [0,1] survive filtering without clipping");
         }
         settings.compression = ck::TextureCompression::BC7;
-        std::vector<std::byte> rejected;
+        ce::dynamic_array<std::byte> rejected;
         check.Check(!ck::CookTexture(hdrSource, settings, rejected, failure) && rejected.empty(),
             "unsupported HDR-to-LDR compression fails explicitly");
         settings = {};
@@ -380,12 +381,12 @@ namespace RenderTest
         settings.normalMap = true;
         settings.mipPolicy = ck::TextureMipPolicy::GenerateFull;
         auto normalSource = TexturePipelineDds(2u, 2u, 1u);
-        const std::array<std::uint8_t, 16u> normals{
+        const ce::fixed_array<std::uint8_t, 16u> normals{
             255u, 128u, 128u, 255u, 128u, 255u, 128u, 255u,
             255u, 128u, 128u, 255u, 128u, 255u, 128u, 255u };
         std::memcpy(normalSource.data() + 148u, normals.data(), normals.size());
         TextureImage normal;
-        std::vector<std::byte> normalArtifact;
+        ce::dynamic_array<std::byte> normalArtifact;
         const bool normalCooked = TexturePipelineCook(normalSource, settings, normal, normalArtifact, failure);
         check.Check(normalCooked, "normal mip fixture cooks");
         if (normalCooked)
@@ -405,7 +406,7 @@ namespace RenderTest
         }
         settings.compression = ck::TextureCompression::BC5;
         TextureImage bc5;
-        std::vector<std::byte> bc5Artifact;
+        ce::dynamic_array<std::byte> bc5Artifact;
         auto normalBc5Source = TexturePipelineDds(4u, 4u, 1u);
         for (std::size_t pixel = 0u; pixel < 16u; ++pixel)
         {
@@ -424,15 +425,15 @@ namespace RenderTest
         settings.mipPolicy = ck::TextureMipPolicy::GenerateFull;
         const auto npot = TexturePipelineDds(12u, 20u, 1u);
         TextureImage bc7;
-        std::vector<std::byte> bc7Artifact;
+        ce::dynamic_array<std::byte> bc7Artifact;
         const bool bc7Cooked = TexturePipelineCook(npot, settings, bc7, bc7Artifact, failure);
         check.Check(bc7Cooked && bc7.Format() == RHIFormat::BC7Unorm && bc7.MipLevels() == 5u,
             "NPOT BC7 chain reaches 1x1 with valid block layout");
-        std::vector<std::byte> repeat;
+        ce::dynamic_array<std::byte> repeat;
         check.Check(ck::CookTexture(npot, settings, repeat, failure) && repeat == bc7Artifact,
             "repeated serial CPU cooking is byte deterministic");
         const auto unaligned = TexturePipelineDds(5u, 7u, 1u);
-        std::vector<std::byte> unalignedArtifact;
+        ce::dynamic_array<std::byte> unalignedArtifact;
         check.Check(!ck::CookTexture(unaligned, settings, unalignedArtifact, failure) && unalignedArtifact.empty(),
             "portable desktop BC output rejects unaligned base dimensions instead of silently padding UVs");
         const auto fastRecipe = ck::TextureImportRecipe(settings);
@@ -442,7 +443,7 @@ namespace RenderTest
         settings = {};
         const auto cubeSource = TexturePipelineDds(2u, 2u, 1u, 6u, true);
         TextureImage cube;
-        std::vector<std::byte> cubeArtifact;
+        ce::dynamic_array<std::byte> cubeArtifact;
         check.Check(TexturePipelineCook(cubeSource, settings, cube, cubeArtifact, failure)
             && cube.IsCube() && cube.ArraySize() == 6u, "cube faces preserve their validated shape and array ordering");
         settings.mipPolicy = ck::TextureMipPolicy::GenerateFull;
@@ -453,7 +454,7 @@ namespace RenderTest
             cutout[148u + pixel * 4u + 3u] = pixel < 8u ? std::byte{ 255 } : std::byte{ 0 };
         }
         TextureImage covered;
-        std::vector<std::byte> coverageArtifact;
+        ce::dynamic_array<std::byte> coverageArtifact;
         const bool coveredCooked = TexturePipelineCook(cutout, settings, covered, coverageArtifact, failure);
         check.Check(coveredCooked && covered.MipLevels() == 3u, "alpha coverage policy processes a cutout chain");
         if (coveredCooked)

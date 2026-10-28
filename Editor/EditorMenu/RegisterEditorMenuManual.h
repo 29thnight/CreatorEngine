@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 // 에디터 메뉴 선언자 중앙 목록 (PHASE 21 M0 · 계획서 부록 A.5).
 //
@@ -46,7 +47,7 @@ namespace editor
     ///   기준이 없다는 뜻이고, 그래서 게이트가 "선언자 0 이면 붉다"를 따로 단정한다
     ///   (빈 집합을 성공으로 읽지 않는다 — 이 저장소에서 두 번 나온 실패 양식).
 #define EDITOR_MENU_NAME_ONE(T) std::string_view{ #T },
-    inline constexpr std::array editor_menu_declarer_names{
+    inline constexpr ce::fixed_array editor_menu_declarer_names{
         EDITOR_MENU_LIST(EDITOR_MENU_NAME_ONE)
     };
 #undef EDITOR_MENU_NAME_ONE

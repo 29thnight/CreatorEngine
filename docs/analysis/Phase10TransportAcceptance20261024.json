@@ -1,0 +1,163 @@
+{
+  "limitations": [
+    "HDR boundary records immutable ownership only; no particle draw or GPU simulation",
+    "Burst submission receipts are tested with a CPU protocol consumer; production HDR observer does not acknowledge simulation work"
+  ],
+  "passed": true,
+  "sources": [
+    {
+      "path": "Engine/RenderEngine/Effects/EffectFrame.h",
+      "sha256": "836CED4FD17753EF1A8D0B6AC854AD0526FDBB84945CEF2F7F74626BFBF50502"
+    },
+    {
+      "path": "Engine/RenderEngine/Effects/IEffectSystem.h",
+      "sha256": "81C5C0998B32FDBA01FAC651B383D6692A91F6FB3DB13CD6088A0DA478CD4238"
+    },
+    {
+      "path": "Engine/Effect/EffectState.h",
+      "sha256": "7534558D709963E7C4FA7F11C227A2CE2B07031013ABB38825AF8E83442349F8"
+    },
+    {
+      "path": "Engine/Effect/EffectState.cpp",
+      "sha256": "3ED257BED9E505AE5557B50AAC995D4E9FB01D0873AB517489E07FFCF4B5B38E"
+    },
+    {
+      "path": "Engine/Effect/EffectRenderContributor.h",
+      "sha256": "2EC3170EA27EC27D531E86768F8A79E31F0F3A0EA6AC89872D3A9CF78AAA3BEF"
+    },
+    {
+      "path": "Engine/Effect/EffectRenderContributor.cpp",
+      "sha256": "3E0E87A1D1EFF29908CB8216D64D6891EF9D70E64004FEAF877554F819D62163"
+    },
+    {
+      "path": "Engine/Effect/EffectPackage.cpp",
+      "sha256": "424A9BB61E16B2B57B31E07010214943D69050B976D9B9F7C02833A119C36892"
+    },
+    {
+      "path": "Engine/Effect/Effect.vcxproj",
+      "sha256": "8516F70E41D459C7970D7E33C4BEF2758CE2E3BED34330972AA69A42DAE6309F"
+    },
+    {
+      "path": "Engine/Effect/EffectDefinition.h",
+      "sha256": "715722ED548D966238C24867A42DB2B2707717B6F9EA099FE93D4CCF21B349C0"
+    },
+    {
+      "path": "Engine/Effect/EffectDefinition.cpp",
+      "sha256": "84A472D93B073D9631C5FD6268BDD4A8BB9A34A498DD0CA9FCB91B04A9D98E99"
+    },
+    {
+      "path": "Engine/RuntimeHost/EngineBootstrap.h",
+      "sha256": "0945654FE33FDA49B58DED6C043C429CD6E0CA03C265B371D3375398B18BE573"
+    },
+    {
+      "path": "Engine/SceneRuntime/SceneManager.cpp",
+      "sha256": "7FD93E816475994CB72E1DB5A6F68588622569E393706B3C6CDD6259224570A0"
+    },
+    {
+      "path": "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h",
+      "sha256": "758B56B76A67AE9B2C4BA8A6FBE391F7FC154CDA4808316AD6D388CB830513A1"
+    },
+    {
+      "path": "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp",
+      "sha256": "B671A5E896C8EBB069C8BC42F2F3CADBF5E7B90EEFFE39D809714FCF84661B2B"
+    },
+    {
+      "path": "Engine/RenderEngine/Render/Graph/EnhancedRenderPass.h",
+      "sha256": "17FE5E51ED913E2E3374AFE75870507C5C9B93778DAEE4A64EFAABD24D2D6B1C"
+    },
+    {
+      "path": "Tools/regression/EffectStateTests.cpp",
+      "sha256": "3428FEB511026A67CF6936B2F74820B2882AF47FC1FD84F1CFC2D0D03B69D578"
+    },
+    {
+      "path": "Tools/regression/EffectStateTests.vcxproj",
+      "sha256": "9B6FA5C34CE409EC36C8AD3EE9575DCBEF29C5E7F3F398B40B7AA042CCC2A986"
+    },
+    {
+      "path": "Tools/regression/verify-effect-transport.ps1",
+      "sha256": "FF02CA57E0FB98420CD0A67138E3246DCDE1D9F339A51AED5F03AD724166866B"
+    },
+    {
+      "path": "Tools/regression/verify-effect-package.ps1",
+      "sha256": "62FA1013394E836F01BB079C458CB2BDE42A682654FD864490495646E751E25E"
+    }
+  ],
+  "resizeDimensions": [
+    "386x152",
+    "546x258"
+  ],
+  "productReceipt": "artifacts/phase10-1c-20261024/product-accepted/result.json",
+  "native": [
+    {
+      "sha256": "28E901307AEEEE1EAB5F6D4250A2DA23EAD58A2126739DD190C372062C4DD3B5",
+      "configuration": "Debug",
+      "test": "EffectStateTests",
+      "checks": 56
+    },
+    {
+      "sha256": "97AE5340260CB55E2596D8C34E9A48BEAD9E15CDDEE7305DB0450D2A14E9E447",
+      "configuration": "Debug",
+      "test": "EffectDefinitionTests",
+      "checks": 51
+    },
+    {
+      "sha256": "338BC1FCB7AF68D281C24B84EBA4BBA8C656FF05EB7078954107ADBA5BAF4383",
+      "configuration": "Release",
+      "test": "EffectStateTests",
+      "checks": 56
+    },
+    {
+      "sha256": "DEAE45C2E39038A93EFFC12D94E769C8535E6EFF67ED32F21EFD4380B8C47234",
+      "configuration": "Release",
+      "test": "EffectDefinitionTests",
+      "checks": 51
+    }
+  ],
+  "productRuns": [
+    {
+      "shutdown": 0,
+      "exitCode": 0,
+      "hostSha256": "1072D91A071632DA06956374DDFD893775BA4E6DF4EAB1C56E3BEC8E199B81AA",
+      "map": "artifacts/phase10-1c-20261024/product-accepted/excluded/CreatorEditor.map",
+      "initialized": 0,
+      "packageIncluded": false,
+      "absent": 1,
+      "host": "CreatorEditor"
+    },
+    {
+      "shutdown": 0,
+      "exitCode": 0,
+      "hostSha256": "802984FE951DFB7B06C581AD8EF3713FDA71BF2B137244A81130020DCF50E120",
+      "map": "artifacts/phase10-1c-20261024/product-accepted/excluded/Player.map",
+      "initialized": 0,
+      "packageIncluded": false,
+      "absent": 1,
+      "host": "Player"
+    },
+    {
+      "shutdown": 1,
+      "exitCode": 0,
+      "hostSha256": "19BF3F1303CAC34DE538E4DFC835765284AEC4AED958D0DC731DB7C0AC3A1333",
+      "map": "artifacts/phase10-1c-20261024/product-accepted/included/CreatorEditor.map",
+      "initialized": 1,
+      "packageIncluded": true,
+      "absent": 0,
+      "host": "CreatorEditor"
+    },
+    {
+      "shutdown": 1,
+      "exitCode": 0,
+      "hostSha256": "27325B08C355514981035330C013F2A10FAD12ACA9415417BE5B7F06D8D63076",
+      "map": "artifacts/phase10-1c-20261024/product-accepted/included/Player.map",
+      "initialized": 1,
+      "packageIncluded": true,
+      "absent": 0,
+      "host": "Player"
+    }
+  ],
+  "date": "2026-10-24",
+  "baselineRevision": "d86fe25e0763d24183bf63150e7e307b3b0d286b",
+  "sourceHashFormat": "SHA256 of raw file bytes",
+  "artifactRoot": "artifacts/phase10-1c-20261024",
+  "scope": "Phase10-1c owned snapshot transport, fixed tick bridge, read-only HDR input seam, lifecycle and optional package"
+}

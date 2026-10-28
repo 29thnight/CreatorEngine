@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -40,12 +41,12 @@ enum class ShaderPropertyType : std::uint8_t
 using ShaderPropertyDefault = std::variant<
     std::monostate,
     float,
-    std::array<float, 2>,
-    std::array<float, 3>,
-    std::array<float, 4>,
+    ce::fixed_array<float, 2>,
+    ce::fixed_array<float, 3>,
+    ce::fixed_array<float, 4>,
     std::int32_t,
     bool,
-    std::array<float, 16>,
+    ce::fixed_array<float, 16>,
     FileGuid>;
 
 struct ShaderPropertyDesc
@@ -82,14 +83,14 @@ struct ShaderGeneratedMaterial
     std::uint32_t features{};
     bool surface{};
     bool volume{};
-    std::vector<ShaderMaterialSampler> samplers;
+    ce::dynamic_array<ShaderMaterialSampler> samplers;
     bool operator==(const ShaderGeneratedMaterial&) const = default;
 };
 
 struct ShaderKeywordAxis
 {
     std::string name;
-    std::vector<std::string> values;
+    ce::dynamic_array<std::string> values;
     bool operator==(const ShaderKeywordAxis&) const = default;
 };
 
@@ -169,9 +170,9 @@ struct ShaderMeta
     // immutable snapshot이 RenderThread로 넘어간 뒤에도 정식 경로를 재구성하려면
     // origin이 함께 있어야 한다. 디스크 schema field는 아니다.
     std::filesystem::path originPath;
-    std::vector<ShaderPropertyDesc> properties;
-    std::vector<ShaderKeywordAxis> keywords;
-    std::vector<ShaderPassDesc> passes;
+    ce::dynamic_array<ShaderPropertyDesc> properties;
+    ce::dynamic_array<ShaderKeywordAxis> keywords;
+    ce::dynamic_array<ShaderPassDesc> passes;
     // Present only on derived Graph outputs. Graph/Blackboard owns authoring.
     std::optional<ShaderGeneratedMaterial> generatedMaterial;
     // Exact immutable artifact source pin. It holds no bulk image or GPU data.
@@ -209,7 +210,7 @@ namespace ShaderMetaLoader
     bool LoadFile(const std::filesystem::path& documentPath,
         const std::filesystem::path& sourceOriginPath, const FileGuid& guid,
         ShaderMeta& outMeta, std::string& outError,
-        std::array<std::uint8_t, 32>* outDocumentDigest = nullptr);
+        ce::fixed_array<std::uint8_t, 32>* outDocumentDigest = nullptr);
 
     // Editor importer와 자가 검증이 디스크 게시 전에 같은 검증기를 쓸 수 있는 경계.
     // originPath는 source 상대 경로의 기준이며 .shadermeta 파일명을 포함한다.

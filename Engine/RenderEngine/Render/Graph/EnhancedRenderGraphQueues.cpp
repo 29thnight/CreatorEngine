@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
@@ -57,7 +58,7 @@ void EnhancedRenderGraph::ResetQueueDiagnostics()
 
 bool EnhancedRenderGraph::SubmitQueues(const own::shared_owner<EnhancedRenderGraph>& self,
     IRHIQueueRecorder& recorder, QueueEndpoint& graphics, QueueEndpoint* compute,
-    const std::vector<QueueHint>& hints, bool enableAsyncCompute,
+    const ce::dynamic_array<QueueHint>& hints, bool enableAsyncCompute,
     ce::lifetime_token owner, QueueExecution& output, std::string& outError)
 {
     output = {};

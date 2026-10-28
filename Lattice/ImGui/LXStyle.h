@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
 
 #include "../Core/LXGraph.h"
 
@@ -159,14 +160,14 @@ class LXStyleSheet
     int SourceVersion() const noexcept { return sourceVersion_; }
 
   private:
-    std::map<std::string, LXNodeStyle> typeStyles_;
-    std::map<Id, LXNodeStyle> nodeStyles_;
-    std::map<PinType, LXPinStyle> pinTypeStyles_;
-    std::map<Id, LXPinStyle> pinStyles_;
-    std::map<PinType, LXWireStyle> wireTypeStyles_;
-    std::map<Id, LXWireStyle> wireStyles_;
+    ce::engine_ordered_map<std::string, LXNodeStyle> typeStyles_;
+    ce::engine_ordered_map<Id, LXNodeStyle> nodeStyles_;
+    ce::engine_ordered_map<PinType, LXPinStyle> pinTypeStyles_;
+    ce::engine_ordered_map<Id, LXPinStyle> pinStyles_;
+    ce::engine_ordered_map<PinType, LXWireStyle> wireTypeStyles_;
+    ce::engine_ordered_map<Id, LXWireStyle> wireStyles_;
     LXItemStyle defaultItem_;
-    std::map<std::string, LXItemStyle> itemStyles_;
+    ce::engine_ordered_map<std::string, LXItemStyle> itemStyles_;
     int sourceVersion_ = 6;
     static std::optional<LXStyleSheet> LoadExact(const std::string& path, std::string* error);
     void Write(std::ostream& out) const;

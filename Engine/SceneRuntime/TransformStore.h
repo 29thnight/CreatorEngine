@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include <mathematics/matrix4x4.hpp>
 #include <mathematics/vector4.hpp>
@@ -26,12 +27,12 @@
 // 레지스터 타입을 수명 경계 밖에 보관하지 않는다.
 struct TransformStore
 {
-    std::vector<math::matrix4x4> localMatrix;
-    std::vector<math::matrix4x4> worldMatrix;
-    std::vector<uint8_t>        dirty;
-    std::vector<math::vector4>   worldScale;
-    std::vector<math::vector4>   worldQuaternion;
-    std::vector<math::vector4>   worldPosition;
+    ce::dynamic_array<math::matrix4x4> localMatrix;
+    ce::dynamic_array<math::matrix4x4> worldMatrix;
+    ce::dynamic_array<uint8_t>        dirty;
+    ce::dynamic_array<math::vector4>   worldScale;
+    ce::dynamic_array<math::vector4>   worldQuaternion;
+    ce::dynamic_array<math::vector4>   worldPosition;
 
     // S2(dirty push / lazy pull) — dirty와는 독립된 두 번째 플래그. dirty는
     // "로컬 포즈(position/rotation/scale)가 재계산 대상"이라는 뜻이고 GetLocalMatrix/
@@ -46,7 +47,7 @@ struct TransformStore
     // 정하면 그 자식(정확히는 갱신 안 된 형제 서브트리)이 갱신을 영영 놓친다 —
     // 값을 실제로 쓰는 단일 지점(SetAndDecomposeMatrix)에서 세우는 이 플래그가
     // 호출 경로와 무관하게 "자식에게 아직 못 알린 변경이 있다"를 보장한다.
-    std::vector<uint8_t>        worldChanged;
+    ce::dynamic_array<uint8_t>        worldChanged;
 
     size_t Size() const { return localMatrix.size(); }
 

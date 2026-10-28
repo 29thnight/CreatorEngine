@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "EnhancedGizmoIconPass.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/RHIEncoder.h"
@@ -212,7 +213,7 @@ void EnhancedGizmoIconPass::Declare(EnhancedRenderGraph& graph,
     const auto colorAccess = explicitAccess
         ? (ownsColor ? RGAccessMode::Write : RGAccessMode::ReadWrite) : RGAccessMode::LegacyState;
     const auto output = m_output;
-    std::vector<EnhancedRenderGraph::RGPassUsage> usages;
+    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> usages;
     usages.push_back({ output, RHIResourceState::RenderTarget, colorAccess });
     if (explicitAccess)
     {

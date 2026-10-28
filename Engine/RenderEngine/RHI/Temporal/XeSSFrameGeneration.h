@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
 #else
@@ -60,7 +61,7 @@ public:
     TemporalResult Initialize(ID3D12Device* device, ID3D12CommandQueue* queue, IDXGIFactory2* factory,
         void* window, const DXGI_SWAP_CHAIN_DESC1& description, const wchar_t* runtimeDirectory,
         const TemporalFrameGenerationConfig& config, bool depthInverted,
-        std::function<TemporalResult()> drain, bool uiPremultiplied = true);
+        ce::owned_func<TemporalResult()> drain, bool uiPremultiplied = true);
     // Initialization leaves generation disabled. The mandatory callback proves
     // GPU retirement before mode/count changes, resize, and shutdown.
     TemporalResult SetEnabled(bool enabled);
@@ -99,6 +100,6 @@ TemporalResult CreateXeSSFrameGeneratorDX12(DX12DeviceResources& resources,
     ID3D12CommandQueue* queue, IDXGIFactory2* factory, void* window,
     const DXGI_SWAP_CHAIN_DESC1& description, const wchar_t* runtimeDirectory,
     const TemporalFrameGenerationConfig& config, bool depthInverted,
-    std::function<TemporalResult()> drain,
+    ce::owned_func<TemporalResult()> drain,
     own::unique_owner<ITemporalFrameGenerator>& frameGenerator,
     XeSSFrameGenerationDX12*& presentation);

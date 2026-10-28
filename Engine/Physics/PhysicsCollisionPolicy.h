@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
@@ -18,7 +19,7 @@ namespace ce::physics
 struct collision_policy_snapshot
 {
     std::uint64_t revision = 1;
-    std::array<std::uint8_t, 32 * 32> matrix{};
+    ce::fixed_array<std::uint8_t, 32 * 32> matrix{};
 
     bool Allows(ce::layers::layer_slot left, ce::layers::layer_slot right) const noexcept
     {

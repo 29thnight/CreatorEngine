@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -33,7 +34,7 @@ namespace experiment::importer
     {
         // 원본 .gltf 가 있는 폴더 기준 상대 경로. 중복은 제거되어 있고
         // 순서는 glTF 의 등장 순서(buffers 먼저, images 다음)다.
-        std::vector<std::filesystem::path> relativePaths{};
+        ce::dynamic_array<std::filesystem::path> relativePaths{};
         GltfDependencyRejection rejection{ GltfDependencyRejection::None };
         // 거부한 URI 원문 또는 파서 메시지. 사용자에게 이유를 말하는 데 쓴다.
         std::string rejectionDetail{};

@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -33,7 +34,7 @@ bool ValidTag(const std::string& name)
 class TagDefinitionsCommand final : public Meta::IUndoableCommand
 {
   public:
-    TagDefinitionsCommand(std::vector<std::string> before, std::vector<std::string> after)
+    TagDefinitionsCommand(ce::dynamic_array<std::string> before, ce::dynamic_array<std::string> after)
         : m_before(std::move(before)), m_after(std::move(after))
     {
     }
@@ -41,7 +42,7 @@ class TagDefinitionsCommand final : public Meta::IUndoableCommand
     void Redo() override { Apply(m_after); }
 
   private:
-    static void Apply(const std::vector<std::string>& definitions)
+    static void Apply(const ce::dynamic_array<std::string>& definitions)
     {
         const auto previous = TagManagers->GetTags();
         TagManagers->SetTagDefinitions(definitions);
@@ -56,7 +57,7 @@ class TagDefinitionsCommand final : public Meta::IUndoableCommand
             throw;
         }
     }
-    std::vector<std::string> m_before, m_after;
+    ce::dynamic_array<std::string> m_before, m_after;
 };
 
 class LayerSettingsCommand final : public Meta::IUndoableCommand

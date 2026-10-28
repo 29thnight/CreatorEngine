@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/ModulePerformanceOptimization20261026.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>모듈 바이너리 전체 성능 재수용 — 2026-10-26</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#고정한-수용-기준">고정한 수용 기준</a></li><li><a href="#환경과-구현-경계">환경과 구현 경계</a></li><li><a href="#일반확장-82개-조건">일반·확장 82개 조건</a></li><li><a href="#고정-mpsc-대-ppl">고정 MPSC 대 PPL</a></li><li><a href="#faa-확장-mpmc-대-ppl">FAA 확장 MPMC 대 PPL</a></li><li><a href="#spsc-및-기존-스핀-mpmc-추가-비교">SPSC 및 기존 스핀 MPMC 추가 비교</a></li><li><a href="#미수용-항목과-판단">미수용 항목과 판단</a></li><li><a href="#증거와-재현">증거와 재현</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="ModulePerformanceOptimization20261026.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>모듈 바이너리 전체 성능 재수용 — 2026-10-26</h1>
+<div class="meta"><p>실제 측정 결과: <strong>일반 컨테이너 82/82, 고정 MPSC 주 수용 batch8 4/4·개별 전송 추가 검사 4/4, FAA 락 프리 큐 6/6, SPSC·기존 스핀 MPMC 처리량 8/8</strong>. 전체 수용 판정은 <strong>PASS</strong>다. 이 판정은 새 named module 바이너리와 이번 원시 표본에서 계산했다. 이전 헤더 바이너리의 통과 판정을 승계하지 않았다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 8개의 분량 막대">
+<a class="map-row" href="#고정한-수용-기준"><span class="ve-label">§00</span><span class="map-name">고정한 수용 기준</span><span class="map-bar"><i style="width:8.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#환경과-구현-경계"><span class="ve-label">§01</span><span class="map-name">환경과 구현 경계</span><span class="map-bar"><i style="width:13.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#일반확장-82개-조건"><span class="ve-label">§02</span><span class="map-name">일반·확장 82개 조건</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#고정-mpsc-대-ppl"><span class="ve-label">§03</span><span class="map-name">고정 MPSC 대 PPL</span><span class="map-bar"><i style="width:13.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#faa-확장-mpmc-대-ppl"><span class="ve-label">§04</span><span class="map-name">FAA 확장 MPMC 대 PPL</span><span class="map-bar"><i style="width:5.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#spsc-및-기존-스핀-mpmc-추가-비교"><span class="ve-label">§05</span><span class="map-name">SPSC 및 기존 스핀 MPMC 추가 비교</span><span class="map-bar"><i style="width:10.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#미수용-항목과-판단"><span class="ve-label">§06</span><span class="map-name">미수용 항목과 판단</span><span class="map-bar"><i style="width:1.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#증거와-재현"><span class="ve-label">§07</span><span class="map-name">증거와 재현</span><span class="map-bar"><i style="width:23.9%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 8개 가운데 「일반·확장 82개 조건」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-고정한-수용-기준">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="고정한-수용-기준">고정한 수용 기준</h2></div>
+<div class="prose"><p>일반·확장 컨테이너와 고정 MPSC는 매 반복에서 custom/MSVC STL 또는 PPL 중앙값 비율 ≤1.10, 양쪽 각각 정렬 15표본 x[13]/x[1] ≤1.30이어야 한다. 일반 82개 조건은 각각 별도 프로세스에서 3회, 총 246개 프로세스로 실행했다. 고정 MPSC는 4개 조건을 3프로세스에서 실행했다. 모든 15표본을 보존했고 반복 2는 일반 조건 순서와 A/B 측정 순서를 반전했다.</p>
+<p>FAA 확장 MPMC는 기존 최적화 보고서의 6개 조건을 5프로세스에서 PPL과 비교했다. 8B/128B 값, 생산자·소비자 1/1·4/1·4/4이며 생산자당 65,536개를 전송한다. 전송 시간과 소멸 포함 시간 비율이 각 프로세스에서 모두 ≤1.10이어야 한다. FAA의 원래 기준에는 표본 편차 한도가 없으므로 이번에도 이를 추가하거나 완화하지 않았으며, 양쪽 편차는 표에 공개한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-환경과-구현-경계">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="환경과-구현-경계">환경과 구현 경계</h2></div>
+<div class="prose"><p>Windows x64 MSVC 19.50.35730, MSVC STL 145, Release, iterator debug 0, C++23이다. 실제 구현은 Creator.Containers 모듈의 22개 파티션에서 가져온다. 기존 정확성/비교 소스의 ce 구현 include를 제거하고 import를 삽입해 같은 작업을 실행했다. 측정용 STL/PPL 사용은 비교 실행 파일에만 있다. FAA 비교 소비자는 기존과 같은 /Ob3을 사용한다.</p>
+<p>일반 및 고정 MPSC는 이전 최종 수용과 같은 측정 스레드 CPU4/above-normal, 자체 SMT pause helper CPU5 조건이다. 자체 helper는 절대 시간을 늘리는 비교 환경 제어이며 라이브러리 최적화가 아니다. 다른 앱이나 OS 설정은 바꾸지 않았다. 일반 항목은 각 구현 100ms 목표로 독립 보정하고 각각 고정 1초 워밍업 후 15표본을 수집했다. 고정 MPSC는 OS yield 대기와 개별 전송 표본을 사용하며 생산자는 다른 물리 코어에 배치한다.</p>
+<p>FAA/PPL 5프로세스는 기존 queue_acceptance 프로토콜 그대로 SMT helper 종료 후 실행했다. 해당 프로토콜은 affinity 고정 없이 A/B 순서를 표본마다 번갈아 사용한다. 일반 단일 스레드/고정 MPSC와 다른 측정 조건임을 구분한다. 측정 중 소스와 바이너리를 수정하거나 빌드하지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-일반확장-82개-조건">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="일반확장-82개-조건">일반·확장 82개 조건</h2></div>
+<div class="prose"><p>아래 비율 범위는 3프로세스의 중앙값 비율 범위이고, 편차 최대는 각 프로세스 안의 x[13]/x[1] 중 최대다. 프로세스 간 절대 시간 차이를 같은 통계로 해석하지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>조건</th><th style="text-align:right">비율 최소–최대</th><th style="text-align:right">자체 편차 최대</th><th style="text-align:right">STL 편차 최대</th><th>3회 모두 수용</th></tr></thead>
+<tbody><tr><td>core/array_growth/23</td><td style="text-align:right">0.5388–0.5477</td><td class="num" style="text-align:right">1.0347</td><td class="num" style="text-align:right">1.0110</td><td>True</td></tr>
+<tr><td>core/array_growth/24</td><td style="text-align:right">0.5365–0.5634</td><td class="num" style="text-align:right">1.0106</td><td class="num" style="text-align:right">1.0301</td><td>True</td></tr>
+<tr><td>core/array_growth/4096</td><td style="text-align:right">0.3314–0.6233</td><td class="num" style="text-align:right">1.0252</td><td class="num" style="text-align:right">1.0125</td><td>True</td></tr>
+<tr><td>core/array_growth/64</td><td style="text-align:right">0.6282–0.6346</td><td class="num" style="text-align:right">1.0157</td><td class="num" style="text-align:right">1.0153</td><td>True</td></tr>
+<tr><td>core/array_growth/65536</td><td style="text-align:right">0.2571–0.5828</td><td class="num" style="text-align:right">1.0249</td><td class="num" style="text-align:right">1.0414</td><td>True</td></tr>
+<tr><td>core/array_growth/8</td><td style="text-align:right">0.1815–0.1873</td><td class="num" style="text-align:right">1.0060</td><td class="num" style="text-align:right">1.0106</td><td>True</td></tr>
+<tr><td>core/array_reserved/23</td><td style="text-align:right">0.9655–0.9830</td><td class="num" style="text-align:right">1.0314</td><td class="num" style="text-align:right">1.0076</td><td>True</td></tr>
+<tr><td>core/array_reserved/24</td><td style="text-align:right">0.9723–0.9780</td><td class="num" style="text-align:right">1.0275</td><td class="num" style="text-align:right">1.0329</td><td>True</td></tr>
+<tr><td>core/array_reserved/4096</td><td style="text-align:right">0.9702–0.9746</td><td class="num" style="text-align:right">1.0082</td><td class="num" style="text-align:right">1.0252</td><td>True</td></tr>
+<tr><td>core/array_reserved/64</td><td style="text-align:right">0.9181–0.9210</td><td class="num" style="text-align:right">1.0255</td><td class="num" style="text-align:right">1.0061</td><td>True</td></tr>
+<tr><td>core/array_reserved/65536</td><td style="text-align:right">1.0087–1.0104</td><td class="num" style="text-align:right">1.0088</td><td class="num" style="text-align:right">1.0121</td><td>True</td></tr>
+<tr><td>core/array_reserved/8</td><td style="text-align:right">0.9431–0.9992</td><td class="num" style="text-align:right">1.0091</td><td class="num" style="text-align:right">1.0115</td><td>True</td></tr>
+<tr><td>core/fifo_batch/23</td><td style="text-align:right">0.6089–0.6125</td><td class="num" style="text-align:right">1.0057</td><td class="num" style="text-align:right">1.0117</td><td>True</td></tr>
+<tr><td>core/fifo_batch/24</td><td style="text-align:right">0.6195–0.6369</td><td class="num" style="text-align:right">1.0114</td><td class="num" style="text-align:right">1.0111</td><td>True</td></tr>
+<tr><td>core/fifo_batch/4096</td><td style="text-align:right">0.6348–0.6374</td><td class="num" style="text-align:right">1.0101</td><td class="num" style="text-align:right">1.0105</td><td>True</td></tr>
+<tr><td>core/fifo_batch/64</td><td style="text-align:right">0.6073–0.6091</td><td class="num" style="text-align:right">1.0082</td><td class="num" style="text-align:right">1.0172</td><td>True</td></tr>
+<tr><td>core/fifo_batch/65536</td><td style="text-align:right">0.5144–0.5300</td><td class="num" style="text-align:right">1.0161</td><td class="num" style="text-align:right">1.0406</td><td>True</td></tr>
+<tr><td>core/fifo_batch/8</td><td style="text-align:right">0.5542–0.5569</td><td class="num" style="text-align:right">1.0205</td><td class="num" style="text-align:right">1.0173</td><td>True</td></tr>
+<tr><td>core/map_build/23</td><td style="text-align:right">0.1714–0.1752</td><td class="num" style="text-align:right">1.0057</td><td class="num" style="text-align:right">1.0349</td><td>True</td></tr>
+<tr><td>core/map_build/24</td><td style="text-align:right">0.1670–0.1709</td><td class="num" style="text-align:right">1.0079</td><td class="num" style="text-align:right">1.0340</td><td>True</td></tr>
+<tr><td>core/map_build/4096</td><td style="text-align:right">0.1554–0.1556</td><td class="num" style="text-align:right">1.0071</td><td class="num" style="text-align:right">1.0425</td><td>True</td></tr>
+<tr><td>core/map_build/64</td><td style="text-align:right">0.1237–0.1258</td><td class="num" style="text-align:right">1.0152</td><td class="num" style="text-align:right">1.0089</td><td>True</td></tr>
+<tr><td>core/map_build/65536</td><td style="text-align:right">0.2202–0.2280</td><td class="num" style="text-align:right">1.0556</td><td class="num" style="text-align:right">1.2291</td><td>True</td></tr>
+<tr><td>core/map_build/8</td><td style="text-align:right">0.2772–0.2782</td><td class="num" style="text-align:right">1.0140</td><td class="num" style="text-align:right">1.0101</td><td>True</td></tr>
+<tr><td>core/map_hit/23</td><td style="text-align:right">0.8919–0.8994</td><td class="num" style="text-align:right">1.0204</td><td class="num" style="text-align:right">1.0356</td><td>True</td></tr>
+<tr><td>core/map_hit/24</td><td style="text-align:right">0.8667–0.8674</td><td class="num" style="text-align:right">1.0144</td><td class="num" style="text-align:right">1.0059</td><td>True</td></tr>
+<tr><td>core/map_hit/4096</td><td style="text-align:right">0.8000–0.8101</td><td class="num" style="text-align:right">1.0114</td><td class="num" style="text-align:right">1.0218</td><td>True</td></tr>
+<tr><td>core/map_hit/64</td><td style="text-align:right">0.8910–0.9021</td><td class="num" style="text-align:right">1.0399</td><td class="num" style="text-align:right">1.0143</td><td>True</td></tr>
+<tr><td>core/map_hit/65536</td><td style="text-align:right">0.5783–0.5855</td><td class="num" style="text-align:right">1.0282</td><td class="num" style="text-align:right">1.0253</td><td>True</td></tr>
+<tr><td>core/map_hit/8</td><td style="text-align:right">0.8558–0.8582</td><td class="num" style="text-align:right">1.0096</td><td class="num" style="text-align:right">1.0365</td><td>True</td></tr>
+<tr><td>core/map_miss/23</td><td style="text-align:right">0.8169–0.8203</td><td class="num" style="text-align:right">1.0089</td><td class="num" style="text-align:right">1.0066</td><td>True</td></tr>
+<tr><td>core/map_miss/24</td><td style="text-align:right">0.7550–0.7553</td><td class="num" style="text-align:right">1.0077</td><td class="num" style="text-align:right">1.0055</td><td>True</td></tr>
+<tr><td>core/map_miss/4096</td><td style="text-align:right">0.5653–0.5692</td><td class="num" style="text-align:right">1.0061</td><td class="num" style="text-align:right">1.0508</td><td>True</td></tr>
+<tr><td>core/map_miss/64</td><td style="text-align:right">0.8453–0.8458</td><td class="num" style="text-align:right">1.0087</td><td class="num" style="text-align:right">1.0070</td><td>True</td></tr>
+<tr><td>core/map_miss/65536</td><td style="text-align:right">0.3334–0.3368</td><td class="num" style="text-align:right">1.0072</td><td class="num" style="text-align:right">1.0327</td><td>True</td></tr>
+<tr><td>core/map_miss/8</td><td style="text-align:right">0.8278–0.8363</td><td class="num" style="text-align:right">1.0295</td><td class="num" style="text-align:right">1.0375</td><td>True</td></tr>
+<tr><td>core/string_append/23</td><td style="text-align:right">0.5832–0.5895</td><td class="num" style="text-align:right">1.0218</td><td class="num" style="text-align:right">1.0266</td><td>True</td></tr>
+<tr><td>core/string_append/24</td><td style="text-align:right">0.9882–1.0101</td><td class="num" style="text-align:right">1.0112</td><td class="num" style="text-align:right">1.0064</td><td>True</td></tr>
+<tr><td>core/string_append/4096</td><td style="text-align:right">0.6561–0.6624</td><td class="num" style="text-align:right">1.0096</td><td class="num" style="text-align:right">1.0193</td><td>True</td></tr>
+<tr><td>core/string_append/64</td><td style="text-align:right">0.7295–0.7403</td><td class="num" style="text-align:right">1.0074</td><td class="num" style="text-align:right">1.0060</td><td>True</td></tr>
+<tr><td>core/string_append/65536</td><td style="text-align:right">0.6664–0.6738</td><td class="num" style="text-align:right">1.0389</td><td class="num" style="text-align:right">1.0087</td><td>True</td></tr>
+<tr><td>core/string_append/8</td><td style="text-align:right">0.9912–0.9990</td><td class="num" style="text-align:right">1.0073</td><td class="num" style="text-align:right">1.0139</td><td>True</td></tr>
+<tr><td>core/string_copy/23</td><td style="text-align:right">0.2228–0.2243</td><td class="num" style="text-align:right">1.0333</td><td class="num" style="text-align:right">1.0066</td><td>True</td></tr>
+<tr><td>core/string_copy/24</td><td style="text-align:right">0.9881–1.0636</td><td class="num" style="text-align:right">1.0243</td><td class="num" style="text-align:right">1.0175</td><td>True</td></tr>
+<tr><td>core/string_copy/4096</td><td style="text-align:right">1.0028–1.0089</td><td class="num" style="text-align:right">1.0349</td><td class="num" style="text-align:right">1.0058</td><td>True</td></tr>
+<tr><td>core/string_copy/64</td><td style="text-align:right">0.9894–1.0202</td><td class="num" style="text-align:right">1.0190</td><td class="num" style="text-align:right">1.0234</td><td>True</td></tr>
+<tr><td>core/string_copy/65536</td><td style="text-align:right">0.9978–1.0030</td><td class="num" style="text-align:right">1.0102</td><td class="num" style="text-align:right">1.0232</td><td>True</td></tr>
+<tr><td>core/string_copy/8</td><td style="text-align:right">0.9057–0.9070</td><td class="num" style="text-align:right">1.0225</td><td class="num" style="text-align:right">1.0067</td><td>True</td></tr>
+<tr><td>core/string_find/23</td><td style="text-align:right">0.9152–0.9189</td><td class="num" style="text-align:right">1.0113</td><td class="num" style="text-align:right">1.0071</td><td>True</td></tr>
+<tr><td>core/string_find/24</td><td style="text-align:right">0.9582–0.9659</td><td class="num" style="text-align:right">1.0061</td><td class="num" style="text-align:right">1.0417</td><td>True</td></tr>
+<tr><td>core/string_find/4096</td><td style="text-align:right">0.1736–0.1745</td><td class="num" style="text-align:right">1.0330</td><td class="num" style="text-align:right">1.0041</td><td>True</td></tr>
+<tr><td>core/string_find/64</td><td style="text-align:right">0.5362–0.5416</td><td class="num" style="text-align:right">1.0242</td><td class="num" style="text-align:right">1.0132</td><td>True</td></tr>
+<tr><td>core/string_find/65536</td><td style="text-align:right">0.1698–0.1707</td><td class="num" style="text-align:right">1.0091</td><td class="num" style="text-align:right">1.0073</td><td>True</td></tr>
+<tr><td>core/string_find/8</td><td style="text-align:right">0.6988–0.7059</td><td class="num" style="text-align:right">1.0228</td><td class="num" style="text-align:right">1.0084</td><td>True</td></tr>
+<tr><td>core/string_view_construct/23</td><td style="text-align:right">0.2615–0.2637</td><td class="num" style="text-align:right">1.0033</td><td class="num" style="text-align:right">1.0233</td><td>True</td></tr>
+<tr><td>core/string_view_construct/24</td><td style="text-align:right">0.9936–1.0045</td><td class="num" style="text-align:right">1.0257</td><td class="num" style="text-align:right">1.0060</td><td>True</td></tr>
+<tr><td>core/string_view_construct/4096</td><td style="text-align:right">1.0024–1.0127</td><td class="num" style="text-align:right">1.0322</td><td class="num" style="text-align:right">1.0301</td><td>True</td></tr>
+<tr><td>core/string_view_construct/64</td><td style="text-align:right">1.0013–1.0170</td><td class="num" style="text-align:right">1.0070</td><td class="num" style="text-align:right">1.0259</td><td>True</td></tr>
+<tr><td>core/string_view_construct/65536</td><td style="text-align:right">0.9973–1.0030</td><td class="num" style="text-align:right">1.0225</td><td class="num" style="text-align:right">1.0068</td><td>True</td></tr>
+<tr><td>core/string_view_construct/8</td><td style="text-align:right">0.9282–0.9289</td><td class="num" style="text-align:right">1.0040</td><td class="num" style="text-align:right">1.0126</td><td>True</td></tr>
+<tr><td>expanded/age_expiration/256</td><td style="text-align:right">0.8139–0.8214</td><td class="num" style="text-align:right">1.0208</td><td class="num" style="text-align:right">1.0150</td><td>True</td></tr>
+<tr><td>expanded/age_expiration/4096</td><td style="text-align:right">0.0994–0.1015</td><td class="num" style="text-align:right">1.0365</td><td class="num" style="text-align:right">1.0220</td><td>True</td></tr>
+<tr><td>expanded/atom_duplicate/256</td><td style="text-align:right">0.7653–0.7738</td><td class="num" style="text-align:right">1.0270</td><td class="num" style="text-align:right">1.0264</td><td>True</td></tr>
+<tr><td>expanded/atom_duplicate/4096</td><td style="text-align:right">0.6820–0.6851</td><td class="num" style="text-align:right">1.0173</td><td class="num" style="text-align:right">1.0221</td><td>True</td></tr>
+<tr><td>expanded/fixed_arena_churn/256</td><td style="text-align:right">0.5422–0.5643</td><td class="num" style="text-align:right">1.0082</td><td class="num" style="text-align:right">1.0064</td><td>True</td></tr>
+<tr><td>expanded/fixed_arena_churn/4096</td><td style="text-align:right">0.5409–0.5418</td><td class="num" style="text-align:right">1.0290</td><td class="num" style="text-align:right">1.0068</td><td>True</td></tr>
+<tr><td>expanded/function_dispatch/256</td><td style="text-align:right">1.0771–1.0897</td><td class="num" style="text-align:right">1.0102</td><td class="num" style="text-align:right">1.0224</td><td>True</td></tr>
+<tr><td>expanded/function_dispatch/4096</td><td style="text-align:right">0.8871–0.8976</td><td class="num" style="text-align:right">1.0124</td><td class="num" style="text-align:right">1.0073</td><td>True</td></tr>
+<tr><td>expanded/lru_touch/256</td><td style="text-align:right">0.2806–0.3121</td><td class="num" style="text-align:right">1.0405</td><td class="num" style="text-align:right">1.0330</td><td>True</td></tr>
+<tr><td>expanded/lru_touch/4096</td><td style="text-align:right">0.3311–0.3330</td><td class="num" style="text-align:right">1.0073</td><td class="num" style="text-align:right">1.0167</td><td>True</td></tr>
+<tr><td>expanded/owned_array/256</td><td style="text-align:right">0.9511–0.9633</td><td class="num" style="text-align:right">1.0077</td><td class="num" style="text-align:right">1.0083</td><td>True</td></tr>
+<tr><td>expanded/owned_array/4096</td><td style="text-align:right">0.9072–0.9547</td><td class="num" style="text-align:right">1.0201</td><td class="num" style="text-align:right">1.0313</td><td>True</td></tr>
+<tr><td>expanded/radix_sort_u64/256</td><td style="text-align:right">0.8507–0.8846</td><td class="num" style="text-align:right">1.0913</td><td class="num" style="text-align:right">1.0407</td><td>True</td></tr>
+<tr><td>expanded/radix_sort_u64/4096</td><td style="text-align:right">0.4193–0.4212</td><td class="num" style="text-align:right">1.0068</td><td class="num" style="text-align:right">1.0063</td><td>True</td></tr>
+<tr><td>expanded/sequence_window/256</td><td style="text-align:right">0.0585–0.0590</td><td class="num" style="text-align:right">1.0245</td><td class="num" style="text-align:right">1.0089</td><td>True</td></tr>
+<tr><td>expanded/sequence_window/4096</td><td style="text-align:right">0.0351–0.0351</td><td class="num" style="text-align:right">1.0060</td><td class="num" style="text-align:right">1.0206</td><td>True</td></tr>
+<tr><td>expanded/slot_lifetime/256</td><td style="text-align:right">0.2039–0.2086</td><td class="num" style="text-align:right">1.0326</td><td class="num" style="text-align:right">1.0321</td><td>True</td></tr>
+<tr><td>expanded/slot_lifetime/4096</td><td style="text-align:right">0.1779–0.1804</td><td class="num" style="text-align:right">1.0063</td><td class="num" style="text-align:right">1.0137</td><td>True</td></tr>
+<tr><td>expanded/string_map_build/256</td><td style="text-align:right">0.6417–0.6480</td><td class="num" style="text-align:right">1.0404</td><td class="num" style="text-align:right">1.0298</td><td>True</td></tr>
+<tr><td>expanded/string_map_build/4096</td><td style="text-align:right">0.6981–0.7021</td><td class="num" style="text-align:right">1.0056</td><td class="num" style="text-align:right">1.0101</td><td>True</td></tr>
+<tr><td>expanded/string_map_hit/256</td><td style="text-align:right">0.7439–0.7509</td><td class="num" style="text-align:right">1.0438</td><td class="num" style="text-align:right">1.0294</td><td>True</td></tr>
+<tr><td>expanded/string_map_hit/4096</td><td style="text-align:right">0.6916–0.6938</td><td class="num" style="text-align:right">1.0111</td><td class="num" style="text-align:right">1.0200</td><td>True</td></tr></tbody></table></div>
+<h3 id="배열-프로세스별-절대-시간-범위">배열 프로세스별 절대 시간 범위</h3>
+<p>표본 내부가 안정적이어도 새 프로세스의 heap/주소·상태 등에 따라 절대 중앙값이 달라질 수 있다. 아래는 각 반복의 ns/작업 중앙값 범위이며 한도 1.30이 적용되는 통계와 다르다. 이 차이의 개별 원인은 이번 비교만으로 확정하지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>배열 조건</th><th style="text-align:right">자체 ns 최소–최대</th><th style="text-align:right">STL ns 최소–최대</th><th style="text-align:right">자체/STL 프로세스 max/min</th></tr></thead>
+<tbody><tr><td>core/array_growth/23</td><td style="text-align:right">5213–5423</td><td style="text-align:right">9676–9900</td><td style="text-align:right">1.040/1.023</td></tr>
+<tr><td>core/array_growth/24</td><td style="text-align:right">5229–5428</td><td style="text-align:right">9566–9771</td><td style="text-align:right">1.038/1.021</td></tr>
+<tr><td>core/array_growth/4096</td><td style="text-align:right">137546–150010</td><td style="text-align:right">239534–422773</td><td style="text-align:right">1.091/1.765</td></tr>
+<tr><td>core/array_growth/64</td><td style="text-align:right">8773–8889</td><td style="text-align:right">13967–14009</td><td style="text-align:right">1.013/1.003</td></tr>
+<tr><td>core/array_growth/65536</td><td style="text-align:right">1653775–2132906</td><td style="text-align:right">3354325–8295350</td><td style="text-align:right">1.290/2.473</td></tr>
+<tr><td>core/array_growth/8</td><td style="text-align:right">1090–1117</td><td style="text-align:right">5963–6013</td><td style="text-align:right">1.025/1.008</td></tr>
+<tr><td>core/array_reserved/23</td><td style="text-align:right">1411–1420</td><td style="text-align:right">1445–1467</td><td style="text-align:right">1.006/1.015</td></tr>
+<tr><td>core/array_reserved/24</td><td style="text-align:right">1430–1440</td><td style="text-align:right">1462–1481</td><td style="text-align:right">1.007/1.013</td></tr>
+<tr><td>core/array_reserved/4096</td><td style="text-align:right">98364–98466</td><td style="text-align:right">101034–101468</td><td style="text-align:right">1.001/1.004</td></tr>
+<tr><td>core/array_reserved/64</td><td style="text-align:right">2344–2346</td><td style="text-align:right">2546–2554</td><td style="text-align:right">1.001/1.003</td></tr>
+<tr><td>core/array_reserved/65536</td><td style="text-align:right">1576880–1580317</td><td style="text-align:right">1561905–1566684</td><td style="text-align:right">1.002/1.003</td></tr>
+<tr><td>core/array_reserved/8</td><td style="text-align:right">1080–1106</td><td style="text-align:right">1097–1145</td><td style="text-align:right">1.024/1.044</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-고정-mpsc-대-ppl">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="고정-mpsc-대-ppl">고정 MPSC 대 PPL</h2></div>
+<div class="prose"><p>기존 주 수용 조건 yield-batch8도 같은 모듈 바이너리로 3회 실행했다. 이전 주 수용 프로토콜과 같이 SMT helper 없이 CPU4 측정 스레드와 분리한 생산자 코어를 사용한다. 3개 고정 워밍업 묶음, 정식 15개 묶음 각각 하위 전송 8개이며 그 평균 시간을 쓴다. 연속 단일 wall interval이나 단일 전송 지연 안정성을 뜻하지 않는다. 하위 전송 1,440쌍 전부를 보존하고 묶음 평균을 재계산했다. 진단용 pause 모드로 바꾸지 않았다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>주 수용 조건/용량/생산자</th><th style="text-align:right">비율 최소–최대</th><th style="text-align:right">자체 편차 최대</th><th style="text-align:right">PPL 편차 최대</th><th>3회 모두 수용</th></tr></thead>
+<tbody><tr><td>batch8/1024/1</td><td style="text-align:right">0.7270–0.7724</td><td class="num" style="text-align:right">1.0575</td><td class="num" style="text-align:right">1.0451</td><td>True</td></tr>
+<tr><td>batch8/1024/4</td><td style="text-align:right">0.8929–0.9393</td><td class="num" style="text-align:right">1.0479</td><td class="num" style="text-align:right">1.0479</td><td>True</td></tr>
+<tr><td>batch8/64/1</td><td style="text-align:right">0.7085–0.7651</td><td class="num" style="text-align:right">1.0787</td><td class="num" style="text-align:right">1.0443</td><td>True</td></tr>
+<tr><td>batch8/64/4</td><td style="text-align:right">0.9074–0.9464</td><td class="num" style="text-align:right">1.0777</td><td class="num" style="text-align:right">1.1256</td><td>True</td></tr></tbody></table></div>
+<p>아래는 별도 SMT 제어 조건에서의 개별 전송 추가 검사다. 주 수용 batch8과 결과를 혼합하지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>개별 용량/생산자</th><th style="text-align:right">비율 최소–최대</th><th style="text-align:right">자체 편차 최대</th><th style="text-align:right">PPL 편차 최대</th><th>3회 모두 수용</th></tr></thead>
+<tbody><tr><td>1024/1</td><td style="text-align:right">0.7381–0.8027</td><td class="num" style="text-align:right">1.1009</td><td class="num" style="text-align:right">1.1653</td><td>True</td></tr>
+<tr><td>1024/4</td><td style="text-align:right">0.6642–0.7041</td><td class="num" style="text-align:right">1.1361</td><td class="num" style="text-align:right">1.0463</td><td>True</td></tr>
+<tr><td>64/1</td><td style="text-align:right">0.7415–0.8032</td><td class="num" style="text-align:right">1.1725</td><td class="num" style="text-align:right">1.0756</td><td>True</td></tr>
+<tr><td>64/4</td><td style="text-align:right">0.8489–0.8726</td><td class="num" style="text-align:right">1.1786</td><td class="num" style="text-align:right">1.0290</td><td>True</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-faa-확장-mpmc-대-ppl">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="faa-확장-mpmc-대-ppl">FAA 확장 MPMC 대 PPL</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>값 B/생산자/소비자</th><th style="text-align:right">전송 비율 최소–최대</th><th style="text-align:right">소멸 포함 비율 최대</th><th style="text-align:right">자체/PPL 편차 최대</th><th>5회 모두 수용</th></tr></thead>
+<tbody><tr><td>128/1/1</td><td style="text-align:right">0.3897–0.4185</td><td class="num" style="text-align:right">0.4502</td><td style="text-align:right">1.2663/1.2281</td><td>True</td></tr>
+<tr><td>128/4/1</td><td style="text-align:right">0.6130–0.6599</td><td class="num" style="text-align:right">0.7481</td><td style="text-align:right">1.2195/1.0872</td><td>True</td></tr>
+<tr><td>128/4/4</td><td style="text-align:right">0.6306–0.6703</td><td class="num" style="text-align:right">0.7365</td><td style="text-align:right">1.1970/1.1234</td><td>True</td></tr>
+<tr><td>8/1/1</td><td style="text-align:right">0.4618–0.5365</td><td class="num" style="text-align:right">0.5531</td><td style="text-align:right">1.3665/1.2225</td><td>True</td></tr>
+<tr><td>8/4/1</td><td style="text-align:right">0.9878–1.0455</td><td class="num" style="text-align:right">1.0904</td><td style="text-align:right">1.1527/1.1037</td><td>True</td></tr>
+<tr><td>8/4/4</td><td style="text-align:right">0.5684–0.6458</td><td class="num" style="text-align:right">0.6641</td><td style="text-align:right">1.1471/1.2936</td><td>True</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-spsc-및-기존-스핀-mpmc-추가-비교">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="spsc-및-기존-스핀-mpmc-추가-비교">SPSC 및 기존 스핀 MPMC 추가 비교</h2></div>
+<div class="prose"><p>과거 concurrent 프로토콜도 빠짐없이 실행했다. 생산자당 16,000개, 2회 워밍업·9표본·3프로세스이며 아래 판정은 각 반복 처리량 비율 ≤1.10이다. 기존 보고서와 같이 x[7]/x[1]&gt;1.25는 별도 편차 경고다. 스핀 MPMC는 락 프리 타입이 아니며 SPSC도 역할 고정 큐이므로 PPL 전체의 대체 가능성을 뜻하지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>타입/값 B/생산자/소비자</th><th style="text-align:right">비율 최소–최대</th><th style="text-align:right">자체/PPL 편차 최대</th><th>처리량 3회 모두 수용</th></tr></thead>
+<tbody><tr><td>mpmc/128/1/1</td><td style="text-align:right">0.4475–0.5481</td><td style="text-align:right">1.7785/1.1060</td><td>True</td></tr>
+<tr><td>mpmc/128/4/1</td><td style="text-align:right">0.8309–1.0119</td><td style="text-align:right">1.4535/1.0688</td><td>True</td></tr>
+<tr><td>mpmc/128/4/4</td><td style="text-align:right">0.5151–0.6240</td><td style="text-align:right">1.4191/1.1413</td><td>True</td></tr>
+<tr><td>mpmc/8/1/1</td><td style="text-align:right">0.3173–0.3793</td><td style="text-align:right">1.1996/1.1276</td><td>True</td></tr>
+<tr><td>mpmc/8/4/1</td><td style="text-align:right">0.5172–0.5301</td><td style="text-align:right">1.1047/1.0532</td><td>True</td></tr>
+<tr><td>mpmc/8/4/4</td><td style="text-align:right">0.2496–0.3217</td><td style="text-align:right">1.0692/1.2886</td><td>True</td></tr>
+<tr><td>spsc/128/1/1</td><td style="text-align:right">0.2190–0.2235</td><td style="text-align:right">1.1656/1.1311</td><td>True</td></tr>
+<tr><td>spsc/8/1/1</td><td style="text-align:right">0.1774–0.1978</td><td style="text-align:right">1.2137/1.2669</td><td>True</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-미수용-항목과-판단">
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="미수용-항목과-판단">미수용 항목과 판단</h2></div>
+<div class="prose"><p>이번 범위의 모든 조건이 기존 기준을 충족했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-증거와-재현">
+<div class="sec-head"><p class="ve-label">§07</p><h2 id="증거와-재현">증거와 재현</h2></div>
+<div class="prose"><p>독립 라이브러리 results/20261026-module-opt-accept1-verdict.json이 판정 정본이며, 20261026-module-opt-accept1-before.json과 20261026-module-opt-accept1-environment.json에 소스·스크립트·바이너리 SHA256을 보존한다. guard JSON과 246개 case 파일의 시간 범위를 대조하고 원시 표본에서 요약 비율과 편차를 다시 계산했다. 전체 표본 파일의 해시도 판정 JSON에 기록한다.</p>
+<p>총 324개 조건/프로세스 결과다. 일반 246·고정 MPSC 개별 12·FAA 30개 결과는 각각 15표본, SPSC·스핀 MPMC 24개 결과는 기존 방식의 9표본으로 총 4,536쌍이다. 주 수용 MPSC 12개 결과의 180개 묶음 표본(하위 전송 1,440쌍)도 추가 보존했다. 워밍업은 이 수에 포함하지 않는다. 컴파일러 및 실제 비교한 STL/PPL 설치 파일 해시도 reference-files JSON에 남겼다.</p>
+<p>재현은 새 Tag와 별도 GuardTag로 experiments/20261026-small-array/with-guard.ps1 안에서 run-module-acceptance.ps1을 실행한다. guard 태그는 측정 태그와 다른 접두사를 사용한다. 이어 module_queue_acceptance.exe를 guard 없이 5회 실행해 <Tag>-ppl-1.csv…5.csv, module_concurrent_tests.exe를 3회 실행해 <Tag>-concurrent-1.csv…3.csv로 보존한다. 별도 run-module-mpsc-primary.ps1 -Tag <Tag>로 주 수용 batch8을 수집하고 verify-module-acceptance.ps1 -Tag <Tag> -GuardTag <GuardTag>로 검증한다. 수집 전에 reference-files JSON과 module-concurrent-before JSON에 비교 설치 파일 및 concurrent 실행 파일 해시를 기록한다. 빌드는 수집 전에 modules/validate-msvc.ps1을 실행한 뒤 module_library_benchmark·module_mpsc_benchmark·module_queue_acceptance 타깃을 Release로 빌드한다.</p>
+<p>모듈 정확성·ASan·Linux 실행 검증은 <a href="ContainerModules20261026.html">모듈 구현 보고서</a>, 이전 헤더 수용은 <a href="SmallArrayVarianceAcceptance20261026.html">이전 수용 보고서</a>를 참조한다. 다른 OS의 성능 동등성이나 실제 엔진 프레임 수용을 입증한 결과는 아니다. 엔진 통합과 PPL 별칭 변경은 수행하지 않았다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="ModulePerformanceOptimization20261026.md"><code>docs/analysis/ModulePerformanceOptimization20261026.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

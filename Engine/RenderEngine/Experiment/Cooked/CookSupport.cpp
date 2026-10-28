@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "CookSupport.h"
 
 #include "ModelCookIdentity.h"
@@ -25,7 +26,7 @@ namespace experiment::cooked
     }
 
     bool ReadBinaryFile(const std::filesystem::path& path,
-        std::vector<std::byte>& out)
+        ce::dynamic_array<std::byte>& out)
     {
         std::ifstream stream(path, std::ios::binary);
         if (!stream) return false;
@@ -68,7 +69,7 @@ namespace experiment::cooked
             return false;
         }
 
-        std::vector<ModelIdentityIssue> issues;
+        ce::dynamic_array<ModelIdentityIssue> issues;
         if (path.filename().string().ends_with(".shadergraph.meta"))
         {
             std::string parseError;

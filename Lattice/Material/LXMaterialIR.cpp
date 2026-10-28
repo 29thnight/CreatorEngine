@@ -1,3 +1,7 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "LXMaterialIR.h"
 
 #include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
@@ -6,7 +10,7 @@ namespace LX
 {
 namespace
 {
-void CollectScopes(const LXGraph& graph, std::map<Id, const LXGroupDefinition*>& scopes)
+void CollectScopes(const LXGraph& graph, ce::engine_ordered_map<Id, const LXGroupDefinition*>& scopes)
 {
     for (const auto& [id, group] : graph.Groups())
     {
@@ -23,13 +27,13 @@ bool IsBoundary(const Node& node)
 }
 
 bool LowerScope(const LXMaterialAsset& asset, Id scopeId, const LXGraph& graph, LXMaterialIRScope& output,
-                std::vector<Issue>& issues)
+                ce::dynamic_array<Issue>& issues)
 {
     output.groupId = scopeId;
     const auto firstIssue = issues.size();
-    std::map<Id, std::size_t> dependencies;
-    std::map<Id, std::vector<Id>> consumers;
-    std::set<Id> ready;
+    ce::engine_ordered_map<Id, std::size_t> dependencies;
+    ce::engine_ordered_map<Id, ce::dynamic_array<Id>> consumers;
+    ce::engine_ordered_set<Id> ready;
     for (const Node& node : graph.Nodes())
     {
         dependencies[node.id] = 0;
@@ -123,10 +127,10 @@ bool LowerScope(const LXMaterialAsset& asset, Id scopeId, const LXGraph& graph, 
 }
 } // namespace
 
-std::optional<LXMaterialIR> BuildMaterialIR(const LXMaterialAsset& asset, std::vector<Issue>* resultIssues)
+std::optional<LXMaterialIR> BuildMaterialIR(const LXMaterialAsset& asset, ce::dynamic_array<Issue>* resultIssues)
 {
-    std::vector<Issue> issues = asset.Validate();
-    std::erase_if(issues, [](const Issue& issue) { return issue.severity == Issue::Severity::Warning; });
+    ce::dynamic_array<Issue> issues = asset.Validate();
+    ce::erase_if(issues, [](const Issue& issue) { return issue.severity == Issue::Severity::Warning; });
     const Node* output = asset.graph.FindNode(asset.activeOutput);
     if (!output || output->type != "ShaderNodeOutputMaterial")
     {
@@ -136,9 +140,9 @@ std::optional<LXMaterialIR> BuildMaterialIR(const LXMaterialAsset& asset, std::v
     result.graphId = asset.graphId;
     result.activeOutput = asset.activeOutput;
     result.blackboard = asset.blackboard;
-    std::map<Id, const LXGroupDefinition*> groups;
+    ce::engine_ordered_map<Id, const LXGroupDefinition*> groups;
     CollectScopes(asset.graph, groups);
-    std::map<Id, LXSocketValue> socketDefaults;
+    ce::engine_ordered_map<Id, LXSocketValue> socketDefaults;
     const auto defaults = [&](const LXGraph& graph) {
         for (const auto& node : graph.Nodes())
         {
@@ -200,7 +204,7 @@ std::optional<LXMaterialIR> BuildMaterialIR(const LXMaterialAsset& asset, std::v
 
 LXMaterialDocument::LXMaterialDocument(LXMaterialAsset asset) : asset_(std::move(asset)) {}
 
-bool LXMaterialDocument::PublishIR(std::vector<Issue>* issues)
+bool LXMaterialDocument::PublishIR(ce::dynamic_array<Issue>* issues)
 {
     auto candidate = BuildMaterialIR(asset_, issues);
     if (!candidate)
@@ -230,7 +234,7 @@ bool LXMaterialDocument::Reload(const std::filesystem::path& path, std::string* 
     return true;
 }
 
-bool LXMaterialDocument::Edit(const std::function<bool(LXMaterialAsset&)>& operation)
+bool LXMaterialDocument::Edit(const ce::owned_func<bool(LXMaterialAsset&)>& operation)
 {
     LXMaterialAsset candidate = asset_;
     if (!operation(candidate))

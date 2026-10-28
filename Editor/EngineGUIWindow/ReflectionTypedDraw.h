@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #include "ImGui.h"
 #include "imgui_stdlib.h"
@@ -78,7 +79,7 @@ namespace Meta::TypedDraw
 {
     consteval bool ObjectHidesEnabledFlag()
     {
-        return std::apply([](const auto&... ms)
+        return ce::apply([](const auto&... ms)
         {
             return ((ms.name == std::string_view{ "m_isEnabled" } &&
                      std::remove_cvref_t<decltype(ms)>::template
@@ -104,7 +105,7 @@ namespace Meta::TypedDraw
     template<class Attr>
     consteval bool ObjectFieldMarked(std::string_view field)
     {
-        return std::apply([field](const auto&... ms)
+        return ce::apply([field](const auto&... ms)
         {
             return ((ms.name == field &&
                      std::remove_cvref_t<decltype(ms)>::template
@@ -172,7 +173,7 @@ namespace Meta::TypedDraw
         constexpr auto& entries = reflgen::enum_entries<E>;
 
         int currentIndex = 0;
-        std::vector<const char*> items;
+        ce::dynamic_array<const char*> items;
         items.reserve(entries.size());
         for (size_t i = 0; i < entries.size(); ++i)
         {
@@ -419,7 +420,7 @@ namespace Meta::TypedDraw
         {
             ((widest = ImMax(widest, LabelHintOf<Bases>())), ...);
         }(reflgen::direct_bases_t<T>{});
-        std::apply([&](const auto&... ms)
+        ce::apply([&](const auto&... ms)
         {
             ((widest = ImMax(widest,
                 ImGui::CalcTextSize(MemberLabel(ms)).x)), ...);
@@ -915,7 +916,7 @@ namespace Meta::TypedDraw
             (DrawFrame<Bases>(obj), ...);
         }(reflgen::direct_bases_t<T>{});
 
-        std::apply([&](const auto&... ms)
+        ce::apply([&](const auto&... ms)
         {
             (DrawOneMember(obj, ms), ...);
         }, reflgen::schema_of<T>.fields);
@@ -936,7 +937,7 @@ namespace Meta::TypedDraw
     inline float OwnLabelHintOf()
     {
         float widest = 0.f;
-        std::apply([&](const auto&... ms)
+        ce::apply([&](const auto&... ms)
         {
             ((widest = ImMax(widest,
                 ImGui::CalcTextSize(MemberLabel(ms)).x)), ...);
@@ -989,7 +990,7 @@ namespace Meta::TypedDraw
     void DrawOwnMembers(T& obj)
     {
         const LayoutScope scope{ OwnLabelHintOf<T>() };
-        std::apply([&](const auto&... ms)
+        ce::apply([&](const auto&... ms)
         {
             (DrawOneMember(obj, ms), ...);
         }, reflgen::schema_of<T>.fields);

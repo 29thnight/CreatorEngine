@@ -1,3 +1,5 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -356,7 +358,7 @@ namespace RenderTest
         {
             const auto sniff = [](std::initializer_list<int> values)
             {
-                std::vector<std::byte> bytes;
+                ce::dynamic_array<std::byte> bytes;
                 for (const int value : values)
                     bytes.push_back(static_cast<std::byte>(value));
                 return std::string(ck::SniffTextureExtension(bytes));
@@ -482,10 +484,10 @@ namespace RenderTest
         if (!loaded.Succeeded()) return false;
         const assets::ModelAssetGeneration& generation = *loaded.generation;
 
-        std::set<uuid::uuid16> embeddedIds;
+        ce::engine_ordered_set<uuid::uuid16> embeddedIds;
         for (const assets::ModelTextureAsset& texture : generation.Textures())
             embeddedIds.insert(texture.textureId);
-        std::set<uuid::uuid16> referencedTextures;
+        ce::engine_ordered_set<uuid::uuid16> referencedTextures;
         std::size_t materials = 0, shaderEdges = 0, textureEdges = 0;
         bool unresolvedTexture = false;
         for (const assets::ModelMaterialAsset& material : generation.Materials())

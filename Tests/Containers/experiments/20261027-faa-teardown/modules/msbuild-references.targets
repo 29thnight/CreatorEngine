@@ -1,0 +1,87 @@
+<Project>
+  <Target Name="ReferenceCreatorContainerModules" Condition="'$(ReflgenTargetsImported)' == 'true' and '@(ReferencedProjectsPublicModules)' != ''">
+    <ItemGroup>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Containers.ixx'">
+        <ModuleName>Creator.Containers</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'fixed_bitset.ixx'">
+        <ModuleName>Creator.Containers:fixed_bitset</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'age_buckets.ixx'">
+        <ModuleName>Creator.Containers:age_buckets</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'bounded_mpsc_queue.ixx'">
+        <ModuleName>Creator.Containers:bounded_mpsc_queue</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'concurrent_queue.ixx'">
+        <ModuleName>Creator.Containers:concurrent_queue</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'containers.ixx'">
+        <ModuleName>Creator.Containers:containers</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'atomic.ixx'">
+        <ModuleName>Creator.Containers:detail_atomic</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'atomic_ptr.ixx'">
+        <ModuleName>Creator.Containers:detail_atomic_ptr</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'atomic_u64.ixx'">
+        <ModuleName>Creator.Containers:detail_atomic_u64</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'queue_profile.ixx'">
+        <ModuleName>Creator.Containers:detail_queue_profile</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'dynamic_array.ixx'">
+        <ModuleName>Creator.Containers:dynamic_array</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'faa_lock_free_queue.ixx'">
+        <ModuleName>Creator.Containers:faa_lock_free_queue</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'fixed_array.ixx'">
+        <ModuleName>Creator.Containers:fixed_array</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'flat_hash_map.ixx'">
+        <ModuleName>Creator.Containers:flat_hash_map</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'hash.ixx'">
+        <ModuleName>Creator.Containers:hash</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'inplace_function.ixx'">
+        <ModuleName>Creator.Containers:inplace_function</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'intrusive_lru.ixx'">
+        <ModuleName>Creator.Containers:intrusive_lru</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'lock_free_queue.ixx'">
+        <ModuleName>Creator.Containers:lock_free_queue</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'memory.ixx'">
+        <ModuleName>Creator.Containers:memory</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'node_hash_map.ixx'">
+        <ModuleName>Creator.Containers:node_hash_map</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'radix_sort.ixx'">
+        <ModuleName>Creator.Containers:radix_sort</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'sequence_buffer.ixx'">
+        <ModuleName>Creator.Containers:sequence_buffer</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'slot_map.ixx'">
+        <ModuleName>Creator.Containers:slot_map</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'string.ixx'">
+        <ModuleName>Creator.Containers:string</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'string_atom.ixx'">
+        <ModuleName>Creator.Containers:string_atom</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'tlsf_resource.ixx'">
+        <ModuleName>Creator.Containers:tlsf_resource</ModuleName>
+      </_CreatorReflgenModuleReference>
+      <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)" Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'utf8_copy.ixx'">
+        <ModuleName>Creator.Containers:utf8_copy</ModuleName>
+      </_CreatorReflgenModuleReference>
+    </ItemGroup>
+  </Target>
+</Project>

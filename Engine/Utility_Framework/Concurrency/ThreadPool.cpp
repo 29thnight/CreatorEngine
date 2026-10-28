@@ -1,8 +1,11 @@
 #if defined(CE_CONTRACT_STANDALONE)
+#include "../../Containers/ContainerAPI.h"
 #include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #include "../../Contracts/External/Creator.EnkiTS.h"
 #else
 module Creator.Concurrency.Jobs;
+import std;
+import "Creator.Containers.h";
 import Creator.Core.Ownership;
 import Creator.Concurrency.JobGraph;
 import "Creator.EnkiTS.h";
@@ -73,8 +76,8 @@ struct thread_pool::state
     struct work : enki::ITaskSet
     {
         state& owner_;
-        std::function<void(std::size_t)> execute_;
-        std::function<void(std::exception_ptr)> complete_;
+        ce::unique_func<void(std::size_t)> execute_;
+        ce::unique_func<void(std::exception_ptr)> complete_;
         std::mutex mutex_;
         std::exception_ptr failure_;
         struct completion : enki::ICompletable
@@ -95,8 +98,8 @@ struct thread_pool::state
             }
         } completion_;
 
-        work(state& owner, std::size_t count, std::function<void(std::size_t)> execute,
-             std::function<void(std::exception_ptr)> complete)
+        work(state& owner, std::size_t count, ce::unique_func<void(std::size_t)> execute,
+             ce::unique_func<void(std::exception_ptr)> complete)
             : enki::ITaskSet(static_cast<std::uint32_t>(count)), owner_(owner), execute_(std::move(execute)),
               complete_(std::move(complete))
         {
@@ -232,7 +235,7 @@ struct thread_pool::state
         {
             graph_work& graph_;
             std::size_t index_;
-            std::vector<std::uint32_t> prerequisites_;
+            ce::dynamic_array<std::uint32_t> prerequisites_;
             std::atomic<bool> failed_{false};
             gate ready_;
             gate complete_;
@@ -301,8 +304,8 @@ struct thread_pool::state
         };
 
         state& owner_;
-        std::function<void(std::size_t)> execute_;
-        std::function<void(std::exception_ptr)> complete_;
+        ce::unique_func<void(std::size_t)> execute_;
+        ce::unique_func<void(std::exception_ptr)> complete_;
         own::shared_owner<job_graph_diagnostics> diagnostics_;
         // 수락된 그래프와 제출 호출이 각각 하나씩 보관한다. 완료 순회는 진입/반환 때 증감한다.
         std::atomic<std::uint64_t> references_{2};
@@ -312,12 +315,12 @@ struct thread_pool::state
         delivery delivery_{*this};
         gate admission_{*this, gate_kind::admission};
         gate terminal_{*this, gate_kind::terminal};
-        std::vector<std::unique_ptr<node>> nodes_;
+        ce::dynamic_array<std::unique_ptr<node>> nodes_;
         // 마지막 멤버로 두어 모든 노드를 파괴하기 전에 간선을 먼저 해제한다.
-        std::vector<enki::Dependency> dependencies_;
+        ce::dynamic_array<enki::Dependency> dependencies_;
 
-        graph_work(state& owner, std::span<const job_graph_node> nodes, std::function<void(std::size_t)> execute,
-                   std::function<void(std::exception_ptr)> complete, own::shared_owner<job_graph_diagnostics> diagnostics)
+        graph_work(state& owner, std::span<const job_graph_node> nodes, ce::unique_func<void(std::size_t)> execute,
+                   ce::unique_func<void(std::exception_ptr)> complete, own::shared_owner<job_graph_diagnostics> diagnostics)
             : owner_(owner), execute_(std::move(execute)), complete_(std::move(complete)),
               diagnostics_(std::move(diagnostics))
         {
@@ -380,7 +383,7 @@ struct thread_pool::state
             return true;
         }
 
-        void prepare(std::function<void(std::size_t)> execute, std::function<void(std::exception_ptr)> complete,
+        void prepare(ce::unique_func<void(std::size_t)> execute, ce::unique_func<void(std::exception_ptr)> complete,
                      own::shared_owner<job_graph_diagnostics> diagnostics)
         {
             execute_ = std::move(execute);
@@ -450,7 +453,7 @@ struct thread_pool::state
     };
 
     static_assert(std::atomic<graph_work*>::is_always_lock_free);
-    std::array<std::atomic<graph_work*>, 8> completed_graphs_{};
+    ce::fixed_array<std::atomic<graph_work*>, 8> completed_graphs_{};
 
     void recycle_graph(graph_work* graph) noexcept
     {
@@ -580,8 +583,8 @@ struct thread_pool::state
         scheduler_.AddPinnedTask(&dispatcher_wake_);
         dispatcher_.join();
     }
-    void dispatch(std::size_t count, std::function<void(std::size_t)> execute,
-                  std::function<void(std::exception_ptr)> complete)
+    void dispatch(std::size_t count, ce::unique_func<void(std::size_t)> execute,
+                  ce::unique_func<void(std::exception_ptr)> complete)
     {
         if (!count || count > (std::numeric_limits<std::uint32_t>::max)())
         {
@@ -603,8 +606,8 @@ struct thread_pool::state
         scheduler_.AddPinnedTask(submitted);
         submitted->release_submission();
     }
-    void dispatch_graph(std::span<const job_graph_node> nodes, std::function<void(std::size_t)> execute,
-                        std::function<void(std::exception_ptr)> complete,
+    void dispatch_graph(std::span<const job_graph_node> nodes, ce::unique_func<void(std::size_t)> execute,
+                        ce::unique_func<void(std::exception_ptr)> complete,
                         own::shared_owner<job_graph_diagnostics> diagnostics)
     {
         auto graph = acquire_graph(nodes);
@@ -640,7 +643,7 @@ struct thread_pool::state
         // 완료가 제출보다 빨랐어도 graph 소멸자의 후속 제출이 submit_mutex_와 교착하지 않게 한다.
         submitted->release();
     }
-    void assist_until(const std::function<bool()>& ready)
+    void assist_until(ce::func_ref<bool()> ready)
     {
         // One extra external slot, no additional OS worker. Never take scheduler
         // or job completion locks while executing a callback on the joining owner.
@@ -749,8 +752,8 @@ void thread_pool::shutdown() noexcept
         state->close();
     }
 }
-void thread_pool::dispatch(std::size_t count, std::function<void(std::size_t)> execute,
-                           std::function<void(std::exception_ptr)> complete)
+void thread_pool::dispatch(std::size_t count, ce::unique_func<void(std::size_t)> execute,
+                           ce::unique_func<void(std::exception_ptr)> complete)
 {
     auto state = snapshot();
     if (!state)
@@ -759,8 +762,8 @@ void thread_pool::dispatch(std::size_t count, std::function<void(std::size_t)> e
     }
     state->dispatch(count, std::move(execute), std::move(complete));
 }
-void thread_pool::dispatch_graph(std::span<const job_graph_node> nodes, std::function<void(std::size_t)> execute,
-                                 std::function<void(std::exception_ptr)> complete,
+void thread_pool::dispatch_graph(std::span<const job_graph_node> nodes, ce::unique_func<void(std::size_t)> execute,
+                                 ce::unique_func<void(std::exception_ptr)> complete,
                                  own::shared_owner<job_graph_diagnostics> diagnostics)
 {
     auto state = snapshot();
@@ -771,7 +774,7 @@ void thread_pool::dispatch_graph(std::span<const job_graph_node> nodes, std::fun
     state->dispatch_graph(nodes, std::move(execute), std::move(complete), std::move(diagnostics));
 }
 
-void thread_pool::assist_until(const std::function<bool()>& ready)
+void thread_pool::assist_until(ce::func_ref<bool()> ready)
 {
     if (const auto state = snapshot())
     {

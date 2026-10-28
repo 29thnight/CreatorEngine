@@ -1,4 +1,5 @@
-﻿#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+﻿#include "../../../../../../Engine/Containers/ContainerAPI.h"
+#include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
 #else
@@ -409,7 +410,7 @@ bool DX12Test::RunSSGITest(std::string& outLog)
             passed = false;
         }
 
-        std::vector<double> sweepHits;
+        ce::dynamic_array<double> sweepHits;
 
         // ── 여러 프레임 돌린다 ──
         //
@@ -563,7 +564,7 @@ bool DX12Test::RunSSGITest(std::string& outLog)
         // RGBA history whether each is preceded by an abandoned preparation,
         // declaration or fully recorded graph. The abandoned camera differs,
         // so accidental previous-camera promotion is observable as well.
-        const auto sequence = [&](int abortStage, std::vector<float>& pixels, EnhancedSSGIPass* selected = nullptr, EnhancedSSGIPass* other = nullptr, RHIReadback* otherReadback = nullptr, unsigned frameCount = 8, bool resetOther = false) {
+        const auto sequence = [&](int abortStage, ce::dynamic_array<float>& pixels, EnhancedSSGIPass* selected = nullptr, EnhancedSSGIPass* other = nullptr, RHIReadback* otherReadback = nullptr, unsigned frameCount = 8, bool resetOther = false) {
             auto& pass = selected ? *selected : ssgi;
             pass.ResetHistory();
             for (unsigned frame = 0; frame < frameCount; ++frame)
@@ -676,11 +677,11 @@ bool DX12Test::RunSSGITest(std::string& outLog)
         };
         if (passed)
         {
-            std::vector<float> reference;
+            ce::dynamic_array<float> reference;
             passed = sequence(-1,reference);
             for (int abortStage=0;abortStage<4 && passed;++abortStage)
             {
-                std::vector<float> recovered;
+                ce::dynamic_array<float> recovered;
                 passed = sequence(abortStage,recovered);
                 float maximumError = 0.f;
                 if (passed && recovered.size() == reference.size())
@@ -708,7 +709,7 @@ bool DX12Test::RunSSGITest(std::string& outLog)
             RHIReadback otherReadback{};
             bool ok = other.Initialize(frameContext, error) &&
                 resources.CreateReadback(giW, giH, EnhancedSSGIPass::kGIFormat, 1, otherReadback, error);
-            std::vector<float> isolatedA, isolatedB, interleavedA, interleavedB;
+            ce::dynamic_array<float> isolatedA, isolatedB, interleavedA, interleavedB;
             ok = ok && sequence(-1, isolatedA);
             const auto savedCamera = camera;
             camera.view.m[3][0] += 0.35f;
@@ -787,7 +788,7 @@ bool DX12Test::RunSSGITest(std::string& outLog)
             };
             for (const auto& test : cases)
             {
-                std::vector<float> warm;
+                ce::dynamic_array<float> warm;
                 if (!sequence(-1,warm)) { passed=false; break; }
                 auto context = frameContext;
                 context.width=test.width;
@@ -833,7 +834,7 @@ bool DX12Test::RunSSGITest(std::string& outLog)
                 const uint32_t h=test.height/EnhancedSSGIPass::kResolutionDivisor;
                 RHIReadback capture{};
                 ok=ok && resources.CreateReadback(w,h,EnhancedSSGIPass::kGIFormat,1,capture,error);
-                const auto render=[&](EnhancedSSGIPass& pass,bool reset,std::vector<float>& first,std::vector<float>& last) {
+                const auto render=[&](EnhancedSSGIPass& pass,bool reset,ce::dynamic_array<float>& first,ce::dynamic_array<float>& last) {
                     for (uint32_t f=0;f<kTestFrames;++f)
                     {
                         context.temporalFrame.realFrameId=f+1;
@@ -863,7 +864,7 @@ bool DX12Test::RunSSGITest(std::string& outLog)
                     }
                     return true;
                 };
-                std::vector<float> first,last,freshFirst,freshLast;
+                ce::dynamic_array<float> first,last,freshFirst,freshLast;
                 ok=ok && render(ssgi,test.reset,first,last);
                 EnhancedSSGIPass fresh;
                 ok=ok && fresh.Initialize(context,error);
@@ -1012,7 +1013,7 @@ bool DX12Test::RunSSGITest(std::string& outLog)
 
             outLog += "[3/3] 필터 스윕 — 시그마/지수 → 이웃 차이(리졸브 → 필터)\n";
 
-            std::vector<double> reductions;
+            ce::dynamic_array<double> reductions;
 
             for (const FilterCase& filterCase : cases)
             {
@@ -1137,7 +1138,7 @@ bool DX12Test::RunSSGITest(std::string& outLog)
         RHIReadback compositeReadback{};
         if (!resources.CreateReadback(kWidth, kHeight, EnhancedSSGIPass::kGIFormat,
             1, compositeReadback, error)) passed = false;
-        std::vector<double> gains;
+        ce::dynamic_array<double> gains;
         const float metallicCases[] = { 0.f, 0.5f, 1.f, -1.f, 0.f };
         for (uint32_t test = 0; test < 5 && passed; ++test)
         {

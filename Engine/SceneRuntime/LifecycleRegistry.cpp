@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
 #include "LifecycleRegistry.h"
 #include "ComponentTypeUUID.h"
 
@@ -37,7 +38,7 @@ namespace Lifecycle
 {
     namespace
     {
-        std::unordered_map<size_t, uint16_t> g_masks;
+        ce::engine_node_map<size_t, uint16_t> g_masks;
     }
 
     void Registry::Store(size_t typeID, uint16_t mask)

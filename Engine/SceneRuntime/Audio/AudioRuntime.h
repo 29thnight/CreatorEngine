@@ -1,4 +1,7 @@
+#include "../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineNodeSet.h"
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "AudioBackend.h"
@@ -69,7 +72,7 @@ namespace wave
         [[nodiscard]] bool LoadCookedClip(
             const experiment::cooked::CookedAudioClipSource& source) override;
         void UnloadClip(const ClipKey& key) override;
-        [[nodiscard]] std::vector<ClipKey> ListClipKeys() const override;
+        [[nodiscard]] ce::dynamic_array<ClipKey> ListClipKeys() const override;
 
         void Update(float deltaSeconds) override;
 
@@ -102,11 +105,11 @@ namespace wave
 
         // 클립 목록의 정본은 런타임이 든다 — 백엔드마다 "무엇을 적재했는가" 를
         // 되물을 수 있어야 할 이유가 없고, 에디터 피커는 백엔드와 무관해야 한다.
-        std::unordered_set<ClipKey> m_clips;
+        ce::engine_node_set<ClipKey> m_clips;
 
-        std::unordered_map<std::uint16_t, Limit> m_busLimits;
-        std::unordered_map<std::uint32_t, Limit> m_concurrencyLimits;
-        std::unordered_map<std::uint16_t, float> m_busVolumes;
+        ce::engine_node_map<std::uint16_t, Limit> m_busLimits;
+        ce::engine_node_map<std::uint32_t, Limit> m_concurrencyLimits;
+        ce::engine_node_map<std::uint16_t, float> m_busVolumes;
         ListenerState m_listener{};
         std::size_t m_physicalLimit{ 0u };
         StealPolicy m_masterPolicy{ StealPolicy::LowestPriority };

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -89,7 +90,7 @@ namespace experiment
 
     void MaterialInstance::SetKeywordSelectionOverrides(std::span<const std::uint16_t> selections)
     {
-        std::vector<std::uint16_t> candidate(selections.begin(), selections.end());
+        ce::dynamic_array<std::uint16_t> candidate(selections.begin(), selections.end());
         keywordSelectionOverrides_ = std::move(candidate);
         keywordOverrides_.clear();
         ++revision_;

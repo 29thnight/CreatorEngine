@@ -1,7 +1,7 @@
 #pragma once
 
 #include "RenderBackend.h"
-#include "RenderPassSettings.h"
+#include "RenderSettings/RenderPassSettings.h"
 #include "TemporalProductSettings.h"
 
 #include "../Foundation/StandardLibrary.h"

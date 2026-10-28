@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -88,7 +89,7 @@ public:
         uint32_t sliceX{ 1 };
         uint32_t sliceY{ 1 };
         int32_t  sliceNum{ 0 };
-        std::array<std::size_t, 3> texturePinIndices{ TextureFramePins::InvalidIndex,
+        ce::fixed_array<std::size_t, 3> texturePinIndices{ TextureFramePins::InvalidIndex,
             TextureFramePins::InvalidIndex, TextureFramePins::InvalidIndex };
     };
 
@@ -117,14 +118,14 @@ public:
 
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
     void Shutdown() override;
-    std::array<RGHandle, 5> DeclareTemporal(EnhancedRenderGraph&, const EnhancedFrameContext&, std::array<RGHandle, 5>);
+    ce::fixed_array<RGHandle, 5> DeclareTemporal(EnhancedRenderGraph&, const EnhancedFrameContext&, ce::fixed_array<RGHandle, 5>);
 
     /// 덧칠 대상. GBuffer 출력을 그대로 받는다 — 데칼은 새 타깃을 만들지 않고
     /// 이미 그려진 GBuffer에 얹는다.
     void SetInputs(const SceneSurfaceTargets::Outputs& inputs) { m_inputs = inputs; }
 
     /// 이번 프레임에 그릴 데칼. PrepareFrame이 텍스처를 올리고 배치를 짠다.
-    void SetDecals(const std::vector<Item>& decals,
+    void SetDecals(const ce::dynamic_array<Item>& decals,
         own::shared_owner<TextureFramePins> texturePins = {})
     {
         m_decals = decals;
@@ -133,7 +134,7 @@ public:
 
     bool HasPreparedDecals() const { return !m_batches.empty(); }
     const SceneSurfaceTargets::Outputs& GetOutputs() const { return m_outputs; }
-    std::array<RGHandle, 3> GetBaseline() const
+    ce::fixed_array<RGHandle, 3> GetBaseline() const
     {
         return { m_copiedDiffuse, m_copiedOrm, m_copiedNormal };
     }
@@ -153,7 +154,7 @@ private:
     GpuGeometryVisibility m_visibility;
     own::shared_owner<const GpuGeometryVisibility::Frame> m_visibilityFrame;
     bool m_gpuVisibilityEnabled{ false };
-    std::vector<math::vector4> m_visibilitySpheres;
+    ce::dynamic_array<math::vector4> m_visibilitySpheres;
 
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
 
@@ -184,7 +185,7 @@ private:
         // 묶음의 정체성은 올라간 자원이 아니라 원본 포인터로 판단한다.
         // 업로드가 실패하거나 아직 안 된 텍스처도 서로 같고 다름은 정해지고,
         // 그래야 배칭이 업로드 성공 여부에 흔들리지 않는다.
-        std::array<std::size_t, 3> texturePinIndices{ TextureFramePins::InvalidIndex,
+        ce::fixed_array<std::size_t, 3> texturePinIndices{ TextureFramePins::InvalidIndex,
             TextureFramePins::InvalidIndex, TextureFramePins::InvalidIndex };
         std::uint64_t textureIds[3]{};
         RHITextureHandle textures[3]{};
@@ -194,13 +195,13 @@ private:
 
     SceneSurfaceTargets::Outputs m_inputs{};
     SceneSurfaceTargets::Outputs m_outputs{};
-    std::vector<Item>            m_decals;
+    ce::dynamic_array<Item>            m_decals;
     own::shared_owner<TextureFramePins> m_texturePins;
     bool                         m_keepAlive{ false };
 
     // PrepareFrame이 채우고 Record가 읽는다.
-    std::vector<InstanceData> m_instances;
-    std::vector<Batch>        m_batches;
+    ce::dynamic_array<InstanceData> m_instances;
+    ce::dynamic_array<Batch>        m_batches;
 
     // 사본 셋. 정말로 읽으면서 쓰는 대상이라 사본이 필요하다.
     RGHandle m_copiedDiffuse;

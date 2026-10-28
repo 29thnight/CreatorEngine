@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineStorage.h"
+#include "../Containers/ContainerAPI.h"
 #include "ProfileCaptureFile.h"
 
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -15,7 +17,7 @@ import "Creator.WinAPI.h";
 // 유니티 빌드에서 다른 파일의 내부 함수와 충돌하지 않도록 이름 있는 네임스페이스를 쓴다.
 namespace ce::detail::recording_file_impl
 {
-    constexpr std::array<char, 8> kMagic{'C', 'E', 'P', 'R', 'O', 'F', '\0', '\0'};
+    constexpr ce::fixed_array<char, 8> kMagic{'C', 'E', 'P', 'R', 'O', 'F', '\0', '\0'};
     constexpr std::uint32_t kRecordMagic = 0x4B435043; // CPCK, little-endian
     constexpr std::size_t kHeaderBytes = 16;
     constexpr std::size_t kEnvelopeBytes = 32;
@@ -41,7 +43,7 @@ namespace ce::detail::recording_file_impl
         // 생산자 경로 밖에서 한 번만 만든다.
         static const auto table = []
         {
-            std::array<std::uint32_t, 256> result{};
+            ce::fixed_array<std::uint32_t, 256> result{};
             for (std::uint32_t i = 0; i < 256; ++i)
             {
                 std::uint32_t entry = i;
@@ -67,7 +69,7 @@ namespace ce::detail::recording_file_impl
 
     struct bytes_writer
     {
-        std::vector<std::byte> bytes;
+        ce::dynamic_array<std::byte> bytes;
         template<typename T>
         void put(T value)
         {
@@ -115,7 +117,7 @@ namespace ce::detail::recording_file_impl
                                               static_cast<std::streamsize>(bytes.size())));
     }
 
-    std::vector<std::byte> file_header()
+    ce::dynamic_array<std::byte> file_header()
     {
         bytes_writer result;
         for (char value : kMagic)
@@ -155,7 +157,7 @@ namespace ce::detail::recording_file_impl
         std::uint32_t type = 0;
         std::uint64_t sequence = 0;
         std::uint64_t next = 0;
-        std::vector<std::byte> payload;
+        ce::dynamic_array<std::byte> payload;
     };
 
     std::expected<disk_record, capture_file_error> read_record(std::ifstream& input, std::uint64_t offset,
@@ -165,7 +167,7 @@ namespace ce::detail::recording_file_impl
         {
             return std::unexpected(capture_file_error::truncated);
         }
-        std::array<std::byte, kEnvelopeBytes> header{};
+        ce::fixed_array<std::byte, kEnvelopeBytes> header{};
         if (!read_at(input, offset, header))
         {
             return std::unexpected(capture_file_error::open_failed);
@@ -235,7 +237,7 @@ namespace ce::detail::recording_file_impl
         return bytes;
     }
 
-    std::vector<std::byte> encode_metadata(const capture_session& capture)
+    ce::dynamic_array<std::byte> encode_metadata(const capture_session& capture)
     {
         capture_session metadata({}, {capture.threads().begin(), capture.threads().end()},
                                  {capture.markers().begin(), capture.markers().end()}, capture.environment(),
@@ -243,7 +245,7 @@ namespace ce::detail::recording_file_impl
         return encode_capture(metadata);
     }
 
-    std::expected<std::vector<std::byte>, capture_file_error> encode_frame(const frame_record& frame)
+    std::expected<ce::dynamic_array<std::byte>, capture_file_error> encode_frame(const frame_record& frame)
     {
         constexpr std::size_t header_bytes = kFrameBytes + sizeof(std::uint32_t);
         if (frame.events.size() > (kMaximumRecordBytes - header_bytes) / kEventBytes ||
@@ -316,7 +318,7 @@ namespace ce::detail::recording_file_impl
         const bool allow_presenter = file_version >= 7;
         const bool allow_rhi = file_version == kRecordingFileVersion;
         bytes_reader input{payload};
-        std::bitset<65536> thread_slots;
+        ce::fixed_bitset<65536> thread_slots;
         for (const auto& thread : metadata.threads())
         {
             if (thread.slot >= thread_slots.size())
@@ -460,7 +462,7 @@ namespace ce::detail::recording_file_impl
             return std::unexpected(capture_file_error::malformed);
         }
         std::uint32_t seen = 0;
-        std::array<std::pair<std::uint64_t, std::uint64_t>, 7> ranges{};
+        ce::fixed_array<ce::pair<std::uint64_t, std::uint64_t>, 7> ranges{};
         for (std::uint32_t index = 0; index < count; ++index)
         {
             bytes_reader entry{payload.subspan(16 + index * 32, 32)};
@@ -520,7 +522,7 @@ namespace ce::detail::recording_file_impl
         {
             return result;
         }
-        std::array<bool, 65536> slots{};
+        ce::fixed_array<bool, 65536> slots{};
         for (const auto& thread : (*result)->threads())
         {
             if (thread.slot >= slots.size() || slots[thread.slot])
@@ -532,7 +534,7 @@ namespace ce::detail::recording_file_impl
         return result;
     }
 
-    std::vector<std::byte> encode_footer(const recording_status& status, bool complete, std::uint32_t unacked)
+    ce::dynamic_array<std::byte> encode_footer(const recording_status& status, bool complete, std::uint32_t unacked)
     {
         bytes_writer output;
         output.put(static_cast<std::uint8_t>(complete));
@@ -603,7 +605,7 @@ namespace ce
         recording_options options;
         mutable std::mutex mutex;
         std::condition_variable wake;
-        std::deque<std::pair<capture_session_ptr, std::uint64_t>> queue;
+        ce::segmented_deque<ce::pair<capture_session_ptr, std::uint64_t>> queue;
         recording_status status;
         std::thread worker;
         capture_session_ptr active_batch;
@@ -667,7 +669,7 @@ namespace ce
                 }
                 std::uint64_t written = header.size();
                 std::uint64_t sequence = 0;
-                std::vector<std::byte> last_metadata;
+                ce::dynamic_array<std::byte> last_metadata;
                 {
                     std::lock_guard lock(mutex);
                     status.written_bytes = written;
@@ -679,7 +681,7 @@ namespace ce
                 auto last_flush = std::chrono::steady_clock::now();
                 for (;;)
                 {
-                    std::pair<capture_session_ptr, std::uint64_t> entry;
+                    ce::pair<capture_session_ptr, std::uint64_t> entry;
                     bool finalize = false;
                     bool flush = false;
                     {
@@ -1009,8 +1011,8 @@ namespace ce
     {
         std::filesystem::path path;
         capture_session_ptr metadata;
-        std::vector<recording_overview_bin> bins;
-        std::vector<std::uint64_t> offsets;
+        ce::dynamic_array<recording_overview_bin> bins;
+        ce::dynamic_array<std::uint64_t> offsets;
         std::uint64_t stride = 1;
         std::uint64_t frames = 0;
         std::uint64_t valid_bytes = 0;
@@ -1027,9 +1029,9 @@ namespace ce
         std::uint64_t legacy_frames_end = 0;
         std::uint64_t legacy_counters_offset = 0;
         std::uint64_t legacy_counters_end = 0;
-        std::vector<std::uint64_t> legacy_counter_offsets;
+        ce::dynamic_array<std::uint64_t> legacy_counter_offsets;
         std::uint64_t legacy_render_measurements_end = 0;
-        std::vector<std::uint64_t> legacy_render_measurement_offsets;
+        ce::dynamic_array<std::uint64_t> legacy_render_measurement_offsets;
 
         void add_frame(recording_overview_bin bin, std::uint64_t offset)
         {
@@ -1084,7 +1086,7 @@ namespace ce::detail::recording_file_impl
         std::uint32_t checksum = 0;
     };
 
-    std::expected<std::vector<legacy_chunk>, capture_file_error>
+    std::expected<ce::dynamic_array<legacy_chunk>, capture_file_error>
     legacy_table(std::ifstream& input, std::uint64_t size, std::uint32_t count,
                  std::uint32_t format_version, std::stop_token cancel)
     {
@@ -1096,12 +1098,12 @@ namespace ce::detail::recording_file_impl
         {
             return std::unexpected(capture_file_error::truncated);
         }
-        std::vector<legacy_chunk> chunks;
+        ce::dynamic_array<legacy_chunk> chunks;
         std::uint32_t seen = 0;
-        std::array<std::byte, 64 * 1024> scratch{};
+        ce::fixed_array<std::byte, 64 * 1024> scratch{};
         for (std::uint32_t index = 0; index < count; ++index)
         {
-            std::array<std::byte, 32> bytes{};
+            ce::fixed_array<std::byte, 32> bytes{};
             if (!read_at(input, kHeaderBytes + index * 32ull, bytes))
             {
                 return std::unexpected(capture_file_error::open_failed);
@@ -1181,7 +1183,7 @@ namespace ce::detail::recording_file_impl
     std::expected<capture_session_ptr, capture_file_error>
     legacy_metadata(std::ifstream& input, std::span<const legacy_chunk> chunks)
     {
-        std::vector<std::pair<legacy_chunk, std::vector<std::byte>>> metadata;
+        ce::dynamic_array<ce::pair<legacy_chunk, ce::dynamic_array<std::byte>>> metadata;
         std::uint64_t total = 0;
         for (auto chunk : chunks)
         {
@@ -1194,7 +1196,7 @@ namespace ce::detail::recording_file_impl
             {
                 return std::unexpected(capture_file_error::resource_limit);
             }
-            std::vector<std::byte> bytes(static_cast<std::size_t>(chunk.size));
+            ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(chunk.size));
             if (!read_at(input, chunk.offset, bytes))
             {
                 return std::unexpected(capture_file_error::open_failed);
@@ -1210,9 +1212,9 @@ namespace ce::detail::recording_file_impl
             }
             metadata.emplace_back(chunk, std::move(bytes));
         }
-        std::vector<std::byte> empty_frames(4);
+        ce::dynamic_array<std::byte> empty_frames(4);
         metadata.push_back({legacy_chunk{4, 2, 0, 4, crc(empty_frames)}, std::move(empty_frames)});
-        std::vector<std::byte> empty_measurements(4);
+        ce::dynamic_array<std::byte> empty_measurements(4);
         metadata.push_back({legacy_chunk{7, 3, 0, 4, crc(empty_measurements)}, std::move(empty_measurements)});
         bytes_writer result;
         for (char value : kMagic)
@@ -1249,7 +1251,7 @@ namespace ce::detail::recording_file_impl
     std::expected<legacy_frame_header, capture_file_error>
     read_legacy_frame(std::ifstream& input, std::uint64_t offset, std::uint64_t end, std::uint32_t version)
     {
-        std::array<std::byte, 32> bytes{};
+        ce::fixed_array<std::byte, 32> bytes{};
         if (offset > end || end - offset < bytes.size() || !read_at(input, offset, bytes))
         {
             return std::unexpected(capture_file_error::malformed);
@@ -1279,12 +1281,12 @@ namespace ce::detail::recording_file_impl
     decode_legacy_frame(std::ifstream& input, std::uint64_t offset, const legacy_frame_header& header,
                         std::uint32_t version, const capture_session& metadata)
     {
-        std::vector<std::byte> bytes(static_cast<std::size_t>(header.next - offset - 32));
+        ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(header.next - offset - 32));
         if (!read_at(input, offset + 32, bytes))
         {
             return std::unexpected(capture_file_error::open_failed);
         }
-        std::bitset<65536> thread_slots;
+        ce::fixed_bitset<65536> thread_slots;
         for (const auto& thread : metadata.threads())
         {
             if (thread.slot >= thread_slots.size())
@@ -1326,10 +1328,10 @@ namespace ce::detail::recording_file_impl
     std::expected<void, capture_file_error> read_render_measurements(
         std::ifstream& input, std::uint64_t offset, std::uint32_t count, std::uint32_t engine_frame,
         const capture_session& metadata, bool allow_presenter, bool allow_rhi, std::stop_token cancel,
-        std::vector<profile_render_measurement>* decoded = nullptr)
+        ce::dynamic_array<profile_render_measurement>* decoded = nullptr)
     {
         constexpr std::size_t batch_samples = 256;
-        std::array<std::byte, batch_samples * kRenderMeasurementWireBytes> buffer{};
+        ce::fixed_array<std::byte, batch_samples * kRenderMeasurementWireBytes> buffer{};
         if (decoded != nullptr)
         {
             decoded->reserve(count);
@@ -1437,7 +1439,7 @@ namespace ce
                 return std::unexpected(capture_file_error::open_failed);
             }
             const auto size = static_cast<std::uint64_t>(input.tellg());
-            std::array<std::byte, kHeaderBytes> header{};
+            ce::fixed_array<std::byte, kHeaderBytes> header{};
             if (size < header.size() || !read_at(input, 0, header))
             {
                 return std::unexpected(capture_file_error::truncated);
@@ -1480,7 +1482,7 @@ namespace ce
                 {
                     if (chunk.type == 4)
                     {
-                        std::array<std::byte, 4> bytes{};
+                        ce::fixed_array<std::byte, 4> bytes{};
                         if (chunk.size < 4 || !read_at(input, chunk.offset, bytes))
                         {
                             return std::unexpected(capture_file_error::malformed);
@@ -1522,7 +1524,7 @@ namespace ce
                     {
                         continue;
                     }
-                    std::array<std::byte, 12> bytes{};
+                    ce::fixed_array<std::byte, 12> bytes{};
                     if (chunk.size < bytes.size() || !read_at(input, chunk.offset, bytes))
                     {
                         return std::unexpected(capture_file_error::malformed);
@@ -1552,7 +1554,7 @@ namespace ce
                         {
                             state->legacy_counter_offsets[counter_bin++] = offset;
                         }
-                        std::array<std::byte, 8> counter_header{};
+                        ce::fixed_array<std::byte, 8> counter_header{};
                         if (offset > state->legacy_counters_end || state->legacy_counters_end - offset < 8 ||
                             !read_at(input, offset, counter_header))
                         {
@@ -1583,7 +1585,7 @@ namespace ce
                     {
                         continue;
                     }
-                    std::array<std::byte, 4> bytes{};
+                    ce::fixed_array<std::byte, 4> bytes{};
                     if (chunk.size < bytes.size() || !read_at(input, chunk.offset, bytes))
                     {
                         return std::unexpected(capture_file_error::malformed);
@@ -1610,7 +1612,7 @@ namespace ce
                         {
                             state->legacy_render_measurement_offsets[measurement_bin++] = offset;
                         }
-                        std::array<std::byte, 8> sample_header{};
+                        ce::fixed_array<std::byte, 8> sample_header{};
                         if (offset > state->legacy_render_measurements_end ||
                             state->legacy_render_measurements_end - offset < sample_header.size() ||
                             !read_at(input, offset, sample_header))
@@ -1786,7 +1788,7 @@ namespace ce
                 return std::unexpected(capture_file_error::resource_limit);
             }
             std::uint64_t remaining = max_bytes - base_bytes - static_cast<std::uint64_t>(count) * sizeof(frame_record);
-            std::vector<frame_record> frames;
+            ce::dynamic_array<frame_record> frames;
             frames.reserve(count);
             if (count != 0)
             {
@@ -1873,7 +1875,7 @@ namespace ce
                     const std::size_t known = state.metadata->counter_descriptors().empty() ? 5 : state.metadata->counter_descriptors().size();
                     for (std::uint64_t index = bin->first_ordinal; index < end_ordinal; ++index)
                     {
-                        std::array<std::byte, 8> header{};
+                        ce::fixed_array<std::byte, 8> header{};
                         if (counter_offset > state.legacy_counters_end || state.legacy_counters_end - counter_offset < 8 ||
                             !read_at(input, counter_offset, header))
                         {
@@ -1900,7 +1902,7 @@ namespace ce
                             frame.counters.reserve(samples);
                             for (std::uint32_t sample_index = 0; sample_index < samples; ++sample_index)
                             {
-                                std::array<std::byte, kCounterBytes> sample_buffer{};
+                                ce::fixed_array<std::byte, kCounterBytes> sample_buffer{};
                                 if (!read_at(input, counter_offset + sample_index * static_cast<std::uint64_t>(sample_bytes),
                                              std::span(sample_buffer).first(sample_bytes)))
                                 {
@@ -1937,7 +1939,7 @@ namespace ce
                         {
                             return std::unexpected(capture_file_error::canceled);
                         }
-                        std::array<std::byte, 8> header{};
+                        ce::fixed_array<std::byte, 8> header{};
                         if (sample_offset > state.legacy_render_measurements_end ||
                             state.legacy_render_measurements_end - sample_offset < header.size() ||
                             !read_at(input, sample_offset, header))
@@ -1977,11 +1979,11 @@ namespace ce
                 }
             }
             return std::make_shared<const capture_session>(
-                std::move(frames), std::vector<thread_info>(state.metadata->threads().begin(), state.metadata->threads().end()),
-                std::vector<capture_marker>(state.metadata->markers().begin(), state.metadata->markers().end()),
+                std::move(frames), ce::dynamic_array<thread_info>(state.metadata->threads().begin(), state.metadata->threads().end()),
+                ce::dynamic_array<capture_marker>(state.metadata->markers().begin(), state.metadata->markers().end()),
                 state.metadata->environment(), state.complete, state.unacked,
                 add(state.status.source_dropped_counters, state.status.dropped_counters),
-                std::vector<capture_counter>(state.metadata->counter_descriptors().begin(), state.metadata->counter_descriptors().end()));
+                ce::dynamic_array<capture_counter>(state.metadata->counter_descriptors().begin(), state.metadata->counter_descriptors().end()));
         }
         catch (const std::bad_alloc&)
         {
@@ -2027,7 +2029,7 @@ namespace ce
             };
             std::ifstream input(recording.path(), std::ios::binary);
             std::ofstream output(temporary, std::ios::binary | std::ios::trunc);
-            std::array<std::byte, 64 * 1024> scratch{};
+            ce::fixed_array<std::byte, 64 * 1024> scratch{};
             std::uint64_t remaining = recording.valid_bytes();
             if (!input || !output)
             {

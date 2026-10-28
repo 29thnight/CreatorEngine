@@ -1,3 +1,6 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "LXMaterialGraph.h"
 
 #include <ryml/ryml.hpp>
@@ -54,7 +57,7 @@ void CheckTree(ryml::ConstNodeRef node, unsigned depth = 0)
     {
         throw ArchiveError("Archive nesting, tags or aliases are unsupported");
     }
-    std::set<std::string> keys;
+    ce::engine_ordered_set<std::string> keys;
     for (auto child : node.children())
     {
         if (node.is_map() && !keys.insert(Text(child.key())).second)
@@ -242,14 +245,14 @@ LXSocketValue ReadValue(ryml::ConstNodeRef node)
         {
             throw ArchiveError("Invalid socket component count");
         }
-        std::array<double, 4> components{};
+        ce::fixed_array<double, 4> components{};
         for (std::size_t index = 0; index < value.num_children(); ++index)
         {
             components[index] = Number<double>(value[index]);
         }
         if (kind == "vector")
         {
-            return std::array<double, 3>{components[0], components[1], components[2]};
+            return ce::fixed_array<double, 3>{components[0], components[1], components[2]};
         }
         return components;
     }
@@ -293,7 +296,7 @@ void WriteValue(std::ostream& out, const LXSocketValue& value)
                 {
                     out << Quote(field);
                 }
-                else if constexpr (std::is_same_v<T, std::array<double, 3>> || std::is_same_v<T, std::array<double, 4>>)
+                else if constexpr (std::is_same_v<T, ce::fixed_array<double, 3>> || std::is_same_v<T, ce::fixed_array<double, 4>>)
                 {
                     out << '[';
                     for (std::size_t index = 0; index < field.size(); ++index)
@@ -466,12 +469,12 @@ void WriteGraph(std::ostream& out, const LXMaterialAsset& asset, const LXGraph& 
         << indent << '}';
 }
 
-bool HasErrors(const std::vector<Issue>& issues)
+bool HasErrors(const ce::dynamic_array<Issue>& issues)
 {
     return std::ranges::any_of(issues, [](const Issue& issue) { return issue.severity == Issue::Severity::Error; });
 }
 
-void CollectGraphs(const LXGraph& graph, std::map<Id, const LXGraph*>& scopes, unsigned depth = 0)
+void CollectGraphs(const LXGraph& graph, ce::engine_ordered_map<Id, const LXGraph*>& scopes, unsigned depth = 0)
 {
     if (depth > 16)
     {
@@ -787,11 +790,11 @@ Id LXMaterialAsset::CreateNode(const std::string& type, float x, float y, std::s
     return id;
 }
 
-Id LXMaterialAsset::CollapseToGroup(const std::vector<Id>& nodes, std::string name)
+Id LXMaterialAsset::CollapseToGroup(const ce::dynamic_array<Id>& nodes, std::string name)
 {
     const LXMaterialAsset before = *this;
     const LXGraph previous = graph;
-    std::map<Id, LXMaterialSocketState> socketStates;
+    ce::engine_ordered_map<Id, LXMaterialSocketState> socketStates;
     for (Id id : nodes)
     {
         if (const Node* node = graph.FindNode(id))
@@ -842,7 +845,7 @@ Id LXMaterialAsset::CollapseToGroup(const std::vector<Id>& nodes, std::string na
     // implicit geometry/UV inputs must retain their defaults inside the group.
     LXGraph body(*group.body);
     auto sockets = group.sockets;
-    std::set<Id> remove;
+    ce::engine_ordered_set<Id> remove;
     for (std::size_t index = 0; index < group.sockets.size(); ++index)
     {
         const auto& socket = group.sockets[index];
@@ -868,7 +871,7 @@ Id LXMaterialAsset::CollapseToGroup(const std::vector<Id>& nodes, std::string na
     }
     if (!remove.empty())
     {
-        std::erase_if(sockets, [&](const auto& socket) { return remove.contains(socket.id); });
+        ce::erase_if(sockets, [&](const auto& socket) { return remove.contains(socket.id); });
         if (!graph.UpdateGroup(group.id, group.name, body, std::move(sockets)))
         {
             *this = before;
@@ -890,7 +893,7 @@ LXMaterialSocketState LXMaterialAsset::SocketState(Id scope, const Pin& pin) con
         }
     }
     const LXGraph* owner = &graph;
-    std::map<Id, const LXGraph*> graphs{{0, &graph}};
+    ce::engine_ordered_map<Id, const LXGraph*> graphs{{0, &graph}};
     CollectGraphs(graph, graphs);
     if (graphs.contains(scope))
     {
@@ -925,7 +928,7 @@ LXMaterialNodeState LXMaterialAsset::NodeState(Id scope, const Node& node) const
     return {schema == definitions_.schemas.end() ? 1u : schema->second.revision};
 }
 
-std::vector<Issue> LXMaterialAsset::Validate() const
+ce::dynamic_array<Issue> LXMaterialAsset::Validate() const
 {
     auto issues = graph.Validate();
     if (!definitions_.nodes)
@@ -943,8 +946,8 @@ std::vector<Issue> LXMaterialAsset::Validate() const
     {
         issues.push_back({"material_output", "Active output is not a Material Output node", activeOutput});
     }
-    std::set<Id> parameterIds;
-    std::set<std::string> parameterNames;
+    ce::engine_ordered_set<Id> parameterIds;
+    ce::engine_ordered_set<std::string> parameterNames;
     for (const auto& parameter : blackboard)
     {
         if (!parameter.id || !parameterIds.insert(parameter.id).second || parameter.identifier.empty() ||
@@ -956,7 +959,7 @@ std::vector<Issue> LXMaterialAsset::Validate() const
             issues.push_back({"material_blackboard", "Invalid parameter identity, type, default or color space"});
         }
     }
-    std::map<Id, const LXGraph*> graphs{{0, &graph}};
+    ce::engine_ordered_map<Id, const LXGraph*> graphs{{0, &graph}};
     CollectGraphs(graph, graphs);
     for (const auto& [scope, owner] : graphs)
     {

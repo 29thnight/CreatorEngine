@@ -1,4 +1,6 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -95,7 +97,7 @@ public:
 
     struct PreparedCookedEnvironment
     {
-        std::array<own::shared_owner<const Texture>, 8> textures;
+        ce::fixed_array<own::shared_owner<const Texture>, 8> textures;
         assets::EnvironmentIdentity identity;
         uint32_t cubeSize{};
         uint32_t brdfSize{};
@@ -111,7 +113,7 @@ public:
     // Record copies in the current upload frame; publish only after its fence.
     bool QueueCookedCapture(const std::filesystem::path& file, const assets::EnvironmentIdentity& identity,
         std::string& error);
-    void WatchPreparationRejected(std::function<void()> rejected) { m_preparationRejected = std::move(rejected); }
+    void WatchPreparationRejected(ce::owned_func<void()> rejected) { m_preparationRejected = std::move(rejected); }
     bool FinishCookedCapture(uint64_t completedFence, std::string& error);
     bool HasPendingCookedCapture() const { return !m_cookedCaptures.empty() || m_cookedWrite.valid(); }
 
@@ -123,7 +125,7 @@ public:
     RHITextureHandle GetIrradianceMap() const { return m_irradianceHandle; }
     RHITextureHandle GetPrefilteredMap() const { return m_prefilteredHandle; }
     RHITextureHandle GetBrdfLut() const { return m_brdfLutHandle; }
-    std::array<RHITextureHandle,3> GetImportanceMaps() const
+    ce::fixed_array<RHITextureHandle,3> GetImportanceMaps() const
         { return {m_sceneImportanceRows,m_sceneImportanceMarginal,m_sceneImportanceSamples}; }
 
     uint32_t GetCubeSize() const { return m_cubeSize; }
@@ -131,10 +133,10 @@ public:
 
 private:
     struct CookedCaptureSlice { RHIReadback readback; uint32_t image{}, mip{}; };
-    std::array<own::shared_owner<const Texture>, 8> m_cookedTextures;
+    ce::fixed_array<own::shared_owner<const Texture>, 8> m_cookedTextures;
     struct CookedCapture
     {
-        std::vector<CookedCaptureSlice> slices;
+        ce::dynamic_array<CookedCaptureSlice> slices;
         std::filesystem::path path;
         assets::EnvironmentIdentity identity;
         uint64_t fence{};
@@ -143,18 +145,18 @@ private:
         uint32_t cube{}, brdf{}, sourceWidth{}, sourceHeight{}, sampleCount{};
     };
     // Selections may change while the preceding GPU copy/disk write is pending.
-    std::vector<CookedCapture> m_cookedCaptures;
+    ce::dynamic_array<CookedCapture> m_cookedCaptures;
     std::future<std::string> m_cookedWrite;
     void ReleaseTargets();
     struct TargetSnapshot
     {
-        std::array<RHITextureHandle, 12> handles;
-        std::array<own::shared_owner<const Texture>, 8> cooked;
+        ce::fixed_array<RHITextureHandle, 12> handles;
+        ce::fixed_array<own::shared_owner<const Texture>, 8> cooked;
         uint64_t generation{}, recording{}, completion{};
         bool waitForIdle{};
         uint32_t cube{}, brdf{}, importanceSize{}, importanceMip{};
     };
-    std::array<RHITextureHandle*, 12> Targets();
+    ce::fixed_array<RHITextureHandle*, 12> Targets();
     bool BeginReplacement(std::string& error);
     void RollbackReplacement();
     void RetireSnapshot(const TargetSnapshot& snapshot) noexcept;
@@ -165,9 +167,9 @@ private:
     void OnUploadAccepted(uint64_t recording, RHICompletionPoint completion) noexcept override;
     PassResourceRetirement m_retirement;
     std::optional<TargetSnapshot> m_previousTargets;
-    std::vector<TargetSnapshot> m_retiredOwners;
+    ce::dynamic_array<TargetSnapshot> m_retiredOwners;
     bool m_targetsWaitForIdle{};
-    std::function<void()> m_preparationRejected;
+    ce::owned_func<void()> m_preparationRejected;
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
     bool CreateTargets(uint32_t cubeSize, uint32_t brdfSize,
         std::string& outError);

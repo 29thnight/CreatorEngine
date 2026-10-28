@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 // PHASE 3.75 MBC8 — typed 재생 데이터(ModelSkeletonAsset·ModelAnimationAsset)의
 // 포즈 샘플러와 클립 계량.
@@ -44,12 +45,12 @@ namespace assets::animation
 
     // bone index → track. 범위 밖 bone은 무시한다(게시 검증이 이미 막는다).
     void BuildTrackTable(const ModelAnimationAsset& clip, std::size_t boneCount,
-        std::vector<const ModelAnimationTrack*>& outTable);
+        ce::dynamic_array<const ModelAnimationTrack*>& outTable);
 
     struct Pose final
     {
-        std::vector<math::matrix4x4> finals{};   // 게시 bone index 기준
-        std::vector<std::uint8_t> hasTrack{};
+        ce::dynamic_array<math::matrix4x4> finals{};   // 게시 bone index 기준
+        ce::dynamic_array<std::uint8_t> hasTrack{};
     };
 
     // 단일 순회 포즈 평가(parent < index 계약). 진단·검사 전용 — 제품 틱은

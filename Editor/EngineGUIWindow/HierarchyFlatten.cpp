@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "HierarchyFlatten.h"
 
 #include "Scene.h"
@@ -15,7 +16,7 @@ namespace
 	};
 }
 
-const std::vector<editor::hierarchy_flat_row>& editor::HierarchyFlatView::Rows(
+const ce::dynamic_array<editor::hierarchy_flat_row>& editor::HierarchyFlatView::Rows(
 	Scene* scene, const hierarchy_flat_key& key, const ImGuiTextFilter& filter)
 {
 	// revision 0 은 "아직 아무것도 못 봤다" 다 — 근거가 없으므로 믿지 않는다.
@@ -118,10 +119,10 @@ void editor::HierarchyFlatView::Rebuild(Scene* scene, const ImGuiTextFilter& fil
 	m_rows.push_back({ 0, 0, 0, hierarchy_row_kind::scene_group, true, true });
 
 	// Authoring order belongs to hierarchy children, never recycled storage slots.
-	std::vector<int> roots;
-	std::vector<int> dontDestroyRoots;
-	std::vector<int> orderedSlots;
-	std::vector<std::uint8_t> visited(static_cast<std::size_t>(count), 0);
+	ce::dynamic_array<int> roots;
+	ce::dynamic_array<int> dontDestroyRoots;
+	ce::dynamic_array<int> orderedSlots;
+	ce::dynamic_array<std::uint8_t> visited(static_cast<std::size_t>(count), 0);
 	if (auto* root = entityAt(0))
 	{
 		const auto& children = root->GetChildrenIndices();
@@ -173,11 +174,11 @@ void editor::HierarchyFlatView::Rebuild(Scene* scene, const ImGuiTextFilter& fil
 	{
 		m_matched.assign(static_cast<std::size_t>(count), 0);
 
-		std::vector<std::uint8_t> seen(static_cast<std::size_t>(count), 0);
-		std::vector<int> order;
+		ce::dynamic_array<std::uint8_t> seen(static_cast<std::size_t>(count), 0);
+		ce::dynamic_array<int> order;
 		order.reserve(static_cast<std::size_t>(count));
 
-		std::vector<int> stack;
+		ce::dynamic_array<int> stack;
 		for (auto it = dontDestroyRoots.rbegin(); it != dontDestroyRoots.rend(); ++it) stack.push_back(*it);
 		for (auto it = roots.rbegin(); it != roots.rend(); ++it) stack.push_back(*it);
 
@@ -222,11 +223,11 @@ void editor::HierarchyFlatView::Rebuild(Scene* scene, const ImGuiTextFilter& fil
 	// **부모와 무관하게** 모아 다시 그렸으므로, 일반 루트의 자손인 DDOL 엔티티가
 	// 두 번 그려질 수 있었다. 평탄 목록에서는 그러면 ImGui 식별자가 겹친다 —
 	// 처음 닿은 자리 하나만 남긴다.
-	std::vector<std::uint8_t> emitted(static_cast<std::size_t>(count), 0);
-	std::vector<visit> stack;
+	ce::dynamic_array<std::uint8_t> emitted(static_cast<std::size_t>(count), 0);
+	ce::dynamic_array<visit> stack;
 	int band = 0;
 
-	const auto emit = [&](const std::vector<int>& source, int baseDepth)
+	const auto emit = [&](const ce::dynamic_array<int>& source, int baseDepth)
 	{
 		for (auto it = source.rbegin(); it != source.rend(); ++it)
 			stack.push_back({ *it, baseDepth });

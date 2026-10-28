@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -80,7 +81,7 @@ bool DataSystem::PublishAuthoredTexture(const RuntimeAssetChange& change)
         {
             options.overrideIdentities.push_back(reference.key);
         }
-        std::vector<cooked::AssetManifestIssue> issues;
+        ce::dynamic_array<cooked::AssetManifestIssue> issues;
         AssetDepot::AssetMountId previousMount;
         {
             std::lock_guard lock(m_assetPreparationMutex);
@@ -119,7 +120,7 @@ bool DataSystem::PublishAuthoredTexture(const RuntimeAssetChange& change)
 namespace AssetDepot
 {
     bool ValidateAssetSetRuntimeCompatibility(const experiment::cooked::AssetSetManifest& manifest,
-        std::vector<experiment::cooked::AssetManifestIssue>& issues)
+        ce::dynamic_array<experiment::cooked::AssetManifestIssue>& issues)
     {
         namespace cooked = experiment::cooked;
         issues.clear();
@@ -185,7 +186,7 @@ AssetDepot::AssetMountId DataSystem::MountAssetSet(
     std::span<const std::byte> manifestBytes,
     own::shared_owner<const experiment::cooked::ArtifactByteSource> byteSource,
     const experiment::cooked::AssetSetMountOptions& options,
-    std::vector<experiment::cooked::AssetManifestIssue>& outIssues,
+    ce::dynamic_array<experiment::cooked::AssetManifestIssue>& outIssues,
     AssetDepot::AssetMountId replaceMount)
 {
     namespace cooked = experiment::cooked;
@@ -276,7 +277,7 @@ AssetDepot::AssetMountId DataSystem::MountAssetSet(
 }
 
 bool DataSystem::UnmountAssetSet(AssetDepot::AssetMountId mountId,
-    std::vector<experiment::cooked::AssetManifestIssue>& outIssues)
+    ce::dynamic_array<experiment::cooked::AssetManifestIssue>& outIssues)
 {
     namespace cooked = experiment::cooked;
     outIssues.clear();
@@ -337,7 +338,7 @@ bool DataSystem::UnmountAssetSet(AssetDepot::AssetMountId mountId,
     return true;
 }
 
-std::vector<experiment::cooked::TypedAssetReference> DataSystem::ListAssetSetRoots(
+ce::dynamic_array<experiment::cooked::TypedAssetReference> DataSystem::ListAssetSetRoots(
     AssetDepot::AssetMountId mountId, experiment::cooked::CookedAssetKind kind) const
 {
     own::shared_owner<const experiment::cooked::CookedAssetCatalog> snapshot;
@@ -351,5 +352,5 @@ std::vector<experiment::cooked::TypedAssetReference> DataSystem::ListAssetSetRoo
         snapshot = m_cookedCatalog;
     }
     return snapshot ? snapshot->ListRoots(mountId, kind)
-        : std::vector<experiment::cooked::TypedAssetReference>{};
+        : ce::dynamic_array<experiment::cooked::TypedAssetReference>{};
 }

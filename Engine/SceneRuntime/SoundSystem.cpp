@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -70,7 +71,7 @@ void SoundSystem::Register(SoundComponent* sound)
 
 void SoundSystem::Unregister(SoundComponent* sound)
 {
-    std::erase(m_sounds, sound);
+    ce::erase(m_sounds, sound);
 }
 
 void SoundSystem::Register(AudioListenerComponent* listener)
@@ -83,7 +84,7 @@ void SoundSystem::Register(AudioListenerComponent* listener)
 
 void SoundSystem::Unregister(AudioListenerComponent* listener)
 {
-    std::erase(m_listeners, listener);
+    ce::erase(m_listeners, listener);
 }
 
 void SoundSystem::OwnerRemoved(std::uint64_t ownerId)
@@ -115,7 +116,7 @@ wave::ClipKey SoundSystem::ResolveAsset(std::string_view text, wave::SoundSource
 
 void SoundSystem::RefreshClipKeys()
 {
-    std::vector<std::string> keys;
+    ce::dynamic_array<std::string> keys;
     if (m_playback)
     {
         for (const auto& key : m_playback->Audio().ListClipKeys())
@@ -131,7 +132,7 @@ void SoundSystem::RefreshClipKeys()
     m_clipKeys = std::move(keys);
 }
 
-std::vector<std::string> SoundSystem::ClipKeys() const
+ce::dynamic_array<std::string> SoundSystem::ClipKeys() const
 {
     std::lock_guard lock(m_clipMutex);
     return m_clipKeys;
@@ -211,7 +212,7 @@ void SoundSystem::Update(float tick, bool recordLifecycle)
 {
     if (m_playback && m_scene)
     {
-        std::erase_if(m_attached, [&](const AttachedPlayback& attached)
+        ce::erase_if(m_attached, [&](const AttachedPlayback& attached)
         {
             if (!m_playback->IsAlive(attached.playback))
             {

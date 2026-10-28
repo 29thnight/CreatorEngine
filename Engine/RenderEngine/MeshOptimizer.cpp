@@ -1,8 +1,9 @@
+#include "../Containers/ContainerAPI.h"
 #include "MeshOptimizer.h"
 #include <meshoptimizer.h>
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 
-void RecalculateNormalsAndTangents(std::vector<Vertex>& vertices, const std::vector<uint32>& indices)
+void RecalculateNormalsAndTangents(ce::dynamic_array<Vertex>& vertices, const ce::dynamic_array<uint32>& indices)
 {
     if (vertices.empty() || indices.empty())
     {
@@ -10,9 +11,9 @@ void RecalculateNormalsAndTangents(std::vector<Vertex>& vertices, const std::vec
     }
 
     // 임시 저장소를 만들어 노멀과 탄젠트를 누적합니다.
-    std::vector<math::vector3> newNormals(vertices.size(), math::vector3::zero());
-    std::vector<math::vector3> newTangents(vertices.size(), math::vector3::zero());
-    std::vector<math::vector3> newBitangents(vertices.size(), math::vector3::zero());
+    ce::dynamic_array<math::vector3> newNormals(vertices.size(), math::vector3::zero());
+    ce::dynamic_array<math::vector3> newTangents(vertices.size(), math::vector3::zero());
+    ce::dynamic_array<math::vector3> newBitangents(vertices.size(), math::vector3::zero());
 
     // 모든 삼각형을 순회하며 노멀과 탄젠트를 계산하고 각 정점에 누적합니다.
     for (size_t i = 0; i < indices.size(); i += 3)
@@ -77,7 +78,7 @@ void RecalculateNormalsAndTangents(std::vector<Vertex>& vertices, const std::vec
     }
 }
 
-MeshOptimizer::LOD::Optional MeshOptimizer::GenerateLODs(const Mesh& originalMesh, const std::vector<float>& lodThresholds)
+MeshOptimizer::LOD::Optional MeshOptimizer::GenerateLODs(const Mesh& originalMesh, const ce::dynamic_array<float>& lodThresholds)
 {
     if (originalMesh.GetVertices().empty() || originalMesh.GetIndices().empty() || lodThresholds.empty())
     {
@@ -86,14 +87,14 @@ MeshOptimizer::LOD::Optional MeshOptimizer::GenerateLODs(const Mesh& originalMes
 
     try
     {
-        std::vector<LOD> lods;
+        ce::dynamic_array<LOD> lods;
         lods.reserve(lodThresholds.size());
 
-        const std::vector<Vertex>& sourceVertices = originalMesh.GetVertices();
-        const std::vector<uint32>& sourceIndices = originalMesh.GetIndices();
+        const ce::dynamic_array<Vertex>& sourceVertices = originalMesh.GetVertices();
+        const ce::dynamic_array<uint32>& sourceIndices = originalMesh.GetIndices();
 
-        std::vector<uint32> simplifiedIndices(sourceIndices.size());
-        std::vector<Vertex> simplifiedVertices(sourceVertices.size());
+        ce::dynamic_array<uint32> simplifiedIndices(sourceIndices.size());
+        ce::dynamic_array<Vertex> simplifiedVertices(sourceVertices.size());
 
         for (float threshold : lodThresholds)
         {
@@ -151,7 +152,7 @@ MeshOptimizer::LOD::Optional MeshOptimizer::GenerateLODs(const Mesh& originalMes
 	}
 }
 
-void MeshOptimizer::OptimizeMesh(std::vector<Vertex>& vertices, std::vector<uint32>& indices)
+void MeshOptimizer::OptimizeMesh(ce::dynamic_array<Vertex>& vertices, ce::dynamic_array<uint32>& indices)
 {
     if (vertices.empty() || indices.empty())
     {

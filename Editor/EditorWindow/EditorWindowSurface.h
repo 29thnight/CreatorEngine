@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 // 에디터 창 표면 정의 (PHASE 21 M4 · 계획서 부록 B.3) — std만 의존한다.
 //
@@ -115,13 +116,13 @@ namespace editor
         count,
     };
 
-    inline constexpr std::array all_window_roles{
+    inline constexpr ce::fixed_array all_window_roles{
         window_role::central,
         window_role::panel,
         window_role::transient,
     };
 
-    inline constexpr std::array all_dock_slots{
+    inline constexpr ce::fixed_array all_dock_slots{
         dock_slot::center,
         dock_slot::left,
         dock_slot::right_upper,
@@ -130,13 +131,13 @@ namespace editor
         dock_slot::floating,
     };
 
-    inline constexpr std::array all_window_stackings{
+    inline constexpr ce::fixed_array all_window_stackings{
         window_stacking::normal,
         window_stacking::display_back,
         window_stacking::focus_front,
     };
 
-    inline constexpr std::array all_size_policies{
+    inline constexpr ce::fixed_array all_size_policies{
         size_policy::none,
         size_policy::first_use_ever,
         size_policy::on_appearing,

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
@@ -51,6 +52,6 @@ public:
     bool        IsValid() const { return !m_bytes.empty(); }
 
 private:
-    std::vector<std::uint8_t> m_bytes;
+    ce::dynamic_array<std::uint8_t> m_bytes;
 };
 

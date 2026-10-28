@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -70,7 +71,7 @@ namespace Meta::Typed
             {
                 return (CanSnapshotImmutable<Bases, Seen..., V>() && ...);
             }(reflgen::direct_bases_t<V>{});
-            const bool fields = std::apply([](const auto&... field)
+            const bool fields = ce::apply([](const auto&... field)
             {
                 return (CanSnapshotImmutable<
                     typename std::remove_cvref_t<decltype(field)>::value_type, Seen..., V>() && ...);
@@ -238,7 +239,7 @@ namespace Meta::Typed
 				{
 					(ReadRecordFields<Bases>(reader, static_cast<Bases&>(obj), changed, self), ...);
 				}(reflgen::direct_bases_t<T>{});
-				std::apply([&](const auto&... fields) { (ReadRecordField(reader, obj, fields, changed, self), ...); },
+				ce::apply([&](const auto&... fields) { (ReadRecordField(reader, obj, fields, changed, self), ...); },
 					reflgen::schema_of<T>.fields);
 			}
 		}

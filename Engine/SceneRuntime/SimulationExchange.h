@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include <array>
 #include <cstdint>
@@ -31,7 +32,7 @@ namespace Runtime
     {
         std::uint64_t epoch{}, tick{}, sequence{};
         std::uint32_t kind{}, bytes{};
-        std::array<std::byte, 64> payload{};
+        ce::fixed_array<std::byte, 64> payload{};
     };
     // Kind/schema 1 is an explicitly local bridge, not a replicated entity ID.
     struct LocalPositionValue { std::uint32_t index{}, generation{}; float x{}, y{}, z{}; };
@@ -105,7 +106,7 @@ namespace Runtime
         template<class Apply> TickResult Begin(std::uint64_t tick, Apply&& fallback)
         {
             if (!Owner()) return TickResult::WrongThread;
-            std::array<TickCommand, command_capacity> batch{};
+            ce::fixed_array<TickCommand, command_capacity> batch{};
             std::size_t count = 0;
             std::shared_ptr<SimulationAdapter> adapter;
             {
@@ -190,13 +191,13 @@ namespace Runtime
         }
     private:
         bool Owner() const { return owner_ == std::this_thread::get_id(); }
-        struct Snapshot { TickSnapshotHeader header{}; std::array<std::byte, snapshot_bytes> payload{}; };
+        struct Snapshot { TickSnapshotHeader header{}; ce::fixed_array<std::byte, snapshot_bytes> payload{}; };
         std::thread::id owner_;
         mutable std::mutex mutex_;
         TickStatus status_{};
         std::uint64_t next_{};
-        std::array<TickCommand, command_capacity> commands_{};
-        std::array<Snapshot, snapshot_capacity> snapshots_{};
+        ce::fixed_array<TickCommand, command_capacity> commands_{};
+        ce::fixed_array<Snapshot, snapshot_capacity> snapshots_{};
         Snapshot staged_{};
         bool ready_{};
         std::shared_ptr<SimulationAdapter> adapter_;

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "ModelVertexLayout.h"
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -33,7 +34,7 @@ inline std::uint32_t Word(std::span<const std::byte> bytes, std::size_t offset)
     }
     return value;
 }
-inline void Put(std::vector<std::byte>& bytes, std::size_t offset, std::uint32_t value)
+inline void Put(ce::dynamic_array<std::byte>& bytes, std::size_t offset, std::uint32_t value)
 {
     Require(offset <= bytes.size() && bytes.size() - offset >= 4, "Quantized write range");
     if constexpr (std::endian::native == std::endian::little)
@@ -42,7 +43,7 @@ inline void Put(std::vector<std::byte>& bytes, std::size_t offset, std::uint32_t
         for (unsigned i = 0; i < 4; ++i)
             bytes[offset + i] = std::byte((value >> (i * 8)) & 255u);
 }
-inline bool Encode(std::uint32_t mask, std::uint32_t count, std::span<const std::byte> raw, std::vector<std::byte>& out,
+inline bool Encode(std::uint32_t mask, std::uint32_t count, std::span<const std::byte> raw, ce::dynamic_array<std::byte>& out,
                    std::string& error)
 {
     out.clear();
@@ -53,9 +54,9 @@ inline bool Encode(std::uint32_t mask, std::uint32_t count, std::span<const std:
                     raw.size() <= MaximumBytes - HeaderBytes,
                 "Invalid quantized geometry layout/count");
         const auto channels = stride / 4;
-        std::vector<std::byte> packet(HeaderBytes + channels * DescriptorBytes);
+        ce::dynamic_array<std::byte> packet(HeaderBytes + channels * DescriptorBytes);
         // Reuse channel scratch during canonical validation of every meshlet.
-        std::vector<std::uint32_t> values(count), codes;
+        ce::dynamic_array<std::uint32_t> values(count), codes;
         codes.reserve(count);
         for (unsigned channel = 0; channel < channels; ++channel)
         {
@@ -178,7 +179,7 @@ inline bool Encode(std::uint32_t mask, std::uint32_t count, std::span<const std:
     }
 }
 inline bool Decode(std::span<const std::byte> packet, std::uint32_t mask, std::uint32_t count,
-                   std::vector<std::byte>& out, std::string& error)
+                   ce::dynamic_array<std::byte>& out, std::string& error)
 {
     out.clear();
     try
@@ -192,7 +193,7 @@ inline bool Decode(std::span<const std::byte> packet, std::uint32_t mask, std::u
                 "Quantized header/layout mismatch");
         const auto rawMode = Word(packet, 8);
         Require(rawMode <= 1, "Unknown quantized packet mode");
-        std::vector<std::byte> raw(std::size_t(count) * stride);
+        ce::dynamic_array<std::byte> raw(std::size_t(count) * stride);
         if (rawMode)
         {
             Require(packet.size() == raw.size() + HeaderBytes, "Quantized raw packet size");
@@ -247,7 +248,7 @@ inline bool Decode(std::span<const std::byte> packet, std::uint32_t mask, std::u
                 }
             }
         }
-        std::vector<std::byte> canonical;
+        ce::dynamic_array<std::byte> canonical;
         Require(Encode(mask, count, raw, canonical, error) && canonical.size() == packet.size() &&
                     std::equal(canonical.begin(), canonical.end(), packet.begin()),
                 "Noncanonical or corrupt quantized payload");

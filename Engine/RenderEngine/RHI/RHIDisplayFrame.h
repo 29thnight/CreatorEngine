@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
@@ -58,7 +59,7 @@ enum class RHISharedImageTransport : uint8_t
 
 struct RHIDisplayAdapterIdentity
 {
-    std::array<uint8_t, 8> luid{};
+    ce::fixed_array<uint8_t, 8> luid{};
     bool valid{false};
     // Current D3D12 presentation queues use node zero. A linked adapter's
     // different node is not proven compatible by the shared LUID alone.
@@ -115,7 +116,7 @@ struct RHITemporalDisplayPacket
     TemporalFrame frame;
     TemporalMeasurementProvenance provenance;
     // HUD-less post-tone-map RGBA8, premultiplied RGBA8 UI, R32F depth, RG16F motion.
-    std::array<void*, 4> sharedHandles{};
+    ce::fixed_array<void*, 4> sharedHandles{};
     own::shared_owner<RHIDisplayConsumerLease> consumerLease;
     ce::lifetime_token lifetimeToken;
     bool valid{ false };

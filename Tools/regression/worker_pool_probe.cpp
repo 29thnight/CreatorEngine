@@ -75,6 +75,28 @@ int main()
         const bool barrier_held = completed == 1;
         unblock.join();
         require(barrier_held, "barrier returned before independent completion");
+        {
+            struct Capture
+            {
+                std::atomic<unsigned>* released;
+                explicit Capture(std::atomic<unsigned>& count):released(&count){}
+                ~Capture(){++*released;}
+            };
+            std::atomic<unsigned> released{0},called{0},observed{0};
+            job_group owned_work;
+            owned_work.add([capture=std::make_unique<Capture>(released),&called]{++called;});
+            owned_work.on_complete([capture=std::make_unique<Capture>(released),&released,&observed](std::exception_ptr error){
+                if(!error && released.load()==1)++observed;
+            });
+            scheduler.submit(std::move(owned_work)).wait();
+            require(called==1 && observed==1 && released==2,"move-only captures released before completion readiness");
+            scheduler.submit_indexed(32,[capture=std::make_unique<Capture>(released),&called](size_t){++called;}).wait();
+            require(called==33 && released==3,"indexed move-only capture lifetime");
+            std::array<job_graph_node,2> nodes{};
+            scheduler.submit_graph(nodes,[capture=std::make_unique<Capture>(released),&called](size_t){++called;}).wait();
+            require(called==35 && released==4,"graph move-only capture lifetime");
+        }
+
 
         // A completed foreground group must not wait for unrelated ongoing work.
         auto foreground = scheduler.submit([] {});

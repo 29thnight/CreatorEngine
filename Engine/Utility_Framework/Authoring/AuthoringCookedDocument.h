@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "AuthoringReadNode.h"
@@ -11,7 +12,7 @@ namespace Authoring
 	// Player consumes this deterministic tree encoding without entering ryml's
 	// text parser. This is deliberately not a legacy reader: unsupported versions
 	// fail and must be recooked.
-	inline constexpr std::array<std::byte, 4> kCookedDocumentMagic{
+	inline constexpr ce::fixed_array<std::byte, 4> kCookedDocumentMagic{
 		std::byte{ 'C' }, std::byte{ 'E' }, std::byte{ 'D' }, std::byte{ 'O' }
 	};
 	inline constexpr std::uint16_t kCookedDocumentVersion = 1u;
@@ -22,7 +23,7 @@ namespace Authoring
 		std::span<const std::byte> bytes) noexcept;
 
 	[[nodiscard]] bool EncodeCookedDocument(const ReadNode& root,
-		std::vector<std::byte>& outBytes, std::string& error);
+		ce::dynamic_array<std::byte>& outBytes, std::string& error);
 
 	[[nodiscard]] std::optional<WriteDocument> DecodeCookedDocument(
 		std::span<const std::byte> bytes, std::string& error);

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -219,7 +220,7 @@ namespace material_graph
         }
     }
 
-    const std::array<RGHandle, 7>& SceneSubsurfaceFrame::DeclareInputs(EnhancedRenderGraph& graph) const
+    const ce::fixed_array<RGHandle, 7>& SceneSubsurfaceFrame::DeclareInputs(EnhancedRenderGraph& graph) const
     {
         if (graph_)
         {
@@ -237,7 +238,7 @@ namespace material_graph
         return graphInputs_;
     }
 
-    std::array<RGHandle, 7> SceneSubsurfaceFrame::DeclareCaptureOutputs(EnhancedRenderGraph& graph) const
+    ce::fixed_array<RGHandle, 7> SceneSubsurfaceFrame::DeclareCaptureOutputs(EnhancedRenderGraph& graph) const
     {
         CheckCurrent(graph);
         if (graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned)
@@ -262,10 +263,10 @@ namespace material_graph
             graphReflection_ = graph.Write(graphReflection_);
         }
         const auto owner = self_.lock();
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+        ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> uses{
             {owners, RHIResourceState::ShaderResource, readAccess},
             {graphReflection_, RHIResourceState::UnorderedAccess, writeAccess}};
-        std::array<RHIBindingDesc, 13> descriptions;
+        ce::fixed_array<RHIBindingDesc, 13> descriptions;
         for (unsigned i = 0; i < 11; ++i)
         {
             const auto input = lookup.Inputs()[i];
@@ -315,7 +316,7 @@ namespace material_graph
             graphIrradiance_ = graph.Write(graphIrradiance_);
         }
         const auto owner = self_.lock();
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+        ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> uses{
             {owners, RHIResourceState::ShaderResource, readAccess},
             {graphIrradiance_, RHIResourceState::UnorderedAccess, writeAccess}};
         for (const auto input : graphInputs_)
@@ -324,7 +325,7 @@ namespace material_graph
         }
         graph.AddPass("METEOR.Scene.SubsurfaceFilter", uses, [owner, owners](const auto& execution) {
             owner->CheckCurrent(*execution.graph);
-            std::array<RHIBindingDesc, 13> descriptions;
+            ce::fixed_array<RHIBindingDesc, 13> descriptions;
             for (unsigned i = 0; i < 7; ++i)
             {
                 descriptions[i] = RHIBindingDesc::Srv2D(owner->inputs_[i], RHIFormat::RGBA32Float);

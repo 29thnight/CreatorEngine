@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 // 에디터 폰트 자원의 유일한 자리 (PHASE 21 W1).
 //
@@ -82,7 +83,7 @@ namespace editor::fonts
     bool merge_icon_font(float size_pixels, float baseline_offset_pixels = 0.0f);
 
     /// 이번 실행에서 적재한 폰트 전부. 보고 표면이 읽는다.
-    const std::vector<loaded_font>& loaded_fonts();
+    const ce::dynamic_array<loaded_font>& loaded_fonts();
 
     /// 아틀라스를 비울 때 함께 비운다(배율 변경 시 재적재 경로).
     void clear_loaded_fonts();

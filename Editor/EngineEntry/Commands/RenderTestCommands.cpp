@@ -1,4 +1,5 @@
-﻿#if defined(CE_CONTRACT_STANDALONE)
+﻿#include "../../../Engine/Containers/ContainerAPI.h"
+#if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
 import Creator.Core.Paths;
@@ -185,7 +186,7 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_dx12_selftest(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
         if (parts.size() < 2 || parts.size() > 3) return CommandCore::InvalidArguments("dx12.selftest <texture-path> [output]");
 
         // EnhancedSceneRenderer 브링업 자가 검증(PHASE 3-3). 자체 디바이스·큐·펜스로
@@ -431,7 +432,7 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_render_livecheck(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
 
         const uint32_t expectedWidth = (parts.size() >= 3)
             ? static_cast<uint32_t>((std::max)(0, std::atoi(parts[1].c_str())))
@@ -1118,7 +1119,7 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_dx12_psocache(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
 
         // PSO 캐시 자가 검증(PHASE 3-4) — 매니저를 두 번 세워 캐시가 컴파일을
         // 실제로 없애는지 확인한다.

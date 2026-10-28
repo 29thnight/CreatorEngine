@@ -1,0 +1,28 @@
+<Project>
+  <!-- Reflect the existing EngineContracts provider; never recompile its module
+       or introduce another owner for the engine's process-wide type registry. -->
+  <PropertyGroup>
+    <_EngineModeIfc>$(SolutionDir)Build\Obj\EngineContracts\$(Platform)-$(EngineConfigKey)\Creator.Core.EngineMode.ixx.ifc</_EngineModeIfc>
+    <_EngineModeReflectionDir>$(IntDir)engine-mode-ifc\</_EngineModeReflectionDir>
+    <_EngineModeReflectionSource>$(_EngineModeReflectionDir)reflgen_creator_engine_mode.cpp</_EngineModeReflectionSource>
+    <_EngineModeReflectionHeader>$(_EngineModeReflectionDir)reflgen_creator_engine_mode.h</_EngineModeReflectionHeader>
+  </PropertyGroup>
+  <ItemDefinitionGroup>
+    <ClCompile><AdditionalIncludeDirectories>$(_EngineModeReflectionDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories></ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup>
+    <ClCompile Include="$(_EngineModeReflectionSource)">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <PrecompiledHeader>NotUsing</PrecompiledHeader>
+    </ClCompile>
+  </ItemGroup>
+  <Target Name="GenerateEngineModeIfcReflection" BeforeTargets="SetModuleDependencies"
+          DependsOnTargets="ResolveProjectReferences"
+          Inputs="$(_EngineModeIfc);$(ReflgenIfcExecutable);$(MSBuildThisFileFullPath)"
+          Outputs="$(_EngineModeReflectionSource);$(_EngineModeReflectionHeader)">
+    <Error Condition="!Exists('$(_EngineModeIfc)')" Text="EngineMode IFC provider has not been built: $(_EngineModeIfc)" />
+    <MakeDir Directories="$(_EngineModeReflectionDir)" />
+    <Exec Command="&quot;$(ReflgenIfcExecutable)&quot; --ifc &quot;$(_EngineModeIfc)&quot; --import Creator.Core.EngineMode --module creator_engine_mode --output &quot;$(_EngineModeReflectionDir).&quot;" />
+    <ItemGroup><FileWrites Include="$(_EngineModeReflectionSource);$(_EngineModeReflectionHeader)" /></ItemGroup>
+  </Target>
+</Project>

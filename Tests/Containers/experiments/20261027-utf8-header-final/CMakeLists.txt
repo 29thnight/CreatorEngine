@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.28)
+project(Utf8HeaderFinal LANGUAGES CXX)
+add_executable(utf8_header_final ../../tests/utf8_copy_correctness.cpp second.cpp)
+target_compile_features(utf8_header_final PRIVATE cxx_std_23)
+target_include_directories(utf8_header_final PRIVATE ../../../../Engine/Containers/include)
+target_compile_options(utf8_header_final PRIVATE /W4 /WX /permissive- /EHsc /utf-8)

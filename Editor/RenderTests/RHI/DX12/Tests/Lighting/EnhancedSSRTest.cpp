@@ -1,3 +1,4 @@
+#include "../../../../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
 #include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
@@ -213,7 +214,7 @@ bool DX12Test::RunSSRTest(std::string& outLog)
 
         // 반정밀도 4채널 한 장을 픽셀 함수로 채운다.
         const auto uploadHalf4 = [&](ID3D12Resource* target,
-            const std::function<void(uint32_t, uint32_t, float(&)[4])>& fill) -> bool
+            const ce::owned_func<void(uint32_t, uint32_t, float(&)[4])>& fill) -> bool
         {
             constexpr uint32_t pitch = kSsrWidth * 8;
             const auto upload = resources.AllocateUpload(
@@ -253,7 +254,7 @@ bool DX12Test::RunSSRTest(std::string& outLog)
 
         // 32비트 한 채널(깊이 float / 비트마스크 uint) 한 장.
         const auto uploadRaw32 = [&](ID3D12Resource* target, DXGI_FORMAT format,
-            const std::function<uint32_t(uint32_t, uint32_t)>& fill) -> bool
+            const ce::owned_func<uint32_t(uint32_t, uint32_t)>& fill) -> bool
         {
             constexpr uint32_t pitch = kSsrWidth * 4;
             const auto upload = resources.AllocateUpload(

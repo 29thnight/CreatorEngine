@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Foundation/EngineFunc.h"
 #include <mathematics/vector2.hpp>
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include <mathematics/rect.hpp>
@@ -26,13 +27,13 @@ public:
 	void OnAddedToScene() override;
 	void OnRemovingFromScene() override;
 
-	void SetClickFunction(std::function<void()> func)
+	void SetClickFunction(ce::owned_func<void()> func)
 	{
 		m_clickFunction = func;
 	}
 	void UpdateHitbox();
 	bool CheckClick(math::vector2 _mousePos);
-	void SetFunction(std::string& funName,float key,std::function<void()> func) { m_clickFunction = func;}
+	void SetFunction(std::string& funName,float key,ce::owned_func<void()> func) { m_clickFunction = func;}
 
 	[[reflgen::reflect]]
 	void Click();
@@ -56,7 +57,7 @@ private:
 	math::rect m_hitbox{};
 
 	[[reflgen::ignore]]
-	std::function<void()> m_clickFunction;
+	ce::owned_func<void()> m_clickFunction;
 
 	[[reflgen::ignore]]
 	bool m_wasClicked = false;

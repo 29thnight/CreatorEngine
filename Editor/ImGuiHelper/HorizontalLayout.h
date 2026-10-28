@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -14,10 +15,10 @@ namespace InternalLayout
         Direction direction;
         float totalFixedSize = 0.0f;
         float totalWeight = 0.0f;
-        std::vector<std::pair<bool, float>> elements; // (isSpring, value)
+        ce::dynamic_array<ce::pair<bool, float>> elements; // (isSpring, value)
     };
 
-    static std::vector<LayoutState> layoutStack;
+    static ce::dynamic_array<LayoutState> layoutStack;
 }
 
 // BeginHorizontal: 가로 정렬 시작

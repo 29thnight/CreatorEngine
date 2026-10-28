@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 
 // PHASE 21 W2-B — Content Browser 를 밖에서 읽고 모는 창구.
@@ -93,7 +94,7 @@ namespace editor::windows
 
         std::size_t historyIndex{};
         std::size_t historySize{};
-        std::vector<std::string> history{}; ///< "folder:<상대 경로>" · "recent" · "everything"
+        ce::dynamic_array<std::string> history{}; ///< "folder:<상대 경로>" · "recent" · "everything"
         bool canBack{};
         bool canForward{};
         bool canUp{};
@@ -101,7 +102,7 @@ namespace editor::windows
         bool canCreateSceneRenderProfile{};     ///< 폴더 메뉴·타일 메뉴가 같은 술어로 연다
 
         std::size_t resultCount{};
-        std::vector<std::string> results{}; ///< 보이는 결과의 상대 경로(앞에서 최대 256)
+        ce::dynamic_array<std::string> results{}; ///< 보이는 결과의 상대 경로(앞에서 최대 256)
         float scrollY{};
         float scrollMaxY{};
 
@@ -113,7 +114,7 @@ namespace editor::windows
         /// 않아야 한다 — 전체 자산 4,274 개에서 매 프레임 모으고 정렬하던 비용이 3.25ms 였다.
         std::uint64_t resultRebuilds{};
         content_browser_layout layout{};
-        std::vector<content_browser_tile> tiles{}; ///< 그린 타일(앞에서 최대 64)
+        ce::dynamic_array<content_browser_tile> tiles{}; ///< 그린 타일(앞에서 최대 64)
         /// 지금 들린 끌기 payload. 끌기 자극의 경계 통과 — 놓는 자리까지 갔는지와 별개로
         /// 브라우저가 무엇을 들어 올렸는지를 본다. 없으면 빈 문자열.
         std::string dragPayloadType{};

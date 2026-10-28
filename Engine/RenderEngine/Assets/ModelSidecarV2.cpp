@@ -1,3 +1,5 @@
+#include "../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../Containers/ContainerAPI.h"
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -37,14 +39,14 @@ namespace assets
             return key == "guid";
         }
 
-        void AddIssue(std::vector<SidecarIssue>& issues, SidecarIssueCode code,
+        void AddIssue(ce::dynamic_array<SidecarIssue>& issues, SidecarIssueCode code,
             std::string context, std::string message)
         {
             issues.push_back({ code, std::move(context), std::move(message) });
         }
 
         [[nodiscard]] bool ReadScalar(const Authoring::ReadNode& parent, const char* key,
-            const std::string& context, std::string& out, std::vector<SidecarIssue>& issues,
+            const std::string& context, std::string& out, ce::dynamic_array<SidecarIssue>& issues,
             bool required = true)
         {
             const Authoring::ReadNode node = parent[key];
@@ -68,7 +70,7 @@ namespace assets
         }
 
         [[nodiscard]] bool ReadV8(const Authoring::ReadNode& parent, const char* key,
-            const std::string& context, uuid::uuid16& out, std::vector<SidecarIssue>& issues)
+            const std::string& context, uuid::uuid16& out, ce::dynamic_array<SidecarIssue>& issues)
         {
             std::string text;
             if (!ReadScalar(parent, key, context, text, issues)) return false;
@@ -96,7 +98,7 @@ namespace assets
 
         // 문서 자체의 형식 규칙 — Read와 Write·Build가 같은 함수를 쓴다.
         [[nodiscard]] bool CheckDocumentShape(const ModelSidecarV2& doc,
-            std::vector<SidecarIssue>& issues)
+            ce::dynamic_array<SidecarIssue>& issues)
         {
             const std::size_t before = issues.size();
             std::string error;
@@ -128,8 +130,8 @@ namespace assets
                     "sha256:<64 소문자 hex>여야 한다.");
             }
 
-            std::set<std::pair<SubAssetKind, std::string>> keys;
-            std::set<uuid::uuid16> ids{ doc.assetId };
+            ce::engine_ordered_set<ce::pair<SubAssetKind, std::string>> keys;
+            ce::engine_ordered_set<uuid::uuid16> ids{ doc.assetId };
             for (std::size_t i = 0; i < doc.subAssets.size(); ++i)
             {
                 const ModelSubAssetRecord& r = doc.subAssets[i];
@@ -191,25 +193,25 @@ namespace assets
     bool IsFingerprintText(std::string_view text) noexcept
     {
         if (!text.starts_with(kFingerprintPrefix)) return false;
-        std::vector<std::uint8_t> bytes;
+        ce::dynamic_array<std::uint8_t> bytes;
         return TryParseLowerHex(text.substr(kFingerprintPrefix.size()), bytes, 32u);
     }
 
     std::string MakeSourceFingerprint(std::span<const std::uint8_t> bytes)
     {
         return std::string(kFingerprintPrefix)
-            + ce::hash::to_hex(ce::hash::sha256::compute(bytes.data(), bytes.size()));
+            + ce::crypto::to_hex(ce::crypto::sha256::compute(bytes.data(), bytes.size()));
     }
 
     std::string CreateModelAuthoringKey(std::string& outError)
     {
-        std::array<std::uint8_t, kAuthoringKeyBytes> bytes{};
+        ce::fixed_array<std::uint8_t, kAuthoringKeyBytes> bytes{};
         if (!CreateAuthoringKeyBytes(bytes, outError)) return {};
-        return MakeAuthoringStableKey(bytes);
+        return MakeAuthoringStableKey(std::span<const std::uint8_t, kAuthoringKeyBytes>(bytes));
     }
 
     bool ReadModelSidecarV2(std::string_view yaml, ModelSidecarV2& out,
-        std::vector<SidecarIssue>& outIssues)
+        ce::dynamic_array<SidecarIssue>& outIssues)
     {
         const std::size_t before = outIssues.size();
         ModelSidecarV2 doc;
@@ -321,7 +323,7 @@ namespace assets
     }
 
     std::string WriteModelSidecarV2(const ModelSidecarV2& document,
-        std::string_view existingYaml, std::vector<SidecarIssue>& outIssues)
+        std::string_view existingYaml, ce::dynamic_array<SidecarIssue>& outIssues)
     {
         if (!CheckDocumentShape(document, outIssues)) return {};
 
@@ -386,12 +388,12 @@ namespace assets
     }
 
     bool ValidateModelSidecarV2Closure(const ModelSidecarV2& document,
-        const IdentityEpochHeader& header, std::vector<SidecarIssue>& outIssues)
+        const IdentityEpochHeader& header, ce::dynamic_array<SidecarIssue>& outIssues)
     {
         const std::size_t before = outIssues.size();
         if (!CheckDocumentShape(document, outIssues)) return false;
 
-        std::vector<EpochHeaderIssue> headerIssues;
+        ce::dynamic_array<EpochHeaderIssue> headerIssues;
         if (!ValidateIdentityEpochHeader(header, headerIssues))
         {
             AddIssue(outIssues, SidecarIssueCode::EpochMismatch, "header",
@@ -449,7 +451,7 @@ namespace assets
                 break;
             }
         }
-        std::vector<std::string> bijection;
+        ce::dynamic_array<std::string> bijection;
         if (!registry.VerifyBijection(bijection))
         {
             for (const std::string& line : bijection)
@@ -461,7 +463,7 @@ namespace assets
     bool BuildModelSidecarV2(const IdentityEpochHeader& header, std::string_view modelAuthoringKey,
         std::uint64_t generation, std::string_view sourceFingerprint,
         std::span<const StableKeyAssignment> assignments, ModelSidecarV2& out,
-        std::vector<SidecarIssue>& outIssues)
+        ce::dynamic_array<SidecarIssue>& outIssues)
     {
         const std::size_t before = outIssues.size();
         ModelSidecarV2 doc;

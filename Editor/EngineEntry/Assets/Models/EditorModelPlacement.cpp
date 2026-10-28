@@ -1,3 +1,5 @@
+#include "../../../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
 #else
@@ -71,8 +73,8 @@ namespace Editor
         job_handle preparation;
         job_handle materialPreparation;
         assets::ModelAssetGeneration::Shared sourceGeneration;
-        std::vector<own::shared_owner<Material>> finalMaterials;
-        std::vector<std::string> materialErrors;
+        ce::dynamic_array<own::shared_owner<Material>> finalMaterials;
+        ce::dynamic_array<std::string> materialErrors;
         bool deferredMaterials{};
         bool sceneApplied{};
         bool materialStarted{};
@@ -92,7 +94,7 @@ namespace Editor
         bool preparationStarted{ false };
         bool materialWarmupStarted{ false };
         bool recipeDispatched{ false };
-        std::vector<own::shared_owner<const material_graph::Generation>> materialWarmOwners;
+        ce::dynamic_array<own::shared_owner<const material_graph::Generation>> materialWarmOwners;
         double admissionWaitMs{};
         bool positionApplied{ false };
         unsigned preparationRetries{};
@@ -114,11 +116,11 @@ namespace Editor
         bool stopping{ true };
         job_handle preparationTail;
         // Cancelled requests remain here until their scheduler jobs release all captures.
-        std::vector<own::shared_owner<Request>> preparations;
-        std::vector<own::shared_owner<Request>> incoming;
-        std::vector<own::shared_owner<Request>> cancellations;
-        std::vector<own::shared_owner<Request>> visible;
-        std::vector<own::shared_owner<Request>> pending; // GT only
+        ce::dynamic_array<own::shared_owner<Request>> preparations;
+        ce::dynamic_array<own::shared_owner<Request>> incoming;
+        ce::dynamic_array<own::shared_owner<Request>> cancellations;
+        ce::dynamic_array<own::shared_owner<Request>> visible;
+        ce::dynamic_array<own::shared_owner<Request>> pending; // GT only
         std::uint64_t completed{};
         std::uint64_t failed{};
         std::uint64_t cancelled{};
@@ -179,9 +181,9 @@ namespace Editor
                 if (node.type == "ShaderNodeBsdfPrincipled")
                     for (const auto& pin : node.pins)
                     {
-                        if (pin.Identifier() == "Base Color") graph->graph.SetSocketValue(pin.id, std::array<double, 4>{0, 0, 0, 1});
+                        if (pin.Identifier() == "Base Color") graph->graph.SetSocketValue(pin.id, ce::fixed_array<double, 4>{0, 0, 0, 1});
                         if (pin.Identifier() == "Specular IOR Level") graph->graph.SetSocketValue(pin.id, 0.0);
-                        if (pin.Identifier() == "Emission Color") graph->graph.SetSocketValue(pin.id, std::array<double, 4>{.35, .35, .35, 1});
+                        if (pin.Identifier() == "Emission Color") graph->graph.SetSocketValue(pin.id, ce::fixed_array<double, 4>{.35, .35, .35, 1});
                         if (pin.Identifier() == "Emission Strength") graph->graph.SetSocketValue(pin.id, 1.0);
                     }
             // Stable transient identity; never written into the asset catalog.
@@ -207,12 +209,12 @@ namespace Editor
             const auto count = model->Materials().size();
             request->finalMaterials.resize(count);
             request->materialErrors.resize(count);
-            std::set<uuid::uuid16> meshes, used;
+            ce::engine_ordered_set<uuid::uuid16> meshes, used;
             for (const auto& node : model->Nodes())
                 for (const auto& mesh : node.meshes) meshes.insert(mesh);
             for (const auto& mesh : model->Meshes())
                 if (meshes.contains(mesh.meshId)) used.insert(mesh.materialId);
-            auto indices = std::make_shared<std::vector<std::size_t>>();
+            auto indices = std::make_shared<ce::dynamic_array<std::size_t>>();
             for (std::size_t i = 0; i < count; ++i)
                 if (used.contains(model->Materials()[i].materialId)) indices->push_back(i);
             const auto next = std::make_shared<std::atomic<std::size_t>>(0);
@@ -250,19 +252,19 @@ namespace Editor
             std::string error;
             const auto model = DataSystems->ReadPreparedModel(request->modelPreparation, error);
             if (!model) return {}; // Preserve the normal recipe's failure/retry path.
-            std::set<uuid::uuid16> meshes, materials;
+            ce::engine_ordered_set<uuid::uuid16> meshes, materials;
             for (const auto& node : model->Nodes())
                 for (const auto& mesh : node.meshes) meshes.insert(mesh);
             for (const auto& mesh : model->Meshes())
                 if (meshes.contains(mesh.meshId)) materials.insert(mesh.materialId);
-            std::vector<FileGuid> graphs;
+            ce::dynamic_array<FileGuid> graphs;
             for (const auto& material : model->Materials())
                 if (materials.contains(material.materialId))
                     graphs.emplace_back(assets::ModelMaterialGraphId(material.materialId));
             request->materialWarmOwners.resize(graphs.size());
             if (graphs.empty()) return {};
             const auto next = std::make_shared<std::atomic<std::size_t>>(0);
-            const auto inputs = std::make_shared<const std::vector<FileGuid>>(std::move(graphs));
+            const auto inputs = std::make_shared<const ce::dynamic_array<FileGuid>>(std::move(graphs));
             job_group work;
             const auto workers = (std::min)(inputs->size(), RHIShaderCompiler::MaxParallelCompiles());
             for (std::size_t worker = 0; worker < workers; ++worker)
@@ -291,7 +293,7 @@ namespace Editor
                 assets::ModelSceneAssetInputs inputs;
                 if (!DataSystems->ReadPreparedModelScene(request->modelPreparation, inputs, error))
                     throw std::runtime_error(error);
-                std::set<uuid::uuid16> usedMeshes;
+                ce::engine_ordered_set<uuid::uuid16> usedMeshes;
                 for (const auto& node : inputs.descriptor->summary.nodes)
                     for (const auto& id : node.meshAssetIds) usedMeshes.insert(id.value);
                 for (const auto& mesh : inputs.meshes)
@@ -302,7 +304,7 @@ namespace Editor
             {
                 const auto generation = DataSystems->ReadPreparedModel(request->modelPreparation, error);
                 if (!generation) throw std::runtime_error(error);
-                std::set<uuid::uuid16> usedMeshes;
+                ce::engine_ordered_set<uuid::uuid16> usedMeshes;
                 for (const auto& node : generation->Nodes()) usedMeshes.insert(node.meshes.begin(), node.meshes.end());
                 for (const auto& mesh : generation->Meshes())
                     if (usedMeshes.contains(mesh.meshId) && mesh.streamDescriptor && mesh.streamDescriptor->streamMetadata && mesh.streamDescriptor->streamMetadata->archive)
@@ -340,7 +342,7 @@ namespace Editor
                         const auto assetRoot = request->assetRoot;
                         const auto expectedProject = request->project;
                         const auto model = inputs.descriptor->summary.modelAssetId.value;
-                        std::vector<uuid::uuid16> meshes;
+                        ce::dynamic_array<uuid::uuid16> meshes;
                         for (const auto& mesh : inputs.descriptor->summary.meshes)
                         {
                             meshes.push_back(mesh.meshAssetId.value);
@@ -425,7 +427,7 @@ namespace Editor
                         const auto assetRoot = request->assetRoot;
                         const auto expectedProject = request->project;
                         const auto model = generation->Identity().modelId;
-                        std::vector<uuid::uuid16> meshes;
+                        ce::dynamic_array<uuid::uuid16> meshes;
                         for (const auto& mesh : generation->Meshes())
                         {
                             meshes.push_back(mesh.meshId);
@@ -556,7 +558,7 @@ namespace Editor
         job_group work;
         work.add([request] { Prepare(request); });
         work.add([request] { PreparePlacementRootPages(request); });
-        std::array<job_handle, 2> dependencies;
+        ce::fixed_array<job_handle, 2> dependencies;
         std::size_t dependencyCount = 0;
         const auto modelWork = DataSystems->ModelPreparationCompletion(request->modelPreparation);
         if (modelWork.valid()) dependencies[dependencyCount++] = modelWork;
@@ -581,7 +583,7 @@ namespace Editor
     {
         ce::profile_scope timing{ ce::marker<"ModelPlacement.Tick">() };
         auto& state = *m_impl;
-        std::vector<own::shared_owner<Request>> cancellations;
+        ce::dynamic_array<own::shared_owner<Request>> cancellations;
         {
             std::lock_guard lock(state.mutex);
             state.pending.insert(state.pending.end(), state.incoming.begin(), state.incoming.end());
@@ -693,7 +695,7 @@ namespace Editor
                         job_group work;
                         work.add([request] { Prepare(request); });
                         work.add([request] { PreparePlacementRootPages(request); });
-                        std::array<job_handle, 2> dependencies;
+                        ce::fixed_array<job_handle, 2> dependencies;
                         std::size_t dependencyCount = 0;
                         // Shared asset preparation deduplicates scene/drop requests.
                         // Serialize only recipe construction; waiting consumes no worker.
@@ -885,10 +887,10 @@ namespace Editor
                 }
             }
         }
-        std::erase_if(state.pending, [](const auto& request) { return request->finished.load(std::memory_order_acquire); });
+        ce::erase_if(state.pending, [](const auto& request) { return request->finished.load(std::memory_order_acquire); });
         std::lock_guard lock(state.mutex);
-        std::erase_if(state.visible, [](const auto& request) { return request->finished.load(std::memory_order_acquire); });
-        std::erase_if(state.preparations, [](const auto& request)
+        ce::erase_if(state.visible, [](const auto& request) { return request->finished.load(std::memory_order_acquire); });
+        ce::erase_if(state.preparations, [](const auto& request)
         {
             if (!request->finished.load(std::memory_order_acquire)) return false;
             if (!request->preparationStarted && !request->finished.load(std::memory_order_acquire)) return false;
@@ -938,7 +940,7 @@ namespace Editor
     // HasVisible이 대신 답한다.
     void ModelPlacement::DrawStatus()
     {
-        std::vector<own::shared_owner<Request>> visible;
+        ce::dynamic_array<own::shared_owner<Request>> visible;
         { std::lock_guard lock(m_impl->mutex); visible = m_impl->visible; }
         for (const auto& request : visible)
         {
@@ -968,7 +970,7 @@ namespace Editor
         m_statusBody.reset();
 
         auto& state = *m_impl;
-        std::vector<own::shared_owner<Request>> preparations;
+        ce::dynamic_array<own::shared_owner<Request>> preparations;
         {
             std::lock_guard lock(state.mutex);
             if (state.stopping)

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 // 소문자 16진 표기 — 신원 계층(epoch seed·authoring key·fingerprint)의 유일한 바이트
 // 표기다. 대문자·접두 `0x`·공백은 받지 않는다(표기가 둘이면 언젠가 비교가 어긋난다).
@@ -21,7 +22,7 @@ namespace assets
 
     // 정확히 expectedBytes 바이트(0이면 길이 무관)의 소문자 16진만 받는다.
     [[nodiscard]] inline bool TryParseLowerHex(std::string_view text,
-        std::vector<std::uint8_t>& out, std::size_t expectedBytes = 0) noexcept
+        ce::dynamic_array<std::uint8_t>& out, std::size_t expectedBytes = 0) noexcept
     {
         out.clear();
         if (text.empty() || (text.size() % 2u) != 0u) return false;

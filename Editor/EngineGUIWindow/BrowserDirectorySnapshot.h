@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 
 // PHASE 21 W7-1 — Content Browser 의 디렉터리 스냅샷.
@@ -59,7 +60,7 @@ namespace editor
 
     struct browser_directory_listing
     {
-        std::vector<browser_directory_entry> entries{};
+        ce::dynamic_array<browser_directory_entry> entries{};
         std::error_code error{};
         bool valid{};
     };

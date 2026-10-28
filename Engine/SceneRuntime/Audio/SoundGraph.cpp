@@ -1,3 +1,6 @@
+#include "../../Utility_Framework/Foundation/EngineFunc.h"
+#include "../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -66,7 +69,7 @@ namespace wave
     }
 
     own::shared_owner<const SoundGraphProgram> CompileSoundGraph(const SoundGraphDefinition& definition,
-        const std::function<bool(const ClipKey&)>& hasClip, std::string& error)
+        const ce::owned_func<bool(const ClipKey&)>& hasClip, std::string& error)
     {
         error.clear();
         const auto fail = [&error](std::string reason) -> own::shared_owner<const SoundGraphProgram>
@@ -80,7 +83,7 @@ namespace wave
         {
             return fail("SoundGraph schema, node count or maximumVoices is invalid");
         }
-        std::unordered_map<std::string, ParameterDefinition> parameters;
+        ce::engine_node_map<std::string, ParameterDefinition> parameters;
         for (const auto& parameter : definition.parameters)
         {
             if (parameter.name.empty() || parameter.name.size() > 128u
@@ -221,9 +224,9 @@ namespace wave
                 return fail("SoundGraph contains an unknown node kind");
             }
         }
-        std::vector<std::uint8_t> marks(definition.nodes.size());
-        std::vector<std::uint32_t> counts(definition.nodes.size());
-        std::function<bool(std::size_t)> visit = [&](std::size_t index)
+        ce::dynamic_array<std::uint8_t> marks(definition.nodes.size());
+        ce::dynamic_array<std::uint32_t> counts(definition.nodes.size());
+        ce::owned_func<bool(std::size_t)> visit = [&](std::size_t index)
         {
             if (marks[index] == 1u)
             {
@@ -292,7 +295,7 @@ namespace wave
     }
 
     bool EvaluateSoundGraph(const SoundGraphProgram& program, const ParameterMap& parameters,
-        std::uint64_t& randomState, std::vector<GraphVoice>& voices, std::string& error)
+        std::uint64_t& randomState, ce::dynamic_array<GraphVoice>& voices, std::string& error)
     {
         voices.clear();
         error.clear();
@@ -301,7 +304,7 @@ namespace wave
         {
             return false;
         }
-        std::function<bool(std::uint32_t, float, float, std::uint64_t)> evaluate;
+        ce::owned_func<bool(std::uint32_t, float, float, std::uint64_t)> evaluate;
         evaluate = [&](std::uint32_t id, float gain, float pitch, std::uint64_t branch)
         {
             const auto& node = program.definition.nodes[program.nodeIndices.at(id)];

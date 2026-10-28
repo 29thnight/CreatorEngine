@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "../VulkanSelfTest.h"
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/Vulkan/VulkanPipelineCache.h"
@@ -53,8 +54,8 @@ namespace
 
     struct PostRhiCapture
     {
-        std::array<PostRhiFrame, kPostRhiVariantCount> frames;
-        std::array<EnhancedRenderGraph::Stats, kPostRhiVariantCount> graphs{};
+        ce::fixed_array<PostRhiFrame, kPostRhiVariantCount> frames;
+        ce::fixed_array<EnhancedRenderGraph::Stats, kPostRhiVariantCount> graphs{};
         uint32_t bloomMipCount{ 0 };
         bool fxaaPassThrough{ false };
 

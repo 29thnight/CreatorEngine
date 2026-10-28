@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "ProfileCapture.h"
 
 #include <stdio.h>
@@ -21,7 +22,7 @@ namespace ce
         struct registry
         {
             std::mutex lock;
-            std::vector<capture_counter> entries{
+            ce::dynamic_array<capture_counter> entries{
                 {profile_counter_id::process_cpu_percent, "CPU", "%", counter_category::process},
                 {profile_counter_id::process_ram_mb, "RAM", "MB", counter_category::process},
                 {profile_counter_id::gpu_vram_mb, "VRAM", "MB", counter_category::gpu},
@@ -145,7 +146,7 @@ namespace ce
         return id;
     }
 
-    std::vector<capture_counter> snapshot_counters()
+    ce::dynamic_array<capture_counter> snapshot_counters()
     {
         auto& registry = detail::counter_registry_impl::instance();
         std::lock_guard guard(registry.lock);
@@ -254,8 +255,8 @@ namespace ce
         {
             return;
         }
-        auto values = std::allocate_shared<std::vector<profile_event, capture_allocator<profile_event>>>(
-            capture_allocator<std::vector<profile_event, capture_allocator<profile_event>>>{});
+        auto values = std::allocate_shared<ce::dynamic_array<profile_event, capture_byte_allocator>>(
+            capture_allocator<ce::dynamic_array<profile_event, capture_byte_allocator>>{});
         values->reserve(m_count);
         for (const profile_event& value : *this)
         {
@@ -278,8 +279,8 @@ namespace ce
         if (m_segments.empty() || !m_segments.back().owned || m_segments.back().owned.use_count() != 1 ||
             m_segments.back().offset + m_segments.back().count != m_segments.back().owned->size())
         {
-            auto values = std::allocate_shared<std::vector<profile_event, capture_allocator<profile_event>>>(
-                capture_allocator<std::vector<profile_event, capture_allocator<profile_event>>>{});
+            auto values = std::allocate_shared<ce::dynamic_array<profile_event, capture_byte_allocator>>(
+                capture_allocator<ce::dynamic_array<profile_event, capture_byte_allocator>>{});
             values->reserve(8);
             m_memoryBytes += values->capacity() * sizeof(profile_event);
             m_segments.push_back(segment{{}, std::move(values), m_count, 0, 0});
@@ -439,10 +440,10 @@ namespace ce
     // capture_session
     //-------------------------------------------------------------------------
 
-    capture_session::capture_session(std::vector<frame_record> frames, std::vector<thread_info> threads,
-                                     std::vector<capture_marker> markers, capture_environment environment,
+    capture_session::capture_session(ce::dynamic_array<frame_record> frames, ce::dynamic_array<thread_info> threads,
+                                     ce::dynamic_array<capture_marker> markers, capture_environment environment,
                                      bool complete, std::uint32_t unacked_streams, std::uint64_t dropped_counters,
-                                     std::vector<capture_counter> counters)
+                                     ce::dynamic_array<capture_counter> counters)
         : m_frames(std::move(frames)), m_threads(std::move(threads)), m_markers(std::move(markers)),
           m_counters(std::move(counters)), m_environment(environment), m_droppedCounters(dropped_counters),
           m_complete(complete), m_unackedStreams(unacked_streams)
@@ -703,7 +704,7 @@ namespace ce
         }
 
         // 자기 자신을 다시 채우지 않도록 통째로 떼어 내고 돈다.
-        std::vector<profile_event> pendingSpans;
+        ce::dynamic_array<profile_event> pendingSpans;
         pendingSpans.swap(m_deferredSpans);
         for (const profile_event& value : pendingSpans)
         {
@@ -806,7 +807,7 @@ namespace ce
 
     void capture_ring::drain_render_measurements()
     {
-        std::vector<profile_render_measurement> pending;
+        ce::dynamic_array<profile_render_measurement> pending;
         pending.swap(m_deferredRenderMeasurements);
         for (const auto& sample : pending)
         {
@@ -871,7 +872,7 @@ namespace ce
     {
         // Record may be requested while the game thread advances. Samples from
         // submissions older than the first boundary never belonged to this capture.
-        std::erase_if(m_deferredCounters,
+        ce::erase_if(m_deferredCounters,
                       [engine_frame](const deferred_counter& sample) { return sample.frame < engine_frame; });
     }
 
@@ -944,9 +945,9 @@ namespace ce
         m_deferredCounters.clear();
     }
 
-    std::vector<frame_record> capture_ring::take_retired_frames()
+    ce::dynamic_array<frame_record> capture_ring::take_retired_frames()
     {
-        std::vector<frame_record> retired;
+        ce::dynamic_array<frame_record> retired;
         retired.swap(retired_frames_);
         return retired;
     }
@@ -956,8 +957,8 @@ namespace ce
     {
         // 프레임 인덱스와 페이지 참조만 복사한다. 이벤트 본문은 봉인된
         // 페이지에 남으므로 라이브 스냅샷을 반복해도 본문을 다시 복사하지 않는다.
-        std::vector<frame_record> frames(m_frames.begin(), m_frames.end());
-        std::vector<thread_info> thread_list(threads.begin(), threads.end());
+        ce::dynamic_array<frame_record> frames(m_frames.begin(), m_frames.end());
+        ce::dynamic_array<thread_info> thread_list(threads.begin(), threads.end());
 
         // ★ 어휘도 **이 순간**의 것을 함께 뜬다(P6). 얼린 뒤에 등록되는
         //   마커는 이 캡처의 뜻이 아니고, 파일로 나갔다 돌아온 캡처는 이

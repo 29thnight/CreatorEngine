@@ -1,3 +1,5 @@
+#include "../../Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -11,7 +13,7 @@ namespace experiment
 {
 	namespace
 	{
-		void AddIssue(std::vector<ModelLoadIssue>& issues,
+		void AddIssue(ce::dynamic_array<ModelLoadIssue>& issues,
 			ModelLoadIssueCode code, std::string context, std::string message,
 			ModelLoadIssueSeverity severity = ModelLoadIssueSeverity::Error)
 		{
@@ -19,7 +21,7 @@ namespace experiment
 				severity, code, std::move(context), std::move(message) });
 		}
 
-		[[nodiscard]] bool HasErrors(const std::vector<ModelLoadIssue>& issues)
+		[[nodiscard]] bool HasErrors(const ce::dynamic_array<ModelLoadIssue>& issues)
 		{
 			return std::ranges::any_of(issues, [](const ModelLoadIssue& issue)
 			{
@@ -111,7 +113,7 @@ namespace experiment
 
 		template <typename Key>
 		[[nodiscard]] bool HasValidKeyTimes(
-			const std::vector<Key>& keys, double duration) noexcept
+			const ce::dynamic_array<Key>& keys, double duration) noexcept
 		{
 			double previous = 0.0;
 			bool first = true;
@@ -146,7 +148,7 @@ namespace experiment
 
 		// per-vertex 검사는 같은 코드의 위반을 mesh당 첫 발견 한 건만 보고한다.
 		// 손상된 대형 mesh가 정점 수만큼 이슈를 증식시키는 것을 막기 위한 상한이다.
-		void ValidateMeshVertices(std::vector<ModelLoadIssue>& issues,
+		void ValidateMeshVertices(ce::dynamic_array<ModelLoadIssue>& issues,
 			const Mesh& mesh, const std::string& context,
 			const Skeleton* skeleton, std::uint32_t maxBoneInfluences)
 		{
@@ -179,7 +181,7 @@ namespace experiment
 				}
 
 				std::uint32_t activeCount = 0;
-				std::array<BoneIndex::value_type, MaxBoneInfluences> activeBones{};
+				ce::fixed_array<BoneIndex::value_type, MaxBoneInfluences> activeBones{};
 				for (std::size_t slot = 0; slot < MaxBoneInfluences; ++slot)
 				{
 					const float weight = vertex.boneWeights[slot];
@@ -321,7 +323,7 @@ namespace experiment
 		}
 		if (HasErrors(result.issues)) return result;
 
-		std::vector<ModelLoadIssue> validation =
+		ce::dynamic_array<ModelLoadIssue> validation =
 			Validate(*decoded.draft, request.importOptions);
 		result.issues.insert(result.issues.end(),
 			std::make_move_iterator(validation.begin()),
@@ -335,15 +337,15 @@ namespace experiment
 		return result;
 	}
 
-	std::vector<ModelLoadIssue> ModelLoader::Validate(const ModelDraft& draft)
+	ce::dynamic_array<ModelLoadIssue> ModelLoader::Validate(const ModelDraft& draft)
 	{
 		return Validate(draft, ModelImportOptions{});
 	}
 
-	std::vector<ModelLoadIssue> ModelLoader::Validate(
+	ce::dynamic_array<ModelLoadIssue> ModelLoader::Validate(
 		const ModelDraft& draft, const ModelImportOptions& importOptions)
 	{
-		std::vector<ModelLoadIssue> issues;
+		ce::dynamic_array<ModelLoadIssue> issues;
 		if (!draft.metadata.assetId.IsValid())
 		{
 			AddIssue(issues, ModelLoadIssueCode::InvalidAssetIdentity,
@@ -411,7 +413,7 @@ namespace experiment
 					context + ".name", "material 이름이 비어 있다.");
 			}
 
-			std::unordered_set<std::string> propertyNames;
+			ce::engine_node_set<std::string> propertyNames;
 			for (const MaterialProperty& property : material.properties)
 			{
 				if (property.name.empty())
@@ -559,7 +561,7 @@ namespace experiment
 						context, "animation 이름·duration·ticksPerSecond가 유효해야 한다.");
 				}
 
-				std::unordered_set<std::uint32_t> channelBones;
+				ce::engine_node_set<std::uint32_t> channelBones;
 				for (const AnimationChannel& channel : clip.channels)
 				{
 					if (!IsInRange(channel.bone, skeleton->bones.size()))

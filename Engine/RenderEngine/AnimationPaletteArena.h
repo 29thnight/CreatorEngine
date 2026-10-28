@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include <mathematics/matrix4x4.hpp>
@@ -75,8 +76,8 @@ namespace ce
             std::uint32_t offset{};
             std::uint32_t count{};
         };
-        std::vector<math::matrix4x4> m_matrices;
-        std::vector<entry> m_entries;
+        ce::dynamic_array<math::matrix4x4> m_matrices;
+        ce::dynamic_array<entry> m_entries;
         bool m_sealed{ false };
     };
 }

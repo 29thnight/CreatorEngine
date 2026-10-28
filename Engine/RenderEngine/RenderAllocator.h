@@ -19,17 +19,30 @@ import Creator.Core.Ownership;
 #include <new>
 #include <type_traits>
 #include <utility>
-#include <vector>
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../Containers/include/ce/all.h"
+#else
+import "Creator.Containers.h";
+#endif
 
 // Renderer-owned CPU storage only. Cross-thread destruction uses mi_free;
 // no private heap is destroyed while a recording or GPU retirement owns data.
 namespace ce
 {
     template<typename T>
-    using render_allocator = heap_allocator<T>;
+    using render_allocator = stl_heap_allocator<T>;
 
+    struct render_byte_allocator
+    {
+        void* allocate(size_t bytes, size_t alignment)
+        {
+            if (void* value = ce::heap::try_allocate_aligned(bytes, alignment)) return value;
+            throw std::bad_alloc{};
+        }
+        void deallocate(void* value, size_t, size_t) noexcept { ce::heap::deallocate(value); }
+    };
     template<typename T>
-    using render_vector = std::vector<T, render_allocator<T>>;
+    using render_vector = dynamic_array<T, render_byte_allocator>;
 
     template<typename T>
     struct render_delete

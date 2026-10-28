@@ -1,3 +1,4 @@
+#include "../../../../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -655,7 +656,7 @@ bool DX12Test::RunDecalTest(std::string& outLog)
         const Texture* const textureA = (batchTextureA ? &*batchTextureA.borrow() : nullptr);
         const Texture* const textureB = (batchTextureB ? &*batchTextureB.borrow() : nullptr);
 
-        std::vector<EnhancedDecalPass::Item> items(4);
+        ce::dynamic_array<EnhancedDecalPass::Item> items(4);
         for (auto& item : items) item.worldMatrix = math::matrix4x4::identity();
 
         std::string dummy;

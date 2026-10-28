@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/ContainerLibraryExpansion20261025.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CreatorContainers 확장 구현·검증 — 2026-10-25</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#범위와-검증">범위와 검증</a></li><li><a href="#측정-방법과-한계">측정 방법과 한계</a></li><li><a href="#결과">결과</a></li><li><a href="#api수명-계약">API·수명 계약</a></li><li><a href="#수용-경계">수용 경계</a></li><li><a href="#2026-10-26-후속-구현">2026-10-26 후속 구현</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="ContainerLibraryExpansion20261025.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>CreatorContainers 확장 구현·검증 — 2026-10-25</h1>
+<div class="meta"><p>독립 솔루션은 <code>C:/Users/idene/source/repos/CreatorContainers/build/CreatorContainers.slnx</code>다. 소스는 <code>CreatorContainers/include/ce/</code>, 재현은 <code>CreatorContainers/run-library-validation.ps1</code>이다. 원시 자료 <code>library-{core,expanded}-final-{1,2,3}.csv</code>, 환경·SHA256 <code>library-environment.json</code>은 <code>CreatorContainers/results/</code> 아래에 보존한다. 이 보고서의 비율은 custom/STL이며 작을수록 빠르다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
+<a class="map-row" href="#범위와-검증"><span class="ve-label">§00</span><span class="map-name">범위와 검증</span><span class="map-bar"><i style="width:14.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#측정-방법과-한계"><span class="ve-label">§01</span><span class="map-name">측정 방법과 한계</span><span class="map-bar"><i style="width:16.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#결과"><span class="ve-label">§02</span><span class="map-name">결과</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">2</span></span></a>
+<a class="map-row" href="#api수명-계약"><span class="ve-label">§03</span><span class="map-name">API·수명 계약</span><span class="map-bar"><i style="width:24.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#수용-경계"><span class="ve-label">§04</span><span class="map-name">수용 경계</span><span class="map-bar"><i style="width:8.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2026-10-26-후속-구현"><span class="ve-label">§05</span><span class="map-name">2026-10-26 후속 구현</span><span class="map-bar"><i style="width:5.6%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「결과」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-범위와-검증">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="범위와-검증">범위와 검증</h2></div>
+<div class="prose"><p>일반 배열·문자열·해시맵을 비단순 타입/이동 전용 값/예외 복구/사용자 할당자로 확장했다. 문자열 키 맵·셋, 세대 핸들 slot map, sequence buffer, intrusive LRU, 문자열 atom, age buckets, inplace function, 안정 32/64비트 radix sort, fixed/monotonic/TLSF resource를 추가했다. STL 컨테이너/문자열/알고리즘은 검증 실행 파일에서만 사용한다. 배포 헤더는 언어·CRT 기능을 사용한다.</p>
+<ul>
+<li>MSVC Release: 기존 큐를 포함한 CTest 7/7.</li>
+<li>MSVC ASan, ClangCL Release, WSL Clang 18 Release, WSL ASan+UBSan: 일반/확장 정확성 각각 2/2.</li>
+<li>공개 헤더 17개 각각 독립 컴파일: MSVC, ClangCL, WSL Clang.</li>
+<li>무작위 문자열 50,000회, 문자열 키 맵 120,000회, slot map 60,000회, sequence 100,000회, LRU 100,000회, age buckets 50,000회, TLSF 100,000회. 할당 실패, 예외, 이동 전용 소유권, stale/cross-owner 핸들, 정렬 안정성도 검사한다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-측정-방법과-한계">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="측정-방법과-한계">측정 방법과 한계</h2></div>
+<div class="prose"><p>MSVC Release / iterator debug 0, 3개 프로세스, 각 15개 표본, 3회 워밍업, A/B 순서 교대, 짧은 작업은 약 2ms 이상 배치한다. 테스트·빌드와 벤치마크는 동시에 실행하지 않는다. 사용자 앱은 그대로 둔다. 표의 중앙값은 세 프로세스 비율의 중앙값, 범위는 그 최솟값/최댓값이다. P90/P10은 양쪽 표본의 가장 큰 편차다. 세 비율이 모두 1.10 이하이고 P90/P10도 1.30 이하인 항목만 이 독립 조건 통과로 표시한다.</p>
+<p>문자열은 copy constructor 대 copy constructor와 pointer+length 생성 대 pointer+length 생성을 분리했다. 두 항목 모두 noinline 바이트 소비 함수로 모든 바이트를 읽으며 소비 함수 비용도 포함한다. 이전의 view 생성 대 STL copy, 또는 길이/중간 1바이트만 소비한 결과와 직접 전후 비교하지 않는다. 일반 해시맵은 tombstone 삭제로 바뀌었으며 적재율 0.5가 기본이다. 메모리 예산이 같은 STL 비교가 아니다. 슬롯/sequence/LRU/age/arena는 특정 용도의 대조다. STL과 API·메모리·실패 조건이 다르므로 일반 대체 우위로 확대하지 않는다. TLSF는 사용자 제공 arena의 128B 순차 할당/해제 대 CRT new/delete이며 초기 arena 확보 비용·실제 엔진 heap 분포는 포함하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-결과">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="결과">결과</h2></div>
+<div class="prose"><p>세 프로세스의 중앙 비율이 모두 1.10 이내인 조건은 81/82개다. 편차까지 포함한 현재 독립 통과 조건은 2/82개다. 배열 확장 65,536개는 한 프로세스에서 목표를 초과했고, 다수 항목은 활성 사용자 환경의 표본 편차로 최종 수용을 보류한다. 문자열 복사/길이 지정 생성은 모든 크기에서 비율 기준을 충족했다. 이는 엔진 통합 완료 판정이 아니다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>작업</th><th style="text-align:right">N</th><th style="text-align:right">중앙 비율</th><th style="text-align:right">세 프로세스 범위</th><th style="text-align:right">최대 P90/P10</th><th>판정</th></tr></thead>
+<tbody><tr><td>array_growth</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.167</td><td style="text-align:right">0.161–0.174</td><td class="num" style="text-align:right">2.15</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>array_growth</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.311</td><td style="text-align:right">0.305–0.320</td><td class="num" style="text-align:right">2.08</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>array_growth</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.489</td><td style="text-align:right">0.477–0.490</td><td class="num" style="text-align:right">1.92</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>array_growth</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.560</td><td style="text-align:right">0.545–0.654</td><td class="num" style="text-align:right">2.30</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>array_growth</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.538</td><td style="text-align:right">0.522–0.803</td><td class="num" style="text-align:right">4.28</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>array_growth</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">0.642</td><td style="text-align:right">0.616–1.373</td><td class="num" style="text-align:right">2.26</td><td>목표 초과 포함</td></tr>
+<tr><td>array_reserved</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.918</td><td style="text-align:right">0.796–0.958</td><td class="num" style="text-align:right">2.17</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>array_reserved</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.844</td><td style="text-align:right">0.821–0.846</td><td class="num" style="text-align:right">1.86</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>array_reserved</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.859</td><td style="text-align:right">0.829–0.862</td><td class="num" style="text-align:right">2.05</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>array_reserved</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.787</td><td style="text-align:right">0.786–0.799</td><td class="num" style="text-align:right">1.78</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>array_reserved</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.797</td><td style="text-align:right">0.770–0.812</td><td class="num" style="text-align:right">1.87</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>array_reserved</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">0.815</td><td style="text-align:right">0.803–0.818</td><td class="num" style="text-align:right">1.87</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>fifo_batch</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.364</td><td style="text-align:right">0.347–0.374</td><td class="num" style="text-align:right">1.64</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>fifo_batch</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.336</td><td style="text-align:right">0.325–0.338</td><td class="num" style="text-align:right">2.38</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>fifo_batch</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.334</td><td style="text-align:right">0.325–0.416</td><td class="num" style="text-align:right">1.88</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>fifo_batch</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.373</td><td style="text-align:right">0.329–0.390</td><td class="num" style="text-align:right">1.47</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>fifo_batch</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.379</td><td style="text-align:right">0.322–0.388</td><td class="num" style="text-align:right">1.48</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>fifo_batch</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">0.368</td><td style="text-align:right">0.364–0.368</td><td class="num" style="text-align:right">1.69</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_build</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.146</td><td style="text-align:right">0.144–0.147</td><td class="num" style="text-align:right">1.82</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_build</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.116</td><td style="text-align:right">0.113–0.121</td><td class="num" style="text-align:right">1.58</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_build</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.133</td><td style="text-align:right">0.132–0.163</td><td class="num" style="text-align:right">3.03</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_build</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.086</td><td style="text-align:right">0.085–0.098</td><td class="num" style="text-align:right">2.90</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_build</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.119</td><td style="text-align:right">0.101–0.139</td><td class="num" style="text-align:right">1.50</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_build</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">0.195</td><td style="text-align:right">0.186–0.200</td><td class="num" style="text-align:right">1.54</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_hit</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.623</td><td style="text-align:right">0.621–0.628</td><td class="num" style="text-align:right">3.33</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_hit</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.686</td><td style="text-align:right">0.686–0.689</td><td class="num" style="text-align:right">1.67</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_hit</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.617</td><td style="text-align:right">0.607–0.628</td><td class="num" style="text-align:right">1.38</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_hit</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.713</td><td style="text-align:right">0.709–0.715</td><td class="num" style="text-align:right">1.40</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_hit</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.576</td><td style="text-align:right">0.566–0.578</td><td class="num" style="text-align:right">1.97</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_hit</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">0.552</td><td style="text-align:right">0.538–0.559</td><td class="num" style="text-align:right">1.30</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_miss</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.703</td><td style="text-align:right">0.653–0.716</td><td class="num" style="text-align:right">2.23</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_miss</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.617</td><td style="text-align:right">0.607–0.619</td><td class="num" style="text-align:right">1.59</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_miss</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.512</td><td style="text-align:right">0.511–0.512</td><td class="num" style="text-align:right">1.49</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_miss</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.706</td><td style="text-align:right">0.702–0.711</td><td class="num" style="text-align:right">1.82</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_miss</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.826</td><td style="text-align:right">0.821–0.831</td><td class="num" style="text-align:right">1.69</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>map_miss</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">0.693</td><td style="text-align:right">0.638–0.739</td><td class="num" style="text-align:right">1.41</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_append</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.983</td><td style="text-align:right">0.971–0.990</td><td class="num" style="text-align:right">1.50</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_append</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.226</td><td style="text-align:right">0.209–0.235</td><td class="num" style="text-align:right">1.86</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_append</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.984</td><td style="text-align:right">0.975–0.989</td><td class="num" style="text-align:right">2.05</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_append</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.795</td><td style="text-align:right">0.774–0.808</td><td class="num" style="text-align:right">1.81</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_append</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.722</td><td style="text-align:right">0.691–0.741</td><td class="num" style="text-align:right">1.74</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_append</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">0.752</td><td style="text-align:right">0.733–0.763</td><td class="num" style="text-align:right">1.92</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_copy</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.902</td><td style="text-align:right">0.900–0.902</td><td class="num" style="text-align:right">1.49</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_copy</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.042</td><td style="text-align:right">0.042–0.042</td><td class="num" style="text-align:right">1.47</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_copy</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">1.040</td><td style="text-align:right">1.029–1.054</td><td class="num" style="text-align:right">1.81</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_copy</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">1.021</td><td style="text-align:right">1.005–1.042</td><td class="num" style="text-align:right">2.22</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_copy</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">1.003</td><td style="text-align:right">0.965–1.011</td><td class="num" style="text-align:right">1.61</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_copy</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">0.989</td><td style="text-align:right">0.966–1.060</td><td class="num" style="text-align:right">1.41</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_find</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.626</td><td style="text-align:right">0.622–0.785</td><td class="num" style="text-align:right">2.11</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_find</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.791</td><td style="text-align:right">0.769–0.800</td><td class="num" style="text-align:right">1.88</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_find</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.811</td><td style="text-align:right">0.799–0.815</td><td class="num" style="text-align:right">2.31</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_find</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.422</td><td style="text-align:right">0.412–0.454</td><td class="num" style="text-align:right">1.56</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_find</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.209</td><td style="text-align:right">0.207–0.215</td><td class="num" style="text-align:right">1.72</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_find</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">0.217</td><td style="text-align:right">0.210–0.218</td><td class="num" style="text-align:right">1.79</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_view_construct</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.852</td><td style="text-align:right">0.848–0.865</td><td class="num" style="text-align:right">1.71</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_view_construct</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.054</td><td style="text-align:right">0.054–0.054</td><td class="num" style="text-align:right">1.66</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_view_construct</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.985</td><td style="text-align:right">0.962–0.993</td><td class="num" style="text-align:right">1.73</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_view_construct</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.993</td><td style="text-align:right">0.965–0.994</td><td class="num" style="text-align:right">1.48</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_view_construct</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">1.004</td><td style="text-align:right">0.994–1.020</td><td class="num" style="text-align:right">1.16</td><td><span class="chip ok">독립 조건 통과</span></td></tr>
+<tr><td>string_view_construct</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">1.057</td><td style="text-align:right">1.004–1.065</td><td class="num" style="text-align:right">1.43</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>age_expiration</td><td class="num" style="text-align:right">256</td><td class="num" style="text-align:right">0.730</td><td style="text-align:right">0.728–0.736</td><td class="num" style="text-align:right">2.02</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>age_expiration</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.095</td><td style="text-align:right">0.092–0.099</td><td class="num" style="text-align:right">1.44</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>atom_duplicate</td><td class="num" style="text-align:right">256</td><td class="num" style="text-align:right">0.810</td><td style="text-align:right">0.752–0.811</td><td class="num" style="text-align:right">1.60</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>atom_duplicate</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.812</td><td style="text-align:right">0.785–0.822</td><td class="num" style="text-align:right">1.86</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>fixed_arena_churn</td><td class="num" style="text-align:right">256</td><td class="num" style="text-align:right">0.570</td><td style="text-align:right">0.566–0.579</td><td class="num" style="text-align:right">1.51</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>fixed_arena_churn</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.574</td><td style="text-align:right">0.528–0.575</td><td class="num" style="text-align:right">1.52</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>function_dispatch</td><td class="num" style="text-align:right">256</td><td class="num" style="text-align:right">0.864</td><td style="text-align:right">0.861–0.867</td><td class="num" style="text-align:right">1.92</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>function_dispatch</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.955</td><td style="text-align:right">0.893–0.973</td><td class="num" style="text-align:right">1.61</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>lru_touch</td><td class="num" style="text-align:right">256</td><td class="num" style="text-align:right">0.251</td><td style="text-align:right">0.251–0.257</td><td class="num" style="text-align:right">1.56</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>lru_touch</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.266</td><td style="text-align:right">0.248–0.279</td><td class="num" style="text-align:right">1.62</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>owned_array</td><td class="num" style="text-align:right">256</td><td class="num" style="text-align:right">0.976</td><td style="text-align:right">0.877–1.054</td><td class="num" style="text-align:right">2.22</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>owned_array</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.950</td><td style="text-align:right">0.825–0.981</td><td class="num" style="text-align:right">1.88</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>radix_sort_u64</td><td class="num" style="text-align:right">256</td><td class="num" style="text-align:right">1.086</td><td style="text-align:right">1.062–1.087</td><td class="num" style="text-align:right">1.45</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>radix_sort_u64</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.424</td><td style="text-align:right">0.421–0.456</td><td class="num" style="text-align:right">1.68</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>sequence_window</td><td class="num" style="text-align:right">256</td><td class="num" style="text-align:right">0.064</td><td style="text-align:right">0.063–0.070</td><td class="num" style="text-align:right">1.47</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>sequence_window</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.041</td><td style="text-align:right">0.040–0.042</td><td class="num" style="text-align:right">1.93</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>slot_lifetime</td><td class="num" style="text-align:right">256</td><td class="num" style="text-align:right">0.262</td><td style="text-align:right">0.249–0.263</td><td class="num" style="text-align:right">1.66</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>slot_lifetime</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.212</td><td style="text-align:right">0.206–0.218</td><td class="num" style="text-align:right">1.34</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_map_build</td><td class="num" style="text-align:right">256</td><td class="num" style="text-align:right">0.614</td><td style="text-align:right">0.607–0.620</td><td class="num" style="text-align:right">1.29</td><td><span class="chip ok">독립 조건 통과</span></td></tr>
+<tr><td>string_map_build</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.656</td><td style="text-align:right">0.537–0.741</td><td class="num" style="text-align:right">1.55</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_map_hit</td><td class="num" style="text-align:right">256</td><td class="num" style="text-align:right">0.644</td><td style="text-align:right">0.641–0.646</td><td class="num" style="text-align:right">1.84</td><td>비율 충족 / 편차 재검증</td></tr>
+<tr><td>string_map_hit</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.728</td><td style="text-align:right">0.712–0.732</td><td class="num" style="text-align:right">1.73</td><td>비율 충족 / 편차 재검증</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-api수명-계약">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="api수명-계약">API·수명 계약</h2></div>
+<div class="prose"><p>배열은 noexcept move 또는 copy 경로에서 재할당 실패 시 원본 값을 보존한다. move-only throwing move와 erase 중 throwing assignment는 기본 보장이다. 중간 insert는 별도 버퍼를 사용하므로 주소를 무효화하며 항상 무할당이라고 가정하지 않는다. 맵 재해시는 noexcept key/value move 또는 양쪽 copy 가능을 요구한다. hash/equality 및 저장소와 함께 전파되는 allocator/policy 복사·대입은 noexcept여야 한다. 비복사 값 컨테이너의 복사는 컴파일 단계에서 거부한다.</p>
+<p>string은 23B SSO이며 UTF-8 바이트·내부 NUL을 보존한다. 대소문자 변환/유니코드 정규화는 범위 밖이다. 사용자 resource는 컨테이너보다 오래 살아야 하며 fixed/monotonic reset/release는 그 저장소를 쓰는 객체를 파괴한 뒤 호출한다. allocator는 외부 컨테이너 저장소와 함께 전파하고 내부 값의 별도 allocator까지 자동 전파하지 않는다.</p>
+<p>slot/atom 핸들은 테이블 수명 안에서만 유효하다. clear/erase 후 generation을 검사하고 다른 owner 핸들을 거부한다. generation wrap 시 슬롯을 퇴역시키거나 atom 재사용을 중단한다. sequence/age는 모듈러 uint64 wrap을 허용하지 않는다. LRU accessor/링크 저장소는 리스트보다 오래 살아야 하고 한 링크는 한 리스트에만 속한다.</p>
+<p>일반 컨테이너와 resource는 자체 동기화를 하지 않는다. TLSF는 64비트 고정 사용자 arena, 물리 이웃 병합, 64x16 비트맵, 16B 블록 정렬이며 상위 크기 클래스 반올림/fragmentation으로 실패할 수 있다. CRT로 자동 fallback하지 않는다. hash_bytes는 자체 블록 혼합으로 변경했고 영속 파일 포맷/보안 해시로 사용하지 않는다. 작은 정렬은 안정 insertion/merge, 큰 정렬은 LSD이며 noexcept 이동·대입·키 추출을 요구한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-수용-경계">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="수용-경계">수용 경계</h2></div>
+<div class="prose"><p>느린 항목과 편차 초과 항목을 평균으로 숨겨 전체 통과시키지 않는다. 엔진 PPL 별칭 및 실제 소비자는 변경하지 않았다. 락 프리 큐의 기존 성능 보고서는 별도이며 이번 일반 컨테이너 확장 결과로 대체하지 않는다. 문자열/새 타입의 보완과 실제 소비자별 메모리·프레임 수용을 마친 범위부터 적용한다.</p>
+<p>이 보고서 작성 시점에는 고정 용량 MPSC 전용 타입을 제공하지 않았다. 예약 후 멈춘 생산자가 소비자를 막는 단순 sequence 링을 lock-free라고 추가하지 않았다. 당시 다중 생산자용 선택 타입은 기존 FAA lock_free_queue다. GCC/macOS/ARM64 및 OS 간 성능 행렬, 실제 엔진 씬·종료 수용은 남아 있다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-2026-10-26-후속-구현">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="2026-10-26-후속-구현">2026-10-26 후속 구현</h2></div>
+<div class="prose"><p>고정 값 풀과 취소 가능한 FAA publication ring의 <code>bounded_mpsc_queue</code>를 추가했다. 대형 배열 재할당, 해시맵 miss 조회, 측정 편차를 분리한 후속 검증은 <a href="MPSCVarianceAcceptance20261026.html">MPSC·배열·편차 보고서</a>가 정본이다. 위 표의 역사적 측정값은 수정하지 않는다. 후속 문자열 비교는 양쪽 복사 생성자를 같은 방식으로 호출하고 pointer+length 생성은 별도 조건으로 측정하므로, 이전 복사 표와 직접 이어 붙이지 않는다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="ContainerLibraryExpansion20261025.md"><code>docs/analysis/ContainerLibraryExpansion20261025.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

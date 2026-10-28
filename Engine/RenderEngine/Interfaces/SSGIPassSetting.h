@@ -1,17 +1,4 @@
 #pragma once
-#include "../../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include "../../Utility_Framework/Foundation/Core.Minimal.h"
 
-struct [[reflgen::reflect]] SSGIPassSetting
-{
-   public:
-    SSGIPassSetting() = default;
-
-    bool isOn{ true };
-    bool useOnlySSGI{ false };
-    int useDualFilteringStep{ 2 };
-    float radius{ 4.f };
-    float thickness{ 0.5f };
-    float intensity{ 1.f };
-    int ssratio{ 4 };
-};
+// Compatibility include; the runtime and renderer share this settings contract.
+#include "../../Utility_Framework/Runtime/RenderSettings/SSGIPassSetting.h"

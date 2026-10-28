@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
@@ -13,7 +14,7 @@ namespace RenderTest
             bool ok{};
             std::size_t mat{}, matSem{}, matAuth{}, tex{}, texSem{}, texAuth{}, mesh{}, skel{}, anim{};
         };
-        std::vector<Model> corpus;
+        ce::dynamic_array<Model> corpus;
     };
     // MBC2 — identity epoch header·stable key 규칙 엔진·sidecar schema v2 코덱/폐포.
     //

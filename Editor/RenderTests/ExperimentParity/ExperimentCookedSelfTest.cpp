@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -94,7 +95,7 @@ namespace RenderTest
         }
 
         template <typename Key>
-        [[nodiscard]] bool SameKeys(const std::vector<Key>& a, const std::vector<Key>& b)
+        [[nodiscard]] bool SameKeys(const ce::dynamic_array<Key>& a, const ce::dynamic_array<Key>& b)
         {
             if (a.size() != b.size()) return false;
             if (a.empty()) return true;
@@ -108,7 +109,7 @@ namespace RenderTest
             return std::visit([&](const auto& left) -> bool
             {
                 using T = std::decay_t<decltype(left)>;
-                const auto& right = std::get<T>(b);
+                const auto& right = ce::get<T>(b);
                 if constexpr (std::is_same_v<T, float>) return SameFloat(left, right);
                 else if constexpr (std::is_same_v<T, math::vector2>) return Same(left, right);
                 else if constexpr (std::is_same_v<T, math::vector3>) return Same(left, right);
@@ -475,11 +476,11 @@ namespace RenderTest
         // ★ "false 를 돌려줬다"만 보면 부족하다. **draft 가 나오지 않았는지**도
         //   봐야 한다 — 거부해 놓고 빈 모델을 채워 주면 legacy 의 조용한 오독을
         //   이름만 바꿔 물려받는 것이다.
-        void ExpectRejected(std::vector<std::byte> bytes, const std::string& what,
+        void ExpectRejected(ce::dynamic_array<std::byte> bytes, const std::string& what,
             Checker& check)
         {
             ex::ModelDraft draft{};
-            std::vector<ex::ModelLoadIssue> issues;
+            ce::dynamic_array<ex::ModelLoadIssue> issues;
             const bool accepted = ck::Read(bytes, draft, issues);
 
             check.Check(!accepted, "거부되어야 한다: " + what);
@@ -565,7 +566,7 @@ namespace RenderTest
                 return {};
             }
             ex::AssetId id{};
-            std::vector<ck::ModelIdentityIssue> issues;
+            ce::dynamic_array<ck::ModelIdentityIssue> issues;
             if (!ck::ReadAssetIdFromMeta(text, id, issues))
             {
                 outFailure = "meta GUID를 읽을 수 없다: " + metaPath.string();
@@ -586,7 +587,7 @@ namespace RenderTest
             const auto rejects = [&](const std::string& yaml, const std::string& what)
             {
                 assets::ModelSidecarV2 parsed;
-                std::vector<assets::SidecarIssue> issues;
+                ce::dynamic_array<assets::SidecarIssue> issues;
                 check.Check(!assets::ReadModelSidecarV2(yaml, parsed, issues), what);
             };
             rejects(
@@ -620,7 +621,7 @@ namespace RenderTest
                 "model GUID가 shard된 canonical Derived path를 만든다");
 
             const auto entry = [&](ex::AssetId id, ck::CookedAssetKind kind,
-                std::string path, std::vector<ex::AssetId> dependencies)
+                std::string path, ce::dynamic_array<ex::AssetId> dependencies)
             {
                 ck::CookedAssetManifestEntry value;
                 value.assetId = id;
@@ -663,7 +664,7 @@ namespace RenderTest
                 "manifest bytes가 입력 순서와 무관하게 결정적이다");
 
             ck::CookedAssetManifest restoredManifest;
-            std::vector<ck::AssetManifestIssue> manifestIssues;
+            ce::dynamic_array<ck::AssetManifestIssue> manifestIssues;
             check.Check(ck::ReadAssetManifest(write.bytes,
                 restoredManifest, manifestIssues), "manifest를 엄격히 읽는다");
             const ck::CookedAssetManifestEntry* restoredModel =
@@ -734,7 +735,7 @@ namespace RenderTest
             {
                 ck::Sha256Digest stale = digest;
                 stale[0] ^= 1u;
-                std::vector<ck::AssetManifestIssue> issues;
+                ce::dynamic_array<ck::AssetManifestIssue> issues;
                 check.Check(restoredModel && !ck::VerifyArtifact(*restoredModel,
                     baked.size(), stale, issues),
                     "stale artifact SHA-256을 거부한다");
@@ -798,12 +799,12 @@ namespace RenderTest
                 outLog += "    " + issue.context + ": " + issue.message + "\n";
             return false;
         }
-        const std::vector<std::byte>& baked = bakedResult.bytes;
+        const ce::dynamic_array<std::byte>& baked = bakedResult.bytes;
         check.Check(!baked.empty(), "굽기 산출물이 비어 있지 않다");
 
         {
             ex::ModelDraft restored{};
-            std::vector<ex::ModelLoadIssue> issues;
+            ce::dynamic_array<ex::ModelLoadIssue> issues;
             const bool ok = ck::Read(baked, restored, issues);
             check.Check(ok, "정상 페이로드를 읽는다");
             if (ok) CompareDrafts(original, restored, check, "합성");
@@ -818,7 +819,7 @@ namespace RenderTest
             masked.materials[0].properties.push_back({"emissiveStrength", 8.f});
             const auto written = ck::Write(masked);
             ex::ModelDraft restored;
-            std::vector<ex::ModelLoadIssue> issues;
+            ce::dynamic_array<ex::ModelLoadIssue> issues;
             const bool ok = written.Succeeded() && ck::Read(written.bytes, restored, issues);
             check.Check(ok, "W4/W6 CEMC7 coverage/emissiveStrength round trip");
             if (ok) CompareDrafts(masked, restored, check, "W4 coverage");
@@ -854,7 +855,7 @@ namespace RenderTest
         }
         {
             ex::ModelDraft invalid = original;
-            auto& texture = std::get<ex::TextureReference>(
+            auto& texture = ce::get<ex::TextureReference>(
                 invalid.materials[0].properties.back().value);
             texture.assetId = {};
             check.Check(!texture.fallbackPath.empty(),
@@ -950,10 +951,10 @@ namespace RenderTest
             ExpectRejected(std::move(grown), "파일 뒤에 바이트가 붙음", check);
         }
         {
-            ExpectRejected(std::vector<std::byte>{}, "빈 파일", check);
+            ExpectRejected(ce::dynamic_array<std::byte>{}, "빈 파일", check);
         }
         {
-            ExpectRejected(std::vector<std::byte>(4, std::byte{ 0 }),
+            ExpectRejected(ce::dynamic_array<std::byte>(4, std::byte{ 0 }),
                 "헤더보다 짧은 파일", check);
         }
 
@@ -966,7 +967,7 @@ namespace RenderTest
             check.Check(write.Succeeded(), "스켈레톤 없는 모델 굽기");
 
             ex::ModelDraft restored{};
-            std::vector<ex::ModelLoadIssue> issues;
+            ce::dynamic_array<ex::ModelLoadIssue> issues;
             const bool ok = ck::Read(write.bytes, restored, issues);
             check.Check(ok, "스켈레톤 없는 모델을 읽는다");
             if (ok)
@@ -987,7 +988,7 @@ namespace RenderTest
             const ck::CookedWriteResult write = ck::Write(minimal);
             check.Check(write.Succeeded(), "identity가 있는 최소 draft 굽기");
             ex::ModelDraft restored{};
-            std::vector<ex::ModelLoadIssue> issues;
+            ce::dynamic_array<ex::ModelLoadIssue> issues;
             check.Check(ck::Read(write.bytes, restored, issues), "최소 draft 왕복");
             check.Equal(restored.metadata.name, minimal.metadata.name, "최소 draft name");
         }
@@ -1023,7 +1024,7 @@ namespace RenderTest
             return false;
         }
         assets::ModelSidecarV2 sidecar;
-        std::vector<assets::SidecarIssue> sidecarIssues;
+        ce::dynamic_array<assets::SidecarIssue> sidecarIssues;
         if (!assets::ReadModelSidecarV2(modelMetaText, sidecar, sidecarIssues))
         {
             outLog += "  결과: 실패 (schema v2 sidecar가 아님)\n";
@@ -1070,7 +1071,7 @@ namespace RenderTest
             assets::LoadModelAssetGeneration(load);
         check.Check(loaded.Succeeded(), "generation을 런타임 리더로 다시 읽는다");
         std::size_t materials = 0, shaders = 0, textures = 0;
-        std::vector<uuid::uuid16> materialIds;
+        ce::dynamic_array<uuid::uuid16> materialIds;
         if (loaded.Succeeded())
         {
             for (const assets::ModelMaterialAsset& material : loaded.generation->Materials())
@@ -1124,7 +1125,7 @@ namespace RenderTest
         const ck::AssetManifestWriteResult manifestWrite = ck::WriteAssetManifest(manifest);
         check.Check(manifestWrite.Succeeded(), "실자산 model/material GUID manifest를 쓴다");
         ck::CookedAssetManifest restoredManifest;
-        std::vector<ck::AssetManifestIssue> manifestIssues;
+        ce::dynamic_array<ck::AssetManifestIssue> manifestIssues;
         const bool manifestRead = ck::ReadAssetManifest(manifestWrite.bytes,
             restoredManifest, manifestIssues);
         check.Check(manifestRead, "실자산 GUID manifest를 다시 읽는다");

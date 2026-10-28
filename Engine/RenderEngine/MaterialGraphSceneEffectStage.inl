@@ -72,10 +72,10 @@ RGHandle SceneHost::EffectStage::DeclareColor(const own::shared_owner<const Fram
     return lighting;
 }
 
-std::vector<SceneHost::ForwardDraw> SceneHost::EffectStage::BlendedDraws(
+ce::dynamic_array<SceneHost::ForwardDraw> SceneHost::EffectStage::BlendedDraws(
     const own::shared_owner<const Frame>& prepared) const
 {
-    std::vector<ForwardDraw> result;
+    ce::dynamic_array<ForwardDraw> result;
     if (!prepared)
     {
         return result;
@@ -94,7 +94,7 @@ std::vector<SceneHost::ForwardDraw> SceneHost::EffectStage::BlendedDraws(
 
 RGHandle SceneHost::EffectStage::DeclareBlended(const own::shared_owner<const Frame>& prepared,
                                                 EnhancedRenderGraph& graph, const SceneSurfaceTargets::Outputs& opaque,
-                                                const std::vector<std::size_t>& indices, const SceneLayerWork& commands,
+                                                const ce::dynamic_array<std::size_t>& indices, const SceneLayerWork& commands,
                                                 RGHandle lighting, RGHandle shadowMap,
                                                 const EnhancedForwardLighting& forward) const
 {
@@ -341,7 +341,7 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
     own::shared_owner<const IndirectMaterialBatch> blendedCommands;
     if (blended && ordinary)
     {
-        const std::array single{*blended};
+        const ce::fixed_array single{*blended};
         const auto order =
             blendedGroup.empty() ? std::span<const size_t>{single} : std::span<const size_t>{blendedGroup};
         const auto found = std::ranges::find_if(this->layers.blendedRanges, [&](const auto& range)
@@ -743,7 +743,7 @@ RGHandle SceneHost::EffectStage::DeclareShading(const own::shared_owner<const Fr
                 const auto depth =
                     RHIDepthTargetDesc::DepthReadOnly(execution.ResolveHandle(inputs.depth), RHIFormat::D32Float);
                 const auto target = frame->device->CreateRenderTargets({&color, 1}, reconstruct ? nullptr : &depth);
-                std::array<RHIBindingDesc, 4> descriptions{
+                ce::fixed_array<RHIBindingDesc, 4> descriptions{
                     RHIBindingDesc::SrvCube(frame->environment,
                                             frame->environment.IsValid()
                                                 ? frame->device->DescribeTexture(frame->environment).format
@@ -1040,7 +1040,7 @@ RGHandle SceneHost::EffectStage::DeclareRuntimeEffects(const own::shared_owner<c
     external.erase_if([&](const auto& use)
                       { return same_scene_resource(graph, use.handle, tileDepth) && use.access == RGAccessMode::Read; });
     NormalizeSceneReads(graph, external);
-    std::array<EnhancedRenderGraph::RepeatedPhaseView, 4> phases{};
+    ce::fixed_array<EnhancedRenderGraph::RepeatedPhaseView, 4> phases{};
     size_t phaseCount = 0;
     auto depthUses =
         graph.CreateDeclarationUsages({{inputs.depth, RHIResourceState::PixelShaderResource, RGAccessMode::Read},
@@ -1095,7 +1095,7 @@ SceneHost::EffectStage::RuntimeBindings SceneHost::EffectStage::RuntimeState::Ta
     const auto ao = blended ? RHITextureHandle{} : execution.ResolveHandle(ambientOcclusion);
     const auto shadowTexture = frame.shadow ? execution.ResolveHandle(shadowMap) : RHITextureHandle{};
     const bool decalEnabled = inputs.decalBaseline[0].IsValid() && !(transmissionStage || blended);
-    const std::array<std::uint64_t, 13> key{color.id,
+    const ce::fixed_array<std::uint64_t, 13> key{color.id,
                                             depth.id,
                                             owners.id,
                                             ao.id,
@@ -1162,9 +1162,9 @@ RHIBindingTable SceneHost::EffectStage::DecalState::Table(const FrameInput& fram
                                                           bool transmissionStage) const
 {
     const bool enabled = inputs.decalBaseline[0].IsValid() && !transmissionStage;
-    const std::array<RGHandle, 6> handles{inputs.diffuse,          inputs.metalRough,       inputs.normal,
+    const ce::fixed_array<RGHandle, 6> handles{inputs.diffuse,          inputs.metalRough,       inputs.normal,
                                           inputs.decalBaseline[0], inputs.decalBaseline[1], inputs.decalBaseline[2]};
-    std::array<RHIBindingDesc, 6> descriptions;
+    ce::fixed_array<RHIBindingDesc, 6> descriptions;
     for (unsigned i = 0; i < handles.size(); ++i)
     {
         descriptions[i] = RHIBindingDesc::Srv2D(enabled ? execution.ResolveHandle(handles[i]) : RHITextureHandle{},

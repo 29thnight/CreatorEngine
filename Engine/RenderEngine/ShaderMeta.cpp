@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../Containers/ContainerAPI.h"
 #include "ShaderMeta.h"
 
 #include "../Utility_Framework/Authoring/AuthoringParsedDocument.h"
@@ -109,7 +111,7 @@ namespace
 
     template<std::size_t Size>
     bool ParseFloatArray(const Authoring::ReadNode& node, std::string_view context,
-        std::array<float, Size>& outValue, std::string& outError)
+        ce::fixed_array<float, Size>& outValue, std::string& outError)
     {
         if (!node || !node.IsSequence() || node.Size() != Size)
             return Fail(context, std::to_string(Size) + "개 float sequence여야 한다", outError);
@@ -165,21 +167,21 @@ namespace
         }
         case ShaderPropertyType::Float2:
         {
-            std::array<float, 2> value{};
+            ce::fixed_array<float, 2> value{};
             if (!ParseFloatArray(node, context, value, outError)) return false;
             outValue = value;
             return true;
         }
         case ShaderPropertyType::Float3:
         {
-            std::array<float, 3> value{};
+            ce::fixed_array<float, 3> value{};
             if (!ParseFloatArray(node, context, value, outError)) return false;
             outValue = value;
             return true;
         }
         case ShaderPropertyType::Float4:
         {
-            std::array<float, 4> value{};
+            ce::fixed_array<float, 4> value{};
             if (!ParseFloatArray(node, context, value, outError)) return false;
             outValue = value;
             return true;
@@ -199,7 +201,7 @@ namespace
         }
         case ShaderPropertyType::Float4x4:
         {
-            std::array<float, 16> value{};
+            ce::fixed_array<float, 16> value{};
             if (!ParseFloatArray(node, context, value, outError)) return false;
             outValue = value;
             return true;
@@ -219,14 +221,14 @@ namespace
     }
 
     bool ParseProperties(const Authoring::ReadNode& node,
-        std::vector<ShaderPropertyDesc>& outProperties, std::string& outError)
+        ce::dynamic_array<ShaderPropertyDesc>& outProperties, std::string& outError)
     {
         if (!node) return true;
         if (!node.IsSequence()) return Fail("properties", "sequence여야 한다", outError);
         if (node.Size() > kMaxProperties)
             return Fail("properties", "상한 " + std::to_string(kMaxProperties) + "개 초과", outError);
 
-        std::unordered_set<std::string> names;
+        ce::engine_node_set<std::string> names;
         outProperties.reserve(node.Size());
         for (std::size_t index = 0; index < node.Size(); ++index)
         {
@@ -287,14 +289,14 @@ namespace
     }
 
     bool ParseKeywords(const Authoring::ReadNode& node,
-        std::vector<ShaderKeywordAxis>& outKeywords, std::string& outError)
+        ce::dynamic_array<ShaderKeywordAxis>& outKeywords, std::string& outError)
     {
         if (!node) return true;
         if (!node.IsSequence()) return Fail("keywords", "sequence여야 한다", outError);
         if (node.Size() > kMaxKeywordAxes)
             return Fail("keywords", "축 상한 " + std::to_string(kMaxKeywordAxes) + "개 초과", outError);
 
-        std::unordered_set<std::string> axes;
+        ce::engine_node_set<std::string> axes;
         outKeywords.reserve(node.Size());
         for (std::size_t index = 0; index < node.Size(); ++index)
         {
@@ -316,7 +318,7 @@ namespace
                 return Fail(context, "values는 2~" + std::to_string(kMaxKeywordValues)
                     + "개 sequence여야 한다", outError);
             }
-            std::unordered_set<std::string> uniqueValues;
+            ce::engine_node_set<std::string> uniqueValues;
             axis.values.reserve(values.Size());
             for (std::size_t valueIndex = 0; valueIndex < values.Size(); ++valueIndex)
             {
@@ -416,14 +418,14 @@ namespace
     }
 
     bool ParsePasses(const Authoring::ReadNode& node,
-        std::vector<ShaderPassDesc>& outPasses, std::string& outError)
+        ce::dynamic_array<ShaderPassDesc>& outPasses, std::string& outError)
     {
         if (!node || !node.IsSequence() || node.Size() == 0)
             return Fail("passes", "비어 있지 않은 sequence여야 한다", outError);
         if (node.Size() > kMaxPasses)
             return Fail("passes", "상한 " + std::to_string(kMaxPasses) + "개 초과", outError);
 
-        std::unordered_set<std::string> names;
+        ce::engine_node_set<std::string> names;
         outPasses.reserve(node.Size());
         for (std::size_t index = 0; index < node.Size(); ++index)
         {
@@ -537,7 +539,7 @@ namespace
         const auto samplers = node["samplers"];
         if (!samplers || !samplers.IsSequence() || samplers.Size() > 64)
             return Fail(context, "samplers must be a bounded sequence", outError);
-        std::unordered_set<std::string> names;
+        ce::engine_node_set<std::string> names;
         for (const auto& property : meta.properties) names.insert(property.name);
         for (std::size_t index = 0; index < samplers.Size(); ++index)
         {
@@ -570,7 +572,7 @@ namespace
         }
         const auto text = *sourceBytes;
         if (text.empty() || text.size() > 16u * 1024u * 1024u ||
-            ce::hash::to_hex(ce::hash::sha256::compute(text.data(), text.size())) != generated.sourceSha256)
+            ce::crypto::to_hex(ce::crypto::sha256::compute(text.data(), text.size())) != generated.sourceSha256)
             return Fail(context, "generated source SHA-256 mismatch", outError);
         meta.generatedMaterial = std::move(generated);
         return true;
@@ -626,7 +628,7 @@ bool ShaderMetaLoader::LoadFile(const std::filesystem::path& path,
 bool ShaderMetaLoader::LoadFile(const std::filesystem::path& documentPath,
     const std::filesystem::path& sourceOriginPath, const FileGuid& guid,
     ShaderMeta& outMeta, std::string& outError,
-    std::array<std::uint8_t, 32>* outDocumentDigest)
+    ce::fixed_array<std::uint8_t, 32>* outDocumentDigest)
 {
     if (documentPath.extension() != ".shadermeta")
     {
@@ -663,14 +665,14 @@ bool ShaderMetaLoader::LoadFile(const std::filesystem::path& documentPath,
     }
     if (outDocumentDigest)
     {
-        std::vector<std::byte> canonical;
+        ce::dynamic_array<std::byte> canonical;
         if (!Authoring::EncodeCookedDocument(document.Root(), canonical, outError))
         {
             return false;
         }
-        ce::hash::sha256 hash;
+        ce::crypto::sha256 hash;
         const auto origin = candidate.originPath.generic_u8string();
-        const auto documentDigest = ce::hash::sha256::compute(canonical.data(), canonical.size());
+        const auto documentDigest = ce::crypto::sha256::compute(canonical.data(), canonical.size());
         hash.update(documentDigest.data(), documentDigest.size());
         hash.update(origin.data(), origin.size());
         *outDocumentDigest = hash.finish();

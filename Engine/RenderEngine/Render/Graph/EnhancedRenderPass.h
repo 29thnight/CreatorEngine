@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -39,6 +41,7 @@ namespace material_graph
 #include "../../Assets/TextureSampler.h"
 
 class Mesh;
+namespace ce::effects { struct EffectFrame; }
 class Texture;
 namespace material_graph
 {
@@ -73,7 +76,7 @@ struct EnhancedForwardMaterialFlowSnapshot
     float totalSeconds{ 0.f };
     float deltaSeconds{ 0.f };
 
-    std::array<float, 8> Values() const noexcept
+    ce::fixed_array<float, 8> Values() const noexcept
     {
         return { windVector.x, windVector.y, windVector.z, windVector.w,
             uvScroll.x, uvScroll.y, totalSeconds, deltaSeconds };
@@ -122,22 +125,22 @@ struct EnhancedMaterialCoverage
 struct EnhancedForwardMaterialDrawSnapshot
 {
     own::shared_owner<const LX::Runtime::Instance> runtimeInstance;
-    std::vector<own::shared_owner<const LX::Runtime::GraphicsGeneration>> pipelineGenerations;
+    ce::dynamic_array<own::shared_owner<const LX::Runtime::GraphicsGeneration>> pipelineGenerations;
     // W8: 이 packet이 어느 저작 값·어느 프레임의 것인지. 값 검증(IsValid)과는
     // 축이 다르다 — 값이 멀쩡해도 지난 프레임 것이면 섞인 것이다.
     EnhancedMaterialSealIdentity seal{};
     ShaderMetaHandle shaderMetaHandle{};
     RHIShaderPermutationKey permutationKey{};
     ShaderMetaBindingLayout bindingLayout{};
-    std::vector<std::uint16_t> keywordSelections{};
-    std::vector<std::uint8_t> propertyBytes{};
+    ce::dynamic_array<std::uint16_t> keywordSelections{};
+    ce::dynamic_array<std::uint8_t> propertyBytes{};
     EnhancedForwardMaterialFlowSnapshot flow{};
     EnhancedMaterialCoverage coverage{};
     math::color baseColorFactor{ 1.f, 1.f, 1.f, 1.f };
     float metallic{ 0.f };
     float roughness{ 1.f };
     std::uint32_t useNormalMap{ 0 };
-    std::vector<EnhancedMaterialTextureBinding> textureBindings{};
+    ce::dynamic_array<EnhancedMaterialTextureBinding> textureBindings{};
 
     bool IsValid() const noexcept
     {
@@ -159,7 +162,7 @@ struct EnhancedForwardMaterialDrawSnapshot
 struct EnhancedMaterialDrawSnapshot
 {
     own::shared_owner<const LX::Runtime::Instance> runtimeInstance;
-    std::vector<own::shared_owner<const LX::Runtime::GraphicsGeneration>> pipelineGenerations;
+    ce::dynamic_array<own::shared_owner<const LX::Runtime::GraphicsGeneration>> pipelineGenerations;
     // W8: 위 Forward packet과 같은 뜻이다. 밀봉한 쪽이 적고 패스가 대조한다.
     EnhancedMaterialSealIdentity seal{};
     EnhancedMaterialCoverage coverage{};
@@ -169,13 +172,13 @@ struct EnhancedMaterialDrawSnapshot
     // 밀봉해 RT가 문자열/축 순서를 다시 추측하지 않게 한다.
     RHIShaderPermutationKey permutationKey{};
     ShaderMetaBindingLayout bindingLayout{};
-    std::vector<std::uint16_t> keywordSelections{};
-    std::vector<std::uint8_t> propertyBytes{};
+    ce::dynamic_array<std::uint16_t> keywordSelections{};
+    ce::dynamic_array<std::uint8_t> propertyBytes{};
     // normalMap 슬롯에는 항상 폴백 texture까지 묶이므로 texture handle만으로는
     // 저작된 normal map의 유무를 셰이더가 구분할 수 없다. sealing 때 계산한
     // 의미 상태를 snapshot이 함께 소유한다.
     std::uint32_t useNormalMap{ 0 };
-    std::vector<EnhancedMaterialTextureBinding> textureBindings{};
+    ce::dynamic_array<EnhancedMaterialTextureBinding> textureBindings{};
 
     bool IsValid() const noexcept
     {
@@ -409,17 +412,17 @@ class AnimationPaletteFrame final
 {
 public:
     bool Prepare(IRenderDeviceServices& resources,
-        const std::vector<EnhancedDrawItem>* opaque,
-        const std::vector<EnhancedDrawItem>* forward,
-        const std::vector<EnhancedDrawItem>* geometryCandidates = nullptr)
+        const ce::dynamic_array<EnhancedDrawItem>* opaque,
+        const ce::dynamic_array<EnhancedDrawItem>* forward,
+        const ce::dynamic_array<EnhancedDrawItem>* geometryCandidates = nullptr)
     {
         m_matrices.clear();
         m_offsets.clear();
         m_upload = {};
         m_uploadDevice = nullptr;
         m_uploadRecording = 0;
-        std::unordered_map<std::uint64_t, std::uint32_t> paletteCounts;
-        auto collect = [this, &paletteCounts](const std::vector<EnhancedDrawItem>* draws)
+        ce::engine_node_map<std::uint64_t, std::uint32_t> paletteCounts;
+        auto collect = [this, &paletteCounts](const ce::dynamic_array<EnhancedDrawItem>* draws)
         {
             if (!draws)
             {
@@ -530,8 +533,8 @@ public:
     }
 
 private:
-    std::vector<PackedBoneMatrix> m_matrices{};
-    std::unordered_map<std::uint64_t, std::uint32_t> m_offsets{};
+    ce::dynamic_array<PackedBoneMatrix> m_matrices{};
+    ce::engine_node_map<std::uint64_t, std::uint32_t> m_offsets{};
     RHIBufferSlice m_upload{};
     IRenderDeviceServices* m_uploadDevice{};
     std::uint64_t m_uploadRecording{};
@@ -541,6 +544,7 @@ private:
 // 전역 DeviceStates를 만지지 않는 것이 3-6의 규약이다.
 struct EnhancedFrameContext
 {
+    own::shared_owner<const ce::effects::EffectFrame> effects;
     uint32_t viewFlags{};
     // Diagnostic captures retain intermediate attachments even when an effect is disabled.
     bool temporalDiagnosticCapture{false};
@@ -577,9 +581,9 @@ struct EnhancedFrameContext
     // 이 프레임에 그릴 것들. 비어 있으면 패스는 클리어만 한다.
     //
     // draws는 불투명(deferred) 큐다 — GBuffer가 그린다.
-    const std::vector<EnhancedDrawItem>* draws{ nullptr };
+    const ce::dynamic_array<EnhancedDrawItem>* draws{ nullptr };
     // Camera visibility must not remove offscreen shadow casters.
-    const std::vector<EnhancedDrawItem>* shadowDraws{ nullptr };
+    const ce::dynamic_array<EnhancedDrawItem>* shadowDraws{ nullptr };
 
     // 포워드 큐. Forward+가 그린다.
     //
@@ -587,7 +591,7 @@ struct EnhancedFrameContext
     // 하나로 합쳐 두면 GBuffer가 포워드 물체까지 GBuffer에 기록하거나
     // Forward+가 이미 deferred로 그려진 것을 한 번 더 그리게 되는데,
     // 둘 다 '그림이 조금 이상하다'로만 드러나 원인을 찾기 어렵다.
-    const std::vector<EnhancedDrawItem>* forwardDraws{ nullptr };
+    const ce::dynamic_array<EnhancedDrawItem>* forwardDraws{ nullptr };
 
     // Product paths provide the one-per-view packed upload. Isolated pass
     // fixtures may leave this null and use their local fallback.
@@ -595,7 +599,7 @@ struct EnhancedFrameContext
 
     // 이 프레임의 광원. 씬의 Light를 그대로 들지 않고 셰이더가 쓰는 형태로
     // 복사해 온다 — 메시·재질과 같은 이유다.
-    const std::vector<EnhancedLight>* lights{ nullptr };
+    const ce::dynamic_array<EnhancedLight>* lights{ nullptr };
 };
 
 class EnhancedRenderPass

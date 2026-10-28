@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Authoring/AuthoringNodeView.h"
 #include <mathematics/vector2.hpp>
@@ -54,7 +55,7 @@ public:
 	// navObject를 쓰지 않고, 한 번 해석되면 OnBeforeSerialize가 새 경로로 치유한다.
 	void LoadLegacyNavigation(const Authoring::NodeView& componentNode); // D3-a-4
 	void DeserializeNavi();
-	std::vector<Navigation> GetNavigations() const { return navigations; }
+	ce::dynamic_array<Navigation> GetNavigations() const { return navigations; }
 	Entity* GetNextNavi(Direction dir);
 	bool IsNavigationThis();
 	void SetNavLock(bool lock) { isNavLocked = lock; }
@@ -98,19 +99,19 @@ public:
 	[[reflgen::ignore]]
 	bool m_canvasLinkLogged = false;
 
-	std::vector<Navigation> navigations{};
+	ce::dynamic_array<Navigation> navigations{};
 private:
 	// 런타임 해석 캐시. 디스크 정본은 source-relative hierarchy route이고,
 	// 캐시는 현재 씬의 세대 검증 핸들이다. DDOL 이송에서는 OnAddedToScene이
 	// 래치를 풀어 모든 노드가 새 씬에 붙은 다음 DeserializeNavi가 다시 채운다.
 	[[reflgen::ignore]]
-	std::array<EntityHandle, NavDirectionCount> navigation{};
+	ce::fixed_array<EntityHandle, NavDirectionCount> navigation{};
 
 	// U7 이전 파일에만 있는 navObject 값. 반영 대상이 아니며 로드 직후 한 번만
 	// 사용한다. 구 프리팹은 Instantiate 전 YAML 복사본에서 로컬 경로로 승격되고,
 	// 구 씬은 이 캐시로 한 번 해석한 뒤 다음 저장에서 새 경로만 쓴다.
 	[[reflgen::ignore]]
-	std::array<HashedGuid, NavDirectionCount> m_legacyNavigationIds{};
+	ce::fixed_array<HashedGuid, NavDirectionCount> m_legacyNavigationIds{};
 
 	bool UpdateNavigationRoute(Navigation& nav, Entity* target);
 	Entity* ResolveNavigationRoute(const Navigation& nav) const;

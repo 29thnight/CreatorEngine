@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 // P5 telemetry view. All values come from the immutable capture; the UI never
 // asks the renderer or process for live state while drawing.
 #include "ProfilerView.h"
@@ -33,9 +34,9 @@ namespace editor::profiler_view
 		struct gpu_series_cache
 		{
 			std::weak_ptr<const ce::capture_session> capture;
-			std::vector<std::optional<double>> values;
-			std::vector<std::uint8_t> ready;
-			std::vector<std::pair<ce::profile_tick, ce::profile_tick>> scratch;
+			ce::dynamic_array<std::optional<double>> values;
+			ce::dynamic_array<std::uint8_t> ready;
+			ce::dynamic_array<std::pair<ce::profile_tick, ce::profile_tick>> scratch;
 		};
 		constexpr metric_descriptor kMetrics[] = {
 			{ metric::cpu, "CPU", "%", "엔진 프로세스 / 전체 논리 CPU", IM_COL32(112, 191, 255, 255), 1 },
@@ -55,7 +56,7 @@ namespace editor::profiler_view
 
 		std::optional<double> gpu_busy_ms(const ce::capture_session& capture,
 		                                  const ce::frame_record& frame,
-		                                  std::vector<std::pair<ce::profile_tick, ce::profile_tick>>& spans)
+		                                  ce::dynamic_array<std::pair<ce::profile_tick, ce::profile_tick>>& spans)
 		{
 			spans.clear();
 			for (const ce::profile_event& event : frame.events)
@@ -115,8 +116,8 @@ namespace editor::profiler_view
 			double minValue = 0.0, maxValue = 0.0, sum = 0.0;
 			std::uint32_t selectedCount = 0;
 			bool haveScale = false;
-			std::vector<plotted_sample> points;
-			std::vector<double> selectedValues;
+			ce::dynamic_array<plotted_sample> points;
+			ce::dynamic_array<double> selectedValues;
 			points.reserve((std::min)(capture.frame_count(), last - first + 1));
 			const auto frames = capture.frames();
 			for (std::size_t i = 0; i < frames.size(); ++i)
@@ -246,7 +247,7 @@ namespace editor::profiler_view
 			{
 				ImGui::TextUnformatted("CPU Self 상위 마커");
 				ImGui::Separator();
-				std::vector<const ce::aggregate_row*> ranked;
+				ce::dynamic_array<const ce::aggregate_row*> ranked;
 				for (const auto& row : view.aggregate().flat())
 					if (row.self_ticks > 0) ranked.push_back(&row);
 				std::sort(ranked.begin(), ranked.end(), [](const auto* a, const auto* b)
@@ -431,7 +432,7 @@ namespace editor::profiler_view
     {
         const auto* capture = reader().capture();
         if (!capture) { ImGui::TextDisabled("Record a capture to inspect Physics counters."); return; }
-        std::vector<std::uint64_t> sessions;
+        ce::dynamic_array<std::uint64_t> sessions;
         for (const auto& frame : capture->frames())
             for (const auto& sample : frame.counters)
                 if (sample.cpu.session && std::find(sessions.begin(), sessions.end(), sample.cpu.session) == sessions.end())
@@ -467,7 +468,7 @@ namespace editor::profiler_view
         descriptor = ce::find_counter(capture->counter_descriptors(), metric);
         if (!descriptor) return;
         struct point { std::uint32_t frame; std::uint64_t tick; double value; };
-        std::vector<point> points;
+        ce::dynamic_array<point> points;
         for (const auto& frame : capture->frames())
         {
             if (frame.engine_frame < reader().selected_first() || frame.engine_frame > reader().selected_last()) continue;

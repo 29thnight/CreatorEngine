@@ -1,3 +1,6 @@
+#include "../../Utility_Framework/Foundation/EngineStorage.h"
+#include "../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -34,7 +37,7 @@ namespace wave
     namespace probe
     {
         bool DecodePcmS16Mono48k(const std::filesystem::path& source,
-            std::size_t wantedFrames, std::vector<std::int16_t>& samples,
+            std::size_t wantedFrames, ce::dynamic_array<std::int16_t>& samples,
             std::uint64_t& length)
         {
             ma_decoder decoder{};
@@ -74,7 +77,7 @@ namespace wave
             ma_vfs_callbacks callbacks{}; // Required first member by the VFS ABI.
             ma_default_vfs files{};
             std::mutex registryMutex;
-            std::unordered_map<std::string, own::shared_owner<const experiment::cooked::CookedAudioClipSource>> sources;
+            ce::engine_node_map<std::string, own::shared_owner<const experiment::cooked::CookedAudioClipSource>> sources;
             std::atomic<bool> cancelling{ false };
             std::atomic<std::uint64_t> readFailures{ 0u };
             std::atomic<std::uint64_t> bytesRead{ 0u };
@@ -258,11 +261,11 @@ namespace wave
             ma_node_base node{}; // Required first member by the node ABI.
             struct Delay final
             {
-                std::vector<float> samples;
+                ce::dynamic_array<float> samples;
                 std::size_t cursor{ 0u };
                 float filter{ 0.0f };
             };
-            std::array<std::array<Delay, 6u>, 2u> delays;
+            ce::fixed_array<ce::fixed_array<Delay, 6u>, 2u> delays;
             std::atomic<float> feedback{ 0.72f };
             std::atomic<float> damping{ 0.25f };
             bool ready{ false };
@@ -274,7 +277,7 @@ namespace wave
                 {
                     return false;
                 }
-                constexpr std::array<float, 6u> seconds{ 0.0297f, 0.0371f, 0.0411f, 0.0437f, 0.005f, 0.0017f };
+                constexpr ce::fixed_array<float, 6u> seconds{ 0.0297f, 0.0371f, 0.0411f, 0.0437f, 0.005f, 0.0017f };
                 const ma_uint32 sampleRate = ma_engine_get_sample_rate(&engine);
                 for (std::size_t channel = 0u; channel < delays.size(); ++channel)
                 {
@@ -351,7 +354,7 @@ namespace wave
 
         struct Clip final
         {
-            std::vector<float> pcm;
+            ce::dynamic_array<float> pcm;
             ClipInfo info{};
             std::string path;
             bool cooked{ false };
@@ -438,7 +441,7 @@ namespace wave
         // Stable addresses are required by the graph and pending resource jobs.
         struct VoiceSlot final
         {
-            std::array<Source, 2u> sources;
+            ce::fixed_array<Source, 2u> sources;
             own::shared_owner<Clip> clip;
             PlayRequest request{};
             bool initialized{ false };
@@ -466,18 +469,18 @@ namespace wave
         float retrySeconds{ 1.0f };
         RoomReverb reverb;
         ReverbPreset preset{ ReverbPreset::Room };
-        std::unordered_map<ClipKey, own::shared_owner<Clip>> clips;
-        std::unordered_map<std::uint64_t, own::shared_owner<Clip>> clipLeases;
+        ce::engine_node_map<ClipKey, own::shared_owner<Clip>> clips;
+        ce::engine_node_map<std::uint64_t, own::shared_owner<Clip>> clipLeases;
         std::uint64_t nextClipLease{ 1u };
-        std::unordered_map<std::uint16_t, std::unique_ptr<ma_sound_group>> busGroups;
-        std::unordered_map<std::uint16_t, float> busVolumes;
-        std::deque<VoiceSlot> voices;
-        std::vector<std::size_t> freeVoices;
+        ce::engine_node_map<std::uint16_t, std::unique_ptr<ma_sound_group>> busGroups;
+        ce::engine_node_map<std::uint16_t, float> busVolumes;
+        ce::segmented_deque<VoiceSlot> voices;
+        ce::dynamic_array<std::size_t> freeVoices;
         std::uint64_t nextSource{ 1u };
         std::string lastError;
         DeviceSettings actual{};
         AudioDeviceDiagnostics deviceDiagnostics{};
-        std::array<std::atomic<std::uint64_t>, kHistogramBins> callbackHistogram{};
+        ce::fixed_array<std::atomic<std::uint64_t>, kHistogramBins> callbackHistogram{};
         std::atomic<std::uint64_t> callbackNanoseconds{ 0u };
         std::atomic<std::uint64_t> callbackMaximumNs{ 0u };
         std::atomic<std::uint64_t> callbacksOverHalfPeriod{ 0u };
@@ -643,7 +646,7 @@ namespace wave
             {
                 silentFramesPending += std::max(0.0, elapsed) * actual.sampleRate;
             }
-            std::array<float, 512u * 2u> silence{};
+            ce::fixed_array<float, 512u * 2u> silence{};
             // Bound work per tick while carrying, rather than losing, elapsed time.
             ma_uint64 remaining = static_cast<ma_uint64>(std::min(silentFramesPending,
                 static_cast<double>(actual.sampleRate) * 0.25));
@@ -769,7 +772,7 @@ namespace wave
         {
             const PlayRequest& request = slot.request;
             const float angle = std::clamp(request.spatialBlend, 0.0f, 1.0f) * kHalfPi;
-            const std::array<float, 2u> gains{
+            const ce::fixed_array<float, 2u> gains{
                 request.spatialBlend >= 1.0f ? 0.0f : std::cos(angle),
                 request.spatialBlend <= 0.0f ? 0.0f : std::sin(angle) * SafeGain(request.attenuationGain) };
             const auto busGain = busVolumes.find(request.bus.value);
@@ -860,7 +863,7 @@ namespace wave
 #if defined(WAVE_AUDIO_PROBE)
     bool MiniaudioBackend::ValidateStreamReadObservation()
     {
-        std::array<float, 4u> pcm{};
+        ce::fixed_array<float, 4u> pcm{};
         ma_audio_buffer buffer{};
         auto config = ma_audio_buffer_config_init(ma_format_f32, 1u, pcm.size(), pcm.data(), nullptr);
         config.sampleRate = 48000u;
@@ -924,7 +927,7 @@ namespace wave
             error = "Audio sources require mono or stereo PCM with a valid sample rate";
             return false;
         }
-        std::array<float, 4096u * 2u> samples{};
+        ce::fixed_array<float, 4096u * 2u> samples{};
         ma_uint64 frames = 0u;
         ma_result result = MA_SUCCESS;
         while (result == MA_SUCCESS)
@@ -1214,7 +1217,7 @@ namespace wave
                     break;
                 }
             }
-            std::array<float, 2u> extra{};
+            ce::fixed_array<float, 2u> extra{};
             ma_uint64 extraFrames = 0u;
             const ma_result result = ma_decoder_read_pcm_frames(&decoder, extra.data(), 1u, &extraFrames);
             valid = decoded == frames && extraFrames == 0u && (result == MA_SUCCESS || result == MA_AT_END)
@@ -1290,7 +1293,7 @@ namespace wave
             && ma_decoder_seek_to_pcm_frame(&decoder, 0u) == MA_SUCCESS;
         if (valid && streaming)
         {
-            std::array<float, 2u> first{};
+            ce::fixed_array<float, 2u> first{};
             ma_uint64 read = 0u;
             valid = ma_decoder_read_pcm_frames(&decoder, first.data(), 1u, &read) == MA_SUCCESS && read == 1u
                 && std::all_of(first.begin(), first.end(), [](float value) { return std::isfinite(value); });
@@ -1311,7 +1314,7 @@ namespace wave
                     break;
                 }
             }
-            std::array<float, 2u> extra{};
+            ce::fixed_array<float, 2u> extra{};
             ma_uint64 extraFrames = 0u;
             const ma_result result = ma_decoder_read_pcm_frames(&decoder, extra.data(), 1u, &extraFrames);
             valid = decoded == metadata.frameCount && extraFrames == 0u && (result == MA_SUCCESS || result == MA_AT_END)

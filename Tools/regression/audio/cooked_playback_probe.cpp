@@ -65,7 +65,7 @@ namespace
         std::ifstream stream(input, std::ios::binary);
         std::vector<char> raw{ std::istreambuf_iterator<char>(stream), {} };
         header.payloadBytes = raw.size();
-        header.payloadSha256 = ce::hash::sha256::compute(raw.data(), raw.size());
+        header.payloadSha256 = ce::crypto::sha256::compute(raw.data(), raw.size());
         auto encoded = ck::WriteAudioClipHeader(header);
         memory = std::make_shared<MemoryArtifact>();
         memory->bytes.assign(encoded.begin(), encoded.end());
@@ -80,7 +80,7 @@ namespace
         entry.formatVersion = ck::kAudioClipArtifactVersion;
         entry.byteSize = memory->bytes.size();
         entry.artifactPath = ck::MakeDerivedAudioClipArtifactPath(id);
-        entry.contentSha256 = ce::hash::sha256::compute(memory->bytes.data(), memory->bytes.size());
+        entry.contentSha256 = ce::crypto::sha256::compute(memory->bytes.data(), memory->bytes.size());
         memory->path = entry.artifactPath;
         ck::CookedAudioClipSource source;
         std::string error;

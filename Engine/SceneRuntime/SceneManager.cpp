@@ -1,3 +1,6 @@
+#include "../Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
 #else
@@ -28,6 +31,7 @@ import Creator.Core.Stopwatch;
 #include "LifecycleRegistry.h"
 #include "SimulationTickExecution.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
+#include "../RenderEngine/Effects/IEffectSystem.h"
 #include "RenderScene.h"
 #include "AnimationScheduler.h"
 #include "TemporalMotionFixture.h"
@@ -381,7 +385,7 @@ Scene* SceneManager::AdoptScene(gc::root_ref<Scene> scene)
     }
     catch (...)
     {
-        std::erase(m_scenes, borrowed);
+        ce::erase(m_scenes, borrowed);
         if (m_activeScene == borrowed)
         {
             SetActiveScene(nullptr);
@@ -435,7 +439,7 @@ void SceneManager::RetireScene(Scene* scene)
     {
         m_asyncSceneToActivate = nullptr;
     }
-    std::erase_if(m_dontDestroyOnLoadObjects, [scene](Object* object)
+    ce::erase_if(m_dontDestroyOnLoadObjects, [scene](Object* object)
     {
         const auto* entity = dynamic_cast<const Entity*>(object);
         return entity && entity->GetScene() == scene;
@@ -444,8 +448,8 @@ void SceneManager::RetireScene(Scene* scene)
 #if !defined(CE_SCENE_HEADLESS)
     PrefabUtilitys->ForgetScene(scene);
 #endif
-    std::erase(m_scenes, scene);
-    std::erase_if(m_sceneRoots, [scene](const auto& root)
+    ce::erase(m_scenes, scene);
+    ce::erase_if(m_sceneRoots, [scene](const auto& root)
         { return root.get() == scene; });
     m_gcDomain.request_collection();
 }
@@ -466,6 +470,7 @@ void SceneManager::AdvanceSceneContextEpoch()
         throw std::overflow_error("Scene context identity space exhausted");
     }
     m_sceneContextEpoch.store(previous + 1u, std::memory_order_release);
+    if (!ce::effects::SetEffectSceneEpoch(previous + 1u)) throw std::logic_error("Effect scene epoch rejected");
     ResetSimulationCommands();
 }
 
@@ -718,7 +723,7 @@ void SceneManager::Editor()
             auto activeScenePtr = m_activeScene.load();
             if (!activeScenePtr) return;
             // Sweep DDOL bucket for destroyed objects
-    		std::erase_if(m_dontDestroyOnLoadObjects, [](Object* o){ return !o || o->IsDestroyMark(); });
+		ce::erase_if(m_dontDestroyOnLoadObjects, [](Object* o){ return !o || o->IsDestroyMark(); });
     		//m_inputActionManager->ClearActionMaps();  //&&&&&TODO:게임스타트 한번만 초기화하고 다시들어가게
             m_isInitialized = false; // Reset initialization state for editor scene
             activeScenePtr->DrainPendingLifecycle();
@@ -835,6 +840,11 @@ void SceneManager::Physics(float deltaSecond)
                 + std::to_string(static_cast<int>(outcome)) + ")");
             return;
         }
+        if (!ce::effects::CommitEffectTick({epoch,m_simulationTick.committed,Runtime::SimulationTick::seconds}))
+        {
+            ReportSimulationFailure("Effect fixed tick boundary rejected");
+            return;
+        }
     }
     scene->SetSimulationInterpolation(m_simulationTick.Alpha());
 }
@@ -898,7 +908,7 @@ void SceneManager::EndOfFrame()
     }
 
     // Sweep DDOL bucket for destroyed objects
-	std::erase_if(m_dontDestroyOnLoadObjects, [](Object* o){ return !o || o->IsDestroyMark(); });
+	ce::erase_if(m_dontDestroyOnLoadObjects, [](Object* o){ return !o || o->IsDestroyMark(); });
 }
 
 void SceneManager::Pausing()
@@ -1199,7 +1209,7 @@ Scene* SceneManager::LoadSceneImmediate(std::string_view name)
 
             SetActiveScene(nullptr);
 
-            std::erase_if(m_scenes,
+            ce::erase_if(m_scenes,
                 [&](const auto& scene) { return scene == swapScene; });
 
             // EntityHandle은 씬 스코프다 — 이 씬이 죽으면 그 씬 소속으로 등록된
@@ -1686,7 +1696,7 @@ Scene* SceneManager::BuildPreparedScene(const PendingSceneLoad& load)
         };
         // SaveScene records DDOL entities in both sections. Construct each identity
         // only once, using the DDOL section for persistent entities.
-        std::unordered_set<size_t> ddolIds;
+        ce::engine_node_set<size_t> ddolIds;
         for (const auto node : root["DontDestroyOnLoadObjects"])
         {
             if (node["m_instanceID"])
@@ -1941,7 +1951,7 @@ void SceneManager::BeforeAwakeSceneLoad()
 
             if (m_isOldSceneDelete)
             {
-                std::erase_if(m_scenes, [&](const auto& scene) { return scene == oldScene; });
+                ce::erase_if(m_scenes, [&](const auto& scene) { return scene == oldScene; });
             }
 
         }
@@ -2047,7 +2057,7 @@ void SceneManager::RemoveDontDestroyOnLoad(Object* objPtr)
 {
     if (objPtr)
     {
-        std::erase_if(m_dontDestroyOnLoadObjects,
+        ce::erase_if(m_dontDestroyOnLoadObjects,
 			[&](const auto& obj) { return obj == objPtr; });
 	}
 }
@@ -2085,7 +2095,7 @@ void SceneManager::RebindEventDontDestroyOnLoadObjects(Scene* scene)
     }
 }
 
-std::vector<MeshRenderer*> SceneManager::GetAllMeshRenderers() const
+ce::dynamic_array<MeshRenderer*> SceneManager::GetAllMeshRenderers() const
 {
 	Scene* scene = m_activeScene.load();
 	if (nullptr == scene) return {};
@@ -2093,11 +2103,11 @@ std::vector<MeshRenderer*> SceneManager::GetAllMeshRenderers() const
 	return { renderers.begin(), renderers.end() };
 }
 
-std::vector<own::shared_owner<const Material>>
+ce::dynamic_array<own::shared_owner<const Material>>
 SceneManager::CaptureRequiredRenderMaterials() const
 {
-    std::vector<own::shared_owner<const Material>> materials;
-    std::unordered_set<std::uint64_t> seen;
+    ce::dynamic_array<own::shared_owner<const Material>> materials;
+    ce::engine_node_set<std::uint64_t> seen;
     Scene* scene = m_activeScene.load();
     if (nullptr == scene) return materials;
 
@@ -2180,7 +2190,7 @@ bool SceneManager::CaptureSceneSnapshot()
         if (!project) throw std::runtime_error("Project layer settings missing before Editor Play");
         m_editorLayerBackup = project->Snapshot();
 
-        std::vector<size_t> persistentIds;
+        ce::dynamic_array<size_t> persistentIds;
         for (const auto& entity : scene->m_Entities)
             if (entity && entity->IsDontDestroyOnLoad()) persistentIds.push_back(entity->GetInstanceID());
         {
@@ -2272,14 +2282,14 @@ bool SceneManager::RestoreSceneSnapshot()
             });
             if (rootEntry != loadBatch.end())
             {
-                std::unordered_map<Entity::Index, Entity::Index> fileToSlot;
+                ce::engine_node_map<Entity::Index, Entity::Index> fileToSlot;
                 for (const auto& entry : loadBatch)
                     if (entry.object) fileToSlot.emplace(entry.fileIndex, entry.object->m_index);
 
                 auto* root = rootEntry->object;
                 const auto currentChildren = root->GetChildrenIndices();
-                std::unordered_set<Entity::Index> remaining(currentChildren.begin(), currentChildren.end());
-                std::vector<Entity::Index> orderedChildren;
+                ce::engine_node_set<Entity::Index> remaining(currentChildren.begin(), currentChildren.end());
+                ce::dynamic_array<Entity::Index> orderedChildren;
                 orderedChildren.reserve(currentChildren.size());
                 for (const auto fileIndex : rootEntry->fileChildrenIndices)
                 {
@@ -2454,7 +2464,7 @@ void SceneManager::EndPlayTransaction()
             resetSelectedObjectEvent.broadcast();
             sceneUnloadedEvent.broadcast();
             scene->AllDestroyMark(true);
-            std::erase_if(m_dontDestroyOnLoadObjects, [](Object* object)
+            ce::erase_if(m_dontDestroyOnLoadObjects, [](Object* object)
             {
                 return !object || object->IsDestroyMark();
             });
@@ -2803,9 +2813,9 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
     // 파일 인덱스 → 실제 슬롯 인덱스. 이 배치에서 막 로드된 오브젝트만 담는다 —
     // 이전에 붙어 있던 DDOL이나 다른 배치의 오브젝트는 여기서 다루지 않는다
     // (호출부가 로더/타깃 씬 단위로 배치를 나눠 넘긴다).
-    std::unordered_map<Entity::Index, Entity::Index> fileToSlot;
+    ce::engine_node_map<Entity::Index, Entity::Index> fileToSlot;
     fileToSlot.reserve(batch.size() + 1);
-    std::unordered_set<Entity::Index> batchSlots;
+    ce::engine_node_set<Entity::Index> batchSlots;
     batchSlots.reserve(batch.size());
 
     // 합성 루트(슬롯 0)는 씬이 서 있는 동안 절대 재할당되지 않는다(Scene::ReleaseSlot의
@@ -2890,7 +2900,7 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
         // 그 외 Entity는 여기서 파일 children을 슬롯 인덱스로 리매핑한다.
         if (obj->m_index != 0)
         {
-            std::vector<Entity::Index> remappedChildren;
+            ce::dynamic_array<Entity::Index> remappedChildren;
 			remappedChildren.reserve(entry.fileChildrenIndices.size());
 			for (Entity::Index childFileIdx : entry.fileChildrenIndices)
             {
@@ -2944,8 +2954,8 @@ void SceneManager::RemapLoadBatchIndices(Scene* targetScene, LoadIndexBatch& bat
         // 건드리지 않는다. 조건부 일괄 삭제라 AttachChildIndex/DetachChildIndex
         // 정본 API로는 1:1 대체가 안 돼(SceneGraphRedesignPlan 트랙 E2 배선 여지로
         // 남겨 둔다) 여기만 필드에 직접 접근한다.
-        std::vector<Entity::Index> retainedRootChildren = rootObject->GetChildrenIndices();
-        std::erase_if(retainedRootChildren, [&](Entity::Index idx) { return batchSlots.contains(idx); });
+        ce::dynamic_array<Entity::Index> retainedRootChildren = rootObject->GetChildrenIndices();
+        ce::erase_if(retainedRootChildren, [&](Entity::Index idx) { return batchSlots.contains(idx); });
         rootObject->SetChildrenIndices(std::move(retainedRootChildren));
 
         // Membership comes from the resolved parent, but authored sibling

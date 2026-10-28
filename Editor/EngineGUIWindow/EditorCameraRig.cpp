@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
@@ -23,7 +24,7 @@ namespace editor::camera_diagnostics
 {
     constexpr std::size_t counter_count = 23;
 
-    const std::array<ce::profile_counter_id, counter_count>& counter_ids()
+    const ce::fixed_array<ce::profile_counter_id, counter_count>& counter_ids()
     {
         static const auto ids = []
         {
@@ -42,7 +43,7 @@ namespace editor::camera_diagnostics
                 "frame", "sequence", "revision", "frame", "sequence", "revision", "0/1", "frame", "sequence",
                 "revision", "count", "count"};
             static_assert(std::size(names) == counter_count && std::size(units) == counter_count);
-            std::array<ce::profile_counter_id, counter_count> result{};
+            ce::fixed_array<ce::profile_counter_id, counter_count> result{};
             for (std::size_t i = 0; i < result.size(); ++i)
             {
                 result[i] = ce::register_counter(names[i], units[i], ce::counter_category::render);
@@ -59,7 +60,7 @@ struct EditorCameraRig::PresentationInput
     winrt::com_ptr<GameInput::v3::IGameInputDevice> mouseDevice;
     GameInput::v3::GameInputMouseState previousMouse{};
     std::chrono::steady_clock::time_point previousSample{};
-    std::array<bool, 256> keys{};
+    ce::fixed_array<bool, 256> keys{};
     std::uint64_t mouseTimestamp{ 0 };
     std::uint64_t consumedSequence{ 0 };
     std::uint64_t imageCount{ 0 };
@@ -184,7 +185,7 @@ void EditorCameraRig::BeginPresentationFrame(bool applicationFocused)
     if (SUCCEEDED(input.gameInput->GetCurrentReading(
             GameInputKindKeyboard, nullptr, reading.put())) && reading)
     {
-        std::array<GameInputKeyState, 256> keys{};
+        ce::fixed_array<GameInputKeyState, 256> keys{};
         const std::uint32_t count = reading->GetKeyState(static_cast<std::uint32_t>(keys.size()), keys.data());
         for (std::uint32_t i = 0; i < count; ++i)
         {
@@ -346,7 +347,7 @@ void EditorCameraRig::PublishPresentationDiagnostics(const EnhancedLiveDisplayTe
         static_cast<double>(input.imageCount), static_cast<double>(input.repeatedImageCount)};
     static_assert(std::size(values) == editor::camera_diagnostics::counter_count);
     const ce::cpu_span_context context{0, m_inputSequence, 0};
-    std::array<ce::profile_counter_sample, editor::camera_diagnostics::counter_count> samples{};
+    ce::fixed_array<ce::profile_counter_sample, editor::camera_diagnostics::counter_count> samples{};
     for (std::size_t i = 0; i < samples.size(); ++i)
     {
         samples[i] = {ids[i], values[i], context};

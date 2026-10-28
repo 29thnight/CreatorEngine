@@ -1,4 +1,7 @@
-﻿#if defined(CE_CONTRACT_STANDALONE)
+#include "../Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
+#if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
 #else
 import Creator.Core.Delegate;
@@ -144,29 +147,29 @@ struct TransformExecutionGraphState
 
 	struct Projection
 	{
-		std::vector<ExecIndex> entityToExec;
-		std::vector<EntityHandle> execToEntity;
-		std::vector<ExecIndex> parentExec;
-		std::vector<ExecIndex> subtreeEnd;
+		ce::dynamic_array<ExecIndex> entityToExec;
+		ce::dynamic_array<EntityHandle> execToEntity;
+		ce::dynamic_array<ExecIndex> parentExec;
+		ce::dynamic_array<ExecIndex> subtreeEnd;
 	};
 
 	struct SpatialProjection : Projection
 	{
-		std::vector<math::matrix4x4> localMatrix;
-		std::vector<math::matrix4x4> worldMatrix;
-		std::vector<uint64_t> localEpoch;
-		std::vector<uint64_t> resolvedLocalEpoch;
-		std::vector<uint64_t> worldEpoch;
-		std::vector<uint64_t> parentWorldEpoch;
-		std::vector<uint8_t> scaleQuatDirty;
+		ce::dynamic_array<math::matrix4x4> localMatrix;
+		ce::dynamic_array<math::matrix4x4> worldMatrix;
+		ce::dynamic_array<uint64_t> localEpoch;
+		ce::dynamic_array<uint64_t> resolvedLocalEpoch;
+		ce::dynamic_array<uint64_t> worldEpoch;
+		ce::dynamic_array<uint64_t> parentWorldEpoch;
+		ce::dynamic_array<uint8_t> scaleQuatDirty;
 		// Animated bones without a Transform observer remain in the hierarchy,
 		// but a parent resolve must not write their cached world transforms.
-		std::vector<uint8_t> unobservedAnimatedBone;
+		ce::dynamic_array<uint8_t> unobservedAnimatedBone;
 		// X7의 bulk pose upload 전까지 Bone만 기존 binding을 읽는다. culling
 		// publication도 compile 시 포인터를 잡아 일반 노드 inner loop의 component
 		// lookup을 없앤다.
-		std::vector<BoneComponent*> boneComponents;
-		std::vector<MeshRenderer*> meshRenderers;
+		ce::dynamic_array<BoneComponent*> boneComponents;
+		ce::dynamic_array<MeshRenderer*> meshRenderers;
 	};
 
 	struct AnimatorPoseBinding
@@ -174,11 +177,11 @@ struct TransformExecutionGraphState
 		EntityHandle owner{};
 		uint64_t skeletonSerial = 0;
 		uint64_t topologyVersion = kInvalidVersion;
-		std::vector<ExecIndex> boneExecByIndex;
-		std::vector<std::string> boneNameByIndex;
-		std::vector<uint8_t> nonBoneChildByIndex;
-		std::vector<uint8_t> observedBones;
-		std::vector<math::matrix4x4> publishedPalette;
+		ce::dynamic_array<ExecIndex> boneExecByIndex;
+		ce::dynamic_array<std::string> boneNameByIndex;
+		ce::dynamic_array<uint8_t> nonBoneChildByIndex;
+		ce::dynamic_array<uint8_t> observedBones;
+		ce::dynamic_array<math::matrix4x4> publishedPalette;
 		uint64_t validBones = 0;
 		uint64_t invalidBones = 0;
 	};
@@ -188,7 +191,7 @@ struct TransformExecutionGraphState
 	ExecutionGraphCompileMetrics metrics{};
 	SpatialResolveMetrics resolveMetrics{};
 	SpatialPullMetrics pullMetrics{};
-	std::unordered_map<size_t, AnimatorPoseBinding> animatorPoseBindings;
+	ce::engine_node_map<size_t, AnimatorPoseBinding> animatorPoseBindings;
 	uint64_t attemptedVersion = kInvalidVersion;
 	uint64_t compiledVersion = kInvalidVersion;
 	bool spatialDataSynchronized = false;
@@ -197,9 +200,9 @@ struct TransformExecutionGraphState
 	// 한 잠금으로 묶는다. write-before-snapshot은 이번 resolve, write-after는 다음
 	// resolve가 소비한다.
 	std::mutex dirtyMutex;
-	std::vector<EntityHandle> dirtyRoots;
-	std::vector<uint64_t> entityQueuedEpoch;
-	std::vector<uint32_t> entityQueuedGeneration;
+	ce::dynamic_array<EntityHandle> dirtyRoots;
+	ce::dynamic_array<uint64_t> entityQueuedEpoch;
+	ce::dynamic_array<uint32_t> entityQueuedGeneration;
 	uint64_t enqueueEpoch = 1;
 	bool forceFullResolve = false;
 };
@@ -257,24 +260,24 @@ struct SceneRenderRegistryState
 		ProxyDirty mask = ProxyDirty::None;
 	};
 
-    std::vector<LightComponent*> lights;
-    std::vector<MeshRenderer*> meshes;
-    std::vector<FoliageComponent*> foliages;
-    std::vector<DecalComponent*> decals;
+    ce::dynamic_array<LightComponent*> lights;
+    ce::dynamic_array<MeshRenderer*> meshes;
+    ce::dynamic_array<FoliageComponent*> foliages;
+    ce::dynamic_array<DecalComponent*> decals;
 
     // 직렬화된 LightComponent::m_lightIndex 복원과 파괴 시 압축용 점유표다.
     // 실제 렌더 값은 LightRenderProxy가 소유한다.
-    std::vector<uint8_t> lightSlots;
+    ce::dynamic_array<uint8_t> lightSlots;
     // 슬롯 압축용 scratch는 Scene 수명 동안 capacity를 재사용한다.
-    std::vector<size_t> lightSlotRemap;
+    ce::dynamic_array<size_t> lightSlotRemap;
 
 	std::mutex dirtyMutex;
-	std::unordered_map<Component*, Registration> registrations;
-	std::vector<std::vector<Component*>> entityProxies;
-	std::vector<Ticket> dirtyQueue;
-	std::vector<Ticket> drainQueue;
-	std::vector<Dispatch> dispatchQueue;
-    std::vector<EntityHandle> physicsTraversal;
+	ce::engine_node_map<Component*, Registration> registrations;
+	ce::dynamic_array<ce::dynamic_array<Component*>> entityProxies;
+	ce::dynamic_array<Ticket> dirtyQueue;
+	ce::dynamic_array<Ticket> drainQueue;
+	ce::dynamic_array<Dispatch> dispatchQueue;
+    ce::dynamic_array<EntityHandle> physicsTraversal;
     std::uint64_t materialAssetRevision = ~std::uint64_t{};
 	uint64_t nextRegistrationGeneration = 1;
 	RenderProxyCommitMetrics metrics{};
@@ -330,7 +333,7 @@ static void UnregisterRenderProxy(SceneRenderRegistryState& state,
 	if (owner.index < state.entityProxies.size())
 	{
 		auto& proxies = state.entityProxies[owner.index];
-		std::erase(proxies, component);
+		ce::erase(proxies, component);
 	}
 	// Outstanding tickets intentionally remain. Commit validates their captured
 	// registration generation before touching the pointer, closing pointer reuse ABA.
@@ -969,8 +972,8 @@ gc::root_ref<Entity> Scene::ReleaseSlot(Entity::Index index, bool transfer)
     {
         m_selectedEntity = nullptr;
     }
-    std::erase(m_selectedEntities, released.get());
-    std::erase(m_simulationSelection, released.get());
+    ce::erase(m_selectedEntities, released.get());
+    ce::erase(m_simulationSelection, released.get());
     m_Entities[index].reset();
 
     // 트랜스폼 스토어 슬롯 리셋(트랙 S, S1) — Transform::ResolveStore의 점유자
@@ -1163,7 +1166,7 @@ ReparentResult Scene::Reparent(EntityHandle childHandle, EntityHandle newParentH
 		return ReparentResult::CorruptHierarchy;
 	}
 
-	std::unordered_set<Entity::Index> ancestors;
+	ce::engine_node_set<Entity::Index> ancestors;
 	Entity::Index cursor = newParentIndex;
 	while (Entity::IsValidIndex(cursor))
 	{
@@ -1220,8 +1223,8 @@ bool Scene::ReorderChildren(EntityHandle parent, std::span<const EntityHandle> c
         return false;
     }
     const auto& current = owner->GetChildrenIndices();
-    std::unordered_set<Entity::Index> remaining(current.begin(), current.end());
-    std::vector<Entity::Index> order;
+    ce::engine_node_set<Entity::Index> remaining(current.begin(), current.end());
+    ce::dynamic_array<Entity::Index> order;
     order.reserve(children.size());
     for (const auto handle : children)
     {
@@ -1243,7 +1246,7 @@ bool Scene::ReorderChildren(EntityHandle parent, std::span<const EntityHandle> c
 HierarchyIntegrityMetrics Scene::GetHierarchyIntegrityMetrics() const
 {
 	HierarchyIntegrityMetrics metrics{};
-	std::vector<uint32_t> listedCount(m_Entities.size(), 0);
+	ce::dynamic_array<uint32_t> listedCount(m_Entities.size(), 0);
 
 	for (size_t parentIndex = 0; parentIndex < m_Entities.size(); ++parentIndex)
 	{
@@ -1254,7 +1257,7 @@ HierarchyIntegrityMetrics Scene::GetHierarchyIntegrityMetrics() const
 			continue;
 		}
 
-		std::unordered_set<Entity::Index> localChildren;
+		ce::engine_node_set<Entity::Index> localChildren;
 		for (Entity::Index childIndex : m_hierarchyStore.ChildrenOf(parentIndex))
 		{
 			if (!localChildren.insert(childIndex).second)
@@ -1417,7 +1420,7 @@ bool Scene::CompileExecutionGraphs(uint64_t topologyVersion)
 
 	// Reparent가 정상 경로의 cycle을 막지만 compiler도 손상된 입력에 fail-close한다.
 	// parent chain 색칠은 루트에서 닿지 않는 고립 cycle까지 O(N)에 찾는다.
-	std::vector<uint8_t> parentColor(m_Entities.size(), 0);
+	ce::dynamic_array<uint8_t> parentColor(m_Entities.size(), 0);
 	for (size_t start = 0; start < m_Entities.size(); ++start)
 	{
 		if (!m_Entities[start] || !m_hierarchyStore.IsOccupied(start)
@@ -1426,7 +1429,7 @@ bool Scene::CompileExecutionGraphs(uint64_t topologyVersion)
 			continue;
 		}
 
-		std::vector<size_t> path;
+		ce::dynamic_array<size_t> path;
 		Entity::Index cursor = static_cast<Entity::Index>(start);
 		while (Entity::IsValidIndex(cursor)
 			&& cursor >= 0 && static_cast<size_t>(cursor) < m_Entities.size()
@@ -1457,7 +1460,7 @@ bool Scene::CompileExecutionGraphs(uint64_t topologyVersion)
 		bool entered = false;
 	};
 
-	std::vector<uint8_t> visited(m_Entities.size(), 0);
+	ce::dynamic_array<uint8_t> visited(m_Entities.size(), 0);
 	uint64_t visitedCount = 0;
 	if (m_Entities.empty() || !m_Entities[Entity::kSceneRootIndex]
 		|| !m_hierarchyStore.IsOccupied(Entity::kSceneRootIndex))
@@ -1466,7 +1469,7 @@ bool Scene::CompileExecutionGraphs(uint64_t topologyVersion)
 	}
 	else
 	{
-		std::vector<CompileFrame> stack;
+		ce::dynamic_array<CompileFrame> stack;
 		stack.push_back(CompileFrame{ static_cast<size_t>(Entity::kSceneRootIndex) });
 		while (!stack.empty())
 		{
@@ -1565,7 +1568,7 @@ bool Scene::CompileExecutionGraphs(uint64_t topologyVersion)
 
 	auto validateProjection = [&](const State::Projection& graph, bool spatialDomain)
 	{
-		std::vector<ExecIndex> intervalStack;
+		ce::dynamic_array<ExecIndex> intervalStack;
 		for (ExecIndex exec = 0; exec < graph.execToEntity.size(); ++exec)
 		{
 			const EntityHandle handle = graph.execToEntity[exec];
@@ -1770,7 +1773,7 @@ void Scene::ProtectTransientDiagnosticRoot(EntityHandle root)
     {
         throw std::logic_error("Transient diagnostic root does not belong to this live scene");
     }
-    std::erase_if(m_transientDiagnosticRoots, [this](EntityHandle previous)
+    ce::erase_if(m_transientDiagnosticRoots, [this](EntityHandle previous)
     {
         return Resolve(previous) == nullptr;
     });
@@ -1945,7 +1948,7 @@ Entity* Scene::TryGetEntity(Entity::Index index)
     return nullptr;
 }
 
-void Scene::DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransfer>& detached)
+void Scene::DetachEntityHierarchy(Entity* root, ce::dynamic_array<DetachedEntityTransfer>& detached)
 {
     RequireManagedMutable();
     if (!root) return;
@@ -1958,7 +1961,7 @@ void Scene::DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransf
 	[[maybe_unused]] auto hierarchyTransaction = BeginHierarchyBulkBuild();
 
     // breadth-first (인덱스 재배열 없이 안전하게 순회)
-    std::vector<Entity::Index> queue;
+    ce::dynamic_array<Entity::Index> queue;
     queue.reserve(m_Entities.size());
     detached.reserve(detached.size() + m_Entities.size());
 	const Entity::Index rootIndex = root->m_index;
@@ -2142,11 +2145,11 @@ Entity::Index Scene::AttachExistingEntity(gc::root_ref<Entity> go, Entity::Index
 }
 
 // === C안 구현: 서브트리 부착 ===
-std::unordered_map<Entity::Index, Entity::Index>
-Scene::AttachExistingEntityHierarchy(std::vector<DetachedEntityTransfer>& objects)
+ce::engine_node_map<Entity::Index, Entity::Index>
+Scene::AttachExistingEntityHierarchy(ce::dynamic_array<DetachedEntityTransfer>& objects)
 {
     RequireManagedMutable();
-    std::unordered_map<Entity::Index, Entity::Index> remap;
+    ce::engine_node_map<Entity::Index, Entity::Index> remap;
     if (objects.empty()) return remap;
 	[[maybe_unused]] auto hierarchyTransaction = BeginHierarchyBulkBuild();
 	struct PendingRootRemap
@@ -2154,7 +2157,7 @@ Scene::AttachExistingEntityHierarchy(std::vector<DetachedEntityTransfer>& object
 		Entity::Index newIndex{ Entity::kInvalidIndex };
 		Entity::Index oldRootIndex{ Entity::kInvalidIndex };
 	};
-	std::vector<PendingRootRemap> pendingRoots;
+	ce::dynamic_array<PendingRootRemap> pendingRoots;
 	pendingRoots.reserve(objects.size());
 
     // BFS로 루트별 서브트리 전개 (부모 → 자식 순서 보장)
@@ -2752,7 +2755,7 @@ void Scene::DrainPendingPhases()
     //
     // 이 큐 하나가 앞 두 단계(OnInitialized·OnAddedToScene)를 함께 처리한다 —
     // OnAddedToScene은 자기 상태 비트가 없어 같은 자리에서 따라잡힌다.
-    std::vector<Component*> initializing;
+    ce::dynamic_array<Component*> initializing;
     initializing.swap(m_schedule.PendingInitializeList());
 
     for (Component* component : initializing)
@@ -2829,7 +2832,7 @@ void Scene::DrainPendingPhases()
         return;
     }
 
-    std::vector<Component*> beginningSimulation;
+    ce::dynamic_array<Component*> beginningSimulation;
     beginningSimulation.swap(m_schedule.PendingSimulationList());
 
     for (Component* component : beginningSimulation)
@@ -2986,7 +2989,7 @@ void Scene::FlushPendingDestroy()
     // 상황이 표현 자체가 불가능해진다. 유니티가 Destroy를 프레임 경계로 미루는 이유와 같다.
     if (m_schedule.DestroyWatchList().empty()) return;
 
-    std::vector<Component*> doomed;
+    ce::dynamic_array<Component*> doomed;
     for (Component* component : m_schedule.DestroyWatchList())
     {
         if (nullptr == component) continue;
@@ -3225,8 +3228,8 @@ ce::physics::result<void> Scene::StartPhysicsSimulation()
     const auto started = m_physicsSimulation.Start(config);
     if (started)
     {
-        for (auto* component : m_physicsBodies | std::views::values) component->m_transferState.reset();
-        for (auto* component : m_physicsCharacters | std::views::values) component->m_transferState.reset();
+        for (const auto& [binding, component] : m_physicsBodies) component->m_transferState.reset();
+        for (const auto& [binding, component] : m_physicsCharacters) component->m_transferState.reset();
     }
     return started;
 }
@@ -3246,7 +3249,7 @@ ce::physics::result<void> Scene::PreparePhysicsSceneExit()
     if (m_physicsSimulation.IsRunning())
     {
         // Capture DDOL motion while SDK reads are still legal. No SDK handle crosses scenes.
-        for (auto* component : m_physicsBodies | std::views::values)
+        for (const auto& [binding, component] : m_physicsBodies)
         {
             if (!component || component->IsDestroyMark() || !component->GetOwner()
                 || component->GetOwner()->IsDestroyMark() || !component->GetOwner()->IsDontDestroyOnLoad()) continue;
@@ -3255,7 +3258,7 @@ ce::physics::result<void> Scene::PreparePhysicsSceneExit()
             if (!state) return std::unexpected(state.error());
             component->m_transferState = *state;
         }
-        for (auto* component : m_physicsCharacters | std::views::values)
+        for (const auto& [binding, component] : m_physicsCharacters)
         {
             if (!component || component->IsDestroyMark() || !component->GetOwner() ||
                 component->GetOwner()->IsDestroyMark() || !component->GetOwner()->IsDontDestroyOnLoad()) continue;
@@ -3689,7 +3692,7 @@ void Scene::UnCollectLightComponent(LightComponent* ptr)
 {
     if (ptr)
     {
-        std::erase_if(m_renderRegistry->lights,
+        ce::erase_if(m_renderRegistry->lights,
             [ptr](const auto& light) { return light == ptr; });
 		UnregisterRenderProxy(*m_renderRegistry, ptr);
     }
@@ -3792,7 +3795,7 @@ void Scene::UnCollectMeshRenderer(MeshRenderer* ptr)
 {
     if (ptr)
 	{
-        std::erase_if(m_renderRegistry->meshes,
+        ce::erase_if(m_renderRegistry->meshes,
             [ptr](const auto& mesh) { return mesh == ptr; });
 		UnregisterRenderProxy(*m_renderRegistry, ptr);
 	}
@@ -3839,7 +3842,7 @@ void Scene::UnCollectFoliageComponent(FoliageComponent* ptr)
 {
     if (ptr)
     {
-        std::erase_if(m_renderRegistry->foliages,
+        ce::erase_if(m_renderRegistry->foliages,
             [ptr](const auto& comp) { return comp == ptr; });
 		UnregisterRenderProxy(*m_renderRegistry, ptr);
     }
@@ -3858,7 +3861,7 @@ void Scene::UnCollectDecalComponent(DecalComponent* ptr)
 {
     if (ptr)
     {
-        std::erase_if(m_renderRegistry->decals,
+        ce::erase_if(m_renderRegistry->decals,
             [ptr](const auto& comp) { return comp == ptr; });
 		UnregisterRenderProxy(*m_renderRegistry, ptr);
     }
@@ -3908,7 +3911,7 @@ void Scene::UnCollectSpriteSheetComponent(SpriteSheetComponent* ptr)
 
 void Scene::DestroyEntities()
 {
-    std::unordered_set<uint32_t> deletedIndices;
+    ce::engine_node_set<uint32_t> deletedIndices;
     for (const auto& obj : m_Entities)
     {
         if (obj && obj->IsDestroyMark())
@@ -3997,7 +4000,7 @@ void Scene::DestroyComponents()
             }
 
             if (false == isDirty) continue;
-            std::erase_if(obj->m_components, [](const auto& component)
+            ce::erase_if(obj->m_components, [](const auto& component)
                 {
                     return component == nullptr;
                 });
@@ -4055,7 +4058,7 @@ void Scene::RenameEntity(Entity& entity, std::string_view name)
 // 이 TU 밖에서는 못 쓴다는 뜻이고, Scene.h에 인라인으로 두면 Debug 전역을
 // include하지 않은 다른 TU에서 컴파일이 깨질 위험이 있다(유니티 빌드).
 template<typename Key>
-bool Scene::TryEnterTraversal(std::unordered_set<Key>& visited, const Key& key,
+bool Scene::TryEnterTraversal(ce::engine_node_set<Key>& visited, const Key& key,
     int depth, const char* traversalLabel, std::string_view nodeName)
 {
     if (!visited.insert(key).second) return false;
@@ -4091,12 +4094,12 @@ bool Scene::TryEnterTraversal(std::unordered_set<Key>& visited, const Key& key,
     return true;
 }
 template bool Scene::TryEnterTraversal<Entity::Index>(
-    std::unordered_set<Entity::Index>&, const Entity::Index&, int, const char*, std::string_view);
+    ce::engine_node_set<Entity::Index>&, const Entity::Index&, int, const char*, std::string_view);
 template bool Scene::TryEnterTraversal<Entity*>(
-    std::unordered_set<Entity*>&, Entity* const&, int, const char*, std::string_view);
+    ce::engine_node_set<Entity*>&, Entity* const&, int, const char*, std::string_view);
 
 void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, bool parentChanged,
-	std::unordered_set<Entity::Index>* visited, int depth,
+	ce::engine_node_set<Entity::Index>* visited, int depth,
 	TransformUpdateAccumulator* diagnostics)
 {
     if (objIndex == Entity::kInvalidIndex || objIndex < 0 ||
@@ -4119,7 +4122,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
     // 스택 프레임에 만들어 재귀 내내 포인터로 물려준다. optional인 이유: MSVC의
     // unordered_set은 기본 생성자가 버킷을 즉시 할당해, 재귀 호출마다 만들면
     // 핫패스에 노드당 할당이 얹힌다. 계층에 순환이 있어도 여기서 멈춘다.
-    std::optional<std::unordered_set<Entity::Index>> localVisited;
+    std::optional<ce::engine_node_set<Entity::Index>> localVisited;
     if (!visited)
     {
         localVisited.emplace();
@@ -4399,7 +4402,7 @@ void Scene::UpdateModelRecursive(Entity::Index objIndex, math::matrix4x4 model, 
 
 void Scene::LayoutUINode(Entity* obj, const math::rect& parentRect,
     float parentScale, bool parentChanged, bool isTopLevel, int depth,
-    std::unordered_set<Entity*>& visited)
+    ce::engine_node_set<Entity*>& visited)
 {
 #if defined(CE_SCENE_HEADLESS)
     return;
@@ -4505,7 +4508,7 @@ bool Scene::UpdateUILayout()
 		return true;
 	}
 
-    std::unordered_set<Entity*> visited;
+    ce::engine_node_set<Entity*> visited;
 
     // 씬 루트의 자식부터 한 번만 훑는다. 캔버스 구동도, 캔버스 밑에 없는 UI도
     // 전부 이 한 순회 안에서 처리된다.
@@ -4565,14 +4568,14 @@ void Scene::LayoutUISubtree(Entity* root)
         }
     }
 
-    std::unordered_set<Entity*> visited;
+    ce::engine_node_set<Entity*> visited;
     LayoutUINode(root, parentRect, parentScale, /*parentChanged=*/true, isTopLevel, 0, visited);
 
 #endif
 }
 
 uint64_t Scene::TakeSpatialDirtySnapshot(
-	std::vector<EntityHandle>& dirtyRoots, bool& forceFull)
+	ce::dynamic_array<EntityHandle>& dirtyRoots, bool& forceFull)
 {
 	std::scoped_lock lock(m_executionGraphs->dirtyMutex);
 	const uint64_t dirtyEpoch = m_spatialDirtyEpoch.load(std::memory_order_acquire);
@@ -4630,7 +4633,7 @@ bool Scene::ResolveSpatialTransformsLegacy(uint64_t,
 }
 
 bool Scene::ResolveSpatialTransformsSparse(uint64_t dirtyEpoch,
-	std::vector<EntityHandle> dirtyRoots, bool forceFull,
+	ce::dynamic_array<EntityHandle> dirtyRoots, bool forceFull,
 	TransformUpdateAccumulator* diagnostics, TransformUpdateMetrics* metrics,
 	SpatialResolveMetrics& sparseMetrics)
 {
@@ -4664,7 +4667,7 @@ bool Scene::ResolveSpatialTransformsSparse(uint64_t dirtyEpoch,
 	}
 
 	struct DirtyRange { ExecIndex begin = 0; ExecIndex end = 0; };
-	std::vector<DirtyRange> ranges;
+	ce::dynamic_array<DirtyRange> ranges;
 	if (forceFull || dirtyRoots.empty())
 	{
 		for (ExecIndex exec = 0; exec < graph.execToEntity.size(); ++exec)
@@ -4675,7 +4678,7 @@ bool Scene::ResolveSpatialTransformsSparse(uint64_t dirtyEpoch,
 	}
 	else
 	{
-		std::vector<ExecIndex> starts;
+		ce::dynamic_array<ExecIndex> starts;
 		starts.reserve(dirtyRoots.size());
 		for (const EntityHandle handle : dirtyRoots)
 		{
@@ -5241,7 +5244,7 @@ TransformBulkWriteMetrics Scene::ApplyWorldWriteBatch(
 		size_t inputOrder = 0;
 		const TransformWorldWrite* write = nullptr;
 	};
-	std::vector<MappedWrite> mapped;
+	ce::dynamic_array<MappedWrite> mapped;
 	mapped.reserve(writes.size());
 	auto& graph = m_executionGraphs->spatial;
 	for (size_t index = 0; index < writes.size(); ++index)
@@ -5269,7 +5272,7 @@ TransformBulkWriteMetrics Scene::ApplyWorldWriteBatch(
 			return lhs.exec < rhs.exec;
 		});
 
-	std::vector<EntityHandle> changedHandles;
+	ce::dynamic_array<EntityHandle> changedHandles;
 	changedHandles.reserve(mapped.size());
 	for (size_t begin = 0; begin < mapped.size();)
 	{
@@ -5435,7 +5438,7 @@ bool Scene::EnsureResolved(EntityHandle target)
 		return finish(false);
 	}
 
-	std::vector<ExecIndex> path;
+	ce::dynamic_array<ExecIndex> path;
 	for (ExecIndex exec = targetExec; State::kInvalidExec != exec;
 		exec = graph.parentExec[exec])
 	{
@@ -5577,7 +5580,7 @@ bool Scene::ResolveSpatialTransforms(
 		return false;
 	}
 
-	std::vector<EntityHandle> dirtyRoots;
+	ce::dynamic_array<EntityHandle> dirtyRoots;
 	bool forceFull = false;
 	const uint64_t dirtyEpoch = TakeSpatialDirtySnapshot(dirtyRoots, forceFull);
 	sparseMetrics.dirtyRequests = dirtyRoots.size();
@@ -5734,12 +5737,12 @@ void Scene::RemoveCanvas(Entity* canvas)
     }
 
     // 지우는 김에 죽은 항목도 함께 걷는다(옛 구현의 expired 청소와 같은 효과).
-    std::erase_if(Canvases, [&](const EntityHandle& h)
+    ce::erase_if(Canvases, [&](const EntityHandle& h)
     {
         return h == handle || !Resolve(h);
     });
 
-    std::erase_if(CanvasMap, [&](const auto& pair)
+    ce::erase_if(CanvasMap, [&](const auto& pair)
     {
         return pair.second == handle || !Resolve(pair.second);
     });
@@ -5783,8 +5786,8 @@ ce::physics::result<void> Scene::QueryPhysicsBatch(std::span<const ce::physics::
 ce::physics::result<ce::physics::query_result> Scene::RaycastPhysics(math::vector3 origin, math::vector3 direction, float distance,
     std::span<ce::physics::query_hit> output, const ce::physics::query_filter& filter)
 {
-    const std::array requests{ce::physics::query_request{ce::physics::ray_query{origin, direction, distance}, output, filter}};
-    std::array<ce::physics::result<ce::physics::query_result>, 1> results;
+    const ce::fixed_array requests{ce::physics::query_request{ce::physics::ray_query{origin, direction, distance}, output, filter}};
+    ce::fixed_array<ce::physics::result<ce::physics::query_result>, 1> results;
     if (auto batch = QueryPhysicsBatch(requests, results); !batch)
         return std::unexpected(batch.error());
 
@@ -5794,8 +5797,8 @@ ce::physics::result<ce::physics::query_result> Scene::RaycastPhysics(math::vecto
 ce::physics::result<ce::physics::query_result> Scene::OverlapPhysics(const ce::physics::geometry& geometry, const ce::physics::pose& pose,
     std::span<ce::physics::query_hit> output, const ce::physics::query_filter& filter)
 {
-    const std::array requests{ce::physics::query_request{ce::physics::overlap_query{geometry, pose}, output, filter}};
-    std::array<ce::physics::result<ce::physics::query_result>, 1> results;
+    const ce::fixed_array requests{ce::physics::query_request{ce::physics::overlap_query{geometry, pose}, output, filter}};
+    ce::fixed_array<ce::physics::result<ce::physics::query_result>, 1> results;
     if (auto batch = QueryPhysicsBatch(requests, results); !batch)
         return std::unexpected(batch.error());
 
@@ -5825,7 +5828,7 @@ ce::physics::result<void> Scene::CommitPhysicsTransforms()
         m_physicsTransformDrain.swap(m_physicsTransformDirty);
     }
     std::ranges::sort(m_physicsTransformDrain, {}, [](const auto& handle) {
-        return std::pair{handle.index, handle.generation};
+        return ce::pair{handle.index, handle.generation};
     });
     const auto duplicates = std::ranges::unique(m_physicsTransformDrain);
     m_physicsTransformDrain.erase(duplicates.begin(), duplicates.end());

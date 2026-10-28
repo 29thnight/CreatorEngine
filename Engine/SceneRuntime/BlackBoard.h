@@ -1,4 +1,6 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineFunc.h"
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector3.hpp>
 #include <mathematics/vector4.hpp>
@@ -48,7 +50,7 @@ public:
 	// 평탄화용 읽기 접근자 (PHASE 9-8 B7).
 	// 런타임 값 소유는 관리 측으로 갔고, 이 클래스는 저작·직렬화 전용이 됐다.
 	// 트리를 만들 때 저작 값을 한 번 실어 보내기 위해 전체를 볼 수 있어야 한다.
-	const std::unordered_map<std::string, BlackBoardValue>& GetValues() const { return m_values; }
+	const ce::engine_node_map<std::string, BlackBoardValue>& GetValues() const { return m_values; }
 
 	// Serialization
 	// 저작 게시는 Editor Host가 소유한다. 여기서는 YAML payload만 만들고 실패는
@@ -60,11 +62,11 @@ private:
 	friend class MenuBarWindow; // Allow MenuBarWindow to access private members
 
 	std::string m_name; // Name of the blackboard
-	std::unordered_map<std::string, BlackBoardValue> m_values;
+	ce::engine_node_map<std::string, BlackBoardValue> m_values;
 	//ce::delegate<void, const std::string&> m_valueChangedDelegate; // 값 변경에 대한 델리게이트
 
 	BlackBoardValue& GetOrCreate(const std::string& key);
 	const BlackBoardValue& GetChecked(const std::string& key, BlackBoardType expected) const;
 };
 
-using ConditionFunc = std::function<bool(const BlackBoard&)>;
+using ConditionFunc = ce::owned_func<bool(const BlackBoard&)>;

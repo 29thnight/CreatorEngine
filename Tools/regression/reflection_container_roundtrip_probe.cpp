@@ -1,3 +1,6 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineNodeSet.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -92,7 +95,7 @@ namespace
     static_assert(!Meta::Typed::CanSnapshotImmutable<
         std::vector<ProbeExclusiveNested>>());
     static_assert(!Meta::Typed::CanSnapshotImmutable<
-        std::map<int, ProbeExclusiveNested>>());
+        ce::engine_ordered_map<int, ProbeExclusiveNested>>());
     static_assert(Meta::Typed::CanSnapshotImmutable<ProbeOwnedRecord>());
 
     struct ProbeOwners
@@ -162,18 +165,18 @@ namespace
 
         std::deque<float> m_deque{};
         std::list<int> m_list{};
-        std::set<int> m_set{};                          // const 원소
-        std::unordered_set<std::string> m_unorderedSet{};
+        ce::engine_ordered_set<int> m_set{};                          // const 원소
+        ce::engine_node_set<std::string> m_unorderedSet{};
         std::array<float, 4> m_array{};                 // 고정 크기
 
-        std::map<std::string, int> m_mapStringInt{};
-        std::map<int, math::vector3> m_mapIntVector3{};
-        std::map<std::string, ProbeKind> m_mapEnumValue{};
-        std::map<std::string, ProbeNested> m_mapNested{};
+        ce::engine_ordered_map<std::string, int> m_mapStringInt{};
+        ce::engine_ordered_map<int, math::vector3> m_mapIntVector3{};
+        ce::engine_ordered_map<std::string, ProbeKind> m_mapEnumValue{};
+        ce::engine_ordered_map<std::string, ProbeNested> m_mapNested{};
         std::unordered_map<std::string, std::string> m_unorderedMap{};
 
         std::vector<int> m_emptyVector{};
-        std::map<std::string, int> m_emptyMap{};
+        ce::engine_ordered_map<std::string, int> m_emptyMap{};
     };
 
     ProbeFixture MakeAuthored()

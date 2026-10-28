@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -19,7 +20,7 @@ struct TerrainAuthoringLayerSnapshot
 	std::string name;
 	std::filesystem::path diffuseTextureSource;
 	float tiling{ 1.0f };
-	std::vector<float> splatWeights;
+	ce::dynamic_array<float> splatWeights;
 };
 
 struct TerrainAuthoringRequest
@@ -31,8 +32,8 @@ struct TerrainAuthoringRequest
 	uint32 height{};
 	float minHeight{};
 	float maxHeight{};
-	std::vector<float> heightMap;
-	std::vector<TerrainAuthoringLayerSnapshot> layers;
+	ce::dynamic_array<float> heightMap;
+	ce::dynamic_array<TerrainAuthoringLayerSnapshot> layers;
 };
 
 struct TerrainAuthoringResult
@@ -87,8 +88,8 @@ struct TerrainSourceImage
 {
     uint32_t width{};
     uint32_t height{};
-    std::vector<float> heights;
-    std::vector<uint8_t> gray;
+    ce::dynamic_array<float> heights;
+    ce::dynamic_array<uint8_t> gray;
 };
 
 // Optional Host adapter for source-asset authoring requests made by runtime

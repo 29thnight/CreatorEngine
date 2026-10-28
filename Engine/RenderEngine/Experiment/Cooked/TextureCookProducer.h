@@ -1,4 +1,6 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 
 #include "CookedAssetManifest.h"
 
@@ -14,7 +16,7 @@ namespace experiment::cooked
         std::filesystem::path sourcePath{};
         std::filesystem::path assetRoot{};
         // A failed supplied reader never falls back to a different disk read.
-        std::function<bool(const std::filesystem::path&, std::vector<std::byte>&,
+        ce::owned_func<bool(const std::filesystem::path&, ce::dynamic_array<std::byte>&,
             std::string&)> captureSource{};
     };
 
@@ -22,7 +24,7 @@ namespace experiment::cooked
     {
         AssetId textureAssetId{};
         std::string artifactPath{};
-        std::vector<std::byte> artifactBytes{};
+        ce::dynamic_array<std::byte> artifactBytes{};
         CookedAssetManifestEntry manifestEntry{};
         Sha256Digest sourceContentSha256{};
         Sha256Digest sourceMetaSha256{};
@@ -41,7 +43,7 @@ namespace experiment::cooked
     struct TextureCookProductResult final
     {
         std::optional<TextureCookProduct> product{};
-        std::vector<TextureCookProductIssue> issues{};
+        ce::dynamic_array<TextureCookProductIssue> issues{};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Reflection/ClassProperty.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -124,11 +125,11 @@ public:
     size_t GetImageCount() const noexcept { return m_images.size(); }
 
 private:
-    std::vector<SpriteSheetComponent*> m_spriteSheets;
-    std::vector<TextComponent*> m_texts;
-    std::vector<UIButton*> m_buttons;
-    std::vector<Canvas*> m_canvases;
-    std::vector<ImageComponent*> m_images;
+    ce::dynamic_array<SpriteSheetComponent*> m_spriteSheets;
+    ce::dynamic_array<TextComponent*> m_texts;
+    ce::dynamic_array<UIButton*> m_buttons;
+    ce::dynamic_array<Canvas*> m_canvases;
+    ce::dynamic_array<ImageComponent*> m_images;
 };
 
 #if defined(CE_SCENE_HEADLESS)

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include <errno.h>
@@ -398,7 +399,7 @@ namespace AssetDepot
             };
             const CanonicalHandle retainedHandle{ handle };
             const DWORD required = GetFinalPathNameByHandleW(handle, nullptr, 0u, FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
-            std::vector<wchar_t> name(static_cast<std::size_t>(required) + 1u);
+            ce::dynamic_array<wchar_t> name(static_cast<std::size_t>(required) + 1u);
             const DWORD length = required == 0u ? 0u : GetFinalPathNameByHandleW(handle, name.data(),
                 static_cast<DWORD>(name.size()), FILE_NAME_NORMALIZED | VOLUME_NAME_DOS);
             if (length == 0u || length >= name.size())
@@ -584,7 +585,7 @@ namespace AssetDepot
 
         [[nodiscard]] bool ReadRecord(std::string& failure)
         {
-            std::array<char, 256u> bytes{};
+            ce::fixed_array<char, 256u> bytes{};
             std::size_t length{};
 #if defined(_WIN32)
             DWORD read{};

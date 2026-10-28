@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "EditorCommandServiceHost.h"
 
 #include "ConsoleCommandSystem.h"
@@ -110,7 +111,7 @@ namespace EditorCommandService
         {
         public:
             bool BuildNamedArguments(const std::string& command, const CommandService::JsonValue& parameters,
-                                     std::vector<std::string>& arguments, std::string& error) override
+                                     ce::dynamic_array<std::string>& arguments, std::string& error) override
             {
                 using JV = CommandService::JsonValue;
                 const auto* descriptor = CommandCore::CommandRegistry::Get().Find(command);
@@ -184,7 +185,7 @@ namespace EditorCommandService
                 return true;
             }
 
-            CommandService::CommandOutcome Execute(const std::vector<std::string>& arguments,
+            CommandService::CommandOutcome Execute(const ce::dynamic_array<std::string>& arguments,
                                                    int timeoutMs) override
             {
                 // 결과를 스레드 사이로 넘긴다. 수신 스레드가 여기서 기다리고,
@@ -288,7 +289,7 @@ namespace EditorCommandService
                 return (nullptr != descriptor) && descriptor->executesUserCode;
             }
 
-            bool ExecuteAsync(const std::vector<std::string>& arguments,
+            bool ExecuteAsync(const ce::dynamic_array<std::string>& arguments,
                               AsyncCompletion onDone) override
             {
                 return ConsoleCommandSystem::Get().EnqueueStructured(arguments,

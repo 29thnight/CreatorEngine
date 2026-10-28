@@ -1,3 +1,5 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineStorage.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "EditorNavContract.h"
 
 #include "ImGui.h"
@@ -20,14 +22,14 @@ namespace editor::nav
         //
         // 한 프레임 동안만 산다. 잠금이 없는 이유는 신고·그리기·관측이 전부
         // 같은 스레드의 같은 프레임 안에서 일어나기 때문이다.
-        std::vector<announced_item> g_frameItems;
-        std::vector<announced_item> g_frameCursors;
+        ce::dynamic_array<announced_item> g_frameItems;
+        ce::dynamic_array<announced_item> g_frameCursors;
 
         // ── 게시본 ───────────────────────────────────────────────────────────
         std::mutex g_mutex;
         contract_view g_published;
-        std::deque<ImGuiKey> g_pendingKeys;
-        std::deque<std::string> g_pendingText;
+        ce::segmented_deque<ImGuiKey> g_pendingKeys;
+        ce::segmented_deque<std::string> g_pendingText;
         ImGuiKey g_liveKey = ImGuiKey_None;
 
         // 주입된 포인터. 큐가 아니라 **고정 상태**다 — 이유는 헤더에 있다.
@@ -41,7 +43,7 @@ namespace editor::nav
         float g_pointerPrevY = 0.f;
         bool g_pointerMoved = false;
 
-        void remember(std::vector<std::string>& names, const char* name)
+        void remember(ce::dynamic_array<std::string>& names, const char* name)
         {
             if (nullptr == name) return;
             if (std::find(names.begin(), names.end(), name) != names.end()) return;
@@ -279,7 +281,7 @@ namespace editor::nav
         g_pointerMoved = true;
     }
 
-    bool request_keys(const std::vector<std::string>& keys, std::string& outError)
+    bool request_keys(const ce::dynamic_array<std::string>& keys, std::string& outError)
     {
         outError.clear();
         if (keys.empty())
@@ -288,7 +290,7 @@ namespace editor::nav
             return false;
         }
 
-        std::vector<ImGuiKey> resolved;
+        ce::dynamic_array<ImGuiKey> resolved;
         resolved.reserve(keys.size());
         for (const std::string& name : keys)
         {

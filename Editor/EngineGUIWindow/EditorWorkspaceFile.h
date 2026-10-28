@@ -1,4 +1,6 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
 #include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace editor::workspace
@@ -24,7 +26,7 @@ namespace editor::workspace
         std::string viewport{ "###Editor.Scene" };
         int imgui_version{ 19280 }, theme_version{ 1 };
         float dpi{ 1.f }, width{ 1920.f }, height{ 1080.f }, tree_width{ 220.f };
-        std::map<std::string, bool> panels;
+        ce::engine_ordered_map<std::string, bool> panels;
         /// 이 배치가 적힌 화면 구성. `<너비>x<높이>+<x>+<y>` 를 정렬해 `;` 로 이은 것
         /// (예: `1920x1080+2880+0;2880x1620+0+0`). 사람이 읽을 수 있는 형태로 두는 이유는
         /// 뷰포트 좌표를 **왜 버렸는지**가 파일만 보고 답해져야 하기 때문이다.
@@ -48,7 +50,7 @@ namespace editor::workspace
 
     struct alias { std::string old_name, stable_id; std::uint32_t old_hash{}, new_hash{}; };
     // A migration never writes the input file. The caller backs it up before publication.
-    std::string migrate_ini(std::string_view ini, const std::vector<alias>& aliases);
+    std::string migrate_ini(std::string_view ini, const ce::dynamic_array<alias>& aliases);
     bool validate_ini(std::string_view ini, std::string& error);
 
     /// `ViewportPos`/`ViewportId` 줄을 걷는다 — 창은 메인 뷰포트로 돌아온다.

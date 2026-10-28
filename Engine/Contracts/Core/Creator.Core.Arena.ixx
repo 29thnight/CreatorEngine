@@ -1,5 +1,5 @@
 export module Creator.Core.Arena;
-
+export import "Creator.Containers.h";
 import std;
 import Creator.Core.HeapAllocator;
 
@@ -297,6 +297,7 @@ export namespace ce
 
     // Stateful STL allocator without a virtual memory_resource dispatch. Nested
     // containers and map values receive the same writer domain through construct.
+    class arena_byte_allocator;
     template<typename T>
     class arena_allocator
     {
@@ -306,6 +307,7 @@ export namespace ce
 
         arena_allocator() noexcept = default;
         arena_allocator(arena_resource* resource) noexcept : resource_(resource) {}
+        arena_allocator(const arena_byte_allocator& other)noexcept;
         template<typename U>
         arena_allocator(const arena_allocator<U>& other) noexcept : resource_(other.resource())
         {
@@ -323,21 +325,21 @@ export namespace ce
                 throw std::bad_array_new_length();
             }
             return resource_ ? static_cast<T*>(resource_->allocate(count * sizeof(T), alignof(T)))
-                             : heap_allocator<T>{}.allocate(count);
+                             : stl_heap_allocator<T>{}.allocate(count);
         }
 
         void deallocate(T* memory, std::size_t count) noexcept
         {
             if (!resource_)
             {
-                heap_allocator<T>{}.deallocate(memory, count);
+                stl_heap_allocator<T>{}.deallocate(memory, count);
             }
         }
 
         template<typename U, typename... Args>
         void construct(U* memory, Args&&... args)
         {
-            std::apply([memory](auto&&... values)
+            ce::apply([memory](auto&&... values)
                        { std::construct_at(memory, std::forward<decltype(values)>(values)...); },
                        std::uses_allocator_construction_args<U>(*this, std::forward<Args>(args)...));
         }
@@ -352,10 +354,44 @@ export namespace ce
         arena_resource* resource_{};
     };
 
+    class arena_byte_allocator
+    {
+      public:
+        using scoped_construction_allocator=arena_byte_allocator;
+        static constexpr bool propagate_on_array_copy_assignment=false;
+        static constexpr bool propagate_on_array_move_assignment=false;
+        arena_byte_allocator()noexcept=default;
+        arena_byte_allocator(arena_resource* resource)noexcept:resource_(resource){}
+        template<class T>arena_byte_allocator(const arena_allocator<T>& other)noexcept:resource_(other.resource()){}
+        arena_resource* resource()const noexcept{return resource_;}
+        arena_byte_allocator select_on_container_copy_construction()const noexcept{return {};}
+        void* allocate(std::size_t bytes,std::size_t alignment)
+        {
+            return resource_?resource_->allocate(bytes,alignment):heap_byte_allocator{}.allocate(bytes,alignment);
+        }
+        void deallocate(void* memory,std::size_t bytes,std::size_t alignment)noexcept
+        {
+            if(!resource_)heap_byte_allocator{}.deallocate(memory,bytes,alignment);
+        }
+        template<class U,class... Args>void construct(U* target,Args&&... args)
+        {
+            ce::apply([target](auto&&... values){std::construct_at(target,std::forward<decltype(values)>(values)...);},
+                std::uses_allocator_construction_args<U>(*this,std::forward<Args>(args)...));
+        }
+        template<class U,class... Args>U construct_value(Args&&... args)
+        {
+            return std::make_obj_using_allocator<U>(*this,std::forward<Args>(args)...);
+        }
+        bool operator==(const arena_byte_allocator& other)const noexcept{return resource_==other.resource_;}
+      private:
+        arena_resource* resource_{};
+    };
+    template<typename T>arena_allocator<T>::arena_allocator(const arena_byte_allocator& other)noexcept:resource_(other.resource()){}
+
     template<typename T>
-    using arena_vector = std::vector<T, arena_allocator<T>>;
+    using arena_vector = ce::dynamic_array<T,arena_byte_allocator>;
 
     template<typename Key, typename Value, typename Compare = std::less<Key>>
-    using arena_map = std::map<Key, Value, Compare, arena_allocator<std::pair<const Key, Value>>>;
+    using arena_map = ce::ordered_node_map<Key, Value, Compare, arena_allocator<std::pair<const Key, Value>>>;
 
 } // namespace ce

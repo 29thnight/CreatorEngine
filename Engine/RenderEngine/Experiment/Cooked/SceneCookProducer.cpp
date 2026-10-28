@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -49,7 +50,7 @@ struct LegacyTextureKey final
     std::string_view nameField;
     std::string_view propertyName;
 };
-inline constexpr std::array<LegacyTextureKey, 5> kLegacyTextureNameKeys{{
+inline constexpr ce::fixed_array<LegacyTextureKey, 5> kLegacyTextureNameKeys{{
     {"m_baseColorTexName", "baseColorMap"},
     {"m_normalTexName", "normalMap"},
     {"m_ORM_TexName", "ormMap"},
@@ -83,7 +84,7 @@ inline constexpr std::array<LegacyTextureKey, 5> kLegacyTextureNameKeys{{
 }
 
 // producer 가 없어서 간선을 그릴 수 없는 GUID 참조.
-inline constexpr std::array<std::string_view, 2> kUnproducedGuidKeys{
+inline constexpr ce::fixed_array<std::string_view, 2> kUnproducedGuidKeys{
     "m_BehaviorTreeGuid",
     "m_BlackBoardGuid",
 };
@@ -96,7 +97,7 @@ inline constexpr std::array<std::string_view, 2> kUnproducedGuidKeys{
         // Preserve the serialized component shape. Only these three existing
         // string fields are lowered to typed identities in the cooked document.
         [[nodiscard]] bool LowerDecalTexture(const Authoring::WriteNode& node,
-            const std::filesystem::path& assetRoot, std::vector<AssetId>& references, std::string& error)
+            const std::filesystem::path& assetRoot, ce::dynamic_array<AssetId>& references, std::string& error)
         {
             if (!node.Read().IsScalar())
             {
@@ -147,7 +148,7 @@ inline constexpr std::array<std::string_view, 2> kUnproducedGuidKeys{
         }
 
         [[nodiscard]] bool LowerDecalTextures(const Authoring::WriteNode& node,
-            const std::filesystem::path& assetRoot, std::vector<AssetId>& references,
+            const std::filesystem::path& assetRoot, ce::dynamic_array<AssetId>& references,
             std::string& error, std::size_t& visited, std::size_t depth = 0u)
         {
             if (depth > 256u || ++visited > 1024u * 1024u)
@@ -285,7 +286,7 @@ struct Walk final
 {
     SceneCookProduct& product;
     AssetId self{};
-    std::vector<AssetId>& dependencies;
+    ce::dynamic_array<AssetId>& dependencies;
     std::string& failureKey;
     std::string& failureValue;
     std::string& failureContext;
@@ -617,7 +618,7 @@ struct Walk final
 } // namespace
 
 bool CollectFoliageBootstrapReferences(const Authoring::ReadNode& root,
-    std::vector<TypedAssetReference>& outReferences, std::string& failure)
+    ce::dynamic_array<TypedAssetReference>& outReferences, std::string& failure)
 {
     failure.clear();
     if (!root.IsMap() || !root["FoliageAsset"].IsMap() || !root["FoliageAsset"]["Types"].IsSequence())
@@ -626,7 +627,7 @@ bool CollectFoliageBootstrapReferences(const Authoring::ReadNode& root,
         return false;
     }
     SceneCookProduct product;
-    std::vector<AssetId> dependencies;
+    ce::dynamic_array<AssetId> dependencies;
     std::string key, value, context;
     Walk walk{product, {}, dependencies, key, value, context, false, true};
     walk.Visit(root["FoliageAsset"]["Types"], 0u, false, true);
@@ -726,7 +727,7 @@ SceneCookProductResult BuildSceneCookProduct(const SceneCookProductRequest& requ
     }
     Authoring::WriteDocument loweredDocument;
     loweredDocument.Root().Assign(root);
-    std::vector<AssetId> decalTextures;
+    ce::dynamic_array<AssetId> decalTextures;
     std::size_t visited{};
     std::string loweringError;
     if (!LowerDecalTextures(loweredDocument.Root(), textureIdentityRoot, decalTextures, loweringError, visited))
@@ -740,7 +741,7 @@ SceneCookProductResult BuildSceneCookProduct(const SceneCookProductRequest& requ
     product.sceneAssetId = sceneAssetId;
     product.kind = kind;
 
-    std::vector<AssetId> dependencies;
+    ce::dynamic_array<AssetId> dependencies;
     std::string failureKey;
     std::string failureValue;
     std::string failureContext;

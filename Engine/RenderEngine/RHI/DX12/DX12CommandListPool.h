@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
@@ -90,7 +91,7 @@ class DX12CommandListPool : public IRHIParallelCommandPool
     };
 
     // [프레임][기록 구간]. OpenWorker에서 해당 allocator/list를 Reset한다.
-    std::vector<std::vector<Slot>> m_slots;
+    ce::dynamic_array<ce::dynamic_array<Slot>> m_slots;
 
     uint32_t GetCurrentFrameSlot() const override { return m_frameIndex; }
     uint64_t GetCurrentRecordingId() const override;
@@ -103,10 +104,10 @@ class DX12CommandListPool : public IRHIParallelCommandPool
     winrt::com_ptr<ID3D12Device> m_device;
     DX12DeviceResources* m_resources{nullptr};
     own::shared_owner<const DX12RecordingResources> m_recordingResources;
-    std::vector<own::unique_owner<DX12Encoder>> m_encoders;
+    ce::dynamic_array<own::unique_owner<DX12Encoder>> m_encoders;
     // A cached fork can be reused only when retirement has released every
     // external owner. Otherwise the new recording receives a different fork.
-    std::vector<own::shared_owner<DX12CommandListPool>> m_translationPools;
+    ce::dynamic_array<own::shared_owner<DX12CommandListPool>> m_translationPools;
     uint32_t m_workerCount{0};
     uint32_t m_frameCount{0};
     uint32_t m_frameIndex{0};

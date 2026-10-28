@@ -1,3 +1,4 @@
+#include "../../../../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -144,17 +145,17 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
     //
     // v0(-1,-1) v1(1,-1) v2(1,1) v3(-1,1), 인덱스 0,1,2 / 0,2,3.
     // 대각선은 v0-v2(y=x 선)다.
-    std::vector<Vertex> vertices(4);
+    ce::dynamic_array<Vertex> vertices(4);
     vertices[0].position = { -1.f, -1.f, 0.f };
     vertices[1].position = { 1.f, -1.f, 0.f };
     vertices[2].position = { 1.f, 1.f, 0.f };
     vertices[3].position = { -1.f, 1.f, 0.f };
-    const std::vector<uint32_t> indices{ 0, 1, 2, 0, 2, 3 };
+    const ce::dynamic_array<uint32_t> indices{ 0, 1, 2, 0, 2, 3 };
 
     Mesh quadMesh("dx12_wireframe_quad", vertices, indices);
 
     // 같은 메시 둘 — 원점과 (3,0,0). 병합이 돌면 배치 하나로 나간다.
-    std::vector<EnhancedDrawItem> draws(2);
+    ce::dynamic_array<EnhancedDrawItem> draws(2);
     draws[0].mesh = &quadMesh;
     draws[0].worldMatrix = math::matrix4x4::identity();
     draws[1].mesh = &quadMesh;
@@ -386,7 +387,7 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
     {
         // 본 하나에 전부 물린 쿼드. 기본 Vertex는 boneWeights가 0이라
         // 셰이더가 스키닝을 건너뛴다 — 가중을 실어야 통로가 열린다.
-        std::vector<Vertex> skinnedVertices(4);
+        ce::dynamic_array<Vertex> skinnedVertices(4);
         skinnedVertices[0].position = { -1.f, -1.f, 0.f };
         skinnedVertices[1].position = { 1.f, -1.f, 0.f };
         skinnedVertices[2].position = { 1.f, 1.f, 0.f };
@@ -403,7 +404,7 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
             math::translation_matrix(math::vector3{ 0.f, 1.5f, 0.f }) };
 
         // 같은 애니메이터를 두 드로우가 공유한다 — 팔레트는 하나여야 한다.
-        std::vector<EnhancedDrawItem> skinnedDraws(2);
+        ce::dynamic_array<EnhancedDrawItem> skinnedDraws(2);
         for (uint32_t i = 0; i < 2; ++i)
         {
             skinnedDraws[i].mesh = &skinnedMesh;
@@ -504,7 +505,7 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
     {
         const auto mask = assets::kCoreVertexAttributes | (skin ? assets::kSkinVertexAttributes : 0);
         const auto stride = assets::StrideOf(mask);
-        std::vector<std::byte> packedVertices(4 * stride);
+        ce::dynamic_array<std::byte> packedVertices(4 * stride);
         for (size_t vertex = 0; vertex < vertices.size(); ++vertex)
         {
             auto* bytes = packedVertices.data() + vertex * stride;
@@ -543,7 +544,7 @@ bool DX12Test::RunWireFrameTest(std::string& outLog)
         model.indexData = indices.data();
         model.indexCount = static_cast<uint32_t>(indices.size());
         const math::matrix4x4 palette[]{math::translation_matrix(math::vector3{0, 1.5f, 0})};
-        std::vector<EnhancedDrawItem> graphDraws(2);
+        ce::dynamic_array<EnhancedDrawItem> graphDraws(2);
         for (unsigned draw = 0; draw < graphDraws.size(); ++draw)
         {
             auto& item = graphDraws[draw];

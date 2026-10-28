@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/MPSCVarianceAcceptance20261026.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>고정 용량 MPSC·배열 확장·측정 편차 — 2026-10-26</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#환경과-독립-위치">환경과 독립 위치</a></li><li><a href="#고정-용량-mpsc-계약과-구현">고정 용량 MPSC 계약과 구현</a></li><li><a href="#대형-배열-확장">대형 배열 확장</a></li><li><a href="#안정된-stl-기준에서-드러난-맵-경로">안정된 STL 기준에서 드러난 맵 경로</a></li><li><a href="#측정-편차에서-확인한-것과-남은-것">측정 편차에서 확인한 것과 남은 것</a></li><li><a href="#정확성진행-보장-검증">정확성·진행 보장 검증</a></li><li><a href="#자료와-재현">자료와 재현</a></li><li><a href="#엔진-통합-경계">엔진 통합 경계</a></li><li><a href="#일반-컨테이너-전체-표">일반 컨테이너 전체 표</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="MPSCVarianceAcceptance20261026.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>고정 용량 MPSC·배열 확장·측정 편차 — 2026-10-26</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 9개의 분량 막대">
+<a class="map-row" href="#환경과-독립-위치"><span class="ve-label">§01</span><span class="map-name">환경과 독립 위치</span><span class="map-bar"><i style="width:15.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#고정-용량-mpsc-계약과-구현"><span class="ve-label">§02</span><span class="map-name">고정 용량 MPSC 계약과 구현</span><span class="map-bar"><i style="width:45.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#대형-배열-확장"><span class="ve-label">§03</span><span class="map-name">대형 배열 확장</span><span class="map-bar"><i style="width:48.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#안정된-stl-기준에서-드러난-맵-경로"><span class="ve-label">§04</span><span class="map-name">안정된 STL 기준에서 드러난 맵 경로</span><span class="map-bar"><i style="width:12.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#측정-편차에서-확인한-것과-남은-것"><span class="ve-label">§05</span><span class="map-name">측정 편차에서 확인한 것과 남은 것</span><span class="map-bar"><i style="width:26.3%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">1</span></span></a>
+<a class="map-row" href="#정확성진행-보장-검증"><span class="ve-label">§06</span><span class="map-name">정확성·진행 보장 검증</span><span class="map-bar"><i style="width:16.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#자료와-재현"><span class="ve-label">§07</span><span class="map-name">자료와 재현</span><span class="map-bar"><i style="width:20.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#엔진-통합-경계"><span class="ve-label">§08</span><span class="map-name">엔진 통합 경계</span><span class="map-bar"><i style="width:10%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#일반-컨테이너-전체-표"><span class="ve-label">§09</span><span class="map-name">일반 컨테이너 전체 표</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 9개 가운데 「일반 컨테이너 전체 표」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><blockquote>
+<p><strong>후속 수용 완료:</strong> 아래 81/82는 SMT 상태 제어 전의 이력이다. 같은 바이너리의 전체 재검증과 원인 분리는 <a href="SmallArrayVarianceAcceptance20261026.html">STL 소형 배열 편차 후속 보고서</a>를 참조한다.</p>
+</blockquote>
+<p><strong>고정 용량 MPSC와 대형 배열의 지정된 독립 성능 조건은 충족했다. 일반 라이브러리 전체의 엄격한 편차 게이트는 81/82로 보류한다. 엔진 통합은 수행하지 않았다.</strong></p>
+<div class="table-scroll"><table>
+<thead><tr><th>범위</th><th style="text-align:right">결과</th><th>판정의 의미</th></tr></thead>
+<tbody><tr><td>고정 MPSC</td><td style="text-align:right">4/4</td><td>용량 64/1024 × 1P1C/4P1C, 기존 yield 정책의 8회 전송 묶음, 3프로세스 모두 충족</td></tr>
+<tr><td>대형 배열</td><td style="text-align:right">4/4</td><td>N=4096/65536 × 성장/reserve, 조건별 새 프로세스에서 각 3회 충족</td></tr>
+<tr><td>일반 컨테이너 시간 비율</td><td style="text-align:right">82/82</td><td>매 조건·반복 custom/MSVC STL 중앙값 ≤1.10</td></tr>
+<tr><td>일반 컨테이너 자체 표본 편차</td><td style="text-align:right">82/82</td><td>매 조건·반복 자체 x[13]/x[1] ≤1.30</td></tr>
+<tr><td>일반 컨테이너 양쪽 편차까지 포함</td><td style="text-align:right">81/82</td><td>STL의 array_growth/64 1건이 초과하므로 전체 수용으로 처리하지 않음</td></tr></tbody></table></div>
+<p>편차는 정렬한 15개 표본의 x[13]/x[1]이다. 세 반복의 평균으로 느린 조건을 숨기지 않고, 모든 반복의 비율과 양쪽 편차가 한도 안이어야 해당 조건을 수용한다. 표본 제거·실패 표본 교체·한도 완화는 하지 않았다. 이는 명시한 warm-throughput 조건의 결과이며 단일 전송 지연, 엔진 프레임 p99 또는 OS 간 동등성을 입증하지 않는다.</p>
+</section>
+<section class="doc-sec" id="sec-환경과-독립-위치">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="환경과-독립-위치">환경과 독립 위치</h2></div>
+<div class="prose"><p>독립 소스/솔루션은 <code>C:/Users/idene/source/repos/CreatorContainers</code>, <code>build/CreatorContainers.slnx</code>다. 엔진 헤더·패키지를 가져오지 않는다. MSVC 명령의 주변 vcpkg include 경로는 남아 있었지만, 실제 CL.read 의존 파일에 vcpkg 경로는 없었다. 배포 헤더는 STL 컨테이너·문자열·std::atomic·std::mutex에 의존하지 않으며 C 메모리 함수, C/C++ 런타임과 컴파일러 원자 primitive를 사용한다.
+환경: Intel(R) Core(TM) i7-8700K CPU @ 3.70GHz, 6코어/12논리 CPU, Microsoft Windows 11 Pro 10.0.26300. MSVC 19.50.35730, STL 145, Release /O2 /Ob2, /W4 /WX, CMake cxx_std_23(/std:c++latest), iterator debug 0.</p>
+<p>측정 스레드는 논리 CPU4, above-normal 우선순위이며 MPSC 생산자는 소비자와 다른 물리 코어다. 다른 앱을 종료하거나 OS 전원·CPU 정책을 바꾸지 않았다. 이 PC의 실제 실행 자료이며 GCC/macOS/ARM64 및 OS 간 성능 비교는 미검증이다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-고정-용량-mpsc-계약과-구현">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="고정-용량-mpsc-계약과-구현">고정 용량 MPSC 계약과 구현</h2></div>
+<div class="prose"><p><a href="../../../CreatorContainers/include/ce/bounded_mpsc_queue.h">bounded_mpsc_queue.h</a>는 고정 값 풀 N개와 64비트 epoch/index publication ring N개를 직접 보유한다. 코어에 힙 할당·락·TLS·참여자 등록은 없다. 소비자는 정확히 한 명이어야 한다.</p>
+<p>생산자는 빈 값 슬롯을 소유하고 T를 생성한 뒤 FAA ticket을 얻어 공개한다. 소비자는 아직 공개되지 않은 빈 예약을 취소하고 다음 epoch로 전진한다. 지연된 생산자는 이미 만든 값을 유지한 채 새 ticket에서 재공개한다. 예약 생산자의 재개를 기다리지 않는다. 실패 CAS는 소비자의 진행을 뜻하고, 풀 탐색은 고정 크기 내에서 종료한다. consumer는 시작 시 tail snapshot까지만 탐색한다. FIFO/생산자별 순서를 검사했으며 생산자의 wait-free 보장은 아니다.</p>
+<p><code>false/unavailable</code>은 공개 FIFO의 strict full 판정이 아니다. 비공개 예약이 용량을 쓰거나 경합 중 풀 탐색을 놓친 경우도 포함한다. false 반환 시 인수를 이동하지 않는다. T 생성자 예외는 ticket 전에 정리하며 이동 대입/소멸은 noexcept를 요구한다. 사용자 T와 예외 런타임의 진행 보장은 코어와 별도다. 유한 counter 소진은 명시적 예외이며 조용히 wrap하지 않는다. 생성/소멸에는 동시 접근이 없어야 한다. 잔존 값은 풀 순서로 소멸하므로 FIFO 소멸이 필요하면 먼저 drain한다.</p>
+<h3 id="ppl-비교의-최종-조건">PPL 비교의 최종 조건</h3>
+<p>값은 128B이고 <strong>각 전송의 생산자별 원소 수는 기존과 같은 262,144개</strong>다. PPL은 기본 무제한 큐, 자체 큐는 고정 용량이다. 같은 메모리 상한 비교는 아니다. ready barrier 뒤 start 공개부터 join까지 측정하며 모든 단어·생산자별 FIFO를 검증한다. 큐 생성/소멸 및 스레드 생성은 이 전송 시간 밖이다.</p>
+<p>최종 사전 지정 조건 <code>yield-batch8</code>은 기존 OS yield 대기 정책을 유지하고, 8개 전송 시간의 합/8을 1표본으로 삼는다. 3개 고정 워밍업 묶음과 정식 15개 묶음을 사용한다. 이는 연속 단일 wall interval이 아닌 동일 작업량의 평균 전송 시간이다. 전체 대조 행렬의 정식 하위 전송 <strong>3,420쌍</strong>을 보존·재계산했다. 단일 전송의 지연 편차를 해결했다는 뜻은 아니다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>용량</th><th style="text-align:right">생산자</th><th style="text-align:right">중앙 비율</th><th style="text-align:right">세 프로세스 비율 범위</th><th style="text-align:right">최대 양쪽 표본 편차</th><th>수용</th></tr></thead>
+<tbody><tr><td class="num">64</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">0.680</td><td style="text-align:right">0.657–0.694</td><td class="num" style="text-align:right">1.077</td><td>True</td></tr>
+<tr><td class="num">64</td><td class="num" style="text-align:right">4</td><td class="num" style="text-align:right">0.878</td><td style="text-align:right">0.839–0.895</td><td class="num" style="text-align:right">1.270</td><td>True</td></tr>
+<tr><td class="num">1024</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">0.686</td><td style="text-align:right">0.668–0.697</td><td class="num" style="text-align:right">1.094</td><td>True</td></tr>
+<tr><td class="num">1024</td><td class="num" style="text-align:right">4</td><td class="num" style="text-align:right">0.796</td><td style="text-align:right">0.794–0.804</td><td class="num" style="text-align:right">1.060</td><td>True</td></tr></tbody></table></div>
+<h3 id="대기-정책과-짧은-표본의-분리">대기 정책과 짧은 표본의 분리</h3>
+<p>이전 단일 전송 검사에서는 자체 1P/64 편차 1.379가 초과했다. 새 계측기는 같은 바이너리 안에서 (1) 시작/재시도 모두 yield, (2) 시작만 pause32, (3) 시작/재시도 모두 pause32, (4) yield 8회 묶음, (5) pause32 8회 묶음을 모두 3회 대조했다. 반복 2는 모드 순서를 반전했다. 개별 시간뿐 아니라 외부 push 실패·empty 재시도 및 start 공개부터 작업자 대기 종료까지의 지연을 기록했다.</p>
+<p>이번 계측기의 단일 전송 대조군에서도 이전 편차 초과가 그대로 재현되지는 않았다. 따라서 배치 길이 또는 OS yield 하나만을 유일한 원인으로 확정하지 않는다. 1P/64의 시작 지연 중앙값은 대체로 0.5~0.9µs여서, 중앙값 수준의 전체 전송 시간 차이를 시작 지연만으로 설명할 근거는 부족하다. hot retry 정책을 바꾸면 empty 시도 수와 시간 분포가 변했지만, backoff 길이·시스템 호출·큐 경합을 순수 비용으로 분해한 계측은 아니다. 외부 재시도 횟수를 PPL 내부 원자 연산/대기 횟수로 해석하지 않는다. busy polling 대조군은 엔진 CPU 전력·수면 정책 수용이 아니다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-대형-배열-확장">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="대형-배열-확장">대형 배열 확장</h2></div>
+<div class="prose"><p>기존 1.5배 성장 정책을 유지했다. <a href="../../../CreatorContainers/include/ce/dynamic_array.h">dynamic_array.h</a>는 trivial/noexcept-move 값과 구체 allocator의 명시적 <code>byte_relocation_allocator</code> 자기 타입 opt-in에만 재할당 최적화를 적용한다. 상속만 한 allocator가 우연히 CRT realloc을 호출해 소유권을 깨지 않게 한다. 자기 참조 append 인수는 재할당 전에 보존한다. 비단순 객체·opt-in 없는 allocator는 기존 생성/이동·복사/파괴 경로를 유지한다.</p>
+<p>일반 정렬은 malloc/realloc/free, 오버얼라인은 정렬 new/delete로 확보·복사한다. MSVC x64의 CRT malloc 정렬 한도 16B와 그 밖의 alignof(max_align_t)를 사용하며 컴파일러 new-alignment 옵션과 구분한다. <a href="https://learn.microsoft.com/en-us/cpp/c-runtime-library/reference/malloc?view=msvc-170">Microsoft malloc 계약</a>을 참조했다. 일반 heap은 전역 operator new hook을 경유하지 않으므로 엔진 계측은 명시적 resource를 사용해야 한다. 원본 주소와 같아 보여도 확장의 참조 무효화 계약은 유지한다. 모든 소비자를 같은 헤더로 재빌드해야 한다.</p>
+<p>아래 ns는 <strong>N개 배열을 16번 생성·채움·합산·파괴하는 1회 작업 묶음</strong>이다. 단일 원소 ns가 아니다. 각 조건은 새 프로세스에서 3회 측정했다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>작업, N</th><th style="text-align:right">중앙 비율</th><th style="text-align:right">세 반복 비율 범위</th><th style="text-align:right">자체 중앙값 ns 범위</th><th style="text-align:right">STL 중앙값 ns 범위</th><th style="text-align:right">최대 양쪽 표본 편차</th></tr></thead>
+<tbody><tr><td>core, array_growth, 4096</td><td class="num" style="text-align:right">0.743</td><td style="text-align:right">0.462–0.837</td><td style="text-align:right">102289–116301</td><td style="text-align:right">138464–221168</td><td class="num" style="text-align:right">1.014</td></tr>
+<tr><td>core, array_growth, 65536</td><td class="num" style="text-align:right">0.188</td><td style="text-align:right">0.145–0.193</td><td style="text-align:right">1237406–1630881</td><td style="text-align:right">8437444–8620675</td><td class="num" style="text-align:right">1.045</td></tr>
+<tr><td>core, array_reserved, 4096</td><td class="num" style="text-align:right">0.764</td><td style="text-align:right">0.761–0.776</td><td style="text-align:right">70010–71258</td><td style="text-align:right">91694–91963</td><td class="num" style="text-align:right">1.039</td></tr>
+<tr><td>core, array_reserved, 65536</td><td class="num" style="text-align:right">0.804</td><td style="text-align:right">0.800–0.807</td><td style="text-align:right">1172431–1183028</td><td style="text-align:right">1465227–1470286</td><td class="num" style="text-align:right">1.018</td></tr></tbody></table></div>
+<h3 id="할당이동페이지-폴트의-별도-계측">할당·이동·페이지 폴트의 별도 계측</h3>
+<p>대조 profile은 현재 CRT backend에서 재할당 경로만 제외한 before와 최적화 after다. 전체 이전 버전의 모든 차이를 뜻하지 않는다. 시간은 단일 배열의 별도 계측이므로 위 16배열 작업과 직접 빼지 않는다. growth는 allocator/이동/중간 해제를 포함하는 포괄 시간이며 표의 시간을 합하면 안 된다. memcpy만의 순수 시간을 측정했다고 주장하지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>경로</th><th style="text-align:right">reserve</th><th style="text-align:right">전체 ns 중앙값</th><th style="text-align:right">확장 ns</th><th style="text-align:right">allocator ns</th><th style="text-align:right">free ns</th></tr></thead>
+<tbody><tr><td>after/custom</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">218400</td><td class="num" style="text-align:right">21500</td><td class="num" style="text-align:right">20300</td><td class="num" style="text-align:right">2000</td></tr>
+<tr><td>after/custom</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">69600</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">200</td><td class="num" style="text-align:right">300</td></tr>
+<tr><td>after/stl</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">624100</td><td class="num" style="text-align:right">407700</td><td class="num" style="text-align:right">30300</td><td class="num" style="text-align:right">117700</td></tr>
+<tr><td>after/stl</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">94500</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">200</td><td class="num" style="text-align:right">300</td></tr>
+<tr><td>before/custom</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">583800</td><td class="num" style="text-align:right">417700</td><td class="num" style="text-align:right">24200</td><td class="num" style="text-align:right">155100</td></tr>
+<tr><td>before/custom</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">69700</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">200</td><td class="num" style="text-align:right">300</td></tr>
+<tr><td>before/stl</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">666200</td><td class="num" style="text-align:right">464100</td><td class="num" style="text-align:right">25400</td><td class="num" style="text-align:right">154800</td></tr>
+<tr><td>before/stl</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">101000</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">200</td><td class="num" style="text-align:right">300</td></tr></tbody></table></div>
+<div class="table-scroll"><table>
+<thead><tr><th>경로</th><th style="text-align:right">reserve</th><th style="text-align:right">호출수</th><th style="text-align:right">재할당수</th><th style="text-align:right">주소 변경수</th><th style="text-align:right">논리 재배치 B</th><th style="text-align:right">주소 변경시 old capacity B</th><th style="text-align:right">페이지 폴트</th></tr></thead>
+<tbody><tr><td>after/custom</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">3</td><td class="num" style="text-align:right">1137832</td><td class="num" style="text-align:right">472</td><td class="num" style="text-align:right">93</td></tr>
+<tr><td>after/custom</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>after/stl</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">29</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">1474808</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">307</td></tr>
+<tr><td>after/stl</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>before/custom</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">1137832</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">282</td></tr>
+<tr><td>before/custom</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>before/stl</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">29</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">1474808</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">381</td></tr>
+<tr><td>before/stl</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">1</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td></tr></tbody></table></div>
+<p>배열 65,536개에서 자체 성장 횟수 23회와 논리 재배치 요구량 1,137,832B는 유지된다. 주소 변경 횟수는 실제 realloc 결과다. 주소 변경시 old capacity는 보존 대상량이지 물리 DRAM 전송량이 아니다. 재할당 경로는 대부분 기존 저장소를 늘려 쓰지만 CRT 내부 동작과 메모리 상태의 영향은 남는다. 프로세스 간 절대 중앙값 차이를 프로세스 내부 15표본 편차와 혼동하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-안정된-stl-기준에서-드러난-맵-경로">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="안정된-stl-기준에서-드러난-맵-경로">안정된 STL 기준에서 드러난 맵 경로</h2></div>
+<div class="prose"><p>map_miss/4096은 편차가 작아진 중간 검사에서 약 1.26~1.31배로 실패했다. 해시 상위 7비트 태그만 추가하면 별도 probe의 equality 호출이 192,000→1,664회로 줄었지만 자체 시간은 1.449ms→1.687ms로 악화했다. 태그만으로 해결했다고 판정하지 않았다.</p>
+<p>최종 <a href="../../../CreatorContainers/include/ce/flat_hash_map.h">flat_hash_map.h</a>는 8개 제어 바이트를 읽어 SWAR로 태그/empty를 찾고 첫 empty 이전의 후보만 비교한다. wrap용 첫 8바이트 복제본, home 슬롯 hit 경로와 capacity≤128 scalar 경로를 함께 사용한다. 같은 분리 probe는 약 0.666ms까지 내려갔다. 이 fixture는 메인 전체 RNG와 다르므로 전체 판정은 아래 표를 따른다. wrap·tombstone·clear·copy·rehash 회귀와 sanitizer를 검사했고 실패한 scalar 후보도 보존했다. 문자열은 양쪽의 실제 복사 생성자를 같은 방식으로 호출하고 pointer+length 생성은 별도 항목으로 나눴다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-측정-편차에서-확인한-것과-남은-것">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="측정-편차에서-확인한-것과-남은-것">측정 편차에서 확인한 것과 남은 것</h2></div>
+<div class="prose"><ul>
+<li>cold 단일 호출로 반복 수를 정하면 실제 배치가 목표보다 짧아졌다. 현재는 warmed batch를 구현별 100ms 목표로 보정하고 양쪽 반복 수를 기록해 1회 작업당 시간으로 환산한다. 느린 구현의 배치가 속도 비율만큼 수초로 늘어나지 않게 했다.</li>
+<li>통계 벡터 4개를 표본 전에 reserve(15)하여 표본 사이 재할당을 제거했다. 작은 layout probe는 reserve 유무 모두 통과했으므로 이것만을 편차의 유일한 원인으로 확정하지 않는다.</li>
+<li>구현별 고정 1초 워밍업, grouped A/B 및 두 번째 반복의 B/A 반전, affinity/우선순위, 자기 프로세스 힙 캐시 정리를 각각 기록했다. <a href="https://learn.microsoft.com/windows/win32/api/heapapi/nf-heapapi-heapsetinformation">HeapOptimizeResources</a>는 자기 프로세스의 사용하지 않는 힙 캐시를 정리한다. LFH 강제 활성화는 최종 조건에 포함하지 않았다.</li>
+<li>일반 최종 검사는 82개 조건 각각을 새 프로세스에서 3회, 총 246개 프로세스로 실행했다. 입력 생성은 유지하고 벤치마크 호출만 선택했다. 두 번째 반복은 조건 순서도 반전했다. 원시 자료/바이너리는 이전 연속 검사와 따로 보존했다.</li>
+<li>Windows GetThreadTimes는 약 15.625ms 단위로 관측되어 짧은 표본의 정밀 CPU 점유율로 쓰지 않았다. thread cycle이 시간 변화와 같이 변한 사례가 있어 전부를 선점으로 처리하지 않았지만, cycle을 정확한 CPU 시간·주파수로 환산하지도 않았다.</li>
+</ul>
+<p>연속 전체 행렬 final4는 일반 81/82, MPSC 4/4였고 STL map_miss/65536 편차 1.354가 남았다. 같은 바이너리의 해당 조건 단독 3회는 통과했다. 이후 일반 82개 전체를 조건별 격리한 final5에서도 STL array_growth/64 편차 1.409가 초과했다. 따라서 여러 작업의 실행 이력만이 원인이라고 결론낼 수 없다. 힙/주소 배치·워밍업·OS·SMT·주파수·IRQ를 완전히 분해했다는 주장도 하지 않는다. 실패를 OS 노이즈라며 무시하지 않았고 일반 전체 수용은 보류한다.</p>
+<h3 id="남은-엄격한-품질-게이트">남은 엄격한 품질 게이트</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>조건</th><th style="text-align:right">최악 시간 비율</th><th style="text-align:right">최대 양쪽 표본 편차</th><th>상태</th></tr></thead>
+<tbody><tr><td>core, array_growth, 64</td><td class="num" style="text-align:right">0.604</td><td class="num" style="text-align:right">1.409</td><td><span class="chip risk">STL 편차 초과, 보류</span></td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-정확성진행-보장-검증">
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="정확성진행-보장-검증">정확성·진행 보장 검증</h2></div>
+<div class="prose"><p>MSVC 전체 CTest 10/10과 MPSC 추가 20회, MSVC ASan·ClangCL의 일반/확장/MPSC/Windows 헤더 조합/정렬 검사를 통과했다. Linux Release와 ASan+UBSan은 일반/확장/MPSC/정렬을 각 5회, MPSC TSan은 5회 통과했다. 정렬은 기본 및 -fnew-alignment=64 대조를 포함한다. 공개 상위 헤더는 각각 독립 컴파일했다.</p>
+<p>고정 MPSC는 용량 1/7/256, 4/8생산자 유일성·FIFO 스트레스, 100개 짧은 전역 FIFO 이력 선형화 탐색, 이동 전용 값, 생성 예외, 유한 counter 소진을 검사했다. 풀 소유 직후/ticket 직후/공개 직전/공개 직후에 생산자 하나를 멈춘 채 각각 10,000회 전송을 완료했다. 실행 검사는 모든 가능한 실행에 대한 형식 증명은 아니다.</p>
+<p>sanitizer 로그는 final2에 보존한다. 측정 helper를 바꾼 final4에서 MSVC CTest 10/10을 다시 실행했고, final5는 동일한 바이너리를 사용했다. 포함 헤더 22개가 검사본과 일치함을 확인했다. 이후 MPSC sampler는 검사 코드만 바꿨다. 최종 generic 두 실행 파일은 final5와 같고, 이전 MPSC 실행 파일/소스는 baseline/20261026-measurement-stage5에 보존했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-자료와-재현">
+<div class="sec-head"><p class="ve-label">§07</p><h2 id="자료와-재현">자료와 재현</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>자료</th><th>위치/명령</th></tr></thead>
+<tbody><tr><td>최종 범위별 판정</td><td><a href="../../../CreatorContainers/results/20261026-component-acceptance.json">component-acceptance.json</a></td></tr>
+<tr><td>일반 82개 격리 표</td><td><a href="../../../CreatorContainers/results/20261026-final5-summary.json">final5-summary.json</a></td></tr>
+<tr><td>MPSC 5모드 분리 표</td><td><a href="../../../CreatorContainers/results/20261026-mpsc-sampler-summary.json">mpsc-sampler-summary.json</a></td></tr>
+<tr><td>일반 환경/해시</td><td><a href="../../../CreatorContainers/results/20261026-final5-environment.json">final5-environment.json</a></td></tr>
+<tr><td>MPSC 환경/해시</td><td><a href="../../../CreatorContainers/results/20261026-mpsc-sampler-environment.json">mpsc-sampler-environment.json</a></td></tr>
+<tr><td>정확성·sanitizer</td><td>results/20261026-final2-*.txt</td></tr>
+<tr><td>원인 대조/배열 profile</td><td>results/20261026-final4-variance-<em>.csv, final4-array-</em>.csv</td></tr>
+<tr><td>조건별 일반 원본</td><td>results/20261026-final5-cases/</td></tr>
+<tr><td>MPSC 개별 전송 원본</td><td>results/20261026-mpsc-sampler-*.csv</td></tr>
+<tr><td>선행 행렬 재현</td><td>run-mpsc-variance.ps1</td></tr>
+<tr><td>조건별 격리 재현</td><td>run-isolated-acceptance.ps1</td></tr>
+<tr><td>MPSC 대조 재현</td><td>experiments/20261026-mpsc-sampler/run.ps1</td></tr>
+<tr><td>원시값·보존본 대조</td><td>verify-mpsc-results.ps1 -Tag 20261026-final5 -ArchiveRoot baseline/20261026-measurement-stage5</td></tr>
+<tr><td>MPSC 하위 전송 검증</td><td>summarize-mpsc-sampler.ps1</td></tr>
+<tr><td>이 보고서 생성</td><td>make-component-report.ps1</td></tr></tbody></table></div>
+<p>이전 실패·중단 자료를 삭제하지 않았다. 초기 74/82·3/4, 중간 77/82·4/4, 연속/격리 81/82 결과와 각 중단 사유를 유지한다. 새 재현에는 새 태그를 사용한다. 일반 양쪽 편차 게이트가 여전히 남으므로 전체 PASS 파일을 만들지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-엔진-통합-경계">
+<div class="sec-head"><p class="ve-label">§08</p><h2 id="엔진-통합-경계">엔진 통합 경계</h2></div>
+<div class="prose"><p>엔진 PPL 별칭과 실제 소비자는 바꾸지 않았다. 프로파일러 collector_work에는 frame/counter/control/barrier가 섞여 있고, 프레임 드롭 한도를 barrier나 제어 명령에 적용할 수 없다. ProfileService.cpp의 큐 외 프레임 수·pending gap·control ticket·semaphore·종료 상태를 함께 보존해야 한다. 단순 고정 큐 치환이나 false 무시는 안전한 통합이 아니다.</p>
+<p>남은 범위는 일반 엄격한 품질 게이트 1건, 실제 소비자별 overflow/소유권/수명/ABI 확인과 엔진 빌드·씬 전환·종료·프레임 검증, GCC/macOS/ARM64 및 OS 간 성능 행렬이다. 이 결과만으로 엔진 프레임 성능이나 모든 PC OS에서의 일정 성능을 달성했다고 표기하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-일반-컨테이너-전체-표">
+<div class="sec-head"><p class="ve-label">§09</p><h2 id="일반-컨테이너-전체-표">일반 컨테이너 전체 표</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>작업, N</th><th style="text-align:right">중앙 비율</th><th style="text-align:right">세 반복 비율 범위</th><th style="text-align:right">최대 양쪽 표본 편차</th><th>수용</th></tr></thead>
+<tbody><tr><td>core, array_growth, 23</td><td class="num" style="text-align:right">0.511</td><td style="text-align:right">0.504–0.521</td><td class="num" style="text-align:right">1.021</td><td>True</td></tr>
+<tr><td>core, array_growth, 24</td><td class="num" style="text-align:right">0.531</td><td style="text-align:right">0.512–0.547</td><td class="num" style="text-align:right">1.017</td><td>True</td></tr>
+<tr><td>core, array_growth, 4096</td><td class="num" style="text-align:right">0.743</td><td style="text-align:right">0.462–0.837</td><td class="num" style="text-align:right">1.014</td><td>True</td></tr>
+<tr><td>core, array_growth, 64</td><td class="num" style="text-align:right">0.588</td><td style="text-align:right">0.586–0.604</td><td class="num" style="text-align:right">1.409</td><td>False</td></tr>
+<tr><td>core, array_growth, 65536</td><td class="num" style="text-align:right">0.188</td><td style="text-align:right">0.145–0.193</td><td class="num" style="text-align:right">1.045</td><td>True</td></tr>
+<tr><td>core, array_growth, 8</td><td class="num" style="text-align:right">0.177</td><td style="text-align:right">0.176–0.179</td><td class="num" style="text-align:right">1.029</td><td>True</td></tr>
+<tr><td>core, array_reserved, 23</td><td class="num" style="text-align:right">0.857</td><td style="text-align:right">0.847–0.857</td><td class="num" style="text-align:right">1.182</td><td>True</td></tr>
+<tr><td>core, array_reserved, 24</td><td class="num" style="text-align:right">0.846</td><td style="text-align:right">0.835–0.882</td><td class="num" style="text-align:right">1.123</td><td>True</td></tr>
+<tr><td>core, array_reserved, 4096</td><td class="num" style="text-align:right">0.764</td><td style="text-align:right">0.761–0.776</td><td class="num" style="text-align:right">1.039</td><td>True</td></tr>
+<tr><td>core, array_reserved, 64</td><td class="num" style="text-align:right">0.821</td><td style="text-align:right">0.780–0.834</td><td class="num" style="text-align:right">1.090</td><td>True</td></tr>
+<tr><td>core, array_reserved, 65536</td><td class="num" style="text-align:right">0.804</td><td style="text-align:right">0.800–0.807</td><td class="num" style="text-align:right">1.018</td><td>True</td></tr>
+<tr><td>core, array_reserved, 8</td><td class="num" style="text-align:right">0.940</td><td style="text-align:right">0.936–0.944</td><td class="num" style="text-align:right">1.027</td><td>True</td></tr>
+<tr><td>core, fifo_batch, 23</td><td class="num" style="text-align:right">0.322</td><td style="text-align:right">0.321–0.322</td><td class="num" style="text-align:right">1.112</td><td>True</td></tr>
+<tr><td>core, fifo_batch, 24</td><td class="num" style="text-align:right">0.327</td><td style="text-align:right">0.293–0.328</td><td class="num" style="text-align:right">1.017</td><td>True</td></tr>
+<tr><td>core, fifo_batch, 4096</td><td class="num" style="text-align:right">0.408</td><td style="text-align:right">0.406–0.410</td><td class="num" style="text-align:right">1.074</td><td>True</td></tr>
+<tr><td>core, fifo_batch, 64</td><td class="num" style="text-align:right">0.356</td><td style="text-align:right">0.352–0.357</td><td class="num" style="text-align:right">1.009</td><td>True</td></tr>
+<tr><td>core, fifo_batch, 65536</td><td class="num" style="text-align:right">0.367</td><td style="text-align:right">0.358–0.368</td><td class="num" style="text-align:right">1.082</td><td>True</td></tr>
+<tr><td>core, fifo_batch, 8</td><td class="num" style="text-align:right">0.363</td><td style="text-align:right">0.359–0.363</td><td class="num" style="text-align:right">1.024</td><td>True</td></tr>
+<tr><td>core, map_build, 23</td><td class="num" style="text-align:right">0.146</td><td style="text-align:right">0.143–0.148</td><td class="num" style="text-align:right">1.015</td><td>True</td></tr>
+<tr><td>core, map_build, 24</td><td class="num" style="text-align:right">0.137</td><td style="text-align:right">0.135–0.138</td><td class="num" style="text-align:right">1.076</td><td>True</td></tr>
+<tr><td>core, map_build, 4096</td><td class="num" style="text-align:right">0.161</td><td style="text-align:right">0.160–0.161</td><td class="num" style="text-align:right">1.052</td><td>True</td></tr>
+<tr><td>core, map_build, 64</td><td class="num" style="text-align:right">0.099</td><td style="text-align:right">0.088–0.102</td><td class="num" style="text-align:right">1.040</td><td>True</td></tr>
+<tr><td>core, map_build, 65536</td><td class="num" style="text-align:right">0.233</td><td style="text-align:right">0.223–0.234</td><td class="num" style="text-align:right">1.257</td><td>True</td></tr>
+<tr><td>core, map_build, 8</td><td class="num" style="text-align:right">0.248</td><td style="text-align:right">0.238–0.253</td><td class="num" style="text-align:right">1.029</td><td>True</td></tr>
+<tr><td>core, map_hit, 23</td><td class="num" style="text-align:right">1.058</td><td style="text-align:right">1.050–1.059</td><td class="num" style="text-align:right">1.071</td><td>True</td></tr>
+<tr><td>core, map_hit, 24</td><td class="num" style="text-align:right">1.022</td><td style="text-align:right">1.022–1.023</td><td class="num" style="text-align:right">1.053</td><td>True</td></tr>
+<tr><td>core, map_hit, 4096</td><td class="num" style="text-align:right">0.826</td><td style="text-align:right">0.821–0.828</td><td class="num" style="text-align:right">1.019</td><td>True</td></tr>
+<tr><td>core, map_hit, 64</td><td class="num" style="text-align:right">1.065</td><td style="text-align:right">1.064–1.065</td><td class="num" style="text-align:right">1.011</td><td>True</td></tr>
+<tr><td>core, map_hit, 65536</td><td class="num" style="text-align:right">0.534</td><td style="text-align:right">0.533–0.536</td><td class="num" style="text-align:right">1.048</td><td>True</td></tr>
+<tr><td>core, map_hit, 8</td><td class="num" style="text-align:right">1.031</td><td style="text-align:right">1.022–1.031</td><td class="num" style="text-align:right">1.012</td><td>True</td></tr>
+<tr><td>core, map_miss, 23</td><td class="num" style="text-align:right">0.959</td><td style="text-align:right">0.959–0.963</td><td class="num" style="text-align:right">1.015</td><td>True</td></tr>
+<tr><td>core, map_miss, 24</td><td class="num" style="text-align:right">0.882</td><td style="text-align:right">0.881–0.882</td><td class="num" style="text-align:right">1.019</td><td>True</td></tr>
+<tr><td>core, map_miss, 4096</td><td class="num" style="text-align:right">0.600</td><td style="text-align:right">0.598–0.605</td><td class="num" style="text-align:right">1.062</td><td>True</td></tr>
+<tr><td>core, map_miss, 64</td><td class="num" style="text-align:right">1.030</td><td style="text-align:right">1.027–1.031</td><td class="num" style="text-align:right">1.025</td><td>True</td></tr>
+<tr><td>core, map_miss, 65536</td><td class="num" style="text-align:right">0.337</td><td style="text-align:right">0.335–0.338</td><td class="num" style="text-align:right">1.027</td><td>True</td></tr>
+<tr><td>core, map_miss, 8</td><td class="num" style="text-align:right">1.028</td><td style="text-align:right">1.028–1.029</td><td class="num" style="text-align:right">1.021</td><td>True</td></tr>
+<tr><td>core, string_append, 23</td><td class="num" style="text-align:right">0.627</td><td style="text-align:right">0.625–0.644</td><td class="num" style="text-align:right">1.017</td><td>True</td></tr>
+<tr><td>core, string_append, 24</td><td class="num" style="text-align:right">0.983</td><td style="text-align:right">0.974–0.986</td><td class="num" style="text-align:right">1.012</td><td>True</td></tr>
+<tr><td>core, string_append, 4096</td><td class="num" style="text-align:right">0.812</td><td style="text-align:right">0.810–0.851</td><td class="num" style="text-align:right">1.094</td><td>True</td></tr>
+<tr><td>core, string_append, 64</td><td class="num" style="text-align:right">0.792</td><td style="text-align:right">0.786–0.795</td><td class="num" style="text-align:right">1.047</td><td>True</td></tr>
+<tr><td>core, string_append, 65536</td><td class="num" style="text-align:right">0.827</td><td style="text-align:right">0.819–0.853</td><td class="num" style="text-align:right">1.010</td><td>True</td></tr>
+<tr><td>core, string_append, 8</td><td class="num" style="text-align:right">0.982</td><td style="text-align:right">0.974–0.983</td><td class="num" style="text-align:right">1.044</td><td>True</td></tr>
+<tr><td>core, string_copy, 23</td><td class="num" style="text-align:right">0.234</td><td style="text-align:right">0.233–0.235</td><td class="num" style="text-align:right">1.042</td><td>True</td></tr>
+<tr><td>core, string_copy, 24</td><td class="num" style="text-align:right">1.009</td><td style="text-align:right">1.007–1.076</td><td class="num" style="text-align:right">1.080</td><td>True</td></tr>
+<tr><td>core, string_copy, 4096</td><td class="num" style="text-align:right">1.001</td><td style="text-align:right">1.000–1.007</td><td class="num" style="text-align:right">1.023</td><td>True</td></tr>
+<tr><td>core, string_copy, 64</td><td class="num" style="text-align:right">1.002</td><td style="text-align:right">0.997–1.002</td><td class="num" style="text-align:right">1.015</td><td>True</td></tr>
+<tr><td>core, string_copy, 65536</td><td class="num" style="text-align:right">1.000</td><td style="text-align:right">0.998–1.003</td><td class="num" style="text-align:right">1.010</td><td>True</td></tr>
+<tr><td>core, string_copy, 8</td><td class="num" style="text-align:right">0.991</td><td style="text-align:right">0.987–1.005</td><td class="num" style="text-align:right">1.040</td><td>True</td></tr>
+<tr><td>core, string_find, 23</td><td class="num" style="text-align:right">0.750</td><td style="text-align:right">0.743–0.752</td><td class="num" style="text-align:right">1.050</td><td>True</td></tr>
+<tr><td>core, string_find, 24</td><td class="num" style="text-align:right">0.772</td><td style="text-align:right">0.771–0.777</td><td class="num" style="text-align:right">1.040</td><td>True</td></tr>
+<tr><td>core, string_find, 4096</td><td class="num" style="text-align:right">0.218</td><td style="text-align:right">0.217–0.223</td><td class="num" style="text-align:right">1.090</td><td>True</td></tr>
+<tr><td>core, string_find, 64</td><td class="num" style="text-align:right">0.419</td><td style="text-align:right">0.415–0.419</td><td class="num" style="text-align:right">1.030</td><td>True</td></tr>
+<tr><td>core, string_find, 65536</td><td class="num" style="text-align:right">0.223</td><td style="text-align:right">0.221–0.224</td><td class="num" style="text-align:right">1.204</td><td>True</td></tr>
+<tr><td>core, string_find, 8</td><td class="num" style="text-align:right">0.660</td><td style="text-align:right">0.647–0.678</td><td class="num" style="text-align:right">1.133</td><td>True</td></tr>
+<tr><td>core, string_view_construct, 23</td><td class="num" style="text-align:right">0.280</td><td style="text-align:right">0.269–0.282</td><td class="num" style="text-align:right">1.038</td><td>True</td></tr>
+<tr><td>core, string_view_construct, 24</td><td class="num" style="text-align:right">0.957</td><td style="text-align:right">0.952–0.978</td><td class="num" style="text-align:right">1.056</td><td>True</td></tr>
+<tr><td>core, string_view_construct, 4096</td><td class="num" style="text-align:right">1.001</td><td style="text-align:right">1.000–1.007</td><td class="num" style="text-align:right">1.016</td><td>True</td></tr>
+<tr><td>core, string_view_construct, 64</td><td class="num" style="text-align:right">0.969</td><td style="text-align:right">0.965–0.973</td><td class="num" style="text-align:right">1.052</td><td>True</td></tr>
+<tr><td>core, string_view_construct, 65536</td><td class="num" style="text-align:right">1.001</td><td style="text-align:right">1.000–1.003</td><td class="num" style="text-align:right">1.015</td><td>True</td></tr>
+<tr><td>core, string_view_construct, 8</td><td class="num" style="text-align:right">0.807</td><td style="text-align:right">0.795–0.808</td><td class="num" style="text-align:right">1.043</td><td>True</td></tr>
+<tr><td>expanded, age_expiration, 256</td><td class="num" style="text-align:right">0.725</td><td style="text-align:right">0.706–0.729</td><td class="num" style="text-align:right">1.019</td><td>True</td></tr>
+<tr><td>expanded, age_expiration, 4096</td><td class="num" style="text-align:right">0.099</td><td style="text-align:right">0.099–0.101</td><td class="num" style="text-align:right">1.022</td><td>True</td></tr>
+<tr><td>expanded, atom_duplicate, 256</td><td class="num" style="text-align:right">0.804</td><td style="text-align:right">0.787–0.808</td><td class="num" style="text-align:right">1.062</td><td>True</td></tr>
+<tr><td>expanded, atom_duplicate, 4096</td><td class="num" style="text-align:right">0.724</td><td style="text-align:right">0.719–0.724</td><td class="num" style="text-align:right">1.055</td><td>True</td></tr>
+<tr><td>expanded, fixed_arena_churn, 256</td><td class="num" style="text-align:right">0.558</td><td style="text-align:right">0.546–0.560</td><td class="num" style="text-align:right">1.120</td><td>True</td></tr>
+<tr><td>expanded, fixed_arena_churn, 4096</td><td class="num" style="text-align:right">0.568</td><td style="text-align:right">0.554–0.572</td><td class="num" style="text-align:right">1.127</td><td>True</td></tr>
+<tr><td>expanded, function_dispatch, 256</td><td class="num" style="text-align:right">0.989</td><td style="text-align:right">0.979–0.990</td><td class="num" style="text-align:right">1.138</td><td>True</td></tr>
+<tr><td>expanded, function_dispatch, 4096</td><td class="num" style="text-align:right">0.959</td><td style="text-align:right">0.950–0.962</td><td class="num" style="text-align:right">1.017</td><td>True</td></tr>
+<tr><td>expanded, lru_touch, 256</td><td class="num" style="text-align:right">0.258</td><td style="text-align:right">0.238–0.263</td><td class="num" style="text-align:right">1.198</td><td>True</td></tr>
+<tr><td>expanded, lru_touch, 4096</td><td class="num" style="text-align:right">0.279</td><td style="text-align:right">0.275–0.282</td><td class="num" style="text-align:right">1.172</td><td>True</td></tr>
+<tr><td>expanded, owned_array, 256</td><td class="num" style="text-align:right">0.973</td><td style="text-align:right">0.904–1.031</td><td class="num" style="text-align:right">1.030</td><td>True</td></tr>
+<tr><td>expanded, owned_array, 4096</td><td class="num" style="text-align:right">0.912</td><td style="text-align:right">0.893–0.947</td><td class="num" style="text-align:right">1.031</td><td>True</td></tr>
+<tr><td>expanded, radix_sort_u64, 256</td><td class="num" style="text-align:right">0.884</td><td style="text-align:right">0.882–0.890</td><td class="num" style="text-align:right">1.024</td><td>True</td></tr>
+<tr><td>expanded, radix_sort_u64, 4096</td><td class="num" style="text-align:right">0.383</td><td style="text-align:right">0.383–0.386</td><td class="num" style="text-align:right">1.013</td><td>True</td></tr>
+<tr><td>expanded, sequence_window, 256</td><td class="num" style="text-align:right">0.070</td><td style="text-align:right">0.069–0.070</td><td class="num" style="text-align:right">1.018</td><td>True</td></tr>
+<tr><td>expanded, sequence_window, 4096</td><td class="num" style="text-align:right">0.043</td><td style="text-align:right">0.042–0.044</td><td class="num" style="text-align:right">1.078</td><td>True</td></tr>
+<tr><td>expanded, slot_lifetime, 256</td><td class="num" style="text-align:right">0.268</td><td style="text-align:right">0.266–0.269</td><td class="num" style="text-align:right">1.050</td><td>True</td></tr>
+<tr><td>expanded, slot_lifetime, 4096</td><td class="num" style="text-align:right">0.225</td><td style="text-align:right">0.223–0.226</td><td class="num" style="text-align:right">1.099</td><td>True</td></tr>
+<tr><td>expanded, string_map_build, 256</td><td class="num" style="text-align:right">0.611</td><td style="text-align:right">0.572–0.622</td><td class="num" style="text-align:right">1.271</td><td>True</td></tr>
+<tr><td>expanded, string_map_build, 4096</td><td class="num" style="text-align:right">0.666</td><td style="text-align:right">0.666–0.672</td><td class="num" style="text-align:right">1.162</td><td>True</td></tr>
+<tr><td>expanded, string_map_hit, 256</td><td class="num" style="text-align:right">0.653</td><td style="text-align:right">0.651–0.658</td><td class="num" style="text-align:right">1.046</td><td>True</td></tr>
+<tr><td>expanded, string_map_hit, 4096</td><td class="num" style="text-align:right">0.625</td><td style="text-align:right">0.619–0.625</td><td class="num" style="text-align:right">1.079</td><td>True</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="MPSCVarianceAcceptance20261026.md"><code>docs/analysis/MPSCVarianceAcceptance20261026.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

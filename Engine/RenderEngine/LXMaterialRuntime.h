@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -64,10 +65,10 @@ namespace LX::Runtime
         // new editable construction state creates a fresh ID; moving preserves it.
         std::uint64_t representationId{ static_cast<std::uint64_t>(TypeTrait::MakeRuntimeResourceId()) };
         own::shared_owner<const ShaderGeneration> shader;
-        std::vector<MaterialPropertyValue> properties;
-        std::vector<std::uint8_t> uniforms;
-        std::vector<MaterialTextureOwner> textureOwners;
-        std::vector<std::uint16_t> keywordSelections;
+        ce::dynamic_array<MaterialPropertyValue> properties;
+        ce::dynamic_array<std::uint8_t> uniforms;
+        ce::dynamic_array<MaterialTextureOwner> textureOwners;
+        ce::dynamic_array<std::uint16_t> keywordSelections;
     };
 
     [[nodiscard]] bool ValidateShaderGeneration(const ShaderGeneration& shader, std::string& error);

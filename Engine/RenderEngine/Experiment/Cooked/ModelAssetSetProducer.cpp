@@ -1,3 +1,6 @@
+#include "../../../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -60,7 +63,7 @@ namespace experiment::cooked
             return std::filesystem::weakly_canonical(path);
         }
 
-        std::vector<std::byte> SourceRead(const std::filesystem::path& path)
+        ce::dynamic_array<std::byte> SourceRead(const std::filesystem::path& path)
         {
             RequireSource(std::filesystem::is_regular_file(path), "Missing model source input: " + path.string());
             std::ifstream stream(path, std::ios::binary | std::ios::ate);
@@ -68,7 +71,7 @@ namespace experiment::cooked
             const auto size = stream.tellg();
             RequireSource(size >= 0 && static_cast<std::uint64_t>(size) <= kMaxInputBytes,
                 "Oversized model source input: " + path.string());
-            std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+            ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(size));
             stream.seekg(0, std::ios::beg);
             stream.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
             RequireSource(static_cast<bool>(stream) && stream.peek() == std::char_traits<char>::eof(),
@@ -84,7 +87,7 @@ namespace experiment::cooked
         struct SourceSnapshot final
         {
             std::filesystem::path root{};
-            std::map<std::filesystem::path, im::ImportSourceBytes> files{};
+            ce::engine_ordered_map<std::filesystem::path, im::ImportSourceBytes> files{};
             std::uint64_t totalBytes{};
             const ModelAssetSetCookRequest* request{};
 
@@ -98,7 +101,7 @@ namespace experiment::cooked
                     return found->second;
                 }
                 RequireSource(files.size() < kMaxSourceFiles, "Too many external model source inputs");
-                std::vector<std::byte> bytes;
+                ce::dynamic_array<std::byte> bytes;
                 if (request != nullptr && request->captureSource)
                 {
                     std::string failure;
@@ -113,14 +116,14 @@ namespace experiment::cooked
                 }
                 RequireSource(bytes.size() <= kMaxTotalInputBytes - totalBytes, "Total model source byte budget exceeded");
                 totalBytes += bytes.size();
-                im::ImportSourceBytes owned = own::make_shared<std::vector<std::byte>>(std::move(bytes));
+                im::ImportSourceBytes owned = own::make_shared<ce::dynamic_array<std::byte>>(std::move(bytes));
                 files.emplace(canonical, owned);
                 return owned;
             }
 
             Sha256Digest VerifyAndDigest() const
             {
-                std::vector<std::byte> inventory;
+                ce::dynamic_array<std::byte> inventory;
                 const auto appendSize = [&](std::uint64_t size)
                 {
                     for (std::size_t index = 0; index < 8u; ++index)
@@ -191,11 +194,11 @@ namespace experiment::cooked
             RequireSource(meta->size() <= 16u * 1024u * 1024u && epoch->size() <= 1024u * 1024u,
                 "Model sidecar or identity header exceeds its authoring byte budget");
             assets::IdentityEpochHeader header;
-            std::vector<assets::EpochHeaderIssue> headerIssues;
+            ce::dynamic_array<assets::EpochHeaderIssue> headerIssues;
             RequireSource(assets::ReadIdentityEpochHeader(SourceText(epoch), header, headerIssues),
                 "Invalid authored identity epoch header; reconcile project identities before BuildAssetSet");
             assets::ModelSidecarV2 sidecar;
-            std::vector<assets::SidecarIssue> sidecarIssues;
+            ce::dynamic_array<assets::SidecarIssue> sidecarIssues;
             RequireSource(assets::ReadModelSidecarV2(SourceText(meta), sidecar, sidecarIssues) &&
                 assets::ValidateModelSidecarV2Closure(sidecar, header, sidecarIssues),
                 "Missing/invalid canonical model sidecar; run model authoring reconciliation before BuildAssetSet");
@@ -233,7 +236,7 @@ namespace experiment::cooked
             // role happened to populate ImportedTexture first.
             constexpr std::uint8_t kLinearRole = 1u;
             constexpr std::uint8_t kSrgbRole = 2u;
-            std::vector<std::uint8_t> textureRoles(imported.scene->textures.size());
+            ce::dynamic_array<std::uint8_t> textureRoles(imported.scene->textures.size());
             const auto addTextureRole = [&](const im::TextureSlot& slot, std::uint8_t role)
             {
                 if (slot.IsValid())
@@ -250,14 +253,14 @@ namespace experiment::cooked
                 addTextureRole(material.metallicRoughness, kLinearRole);
                 addTextureRole(material.occlusion, kLinearRole);
             }
-            std::vector<assets::StableKeyAssignment> assignments;
+            ce::dynamic_array<assets::StableKeyAssignment> assignments;
             RequireSource(assets::ReconcileAuthoredModelBindings(*imported.scene, sidecar, assignments, failure), failure);
-            std::map<AssetId, std::size_t> clipIndices;
-            std::map<AssetId, std::size_t> meshIndices;
-            std::map<AssetId, std::size_t> materialIndices;
-            std::map<AssetId, std::size_t> textureIndices;
-            std::vector<AssetId> meshIds(imported.scene->meshes.size());
-            std::vector<AssetId> materialIds(imported.scene->materials.size());
+            ce::engine_ordered_map<AssetId, std::size_t> clipIndices;
+            ce::engine_ordered_map<AssetId, std::size_t> meshIndices;
+            ce::engine_ordered_map<AssetId, std::size_t> materialIndices;
+            ce::engine_ordered_map<AssetId, std::size_t> textureIndices;
+            ce::dynamic_array<AssetId> meshIds(imported.scene->meshes.size());
+            ce::dynamic_array<AssetId> materialIds(imported.scene->materials.size());
             AssetId skeletonId{};
             for (const auto& binding : assignments)
             {
@@ -300,8 +303,8 @@ namespace experiment::cooked
                 }
             }
 
-            std::vector<std::size_t> selectedClips;
-            std::set<TypedAssetReference> distinct;
+            ce::dynamic_array<std::size_t> selectedClips;
+            ce::engine_ordered_set<TypedAssetReference> distinct;
             const AssetId modelId{ sidecar.assetId };
             for (const auto& selection : request.selected)
             {
@@ -344,7 +347,7 @@ namespace experiment::cooked
             conversion.modelAssetId = modelId;
             conversion.modelName = source.stem().string();
             SkeletonArtifact skeleton;
-            std::vector<AnimationClip> clips;
+            ce::dynamic_array<AnimationClip> clips;
             const auto prepareSkeleton = [&]
             {
                 if (!skeleton.skeleton.bones.empty())
@@ -506,7 +509,7 @@ namespace experiment::cooked
                     }
                     // Legacy controllers persist clip indices. Keep source order
                     // in the summary list while every entry carries its stable ID.
-                    std::vector<std::pair<std::size_t, AssetId>> orderedClips;
+                    ce::dynamic_array<ce::pair<std::size_t, AssetId>> orderedClips;
                     for (const auto& [id, index] : clipIndices)
                     {
                         orderedClips.emplace_back(index, id);

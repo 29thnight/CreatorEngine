@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include "Texture.h"
@@ -11,7 +12,7 @@
 struct Texture::CodecImage
 {
     TextureImage owned;
-    std::vector<TextureSubimage> subresources;
+    ce::dynamic_array<TextureSubimage> subresources;
     RHIFormat format{ RHIFormat::Unknown };
     uint32_t width{};
     uint32_t height{};

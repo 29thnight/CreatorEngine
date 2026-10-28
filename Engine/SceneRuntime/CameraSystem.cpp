@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Foundation/EngineFunc.h"
 #include "CameraSystem.h"
 #include "LifecycleTrace.h"
 #include "CameraComponent.h"
@@ -43,7 +44,7 @@ void CameraSystem::Unregister(CameraComponent* camera)
     }
 }
 
-void CameraSystem::Update(float tick, const std::function<void()>& midTraversalProbe)
+void CameraSystem::Update(float tick, const ce::owned_func<void()>& midTraversalProbe)
 {
     // 옛 Scene::RegistryTick이 공통으로 해주던 가드(owner 없음/파괴 표시/
     // 비활성 스킵)를 이 시스템이 대신 적용한다 — CameraComponent가 더 이상

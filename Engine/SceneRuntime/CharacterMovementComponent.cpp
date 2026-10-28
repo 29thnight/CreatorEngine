@@ -1,4 +1,5 @@
-﻿#include "CharacterMovementComponent.h"
+﻿#include "../Containers/ContainerAPI.h"
+#include "CharacterMovementComponent.h"
 #include "PhysicsLifecyclePolicy.h"
 #include "../EngineDiagnostics/ProfileScope.h"
 #include "Scene.h"
@@ -17,7 +18,7 @@ namespace
     void InvalidateCharacterPresentation(Scene& scene, Entity* owner)
     {
         if(!owner)return;
-        std::vector<EntityHandle> pending{scene.HandleOf(owner->m_index)};
+        ce::dynamic_array<EntityHandle> pending{scene.HandleOf(owner->m_index)};
         while(!pending.empty())
         {
             const auto handle=pending.back();pending.pop_back();

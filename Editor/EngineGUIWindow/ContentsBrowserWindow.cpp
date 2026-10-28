@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -36,7 +37,7 @@ namespace
 {
 	using FileType = EditorAssetPresentation::FileType;
 
-	using FileTypeCharArr = std::array<std::pair<FileType, const char*>, (size_t)FileType::End>;
+	using FileTypeCharArr = ce::fixed_array<ce::pair<FileType, const char*>, (size_t)FileType::End>;
 
 	constexpr FileTypeCharArr FileTypeStringTable{ {
 		{ FileType::Unknown,        "Unknown"                },
@@ -269,7 +270,7 @@ namespace
     constexpr int kWarmBudget = 2;
 
     std::mutex g_browserMailboxMutex;
-    std::vector<editor::windows::content_browser_request> g_browserRequests;
+    ce::dynamic_array<editor::windows::content_browser_request> g_browserRequests;
     editor::windows::content_browser_snapshot g_browserSnapshot;
 
     /// 캐시에 있으면 그것을(낡았으면 공유 예산 안에서 다시 훑는다), 없으면
@@ -523,7 +524,7 @@ void ContentsBrowserWindow::SaveRecents() const
 // ★ 돌려주는 포인터는 캐시 항목을 가리킨다. 캐시가 그 폴더를 다시 훑으면
 //   무효가 되므로 이 프레임 안에서만 쓴다.
 
-void ContentsBrowserWindow::CollectResults(std::vector<const editor::browser_directory_entry*>& out, size_t& supported)
+void ContentsBrowserWindow::CollectResults(ce::dynamic_array<const editor::browser_directory_entry*>& out, size_t& supported)
 {
     out.clear();
     supported = 0;
@@ -547,7 +548,7 @@ void ContentsBrowserWindow::CollectResults(std::vector<const editor::browser_dir
     }
     else if (m_scope == Scope::everything)
     {
-        std::vector<std::filesystem::path> queue{ m_rootDirectory };
+        ce::dynamic_array<std::filesystem::path> queue{ m_rootDirectory };
         for (size_t head = 0; head < queue.size(); ++head)
         {
             const auto* listing = browser_warm_listing(queue[head], budget);
@@ -603,7 +604,7 @@ void ContentsBrowserWindow::CollectResults(std::vector<const editor::browser_dir
 void ContentsBrowserWindow::ApplyRequests()
 {
     using Kind = editor::windows::content_browser_request_kind;
-    std::vector<editor::windows::content_browser_request> requests;
+    ce::dynamic_array<editor::windows::content_browser_request> requests;
     {
         std::lock_guard lock(g_browserMailboxMutex);
         requests.swap(g_browserRequests);
@@ -851,7 +852,7 @@ void ContentsBrowserWindow::ShowDirectoryTree(const std::filesystem::path& direc
     // W7-1: 프레임마다 directory_iterator 를 돌리지 않는다. 목록은 스냅샷이
     // 주고, 정렬도 스캔할 때 한 번 해 둔 것이다.
     const editor::browser_directory_listing& listing = editor::browser_cache_listing(directory);
-    std::vector<std::filesystem::path> children;
+    ce::dynamic_array<std::filesystem::path> children;
     for (const auto& entry : listing.entries)
     {
         // ★ 목록은 폴더가 먼저다(스캔이 그렇게 세운다). 첫 파일에서 멈춘다 — 파일
@@ -1011,7 +1012,7 @@ void ContentsBrowserWindow::ShowCurrentDirectoryFiles()
         for (size_t i = 0; i < m_results.size() && i < kPublishedResultCapacity; ++i)
             m_publishedResults.push_back(RelativeUtf8(m_results[i]->path));
     }
-    const std::vector<const editor::browser_directory_entry*>& entries = m_results;
+    const ce::dynamic_array<const editor::browser_directory_entry*>& entries = m_results;
     const size_t supported = m_resultSupported;
     const auto filesAfter = editor::browser_cache_get_stats();
     editor::windows::add_panel_scans(editor::windows::panel_cost_slot::browser_files,
@@ -1323,7 +1324,7 @@ void ContentsBrowserWindow::DrawBreadcrumb(float width)
         ImGui::PopStyleColor();
         return;
     }
-    std::vector<std::filesystem::path> chain{ m_rootDirectory };
+    ce::dynamic_array<std::filesystem::path> chain{ m_rootDirectory };
     auto path = m_rootDirectory;
     for (const auto& part : m_currentDirectory.lexically_relative(m_rootDirectory))
     {

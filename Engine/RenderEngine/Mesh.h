@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -22,10 +23,10 @@ struct ModelNode : public meta::polymorphic
 	math::matrix4x4 m_transform{ math::matrix4x4::identity() };
 	uint32 m_index{};
 	uint32 m_parentIndex{};
-	std::vector<uint32> m_childrenIndex;
+	ce::dynamic_array<uint32> m_childrenIndex;
 	uint32 m_numChildren{};
 	uint32 m_numMeshes{};
-	std::vector<uint32> m_meshes;
+	ce::dynamic_array<uint32> m_meshes;
 
 	ModelNode() = default;
 	ModelNode(std::string_view name) : m_name(name) {}
@@ -101,8 +102,8 @@ public:
 
 public:
 	Mesh() = default;
-	Mesh(std::string_view _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices);
-	Mesh(std::string_view _name, std::vector<Vertex>&& _vertices, std::vector<uint32>&& _indices);
+	Mesh(std::string_view _name, const ce::dynamic_array<Vertex>& _vertices, const ce::dynamic_array<uint32>& _indices);
+	Mesh(std::string_view _name, ce::dynamic_array<Vertex>&& _vertices, ce::dynamic_array<uint32>&& _indices);
 	Mesh(Mesh&& _other) noexcept;
 	~Mesh();
 
@@ -117,15 +118,15 @@ public:
 
 	// LOD 생성 함수
 	bool HasLODs() const;
-	void GenerateLODs(const std::vector<float>& lodThresholds);
-	const std::vector<float>& GetLODThresholds() const { return m_LODThresholds; }
+	void GenerateLODs(const ce::dynamic_array<float>& lodThresholds);
+	const ce::dynamic_array<float>& GetLODThresholds() const { return m_LODThresholds; }
 
 	std::string GetName() const { return m_name; }
 	std::string GetModelName() const { return m_modelName; }
 	uint32 GetMaterialIndex() const { return m_materialIndex; }
 
-	const std::vector<Vertex>& GetVertices() { return m_vertices; }
-	const std::vector<uint32>& GetIndices() { return m_indices; }
+	const ce::dynamic_array<Vertex>& GetVertices() { return m_vertices; }
+	const ce::dynamic_array<uint32>& GetIndices() { return m_indices; }
 
 	const math::aabb& GetBoundingBox() const noexcept { return m_boundingBox; }
 	const math::sphere& GetBoundingSphere() const noexcept { return m_boundingSphere; }
@@ -135,8 +136,8 @@ public:
 	/// (empty AABB/반지름 0)으로 남아 그림자 캐스터 컬링 같은 판정이 조용히 틀어진다.
 	void RecalculateBounds();
 
-	std::vector<Vertex> GetVertices() const{ return m_vertices; }
-	std::vector<uint32> GetIndices() const { return m_indices; }
+	ce::dynamic_array<Vertex> GetVertices() const{ return m_vertices; }
+	ce::dynamic_array<uint32> GetIndices() const { return m_indices; }
 	uint32 GetStride()  { return m_stride; }
 
 	[[reflgen::ignore]]
@@ -153,10 +154,10 @@ private:
 	std::string m_modelName;
 
 	[[reflgen::ignore]]
-	std::vector<Vertex> m_vertices;
+	ce::dynamic_array<Vertex> m_vertices;
 
 	[[reflgen::ignore]]
-	std::vector<uint32> m_indices;
+	ce::dynamic_array<uint32> m_indices;
 
 	[[reflgen::ignore]]
 	math::aabb m_boundingBox{};
@@ -172,10 +173,10 @@ private:
 	// --- LOD 관련 멤버 변수 ---
 	// 인덱스 0: 원본(LOD0), 1: LOD1, ...
 	[[reflgen::ignore]]
-	std::vector<LODResource> m_LODs;
+	ce::dynamic_array<LODResource> m_LODs;
 
 	// 화면 공간 크기 기반의 LOD 전환 임계값
-	std::vector<float> m_LODThresholds;
+	ce::dynamic_array<float> m_LODThresholds;
 	// ---
 
 	static constexpr const uint32 m_stride = sizeof(Vertex);
@@ -184,9 +185,9 @@ private:
 class PrimitiveCreator
 {
 public:
-	static inline std::vector<Vertex> CubeVertices()
+	static inline ce::dynamic_array<Vertex> CubeVertices()
 	{
-		std::vector<Vertex> cube;
+		ce::dynamic_array<Vertex> cube;
 		cube.reserve(24);
 
 		cube.push_back({ { -1.0f, -1.0f, -1.0f }, {  0.0f,  0.0f, -1.0f }, { 0.0f, 0.0f } });
@@ -222,9 +223,9 @@ public:
 		return cube;
 	}
 
-	static inline std::vector<uint32> CubeIndices()
+	static inline ce::dynamic_array<uint32> CubeIndices()
 	{
-		return std::vector<uint32>
+		return ce::dynamic_array<uint32>
 		{
 			0, 2, 1, 0, 3, 2,
 			4, 6, 5, 4, 7, 6,
@@ -235,9 +236,9 @@ public:
 		};
 	}
 
-	static inline std::vector<Vertex> QuadVertices()
+	static inline ce::dynamic_array<Vertex> QuadVertices()
 	{
-		std::vector<Vertex> quad;
+		ce::dynamic_array<Vertex> quad;
 		quad.reserve(4);
 		quad.push_back({ { -1.0f, 0.0f,  1.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f } });
 		quad.push_back({ { -1.0f, 0.0f, -1.0f }, { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } });
@@ -246,9 +247,9 @@ public:
 		return quad;
 	}
 
-	static inline std::vector<uint32> QuadIndices()
+	static inline ce::dynamic_array<uint32> QuadIndices()
 	{
-		return std::vector<uint32>{ 0, 2, 1, 0, 3, 2 };
+		return ce::dynamic_array<uint32>{ 0, 2, 1, 0, 3, 2 };
 	}
 };
 
@@ -275,8 +276,8 @@ public:
 private:
 	friend class ModelLoader;
 	std::string m_name;
-	std::vector<UIvertex> m_vertices;
-	std::vector<uint32> m_indices;
+	ce::dynamic_array<UIvertex> m_vertices;
+	ce::dynamic_array<uint32> m_indices;
 	uint32 m_materialIndex{};
 
 	std::string m_nodeName;
@@ -288,12 +289,12 @@ private:
 
 	static constexpr uint32 m_stride = sizeof(UIvertex);
 
-	std::vector<UIvertex> UIQuad
+	ce::dynamic_array<UIvertex> UIQuad
 	{
 		{ {-1.0f,  1.0f, 0.0f}, { 0.0f, 0.0f} },  // 좌상단
 		{ { 1.0f,  1.0f, 0.0f}, { 1.0f, 0.0f} },   // 우상단
 		{ { 1.0f, -1.0f, 0.0f}, { 1.0f, 1.0f} },   // 우하단
 		{ {-1.0f, -1.0f, 0.0f}, { 0.0f, 1.0f} },    // 좌하단
 	};
-	std::vector<uint32> UIIndices = { 0, 1, 2, 0, 2, 3 };
+	ce::dynamic_array<uint32> UIIndices = { 0, 1, 2, 0, 2, 3 };
 };

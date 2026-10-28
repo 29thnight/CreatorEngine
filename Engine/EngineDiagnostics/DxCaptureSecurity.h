@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 // Editor와 helper가 같은 경계 검사를 사용해야 한쪽의 완화가 우회 경로가 되지 않는다.
@@ -64,7 +65,7 @@ namespace ce::dx_capture::security
         return (static_cast<std::uint64_t>(creation.dwHighDateTime) << 32) | creation.dwLowDateTime;
     }
 
-    inline bool token_user(HANDLE process, std::vector<std::byte>& buffer)
+    inline bool token_user(HANDLE process, ce::dynamic_array<std::byte>& buffer)
     {
         HANDLE raw = nullptr;
         if (!OpenProcessToken(process, TOKEN_QUERY, &raw))
@@ -84,13 +85,13 @@ namespace ce::dx_capture::security
 
     inline bool same_user(HANDLE first, HANDLE second)
     {
-        std::vector<std::byte> first_user, second_user;
+        ce::dynamic_array<std::byte> first_user, second_user;
         return token_user(first, first_user) && token_user(second, second_user) &&
                EqualSid(reinterpret_cast<TOKEN_USER*>(first_user.data())->User.Sid,
                         reinterpret_cast<TOKEN_USER*>(second_user.data())->User.Sid);
     }
 
-    inline bool logon_sid(HANDLE process, std::vector<std::byte>& sid)
+    inline bool logon_sid(HANDLE process, ce::dynamic_array<std::byte>& sid)
     {
         HANDLE raw = nullptr;
         if (!OpenProcessToken(process, TOKEN_QUERY, &raw))
@@ -104,7 +105,7 @@ namespace ce::dx_capture::security
         {
             return false;
         }
-        std::vector<std::byte> groups(bytes);
+        ce::dynamic_array<std::byte> groups(bytes);
         if (!GetTokenInformation(token.get(), TokenLogonSid, groups.data(), bytes, &bytes))
         {
             return false;
@@ -120,7 +121,7 @@ namespace ce::dx_capture::security
 
     inline bool same_logon(HANDLE first, HANDLE second)
     {
-        std::vector<std::byte> first_sid, second_sid;
+        ce::dynamic_array<std::byte> first_sid, second_sid;
         return logon_sid(first, first_sid) && logon_sid(second, second_sid) &&
                EqualSid(first_sid.data(), second_sid.data());
     }
@@ -274,7 +275,7 @@ namespace ce::dx_capture::security
 
     struct pinned_image
     {
-        std::vector<handle> handles;
+        ce::dynamic_array<handle> handles;
         std::wstring path;
 
         HANDLE file() const { return handles.empty() ? nullptr : handles.back().get(); }
@@ -417,7 +418,7 @@ namespace ce::dx_capture::security
         {
             return false;
         }
-        std::array<IMAGE_SECTION_HEADER, 96> sections{};
+        ce::fixed_array<IMAGE_SECTION_HEADER, 96> sections{};
         const auto section_offset = static_cast<std::size_t>(dos.e_lfanew) + sizeof(headers);
         for (std::size_t index = 0; index < headers.FileHeader.NumberOfSections; ++index)
         {

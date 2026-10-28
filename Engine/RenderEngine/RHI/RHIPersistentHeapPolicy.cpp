@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "RHIPersistentHeapPolicy.h"
 
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -218,12 +219,12 @@ bool RHIPersistentHeapPolicy::Release(
     return true;
 }
 
-std::vector<RHIPersistentHeapSegmentHandle>
+ce::dynamic_array<RHIPersistentHeapSegmentHandle>
 RHIPersistentHeapPolicy::TrimEmptySegments(uint32_t keepPerKey)
 {
     std::lock_guard lock(m_mutex);
-    std::vector<RHIPersistentHeapSegmentHandle> removed;
-    std::unordered_map<uint64_t, uint32_t> kept;
+    ce::dynamic_array<RHIPersistentHeapSegmentHandle> removed;
+    ce::node_hash_map<uint64_t, uint32_t> kept;
 
     for (uint32_t slot = 0; slot < m_segments.size(); ++slot)
     {
@@ -414,8 +415,17 @@ bool RunRHIPersistentHeapPolicyContractTest(std::string& outLog)
         pressureBudget.memoryPressure && heldPressure.memoryPressure &&
         !releasedPressure.memoryPressure && 4 == budgetStats.budgetRefreshes &&
         1 == budgetStats.budgetPressureEvents;
+    RHIPersistentHeapPolicy multiKeyPolicy(config);
+    const auto keyA0 = multiKeyPolicy.AddSegment(7, 1024);
+    const auto keyB0 = multiKeyPolicy.AddSegment(11, 1024);
+    const auto keyA1 = multiKeyPolicy.AddSegment(7, 1024);
+    const auto keyB1 = multiKeyPolicy.AddSegment(11, 1024);
+    const auto multipleTrimmed = multiKeyPolicy.TrimEmptySegments(1);
+    const bool perKeyTrim = keyA0.IsValid() && keyB0.IsValid() && keyA1.IsValid() && keyB1.IsValid() &&
+        multipleTrimmed.size() == 2 && multipleTrimmed[0] == keyA1 &&
+        multipleTrimmed[1] == keyB1 && multiKeyPolicy.GetStats().activeSegments == 2;
     const bool passed = alignmentAndPadding && fullCoalesce && standbyTrim &&
-        generationInvalidation && boundary && dedicatedPolicy && budgetPolicy;
+        generationInvalidation && boundary && dedicatedPolicy && budgetPolicy && perKeyTrim;
 
     outLog += passed
         ? "[공통 persistent heap] 정렬·padding·best-fit·병합·trim·generation·budget hysteresis 검증 통과\n"

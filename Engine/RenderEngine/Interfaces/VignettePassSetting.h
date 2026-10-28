@@ -1,13 +1,4 @@
 #pragma once
-#include "../../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include "../../Utility_Framework/Foundation/Core.Minimal.h"
 
-struct [[reflgen::reflect]] VignettePassSetting
-{
-   public:
-    VignettePassSetting() = default;
-
-    bool isOn{ true };
-    float radius{ 0.75f };
-    float softness{ 0.5f };
-};
+// Compatibility include; the runtime and renderer share this settings contract.
+#include "../../Utility_Framework/Runtime/RenderSettings/VignettePassSetting.h"

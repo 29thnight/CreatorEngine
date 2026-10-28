@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -63,7 +64,7 @@ namespace material_graph
     bool VerifySurfaceProduct(const LX::LXMaterialProgram& program, const std::filesystem::path& file,
                               std::span<const CompileTarget> targets, RHIShaderCompileOptions options,
                               const Budget& budget, VerifiedProduct& result,
-                              std::vector<LX::LXMaterialDiagnostic>& diagnostics);
+                              ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics);
 
     class SurfaceBatch
     {
@@ -120,7 +121,7 @@ namespace material_graph
         IRenderDeviceServices* device_{};
         RHIBufferHandle buffer_;
         SurfaceView view_;
-        std::vector<SurfacePoint> points_;
+        ce::dynamic_array<SurfacePoint> points_;
         own::shared_owner<const SurfaceGeometrySource> mesh_;
         std::uint32_t count_{};
         own::shared_owner<const RenderBindings> bindings_;

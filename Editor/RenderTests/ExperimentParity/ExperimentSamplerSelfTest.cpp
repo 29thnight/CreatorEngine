@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "ExperimentParity/ExperimentSamplerSelfTest.h"
 #include "ExperimentParity/ExperimentPoseSampler.h"
 
@@ -75,7 +76,7 @@ namespace RenderTest
         }
 
         [[nodiscard]] ex::AnimationChannel MakeTranslationChannel(
-            ex::InterpolationMode mode, const std::vector<ex::TranslationKey>& keys)
+            ex::InterpolationMode mode, const ce::dynamic_array<ex::TranslationKey>& keys)
         {
             ex::AnimationChannel channel;
             channel.bone = ex::BoneIndex(0);
@@ -397,9 +398,9 @@ namespace RenderTest
 
         // 평면 메시를 만든다. 법선은 전부 +Z 이고, 삼각형 감김도 +Z 를 향한다.
         [[nodiscard]] im::ImportedMesh MakePlanarMesh(
-            const std::vector<math::vector3>& positions,
-            const std::vector<math::vector2>& uvs,
-            const std::vector<std::uint32_t>& indices)
+            const ce::dynamic_array<math::vector3>& positions,
+            const ce::dynamic_array<math::vector2>& uvs,
+            const ce::dynamic_array<std::uint32_t>& indices)
         {
             im::ImportedMesh mesh;
             mesh.name = "synthetic";
@@ -617,8 +618,8 @@ namespace RenderTest
     {
         // 법선 없는 메시를 만든다(MakePlanarMesh 는 법선을 채워 준다).
         [[nodiscard]] im::ImportedMesh MakeNormalLessMesh(
-            const std::vector<math::vector3>& positions,
-            const std::vector<std::uint32_t>& indices)
+            const ce::dynamic_array<math::vector3>& positions,
+            const ce::dynamic_array<std::uint32_t>& indices)
         {
             im::ImportedMesh mesh;
             mesh.name = "synthetic_no_normal";

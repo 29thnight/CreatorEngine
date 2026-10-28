@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "Tasks/SceneGCSelfTest.h"
 #include "Scene.h"
 #include "SceneManager.h"
@@ -36,8 +37,8 @@ namespace
 
     struct ObservationRecorder final : Runtime::ISceneEntityObserver, Runtime::IComponentWriteObserver
     {
-        std::vector<Runtime::SceneEntityEvent> entities;
-        std::vector<Runtime::ComponentWriteEvent> writes;
+        ce::dynamic_array<Runtime::SceneEntityEvent> entities;
+        ce::dynamic_array<Runtime::ComponentWriteEvent> writes;
         void OnEntityChanged(const Runtime::SceneEntityEvent& event) override {entities.push_back(event);}
         void OnComponentWritten(const Runtime::ComponentWriteEvent& event) override {writes.push_back(event);}
     };
@@ -333,7 +334,7 @@ namespace RenderTest
         ProbeResults results;
         gc::root_ref<Scene> source;
         gc::root_ref<Scene> destination;
-        std::vector<DetachedEntityTransfer> transfers;
+        ce::dynamic_array<DetachedEntityTransfer> transfers;
         try
         {
             Require(!SceneManagers->IsPlayCommitted(), "GC regression requires an idle host");
@@ -343,14 +344,14 @@ namespace RenderTest
                 auto abandoned=Scene::CreateNewScene(domain,"AbandonedTransfer");
                 auto* entity=abandoned->CreateEntity("DetachedFinalization");
                 const auto identity=entity->GetInstanceID();
-                std::vector<DetachedEntityTransfer> pending;
+                ce::dynamic_array<DetachedEntityTransfer> pending;
                 abandoned->DetachEntityHierarchy(entity,pending);
                 entity->FinalizeManagedDestroy();
                 entity->FinalizeManagedDestroy();
                 pending.clear();abandoned->RetireManagedGraph();abandoned.reset();
-                std::vector<Runtime::EntityChange> events;
+                ce::dynamic_array<Runtime::EntityChange> events;
                 for(const auto& event:observation.recorder->entities)if(event.instance==identity)events.push_back(event.change);
-                Require(events==std::vector{Runtime::EntityChange::Created,Runtime::EntityChange::Detached,Runtime::EntityChange::Destroyed},"Abandoned DDOL transfer terminal notification incorrect");
+                Require(events==ce::dynamic_array{Runtime::EntityChange::Created,Runtime::EntityChange::Detached,Runtime::EntityChange::Destroyed},"Abandoned DDOL transfer terminal notification incorrect");
             }
             observation.recorder->entities.clear();
             domain.collect_full();
@@ -491,7 +492,7 @@ namespace RenderTest
                 && !weakFirstProbe.lock() && !weakSecondProbe.lock()
                 && !weakSource.lock() && !weakDestination.lock(),
                 "Unreachable Scene/Entity/Component cycles were not reclaimed");
-            std::vector<Runtime::EntityChange> firstEvents, secondEvents;
+            ce::dynamic_array<Runtime::EntityChange> firstEvents, secondEvents;
             for(const auto& event:observation.recorder->entities)
             {
                 if(event.instance==firstIdentity)firstEvents.push_back(event.change);
@@ -499,8 +500,8 @@ namespace RenderTest
                 if(event.instance==secondIdentity&&event.change==Runtime::EntityChange::Attached)
                     Require(event.before.scene==staleSecond.sceneId&&event.after.scene!=event.before.scene,"DDOL location was not rebound");
             }
-            Require(firstEvents==std::vector{Runtime::EntityChange::Created,Runtime::EntityChange::Destroyed},"Entity create/destroy observation order incorrect");
-            Require(secondEvents==std::vector{Runtime::EntityChange::Created,Runtime::EntityChange::Detached,Runtime::EntityChange::Attached,Runtime::EntityChange::Destroyed},"DDOL observation duplicated destruction or identity");
+            Require(firstEvents==ce::dynamic_array{Runtime::EntityChange::Created,Runtime::EntityChange::Destroyed},"Entity create/destroy observation order incorrect");
+            Require(secondEvents==ce::dynamic_array{Runtime::EntityChange::Created,Runtime::EntityChange::Detached,Runtime::EntityChange::Attached,Runtime::EntityChange::Destroyed},"DDOL observation duplicated destruction or identity");
             Require(SceneManagers->Observations().Metrics().lost==0&&SceneManagers->Observations().Metrics().failures==0,"Observer delivery lost/failed");
             std::printf("SCENE_OBSERVATION_PRODUCT_OK scalar=1 enum=1 container=1 locked=1 undoRedo=1 noOp=1 staleUndo=1 native=1 transform=1 nonRender=1 lifetime=1 ddol=1 abandoned=1\n");
             const auto final = domain.stats();

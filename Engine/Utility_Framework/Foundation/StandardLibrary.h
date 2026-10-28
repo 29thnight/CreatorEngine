@@ -289,3 +289,17 @@ import std;
 // Preserve the legacy global alias supplied by MSVC's <cstddef> for SDK clients.
 using std::max_align_t;
 #endif
+
+// Engine containers are the common storage vocabulary. The implementation
+// itself uses runtime/language support headers and never imports this bridge.
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Containers/include/ce/all.h"
+#else
+import "Creator.Containers.h";
+#endif
+
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Containers/values/value_types.h"
+#else
+import "Creator.Containers.h";
+#endif

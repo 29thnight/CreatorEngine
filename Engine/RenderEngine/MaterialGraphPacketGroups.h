@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include <algorithm>
 #include <cstdint>
@@ -46,8 +47,8 @@ namespace material_graph
         };
         struct Group
         {
-            std::tuple<std::string, bool, uint32_t> first;
-            std::vector<size_t> second;
+            ce::tuple<std::string, bool, uint32_t> first;
+            ce::dynamic_array<size_t> second;
         };
 
         bool Update(std::span<const Input> inputs, bool reuse)
@@ -83,8 +84,8 @@ namespace material_graph
                       {
                           const auto& x = m_inputs[a];
                           const auto& y = m_inputs[b];
-                          return std::tie(x.semantic, x.doubleSided, x.page, x.index) <
-                                 std::tie(y.semantic, y.doubleSided, y.page, y.index);
+                          return ce::tie(x.semantic, x.doubleSided, x.page, x.index) <
+                                 ce::tie(y.semantic, y.doubleSided, y.page, y.index);
                       });
             for (auto& group : m_groups)
             {
@@ -96,7 +97,7 @@ namespace material_graph
             for (const auto index : m_order)
             {
                 const auto& input = m_inputs[index];
-                const auto key = std::tie(input.semantic, input.doubleSided, input.page);
+                const auto key = ce::tie(input.semantic, input.doubleSided, input.page);
                 if (!active || m_groups[active - 1].first != key)
                 {
                     if (active == m_groups.size())
@@ -147,12 +148,12 @@ namespace material_graph
             size_t index{};
             uint32_t record{}, capacity{};
         };
-        std::vector<StoredInput> m_inputs;
-        std::vector<size_t> m_order;
-        std::vector<Group> m_groups;
-        std::vector<std::span<const size_t>> m_spans;
-        std::vector<ScenePacketRecord> m_templates;
-        std::vector<uint32_t> m_capacities;
+        ce::dynamic_array<StoredInput> m_inputs;
+        ce::dynamic_array<size_t> m_order;
+        ce::dynamic_array<Group> m_groups;
+        ce::dynamic_array<std::span<const size_t>> m_spans;
+        ce::dynamic_array<ScenePacketRecord> m_templates;
+        ce::dynamic_array<uint32_t> m_capacities;
         uint64_t m_capacity{};
         bool m_capacityValid{};
         size_t m_active{};
@@ -162,7 +163,7 @@ namespace material_graph
 
     struct ScenePacketRecords
     {
-        std::vector<ScenePacketRecord> m_records;
+        ce::dynamic_array<ScenePacketRecord> m_records;
         uint64_t m_revision{};
         const ScenePacketGroups* m_owner{};
         bool Prepare(const ScenePacketGroups& groups)

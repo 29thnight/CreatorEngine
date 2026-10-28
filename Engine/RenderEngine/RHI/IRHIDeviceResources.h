@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineOrderedMap.h"
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // 디바이스·프레임·프레젠트 인터페이스 (PHASE 3-1 재정의, D1).
@@ -67,7 +68,7 @@ struct RHIGpuObjectCensus
 {
     bool     available{ false };            // 디버그 레이어가 없으면 false (VRAM만 유효)
     uint32_t totalObjects{ 0 };
-    std::map<std::string, uint32_t> byType; // 예: "ID3D12Resource" -> 47
+    ce::engine_ordered_map<std::string, uint32_t> byType; // 예: "ID3D12Resource" -> 47
     uint64_t vramUsedMB{ 0 };
     uint64_t vramBudgetMB{ 0 };
 };

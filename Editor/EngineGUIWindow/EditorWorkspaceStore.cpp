@@ -1,9 +1,11 @@
+﻿#include "../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
 import Creator.Core.Paths;
 #endif
 #include "EditorWorkspaceStore.h"
+#include "../ImGuiHelper/Utf16Text.h"
 #include "EditorWindowNames.h"
 #include "ViewportHostWindow.h"
 #include "../EngineEntry/Project/EditorSettingsStore.h"
@@ -27,11 +29,12 @@ namespace editor
         std::string pendingPanel;
         workspace_status published;
         bool resetDialog{};
-        // 이름을 받는 대화 상자 셋. `nameBuffer` 를 셋이 함께 쓰고, 여는 쪽이
-        // 채워 넣는다 — 동시에 둘이 열리지 않으므로 버퍼를 나눌 이유가 없다.
+        // 이름 대화 상자는 UTF-16 값과 소유된 UTF-8 편집 상태를 공유한다.
+        // 동시에 열리지 않으며, 파일 경계에서는 UTF-8로 저장한다.
         enum class name_dialog { none, save_as, rename };
         name_dialog nameDialog{ name_dialog::none };
-        char nameBuffer[128]{};
+        ce::string nameText;
+        ce::utf16_input_state nameInput;
         std::string deleteTarget;
         /// 지금 화면 구성의 지문. 뷰포트 좌표를 믿어도 되는지를 이것 하나로 가른다.
         ///
@@ -58,7 +61,7 @@ namespace editor
                 return std::string(value.begin(),value.end());  // 지문은 ASCII 다
             }
 
-            std::vector<std::string> rectangles;
+            ce::dynamic_array<std::string> rectangles;
             ::EnumDisplayMonitors(nullptr, nullptr,
                 [](HMONITOR monitor, HDC, LPRECT, LPARAM param) -> BOOL
                 {
@@ -70,7 +73,7 @@ namespace editor
                             info.rcMonitor.right - info.rcMonitor.left,
                             info.rcMonitor.bottom - info.rcMonitor.top,
                             info.rcMonitor.left, info.rcMonitor.top);
-                        reinterpret_cast<std::vector<std::string>*>(param)->emplace_back(buffer);
+                        reinterpret_cast<ce::dynamic_array<std::string>*>(param)->emplace_back(buffer);
                     }
                     return TRUE;
                 },
@@ -94,9 +97,9 @@ namespace editor
             const auto length=GetEnvironmentVariableW(name,value,32768);
             return length>0 && length<32768 ? std::filesystem::path(value) : fallback;
         }
-        std::vector<workspace::alias> aliases(const window_table& windows)
+        ce::dynamic_array<workspace::alias> aliases(const window_table& windows)
         {
-            std::vector<workspace::alias> result;
+            ce::dynamic_array<workspace::alias> result;
             for(const auto& a:EditorWindowName::legacy_names)
             {
                 // Both pre-M4 bare names and M4's ### suffix hash are present in legacy files.
@@ -154,8 +157,8 @@ namespace editor
         }
         if(ImGui::MenuItem("Save Workspace As..."))
         {
-            const auto source=status.name.substr(0,sizeof(nameBuffer)-1);
-            std::memcpy(nameBuffer,source.c_str(),source.size()+1);
+            if(!ce::to_utf16(ce::utf8_string_view(status.name.data(),status.name.size()),nameText))
+                nameText.clear();
             nameDialog=name_dialog::save_as;
         }
         // 이름이 파일로 서 있지 않으면 바꿀 것도 지울 것도 없다. 눌리지 않게
@@ -163,8 +166,8 @@ namespace editor
         ImGui::BeginDisabled(!status.named);
         if(ImGui::MenuItem("Rename Workspace..."))
         {
-            const auto source=status.name.substr(0,sizeof(nameBuffer)-1);
-            std::memcpy(nameBuffer,source.c_str(),source.size()+1);
+            if(!ce::to_utf16(ce::utf8_string_view(status.name.data(),status.name.size()),nameText))
+                nameText.clear();
             nameDialog=name_dialog::rename;
         }
         if(ImGui::MenuItem("Delete Workspace...")) deleteTarget=status.name;
@@ -196,16 +199,17 @@ namespace editor
             const bool renaming=nameDialog==name_dialog::rename;
             ImGui::TextUnformatted(renaming?"Rename the current workspace:":"Save the current layout as:");
             ImGui::SetNextItemWidth(ThemePixels(280.f));
-            ImGui::InputText("##workspace-name",nameBuffer,sizeof(nameBuffer));
+            const auto input=editor::text::InputText("##workspace-name",nameText,nameInput);
+            const auto& nameBuffer=nameInput.buffer();
             // 만들기 전에 거절한다. 파일 이름으로 못 쓰는 이름을 받아 두고
             // 저장할 때 실패하면, 사람은 무엇이 문제인지 모른 채 배치를 잃는다.
             std::string error;
-            const bool ok=workspace::valid_name(nameBuffer,error);
+            const bool ok=bool(input.status) && !input.conflict && workspace::valid_name(std::string_view(nameBuffer.data(),nameBuffer.size()),error);
             if(!ok) ImGui::TextWrapped("%s",error.c_str());
             ImGui::BeginDisabled(!ok);
             if(ImGui::Button(renaming?"Rename":"Save"))
             {
-                request_workspace_action(renaming?workspace_action::rename:workspace_action::save_as,nameBuffer);
+                request_workspace_action(renaming?workspace_action::rename:workspace_action::save_as,std::string(nameBuffer.data(),nameBuffer.size()));
                 nameDialog=name_dialog::none; ImGui::CloseCurrentPopup();
             }
             ImGui::EndDisabled();

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "AuthoringParsedDocument.h"
 
 #include "AuthoringCookedDocument.h"
@@ -12,7 +13,7 @@ namespace Authoring
 	{
 		std::atomic<std::uint64_t> g_textParseCalls{};
 		std::mutex g_textParseContextMutex;
-		std::vector<std::string> g_textParseContexts;
+		ce::dynamic_array<std::string> g_textParseContexts;
 		constexpr std::size_t kMaxTextParseContexts = 64u;
 	}
 

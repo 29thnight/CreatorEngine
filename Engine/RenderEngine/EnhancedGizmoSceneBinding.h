@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -41,8 +42,8 @@ struct EnhancedGizmoIconTextures
 // RenderThread 소비 완료까지 붙든다.
 struct EnhancedGizmoSceneData
 {
-    std::vector<EnhancedGizmoIcon> icons;
-    std::vector<EnhancedGizmoLineVertex> lineVertices;
+    ce::dynamic_array<EnhancedGizmoIcon> icons;
+    ce::dynamic_array<EnhancedGizmoLineVertex> lineVertices;
     own::shared_owner<const EnhancedGizmoIconTextures> iconTextures;
 
     uint32_t cameraIcons{ 0 };

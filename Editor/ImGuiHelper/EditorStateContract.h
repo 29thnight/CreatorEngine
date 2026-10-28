@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 // PHASE 21 W2-3 — 상태 행렬을 **데이터로** 고정한다.
 //
@@ -80,7 +81,7 @@ namespace editor::state
     {
         std::uint64_t frames{0};
         std::uint64_t announced{0};
-        std::vector<widget_view> widgets;
+        ce::dynamic_array<widget_view> widgets;
     };
 
     /// 위젯이 자기 행렬을 선언한다. 같은 이름으로 여러 번 불러도 한 번만 산다.

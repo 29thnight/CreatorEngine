@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 // LC4 (PHASE 14.5) — 자체 JSON codec.
 //
@@ -43,8 +44,8 @@ namespace CommandService
         double             AsDouble() const noexcept { return m_double; }
         const std::string& AsString() const noexcept { return m_string; }
 
-        const std::vector<JsonValue>& Items() const noexcept { return m_array; }
-        const std::vector<std::pair<std::string, JsonValue>>& Fields() const noexcept { return m_object; }
+        const ce::recursive_array<JsonValue>& Items() const noexcept { return m_array; }
+        const ce::recursive_array<ce::pair<std::string, JsonValue>>& Fields() const noexcept { return m_object; }
 
         void Append(JsonValue value);
         void Set(std::string key, JsonValue value);
@@ -63,8 +64,8 @@ namespace CommandService
         double      m_double{};
         std::string m_string;
 
-        std::vector<JsonValue>                         m_array;
-        std::vector<std::pair<std::string, JsonValue>> m_object;
+        ce::recursive_array<JsonValue>                         m_array;
+        ce::recursive_array<ce::pair<std::string, JsonValue>> m_object;
     };
 
     struct JsonParseResult

@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
 #else
@@ -610,8 +611,8 @@ ce::lifetime_token DX12UploadSegmentAllocator::PinRecording(uint64_t recordingId
     m_sealedRecordingId.store(recordingId, std::memory_order_release);
     struct Lease
     {
-        std::vector<ce::lifetime_token> segments;
-        std::vector<winrt::com_ptr<ID3D12Resource>> resources;
+        ce::dynamic_array<ce::lifetime_token> segments;
+        ce::dynamic_array<winrt::com_ptr<ID3D12Resource>> resources;
     };
     auto result = own::make_shared<Lease>();
     for (const auto& segment : m_segments)

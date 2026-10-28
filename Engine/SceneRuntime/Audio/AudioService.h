@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -104,7 +105,7 @@ namespace wave
         virtual void UnloadClip(const ClipKey& key) = 0;
 
         // ⑥ 에디터 클립 피커 전용. 런타임 경로는 이걸 부르지 않는다.
-        [[nodiscard]] virtual std::vector<ClipKey> ListClipKeys() const = 0;
+        [[nodiscard]] virtual ce::dynamic_array<ClipKey> ListClipKeys() const = 0;
 
         virtual void Update(float deltaSeconds) = 0;
 

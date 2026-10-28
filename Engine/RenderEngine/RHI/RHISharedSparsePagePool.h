@@ -1,4 +1,6 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -23,8 +25,8 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
         RHIBufferHandle buffer;
         uint64_t virtualBytes{}, revision{}, lastUse{};
         bool evictable{};
-        std::map<uint32_t, uint32_t> tiles;
-        std::map<uint32_t, uint32_t> priorities;
+        ce::engine_ordered_map<uint32_t, uint32_t> tiles;
+        ce::engine_ordered_map<uint32_t, uint32_t> priorities;
         ~Allocation()
         {
             if (pool)
@@ -66,7 +68,7 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
     static own::shared_owner<RHISharedSparsePagePool> ForDevice(IRenderDeviceServices& device)
     {
         static std::mutex registryMutex;
-        static std::map<IRenderDeviceServices*, own::weak_owner<RHISharedSparsePagePool>> registry;
+        static ce::engine_ordered_map<IRenderDeviceServices*, own::weak_owner<RHISharedSparsePagePool>> registry;
         std::lock_guard lock(registryMutex);
         auto result = registry[&device].lock();
         if (!result)
@@ -155,7 +157,7 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
             {
                 break;
             }
-            std::vector<own::shared_owner<Allocation>> owners;
+            ce::dynamic_array<own::shared_owner<Allocation>> owners;
             for (const auto& weak : allocations_)
             {
                 auto owner = weak.lock();
@@ -236,7 +238,7 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
         Grow(target, wanted);
         return std::forward<Plan>(plan)(AdmissibleTiles(target));
     }
-    bool Prepare(const own::shared_owner<Allocation>& allocation, const std::map<uint32_t, uint32_t>& wanted,
+    bool Prepare(const own::shared_owner<Allocation>& allocation, const ce::engine_ordered_map<uint32_t, uint32_t>& wanted,
                  std::string& error)
     {
         std::lock_guard lock(mutex_);
@@ -265,7 +267,7 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
             own::shared_owner<Allocation> owner;
             uint32_t tile{}, priority{};
         };
-        std::vector<Victim> candidates;
+        ce::dynamic_array<Victim> candidates;
         for (auto it = allocations_.begin(); it != allocations_.end();)
         {
             auto owner = it->lock();
@@ -294,7 +296,7 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
         }
         // Admission is checked before any mutation. An individual successful NULL
         // map is committed immediately, so a later queue rejection cannot invent residency.
-        std::vector<uint32_t> obsolete;
+        ce::dynamic_array<uint32_t> obsolete;
         for (const auto& [tile, physical] : target.tiles)
         {
             if (!wanted.contains(tile))
@@ -323,7 +325,7 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
             ++evictions_;
             ++available;
         }
-        std::vector<RHISparseTileMapping> maps;
+        ce::dynamic_array<RHISparseTileMapping> maps;
         uint32_t cursor{};
         for (const auto& [tile, priority] : wanted)
         {
@@ -460,12 +462,12 @@ class RHISharedSparsePagePool : public own::enable_owner_from_this<RHISharedSpar
     IRenderDeviceServices& device_;
     Policy policy_;
     uint32_t capacity_;
-    std::vector<Slab> slabs_;
+    ce::dynamic_array<Slab> slabs_;
     uint64_t tick_{}, lastRecording_{UINT64_MAX};
     uint64_t growths_{}, shrinks_{}, growthDenials_{}, deferredShrinks_{};
     RHIBufferHandle anchor_;
     mutable std::recursive_mutex mutex_;
     ce::dynamic_bitset occupied_, usedBefore_;
-    std::vector<own::weak_owner<Allocation>> allocations_;
+    ce::dynamic_array<own::weak_owner<Allocation>> allocations_;
     uint64_t clock_{}, evictions_{}, reuses_{};
 };

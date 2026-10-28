@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #include "VulkanLoader.h"
 
@@ -305,8 +306,8 @@ public:
 
 private:
     uint64_t m_computeDispatches{};
-    std::vector<VkImageMemoryBarrier2> m_imageBarrierScratch;
-    std::vector<VkBufferMemoryBarrier2> m_bufferBarrierScratch;
+    ce::dynamic_array<VkImageMemoryBarrier2> m_imageBarrierScratch;
+    ce::dynamic_array<VkBufferMemoryBarrier2> m_bufferBarrierScratch;
     // ★ 여기 "백엔드 전용 경로 (계약 밖)" 공개 구간이 있었다 — 렌더 타깃
     //   셋(`VulkanRenderTargetBinding` 오버로드)과 `SetConstantBuffer
     //   (VkDescriptorSet)`. `VulkanTrianglePass` 가 유일한 소비자였고 5 가
@@ -384,10 +385,10 @@ private:
     RHIPipelineHandle m_boundPipeline[2];
 
     const VulkanRecordingResources* m_recordingResources{};
-    std::vector<PendingBinding> m_pending[2];
-    std::vector<PendingBinding> m_resolvedBindingScratch;
-    std::vector<VkWriteDescriptorSet> m_descriptorWriteScratch;
-    std::vector<VkImageCopy> m_imageCopyScratch;
+    ce::dynamic_array<PendingBinding> m_pending[2];
+    ce::dynamic_array<PendingBinding> m_resolvedBindingScratch;
+    ce::dynamic_array<VkWriteDescriptorSet> m_descriptorWriteScratch;
+    ce::dynamic_array<VkImageCopy> m_imageCopyScratch;
     bool m_descriptorsDirty[2]{ false, false };
 
     /// 이 command buffer가 기록한 이미지의 최신 layout. 병렬 기록에서는
@@ -402,7 +403,7 @@ private:
     };
     VkImageLayout GetRecordedImageLayout(RHITextureHandle texture, const RHITextureSubresourceRange& range,
                                          VkImageLayout fallback) const;
-    std::vector<RecordedImageLayout> m_recordedImageLayouts;
+    ce::dynamic_array<RecordedImageLayout> m_recordedImageLayouts;
 
     /// 지금 걸린 파이프라인이 구워진 셋 레이아웃과 그 레이아웃 핸들 (5c-4d).
     /// 앞엣것은 셋을 **할당**하는 데, 뒤엣것은 슬롯 번호를 **binding 번호로

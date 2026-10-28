@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
@@ -125,7 +126,7 @@ namespace
                 ? maximum : count * sizeof(std::filesystem::path::value_type));
         }
         template<class T>
-        void Vector(const std::vector<T>& values) noexcept
+        void Vector(const ce::dynamic_array<T>& values) noexcept
         {
             const auto maximum = (std::numeric_limits<std::size_t>::max)();
             Add(values.capacity() > maximum / sizeof(T) ? maximum : values.capacity() * sizeof(T));
@@ -214,7 +215,7 @@ namespace
     }
 
     Error ReadShaderMetaBytes(material_cooked::ResolvedAssetEntry& resolved,
-        std::vector<std::byte>& bytes, AssetDepot::AssetByteObservation& inputObservation, std::string& failure)
+        ce::dynamic_array<std::byte>& bytes, AssetDepot::AssetByteObservation& inputObservation, std::string& failure)
     {
         // All backing capture, Size/ReadAt calls and hashing run in the tracked
         // job. Never read a source-registry path or retry with a newer resolver.
@@ -252,14 +253,14 @@ namespace
 
     void PruneShaderMetaEntries(AssetDepot::MaterialAssetRuntimeState& state)
     {
-        std::erase_if(state.shaderMetadata, [](const auto& item)
+        ce::erase_if(state.shaderMetadata, [](const auto& item)
         {
             return !item.second.retained && !item.second.inFlight && item.second.live.expired();
         });
     }
 
     void TrimShaderMetaCache(AssetDepot::MaterialAssetRuntimeState& state,
-        std::vector<own::shared_owner<const ShaderMeta>>& retired)
+        ce::dynamic_array<own::shared_owner<const ShaderMeta>>& retired)
     {
         while (state.shaderMetaRetainedChargeBytes > state.shaderMetaBudgetBytes)
         {
@@ -495,7 +496,7 @@ void DataSystem::RunShaderMetaAssetWork(own::shared_owner<AssetDepot::ShaderMeta
         }
         auto resolved = work->resolved;
         AssetDepot::AssetByteObservation inputObservation(m_materialAssets.shaderMetaInputStagingBytes);
-        std::vector<std::byte> bytes;
+        ce::dynamic_array<std::byte> bytes;
         std::string failure;
         auto error = ReadShaderMetaBytes(resolved, bytes, inputObservation, failure);
         own::shared_owner<const ShaderMeta> candidate;
@@ -813,7 +814,7 @@ namespace
     template<class T>
     void PruneMaterialPipelineCache(AssetDepot::MaterialPipelineAssetCache<T>& cache)
     {
-        std::erase_if(cache.entries, [](const auto& item)
+        ce::erase_if(cache.entries, [](const auto& item)
         {
             return !item.second.retained && !item.second.inFlight && item.second.live.expired();
         });
@@ -821,7 +822,7 @@ namespace
 
     template<class T>
     void TrimMaterialPipelineCache(AssetDepot::MaterialPipelineAssetCache<T>& cache,
-        std::vector<own::shared_owner<const T>>& retired)
+        ce::dynamic_array<own::shared_owner<const T>>& retired)
     {
         while (cache.retainedChargeBytes > cache.budgetBytes)
         {
@@ -853,7 +854,7 @@ namespace
 
     template<class T>
     void StageMaterialPipelineConsumers(const AssetDepot::MaterialPipelineAssetCache<T>& cache,
-        std::vector<own::shared_owner<AssetDepot::AssetRequestState<T>>>& consumers)
+        ce::dynamic_array<own::shared_owner<AssetDepot::AssetRequestState<T>>>& consumers)
     {
         ::ce::contracts::assert_that(
             [&]() -> bool {
@@ -891,7 +892,7 @@ namespace
     template<class T>
     void InvalidateMaterialPipelineCache(AssetDepot::MaterialPipelineAssetCache<T>& cache,
         AssetDepot::MaterialPipelineAssetEntries<T>& retired,
-        const std::vector<own::shared_owner<AssetDepot::AssetRequestState<T>>>& consumers,
+        const ce::dynamic_array<own::shared_owner<AssetDepot::AssetRequestState<T>>>& consumers,
         Status status, Error error) noexcept
     {
         ::ce::contracts::assert_that(
@@ -923,7 +924,7 @@ namespace
 
     template<class T>
     Error ReadMaterialPipelineBytes(material_cooked::ResolvedAssetEntry& resolved,
-        std::vector<std::byte>& bytes, AssetDepot::AssetByteObservation& inputObservation, std::string& failure)
+        ce::dynamic_array<std::byte>& bytes, AssetDepot::AssetByteObservation& inputObservation, std::string& failure)
     {
         constexpr auto maximum = (std::is_same_v<T, material_graph::Generation>
             || std::is_same_v<T, LX::Runtime::ShaderGeneration>)
@@ -962,7 +963,7 @@ namespace
     own::shared_owner<const Texture> SelectMaterialTexture(
         const experiment::AssetId& id, LX::LXColorSpace colorSpace,
         std::span<const AssetDepot::MaterialAssetTexturePin> sources,
-        std::vector<AssetDepot::MaterialAssetTexturePin>& selected, std::string& failure)
+        ce::dynamic_array<AssetDepot::MaterialAssetTexturePin>& selected, std::string& failure)
     {
         if (colorSpace != LX::LXColorSpace::Data && colorSpace != LX::LXColorSpace::Linear
             && colorSpace != LX::LXColorSpace::SRGB)
@@ -1091,7 +1092,7 @@ void DataSystem::InvalidateMaterialAssetsLocked(AssetDepot::MaterialAssetRetired
 
 void DataSystem::SetShaderMetaAssetCacheBudget(std::size_t bytes)
 {
-    std::vector<own::shared_owner<const ShaderMeta>> retired;
+    ce::dynamic_array<own::shared_owner<const ShaderMeta>> retired;
     {
         std::lock_guard lock(m_assetPreparationMutex);
         retired.reserve(m_materialAssets.shaderMetadata.size());
@@ -1229,7 +1230,7 @@ AssetDepot::AssetRequest<T> DataSystem::RequestMaterialPipelineAssetFromSnapshot
     {
         return fail(Status::Failed, Error::NotMounted, "No material pipeline catalog is mounted.");
     }
-    std::vector<material_cooked::ResolvedAssetEntry> closure;
+    ce::dynamic_array<material_cooked::ResolvedAssetEntry> closure;
     material_cooked::AssetCatalogLookupIssue issue;
     const auto lookup = catalog->CollectHardClosure(link.ToReference(), closure, issue);
     if (lookup != material_cooked::AssetLookupStatus::Found)
@@ -1250,12 +1251,12 @@ AssetDepot::AssetRequest<T> DataSystem::RequestMaterialPipelineAssetFromSnapshot
     // inline scheduler terminal observer and a lost duplicate-admission race.
     own::shared_owner<AssetDepot::MaterialPipelineAssetWork<T>> work;
     own::shared_owner<const T> resident;
-    std::vector<AssetDepot::MaterialAssetTextureRequest> textures;
+    ce::dynamic_array<AssetDepot::MaterialAssetTextureRequest> textures;
     AssetDepot::AssetRequest<material_graph::Generation> program;
     AssetDepot::AssetRequest<LX::Runtime::ShaderGeneration> codeProgram;
     AssetDepot::AssetRequest<experiment::Material> authoredMaterial;
     std::optional<material_cooked::ResolvedAssetEntry> shaderMetadata;
-    std::vector<job_handle> dependencies;
+    ce::dynamic_array<job_handle> dependencies;
     const auto joinOrAcquire = [&]()
     {
         auto& cache = MaterialPipelineAssetCacheLocked<T>();
@@ -1514,7 +1515,7 @@ void DataSystem::RunMaterialPipelineAssetWork(own::shared_owner<AssetDepot::Mate
         }
         std::string failure;
         Error error = Error::None;
-        std::vector<AssetDepot::MaterialAssetTexturePin> sources;
+        ce::dynamic_array<AssetDepot::MaterialAssetTexturePin> sources;
         sources.reserve(work->textures.size());
         for (const auto& texture : work->textures)
         {
@@ -1577,7 +1578,7 @@ void DataSystem::RunMaterialPipelineAssetWork(own::shared_owner<AssetDepot::Mate
         }
         auto resolved = work->resolved;
         AssetDepot::AssetByteObservation inputObservation(m_materialAssets.materialInputStagingBytes);
-        std::vector<std::byte> bytes;
+        ce::dynamic_array<std::byte> bytes;
         own::shared_owner<const T> candidate;
         own::shared_owner<LX::Runtime::ShaderGeneration> pendingCodeProgram;
         own::shared_owner<AssetDepot::MaterialProgramAssetOrigin> pendingCodeOrigin;
@@ -1649,7 +1650,7 @@ void DataSystem::RunMaterialPipelineAssetWork(own::shared_owner<AssetDepot::Mate
                 {
                     auto metadataEntry = *work->shaderMetadata;
                     AssetDepot::AssetByteObservation metadataObservation(m_materialAssets.shaderMetaInputStagingBytes);
-                    std::vector<std::byte> metadataBytes;
+                    ce::dynamic_array<std::byte> metadataBytes;
                     error = ReadShaderMetaBytes(metadataEntry, metadataBytes, metadataObservation, failure);
                     auto metadata = own::make_shared<ShaderMeta>();
                     if (error == Error::None && (metadataBytes != product->metadataBytes
@@ -1742,7 +1743,7 @@ void DataSystem::RunMaterialPipelineAssetWork(own::shared_owner<AssetDepot::Mate
                     }
                     else
                     {
-                        std::vector<MaterialTextureOwner> textureOwners;
+                        ce::dynamic_array<MaterialTextureOwner> textureOwners;
                         for (const auto& texture : resolvedMaterial.textures)
                         {
                             textureOwners.push_back({ texture.propertyName, texture.owner });
@@ -1773,7 +1774,7 @@ void DataSystem::RunMaterialPipelineAssetWork(own::shared_owner<AssetDepot::Mate
                     }
                     else
                     {
-                        std::vector<MaterialTextureOwner> owners;
+                        ce::dynamic_array<MaterialTextureOwner> owners;
                         for (const auto& texture : resolvedMaterial.textures)
                         {
                             owners.push_back({ texture.propertyName, texture.owner });
@@ -1805,7 +1806,7 @@ void DataSystem::RunMaterialPipelineAssetWork(own::shared_owner<AssetDepot::Mate
                     }
                     else
                     {
-                        std::vector<AssetDepot::MaterialAssetTexturePin> selected;
+                        ce::dynamic_array<AssetDepot::MaterialAssetTexturePin> selected;
                         const auto loadTexture = [&](const experiment::AssetId& id, LX::LXColorSpace colorSpace,
                             std::string& textureFailure) -> own::shared_owner<const Texture>
                         {
@@ -1980,8 +1981,8 @@ void DataSystem::CompleteMaterialPipelineAssetWorkLocked(
 
 void DataSystem::SetMaterialAssetCacheBudgets(std::size_t programs, std::size_t materials)
 {
-    std::vector<own::shared_owner<const material_graph::Generation>> retiredPrograms;
-    std::vector<own::shared_owner<const Material>> retiredMaterials;
+    ce::dynamic_array<own::shared_owner<const material_graph::Generation>> retiredPrograms;
+    ce::dynamic_array<own::shared_owner<const Material>> retiredMaterials;
     {
         std::lock_guard lock(m_assetPreparationMutex);
         retiredPrograms.reserve(m_materialAssets.programs.entries.size());
@@ -2040,8 +2041,8 @@ template AssetDepot::AssetRequest<Material> DataSystem::RequestMaterialPipelineA
 
 void DataSystem::SetCodeMaterialAssetCacheBudgets(std::size_t programs, std::size_t materials)
 {
-    std::vector<own::shared_owner<const LX::Runtime::ShaderGeneration>> retiredPrograms;
-    std::vector<own::shared_owner<const experiment::Material>> retiredMaterials;
+    ce::dynamic_array<own::shared_owner<const LX::Runtime::ShaderGeneration>> retiredPrograms;
+    ce::dynamic_array<own::shared_owner<const experiment::Material>> retiredMaterials;
     {
         std::lock_guard lock(m_assetPreparationMutex);
         retiredPrograms.reserve(m_materialAssets.codePrograms.entries.size());

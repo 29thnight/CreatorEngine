@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
@@ -153,8 +154,8 @@ RHIPipelineLayoutHandle DX12RootSignatureCache::GetOrCreate(
     }))
     {
         const auto caps = m_resources->GetShaderArrayCapabilities();
-        std::array<uint64_t, 4> resources{}, samplers{};
-        constexpr std::array<RHIShaderVisibility, 4> stages{
+        ce::fixed_array<uint64_t, 4> resources{}, samplers{};
+        constexpr ce::fixed_array<RHIShaderVisibility, 4> stages{
             RHIShaderVisibility::All, RHIShaderVisibility::Vertex,
             RHIShaderVisibility::Pixel, RHIShaderVisibility::Mesh,
         };
@@ -201,8 +202,8 @@ RHIPipelineLayoutHandle DX12RootSignatureCache::GetOrCreate(
     //   포인터로 가리키므로, 범위를 파라미터 루프 안의 지역 변수로 두면
     //   루프를 빠져나가는 순간 죽은 주소를 가리킨다. 캐시 미스 때만 도는
     //   길이라 벡터 두 개의 비용은 문제가 되지 않는다.
-    std::vector<D3D12_ROOT_PARAMETER> params(desc.params.size());
-    std::vector<D3D12_DESCRIPTOR_RANGE> ranges(desc.params.size());
+    ce::dynamic_array<D3D12_ROOT_PARAMETER> params(desc.params.size());
+    ce::dynamic_array<D3D12_DESCRIPTOR_RANGE> ranges(desc.params.size());
 
     for (size_t i = 0; i < desc.params.size(); ++i)
     {
@@ -233,7 +234,7 @@ RHIPipelineLayoutHandle DX12RootSignatureCache::GetOrCreate(
         }
     }
 
-    std::vector<D3D12_STATIC_SAMPLER_DESC> samplers(desc.staticSamplers.size());
+    ce::dynamic_array<D3D12_STATIC_SAMPLER_DESC> samplers(desc.staticSamplers.size());
     for (size_t i = 0; i < desc.staticSamplers.size(); ++i)
     {
         samplers[i] = DX12Translate::ToD3D12(desc.staticSamplers[i]);

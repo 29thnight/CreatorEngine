@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../AssetIdentity.h"
@@ -22,7 +23,7 @@ namespace experiment::cooked
         std::string& out);
 
     [[nodiscard]] bool ReadBinaryFile(const std::filesystem::path& path,
-        std::vector<std::byte>& out);
+        ce::dynamic_array<std::byte>& out);
 
     // child 가 root 아래에 있는가. `..` 세그먼트가 하나라도 있으면 거짓이다.
     [[nodiscard]] bool IsContainedPath(const std::filesystem::path& root,

@@ -1,4 +1,5 @@
-﻿#include "EnhancedSSGIPass.h"
+﻿#include "../../../../Containers/ContainerAPI.h"
+#include "EnhancedSSGIPass.h"
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
 #include "../../../RHI/DX12/DX12RootSignatureCache.h"
@@ -270,7 +271,7 @@ bool EnhancedSSGIPass::EnsureHistory(const EnhancedFrameContext& context,
         return true;
     }
 
-    std::array<RHITextureHandle, kHistoryCount> history{}, depth{};
+    ce::fixed_array<RHITextureHandle, kHistoryCount> history{}, depth{};
     const auto rollback = [&]()
     {
         for (uint32_t i = 0; i < kHistoryCount; ++i)
@@ -423,7 +424,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
     // 각 AddPass가 사용 목록을 그래프 저장소로 복사한다. 최대 밉 수와 추가
     // 입력 수가 고정되어 있으므로 선언마다 vector와 checked proxy를 만들지 않는다.
     using Usage = EnhancedRenderGraph::RGPassUsage;
-    std::array<Usage, kMaxHiZMips + 3> usageStorage;
+    ce::fixed_array<Usage, kMaxHiZMips + 3> usageStorage;
 
     const bool hasCamera = context.camera != nullptr;
     const auto viewProjection = hasCamera
@@ -580,7 +581,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                     // SRV 테이블은 시그니처 크기만큼 잡는다. 안 쓰는 슬롯도
                     // 디스크립터가 있어야 검증 레이어가 조용하다 — 그래서 전부
                     // 같은 것으로 채운다.
-                    std::array<RHIBindingDesc, kMaxHiZMips + 2> srvs{};
+                    ce::fixed_array<RHIBindingDesc, kMaxHiZMips + 2> srvs{};
                     srvs.fill((0 == mip) ? RHIBindingDesc::SrvDepth(source)
                                          : RHIBindingDesc::Srv2D(source, kHiZFormat));
                     const RHIBindingDesc uavs[] = {
@@ -674,7 +675,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                     const RHITextureHandle fallback = executeContext.ResolveHandle(m_hiZMips[0]);
                     constexpr RHIFormat kColorFormat = RHIFormat::RGBA16Float;
 
-                    std::array<RHIBindingDesc, kMaxHiZMips + 2> srvs{};
+                    ce::fixed_array<RHIBindingDesc, kMaxHiZMips + 2> srvs{};
                     for (uint32_t i = 0; i < kMaxHiZMips; ++i)
                     {
                         // 밉이 모자라면 마지막 것으로 채운다. 셰이더가 gMipCount
@@ -752,7 +753,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                     memcpy(cb.cpuAddress, constantCopy.data(), constantCopy.size());
 
                     // 그래프 리소스와 외부 리소스를 순서대로 꽂는다.
-                    std::array<RHITextureHandle, kMaxHiZMips + 2> sources;
+                    ce::fixed_array<RHITextureHandle, kMaxHiZMips + 2> sources;
                     size_t sourceCount{};
                     for (const RGHandle handle : srvHandles)
                     {
@@ -769,7 +770,7 @@ void EnhancedSSGIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                     const RHITextureHandle fallback =
                         sourceCount == 0 ? executeContext.ResolveHandle(m_hiZMips[0]) : sources.front();
 
-                    std::array<RHIBindingDesc, kMaxHiZMips + 2> srvs{};
+                    ce::fixed_array<RHIBindingDesc, kMaxHiZMips + 2> srvs{};
                     for (uint32_t i = 0; i < kMaxHiZMips + 2; ++i)
                     {
                         const RHITextureHandle resource =

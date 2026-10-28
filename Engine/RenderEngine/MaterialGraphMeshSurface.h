@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -129,22 +130,22 @@ namespace material_graph
         RHIModelMeshView geometry_;
         math::matrix4x4 world_;
         SurfaceView view_;
-        std::vector<std::byte> vertices_, packedVertices_;
+        ce::dynamic_array<std::byte> vertices_, packedVertices_;
         own::shared_owner<const assets::cluster::Archive> clusterArchive_;
         own::shared_owner<assets::cluster::Stream> clusterStream_;
         own::shared_owner<const assets::cluster::ResidentSet> residentClusters_;
-        std::vector<std::uint32_t> indices_;
+        ce::dynamic_array<std::uint32_t> indices_;
         experiment::MeshletPayload meshlets_;
         experiment::MeshClusterHierarchy hierarchy_{};
         // 불변 압축 토폴로지의 경계다. W=0이면 현재 포즈의 조기 컬링을 생략한다.
         math::vector4 m_instanceMinimum{}, m_instanceMaximum{};
         uint32_t originalIndexCount_{};
-        std::vector<std::uint32_t> sourceVertexIds_;
+        ce::dynamic_array<std::uint32_t> sourceVertexIds_;
         uint32_t sourcePrimitiveCount_{}, sourceVertexCount_{};
         uint32_t logicalVertexCount_{};
         bool streamedTopology_{};
-        std::vector<PackedBoneMatrix> bones_;
-        std::vector<float> lods_;
+        ce::dynamic_array<PackedBoneMatrix> bones_;
+        ce::dynamic_array<float> lods_;
         // A per-frame pose can share validated, immutable product bytes with the
         // cached partition. The owner outlives all GPU batches retaining this input.
         own::shared_owner<const MeshSurfaceInput> staticOwner_;
@@ -178,7 +179,7 @@ namespace material_graph
 
       private:
         friend class MeshSurfacePlan;
-        own::shared_owner<const std::vector<std::uint32_t>> sourceVerticesOwner_;
+        own::shared_owner<const ce::dynamic_array<std::uint32_t>> sourceVerticesOwner_;
     };
 
     // Stable triangle-order partition. Every triangle appears exactly once; shared
@@ -229,7 +230,7 @@ namespace material_graph
                                   const MeshSurfacePlanBudget& budget, own::shared_owner<const MeshSurfacePlan>& result,
                                   std::string& error);
         own::shared_owner<const MeshSurfaceInput> source_;
-        std::vector<MeshSurfaceChunk> chunks_;
+        ce::dynamic_array<MeshSurfaceChunk> chunks_;
         MeshSurfacePlanCost cost_;
         std::uint32_t chunkLimit_{};
         own::shared_owner<const MeshSurfacePlan> staticOwner_;
@@ -237,7 +238,7 @@ namespace material_graph
 
     struct SurfaceTextureFootprint
     {
-        std::array<float, 2> uvDx{}, uvDy{};
+        ce::fixed_array<float, 2> uvDx{}, uvDy{};
         std::uint32_t width{}, height{}, mipLevels{};
         float bias{};
     };
@@ -331,7 +332,7 @@ namespace material_graph
                                    std::span<const own::shared_owner<const MeshSurfaceBatch>> batches,
                                    const MeshTransformDispatch& dispatch, std::string& error);
         // Imports inputs/output and appends this mesh's usages; adds no pass.
-        bool DeclareResources(EnhancedRenderGraph& graph, std::vector<EnhancedRenderGraph::RGPassUsage>& inputs,
+        bool DeclareResources(EnhancedRenderGraph& graph, ce::dynamic_array<EnhancedRenderGraph::RGPassUsage>& inputs,
                               bool& reused, std::string& error) const;
         IRenderDeviceServices* device_{};
         RHIBufferHandle buffer_;
@@ -351,7 +352,7 @@ namespace material_graph
         mutable RHIResourceState bufferState_{RHIResourceState::Common};
         own::shared_owner<const MeshSurfaceInput> input_;
         own::shared_owner<const MeshSurfaceBatch> source_;
-        own::unique_owner<std::vector<MeshSurfaceSample>> samples_;
+        own::unique_owner<ce::dynamic_array<MeshSurfaceSample>> samples_;
         std::uint32_t count_{};
         std::uint64_t recordingId_{}, auditRealFrame_{}, auditView_{};
         std::uint64_t descriptorVersion_{};
@@ -407,7 +408,7 @@ namespace material_graph
         own::shared_owner<MeshSurfaceBufferPool> bufferPool_;
         own::shared_owner<MeshSurfaceStaticCache> staticCache_;
         own::shared_owner<MeshSurfaceRequestCache> requestCache_;
-        std::vector<own::shared_owner<const MeshSurfaceBatch>> transformedCache_;
+        ce::dynamic_array<own::shared_owner<const MeshSurfaceBatch>> transformedCache_;
         std::uint64_t transformedBytes_{}, transforms_{}, transformHits_{};
         std::uint64_t cacheRecording_{}, cacheGeneration_{};
     };

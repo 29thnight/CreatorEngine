@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
@@ -22,14 +23,14 @@ class ProjectLayerSettingsCodec final
     static constexpr std::size_t max_bytes = 64 * 1024;
     static constexpr std::size_t max_name_bytes = max_layer_name_bytes;
 
-    static result<std::vector<std::byte>> Encode(const project_layer_snapshot& source)
+    static result<ce::dynamic_array<std::byte>> Encode(const project_layer_snapshot& source)
     {
         if (!LayerCatalog::Validate(source.catalog) || !ce::physics::PhysicsCollisionPolicy::Validate(source.policy))
             return std::unexpected(error::invalid_definition);
 
         try
         {
-            std::vector<std::byte> output;
+            ce::dynamic_array<std::byte> output;
             output.reserve(2048);
             Put(output, 0x52594c43u, 4); // CLYR
             Put(output, 1, 4);
@@ -129,7 +130,7 @@ class ProjectLayerSettingsCodec final
     }
 
   private:
-    static void Put(std::vector<std::byte>& output, std::uint64_t value, std::size_t bytes)
+    static void Put(ce::dynamic_array<std::byte>& output, std::uint64_t value, std::size_t bytes)
     {
         for (std::size_t i = 0; i < bytes; ++i)
             output.push_back(std::byte{static_cast<std::uint8_t>(value >> (i * 8))});

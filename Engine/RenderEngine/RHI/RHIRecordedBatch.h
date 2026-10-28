@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
@@ -136,7 +137,7 @@ class RHIRecordedBatch final
     IRHIParallelCommandPool* m_pool{nullptr};
     // Parallel recording already admits at most eight distinct targets. Keep
     // their order in the batch instead of allocating a vector per translation.
-    std::array<uint32_t, kMaxCommandTargets> m_commandOrder{};
+    ce::fixed_array<uint32_t, kMaxCommandTargets> m_commandOrder{};
     uint32_t m_commandCount{0};
     uint64_t m_frameId{0};
     uint64_t m_backendGeneration{0};

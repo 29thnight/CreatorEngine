@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineFunc.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 class CameraComponent;
@@ -35,12 +37,12 @@ public:
     // 구현 참고). 비워 두면(기본값) 아무 일도 하지 않는다 — Scene 외 다른
     // 호출부(장차 생길 도구·테스트 등)가 이 시스템을 재진입 시험과 무관하게
     // 그냥 틱만 시키고 싶을 때를 위한 것이다.
-    void Update(float tick, const std::function<void()>& midTraversalProbe = nullptr);
+    void Update(float tick, const ce::owned_func<void()>& midTraversalProbe = nullptr);
 
 	// 이 Scene의 enabled 카메라 중 명시 primary를 우선하고, 없으면 instance ID가
 	// 가장 작은 후보를 결정론적으로 고른다. 등록 순서나 전역 슬롯은 선택 의미가 아니다.
 	CameraComponent* GetPrimaryCamera() const noexcept;
-	const std::vector<CameraComponent*>& GetRegisteredCameras() const noexcept
+	const ce::dynamic_array<CameraComponent*>& GetRegisteredCameras() const noexcept
 	{
 		return m_cameras;
 	}
@@ -48,5 +50,5 @@ public:
     size_t GetCount() const noexcept { return m_cameras.size(); }
 
 private:
-    std::vector<CameraComponent*> m_cameras;
+    ce::dynamic_array<CameraComponent*> m_cameras;
 };

@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "../Utility_Framework/Reflection/ClassProperty.h"
@@ -31,9 +33,9 @@ class TagManager : public Singleton<TagManager>
     void RemoveTag(std::string_view tag);
     bool HasTag(std::string_view tag) const;
     // Restore ordered definitions without disturbing the object membership index.
-    void SetTagDefinitions(const std::vector<std::string>& tags);
+    void SetTagDefinitions(const ce::dynamic_array<std::string>& tags);
 
-    std::vector<std::string>& GetTags() { return m_tags; }
+    ce::dynamic_array<std::string>& GetTags() { return m_tags; }
 
     size_t GetTagIndex(std::string_view tag) const
     {
@@ -52,7 +54,7 @@ class TagManager : public Singleton<TagManager>
     void AddTagToObject(std::string_view tag, Entity* object);
     void RemoveTagFromObject(std::string_view tag, Entity* object);
 
-    std::vector<Entity*> GetObjectsWithTag(std::string_view tag) const
+    ce::dynamic_array<Entity*> GetObjectsWithTag(std::string_view tag) const
     {
         if (tag.empty() || tag == "Untagged")
         {
@@ -100,9 +102,9 @@ class TagManager : public Singleton<TagManager>
     //   다르므로(D3-b-2b-0: 21건) yaml-cpp가 읽던 파일을 ryml이 거부할 수 있고,
     //   그 순간 저장이 손실을 확정한다. 그래서 로드 성공 여부를 기억한다.
     bool m_loadSucceeded{false};
-    std::unordered_map<std::string, size_t, TagHash, std::equal_to<>> m_tagMap{};
-    std::vector<std::string> m_tags{};
-    std::unordered_map<std::string, std::vector<Entity*>, TagHash, std::equal_to<>> m_taggedObjects{};
+    ce::engine_node_map<std::string, size_t, TagHash, std::equal_to<>> m_tagMap{};
+    ce::dynamic_array<std::string> m_tags{};
+    ce::engine_node_map<std::string, ce::dynamic_array<Entity*>, TagHash, std::equal_to<>> m_taggedObjects{};
 };
 
 static auto TagManagers = TagManager::GetInstance();

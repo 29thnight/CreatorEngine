@@ -1,0 +1,13 @@
+<Project DefaultTargets="Validate" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <EngineRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..'))</EngineRoot>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+  </PropertyGroup>
+  <Target Name="Validate">
+    <MSBuild Projects="$(EngineRoot)\Tools\regression\FuncMigrationProbe.vcxproj" Targets="Build" Properties="Configuration=$(Configuration);Platform=x64;SolutionDir=$(EngineRoot)\" />
+    <Exec Command="&quot;$(EngineRoot)\Build\Validation\UtilityModules\FuncMigrationProbe\x64-$(Configuration)\FuncMigrationProbe.exe&quot;" />
+  </Target>
+  <Target Name="BuildPerformance">
+    <MSBuild Projects="$(EngineRoot)\Tools\regression\FuncPerformanceProbe.vcxproj" Targets="Build" Properties="Configuration=Release;Platform=x64;SolutionDir=$(EngineRoot)\" />
+  </Target>
+</Project>

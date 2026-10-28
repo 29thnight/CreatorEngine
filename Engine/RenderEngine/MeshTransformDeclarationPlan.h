@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -16,7 +17,7 @@ namespace material_graph
 
         struct Job
         {
-            std::array<std::uint32_t, 3> m_inputOffsets{};
+            ce::fixed_array<std::uint32_t, 3> m_inputOffsets{};
             std::uint32_t m_firstGroup{}, m_groupCount{};
         };
 
@@ -194,9 +195,9 @@ namespace material_graph
 
         static constexpr std::uint32_t kEmptySlot = UINT32_MAX;
         static constexpr std::size_t kSlotCount = 32768;
-        std::array<Job, kMaxJobs> m_jobs;
-        std::array<Input, kMaxInputs> m_inputs;
-        std::array<std::uint32_t, kSlotCount> m_slots;
+        ce::fixed_array<Job, kMaxJobs> m_jobs;
+        ce::fixed_array<Input, kMaxInputs> m_inputs;
+        ce::fixed_array<std::uint32_t, kSlotCount> m_slots;
         std::size_t m_jobCount{}, m_inputCount{}, m_inputBytes{};
         std::uint64_t m_groupCount{};
     };

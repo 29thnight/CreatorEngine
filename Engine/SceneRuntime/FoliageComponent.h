@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -67,23 +68,43 @@ public:
 	void UpdateFoliageCullingData(
 		const std::optional<math::bounding_frustum>& cameraFrustum);
 
-    const std::vector<FoliageType>& GetFoliageTypes() const { return m_foliageTypes; }
-    const std::vector<FoliageInstance>& GetFoliageInstances() const { return m_foliageInstances; }
+    const ce::dynamic_array<FoliageType>& GetFoliageTypes() const { return m_foliageTypes; }
+    const ce::dynamic_array<FoliageInstance>& GetFoliageInstances() const { return m_foliageInstances; }
+
+    // Owner-thread development measurement. Disabled by default; samples use
+    // preallocated storage and never allocate in the measured frame loop.
+    void ConfigureCullingProbe(bool cached);
+    std::span<const double> CullingProbeSamples() const { return m_cullingProbeSamples; }
+    std::span<const double> CullingProbeFrameSamples() const { return m_cullingProbeFrames; }
+    size_t CullingCacheBytes() const { return m_worldBoundsCache.AllocatedBytes(); }
+    uint64_t CullingProbeTransforms() const { return m_cullingProbeTransforms; }
 
     FileGuid m_foliageAssetGuid{};
 private:
     struct AssetBinding;
     void CancelAssetBindings();
     [[reflgen::ignore]]
-    std::vector<own::unique_owner<AssetBinding>> m_assetBindings{};
+    ce::dynamic_array<own::unique_owner<AssetBinding>> m_assetBindings{};
 
     [[reflgen::ignore]]
-    std::vector<FoliageType> m_foliageTypes{};
+    ce::dynamic_array<FoliageType> m_foliageTypes{};
 
     [[reflgen::ignore]]
-    std::vector<FoliageInstance> m_foliageInstances{};
+    ce::dynamic_array<FoliageInstance> m_foliageInstances{};
     [[reflgen::ignore]]
     foliage::WorldBoundsCache m_worldBoundsCache{};
+    [[reflgen::ignore]]
+    bool m_cullingProbeEnabled{false};
+    [[reflgen::ignore]]
+    bool m_cullingProbeCached{true};
+    [[reflgen::ignore]]
+    ce::dynamic_array<double> m_cullingProbeSamples{};
+    [[reflgen::ignore]]
+    uint64_t m_cullingProbeTransforms{};
+    [[reflgen::ignore]]
+    ce::dynamic_array<double> m_cullingProbeFrames{};
+    [[reflgen::ignore]]
+    std::chrono::steady_clock::time_point m_cullingProbeLastFrame{};
 private:
     [[reflgen::ignore]]
     void ReleaseManagedResources() override;

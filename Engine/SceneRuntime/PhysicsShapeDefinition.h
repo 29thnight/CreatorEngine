@@ -79,7 +79,7 @@ inline contact_role_id ContactRoleValue(std::string_view text)
 namespace detail
 {
 template<bool ResolveCooked, class Resolver>
-result<std::vector<ShapeInstance>> BuildPhysicsShapesImpl(std::span<const PhysicsShapeDefinition> definitions,
+result<ce::dynamic_array<ShapeInstance>> BuildPhysicsShapesImpl(std::span<const PhysicsShapeDefinition> definitions,
                                                           math::vector3 scale, collision_filter filter,
                                                           body_kind motion, Resolver&& resolver,
                                                           const project_layer_snapshot* settings)
@@ -104,8 +104,8 @@ result<std::vector<ShapeInstance>> BuildPhysicsShapesImpl(std::span<const Physic
 
     try
     {
-        std::vector<ShapeInstance> shapes;
-        std::vector<std::uint32_t> ids;
+        ce::dynamic_array<ShapeInstance> shapes;
+        ce::dynamic_array<std::uint32_t> ids;
         shapes.reserve(definitions.size());
         ids.reserve(definitions.size());
 
@@ -274,7 +274,7 @@ inline result<void> ValidatePhysicsShapes(std::span<const PhysicsShapeDefinition
 }
 
 template<class Resolver = MissingGeometryResolver>
-[[nodiscard]] result<std::vector<ShapeInstance>> BuildPhysicsShapes(std::span<const PhysicsShapeDefinition> definitions,
+[[nodiscard]] result<ce::dynamic_array<ShapeInstance>> BuildPhysicsShapes(std::span<const PhysicsShapeDefinition> definitions,
                                                                     math::vector3 scale, collision_filter filter,
                                                                     body_kind motion, Resolver resolver = {},
                                                                     const project_layer_snapshot* settings = nullptr)

@@ -1,4 +1,6 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 
 #include "CookedModelSubAssetCodec.h"
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -11,20 +13,20 @@ namespace experiment::cooked
         std::filesystem::path assetRoot{};
         std::filesystem::path identityHeaderPath{};
         // Already-authored global UUIDv8 model/subasset identities. No ordinals.
-        std::vector<TypedAssetReference> selected{};
+        ce::dynamic_array<TypedAssetReference> selected{};
         // Optional build-local stable capture. Every source, sidecar, epoch and
         // importer dependency goes through this reader. No filesystem fallback
         // is allowed after a supplied reader fails.
-        std::function<bool(const std::filesystem::path&, std::vector<std::byte>&,
+        ce::owned_func<bool(const std::filesystem::path&, ce::dynamic_array<std::byte>&,
             std::string&)> captureSource{};
     };
 
     struct ModelAssetSetProduct final
     {
         TypedAssetReference asset{};
-        std::vector<std::byte> artifactBytes{};
-        std::vector<std::byte> cpuGeometryBytes{};
-        std::vector<AssetDependency> dependencies{};
+        ce::dynamic_array<std::byte> artifactBytes{};
+        ce::dynamic_array<std::byte> cpuGeometryBytes{};
+        ce::dynamic_array<AssetDependency> dependencies{};
         std::uint32_t representation{};
         std::uint32_t schemaVersion{};
         std::string extension{};
@@ -35,11 +37,11 @@ namespace experiment::cooked
 
     struct ModelAssetSetCookResult final
     {
-        std::vector<ModelAssetSetProduct> products{};
+        ce::dynamic_array<ModelAssetSetProduct> products{};
         // Length-framed ordered path+hash inventory: root source, canonical
         // sidecar, epoch header and every captured external importer input.
         Sha256Digest sourceInputsSha256{};
-        std::vector<std::string> warnings{};
+        ce::dynamic_array<std::string> warnings{};
         std::string failure{};
         [[nodiscard]] bool Succeeded() const noexcept
         {

@@ -1,3 +1,4 @@
+#include "../../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -315,7 +316,7 @@ namespace
         {
             metadata.miscFlags = DirectX::TEX_MISC_TEXTURECUBE;
         }
-        std::vector<DirectX::Image> images;
+        ce::dynamic_array<DirectX::Image> images;
         for (uint32_t item = 0; item < view.ArraySize(); ++item)
         {
             const auto* base = view.Find(0, item);
@@ -615,7 +616,7 @@ namespace
         return converted.GetImage(0, 0, 0);
     }
 
-    bool terrain_gray8(const DirectX::ScratchImage& source, std::vector<uint8_t>& gray)
+    bool terrain_gray8(const DirectX::ScratchImage& source, ce::dynamic_array<uint8_t>& gray)
     {
         const auto* image = source.GetImage(0, 0, 0);
         if (!image || !image->pixels)

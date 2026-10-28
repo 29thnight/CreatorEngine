@@ -1,3 +1,7 @@
+#include "../../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../../../Engine/Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../../../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -71,7 +75,7 @@ struct ImGuiDx12Shell::Impl
     // 힙이 하나여야 SetDescriptorHeaps가 프레임에 한 번으로 끝난다.
     winrt::com_ptr<ID3D12DescriptorHeap> srvHeap;
     uint32_t srvIncrement{ 0 };
-    std::vector<uint32_t> srvFreeList;
+    ce::dynamic_array<uint32_t> srvFreeList;
 
     ImGui_ImplDX12_InitInfo initInfo{};
 
@@ -87,7 +91,7 @@ struct ImGuiDx12Shell::Impl
         bool uploaded{ false };
         bool initialized{ false };
     };
-    std::unordered_map<uint64_t, TextureSlot> textureSlots;
+    ce::engine_node_map<uint64_t, TextureSlot> textureSlots;
 
     // 공유 핸들 → (열린 리소스, ImTextureID).
     struct SharedEntry
@@ -99,15 +103,15 @@ struct ImGuiDx12Shell::Impl
         uint64_t textureId{ 0 };
         uint64_t lastUsedFrame{ 0 };
     };
-    std::unordered_map<HANDLE, SharedEntry> sharedTextures;
+    ce::engine_node_map<HANDLE, SharedEntry> sharedTextures;
 
     struct DisplayUse
     {
         own::shared_owner<RHIDisplayConsumerLease> m_lease;
         winrt::com_ptr<ID3D12Resource> m_resource;
     };
-    std::vector<DisplayUse> m_pendingDisplayUses;
-    RHICompletionRetireQueue<std::vector<DisplayUse>> m_displayUseRetireQueue;
+    ce::dynamic_array<DisplayUse> m_pendingDisplayUses;
+    RHICompletionRetireQueue<ce::dynamic_array<DisplayUse>> m_displayUseRetireQueue;
 
     void RetainDisplayUse(own::shared_owner<RHIDisplayConsumerLease> consumerLease,
         const winrt::com_ptr<ID3D12Resource>& resource)
@@ -140,14 +144,14 @@ struct ImGuiDx12Shell::Impl
             return;
         }
         m_displayUseRetireQueue.Collect(RHICompletionPoint{ completedValue },
-            [](std::vector<DisplayUse>& uses) { uses.clear(); });
+            [](ce::dynamic_array<DisplayUse>& uses) { uses.clear(); });
     }
 
     void DrainDisplayUses(bool gpuCompletionProven)
     {
         RetireDisplayUses(0);
         m_displayUseRetireQueue.Drain(
-            [gpuCompletionProven](std::vector<DisplayUse>& uses)
+            [gpuCompletionProven](ce::dynamic_array<DisplayUse>& uses)
             {
                 if (!gpuCompletionProven)
                 {
@@ -167,12 +171,12 @@ struct ImGuiDx12Shell::Impl
     {
         uint32_t width{ 0 };
         uint32_t height{ 0 };
-        std::vector<uint8_t> rgba;
+        ce::dynamic_array<uint8_t> rgba;
         RHIDisplayFrameMetadata metadata{};
     };
     std::mutex cpuFrameMutex;
-    std::unordered_map<uint64_t, CpuFrame> pendingCpuFrames;
-    std::unordered_map<uint64_t, CpuFrame> recordingCpuFrames;
+    ce::engine_node_map<uint64_t, CpuFrame> pendingCpuFrames;
+    ce::engine_node_map<uint64_t, CpuFrame> recordingCpuFrames;
 
     struct CpuFrameEntry
     {
@@ -186,7 +190,7 @@ struct ImGuiDx12Shell::Impl
         RHIDisplayFrameMetadata metadata{};
         uint64_t lastUsedFrame{ 0 };
     };
-    std::unordered_map<uint64_t, CpuFrameEntry> cpuFrames;
+    ce::engine_node_map<uint64_t, CpuFrameEntry> cpuFrames;
 
     // 실패한 기록의 barrier가 실행됐다고 가정하지 않는다. 다음 업로드는 새
     // 자원으로 시작하고, 옛 자원은 기존 제출 완료점 기반 은퇴 경로로 보낸다.
@@ -223,7 +227,7 @@ struct ImGuiDx12Shell::Impl
         winrt::com_ptr<ID3D12Resource> resource;
     };
     RHICompletionRetireQueue<RetiredDescriptor> retireQueue;
-    std::vector<RetiredDescriptor> pendingFrameRetirements;
+    ce::dynamic_array<RetiredDescriptor> pendingFrameRetirements;
 
     uint32_t width{ 0 };
     uint32_t height{ 0 };
@@ -241,7 +245,7 @@ struct ImGuiDx12Shell::Impl
     uint64_t fallbackTextureId{ 0 };
 
     // 검증 레이어 메시지(Debug 전용, 처음 본 것만 보고).
-    std::unordered_set<std::string> reportedValidation;
+    ce::engine_node_set<std::string> reportedValidation;
 
     bool AllocateSlot(D3D12_CPU_DESCRIPTOR_HANDLE& outCpu, D3D12_GPU_DESCRIPTOR_HANDLE& outGpu)
     {
@@ -864,7 +868,7 @@ RHIDisplayTexture ImGuiDx12Shell::GetCpuFrameTexture(uint64_t key)
 }
 
 bool ImGuiDx12Shell::RenderAndPresent(std::string& outError,
-    const std::function<void()>& onRecorded)
+    const ce::owned_func<void()>& onRecorded)
 {
     ce::profile_scope profile{ce::marker<"ImGuiDX12MainViewport">()};
     Impl& impl = *m_impl;

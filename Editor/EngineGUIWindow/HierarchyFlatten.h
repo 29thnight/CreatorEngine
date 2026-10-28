@@ -1,4 +1,6 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../Engine/Utility_Framework/Foundation/EngineNodeSet.h"
 
 // PHASE 21 W7-2 — Hierarchy 의 평탄 표시 목록.
 //
@@ -98,7 +100,7 @@ namespace editor
 	{
 	public:
 		/// 보이는 행의 목록. 근거가 하나도 안 바뀌었으면 **다시 만들지 않는다.**
-		const std::vector<hierarchy_flat_row>& Rows(
+		const ce::dynamic_array<hierarchy_flat_row>& Rows(
 			Scene* scene, const hierarchy_flat_key& key, const ImGuiTextFilter& filter);
 
 		/// 사람이 화살표를 눌렀다. 기본값에서 벗어난 집합을 뒤집는다.
@@ -124,9 +126,9 @@ namespace editor
 		/// 않게 한자리에 둔다 — 두 벌이 되면 한쪽만 고쳐져도 조용하다.
 		bool IsSlotExpanded(const Entity* obj, int index) const;
 
-		std::vector<hierarchy_flat_row> m_rows;
-		std::vector<std::uint8_t> m_matched;   ///< 검색: 자신 또는 자손이 걸린다
-		std::unordered_set<int> m_toggled;     ///< 기본값에서 **벗어난** 슬롯만 담는다
+		ce::dynamic_array<hierarchy_flat_row> m_rows;
+		ce::dynamic_array<std::uint8_t> m_matched;   ///< 검색: 자신 또는 자손이 걸린다
+		ce::engine_node_set<int> m_toggled;     ///< 기본값에서 **벗어난** 슬롯만 담는다
 		hierarchy_flat_key m_built{};
 		std::uint64_t m_toggleStamp{ 1 };
 		std::uint64_t m_builtToggleStamp{};

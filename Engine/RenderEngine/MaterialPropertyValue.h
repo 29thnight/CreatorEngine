@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Reflection/Reflection.hpp"
 #include "../Utility_Framework/Reflection/TypeTrait.h"
@@ -12,7 +13,7 @@ struct [[reflgen::reflect]] MaterialPropertyValue
 {
 
     std::string m_name{};
-    std::vector<float> m_numericValue{};
+    ce::dynamic_array<float> m_numericValue{};
     std::int32_t m_integerValue{};
     bool m_boolValue{};
     FileGuid m_textureGuid{};

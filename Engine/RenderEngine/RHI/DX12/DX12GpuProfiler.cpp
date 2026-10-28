@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -608,7 +609,7 @@ bool DX12GpuProfiler::Collect(const GpuFrameToken& token, FrameTimings& outTimin
     return true;
 }
 
-void DX12GpuProfiler::MergeSlices(const FrameTimings& timings, std::vector<PassTiming>& outTimings)
+void DX12GpuProfiler::MergeSlices(const FrameTimings& timings, ce::dynamic_array<PassTiming>& outTimings)
 {
     m_lastTotalMs = 0.0;
 

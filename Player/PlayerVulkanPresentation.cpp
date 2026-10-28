@@ -1,3 +1,4 @@
+#include "../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -35,7 +36,7 @@ namespace Player
                 return false;
             }
             // Keep the Vulkan code pointer aligned, and use the artifact's actual entry name.
-            std::vector<uint32_t> words(blob.Size() / sizeof(uint32_t));
+            ce::dynamic_array<uint32_t> words(blob.Size() / sizeof(uint32_t));
             std::memcpy(words.data(), blob.Data(), blob.Size());
             if (0x07230203u != words[0])
             {
@@ -548,7 +549,7 @@ namespace Player
                 uint64_t key{0};
                 uint32_t width{0};
                 uint32_t height{0};
-                std::vector<uint8_t> rgba;
+                ce::dynamic_array<uint8_t> rgba;
                 RHIDisplayFrameMetadata metadata{};
             };
 
@@ -865,7 +866,7 @@ namespace Player
             uint32_t m_height{0};
             uint32_t m_maxTextureDimension{0};
             VulkanDeviceResources m_resources;
-            std::vector<VkImageView> m_backBufferViews;
+            ce::dynamic_array<VkImageView> m_backBufferViews;
             VkSampler m_sampler{VK_NULL_HANDLE};
             VkDescriptorSetLayout m_descriptorLayout{VK_NULL_HANDLE};
             VkDescriptorPool m_descriptorPool{VK_NULL_HANDLE};

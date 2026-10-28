@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #include "ImGui.h"
 #include <imgui.h>
@@ -53,8 +54,8 @@ public:
 	int seletedCurLinkIndex = -1;
 	ax::NodeEditor::EditorContext* m_nodeContext = nullptr;
 	std::string m_filePath;
-	std::vector<Node*> Nodes;
-	std::vector<NodeLink*> Links;
+	ce::dynamic_array<Node*> Nodes;
+	ce::dynamic_array<NodeLink*> Links;
 	
 	int* m_retrunIndex = nullptr; 
 	bool needMakeLink = false;

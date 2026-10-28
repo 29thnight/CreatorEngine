@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "CookedTexture.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Platform/WindowsSDK/Creator.WinAPI.h"
@@ -197,7 +198,7 @@ namespace experiment::cooked
             // selected transfer-function label. Mip/resize filtering is separate.
             auto linearMetadata = metadata;
             linearMetadata.format = DirectX::MakeLinear(metadata.format);
-            std::vector<DirectX::Image> linearImages(source.GetImages(), source.GetImages() + source.GetImageCount());
+            ce::dynamic_array<DirectX::Image> linearImages(source.GetImages(), source.GetImages() + source.GetImageCount());
             for (auto& image : linearImages)
             {
                 image.format = linearMetadata.format;
@@ -265,7 +266,7 @@ namespace experiment::cooked
             tailMetadata.width = (std::max)(std::size_t{ 1u }, metadata.width >> (authoredLevels - 1u));
             tailMetadata.height = (std::max)(std::size_t{ 1u }, metadata.height >> (authoredLevels - 1u));
             tailMetadata.mipLevels = 1u;
-            std::vector<DirectX::Image> tailBases;
+            ce::dynamic_array<DirectX::Image> tailBases;
             tailBases.reserve(metadata.arraySize);
             for (std::size_t item = 0u; item < metadata.arraySize; ++item)
             {
@@ -452,7 +453,7 @@ namespace experiment::cooked
     }
 
     bool CookTexture(std::span<const std::byte> source, const TextureImportSettings& settings,
-        std::vector<std::byte>& artifact, std::string& failure)
+        ce::dynamic_array<std::byte>& artifact, std::string& failure)
     {
         artifact.clear();
         if (!ValidateTextureImportSettings(settings, failure))
@@ -637,7 +638,7 @@ namespace experiment::cooked
             {
                 return fail("Cooked texture exceeds the supported dimension or byte limits.");
             }
-            std::vector<TextureSubimage> subresources;
+            ce::dynamic_array<TextureSubimage> subresources;
             subresources.reserve(finalImage->GetImageCount());
             for (std::size_t index = 0u; index < finalImage->GetImageCount(); ++index)
             {

@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -25,7 +27,7 @@ class [[reflgen::reflect]] StateMachineComponent :public meta::identity<StateMac
     }
 
 public:
-	using ConditionFunc = std::function<bool(const BlackBoard&)>;
+	using ConditionFunc = ce::owned_func<bool(const BlackBoard&)>;
 public:
    StateMachineComponent()
    {
@@ -46,10 +48,10 @@ public:
 	FSM::FSMState* FindStateByName(const std::string& name) const;
 private:
 	[[reflgen::ignore]]
-	std::vector<own::shared_owner<FSM::FSMState>> m_states;
+	ce::dynamic_array<own::shared_owner<FSM::FSMState>> m_states;
 
 	[[reflgen::ignore]]
-	std::vector<own::shared_owner<FSM::Transition>> m_transitions;
+	ce::dynamic_array<own::shared_owner<FSM::Transition>> m_transitions;
 
 	[[reflgen::ignore]]
 	FSM::FSMState* m_currentState = nullptr;

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 // LC4 (PHASE 14.5) — 로컬 HTTP/JSON 명령 서비스.
 //
@@ -155,7 +156,7 @@ namespace CommandService
             std::shared_ptr<Connection>         connection;
         };
         std::mutex          m_workerMutex;
-        std::vector<Worker> m_workers;
+        ce::dynamic_array<Worker> m_workers;
 
         void ReapFinishedWorkers();
         void JoinAllWorkers();

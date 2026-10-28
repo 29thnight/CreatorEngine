@@ -1,4 +1,6 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineStorage.h"
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "PlayRequest.h"
@@ -125,7 +127,7 @@ namespace wave
 
         [[nodiscard]] const Slot* ResolveSlot(VoiceHandle handle) const noexcept;
 
-        std::vector<Slot> m_slots;
+        ce::dynamic_array<Slot> m_slots;
 
         // ★ 반납 순서대로 다시 쓴다(FIFO). LIFO 로 하면 방금 놓은 슬롯이 곧바로
         //   재사용돼, 낡은 핸들이 살아 있는 다른 보이스를 가리킬 확률이 높아진다.
@@ -135,7 +137,7 @@ namespace wave
         //   vector + 읽기 커서로 짰다가 deque 로 바꿨다 — 소비된 앞부분을 언제
         //   걷을지 결정하는 분기가 실수의 자리였고, 그 분기가 없어야 순서 규약이
         //   한눈에 읽힌다.
-        std::deque<std::uint32_t> m_freeSlots;
+        ce::segmented_deque<std::uint32_t> m_freeSlots;
         std::size_t m_aliveCount{ 0 };
         std::uint32_t m_generationNamespace{ 0 };
     };

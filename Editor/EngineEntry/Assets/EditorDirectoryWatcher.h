@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
 
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -31,7 +32,7 @@ public:
 		std::error_code error{};
 	};
 
-	using Handler = std::function<void(const Change&)>;
+	using Handler = ce::owned_func<void(const Change&)>;
 
 	EditorDirectoryWatcher();
 	~EditorDirectoryWatcher();

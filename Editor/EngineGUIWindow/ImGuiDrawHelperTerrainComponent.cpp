@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -57,7 +58,7 @@ namespace
 		if (brush->m_masks.empty()) return;
 
 		static int selectedMaskIndex = -1;
-		std::vector<std::string>& maskNames = brush->GetMaskNames();
+		ce::dynamic_array<std::string>& maskNames = brush->GetMaskNames();
 		const float tile = editor::ThemePixels(64.f);
 		const float gap = ImGui::GetStyle().ItemSpacing.x;
 		for (int maskIndex = 0; maskIndex < static_cast<int>(brush->m_masks.size()); ++maskIndex)
@@ -195,7 +196,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
 			ImGui::EndDisabled();
 
 			// --- 레이어 목록 리스트 박스 ---
-			std::vector<const char*> layerNames = terrainComponent->GetLayerNames();
+			ce::dynamic_array<const char*> layerNames = terrainComponent->GetLayerNames();
 			int currentSelection = static_cast<int>(terrainComponent->GetSelectedLayerId());
 			ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
 			if (ImGui::ListBox("##LayerList", &currentSelection, layerNames.data(), (int)layerNames.size(), 4))
@@ -287,7 +288,7 @@ void ImGuiDrawHelperTerrainComponent(TerrainComponent* terrainComponent)
         return;
 	}
 
-	std::vector<const char*> typeNames;
+	ce::dynamic_array<const char*> typeNames;
 	for (const auto& t : foliage->GetFoliageTypes()) { typeNames.push_back(t.m_modelName.c_str()); }
 	int typeIndex = static_cast<int>(g_CurrentBrush->m_foliageTypeID);
 	if (!typeNames.empty())

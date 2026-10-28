@@ -154,7 +154,7 @@ int wmain(int argc,wchar_t** argv)
         do { EnvironmentRequire(generator.FinishCookedCapture(device.GetCompletedFenceValue(),error),error);
             if (generator.HasPendingCookedCapture()) std::this_thread::sleep_for(std::chrono::milliseconds(5));
         } while(generator.HasPendingCookedCapture());
-        ce::hash::sha256_digest original{},copy{};
+        ce::crypto::sha256_digest original{},copy{};
         EnvironmentRequire(assets::EnvironmentSourceIdentity(output,original,error) &&
             assets::EnvironmentSourceIdentity(roundtrip,copy,error) && original==copy,"Environment GPU upload roundtrip differs: "+error);
         std::filesystem::remove(roundtrip);

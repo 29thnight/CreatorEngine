@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #include "ImGui.h"
 #include <imgui.h>
@@ -18,7 +19,7 @@ public:
 private:
     void DrawAddComponent(Entity* entity);
     EntityHandle m_addComponentTarget{};
-    std::vector<editor::components::Entry> m_componentCatalog;
+    ce::dynamic_array<editor::components::Entry> m_componentCatalog;
     std::string m_componentSearch;
     std::string m_componentCategory;
     std::string m_componentError;
@@ -55,7 +56,7 @@ private:
 	void ImGuiDrawHelperCanvas(class Canvas* canvas);
 	void ImGuiDrawHelperSoundComponent(class SoundComponent* sc);
 
-	bool DrawRolloffCurveEditor(std::vector<CurvePoint>& curve,
+	bool DrawRolloffCurveEditor(ce::dynamic_array<CurvePoint>& curve,
 		float maxDist,
 		ImVec2 size = ImVec2(0, 180),
 		int* outSelected = nullptr,
@@ -67,5 +68,5 @@ private:
     EntityHandle m_clipPickerOwner{};
     std::uint64_t m_clipPickerComponent{};
 	std::string     m_clipSearch;                 // 검색어
-	std::vector<std::string> m_clipKeyCache;      // 캐시
+	ce::dynamic_array<std::string> m_clipKeyCache;      // 캐시
 };

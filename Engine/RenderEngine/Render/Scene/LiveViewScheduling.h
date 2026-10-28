@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 #include <algorithm>
@@ -48,8 +49,8 @@ class LiveViewScheduler
 
     struct Plan
     {
-        std::array<uint32_t, Capacity> order{};
-        std::array<bool, Capacity> due{};
+        ce::fixed_array<uint32_t, Capacity> order{};
+        ce::fixed_array<bool, Capacity> due{};
         uint32_t count{};
         uint64_t scheduledAt{};
     };
@@ -105,12 +106,12 @@ class LiveViewScheduler
                (now >= state.nextDueAt || state.nextDueAt - now <= tolerance);
     }
 
-    Plan BuildPlan(const std::array<LiveViewScheduleRequest, Capacity>& requests, uint32_t count, uint64_t now)
+    Plan BuildPlan(const ce::fixed_array<LiveViewScheduleRequest, Capacity>& requests, uint32_t count, uint64_t now)
     {
         Plan plan;
         plan.scheduledAt = now;
         plan.count = (std::min)(count, Capacity);
-        std::array<bool, Capacity> overdue{};
+        ce::fixed_array<bool, Capacity> overdue{};
         for (uint32_t index = 0; index < plan.count; ++index)
         {
             plan.order[index] = index;
@@ -229,5 +230,5 @@ class LiveViewScheduler
                left.policy == right.policy;
     }
 
-    std::array<State, Capacity> m_states{};
+    ce::fixed_array<State, Capacity> m_states{};
 };

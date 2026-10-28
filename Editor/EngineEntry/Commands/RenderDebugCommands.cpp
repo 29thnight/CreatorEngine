@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -1271,7 +1272,7 @@ namespace ConsoleCmd
         std::string report;
         Scene* activeScene = SceneManagers->GetActiveScene();
 
-        const std::vector<CameraComponent*>* cameras = nullptr != activeScene
+        const ce::dynamic_array<CameraComponent*>* cameras = nullptr != activeScene
             ? &activeScene->Cameras().GetRegisteredCameras() : nullptr;
         if (nullptr != cameras) for (CameraComponent* camera : *cameras)
         {

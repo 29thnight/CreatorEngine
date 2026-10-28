@@ -1,3 +1,6 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "LXMaterialCompiler.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
@@ -41,10 +44,10 @@ struct Invocation
     const LXMaterialIRScope* scope{};
     Invocation* parent{};
     const LXMaterialIRNode* instance{};
-    std::vector<Id> path;
-    std::map<Id, Expression> values;
-    std::map<Id, std::unique_ptr<Invocation>> children;
-    std::set<Id> resolving;
+    ce::dynamic_array<Id> path;
+    ce::engine_ordered_map<Id, Expression> values;
+    ce::engine_ordered_map<Id, std::unique_ptr<Invocation>> children;
+    ce::engine_ordered_set<Id> resolving;
 };
 
 class GenerationError : public std::runtime_error
@@ -114,7 +117,7 @@ double Srgb(double value)
 std::optional<double> Scalar(const Expression& value)
 {
     if (value.constant && std::holds_alternative<double>(*value.constant))
-        return std::get<double>(*value.constant);
+        return ce::get<double>(*value.constant);
     return std::nullopt;
 }
 
@@ -167,8 +170,8 @@ class Generator
             const auto& socket = Socket(*output, name, Direction::Input);
             auto value = Resolve(root, socket.id);
             bool neutral = Zero(value);
-            if (value.constant && std::holds_alternative<std::array<double, 3>>(*value.constant))
-                neutral = std::get<std::array<double, 3>>(*value.constant) == std::array<double, 3>{};
+            if (value.constant && std::holds_alternative<ce::fixed_array<double, 3>>(*value.constant))
+                neutral = ce::get<ce::fixed_array<double, 3>>(*value.constant) == ce::fixed_array<double, 3>{};
             if (!neutral)
                 Fail(root, *output, &socket, "material_unsupported_socket", std::string(name) + " is not implemented");
         }
@@ -195,10 +198,10 @@ class Generator
     const LXMaterialIR& ir_;
     LXMaterialCompilerOptions options_;
     LXMaterialProgram program_;
-    std::vector<Statement> statements_;
-    std::set<std::string> contextDependent_;
-    std::map<Id, LXMaterialParameter> parameters_;
-    std::map<std::string, std::size_t> resources_;
+    ce::dynamic_array<Statement> statements_;
+    ce::engine_ordered_set<std::string> contextDependent_;
+    ce::engine_ordered_map<Id, LXMaterialParameter> parameters_;
+    ce::engine_ordered_map<std::string, std::size_t> resources_;
     std::size_t expressions_ = 0;
     std::uint32_t line_ = 1;
 
@@ -277,9 +280,9 @@ class Generator
                 if (type == PinType::Closure)
                     return {type};
                 if (type == PinType::Color)
-                    value = std::array<double, 4>{};
+                    value = ce::fixed_array<double, 4>{};
                 else if (type == PinType::Vector || type == PinType::Normal)
-                    value = std::array<double, 3>{};
+                    value = ce::fixed_array<double, 3>{};
                 else if (type == PinType::Float)
                     value = 0.0;
                 else if (type == PinType::Int)
@@ -292,14 +295,14 @@ class Generator
             std::string text;
             if (type == PinType::Float)
             {
-                text = FloatLiteral(std::get<double>(value));
-                value = static_cast<double>(static_cast<float>(std::get<double>(value)));
+                text = FloatLiteral(ce::get<double>(value));
+                value = static_cast<double>(static_cast<float>(ce::get<double>(value)));
             }
             else if (type == PinType::Bool)
-                text = std::get<bool>(value) ? "true" : "false";
+                text = ce::get<bool>(value) ? "true" : "false";
             else if (type == PinType::Int)
             {
-                const auto integer = std::get<std::int64_t>(value);
+                const auto integer = ce::get<std::int64_t>(value);
                 if (integer < std::numeric_limits<std::int32_t>::min() ||
                     integer > std::numeric_limits<std::int32_t>::max())
                     throw std::runtime_error("Live Int parameter exceeds shader int32 range");
@@ -308,7 +311,7 @@ class Generator
             }
             else if (type == PinType::Vector || type == PinType::Normal)
             {
-                auto vector = std::get<std::array<double, 3>>(value);
+                auto vector = ce::get<ce::fixed_array<double, 3>>(value);
                 text = "float3(" + FloatLiteral(vector[0]) + ", " + FloatLiteral(vector[1]) + ", " +
                        FloatLiteral(vector[2]) + ")";
                 for (auto& component : vector)
@@ -317,7 +320,7 @@ class Generator
             }
             else if (type == PinType::Color)
             {
-                auto color = std::get<std::array<double, 4>>(value);
+                auto color = ce::get<ce::fixed_array<double, 4>>(value);
                 if (colorSpace == LXColorSpace::SRGB)
                     for (std::size_t index = 0; index < 3; ++index)
                         color[index] = Srgb(color[index]);
@@ -331,7 +334,7 @@ class Generator
                 value = color;
             }
             else
-                text = std::get<std::string>(value);
+                text = ce::get<std::string>(value);
             return {type, text, std::move(value), Closure::None, colorSpace};
         }
         catch (const std::exception& error)
@@ -447,7 +450,7 @@ class Generator
         if (socket.type == PinType::Texture || socket.type == PinType::Sampler)
             return Resource(
                 socket.type == PinType::Texture ? LXMaterialResourceKind::Texture : LXMaterialResourceKind::Sampler,
-                std::get<std::string>(parameter->value), id, parameter->colorSpace, Source(invocation, node, &socket));
+                ce::get<std::string>(parameter->value), id, parameter->colorSpace, Source(invocation, node, &socket));
         auto value = Expression{socket.type, "parameters.lx_p" + std::to_string(id)};
         if (socket.type == PinType::Color && parameter->colorSpace == LXColorSpace::SRGB)
             value.text = "LXDecodeSrgb(" + value.text + ")";
@@ -503,7 +506,7 @@ class Generator
                     return item.direction == Direction::Input && item.internalPin == vectorPin.id;
                 });
             if (!interfaceInput && !Incoming(invocation, vectorPin.id) && vector.constant &&
-                std::get<std::array<double, 3>>(*vector.constant) == std::array<double, 3>{})
+                ce::get<ce::fixed_array<double, 3>>(*vector.constant) == ce::fixed_array<double, 3>{})
                 uv = "context.uv";
             const auto name = Name(invocation, node) + "_sample";
             Emit("float4 " + name + " = LXSampleMaterialImage(" + texture.text + ", " + sampler.text + ", (" + uv +
@@ -655,7 +658,7 @@ class Generator
             Properties(invocation, node, {});
             const auto name = Name(invocation, node);
             Emit("VolumeInputs " + name + " = DefaultVolumeInputs();", Source(invocation, node, &socket));
-            const std::pair<const char*, const char*> fields[] = {{"Color", "color"},
+            const ce::pair<const char*, const char*> fields[] = {{"Color", "color"},
                                                                   {"Density", "density"},
                                                                   {"Anisotropy", "anisotropy"},
                                                                   {"Absorption Color", "absorptionColor"},
@@ -683,11 +686,11 @@ class Generator
             {
                 LXSocketValue value;
                 if (socket.type == PinType::Float)
-                    value = std::get<double>(*a.constant) * std::get<double>(*b.constant);
+                    value = ce::get<double>(*a.constant) * ce::get<double>(*b.constant);
                 else
                 {
-                    auto color = std::get<std::array<double, 4>>(*a.constant);
-                    const auto other = std::get<std::array<double, 4>>(*b.constant);
+                    auto color = ce::get<ce::fixed_array<double, 4>>(*a.constant);
+                    const auto other = ce::get<ce::fixed_array<double, 4>>(*b.constant);
                     for (std::size_t index = 0; index < 4; ++index)
                         color[index] *= other[index];
                     value = color;
@@ -898,7 +901,7 @@ bool ComputeMaterialSourceKey(const LXMaterialAsset& asset, std::string& result,
             error = "Material source key requires a node definition registry.";
             return false;
         }
-        ce::hash::sha256 hash;
+        ce::crypto::sha256 hash;
         const auto append = [&](std::string_view value) {
             const auto length = std::to_string(value.size()) + ':';
             hash.update(length.data(), length.size());
@@ -970,7 +973,7 @@ bool ComputeMaterialSourceKey(const LXMaterialAsset& asset, std::string& result,
                 }
             }
         }
-        result = ce::hash::to_hex(hash.finish());
+        result = ce::crypto::to_hex(hash.finish());
         return true;
     }
     catch (const std::exception& failure)
@@ -981,11 +984,11 @@ bool ComputeMaterialSourceKey(const LXMaterialAsset& asset, std::string& result,
 }
 
 std::optional<LXMaterialProgram> GenerateMaterialSlang(const LXMaterialAsset& asset,
-                                                       std::vector<LXMaterialDiagnostic>* diagnostics,
+                                                       ce::dynamic_array<LXMaterialDiagnostic>* diagnostics,
                                                        LXMaterialCompilerOptions options)
 {
-    std::vector<LXMaterialDiagnostic> errors;
-    std::vector<Issue> issues;
+    ce::dynamic_array<LXMaterialDiagnostic> errors;
+    ce::dynamic_array<Issue> issues;
     auto ir = BuildMaterialIR(asset, &issues);
     if (!ir)
     {
@@ -1144,7 +1147,7 @@ std::string WriteMaterialProgramMetadata(const LXMaterialProgram& program)
     return out.str();
 }
 
-std::vector<LXMaterialDiagnostic> MapMaterialCompilerDiagnostics(const LXMaterialProgram& program,
+ce::dynamic_array<LXMaterialDiagnostic> MapMaterialCompilerDiagnostics(const LXMaterialProgram& program,
                                                                  const std::filesystem::path& sourceFile,
                                                                  const std::string& text)
 {
@@ -1152,7 +1155,7 @@ std::vector<LXMaterialDiagnostic> MapMaterialCompilerDiagnostics(const LXMateria
         R"(^(.+?)(?:\(([0-9]+)(?:,[0-9]+)?\)|:([0-9]+)(?::[0-9]+)?):\s*(warning|error)[^:]*:\s*(.*)$)");
     const std::regex header(R"(^(?:fatal )?(warning|error)(?:\[[^\]]+\])?[^:]*:\s*(.*)$)");
     const std::regex arrow(R"(^\s*-->\s+(.+):([0-9]+):([0-9]+)\s*$)");
-    std::vector<LXMaterialDiagnostic> result;
+    ce::dynamic_array<LXMaterialDiagnostic> result;
     std::istringstream lines(text);
     std::string line;
     while (std::getline(lines, line))
@@ -1206,9 +1209,9 @@ std::vector<LXMaterialDiagnostic> MapMaterialCompilerDiagnostics(const LXMateria
 }
 
 bool LXMaterialProgramStore::Publish(const LXMaterialAsset& asset, const LXMaterialVerifier& verifier,
-                                     std::vector<LXMaterialDiagnostic>* diagnostics, LXMaterialCompilerOptions options)
+                                     ce::dynamic_array<LXMaterialDiagnostic>* diagnostics, LXMaterialCompilerOptions options)
 {
-    std::vector<LXMaterialDiagnostic> errors;
+    ce::dynamic_array<LXMaterialDiagnostic> errors;
     auto candidate = GenerateMaterialSlang(asset, &errors, options);
     if (!candidate)
     {
@@ -1224,7 +1227,7 @@ bool LXMaterialProgramStore::Publish(const LXMaterialAsset& asset, const LXMater
             diagnostics->clear();
         return true;
     }
-    std::vector<LXMaterialShaderArtifact> artifacts;
+    ce::dynamic_array<LXMaterialShaderArtifact> artifacts;
     bool verified = false;
     try
     {
@@ -1234,7 +1237,7 @@ bool LXMaterialProgramStore::Publish(const LXMaterialAsset& asset, const LXMater
     {
         errors.push_back({"material_backend", error.what()});
     }
-    std::set<std::pair<std::string, std::string>> targets;
+    ce::engine_ordered_set<ce::pair<std::string, std::string>> targets;
     if (verified)
     {
         for (const auto& artifact : artifacts)

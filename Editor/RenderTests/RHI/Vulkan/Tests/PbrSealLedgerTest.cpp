@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "../VulkanSelfTest.h"
 #include "Render/Graph/EnhancedMaterialSealHash.h"
 #include "Render/Graph/EnhancedDrawSealLedger.h"
@@ -171,7 +172,7 @@ namespace
         reference.value = value;
         texture.properties.push_back(reference);
         experiment::Material linear = texture;
-        std::get<experiment::TextureReference>(linear.properties.back().value)
+        ce::get<experiment::TextureReference>(linear.properties.back().value)
             .colorSpace = experiment::TextureColorSpace::Linear;
         cases.Check(EnhancedAuthoredMaterialDigest::Compute(texture)
             != EnhancedAuthoredMaterialDigest::Compute(linear),

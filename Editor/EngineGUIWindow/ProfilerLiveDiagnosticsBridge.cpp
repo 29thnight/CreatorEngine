@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "ProfilerLiveDiagnosticsBridge.h"
 
 #include "AnimationDiagnostics.h"
@@ -173,10 +174,10 @@ namespace editor
                 // a bounded immutable value, never the bridge or engine services.
                 return [frozen = published]
                 {
-                    std::vector<std::byte> bytes;
+                    ce::dynamic_array<std::byte> bytes;
                     if (!dto::encode_snapshot(frozen, bytes))
                     {
-                        return std::vector<std::byte>{};
+                        return ce::dynamic_array<std::byte>{};
                     }
                     return bytes;
                 };

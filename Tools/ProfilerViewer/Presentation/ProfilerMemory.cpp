@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../build/ModuleAdapters/Creator.Core.Strings.h"
 #else
@@ -23,7 +24,7 @@ namespace editor::profiler_view
 
 		struct memory_view_state
 		{
-			std::vector<std::shared_ptr<const snapshot>> snapshots;
+			ce::dynamic_array<std::shared_ptr<const snapshot>> snapshots;
 			std::uint64_t last_seen{};
 			std::uint64_t target_revision{};
 			int selected_a{ -1 };
@@ -353,7 +354,7 @@ namespace editor::profiler_view
 				else
 				{
 					const std::uint64_t fragmented = (std::min)(a.managed_fragmented_bytes, a.managed_heap_bytes);
-					const std::array<bar_part, 2> parts{{
+					const ce::fixed_array<bar_part, 2> parts{{
 						{ "비단편 힙", a.managed_heap_bytes - fragmented, IM_COL32(108, 174, 183, 255) },
 						{ "단편화", fragmented, IM_COL32(231, 199, 85, 255) },
 					}};
@@ -386,7 +387,7 @@ namespace editor::profiler_view
 				ImGui::Separator();
 				const auto& counts = a.object_kind_counts;
 				const auto& cpuBytes = a.object_kind_cpu_bytes;
-				const std::array<bar_part, 3> parts{{
+				const ce::fixed_array<bar_part, 3> parts{{
 					{ "Texture", cpuBytes[static_cast<std::size_t>(object_kind::texture)], IM_COL32(122, 98, 173, 255) },
 					{ "UI Texture", cpuBytes[static_cast<std::size_t>(object_kind::ui_texture)], IM_COL32(159, 126, 213, 255) },
 					{ "Sprite Sheet", cpuBytes[static_cast<std::size_t>(object_kind::sprite_sheet)], IM_COL32(193, 152, 202, 255) },
@@ -443,7 +444,7 @@ namespace editor::profiler_view
 					bool previous_available;
 					std::uint64_t budget;
 				};
-				const std::array<metric, 6> metrics{{
+				const ce::fixed_array<metric, 6> metrics{{
 					{ "상주 RAM", "OS 작업 집합: 현재 물리 메모리에 상주하는 프로세스 페이지", a.working_set_bytes,
 						a.process_valid, { 0.46f, 0.73f, 0.94f, 1.0f }, b ? b->working_set_bytes : 0, b && b->process_valid, 0 },
 					{ "Private commit", "OS가 프로세스 전용으로 커밋한 메모리. 상주 RAM과 합산하지 않습니다.", a.private_commit_bytes,
@@ -488,7 +489,7 @@ namespace editor::profiler_view
 				ImGui::Separator();
 				const std::uint64_t total = a.committed_private_bytes + a.committed_image_bytes +
 					a.committed_mapped_bytes;
-				const std::array<bar_part, 3> parts{{
+				const ce::fixed_array<bar_part, 3> parts{{
 					{ "Private", a.committed_private_bytes, IM_COL32(104, 189, 159, 255) },
 					{ "Image", a.committed_image_bytes, IM_COL32(239, 205, 115, 255) },
 					{ "Mapped", a.committed_mapped_bytes, IM_COL32(138, 177, 220, 255) },
@@ -548,7 +549,7 @@ namespace editor::profiler_view
 					indexed[memory_profiler::object_comparison_key(object, 2, index)].second = &object;
 				}
 			}
-			std::vector<compared_object> rows;
+			ce::dynamic_array<compared_object> rows;
 			bool identity_unavailable = false;
 			for (const auto& [key, objects] : indexed)
 			{
@@ -715,7 +716,7 @@ namespace editor::profiler_view
 		void draw_region_tiles(const snapshot& a, memory_view_state& view)
 		{
 			using region = memory_profiler::virtual_region;
-			std::vector<const region*> largest;
+			ce::dynamic_array<const region*> largest;
 			for (const region& entry : a.regions)
 			{
 				if (entry.committed && entry.bytes > 0)
@@ -734,7 +735,7 @@ namespace editor::profiler_view
 				return;
 			}
 			struct tile { const region* source; ImVec2 top_left; ImVec2 bottom_right; };
-			std::vector<tile> tiles;
+			ce::dynamic_array<tile> tiles;
 			tiles.reserve(largest.size());
 			const ImVec2 origin = ImGui::GetCursorScreenPos();
 			const ImVec2 size((std::max)(ImGui::GetContentRegionAvail().x, 100.0f), 170.0f);
@@ -823,7 +824,7 @@ namespace editor::profiler_view
 			draw_region_tiles(a, view);
 			ImGui::SetNextItemWidth(160.0f);
 			ImGui::Combo("영역 필터", &view.region_filter, "전체\0Commit\0Reserve\0\0");
-			std::vector<const memory_profiler::virtual_region*> rows;
+			ce::dynamic_array<const memory_profiler::virtual_region*> rows;
 			for (const auto& region : a.regions)
 			{
 				if (view.region_filter == 0 ||

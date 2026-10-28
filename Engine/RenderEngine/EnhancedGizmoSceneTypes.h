@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include <mathematics/color.hpp>
 #include <mathematics/frustum.hpp>
@@ -51,8 +52,8 @@ class EnhancedGizmoLineCollector
 {
 public:
     void Reset() { m_vertices.clear(); }
-    void Set(const std::vector<EnhancedGizmoLineVertex>& vertices) { m_vertices = vertices; }
-    const std::vector<EnhancedGizmoLineVertex>& GetVertices() const { return m_vertices; }
+    void Set(const ce::dynamic_array<EnhancedGizmoLineVertex>& vertices) { m_vertices = vertices; }
+    const ce::dynamic_array<EnhancedGizmoLineVertex>& GetVertices() const { return m_vertices; }
 
     void AddLine(const math::vector3& p0, const math::vector3& p1,
         const math::color& color);
@@ -76,5 +77,5 @@ public:
         const math::color& color);
 
 private:
-    std::vector<EnhancedGizmoLineVertex> m_vertices;
+    ce::dynamic_array<EnhancedGizmoLineVertex> m_vertices;
 };

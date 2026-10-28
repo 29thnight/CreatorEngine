@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Engine/Utility_Framework/Foundation/EngineFunc.h"
 
 // 그릴 창의 표를 생성자로 받으므로 타입을 안다(PHASE 21 W3).
 #include "EditorWindowRegistry.h"
@@ -43,7 +44,7 @@ public:
     void RenderProfiler();
     void Render();
     // 네이티브 draw 기록이 호스트 소유 자원을 모두 확보한 뒤 콜백을 부른다.
-    void EndRender(std::function<void()> onRecorded);
+    void EndRender(ce::owned_func<void()> onRecorded);
 
     /// 다음 BeginRender가 기본 도크 레이아웃을 다시 세운다. imgui.ini에는
     /// 재생성 경로가 없어서 한 번 어긋난 배치를 되돌릴 방법이 없었다.

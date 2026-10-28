@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -19,8 +20,8 @@ struct SceneMaterialWork final
     own::shared_owner<TransientBufferPool> pool;
     own::shared_owner<const SceneFrameGeometry> geometry;
     own::shared_owner<const ResidentBufferFrame> sceneRecordsOwner;
-    std::array<own::shared_owner<const LX::Runtime::ComputeGeneration>, 6> pipelines;
-    std::vector<Bucket> buckets;
+    ce::fixed_array<own::shared_owner<const LX::Runtime::ComputeGeneration>, 6> pipelines;
+    ce::dynamic_array<Bucket> buckets;
     RHIBufferSlice records;
     RHIBufferHandle work, ranges, arguments;
     uint32_t width{}, height{}, recordCount{}, commandCount{};
@@ -41,7 +42,7 @@ struct SceneMaterialWork final
         records = sceneRecords;
         commandCount = bucketCount;
         const auto tileCount = ((uint64_t(width) + 7) / 8) * ((uint64_t(height) + 7) / 8);
-        std::vector<uint32_t> capacities;
+        ce::dynamic_array<uint32_t> capacities;
         capacities.reserve(bucketCount);
         uint64_t capacity{};
         for (const auto& bucket : buckets)
@@ -88,7 +89,7 @@ struct SceneMaterialWork final
                     encoder.SetRootBuffer(RHIBindPoint::Compute, 5, owner->packetWork->plans);
             });
     }
-    std::array<RGHandle, 2> GraphInputs(const EnhancedRenderGraph& graph) const
+    ce::fixed_array<RGHandle, 2> GraphInputs(const EnhancedRenderGraph& graph) const
     {
         if (!packetWork || packetWork->graphOwner != graph.DeclarationGraph() ||
             packetWork->graphEpoch != graph.DeclarationEpoch())
@@ -97,7 +98,7 @@ struct SceneMaterialWork final
         }
         return {packetWork->graphPackets, packetWork->graphArguments};
     }
-    void ValidateInputs(const EnhancedRenderGraph& graph, const std::array<RGHandle, 2>& inputs) const
+    void ValidateInputs(const EnhancedRenderGraph& graph, const ce::fixed_array<RGHandle, 2>& inputs) const
     {
         const auto expected = GraphInputs(graph);
         for (size_t index = 0; index < inputs.size(); ++index)
@@ -106,7 +107,7 @@ struct SceneMaterialWork final
                 throw std::runtime_error("METEOR material packet input is not its published resource version.");
     }
     void AddRead(EnhancedRenderGraph& graph, auto& uses,
-                 const std::array<RGHandle, 2>& inputs) const
+                 const ce::fixed_array<RGHandle, 2>& inputs) const
     {
         ValidateInputs(graph, inputs);
         packetWork->AddRead(uses);

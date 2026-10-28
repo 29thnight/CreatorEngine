@@ -1,3 +1,11 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../../Engine/Utility_Framework/Foundation/EngineStorage.h"
+#include "../../../Engine/Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Engine/Containers/ContainerAPI.h"
+#include "../../../Engine/Utility_Framework/Reflection/ReflgenRuntime.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -39,6 +47,9 @@ import winrt_base;
 // 유니티 빌드에서 빠져 있다(`IncludeInUnityFile=false`). 다른 파일이 앞서
 // 들여온 헤더에 기대면 평상시 빌드에서 바로 깨진다.
 
+#include "../../../Engine/SceneRuntime/CollisionGeometryLibrary.h"
+#include "../../../Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h"
+#include "../../../Engine/RenderEngine/Render/Graph/EnhancedDrawSealLedger.h"
 #include "CommandRegistrar.h"
 #include "CommandSupport.h"
 
@@ -61,6 +72,7 @@ import winrt_base;
 #include "SceneManager.h"
 #include "Scene.h"
 #include "CameraComponent.h"
+#include "RHI/IRenderDeviceServices.h"
 #include "CameraSystem.h"
 #include "ClrHost.h"
 #include "ScriptComponent.h"
@@ -83,7 +95,10 @@ import winrt_base;
 #include "Experiment/Model.h" // I5: Experiment 모델 패리티
 #include "RenderScene.h"      // I5-D4e-1: GetAnimationJob
 #include "AvatarMask.h"       // I5: AvatarMask A/B 대조
-#include "FoliageComponent.h"      // I5: Foliage 게이트
+#include "FoliageComponent.h"
+#include "Assets/ModelMeshDescriptor.h"
+#include "CameraComponent.h"
+#include "RHI/IRenderDeviceServices.h"      // I5: Foliage 게이트
 #include "Terrain.h"               // D4 Terrain YAML authoring round-trip
 #include "Experiment/MaterialInstance.h"      // I5: Experiment MaterialInstance
 #include "Experiment/MaterialAuthoringCodec.h" // I5-D5c1: 값 인코딩 대조
@@ -443,7 +458,7 @@ namespace ConsoleCmd
         };
 
         const std::filesystem::path assetRoot = ce::paths::relative();
-        std::vector<std::filesystem::path> metaPaths;
+        ce::dynamic_array<std::filesystem::path> metaPaths;
         std::error_code walkError;
         for (std::filesystem::recursive_directory_iterator it(assetRoot, walkError), end;
             it != end && !walkError; it.increment(walkError))
@@ -603,7 +618,7 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_pix_capture(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
 
         const std::string mode = (parts.size() >= 2) ? parts[1] : "status";
         if (parts.size() > 2 || (mode != "begin" && mode != "end" && mode != "status"))
@@ -885,7 +900,7 @@ namespace ConsoleCmd
         //   (Debug 의 RenderThread 는 246 프레임 중 4 번 소비한다)는 그 창에
         //   영영 안 걸린다. 이 계수는 창과 무관하게 캡처 전체를 본다.
         ce::capture_session_ptr capturedForThreads = ce::profiler().capture();
-        std::unordered_map<std::uint32_t, std::uint64_t> capturedPerThread;
+        ce::engine_node_map<std::uint32_t, std::uint64_t> capturedPerThread;
         if (capturedForThreads)
         {
             for (const ce::frame_record& frame : capturedForThreads->frames())
@@ -970,7 +985,7 @@ namespace ConsoleCmd
             // 캡처에 GPU 구간이 있어도 조회 결과에서는 빠질 수 있다.
             constexpr std::size_t kMaxReportedFrames = 8;
             const std::span<const ce::frame_record> all = capture->frames();
-            std::vector<std::size_t> selected;
+            ce::dynamic_array<std::size_t> selected;
             selected.reserve(kMaxReportedFrames);
             for (std::size_t i = all.size(); i > 0 && selected.size() < kMaxReportedFrames; --i)
             {
@@ -1005,7 +1020,7 @@ namespace ConsoleCmd
                 //   순서여야 게이트가 화면 없이 그 순서를 물을 수 있다.
                 //   비교는 코어의 track_precedes 하나를 쓴다 — 여기서 다시
                 //   적으면 두 벌이 되고, 한쪽만 고쳐지는 날이 온다.
-                std::vector<ce::thread_info> lanes(capture->threads().begin(),
+                ce::dynamic_array<ce::thread_info> lanes(capture->threads().begin(),
                                                    capture->threads().end());
                 std::sort(lanes.begin(), lanes.end(), ce::track_precedes);
 
@@ -1498,7 +1513,7 @@ namespace ConsoleCmd
             return InvalidArguments("dump.list/show [limit: 1..1000]");
         const std::filesystem::path directory = ce::paths::dump_path();
         std::error_code error;
-        std::vector<std::pair<std::filesystem::path, std::filesystem::file_time_type>> dumps;
+        ce::dynamic_array<ce::pair<std::filesystem::path, std::filesystem::file_time_type>> dumps;
         if (std::filesystem::exists(directory, error))
         {
             std::filesystem::directory_iterator it(directory, error), end;
@@ -1609,7 +1624,7 @@ namespace ConsoleCmd
     {
         using namespace CommandCore;
         auto data = CommandData::Object();
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
 
         // ★ mem.* 넷을 한 분기에 몰아 둔다 — else-if 사슬을 하나 더 늘리면
@@ -1660,7 +1675,7 @@ namespace ConsoleCmd
 
 
 
-            std::vector<size_t> order;
+            ce::dynamic_array<size_t> order;
             order.reserve(CrtAllocProbe::kMaxSites);
             for (size_t i = 0; i < CrtAllocProbe::kMaxSites; ++i)
             {
@@ -1924,7 +1939,7 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_crash_test(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
 
         // 크래시 핸들러 자체를 검증하는 수단.
         //
@@ -1971,8 +1986,13 @@ namespace ConsoleCmd
     // "어느 쪽 서명인가"가 타입에 드러나야 이행 진행도를 셀 수 있기 때문이다.
     // legacy 가 0 이 되는 날이 LC9 의 완료 조건 중 하나다.
 
+    #include "FoliageCacheProbe.inl"
+    #include "ContainerIntegrationProbe.inl"
+
     void RegisterDiagnosticsCommands(Registrar& reg)
     {
+        reg.Result({ "containers.integration.probe" }, &Cmd_container_integration_probe);
+        reg.Result({ "foliage.cache.probe" }, &Cmd_foliage_cache_probe);
         reg.Result({ "shadermeta.probe" }, &Cmd_shadermeta_probe);
         reg.Result({ "pix.capture" }, &Cmd_pix_capture, SceneAccess::OwnedState);
         reg.Result({ "profile.stats" }, &Cmd_profile_stats);

@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "MeshletBuilder.h"
 
 #if defined(CE_CONTRACT_STANDALONE)
@@ -19,8 +20,8 @@ namespace experiment::importer
             "The packed model vertex-byte contract is little-endian.");
         static_assert(sizeof(unsigned int) == sizeof(std::uint32_t));
 
-        using MeshletPosition = std::array<float, 3>;
-        using MeshletTriangle = std::array<std::uint32_t, 3>;
+        using MeshletPosition = ce::fixed_array<float, 3>;
+        using MeshletTriangle = ce::fixed_array<std::uint32_t, 3>;
         static_assert(sizeof(MeshletPosition) == 12);
 
         [[nodiscard]] bool MeshletFail(std::string& diagnostic, const char* message)
@@ -119,7 +120,7 @@ namespace experiment::importer
             return (std::min)(first, (std::min)(second, third));
         }
 
-        void MeshletHashU32(ce::hash::sha256& hash, std::uint32_t value) noexcept
+        void MeshletHashU32(ce::crypto::sha256& hash, std::uint32_t value) noexcept
         {
             const std::uint8_t bytes[4]{ static_cast<std::uint8_t>(value),
                 static_cast<std::uint8_t>(value >> 8), static_cast<std::uint8_t>(value >> 16),
@@ -127,7 +128,7 @@ namespace experiment::importer
             hash.update(bytes, sizeof(bytes));
         }
 
-        void MeshletHashU64(ce::hash::sha256& hash, std::uint64_t value) noexcept
+        void MeshletHashU64(ce::crypto::sha256& hash, std::uint64_t value) noexcept
         {
             MeshletHashU32(hash, static_cast<std::uint32_t>(value));
             MeshletHashU32(hash, static_cast<std::uint32_t>(value >> 32));
@@ -203,7 +204,7 @@ namespace experiment::importer
         }
 
         [[nodiscard]] bool MeshletBuildBounds(const Mesh& mesh, MeshletPayload& payload,
-            MeshletDescriptor& descriptor, const std::vector<MeshletPosition>& positions, std::string& diagnostic)
+            MeshletDescriptor& descriptor, const ce::dynamic_array<MeshletPosition>& positions, std::string& diagnostic)
         {
             const meshopt_Bounds bounds = meshopt_computeMeshletBounds(
                 payload.vertexRemap.data() + descriptor.vertexOffset,
@@ -303,7 +304,7 @@ namespace experiment::importer
                 return MeshletFail(diagnostic, "Meshlet digest does not match finalized geometry and build settings.");
             }
 
-            std::vector<std::uint8_t> seenPrimitives(payload.primitiveRemap.size(), 0);
+            ce::dynamic_array<std::uint8_t> seenPrimitives(payload.primitiveRemap.size(), 0);
             std::size_t vertexEnd = 0;
             std::size_t triangleEnd = 0;
             std::size_t primitiveEnd = 0;
@@ -356,7 +357,7 @@ namespace experiment::importer
                     }
                 }
 
-                std::array<bool, kMeshletMaxVertices> usedVertices{};
+                ce::fixed_array<bool, kMeshletMaxVertices> usedVertices{};
                 for (std::size_t triangle = 0; triangle < descriptor.triangleCount; ++triangle)
                 {
                     MeshletTriangle actual{};
@@ -435,7 +436,7 @@ namespace experiment::importer
                 return true;
             }
 
-            std::vector<MeshletPosition> positions(mesh.vertices.size());
+            ce::dynamic_array<MeshletPosition> positions(mesh.vertices.size());
             for (std::size_t vertex = 0; vertex < positions.size(); ++vertex)
             {
                 positions[vertex] = MeshletReadPosition(mesh, vertex);
@@ -446,9 +447,9 @@ namespace experiment::importer
             {
                 return MeshletFail(diagnostic, "Meshlet builder capacity exceeds the 32-bit descriptor contract.");
             }
-            std::vector<meshopt_Meshlet> built(meshletBound);
-            std::vector<std::uint32_t> vertices(mesh.indices.size());
-            std::vector<std::uint8_t> triangles(mesh.indices.size());
+            ce::dynamic_array<meshopt_Meshlet> built(meshletBound);
+            ce::dynamic_array<std::uint32_t> vertices(mesh.indices.size());
+            ce::dynamic_array<std::uint8_t> triangles(mesh.indices.size());
             // meshoptimizer 1.2 supports 126 triangles directly and writes tightly
             // packed micro-indices. Do not retain the old multiple-of-four rule.
             // METEOR raster derivatives require exact primitive and corner order.
@@ -461,7 +462,7 @@ namespace experiment::importer
                 return MeshletFail(diagnostic, "Meshlet builder returned an invalid descriptor count.");
             }
 
-            std::vector<MeshletSourceTriangle> sourceTriangles(mesh.indices.size() / 3);
+            ce::dynamic_array<MeshletSourceTriangle> sourceTriangles(mesh.indices.size() / 3);
             for (std::size_t primitive = 0; primitive < sourceTriangles.size(); ++primitive)
             {
                 const std::size_t source = primitive * 3;
@@ -550,7 +551,7 @@ namespace experiment::importer
                     // barycentrics and provoking-vertex semantics remain meaningful.
                     const std::size_t sourceIndex = static_cast<std::size_t>(primitive) * 3;
                     const std::size_t triangleOffset = descriptor.triangleOffset + triangle * 3;
-                    const std::array<std::uint8_t, 3> local{
+                    const ce::fixed_array<std::uint8_t, 3> local{
                         payload.triangleIndices[triangleOffset], payload.triangleIndices[triangleOffset + 1],
                         payload.triangleIndices[triangleOffset + 2] };
                     for (std::size_t rotation = 0; rotation < 3; ++rotation)
@@ -580,7 +581,7 @@ namespace experiment::importer
 
     MeshletGeometryDigest ComputeMeshletGeometryDigest(const Mesh& mesh, const MeshletBuildSettings& settings) noexcept
     {
-        ce::hash::sha256 hash;
+        ce::crypto::sha256 hash;
         static constexpr char domain[] = "CreatorEngine.Meshlet.FinalGeometry.v1";
         hash.update(domain, sizeof(domain));
         MeshletHashU32(hash, settings.profileVersion);

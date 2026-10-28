@@ -1,4 +1,6 @@
+#include "../../../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../../../Engine/Utility_Framework/Foundation/EngineNodeSet.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
 #else
@@ -11,7 +13,7 @@ import Creator.Core.Uuid;
 
 namespace Editor
 {
-inline ce::physics::result<std::vector<PhysicsShapeDefinition>> ParsePhysicsShapeDocument(std::string_view text)
+inline ce::physics::result<ce::dynamic_array<PhysicsShapeDefinition>> ParsePhysicsShapeDocument(std::string_view text)
 {
     using namespace ce::physics;
     const auto invalid = [] {
@@ -26,14 +28,14 @@ inline ce::physics::result<std::vector<PhysicsShapeDefinition>> ParsePhysicsShap
         const auto root = document.Root();
         if (!document || !root.IsSequence() || !root.Size() || root.Size() > 65535)
             return invalid();
-        std::vector<PhysicsShapeDefinition> shapes;
+        ce::dynamic_array<PhysicsShapeDefinition> shapes;
         shapes.reserve(root.Size());
         for (const auto node : root)
         {
             if (!node.IsMap() || !node["shapeId"].IsScalar() || !node["kind"].IsScalar())
                 return invalid();
             PhysicsShapeDefinition shape;
-            std::unordered_set<std::string> seen;
+            ce::engine_node_set<std::string> seen;
             const auto scalar = [](auto value, auto& out) {
                 if (!value.IsScalar() || !Authoring::Scalar::TryConvert(value.AsString(), out))
                     return false;
@@ -61,8 +63,8 @@ inline ce::physics::result<std::vector<PhysicsShapeDefinition>> ParsePhysicsShap
                 }
                 if (!value.IsMap() || value.Size() != out.size())
                     return false;
-                constexpr std::array<const char*, 4> names{"x", "y", "z", "w"};
-                std::unordered_set<std::string> axes;
+                constexpr ce::fixed_array<const char*, 4> names{"x", "y", "z", "w"};
+                ce::engine_node_set<std::string> axes;
                 for (const auto pair : value.Map())
                     if (!pair.key.IsScalar() || !axes.insert(pair.key.AsString()).second)
                         return false;
@@ -119,13 +121,13 @@ inline ce::physics::result<std::vector<PhysicsShapeDefinition>> ParsePhysicsShap
                     valid = scalar(value, shape.queryEnabled);
                 else if (key == "localRotation")
                 {
-                    std::array<float, 4> values{};
+                    ce::fixed_array<float, 4> values{};
                     valid = parts(value, values);
                     shape.localRotation = {values[0], values[1], values[2], values[3]};
                 }
                 else if (key == "halfExtent" || key == "geometryScale" || key == "localPosition")
                 {
-                    std::array<float, 3> values{};
+                    ce::fixed_array<float, 3> values{};
                     valid = parts(value, values);
                     math::vector3 vector{values[0], values[1], values[2]};
                     if (key == "halfExtent")

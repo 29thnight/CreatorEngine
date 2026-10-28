@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 // PHASE 14 P3 — 얼린 캡처를 읽는 집계.
 //
@@ -150,12 +151,12 @@ namespace ce
 		                                        aggregate_scope);
 
 	private:
-		std::vector<profile_event>  m_spans;
-		std::vector<frame_boundary> m_boundaries;
-		std::vector<profile_event>  m_instants;
-		std::vector<aggregate_row>  m_hierarchy;
-		std::vector<aggregate_row>  m_flat;
-		std::vector<thread_summary> m_threads;
+		ce::dynamic_array<profile_event>  m_spans;
+		ce::dynamic_array<frame_boundary> m_boundaries;
+		ce::dynamic_array<profile_event>  m_instants;
+		ce::dynamic_array<aggregate_row>  m_hierarchy;
+		ce::dynamic_array<aggregate_row>  m_flat;
+		ce::dynamic_array<thread_summary> m_threads;
 
 		std::uint32_t m_frameBegin = 0;
 		std::uint32_t m_frameEnd = 0;

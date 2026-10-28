@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "ProfilerRenderingDiagnostics.h"
 #include "ProfileRenderMeasurement.h"
 
@@ -41,7 +42,7 @@ namespace ce::profiler_viewer::diagnostics
         {
         public:
             bool valid = true;
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
 
             template <std::unsigned_integral T>
             void field(T value)
@@ -100,7 +101,7 @@ namespace ce::profiler_viewer::diagnostics
             }
 
             template <typename T>
-            void count(const std::vector<T>& values, std::size_t maximum)
+            void count(const ce::dynamic_array<T>& values, std::size_t maximum)
             {
                 if (values.size() > maximum)
                 {
@@ -181,7 +182,7 @@ namespace ce::profiler_viewer::diagnostics
             }
 
             template <typename T>
-            void count(std::vector<T>& values, std::size_t maximum)
+            void count(ce::dynamic_array<T>& values, std::size_t maximum)
             {
                 std::uint32_t size{};
                 field(size);
@@ -293,7 +294,7 @@ namespace ce::profiler_viewer::diagnostics
         }
     }
 
-    std::vector<std::byte> encode_rendering(const rendering_snapshot& snapshot)
+    ce::dynamic_array<std::byte> encode_rendering(const rendering_snapshot& snapshot)
     {
         rendering_codec::writer writer;
         writer.bytes.reserve(4096);

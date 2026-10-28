@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "Object.h"
 #include "../Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-5
@@ -56,7 +58,7 @@ void Object::SetDontDestroyOnLoad(Object* objPtr)
     }
 
     // Collect subtree & mark DDOL
-	std::vector<Object*> collected;
+	ce::dynamic_array<Object*> collected;
     Scene* originScene = go->GetScene();
 
     auto markDdol = [&](auto&& self, Entity* node) -> void {
@@ -119,8 +121,8 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 			Entity* clone{ nullptr };
 			Entity::Index sourceRoot{ Entity::kInvalidIndex };
 		};
-		std::unordered_map<Entity::Index, Entity::Index> sourceToClone;
-		std::vector<RootFixup> rootFixups;
+		ce::engine_node_map<Entity::Index, Entity::Index> sourceToClone;
+		ce::dynamic_array<RootFixup> rootFixups;
 
 		auto cloneRecursive = [&](auto&& self, const Entity* source,
 			std::string_view requestedName) -> Entity*
@@ -173,7 +175,7 @@ Object* Object::Instantiate(const Object* original, std::string_view newName)
 			}
 
 			// 재귀 생성이 Store의 바깥 children 배열을 재할당할 수 있으므로 복사본을 돈다.
-			const std::vector<Entity::Index> sourceChildren = source->GetChildrenIndices();
+			const ce::dynamic_array<Entity::Index> sourceChildren = source->GetChildrenIndices();
 			for (Entity::Index childIndex : sourceChildren)
 			{
 				Entity* child = scene->TryGetEntity(childIndex);

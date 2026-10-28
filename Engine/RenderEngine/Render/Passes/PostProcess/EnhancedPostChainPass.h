@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #pragma once
 #include "../../../RHI/RHIFormat.h"
 #include "../../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -225,7 +226,7 @@ private:
     RGHandle m_output;
     RGHandle m_toneMapped;
 
-    std::array<RGHandle, kMaxBloomMips> m_bloomMips{};
+    ce::fixed_array<RGHandle, kMaxBloomMips> m_bloomMips{};
     uint32_t m_bloomMipCount{ 0 };
     bool     m_bloomChainValid{ false };
 

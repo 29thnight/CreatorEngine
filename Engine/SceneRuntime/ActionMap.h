@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineFunc.h"
 #include <mathematics/vector2.hpp>
 #include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
@@ -11,11 +13,11 @@ public:
 	~ActionMap();
 
 	InputAction* AddAction();
-	void AddButtonAction(std::string name, size_t _playerindex, InputType _inputType, size_t _key, KeyState _state, std::function<void()> _action);
+	void AddButtonAction(std::string name, size_t _playerindex, InputType _inputType, size_t _key, KeyState _state, ce::owned_func<void()> _action);
 	void AddButtonAction(std::string name, size_t _playerindex, InputType _inputType, size_t _key, KeyState _state, void (*_action)());
 
-	void AddValueAction(std::string name, size_t _playerindex, InputValueType _inputValueType, InputType _inputType, std::vector<size_t> _keys, std::function<void(math::vector2)> _action);
-	void AddValueAction(std::string name, size_t _playerindex, InputValueType _inputValueType, InputType _inputType, std::vector<size_t> _keys, std::function<void(float)> _action);
+	void AddValueAction(std::string name, size_t _playerindex, InputValueType _inputValueType, InputType _inputType, ce::dynamic_array<size_t> _keys, ce::owned_func<void(math::vector2)> _action);
+	void AddValueAction(std::string name, size_t _playerindex, InputValueType _inputValueType, InputType _inputType, ce::dynamic_array<size_t> _keys, ce::owned_func<void(float)> _action);
 	void CheckAction();
 
 	// 이번 프레임에 발동한 액션의 함수 이름을 콜백으로 알린다.
@@ -24,11 +26,11 @@ public:
 	// 콜백으로 빼면 액션 판정(입력 상태 읽기)과 전달 방식이 분리되어, 관리 스크립트든
 	// 네이티브든 같은 판정을 쓸 수 있다.
 	void CheckAction(int playerIndex, std::string_view scriptName,
-		const std::function<void(const std::string&)>& onFired);
+		const ce::owned_func<void(const std::string&)>& onFired);
 	void DeleteAction(const std::string& name);
 	InputAction* FindAction(const std::string& name);
 	std::string m_name;
-	std::vector<InputAction*> m_actions;
+	ce::dynamic_array<InputAction*> m_actions;
 
 
 private:

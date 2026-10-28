@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -44,6 +45,16 @@ import Creator.Core.Uuid;
 #include "CameraSystem.h"
 #include "MeshRenderer.h"
 #include "LightComponent.h"
+#include "BehaviorTreeComponent.h"
+#include "BoneComponent.h"
+#include "DecalComponent.h"
+#include "FoliageComponent.h"
+#include "PlayerInput.h"
+#include "SceneRenderProfileComponent.h"
+#include "SpriteRenderer.h"
+#include "SpriteSheetComponent.h"
+#include "StateMachineComponent.h"
+#include "Terrain.h"
 #include "../RenderEngine/Material.h"
 #include "../RenderEngine/DataSystem.h"
 #include "InputManager.h"
@@ -416,6 +427,9 @@ namespace
         int (__stdcall* Simulation_Status)(Runtime::TickStatus* status);
         int (__stdcall* Simulation_Submit)(std::uint64_t epoch, std::uint64_t tick, std::uint32_t kind, const std::byte* payload, int bytes, std::uint64_t* sequence);
         int (__stdcall* Simulation_Read)(std::uint64_t epoch, std::uint64_t after, Runtime::TickSnapshotHeader* header, std::byte* payload, int capacity);
+        int (__stdcall* ExtraComponent_Exists)(ScriptObjectHandle handle, int kind);
+        int (__stdcall* ExtraComponent_GetEnabled)(ScriptObjectHandle handle, int kind);
+        void (__stdcall* ExtraComponent_SetEnabled)(ScriptObjectHandle handle, int kind, int enabled);
 
 	};
 
@@ -456,7 +470,7 @@ namespace
     static_assert(offsetof(ScriptApiTable, Camera_NotifyCameraCut)
         == offsetof(ScriptApiTable, Body_ShapeRole) + sizeof(decltype(ScriptApiTable::Body_ShapeRole)));
     static_assert(sizeof(ScriptApiTable)
-        == offsetof(ScriptApiTable, Simulation_Read) + sizeof(decltype(ScriptApiTable::Simulation_Read)));
+        == offsetof(ScriptApiTable, ExtraComponent_SetEnabled) + sizeof(decltype(ScriptApiTable::ExtraComponent_SetEnabled)));
 
 	ScriptApiTable g_apiTable{};
 
@@ -2434,7 +2448,7 @@ namespace
                 }
             }
 
-            std::vector<PhysicsShapeDefinition> shapes(body->Shapes().begin(), body->Shapes().end());
+            ce::dynamic_array<PhysicsShapeDefinition> shapes(body->Shapes().begin(), body->Shapes().end());
             const auto shape = std::ranges::find(shapes, id, &PhysicsShapeDefinition::shapeId);
             if (shape == shapes.end())
             {
@@ -2464,7 +2478,7 @@ namespace
 
         try
         {
-            std::vector<PhysicsShapeDefinition> shapes(body->Shapes().begin(), body->Shapes().end());
+            ce::dynamic_array<PhysicsShapeDefinition> shapes(body->Shapes().begin(), body->Shapes().end());
             const auto shape = std::ranges::find(shapes, id, &PhysicsShapeDefinition::shapeId);
             if (shape == shapes.end()) return PhysicsFailure(ce::physics::error_code::stale_handle);
             shape->sensor = sensor != 0;
@@ -2493,7 +2507,7 @@ namespace
 
         try
         {
-            std::array<ce::physics::query_hit, ce::script::physics_query_capacity> scratch;
+            ce::fixed_array<ce::physics::query_hit, ce::script::physics_query_capacity> scratch;
             const auto buffer = std::span{scratch}.first(static_cast<std::size_t>(capacity));
             const ce::physics::query_filter filter{layers, includeSensors != 0};
             auto queried = kind == 0
@@ -2576,11 +2590,11 @@ namespace
         try
         {
             using namespace ce::physics;
-            std::vector<query_hit> scratch;
-            std::vector<query_request> requests;
-            std::vector<std::size_t> indices;
-            std::vector<ce::script::physics_batch_result> results;
-            std::vector<result<query_result>> answers;
+            ce::dynamic_array<query_hit> scratch;
+            ce::dynamic_array<query_request> requests;
+            ce::dynamic_array<std::size_t> indices;
+            ce::dynamic_array<ce::script::physics_batch_result> results;
+            ce::dynamic_array<result<query_result>> answers;
 
             {
                 ce::profile_scope prepare{ce::marker<"Physics.ScriptQueryPrepare">()};
@@ -2617,8 +2631,8 @@ namespace
             if (auto batch = scene.QueryPhysicsBatch(requests, answers); !batch)
                 return PhysicsFailure(batch.error().code);
 
-            std::vector<ce::script::physics_hit> translated;
-            std::array<std::size_t, ce::script::physics_batch_capacity> translatedOffsets{};
+            ce::dynamic_array<ce::script::physics_hit> translated;
+            ce::fixed_array<std::size_t, ce::script::physics_batch_capacity> translatedOffsets{};
 
             {
                 ce::profile_scope translate{ce::marker<"Physics.ScriptQueryTranslate">()};
@@ -2938,6 +2952,40 @@ namespace
 			rect->SetScreenPosition({ position.x, position.y });
 	}
 
+    Component* ResolveExtraComponent(ScriptObjectHandle handle, int kind)
+    {
+        Entity* entity = ScriptObjectRegistry::Get().Resolve(handle);
+        if (!entity) return nullptr;
+        switch (kind)
+        {
+        case 0: return entity->GetComponent<BehaviorTreeComponent>();
+        case 1: return entity->GetComponent<BoneComponent>();
+        case 2: return entity->GetComponent<DecalComponent>();
+        case 3: return entity->GetComponent<FoliageComponent>();
+        case 4: return entity->GetComponent<PlayerInputComponent>();
+        case 5: return entity->GetComponent<SceneRenderProfileComponent>();
+        case 6: return entity->GetComponent<SpriteRenderer>();
+        case 7: return entity->GetComponent<SpriteSheetComponent>();
+        case 8: return entity->GetComponent<StateMachineComponent>();
+        case 9: return entity->GetComponent<TerrainComponent>();
+        default: return nullptr;
+        }
+    }
+
+    int __stdcall Api_ExtraComponent_Exists(ScriptObjectHandle handle, int kind)
+    { return ResolveExtraComponent(handle, kind) != nullptr; }
+
+    int __stdcall Api_ExtraComponent_GetEnabled(ScriptObjectHandle handle, int kind)
+    {
+        auto* component = ResolveExtraComponent(handle, kind);
+        return component ? (component->IsEnabled() ? 1 : 0) : -1;
+    }
+
+    void __stdcall Api_ExtraComponent_SetEnabled(ScriptObjectHandle handle, int kind, int enabled)
+    {
+        if (auto* component = ResolveExtraComponent(handle, kind)) component->SetEnabled(enabled != 0);
+    }
+
 	void FillApiTable()
 	{
 #if defined(CE_SCENE_HEADLESS)
@@ -3249,6 +3297,10 @@ namespace
 
 #endif
 
+        g_apiTable.ExtraComponent_Exists = &Api_ExtraComponent_Exists;
+        g_apiTable.ExtraComponent_GetEnabled = &Api_ExtraComponent_GetEnabled;
+        g_apiTable.ExtraComponent_SetEnabled = &Api_ExtraComponent_SetEnabled;
+
 	}
 
     Runtime::ManagedAssembly g_managedAssembly;
@@ -3474,7 +3526,7 @@ ClrHost::UserCodeScope::~UserCodeScope() noexcept
 }
 
 ClrHost::InvokeResult ClrHost::InvokeCallableStatic(const std::string& typeName,
-	const std::string& methodName, const std::vector<std::string>& args)
+	const std::string& methodName, const ce::dynamic_array<std::string>& args)
 {
 	InvokeResult result;
 
@@ -3607,7 +3659,7 @@ void ClrHost::FlushAniEvents()
 	if (m_aniEvents.empty()) return;
 
 	// 전달 도중 새 이벤트가 쌓일 수 있으므로 비운 뒤 넘긴다.
-	std::vector<ScriptAniEvent> batch;
+	ce::dynamic_array<ScriptAniEvent> batch;
 	batch.swap(m_aniEvents);
 
 	m_fnFlushAniEvents(batch.data(), static_cast<int>(batch.size()));
@@ -3723,7 +3775,7 @@ void ClrHost::FlushAITicks()
 
     // 전달 전에 큐를 분리해 이번 배치만 넘긴다(ScriptMessage와 같은 규약).
     // 스왑 구간만 잠그고 관리 측 호출 중에는 큐 잠금을 보유하지 않는다.
-	std::vector<ScriptAITick> batch;
+	ce::dynamic_array<ScriptAITick> batch;
 	{
 		spin_lock lock(m_aiTickFlag);
 		batch.swap(m_aiTicks);
@@ -3799,16 +3851,16 @@ bool ClrHost::DispatchLifecycle(int instanceId, ScriptLifecyclePhase phase)
 namespace
 {
 	// 관리 측은 타입 이름을 '\n'으로 이어 한 번에 준다 — 이름마다 경계를 넘지 않기 위해서다.
-	std::vector<std::string> ReadTypeNameList(int(__stdcall* fn)(char*, int))
+	ce::dynamic_array<std::string> ReadTypeNameList(int(__stdcall* fn)(char*, int))
 	{
 		if (nullptr == fn) return {};
 
 		// 스크립트 수백 개 규모까지 여유 있는 크기.
-		std::vector<char> buffer(16 * 1024, '\0');
+		ce::dynamic_array<char> buffer(16 * 1024, '\0');
 		const int length = fn(buffer.data(), static_cast<int>(buffer.size()));
 		if (length <= 0) return {};
 
-		std::vector<std::string> names;
+		ce::dynamic_array<std::string> names;
 		const std::string joined(buffer.data(), static_cast<size_t>(length));
 		size_t begin = 0;
 		while (begin < joined.size())
@@ -3822,9 +3874,9 @@ namespace
 	}
 }
 
-std::vector<std::string> ClrHost::GetComponentTypeNames()
+ce::dynamic_array<std::string> ClrHost::GetComponentTypeNames()
 {
-	return m_ready ? ReadTypeNameList(m_fnGetComponentTypeNames) : std::vector<std::string>{};
+	return m_ready ? ReadTypeNameList(m_fnGetComponentTypeNames) : ce::dynamic_array<std::string>{};
 }
 
 bool ClrHost::HasBTNodeType(std::string_view typeName)
@@ -3835,18 +3887,18 @@ bool ClrHost::HasBTNodeType(std::string_view typeName)
 	return 0 != m_fnHasBTNodeType(name.c_str());
 }
 
-std::vector<std::string> ClrHost::GetBTNodeTypeNames(BTNodeKind kind)
+ce::dynamic_array<std::string> ClrHost::GetBTNodeTypeNames(BTNodeKind kind)
 {
 	if (!m_ready || nullptr == m_fnGetBTNodeTypeNames) return {};
 
 	// 이름을 개행으로 이어 한 번에 받는다(위 ReadTypeNameList와 같은 규약).
 	// 갈래 인자가 하나 더 붙어 그 헬퍼를 그대로 쓰지 못하므로 여기서 푼다.
-	std::vector<char> buffer(16 * 1024, '\0');
+	ce::dynamic_array<char> buffer(16 * 1024, '\0');
 	const int length = m_fnGetBTNodeTypeNames(
 		static_cast<int>(kind), buffer.data(), static_cast<int>(buffer.size()));
 	if (length <= 0) return {};
 
-	std::vector<std::string> names;
+	ce::dynamic_array<std::string> names;
 	const std::string joined(buffer.data(), static_cast<size_t>(length));
 	size_t begin = 0;
 	while (begin < joined.size())
@@ -3859,9 +3911,9 @@ std::vector<std::string> ClrHost::GetBTNodeTypeNames(BTNodeKind kind)
 	return names;
 }
 
-std::vector<std::string> ClrHost::GetAniBehaviorTypeNames()
+ce::dynamic_array<std::string> ClrHost::GetAniBehaviorTypeNames()
 {
-	return m_ready ? ReadTypeNameList(m_fnGetAniBehaviorTypeNames) : std::vector<std::string>{};
+	return m_ready ? ReadTypeNameList(m_fnGetAniBehaviorTypeNames) : ce::dynamic_array<std::string>{};
 }
 
 void ClrHost::QueueScriptMessage(int instanceId, std::string_view methodName)
@@ -3890,7 +3942,7 @@ void ClrHost::FlushScriptMessages()
 {
 	// 전달 도중 새 메시지가 쌓일 수 있으므로 비운 뒤 넘긴다(AniEvent와 같은 규약).
 	// 스왑 구간만 잠근다 — 관리 측 호출까지 잠그면 잡 스레드가 그동안 막힌다.
-	std::vector<ScriptMessage> batch;
+	ce::dynamic_array<ScriptMessage> batch;
 	{
 		spin_lock lock(m_scriptMessageFlag);
 		batch.swap(m_scriptMessages);

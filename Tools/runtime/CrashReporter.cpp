@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../build/ModuleAdapters/Creator.Core.Distribution.h"
 #else
@@ -323,7 +324,7 @@ namespace
     {
         if (!state.succeeded) return;
         const std::filesystem::path source = ReportPath(*state.request);
-        std::vector<wchar_t> destination(32768, L'\0');
+        ce::dynamic_array<wchar_t> destination(32768, L'\0');
         const std::wstring initial = source.filename().wstring();
         std::copy_n(initial.c_str(),
             std::min(initial.size(), destination.size() - 1), destination.data());

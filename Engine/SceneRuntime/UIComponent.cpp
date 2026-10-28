@@ -1,3 +1,6 @@
+#include "../Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #include "UIComponent.h"
 #include "../Utility_Framework/Authoring/AuthoringNodeViewAccess.h" // D3-a-4
 #include "Entity.h"
@@ -95,10 +98,10 @@ namespace
 {
 	constexpr size_t kNavigationMaxDepth = 256;
 
-	bool BuildAncestorChain(Entity* start, std::vector<Entity*>& chain)
+	bool BuildAncestorChain(Entity* start, ce::dynamic_array<Entity*>& chain)
 	{
 		chain.clear();
-		std::unordered_set<Entity*> visited;
+		ce::engine_node_set<Entity*> visited;
 		Entity* node = start;
 		for (size_t depth = 0; node && depth < kNavigationMaxDepth; ++depth)
 		{
@@ -160,12 +163,12 @@ bool UIComponent::UpdateNavigationRoute(Navigation& nav, Entity* target)
 	if (!source || !target || source->GetScene() != target->GetScene())
 		return false;
 
-	std::vector<Entity*> sourceChain;
-	std::vector<Entity*> targetChain;
+	ce::dynamic_array<Entity*> sourceChain;
+	ce::dynamic_array<Entity*> targetChain;
 	if (!BuildAncestorChain(source, sourceChain) || !BuildAncestorChain(target, targetChain))
 		return false;
 
-	std::unordered_map<Entity*, size_t> sourceDepth;
+	ce::engine_node_map<Entity*, size_t> sourceDepth;
 	sourceDepth.reserve(sourceChain.size());
 	for (size_t i = 0; i < sourceChain.size(); ++i)
 		sourceDepth.emplace(sourceChain[i], i);
@@ -181,7 +184,7 @@ bool UIComponent::UpdateNavigationRoute(Navigation& nav, Entity* target)
 	if (sourceLca == sourceDepth.end())
 		return false;
 
-	std::vector<uint32_t> childPath;
+	ce::dynamic_array<uint32_t> childPath;
 	childPath.reserve(targetLcaDepth);
 	Entity* parent = targetChain[targetLcaDepth];
 	for (size_t depth = targetLcaDepth; depth > 0; --depth)

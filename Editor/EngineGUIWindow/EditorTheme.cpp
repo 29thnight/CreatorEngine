@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "EditorTheme.h"
 
 #include "ImGui.h"
@@ -9,7 +10,7 @@ namespace editor
     namespace
     {
         struct ColorToken { const char* name; std::uint32_t rgb; };
-        constexpr std::array<ColorToken, static_cast<std::size_t>(ThemeColor::Count)> kColors{{
+        constexpr ce::fixed_array<ColorToken, static_cast<std::size_t>(ThemeColor::Count)> kColors{{
             { "Canvas", 0x181818 }, { "Chrome", 0x2A2A2A },
             { "Panel", 0x343434 }, { "PanelRaised", 0x484848 },
             { "Selection", 0x525252 }, { "Border", 0x3E3E3E },

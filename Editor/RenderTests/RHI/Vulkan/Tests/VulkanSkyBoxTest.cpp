@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -488,7 +489,7 @@ bool RunVulkanGizmoIconTest(std::string& outLog)
         EnhancedGizmoIconPass::kOutputFormat, 1, readback, error))
         return fail("[2/4] 리드백 생성 실패: " + error + "\n");
 
-    std::vector<EnhancedGizmoIconPass::Icon> icons(1);
+    ce::dynamic_array<EnhancedGizmoIconPass::Icon> icons(1);
     icons[0].position = { 0.f, 0.f, 0.f };
     icons[0].size = 2.f;
     icons[0].texture = (cameraIcon ? &*cameraIcon.borrow() : nullptr);

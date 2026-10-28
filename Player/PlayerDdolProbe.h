@@ -1,3 +1,4 @@
+#include "../Engine/Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
@@ -23,14 +24,14 @@ class DdolProbe
         EntityHandle oldHandle;
         ce::layers::layer_id layer;
         bool enabled;
-        std::array<float, 10> pose;
-        std::vector<Entity*> children;
+        ce::fixed_array<float, 10> pose;
+        ce::dynamic_array<Entity*> children;
         CharacterMovementComponent* character;
         PhysicsBodyComponent* body;
         std::optional<ScenePhysicsSimulation::character_motion_state> state;
     };
 
-    static std::array<float, 10> Pose(Entity& entity)
+    static ce::fixed_array<float, 10> Pose(Entity& entity)
     {
         const auto position = entity.Transform_().GetWorldPosition();
         const auto rotation = entity.Transform_().GetWorldQuaternion();
@@ -50,7 +51,7 @@ class DdolProbe
     DdolProbe(Entity& active, bool hierarchy, bool geometry = false)
         : m_active(&active), m_hierarchy(hierarchy), m_geometry(geometry)
     {
-        std::vector<Entity*> entities{&active};
+        ce::dynamic_array<Entity*> entities{&active};
         if (geometry)
         {
             if (hierarchy)
@@ -250,10 +251,10 @@ class DdolProbe
     bool m_hierarchy, m_geometry, m_done = false;
     unsigned m_passed = 0, m_phase = 0;
     std::uint64_t m_phaseTick = 0;
-    std::vector<Node> m_nodes;
+    ce::dynamic_array<Node> m_nodes;
     CharacterMovementComponent* m_disabled = nullptr;
     PhysicsBodyComponent* m_body = nullptr;
-    std::array<float, 10> m_held{};
+    ce::fixed_array<float, 10> m_held{};
     ScenePhysicsSimulation::character_motion_state m_heldState{};
 };
 } // namespace Player

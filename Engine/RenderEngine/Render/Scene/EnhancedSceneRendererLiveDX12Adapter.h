@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
@@ -154,8 +155,8 @@ public:
     /// 통합 축이 꺼져 있으면 비워서 돌려준다 — 옮기지 못한 틱을 내보내면
     /// 받는 쪽이 그것을 CPU 시각으로 읽는다.
     bool CollectProfiler(const GpuFrameToken& token,
-        std::vector<EnhancedLivePassTiming>& outTimings,
-        std::vector<EnhancedLiveGpuSlice>& outSlices,
+        ce::dynamic_array<EnhancedLivePassTiming>& outTimings,
+        ce::dynamic_array<EnhancedLiveGpuSlice>& outSlices,
         EnhancedLiveGpuSpan& outSpan,
         double& outTotalMilliseconds, std::string& outError);
 

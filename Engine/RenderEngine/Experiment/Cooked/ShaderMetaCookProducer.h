@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "CookedAssetManifest.h"
@@ -45,7 +46,7 @@ namespace experiment::cooked
         AssetId sourceShaderAssetId{};
 
         std::string artifactPath{};
-        std::vector<std::byte> artifactBytes{};
+        ce::dynamic_array<std::byte> artifactBytes{};
         CookedAssetManifestEntry manifestEntry{};
 
         // 진단용. identity 가 아니다.
@@ -65,7 +66,7 @@ namespace experiment::cooked
     struct ShaderMetaCookProductResult final
     {
         std::optional<ShaderMetaCookProduct> product{};
-        std::vector<ShaderMetaCookProductIssue> issues{};
+        ce::dynamic_array<ShaderMetaCookProductIssue> issues{};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {

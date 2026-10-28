@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -46,7 +47,7 @@ public:
     TemporalProvider Provider() const;
     TemporalResult LastResult() const;
     TemporalResult RequestedResult() const;
-    const std::vector<TemporalCapabilities>& Capabilities() const;
+    const ce::dynamic_array<TemporalCapabilities>& Capabilities() const;
     TemporalResult Evaluate(const TemporalUpscaleInputs&, RHIEncoder&);
     TemporalResult Shutdown();
 private:

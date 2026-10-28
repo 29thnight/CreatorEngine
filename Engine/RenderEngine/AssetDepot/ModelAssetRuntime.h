@@ -1,4 +1,6 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
@@ -76,7 +78,7 @@ namespace AssetDepot
         experiment::cooked::ResolvedAssetEntry resolved{};
         own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog{};
         ModelAssetDependencies<T> dependencies{};
-        std::vector<own::weak_owner<AssetRequestState<T>>> consumers{};
+        ce::dynamic_array<own::weak_owner<AssetRequestState<T>>> consumers{};
         std::uint64_t epoch{};
         std::uint64_t requestId{};
         job_handle completion{};
@@ -86,7 +88,7 @@ namespace AssetDepot
         own::shared_owner<const T> asset{};
         // Eviction captures are released with the accepted work, after the
         // scheduler terminal observer has left the preparation lock.
-        std::vector<own::shared_owner<const T>> retiredAssets{};
+        ce::dynamic_array<own::shared_owner<const T>> retiredAssets{};
         // Written by this worker only; snapshots never read its mutable vectors.
         std::atomic<std::size_t> inputStagingBytes{};
         std::atomic<std::size_t> decodeStagingChargeBytes{};
@@ -103,7 +105,7 @@ namespace AssetDepot
     };
 
     template<class T>
-    using ModelAssetEntries = std::map<ModelAssetKey, ModelAssetCacheEntry<T>>;
+    using ModelAssetEntries = ce::engine_ordered_map<ModelAssetKey, ModelAssetCacheEntry<T>>;
 
     template<class T>
     struct ModelAssetCache final
@@ -114,7 +116,7 @@ namespace AssetDepot
         std::uint64_t logicalEvictions{};
         // Weak diagnostic index includes accepted work after logical invalidation
         // and completed dependency results until their final work pin is released.
-        std::vector<own::weak_owner<ModelAssetWork<T>>> works{};
+        ce::dynamic_array<own::weak_owner<ModelAssetWork<T>>> works{};
     };
 
     struct ModelAssetRetiredEntries final
@@ -126,13 +128,13 @@ namespace AssetDepot
         ModelAssetEntries<assets::ModelGeometryPayload> geometry{};
         ModelAssetEntries<assets::ModelSkeletonStorage> skeletonStorage{};
         ModelAssetEntries<assets::ModelAnimationStorage> animationStorage{};
-        std::vector<own::shared_owner<AssetRequestState<assets::ModelAnimationDescriptor>>> descriptorConsumers;
-        std::vector<own::shared_owner<AssetRequestState<assets::ModelSkeletonPayload>>> skeletonConsumers;
-        std::vector<own::shared_owner<AssetRequestState<assets::ModelAnimationPayload>>> animationConsumers;
-        std::vector<own::shared_owner<AssetRequestState<assets::ModelMeshDescriptor>>> meshConsumers;
-        std::vector<own::shared_owner<AssetRequestState<assets::ModelGeometryPayload>>> geometryConsumers;
-        std::vector<own::shared_owner<AssetRequestState<assets::ModelSkeletonStorage>>> skeletonStorageConsumers;
-        std::vector<own::shared_owner<AssetRequestState<assets::ModelAnimationStorage>>> animationStorageConsumers;
+        ce::dynamic_array<own::shared_owner<AssetRequestState<assets::ModelAnimationDescriptor>>> descriptorConsumers;
+        ce::dynamic_array<own::shared_owner<AssetRequestState<assets::ModelSkeletonPayload>>> skeletonConsumers;
+        ce::dynamic_array<own::shared_owner<AssetRequestState<assets::ModelAnimationPayload>>> animationConsumers;
+        ce::dynamic_array<own::shared_owner<AssetRequestState<assets::ModelMeshDescriptor>>> meshConsumers;
+        ce::dynamic_array<own::shared_owner<AssetRequestState<assets::ModelGeometryPayload>>> geometryConsumers;
+        ce::dynamic_array<own::shared_owner<AssetRequestState<assets::ModelSkeletonStorage>>> skeletonStorageConsumers;
+        ce::dynamic_array<own::shared_owner<AssetRequestState<assets::ModelAnimationStorage>>> animationStorageConsumers;
     };
 
     struct ModelAssetCacheSnapshot final

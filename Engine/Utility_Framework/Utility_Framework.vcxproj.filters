@@ -221,6 +221,9 @@
     <ClInclude Include="Foundation/BaseTypeDef.h">
       <Filter>Foundation</Filter>
     </ClInclude>
+    <ClInclude Include="Foundation/ManagedObjectContract.h">
+      <Filter>Foundation</Filter>
+    </ClInclude>
     <ClInclude Include="Foundation/Core.Definition.h">
       <Filter>Foundation</Filter>
     </ClInclude>
@@ -303,6 +306,9 @@
       <Filter>Runtime</Filter>
     </ClInclude>
     <ClInclude Include="Runtime/RuntimeSettings.h">
+      <Filter>Runtime</Filter>
+    </ClInclude>
+    <ClInclude Include="Runtime/RenderBackend.h">
       <Filter>Runtime</Filter>
     </ClInclude>
     <ClInclude Include="Runtime/TemporalProductSettings.h">

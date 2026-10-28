@@ -1,4 +1,7 @@
+#include "../../../../../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../../../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../../../../../Engine/Utility_Framework/Foundation/EngineStorage.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -39,7 +42,7 @@ public:
 
     // Copies a static triangle list into the core model vertex layout.
     // Returns the mesh index used by Draw.
-    std::uint32_t AddMesh(const std::vector<Vertex>& vertices, const std::vector<std::uint32_t>& indices);
+    std::uint32_t AddMesh(const ce::dynamic_array<Vertex>& vertices, const ce::dynamic_array<std::uint32_t>& indices);
 
     void BuildPins(assets::ModelAssetGenerationPins& descriptors, assets::ModelGeometryPreparationPins& geometry) const;
 
@@ -70,7 +73,7 @@ public:
 
     std::uint32_t ShadowDrawCount() const { return m_host.ShadowDrawCount(); }
     auto ShadowCacheStats() const { return m_host.CurrentShadowCacheStats(); }
-    std::array<std::uint32_t, 3> RecordedShadowMeshletDrawCounts() const
+    ce::fixed_array<std::uint32_t, 3> RecordedShadowMeshletDrawCounts() const
         { return m_host.RecordedShadowMeshletDrawCounts(); }
     auto ShadowMeshletOutputs() const { return m_host.ShadowMeshletOutputs(); }
     void Shutdown();
@@ -99,8 +102,8 @@ private:
     void CookMesh(uint32_t index);
     struct MeshStorage
     {
-        std::vector<std::uint8_t> vertices;
-        std::vector<std::uint32_t> indices;
+        ce::dynamic_array<std::uint8_t> vertices;
+        ce::dynamic_array<std::uint32_t> indices;
         RHIModelMeshView view{};
         own::shared_owner<assets::ModelMeshDescriptor> descriptor;
         own::shared_owner<const assets::ModelGeometryPayload> payload;
@@ -111,7 +114,7 @@ private:
     // callbacks read it; it renders no legacy draws.
     SceneSurfaceTargets m_cameraTargets;
     EnhancedFrameContext m_cameraContext{};
-    std::vector<EnhancedDrawItem> m_surfaceDraws;
+    ce::dynamic_array<EnhancedDrawItem> m_surfaceDraws;
     SceneSurfaceTargets::Outputs m_surfaceOutputs{};
     material_graph::SceneLayerWork m_layerWork{};
     material_graph::SceneColorInputs m_colorInputs{};
@@ -119,8 +122,8 @@ private:
     own::shared_owner<const material_graph::Instance> m_instance;
     std::uint32_t AddView(const RHIModelMeshView& source);
 
-    std::deque<MeshStorage> m_meshes;
-    std::unordered_map<std::size_t, std::uint32_t> m_sourceMeshes;
+    ce::segmented_deque<MeshStorage> m_meshes;
+    ce::engine_node_map<std::size_t, std::uint32_t> m_sourceMeshes;
     std::uint64_t m_sceneEpoch{1};
     bool m_initialized{};
 };

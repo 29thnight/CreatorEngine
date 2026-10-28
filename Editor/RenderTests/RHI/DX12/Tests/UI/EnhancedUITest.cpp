@@ -1,3 +1,4 @@
+#include "../../../../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -84,7 +85,7 @@ bool DX12Test::RunUITest(std::string& outLog)
     //
     // 텍스처를 안 주므로 전부 1x1 흰색이다. 즉 연속한 사각형은 전부
     // 같은 텍스처라 배치 하나로 묶여야 한다 — 배칭이 도는지가 그것으로 갈린다.
-    std::vector<EnhancedUIPass::Rect> rects;
+    ce::dynamic_array<EnhancedUIPass::Rect> rects;
 
     // ① 왼쪽 위: 불투명 빨강 (10,10)~(60,60)
     {
@@ -324,7 +325,7 @@ bool DX12Test::RunUITest(std::string& outLog)
         const Texture* const textureA = (batchTextureA ? &*batchTextureA.borrow() : nullptr);
         const Texture* const textureB = (batchTextureB ? &*batchTextureB.borrow() : nullptr);
 
-        std::vector<EnhancedUIPass::Rect> mixed = rects;
+        ce::dynamic_array<EnhancedUIPass::Rect> mixed = rects;
         mixed[0].texture = textureA;
         mixed[1].texture = textureB;
         mixed[2].texture = textureA;

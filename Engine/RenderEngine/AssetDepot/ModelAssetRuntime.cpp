@@ -1,3 +1,5 @@
+#include "../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
@@ -226,7 +228,7 @@ namespace
     }
 
     Error ReadModelBytes(model_cooked::ResolvedAssetEntry& resolved,
-        std::vector<std::byte>& bytes, std::string& failure, ModelStagingCharge& staging)
+        ce::dynamic_array<std::byte>& bytes, std::string& failure, ModelStagingCharge& staging)
     {
         std::uint64_t size{};
         constexpr std::uint64_t maxArtifactBytes = model_cooked::kModelSubAssetMaxBytes;
@@ -419,7 +421,7 @@ namespace
         {
             return {};
         }
-        std::array<double, 3> minimum{}, maximum{};
+        ce::fixed_array<double, 3> minimum{}, maximum{};
         for (size_t axis = 0; axis < 3; ++axis)
         {
             minimum[axis] = std::numeric_limits<double>::infinity();
@@ -434,7 +436,7 @@ namespace
                 maximum[axis] = (std::max)(maximum[axis], center + descriptor.sphereRadius);
             }
         }
-        std::array<float, 3> center{};
+        ce::fixed_array<float, 3> center{};
         for (size_t axis = 0; axis < 3; ++axis)
         {
             const double midpoint = (minimum[axis] + maximum[axis]) * 0.5;
@@ -476,7 +478,7 @@ namespace
         if (decoded.mesh.clusterArchive && resolved.byteSource)
         {
             auto archive = own::make_shared<assets::cluster::Archive>(*decoded.mesh.clusterArchive);
-            std::vector<model_cooked::Sha256Digest> hashes;
+            ce::dynamic_array<model_cooked::Sha256Digest> hashes;
             for (const auto& packet : archive->packets)
             {
                 model_cooked::Sha256Digest hash{};
@@ -489,7 +491,7 @@ namespace
             archive->pageReader = [source = resolved.byteSource, path = resolved.blob.artifactPath,
                 offsets = archive->fileOffsets, sizes = archive->packetSizes, hashes = std::move(hashes)](uint32_t page) {
                 assets::quantized::Require(page < offsets.size() && page < sizes.size(), "Cluster artifact page range");
-                std::vector<std::byte> packet(sizes[page]);
+                ce::dynamic_array<std::byte> packet(sizes[page]);
                 std::string error;
                 model_cooked::Sha256Digest hash{};
                 if (!source->ReadAt(path, offsets[page], packet, error) ||
@@ -503,7 +505,7 @@ namespace
             // Only admitted pages retain compressed CPU bytes after decoding.
             for (auto& packet : archive->packets)
             {
-                std::vector<std::byte>().swap(packet);
+                ce::dynamic_array<std::byte>().swap(packet);
             }
             decoded.mesh.clusterArchive = std::move(archive);
         }
@@ -548,7 +550,7 @@ namespace
         {
             const auto& archive = *mesh.clusterArchive;
             charge = AddModelCharge(charge, sizeof(assets::cluster::Archive));
-            charge = AddModelCharge(charge, archive.packets.capacity() * (sizeof(std::vector<std::byte>) + sizeof(model_cooked::Sha256Digest)));
+            charge = AddModelCharge(charge, archive.packets.capacity() * (sizeof(ce::dynamic_array<std::byte>) + sizeof(model_cooked::Sha256Digest)));
             charge = AddModelCharge(charge, archive.fileOffsets.capacity() * sizeof(uint64_t));
             charge = AddModelCharge(charge, archive.packetSizes.capacity() * sizeof(uint32_t));
             charge = AddModelCharge(charge, (archive.grid.origin.capacity() + archive.grid.step.capacity()) * sizeof(float));
@@ -628,7 +630,7 @@ namespace
             }
             result->meshes.push_back(std::move(child));
         }
-        std::set<experiment::AssetId> instantiatedMeshes;
+        ce::engine_ordered_set<experiment::AssetId> instantiatedMeshes;
         for (const auto& node : result->summary.nodes)
         {
             instantiatedMeshes.insert(node.meshAssetIds.begin(), node.meshAssetIds.end());
@@ -682,13 +684,13 @@ namespace
     template<class T>
     struct ModelSnapshotPins final
     {
-        std::vector<own::shared_owner<const T>> assets;
-        std::vector<own::shared_owner<AssetDepot::ModelAssetWork<T>>> works;
+        ce::dynamic_array<own::shared_owner<const T>> assets;
+        ce::dynamic_array<own::shared_owner<AssetDepot::ModelAssetWork<T>>> works;
     };
 
     template<class T>
     void TrimModelCache(AssetDepot::ModelAssetCache<T>& cache,
-        std::vector<own::shared_owner<const T>>* retired = nullptr)
+        ce::dynamic_array<own::shared_owner<const T>>* retired = nullptr)
     {
         while (cache.retainedBytes > cache.budgetBytes)
         {
@@ -723,7 +725,7 @@ namespace
             }
             ++cache.logicalEvictions;
         }
-        std::erase_if(cache.entries, [](const auto& item)
+        ce::erase_if(cache.entries, [](const auto& item)
         {
             return !item.second.retained && !item.second.inFlight && item.second.live.expired();
         });
@@ -857,7 +859,7 @@ AssetDepot::AssetRequest<T> DataSystem::RequestModelAssetFromSnapshot(AssetDepot
     {
         return fail(Status::Failed, Error::NotMounted, "No asset catalog is mounted.");
     }
-    std::vector<model_cooked::ResolvedAssetEntry> closure;
+    ce::dynamic_array<model_cooked::ResolvedAssetEntry> closure;
     model_cooked::AssetCatalogLookupIssue issue;
     const auto status = catalog->CollectHardClosure(link.ToReference(), closure, issue);
     if (status != model_cooked::AssetLookupStatus::Found)
@@ -1034,7 +1036,7 @@ AssetDepot::AssetRequest<assets::ModelCpuGeometryPayload> DataSystem::RequestMod
     try
     {
         const auto dependency = descriptor.Completion();
-        const std::array dependencies{dependency};
+        const ce::fixed_array dependencies{dependency};
         auto completion = SubmitAssetWorkLocked(std::move(jobs),dependency.valid() ? std::span<const job_handle>(dependencies) : std::span<const job_handle>{},true);
         std::lock_guard stateLock(consumer->mutex); consumer->completion = std::move(completion);
     }
@@ -1050,7 +1052,7 @@ own::shared_owner<AssetDepot::ModelAssetWork<T>> DataSystem::StartModelAssetWork
     auto& cache = ModelAssetCacheLocked<T>();
     // Resident-only requests have no terminal callback to prune their weak work
     // records. Keep repeated cache hits from growing diagnostic metadata forever.
-    std::erase_if(cache.works, [](const auto& weak) { return weak.expired(); });
+    ce::erase_if(cache.works, [](const auto& weak) { return weak.expired(); });
     const auto key = ModelKey<T>(resolved, exactGeneration);
     const auto previous = cache.entries.find(key);
     if (previous != cache.entries.end() && previous->second.inFlight)
@@ -1082,7 +1084,7 @@ own::shared_owner<AssetDepot::ModelAssetWork<T>> DataSystem::StartModelAssetWork
         return work;
     }
     work->requestId = m_modelAssets.nextRequestId++;
-    std::vector<job_handle> dependencies;
+    ce::dynamic_array<job_handle> dependencies;
     try
     {
         if constexpr (std::is_same_v<T, assets::ModelAnimationPayload>
@@ -1234,7 +1236,7 @@ void DataSystem::RunModelAssetWork(own::shared_owner<AssetDepot::ModelAssetWork<
         else if constexpr (std::is_same_v<T, assets::ModelGeometryPayload>)
         {
             ModelStagingCharge inputStaging(work->inputStagingBytes);
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
             auto resolved = work->resolved;
             error = ReadModelBytes(resolved, bytes, failure, inputStaging);
             if (error == Error::None) candidate = DecodeModelGeometry(resolved,bytes,failure);
@@ -1254,7 +1256,7 @@ void DataSystem::RunModelAssetWork(own::shared_owner<AssetDepot::ModelAssetWork<
         else
         {
             ModelStagingCharge inputStaging(work->inputStagingBytes);
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
             auto resolved = work->resolved;
             error = ReadModelBytes(resolved, bytes, failure, inputStaging);
             if (error == Error::None)
@@ -1539,8 +1541,8 @@ bool DataSystem::HasModelMeshDescriptor(AssetDepot::AssetLink<assets::ModelMeshD
 
 void DataSystem::SetModelGeometryCacheBudgets(std::size_t descriptors, std::size_t geometry)
 {
-    std::vector<own::shared_owner<const assets::ModelMeshDescriptor>> retiredMeshes;
-    std::vector<own::shared_owner<const assets::ModelGeometryPayload>> retiredGeometry;
+    ce::dynamic_array<own::shared_owner<const assets::ModelMeshDescriptor>> retiredMeshes;
+    ce::dynamic_array<own::shared_owner<const assets::ModelGeometryPayload>> retiredGeometry;
     {
         std::lock_guard lock(m_assetPreparationMutex);
         retiredMeshes.reserve(m_modelAssets.meshes.entries.size());
@@ -1610,11 +1612,11 @@ void DataSystem::TrimModelAssetsLocked()
     // This maintenance path only forgets weak nodes that no longer own anything.
     const auto prune = [](auto& cache)
     {
-        std::erase_if(cache.entries, [](const auto& item)
+        ce::erase_if(cache.entries, [](const auto& item)
         {
             return !item.second.retained && !item.second.inFlight && item.second.live.expired();
         });
-        std::erase_if(cache.works, [](const auto& weak) { return weak.expired(); });
+        ce::erase_if(cache.works, [](const auto& weak) { return weak.expired(); });
     };
     prune(m_modelAssets.descriptors);
     prune(m_modelAssets.skeletons);
@@ -1763,9 +1765,9 @@ void DataSystem::InvalidateModelAssetsLocked(AssetDepot::ModelAssetRetiredEntrie
 
 void DataSystem::SetModelAssetCacheBudgets(std::size_t descriptors, std::size_t skeletons, std::size_t clips)
 {
-    std::vector<own::shared_owner<const assets::ModelAnimationDescriptor>> retiredDescriptors;
-    std::vector<own::shared_owner<const assets::ModelSkeletonPayload>> retiredSkeletons;
-    std::vector<own::shared_owner<const assets::ModelAnimationPayload>> retiredClips;
+    ce::dynamic_array<own::shared_owner<const assets::ModelAnimationDescriptor>> retiredDescriptors;
+    ce::dynamic_array<own::shared_owner<const assets::ModelSkeletonPayload>> retiredSkeletons;
+    ce::dynamic_array<own::shared_owner<const assets::ModelAnimationPayload>> retiredClips;
     {
         std::lock_guard lock(m_assetPreparationMutex);
         // Reserve before mutation so an allocation failure preserves all budgets.
@@ -1784,8 +1786,8 @@ void DataSystem::SetModelAssetCacheBudgets(std::size_t descriptors, std::size_t 
 
 void DataSystem::SetModelAnimationStorageCacheBudgets(std::size_t skeletons, std::size_t clips)
 {
-    std::vector<own::shared_owner<const assets::ModelSkeletonStorage>> retiredSkeletons;
-    std::vector<own::shared_owner<const assets::ModelAnimationStorage>> retiredClips;
+    ce::dynamic_array<own::shared_owner<const assets::ModelSkeletonStorage>> retiredSkeletons;
+    ce::dynamic_array<own::shared_owner<const assets::ModelAnimationStorage>> retiredClips;
     {
         std::lock_guard lock(m_assetPreparationMutex);
         retiredSkeletons.reserve(m_modelAssets.skeletonStorage.entries.size());
@@ -1811,7 +1813,7 @@ AssetDepot::ModelAssetCacheSnapshot DataSystem::SnapshotModelAssetCache() const
     ModelSnapshotPins<assets::ModelAnimationStorage> animationStoragePins;
     std::lock_guard lock(m_assetPreparationMutex);
     AssetDepot::ModelAssetCacheSnapshot result;
-    std::set<const void*> resultPins;
+    ce::engine_ordered_set<const void*> resultPins;
     const auto append = [&](const auto& cache, auto& pins)
     {
         using Cache = std::remove_cvref_t<decltype(cache)>;
@@ -1942,7 +1944,7 @@ own::shared_owner<const ModelSkeletonPayload> LoadModelStreamSkeleton(
     experiment::cooked::ResolvedAssetEntry resolved, std::string& failure)
 {
     std::atomic<std::size_t> observed{}; ModelStagingCharge staging(observed);
-    std::vector<std::byte> bytes;
+    ce::dynamic_array<std::byte> bytes;
     if (ReadModelBytes(resolved, bytes, failure, staging) != Error::None) return {};
     const auto storage = DecodeModelSkeleton(resolved, bytes, failure, staging);
     if (!storage) return {};

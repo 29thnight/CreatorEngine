@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -60,7 +61,7 @@ namespace RenderTest
 
         // ── 1. core(정적 48B) ─────────────────────────────────────────────
         {
-            std::vector<RHIInputElement> elements;
+            ce::dynamic_array<RHIInputElement> elements;
             check.Check(ModelVertexInput::BuildInputElements(
                 assets::kCoreVertexAttributes, elements, error),
                 "core 마스크 유도 (" + error + ")");
@@ -83,7 +84,7 @@ namespace RenderTest
 
         // ── 2. V2(스킨 68B) ───────────────────────────────────────────────
         {
-            std::vector<RHIInputElement> elements;
+            ce::dynamic_array<RHIInputElement> elements;
             check.Check(ModelVertexInput::BuildInputElements(
                 assets::kV2VertexAttributes, elements, error),
                 "스킨 마스크 유도 (" + error + ")");
@@ -104,7 +105,7 @@ namespace RenderTest
             const assets::VertexAttributeMask mask =
                 assets::kCoreVertexAttributes
                 | assets::Bit(assets::VertexAttribute::Uv1);
-            std::vector<RHIInputElement> elements;
+            ce::dynamic_array<RHIInputElement> elements;
             check.Check(ModelVertexInput::BuildInputElements(mask,
                 elements, error), "uv1 마스크 유도 (" + error + ")");
             check.Check(5u == elements.size(), "uv1 원소 수 5");
@@ -119,7 +120,7 @@ namespace RenderTest
 
         // ── 4. fail-closed ────────────────────────────────────────────────
         {
-            std::vector<RHIInputElement> elements;
+            ce::dynamic_array<RHIInputElement> elements;
             check.Check(!ModelVertexInput::BuildInputElements(
                 assets::Bit(assets::VertexAttribute::Position),
                 elements, error) && !error.empty(),
@@ -157,15 +158,15 @@ namespace RenderTest
         // core/color/skin 및 UV1 조합이 layout과 shader permutation 양쪽에서 서로 다른
         // key를 가져야 한다. skin bool 하나로 축약하면 이 단정이 붉어진다.
         {
-            constexpr std::array<std::uint32_t, 8> expectedStride{{ 48u, 64u, 68u, 84u, 56u, 72u, 76u, 92u }};
-            constexpr std::array<std::size_t, 8> expectedElements{{ 4u, 5u, 6u, 7u, 5u, 6u, 7u, 8u }};
+            constexpr ce::fixed_array<std::uint32_t, 8> expectedStride{{ 48u, 64u, 68u, 84u, 56u, 72u, 76u, 92u }};
+            constexpr ce::fixed_array<std::size_t, 8> expectedElements{{ 4u, 5u, 6u, 7u, 5u, 6u, 7u, 8u }};
             static_assert(expectedStride.size() == assets::kModelVertexMasks.size());
             static_assert(expectedElements.size() == assets::kModelVertexMasks.size());
-            std::vector<RHIShaderPermutationKey> keys;
+            ce::dynamic_array<RHIShaderPermutationKey> keys;
             for (std::size_t i = 0; i < assets::kModelVertexMasks.size(); ++i)
             {
                 const auto mask = assets::kModelVertexMasks[i];
-                std::vector<RHIInputElement> elements;
+                ce::dynamic_array<RHIInputElement> elements;
                 check.Check(ModelVertexInput::BuildInputElements(mask, elements, error),
                     "model mask layout " + std::to_string(mask));
                 check.Check(elements.size() == expectedElements[i],
@@ -194,7 +195,7 @@ namespace RenderTest
         // ordered triangle stream: never reorder, lose, duplicate or rotate
         // a triangle across sealed chunk-local remaps.
         {
-            std::vector<std::array<float, 12>> vertices(16 * 12);
+            ce::dynamic_array<ce::fixed_array<float, 12>> vertices(16 * 12);
             for (unsigned y = 0; y < 12; ++y)
             {
                 for (unsigned x = 0; x < 16; ++x)
@@ -203,7 +204,7 @@ namespace RenderTest
                     vertices[y * 16 + x] = {float(x), float(y), 0, 0, 0, 1, 0, 0, 1, 0, 0, 1};
                 }
             }
-            std::vector<uint32_t> indices;
+            ce::dynamic_array<uint32_t> indices;
             for (unsigned y = 0; y < 11; ++y)
             {
                 for (unsigned x = 0; x < 15; ++x)
@@ -254,7 +255,7 @@ namespace RenderTest
                 experiment::cooked::ModelGeometryArtifact artifact;
                 artifact.mesh = authored;
                 artifact.mesh.meshlets = cooked;
-                std::vector<std::byte> encoded;
+                ce::dynamic_array<std::byte> encoded;
                 const bool encodedOk = experiment::cooked::WriteModelGeometryArtifact(artifact, encoded, error);
                 check.Check(encodedOk, "METEOR cooked geometry encoding: " + error);
                 experiment::cooked::ModelGeometryArtifact decoded;
@@ -271,7 +272,7 @@ namespace RenderTest
                 check.Check(identity.geometryKey == 0x1122334455667788ull && identity.materialSlot == 14 &&
                     identity.instanceId == 13 && identity.lodIndex == 3 && sizeof(identity) == 64, "METEOR geometry/instance/material/LOD scalar ABI");
                 GraphSceneFixture fixture;
-                std::vector<::Vertex> fixtureVertices(vertices.size());
+                ce::dynamic_array<::Vertex> fixtureVertices(vertices.size());
                 for (size_t i = 0; i < vertices.size(); ++i)
                 {
                     fixtureVertices[i].position = {vertices[i][0], vertices[i][1], vertices[i][2]};

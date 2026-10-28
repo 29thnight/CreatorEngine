@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
@@ -48,6 +49,7 @@ import Creator.Core.EngineMode;
 import Creator.Concurrency.Jobs;
 #endif
 #include "../Utility_Framework/Runtime/RuntimeResults.h"
+#include "../RenderEngine/Effects/IEffectSystem.h"
 
 #include <stdio.h>
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -263,7 +265,7 @@ namespace EngineBootstrap
              [](std::uint32_t frame, const EnhancedSceneRenderer::RenderThreadHooks::Counters& value)
              {
                  auto& service = ce::profiler();
-                 const std::array<ce::profile_counter_sample, 7> samples{{
+                 const ce::fixed_array<ce::profile_counter_sample, 7> samples{{
                      {ce::profile_counter_id::upload_bytes, static_cast<double>(value.uploadBytes)},
                      {ce::profile_counter_id::upload_overflows, static_cast<double>(value.uploadOverflows)},
                      {ce::profile_counter_id::descriptor_allocations, static_cast<double>(value.descriptorAllocations)},
@@ -491,6 +493,18 @@ namespace EngineBootstrap
                 ShutdownTrace("[5] FinalizeRuntime 완료");
             }
         } runtimeGuard;
+
+        // Owned inside RuntimeGuard and outside App: Effect is alive throughout
+        // application initialization/finalization and retires before core teardown.
+        ce::effects::Session effectSession;
+        std::string effectError;
+        if (!effectSession.Initialize(effectError))
+        {
+            std::fprintf(stderr, "[effect.package] initialization failed: %s\n", effectError.c_str());
+            return 4;
+        }
+        if (!effectSession.Get()) std::puts("[effect.package] unavailable");
+        else if (!effectSession.Get()->SetSceneEpoch(SceneManagers->SceneContextEpoch())) return 4;
 
         // app을 명시적 스코프에 두어 소멸 시점을 추적한다.
         // CoreWindow를 app보다 먼저 만들면 역순 소멸로 app/presentation이 HWND보다

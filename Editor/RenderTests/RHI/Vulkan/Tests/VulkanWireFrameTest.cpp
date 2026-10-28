@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "../VulkanSelfTest.h"
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/Vulkan/VulkanPipelineCache.h"
@@ -154,15 +155,15 @@ namespace
             math::vector3{0.f, 0.f, -20.f},
             math::vector3{0.f, 1.f, 0.f});
 
-        std::vector<Vertex> vertices(4);
+        ce::dynamic_array<Vertex> vertices(4);
         vertices[0].position = { -1.f, -1.f, 0.f };
         vertices[1].position = { 1.f, -1.f, 0.f };
         vertices[2].position = { 1.f, 1.f, 0.f };
         vertices[3].position = { -1.f, 1.f, 0.f };
-        const std::vector<uint32_t> indices{ 0, 1, 2, 0, 2, 3 };
+        const ce::dynamic_array<uint32_t> indices{ 0, 1, 2, 0, 2, 3 };
         Mesh quadMesh("rhi_wireframe_quad", vertices, indices);
 
-        std::vector<EnhancedDrawItem> draws(2);
+        ce::dynamic_array<EnhancedDrawItem> draws(2);
         draws[0].mesh = &quadMesh;
         draws[0].worldMatrix = math::matrix4x4::identity();
         draws[1].mesh = &quadMesh;
@@ -226,7 +227,7 @@ namespace
             outCapture.visible.image, secondX, secondY, 2, 1);
         outCapture.inside = outCapture.visible.image.At(insideX, insideY, 1);
 
-        std::vector<Vertex> skinnedVertices = vertices;
+        ce::dynamic_array<Vertex> skinnedVertices = vertices;
         for (Vertex& vertex : skinnedVertices)
         {
             vertex.boneIndices = { 0.f, 0.f, 0.f, 0.f };
@@ -236,7 +237,7 @@ namespace
         const math::matrix4x4 palette[1] = {
             math::translation_matrix(math::vector3{ 0.f, 1.5f, 0.f })
         };
-        std::vector<EnhancedDrawItem> skinnedDraws(2);
+        ce::dynamic_array<EnhancedDrawItem> skinnedDraws(2);
         for (uint32_t i = 0; i < 2; ++i)
         {
             skinnedDraws[i].mesh = &skinnedMesh;
@@ -452,11 +453,11 @@ bool RunVulkanWireFrameTest(std::string& outLog)
         WireRhiFunctional(dx12Capture) && WireRhiFunctional(vkCapture);
 
     WireRhiComparison comparison{};
-    const std::array<const WireRhiFrame*, 4> dx12Frames = {
+    const ce::fixed_array<const WireRhiFrame*, 4> dx12Frames = {
         &dx12Capture.visible, &dx12Capture.away,
         &dx12Capture.skinned, &dx12Capture.bindPose
     };
-    const std::array<const WireRhiFrame*, 4> vkFrames = {
+    const ce::fixed_array<const WireRhiFrame*, 4> vkFrames = {
         &vkCapture.visible, &vkCapture.away,
         &vkCapture.skinned, &vkCapture.bindPose
     };

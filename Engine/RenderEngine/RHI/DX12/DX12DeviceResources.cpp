@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
 #else
@@ -2473,7 +2475,7 @@ void DX12DeviceResources::TransitionResources(std::span<const RHITransition> tra
     }
 
     // 한 번에 모아 넣는다 — 배리어를 흩뿌리면 GPU가 그때마다 파이프라인을 비운다.
-    static thread_local std::vector<D3D12_RESOURCE_BARRIER> barriers;
+    static thread_local ce::dynamic_array<D3D12_RESOURCE_BARRIER> barriers;
     barriers.clear();
     barriers.reserve(transitions.size());
 
@@ -2511,7 +2513,7 @@ void DX12DeviceResources::TransitionBuffers(std::span<const RHIBufferTransition>
         return;
     }
 
-    static thread_local std::vector<D3D12_RESOURCE_BARRIER> barriers;
+    static thread_local ce::dynamic_array<D3D12_RESOURCE_BARRIER> barriers;
     barriers.clear();
     barriers.reserve(transitions.size());
     for (const RHIBufferTransition& transition : transitions)
@@ -3398,13 +3400,13 @@ bool DX12DeviceResources::UpdateSparseBufferMappings(RHIBufferHandle buffer,
         return false;
     }
     const auto virtualTiles = resource->GetDesc().Width / RHISparseTileBytes;
-    std::vector<winrt::com_ptr<ID3D12Heap>> sourceHeaps;
-    std::vector<ce::lifetime_token> sourceBudgets;
-    std::vector<D3D12_TILED_RESOURCE_COORDINATE> coordinates;
-    std::vector<D3D12_TILE_REGION_SIZE> regions;
-    std::vector<D3D12_TILE_RANGE_FLAGS> flags;
-    std::vector<UINT> offsets, counts;
-    std::set<uint32_t> seen;
+    ce::dynamic_array<winrt::com_ptr<ID3D12Heap>> sourceHeaps;
+    ce::dynamic_array<ce::lifetime_token> sourceBudgets;
+    ce::dynamic_array<D3D12_TILED_RESOURCE_COORDINATE> coordinates;
+    ce::dynamic_array<D3D12_TILE_REGION_SIZE> regions;
+    ce::dynamic_array<D3D12_TILE_RANGE_FLAGS> flags;
+    ce::dynamic_array<UINT> offsets, counts;
+    ce::engine_ordered_set<uint32_t> seen;
     for (const auto& mapping : mappings)
     {
         const auto source = mapping.physicalPoolOwner.IsValid() ? mapping.physicalPoolOwner : buffer;
@@ -3437,11 +3439,11 @@ bool DX12DeviceResources::UpdateSparseBufferMappings(RHIBufferHandle buffer,
     {
         // Destroy native references before returning their global budget leases.
         ce::lifetime_token budget;
-        std::vector<ce::lifetime_token> sourceBudgets;
+        ce::dynamic_array<ce::lifetime_token> sourceBudgets;
         winrt::com_ptr<ID3D12Resource> resource;
         winrt::com_ptr<ID3D12Heap> heap;
         winrt::com_ptr<ID3D12Fence> fence;
-        std::vector<winrt::com_ptr<ID3D12Heap>> sourceHeaps;
+        ce::dynamic_array<winrt::com_ptr<ID3D12Heap>> sourceHeaps;
     };
     auto lifetime = own::make_shared<MappingLifetime>();
     lifetime->resource = retainedResource;
@@ -4151,7 +4153,7 @@ ID3D12CommandSignature* DX12DeviceResources::GetMaterialBatchSignature(ID3D12Roo
     // shared device lock. Shutdown/Initialize run after recording has joined and
     // change a globally unique generation before this device is reused. Stale
     // raw entries are compared only, never dereferenced or retained as owners.
-    thread_local std::array<RecentSignature, 16> recent{};
+    thread_local ce::fixed_array<RecentSignature, 16> recent{};
     thread_local size_t nextRecent{};
     for (const auto& entry : recent)
     {
@@ -4165,7 +4167,7 @@ ID3D12CommandSignature* DX12DeviceResources::GetMaterialBatchSignature(ID3D12Roo
     auto found = m_meshBatchSignatures.find(key);
     if (found == m_meshBatchSignatures.end())
     {
-        std::array<D3D12_INDIRECT_ARGUMENT_DESC, 66> descriptions{};
+        ce::fixed_array<D3D12_INDIRECT_ARGUMENT_DESC, 66> descriptions{};
         uint32_t count{};
         for (const auto root : roots)
         {

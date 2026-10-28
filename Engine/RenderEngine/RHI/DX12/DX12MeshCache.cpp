@@ -1,4 +1,5 @@
-﻿#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
+﻿#include "../../../Containers/ContainerAPI.h"
+#include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
 #else
@@ -104,7 +105,7 @@ uint64_t DX12MeshCache::RetireUnused(uint64_t fenceValue,
     RHIAssetEvictionPass* evictionPass)
 {
     uint64_t retired = 0;
-    std::vector<RHIAssetEvictionCandidate> candidates;
+    ce::dynamic_array<RHIAssetEvictionCandidate> candidates;
     candidates.reserve(m_entries.size());
     for (const auto& pair : m_entries)
     {
@@ -163,8 +164,8 @@ uint64_t DX12MeshCache::RetireUnused(uint64_t fenceValue,
 
     // Model generation cache는 축약 assetId로 다시 찾지 않는다. selection의
     // assetId는 이번 호출 안에서만 쓰는 정렬된 key 배열 인덱스다.
-    std::vector<assets::ModelMeshHandle> modelKeys;
-    std::vector<RHIAssetEvictionCandidate> modelCandidates;
+    ce::dynamic_array<assets::ModelMeshHandle> modelKeys;
+    ce::dynamic_array<RHIAssetEvictionCandidate> modelCandidates;
     modelKeys.reserve(m_modelEntries.size());
     modelCandidates.reserve(m_modelEntries.size());
     for (const auto& pair : m_modelEntries)
@@ -247,8 +248,8 @@ void DX12MeshCache::ReleaseCoarseHandles(const Entry& entry)
 }
 
 void DX12MeshCache::ReleaseCoarseAllocations(
-    std::array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods>& indices,
-    std::array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods>& meshlets)
+    ce::fixed_array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods>& indices,
+    ce::fixed_array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods>& meshlets)
 {
     for (uint32_t i = 0; i < kRHIMaxCoarseMeshLods; ++i)
     {
@@ -429,12 +430,12 @@ DX12MeshCache::Entry DX12MeshCache::UploadResolved(HashedGuid legacyKey,
         withMeshlets = false;
     };
     const uint64_t indexBytes = uint64_t(indexCount) * sizeof(uint32_t);
-    const std::array<RHIUploadRequest, 3> requests = {{
+    const ce::fixed_array<RHIUploadRequest, 3> requests = {{
         { vertexBytes, RHIUploadUsage::VertexData, alignof(Vertex) },
         { indexBytes, RHIUploadUsage::IndexData, alignof(uint32_t) },
         { meshlets.bytes.size(), RHIUploadUsage::BufferCopy, 16 }
     }};
-    std::array<RHIBufferSlice, 3> staging{};
+    ce::fixed_array<RHIBufferSlice, 3> staging{};
     const auto reserve = [&](size_t count)
     {
         return m_resources->ReserveUploadBatch(std::span(requests).first(count),
@@ -552,7 +553,7 @@ DX12MeshCache::Entry DX12MeshCache::UploadResolved(HashedGuid legacyKey,
         RHIModelMeshletUpload meshlets;
         RHIBufferSlice indexStaging, meshletStaging;
     };
-    std::array<CoarseUpload, kRHIMaxCoarseMeshLods> coarseUploads;
+    ce::fixed_array<CoarseUpload, kRHIMaxCoarseMeshLods> coarseUploads;
     uint64_t coarseBytes = 0;
     const auto* sourceMesh = modelView ? modelView->SourceMesh() : nullptr;
     if (sourceMesh)
@@ -620,11 +621,11 @@ DX12MeshCache::Entry DX12MeshCache::UploadResolved(HashedGuid legacyKey,
                     }
                 }
             }
-            const std::array<RHIUploadRequest, 2> lodRequests = {{
+            const ce::fixed_array<RHIUploadRequest, 2> lodRequests = {{
                 { bytes, RHIUploadUsage::IndexData, alignof(uint32_t) },
                 { upload.meshlets.bytes.size(), RHIUploadUsage::BufferCopy, 16 }
             }};
-            std::array<RHIBufferSlice, 2> lodStaging{};
+            ce::fixed_array<RHIBufferSlice, 2> lodStaging{};
             bool reserved = false;
             if (!upload.meshlets.bytes.empty())
             {

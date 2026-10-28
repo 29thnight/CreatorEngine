@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "EditorCommandlets.h"
 #include "CommandCore/CommandRegistry.h"
 #include "../../RenderTests/ExperimentParity/ExperimentMaterialMigrateSelfTest.h"
@@ -8,7 +9,7 @@
 
 namespace EditorCommandlets
 {
-    CommandCore::CommandResult Run(const std::vector<std::string>& arguments)
+    CommandCore::CommandResult Run(const ce::dynamic_array<std::string>& arguments)
     {
         using namespace CommandCore;
         if (arguments.empty()) return InvalidArguments("--commandlet requires a name", "commandlet.name_missing");

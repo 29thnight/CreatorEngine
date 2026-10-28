@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿#include "../../Containers/ContainerAPI.h"
+#pragma once
 #include "../Foundation/StandardLibrary.h"
 
 // 엔진이 직접 세는 리소스 카운터.
@@ -23,7 +24,7 @@ namespace Diagnostics
 		Count
 	};
 
-	inline constexpr std::array<std::string_view, static_cast<size_t>(EngineResource::Count)> kEngineResourceNames
+	inline constexpr ce::fixed_array<std::string_view, static_cast<size_t>(EngineResource::Count)> kEngineResourceNames
 	{
 		"Texture",
 		"Mesh",
@@ -35,7 +36,7 @@ namespace Diagnostics
 	{
 		// inline 변수라 번역 단위마다 복사되지 않는다.
 		// (DLL 경계를 넘으면 별개가 되므로, 세는 쪽과 읽는 쪽은 같은 모듈에 있어야 한다)
-		inline std::array<std::atomic<int64_t>, static_cast<size_t>(EngineResource::Count)> g_liveCounts{};
+		inline ce::fixed_array<std::atomic<int64_t>, static_cast<size_t>(EngineResource::Count)> g_liveCounts{};
 	}
 
 	inline void TrackCreate(EngineResource type) noexcept
@@ -55,7 +56,7 @@ namespace Diagnostics
 
 	struct ResourceSnapshot
 	{
-		std::array<int64_t, static_cast<size_t>(EngineResource::Count)> counts{};
+		ce::fixed_array<int64_t, static_cast<size_t>(EngineResource::Count)> counts{};
 
 		int64_t Total() const noexcept
 		{

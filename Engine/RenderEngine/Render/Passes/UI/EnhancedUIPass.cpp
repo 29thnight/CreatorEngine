@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #include "EnhancedUIPass.h"
 #include "../../Graph/EnhancedRenderGraph.h"
 #include "../../../RHI/RHIEncoder.h"
@@ -57,7 +58,7 @@ namespace
 
 // ── 불변 글리프 배치를 화면/Canvas 사각형으로 ──
 bool EnhancedUIPass::AppendTextRects(const UIRenderProxy::TextData& text,
-    std::vector<Rect>& outRects, TextureFramePins& texturePins, float offsetX, float offsetY)
+    ce::dynamic_array<Rect>& outRects, TextureFramePins& texturePins, float offsetX, float offsetY)
 {
     if (!text.layout || !std::isfinite(offsetX) || !std::isfinite(offsetY) ||
         !std::isfinite(text.position.x) || !std::isfinite(text.position.y) ||
@@ -138,7 +139,7 @@ bool EnhancedUIPass::AppendTextRects(const UIRenderProxy::TextData& text,
 }
 
 uint32_t EnhancedUIPass::BuildRectsFromQueue(
-    UIRenderProxy* const* proxies, size_t count, std::vector<Rect>& outRects,
+    UIRenderProxy* const* proxies, size_t count, ce::dynamic_array<Rect>& outRects,
     float screenWidth, float screenHeight, TextureFramePins* texturePins)
 {
     outRects.clear();
@@ -361,7 +362,7 @@ bool EnhancedUIPass::PrepareFrame(const EnhancedFrameContext& context, std::stri
     //
     //   그래서 (canvasOrder, layerOrder)로 안정 정렬만 하고, 텍스처는
     //   '연속해서 같은 것'인 구간만 묶는다.
-    std::vector<uint32_t> order(m_rects->size());
+    ce::dynamic_array<uint32_t> order(m_rects->size());
     for (uint32_t i = 0; i < order.size(); ++i) order[i] = i;
 
     std::stable_sort(order.begin(), order.end(),
@@ -460,7 +461,7 @@ void EnhancedUIPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCont
     const auto colorAccess = explicitAccess
         ? (ownsColor ? RGAccessMode::Write : RGAccessMode::ReadWrite) : RGAccessMode::LegacyState;
     const auto output = m_output;
-    std::vector<EnhancedRenderGraph::RGPassUsage> usages;
+    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> usages;
     usages.push_back({ output, RHIResourceState::RenderTarget, colorAccess });
     if (explicitAccess)
     {

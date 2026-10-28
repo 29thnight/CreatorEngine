@@ -1,3 +1,5 @@
+#include "../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Engine/Containers/ContainerAPI.h"
 #include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../Tools/build/ModuleAdapters/Creator.Platform.Windows.Strings.h"
@@ -61,7 +63,7 @@ namespace PlayerCmd
 	{
         struct BatchInput
         {
-            std::vector<std::vector<std::string>> commands;
+            ce::dynamic_array<ce::dynamic_array<std::string>> commands;
             std::filesystem::path resultPath;
             std::ofstream resultFile;
             std::size_t next{};
@@ -193,7 +195,7 @@ namespace PlayerCmd
                 }, 0);
         }
 
-		using Handler = CommandCore::CommandResult(*)(const std::vector<std::string>&);
+		using Handler = CommandCore::CommandResult(*)(const ce::dynamic_array<std::string>&);
 
 		// ── 핸들러 ──────────────────────────────────────────────────────
 		//
@@ -214,7 +216,7 @@ namespace PlayerCmd
 			return object;
 		}
 
-		CommandCore::CommandResult Cmd_help(const std::vector<std::string>& parts)
+		CommandCore::CommandResult Cmd_help(const ce::dynamic_array<std::string>& parts)
 		{
 			const CommandCore::CommandRegistry& registry = CommandCore::CommandRegistry::Get();
 
@@ -237,13 +239,13 @@ namespace PlayerCmd
 			return CommandCore::Ok();
 		}
 
-		CommandCore::CommandResult Cmd_quit(const std::vector<std::string>&)
+		CommandCore::CommandResult Cmd_quit(const ce::dynamic_array<std::string>&)
 		{
 			CommandHost::Get().RequestQuit();
 			return CommandCore::Ok("종료 요청");
 		}
 
-		CommandCore::CommandResult Cmd_status(const std::vector<std::string>&)
+		CommandCore::CommandResult Cmd_status(const ce::dynamic_array<std::string>&)
 		{
 			const CommandHost::Status status = CommandHost::Get().Snapshot();
 
@@ -257,7 +259,7 @@ namespace PlayerCmd
 			return CommandCore::Ok("player status", std::move(data));
 		}
 
-		CommandCore::CommandResult Cmd_scene(const std::vector<std::string>&)
+		CommandCore::CommandResult Cmd_scene(const ce::dynamic_array<std::string>&)
 		{
 			Scene* scene = ActiveScene();
 			if (nullptr == scene)
@@ -276,7 +278,7 @@ namespace PlayerCmd
 			return CommandCore::Ok("scene", std::move(data));
 		}
 
-		CommandCore::CommandResult Cmd_objects(const std::vector<std::string>& parts)
+		CommandCore::CommandResult Cmd_objects(const ce::dynamic_array<std::string>& parts)
 		{
 			Scene* scene = ActiveScene();
 			if (nullptr == scene)
@@ -304,7 +306,7 @@ namespace PlayerCmd
 			return CommandCore::Ok("objects", std::move(data));
 		}
 
-		CommandCore::CommandResult Cmd_object(const std::vector<std::string>& parts)
+		CommandCore::CommandResult Cmd_object(const ce::dynamic_array<std::string>& parts)
 		{
 			if (parts.size() < 2)
 			{
@@ -342,7 +344,7 @@ namespace PlayerCmd
 			return CommandCore::Ok("object", std::move(data));
 		}
 
-		CommandCore::CommandResult Cmd_animation(const std::vector<std::string>& parts)
+		CommandCore::CommandResult Cmd_animation(const ce::dynamic_array<std::string>& parts)
 		{
 			if (parts.size() != 2)
 				return CommandCore::InvalidArguments("player.animation: <이름> 이 필요하다");
@@ -360,7 +362,7 @@ namespace PlayerCmd
 			std::uint64_t digest = 14695981039346656037ull;
 			for (const auto& matrix : instance.finalTransforms)
 			{
-				std::array<float, 16> values{};
+				ce::fixed_array<float, 16> values{};
 				std::memcpy(values.data(), &matrix, sizeof(values));
 				for (float value : values)
 				{
@@ -387,7 +389,7 @@ namespace PlayerCmd
 			return CommandCore::Ok("animation", std::move(data));
 		}
 
-		CommandCore::CommandResult Cmd_move(const std::vector<std::string>& parts)
+		CommandCore::CommandResult Cmd_move(const ce::dynamic_array<std::string>& parts)
 		{
 			if (parts.size() < 5)
 			{
@@ -431,7 +433,7 @@ namespace PlayerCmd
 #if !CE_SHIPPING
 		// 시험 전용: 다음 프레임 시작에 DX12 장치를 지워 장치 제거 경로를 재현한다.
 		// scene 은 렌더 장치, host 는 표시 장치지만 같은 어댑터라 실제로는 둘 다 지워진다.
-		CommandCore::CommandResult Cmd_device_remove(const std::vector<std::string>& parts)
+		CommandCore::CommandResult Cmd_device_remove(const ce::dynamic_array<std::string>& parts)
 		{
 			if (parts.size() != 2 || (parts[1] != "scene" && parts[1] != "host"))
 			{
@@ -562,7 +564,7 @@ namespace PlayerCmd
             return data;
         }
 
-        static CommandCore::CommandResult Cmd_render_status(const std::vector<std::string>& parts)
+        static CommandCore::CommandResult Cmd_render_status(const ce::dynamic_array<std::string>& parts)
         {
             using namespace CommandCore;
             if (parts.size() != 1)
@@ -577,7 +579,7 @@ namespace PlayerCmd
             data.Set("slotMask", CommandData::Int(game.promotedSlotMask));
             return Ok("", std::move(data));
         }
-        static CommandCore::CommandResult Cmd_profile_record(const std::vector<std::string>& parts)
+        static CommandCore::CommandResult Cmd_profile_record(const ce::dynamic_array<std::string>& parts)
         {
             using namespace CommandCore;
             if (parts.size() != 1)
@@ -606,7 +608,7 @@ namespace PlayerCmd
             return Ok("New recording requested", ProfileStatePayload());
         }
 
-        static CommandCore::CommandResult Cmd_profile_pause(const std::vector<std::string>& parts)
+        static CommandCore::CommandResult Cmd_profile_pause(const ce::dynamic_array<std::string>& parts)
         {
             using namespace CommandCore;
             if (parts.size() != 1)
@@ -621,7 +623,7 @@ namespace PlayerCmd
             return Ok("Stop requested; profile.save status reports writer finalization", ProfileStatePayload());
         }
 
-        static CommandCore::CommandResult Cmd_profile_save(const std::vector<std::string>& parts)
+        static CommandCore::CommandResult Cmd_profile_save(const ce::dynamic_array<std::string>& parts)
         {
             using namespace CommandCore;
             if (parts.size() != 2)
@@ -738,7 +740,7 @@ namespace PlayerCmd
 
 		// ── 표 ──────────────────────────────────────────────────────────
 
-        CommandCore::CommandResult Cmd_temporal(const std::vector<std::string>& parts)
+        CommandCore::CommandResult Cmd_temporal(const ce::dynamic_array<std::string>& parts)
         {
             return CommandCore::ExecuteTemporalCommand(parts, TemporalPresentationTarget::PlayerSwapchain);
         }
@@ -783,9 +785,9 @@ namespace PlayerCmd
 			{ "player.move",    &Cmd_move },
 		};
 
-		std::unordered_map<std::string, Handler>& Table()
+		ce::engine_node_map<std::string, Handler>& Table()
 		{
-			static std::unordered_map<std::string, Handler> table;
+			static ce::engine_node_map<std::string, Handler> table;
 			return table;
 		}
 	}
@@ -847,7 +849,7 @@ namespace PlayerCmd
             }
             else
             {
-                std::vector<std::string> arguments;
+                ce::dynamic_array<std::string> arguments;
                 for (++index; index < argc; ++index)
                 {
                     if (std::wstring_view(argv[index]) == L"--")
@@ -993,7 +995,7 @@ namespace PlayerCmd
 			Table().size(), registry.CommandCount());
 	}
 
-	CommandCore::CommandResult CommandHost::Execute(const std::vector<std::string>& arguments)
+	CommandCore::CommandResult CommandHost::Execute(const ce::dynamic_array<std::string>& arguments)
 	{
 		if (arguments.empty()) return CommandCore::Ok();
 
@@ -1023,7 +1025,7 @@ namespace PlayerCmd
 		}
 	}
 
-	bool CommandHost::Enqueue(std::vector<std::string> arguments, Completion completion,
+	bool CommandHost::Enqueue(ce::dynamic_array<std::string> arguments, Completion completion,
 	                          std::size_t queueCap)
 	{
 		if (arguments.empty()) return false;

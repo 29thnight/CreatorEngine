@@ -15,7 +15,7 @@ RGHandle SceneHost::GeometryStage::DeclareGeometry(const own::shared_owner<const
         return this->geometryTable->GraphTable(graph);
     }
     // Declare unique pose producers once; instance views retain their own worlds.
-    static thread_local std::vector<const MeshSurfaceBatch*> geometry;
+    static thread_local ce::dynamic_array<const MeshSurfaceBatch*> geometry;
     static thread_local ce::render_pointer_set<MeshSurfaceBatch> declaredGeometry;
     declaredGeometry.reset(frame->draws.size() * 2 + frame->shadowDraws.size());
     if (!geometry.empty())
@@ -24,7 +24,7 @@ RGHandle SceneHost::GeometryStage::DeclareGeometry(const own::shared_owner<const
     }
     struct ClearGeometry
     {
-        std::vector<const MeshSurfaceBatch*>& values;
+        ce::dynamic_array<const MeshSurfaceBatch*>& values;
         ce::render_pointer_set<MeshSurfaceBatch>& seen;
         ~ClearGeometry()
         {

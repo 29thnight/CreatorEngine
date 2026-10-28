@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "AudioRuntime.h"
 #include "../../RenderEngine/Experiment/Cooked/CookedAudioClipSource.h"
 
@@ -746,7 +747,7 @@ namespace wave
             return;
         }
         m_concurrencyLimits[group.value] = { cap, policy };
-        std::vector<VoiceHandle> handles;
+        ce::dynamic_array<VoiceHandle> handles;
         m_voices.ForEachAlive([&](VoiceHandle handle, const VoiceRecord& record)
         {
             if (record.request.concurrencyGroup.value == group.value)
@@ -865,9 +866,9 @@ namespace wave
         m_clips.erase(key);
     }
 
-    std::vector<ClipKey> AudioRuntime::ListClipKeys() const
+    ce::dynamic_array<ClipKey> AudioRuntime::ListClipKeys() const
     {
-        std::vector<ClipKey> keys(m_clips.begin(), m_clips.end());
+        ce::dynamic_array<ClipKey> keys(m_clips.begin(), m_clips.end());
         std::sort(keys.begin(), keys.end(), [](const ClipKey& left, const ClipKey& right)
         {
             if (left.Text() != right.Text())
@@ -888,7 +889,7 @@ namespace wave
         ++m_frame;
         const double elapsed = std::isfinite(deltaSeconds) ? std::max(0.0f, deltaSeconds) : 0.0;
         m_backend.Advance(deltaSeconds);
-        std::vector<VoiceHandle> virtualVoices;
+        ce::dynamic_array<VoiceHandle> virtualVoices;
         m_voices.ForEachAlive([&](VoiceHandle handle, VoiceRecord& record)
         {
             if (record.transformDirty || record.settingsDirty)

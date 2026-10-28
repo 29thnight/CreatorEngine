@@ -1,5 +1,6 @@
 #include "../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
+#include "../Engine/Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -51,7 +52,7 @@ namespace Player
 
         // Installed before RT starts, cleared only after RT joins. The callback only
         // wakes the existing PT; it never records GPU work on the producer thread.
-        void SetDisplayAvailableCallback(std::function<void()> callback) { m_displayAvailable = std::move(callback); }
+        void SetDisplayAvailableCallback(ce::owned_func<void()> callback) { m_displayAvailable = std::move(callback); }
 
         void NotifyDisplayAvailable() final
         {
@@ -73,7 +74,7 @@ namespace Player
         own::shared_owner<PresentationRetirement> m_retirement;
         std::atomic<uint64_t> m_submittedGameFrames{0};
         bool m_shutdownFailed{false};
-        std::function<void()> m_displayAvailable;
+        ce::owned_func<void()> m_displayAvailable;
     };
 
     template<class T>

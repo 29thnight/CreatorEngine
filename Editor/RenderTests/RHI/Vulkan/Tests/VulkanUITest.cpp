@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -35,9 +36,9 @@ namespace
         own::shared_owner<const Texture> redTexture;
         own::shared_owner<const Texture> blueTexture;
         own::shared_owner<const Texture> distanceTexture;
-        std::vector<EnhancedUIPass::Rect> baseRects;
-        std::vector<EnhancedUIPass::Rect> texturedRects;
-        std::vector<EnhancedUIPass::Rect> distanceRects;
+        ce::dynamic_array<EnhancedUIPass::Rect> baseRects;
+        ce::dynamic_array<EnhancedUIPass::Rect> texturedRects;
+        ce::dynamic_array<EnhancedUIPass::Rect> distanceRects;
 
         UiRhiFixture()
         {
@@ -49,8 +50,8 @@ namespace
                 RHIFormat::RGBA8Unorm, blue);
             // Exact outside / contour / inside plateaus make coverage and the
             // straight-alpha blend test independent of font files and rasterizers.
-            constexpr std::array<uint8_t, 8> distances{ 0, 0, 128, 128, 255, 255, 0, 0 };
-            std::array<uint8_t, 32> distancePixels{};
+            constexpr ce::fixed_array<uint8_t, 8> distances{ 0, 0, 128, 128, 255, 255, 0, 0 };
+            ce::fixed_array<uint8_t, 32> distancePixels{};
             for (size_t pixel = 0; pixel < distances.size(); ++pixel)
             {
                 for (size_t channel = 0; channel < 4; ++channel)
@@ -213,7 +214,7 @@ namespace
                 EnhancedUIPass::kOutputFormat, 1, readback, outError))
             return fail(outError);
 
-        const auto render = [&](const std::vector<EnhancedUIPass::Rect>& rects,
+        const auto render = [&](const ce::dynamic_array<EnhancedUIPass::Rect>& rects,
             UiRhiFrame& frame) -> bool
         {
             ui.SetRects(&rects);
@@ -317,7 +318,7 @@ namespace
     {
         EnhancedUIPass ui;
         EnhancedFrameContext context{};
-        std::vector<EnhancedUIPass::Rect> rects(1);
+        ce::dynamic_array<EnhancedUIPass::Rect> rects(1);
         auto texture = own::make_shared<const Texture>();
         const own::weak_owner<const Texture> weakTexture = texture;
         auto texturePins = own::make_shared<TextureFramePins>();
@@ -371,7 +372,7 @@ namespace
         text.position = { 200.f, 100.f };
         text.canvasOrder = 7;
         text.layerOrder = 3;
-        std::vector<EnhancedUIPass::Rect> rects(1);
+        ce::dynamic_array<EnhancedUIPass::Rect> rects(1);
         TextureFramePins textPins;
         if (!EnhancedUIPass::AppendTextRects(text, rects, textPins, 20.f, 30.f) || rects.size() != 3 ||
             rects[1].left != 180.f || rects[1].top != 114.f ||
@@ -428,7 +429,7 @@ namespace
         // when the source list is rebuilt before graph recording.
         EnhancedSpritePass sprite;
         EnhancedFrameContext context{};
-        std::vector<EnhancedSpritePass::Item> items(1);
+        ce::dynamic_array<EnhancedSpritePass::Item> items(1);
         auto texture = own::make_shared<const Texture>();
         const own::weak_owner<const Texture> weakTexture = texture;
         auto texturePins = own::make_shared<TextureFramePins>();

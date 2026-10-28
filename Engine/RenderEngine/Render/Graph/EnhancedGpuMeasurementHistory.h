@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -16,7 +17,7 @@ public:
     struct Sample
     {
         own::shared_owner<const std::string> graphSignature;
-        std::vector<std::optional<uint64_t>> nanoseconds;
+        ce::dynamic_array<std::optional<uint64_t>> nanoseconds;
         GpuFrameToken token;
     };
 
@@ -93,7 +94,7 @@ public:
         {
             const auto equal = [](const auto& a, const auto& b)
             { return a.operator->() == b.operator->() || (a && b && *a == *b); };
-            std::erase_if(entry.variants, [&](const Sample& old)
+            ce::erase_if(entry.variants, [&](const Sample& old)
             { return equal(old.graphSignature, sample.graphSignature); });
             if (!equal(entry.latest.graphSignature, sample.graphSignature))
                 entry.variants.push_back(std::move(entry.latest));
@@ -105,12 +106,14 @@ public:
     }
 
 private:
-    struct Entry { Sample latest; std::vector<Sample> variants; };
-    using DomainSamples = std::unordered_map<uint64_t, Entry>;
+    struct Entry { Sample latest; ce::dynamic_array<Sample> variants; };
+    // Erase/Clear release value storage immediately; retained samples keep their owners.
+    using DomainSamples = ce::node_hash_map<uint64_t, Entry, ce::hash<uint64_t>,
+        ce::equal_to<uint64_t>, ce::heap_allocator, false>;
     static constexpr size_t kMaxViews = 8;
     static constexpr size_t kMaxSignaturesPerView = 4;
     static constexpr uint64_t kMaxFrameAge = 8;
-    std::array<DomainSamples, 2> m_domains;
+    ce::fixed_array<DomainSamples, 2> m_domains;
 
     DomainSamples& Samples(RGMeasurementDomain domain)
     {

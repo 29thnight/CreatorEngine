@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
@@ -50,7 +51,7 @@ class SceneLayerIndex final
 
         for (auto& bucket : m_buckets)
             if (&bucket != &target)
-                std::erase(bucket, entity);
+                ce::erase(bucket, entity);
 
         return {};
     }
@@ -64,7 +65,7 @@ class SceneLayerIndex final
             return std::unexpected(ce::layers::error::wrong_scene);
 
         for (auto& bucket : m_buckets)
-            std::erase(bucket, entity);
+            ce::erase(bucket, entity);
 
         return {};
     }
@@ -94,5 +95,5 @@ class SceneLayerIndex final
 
     std::uint32_t m_scene;
     std::thread::id m_owner = std::this_thread::get_id();
-    std::array<std::vector<EntityHandle>, 32> m_buckets;
+    ce::fixed_array<ce::dynamic_array<EntityHandle>, 32> m_buckets;
 };

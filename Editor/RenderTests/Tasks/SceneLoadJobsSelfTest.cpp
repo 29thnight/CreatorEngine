@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "Tasks/SceneLoadJobsSelfTest.h"
 #include "SceneManager.h"
 #include "Scene.h"
@@ -72,7 +73,7 @@ namespace
     private:
         std::mutex m_mutex;
         std::condition_variable m_ready;
-        std::vector<job_handle> m_jobs;
+        ce::dynamic_array<job_handle> m_jobs;
         size_t m_entered = 0;
         bool m_release = false;
     };

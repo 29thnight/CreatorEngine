@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
@@ -26,7 +27,7 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
         outLog += "RG7 requires an actual DX12 validation queue; use CREATOR_DX12_VALIDATION=gpu";
         return false;
     }
-    std::array<std::vector<uint8_t>, 6> baseline;
+    ce::fixed_array<ce::dynamic_array<uint8_t>, 6> baseline;
     uint64_t baselineBytes = 0;
     RGTransientPool aliasPool;
     RHIBufferHandle cachedBuffer;
@@ -63,8 +64,8 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
                 return false;
             }
         }
-        std::array<RGHandle, 6> handles{};
-        std::array<RHIReadback, 6> readbacks{};
+        ce::fixed_array<RGHandle, 6> handles{};
+        ce::fixed_array<RHIReadback, 6> readbacks{};
         uint64_t measuredUnaliasedBytes = 0;
         auto cleanup = [&]
         {
@@ -299,7 +300,7 @@ bool DX12Test::RunTransientAliasingTest(std::string& outLog)
                     throw std::runtime_error(error);
                 }
                 // Readback row padding is undefined. Compare authored pixels only.
-                std::vector<uint8_t> pixels;
+                ce::dynamic_array<uint8_t> pixels;
                 if (index % 3 == 1)
                 {
                     pixels = image.data;

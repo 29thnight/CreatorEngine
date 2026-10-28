@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "LXCanvas.h"
 #include "../Core/LXDocument.h"
 
@@ -199,12 +200,12 @@ std::string ItemValue(const Node& node, const std::string& key, const LXNodeItem
     {
         return WriteFloat(static_cast<float>(*value));
     }
-    if (const auto* value = std::get_if<std::array<double, 4>>(&pin->value))
+    if (const auto* value = std::get_if<ce::fixed_array<double, 4>>(&pin->value))
     {
         return WriteColor({static_cast<float>((*value)[0]), static_cast<float>((*value)[1]),
                            static_cast<float>((*value)[2]), static_cast<float>((*value)[3])});
     }
-    if (const auto* value = std::get_if<std::array<double, 3>>(&pin->value))
+    if (const auto* value = std::get_if<ce::fixed_array<double, 3>>(&pin->value))
     {
         std::ostringstream stream;
         stream << (*value)[0] << ", " << (*value)[1] << ", " << (*value)[2];
@@ -222,7 +223,7 @@ ImVec4 ItemColor(const Node& node, const std::string& key, const LXNodeItemRegis
     const Pin* pin = items.ValuePin(node, key);
     if (pin)
     {
-        if (const auto* value = std::get_if<std::array<double, 4>>(&pin->value))
+        if (const auto* value = std::get_if<ce::fixed_array<double, 4>>(&pin->value))
         {
             return {static_cast<float>((*value)[0]), static_cast<float>((*value)[1]), static_cast<float>((*value)[2]),
                     static_cast<float>((*value)[3])};
@@ -479,7 +480,7 @@ std::optional<LXHeaderLinkEndpoints> HeaderLinkEndpoints(const LXGraph& graph, c
                 ++count;
             }
         }
-        return std::pair{index, count};
+        return ce::pair{index, count};
     };
     const auto [outputIndex, outputCount] = order(source->id, outputSide);
     const auto [inputIndex, inputCount] = order(target->id, inputSide);
@@ -743,10 +744,10 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
         return document ? document->Execute(LXSetNodeCollapsed{node, value}, document->Revision()).applied
                         : graph.SetNodeCollapsed(node, value);
     };
-    const auto previewPositions = [&](const std::vector<NodePosition>& positions) {
+    const auto previewPositions = [&](const ce::dynamic_array<NodePosition>& positions) {
         return document ? document->PreviewNodePositions(positions) : graph.SetNodePositions(positions, false);
     };
-    const auto finishPositions = [&](const std::vector<NodePosition>& start, const std::vector<NodePosition>& final) {
+    const auto finishPositions = [&](const ce::dynamic_array<NodePosition>& start, const ce::dynamic_array<NodePosition>& final) {
         if (document)
         {
             return document->FinishNodePositionPreview(start, final).applied;
@@ -758,7 +759,7 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
         return document ? document->Execute(LXPasteNodes{fragment, x, y}, document->Revision()).createdNodes
                         : graph.PasteNodes(fragment, x, y);
     };
-    const auto remove = [&](const std::vector<Id>& nodes) {
+    const auto remove = [&](const ce::dynamic_array<Id>& nodes) {
         return document ? document->Execute(LXRemoveNodes{nodes}, document->Revision()).applied
                         : graph.RemoveNodes(nodes);
     };
@@ -1251,7 +1252,7 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
                 delta.y = std::round((anchor->y + delta.y) / spacing) * spacing - anchor->y;
             }
         }
-        std::vector<NodePosition> positions = state.dragStartNodes;
+        ce::dynamic_array<NodePosition> positions = state.dragStartNodes;
         for (NodePosition& position : positions)
         {
             position.x += delta.x;
@@ -1264,7 +1265,7 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
     }
     if (state.draggingNode && ImGui::IsMouseReleased(ImGuiMouseButton_Left))
     {
-        std::vector<NodePosition> finalPositions;
+        ce::dynamic_array<NodePosition> finalPositions;
         finalPositions.reserve(state.dragStartNodes.size());
         for (const NodePosition& position : state.dragStartNodes)
         {
@@ -1313,7 +1314,7 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
     {
         if (ImGui::GetIO().KeyCtrl && ImGui::IsKeyPressed(ImGuiKey_C) && state.selectedNode)
         {
-            state.clipboard = graph.CopyNodes(state.selectedNodes.empty() ? std::vector<Id>{state.selectedNode}
+            state.clipboard = graph.CopyNodes(state.selectedNodes.empty() ? ce::dynamic_array<Id>{state.selectedNode}
                                                                           : state.selectedNodes);
             state.pasteCount = 0;
             state.message = "Selection copied";
@@ -1328,7 +1329,7 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
             state.message = state.dirty ? "Selection pasted" : "Paste failed";
         }
         if (ImGui::IsKeyPressed(ImGuiKey_Delete) && state.selectedNode &&
-            remove(state.selectedNodes.empty() ? std::vector<Id>{state.selectedNode} : state.selectedNodes))
+            remove(state.selectedNodes.empty() ? ce::dynamic_array<Id>{state.selectedNode} : state.selectedNodes))
         {
             state.selectedNode = 0;
             state.selectedNodes.clear();
@@ -1635,7 +1636,7 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
                             const bool changed =
                                 valuePin && valuePin->type == PinType::Color
                                     ? setSocketValue(valuePin->id,
-                                                     std::array<double, 4>{state.colorValue.x, state.colorValue.y,
+                                                     ce::fixed_array<double, 4>{state.colorValue.x, state.colorValue.y,
                                                                            state.colorValue.z, state.colorValue.w})
                                     : setProperty(node.id, key, WriteColor(state.colorValue));
                             if (changed)
@@ -1674,7 +1675,7 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
                     }
                     else if (kind == LXNodeItemKind::Boolean && valuePin)
                     {
-                        bool checked = std::get_if<bool>(&valuePin->value) && std::get<bool>(valuePin->value);
+                        bool checked = std::get_if<bool>(&valuePin->value) && ce::get<bool>(valuePin->value);
                         if (ImGui::Checkbox("##bool", &checked))
                         {
                             state.dirty |= setSocketValue(valuePin->id, checked);
@@ -1685,7 +1686,7 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
                         auto components = state.vectorValue;
                         if (state.editingPin != valuePin->id)
                         {
-                            if (const auto* vector = std::get_if<std::array<double, 3>>(&valuePin->value))
+                            if (const auto* vector = std::get_if<ce::fixed_array<double, 3>>(&valuePin->value))
                             {
                                 std::transform(vector->begin(), vector->end(), components.begin(),
                                                [](double number) { return static_cast<float>(number); });
@@ -1699,7 +1700,7 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
                         if (ImGui::IsItemDeactivatedAfterEdit())
                         {
                             state.dirty |= setSocketValue(
-                                valuePin->id, std::array<double, 3>{components[0], components[1], components[2]});
+                                valuePin->id, ce::fixed_array<double, 3>{components[0], components[1], components[2]});
                             state.editingPin = 0;
                         }
                     }
@@ -1707,7 +1708,7 @@ void DrawCanvas(LXGraph& graph, CanvasState& state, const LXStyleSheet& styles, 
                     {
                         auto number = state.editingPin == valuePin->id ? state.integerValue
                                       : std::get_if<std::int64_t>(&valuePin->value)
-                                          ? std::get<std::int64_t>(valuePin->value)
+                                          ? ce::get<std::int64_t>(valuePin->value)
                                           : 0;
                         if (ImGui::InputScalar("##integer", ImGuiDataType_S64, &number))
                         {

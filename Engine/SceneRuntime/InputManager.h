@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
@@ -111,7 +112,7 @@ public:
 
 	KeyboardState					m_keyboardState{};
 	IGameInputDevice*				m_keyboardDevice{ nullptr };
-	std::vector<GameInputKeyState>	m_GameInputKeyStates{};
+	ce::dynamic_array<GameInputKeyState>	m_GameInputKeyStates{};
 	GameInputMouseState				m_GameInputMouseState{};
 	//비트 플레그의 정수를 보여주지
 	key_bit_flag                      m_curKeyStates{};

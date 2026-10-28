@@ -1,3 +1,5 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 // 에디터 크롬 스냅샷 — 게시·읽기와 감사·덤프 (PHASE 21 W0 전반).
 //
 // 이 TU 는 ImGui 를 모른다. 값을 채우는 것은 `EditorChromeProbe.cpp` 하나다.
@@ -42,7 +44,7 @@ namespace editor
             return std::string{ buffer };
         }
 
-        std::string joined(const std::vector<std::string>& items, std::size_t limit = 6)
+        std::string joined(const ce::dynamic_array<std::string>& items, std::size_t limit = 6)
         {
             std::string out;
             for (std::size_t index = 0; index < items.size() && index < limit; ++index)
@@ -288,7 +290,7 @@ namespace editor
             return audit;
         }
 
-        std::unordered_map<std::string, int> seen;
+        ce::engine_node_map<std::string, int> seen;
         std::string line;
         while (std::getline(stream, line))
         {
@@ -368,7 +370,7 @@ namespace editor
         for (const auto& [name, color] : snapshot.theme_tokens)
             out += name + '\t' + hex_color(color) + '\n';
         out += "\nstyleColor\tvalue\n";
-        for (const std::pair<std::string, std::uint32_t>& color : snapshot.style_colors)
+        for (const ce::pair<std::string, std::uint32_t>& color : snapshot.style_colors)
         {
             out += color.first;
             out += '\t';
@@ -378,7 +380,7 @@ namespace editor
 
         out += "\nstyleScalar\tvalue\n";
         char buffer[128]{};
-        for (const std::pair<std::string, float>& scalar : snapshot.style_scalars)
+        for (const ce::pair<std::string, float>& scalar : snapshot.style_scalars)
         {
             out += scalar.first;
             std::snprintf(buffer, sizeof(buffer), "\t%.3f\n", scalar.second);

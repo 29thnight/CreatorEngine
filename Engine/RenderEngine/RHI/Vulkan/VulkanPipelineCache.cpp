@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
@@ -206,16 +208,16 @@ namespace
         bool indexingLimits, const VkPhysicalDeviceDescriptorIndexingProperties& limits,
         VulkanDescriptorRequirements& result, std::string& error)
     {
-        constexpr std::array<VkShaderStageFlagBits, 8> stages{
+        constexpr ce::fixed_array<VkShaderStageFlagBits, 8> stages{
             VK_SHADER_STAGE_VERTEX_BIT, VK_SHADER_STAGE_TESSELLATION_CONTROL_BIT,
             VK_SHADER_STAGE_TESSELLATION_EVALUATION_BIT, VK_SHADER_STAGE_GEOMETRY_BIT,
             VK_SHADER_STAGE_FRAGMENT_BIT, VK_SHADER_STAGE_COMPUTE_BIT,
             VK_SHADER_STAGE_TASK_BIT_EXT, VK_SHADER_STAGE_MESH_BIT_EXT,
         };
-        using Counts = std::array<uint64_t, VulkanDescriptorTypes.size()>;
+        using Counts = ce::fixed_array<uint64_t, VulkanDescriptorTypes.size()>;
         Counts total{};
-        std::array<Counts, stages.size()> perStage{};
-        std::set<uint32_t> numbers;
+        ce::fixed_array<Counts, stages.size()> perStage{};
+        ce::engine_ordered_set<uint32_t> numbers;
         for (const auto& binding : bindings)
         {
             const auto type = std::find(VulkanDescriptorTypes.begin(), VulkanDescriptorTypes.end(),
@@ -583,8 +585,8 @@ RHIPipelineLayoutHandle VulkanPipelineCache::GetOrCreate(
     // ★ 걸으면서 **슬롯 번호표**도 만든다 (5c-4d). 계약의 `slot` 은 DX12 의
     //   루트 파라미터 번호라, Vulkan 은 "몇 번째 칸이 어느 binding 인가"를
     //   레이아웃마다 들어야 한다 — `VulkanLayoutSlot` 의 ★ 참고.
-    std::vector<VkDescriptorSetLayoutBinding> bindings;
-    std::vector<VulkanLayoutSlot> paramSlots;
+    ce::dynamic_array<VkDescriptorSetLayoutBinding> bindings;
+    ce::dynamic_array<VulkanLayoutSlot> paramSlots;
     bool indexingLimits = false;
     for (const RHIPipelineLayoutParam& param : desc.params)
     {
@@ -982,7 +984,7 @@ VulkanLayoutSlot VulkanPipelineCache::ResolveParam(RHIPipelineLayoutHandle handl
     const uint32_t slot = RHIHandleBits::SlotOf(handle.id);
     if (slot >= m_layouts.size()) return {};
 
-    const std::vector<VulkanLayoutSlot>& slots = m_layouts[slot].paramSlots;
+    const ce::dynamic_array<VulkanLayoutSlot>& slots = m_layouts[slot].paramSlots;
     if (param >= slots.size()) return {};
     return slots[param];
 }
@@ -1181,7 +1183,7 @@ RHIPipelineHandle VulkanPipelineCache::GetOrCreate(const RHIGraphicsPipelineDesc
 
 void VulkanPipelineCache::CollectAbandonedGraphics()
 {
-    std::erase_if(m_abandonedGraphics, [this](const auto& request) {
+    ce::erase_if(m_abandonedGraphics, [this](const auto& request) {
         if (request->completion.valid() && !request->completion.is_complete())
             return false;
         if (!request->checked)
@@ -1430,7 +1432,7 @@ VkPipeline VulkanPipelineCache::CreateRaster(VkDevice device, const RHIGraphicsP
 
     VkPipelineVertexInputStateCreateInfo vertexInput{VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO};
     VkVertexInputBindingDescription vertexBinding{};
-    std::vector<VkVertexInputAttributeDescription> vertexAttributes;
+    ce::dynamic_array<VkVertexInputAttributeDescription> vertexAttributes;
     if (!meshShader && 0 != desc.inputElementCount)
     {
         // 현재 RHIEncoder는 vertex slot 0 하나만 바인딩한다. 지원하지 않는
@@ -1548,7 +1550,7 @@ VkPipeline VulkanPipelineCache::CreateRaster(VkDevice device, const RHIGraphicsP
     //   한다 — Vulkan 은 **부류**를 파이프라인에 굽고 구체 배열만 동적으로
     //   바꿀 수 있다. 두 어휘를 겹쳐 두었다면 인코더의 SetPrimitiveTopology 가
     //   파이프라인을 다시 구우라는 요구가 됐을 자리다.
-    std::vector<VkDynamicState> dynamicStates = {
+    ce::dynamic_array<VkDynamicState> dynamicStates = {
         VK_DYNAMIC_STATE_VIEWPORT,
         VK_DYNAMIC_STATE_SCISSOR,
     };

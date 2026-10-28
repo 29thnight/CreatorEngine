@@ -1,0 +1,351 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/Utf16StringIntegration20261027.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>UTF-16 기본 문자열과 ImGui 입력 통합</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#인코딩과-소유권-계약">인코딩과 소유권 계약</a></li><li><a href="#imgui-api와-실제-사용처">ImGui API와 실제 사용처</a></li><li><a href="#검증-범위">검증 범위</a></li><li><a href="#실제-한글-ime">실제 한글 IME</a></li><li><a href="#성능-비교-방법과-원인-분리">성능 비교 방법과 원인 분리</a></li><li><a href="#최종-성능-판정">최종 성능 판정</a></li><li><a href="#증거와-재현">증거와 재현</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="Utf16StringIntegration20261027.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>UTF-16 기본 문자열과 ImGui 입력 통합</h1>
+
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">7<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 7"><i class="ok" style="flex:7"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 7</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 7개의 분량 막대">
+<a class="map-row" href="#인코딩과-소유권-계약"><span class="ve-label">§01</span><span class="map-name">인코딩과 소유권 계약</span><span class="map-bar"><i style="width:44.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#imgui-api와-실제-사용처"><span class="ve-label">§02</span><span class="map-name">ImGui API와 실제 사용처</span><span class="map-bar"><i style="width:55.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#검증-범위"><span class="ve-label">§03</span><span class="map-name">검증 범위</span><span class="map-bar"><i style="width:47.9%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">6</span></span></a>
+<a class="map-row" href="#실제-한글-ime"><span class="ve-label">§04</span><span class="map-name">실제 한글 IME</span><span class="map-bar"><i style="width:40%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#성능-비교-방법과-원인-분리"><span class="ve-label">§05</span><span class="map-name">성능 비교 방법과 원인 분리</span><span class="map-bar"><i style="width:82.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#최종-성능-판정"><span class="ve-label">§06</span><span class="map-name">최종 성능 판정</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">1</span></span></a>
+<a class="map-row" href="#증거와-재현"><span class="ve-label">§07</span><span class="map-name">증거와 재현</span><span class="map-bar"><i style="width:86.7%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 7개 가운데 「최종 성능 판정」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><blockquote>
+<p>2026-10-27 후속 최적화에서 기존 수용 기준을 유지해 <strong>57/57</strong>을 통과했다. UTF-8 2KB 추가 두 건도 해소했다. <a href="Utf8AppendOptimization20261027.html">원인 분리·수정·최종 재수용</a>. 아래의 55/57은 초기 통합 당시 기록이다.</p>
+</blockquote>
+<p>구현·기능·실제 IME·Editor Debug 실행 검증은 통과했다. 초기 통합 성능은 <strong>55/57</strong>이며 UTF-16 기본 문자열 조건은 <strong>18/18</strong>이다. UTF-8 2KB 재사용 추가 두 건이 미달이므로 전체 성능 수용 완료로 판정하지 않는다.</p>
+<p><code>Engine/Containers/modules/string.ixx</code>가 구현 정본이다. <code>ce::string</code>과 <code>ce::string_view</code>의 코드 단위는 <code>char16_t</code>이며, <code>basic_string&lt;Allocator&gt;</code>도 UTF-16이다. 기존 바이트 문자열은 <code>utf8_string</code>, <code>utf8_string_view</code>, <code>basic_utf8_string&lt;Allocator&gt;</code>로 명시했다. 생성 헤더는 동기화 도구의 산출물이며 외부 테스트 솔루션은 이 엔진 내부 구현을 직접 빌드한다.</p>
+</section>
+<section class="doc-sec" id="sec-인코딩과-소유권-계약">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="인코딩과-소유권-계약">인코딩과 소유권 계약</h2></div>
+<div class="prose"><ul>
+<li>문자열 길이·인덱스·부분 문자열은 코드 단위 기준이다. UTF-16 코드 단위 2개가 하나의 보충 평면 문자를 나타낼 수 있다. 일반 배열식 변경은 코드 단위 연산이며 글자소 편집 API가 아니다.</li>
+<li>UTF-8 표현은 ImGui의 <code>char*</code> API와 연결하기 위해 <code>char</code> 바이트를 사용한다. 로캘·ACP 변환을 사용하지 않는다. <code>wchar_t</code>의 플랫폼별 크기를 UTF-16 타입의 전제로 삼지 않는다.</li>
+<li><code>to_utf8</code>과 <code>to_utf16</code>은 전체 입력을 검증한 뒤 결과를 변경한다. 잘못된 서로게이트, 잘린 시퀀스, 잘못된 연속 바이트, 과잉 인코딩, 서로게이트 스칼라, U+10FFFF 초과를 거부하고 첫 오류의 코드 단위/바이트 위치를 반환한다. 잘못된 입력이나 할당 실패는 목적 문자열의 기존 내용을 보존한다.</li>
+<li>입력·목적 저장소가 겹치면 임시 소유 문자열에서 변환 후 교환한다. 일반 변환은 내장 NUL을 보존한다. ImGui 편집 API는 C 문자열 경계 때문에 내장 NUL을 명시적으로 거부한다.</li>
+<li>캐시는 UTF-16 원본 스냅샷과 UTF-8 결과를 모두 소유한다. 호출자 버퍼의 주소나 수명을 캐시 키로 신뢰하지 않는다. 같은 내용의 적중과 확보한 용량 안의 변경은 할당하지 않는다. 내용 비교 비용은 문자열 길이에 비례한다.</li>
+<li>캐시·입력 상태는 위젯별로 유지하며 ImGui 스레드에서 사용한다. 동시 접근용 컨테이너가 아니다. 확보 용량은 재사용하고 객체 소멸 때 반환한다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-imgui-api와-실제-사용처">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="imgui-api와-실제-사용처">ImGui API와 실제 사용처</h2></div>
+<div class="prose"><p><code>Editor/ImGuiHelper/Utf16Text.h</code>에 <code>editor::text::TextUnformatted</code>, <code>InputText</code>, <code>InputTextWithHint</code>, <code>InputTextMultiline</code>을 추가했다. 모듈 또는 <code>ContainerAPI.h</code>로 컨테이너 API를 먼저 공급한다.</p>
+<pre><code class="language-cpp">ce::string value(u&quot;한글 \U0001F680&quot;);
+ce::utf8_conversion_cache display;
+ce::utf16_input_state editing;
+// display와 editing은 매 프레임 생성하지 않고 위젯 수명 동안 보관한다.
+editor::text::TextUnformatted(value.view(), display);
+auto result = editor::text::InputText(&quot;##name&quot;, value, editing);</code></pre>
+<p>레이블과 힌트는 ImGui의 UTF-8 식별자/표시 규약을 유지한다. UTF-16 값은 소유된 UTF-8 편집 버퍼로 변환한다. resize 콜백은 버퍼 성장과 주소 갱신을 담당하고, 편집 결과는 검증 후 UTF-16 원본으로 확정한다. 편집 중 외부 값이 바뀌면 <code>conflict</code>를 보고하고 외부 값을 덮어쓰지 않는다. 포커스를 잃은 뒤 외부 값으로 재동기화하며, 외부 값이 기존 확정값으로 돌아오면 충돌을 해제한다.</p>
+<p>콜백 플래그와 <code>EnterReturnsTrue</code>는 반환값 의미가 다른 별도 확장 API가 필요하므로 현재 명시적으로 거부한다. Release에서도 오류를 반환한다. 작업공간 이름 대화 상자를 이 UTF-16 입력 경로로 전환했다. 파일명 검증·저장은 UTF-8 경계에서 기존 로직을 계속 사용한다. 기존 파일 형식을 인코딩 변경으로 재해석하지 않는다. 식별자 atom과 기존 바이트 키 맵도 UTF-8 저장을 유지한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-검증-범위">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="검증-범위">검증 범위</h2></div>
+<div class="prose"><p>전체 엔진 STL 사용처의 전환 완료 또는 모든 PC OS의 동등 성능을 뜻하지 않는다. 잠금 없는 큐 구현은 이번 문자열 변경으로 수정하지 않았다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>검사</th><th>최종 구현 결과</th></tr></thead>
+<tbody><tr><td>MSVC named module 일반 검사</td><td><span class="chip ok">15/15 통과</span></td></tr>
+<tr><td>MSVC AddressSanitizer</td><td><span class="chip ok">15/15 통과</span></td></tr>
+<tr><td>Linux Clang 18, ThreadSanitizer 포함</td><td>25 partition + primary, 12개 실행 통과</td></tr>
+<tr><td>공개 헤더 독립 컴파일</td><td><span class="chip ok">전체 통과</span></td></tr>
+<tr><td>Windows SDK 헤더 뒤 컨테이너 포함</td><td>UTF-16·UTF-8 변환 포함 통과</td></tr>
+<tr><td>유니코드 스칼라 왕복</td><td><span class="chip ok">1,112,064개 전체 통과</span></td></tr>
+<tr><td>UTF-16 변경 연산과 STL 차등 검사</td><td><span class="chip ok">20,000회 통과</span></td></tr>
+<tr><td>무효 인코딩·할당 실패·겹치는 변환/추가</td><td><span class="chip ok">기존 결과 보존과 경계 검사 통과</span></td></tr>
+<tr><td>캐시 적중 10,000회·같은 용량의 변경</td><td>계수 allocator의 추가 할당 0회</td></tr>
+<tr><td>ImGui 입력 이벤트</td><td>한글·이모지 쌍, 스칼라 단위 Backspace, 4KB 성장, 힌트·여러 줄 통과</td></tr>
+<tr><td>실제 Windows 한글 IME</td><td>조합·확정 메시지와 최종 UTF-16 값 확인</td></tr>
+<tr><td>Editor Debug 엔진 빌드·실행</td><td>17명령 통과, GPU 완료·Play/Stop 복원·정상 종료</td></tr></tbody></table></div>
+<p>UTF-16 키의 노드 맵을 <code>string_view</code>로 조회하는 검사도 추가했다. <code>utf16_string_hash</code>와 <code>equal_to&lt;basic_utf16_string&lt;A&gt;&gt;</code>가 뷰를 직접 받아 소유 키를 생성하지 않는다. <code>hash&lt;ce::string&gt;</code>과 <code>hash&lt;ce::string_view&gt;</code>도 같은 해시 규약을 사용한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-실제-한글-ime">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="실제-한글-ime">실제 한글 IME</h2></div>
+<div class="prose"><p>단순한 <code>AddInputCharacterUTF16</code> 호출을 실제 IME 통과로 간주하지 않았다. 엔진이 사용하는 ImGui 1.92.8 라이브러리, Win32 backend와 같은 입력 어댑터를 연결한 실제 D3D11 창에서 키를 입력했다. 해당 창의 한국어 IME 컨텍스트를 열고 <code>g k s r m f Return</code>으로 <code>한글</code>을 조합·확정했다. Windows 전역 설정이나 설치 언어 팩을 변경하지 않았다.</p>
+<p>관측한 조합은 <code>314E → D558 → D55C</code>, <code>3131 → ADF8 → AE00</code>이고 각 음절의 <code>GCS_RESULTSTR</code>을 확인했다. 최종 소유 문자열은 <code>D55C AE00</code>, 길이 2 코드 단위였다. 조합 중 미확정 문자열은 OS/ImGui가 유지하고, UTF-16 원본에는 확정된 입력을 반영한다. 최종 바이너리로 다시 수행한 <code>20261027-unicode-ime-locked.log</code>와 바이너리·소스 해시를 보존했다.</p>
+<p>이 결과는 어댑터의 실제 Windows IME 경로 검증이다. Editor 작업공간 대화 상자를 UI로 열어 같은 입력을 반복한 결과로 확대하지 않는다. Editor 자체에서는 모듈 문자열·변환·입력 상태를 명령 프로브로 실행하고 작업공간 입력창 배선을 빌드했다. 기존 엔진의 한국어/보충 평면 폰트 fallback 설정도 유지한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-성능-비교-방법과-원인-분리">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="성능-비교-방법과-원인-분리">성능 비교 방법과 원인 분리</h2></div>
+<div class="prose"><p>C++23 Release 소비자가 <code>import Creator.Containers;</code>로 정본 모듈을 사용한다. MSVC 19.50.35730.0의 <code>std::u16string</code> 및 <code>std::string</code>과 각각 같은 코드 단위·내용을 비교한다. 엔진 기능 빌드는 기존 도구 체인 요구에 따라 MSVC 19.51을 사용한다.</p>
+<p>조건은 UTF-16·UTF-8 각각 5/64/2,048 코드 단위의 생성·재사용 추가 12개, ASCII+이모지 및 한글+이모지의 양방향 변환 4개, 캐시 적중/변경 2개, 입력 확정 1개로 총 19개다. 변환은 같은 엄격한 변환기로 출력 저장소만 ce/STL로 바꿔 비교한다. STL 자체 변환 알고리즘 대비 성능이라는 뜻이 아니다. 캐시도 STL 측에 같은 소유 스냅샷·내용 비교·변환 재사용을 적용한다. 입력 수치는 확정 처리이며 ImGui 레이아웃·GPU 렌더링 시간 비교가 아니다.</p>
+<p>기존과 같이 각 측면 1초 워밍업, 100ms 독립 배치 15개, 측면별 자기 프로세스 heap 최적화, CPU4 고정과 한시적인 CPU5 helper를 사용한다. 세 독립 프로세스 중 두 번째는 측면 순서를 바꾼다. 모든 원시 샘플을 보존하고 <strong>각 프로세스·각 조건</strong>에 시간 중앙값 비율 ≤ 1.10, 양쪽 편차 x[13]/x[1] ≤ 1.30을 요구한다. 빌드·기능 검사를 종료하고 소스·바이너리 해시를 고정해 수집한다.</p>
+<p>최초 구현은 34/57이었다. UTF-16 생성에서 임시 객체를 거쳐 할당·이동하는 경로를 제거한 진단 변형은 약 17~29% 개선됐다. 짧은 고정 폭 복사는 단순 직접 생성 대비 추가 이득을 입증하지 못해 채택하지 않았다. 추가 경로는 용량이 충분할 때 성장·별칭 검사를 건너뛰고, 성장 처리를 별도 함수로 분리했다. 겹치는 데이터의 복사는 계속 <code>memmove</code>로 보장한다.</p>
+<p>분리 실험에서 성장 경로의 분리는 강제 인라인보다 유리했다. 적합 용량 경로만 바꾼 대조군에 비해 5/64 코드 단위 추가에서 약 19~25% 개선됐다. 이후 정본 재측정은 53/57이었으며, UTF-8 생성의 인라인 결정과 한 번의 4KB 추가 미달이 남았다. UTF-8 초기화 인라인을 보완했다. 순수 <code>memmove</code>와 네 주소 조합의 대조군에서는 차이가 약 4% 이내였으므로, 이전 18% 미달의 원인을 주소만으로 확정하지 않았다. 마지막 판정은 이 진단 수치가 아니라 아래 정본 바이너리 결과를 사용한다.</p>
+<p>최초 수집 스크립트에는 helper 래퍼의 태그 변수 가림으로 CSV 이름에 <code>-guard</code>가 붙는 집계 오류가 있었다. 세 원시 CSV를 그대로 보존해 별도 회수 집계했으며, 수집 조건과 바이너리는 바뀌지 않았다. 후속 실행에서는 변수 이름을 고쳐 자동 판정을 수행했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-최종-성능-판정">
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="최종-성능-판정">최종 성능 판정</h2></div>
+<div class="prose"><p>초기 통합 정본 <code>20261027-unicode-final1</code>은 <strong>55/57</strong>이다. 수집 전후 입력 66개 해시가 일치했다. 모든 조건의 편차 기준은 통과했고, 시간 비율에서 두 건이 미달이었다. 최대 custom 편차는 1.068938, STL 편차는 1.050104다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>구분</th><th style="text-align:right">조건 × 프로세스</th><th style="text-align:right">통과</th></tr></thead>
+<tbody><tr><td>UTF-16 생성·재사용 추가</td><td style="text-align:right">6 × 3</td><td style="text-align:right">18/18</td></tr>
+<tr><td>UTF-8 생성·재사용 추가</td><td style="text-align:right">6 × 3</td><td style="text-align:right">16/18</td></tr>
+<tr><td>같은 변환기의 ce/STL 출력 저장소</td><td style="text-align:right">4 × 3</td><td style="text-align:right">12/12</td></tr>
+<tr><td>같은 소유권 규약의 캐시</td><td style="text-align:right">2 × 3</td><td style="text-align:right">6/6</td></tr>
+<tr><td><span class="chip ok">입력 확정</span></td><td style="text-align:right">1 × 3</td><td style="text-align:right">3/3</td></tr></tbody></table></div>
+<p>미달은 다음과 같다. 원시 샘플을 빼거나 허용치를 바꾸지 않았다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>프로세스</th><th>조건</th><th style="text-align:right">ce ns/회</th><th style="text-align:right">STL ns/회</th><th style="text-align:right">비율</th></tr></thead>
+<tbody><tr><td class="num">1</td><td>utf8_reuse_append_2048</td><td class="num" style="text-align:right">24.483</td><td class="num" style="text-align:right">21.864</td><td class="num" style="text-align:right">1.119759</td></tr>
+<tr><td class="num">2</td><td>utf8_reuse_append_2048</td><td class="num" style="text-align:right">36.821</td><td class="num" style="text-align:right">22.917</td><td class="num" style="text-align:right">1.606680</td></tr></tbody></table></div>
+<p>아래 중앙값으로 프로세스를 합쳐 통과시키지 않고, 각 프로세스를 별도로 판정했다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>조건</th><th style="text-align:right">비율 중앙값</th><th style="text-align:right">최소</th><th style="text-align:right">최대</th></tr></thead>
+<tbody><tr><td>cache_change_256</td><td class="num" style="text-align:right">0.9928</td><td class="num" style="text-align:right">0.9916</td><td class="num" style="text-align:right">0.9942</td></tr>
+<tr><td>cache_hit_256</td><td class="num" style="text-align:right">1.0495</td><td class="num" style="text-align:right">1.0483</td><td class="num" style="text-align:right">1.0519</td></tr>
+<tr><td>decode_ascii_emoji</td><td class="num" style="text-align:right">1.0043</td><td class="num" style="text-align:right">0.9999</td><td class="num" style="text-align:right">1.0107</td></tr>
+<tr><td>decode_korean_emoji</td><td class="num" style="text-align:right">1.0404</td><td class="num" style="text-align:right">1.0399</td><td class="num" style="text-align:right">1.0404</td></tr>
+<tr><td>encode_ascii_emoji</td><td class="num" style="text-align:right">0.8802</td><td class="num" style="text-align:right">0.8780</td><td class="num" style="text-align:right">0.8803</td></tr>
+<tr><td>encode_korean_emoji</td><td class="num" style="text-align:right">1.0175</td><td class="num" style="text-align:right">1.0172</td><td class="num" style="text-align:right">1.0181</td></tr>
+<tr><td>input_commit_256</td><td class="num" style="text-align:right">0.9596</td><td class="num" style="text-align:right">0.9594</td><td class="num" style="text-align:right">0.9619</td></tr>
+<tr><td>utf16_construct_2048</td><td class="num" style="text-align:right">0.9810</td><td class="num" style="text-align:right">0.9765</td><td class="num" style="text-align:right">0.9812</td></tr>
+<tr><td>utf16_construct_5</td><td class="num" style="text-align:right">0.8702</td><td class="num" style="text-align:right">0.8669</td><td class="num" style="text-align:right">0.8719</td></tr>
+<tr><td>utf16_construct_64</td><td class="num" style="text-align:right">0.9645</td><td class="num" style="text-align:right">0.9540</td><td class="num" style="text-align:right">0.9743</td></tr>
+<tr><td>utf16_reuse_append_2048</td><td class="num" style="text-align:right">1.0169</td><td class="num" style="text-align:right">0.9951</td><td class="num" style="text-align:right">1.0190</td></tr>
+<tr><td>utf16_reuse_append_5</td><td class="num" style="text-align:right">0.9246</td><td class="num" style="text-align:right">0.9160</td><td class="num" style="text-align:right">0.9270</td></tr>
+<tr><td>utf16_reuse_append_64</td><td class="num" style="text-align:right">1.0296</td><td class="num" style="text-align:right">1.0240</td><td class="num" style="text-align:right">1.0298</td></tr>
+<tr><td>utf8_construct_2048</td><td class="num" style="text-align:right">1.0904</td><td class="num" style="text-align:right">1.0846</td><td class="num" style="text-align:right">1.0991</td></tr>
+<tr><td>utf8_construct_5</td><td class="num" style="text-align:right">0.9034</td><td class="num" style="text-align:right">0.8976</td><td class="num" style="text-align:right">0.9036</td></tr>
+<tr><td>utf8_construct_64</td><td class="num" style="text-align:right">1.0250</td><td class="num" style="text-align:right">1.0021</td><td class="num" style="text-align:right">1.0328</td></tr>
+<tr><td>utf8_reuse_append_2048</td><td class="num" style="text-align:right">1.1198</td><td class="num" style="text-align:right">1.0105</td><td class="num" style="text-align:right">1.6067</td></tr>
+<tr><td>utf8_reuse_append_5</td><td class="num" style="text-align:right">0.9375</td><td class="num" style="text-align:right">0.9353</td><td class="num" style="text-align:right">0.9382</td></tr>
+<tr><td>utf8_reuse_append_64</td><td class="num" style="text-align:right">0.9324</td><td class="num" style="text-align:right">0.9295</td><td class="num" style="text-align:right">0.9337</td></tr></tbody></table></div>
+<p>SIMD 대조군은 채택하지 않았다. 4KB UTF-16 추가에서 STL의 약 1.69배였고, 2KB UTF-8 추가도 약 1.60배였다. 이 복사본은 외부 진단 디렉토리에만 남기며 엔진 구현에 포함하지 않는다.</p>
+<p>동일한 <code>std::string</code>끼리 버퍼만 달리한 네 쌍에서도 빠른 쪽 대비 느린 쪽이 약 19~29% 차이를 보였다. 같은 버퍼 쌍에 컨테이너 없이 <code>memmove</code>만 수행해도 차이가 관측됐다. 실제 객체 코드에서 ce와 STL의 해당 경로는 모두 CRT <code>memmove</code>를 호출한다. 버퍼 배치 영향을 구현 자체의 비용으로 곧바로 해석할 수 없지만, 이 대조군만으로 앞선 61% 미달 전체의 원인을 확정하지 않는다. 단일 버퍼 조건을 여러 버퍼 평균으로 바꿔 수용을 선언하지 않았으며, 이 항목의 원인 분리·성능 수용은 남겨 둔다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-증거와-재현">
+<div class="sec-head"><p class="ve-label">§07</p><h2 id="증거와-재현">증거와 재현</h2></div>
+<div class="prose"><p>외부 <code>CreatorContainers</code>는 엔진 내부 정본을 참조한다. 진단용 복사본은 <code>CE_UNICODE_ABLATION=ON</code>에서만 빌드하며 기본값은 OFF다. 일반 모듈 검사와 성능 소비자는 정본을 import한다.</p>
+<p>외부 <code>CreatorContainers/results</code>의 주요 파일:</p>
+<ul>
+<li><code>20261027-unicode-final1-{1,2,3}.csv</code>, 같은 이름의 <code>.stderr</code>: 모든 원시 샘플과 컴파일러·일부 버퍼 배치 정보.</li>
+<li><code>20261027-unicode-final1-verdict.json</code>, <code>-inputs.json</code>, <code>-snapshot/</code>, <code>-guard-guard.json</code>: 최종 판정, 수집 당시 입력·바이너리, helper 수명 영수증.</li>
+<li><code>20261027-unicode-diag1-guard-{1,2,3}.csv</code>, <code>-recovered-summary.json</code>: 최초 34/57과 집계 오류 회수 자료.</li>
+<li><code>20261027-unicode-ablation1.csv</code>, <code>-inlining1.csv</code>, <code>-ctor1.csv</code>: 생성·적합 용량 경로·인라인 결정의 분리 측정.</li>
+<li><code>20261027-unicode-opt1-verdict.json</code>: 중간 정본 53/57.</li>
+<li><code>20261027-unicode-addresses1.csv</code>, <code>-bulk1.csv</code>, <code>-address-self1.csv</code>: 주소·복사 및 채택하지 않은 SIMD 대조군.</li>
+<li><code>unicode-final1-disassembly.txt</code>: 실제 소비자 객체의 호출 경로.</li>
+<li><code>unicode-locked-normal-driver.log</code>, <code>unicode-locked-asan-driver.log</code>, <code>unicode-locked-linux-driver.log</code>: 최종 기능 검사.</li>
+<li><code>unicode-locked-build.log</code>: 성능/ImGui 소비자와 Windows·독립 헤더 컴파일.</li>
+<li><code>20261027-unicode-ime-locked.log</code>, <code>-hashes.json</code>: 최종 바이너리의 실제 Windows IME 조합·확정.</li>
+</ul>
+<p>엔진 빌드는 <code>Build/utf16-editor-locked-debug.log</code>, 마지막 입력창 변경의 증분 빌드는 <code>Build/utf16-editor-final-incremental.log</code>다. 실행 증거는 <code>Build/Verification/ContainerMigration/Utf16Debug1/acceptance.json</code>과 <code>results.jsonl</code>이며 두 프로브의 <code>utf16Strings=true</code>를 요구한다. 수집 이후에는 외부 진단 타깃 등록만 추가했고 정본 구현·성능 소비자·바이너리는 바꾸지 않았다.</p>
+<p>Windows/MSVC 문자열의 위 범위만 측정했다. Linux는 기능·ThreadSanitizer 검사이며 성능 수용이 아니다. macOS 성능, 최신 전체 82조건 및 PPL 큐 재수용, 기존 엔진 STL 문자열 전체 전환 완료를 이 결과로 대신하지 않는다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="Utf16StringIntegration20261027.md"><code>docs/analysis/Utf16StringIntegration20261027.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

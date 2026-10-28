@@ -1,3 +1,6 @@
+#include "../Utility_Framework/Foundation/EngineStorage.h"
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #include "ProfileMarker.h"
 
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -12,14 +15,14 @@ namespace ce::detail::marker_registry_impl
 	struct registry
 	{
 		std::mutex                                     lock;
-		std::vector<marker_desc>                       descs;
-		std::unordered_map<std::string, marker_id>     by_name;
+		ce::dynamic_array<marker_desc>                       descs;
+		ce::engine_node_map<std::string, marker_id>     by_name;
 
 		// 런타임 이름의 보관소. deque 인 이유는 **주소가 고정**되어야 하기
 		// 때문이다 — vector<string> 은 재할당 때 원소를 옮기고, 짧은 문자열은
 		// 버퍼가 객체 안에 있어(SSO) 같이 움직인다. 그러면 표가 들고 있는
 		// c_str() 가 통째로 엉뚱한 곳을 가리킨다.
-		std::deque<std::string>                        owned_names;
+		ce::segmented_deque<std::string>                        owned_names;
 	};
 
 	// 함수 지역 static — 첫 호출에서 선다. 마커 슬롯의 동적 초기화가 어느
@@ -86,7 +89,7 @@ namespace ce
         // Registry names are immutable and live until process teardown. Cache
         // contents never refer to the caller's temporary string or frame arena.
         static constexpr std::size_t capacity = 4096;
-        thread_local std::array<cache_entry, capacity> cache{};
+        thread_local ce::fixed_array<cache_entry, capacity> cache{};
         std::uint64_t hash = 14695981039346656037ull;
         for (const unsigned char byte : name)
         {
@@ -162,7 +165,7 @@ namespace ce
 		return std::span<const marker_desc>(reg.descs.data(), reg.descs.size());
     }
 
-    std::vector<capture_marker> snapshot_markers()
+    ce::dynamic_array<capture_marker> snapshot_markers()
 	{
 		using namespace ce::detail::marker_registry_impl;
 
@@ -172,7 +175,7 @@ namespace ce
 
 		// 잠금 **안에서** 글자까지 복사한다. 밖으로 나가는 것은 포인터가
 		// 아니라 값이므로, 이 뒤에 표가 재할당돼도 뜬 것은 안 변한다.
-		std::vector<capture_marker> table;
+		ce::dynamic_array<capture_marker> table;
 		table.reserve(reg.descs.size());
 		for (const marker_desc& desc : reg.descs)
 		{

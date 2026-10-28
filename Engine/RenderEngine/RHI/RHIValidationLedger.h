@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 // PHASE 21 W8-3 — 검증 레이어가 말한 것을 **셈으로** 남긴다.
@@ -57,7 +58,7 @@ namespace rhi::validation
         std::uint64_t messages{ 0 };   ///< 비우면서 본 메시지 총수(INFO 포함)
         std::uint64_t problems{ 0 };   ///< 그중 CORRUPTION · ERROR · WARNING
 
-        std::vector<std::string> retained;  ///< 처음 kRetainedMessages 건의 문구
+        ce::dynamic_array<std::string> retained;  ///< 처음 kRetainedMessages 건의 문구
         std::uint64_t droppedMessages{ 0 }; ///< 자리가 없어 버린 문구 수
     };
 

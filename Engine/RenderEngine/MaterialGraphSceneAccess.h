@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include "Render/Passes/Geometry/SceneSurfaceTargets.h"
@@ -82,8 +83,8 @@ namespace material_graph
         // 압축 중에 덮어쓴 원본 핸들을 다시 참조하지 않는다. 호출마다 인덱스를 초기화하되
         // 소유자가 가진 저장 용량은 유지한다. 충돌 시 핸들 전체를 비교한다.
         constexpr size_t empty = (std::numeric_limits<size_t>::max)();
-        std::array<size_t, 128> localSlots;
-        std::array<size_t, 64> localDestinations;
+        ce::fixed_array<size_t, 128> localSlots;
+        ce::fixed_array<size_t, 64> localDestinations;
         std::span<size_t> slots;
         std::span<size_t> destinations;
         if (uses.size() <= localDestinations.size())

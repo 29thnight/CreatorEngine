@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
 #else
@@ -76,8 +78,8 @@ namespace
         animation::quality_observation observation{};
         animation::quality_stage maximumStage{ animation::quality_stage::l0 };
         animation::quality_stage previousStage{ animation::quality_stage::l0 };
-        std::array<double, animation::task_kind_count> taskTimesUs{};
-        std::array<std::uint32_t, animation::task_kind_count> taskCounts{};
+        ce::fixed_array<double, animation::task_kind_count> taskTimesUs{};
+        ce::fixed_array<std::uint32_t, animation::task_kind_count> taskCounts{};
         double predictedUs{};
         double measuredUs{};
         double interpolatedUs{};
@@ -117,7 +119,7 @@ namespace
     };
 
     animation::quality_observation ObserveQuality(Animator& animator,
-        std::unordered_map<Scene*, std::vector<QualityCamera>>& cache)
+        ce::engine_node_map<Scene*, ce::dynamic_array<QualityCamera>>& cache)
     {
         if (!SceneManagers->IsGameStart())
             return { 1.f, true, false, true };
@@ -391,10 +393,10 @@ namespace
 
 struct AnimationScheduler::Scratch final
 {
-    std::vector<AnimationWork> work;
-    std::vector<AnimationWorkerTiming> timings;
-    std::vector<std::size_t> budgetOrder;
-    std::vector<std::size_t> executeIndices;
+    ce::dynamic_array<AnimationWork> work;
+    ce::dynamic_array<AnimationWorkerTiming> timings;
+    ce::dynamic_array<std::size_t> budgetOrder;
+    ce::dynamic_array<std::size_t> executeIndices;
 };
 
 namespace
@@ -535,7 +537,7 @@ void AnimationScheduler::Update(float deltaTime)
     auto& work = m_scratch->work;
     work.clear();
     work.reserve(currentAnimators.size());
-    std::unordered_map<Scene*, std::vector<QualityCamera>> qualityCameras;
+    ce::engine_node_map<Scene*, ce::dynamic_array<QualityCamera>> qualityCameras;
     for (Animator* animator : currentAnimators)
     {
         if (nullptr == animator || !animator->IsEnabled()) continue;
@@ -947,7 +949,7 @@ void AnimationScheduler::Update(float deltaTime)
                 instance.pose.GetTranslations().data());
             hud->workerPoseBuffers = instance.workerPoseBufferCount;
             hud->instancePoseBuffers = instance.GetAllocatedPoseBufferCount();
-            std::vector<std::uint32_t> executionOrder(instance.taskList.size(),
+            ce::dynamic_array<std::uint32_t> executionOrder(instance.taskList.size(),
                 animation::invalid_task);
             for (std::size_t order = 0; order < instance.executedTaskIndices.size(); ++order)
                 executionOrder[instance.executedTaskIndices[order]] =
@@ -1183,8 +1185,8 @@ namespace
 
         instance.bindLocals.clear();
         instance.bindSkeletonSerial = 0;
-        std::vector<math::matrix4x4> bindGlobals(boneCount);
-        std::vector<Animation::LocalTransform> locals(boneCount);
+        ce::dynamic_array<math::matrix4x4> bindGlobals(boneCount);
+        ce::dynamic_array<Animation::LocalTransform> locals(boneCount);
         const math::matrix4x4 inverseGlobal = math::inverse(source.GlobalInverse());
         for (std::size_t bone = 0; bone < boneCount; ++bone)
         {
@@ -1214,7 +1216,7 @@ namespace
 
     template <class Source>
     bool SampleClipPose(Animator& animator, const Source& source,
-        int clipIndex, float time, std::array<Animation::ClipSamplingCursor, 2>& cursors,
+        int clipIndex, float time, ce::fixed_array<Animation::ClipSamplingCursor, 2>& cursors,
         std::uint8_t sampleSlot, int referenceClipIndex = -1,
         bool useDetailReduction = false)
     {
@@ -1420,9 +1422,9 @@ namespace
             || instance.l6PreviousGlobals.size() != source.BoneCount()
             || instance.l6LatestGlobals.size() != source.BoneCount()) return;
         alpha = std::clamp(alpha, 0.f, 1.f);
-        const auto interpolate = [alpha](std::vector<math::matrix4x4>& output,
-            const std::vector<math::matrix4x4>& before,
-            const std::vector<math::matrix4x4>& after)
+        const auto interpolate = [alpha](ce::dynamic_array<math::matrix4x4>& output,
+            const ce::dynamic_array<math::matrix4x4>& before,
+            const ce::dynamic_array<math::matrix4x4>& after)
         {
             for (std::size_t bone = 0; bone < output.size(); ++bone)
             {
@@ -1459,7 +1461,7 @@ namespace
     template <class Source>
     void UpdatePose(Animator& animator, const Source& source,
         AnimationController* controller, int clipIndex, int nextClipIndex,
-        float time, float nextTime, std::array<Animation::ClipSamplingCursor, 2>& cursors,
+        float time, float nextTime, ce::fixed_array<Animation::ClipSamplingCursor, 2>& cursors,
         bool updateComposite = true)
     {
         if (nullptr == source.ClipAt(clipIndex)) return;
@@ -2212,7 +2214,7 @@ namespace
         instance.ResizePose(source.BoneCount());
         std::fill(instance.finalTransforms.begin(), instance.finalTransforms.end(), math::matrix4x4::identity());
         // Diagnostic samples must not replace the live playback cursors.
-        std::array<Animation::ClipSamplingCursor, 2> samplingCursors;
+        ce::fixed_array<Animation::ClipSamplingCursor, 2> samplingCursors;
         UpdatePose(animator, source, nullptr, clipIndex, -1, time, 0.f, samplingCursors, false);
         std::fill_n(outPose, kMaxBones, math::matrix4x4::identity());
         std::copy(instance.finalTransforms.begin(), instance.finalTransforms.end(), outPose);

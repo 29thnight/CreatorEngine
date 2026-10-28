@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -60,7 +61,7 @@ namespace RenderTest
             meta.name = "SealProbe";
             meta.properties = {
                 { "baseColor", "Base Color", ShaderPropertyType::Float4,
-                  std::array<float, 4>{ 1.0f, 1.0f, 1.0f, 1.0f } },
+                  ce::fixed_array<float, 4>{ 1.0f, 1.0f, 1.0f, 1.0f } },
                 { "metallic", "Metallic", ShaderPropertyType::Float, 0.0f },
                 { "roughness", "Roughness", ShaderPropertyType::Float, 1.0f },
                 { "albedoMap", "Albedo Map", ShaderPropertyType::Texture2D,
@@ -93,9 +94,9 @@ namespace RenderTest
         // 재현하는지가 브리지 패리티의 전부다.
         void CheckSealParity(Checker& check, const SealContract& contract,
             const Material& legacy, const std::string& what,
-            std::vector<EnhancedMaterialTextureBinding>* outBindings = nullptr)
+            ce::dynamic_array<EnhancedMaterialTextureBinding>* outBindings = nullptr)
         {
-            std::vector<std::uint8_t> legacyBytes;
+            ce::dynamic_array<std::uint8_t> legacyBytes;
             std::string error;
             check.Check(legacy.BuildShaderPropertyBlock(contract.meta,
                 contract.layout, legacyBytes, error),
@@ -106,8 +107,8 @@ namespace RenderTest
                 legacy, contract.meta, sealSource, error),
                 what + " — 브리지 변환 (" + error + ")");
 
-            std::vector<std::uint8_t> sealedBytes;
-            std::vector<EnhancedMaterialTextureBinding> bindings;
+            ce::dynamic_array<std::uint8_t> sealedBytes;
+            ce::dynamic_array<EnhancedMaterialTextureBinding> bindings;
             check.Check(ExperimentMaterialSealing::SealCore(sealSource,
                 contract.meta, contract.layout, sealedBytes, bindings, error),
                 what + " — SealCore (" + error + ")");
@@ -148,7 +149,7 @@ namespace RenderTest
             auto owner = own::make_shared<const Texture>();
             legacy.UseTextureMap("albedoMap", owner);
 
-            std::vector<EnhancedMaterialTextureBinding> bindings;
+            ce::dynamic_array<EnhancedMaterialTextureBinding> bindings;
             CheckSealParity(check, contract, legacy, "저작 재질", &bindings);
             check.Check(bindings.size() == 1u, "texture binding 수");
             if (1u == bindings.size())
@@ -173,7 +174,7 @@ namespace RenderTest
             legacy.m_materialInfo.m_metallic = 0.7f;
             legacy.m_materialInfo.m_roughness = 0.25f;
 
-            std::vector<EnhancedMaterialTextureBinding> bindings;
+            ce::dynamic_array<EnhancedMaterialTextureBinding> bindings;
             CheckSealParity(check, contract, legacy, "MaterialInfo 폴백 재질",
                 &bindings);
             // 논리 값이 없는 texture property는 meta 기본 GUID를 나른다.
@@ -197,11 +198,11 @@ namespace RenderTest
             check.Check(ExperimentMaterialSealing::BuildSealSourceFromLegacy(
                 legacy, contract.meta, sealSource, error),
                 "keyword 브리지 변환");
-            std::vector<std::uint16_t> selections;
+            ce::dynamic_array<std::uint16_t> selections;
             check.Check(experiment::NormalizeMaterialKeywordSelections(
                 sealSource.material, contract.meta.keywords, selections, error),
                 "keyword 정규화 (" + error + ")");
-            check.Check(selections == std::vector<std::uint16_t>{ 1, 0 },
+            check.Check(selections == ce::dynamic_array<std::uint16_t>{ 1, 0 },
                 "legacy 인덱스 선택이 그대로 정규화된다");
         }
 
@@ -214,7 +215,7 @@ namespace RenderTest
             source.material.properties = {{"doubleSided", true}};
             auto layout = contract.layout;
             layout.properties.push_back(CbBinding("alphaCutoff", ShaderPropertyType::Float, 24, 4));
-            std::vector<uint8_t> bytes(32);
+            ce::dynamic_array<uint8_t> bytes(32);
             float alpha = .25f, cutoff = .125f;
             std::memcpy(bytes.data() + 12, &alpha, 4);
             std::memcpy(bytes.data() + 24, &cutoff, 4);
@@ -268,13 +269,13 @@ namespace RenderTest
                 bool cutoff = false, sided = false;
                 for (const auto& property : materials[0].properties)
                 {
-                    if (property.name == "alphaCutoff") cutoff = std::get<float>(property.value) == .375f;
-                    if (property.name == "doubleSided") sided = std::get<bool>(property.value);
+                    if (property.name == "alphaCutoff") cutoff = ce::get<float>(property.value) == .375f;
+                    if (property.name == "doubleSided") sided = ce::get<bool>(property.value);
                 }
                 check.Check(cutoff && sided, "W4 importer preserves cutoff and doubleSided");
                 bool strength = false;
                 for (const auto& property : materials[0].properties)
-                    if (property.name == "emissiveStrength") strength = std::get<float>(property.value) == 8.f;
+                    if (property.name == "emissiveStrength") strength = ce::get<float>(property.value) == 8.f;
                 check.Check(strength, "W6 importer preserves HDR emissive strength");
             }
         }

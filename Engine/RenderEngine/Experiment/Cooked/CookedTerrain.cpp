@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "CookedTerrain.h"
 #include "CookedTexture.h"
 
@@ -23,7 +24,7 @@ namespace experiment::cooked
             return value;
         }
 
-        void TerrainWrite(std::vector<std::byte>& bytes, std::size_t offset, std::uint64_t value, std::size_t count)
+        void TerrainWrite(ce::dynamic_array<std::byte>& bytes, std::size_t offset, std::uint64_t value, std::size_t count)
         {
             for (std::size_t index = 0u; index < count; ++index)
             {
@@ -161,7 +162,7 @@ namespace experiment::cooked
         return true;
     }
 
-    bool EncodeCookedTerrain(const CookedTerrainView& terrain, std::vector<std::byte>& bytes, std::string& failure)
+    bool EncodeCookedTerrain(const CookedTerrainView& terrain, ce::dynamic_array<std::byte>& bytes, std::string& failure)
     {
         bytes.clear();
         if (!TerrainShape(terrain))
@@ -195,7 +196,7 @@ namespace experiment::cooked
         }
         try
         {
-            std::vector<std::byte> encoded(static_cast<std::size_t>(total));
+            ce::dynamic_array<std::byte> encoded(static_cast<std::size_t>(total));
             TerrainWrite(encoded, 0u, kCookedTerrainMagic, 4u);
             TerrainWrite(encoded, 4u, kCookedTerrainVersion, 4u);
             TerrainWrite(encoded, 8u, total, 8u);

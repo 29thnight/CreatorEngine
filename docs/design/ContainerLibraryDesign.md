@@ -1,681 +1,97 @@
-# ce 컨테이너 라이브러리 설계 — `ce::dynamic_array`
+# CreatorContainers — C++23 독립 컨테이너 검증
 
-<!-- master-doc-review:start -->
-## 2026-10-20 master 구현 대조
+2026-10-25 사용자 지시에 따라 기존 자체 컨테이너 제작 중단 결정을 폐기한다. 과거 중단 사유를 현재 구현 금지 조건으로 사용하지 않는다. 이 문서가 기존 `ContainerLibraryDesign`의 본문과 판정을 대체한다.
 
-기준: `27de3f5a02aadde7456aab680db3184c36ee735e`. 대시보드는 변경하지 않는다. 아래 현행 대조와 소스 선언이 이전 시점의 구조·미구현 표기보다 우선한다.
+## 목표와 위치
 
-[전체 대조·링크 정리 원장](../analysis/MasterDocumentationAudit20261020.html)
+STL 컨테이너·알고리즘·문자열 구현에 의존하지 않는 자체 라이브러리를 작성한다. 현재 독립 위치는 `C:/Users/idene/source/repos/CreatorContainers`다. CreatorEngine 솔루션, Directory.Build 설정, PhysX·reflgen·vcpkg·엔진 헤더를 가져오지 않는다. CMake가 생성하는 `build/CreatorContainers.slnx`를 Visual Studio에서 연다.
 
-### 현행 계약과 이 문서의 적용 범위
+기준 문서는 [컨테이너·자료구조 분석](../analysis/ContainerDataStructureAnalysis20261025.md)이다. 해당 문서의 비용 추정은 성능 입증으로 사용하지 않는다. 비교 대상은 로컬 MSVC STL Release다. 정확성 검사의 STL 사용은 허용하고 배포 헤더와 분리한다.
 
-- 공용 인프라의 작업 실행·완료와 컨테이너 저장 수명은 호출자 계약을 따른다. job handle의 완료·join과 저장소/자원 owner를 구분한다.
-- 과거 PPL/독립 thread pool 이행 제안은 현재 공용 구현과 실제 소비자를 먼저 대조한다. 기반 구현의 존재가 모든 병렬 소비자의 취소·종료·비용 수용을 뜻하지 않는다.
+## 현재 구현
 
-### 해당 구현에서 확인한 선언·소유 경계
-
-- [Engine/Utility_Framework/ReflectionTypedYml.h:123](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionTypedYml.h#L123) — `inline void ReadScalar(const Authoring::ReadNode& n, std::string& out) { out = ScalarDetail::StringOf(n); }`
-- [Engine/Utility_Framework/ReflectionTypedYml.h:130](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionTypedYml.h#L130) — `inline void ReadScalar(const Authoring::ReadNode& n, math::vector2& out)`
-- [Engine/Utility_Framework/ReflectionTypedYml.h:135](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionTypedYml.h#L135) — `inline void ReadScalar(const Authoring::ReadNode& n, math::vector3& out)`
-- [Engine/Utility_Framework/ReflectionRegister.h:1](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/Utility_Framework/ReflectionRegister.h#L1) — `#pragma once`
-- [Engine/SceneRuntime/Scene.cpp:1851](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L1851) — `void Scene::DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransfer>& detached)`
-- [Engine/SceneRuntime/Scene.cpp:2049](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L2049) — `Scene::AttachExistingEntityHierarchy(std::vector<DetachedEntityTransfer>& objects)`
-- [Engine/SceneRuntime/Scene.cpp:5605](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/Scene.cpp#L5605) — `ce::physics::result<ce::physics::query_result> Scene::RaycastPhysics(math::vector3 origin, math::vector3 direction, float distance,`
-- [Engine/SceneRuntime/TagManager.cpp:136](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TagManager.cpp#L136) — `void TagManager::SetTagDefinitions(const std::vector<std::string>& tags)`
-- [Engine/SceneRuntime/TagManager.cpp:145](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TagManager.cpp#L145) — `void TagManager::AddTag(std::string_view tag)`
-- [Engine/SceneRuntime/TagManager.cpp:159](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TagManager.cpp#L159) — `void TagManager::RemoveTag(std::string_view tag)`
-- [Tools/regression/verify-hashing-string.ps1:36](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-hashing-string.ps1#L36) — `$repoRoot = [IO.Path]::GetFullPath((Join-Path $PSScriptRoot '..\..'))`
-- [Tools/regression/verify-hashing-string.ps1:92](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-hashing-string.ps1#L92) — `throw 'Scene assigns m_sceneName through string_view::data() again (length is lost).'`
-- [Tools/regression/verify-hashing-string.ps1:127](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Tools/regression/verify-hashing-string.ps1#L127) — `$branchEnd = $typedDrawText.IndexOf('else if constexpr', $branchStart)`
-- [Editor/EngineEntry/ConsoleCommandSystem.cpp:1041](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.cpp#L1041) — `CommandCore::CommandResult HandleSceneTransformDigest(const std::vector<std::string>& parts)`
-- [Editor/EngineEntry/ConsoleCommandSystem.cpp:1217](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.cpp#L1217) — `CommandCore::CommandResult HandleSceneFlag(const std::vector<std::string>& parts)`
-- [Editor/EngineEntry/ConsoleCommandSystem.cpp:1315](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Editor/EngineEntry/ConsoleCommandSystem.cpp#L1315) — `CommandCore::CommandResult HandleSceneBoneDump(const std::vector<std::string>& parts)`
-- [Engine/SceneRuntime/ClrHost.h:114](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ClrHost.h#L114) — `std::vector<std::string> GetAniBehaviorTypeNames();`
-- [Engine/SceneRuntime/ClrHost.h:270](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ClrHost.h#L270) — `std::vector<std::string> GetBTNodeTypeNames(BTNodeKind kind);`
-- [Engine/SceneRuntime/ClrHost.h:296](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/ClrHost.h#L296) — `std::vector<std::string> GetComponentTypeNames();`
-- [Engine/SceneRuntime/TagManager.h:24](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TagManager.h#L24) — `void SetTagDefinitions(const std::vector<std::string>& tags);`
-- [Engine/SceneRuntime/TagManager.h:26](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TagManager.h#L26) — `std::vector<std::string>& GetTags() { return m_tags; }`
-- [Engine/SceneRuntime/TagManager.h:45](https://github.com/29thnight/CreatorEngine/blob/27de3f5a02aadde7456aab680db3184c36ee735e/Engine/SceneRuntime/TagManager.h#L45) — `std::vector<Entity*> GetObjectsWithTag(std::string_view tag) const`
-
-### 이전 근거의 유효 범위
-
-기존 세부 계약은 위 현행 구현과 모순되지 않는 범위에서 유지한다. 과거 수치·실행 통과·해시·장치 조건은 당시 기록이다. 로컬 산출물이 사라진 항목은 링크 대신 경로와 미보존 상태를 표시하며, 현재 master의 재실행 통과로 승격하지 않는다.
-
-<!-- master-doc-review:end -->
-
-<details data-master-history><summary>세부 계약·원래 분석과 당시 측정 기록</summary>
-
-> ## ⛔ 결론 (2026-08-18): **만들지 않는다.**
->
-> C0 측정이 끝났고 사전에 정한 판정 규칙(§4)에 그대로 걸렸다.
->
-> **가중 이득 25.2 µs/frame = 예산의 0.151%** — 규칙의 NO-GO 기준(<0.5%)의 1/3이다.
->
-> 근거 둘이 곱해진 결과다:
-> - mimalloc의 이득은 **작은 할당에서 22~75ns**뿐이다(비율로는 2.6~4배지만 절대값이 작다).
-> - 그런데 실측 분포의 **91.6%가 ≤256B**다. 이득이 큰 4KB 이상은 **1.7%(프레임당 5건)**에 불과하다.
->
-> 즉 "mimalloc이 빠른 구간"과 "이 엔진이 실제로 할당하는 구간"이 어긋난다.
-> 컨테이너를 만들어 모든 할당을 mimalloc으로 보내도 프레임의 0.15%를 얻는다.
->
-> **취할 것**: `ce::remove_at_swap` 자유 함수(§2.4 — 새 타입이 필요 없다).
-> **버릴 것**: `ce::dynamic_array` 타입 자체와 그에 딸린 리플렉션·직렬화 작업 전부.
->
-> 아래 본문은 그 판정에 이른 근거와 과정으로 남긴다. 되살리려면 §5 C0의
-> 측정을 다시 하고 이 표가 바뀌었음을 보여야 한다.
-
-> ### 후속 (2026-08-18): **mimalloc 자체를 걷어냈다.**
->
-> 위 판정은 "컨테이너를 만들어 커버리지를 늘려도 소용없다"였다. 그 다음 질문은
-> "그러면 지금 있는 커버리지는 값을 하는가"였고, scene.glb(35MB) 로드로 쟀다.
->
-> | 구간 | mimalloc | CRT | mimalloc 지분 |
-> |---|---:|---:|---:|
-> | scene.glb 로드 + 씬 배치 | **173건** / 0.04 MB | 553,125건 / 120.52 MB | **0.031%** |
-> | 정상 프레임 300 | **0건** | 408,456건 / 33.21 MB | 0% |
->
-> Release `mem.bench`로 호출당 이득은 실재함을 확인했다(16~256B에서 26~34ns,
-> 2.1~2.6배). 그러나 173건에 곱하면 **씬 로드당 상한 약 5 µs**다. 오브젝트
-> 5,000개를 몰아 만들어도 0.15 ms.
->
-> 커버리지를 늘리는 길은 셋 다 닫혀 있다 — 전역 override는 yaml-cpp DLL 경계에서
-> 힙 불일치로 죽고(스택 재현 완료), 컨테이너 경유는 위의 0.151%, 22배 이득이 나는
-> 4KB 대역은 전부 CRT 쪽(정점·텍스처 버퍼)이라 손이 닿지 않는다.
->
-> 그래서 `ManagedHeap.dll` · `MyAlloc/MyFree` · `MyAllocator` · `ce::` STL 별칭 ·
-> `shared_alloc/unique_alloc` · vcpkg의 mimalloc 의존을 전부 제거했다.
-> `Managed::HeapObject`는 리플렉션이 shared/unique 팩토리를 붙이는 표식으로만 남는다.
->
-> 곁가지 발견: 엔진 모듈은 전부 StaticLibrary이고 **유일한 DLL이 ManagedHeap 자신**이었다.
-> "EXE/DLL 경계를 넘는 객체"라는 원래 명분은 그 시점에 이미 사라져 있었고, 남은 것은
-> 할당마다 치르는 임포트 썽크뿐이었다. 같은 이유로 `SingletonManager.dll`도 함께 걷었다.
-
-2026-08-17. `UtilityFrameworkModernizationPlan`의 컨테이너 축을 구체화한다.
-직접 선행은 **InlineVector 폐기**(`SceneGraphRedesignPlan` K2 스테이지 B) —
-그 폐기가 남긴 판정 기준을 이 문서가 이어받는다.
-
-핵심 입장: **STL이 기본값이고, 자체 컨테이너는 측정된 축에서만 만든다.**
-"상용 엔진이 자체 컨테이너를 쓰니까"는 근거가 아니다.
-
----
-
-## 1. 왜 자체 컨테이너인가 — 그리고 왜 대부분은 아닌가
-
-### 1.1 상용 엔진 대조
-
-Unreal(`TArray`/`TMap`/`TSet`), Godot(`Vector`/`HashMap`/`LocalVector`),
-Unity C++ 코어(`dynamic_array`) 모두 STL을 쓰지 않는다. 그러나 **그들이 버린
-이유가 이 엔진에 그대로 적용되지는 않는다.**
-
-| 그들이 STL을 버린 이유 | 이 엔진에서의 무게 |
+| 타입 | 범위와 계약 |
 |---|---|
-| 할당자가 타입 매개변수라 타입 정체성이 바뀐다 | **큼** — `ce::vector<T>`가 `is_vector_v`에 안 걸려 리플렉션 필드가 유실되는 것이 실측됐다 |
-| 디버그 빌드 성능(MSVC `_ITERATOR_DEBUG_LEVEL=2`) | **큼** — 실질 이득이 가장 큰 축 |
-| `unordered_map`이 규격상 노드 기반이라 오픈 어드레싱 불가 | **큼** — 규격이 막고 있어 우회 불가 |
-| 컴파일 시간·헤더 부하 | 중간 |
-| 크기(`vector` 24B → 16B) | 중간 |
-| DLL 경계 ABI | **작음** — `/MD` 공유 CRT |
-| 구현체 간 결정성 | **작음** — MSVC 단일 |
-| 콘솔·플랫폼 지원 | **없음** — Windows 전용 |
+| `ce::dynamic_array<T>` | 비단순/이동 전용 값, emplace/insert/erase/resize, copy/move, 예외 복구. 1.5배 성장, 오버얼라인·사용자 allocator 지원 |
+| `ce::bounded_ring<T>` | 단일 스레드 제한 용량 FIFO. 생성 후 할당 없음. full/empty를 bool로 반환. SPSC/MPSC 아님 |
+| `ce::flat_hash_map<V>` | uint64 키 호환 별칭. 일반 키 basic_flat_hash_map, 문자열 키 string_hash_map, flat_hash_set 추가. 비단순 값, 선형 조사, 최대 적재율 0.5, tombstone 삭제. 재해시 시 주소 무효화 |
+| `ce::string` | UTF-8 바이트 문자열, 23바이트 SSO, NUL 종료, 길이 지정 시 내부 NUL 허용. copy/move, reserve, append/assign/insert/erase/resize, 검색·비교, 사용자 allocator |
+| `ce::string_view` | 비소유 바이트 범위, 길이 보존 조회. 원본의 수명과 재할당에 종속 |
+| `ce::concurrent_queue<T>` | 비단순 객체를 지원하는 자동 확장 MPMC FIFO. 블록 재사용·스핀락 기반. 락 프리 아님 |
+| `ce::lock_free_queue<T>` | FAA 세그먼트 + hazard + 재사용 슬랩. prepare/publish/try_pop/reclaim 분리. 초기 등록·CRT·T 연산은 핵심 진행 보장과 별도 |
+| `ce::bounded_spsc_ring<T,Capacity>` | 역할이 고정된 1생산자/1소비자 전용, 무할당 제한 링. 실패를 bool로 반환 |
+| `ce::bounded_mpsc_queue<T,Capacity>` | 고정 값 풀 + 취소 가능한 FAA publication ring. 다중 생산자/단일 소비자, 코어 무할당·락 프리. 예약 저장소도 Capacity에 포함 |
+| `slot_map<T>` | 256슬롯 청크, 원소 주소 안정성, 소유 테이블/64비트 generation 핸들, stale/cross-owner 거부 |
+| `sequence_buffer<T,N>` | 고정 저장, 단조 uint64 시퀀스 윈도, 범위 밖 입력 거부, 자동 만료. 모듈러 wrap 미지원 |
+| `intrusive_lru<Index>` | 호출자 링크, O(1) touch/erase, 같은 리스트에 링크 중복 소속 금지 |
+| `string_atom_table` | 안정 문자열 저장, 중복 할당 방지, owner/generation 검증, clear로 핸들 무효화 |
+| `age_buckets<T,N>` | 고정 시간창에 예약, 같은 tick은 삽입 순서 만료, noexcept 콜백 |
+| `inplace_function<Sig,Bytes>` | 고정 inline 용량, 이동 전용 캡처, 힙 할당 없음. 초과 크기/throwing move는 컴파일 거부 |
+| `radix_sort` | unsigned 32/64비트 키 안정 정렬, 작은 범위는 안정 insertion/merge, 큰 범위는 LSD. 임시 allocator 지원 |
+| `memory_resource` | heap/fixed-buffer/monotonic/TLSF. allocator는 저장소 소유권과 함께 전파. 중첩 값 allocator는 자동 전파하지 않음 |
 
-유효한 축은 **할당자 · 디버그 성능 · 해시맵 레이아웃** 셋뿐이다.
+STL의 완전 대체 API가 아니다. iterator는 제공 타입의 범위 순회 계약이며 STL iterator 전체 요구를 충족한다고 주장하지 않는다. 이동/복사/할당자·예외 보장은 [확장 구현 보고서](../analysis/ContainerLibraryExpansion20261025.md)에 정리한다. `string`의 인덱스는 바이트 기준이며 유니코드 정규화·문자 단위 인덱싱·locale 처리는 제공하지 않는다. C 런타임 `memcpy/memmove/memchr`와 `<new>`의 placement new·정렬 할당·실패 예외는 사용한다. 표준 컨테이너에 대한 의존 제거와 C/C++ 런타임 제거는 구별한다.
 
-### 1.2 STL을 기본값으로 두는 이유 (실측)
+## OS 일관성 정책
 
-이 저장소에서 **버그와 죽은 코드는 전부 자체 제작물에서 나왔다**:
+성장률, 해시 혼합, 적재율, 탐색·삭제 규칙, SSO 용량은 OS와 STL 구현에 무관하게 동일하게 고정한다. 핵심 정책은 OS와 분리하며 원자 연산·비트 검색은 컴파일러별 작은 백엔드로 제공한다. 공통 allocator와 비단순 객체 수명을 구현했다. 기본 string 크기는 MSVC 40B이며 ClangCL에서는 no_unique_address 지원 차이로 더 클 수 있어 모듈/컴파일러 사이 raw ABI 공유를 가정하지 않는다. OS별 heap·CRT·컴파일러·CPU·스케줄러 차이 때문에 동일 시간은 보장할 수 없다.
 
-- `HashingString::operator==`가 해시만 비교 — `operator<=>`(문자열까지 비교)와
-  서로 모순되는 **정확성 결함** (2026-09-05 수정, PHASE 15 H-c. 게이트는
-  `verify-hashing-string.ps1`)
-- `MyAllocator::allocate` 정렬 인자 무시 — 과다 정렬 타입에서 조용한 미정렬
-- 프로파일러 `LinearAllocator` 동일 결함
-- `MemoryPool` · `ce::` 컨테이너 alias 20여 개 · `Core.Fence` — 소비자 0으로 사망
-- `InlineVector` — 측정 패리티 + 오측 근거로 1일 만에 폐기
+현재 확인 대상은 Windows x64 + MSVC/ClangCL, WSL Ubuntu x86_64 + Clang 18이다. Linux는 정확성·ThreadSanitizer 실행까지 수행했고 성능은 비교하지 않았다. GCC, macOS AppleClang, ARM64 실행은 미검증이다. 이 행렬의 실측 없이는 '모든 PC OS에서 거의 일정한 성능'을 달성했다고 표기하지 않는다.
 
-반면 `std::vector`는 1,030곳에서 쓰이는데 **버그의 원인이었던 적이 없다.**
-자체 컨테이너는 영구 유지보수 부채다 — 예외 안전성, 정렬, 이터레이터 무효화
-규칙, 리플렉션 연동, natvis 시각화, 그리고 만든 사람이 떠난 뒤의 비용까지.
+## 독립 검증과 수용 기준
 
----
+2026-10-26 최종 독립 수용은 [소형 배열 편차 후속 보고서](../analysis/SmallArrayVarianceAcceptance20261026.md)가 정본이다. 일반 82/82와 고정 MPSC 4/4를 같은 SMT 제어 조건에서 통과했으며 엔진 제품 수용과 구분한다. `CreatorContainers/run-isolated-acceptance.ps1`을 자체 SMT 제어 helper 안에서 실행해 재현한다. 기존 구현 계약과 단계별 실패 자료는 [MPSC·배열·편차 보고서](../analysis/MPSCVarianceAcceptance20261026.md)에 보존한다. [확장 보고서](../analysis/ContainerLibraryExpansion20261025.md)와 아래 초기 `run-tests.ps1` 결과는 당시 범위의 기록이다.
 
-## 2. 설계 결정
+`CreatorContainers/run-tests.ps1`은 Release 빌드, 프로세스 3회 반복 측정, ASan 정확성 실행, 소스·바이너리 해시 및 환경 기록을 남긴다. 결과 원본은 `results/release-run1.csv`부터 `release-run3.csv`, `asan.txt`, `clang.txt`, `environment.json`이다.
 
-### 2.1 이름·시맨틱
+측정은 N=8/23/24/64/4096/65536, 워밍업 3회, 표본 15개, 작은 작업은 약 2ms 이상으로 묶어 수행한다. A/B 실행 순서를 교대하고 체크섬으로 결과를 소비한다. 표본은 각 작업 묶음의 시간이며 단일 원소 ns와 혼동하지 않는다. 세 프로세스의 중앙값 비율을 함께 본다. 0.90 미만은 우위 후보, 0.90~1.10은 동급 후보, 1.10 초과는 보완 대상으로 삼는다. 표본 편차가 큰 항목은 확정 판정하지 않는다.
 
-```cpp
-namespace ce { template<class T> class dynamic_array; }
-```
+배열은 reserve 유무를 나누고, FIFO는 제한 링 대 deque의 용도 비교다. 해시맵은 자체 적재율 0.5 대 STL 기본 정책이며 더 큰 버킷 저장 공간을 사용할 수 있다. 동일 메모리 예산 비교는 아직 없다. 문자열 복사·문자 추가·고정 패턴 검색을 비교한다. 짧은 문자열은 SSO 용량 차이의 효과를 포함한다. 캐시는 워밍업 후이며 콜드 캐시·페이지 폴트·실제 엔진 분포 측정이 아니다. 다른 프로그램을 종료하거나 PC 전원 정책을 바꾸지 않는다.
 
-- **STL 명명·시맨틱 유지**: `begin/end/size/capacity/empty/reserve/resize/
-  push_back/emplace_back/pop_back/erase/insert/clear/data/front/back/operator[]`
-- 이유는 성능이 아니라 **치환 비용**이다. `InlineVector`가 `std::vector`
-  인터페이스 부분집합이었기 때문에 폐기 비용이 타입 별칭 한 줄이었다. 모양이
-  달랐으면 되돌릴 수도 없었다. 이 교훈을 계약으로 박는다.
+정확성 검사는 STL과 대조하는 해시맵 50만 연산, 링 wrap/full/empty, 배열 자기 참조 확장·복사/이동·128바이트 정렬·크기 오버플로, 문자열 SSO 경계·자기/부분 범위 추가·내부 NUL·UTF-8·검색 경계 등을 포함한다.
 
-### 2.2 채택 기능
+## 엔진 통합 게이트
 
-| # | 기능 | 근거 |
-|---|---|---|
-| 1 | **mimalloc 직결**(`MyAlloc`/`MyFree`), 할당자 템플릿 매개변수 없음 | 타입이 하나만 늘어난다. `std::vector<T,Alloc>`는 할당자마다 타입이 갈라져 리플렉션 특수화가 배로 는다 |
-| 2 | **`mi_good_size` 용량 반올림** | mimalloc이 이미 반올림해 준 여유분을 `std::vector`는 영영 모른 채 버린다. `std::allocator`에 "얼마나 줄 건데?"를 묻는 창구가 없어 **구조적으로 못 얻는** 이득. 크기는 한 자릿수 % (빈 간격 ≈1.19배) |
-| 3 | **`remove_at_swap`** (O(1) 비순서 삭제) | `SystemSchedule`이 이미 손으로 구현해 쓴다. Unreal `RemoveAtSwap`과 같은 이유 |
-| 4 | **`resize_uninitialized` / `append_uninitialized`** | POD 버퍼의 값 초기화 생략. Godot `LocalVector`의 실질 이득이 realloc보다 이쪽 |
-| 5 | **축소 금지를 타입이 보장** — `clear()`가 용량을 절대 안 버림 | ClrHost 큐의 용량 손실이 규약으로 관리되다 셋 중 셋이 어긋났다. 타입이 지키면 재발 불가 |
-| 6 | **32비트 size/capacity** | `sizeof` 24 → 16B. GameObject마다 벡터를 지는 구조라 수천 개에서 유의미 |
-| 7 | **명시적 성장 정책**(배율·고정 증분·상한) | 필드별로 고를 수 있게 |
-| 8 | **정렬 처리** (`alignof(T)` > 기본 new 정렬이면 정렬 할당) | `MyAllocator`·`LinearAllocator`가 **둘 다 놓친** 결함. 새로 만들면서 반복하지 않는다 |
+독립 마이크로벤치 통과는 엔진 프레임 성능 입증이 아니다. 다음 조건을 소비자별로 만족한 범위만 통합한다.
 
-### 2.4 ★ 이 중 새 타입이 정말 필요한 것은 절반이다
+1. 해당 타입·분포·연산에서 MSVC STL과 동급 또는 우위이고 변동성이 수용 가능해야 한다. 문자열 등 아직 느린 경로를 숨긴 전체 평균으로 통과시키지 않는다.
+2. 실제 소비자의 원소 수, 수명, 순서·주소 안정성, 예외·동시 접근 요구를 확인하고 필요한 API를 구현한다.
+3. 순서가 필요한 쿠킹·검증·렌더 그래프·안정 정렬 경로를 보존하고 stale generation, unregister/re-registration 같은 수명 회귀를 확인한다.
+4. 최초 소비자 한 곳만 A/B 적용하고 엔진 빌드·실제 씬·정확성·전후 시간·메모리를 검증한다. 리플렉션/직렬화/SDK 경계는 별도 계약으로 유지한다.
 
-C0를 다시 쓰면서 드러난 것 — 위 목록은 성질이 다른 셋을 한 묶음으로 적고 있었다.
-**새 타입을 만들어야만 얻는 것**과 그렇지 않은 것을 갈라 두지 않으면, 이득을
-`ce::dynamic_array`의 공으로 부풀리게 된다.
+현재는 독립 구현·검증 단계다. 후속 보고서의 Windows warm throughput 수용과 실제 소비자 수용을 구분하며, 엔진 통합은 아직 시작하지 않았다. 초기 결과는 [측정 보고서](../analysis/ContainerLibraryBenchmark20261025.md)에 보존한다.
 
-| 층 | 항목 | 비고 |
-|---|---|---|
-| **새 타입이 필요** | mimalloc 직결 · `mi_good_size` · 32비트 size/capacity · 축소 금지를 타입이 보장 · 성장 정책 · 정렬 처리 | 전부 타입의 내부 표현이나 할당 경로를 바꾸는 것 |
-| **`std::vector` 위 자유 함수면 충분** | `remove_at_swap` | `ce::remove_at_swap(vec, i)` 한 줄. 타입을 안 바꾸니 리플렉션도 안 건드린다. **트랙 K가 접혀도 이건 할 수 있다** |
-| **빌드 플래그 문제** | 디버그 이터레이터 검사 비용 | 컨테이너와 무관. C0-2가 잰다 |
-| **새 타입 + UB 인접** | `resize_uninitialized` | 소비자(대형 POD 배열)가 아직 없어 C2 이후에나 판단 가능 |
+## 후속 순서
 
-즉 §1.1이 꼽은 유효한 축 셋 중 **디버그 성능은 컨테이너로 오지 않는다.**
-이 문서의 이득을 그것으로 부풀리지 않는다(§8과 같은 취지).
+일반 컨테이너 확장과 고정 용량 MPSC를 구현했다. 성능은 [MPSC·배열·편차 보고서](../analysis/MPSCVarianceAcceptance20261026.md)의 조건별 결과로 판정한다. 독립 성능 수용 → 실제 소비자 한 곳의 분포/메모리/수명/프레임 수용 → OS/컴파일러 행렬 확대 순서로 진행한다. 엔진 통합은 아직 완료하지 않았다. 기존 FAA MPMC 큐의 성능 수용은 [최적화 보고서](../analysis/LockFreeQueueOptimization20261025.md)가 정본이다.
 
-**성장 계측 훅**은 초안의 기능 9번이었으나 C0 폐기와 함께 뺐다 — 잴 대상이
-70KB였다.
+## 고정 용량 MPSC 및 확장 최적화 계약
 
-### 2.3 기각 기능
+`bounded_mpsc_queue`는 예약한 생산자가 멈춰도 소비자가 빈 예약을 취소해 다음 epoch로 진행한다. 생산자는 값을 유지한 채 재공개한다. 풀 탐색은 고정 크기 안에서 종료하며 공개 재시도 실패는 소비자의 진행을 뜻한다. 정확히 한 소비자만 허용하고 생성/소멸에는 동시 접근이 없어야 한다. 코어 진행 보장에 사용자 생성자/이동 대입/소멸자와 예외 런타임의 진행 보장을 포함하지 않는다. 값 이동 대입/소멸은 noexcept를 요구한다. `false/unavailable`은 저장소 예약 또는 경합 실패도 포함하므로 공개 FIFO의 strict full 판정이 아니다. false 시 인수는 소비하지 않는다. ticket 한도 소진은 예외이며 재생성이 필요하다.
 
-★★ **전역 `operator new` 교체 — 이미 깨져 본 길이다 (2026-08-17 사용자 증언).**
+배열의 일반 heap 재할당은 trivial/noexcept-move 값과 구체 allocator의 명시적 `byte_relocation_allocator` opt-in에만 사용한다. 상속 allocator가 우연히 CRT realloc을 물려받아 소유권을 깨지 않게 한다. 기본 CRT 정렬 한도는 MSVC x64 16B, 그 밖에는 alignof(max_align_t)이며 new-alignment 컴파일 옵션과 분리한다. 오버얼라인은 정렬 new/delete 경로다. 일반 heap은 전역 operator new hook을 경유하지 않으므로 엔진 계측에는 명시적 resource를 연결한다.
 
-이 문서의 여러 대목이 "전역 `operator new`를 교체하면 모든 컨테이너가 공짜로
-mimalloc을 탄다"를 더 싼 대안으로 언급했다. **그 길은 이미 시도됐고, yaml-cpp
-내부 할당에서 터져서 되돌린 결과가 지금 구조다.**
+해시맵은 상위 7비트 제어 태그와 8바이트 그룹 조회를 사용하고 작은 테이블에는 scalar 경로를 유지한다. 최대 적재율 0.5와 tombstone 계약은 유지한다. 제어 저장소에 wrap 조회용 8바이트 복제본을 추가하며 재해시의 주소 무효화 계약은 동일하다.
+## PPL 대체 후보의 진행 보장
 
-즉 `ManagedHeapObject.h`의 클래스 스코프 `operator new` opt-in은 한계나
-미완성이 아니라 **그 실패에 대한 대응**이다. 앞으로 "왜 전역으로 안 하나"가
-나오면 이 절을 먼저 볼 것.
+PPL의 try_pop 빈 큐 반환 계약을 내부 모든 경로의 lock-free 보장으로 해석하지 않는다. 로컬 설치 헤더에는 내부 마이크로 큐의 동기화 필드가 있다. 자체 concurrent_queue는 하나의 스핀락으로 직렬화하는 독립 대체 후보이며 PPL과 구조·공정성·최대 지연이 같다는 뜻은 아니다. 컴파일러 원자 연산을 사용하더라도 락 프리가 자동으로 성립하지 않는다. SPSC는 고정 역할·고정 용량 계약이며 두 생산자 이상의 경로에는 사용하지 않는다.
 
-가설(미검증): yaml-cpp는 동적 트리플릿이라 DLL이고, `YAML::Node`는 내부가
-shared_ptr 덩어리라 경계를 넘나든다. 한쪽이 CRT `new`로 잡은 것을 다른 쪽이
-mimalloc `delete`로 놓으면 즉사한다 — 전역 override의 고전적 실패 모드다.
-그렇다면 yaml-cpp만의 문제가 아니라 **동적 C++ 서드파티 전부**(assimp·spdlog·
-DirectXTK·imgui)가 같은 조건이다.
+## 락 프리 MPMC 현재 구현
 
-함의 둘:
-- 공식 `mimalloc-new-delete.h`(vcpkg 트리에 이미 있다)도 같은 이유로 그대로
-  쓸 수 없다.
-- **역설적으로 이것이 이 문서의 근거를 강화한다** — 전역이 막히면 mimalloc
-  라우팅에는 opt-in 기계가 필요하고, 컨테이너 타입이 바로 그 기계다.
+Windows 독립 성능 게이트를 통과했다. 기본 push/try_pop 6개 조건의 5회 프로세스 중앙값과 큐 소멸 포함 중앙값이 모두 PPL의 1.10배 이내다. 이 판정은 실제 엔진 프레임 수용과 구분한다.
 
-확인할 것: 커밋 `045b0a56`·`3bbf2f4a`가 `mimalloc-override`를 건드렸다 —
-어느 쪽이 도입이고 철회인지, 실패 모드가 DLL 경계 힙 불일치인지 정적 초기화
-순서인지. 전자면 yaml-cpp를 정적 링크해 풀 수 있지만 다른 동적 의존 전부에
-같은 처리가 필요해진다.
+선택 타입 `ce::lock_free_queue<T>`는 FAA 배열 세그먼트·hazard·값 슬랩을 사용한다. 이전 노드별 MS 구현은 비교 기준으로 보존했고, 스핀락 타입 및 엔진 PPL 별칭은 자동 치환하지 않는다. 기본 push/try_pop을 이전 구현과 PPL에 대조한 원시 자료, 분리 계측 및 수용 판정은 [최적화 보고서](../analysis/LockFreeQueueOptimization20261025.md)가 정본이다.
 
-**realloc / `mi_expand` — 기각.**
-1. mimalloc은 빈 기반이고 `mi_expand`는 요청 크기가 **현재 블록의 usable size
-   안**에 들어올 때만 성공한다. 빈 간격(≈1.19배)보다 성장 배율(1.5~2배)이 크므로
-   **정의상 항상 실패**한다.
-2. realloc이 빛나는 경로는 대형 블록의 페이지 재매핑(Linux `mremap`)인데,
-   **Windows + mimalloc 조합에는 그 경로가 없다.** 큰 배열도 복사한다.
-3. 비트 단위 이동이므로 **trivially relocatable** 판정이 필요한데 표준 트레이트가
-   없다(P1144 제안 단계). 손으로 유지하는 목록은 오판 시 **조용한 메모리 손상**을
-   낸다 — 이 저장소가 이미 겪은 결함들 중 디버깅 난이도가 가장 높은 종류.
+값은 이동 대입/소멸이 noexcept여야 한다. 32B 이하 값 노드의 슬랩은 256개, 나머지는 64개 슬롯을 묶어 할당하고 clear/소멸까지 유지한다. 원소 처리는 FIFO이며 잔존 값의 소멸 순서가 필요하면 명시적으로 drain한다. prepare는 예비 세그먼트도 만들며 등록 완료 후 publish는 경계에서도 할당·해제 없이 공개한다. 기본 push의 캐시 미스, 초기 TLS 등록, CRT 및 사용자 T 연산까지 무조건 락 프리라고 표현하지 않는다.
 
-★ 같은 여유분은 `mi_good_size`(§2.2-2)가 **사전에, 실패 분기 없이** 챙긴다.
-`mi_expand`와 `mi_good_size`는 같은 slack을 노리는 두 방식이고 후자가 낫다.
+`MaxParticipants=64`는 T/한도/Hook 특수화별로 등록되어 살아 있는 스레드 수다. 초기 구현의 활성 호출 한도와 구분해야 한다. 종료 시 등록이 해제되고 초과 시 명시적 예외를 던진다. TLS에는 큐 주소가 없어 큐 수명이 먼저 끝나도 그 큐를 만지지 않는다. clear/소멸은 모든 접근이 끝났음을 동기화한 뒤에만 실행한다.
 
-재검토 시점은 명확하다 — **파티클·탄막처럼 프레임마다 수만 원소가 오가는 대형
-POD 배열이 생길 때.** 그때는 `reserve` 규율로 안 되는 구간이 생기고 원소가 확실한
-POD라 트레이트 위험도 사라진다.
+생산자가 예약 직후·공개 직후 멈춘 상황, 보호 중인 세그먼트의 지연 회수, 참여자 한도, 짧은 큐 수명, 256슬롯 경계, 예외·이동 전용 소유권을 검사했다. MSVC/ClangCL 외 GNU 원자 백엔드도 WSL Ubuntu Clang 18에서 Release와 ThreadSanitizer를 실행했다. 실행 범위는 보고서와 로그로 구분하며 실제 엔진 프레임 성능은 아직 입증하지 않았다.
 
-**SBO — 기각(승계).** `SceneGraphRedesignPlan` K2 스테이지 B 폐기 결정을 잇는다.
-재적용은 넷을 **모두** 충족할 때만: ① 제거되는 힙 할당이 핫패스에서 실제 지불되고
-② 인라인 버퍼가 비는 비율 × 크기 증가분이 그 이득보다 작고 ③ 객체가 커져서 손해
-보는 다른 순회가 없고 ④ before/after 측정치가 있다.
+## 2026-10-26 모듈 구현
 
-**할당자 템플릿 매개변수(`ce::vector<T,Alloc>`) — 기각.** §2.2-1 참조.
+독립 라이브러리의 구현 22개를 .ixx 인터페이스 파티션으로 이전하고 Creator.Containers 기본 모듈로 재수출한다. .ixx가 정본이며 기존 헤더는 생성하는 호환 경로다. MSVC Release/ASan 각각 9개, Linux Clang 7개 실행 검사가 통과했다. 모듈 사용법, 실제 검사 범위와 성능 재수용 경계는 [모듈 구현 보고서](../analysis/ContainerModules20261026.md)를 참조한다.
 
----
+## 2026-10-26 모듈 성능 수용
 
-## 3. 필수 선행 조건 — 리플렉션 특수화
-
-`is_vector_v` / `VectorElementType` 짝을 **먼저** 넣지 않으면
-`[[Property]] ce::dynamic_array<T>` 필드는:
-
-- 저장: `node[name] = "[not support type]"` — **경고 없이 문자열이 들어간다**
-  (`ReflectionTypedYml.h:399`)
-- 로드: 에러 로그만 남고 값은 복원되지 않음 (`ReflectionTypedYml.h:533`)
-
-즉 **빌드는 통과하고 저장도 성공한 것처럼 보이는데 왕복하면 데이터가 사라진다.**
-컨테이너 코드보다 이 특수화가 먼저다.
-
-★ 부수 작업으로 이 `else` 분기를 `static_assert` 또는 저장 시점 에러로 승격할
-것을 권한다 — 지금은 저장 쪽이 완전히 조용해서 **이미 새고 있는 필드가 있는지조차
-알 수 없다.**
-
----
-
-## 4. 첫 소비자 — 만들기 전에 정한다
-
-이 저장소에서 자료구조는 만들어서가 아니라 **정본으로 지정되지 않아서** 죽는다
-(§1.2의 사망 목록). 구 RHI가 "소비자 없는 추상"으로 죽은 것과 같은 사인이다.
-
-| 후보 | 이미 필요로 하는 기능 | 판정 |
-|---|---|---|
-| `SystemSchedule` 6개 리스트 | `remove_at_swap`을 **이미 손으로 구현 중** | **채택** — 기능 요구가 코드에 이미 있다 |
-| ClrHost 이벤트 큐 4종 | 축소 금지 정책 | 보류 — 상위 해법이 `BatchMailbox`(별도 정본)라 그쪽이 먼저 |
-| `Scene` Collect* 캐시 8종 | 프레임당 복사 제거 | 보류 — `FrameArena` 소관 |
-
----
-
-## 5. 슬라이스
-
-**C0 — go/no-go 프로브 (0.5일)**
-
-★ **초안의 C0("성장 계측으로 `reserve` 상수 정리")는 폐기했다.** 전수를 뽑아
-크기를 계산해 보니 문제 삼은 상수의 총합이 **약 70KB**였다 — `Scene` 3000이
-60KB(shared_ptr 16B + uint32 4B), `TagManager` 6개가 8KB, `Meta::Registry`가 2KB.
-`RenderPassData`의 500 둘은 아예 죽은 코드다(`PushRenderQueue` 호출자 0).
-70KB를 재려고 계측 하네스를 세울 수는 없다. 게다가 `Meta::Registry` 128은
-등록 타입 수라 **재는 게 아니라 세면 되고**, `TagManager`는 `TagManager.asset`의
-태그 수라 역시 셀 수 있다. → §7의 잡무 항목으로 격하.
-
-대신 **트랙 전체의 go/no-go**를 묻는 프로브 둘을 돌린다. 둘 다 계측 코드를
-새로 짜지 않는다.
-
-1. **mimalloc 내장 통계** — `mi_stats_print`로 할당 총량과 사이즈 클래스 분포를
-   본다. "할당량이 애초에 유의미한가"에 답한다. (vcpkg mimalloc이 `MI_STAT`을
-   켜고 빌드됐는지 확인 선행.)
-2. **`_ITERATOR_DEBUG_LEVEL=0` 빌드 시도** — 현재 어디에도 설정이 없어 Debug
-   (`/MDd`)는 MSVC 기본값 **2**(전면 이터레이터 검사)로 돈다. §1.1에서 "실질
-   이득이 가장 큰 축"으로 꼽은 것이 이건데 **컨테이너를 하나도 안 만들고**
-   얻을 수 있다. 이 매크로는 링크 단위 ABI라 vcpkg 디버그 라이브러리와 값이
-   맞아야 하고, 안 맞으면 링커가 거부한다 — **그 난이도 자체가 측정 결과다.**
-
-판정: 1의 할당량이 미미하고 2가 큰 이득을 주면, `ce::dynamic_array`의 정당성은
-"디버그 빌드 + `remove_at_swap`"으로 좁아진다. 그런데 **둘 다 새 타입이 필요
-없다**(§2.4) — 그 경우 트랙 K를 접는다. §5 C4의 "이득이 없으면 되돌린다"를
-착수 지점으로 당긴 것이다.
-
-#### C0 실행 결과 (2026-08-17)
-
-**프로브 2 — 완료. `_ITERATOR_DEBUG_LEVEL=0`은 플래그 하나로 안 된다.**
-저장소를 건드리지 않고 `/p:ForceImportBeforeCppTargets`로 정의만 주입해 전체
-솔루션을 빌드했다. **첫 프로젝트에서 즉시 `LNK2038`**:
-
-```
-mimalloc-static-debug.lib(alloc.c.obj) : error LNK2038:
-  '_ITERATOR_DEBUG_LEVEL'에 대해 불일치가 검색되었습니다.
-  '2' 값이 '0'(MemoryManager.obj에 위치) 값과 일치하지 않습니다.
-  [ManagedHeap.vcxproj]
-```
-
-vcpkg 디버그 라이브러리가 전부 기본값 2로 빌드돼 있어, 엔진만 0으로 돌리면
-링크가 막힌다. 즉 이 축을 열려면 **커스텀 트리플릿을 만들어 34개 포트를 전부
-재빌드**해야 한다. 실험 후 `/t:Rebuild`로 정상 상태를 복구했다(양 실행 파일 링크 확인).
-
-★ 이것이 트랙 K의 계산을 바꾼다. §1.1이 "실질 이득이 가장 큰 축"으로 꼽은
-디버그 빌드 성능은 ① 이 컨테이너와 **무관**하고(§2.4) ② **vcpkg 전면 재빌드라는
-별도 프로젝트**다. 그러니 이 축의 이득을 `ce::dynamic_array`의 정당성으로 쓸 수
-없다. 이 축은 빌드 인프라 트랙으로 분리해 따로 결정한다.
-
-**프로브 1 — 계측기를 두 번 고쳐서 답을 얻었다. 결론은 GO.**
-
-계측기 ①(`mi_stats_print`)은 **틀렸다.** 전역 `operator new` 오버라이드가 저장소에
-없어(실측: 클래스 스코프 오버로드가 `ManagedHeapObject.h:38-52` 한 곳뿐)
-`std::vector`의 버퍼는 **CRT 힙**으로 간다. mimalloc을 지나는 것은
-`Managed::HeapObject` 파생뿐이다. 즉 그것은 **옮기려는 바로 그 할당을 못 본다.**
-
-계측기 ②(`_CrtMemCheckpoint`)도 **혼자서는 틀린 답을 준다.** 그것은 그 순간 살아
-있는 블록만 세므로 "프레임마다 할당했다 그 프레임에 해제하는" 패턴이 **0으로
-보인다** — 그런데 그것이 정확히 이 컨테이너가 없애려는 비용이다. 실제로 순증만
-봤을 때 재생 300프레임 동안 CRT +517블록이 나와 **"프레임당 할당이 거의 없다"는
-정반대 결론에 도달할 뻔했다.**
-
-계측기 ③ — `_CrtSetAllocHook`으로 **할당 호출 자체를 센다**(`_CRT_BLOCK` 제외).
-이것이 churn을 본다. 셋을 합쳐 `mem.stats`/`mem.delta`/`mem.reset`/`mem.hook`
-콘솔 명령으로 넣었다(`ConsoleCommandSystem.cpp`, ManagedHeap에는
-`MyHeapStats`/`MyHeapStatsReset` 추가).
-
-#### 실측 (Test1 씬 68오브젝트, Debug x64, `--script` 무인 실행)
-
-| 구간 | mimalloc | CRT live 블록 | **CRT 할당 호출(churn)** |
-|---|---|---|---|
-| 씬 로드 | +213건 / 0.13MB | +8,740 | — |
-| 편집 180프레임 | 0 | +436 | — |
-| 재생 진입(1회성) | 0 | +95,756 / 3.33MB | — |
-| **재생 300프레임** | **0** | +517 | **459,964건 / 41.54MB** |
-| **재생 600프레임** | **0** | −412 | **915,603건 / 82.51MB** |
-
-**프레임당 CRT 할당 약 1,530건 / 137KB.** 300↔600프레임이 정확히 2배라 선형이
-확인됐고, live 블록은 거의 안 늘어난다 — 즉 **99.9%가 프레임 내에서 할당했다
-해제되는 churn이다.** mimalloc 쪽은 런타임 내내 **0건**이다(씬 로드 때 213건뿐).
-
-★ 재생 진입 시 +95,756블록은 누수가 아니다. 구간을 셋으로 나눠 재보니 +330 → +3
-→ +89로 평탄해졌다 — `CreateEditorOnlyPlayScene`의 1회성 복제다.
-
-#### 귀속 (2026-08-17, `mem.hook stack` + `mem.hook top`)
-
-할당 훅에 `CaptureStackBackTrace`를 붙여 호출 지점별로 모았다(고정 표 1024칸,
-심볼 해석은 훅을 끈 뒤). 120프레임 재생에서 **서로 다른 호출 지점 1024개 이상
-(표 넘침) / 131,250건**. 최상위도 2.1%뿐인 **긴 꼬리**다 — 단일 핫스팟이 없다.
-
-★ **그런데 상위 목록이 판정을 뒤집는다.** 1·2·3·4·5·6·8위가 전부
-`std::allocator<std::_Container_proxy>::allocate`다. `_Container_proxy`는
-**`_ITERATOR_DEBUG_LEVEL ≥ 1`일 때 MSVC가 컨테이너 인스턴스마다 추가로 하는
-힙 할당**이다. 즉 상위 할당의 상당 부분이 **디버그 빌드에만 존재하는 계측
-부산물**이고, Release(IDL=0)에는 아예 없다.
-
-실제 코드에서 온 것으로 확인된 것:
-
-| 출처 | 성격 |
-|---|---|
-| `DX12GpuProfiler::PassTiming` 생성자의 `std::string` | 프레임마다 패스 이름 문자열 — 진짜 비용 |
-| `std::vector<RHITransition>::_Emplace_reallocate` | 렌더 그래프 전이 배열의 성장 — `reserve`로 없앨 수 있다 |
-| `std::string` 각종 구축(`operator+`, `_Construct`) | 문자열 churn — `Symbol` 인터닝 축과 겹친다 |
-
-#### 판정: **보류** — Debug 수치가 이터레이터 디버깅으로 오염됐다
-
-앞 절의 "프레임당 1,530건"은 **Debug 빌드 수치이고, 그중 상당 부분이
-`_Container_proxy`다.** Release의 실제 할당량은 이보다 크게 낮다. 그런데
-CRT 디버그 힙 훅은 Release에 없으므로 **같은 도구로 Release를 잴 수 없다.**
-
-즉 C0는 "GO"가 아니라 **"측정 방법을 하나 더 갖추기 전에는 판정 불가"** 다.
-길은 둘이다:
-
-1. **C0-2를 먼저 푼다** — 커스텀 트리플릿으로 vcpkg를 IDL=0으로 재빌드하면
-   `_Container_proxy` 잡음이 사라져 같은 훅으로 깨끗한 수치를 얻는다.
-   **성능 개선과 측정 정합이 같은 작업으로 해결된다** — 이것이 C0-2의 우선순위를
-   올린다.
-2. 또는 Release에서 동작하는 별도 계측(전역 `operator new` 교체 등)을 세운다.
-   그런데 그건 §2.3에서 다룬 그 결정 자체라 순환이다.
-
-**→ 1번을 먼저 한다.** 트랙 K의 착수 조건을 "C0-2 해결 후 재측정"으로 바꾼다.
-
-#### C0-2 이행 (착수 2026-08-17)
-
-커스텀 트리플릿 `x64-windows-idl0`을 세웠다:
-
-- `triplets/x64-windows-idl0.cmake` — x64-windows와 동일한 아키텍처·링크 설정에
-  `VCPKG_C_FLAGS_DEBUG`/`VCPKG_CXX_FLAGS_DEBUG`로 `/D_ITERATOR_DEBUG_LEVEL=0`만 더한다.
-  릴리스는 `_DEBUG`가 없어 이미 0이므로 디버그 구성에만 넣는다.
-- `vcpkg-configuration.json` — `overlay-triplets`로 저장소의 `triplets/`를 가리킨다.
-  이게 없으면 vcpkg가 저장소 안을 안 보고 "알 수 없는 트리플릿"으로 실패한다.
-
-설치 트리는 트리플릿별로 갈리므로(`vcpkg_installed/x64-windows-idl0/`) **기존
-`x64-windows` 트리는 그대로 남는다** — 되돌리기가 `Directory.Build.props`의
-`VcpkgTriplet` 한 줄 제거로 끝난다.
-
-예상 비용: 바이너리 캐시는 트리플릿 ABI 해시로 갈리므로 **이 트리플릿은 캐시가
-비어 있다.** 즉 34개 포트를 소스에서 빌드하는 경로다(같은 저장소의 첫 환경 실측이
-38분).
-
-★ 알려진 위험: **CMake를 쓰지 않는 포트는 `VCPKG_CXX_FLAGS_DEBUG`를 무시할 수
-있다.** 그런 포트가 있으면 IDL 불일치가 남아 다시 `LNK2038`이 나는데, 이번에는
-어느 포트인지가 오류에 찍히므로 그 포트만 따로 다루면 된다. physx가 후보다.
-
-#### C0-2 결과 — physx에서 좌초 (2026-08-17)
-
-34개 포트 재빌드는 **18분에 성공**했다. 그리고 두 관문을 지났다:
-
-1. **mimalloc** — `ManagedHeap.vcxproj`가 매니페스트를 우회해 전역 vcpkg 트리의
-   `x64-windows-static-md`를 직접 가리키고 있었다(의도된 배치 — 동적 mimalloc은
-   `mimalloc-redirect.dll`로 프로세스 전역 CRT를 후킹해 `DllMain`을 깨뜨린다).
-   `x64-windows-static-md-idl0` 트리플릿을 하나 더 만들어 해결했다.
-2. **physx — 뚫지 못했다.** 트리플릿의 `VCPKG_CXX_FLAGS_DEBUG`를 **무시한다.**
-   실측: `x64-windows-idl0` 트리로 다시 빌드한
-   `PhysXExtensions_static_64.lib`(debug)에도 여전히
-   `/FAILIFMISMATCH:_ITERATOR_DEBUG_LEVEL=2`가 박혀 있다 — 포트의 자체 CMake가
-   `CMAKE_CXX_FLAGS_DEBUG`를 덮어쓰기 때문이다.
-
-뚫으려면 physx 포트 오버레이를 만들어 빌드 스크립트를 패치해야 하고, 그것은
-**physx 5.5.0에 고정된 영구 유지보수 항목**이 된다. 그 값어치는 별도 결정으로
-남긴다. 트리플릿 둘은 저장소에 그대로 두었으므로 patch만 더하면 이어서 할 수 있다.
-엔진 배선(`Directory.Build.props`·`ManagedHeap.vcxproj`)은 되돌렸고 빌드는 정상이다.
-
-#### 대안으로 측정만 살렸다 — 그리고 그것으로 충분했다
-
-빌드를 바꾸는 대신 **보고에서 `_Container_proxy`를 분리 집계**했다
-(`mem.hook top`). 성능 이득은 못 얻지만 "실제 코드가 하는 할당"은 읽을 수 있다.
-
-| | 건수 | 비중 |
-|---|---|---|
-| 총 할당 (120프레임) | 129,356 | 100% |
-| `_Container_proxy`(이터레이터 검사 부산물) | 99,916 | **77.2%** |
-| **실제 코드 할당** | **29,440** | **22.8%** |
-
-**→ 프레임당 실제 할당은 약 245건이다.** 앞서 보고한 1,530건의 **1/6**이다.
-
-#### Tier 0 — 호출당 비용 실측 (2026-08-18, `mem.bench`)
-
-앞의 모든 측정은 **"할당이 몇 번인가"** 만 봤다. 판정에 필요한 나머지 절반은
-**"mimalloc이 CRT보다 얼마나 싼가"** 인데 한 번도 재지 않았다. `mem.bench`가 그것을
-잰다 — 같은 크기·패턴을 `::operator new/delete`와 `MyAlloc/MyFree`로 각각 돌려
-할당+해제 한 쌍의 비용을 중앙값으로 낸다(mimalloc 쪽은 DLL 경계 비용 포함).
-
-★ **Debug 수치는 판정에 쓸 수 없다.** 그 구성은 CRT 디버그 힙과 **mimalloc의
-디버그 빌드**(전수 assertion)를 비교한다 — 둘 다 출하되지 않는다. 실측에서
-mimalloc이 6~8배 *느리게* 나왔는데, 그것은 mimalloc이 느린 것이 아니라 다른
-물건을 잰 것이다. 이 함정을 명령 출력에 못 박아 두었다.
-
-**Release 실측** (라운드 64 · 블록 4096 · 프레임당 272건 가정):
-
-| 크기 | 패턴 | CRT(ns) | mimalloc(ns) | 비율 | 프레임당 이득 |
-|---|---|---|---|---|---|
-| 16 | LIFO | 96.9 | 28.1 | 3.45× | 18.7 µs (0.11%) |
-| 16 | 분산 | 59.5 | 21.6 | 2.76× | 10.3 µs (0.06%) |
-| 64 | LIFO | 75.0 | 28.1 | 2.67× | 12.8 µs (0.08%) |
-| 64 | 분산 | 59.6 | 22.5 | 2.65× | 10.1 µs (0.06%) |
-| 256 | LIFO | 54.2 | 32.1 | 1.69× | 6.0 µs (0.04%) |
-| 256 | 분산 | 100.5 | 25.2 | 3.99× | 20.5 µs (0.12%) |
-| **4096** | LIFO | **2005.3** | **99.8** | **20.1×** | **518.3 µs (3.11%)** |
-| **4096** | 분산 | **1665.0** | **79.0** | **21.1×** | **431.4 µs (2.59%)** |
-
-**답이 크기에 따라 갈린다.**
-
-- **작은 할당(≤256B)**: mimalloc이 2.6~4배 빠르지만 **절대 차이가 22~75ns**뿐이라
-  프레임당 6~20µs, 예산의 **0.04~0.12%**다. 판정 규칙상 **NO-GO** 구간이다.
-- **큰 할당(4KB)**: CRT가 **2µs**로 급격히 나빠진다 — 256B 대비 20~40배다.
-  MSVC CRT 힙이 어떤 임계에서 다른 경로로 넘어간다는 뜻이고, 여기서는 mimalloc이
-  **20배** 빠르다. 프레임당 4KB 할당이 몇 건만 있어도 **2.6~3.1%**가 나온다.
-
-#### Tier 1 — 크기 분포 실측 (2026-08-18) → **판정 완료: NO-GO**
-
-훅에 크기 히스토그램을 붙여 잰 실제 분포(120프레임, `_Container_proxy` 제외.
-프록시는 전부 16B라 그 버킷에서 빼면 깨끗이 분리된다 — 실측 1.46MB/95,461건 = 15.9B):
-
-| 크기 | 건수 | 비중 | 절감 가정(ns) |
-|---|---|---|---|
-| ≤8B | 2,239 | 6.9% | 40 |
-| ≤16B | 4,797 | 14.7% | 40 |
-| **≤32B** | **11,890** | **36.5%** | 40 |
-| ≤64B | 4,117 | 12.6% | 40 |
-| ≤128B | 5,581 | 17.1% | 40 |
-| ≤256B | 1,236 | 3.8% | 40 |
-| ≤512B | 1,174 | 3.6% | 151 |
-| ≤1024B | 352 | 1.1% | 372 |
-| ≤2048B | 612 | 1.9% | 815 |
-| ≤4096B | 144 | 0.4% | 1,700 |
-| ≤8192B | 143 | 0.4% | 1,700 |
-| ≤16384B | 71 | 0.2% | 1,700 |
-| ≤65536B | 244 | 0.7% | 1,700 |
-
-**⇒ 가중 이득 25.2 µs/frame = 0.151%**. 실제 코드 32,600건 / 120프레임 = 272건/frame.
-
-**§4 판정 규칙의 NO-GO 구간(<0.5%)에 명확히 들어간다.**
-
-왜 이렇게 나오는지가 중요하다 — **"mimalloc이 빠른 구간"과 "이 엔진이 할당하는
-구간"이 어긋난다.** 분포의 **91.6%가 ≤256B**인데 거기서 mimalloc의 절대 이득은
-40ns뿐이다. 이득이 20배인 4KB 이상은 **1.7%, 프레임당 5건**에 그쳐 총합에
-기여하지 못한다(5건 × 1.7µs = 8.5µs).
-
-★ 이것이 §1 서두의 산술이 예고한 결과다. 비율(2.6~4배)이 커 보여도 **절대값 ×
-빈도**가 판정을 낸다. 비율만 보고 착수했으면 며칠을 쓰고 0.15%를 얻었을 것이다.
-
-#### (기록) 판정 전 상태 — 크기 분포가 없어 결론을 못 냈던 시점
-
-Tier 0는 "애매하면 Tier 1"이라는 조건을 스스로 만족시켰다. 지금 없는 것은
-**프레임당 272건의 크기 분포**다. 전부 작은 할당이면 0.1%로 NO-GO고, 4KB급이
-섞여 있으면 그 몇 건이 전체를 지배한다.
-
-다음 작업: 할당 훅에 **크기 히스토그램**을 붙인다(2의 거듭제곱 버킷,
-`_Container_proxy` 제외). 그 분포를 위 표에 대입하면 가중 평균 이득이 나오고,
-그것이 §4 판정 규칙의 입력이다.
-
-★ 부수 발견 — **CRT의 4KB 절벽 자체가 별개 최적화 기회**다. 프레임마다 4KB 이상을
-할당하는 지점이 있으면(`ProxyCommand`의 32KB 본 팔레트가 유력한 후보다) 컨테이너
-라이브러리와 무관하게 그것만 재사용해도 프레임당 수백 µs가 돌아온다.
-
-#### (앞선) 판정: 트랙 K는 **보류 유지**, 호출부 수정이 먼저
-
-245건/프레임(60fps에서 초당 약 14,700건)은 무시할 양은 아니지만, 이 수치가
-방향을 바꾼다:
-
-- `ce::dynamic_array`의 mimalloc 라우팅은 **각 할당을 싸게** 만들 뿐 **횟수를
-  줄이지 않는다.**
-- 245건을 줄이는 것은 호출부 작업이다 — `reserve`, 버퍼 재사용, 문자열 인터닝.
-  이미 지목된 셋(`DX12GpuProfiler::PassTiming` 문자열, `vector<RHITransition>`
-  `reserve` 누락, `std::string` churn)이 그대로 후보다.
-- **호출부를 고친 뒤 남는 양이 그때의 판정 근거다.** 245건이 50건이 되면 컨테이너
-  라이브러리의 근거는 사라지고, 그대로면 그때 만든다.
-
-즉 C0의 결론은 "GO"도 "NO-GO"도 아니라 **"순서가 틀렸다"**이다. 컨테이너보다
-호출부가 먼저다.
-
-★ 다만 귀속에서 나온 **개별 항목 둘은 트랙 K와 무관하게 지금 고칠 수 있다**:
-`DX12GpuProfiler::PassTiming`의 프레임당 문자열 생성, `vector<RHITransition>`의
-`reserve` 누락. 둘 다 컨테이너 라이브러리가 아니라 호출부 수정이다.
-
-#### (참고) 오염 이전의 원 판정
-
-- `ce::dynamic_array`가 겨냥하는 CRT 힙이 **런타임 할당의 사실상 전부**를 쥐고 있다.
-  mimalloc 쪽은 이미 0이라 더 짜낼 것이 없다.
-- 60fps 기준 **초당 약 92,000건**이다. 무시할 수 있는 양이 아니다.
-- 다만 이 1,530건이 전부 `std::vector`는 아니다 — `std::string`·`std::function`·
-  yaml-cpp 노드도 같은 힙에 있다. **다음 질문은 "이 churn의 출처"이고,
-  그것이 C2의 첫 소비자를 실제 데이터로 다시 고르게 한다**(§4의 `SystemSchedule`
-  선정은 코드 근거였지 측정 근거가 아니었다).
-- ★ 그 자체로 별개 가치가 있는 발견이다. **프레임당 1,530건은 컨테이너 문제이기
-  이전에 "프레임 루프가 왜 이렇게 할당하는가"라는 질문**이고, 앞서 실측된
-  ClrHost 3개 큐의 swap 재할당 · `Scene::UpdateRenderData`의 벡터 8개 복사 ·
-  `ProxyCommand`의 스킨드 메시당 32KB `make_shared`가 모두 후보다.
-
-**C1 — 리플렉션 미지원 타입을 컴파일 오류로 (2026-08-17 완료)**
-`ce::dynamic_array` 특수화는 C2에서 타입이 생긴 뒤에 붙인다. C1에서 실행한 것은
-**미지원 타입의 조용한 유실을 없애는 것**이고, 그 과정에서 실제 유실 2종이 나왔다.
-
-발견 ① **`Skeleton::m_rootTransform`이 저장마다 유실되고 있었다.**
-`Mathf::xMatrix`(=`XMMATRIX`)가 스칼라 목록에 없어 `"[not support type]"` 문자열로
-덮여 왔다 — `Test1.creator`·`Test2.creator`에 그 흔적이 남아 있다(디스크 전수
-851파일 중 2건). `EmitScalar`/`ReadScalar` 짝을 추가해 행 우선 16 float 시퀀스로
-왕복하게 했다(SIMD 레지스터 표현이 아니라 `XMFLOAT4X4`로 내려 적어 정렬·플랫폼
-의존을 없앤다). 낡은 파일의 문자열은 로드 시 항등행렬로 떨어지고 다음 저장에서
-정상 값으로 교체된다.
-
-발견 ② **`MeshColliderComponent::m_Info`는 한 번도 왕복한 적이 없었다.**
-`ConvexMeshColliderInfo`는 원시 포인터(`Vector3* vertices`)를 담은 런타임 구조체다.
-★ 이 건은 **디스크 증거로는 잡을 수 없었다** — 이 컴포넌트가 저장된 씬·프리팹이
-0건이라 `"[not support type]"` 문자열조차 남지 않았고, `static_assert` 승격 후
-빌드에서만 드러났다. **컴파일 타임 검사가 디스크 grep의 상위집합**임을 보여 준다.
-관례(`BoxColliderComponent`는 정보 구조체가 아니라 컴포넌트의 미러 필드를 저장)를
-따라 필드 목록에서 뺐다.
-
-변경: `EmitMember`/`ReadMember`의 `else`를 `static_assert(kUnsupportedForYaml<T>)`로
-승격(의존 거짓 관용구). 오류 메시지가 세 가지 처방을 직접 지시한다 — 스칼라 짝
-추가 / `reflect()` 부착 / 필드 목록에서 제외.
-
-판정: **Debug x64 전체 솔루션 빌드 통과** = 모든 `[[Property]]` 필드가 직렬화
-가능함이 컴파일 타임에 보장된다. 이제 미지원 타입은 저장 시점이 아니라 **선언
-시점**에 걸린다.
-
-**C2 — `ce::dynamic_array` 구현 (2일) — C0 통과 조건부**
-§2.4의 "새 타입이 필요" 여섯. 단위 테스트: 정렬 타입(`alignas(64)`), 무브 온리
-타입, 예외 던지는 타입의 강한 보장, `clear()` 후 용량 유지, `mi_good_size`
-반올림이 실제 usable size와 일치. 리플렉션 특수화(`is_vector_v`/
-`VectorElementType`)를 이 슬라이스에서 함께 붙인다 — C1이 만든
-`static_assert`가 누락을 바로 잡아 준다.
-판정: 테스트 전수 통과 + `sizeof(ce::dynamic_array<int>) == 16`.
-
-**C3 — 첫 소비자 이관 (1일)**
-`SystemSchedule` 6개 리스트를 이관한다. 판정: 회귀 세트 통과 + 프리팹 왕복 검사
-통과 + C0-1 대비 할당 총량 비퇴행.
-
-**C4 — 판정과 확대 결정 (0.5일)**
-C0 기준선 대비 수치로 확대 여부를 정한다. **이득이 없으면 C3에서 멈추고
-되돌린다** — `InlineVector`가 준 교훈이다(측정 패리티인데 유지하지 않는다).
-
-**독립 항목 — `ce::remove_at_swap` (0.5일, 트랙 K와 무관하게 가능)**
-`std::vector` 위의 자유 함수(§2.4). `SystemSchedule`이 손으로 구현한
-swap-and-pop을 대체한다. 타입을 안 바꾸니 리플렉션·직렬화에 영향이 없고,
-**C0에서 트랙 K를 접어도 이건 남는다.**
-
-합계 **4.5일**(C0 0.5 · C2 2 · C3 1 · C4 0.5 · remove_at_swap 0.5. C1은 완료).
-순서 제약: **C0가 관문이다** — 여기서 no-go면 C2~C4를 하지 않는다.
-`remove_at_swap`은 어느 시점이든 독립적으로 가능.
-
----
-
-## 6. 완료 기준
-
-1. **C0 프로브 둘의 결과가 문서에 수치로 적혀 있다** — 그 수치가 트랙 K를
-   진행할지 접을지의 근거다. no-go로 접는 것도 완료다.
-2. ✅ 미지원 타입이 선언 시점에 걸린다(C1 완료). 씬·프리팹의 잔여
-   `"[not support type]"` 2건은 다음 저장에서 자동 교체된다.
-3. `SystemSchedule`에 손으로 구현한 swap-and-pop이 0건(`ce::remove_at_swap`).
-4. **(C0 go인 경우만)** `sizeof(ce::dynamic_array<int>) == 16`,
-   정렬·무브온리·예외 테스트 통과.
-5. **(C0 go인 경우만)** C0 기준선 대비 할당 총량이 비퇴행이고 **개선이 수치로
-   있다** (없으면 §5 C4대로 되돌린다).
-6. 회귀 세트 · 프리팹 왕복 검사 착수 전과 동일 판정.
-
-## 7. 하지 않을 것
-
-- **`std::vector` 전면 치환** — 1,030곳을 건드릴 이유가 없다. 측정된 축에서만.
-- **realloc / `mi_expand`** — §2.3.
-- **SBO 재도입** — §2.3의 4조건 전이면 안 된다.
-- **`ce::` 컨테이너 alias 20여 개 부활** — 죽은 이유가 소비자 부재다.
-  `ce::dynamic_array`가 자리를 잡은 뒤에도 나머지는 필요할 때만 하나씩.
-- **`std::string` 대체** — 별개 축(`Symbol` 인터닝)이 먼저다.
-- **`reserve` 상수 계측** — 초안 C0. 총합 70KB라 잴 가치가 없다(§5 C0).
-  아래 잡무로 격하한다.
-
-### 7.1 잡무 (트랙과 무관, 언제든)
-
-- `RenderPassData.cpp:69-70`의 `reserve(500)` 둘은 **죽은 코드다**
-  (`PushRenderQueue`/`PushUIRenderQueue` 호출자 0). 큐 자체와 함께 철거 대상.
-- `ReflectionRegister.h:26-27`의 128은 등록 타입 수이므로 **재는 게 아니라
-  세어서** 맞추거나 지운다.
-- `TagManager.cpp:8-13`의 32·300은 `TagManager.asset`의 태그·레이어 수에서
-  나온다. 마찬가지로 센다.
-- `Scene.cpp:60-61`의 3000은 저작 최대 씬(68 오브젝트)의 44배다. 다만 런타임
-  프리팹 인스턴스화로 늘어나므로(최대 프리팹 혼자 178 오브젝트) 근거 없는
-  값이라는 것과 틀린 값이라는 것은 다르다. **지울지 줄일지는 60KB짜리
-  판단이므로 서두르지 않는다.**
-
-## 8. 리스크
-
-- **또 하나의 죽은 컨테이너가 될 위험** — 이 저장소의 대표 실패 양식이다.
-  §4가 소비자를 먼저 못 박고, §5 C0가 관문이 되고, C4가 되돌림 조건을
-  명시하는 이유.
-- **리플렉션 특수화 누락 시 조용한 데이터 유실** — C1이 이를 컴파일 오류로
-  바꿔 놓았으므로 C2에서 특수화를 빠뜨리면 빌드가 막힌다. 위험이 해소된 것이
-  아니라 **발현 시점이 앞당겨진 것**이다.
-- **예외 안전성** — `InlineVector` 리뷰가 남긴 미검증 경로와 같은 함정.
-  C2 테스트에 "던지는 T"를 반드시 포함한다.
-- **디버그 빌드 이득은 이 컨테이너로 오지 않는다** — 가장 큰 축(§1.1)은
-  빌드 구성(`_ITERATOR_DEBUG_LEVEL`) 문제다(§2.4). 이 문서의 이득을 그것으로
-  부풀리지 않는다. C0-2가 그 크기를 따로 잰다.
-- **★ 이 문서가 스스로 커지는 것** — 초안의 C0와 기능 9번이 그랬다. "만들면
-  좋을 것"을 적으면 목록이 늘고, 늘어난 목록이 다시 트랙의 정당성처럼 읽힌다.
-  §2.4의 층 구분과 §5 C0의 관문이 그것을 막는 장치다.
-
-## 9. 관련 문서
-
-- [UtilityFrameworkModernizationPlan.md](../plans/UtilityFrameworkModernizationPlan.md) — 상위 계획
-- [SceneGraphRedesignPlan.md](../plans/archive/SceneGraphRedesignPlan.md) — K2 스테이지 B 폐기 결정, SBO 재적용 기준
-- [ReflectionRedesignPlan.md](../plans/archive/ReflectionRedesignPlan.md) — 리플렉션 표면
-- [PPLContainerMigrationAnalysis.md](../analysis/PPLContainerMigrationAnalysis.md) — PPL 컨테이너 축
-
-</details>
+모듈 경로의 문자열·32비트 원자 래퍼·기본 빈 훅에 명시적 inline을 지정하고 전체 수용을 재실행했다. 일반 82/82, MPSC 주 수용·개별 전송 각 4/4, FAA 6/6, SPSC·스핀 MPMC 처리량 8/8로 PASS다. 원자 순서·메모리 배치·상태 전이는 동일하다. MSVC Release 19/19, 모듈 ASan 9/9, Linux 모듈 TSan 7/7을 통과했다. [원인 분리](../analysis/ModuleOptimizationDiagnostics20261026.md)와 [최종 전체 표](../analysis/ModulePerformanceOptimization20261026.md)를 참조한다. 엔진 통합·실제 프레임 수용과 OS 간 성능 동등성은 별도 게이트다.

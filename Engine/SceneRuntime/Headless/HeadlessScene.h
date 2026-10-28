@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -42,7 +43,7 @@ namespace Runtime::Headless
         ::Scene* scene_ = nullptr; // borrowed; manager owns its GC root
         std::thread::id owner_ = std::this_thread::get_id();
         struct EntityReport { std::string name; math::vector3 position; };
-        std::vector<EntityReport> entityReport_;
+        ce::dynamic_array<EntityReport> entityReport_;
         std::uint64_t frames_ = 0, committed_ = 0, zeroFrames_ = 0, multiFrames_ = 0;
         double dropped_ = 0;
         std::uint64_t physicsSteps_ = 0;

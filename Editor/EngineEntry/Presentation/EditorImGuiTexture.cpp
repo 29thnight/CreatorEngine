@@ -1,3 +1,4 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -24,9 +25,9 @@ namespace EditorImGuiTexture
 
         // Presentation-thread consumer state only. DataSystem owns accepted jobs
         // and drain tracking; dropping this request cancels only this subscriber.
-        std::unordered_map<uint64_t, PreparedImage>& PreparedImages()
+        ce::engine_node_map<uint64_t, PreparedImage>& PreparedImages()
         {
-            static std::unordered_map<uint64_t, PreparedImage> images;
+            static ce::engine_node_map<uint64_t, PreparedImage> images;
             return images;
         }
     }

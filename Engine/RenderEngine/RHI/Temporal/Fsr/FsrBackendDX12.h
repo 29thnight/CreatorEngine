@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
 #else
@@ -62,7 +63,7 @@ public:
     IDXGISwapChain4* GetSwapchain() const { return m_swapchain.get(); } // Borrowed.
     uint32_t GetCompletedGeneratedFrameCount() const { return m_generator->GetCompletedGeneratedFrameCount(); }
 #if CE_DEVELOPMENT && !CE_SHIPPING
-    void SetDevelopmentEvaluationFailure(std::function<bool()> reject)
+    void SetDevelopmentEvaluationFailure(ce::owned_func<bool()> reject)
     {
         m_generator->SetDevelopmentEvaluationFailure(std::move(reject));
     }

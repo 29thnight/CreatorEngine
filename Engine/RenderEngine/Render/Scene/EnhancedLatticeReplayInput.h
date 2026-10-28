@@ -1,4 +1,7 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../../Utility_Framework/Foundation/EngineOrderedSet.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -25,19 +28,19 @@ struct EnhancedLatticeReplayInput
     };
     struct Draw
     {
-        std::array<uint8_t,32> geometryIds{};
+        ce::fixed_array<uint8_t,32> geometryIds{};
         uint64_t program{};
         EnhancedMaterialCoverage coverage;
         material_graph::InstanceDescription description;
-        std::vector<TextureIdentity> textures;
+        ce::dynamic_array<TextureIdentity> textures;
     };
-    std::vector<Draw> draws;
+    ce::dynamic_array<Draw> draws;
     static constexpr size_t kMaxBytes=16u*1024u*1024u;
-    static constexpr std::array<uint8_t,8> kMagic{'C','E','L','X','I','0','0','1'};
+    static constexpr ce::fixed_array<uint8_t,8> kMagic{'C','E','L','X','I','0','0','1'};
 
     struct Writer
     {
-        std::vector<uint8_t> bytes;
+        ce::dynamic_array<uint8_t> bytes;
         void Number(uint64_t value, unsigned count=4)
         { for(unsigned i=0;i<count;++i) bytes.push_back(static_cast<uint8_t>(value>>(8*i))); }
         void Block(std::span<const uint8_t> value) { bytes.insert(bytes.end(),value.begin(),value.end()); }
@@ -52,8 +55,8 @@ struct EnhancedLatticeReplayInput
                 if constexpr(std::is_same_v<T,bool>) { Number(0); Number(v ? 1 : 0,8); }
                 else if constexpr(std::is_same_v<T,int64_t>) { Number(1); Number(std::bit_cast<uint64_t>(v),8); }
                 else if constexpr(std::is_same_v<T,double>) { Number(2); Double(v); }
-                else if constexpr(std::is_same_v<T,std::array<double,3>>) { Number(3); for(auto n:v) Double(n); }
-                else if constexpr(std::is_same_v<T,std::array<double,4>>) { Number(4); for(auto n:v) Double(n); }
+                else if constexpr(std::is_same_v<T,ce::fixed_array<double,3>>) { Number(3); for(auto n:v) Double(n); }
+                else if constexpr(std::is_same_v<T,ce::fixed_array<double,4>>) { Number(4); for(auto n:v) Double(n); }
                 else throw std::runtime_error("unsupported Lattice replay value");
             },value);
         }
@@ -79,8 +82,8 @@ struct EnhancedLatticeReplayInput
             case 0: { auto v=Number(8); if(v>1) throw std::runtime_error("invalid Lattice replay bool"); return v!=0; }
             case 1: { auto v=std::bit_cast<int64_t>(Number(8)); if(v<INT32_MIN || v>INT32_MAX) throw std::runtime_error("invalid Lattice replay int"); return v; }
             case 2: return Double();
-            case 3: return std::array<double,3>{Double(),Double(),Double()};
-            case 4: return std::array<double,4>{Double(),Double(),Double(),Double()};
+            case 3: return ce::fixed_array<double,3>{Double(),Double(),Double()};
+            case 4: return ce::fixed_array<double,4>{Double(),Double(),Double(),Double()};
             default: throw std::runtime_error("unknown Lattice replay value type");
             }
         }
@@ -126,7 +129,7 @@ struct EnhancedLatticeReplayInput
         }
         return hash;
     }
-    std::vector<uint8_t> Encode() const
+    ce::dynamic_array<uint8_t> Encode() const
     {
         Writer w; w.Block(kMagic); w.Number(1); w.Number(draws.size());
         for(const auto& d:draws)
@@ -162,7 +165,7 @@ struct EnhancedLatticeReplayInput
                 d.coverage.flags=static_cast<uint32_t>(r.Number()); d.coverage.cutoff=r.Float(); d.coverage.baseAlpha=r.Float();
                 if(!d.coverage.IsValid() || (d.coverage.flags&EnhancedMaterialCoverage::Blended))
                     throw std::runtime_error("unsupported Lattice replay coverage");
-                std::set<LX::Id> ids;
+                ce::engine_ordered_set<LX::Id> ids;
                 for(uint32_t j=0,n=r.Count(128);j<n;++j)
                 {
                     const auto id=r.Number(8);
@@ -175,7 +178,7 @@ struct EnhancedLatticeReplayInput
                     if(!id || !ids.insert(id).second) throw std::runtime_error("duplicate/zero Lattice replay texture parameter ID");
                     d.description.textures.push_back({id,r.Asset()});
                 }
-                std::set<uint32_t> slots;
+                ce::engine_ordered_set<uint32_t> slots;
                 for(uint32_t j=0,n=r.Count(64);j<n;++j)
                 {
                     TextureIdentity t; t.slot=static_cast<uint32_t>(r.Number()); t.colorSpace=static_cast<uint32_t>(r.Number());
@@ -193,7 +196,7 @@ struct EnhancedLatticeReplayInput
     {
         std::error_code ec; const auto file=std::filesystem::path(path); const auto size=std::filesystem::file_size(file,ec);
         if(!file.is_absolute() || ec || size<24 || size>kMaxBytes) { error="Lattice replay requires bounded absolute file"; return false; }
-        std::vector<uint8_t> bytes(static_cast<size_t>(size)); std::ifstream stream(file,std::ios::binary);
+        ce::dynamic_array<uint8_t> bytes(static_cast<size_t>(size)); std::ifstream stream(file,std::ios::binary);
         if(!stream.read(reinterpret_cast<char*>(bytes.data()),bytes.size()) || stream.peek()!=EOF) { error="Lattice replay read failed"; return false; }
         return Decode(bytes,output,error);
     }
@@ -224,7 +227,7 @@ struct EnhancedLatticeReplayInput
                     }
                 std::ranges::sort(d.description.parameters,{},&material_graph::ParameterOverride::id);
                 std::ranges::sort(d.description.textures,{},&material_graph::TextureOverride::parameter);
-                std::vector<uint8_t> uniforms; std::vector<LX::LXMaterialDiagnostic> diagnostics;
+                ce::dynamic_array<uint8_t> uniforms; ce::dynamic_array<LX::LXMaterialDiagnostic> diagnostics;
                 if(!material_graph::PrepareUniforms(instance->generation->cooked.product.layout,d.description.parameters,uniforms,diagnostics)
                     || uniforms!=instance->uniforms) throw std::runtime_error("Lattice replay typed values differ from sealed uniforms");
                 for(const auto& t:instance->textures)
@@ -253,8 +256,8 @@ struct EnhancedLatticeReplayInput
             return false;
         }
         if(draws.size()!=graph.size()) { error="Lattice replay selected draw count mismatch"; return false; }
-        std::vector<own::shared_owner<const material_graph::Instance>> instances;
-        std::map<uint64_t,size_t> sharedSlots;
+        ce::dynamic_array<own::shared_owner<const material_graph::Instance>> instances;
+        ce::engine_ordered_map<uint64_t,size_t> sharedSlots;
         for(size_t i=0;i<draws.size();++i)
         {
             const auto& saved=draws[i]; const auto& live=current.draws[i]; const auto source=graph[i].GraphInstance();

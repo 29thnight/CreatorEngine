@@ -1,3 +1,6 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -175,7 +178,7 @@ namespace editor::material_editing
             std::string diskPayload;
             std::uint64_t uiFrames = 0;
             std::uint64_t defaultsSourceRevision = std::numeric_limits<std::uint64_t>::max();
-            std::map<Id, LXSocketValue> resolvedDefaults;
+            ce::engine_ordered_map<Id, LXSocketValue> resolvedDefaults;
             bool fit = true;
             bool diagnostics = false;
             bool materialDetails = true;
@@ -889,7 +892,7 @@ namespace editor::material_editing
         };
 
         std::mutex sessionMutex;
-        std::vector<std::unique_ptr<Session>> sessions;
+        ce::dynamic_array<std::unique_ptr<Session>> sessions;
         Session* active = nullptr;
         own::shared_owner<const material_graph::SceneMaterialSource> inspectorPreview;
         std::uint64_t inspectorPreviewRevision{};
@@ -916,7 +919,7 @@ namespace editor::material_editing
             }
         }
 
-        std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> previewFloor;
+        ce::fixed_array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> previewFloor;
         std::string previewFloorError;
         own::shared_owner<PreviewWork> previewFloorWork;
         job_handle previewFloorJob;
@@ -962,7 +965,7 @@ namespace editor::material_editing
                     return false;
                 }
                 Material light(dark);
-                if (!light.TrySetMaterialGraphParameter(1, std::array<double, 4>{.48, .48, .48, 1}, previewFloorError))
+                if (!light.TrySetMaterialGraphParameter(1, ce::fixed_array<double, 4>{.48, .48, .48, 1}, previewFloorError))
                 {
                     return false;
                 }
@@ -980,7 +983,7 @@ namespace editor::material_editing
                 return std::ranges::find_if(pins, [&](const Pin& p) { return p.Identifier() == name; })->id;
             };
             asset.blackboard.push_back({1, "baseColor", "Base Color", PinType::Color,
-                                       std::array<double, 4>{.12, .12, .12, 1}, LXColorSpace::Linear, true});
+                                       ce::fixed_array<double, 4>{.12, .12, .12, 1}, LXColorSpace::Linear, true});
             const Id color = asset.CreateNode("LXParameterColor", -300, 0);
             asset.graph.SetProperty(color, "parameter", "1");
             asset.graph.SetProperty(color, "valueSource", "socket");
@@ -1216,7 +1219,7 @@ namespace editor::material_editing
             ImGui::SameLine();
             if (ImGui::BeginCombo("##open_material_asset", "Open Material Asset"))
             {
-                static std::vector<std::filesystem::path> paths;
+                static ce::dynamic_array<std::filesystem::path> paths;
                 static ImGuiTextFilter filter;
                 if (ImGui::IsWindowAppearing())
                 {
@@ -1307,21 +1310,21 @@ namespace editor::material_editing
             {
                 return ImGui::Checkbox("Default", boolean);
             }
-            if (auto* vector = std::get_if<std::array<double, 3>>(&value))
+            if (auto* vector = std::get_if<ce::fixed_array<double, 3>>(&value))
             {
                 float numbers[]{float((*vector)[0]), float((*vector)[1]), float((*vector)[2])};
                 if (ImGui::DragFloat3("Default", numbers, 0.01f))
                 {
-                    value = std::array<double, 3>{numbers[0], numbers[1], numbers[2]};
+                    value = ce::fixed_array<double, 3>{numbers[0], numbers[1], numbers[2]};
                     return true;
                 }
             }
-            if (auto* color = std::get_if<std::array<double, 4>>(&value))
+            if (auto* color = std::get_if<ce::fixed_array<double, 4>>(&value))
             {
                 float numbers[]{float((*color)[0]), float((*color)[1]), float((*color)[2]), float((*color)[3])};
                 if (ImGui::ColorEdit4("Default", numbers, ImGuiColorEditFlags_Float))
                 {
-                    value = std::array<double, 4>{numbers[0], numbers[1], numbers[2], numbers[3]};
+                    value = ce::fixed_array<double, 4>{numbers[0], numbers[1], numbers[2], numbers[3]};
                     return true;
                 }
             }
@@ -1341,11 +1344,11 @@ namespace editor::material_editing
             case PinType::Int:
                 return std::int64_t{0};
             case PinType::Vector:
-                return std::array<double, 3>{0, 0, 0};
+                return ce::fixed_array<double, 3>{0, 0, 0};
             case PinType::Normal:
-                return std::array<double, 3>{0, 0, 1};
+                return ce::fixed_array<double, 3>{0, 0, 1};
             case PinType::Color:
-                return std::array<double, 4>{1, 1, 1, 1};
+                return ce::fixed_array<double, 4>{1, 1, 1, 1};
             case PinType::Texture:
                 return std::string{};
             case PinType::Sampler:
@@ -1409,9 +1412,9 @@ namespace editor::material_editing
                 changed = true;
                 if (!found->exposed)
                 {
-                    std::erase_if(session.defaults.parameters,
+                    ce::erase_if(session.defaults.parameters,
                                   [&](const auto& item) { return item.id == found->id; });
-                    std::erase_if(session.defaults.textures,
+                    ce::erase_if(session.defaults.textures,
                                   [&](const auto& item) { return item.parameter == found->id; });
                 }
             }
@@ -1445,12 +1448,12 @@ namespace editor::material_editing
             if (session.defaultsSourceRevision != revision)
             {
                 // 노출된 기본값은 소스 변경마다 한 번 수집한다. 각 UI 행에서 그룹을 다시 순회하지 않는다.
-                std::map<Id, LXSocketValue> resolved;
+                ce::engine_ordered_map<Id, LXSocketValue> resolved;
                 for (const auto& declaration : session.asset.blackboard)
                 {
                     resolved.emplace(declaration.id, declaration.value);
                 }
-                std::set<Id> visited;
+                ce::engine_ordered_set<Id> visited;
                 const auto visit = [&](auto&& self, const LXGraph& graph) -> void {
                     for (const auto& node : graph.Nodes())
                     {
@@ -1549,9 +1552,9 @@ namespace editor::material_editing
                 }
                 if (ImGui::SmallButton("Use Graph Default"))
                 {
-                    std::erase_if(session.defaults.parameters,
+                    ce::erase_if(session.defaults.parameters,
                         [&](const auto& item) { return item.id == parameter.id; });
-                    std::erase_if(session.defaults.textures,
+                    ce::erase_if(session.defaults.textures,
                         [&](const auto& item) { return item.parameter == parameter.id; });
                     ++session.settingsRevision;
                 }
@@ -2041,7 +2044,7 @@ namespace editor::material_editing
 
     void Shutdown()
     {
-        std::vector<job_handle> pending;
+        ce::dynamic_array<job_handle> pending;
         {
             std::lock_guard lock(sessionMutex);
             shuttingDown = true;
@@ -2198,7 +2201,7 @@ namespace editor::material_editing
         return false;
     }
 
-    CommandResult Command(const std::vector<std::string>& parts)
+    CommandResult Command(const ce::dynamic_array<std::string>& parts)
     {
         using namespace ConsoleCmd;
         std::lock_guard lock(sessionMutex);
@@ -2394,7 +2397,7 @@ namespace editor::material_editing
                 return InvalidArguments("Pin not found");
             }
             LXSocketValue value;
-            std::array<double, 4> numbers{};
+            ce::fixed_array<double, 4> numbers{};
             const std::size_t count = pin->type == PinType::Color                                    ? 4
                                       : pin->type == PinType::Vector || pin->type == PinType::Normal ? 3
                                                                                                      : 1;
@@ -2429,7 +2432,7 @@ namespace editor::material_editing
                     }
                 }
                 value = count == 4   ? LXSocketValue{numbers}
-                        : count == 3 ? LXSocketValue{std::array<double, 3>{numbers[0], numbers[1], numbers[2]}}
+                        : count == 3 ? LXSocketValue{ce::fixed_array<double, 3>{numbers[0], numbers[1], numbers[2]}}
                                      : LXSocketValue{numbers[0]};
             }
             applied = active->Execute(LXSetSocketValue{first, value}, revision);

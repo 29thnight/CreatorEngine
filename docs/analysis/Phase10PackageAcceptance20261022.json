@@ -1,0 +1,136 @@
+{
+  "passed": true,
+  "runs": [
+    {
+      "map": "artifacts/phase10-1a-20261022/solution-debug-matrix/excluded/CreatorEditor.map",
+      "exitCode": 0,
+      "initialized": 0,
+      "shutdown": 0,
+      "hostSha256": "5C1D82242BD32F092BA19CE74974A76A84BC3A8308A349DEE56F352576810960",
+      "absent": 1,
+      "host": "CreatorEditor",
+      "packageIncluded": false
+    },
+    {
+      "map": "artifacts/phase10-1a-20261022/solution-debug-matrix/excluded/Player.map",
+      "exitCode": 0,
+      "initialized": 0,
+      "shutdown": 0,
+      "hostSha256": "6BC65F50D96F3BBB837A90E2CC3472398813A530CCE57D25D4574A0842E87BDE",
+      "absent": 1,
+      "host": "Player",
+      "packageIncluded": false
+    },
+    {
+      "map": "artifacts/phase10-1a-20261022/solution-debug-matrix/included/CreatorEditor.map",
+      "exitCode": 0,
+      "initialized": 1,
+      "shutdown": 1,
+      "hostSha256": "B8167B3535A90DBCD3B7F4D8B5D4EBF24F7B86F78E71E226008871FBDCA05C3B",
+      "absent": 0,
+      "host": "CreatorEditor",
+      "packageIncluded": true
+    },
+    {
+      "map": "artifacts/phase10-1a-20261022/solution-debug-matrix/included/Player.map",
+      "exitCode": 0,
+      "initialized": 1,
+      "shutdown": 1,
+      "hostSha256": "68C01E6A7F773301BD010ECA377AA9EB4FA944EFE5F1565799C9502D23265E0B",
+      "absent": 0,
+      "host": "Player",
+      "packageIncluded": true
+    }
+  ],
+  "fixture": "artifacts/phase10-1a-20261022/repro-fixture/Project",
+  "configuration": "Debug",
+  "pakSha256": "6A35273EA5E741C0067C90B043C41989B2013611141AFC87628B607F2F7FA676",
+  "cookedPak": "artifacts/phase10-1a-20261022/repro-fixture/GameAssets.pak",
+  "date": "2026-10-22",
+  "baselineRevision": "0847ceeb2ec99d1b4edbdfd9f7f8a94bd773f915",
+  "scope": "Phase 10-1a lifecycle and optional static package; solution-based Debug x64 Editor/Player DX12 offscreen product smoke",
+  "optimizedArchiveProbe": {
+    "passed": true,
+    "flags": [
+      "/O2",
+      "/GL",
+      "/LTCG",
+      "/OPT:REF"
+    ],
+    "included": true,
+    "excluded": true,
+    "productReleaseAcceptance": false
+  },
+  "contractProbe": {
+    "passed": true,
+    "cases": [
+      "absent",
+      "duplicate registration",
+      "wrong unregister",
+      "failed initialization cleanup",
+      "throw cleanup",
+      "null factory",
+      "repeated session",
+      "unregister"
+    ]
+  },
+  "limitations": [
+    "No particle simulation/render/schema/graph implementation",
+    "No Release Editor/Player or Shipping acceptance",
+    "Private minimal scene uses camera and light with no mesh; not a visual correctness or performance claim"
+  ],
+  "artifactRoot": "artifacts/phase10-1a-20261022",
+  "excludedSolutionPackageBuild": {
+    "passed": true,
+    "target": "Engine\\Effect",
+    "configurationType": "Utility",
+    "compileInputs": 0,
+    "archiveRewritten": false
+  },
+  "sources": [
+    {
+      "path": "CreatorEngine.sln",
+      "sha256": "0f0a9d1535e34a6e7df051b9c0324c616ec45301c4df07f710dbe610aa8dffe5"
+    },
+    {
+      "path": "Directory.Build.targets",
+      "sha256": "4bea454fd4ce7d259afbe01f6186a0824b7182b8c35860cee8e80675c457130c"
+    },
+    {
+      "path": "Engine/RuntimeHost/EngineBootstrap.h",
+      "sha256": "bb1b68cc0e072b3b97ee153dc478d2315035249904a7f2319924725b6c7c16bd"
+    },
+    {
+      "path": "Engine/RenderEngine/Effects/IEffectSystem.h",
+      "sha256": "23e5a36bfed7def6e3523600aa033b919e628b958fb0c2048ec4f1ba378efe2f"
+    },
+    {
+      "path": "Engine/Effect/EffectPackage.cpp",
+      "sha256": "5951b197b286e6627c2b8c2f7661df9ff2dd05b198346cd6626058c4c236bf98"
+    },
+    {
+      "path": "Engine/Effect/Effect.vcxproj",
+      "sha256": "7bc73e65aeca9d7308bf40c172f20ca2814accf83bf6911b77fc3844dc7006bb"
+    },
+    {
+      "path": "Tools/build/EffectPackage.targets",
+      "sha256": "8c3475fd8cd4259c97baf0259e254e222eb3bd09e199a5c07458d2acaae1e588"
+    },
+    {
+      "path": "Tools/regression/EffectPackageContractTests.cpp",
+      "sha256": "cfa8af5ffcf9b8a4c82971141558a24f65100696a9c00f3b517edaa4db4b9b36"
+    },
+    {
+      "path": "Tools/regression/EffectPackageRegistrationProbe.cpp",
+      "sha256": "64fe2ea43145ac64624607bfe87111f213884634c6b70f30295a320723f56f91"
+    },
+    {
+      "path": "Tools/regression/verify-effect-package.ps1",
+      "sha256": "1b69eb37dbb6c04d3b290bd359c2e0454c3deb585f8e04e3d0e68b2c94bf4a32"
+    },
+    {
+      "path": "Tools/regression/new-effect-package-fixture.ps1",
+      "sha256": "b13c46fc369d6e80812e2750f8de64d71d0e145809958e6805123efb08c3f13f"
+    }
+  ]
+}

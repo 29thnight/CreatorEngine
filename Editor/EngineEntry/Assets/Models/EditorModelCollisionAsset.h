@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
 #else

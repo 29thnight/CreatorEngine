@@ -14,16 +14,29 @@
 # port 를 만든다(REFLGEN_SOURCE 표지 사이).
 set(VCPKG_BUILD_TYPE release) # 생성기는 도구이고 라이브러리는 헤더뿐이다 — debug 빌드가 필요 없다.
 
-# REFLGEN_SOURCE_BEGIN (make-overlay-port.ps1 -Ref v1.0.0)
+# REFLGEN_SOURCE_BEGIN (make-overlay-port.ps1 -Ref 357971b7f07f48393c0995cdd7fa52bfe29c3c47)
 vcpkg_from_github(
     OUT_SOURCE_PATH SOURCE_PATH
     REPO 29thnight/reflgen_cpp
-    REF v1.0.0
-    SHA512 dcd60bd1744d505a6dd8a11013b1b8b29aab81996fc3e7e8b39b93896dee1f13b0a10ced8c4b5b8b1199f9600de5d52d35231aae3c6ca23609512fa6d8756b8d
+    REF 357971b7f07f48393c0995cdd7fa52bfe29c3c47
+    SHA512 faa5f5d2ced0b77332cffd7659f68a3ff93144de428c5e4b96c485bed04cf0aa70b469fe77d48f6afb869ddac5232ec3976d6c3057fe4702c64e38a8d3da89d7
     HEAD_REF main
-    PATCHES respect-class-allocation.patch
 )
 # REFLGEN_SOURCE_END
+
+# vcpkg configures with FetchContent disconnected; acquire pinned sources through its download cache.
+vcpkg_from_github(
+    OUT_SOURCE_PATH IFC_SOURCE_PATH
+    REPO microsoft/ifc
+    REF 096b22d357d8af1c5f10d5f1895b8e2e80eaae5a
+    SHA512 ce7fd0fd9ff385e5940035bbd060110db1e80e3ab37f8f4299c9333c27e1284404b0fa4de1aa8f16cde172b1eae0887b1021a0ebae0465d45f361bc450dc579f
+)
+vcpkg_from_github(
+    OUT_SOURCE_PATH GSL_SOURCE_PATH
+    REPO microsoft/GSL
+    REF 2828399820ef4928cc89b65605dca5dc68efca6e
+    SHA512 a6d731c450da91cba34c13293cc0881a842bd90268dd5ef721ae1f48752c41dc355ebea7716a6de5b49d41568e55751c46a9dd78da4cd68656bffd33e5ee448e
+)
 
 vcpkg_cmake_configure(
     SOURCE_PATH "${SOURCE_PATH}"
@@ -31,12 +44,15 @@ vcpkg_cmake_configure(
         -DREFLGEN_BUILD_TESTS=OFF
         -DREFLGEN_BUILD_EXAMPLES=OFF
         -DREFLGEN_BUILD_GENERATOR=ON
+        -DREFLGEN_BUILD_IFC=ON
+        "-DFETCHCONTENT_SOURCE_DIR_REFLGEN_IFC_SDK=${IFC_SOURCE_PATH}"
+        "-DFETCHCONTENT_SOURCE_DIR_REFLGEN_IFC_GSL=${GSL_SOURCE_PATH}"
 )
 vcpkg_cmake_install()
 vcpkg_cmake_config_fixup(CONFIG_PATH lib/cmake/reflgen)
 
 # bin/ 의 reflgen.exe, libclang.dll, clang/include(clang 내장 header)를 tools/reflgen/ 으로 옮긴다.
-vcpkg_copy_tools(TOOL_NAMES reflgen AUTO_CLEAN)
+vcpkg_copy_tools(TOOL_NAMES reflgen reflgen-ifc AUTO_CLEAN)
 file(COPY "${CURRENT_PACKAGES_DIR}/bin/libclang.dll" "${CURRENT_PACKAGES_DIR}/bin/clang"
      DESTINATION "${CURRENT_PACKAGES_DIR}/tools/reflgen")
 file(REMOVE_RECURSE "${CURRENT_PACKAGES_DIR}/bin" "${CURRENT_PACKAGES_DIR}/lib")

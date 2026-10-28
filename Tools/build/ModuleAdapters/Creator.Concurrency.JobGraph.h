@@ -5,13 +5,13 @@
 #error "Native consumers must import the named module directly."
 #endif
 
-
+#include "../../../Engine/Containers/Creator.Containers.h"
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // 제출 전에 고정하는 위상 순서다. 선행 ID는 현재 ID보다 작고 중복이 없어야 한다.
 struct job_graph_node
 {
-    std::vector<std::uint32_t> dependencies;
+    ce::dynamic_array<std::uint32_t> dependencies;
 };
 
 struct job_graph_node_timing
@@ -38,7 +38,7 @@ struct job_graph_node_timing
 // nullptr이면 노드별 저장소와 시계 조회를 모두 생략한다.
 struct job_graph_diagnostics
 {
-    std::vector<job_graph_node_timing> nodes;
+    ce::dynamic_array<job_graph_node_timing> nodes;
     std::uint64_t submitted_ns{};
     std::uint64_t dispatcher_begin_ns{};
     std::uint64_t completed_ns{};

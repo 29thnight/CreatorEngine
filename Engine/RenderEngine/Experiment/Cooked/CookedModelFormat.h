@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -196,7 +197,7 @@ struct CookedMesh final
 struct CookedMeshletMesh final
 {
     MeshletBuildSettings settings{};
-    std::array<std::uint8_t, 32> geometryDigest{};
+    ce::fixed_array<std::uint8_t, 32> geometryDigest{};
     std::uint32_t descriptorBegin{};
     std::uint32_t descriptorCount{};
     std::uint32_t vertexBegin{};

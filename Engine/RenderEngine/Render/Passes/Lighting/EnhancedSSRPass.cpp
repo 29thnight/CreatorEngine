@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #include "EnhancedSSRPass.h"
 #include "../../../RHI/RHIEncoder.h"
 #include "../../../RHI/RHIShaderCompiler.h"
@@ -191,7 +192,7 @@ void EnhancedSSRPass::Declare(EnhancedRenderGraph &graph, const EnhancedFrameCon
     const auto readAccess = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
     const auto writeAccess = explicitAccess ? RGAccessMode::Write : RGAccessMode::LegacyState;
 
-    const std::vector<EnhancedRenderGraph::RGPassUsage> usages = {
+    const ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> usages = {
         {inputs.color, RHIResourceState::ShaderResource, readAccess},
         {inputs.depth, RHIResourceState::ShaderResource, readAccess},
         {inputs.metalRough, RHIResourceState::ShaderResource, readAccess},

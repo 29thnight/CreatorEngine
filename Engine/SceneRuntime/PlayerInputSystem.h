@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Reflection/ClassProperty.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -35,7 +36,7 @@ public:
     size_t GetCount() const noexcept { return m_inputs.size(); }
 
 private:
-    std::vector<PlayerInputComponent*> m_inputs;
+    ce::dynamic_array<PlayerInputComponent*> m_inputs;
 };
 
 #if defined(CE_SCENE_HEADLESS)

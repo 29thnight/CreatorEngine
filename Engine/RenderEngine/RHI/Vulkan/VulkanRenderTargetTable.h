@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -158,7 +159,7 @@ private:
   friend class VulkanRecordingResources;
   struct OwnedViews
   {
-      std::vector<VkImageView> m_views;
+      ce::dynamic_array<VkImageView> m_views;
       void Reset(VkDevice device)
       {
           if (VK_NULL_HANDLE != device)
@@ -171,8 +172,8 @@ private:
           m_views.clear();
       }
   };
-    std::vector<VulkanRenderTargetBinding> m_bindings;
+    ce::dynamic_array<VulkanRenderTargetBinding> m_bindings;
     own::shared_owner<OwnedViews> m_ownedViews;
-    std::vector<own::shared_owner<OwnedViews>> m_viewOwners;
+    ce::dynamic_array<own::shared_owner<OwnedViews>> m_viewOwners;
     mutable std::mutex                     m_mutex;
 };

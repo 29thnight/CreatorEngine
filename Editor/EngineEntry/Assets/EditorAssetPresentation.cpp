@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -110,7 +111,7 @@ void EditorAssetPresentation::Shutdown() noexcept
 	m_textureImportBody.reset();
 	m_pendingTexturePaths.clear();
 	std::filesystem::path discarded;
-	while (m_textureImportQueue.try_pop(discarded)) {}
+	while (m_textureImportQueue.try_pop(discarded)) { m_textureImportQueue.reclaim(); }
 	m_previewedMaterial.reset();
 	m_selectedMaterial.reset();
 	ReleasePresentationResources();
@@ -122,10 +123,22 @@ void EditorAssetPresentation::QueueTextureImport(const std::filesystem::path& so
 	if (!source.empty()) m_textureImportQueue.push(source);
 }
 
+bool EditorAssetPresentation::HasPendingTextureImports()
+{
+    std::filesystem::path path;
+    size_t count = 0;
+    while (m_textureImportQueue.try_pop(path)) {
+        if (!path.empty()) m_pendingTexturePaths.push_back(std::move(path));
+        if ((++count & 63) == 0) m_textureImportQueue.reclaim();
+    }
+    m_textureImportQueue.reclaim();
+    return !m_pendingTexturePaths.empty();
+}
+
 void EditorAssetPresentation::OpenPendingTextureImportSelector()
 {
 	if (!m_initialized ||
-		(m_textureImportQueue.empty() && m_pendingTexturePaths.empty())) return;
+		!HasPendingTextureImports()) return;
 
 	if (!editor::is_window_open(kTextureImportSelector))
 		editor::open_window(kTextureImportSelector);
@@ -147,13 +160,9 @@ EditorAssetPresentation::FilePresentation
 EditorAssetPresentation::ResolveFilePresentation(std::string_view extension) const
 {
 	FileType type = FileType::Unknown;
-	std::string normalizedExtension(extension);
-	ce::strings::to_lower_in_place(normalizedExtension);
-	if (const auto it = m_extensionTypes.find(normalizedExtension);
-		it != m_extensionTypes.end())
-	{
-		type = it->second;
-	}
+	ce::utf8_string normalizedExtension(ce::utf8_string_view(extension.data(), extension.size()));
+	for (size_t i = 0; i < normalizedExtension.size(); ++i) normalizedExtension[i] = ce::strings::ascii_to_lower_char(static_cast<unsigned char>(normalizedExtension[i]));
+	if (const auto* value = m_extensionTypes.find(normalizedExtension)) { type = *value; }
 
 	return { type, TypeIcon(type), GetFileIcon(type) };
 }
@@ -164,6 +173,7 @@ void EditorAssetPresentation::RenderTextureImportSelector()
 	while (m_textureImportQueue.try_pop(queuedPath))
 	{
 		if (!queuedPath.empty()) m_pendingTexturePaths.push_back(std::move(queuedPath));
+        m_textureImportQueue.reclaim();
 	}
 
 	for (const std::filesystem::path& path : m_pendingTexturePaths)
@@ -270,7 +280,7 @@ void EditorAssetPresentation::LoadPresentationResources()
 		return Texture::LoadSharedFromPath(iconPath / filename);
 	};
 
-	m_extensionTypes = {
+	const struct ExtensionEntry { const char* name; FileType type; } entries[] = {
 		{ ".fbx", FileType::Model }, { ".gltf", FileType::Model },
 		{ ".obj", FileType::Model }, { ".glb", FileType::Model },
 		{ ".png", FileType::Texture }, { ".dds", FileType::Texture },
@@ -288,6 +298,7 @@ void EditorAssetPresentation::LoadPresentationResources()
 		{ ".spritefont", FileType::Font },
 		{ ".ttf", FileType::Font }, { ".otf", FileType::Font },
 	};
+    for (const auto& entry : entries) m_extensionTypes.insert_or_assign(ce::utf8_string(entry.name), entry.type);
 
 	auto gizmoIcons = own::make_shared<EnhancedGizmoIconTextures>();
 	gizmoIcons->camera = loadIcon(L"CameraGizmo.png");
@@ -306,7 +317,7 @@ void EditorAssetPresentation::LoadPresentationResources()
         m_entityIcons[i] = loadIcon(editor::EntityIconPresets[i].filename);
     m_projectIcon = loadIcon(L"Assets.png");
     // FileType order; one cached texture per type, never loaded during tile drawing.
-    constexpr std::array fileIconNames{
+    constexpr ce::fixed_array fileIconNames{
         L"Unknown.png", L"Model.png", L"Texture.png", L"Material.png", L"Terrain.png",
         L"Shader.png", L"Code.png", L"Code.png", L"EntityPrefab.png", L"Audio.png",
         L"HDR.png", L"SceneRenderProfile.png", L"Font.png"

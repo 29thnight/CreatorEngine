@@ -1,4 +1,6 @@
 #pragma once
+#include "../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../../Engine/Utility_Framework/Foundation/EngineStorage.h"
 // 에디터 Undo/Redo 스택 (CT3에서 ReflectionRegister.h로부터 분리,
 // E1-6/E3-2 후속으로 Utility_Framework에서 EditorRuntime으로 물리 이관).
 //
@@ -97,17 +99,17 @@ namespace Meta
         bool m_isGameMode = false;
 
     private:
-        static void Transfer(std::stack<std::unique_ptr<IUndoableCommand>>& source,
-                             std::stack<std::unique_ptr<IUndoableCommand>>& destination, bool undo)
+        static void Transfer(ce::storage_stack<std::unique_ptr<IUndoableCommand>>& source,
+                             ce::storage_stack<std::unique_ptr<IUndoableCommand>>& destination, bool undo)
         {
             Editor::TransferUndoHistory(source, destination, undo);
         }
 
-        std::stack<std::unique_ptr<IUndoableCommand>> m_undoStack;
-        std::stack<std::unique_ptr<IUndoableCommand>> m_redoStack;
+        ce::storage_stack<std::unique_ptr<IUndoableCommand>> m_undoStack;
+        ce::storage_stack<std::unique_ptr<IUndoableCommand>> m_redoStack;
 
-        std::stack<std::unique_ptr<IUndoableCommand>> m_gameModeUndoStack;
-        std::stack<std::unique_ptr<IUndoableCommand>> m_gameModeRedoStack;
+        ce::storage_stack<std::unique_ptr<IUndoableCommand>> m_gameModeUndoStack;
+        ce::storage_stack<std::unique_ptr<IUndoableCommand>> m_gameModeRedoStack;
     };
 
     inline void UndoSystemInitialize()
@@ -124,7 +126,7 @@ namespace Meta
     // 있었지만 호출자가 전부 에디터 층이라 함께 이관했다(Core 리플렉션이
     // Undo를 아는 마지막 지점이었다).
     inline thread_local unsigned g_inlinePropertyEditDepth = 0;
-    inline void MakeCustomChangeCommand(std::function<void()> undoFunc, std::function<void()> redoFunc)
+    inline void MakeCustomChangeCommand(ce::owned_func<void()> undoFunc, ce::owned_func<void()> redoFunc)
     {
         if (g_inlinePropertyEditDepth) { redoFunc(); return; }
         UndoManager::GetInstance()->Execute(

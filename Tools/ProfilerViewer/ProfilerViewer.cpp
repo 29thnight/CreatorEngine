@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
@@ -74,7 +75,7 @@ namespace ce::profiler_viewer
             TOKEN_ELEVATION elevation{};
             DWORD bytes = sizeof(elevation);
             const bool queried = GetTokenInformation(token, TokenElevation, &elevation, bytes, &bytes) != FALSE;
-            alignas(TOKEN_MANDATORY_LABEL) std::array<std::byte, 256> integrity{};
+            alignas(TOKEN_MANDATORY_LABEL) ce::fixed_array<std::byte, 256> integrity{};
             const bool integrity_queried = GetTokenInformation(token, TokenIntegrityLevel, integrity.data(),
                 static_cast<DWORD>(integrity.size()), &bytes) != FALSE;
             bool ordinary = false;
@@ -586,7 +587,7 @@ namespace ce::profiler_viewer
                 check(rgba->Initialize(frame.get(), GUID_WICPixelFormat32bppRGBA, WICBitmapDitherTypeNone,
                     nullptr, 0.0, WICBitmapPaletteTypeCustom), "Profiler icon RGBA conversion");
                 const UINT stride = width * 4;
-                std::vector<BYTE> pixels(static_cast<std::size_t>(stride) * height);
+                ce::dynamic_array<BYTE> pixels(static_cast<std::size_t>(stride) * height);
                 check(rgba->CopyPixels(nullptr, stride, static_cast<UINT>(pixels.size()), pixels.data()),
                     "Profiler icon pixels");
                 D3D11_TEXTURE2D_DESC description{};
@@ -796,7 +797,7 @@ int WINAPI wWinMain(HINSTANCE instance, HINSTANCE, PWSTR, int)
     bool valid = false;
     try
     {
-        std::vector<std::wstring_view> values;
+        ce::dynamic_array<std::wstring_view> values;
         for (int index = 1; index < count; ++index)
         {
             values.emplace_back(raw[index]);

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "AnimTaskList.h"
@@ -17,7 +18,7 @@ struct AnimationFrameMetrics
     std::uint64_t m_poseStorageGrowths{};
     double m_budgetUs{}, m_predictedPoseUs{}, m_measuredPoseUs{};
     std::uint64_t m_budgetEligible{}, m_budgetDegraded{}, m_budgetOverrun{};
-    std::array<std::uint64_t, 8> m_qualityStageCounts{};
+    ce::fixed_array<std::uint64_t, 8> m_qualityStageCounts{};
 };
 
 // Owner-published, immutable live HUD data. The selected recipe is copied
@@ -60,10 +61,10 @@ struct AnimationHudSnapshot
     double budgetUs{};
     double predictedUs{};
     double measuredUs{};
-    std::array<std::uint64_t, 8> stages{};
-    std::vector<AnimationHudAnimator> animators{};
+    ce::fixed_array<std::uint64_t, 8> stages{};
+    ce::dynamic_array<AnimationHudAnimator> animators{};
     std::uint64_t selectedAnimatorId{};
-    std::vector<AnimationHudTask> tasks{};
+    ce::dynamic_array<AnimationHudTask> tasks{};
     std::uintptr_t workerPosePool{};
     std::uintptr_t workerCurrentStorage{};
     std::uintptr_t instancePoseStorage{};

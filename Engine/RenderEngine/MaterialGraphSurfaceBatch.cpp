@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -26,7 +27,7 @@ namespace material_graph
 
         bool ValidInput(const SurfacePoint& point, const SurfaceView& view)
         {
-            const auto values = std::bit_cast<std::array<float, 20>>(point);
+            const auto values = std::bit_cast<ce::fixed_array<float, 20>>(point);
             if (!Finite(values) || point.uvLod[3] < 0 || point.uvLod[3] > 32 || point.position[3] < 0)
             {
                 return false;
@@ -55,7 +56,7 @@ namespace material_graph
     bool VerifySurfaceProduct(const LX::LXMaterialProgram& program, const std::filesystem::path& file,
                               std::span<const CompileTarget> targets, RHIShaderCompileOptions options,
                               const Budget& budget, VerifiedProduct& result,
-                              std::vector<LX::LXMaterialDiagnostic>& diagnostics)
+                              ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics)
     {
         std::ifstream input(file, std::ios::binary);
         const std::string source{std::istreambuf_iterator<char>(input), std::istreambuf_iterator<char>()};
@@ -119,7 +120,7 @@ namespace material_graph
                     return Fail(error, "Uncovered surface point must carry the explicit rejection marker.");
                 }
                 background.viewTier[3] = 0;
-                const auto values = std::bit_cast<std::array<float, sizeof(IblBakePoint) / sizeof(float)>>(background);
+                const auto values = std::bit_cast<ce::fixed_array<float, sizeof(IblBakePoint) / sizeof(float)>>(background);
                 if (!std::ranges::all_of(values, [](float value) { return value == 0; }))
                 {
                     return Fail(error, "Uncovered surface point contains material payload.");
@@ -141,7 +142,7 @@ namespace material_graph
                                       IRenderPipelineCache& pipelines, const VerifiedProduct& product,
                                       RHIShaderBinary backend, const Budget& budget, std::string& error)
     {
-        std::vector<std::uint8_t> cooked;
+        ce::dynamic_array<std::uint8_t> cooked;
         if ((device_ && device_ != &device) || !WriteCookedProgram(product, budget, cooked, error) ||
             !product.program.surface || product.program.volume || product.selection.tier == Tier::Special ||
             product.selection.route != Route::Forward)
@@ -321,7 +322,7 @@ namespace material_graph
         }
         struct Constants
         {
-            std::array<std::uint32_t, 4> countTier;
+            ce::fixed_array<std::uint32_t, 4> countTier;
             IblVector eye;
         };
         const Constants constants{{candidate->Count(), principledGgx_ ? 1u : 0u, 0, 0}, view.eye};
@@ -430,7 +431,7 @@ namespace material_graph
         {
             graphOutput_ = graph.Write(graphOutput_);
         }
-        std::vector<EnhancedRenderGraph::RGPassUsage> usages{{input, RHIResourceState::ShaderResource, read},
+        ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> usages{{input, RHIResourceState::ShaderResource, read},
                                                              {graphOutput_, RHIResourceState::UnorderedAccess, write}};
         for (const auto& binding : bindings_->resources.textures)
         {

@@ -93,8 +93,55 @@ namespace ce
         }
 
       private:
+        friend class capture_byte_allocator;
         template<class>
         friend class capture_allocator;
+        std::shared_ptr<capture_detail::heap_owner> heap_;
+    };
+
+    // Byte policy for internal containers. Retained snapshots keep the same
+    // private heap alive; the STL allocator above remains at shared_ptr control
+    // block boundaries until ownership migration reaches that boundary.
+    class capture_byte_allocator
+    {
+      public:
+        capture_byte_allocator() : heap_(capture_detail::heap()) {}
+        capture_byte_allocator(const capture_byte_allocator&) noexcept = default;
+        capture_byte_allocator& operator=(const capture_byte_allocator&) noexcept = default;
+        capture_byte_allocator(capture_byte_allocator&& other) noexcept : heap_(other.heap_) {}
+        capture_byte_allocator& operator=(capture_byte_allocator&& other) noexcept { heap_=other.heap_;return *this; }
+        template<class T> capture_byte_allocator(const capture_allocator<T>& other) noexcept : heap_(other.heap_) {}
+        void* allocate(size_t bytes,size_t alignment)
+        {
+            if(!alignment || (alignment&(alignment-1)))throw std::bad_alloc{};
+#if defined(_WIN32)
+            const auto extra=alignment>MEMORY_ALLOCATION_ALIGNMENT?alignment-1+sizeof(void*):size_t{};
+            if(bytes>SIZE_MAX-extra)throw std::bad_alloc{};
+            auto* base=HeapAlloc(heap_->handle,0,bytes+extra);
+            if(!base)throw std::bad_alloc{};
+            if(!extra)return base;
+            const auto address=(reinterpret_cast<uintptr_t>(base)+sizeof(void*)+alignment-1)&~uintptr_t(alignment-1);
+            auto* output=reinterpret_cast<unsigned char*>(address);
+            std::memcpy(output-sizeof(void*),&base,sizeof(base));return output;
+#else
+            return ce::heap_allocator{}.allocate(bytes,alignment);
+#endif
+        }
+        void deallocate(void* pointer,size_t bytes,size_t alignment)noexcept
+        {
+            if(!pointer)return;
+#if defined(_WIN32)
+            (void)bytes;
+            void* base=pointer;
+            if(alignment>MEMORY_ALLOCATION_ALIGNMENT)
+                std::memcpy(&base,static_cast<unsigned char*>(pointer)-sizeof(void*),sizeof(base));
+            HeapFree(heap_->handle,0,base);
+#else
+            ce::heap_allocator{}.deallocate(pointer,bytes,alignment);
+#endif
+        }
+        bool operator==(const capture_byte_allocator& other)const noexcept { return heap_==other.heap_; }
+      private:
         std::shared_ptr<capture_detail::heap_owner> heap_;
     };
 } // namespace ce

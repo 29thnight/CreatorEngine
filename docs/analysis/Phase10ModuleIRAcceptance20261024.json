@@ -1,0 +1,139 @@
+{
+  "phase": "10-2a",
+  "date": "2026-10-24",
+  "passed": true,
+  "scope": "CPU typed module IR, graph compilation and reference evaluation; not GPU/render/editor/serialization acceptance",
+  "irRuns": [
+    {
+      "exitCode": 0,
+      "checks": 142,
+      "executableSha256": "A1F93381654822092D18CCBA1E4010D50A8DDE52434FDC6F274B649B1816C9CE",
+      "configuration": "Debug"
+    },
+    {
+      "exitCode": 0,
+      "checks": 142,
+      "executableSha256": "3340826630C46E14ECF735C43BD12E11E36BD04F71FA1D668E944710021D9C01",
+      "configuration": "Release"
+    }
+  ],
+  "sources": [
+    {
+      "path": "Engine/Effect/EffectDefinition.h",
+      "sha256": "07CC30E54D9B16EDB3B80A4B86E21399BFCF5B953D77CE13BB93B8BC8B7B424A"
+    },
+    {
+      "path": "Engine/Effect/EffectDefinition.cpp",
+      "sha256": "0903301E0046BD7D0BBEBDE19BD57230EAC34D4ACB13CDA7349D6A90320D9470"
+    },
+    {
+      "path": "Engine/Effect/EffectModuleIR.h",
+      "sha256": "186CDB7CEF29903BFA64DE638EABE765D1EAE0CB39ED4ACA8EFAC03997B4CB82"
+    },
+    {
+      "path": "Engine/Effect/EffectModuleIR.cpp",
+      "sha256": "36F704F7943165D1C9F2AAEFFA95B9DEB62D712C29AA1E7F221A84E5AFAF85D5"
+    },
+    {
+      "path": "Engine/Effect/Effect.vcxproj",
+      "sha256": "7CC09D171A8B757EFF624A52FB4D2875E8A9DC0DB7AB2969914DC79D5D320DEC"
+    },
+    {
+      "path": "Tools/regression/EffectModuleIRTests.cpp",
+      "sha256": "5967DAF35EE0E2918481DB726E67F59E68206F59C7DCE2D082C313D765F830E4"
+    },
+    {
+      "path": "Tools/regression/EffectModuleIRTests.vcxproj",
+      "sha256": "63336985E846556FEEAFDCBD2DCC1D3799A429DE3CB30278EEC4EECE154C88AC"
+    },
+    {
+      "path": "Tools/regression/verify-effect-module-ir.ps1",
+      "sha256": "08B21873720954FB796F82CA44FBA75FB2B30D4C265EC66E4361211176B492DE"
+    }
+  ],
+  "nativeRegression": [
+    {
+      "checks": 56,
+      "sha256": "A1FFD8D1C48E6EE64491AA50E81E4FE489DDE7A9FFCBD358B00C1171CC744914",
+      "test": "EffectStateTests",
+      "configuration": "Debug"
+    },
+    {
+      "checks": 51,
+      "sha256": "9D7E34EDE325CE77AC291D8309120CA085844FD45629970EAA3BA203BC4032A7",
+      "test": "EffectDefinitionTests",
+      "configuration": "Debug"
+    },
+    {
+      "checks": 56,
+      "sha256": "79D7DEB6C8720760B58D78AEAFC454CBB2A005DA9A78069C6809BE1AAD71E6DA",
+      "test": "EffectStateTests",
+      "configuration": "Release"
+    },
+    {
+      "checks": 51,
+      "sha256": "04E469A42DA1C44412DB1ED9164ACD364BE0810D76E5ADC16B181C06B50B896A",
+      "test": "EffectDefinitionTests",
+      "configuration": "Release"
+    }
+  ],
+  "productConfiguration": "Debug",
+  "productRuns": [
+    {
+      "shutdown": 0,
+      "absent": 1,
+      "host": "CreatorEditor",
+      "hostSha256": "9DDCE2D8E753503462DCC04A9122A6A993020AB71B60F3752BA97E4673D7CD69",
+      "packageIncluded": false,
+      "map": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\artifacts\\phase10-2a-20261024\\transport\\product\\excluded/CreatorEditor.map",
+      "initialized": 0,
+      "exitCode": 0
+    },
+    {
+      "shutdown": 0,
+      "absent": 1,
+      "host": "Player",
+      "hostSha256": "251799DB8876416F5347D258EEDE4663726101D3E003DAB9595356163B2C13B1",
+      "packageIncluded": false,
+      "map": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\artifacts\\phase10-2a-20261024\\transport\\product\\excluded/Player.map",
+      "initialized": 0,
+      "exitCode": 0
+    },
+    {
+      "shutdown": 1,
+      "absent": 0,
+      "host": "CreatorEditor",
+      "hostSha256": "8BF002D1497897F4ECDD494D714222270B11E38C3E930CC7F6749199466AE2C9",
+      "packageIncluded": true,
+      "map": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\artifacts\\phase10-2a-20261024\\transport\\product\\included/CreatorEditor.map",
+      "initialized": 1,
+      "exitCode": 0
+    },
+    {
+      "shutdown": 1,
+      "absent": 0,
+      "host": "Player",
+      "hostSha256": "BE3B493959D3813B19D69CD7236C0573AE7CF93499C851AF7B9336AAA7ACFA66",
+      "packageIncluded": true,
+      "map": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\artifacts\\phase10-2a-20261024\\transport\\product\\included/Player.map",
+      "initialized": 1,
+      "exitCode": 0
+    }
+  ],
+  "resizeDimensions": [
+    "386x152",
+    "546x258"
+  ],
+  "artifacts": {
+    "transport": "artifacts/phase10-2a-20261024/transport/result.json",
+    "ir": "artifacts/phase10-2a-20261024/ir-final/result.json",
+    "product": "artifacts/phase10-2a-20261024/transport/product/result.json"
+  },
+  "limitations": [
+    "IR v1 supports constant/parameter bindings; random/curve/gradient lowering is explicitly rejected",
+    "Seven builtin attribute modules have lowering; emission, sphere/cone sampling and billboard lowering remain pending",
+    "CPU evaluator executes module operations only; no spawn, age/lifetime scheduler or position integration",
+    "No GPU simulation/readback/render, graph UI, serialization, performance or Release/Shipping product acceptance",
+    "Debug product matrix verifies package composition and existing snapshot/HDR boundary, not particle execution"
+  ]
+}

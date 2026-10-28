@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
@@ -28,7 +29,7 @@ struct VulkanImageViewEntry
 
 struct VulkanImageViewCache
 {
-    std::vector<VulkanImageViewEntry> entries;
+    ce::dynamic_array<VulkanImageViewEntry> entries;
 };
 
 // 핸들 → Vulkan 리소스 표 (5c-4a).
@@ -226,7 +227,7 @@ public:
     };
 
     template<typename T>
-    static uint32_t Acquire(std::vector<Slot<T>>& slots, std::vector<uint32_t>& freeList, const T& entry, bool owned)
+    static uint32_t Acquire(ce::dynamic_array<Slot<T>>& slots, ce::dynamic_array<uint32_t>& freeList, const T& entry, bool owned)
     {
         uint32_t slot = 0;
         if (!freeList.empty())
@@ -253,7 +254,7 @@ public:
     }
 
     template <typename T>
-    static T ResolveIn(const std::vector<Slot<T>>& slots, uint32_t id)
+    static T ResolveIn(const ce::dynamic_array<Slot<T>>& slots, uint32_t id)
     {
         if (0 == id) return T{};
         const uint32_t slot = RHIHandleBits::SlotOf(id);
@@ -310,7 +311,7 @@ public:
     }
 
     template <typename T>
-    static Slot<T>* Find(std::vector<Slot<T>>& slots, uint32_t id)
+    static Slot<T>* Find(ce::dynamic_array<Slot<T>>& slots, uint32_t id)
     {
         if (0 == id) return nullptr;
         const uint32_t slot = RHIHandleBits::SlotOf(id);
@@ -325,16 +326,16 @@ public:
     static void DestroyOwnedCubeView(VkDevice device, VulkanImageEntry& entry);
     static void DestroyBuffer(VkDevice device, VulkanBufferEntry& entry);
 
-    std::vector<Slot<VulkanImageEntry>>  m_images;
+    ce::dynamic_array<Slot<VulkanImageEntry>>  m_images;
     // 생성 시 고정 용량을 확보해 등록·재사용 중에도 기존 slot 주소가 움직이지 않는다.
-    std::vector<Slot<VulkanBufferEntry>> m_buffers;
-    std::vector<uint32_t> m_imageFree;
-    std::vector<uint32_t> m_bufferFree;
+    ce::dynamic_array<Slot<VulkanBufferEntry>> m_buffers;
+    ce::dynamic_array<uint32_t> m_imageFree;
+    ce::dynamic_array<uint32_t> m_bufferFree;
     std::atomic<uint32_t> m_bufferHighWater{ 0 };
     std::atomic<uint32_t> m_liveBuffers{ 0 };
     std::atomic<uint64_t> m_bufferSlotReuses{ 0 };
-    std::vector<Slot<VulkanImageEntry>> m_pendingImages;
-    std::vector<Slot<VulkanBufferEntry>> m_pendingBuffers;
+    ce::dynamic_array<Slot<VulkanImageEntry>> m_pendingImages;
+    ce::dynamic_array<Slot<VulkanBufferEntry>> m_pendingBuffers;
     mutable std::mutex m_imageRegistryMutex;
     mutable std::mutex m_bufferRegistryMutex;
 };

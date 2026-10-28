@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "EditorAxisField3.h"
 
 #include "ImGui.h"
@@ -13,19 +14,19 @@ namespace editor::widgets
     namespace
     {
         // Muted axis letters on a shared dark badge; color is not the only cue.
-        constexpr std::array<std::uint32_t, static_cast<std::size_t>(axis::Count)> kAxisColors{
+        constexpr ce::fixed_array<std::uint32_t, static_cast<std::size_t>(axis::Count)> kAxisColors{
             0xD68C83, // X
             0xA6C779, // Y
             0x83A9DC, // Z
         };
 
-        constexpr std::array<const char*, static_cast<std::size_t>(axis::Count)> kAxisLabels{
+        constexpr ce::fixed_array<const char*, static_cast<std::size_t>(axis::Count)> kAxisLabels{
             "X", "Y", "Z"
         };
 
         // 필드의 ImGui ID. 축마다 고정이라 열 순서가 바뀌어도 편집 상태가 딴
         // 칸으로 옮겨 가지 않는다.
-        constexpr std::array<const char*, static_cast<std::size_t>(axis::Count)> kAxisFieldIds{
+        constexpr ce::fixed_array<const char*, static_cast<std::size_t>(axis::Count)> kAxisFieldIds{
             "##ax", "##ay", "##az"
         };
 

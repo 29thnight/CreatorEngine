@@ -208,8 +208,17 @@ inline void VerifyReflectRegistration()
     }
 }
 
+namespace reflgen::generated
+{
+    void register_creator_engine_mode(::reflgen::registry&);
+}
+
 inline void RegisterReflectManual()
 {
+    reflgen::generated::register_creator_engine_mode(Meta::Types());
+    const auto* engineMode = Meta::Find("EngineMode");
+    if (!engineMode || engineMode->is_constructible())
+        throw std::logic_error("IFC EngineMode registration or ownership contract failed");
     reflgen::generated::register_RenderEngine(Meta::Types());
     reflgen::generated::register_SceneRuntime(Meta::Types());
 

@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
@@ -80,14 +81,14 @@ private:
 
     VulkanDeviceResources* m_resources{ nullptr };
     VkDevice m_device{ VK_NULL_HANDLE };
-    std::vector<std::vector<Slot>> m_slots;
+    ce::dynamic_array<ce::dynamic_array<Slot>> m_slots;
     uint32_t m_workerCount{ 0 };
     uint32_t m_frameCount{ 0 };
     uint32_t m_frameIndex{ 0 };
 
     own::shared_owner<VulkanRecordingResources> m_recordingResources;
     VulkanDescriptorPoolRecycler m_translationDescriptors;
-    std::vector<own::shared_owner<VulkanCommandBufferPool>> m_translationPools;
+    ce::dynamic_array<own::shared_owner<VulkanCommandBufferPool>> m_translationPools;
     uint64_t m_translationDescriptorRecording{};
     own::shared_owner<IRHICommandTranslator> m_translator;
     RHIQueueIdentity m_translatorQueue;

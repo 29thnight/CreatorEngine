@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "ExperimentParity/ExperimentSceneCookSelfTest.h"
 
 #include "Experiment/AssetIdentity.h"
@@ -318,18 +319,18 @@ namespace RenderTest
                     && product.cookedOverrideValues
                         == CountAuthoredOverrideValues(sourceDocument.Root()),
                     "fixture nested override cook 수가 authoring 입력과 같아야 한다");
-                std::vector<std::byte> truncated = product.artifactBytes;
+                ce::dynamic_array<std::byte> truncated = product.artifactBytes;
                 truncated.pop_back();
                 std::string corruptError;
                 check.Check(!Authoring::DecodeCookedDocument(
                     truncated, corruptError).has_value(),
                     "잘린 CEDO payload는 fail-closed여야 한다");
-                std::vector<std::byte> wrongVersion = product.artifactBytes;
+                ce::dynamic_array<std::byte> wrongVersion = product.artifactBytes;
                 wrongVersion[4] = std::byte{ 0xff };
                 check.Check(!Authoring::DecodeCookedDocument(
                     wrongVersion, corruptError).has_value(),
                     "지원하지 않는 CEDO version은 fail-closed여야 한다");
-                std::vector<std::byte> trailing = product.artifactBytes;
+                ce::dynamic_array<std::byte> trailing = product.artifactBytes;
                 trailing.push_back(std::byte{});
                 check.Check(!Authoring::DecodeCookedDocument(
                     trailing, corruptError).has_value(),
@@ -511,7 +512,7 @@ namespace RenderTest
             if (result.Succeeded())
             {
                 const auto& product = *result.product;
-                check.Check(product.manifestEntry.dependencies == std::vector<experiment::AssetId>{ texture },
+                check.Check(product.manifestEntry.dependencies == ce::dynamic_array<experiment::AssetId>{ texture },
                     "decal dependency resolves exact Textures path and deduplicates");
                 check.Check(product.bootstrapReferences.size() == 1u
                     && product.bootstrapReferences.front().key.assetId == texture

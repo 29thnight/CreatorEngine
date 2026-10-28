@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #include "EnhancedCameraReplayInput.h"
 #include "../Graph/EnhancedRenderPass.h"
@@ -9,21 +10,21 @@ struct EnhancedDrawReplayInput
 {
     struct Draw
     {
-        std::array<uint8_t, 32> assetIds{};
+        ce::fixed_array<uint8_t, 32> assetIds{};
         assets::ModelMeshDomain domain{ assets::ModelMeshDomain::LegacyAggregate };
         uint64_t geometryDigest{};
         uint32_t route{}; // opaque=0, forward=1, LX=2
         math::matrix4x4 world{};
-        std::vector<math::matrix4x4> bones;
+        ce::dynamic_array<math::matrix4x4> bones;
     };
-    std::vector<Draw> draws;
+    ce::dynamic_array<Draw> draws;
     static constexpr size_t kMaxBytes = 64u * 1024u * 1024u;
     static constexpr uint32_t kMaxDraws = 16384, kMaxBones = 1024;
-    static constexpr std::array<uint8_t, 8> kMagic{'C','E','D','R','W','0','0','1'};
+    static constexpr ce::fixed_array<uint8_t, 8> kMagic{'C','E','D','R','W','0','0','1'};
 
-    static std::array<uint8_t, 32> Identity(const RHIModelMeshView& mesh)
+    static ce::fixed_array<uint8_t, 32> Identity(const RHIModelMeshView& mesh)
     {
-        std::array<uint8_t, 32> result{};
+        ce::fixed_array<uint8_t, 32> result{};
         if (mesh.handle.domain == assets::ModelMeshDomain::Granular)
         {
             const auto& asset = mesh.handle.asset.key;
@@ -44,7 +45,7 @@ struct EnhancedDrawReplayInput
             for (auto byte : bytes) { hash ^= byte; hash *= 1099511628211ull; }
         };
         const auto number = [&](uint64_t value) {
-            std::array<uint8_t, 8> bytes{};
+            ce::fixed_array<uint8_t, 8> bytes{};
             for (unsigned i = 0; i < 8; ++i) bytes[i] = static_cast<uint8_t>(value >> (8*i));
             mix(bytes);
         };
@@ -69,18 +70,18 @@ struct EnhancedDrawReplayInput
     }
     static bool Finite(const math::matrix4x4& value)
     {
-        std::array<float, 16> floats{};
+        ce::fixed_array<float, 16> floats{};
         std::memcpy(floats.data(), &value, sizeof(value));
         return std::ranges::all_of(floats, [](float v) { return std::isfinite(v); });
     }
-    std::vector<uint8_t> Encode() const
+    ce::dynamic_array<uint8_t> Encode() const
     {
-        std::vector<uint8_t> bytes(kMagic.begin(), kMagic.end());
+        ce::dynamic_array<uint8_t> bytes(kMagic.begin(), kMagic.end());
         const auto number = [&](uint64_t value, unsigned count) {
             for (unsigned i = 0; i < count; ++i) bytes.push_back(static_cast<uint8_t>(value >> (8*i)));
         };
         const auto matrix = [&](const math::matrix4x4& value) {
-            std::array<float, 16> floats{};
+            ce::fixed_array<float, 16> floats{};
             std::memcpy(floats.data(), &value, sizeof(value));
             for (float v : floats) number(std::bit_cast<uint32_t>(v), 4);
         };
@@ -120,7 +121,7 @@ struct EnhancedDrawReplayInput
             return value;
         };
         const auto matrix = [&]() {
-            std::array<float,16> floats{};
+            ce::fixed_array<float,16> floats{};
             for (auto& v : floats) v=std::bit_cast<float>(static_cast<uint32_t>(number(4)));
             math::matrix4x4 value;
             std::memcpy(&value, floats.data(), sizeof(value));
@@ -180,7 +181,7 @@ struct EnhancedDrawReplayInput
         const auto size=std::filesystem::file_size(file, ec);
         if (!file.is_absolute() || ec || size<24 || size>kMaxBytes)
         { error="draw replay requires a bounded absolute file"; return false; }
-        std::vector<uint8_t> bytes(static_cast<size_t>(size));
+        ce::dynamic_array<uint8_t> bytes(static_cast<size_t>(size));
         std::ifstream stream(file, std::ios::binary);
         if (!stream.read(reinterpret_cast<char*>(bytes.data()), bytes.size()) || stream.peek()!=EOF)
         { error="draw replay file read failed"; return false; }

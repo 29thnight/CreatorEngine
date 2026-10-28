@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "AnimationPaletteArena.h"
 #if defined(CE_CONTRACT_STANDALONE)
@@ -223,12 +225,12 @@ public:
 	// m_isCulled는 한 카메라에서 파생된 값이라 색인에서 제거 기준으로 쓰지
 	// 않는다. 실제 view별 절두체 판정은 DrawSource의 worldBounds로 수행한다.
 	void RebuildInstanceMap();
-	std::vector<DrawSource> CaptureDrawSources() const;
+	ce::dynamic_array<DrawSource> CaptureDrawSources() const;
 
 public:
-	std::vector<FoliageInstance>	m_foliageInstances{};
-	std::vector<FoliageType>		m_foliageTypes{};
-	std::unordered_map<uint32, std::vector<FoliageInstance*>> instanceMap;
+	ce::dynamic_array<FoliageInstance>	m_foliageInstances{};
+	ce::dynamic_array<FoliageType>		m_foliageTypes{};
+	ce::engine_node_map<uint32, ce::dynamic_array<FoliageInstance*>> instanceMap;
 };
 
 // ── 데칼 ──

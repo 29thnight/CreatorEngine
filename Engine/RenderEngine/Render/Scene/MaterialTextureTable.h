@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -16,8 +17,8 @@ namespace MaterialTextureTable
 {
     inline constexpr uint32_t FirstRegister = 16;
     inline constexpr uint32_t RegisterLimit = 128; // SM5 SRV register limit
-    using Schema = std::vector<std::string>;
-    using Views = std::vector<RHIBindingDesc>;
+    using Schema = ce::dynamic_array<std::string>;
+    using Views = ce::dynamic_array<RHIBindingDesc>;
 
     inline bool Add(Schema& schema, std::string_view name, uint32_t index,
         uint32_t space, std::string& error)
@@ -122,12 +123,12 @@ namespace MaterialTextureTable
     }
 
     template <typename Snapshot>
-    std::vector<const Texture*> Owners(const Snapshot& snapshot)
+    ce::dynamic_array<const Texture*> Owners(const Snapshot& snapshot)
     {
         Schema schema;
         std::string error;
         if (!FromLayout(snapshot.bindingLayout, schema, error)) return {};
-        std::vector<const Texture*> owners(schema.size());
+        ce::dynamic_array<const Texture*> owners(schema.size());
         for (const auto& texture : snapshot.textureBindings)
             owners[texture.registerIndex - FirstRegister] = (texture.textureOwner ? &*texture.textureOwner.borrow() : nullptr);
         return owners; // Callers validate the complete snapshot before indexing.
@@ -136,8 +137,8 @@ namespace MaterialTextureTable
     // CPU/GPU ABI for offset + R * S * UV; w of U selects UV0/UV1.
     struct GpuCoordinates
     {
-        std::array<float, 4> u{1, 0, 0, 0};
-        std::array<float, 4> v{0, 1, 0, 0};
+        ce::fixed_array<float, 4> u{1, 0, 0, 0};
+        ce::fixed_array<float, 4> v{0, 1, 0, 0};
     };
     static_assert(sizeof(GpuCoordinates) == 32);
     inline GpuCoordinates PackCoordinates(const assets::TextureCoordinates& uv)
@@ -147,11 +148,11 @@ namespace MaterialTextureTable
             {s * uv.scale[0], c * uv.scale[1], uv.offset[1], 0.f}};
     }
     template <typename Snapshot>
-    std::vector<assets::TextureCoordinates> Coordinates(const Snapshot& snapshot)
+    ce::dynamic_array<assets::TextureCoordinates> Coordinates(const Snapshot& snapshot)
     {
         Schema schema; std::string error;
         if (!FromLayout(snapshot.bindingLayout, schema, error)) return {};
-        std::vector<assets::TextureCoordinates> result(schema.size());
+        ce::dynamic_array<assets::TextureCoordinates> result(schema.size());
         for (const auto& binding : snapshot.textureBindings)
             result[binding.registerIndex - FirstRegister] = binding.coordinates;
         return result;
@@ -187,17 +188,17 @@ namespace MaterialTextureTable
         return true;
     }
     inline auto UploadCoordinates(IRenderDeviceServices& resources,
-        const std::vector<assets::TextureCoordinates>& coordinates)
+        const ce::dynamic_array<assets::TextureCoordinates>& coordinates)
     {
-        std::array<GpuCoordinates, RegisterLimit - FirstRegister> table{};
+        ce::fixed_array<GpuCoordinates, RegisterLimit - FirstRegister> table{};
         for (size_t i = 0; i < coordinates.size() && i < table.size(); ++i)
             table[i] = PackCoordinates(coordinates[i]);
         return resources.UploadConstants(table.data(), sizeof(table));
     }
 
-    inline std::vector<const Texture*> LegacyOwners(const Schema& schema, const EnhancedDrawItem& draw)
+    inline ce::dynamic_array<const Texture*> LegacyOwners(const Schema& schema, const EnhancedDrawItem& draw)
     {
-        std::vector<const Texture*> owners(schema.size());
+        ce::dynamic_array<const Texture*> owners(schema.size());
         for (size_t i = 0; i < schema.size(); ++i)
         {
             using namespace standard_material::property;
@@ -210,7 +211,7 @@ namespace MaterialTextureTable
     }
 
     inline bool Upload(IRenderTextureCache& cache, const Schema& schema,
-        const std::vector<const Texture*>& owners, Views& views, std::string& error, bool legacy,
+        const ce::dynamic_array<const Texture*>& owners, Views& views, std::string& error, bool legacy,
         const TextureFramePins* imagePins = nullptr)
     {
         if (schema.size() != owners.size())

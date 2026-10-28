@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
@@ -34,7 +35,7 @@ namespace
                 error = "RG7 test changed a command slot before CPU submission completed";
                 return false;
             }
-            std::vector<ID3D12CommandList*> lists;
+            ce::dynamic_array<ID3D12CommandList*> lists;
             for (auto worker : order)
             {
                 lists.push_back(Get(worker));
@@ -60,10 +61,10 @@ namespace
             RGTransientPool cache;
             Rg7PostSubmitPool pool;
             winrt::com_ptr<ID3D12Fence> gate;
-            std::array<std::array<RHIReadback, 4>, 3> readbacks{};
-            std::array<std::array<RHIBufferHandle, 3>, 3> handles{};
-            std::array<own::weak_owner<EnhancedRenderGraph>, 3> retained;
-            std::array<RHISubmissionTicket, 3> tickets;
+            ce::fixed_array<ce::fixed_array<RHIReadback, 4>, 3> readbacks{};
+            ce::fixed_array<ce::fixed_array<RHIBufferHandle, 3>, 3> handles{};
+            ce::fixed_array<own::weak_owner<EnhancedRenderGraph>, 3> retained;
+            ce::fixed_array<RHISubmissionTicket, 3> tickets;
             RHIBufferHandle history;
             RHIResourceState historyState = RHIResourceState::Common;
             int inspectorOwner = 0;
@@ -161,7 +162,7 @@ namespace
                             context.encoder->ClearUnorderedAccess(binding, values);
                         });
                     }
-                    std::array<RGHandle, 3> written;
+                    ce::fixed_array<RGHandle, 3> written;
                     for (uint32_t index = 0; index < 3; ++index)
                     {
                         if (!resources.CreateBufferReadback(256, readbacks[view][index], error))

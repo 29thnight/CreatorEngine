@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/plans/NativeUIFrameworkPlan.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>엔진 공통 UI 기반과 자체 편집기 UI 전환 계획</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#남은-작업과-완료-판정">남은 작업과 완료 판정</a></li><li><a href="#현재-기준선과-재사용-범위">현재 기준선과 재사용 범위</a></li><li><a href="#적용할-구조와-경계">적용할 구조와 경계</a></li><li><a href="#구현-위치와-병행-검증-절차">구현 위치와 병행 검증 절차</a></li><li><a href="#채택-방향과-대안">채택 방향과 대안</a></li><li><a href="#필수-계약">필수 계약</a></li><li><a href="#다른-계획과의-소유-경계">다른 계획과의 소유 경계</a></li><li><a href="#추적할-미래-항목">추적할 미래 항목</a></li><li><a href="#검증-행렬과-성능-판정">검증 행렬과 성능 판정</a></li><li><a href="#소스와-설계-근거">소스와 설계 근거</a></li><li><a href="#검증-경계">검증 경계</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/plans/</span><a href="NativeUIFrameworkPlan.md">원본 Markdown</a></nav>
+<p class="eyebrow">계획</p>
+<h1>엔진 공통 UI 기반과 자체 편집기 UI 전환 계획</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 11개의 분량 막대">
+<a class="map-row" href="#남은-작업과-완료-판정"><span class="ve-label">§01</span><span class="map-name">남은 작업과 완료 판정</span><span class="map-bar"><i style="width:20.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#현재-기준선과-재사용-범위"><span class="ve-label">§02</span><span class="map-name">현재 기준선과 재사용 범위</span><span class="map-bar"><i style="width:48%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#적용할-구조와-경계"><span class="ve-label">§03</span><span class="map-name">적용할 구조와 경계</span><span class="map-bar"><i style="width:46.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#구현-위치와-병행-검증-절차"><span class="ve-label">§04</span><span class="map-name">구현 위치와 병행 검증 절차</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#채택-방향과-대안"><span class="ve-label">§05</span><span class="map-name">채택 방향과 대안</span><span class="map-bar"><i style="width:39.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#필수-계약"><span class="ve-label">§06</span><span class="map-name">필수 계약</span><span class="map-bar"><i style="width:94.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#다른-계획과의-소유-경계"><span class="ve-label">§07</span><span class="map-name">다른 계획과의 소유 경계</span><span class="map-bar"><i style="width:40.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#추적할-미래-항목"><span class="ve-label">§08</span><span class="map-name">추적할 미래 항목</span><span class="map-bar"><i style="width:78%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#검증-행렬과-성능-판정"><span class="ve-label">§09</span><span class="map-name">검증 행렬과 성능 판정</span><span class="map-bar"><i style="width:85.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#소스와-설계-근거"><span class="ve-label">§10</span><span class="map-name">소스와 설계 근거</span><span class="map-bar"><i style="width:24.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#검증-경계"><span class="ve-label">§11</span><span class="map-name">검증 경계</span><span class="map-bar"><i style="width:12.5%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 11개 가운데 「구현 위치와 병행 검증 절차」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><blockquote>
+<p>2026-10-28 수립 · 미래 계획 FUI · 현재 리팩토링 이후 · 구현 미착수 · 공수 미산정·현재 집계 제외</p>
+</blockquote>
+<p>UTF-16 문자열, 변경 기반 레이아웃·그리기 갱신, 명시적 입력·포커스 소유권을 갖는 엔진 내부 UI 기반을 구축한다. 게임 UI와 편집기 UI는 공통 기반을 사용하되 서로 다른 Context와 수명을 갖는다. 기존 ImGui 편집기는 새 패널의 제품 수용이 끝날 때까지 유지하고, 최종 전환 뒤 직접 의존성을 제거한다.</p>
+<p>이 문서는 미래 도입 순서와 완료 계약을 정의한다. 계획 등록은 포크 생성·엔진 코드 수정·기존 문자열 사용처 일괄 전환 또는 현재 PHASE 16·21의 중단을 뜻하지 않는다. PHASE 번호와 인일은 착수 시 다른 계획과 대조해 확정하며, FUI 항목을 현재 진행률의 분모·분자에 넣지 않는다.</p>
+</section>
+<section class="doc-sec" id="sec-남은-작업과-완료-판정">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="남은-작업과-완료-판정">남은 작업과 완료 판정</h2></div>
+<div class="prose"><ul>
+<li>공통 UI Core의 상태·트리·레이아웃·텍스트·입력·그리기 제출 경계를 설계하고 대표 패널 하나를 실제 엔진에서 수용한다.</li>
+<li>기존 ImGui와 같은 편집 동작을 비교해 기능·수명·입력·성능 기준을 통과한 패널부터 전환한다. 전체 위젯을 매 프레임 구성하는 호출 방식과 특정 내부 자료구조의 유지 여부는 별도로 결정한다.</li>
+<li>게임 UI는 PHASE 16의 Scene 소유·등록·렌더 제출 계약을 소비한다. 편집기 위젯마다 Entity·Component를 만들거나 Scene의 GC 수명을 부여하지 않는다.</li>
+<li>도킹·팝업·멀티윈도·저장/복구·특수 편집기를 마지막까지 수용한 뒤 ImGui 사용처와 제품 배포 의존성을 제거한다. 구조 구현, 실제 GUI 동작, 성능 수용을 각각 판정한다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-현재-기준선과-재사용-범위">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="현재-기준선과-재사용-범위">현재 기준선과 재사용 범위</h2></div>
+<div class="prose"><p>조사 기준은 2026-10-28의 <code>master</code> HEAD <code>27394992c9e2d31300298ef1f3b06438c9e4b9a7</code> 및 당시의 미커밋·미추적 작업 트리다. 아래 파일 링크는 현재 소스를 가리키며, 해당 HEAD에 모든 로컬 변경이 커밋돼 있다는 뜻은 아니다. 착수 때 소스 해시와 사용처 수를 다시 고정한다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>확인한 기반</th><th>재사용할 계약</th><th>완료로 확대하지 않을 범위</th></tr></thead>
+<tbody><tr><td>Scene 레이아웃의 dirty/resolved epoch</td><td>변경 없는 경우 계산 생략, 기존 Transform 좌표·스케일 의미</td><td>공통 위젯 트리·최소 dirty root 처리 전체</td></tr>
+<tr><td>RenderScene의 값 UIDrawSnapshot</td><td>live Component를 직접 넘기지 않는 값 조회 방향</td><td>현재 진단용 복사 API가 최종 UI 렌더 제출 전체라는 판단</td></tr>
+<tr><td>EditorWindowRegistry</td><td>stable ID, 창 역할·표시 상태와 등록 정책</td><td>현재 <code>draw()</code> 호출의 실행 방식 자체</td></tr>
+<tr><td>공통 편집 트랜잭션·명령</td><td>Undo/Redo·직렬화·선택·Play/Stop 의미</td><td>UI 교체를 이유로 별도 상태 정본을 만드는 것</td></tr>
+<tr><td>UTF-16 문자열·UTF-8 변환 캐시·입력 상태</td><td>기존 문자열 및 어댑터의 소유권·실패 처리</td><td>ImGui 경계 캐시를 새 UI의 필수 중간 표현으로 고정하는 것</td></tr>
+<tr><td>편집기 panel/frame cost·chrome 관측</td><td>기존 관측 지점과 실제 창 상태의 대조</td><td>CPU 시간만으로 픽셀·입력·전체 프레임 개선 판정</td></tr></tbody></table></div>
+<p>주석·문자열을 제외한 당시 문법 검색에서 Editor 56개 파일에 ImGui 호출 지점 4,029개, Lattice 1개 파일에 115개가 있었다. 이는 런타임 호출 횟수·병목·확정 공수가 아니다. 직접 호출 외에 타입·매크로·확장 라이브러리·도킹 저장 형식과 테스트 소비자는 FUI0에서 별도로 조사한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-적용할-구조와-경계">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="적용할-구조와-경계">적용할 구조와 경계</h2></div>
+<div class="prose"><pre><code class="language-text">Scene UI components → Scene adapter ┐
+                                   ├→ UI Core → immutable draw snapshot → RHI adapter
+Editor widgets/commands → Editor adapter ┘
+OS window/input/IME → platform adapter → owning UI Context</code></pre>
+<p>공통화할 것은 알고리즘과 값 계약이다. 게임과 편집기가 포커스·캡처·창·위젯 상태를 하나의 전역 저장소에서 공유하는 구조를 만들지 않는다. 아래 이름과 디렉토리는 제안이며 구현된 API가 아니다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>계층 제안</th><th>소유하는 것</th><th>허용하지 않는 의존</th></tr></thead>
+<tbody><tr><td><code>Engine/UI/Core</code></td><td>위젯 식별·슬롯·레이아웃·스타일·클리핑·입력 규칙·텍스트 및 draw 값 계약</td><td>ImGui, Editor, Scene의 구체 Component</td></tr>
+<tr><td><code>Engine/UI/Text</code></td><td>UTF-16 문서, 문자 경계·조판·측정 캐시·글리프와 폰트 자산 연결</td><td>위젯별 UTF-8 사본을 정본으로 삼는 것</td></tr>
+<tr><td><code>Engine/UI/Rendering</code></td><td>draw snapshot 소비, batching, RHI 자원 pin과 완료 제출 수명</td><td>render thread의 live 위젯/Component 역참조</td></tr>
+<tr><td>Scene adapter</td><td>Scene·Canvas 등록/해지·좌표 변환·게임 입력 및 저작 연결</td><td>편집기 창이 Scene 종료와 함께 파괴되는 결합</td></tr>
+<tr><td>Editor adapter</td><td>명령·편집 트랜잭션·선택·패널·workspace 연결</td><td>Core가 Editor 전용 저장·명령 정책을 아는 것</td></tr>
+<tr><td>Platform adapter</td><td>OS 창·DPI·키보드·포인터·IME·클립보드·접근성 연결</td><td>OS 전역 입력 상태를 임의 Context가 덮어쓰기</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-구현-위치와-병행-검증-절차">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="구현-위치와-병행-검증-절차">구현 위치와 병행 검증 절차</h2></div>
+<div class="prose"><p>2026-10-28 구현 방식 결정: <strong>엔진 내부 격리 모듈을 정본으로 구현하고, 독립 테스트와 실제 ImGui 패널 비교를 병행한 뒤 수용 기준을 통과한 패널부터 제품 기본 경로로 전환한다.</strong> 외부 라이브러리를 먼저 완성한 다음 엔진에 맞춰 이식하는 순서를 사용하지 않는다. 이 결정은 미래 계획의 실행 방식을 확정하며 구현 착수나 현재 기본 UI 변경을 뜻하지 않는다.</p>
+<h3 id="엔진-내부-정본과-선택적-연결">엔진 내부 정본과 선택적 연결</h3>
+<p>구현 정본은 제안한 <code>Engine/UI</code> 계층에 둔다. 독립 테스트 실행 파일과 편집기 비교 호스트는 같은 모듈·소스·공개 계약을 참조하며 테스트용 구현 복사본을 만들지 않는다. 별도 실행 파일이나 솔루션은 빌드·실험 경계일 뿐 별도 구현 정본이 아니다.</p>
+<p>새 모듈은 명시적으로 선택해 빌드·연결할 수 있도록 격리하고, Core가 기존 ImGui 또는 편집기 셸에 의존하지 않도록 한다. 초기부터 엔진의 컨테이너·할당·문자열·RHI·플랫폼 입력 및 수명 계약을 사용한다. 실험 모듈을 연결하는 것과 기존 패널을 대체해 기본 활성화하는 것은 별도 단계다. 미수용 패널은 기존 ImGui를 기본 경로로 유지한다.</p>
+<h3 id="세-검증-경로">세 검증 경로</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>경로</th><th>검증 대상</th><th>단독 통과로 주장하지 않을 범위</th></tr></thead>
+<tbody><tr><td>독립 테스트 실행 파일</td><td>핸들·소유권·삭제·레이아웃·dirty 전파·문자 경계·가상화·할당과 고의 결함</td><td>실제 OS IME·엔진 렌더 출력·편집기 기능·전체 성능 수용</td></tr>
+<tr><td>엔진 내 실험 UI 화면</td><td>실제 RHI·폰트·클립·DPI·창·플랫폼 입력·한글 IME·GPU 자원 수명</td><td>기존 편집 패널과의 기능 동등성 또는 기본 경로 전환</td></tr>
+<tr><td>실제 편집기 패널 A/B</td><td>같은 모델·명령·Undo/Redo·동작의 기능·입력 지연·CPU/GPU·메모리·전체 프레임</td><td>측정하지 않은 다른 패널·장면·OS의 수용</td></tr></tbody></table></div>
+<p>독립 테스트는 Core 구현과 함께 추가하고, 렌더·입력 연결이 가능한 시점부터 실제 엔진 검증도 함께 진행한다. 독립 테스트만으로 UI 라이브러리 전체를 완성한 뒤 엔진에서 처음 검증하는 순서를 피한다.</p>
+<h3 id="기준선부터-패널-전환까지">기준선부터 패널 전환까지</h3>
+<ol>
+<li>FUI0에서 기존 ImGui의 대표 화면·데이터·동작과 빌드/하드웨어·해상도·DPI를 고정한다. 정적 화면, 단일 속성 변경, 대형 목록 스크롤, 연속 텍스트 입력·IME를 포함한다.</li>
+<li>FUI1~3에서 Context·핸들·수명, 텍스트/레이아웃, RHI 제출, 버튼·스크롤·입력 필드의 작은 수직 구현을 만든다. 도킹과 전체 위젯 카탈로그 완성을 선행시키지 않는다.</li>
+<li>FUI4의 첫 비교 후보는 기본 속성 패널 일부로 둔다. 숫자·체크박스·UTF-16 이름 입력·접기·스크롤·Undo/Redo를 포함한다. 후보 변경은 FUI0의 대표성·비교 가능성 근거와 함께 기록한다.</li>
+<li>기존 ImGui 패널과 신규 패널은 같은 원본 모델·명령·편집 트랜잭션을 사용한다. 경로별로 재현 가능한 동등 상태를 준비하며, 동시에 모델을 수정하거나 입력을 소비하지 못하게 한다. 표준 A/B 측정은 두 경로를 교대로 단독 실행한다. 나란히 표시하는 진단 실행은 성능 판정과 구분한다.</li>
+<li>기능·수명·입력·렌더·성능 기준을 모두 통과한 패널만 기본 경로로 승격한다. 각 후속 패널도 동일한 개별 게이트를 통과해야 하며 대표 패널 통과를 전체 전환 허가로 사용하지 않는다.</li>
+<li>승격 초기에는 패널별 기존 경로 복귀를 유지하고 복귀 동작도 검증한다. 도킹 셸·멀티윈도·특수 편집기는 후속 단계에서 전환한다. 전체 동등성과 최종 제품 회귀를 수용한 FUI8에서 기존 경로 및 ImGui 의존성을 제거한다.</li>
+</ol>
+<p>패널별 수용 기록에는 소스·바이너리·fixture 신원, 두 경로의 기능 결과·원시 계측·실패 내역, 입력/모델 소유자, 기본 경로 상태와 복귀 가능 여부를 남긴다. CPU 단독 마이크로벤치나 독립 테스트 통과를 실제 편집기 패널 전환 판정으로 대신하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-채택-방향과-대안">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="채택-방향과-대안">채택 방향과 대안</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>방안</th><th>평가와 적용 범위</th></tr></thead>
+<tbody><tr><td>ImGui를 UTF-16 및 보관형 위젯 시스템으로 완전 개조</td><td>기존 컨트롤을 활용할 수 있으나 Begin/End·ID stack·동기 반환값·활성 입력·도킹 의미까지 바꾸면 소비자 전환과 upstream 충돌을 함께 관리해야 한다. 주 경로로 채택하지 않는다.</td></tr>
+<tr><td>엔진 내부 공통 기반과 자체 편집기 위젯</td><td>장기 정본으로 채택한다. 자체 컨테이너·할당·핸들·렌더 수명 정책을 적용하고 PHASE 16과 공통 기반을 나눈다. 초기 기능 구축과 제품 동등성 수용 비용은 별도 부담이다.</td></tr>
+<tr><td>기존 ImGui를 유지한 단계적 혼용</td><td>전환기 경로로 채택한다. 기존 셸에서 새 패널을 호스팅하되 입력·포커스·자원 소유자를 명시한다. 영구적인 이중 위젯 체계로 종료하지 않는다.</td></tr></tbody></table></div>
+<p>Immediate Mode API가 내부 캐시를 금지하는 것은 아니다. 선언형·즉시 호출형 API 중 어느 형태를 제공할지는 Core의 invalidation·수명 계약과 분리한다. Slate는 설계 참고 대상이며 Unreal 소스·컨테이너·수명 모델을 그대로 도입하지 않는다.</p>
+<p>Dear ImGui의 MIT 라이선스는 수정·배포를 허용하되 원 저작권·허가문 유지 조건이 있다. 제한적 포크나 코드 재사용이 생기면 출처·버전·패치·고지를 기록한다. 별도 UI 프레임워크를 사용하지 않는다는 범위와 폰트 래스터라이저·조판·OS API 의존성의 범위는 구분한다. 폰트 파싱·Unicode 전체를 새로 구현하는 작업을 암묵적으로 포함하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-필수-계약">
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="필수-계약">필수 계약</h2></div>
+<div class="prose"><h3 id="소유권과-수명">소유권과 수명</h3>
+<ul>
+<li>Context가 위젯 저장소와 루트를 소유한다. 장기 참조는 Context 신원과 generation을 포함한 핸들로 검증하고, 주소 재사용이 옛 입력·콜백을 새 위젯으로 보내지 못하게 한다.</li>
+<li>제거 시 입력 캡처·포커스·타이머·구독을 먼저 해제하고 트리에서 분리한다. 메모리 회수와 GPU 자원 해제는 각각의 완료 조건 뒤에 수행한다. 순회·콜백 중 제거는 명시적 지연 큐를 사용한다.</li>
+<li>소유 콜백은 <code>ce::owned_func</code> 또는 <code>ce::unique_func</code>의 복사·이동 계약을 따른다. <code>ce::func_ref</code>는 동기 호출 범위에만 사용하고 저장하지 않는다. 위젯과 콜백의 상호 강한 소유 사이클을 만들지 않는다.</li>
+<li>조회·hit test·핸들 해석·워밍된 불변 프레임에서 추가 래퍼/컨테이너 할당을 하지 않는다. 생성·새 글리프·용량 확장은 별도로 계측한다. 해지/삭제 뒤 소유 자원은 정해진 시점에 반환한다.</li>
+</ul>
+<h3 id="변경과-레이아웃">변경과 레이아웃</h3>
+<ul>
+<li>hierarchy/layout/paint/text/resource/input 변경 이유와 의존 범위를 분리한다. 최소 dirty root를 처리하고 같은 프레임의 중복 무효화를 합친다. 입력에서 생긴 변경은 명시된 프레임 단계에서 적용한다.</li>
+<li>캐시는 원본 revision과 폰트·스타일·DPI·viewport·클립·장치/자원 세대를 검증한다. 호출자 임시 버퍼의 주소를 캐시 신원으로 사용하지 않는다.</li>
+<li>목록·트리는 보이는 행과 명시한 overscan만 구성·배치한다. 전체 데이터의 위젯 생성 또는 매 프레임 내용 비교로 가상화 효과를 없애지 않는다.</li>
+<li>뷰포트·커서·선택 강조·애니메이션·타임라인은 동적 영역을 선언한다. 정적 형제까지 갱신하지 않으며 최적화 때문에 시간이 진행되는 표현을 멈추지 않는다.</li>
+</ul>
+<h3 id="utf-16-텍스트와-입력">UTF-16 텍스트와 입력</h3>
+<ul>
+<li>공개 문자열 계약은 <code>char16_t</code> 기반 <code>ce::string</code>·<code>ce::string_view</code>다. 플랫폼별 <code>wchar_t</code> 폭을 공통 인코딩으로 삼지 않는다. 파일·클립보드·기존 ImGui 등 외부 경계의 변환 위치와 소유자를 명시한다.</li>
+<li>UTF-16 코드 단위·Unicode scalar·사용자 문자 묶음·glyph 위치를 구분한다. 서로게이트, 결합 문자, 양방향 텍스트, fallback 폰트, 줄바꿈과 선택/검색 위치를 동일한 Text 계약에서 처리한다.</li>
+<li>IME 조합 문자열과 확정 문서를 분리한다. 조합 중 외부 모델 변경·포커스 이동·위젯 제거·Undo/Redo의 확정/취소 규칙을 정의하고 한글 실제 OS IME로 검증한다.</li>
+<li>혼용 기간에는 포인터·키보드·텍스트·IME 이벤트마다 소비 Context를 한 곳으로 정한다. ImGui와 새 UI가 같은 이벤트를 중복 처리하지 못하게 한다. 새 위젯의 ID는 표시 문자열과 분리한다.</li>
+</ul>
+<h3 id="렌더와-스레드">렌더와 스레드</h3>
+<ul>
+<li>UI 상태 변경과 입력은 Context 소유 스레드가 직렬화한다. 작업 스레드의 조판·메시 계산은 불변 입력과 revision을 사용하고, 오래된 결과는 버린다.</li>
+<li>draw snapshot은 좌표·클립·정렬·글리프/도형 값과 세대 검증 자원 참조를 보유한다. draw data의 프레임 임시 포인터를 다음 프레임에 재사용하지 않는다.</li>
+<li>RHI adapter가 폰트 atlas·텍스처·버퍼를 실제 제출 완료까지 pin한다. 이전 제출 실패·취소·resize·장치 재생성에서도 살아 있는 제출의 자원이 먼저 반환되지 않게 한다.</li>
+<li>CPU 레이아웃/메시 캐시와 렌더 타깃 캐시는 구분한다. geometry 재사용만으로 GPU raster·draw call·Present가 감소했다고 판정하지 않는다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-다른-계획과의-소유-경계">
+<div class="sec-head"><p class="ve-label">§07</p><h2 id="다른-계획과의-소유-경계">다른 계획과의 소유 경계</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>기존 계획</th><th>계속 소유할 범위</th><th>FUI가 소유할 범위</th></tr></thead>
+<tbody><tr><td><a href="UISystemRedesignPlan.html">UISystemRedesignPlan</a> · PHASE 16</td><td>Scene-local UI 등록·입력, Canvas/Transform, 게임 UI 저작·직렬화, 기존 U/T 수용</td><td>Scene에 독립적인 Core와 새 공통 API, 연결 시의 어댑터 적합성</td></tr>
+<tr><td><a href="EditorWorkspaceRedesignPlan.html">EditorWorkspaceRedesignPlan</a> · PHASE 21</td><td>현재 셸·도킹·ViewportHost·workspace 동작·기존 W 항목</td><td>새 위젯·도킹 구현으로의 전환과 기존 동작 동등성</td></tr>
+<tr><td><a href="EditorRenderingSurfacesPlan.html">EditorRenderingSurfacesPlan</a></td><td>Preferences·Project Settings·품질 설정의 정본과 저장 범위</td><td>새 UI에서 같은 설정·명령을 조작하는 표현 계층</td></tr>
+<tr><td><a href="LatticeAdoptionPlan.html">LatticeAdoptionPlan</a></td><td>그래프 문서·모델·편집 의미와 노드 편집 수용</td><td>새 UI surface 연결. 그래프 모델이나 명령을 복제하지 않음</td></tr>
+<tr><td><a href="EngineLayerSeparationPlan.html">EngineLayerSeparationPlan</a></td><td>Runtime/Editor/Host 의존 방향</td><td>새 UI 모듈이 같은 의존 방향을 지키는 검증</td></tr>
+<tr><td>컨테이너·문자열 정본</td><td>기존 합격 구현·UTF-16/UTF-8 API·할당 계약</td><td>사용·연결·별도 UI workload 측정. 기존 합격 조건 완화 없음</td></tr></tbody></table></div>
+<p>기존 U/T/W 작업의 완료를 FUI 완료로 중복 산정하지 않는다. 공통 텍스트/폰트 등 중첩 가능 항목은 FUI0에서 구현 소유자를 한 곳으로 정하고 기존 요구를 링크한다. 현재 계획을 후속 UI 착수를 기다리는 상태로 변경하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-추적할-미래-항목">
+<div class="sec-head"><p class="ve-label">§08</p><h2 id="추적할-미래-항목">추적할 미래 항목</h2></div>
+<div class="prose"><p>모든 항목은 <strong>미래·미착수·공수 미산정</strong>이다. 선행 항목의 실제 완료가 다음 단계의 착수 조건이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>추적 ID</th><th>단계와 선행 조건</th><th>산출물</th><th>완료 판정</th></tr></thead>
+<tbody><tr><td>FUI0</td><td>사용처·기능·의존·측정 기준선 고정</td><td>위젯/패널 승계표, 엔진 내부 격리 빌드·독립 테스트·패널 A/B 구성, U/T/W 소유표, workload·빌드·HW/OS·소스 신원, 동작 golden, 예산 확정</td><td>직접/간접 ImGui·확장·타입·저장 소비자와 실패 사례 누락 0</td></tr>
+<tr><td>FUI1</td><td>FUI0 이후 Core 수명·상태·변경 계약</td><td>Context·세대 핸들·트리·구독·dirty root·할당 관측</td><td>제거/재부모화/재진입/Context 종료 뒤 stale 접근·누수 0, 워밍 조회 추가 할당 0</td></tr>
+<tr><td>FUI2</td><td>FUI1 이후 텍스트·레이아웃·플랫폼 입력</td><td>UTF-16 Text 모델, 조판/측정 캐시, 기본 컨트롤, IME·포커스·캡처</td><td>텍스트·DPI·키보드·IME 상태/OS 이벤트·독립 Context 계약 통과. 실제 편집 필드 IME는 FUI3~4에서 통합 수용</td></tr>
+<tr><td>FUI3</td><td>FUI1~2 이후 RHI 수직 연결</td><td>불변 draw snapshot·batch·클립·atlas·자원 pin·동적 영역</td><td>실제 DX12/Vulkan 픽셀·겹치는 제출·실패/resize/장치 세대 행렬 통과</td></tr>
+<tr><td>FUI4</td><td>FUI3 이후 대표 편집 패널 비교·수용</td><td>기본 속성 패널 일부 우선, 동일 모델·명령/Undo/Redo의 ImGui/신규 A/B, 입력 단일 소유, 전환·복귀 스위치</td><td>독립·엔진 실험·실제 패널 검증을 모두 통과한 뒤 해당 패널만 기본 활성화</td></tr>
+<tr><td>FUI5</td><td>FUI4 이후 일반 패널 개별 수용·전환</td><td>Inspector·트리·Browser·로그·검색·메뉴·툴팁·DnD·가상화, 패널별 A/B와 복귀 경로</td><td>패널마다 기능·수명·입력·렌더·성능 게이트 통과 후 기본 전환, 저장/로드·편집 트랜잭션·입력 회귀 0</td></tr>
+<tr><td>FUI6</td><td>FUI3~5와 기존 U/T 계약 수용 후 게임 UI 연결</td><td>Scene adapter, 게임/편집기 Context 분리, 기존 저작의 왕복</td><td>Scene 교체·DDOL·Play/Stop·Prefab·직렬화·입력 격리 통과</td></tr>
+<tr><td>FUI7</td><td>FUI5 이후 셸·도킹·특수 편집기 전환</td><td>OS 창·멀티 DPI·workspace 복구·노드/곡선/타임라인·viewport 연결</td><td>기존 stable ID/설정 승계, 재시작·다중 창·모니터 이동·포커스·실제 조작 통과</td></tr>
+<tr><td>FUI8</td><td>FUI5~7 전체 수용 후 ImGui 퇴역</td><td>직접/간접 의존 제거, 빌드/배포 정리, 롤백 종료 기록</td><td>제품 범위 ImGui 소비자·헤더·타입·링크 의존 0, 최종 Editor/Player 회귀·성능 통과</td></tr></tbody></table></div>
+<p>FUI4 이후에도 각 패널의 수용·기본 전환과 초기 회귀 확인 동안 기존 경로 복귀를 유지한다. FUI8 최종 퇴역 수용 전에는 기존 경로를 일괄 제거하지 않는다. 두 경로가 같은 모델을 동시에 수정하지 못하게 하며, 실패한 입력·저장 결과를 덮어써 숨기지 않는다. ImGui 철거는 단순 호출 수 감소나 Core 단위 테스트만으로 진행하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-검증-행렬과-성능-판정">
+<div class="sec-head"><p class="ve-label">§09</p><h2 id="검증-행렬과-성능-판정">검증 행렬과 성능 판정</h2></div>
+<div class="prose"><h3 id="기능과-실패-수용">기능과 실패 수용</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>축</th><th>필수 자극과 판정</th></tr></thead>
+<tbody><tr><td>텍스트</td><td>ASCII·한글·이모지·서로게이트·결합 문자·혼합 방향·다중 행, 선택/삭제/검색/복사/붙여넣기·Undo/Redo의 문서와 위치 불일치 0</td></tr>
+<tr><td>실제 입력</td><td>Windows 한글 IME 조합·확정·취소·포커스 전환·위젯 제거, 마우스/키보드 탐색·캡처 상실·popup 가림 오류 0. 다른 OS는 플랫폼별 실제 입력 수용을 별도 표기</td></tr>
+<tr><td>레이아웃</td><td>중첩 clip/scroll, 100/150/200% DPI, 창 resize·숨김/복원·모니터 이동, 숨은 변경의 재표시와 오래된 캐시 오류 0</td></tr>
+<tr><td>수명</td><td>입력/콜백/순회 중 삭제·재부모화, generation 재사용, Context/Scene/장치 종료, 실패한 비동기 결과와 겹치는 GPU 제출의 stale 접근·조기 해제 0</td></tr>
+<tr><td>제품 동작</td><td>설정/도킹 저장·복구, 선택·DnD·명령·Undo/Redo, Play/Stop 전후 장면·편집 상태 복원, 실제 Editor와 cooked Player의 정상 종료</td></tr>
+<tr><td>관측 신뢰성</td><td>dirty 전파 제거·캐시 세대 누락·입력 이중 전달·자원 조기 해제 등 고의 결함을 각 대응 게이트가 검출. 관측 미배선은 통과로 취급하지 않음</td></tr></tbody></table></div>
+<h3 id="측정과-제안-예산">측정과 제안 예산</h3>
+<p>다음 수치는 <strong>착수 전 확정할 초기 제안</strong>이며 실측 성능·보장치가 아니다. FUI0에서 대표 workload와 측정 해상도를 확인해 동결한다. 이후 실패를 통과시키기 위해 기준을 완화하지 않으며 변경이 필요하면 사유와 재기준선을 남긴다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>조건</th><th>초기 수용 제안</th></tr></thead>
+<tbody><tr><td>공통 표본</td><td>고정 HW/OS·빌드·해상도·DPI·콘텐츠에서 기존/신규 순서 교대 최소 3회. warm 조건은 회당 최소 300프레임, cold 시작은 별도 최소 10회. p50/p95/p99·최악값·메모리·할당·dirty/visible 개수 공개</td></tr>
+<tr><td>정적 예열 패널</td><td>UI CPU 중앙값 기존 대비 20% 이상 감소, p95 증가 없음. 달성하지 못하면 효율성 수용은 보류하고 FUI4에서 원인 재검토</td></tr>
+<tr><td>동적·스크롤·입력</td><td>UI CPU·입력 반영 지연·전체 프레임 p95가 각각 기존의 1.05배 이하. 작은 값의 계측 오차/절대 허용치는 FUI0에서 미리 확정</td></tr>
+<tr><td>GPU와 전체 제품</td><td>UI GPU p95 및 전체 프레임 p95가 각각 기존의 1.05배 이하. CPU 캐시 성과와 별도로 draw·upload·Present 대기·최종 화면을 확인</td></tr>
+<tr><td>할당·삭제</td><td>10,000회 워밍 조회와 300프레임 불변 반복의 UI 관리 할당 증가 0. 제거 후 CPU 소유 객체 잔여 0, GPU는 완료 제출 뒤 소유 pin 잔여 0</td></tr>
+<tr><td>가상화</td><td>10,000개 항목 fixture에서 구성/배치 위젯 수가 실제 visible+동결한 overscan 한도 이내. 프레임마다 전체 항목의 위젯 생성 금지</td></tr>
+<tr><td>메모리</td><td>live/peak·cache·atlas·retained geometry·렌더 타깃·할당/해제량 공개. FUI0에서 workload별 상한 동결 후 그 이내. CPU 개선만으로 무제한 캐시를 수용하지 않음</td></tr></tbody></table></div>
+<p>성능 측정과 GPU validation·ASan·고의 결함 실행은 분리한다. 표본·실패·측정 순서·진단 상태·소스/바이너리 해시를 보존하고, 유리한 패널/표본만 합쳐 전체 통과로 판정하지 않는다. 전체 Editor 성능과 특정 패널 CPU 개선을 구분한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-소스와-설계-근거">
+<div class="sec-head"><p class="ve-label">§10</p><h2 id="소스와-설계-근거">소스와 설계 근거</h2></div>
+<div class="prose"><ul>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/SceneRuntime/Scene.cpp" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">Scene::UpdateUILayout</a>: dirty/resolved epoch 기반 생략과 기존 Scene 순회. 새 Core의 최소 dirty root 비용은 별도 수용 대상이다.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/SceneRuntime/UIManager.h" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">UIManager</a>, <a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/SceneRuntime/Canvas.h" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">Canvas</a>: 기존 전역 관리·등록·Scene 수명의 실제 이관 경계.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/RenderEngine/RenderScene.h" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">RenderScene</a>, <a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Engine/RenderEngine/RenderScene.cpp" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">값 snapshot 구현</a>: 현재 값 조회 및 렌더 자원 수명을 새 제출 계약과 구분한다.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Editor/EditorWindow/EditorWindowRegistry.h" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">EditorWindowRegistry</a>: stable ID·창 정책·표시 상태의 기존 정본.</li>
+<li><a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Editor/HostImGuiPresentation/RHI/ImGuiHost.cpp" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">ImGuiHost</a>, <a href="https://github.com/29thnight/CreatorEngine/blob/7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff/Editor/EngineGUIWindow/EditorPanelCost.h" title="소스 열람 기준: 7c59b8f8b99ff2c1b26cd72fa9b1a0764734f0ff. 측정 당시 소스 신원은 문서의 원본 기록 참조.">EditorPanelCost</a>: 프레임 생성/제출과 기존 관측의 교체 경계.</li>
+<li><a href="../../Editor/ImGuiHelper/Utf16Text.h">UTF-16 ImGui 어댑터</a>, <a href="../analysis/Utf16StringIntegration20261027.html">문자열 도입 수용 기록</a>: 혼용 기간의 변환·입력 상태와 기존 계약.</li>
+<li><a href="https://github.com/ocornut/imgui/wiki/About-the-IMGUI-paradigm">Dear ImGui의 API/구현 구분</a>, <a href="https://github.com/ocornut/imgui/blob/master/LICENSE.txt">MIT 라이선스</a>.</li>
+<li><a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/understanding-the-slate-ui-architecture-in-unreal-engine">Slate 아키텍처</a>, <a href="https://dev.epicgames.com/documentation/en-us/unreal-engine/invalidation-in-slate-and-umg-for-unreal-engine">invalidation과 렌더 타깃 캐시</a>.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-검증-경계">
+<div class="sec-head"><p class="ve-label">§11</p><h2 id="검증-경계">검증 경계</h2></div>
+<div class="prose"><p>이번 산출물은 계획 문서와 미래 색인 등록이다. 소스 기준선·계획 소유 경계·상대 링크·생성 HTML을 확인하며 엔진 코드를 변경하지 않는다. 자체 UI·ImGui 포크·성능 우위·다른 OS 입력 수용을 구현 또는 실측 완료로 표시하지 않는다. 기존 컨테이너·문자열·편집기 실행 수용 기록은 각 원래 소스와 바이너리에 한정한다. 향후 FUI0에서 최신 기준선을 확보한 뒤 단계별 제품 산출물로 완료를 판정한다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="NativeUIFrameworkPlan.md"><code>docs/plans/NativeUIFrameworkPlan.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

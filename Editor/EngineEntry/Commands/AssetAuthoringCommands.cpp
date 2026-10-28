@@ -1,3 +1,5 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -340,7 +342,7 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_model_load(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
 
         if (parts.size() < 2)
@@ -617,7 +619,7 @@ namespace ConsoleCmd
 						&& restored->inputType == InputType::KeyBoard
 						&& restored->actionType == ActionType::Value
 						&& restored->keystate == KeyState::Released
-						&& restored->key == std::vector<std::size_t>{
+						&& restored->key == ce::dynamic_array<std::size_t>{
 							static_cast<std::size_t>(KeyBoard::LeftArrow),
 							static_cast<std::size_t>(KeyBoard::RightArrow),
 							static_cast<std::size_t>(KeyBoard::DownArrow),
@@ -670,7 +672,7 @@ namespace ConsoleCmd
         std::size_t buttons = 0;
         std::size_t values = 0;
         std::size_t invalid = 0;
-        std::unordered_set<std::string> names;
+        ce::engine_node_set<std::string> names;
         for (const ActionMap* map : InputActionManagers->m_actionMaps)
         {
             if (!map || map->m_name.empty() || !names.insert(map->m_name).second)
@@ -910,7 +912,7 @@ namespace ConsoleCmd
 
         auto captureReferences = [](const Material& material)
         {
-            std::vector<std::string> rows;
+            ce::dynamic_array<std::string> rows;
             rows.push_back("shader|" + material.m_shaderMetaGuid.ToString());
             for (const MaterialPropertyValue& property : material.m_propertyValues)
             {
@@ -1030,7 +1032,7 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_model_loadcached(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
         if (parts.size() != 2)
         {
             std::printf("[CLI] 사용법: model.loadcached <모델 경로>\n");
@@ -1356,7 +1358,7 @@ namespace ConsoleCmd
         }
         const std::filesystem::path root = (ctx.parts.size() > 1 && ctx.parts[1] != "-")
             ? std::filesystem::path(ctx.parts[1]) : ce::paths::relative();
-        std::vector<std::filesystem::path> sources;
+        ce::dynamic_array<std::filesystem::path> sources;
         std::error_code walkError;
         for (auto it = std::filesystem::recursive_directory_iterator(root, walkError);
             it != std::filesystem::recursive_directory_iterator(); it.increment(walkError))
@@ -1390,7 +1392,7 @@ namespace ConsoleCmd
         size_t compared = 0;
         size_t identical = 0;
         size_t failed = 0;
-        std::vector<std::string> failures;
+        ce::dynamic_array<std::string> failures;
         for (const auto& path : sources)
         {
             DirectX::ScratchImage source;
@@ -1499,7 +1501,7 @@ namespace ConsoleCmd
             ? parsedLimit : 64;
         const std::filesystem::path root = ce::paths::relative();
 
-        std::vector<std::filesystem::path> sources;
+        ce::dynamic_array<std::filesystem::path> sources;
         std::error_code walkError;
         for (auto it = std::filesystem::recursive_directory_iterator(root, walkError);
             it != std::filesystem::recursive_directory_iterator(); it.increment(walkError))
@@ -1531,7 +1533,7 @@ namespace ConsoleCmd
             if (!stream) continue;
             const std::streamsize size = stream.tellg();
             stream.seekg(0);
-            std::vector<char> raw(static_cast<size_t>(size));
+            ce::dynamic_array<char> raw(static_cast<size_t>(size));
             stream.read(raw.data(), size);
             stream.close();
             auto t1 = chrono::steady_clock::now();

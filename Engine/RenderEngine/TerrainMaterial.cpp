@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "TerrainMaterial.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -10,7 +11,7 @@ void TerrainMaterial::Initialize(uint32_t width, uint32_t height)
 
 	// 초기에는 레이어 하나짜리 마스크로 시작한다(예전 InitSplatMapTextureArray가
 	// layerCount = 1로 텍스처 배열을 만들던 것과 같은 자리다).
-	m_splatMasks.assign(1, std::vector<uint8_t>(static_cast<size_t>(m_width) * m_height, 0));
+	m_splatMasks.assign(1, ce::dynamic_array<uint8_t>(static_cast<size_t>(m_width) * m_height, 0));
 	++m_revision;
 }
 
@@ -38,7 +39,7 @@ void TerrainMaterial::UpdateBuffer(const TerrainLayerBuffer& layers)
 }
 
 void TerrainMaterial::UpdateSplatMapPatch(uint32_t layerIndex, int offsetX, int offsetY,
-                                          int patchW, int patchH, const std::vector<uint8_t>& patchData)
+                                          int patchW, int patchH, const ce::dynamic_array<uint8_t>& patchData)
 {
 	if (layerIndex >= m_splatMasks.size()) return;
 	if (patchW <= 0 || patchH <= 0) return;
@@ -70,8 +71,8 @@ void TerrainMaterial::UpdateSplatMapPatch(uint32_t layerIndex, int offsetX, int 
 }
 
 void TerrainMaterial::MateialDataUpdate(int width, int height,
-                                        std::vector<TerrainLayer>& layers,
-                                        std::vector<std::vector<float>>& layerHeightMap)
+                                        ce::dynamic_array<TerrainLayer>& layers,
+                                        ce::dynamic_array<ce::dynamic_array<float>>& layerHeightMap)
 {
 	m_width = width;
 	m_height = height;
@@ -81,7 +82,7 @@ void TerrainMaterial::MateialDataUpdate(int width, int height,
 
 	// 레이어 가중치(0..1 float)를 8비트로 굳혀 둔다. 예전에는 이 값을 바로
 	// 스플랫맵 텍스처 배열에 올리고 CPU 쪽은 남기지 않았다.
-	m_splatMasks.assign(layerCount, std::vector<uint8_t>(pixels, 0));
+	m_splatMasks.assign(layerCount, ce::dynamic_array<uint8_t>(pixels, 0));
 	for (size_t i = 0; i < layerCount; ++i)
 	{
 		if (i >= layerHeightMap.size()) continue;

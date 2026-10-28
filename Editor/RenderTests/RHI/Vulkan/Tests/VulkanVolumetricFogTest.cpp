@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "../VulkanSelfTest.h"
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/Vulkan/VulkanPipelineCache.h"
@@ -52,12 +53,12 @@ namespace
         float darkScatter{ 0.f };
         float litPixel{ 0.f };
         float plainPixel{ 0.f };
-        std::array<float, 5> transmittance{};
+        ce::fixed_array<float, 5> transmittance{};
         bool passThrough{ false };
-        std::array<EnhancedRenderGraph::Stats, kFogRhiVariantCount> graphs{};
+        ce::fixed_array<EnhancedRenderGraph::Stats, kFogRhiVariantCount> graphs{};
         RHIReadbackImage litVoxel;
         RHIReadbackImage historyVoxel;
-        std::array<RHIReadbackImage, kFogRhiVariantCount> screens;
+        ce::fixed_array<RHIReadbackImage, kFogRhiVariantCount> screens;
     };
 
     bool IsFogRhiFunctional(const FogRhiCapture& capture)
@@ -164,7 +165,7 @@ namespace
             const EnhancedVolumetricFogPass::Tuning& tuning,
             uint32_t lightCount) -> bool
         {
-            std::vector<EnhancedLight> lights;
+            ce::dynamic_array<EnhancedLight> lights;
             for (uint32_t i = 0; i < lightCount; ++i)
             {
                 EnhancedLight light{};

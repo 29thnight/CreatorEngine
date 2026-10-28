@@ -1,3 +1,6 @@
+#include "../Foundation/EngineOrderedSet.h"
+#include "../Foundation/EngineNodeMap.h"
+#include "../../Containers/ContainerAPI.h"
 #include "../Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -23,7 +26,7 @@ namespace
     struct GuidRegistry
     {
         std::mutex mutex;
-        std::set<HashedGuid> reserved;
+        ce::engine_ordered_set<HashedGuid> reserved;
     };
 
     GuidRegistry& GetGuidRegistry()
@@ -79,15 +82,15 @@ namespace TypeTrait
         }
     }
 
-    std::unordered_map<HashedGuid, uint32_t>& ComponentTypeIndex::Table()
+    ce::engine_node_map<HashedGuid, uint32_t>& ComponentTypeIndex::Table()
     {
-        static std::unordered_map<HashedGuid, uint32_t> table;
+        static ce::engine_node_map<HashedGuid, uint32_t> table;
         return table;
     }
 
-    std::vector<std::pair<std::string, uuid::uuid16>>& ComponentUUIDRegistry::Entries()
+    ce::dynamic_array<ce::pair<std::string, uuid::uuid16>>& ComponentUUIDRegistry::Entries()
     {
-        static std::vector<std::pair<std::string, uuid::uuid16>> entries;
+        static ce::dynamic_array<ce::pair<std::string, uuid::uuid16>> entries;
         return entries;
     }
 }

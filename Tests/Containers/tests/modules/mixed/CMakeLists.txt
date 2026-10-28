@@ -1,0 +1,6 @@
+cmake_minimum_required(VERSION 3.28)
+project(RejectedMixedApi LANGUAGES CXX)
+set(CE_MODULES ON CACHE BOOL "" FORCE)
+add_subdirectory(../../.. containers)
+add_executable(mixed main.cpp)
+target_link_libraries(mixed PRIVATE creator_containers creator_containers_headers)

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -13,7 +14,7 @@ namespace material_graph
 {
 bool IsValidIblBakePoint(const IblBakePoint& point)
 {
-    const auto values = std::bit_cast<std::array<float, 44>>(point);
+    const auto values = std::bit_cast<ce::fixed_array<float, 44>>(point);
     if (!std::ranges::all_of(values, [](float value) { return std::isfinite(value) && std::abs(value) <= 1e6f; }))
     {
         return false;
@@ -208,7 +209,7 @@ bool IblBaker::PrepareInputs(IRenderDeviceServices& device, const IblEnvironment
     candidate->inputs_ = candidate->gpuPoints_
                              ? RHIBufferSlice::Whole(candidate->gpuPoints_->Buffer())
                              : device.AllocateUpload({cpuPoints.size_bytes(), RHIUploadUsage::Raw, 16});
-    const std::array<std::uint32_t, 4> constants{candidate->Count(), 0, 0, 0};
+    const ce::fixed_array<std::uint32_t, 4> constants{candidate->Count(), 0, 0, 0};
     candidate->uniform_ = device.UploadConstants(constants.data(), sizeof(constants));
     const auto source = RHIBindingDesc::SrvCube(cube.handle, cube.format, 1);
     const auto target = RHIBindingDesc::UavBuffer(candidate->buffer_, candidate->Count(), sizeof(IblBakeSample));

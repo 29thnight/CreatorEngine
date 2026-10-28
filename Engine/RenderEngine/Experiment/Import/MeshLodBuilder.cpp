@@ -1,3 +1,6 @@
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
+#include "../../../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #include "MeshLodBuilder.h"
 
 #include "MeshletBuilder.h"
@@ -21,7 +24,7 @@ namespace experiment::importer
         static_assert(std::endian::native == std::endian::little);
         static_assert(sizeof(unsigned int) == sizeof(std::uint32_t));
 
-        using MeshLodPosition = std::array<float, 3>;
+        using MeshLodPosition = ce::fixed_array<float, 3>;
         static_assert(sizeof(MeshLodPosition) == 12);
 
         bool MeshLodFail(std::string& diagnostic, const char* message)
@@ -88,13 +91,13 @@ namespace experiment::importer
             return true;
         }
 
-        void MeshLodHashU32(ce::hash::sha256& hash, std::uint32_t value) noexcept
+        void MeshLodHashU32(ce::crypto::sha256& hash, std::uint32_t value) noexcept
         {
             hash.update(&value, sizeof(value));
         }
 
         template<class T>
-        void MeshLodHashVector(ce::hash::sha256& hash, const std::vector<T>& values) noexcept
+        void MeshLodHashVector(ce::crypto::sha256& hash, const ce::dynamic_array<T>& values) noexcept
         {
             const auto count = static_cast<std::uint64_t>(values.size());
             hash.update(&count, sizeof(count));
@@ -104,7 +107,7 @@ namespace experiment::importer
             }
         }
 
-        void MeshLodHashMeshletSettings(ce::hash::sha256& hash, const MeshletBuildSettings& settings) noexcept
+        void MeshLodHashMeshletSettings(ce::crypto::sha256& hash, const MeshletBuildSettings& settings) noexcept
         {
             MeshLodHashU32(hash, settings.profileVersion);
             MeshLodHashU32(hash, settings.builderVersion);
@@ -114,8 +117,8 @@ namespace experiment::importer
             MeshLodHashU32(hash, std::bit_cast<std::uint32_t>(settings.coneWeight));
         }
 
-        using Boundary = std::map<std::pair<uint32_t, uint32_t>, uint32_t>;
-        Boundary PatchBoundary(const std::vector<uint32_t>& indices, const std::vector<uint32_t>& positionRemap)
+        using Boundary = ce::engine_ordered_map<ce::pair<uint32_t, uint32_t>, uint32_t>;
+        Boundary PatchBoundary(const ce::dynamic_array<uint32_t>& indices, const ce::dynamic_array<uint32_t>& positionRemap)
         {
             Boundary result;
             for (size_t i = 0; i < indices.size(); i += 3)
@@ -145,9 +148,9 @@ namespace experiment::importer
             }
             return result;
         }
-        std::vector<uint32_t> GroupIndices(const Mesh& mesh, const MeshClusterGroup& group)
+        ce::dynamic_array<uint32_t> GroupIndices(const Mesh& mesh, const MeshClusterGroup& group)
         {
-            std::vector<uint32_t> result;
+            ce::dynamic_array<uint32_t> result;
             for (uint32_t i = 0; i < group.meshletCount; ++i)
             {
                 const auto& d = mesh.meshlets.descriptors[group.firstMeshlet + i];
@@ -160,7 +163,7 @@ namespace experiment::importer
             }
             return result;
         }
-        void PatchSphere(const std::vector<MeshLodPosition>& positions, const std::vector<uint32_t>& indices,
+        void PatchSphere(const ce::dynamic_array<MeshLodPosition>& positions, const ce::dynamic_array<uint32_t>& indices,
                          float (&sphere)[4])
         {
             double lo[3]{INFINITY, INFINITY, INFINITY}, hi[3]{-INFINITY, -INFINITY, -INFINITY};
@@ -230,8 +233,8 @@ namespace experiment::importer
                 return MeshLodFail(diagnostic, "Spatial DAG digest mismatch; recook required.");
             }
             const bool skinned = MeshLodHasSkinning(mesh);
-            const auto skinVertices = skinned ? SkinErrorVertices(mesh) : std::vector<SkinErrorVertex>{};
-            std::vector<MeshLodPosition> positions(mesh.vertices.size());
+            const auto skinVertices = skinned ? SkinErrorVertices(mesh) : ce::dynamic_array<SkinErrorVertex>{};
+            ce::dynamic_array<MeshLodPosition> positions(mesh.vertices.size());
             for (size_t v = 0; v < positions.size(); ++v)
             {
                 std::memcpy(positions[v].data(),
@@ -239,15 +242,15 @@ namespace experiment::importer
                                 OffsetOf(mesh.vertices.AttributeMask(), VertexAttribute::Position),
                             12);
             }
-            std::vector<uint32_t> positionRemap(positions.size());
+            ce::dynamic_array<uint32_t> positionRemap(positions.size());
             meshopt_generatePositionRemap(positionRemap.data(), positions.front().data(), positions.size(),
                                           sizeof(MeshLodPosition));
             if (skinned)
             {
                 std::iota(positionRemap.begin(), positionRemap.end(), 0u);
             }
-            std::vector<const MeshletPayload*> payloads{&mesh.meshlets};
-            std::vector<uint32_t> clusterBases{0}, primitiveBases{0};
+            ce::dynamic_array<const MeshletPayload*> payloads{&mesh.meshlets};
+            ce::dynamic_array<uint32_t> clusterBases{0}, primitiveBases{0};
             uint64_t clusters = mesh.meshlets.descriptors.size(), primitives = mesh.indices.size() / 3;
             Mesh levelMesh;
             levelMesh.vertices = mesh.vertices;
@@ -277,9 +280,9 @@ namespace experiment::importer
             {
                 return MeshLodFail(diagnostic, "Spatial DAG addressing overflow.");
             }
-            std::vector<uint8_t> covered(size_t(clusters), 0), parents(lods.groups.size(), 0);
-            std::vector<std::vector<uint32_t>> originals(lods.groups.size());
-            std::vector<uint32_t> depths(lods.groups.size(), 0);
+            ce::dynamic_array<uint8_t> covered(size_t(clusters), 0), parents(lods.groups.size(), 0);
+            ce::dynamic_array<ce::dynamic_array<uint32_t>> originals(lods.groups.size());
+            ce::dynamic_array<uint32_t> depths(lods.groups.size(), 0);
             for (uint32_t i = 0; i < lods.groups.size(); ++i)
             {
                 const auto& g = lods.groups[i];
@@ -360,7 +363,7 @@ namespace experiment::importer
                     {
                         return MeshLodFail(diagnostic, "DAG replacement changes its original patch boundary.");
                     }
-                    std::vector<uint8_t> allowed(mesh.vertices.size(), 0);
+                    ce::dynamic_array<uint8_t> allowed(mesh.vertices.size(), 0);
                     for (auto v : originals[i])
                     {
                         allowed[v] = 1;
@@ -437,8 +440,8 @@ namespace experiment::importer
                 return true;
             }
             const bool skinned = MeshLodHasSkinning(mesh);
-            const auto skinVertices = skinned ? SkinErrorVertices(mesh) : std::vector<SkinErrorVertex>{};
-            std::vector<MeshLodPosition> positions(mesh.vertices.size());
+            const auto skinVertices = skinned ? SkinErrorVertices(mesh) : ce::dynamic_array<SkinErrorVertex>{};
+            ce::dynamic_array<MeshLodPosition> positions(mesh.vertices.size());
             for (size_t v = 0; v < positions.size(); ++v)
             {
                 std::memcpy(positions[v].data(),
@@ -446,15 +449,15 @@ namespace experiment::importer
                                 OffsetOf(mesh.vertices.AttributeMask(), VertexAttribute::Position),
                             12);
             }
-            std::vector<uint32_t> positionRemap(positions.size());
+            ce::dynamic_array<uint32_t> positionRemap(positions.size());
             meshopt_generatePositionRemap(positionRemap.data(), positions.front().data(), positions.size(),
                                           sizeof(MeshLodPosition));
             if (skinned)
             {
                 std::iota(positionRemap.begin(), positionRemap.end(), 0u);
             }
-            std::vector<std::vector<uint32_t>> originals;
-            std::vector<uint32_t> leaves;
+            ce::dynamic_array<ce::dynamic_array<uint32_t>> originals;
+            ce::dynamic_array<uint32_t> leaves;
             const uint32_t leafWidth = uint32_t((mesh.meshlets.descriptors.size() + (1u << settings.levelCount) - 1) /
                                                 (1u << settings.levelCount));
             for (uint32_t first = 0; first < mesh.meshlets.descriptors.size(); first += leafWidth)
@@ -472,7 +475,7 @@ namespace experiment::importer
                 result.groups.push_back(g);
                 originals.push_back(std::move(indices));
             }
-            std::function<uint32_t(std::vector<uint32_t>)> build = [&](std::vector<uint32_t> nodes) -> uint32_t
+            ce::owned_func<uint32_t(ce::dynamic_array<uint32_t>)> build = [&](ce::dynamic_array<uint32_t> nodes) -> uint32_t
             {
                 if (nodes.size() == 1)
                 {
@@ -498,13 +501,13 @@ namespace experiment::importer
                 std::stable_sort(nodes.begin(), nodes.end(), [&](auto a, auto b)
                                  { return result.groups[a].sphere[axis] < result.groups[b].sphere[axis]; });
                 const auto middle = nodes.begin() + nodes.size() / 2;
-                const auto left = build(std::vector<uint32_t>(nodes.begin(), middle));
-                const auto right = build(std::vector<uint32_t>(middle, nodes.end()));
+                const auto left = build(ce::dynamic_array<uint32_t>(nodes.begin(), middle));
+                const auto right = build(ce::dynamic_array<uint32_t>(middle, nodes.end()));
                 MeshClusterGroup g;
                 g.childGroup = left;
                 g.secondChild = right;
                 g.lodIndex = std::max(result.groups[left].lodIndex, result.groups[right].lodIndex) + 1;
-                std::vector<uint32_t> indices = originals[left];
+                ce::dynamic_array<uint32_t> indices = originals[left];
                 indices.insert(indices.end(), originals[right].begin(), originals[right].end());
                 PatchSphere(positions, indices, g.sphere);
                 Mesh patch;
@@ -519,7 +522,7 @@ namespace experiment::importer
                 // Lock every wedge at an original geometric boundary position. Border
                 // classification alone can remap coincident UV/normal seam indices.
                 const auto boundary = PatchBoundary(indices, positionRemap);
-                std::vector<unsigned char> locked(positions.size(), 0);
+                ce::dynamic_array<unsigned char> locked(positions.size(), 0);
                 for (const auto& edge : boundary)
                 {
                     locked[edge.first.first] = meshopt_SimplifyVertex_Lock;
@@ -616,7 +619,7 @@ namespace experiment::importer
 
     MeshletGeometryDigest ComputeMeshLodGeometryDigest(const Mesh& mesh, const MeshLodChain& lods) noexcept
     {
-        ce::hash::sha256 hash;
+        ce::crypto::sha256 hash;
         constexpr char domain[] = "CreatorEngine.SpatialClusterDag.v3";
         hash.update(domain, sizeof(domain) - 1u);
         MeshLodHashU32(hash, mesh.vertices.AttributeMask());

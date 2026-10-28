@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #include "EnhancedSSSPass.h"
 #include "../../../RHI/RHIEncoder.h"
 #include "../../../RHI/RHIShaderCompiler.h"
@@ -180,7 +181,7 @@ void EnhancedSSSPass::Declare(EnhancedRenderGraph &graph, const EnhancedFrameCon
     // 뜻하는 바를 그대로 적었다.
     const auto declareAxis = [&](RGHandle source, RGHandle target, bool isFinal, float dirX, float dirY,
                                  const char *name) {
-        const std::vector<EnhancedRenderGraph::RGPassUsage> usages = {
+        const ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> usages = {
             {source, RHIResourceState::ShaderResource, readAccess},
             {depth, RHIResourceState::ShaderResource, readAccess},
             {target, RHIResourceState::RenderTarget, writeAccess},

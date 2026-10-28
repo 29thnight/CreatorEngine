@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
 #else
@@ -150,7 +151,7 @@ namespace experiment::cooked
             failure = "audio artifact size differs from manifest";
             return false;
         }
-        std::array<std::byte, kAudioClipHeaderBytes> headerBytes{};
+        ce::fixed_array<std::byte, kAudioClipHeaderBytes> headerBytes{};
         if (!source.ReadAt(entry.artifactPath, 0u, headerBytes, failure))
         {
             return false;
@@ -162,10 +163,10 @@ namespace experiment::cooked
             return false;
         }
 
-        ce::hash::sha256 artifactHash;
-        ce::hash::sha256 payloadHash;
+        ce::crypto::sha256 artifactHash;
+        ce::crypto::sha256 payloadHash;
         artifactHash.update(headerBytes.data(), headerBytes.size());
-        std::array<std::byte, 64u * 1024u> block{};
+        ce::fixed_array<std::byte, 64u * 1024u> block{};
         std::uint64_t position = 0u;
         while (position < metadata.payloadBytes)
         {

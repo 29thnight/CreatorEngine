@@ -1,3 +1,6 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../../Engine/Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -163,7 +166,7 @@ namespace ConsoleCmd
     //   아니라 값으로 물을 수 있어야 한다 — 서비스만 켠 실행에는 콘솔이 없다.
     static CommandCore::CommandResult Cmd_script_add(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
 
         if (parts.size() < 3)
@@ -275,7 +278,7 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_script_set(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
 
         if (parts.size() < 4)
@@ -394,7 +397,7 @@ namespace ConsoleCmd
     //   덧붙는 줄이지 고쳐 쓰는 줄이 아니라 기존 정규식은 그대로 맞는다.
     static CommandCore::CommandResult Cmd_ui_rect(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
 
         // 오브젝트 이하 전체의 worldRect를 재귀로 찍는다. 이름 대신 *를 주면 씬의
         // 모든 RectTransform을 훑는다 — 해상도를 바꿔 가며, 또는 코드를 고치기
@@ -417,7 +420,7 @@ namespace ConsoleCmd
         // 재귀 깊이 상한 — 계층이 순환하더라도 CLI가 스택을 태우지 않게 한다.
         constexpr int kMaxDepth = 32;
 
-        std::function<void(Entity*, int)> dump = [&](Entity* obj, int depth)
+        ce::owned_func<void(Entity*, int)> dump = [&](Entity* obj, int depth)
         {
             if (nullptr == obj || depth > kMaxDepth) return;
 
@@ -461,7 +464,7 @@ namespace ConsoleCmd
             // 최상위는 "아무의 자식도 아닌 오브젝트"로 가린다. m_parentIndex만 보고
             // 판별했더니 프리팹 루트 밑의 캔버스가 최상위로도 잡혀 같은 서브트리가
             // 두 번 찍혔다 — 대조에서 개수가 정확히 두 배가 되어 드러났다.
-            std::unordered_set<Entity::Index> childIndices;
+            ce::engine_node_set<Entity::Index> childIndices;
             for (const auto& obj : scene->m_Entities)
             {
                 if (!obj || obj->IsDestroyMark()) continue;
@@ -516,7 +519,7 @@ namespace ConsoleCmd
         auto* target = SceneManagers->GetActiveScene()->Resolve(handle);
         auto* rect = target->GetComponent<RectTransformComponent>();
         if (!rect) return PreconditionFailed("ui.anchor.no_rect", "Object has no RectTransform");
-        std::vector<EditorObjectOperations::PropertyEdit> edits;
+        ce::dynamic_array<EditorObjectOperations::PropertyEdit> edits;
         edits.push_back(EditorObjectOperations::CapturePropertyEdit(*rect,
             {"m_anchorMin", "m_anchorMax", "m_anchoredPosition", "m_sizeDelta"}));
         if (cmd == "ui.anchor") { rect->SetAnchorMin({values[0], values[1]}); rect->SetAnchorMax({values[2], values[3]}); }
@@ -843,7 +846,7 @@ namespace ConsoleCmd
         size_t cameraGlyphRects = 0;
         size_t worldGlyphRects = 0;
         size_t unknownModeGlyphRects = 0;
-        std::vector<EnhancedUIPass::Rect> glyphRects;
+        ce::dynamic_array<EnhancedUIPass::Rect> glyphRects;
         for (const auto& state : snapshot)
         {
             if (!state.enabled)
@@ -1060,7 +1063,7 @@ namespace ConsoleCmd
 
         const std::string& typeName   = ctx.parts[1];
         const std::string& methodName = ctx.parts[2];
-        const std::vector<std::string> args(ctx.parts.begin() + 3, ctx.parts.end());
+        const ce::dynamic_array<std::string> args(ctx.parts.begin() + 3, ctx.parts.end());
 
         const ClrHost::InvokeResult invoked =
             ClrHost::Get().InvokeCallableStatic(typeName, methodName, args);

@@ -1,3 +1,5 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -74,16 +76,16 @@ namespace editor
             std::uint64_t generation{ 0 };
             std::uint32_t width{ 0 };
             std::uint32_t height{ 0 };
-            std::vector<std::byte> rgba;  ///< 비어 있으면 실패
+            ce::dynamic_array<std::byte> rgba;  ///< 비어 있으면 실패
         };
 
         struct thumbnail_cache_state
         {
-            std::unordered_map<thumbnail_key, thumbnail_entry, thumbnail_key_hasher> entries;
+            ce::engine_node_map<thumbnail_key, thumbnail_entry, thumbnail_key_hasher> entries;
 
             // 작업 스레드 ↔ Presentation 스레드
             std::mutex completionMutex;
-            std::vector<thumbnail_completion> completions;
+            ce::dynamic_array<thumbnail_completion> completions;
 
             // Presentation 스레드 ↔ 게임 스레드(CLI)
             std::mutex statsMutex;
@@ -138,7 +140,7 @@ namespace editor
         ///   심하게 남는다. 썸네일은 대부분 큰 축소율이라 그 차이가 그대로 보인다.
         void thumbnail_downscale_rgba(const std::byte* source, std::uint32_t sourceWidth,
                             std::uint32_t sourceHeight, std::size_t sourceRowPitch,
-                            std::uint32_t target, std::vector<std::byte>& outPixels,
+                            std::uint32_t target, ce::dynamic_array<std::byte>& outPixels,
                             std::uint32_t& outWidth, std::uint32_t& outHeight)
         {
             const std::uint32_t longest = std::max(sourceWidth, sourceHeight);
@@ -225,7 +227,7 @@ namespace editor
             {
                 return result;
             }
-            std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+            ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(size));
             stream.read(reinterpret_cast<char*>(bytes.data()),
                         static_cast<std::streamsize>(bytes.size()));
             if (!stream)
@@ -318,7 +320,7 @@ namespace editor
         }
 
         // ── ① 완료를 반영한다 ─────────────────────────────────────────────
-        std::vector<thumbnail_completion> arrived;
+        ce::dynamic_array<thumbnail_completion> arrived;
         {
             std::lock_guard<std::mutex> guard(self.completionMutex);
             arrived.swap(self.completions);
@@ -430,7 +432,7 @@ namespace editor
             // ★ 나이를 키와 **함께** 담는다. 비교자 안에서 표를 다시 찾으면
             //   (`entries[key]`) 정렬 도중에 표를 건드리는 꼴이 되고, 그것은
             //   없는 키 하나에 항목을 만들어 순회를 무너뜨릴 수 있는 모양이다.
-            std::vector<std::pair<std::uint64_t, thumbnail_key>> order;
+            ce::dynamic_array<ce::pair<std::uint64_t, thumbnail_key>> order;
             order.reserve(self.entries.size());
             for (const auto& [key, item] : self.entries)
             {

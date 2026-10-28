@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #if defined(CE_CONTRACT_STANDALONE)
@@ -142,7 +143,7 @@ namespace material_graph
       private:
         job_scheduler& scheduler_;
         bool parallel_{};
-        std::array<job_handle, 16> work_;
+        ce::fixed_array<job_handle, 16> work_;
         std::size_t count_{};
     };
 } // namespace material_graph

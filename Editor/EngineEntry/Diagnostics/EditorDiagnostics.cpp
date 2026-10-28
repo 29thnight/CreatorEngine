@@ -1,3 +1,6 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "EditorDiagnostics.h"
 #include "../Scene/EditorObjectOperations.h"
 #include "Scene.h"
@@ -40,7 +43,7 @@ namespace EditorDiagnostics
         size_t unreachable = 0;       // 씬 루트에서 children만 따라 내려가 닿지 못함
 
         // 어느 부모의 children에 실려 있는지 역인덱스를 만든다.
-        std::unordered_map<Entity::Index, Entity::Index> listedUnder;
+        ce::engine_node_map<Entity::Index, Entity::Index> listedUnder;
         for (const auto& obj : objects)
         {
             if (!obj) continue;
@@ -51,10 +54,10 @@ namespace EditorDiagnostics
         }
 
         // 씬 루트에서 children만 따라 내려가 닿는 집합.
-        std::unordered_set<Entity::Index> reached;
+        ce::engine_node_set<Entity::Index> reached;
         if (!objects.empty() && objects[0])
         {
-            std::vector<Entity::Index> stack{ objects[0]->m_index };
+            ce::dynamic_array<Entity::Index> stack{ objects[0]->m_index };
             reached.insert(objects[0]->m_index);
             while (!stack.empty())
             {

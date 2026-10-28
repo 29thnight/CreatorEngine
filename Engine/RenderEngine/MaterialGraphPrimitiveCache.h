@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -20,21 +22,21 @@ namespace material_graph
             own::weak_owner<const Generation> m_generation;
             RHIPipelineHandle m_pipeline;
         };
-        std::array<LX::Runtime::ComputePipeline, 2> m_compute;
-        std::map<std::uint32_t, ReconstructionPipeline> m_reconstructionPipelines;
+        ce::fixed_array<LX::Runtime::ComputePipeline, 2> m_compute;
+        ce::engine_ordered_map<std::uint32_t, ReconstructionPipeline> m_reconstructionPipelines;
         std::mutex m_declarationMutex;
-        std::vector<EnhancedRenderGraph::RGPassUsage> m_declarationUses;
-        std::vector<std::size_t> m_normalizationScratch;
+        ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> m_declarationUses;
+        ce::dynamic_array<std::size_t> m_normalizationScratch;
 
         bool Prepare(const EnhancedFrameContext& context, std::string& error)
         {
-            std::erase_if(m_reconstructionPipelines,
+            ce::erase_if(m_reconstructionPipelines,
                           [](const auto& item) { return item.second.m_generation.expired(); });
             if (m_compute[0].IsValid() && m_compute[1].IsValid())
             {
                 return true;
             }
-            const std::array parameters{RHILayout::Cbv(0),
+            const ce::fixed_array parameters{RHILayout::Cbv(0),
                                         RHILayout::SrvTable(1, 0),
                                         RHILayout::SrvBufferTable(3, 1),
                                         RHILayout::SrvBufferArray(SceneGpuData::kGeometryPageSize, 256),
@@ -46,7 +48,7 @@ namespace material_graph
             {
                 return false;
             }
-            const std::array entries{"ClearPrimitiveCache", "PopulatePrimitiveCache"};
+            const ce::fixed_array entries{"ClearPrimitiveCache", "PopulatePrimitiveCache"};
             const auto source = RHIShaderSource::Resolve("MaterialGraphPrimitiveCache.slang").string();
             for (std::size_t stage = 0; stage < m_compute.size(); ++stage)
             {
@@ -206,7 +208,7 @@ namespace material_graph
                 error = "METEOR primitive cache constants upload failed.";
                 return false;
             }
-            const std::array descriptions{RHIBufferDesc{.bytes = ScenePrimitiveCacheContract::kKeyBytes,
+            const ce::fixed_array descriptions{RHIBufferDesc{.bytes = ScenePrimitiveCacheContract::kKeyBytes,
                                                         .allowUnorderedAccess = true,
                                                         .debugName = L"METEOR.Scene.PrimitiveCache.Keys"},
                                           RHIBufferDesc{.bytes = ScenePrimitiveCacheContract::kDataBytes,
@@ -216,13 +218,13 @@ namespace material_graph
             {
                 return false;
             }
-            const std::array inputDescriptions{
+            const ce::fixed_array inputDescriptions{
                 RHIBindingDesc::SrvBuffer(m_sceneData->recordBuffer->Buffer(), constants.recordCount,
                                           sizeof(SceneGpuData::Record)),
                 RHIBindingDesc::SrvBuffer(m_material->work, m_material->PacketCapacity(), 8),
                 RHIBindingDesc::SrvBuffer(m_material->ranges, static_cast<std::uint32_t>(m_material->buckets.size()),
                                           16)};
-            const std::array outputDescriptions{
+            const ce::fixed_array outputDescriptions{
                 RHIBindingDesc::UavBuffer(Keys(), ScenePrimitiveCacheContract::kCapacity, sizeof(std::uint32_t)),
                 RHIBindingDesc::UavBuffer(Data(), ScenePrimitiveCacheContract::kCapacity,
                                           ScenePrimitiveCacheContract::kTriangleBytes)};
@@ -378,8 +380,8 @@ namespace material_graph
         own::shared_owner<ScenePrimitiveCacheResources> m_resources;
         own::shared_owner<const SceneGpuData> m_sceneData;
         own::shared_owner<const SceneMaterialWork> m_material;
-        std::array<own::shared_owner<const LX::Runtime::ComputeGeneration>, 2> m_compute;
-        std::array<RHIBufferHandle, 2> m_buffers{};
+        ce::fixed_array<own::shared_owner<const LX::Runtime::ComputeGeneration>, 2> m_compute;
+        ce::fixed_array<RHIBufferHandle, 2> m_buffers{};
         RHIBufferSlice m_constants;
         RHIBindingTable m_inputs, m_outputs;
         std::uint64_t m_recording{}, m_descriptors{};

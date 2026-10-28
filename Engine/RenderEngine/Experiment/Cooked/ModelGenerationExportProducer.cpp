@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -44,14 +45,14 @@ namespace experiment::cooked
         }
 
         [[nodiscard]] bool ReadFileBytes(const std::filesystem::path& path,
-            std::vector<std::byte>& out)
+            ce::dynamic_array<std::byte>& out)
         {
             std::ifstream stream(path, std::ios::binary);
             if (!stream)
             {
                 return false;
             }
-            std::vector<char> buffer((std::istreambuf_iterator<char>(stream)),
+            ce::dynamic_array<char> buffer((std::istreambuf_iterator<char>(stream)),
                 std::istreambuf_iterator<char>());
             out.resize(buffer.size());
             std::transform(buffer.begin(), buffer.end(), out.begin(),
@@ -84,7 +85,7 @@ namespace experiment::cooked
             return result;
         }
         assets::ModelSidecarV2 sidecar;
-        std::vector<assets::SidecarIssue> sidecarIssues;
+        ce::dynamic_array<assets::SidecarIssue> sidecarIssues;
         if (!assets::ReadModelSidecarV2(sidecarText, sidecar, sidecarIssues))
         {
             for (const assets::SidecarIssue& issue : sidecarIssues)
@@ -153,7 +154,7 @@ namespace experiment::cooked
         const std::string prefix = "Derived/Models/" + idText.substr(0, 2) + "/" + idText
             + "/" + std::to_string(sidecar.generation) + "/";
 
-        std::vector<std::filesystem::path> files;
+        ce::dynamic_array<std::filesystem::path> files;
         for (std::filesystem::recursive_directory_iterator it(generationPath, error), end;
             !error && it != end; it.increment(error))
         {
@@ -211,7 +212,7 @@ namespace experiment::cooked
             AddIssue(result, "generation", "generation record 또는 sidecar가 없다.");
             return result;
         }
-        auto encode = [&result](std::string_view text, std::vector<std::byte>& out,
+        auto encode = [&result](std::string_view text, ce::dynamic_array<std::byte>& out,
             const char* context)
         {
             std::string error;
@@ -247,7 +248,7 @@ namespace experiment::cooked
             return result;
         }
         const auto recordRoot = recordDocument->Root();
-        recordRoot.Child("sidecarFingerprint").SetScalar("sha256:" + ce::hash::to_hex(sidecarDigest));
+        recordRoot.Child("sidecarFingerprint").SetScalar("sha256:" + ce::crypto::to_hex(sidecarDigest));
         const auto subAssets = recordRoot.Child("subAssets");
         std::size_t cookedTextures{};
         for (std::size_t index = 0; index < subAssets.Size(); ++index)
@@ -271,7 +272,7 @@ namespace experiment::cooked
             Sha256Digest sourceDigest{};
             if (texture == loaded.generation->Textures().end() || textureFile == product.files.end() ||
                 !ComputeSha256(textureFile->bytes, sourceDigest, recordFailure) ||
-                originalFingerprint != "sha256:" + ce::hash::to_hex(sourceDigest))
+                originalFingerprint != "sha256:" + ce::crypto::to_hex(sourceDigest))
             {
                 AddIssue(result, "generation.textures", "Generation texture snapshot/identity mismatch: " + textureId);
                 return result;
@@ -280,7 +281,7 @@ namespace experiment::cooked
             settings.mipPolicy = TextureMipPolicy::GenerateFull;
             settings.colorSpace = texture->colorSpace == assets::ModelTextureColorSpace::Srgb
                 ? TextureColorSpace::Srgb : TextureColorSpace::Linear;
-            std::vector<std::byte> cookedBytes;
+            ce::dynamic_array<std::byte> cookedBytes;
             if (!ParseTextureImportSettings(sidecarText, settings, recordFailure) ||
                 !CookTexture(textureFile->bytes, settings, cookedBytes, recordFailure))
             {
@@ -297,7 +298,7 @@ namespace experiment::cooked
             textureFile->artifactPath = prefix + cookedPath;
             textureFile->bytes = std::move(cookedBytes);
             entry.Child("artifactPath").SetScalar(cookedPath);
-            entry.Child("artifactFingerprint").SetScalar("sha256:" + ce::hash::to_hex(cookedDigest));
+            entry.Child("artifactFingerprint").SetScalar("sha256:" + ce::crypto::to_hex(cookedDigest));
             ++cookedTextures;
         }
         if (cookedTextures != product.embeddedTextureCount ||
@@ -317,7 +318,7 @@ namespace experiment::cooked
                 product.embeddedTextureBytes += file.bytes.size();
             }
         }
-        const std::vector<std::byte>& recordBytes = record->bytes;
+        const ce::dynamic_array<std::byte>& recordBytes = record->bytes;
 
         Sha256Digest digest{};
         if (!ComputeSha256(recordBytes, digest, hashError))

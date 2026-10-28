@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "EditorClipContract.h"
 
 #include "ImGui.h"
@@ -23,9 +24,9 @@ namespace editor::clipping
             const char* widget{ nullptr };
             int depth{ 0 };
         };
-        std::vector<open_widget> g_openWidgets;
+        ce::dynamic_array<open_widget> g_openWidgets;
 
-        void remember(std::vector<std::string>& names, const char* name)
+        void remember(ce::dynamic_array<std::string>& names, const char* name)
         {
             if (nullptr == name) return;
             if (std::find(names.begin(), names.end(), name) != names.end()) return;

@@ -1,3 +1,6 @@
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../Containers/ContainerAPI.h"
 #include "DxCaptureFile.h"
 
 #include <stdint.h>
@@ -7,7 +10,7 @@
 namespace ce::dx_capture::file_detail
 {
     static_assert(std::endian::native == std::endian::little);
-    constexpr std::array<char, 8> magic{ 'C', 'E', 'D', 'X', 'R', 'A', 'W', '\0' };
+    constexpr ce::fixed_array<char, 8> magic{ 'C', 'E', 'D', 'X', 'R', 'A', 'W', '\0' };
     constexpr std::uint32_t record_tag = 0x43455244; // DREC
     constexpr std::uint32_t footer_tag = 0x444E4544; // DEND
     constexpr std::uint32_t envelope_version = 1;
@@ -186,9 +189,9 @@ namespace ce::dx_capture::file_detail
         }
     }
 
-    std::array<std::byte, header_bytes> make_header(const record& session)
+    ce::fixed_array<std::byte, header_bytes> make_header(const record& session)
     {
-        std::array<std::byte, header_bytes> result{};
+        ce::fixed_array<std::byte, header_bytes> result{};
         std::memcpy(result.data(), magic.data(), magic.size());
         put<std::uint32_t>(result, 8, capture_file_version);
         put<std::uint32_t>(result, 12, header_bytes);
@@ -203,7 +206,7 @@ namespace ce::dx_capture::file_detail
     }
 
     template<std::size_t N>
-    void finish_envelope(std::array<std::byte, N>& bytes, std::uint32_t tag, std::uint64_t sequence)
+    void finish_envelope(ce::fixed_array<std::byte, N>& bytes, std::uint32_t tag, std::uint64_t sequence)
     {
         put<std::uint32_t>(bytes, 0, tag);
         put<std::uint32_t>(bytes, 4, envelope_version);
@@ -214,9 +217,9 @@ namespace ce::dx_capture::file_detail
             update_crc(prefix_crc, std::span(bytes).subspan(envelope_bytes)) ^ UINT32_MAX);
     }
 
-    std::array<std::byte, record_bytes> make_record(const record& value, std::uint64_t sequence)
+    ce::fixed_array<std::byte, record_bytes> make_record(const record& value, std::uint64_t sequence)
     {
-        std::array<std::byte, record_bytes> result{};
+        ce::fixed_array<std::byte, record_bytes> result{};
         // protocol v1은 필드 위치/크기/예약 바이트가 고정된 little-endian POD다.
         // 파일 머리에 그 버전을 따로 기록하므로 새 ABI를 옛 레코드로 해석하지 않는다.
         std::memcpy(result.data() + envelope_bytes, &value, sizeof(value));
@@ -224,10 +227,10 @@ namespace ce::dx_capture::file_detail
         return result;
     }
 
-    std::array<std::byte, footer_bytes> make_footer(const recording_summary& summary,
+    ce::fixed_array<std::byte, footer_bytes> make_footer(const recording_summary& summary,
         std::uint32_t rolling_crc, bool source_stopped_cleanly)
     {
-        std::array<std::byte, footer_bytes> result{};
+        ce::fixed_array<std::byte, footer_bytes> result{};
         const std::uint32_t issues = (summary.issues & persisted_issues) |
             (source_stopped_cleanly ? 0u : caller_incomplete);
         put<std::uint64_t>(result, 32, summary.record_count);
@@ -284,9 +287,9 @@ namespace ce::dx_capture
             auto& summary = snapshot.summary_;
             executions.reserve(summary.execution_count);
             snapshot.works_.reserve(summary.work_count);
-            std::vector<std::pair<execution_key, std::uint32_t>> identities;
+            ce::dynamic_array<ce::pair<execution_key, std::uint32_t>> identities;
             identities.reserve(summary.execution_count);
-            std::vector<std::uint32_t> submissions;
+            ce::dynamic_array<std::uint32_t> submissions;
             submissions.reserve(summary.submission_count);
             for (std::uint32_t i = 0; i != records.size(); ++i)
             {
@@ -327,7 +330,7 @@ namespace ce::dx_capture
             {
                 const auto key = key_of(value);
                 const auto found = std::lower_bound(identities.begin(), identities.end(),
-                    std::pair{ key, std::uint32_t{ 0 } });
+                    ce::pair{ key, std::uint32_t{ 0 } });
                 if (found == identities.end() || found->first != key ||
                     executions[found->second].duplicate_execution)
                 {
@@ -372,12 +375,12 @@ namespace ce::dx_capture
             // CPU 제출 시각을 유일하게 감싼 실제 호출 구간만 귀속 근거로 삼는다.
             std::sort(submissions.begin(), submissions.end(), [&](auto a, auto b)
             {
-                return std::tie(records[a].process_id, records[a].thread_id,
+                return ce::tie(records[a].process_id, records[a].thread_id,
                     records[a].qpc_begin, records[a].qpc_end) <
-                    std::tie(records[b].process_id, records[b].thread_id,
+                    ce::tie(records[b].process_id, records[b].thread_id,
                         records[b].qpc_begin, records[b].qpc_end);
             });
-            std::vector<std::uint32_t> queries;
+            ce::dynamic_array<std::uint32_t> queries;
             queries.reserve(executions.size());
             for (std::uint32_t i = 0; i != executions.size(); ++i)
             {
@@ -394,25 +397,25 @@ namespace ce::dx_capture
             {
                 const auto& left = records[executions[a].begin_record];
                 const auto& right = records[executions[b].begin_record];
-                return std::tie(left.process_id, left.thread_id, left.cpu_submit_qpc) <
-                    std::tie(right.process_id, right.thread_id, right.cpu_submit_qpc);
+                return ce::tie(left.process_id, left.thread_id, left.cpu_submit_qpc) <
+                    ce::tie(right.process_id, right.thread_id, right.cpu_submit_qpc);
             });
-            std::multiset<std::pair<std::uint64_t, std::uint32_t>> active;
+            ce::engine_ordered_multiset<ce::pair<std::uint64_t, std::uint32_t>> active;
             std::size_t next_submission = 0;
-            std::pair<std::uint32_t, std::uint32_t> active_thread{};
+            ce::pair<std::uint32_t, std::uint32_t> active_thread{};
             bool have_thread = false;
             for (const auto index : queries)
             {
                 auto& link = executions[index];
                 const auto& value = records[link.begin_record];
-                const auto source_thread = std::pair{ value.process_id, value.thread_id };
+                const auto source_thread = ce::pair{ value.process_id, value.thread_id };
                 if (!have_thread || active_thread != source_thread)
                 {
                     active.clear();
                     active_thread = source_thread;
                     have_thread = true;
                     while (next_submission != submissions.size() &&
-                        std::pair{ records[submissions[next_submission]].process_id,
+                        ce::pair{ records[submissions[next_submission]].process_id,
                             records[submissions[next_submission]].thread_id } < active_thread)
                     {
                         ++next_submission;
@@ -422,7 +425,7 @@ namespace ce::dx_capture
                 {
                     const auto record_index = submissions[next_submission];
                     const auto& submission = records[record_index];
-                    if (std::pair{ submission.process_id, submission.thread_id } != active_thread ||
+                    if (ce::pair{ submission.process_id, submission.thread_id } != active_thread ||
                         submission.qpc_begin > value.cpu_submit_qpc)
                     {
                         break;
@@ -513,7 +516,7 @@ namespace ce::dx_capture
                     summary.issues |= unfinished_execution;
                     const auto key = key_of(records[i]);
                     const auto found = std::lower_bound(identities.begin(), identities.end(),
-                        std::pair{ key, std::uint32_t{ 0 } });
+                        ce::pair{ key, std::uint32_t{ 0 } });
                     if (found != identities.end() && found->first == key)
                     {
                         link.association = association_state::ambiguous;
@@ -736,7 +739,7 @@ namespace ce::dx_capture
         }
         try
         {
-            std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+            ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(size));
             stream.seekg(0);
             if (!bytes.empty() && !stream.read(reinterpret_cast<char*>(bytes.data()),
                 static_cast<std::streamsize>(bytes.size())))
@@ -756,7 +759,7 @@ namespace ce::dx_capture
         }
     }
 
-    std::expected<std::vector<std::byte>, file_error>
+    std::expected<ce::dynamic_array<std::byte>, file_error>
     encode_recording(std::span<const record> records, bool source_stopped_cleanly, recording_limits limits)
     {
         using namespace file_detail;
@@ -771,7 +774,7 @@ namespace ce::dx_capture
         }
         try
         {
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
             bytes.reserve(header_bytes + records.size() * record_bytes + footer_bytes);
             const auto header = make_header(records.front());
             bytes.insert(bytes.end(), header.begin(), header.end());
@@ -816,7 +819,7 @@ namespace ce::dx_capture
             std::uint64_t source_begin_ns = 0;
             std::uint64_t source_end_ns = 0;
         };
-        std::map<file_detail::execution_key, execution_bounds> open_executions;
+        ce::engine_ordered_map<file_detail::execution_key, execution_bounds> open_executions;
 
         bool write(std::span<const std::byte> bytes)
         {

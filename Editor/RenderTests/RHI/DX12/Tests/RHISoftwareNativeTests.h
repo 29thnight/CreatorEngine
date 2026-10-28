@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
@@ -62,7 +63,7 @@ namespace
             {
                 DX12GpuProfiler mergeProfiler;
                 DX12GpuProfiler::FrameTimings input;
-                std::vector<DX12GpuProfiler::PassTiming> output;
+                ce::dynamic_array<DX12GpuProfiler::PassTiming> output;
                 input.ticksPerSecond = 1000;
                 input.slices.resize(128);
                 for (size_t index = 0; index < input.slices.size(); ++index)
@@ -104,7 +105,7 @@ namespace
                 EnhancedRenderGraph graph(resources, RGSchedulingMode::ExplicitVersioned);
                 for (uint32_t iteration = 0; iteration < 3; ++iteration)
                 {
-                    std::array<RGHandle, 2048> imported;
+                    ce::fixed_array<RGHandle, 2048> imported;
                     for (uint32_t index = 0; index < imported.size(); ++index)
                     {
                         const uint32_t id = RHIHandleBits::Encode(index % 128, index / 128 + iteration * 32);
@@ -123,7 +124,7 @@ namespace
                                 "Import index rehash lost an earlier entry.");
                     }
                     const auto output = graph.Write(imported.front());
-                    std::array<EnhancedRenderGraph::RGPassUsage, 1> uses{
+                    ce::fixed_array<EnhancedRenderGraph::RGPassUsage, 1> uses{
                         {{output, RHIResourceState::UnorderedAccess, RGAccessMode::Write}}};
                     graph.AddPass("UsageCopyProbe", std::span{uses}, nullptr, true);
                     uses.front().handle = {};
@@ -158,7 +159,7 @@ namespace
                 // Force multiple backing blocks after storing the first callback.
                 for (size_t index = 0; index < 10000; ++index)
                 {
-                    graph.RetainDeclaration<std::array<uint64_t, 16>>();
+                    graph.RetainDeclaration<ce::fixed_array<uint64_t, 16>>();
                 }
                 callback(EnhancedRenderGraph::ExecuteContext{});
                 require(calls == 1 && !weak.expired(), "Declaration arena lost a live callback capture.");
@@ -195,7 +196,7 @@ namespace
             RHIReadback readback;
             require(resources.CreateTexture(textureDesc, texture, error), error);
             require(resources.CreateReadback(8, 8, textureDesc.format, 1, readback, error), error);
-            const std::array<RHITextureHandle, 1> targets{texture};
+            const ce::fixed_array<RHITextureHandle, 1> targets{texture};
             const auto binding = resources.CreateRenderTargets(std::span<const RHITextureHandle>{targets}, nullptr);
             require(binding.IsValid(), "Software native probe render target creation failed.");
 
@@ -231,12 +232,12 @@ namespace
                         value = graph.Modify(value);
                         require(value.IsValid() && value.version == index + 1,
                                 "Packet version reservation changed the producer chain.");
-                        std::array<EnhancedRenderGraph::RGPassUsage, 1> usages{
+                        ce::fixed_array<EnhancedRenderGraph::RGPassUsage, 1> usages{
                             {{value, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite}}};
                         if (index % 3 == 0)
                         {
                             std::string phaseName = name + ".Phase";
-                            const std::array<EnhancedRenderGraph::RepeatedPhaseView, 1> phases{{{phaseName, usages}}};
+                            const ce::fixed_array<EnhancedRenderGraph::RepeatedPhaseView, 1> phases{{{phaseName, usages}}};
                             graph.AddRepeatedPassView(
                                 name, usages, phases, 2,
                                 [](const EnhancedRenderGraph::ExecuteContext&, uint32_t, uint32_t) {}, true);
@@ -267,7 +268,7 @@ namespace
                     }
                     graph.AddPass("AfterPacketCollection",
                                   {{value, RHIResourceState::ShaderResource, RGAccessMode::Read}}, nullptr, true);
-                    std::vector<EnhancedRenderGraph::RGPassUsage> movedUsages{
+                    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> movedUsages{
                         {value, RHIResourceState::ShaderResource, RGAccessMode::Read}};
                     const auto movedPass = graph.AddPass("MovedUsagePayload", std::move(movedUsages), nullptr, true);
                     require(movedUsages.empty(), "Rvalue usage input was not consumed.");
@@ -328,9 +329,9 @@ namespace
                 {
                     packets.NextDeclarationPacket();
                     value = packets.Modify(value);
-                    const std::array<EnhancedRenderGraph::RGPassUsage, 1> usages{
+                    const ce::fixed_array<EnhancedRenderGraph::RGPassUsage, 1> usages{
                         {{value, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite}}};
-                    const std::array<EnhancedRenderGraph::RepeatedPhaseView, 1> phases{{{largePhaseName, usages}}};
+                    const ce::fixed_array<EnhancedRenderGraph::RepeatedPhaseView, 1> phases{{{largePhaseName, usages}}};
                     packets.AddRepeatedPassView("LargePacket", usages, phases, 2,
                         [](const EnhancedRenderGraph::ExecuteContext&, uint32_t, uint32_t) {}, true);
                 }
@@ -366,7 +367,7 @@ namespace
             own::weak_owner<ArenaFrame> pendingFrame = arenaFrame;
             auto* pendingArena = arenaFrame->storage.operator->();
             batchDesc.lifetimeToken = arenaFrame;
-            const std::array<uint32_t, 1> order{0};
+            const ce::fixed_array<uint32_t, 1> order{0};
             DX12CommandTranslator translator(pool, resources, primary->GetIdentity());
             RHITranslatedBatch translated;
             RHICommandFailure failure;
@@ -386,7 +387,7 @@ namespace
             float color[4]{0.25f, 0.5f, 0.75f, 1.0f};
             encoder.ClearRenderTargets(binding, color);
             color[0] = color[1] = color[2] = color[3] = 0;
-            const std::array<RHITransition, 1> transition{
+            const ce::fixed_array<RHITransition, 1> transition{
                 RHITransition{texture, RHIResourceState::RenderTarget, RHIResourceState::CopySource}};
             RHIBarrierBatch barriers;
             barriers.textureTransitions = transition;
@@ -448,7 +449,7 @@ namespace
             require(submitted && !translated.IsValid(), error);
             RHIReadbackImage image;
             require(resources.MapReadback(readback, image, error), error);
-            const std::array<float, 4> expected{0.25f, 0.5f, 0.75f, 1.0f};
+            const ce::fixed_array<float, 4> expected{0.25f, 0.5f, 0.75f, 1.0f};
             for (uint32_t y = 0; y < 8; ++y)
             {
                 for (uint32_t x = 0; x < 8; ++x)
@@ -499,7 +500,7 @@ namespace
             require(resources.BeginFrame(error), error);
             pool.BeginFrame(0);
             require(pool.Prepare(error), error);
-            const std::array<RHITextureHandle, 1> sourceTargets{other};
+            const ce::fixed_array<RHITextureHandle, 1> sourceTargets{other};
             const auto parallelBinding =
                 resources.CreateRenderTargets(std::span<const RHITextureHandle>{sourceTargets}, nullptr);
             require(parallelBinding.IsValid(), "Parallel translation target creation failed.");
@@ -512,24 +513,24 @@ namespace
             require(recorder.BeginRecording(recordingDesc, error), error);
             auto& first = recorder.AcquireEncoder(1);
             first.BindRenderTargets(parallelBinding);
-            const std::array<float, 4> parallelExpected{1, 0, 0, 1};
+            const ce::fixed_array<float, 4> parallelExpected{1, 0, 0, 1};
             first.ClearRenderTargets(parallelBinding, parallelExpected.data());
-            const std::array<RHITransition, 1> sourceTransition{
+            const ce::fixed_array<RHITransition, 1> sourceTransition{
                 RHITransition{other, RHIResourceState::RenderTarget, RHIResourceState::CopySource}};
             barriers.textureTransitions = sourceTransition;
             first.ResourceBarriers(barriers);
             auto& last = recorder.AcquireEncoder(0);
-            const std::array<RHITransition, 1> toCopyDest{
+            const ce::fixed_array<RHITransition, 1> toCopyDest{
                 RHITransition{texture, RHIResourceState::CopySource, RHIResourceState::CopyDest}};
             barriers.textureTransitions = toCopyDest;
             last.ResourceBarriers(barriers);
             last.CopyResource(texture, other);
-            const std::array<RHITransition, 1> toCopySource{
+            const ce::fixed_array<RHITransition, 1> toCopySource{
                 RHITransition{texture, RHIResourceState::CopyDest, RHIResourceState::CopySource}};
             barriers.textureTransitions = toCopySource;
             last.ResourceBarriers(barriers);
             last.CopyToReadback(readback, texture, 0, 0);
-            const std::array<uint32_t, 2> reversedOrder{1, 0};
+            const ce::fixed_array<uint32_t, 2> reversedOrder{1, 0};
             require(recorder.FinishRecording(reversedOrder, batchDesc, software, error), error);
             require(pool.CreateTranslationPool(frozen, error), error);
             DX12CommandTranslator parallelTranslator(*frozen, resources, primary->GetIdentity());
@@ -592,7 +593,7 @@ namespace
                 RHISoftwareQueueFactory ownedFactory(resources, ownedRecorder);
                 own::shared_owner<IRHICommandQueue> ownedCompute;
                 require(ownedFactory.CreateQueue(RHIQueueKind::Compute, ownedCompute, error), error);
-                std::array<RHITextureHandle, 2> ownedTextures;
+                ce::fixed_array<RHITextureHandle, 2> ownedTextures;
                 for (uint32_t index = 0; index < ownedTextures.size(); ++index)
                 {
                     auto ownedTextureDesc = textureDesc;
@@ -605,7 +606,7 @@ namespace
                 for (uint32_t iteration = 0; iteration < 2; ++iteration)
                 {
                     const auto ownedTexture = ownedTextures[iteration];
-                    const std::array ownedTargets{ownedTexture};
+                    const ce::fixed_array ownedTargets{ownedTexture};
                     require(resources.BeginFrame(error) && resources.BeginQueueFrame(primary, error), error);
                     RHISoftwareBatchDesc ownedDesc;
                     ownedDesc.frameId = 3 + iteration;
@@ -621,16 +622,16 @@ namespace
                     require(ownedRecorder.BeginRecording(ownedGraphics, 2, ownedLifetime, ownedRecording, error),
                             error);
                     auto& clear = ownedRecording->AcquireEncoder(0);
-                    const std::array<RHITransition, 1> toRenderTarget{
+                    const ce::fixed_array<RHITransition, 1> toRenderTarget{
                         RHITransition{ownedTexture, RHIResourceState::CopySource, RHIResourceState::RenderTarget}};
                     barriers.textureTransitions = toRenderTarget;
                     clear.ResourceBarriers(barriers);
                     clear.BindRenderTargets(ownedBinding);
-                    const std::array<float, 4> ownedExpected{0, iteration == 0 ? 1.0f : 0.0f,
+                    const ce::fixed_array<float, 4> ownedExpected{0, iteration == 0 ? 1.0f : 0.0f,
                                                              iteration == 0 ? 0.0f : 1.0f, 1};
                     clear.ClearRenderTargets(ownedBinding, ownedExpected.data());
                     auto& copy = ownedRecording->AcquireEncoder(1);
-                    const std::array<RHITransition, 1> ownedToCopySource{
+                    const ce::fixed_array<RHITransition, 1> ownedToCopySource{
                         RHITransition{ownedTexture, RHIResourceState::RenderTarget, RHIResourceState::CopySource}};
                     barriers.textureTransitions = ownedToCopySource;
                     copy.ResourceBarriers(barriers);
@@ -702,7 +703,7 @@ namespace
                 const void* address = nullptr;
                 {
                     DX12PendingCommands pending(pendingPool);
-                    std::array<uint32_t, 3> input{7, 11, 19};
+                    ce::fixed_array<uint32_t, 3> input{7, 11, 19};
                     const auto copy = pending.Copy<uint32_t>(input);
                     address = copy.data();
                     auto owner = own::make_shared<int>(41);
@@ -732,7 +733,7 @@ namespace
                 }
                 require(weak.expired(), "Retired pending payload retained its owner.");
                 DX12PendingCommands reused(pendingPool);
-                const std::array<uint32_t, 3> input{1, 2, 3};
+                const ce::fixed_array<uint32_t, 3> input{1, 2, 3};
                 require(reused.Copy<uint32_t>(input).data() == address, "Pending arena storage was not reused.");
             }
             {
@@ -756,18 +757,18 @@ namespace
                         !GetRHISubmissionThread().GetOwnerStats(&resources).faulted,
                     "A refused resource allocation poisoned the RHI submission owner.");
             error.clear();
-            const std::array<RHITextureHandle, 1> deferredTargets{texture};
+            const ce::fixed_array<RHITextureHandle, 1> deferredTargets{texture};
             const auto deferredBinding = resources.CreateRenderTargets(deferredTargets, nullptr);
             require(deferredBinding.IsValid(), "Deferred target reservation failed.");
-            const std::array<float, 4> deferredColor{0.25f, 0.5f, 0.75f, 1.0f};
+            const ce::fixed_array<float, 4> deferredColor{0.25f, 0.5f, 0.75f, 1.0f};
             auto& deferredEncoder = resources.GetImmediateEncoder();
-            const std::array<RHITransition, 1> toTarget{
+            const ce::fixed_array<RHITransition, 1> toTarget{
                 RHITransition{texture, RHIResourceState::CopySource, RHIResourceState::RenderTarget}};
             RHIBarrierBatch beforeClear;
             beforeClear.textureTransitions = toTarget;
             deferredEncoder.ResourceBarriers(beforeClear);
             deferredEncoder.ClearRenderTargets(deferredBinding, deferredColor.data());
-            const std::array<RHITransition, 1> toCopy{
+            const ce::fixed_array<RHITransition, 1> toCopy{
                 RHITransition{texture, RHIResourceState::RenderTarget, RHIResourceState::CopySource}};
             RHIBarrierBatch afterClear;
             afterClear.textureTransitions = toCopy;

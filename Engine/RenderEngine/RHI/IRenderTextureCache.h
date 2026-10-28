@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -25,14 +26,14 @@ class Texture;
 namespace RHINeutralTexel
 {
     /// base color · normal · emissive(현행) · AO 미저작, 그리고 업로드 실패 대체.
-    inline constexpr std::array<std::uint8_t, 4> kWhite{ 255, 255, 255, 255 };
+    inline constexpr ce::fixed_array<std::uint8_t, 4> kWhite{ 255, 255, 255, 255 };
 
     /// legacy 세대의 emissive 미저작. 더하는 슬롯이라 중립이 0 이다.
-    inline constexpr std::array<std::uint8_t, 4> kBlack{ 0, 0, 0, 255 };
+    inline constexpr ce::fixed_array<std::uint8_t, 4> kBlack{ 0, 0, 0, 255 };
 
     /// R 오클루전 · G 거칠기 · B 금속 — 셋 다 저작 factor 가 곱해지는 슬롯이므로
     /// 중립은 1 이다. glTF 규격도 "MR 텍스처가 없으면 metallic = metallicFactor" 다.
-    inline constexpr std::array<std::uint8_t, 4> kOrmNeutral{ 255, 255, 255, 255 };
+    inline constexpr ce::fixed_array<std::uint8_t, 4> kOrmNeutral{ 255, 255, 255, 255 };
 }
 
 /// CPU 자산 텍스처를 현재 백엔드의 GPU 리소스로 올리는 캐시.

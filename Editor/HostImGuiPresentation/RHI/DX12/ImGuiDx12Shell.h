@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -79,7 +80,7 @@ public:
     /// 대기 업로드 처리 → 백버퍼에 드로우 데이터 렌더 → Present.
     /// EndRender의 DX11 RenderDrawData + DX11 Present 자리를 합쳐 맡는다.
     bool RenderAndPresent(std::string& outError,
-        const std::function<void()>& onRecorded);
+        const ce::owned_func<void()>& onRecorded);
 
     /// 창 크기 변경. CE 스레드(BeginRender의 크기 감지 자리)에서 부른다.
     void Resize(uint32_t width, uint32_t height);

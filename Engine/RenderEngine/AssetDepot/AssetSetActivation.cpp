@@ -1,3 +1,5 @@
+#include "../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -21,7 +23,7 @@ namespace
     constexpr std::size_t ActivationMaxBytes = 16384u;
     constexpr std::size_t ActivationManifestBudget = 128u * 1024u * 1024u;
 
-    std::vector<std::byte> ReadActivationArtifact(
+    ce::dynamic_array<std::byte> ReadActivationArtifact(
         own::shared_owner<const cooked::ArtifactByteSource> source,
         std::string_view path, std::size_t limit)
     {
@@ -32,7 +34,7 @@ namespace
         {
             throw std::runtime_error("AssetSet activation input is unavailable or oversized: " + failure);
         }
-        std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+        ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(size));
         if (!source->ReadAt(path, 0u, bytes, failure))
         {
             throw std::runtime_error("AssetSet activation read failed: " + failure);
@@ -68,8 +70,8 @@ namespace
 namespace AssetDepot
 {
     bool ReadConfiguredAssetSets(const std::filesystem::path& assetRoot,
-        std::vector<cooked::AssetSetMountInput>& outInputs, std::string& failure,
-        std::vector<std::string>* outHashes)
+        ce::dynamic_array<cooked::AssetSetMountInput>& outInputs, std::string& failure,
+        ce::dynamic_array<std::string>* outHashes)
     {
         failure.clear();
         try
@@ -108,8 +110,8 @@ namespace AssetDepot
             {
                 throw std::runtime_error("AssetSet activation differs from the installed host content ABI.");
             }
-            std::vector<cooked::AssetSetMountInput> inputs;
-            std::set<std::string> seen;
+            ce::dynamic_array<cooked::AssetSetMountInput> inputs;
+            ce::engine_ordered_set<std::string> seen;
             std::size_t remaining = ActivationManifestBudget;
             while (lines.peek() != std::char_traits<char>::eof())
             {
@@ -126,7 +128,7 @@ namespace AssetDepot
                 const auto manifestBytes = ReadActivationArtifact(input.byteSource,
                     "Derived/asset-set-manifest.cemf", remaining);
                 remaining -= manifestBytes.size();
-                std::vector<cooked::AssetManifestIssue> issues;
+                ce::dynamic_array<cooked::AssetManifestIssue> issues;
                 if (ActivationHash(manifestBytes) != hash
                     || !cooked::ReadAssetSetManifest(manifestBytes, input.manifest, issues))
                 {
@@ -163,8 +165,8 @@ namespace AssetDepot
 
     bool ValidateConfiguredAssetSets(const std::filesystem::path& assetRoot, std::string& failure)
     {
-        std::vector<cooked::AssetSetMountInput> inputs;
-        std::vector<std::string> hashes;
+        ce::dynamic_array<cooked::AssetSetMountInput> inputs;
+        ce::dynamic_array<std::string> hashes;
         if (!ReadConfiguredAssetSets(assetRoot, inputs, failure, &hashes))
         {
             return false;
@@ -195,7 +197,7 @@ namespace AssetDepot
         }
         const cooked::CookedAssetCatalog empty;
         cooked::CookedAssetCatalog candidate;
-        std::vector<cooked::AssetManifestIssue> issues;
+        ce::dynamic_array<cooked::AssetManifestIssue> issues;
         if (!empty.WithMountedAssetSets(inputs, inputs.size(), candidate, issues))
         {
             failure = "AssetSet activation closure was rejected";
@@ -214,8 +216,8 @@ bool DataSystem::MountConfiguredAssetSets(const std::filesystem::path& assetRoot
     failure.clear();
     try
     {
-        std::vector<cooked::AssetSetMountInput> inputs;
-        std::vector<std::string> hashes;
+        ce::dynamic_array<cooked::AssetSetMountInput> inputs;
+        ce::dynamic_array<std::string> hashes;
         if (!AssetDepot::ReadConfiguredAssetSets(assetRoot, inputs, failure, &hashes))
         {
             return false;
@@ -246,7 +248,7 @@ bool DataSystem::MountConfiguredAssetSets(const std::filesystem::path& assetRoot
         }
         cooked::CookedAssetCatalog empty;
         cooked::CookedAssetCatalog candidate;
-        std::vector<cooked::AssetManifestIssue> issues;
+        ce::dynamic_array<cooked::AssetManifestIssue> issues;
         if (!(snapshot ? *snapshot : empty).WithMountedAssetSets(
             inputs, revision + inputs.size(), candidate, issues))
         {

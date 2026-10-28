@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -38,7 +39,7 @@ class ModelMaterialGraphPublication
         std::filesystem::path staging, destination;
         bool published{};
     };
-    std::vector<File> files_;
+    ce::dynamic_array<File> files_;
     bool committed_{};
 };
 } // namespace assets

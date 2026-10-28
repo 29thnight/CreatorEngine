@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -71,7 +73,7 @@ namespace material_graph
             {
                 return Fail(error, "Invalid graph identity or oversized material instance.");
             }
-            std::set<LX::Id> ids;
+            ce::engine_ordered_set<LX::Id> ids;
             for (const auto& parameter : description.parameters)
             {
                 if (parameter.id == 0 || !ids.insert(parameter.id).second)
@@ -96,7 +98,7 @@ namespace material_graph
                         {
                             return finite(value);
                         }
-                        else if constexpr (std::is_same_v<T, std::array<double, 3>> || std::is_same_v<T, std::array<double, 4>>)
+                        else if constexpr (std::is_same_v<T, ce::fixed_array<double, 3>> || std::is_same_v<T, ce::fixed_array<double, 4>>)
                         {
                             return std::ranges::all_of(value, finite);
                         }
@@ -127,7 +129,7 @@ namespace material_graph
             {
                 return false;
             }
-            std::set<std::string_view> seen;
+            ce::engine_ordered_set<std::string_view> seen;
             for (const auto entry : node.Map())
             {
                 const auto key = entry.key.Scalar();
@@ -158,7 +160,7 @@ namespace material_graph
 
         void WriteDouble(Authoring::WriteNode node, double value)
         {
-            std::array<char, 64> buffer;
+            ce::fixed_array<char, 64> buffer;
             const auto converted = std::to_chars(buffer.data(), buffer.data() + buffer.size(), value,
                                                  std::chars_format::general, std::numeric_limits<double>::max_digits10);
             node.SetScalar(std::string_view(buffer.data(), converted.ptr));
@@ -173,7 +175,7 @@ namespace material_graph
             return Fail(error, "Material generation requires a canonical UUIDv4/UUIDv8 and a reserved identity.");
         }
         const auto& loaded = generation.cooked;
-        std::vector<std::uint8_t> payload;
+        ce::dynamic_array<std::uint8_t> payload;
         if (!WriteCookedProgram(loaded.product, {}, payload, error) ||
             (loaded.product.materialShader && loaded.product.materialShader->meta.guid.m_guid != generation.assetId.value) ||
             loaded.boundSource != BuildBoundSource(loaded.product.program) ||
@@ -294,7 +296,7 @@ namespace material_graph
                         ? SIZE_MAX : capacity * sizeof(std::filesystem::path::value_type));
             }
             template<class T>
-            void AddVector(const std::vector<T>& values) noexcept
+            void AddVector(const ce::dynamic_array<T>& values) noexcept
             {
                 Add(values.capacity() > SIZE_MAX / sizeof(T) ? SIZE_MAX : values.capacity() * sizeof(T));
             }
@@ -513,7 +515,7 @@ namespace material_graph
         return useSerial_;
     }
 
-    void GenerationStore::TrimRetainedLocked(std::vector<own::shared_owner<const Generation>>& released)
+    void GenerationStore::TrimRetainedLocked(ce::dynamic_array<own::shared_owner<const Generation>>& released)
     {
         while (retainedBytes_ > retainedBudgetBytes_)
         {
@@ -537,7 +539,7 @@ namespace material_graph
     }
 
     void GenerationStore::RetainLocked(Entry& entry, const own::shared_owner<const Generation>& owner,
-                                      std::vector<own::shared_owner<const Generation>>& released)
+                                      ce::dynamic_array<own::shared_owner<const Generation>>& released)
     {
         entry.lastUse = NextUseLocked();
         if (entry.retained)
@@ -566,7 +568,7 @@ namespace material_graph
             return {};
         }
         GenerationPreparationRequest result;
-        std::vector<own::shared_owner<const Generation>> released;
+        ce::dynamic_array<own::shared_owner<const Generation>> released;
         own::shared_owner<GenerationPreparationState> candidate;
         own::shared_owner<GenerationPreparationState> pending;
         own::shared_owner<const Generation> current;
@@ -706,7 +708,7 @@ namespace material_graph
     {
         error.clear();
         if (invalidated) *invalidated = false;
-        std::vector<own::shared_owner<const Generation>> released;
+        ce::dynamic_array<own::shared_owner<const Generation>> released;
         own::shared_owner<const Generation> result;
         own::shared_owner<const Generation> current;
         {
@@ -756,7 +758,7 @@ namespace material_graph
         {
             return Fail(error, "Only a verified, owned material graph generation can be published.");
         }
-        std::vector<own::shared_owner<const Generation>> released;
+        ce::dynamic_array<own::shared_owner<const Generation>> released;
         own::shared_owner<const Generation> current;
         {
             std::lock_guard lock(mutex_);
@@ -885,7 +887,7 @@ namespace material_graph
 
     void GenerationStore::SetRetainedBudgetBytes(std::size_t bytes)
     {
-        std::vector<own::shared_owner<const Generation>> released;
+        ce::dynamic_array<own::shared_owner<const Generation>> released;
         {
             std::lock_guard lock(mutex_);
             released.reserve(entries_.size());
@@ -952,7 +954,7 @@ namespace material_graph
         std::ranges::sort(candidate.description.parameters, {}, &ParameterOverride::id);
         std::ranges::sort(candidate.description.textures, {}, &TextureOverride::parameter);
         const auto& product = candidate.generation->cooked.product;
-        std::vector<LX::LXMaterialDiagnostic> diagnostics;
+        ce::dynamic_array<LX::LXMaterialDiagnostic> diagnostics;
         if (product.materialShader)
         {
             const auto& shader = *product.materialShader;
@@ -994,7 +996,7 @@ namespace material_graph
                         {
                             value.m_numericValue = {static_cast<float>(input)};
                         }
-                        else if constexpr (std::is_same_v<T, std::array<double, 3>> || std::is_same_v<T, std::array<double, 4>>)
+                        else if constexpr (std::is_same_v<T, ce::fixed_array<double, 3>> || std::is_same_v<T, ce::fixed_array<double, 4>>)
                         {
                             value.m_numericValue.clear();
                             for (const auto number : input)
@@ -1121,7 +1123,7 @@ namespace material_graph
                     {
                         WriteDouble(entry.Child("float"), value);
                     }
-                    else if constexpr (std::is_same_v<T, std::array<double, 3>> || std::is_same_v<T, std::array<double, 4>>)
+                    else if constexpr (std::is_same_v<T, ce::fixed_array<double, 3>> || std::is_same_v<T, ce::fixed_array<double, 4>>)
                     {
                         const auto values = entry.Child(value.size() == 3 ? "vector" : "color");
                         values.SetSequence(true);
@@ -1204,13 +1206,13 @@ namespace material_graph
                 else if (Keys(entry, {"id", "vector"}) && entry["vector"].IsSequence() && entry["vector"].Size() == 3)
                 {
                     parameter.value =
-                        std::array<double, 3>{Scalar<double>(entry["vector"].At(0)), Scalar<double>(entry["vector"].At(1)),
+                        ce::fixed_array<double, 3>{Scalar<double>(entry["vector"].At(0)), Scalar<double>(entry["vector"].At(1)),
                                               Scalar<double>(entry["vector"].At(2))};
                 }
                 else if (Keys(entry, {"id", "color"}) && entry["color"].IsSequence() && entry["color"].Size() == 4)
                 {
                     parameter.value =
-                        std::array<double, 4>{Scalar<double>(entry["color"].At(0)), Scalar<double>(entry["color"].At(1)),
+                        ce::fixed_array<double, 4>{Scalar<double>(entry["color"].At(0)), Scalar<double>(entry["color"].At(1)),
                                               Scalar<double>(entry["color"].At(2)), Scalar<double>(entry["color"].At(3))};
                 }
                 else

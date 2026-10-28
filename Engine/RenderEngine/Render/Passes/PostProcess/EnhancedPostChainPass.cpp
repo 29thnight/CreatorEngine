@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #include "EnhancedPostChainPass.h"
 #include "EnhancedPostChainShaders.h"
 #include "../../Graph/EnhancedRenderGraph.h"
@@ -223,7 +224,7 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
         }
         const auto outputAccess = explicitAccess
             ? (accumulate ? RGAccessMode::ReadWrite : RGAccessMode::Write) : RGAccessMode::LegacyState;
-        std::vector<EnhancedRenderGraph::RGPassUsage> usages;
+        ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> usages;
         usages.push_back({ srcA, RHIResourceState::ShaderResource, readAccess });
         if (srcB.IsValid() && srcB.index != srcA.index)
         {
@@ -303,8 +304,8 @@ void EnhancedPostChainPass::Declare(EnhancedRenderGraph& graph,
         uint32_t mipW = m_width / kBloomStartDivisor;
         uint32_t mipH = m_height / kBloomStartDivisor;
 
-        std::vector<uint32_t> widths;
-        std::vector<uint32_t> heights;
+        ce::dynamic_array<uint32_t> widths;
+        ce::dynamic_array<uint32_t> heights;
 
         for (uint32_t i = 0; i < m_bloomMipCount; ++i)
         {

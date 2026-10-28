@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 // PHASE 3.75 MBC11 — 모델 cook의 단일 경로.
 //
@@ -34,7 +35,7 @@ namespace experiment::cooked
     struct ModelGenerationExportFile final
     {
         std::string artifactPath{};        // Derived/Models/xx/<id>/<gen>/<relative>
-        std::vector<std::byte> bytes{};
+        ce::dynamic_array<std::byte> bytes{};
     };
 
     struct ModelGenerationExportProduct final
@@ -42,12 +43,12 @@ namespace experiment::cooked
         AssetId modelAssetId{};
         std::uint64_t generation{};
         std::string recordArtifactPath{};  // generation.asset의 artifactPath
-        std::vector<ModelGenerationExportFile> files{};
+        ce::dynamic_array<ModelGenerationExportFile> files{};
         CookedAssetManifestEntry manifestEntry{};
         // 모델 subasset entry — 재질(kind Material, record를 가리킴)·embedded texture
         // (kind Texture, textures/<TextureId>.cetex). 씬·재질 문서의 의존 GUID가 manifest
         // 안에서 해소되려면 legacy cook과 같이 이 entry들이 있어야 한다.
-        std::vector<CookedAssetManifestEntry> subAssetEntries{};
+        ce::dynamic_array<CookedAssetManifestEntry> subAssetEntries{};
         std::size_t materialCount{};
         std::size_t embeddedTextureCount{};
         std::size_t meshCount{};
@@ -64,7 +65,7 @@ namespace experiment::cooked
     struct ModelGenerationExportResult final
     {
         std::optional<ModelGenerationExportProduct> product{};
-        std::vector<ModelGenerationExportIssue> issues{};
+        ce::dynamic_array<ModelGenerationExportIssue> issues{};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {

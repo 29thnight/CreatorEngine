@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -38,7 +40,7 @@ namespace
                std::uint32_t(value[3]);
     }
 
-    bool validate_sfnt(const std::vector<unsigned char>& bytes, std::string& error)
+    bool validate_sfnt(const ce::dynamic_array<unsigned char>& bytes, std::string& error)
     {
         // Reject collections and compressed containers. Their extra offset graph is
         // intentionally outside the supported TTF/OTF project-asset surface.
@@ -162,7 +164,7 @@ struct FontAsset::Impl
     struct Face
     {
         std::filesystem::path path;
-        std::vector<unsigned char> bytes;
+        ce::dynamic_array<unsigned char> bytes;
         stbtt_fontinfo info{};
         float scale{};
         float ascent{};
@@ -178,17 +180,17 @@ struct FontAsset::Impl
     {
         // 1 MiB staging + 4 MiB immutable RGBA snapshot per page (8 page cap).
         // RGBA uses the existing neutral upload formats; all channels hold SDF.
-        std::vector<unsigned char> pixels = std::vector<unsigned char>(kAtlasSize * kAtlasSize, 0u);
+        ce::dynamic_array<unsigned char> pixels = ce::dynamic_array<unsigned char>(kAtlasSize * kAtlasSize, 0u);
         int cursorX{1}, cursorY{1}, rowHeight{};
         bool dirty{true};
         own::shared_owner<TextAtlasPage> owner = own::make_shared<TextAtlasPage>();
     };
-    std::vector<own::unique_owner<Face>> faces;
-    std::unordered_map<std::uint64_t, CachedGlyph> glyphs;
-    std::vector<Page> pages;
+    ce::dynamic_array<own::unique_owner<Face>> faces;
+    ce::engine_node_map<std::uint64_t, CachedGlyph> glyphs;
+    ce::dynamic_array<Page> pages;
     // Weak bookkeeping imposes a live resource bound without retaining retired
     // owners. In-flight frames may hold old pages; they are never overwritten.
-    std::vector<own::weak_owner<const Texture>> snapshots;
+    ce::dynamic_array<own::weak_owner<const Texture>> snapshots;
     bool snapshotAdmissionDenied{};
 
     Impl()
@@ -243,7 +245,7 @@ struct FontAsset::Impl
         return face;
     }
 
-    std::pair<std::size_t, int> ResolveGlyph(std::uint32_t codepoint, bool& fallback) const
+    ce::pair<std::size_t, int> ResolveGlyph(std::uint32_t codepoint, bool& fallback) const
     {
         for (std::size_t face = 0; face < faces.size(); ++face)
         {
@@ -264,7 +266,7 @@ struct FontAsset::Impl
 
     bool CanDirtyPage(const Page* target)
     {
-        std::erase_if(snapshots, [](const auto& snapshot) { return snapshot.expired(); });
+        ce::erase_if(snapshots, [](const auto& snapshot) { return snapshot.expired(); });
         // Count every prospective version conservatively. An RT reader can
         // acquire the old published Texture concurrently, so use_count subtraction
         // would race and undercount. At most one publication batch is in flight.
@@ -386,7 +388,7 @@ struct FontAsset::Impl
 
     bool PublishPages(std::string& error)
     {
-        std::erase_if(snapshots, [](const auto& snapshot) { return snapshot.expired(); });
+        ce::erase_if(snapshots, [](const auto& snapshot) { return snapshot.expired(); });
         std::size_t additional = 0;
         for (const auto& page : pages)
         {
@@ -406,7 +408,7 @@ struct FontAsset::Impl
             {
                 continue;
             }
-            std::vector<unsigned char> rgba(std::size_t(kAtlasSize) * kAtlasSize * 4u);
+            ce::dynamic_array<unsigned char> rgba(std::size_t(kAtlasSize) * kAtlasSize * 4u);
             for (std::size_t index = 0; index < page.pixels.size(); ++index)
             {
                 std::fill_n(rgba.data() + index * 4u, 4u, page.pixels[index]);
@@ -515,9 +517,9 @@ try
         float x;
         std::size_t line;
     };
-    std::vector<PendingGlyph> pending;
+    ce::dynamic_array<PendingGlyph> pending;
     pending.reserve(std::min(utf8.size(), kMaxLayoutCharacters));
-    std::vector<float> lineWidths;
+    ce::dynamic_array<float> lineWidths;
     float x = 0.0f;
     int previousGlyph = 0;
     std::size_t previousFace = kNoPage;
@@ -651,7 +653,7 @@ catch (const std::exception& exception)
 bool FontAsset::CanRetryAtlas() const
 {
     std::lock_guard lock(m_mutex);
-    std::erase_if(m_impl->snapshots, [](const auto& snapshot) { return snapshot.expired(); });
+    ce::erase_if(m_impl->snapshots, [](const auto& snapshot) { return snapshot.expired(); });
     std::size_t required = m_impl->snapshots.size();
     for (const auto& page : m_impl->pages)
     {

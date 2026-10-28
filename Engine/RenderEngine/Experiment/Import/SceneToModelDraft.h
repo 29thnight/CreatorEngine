@@ -1,4 +1,6 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 
 #include "ImportedScene.h"
 #include "../ModelData.h"
@@ -55,14 +57,14 @@ namespace experiment::importer
         // alpha 정책에 맞는 실제 ShaderMeta identity를 재질마다 공급한다.
         AssetId shaderAssetId{};
 
-        std::function<AssetId(const ImportedMaterial&, std::size_t)>
+        ce::owned_func<AssetId(const ImportedMaterial&, std::size_t)>
             resolveShaderAsset{};
 
         // material은 모델 내부 순번만으로 영속 ID를 만들지 않는다. D2 catalog/
         // authoring transaction이 발급한 identity를 D5 cook producer가 이 훅으로
         // 공급한다. 비어 있거나 nil을 반환하면 source preview draft에는 nil이
         // 남을 수 있지만 checked cooked writer는 publication을 거부한다.
-        std::function<AssetId(const ImportedMaterial&, std::size_t)>
+        ce::owned_func<AssetId(const ImportedMaterial&, std::size_t)>
             resolveMaterialAsset{};
 
         MaterialPropertyNames propertyNames{};
@@ -77,13 +79,13 @@ namespace experiment::importer
 
         // 임베디드/외부 텍스처를 자산 ID 로 푸는 훅. 비어 있으면 sourcePath 를
         // fallbackPath 로 쓰고, 그것도 없으면 논리 이름만 남기고 계수한다.
-        std::function<AssetId(const ImportedTexture&)> resolveTextureAsset{};
+        ce::owned_func<AssetId(const ImportedTexture&)> resolveTextureAsset{};
     };
 
     struct ConversionResult final
     {
         std::optional<ModelDraft> draft{};
-        std::vector<ImportNote> notes{};
+        ce::dynamic_array<ImportNote> notes{};
 
         [[nodiscard]] bool Succeeded() const noexcept { return draft.has_value(); }
     };
@@ -106,14 +108,14 @@ namespace experiment::importer
     struct MeshConversionResult final
     {
         std::optional<Mesh> mesh{};
-        std::vector<ImportNote> notes{};
+        ce::dynamic_array<ImportNote> notes{};
     };
 
     struct ModelMetadataConversionResult final
     {
-        std::vector<ModelNode> nodes{};
-        std::vector<MeshMetadata> meshes{};
-        std::vector<ImportNote> notes{};
+        ce::dynamic_array<ModelNode> nodes{};
+        ce::dynamic_array<MeshMetadata> meshes{};
+        ce::dynamic_array<ImportNote> notes{};
         bool succeeded{};
     };
 
@@ -130,7 +132,7 @@ namespace experiment::importer
     struct SkeletonConversionResult final
     {
         std::optional<Skeleton> skeleton{};
-        std::vector<ImportNote> notes{};
+        ce::dynamic_array<ImportNote> notes{};
     };
 
     // Converts only the selected clips (in ascending source-index order).

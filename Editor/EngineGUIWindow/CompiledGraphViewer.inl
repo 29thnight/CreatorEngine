@@ -190,7 +190,7 @@ namespace EnhancedRenderDebugUi
     }
 
     void DrawGraphMatrix(const GraphSnapshot& snapshot, const GraphViewModel& model,
-                         const std::vector<uint32_t>& columns, const std::vector<uint32_t>& resources,
+                         const ce::dynamic_array<uint32_t>& columns, const ce::dynamic_array<uint32_t>& resources,
                          uint32_t& selectedPass, uint32_t& selectedResource, float height)
     {
         ImGui::TextUnformatted("R read | W write | RW modify/atomic | faint band: resource lifetime");

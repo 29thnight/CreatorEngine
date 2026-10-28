@@ -1,4 +1,7 @@
+#include "../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../Engine/Utility_Framework/Foundation/EngineStorage.h"
 // Development Player reuses the role-neutral parser, registry, and batch session.
 // Shipping retains only the argument rejection surface below.
 #include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
@@ -24,7 +27,7 @@ namespace PlayerCmd
 	};
 
 	using Completion =
-		std::function<void(const CommandCore::CommandResult&, const Timing&)>;
+		ce::owned_func<void(const CommandCore::CommandResult&, const Timing&)>;
 
 	/// Player 의 명령 표와 큐. **실행은 게임 스레드 전용**이다.
 	class CommandHost
@@ -48,7 +51,7 @@ namespace PlayerCmd
 		///
 		/// `arguments[0]` 이 명령 이름이다. 라인 문법을 거치지 않는다 —
         /// Local line input is tokenized before it reaches this queue.
-		bool Enqueue(std::vector<std::string> arguments, Completion completion,
+		bool Enqueue(ce::dynamic_array<std::string> arguments, Completion completion,
 		             std::size_t queueCap);
 
 		/// 프레임 경계에서 부른다. 예산만큼 꺼내 실행한다.
@@ -85,18 +88,18 @@ namespace PlayerCmd
 		CommandHost(const CommandHost&)            = delete;
 		CommandHost& operator=(const CommandHost&) = delete;
 
-		CommandCore::CommandResult Execute(const std::vector<std::string>& arguments);
+		CommandCore::CommandResult Execute(const ce::dynamic_array<std::string>& arguments);
 
 		struct Pending
 		{
-			std::vector<std::string>              arguments;
+			ce::dynamic_array<std::string>              arguments;
 			std::chrono::steady_clock::time_point enqueuedAt{};
 			uint64_t                              enqueuedFrame{};
 			Completion                            completion;
 		};
 
 		mutable std::mutex   m_mutex;
-		std::deque<Pending>  m_pending;
+		ce::segmented_deque<Pending>  m_pending;
 
 		// 프레임 경계에서만 증가한다. 수신 스레드가 읽으므로 원자적이어야 한다.
 		std::atomic<uint64_t> m_frameIndex{ 0 };

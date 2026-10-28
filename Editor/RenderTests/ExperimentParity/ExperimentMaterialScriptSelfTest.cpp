@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "ExperimentParity/ExperimentMaterialScriptSelfTest.h"
 
 #include "DataSystem.h"
@@ -34,7 +35,7 @@ namespace RenderTest
                 { "roughness", "Roughness", ShaderPropertyType::Float, 1.0f },
                 { "metallic", "Metallic", ShaderPropertyType::Float, 0.0f },
                 { "tint", "Tint", ShaderPropertyType::Float4,
-                  std::array<float, 4>{ 1.0f, 1.0f, 1.0f, 1.0f } },
+                  ce::fixed_array<float, 4>{ 1.0f, 1.0f, 1.0f, 1.0f } },
                 { "steps", "Steps", ShaderPropertyType::Int, std::int32_t{ 3 } },
                 { "useFlag", "Use Flag", ShaderPropertyType::Bool, false },
             };
@@ -69,7 +70,7 @@ namespace RenderTest
             const MaterialPropertyValue* roughness =
                 FindValue(material, "roughness");
             check.Check(nullptr != roughness
-                && roughness->m_numericValue == std::vector<float>{ 0.75f },
+                && roughness->m_numericValue == ce::dynamic_array<float>{ 0.75f },
                 "논리 값 갱신");
             check.Check(material.m_materialInfo.m_roughness == 0.75f,
                 "legacy 스칼라 동기화 — roughness");
@@ -138,7 +139,7 @@ namespace RenderTest
                 FindValue(material, "baseColor");
             check.Check(nullptr != baseColor
                 && baseColor->m_numericValue
-                    == std::vector<float>{ 0.2f, 0.3f, 0.4f, 1.0f },
+                    == ce::dynamic_array<float>{ 0.2f, 0.3f, 0.4f, 1.0f },
                 "SetBaseColor 논리 값");
             check.Check(material.m_materialInfo.m_baseColor.r == 0.2f,
                 "SetBaseColor 사본 동기화");
@@ -156,7 +157,7 @@ namespace RenderTest
                 "SetFloatVector — float4");
             const MaterialPropertyValue* tintValue = FindValue(material, "tint");
             check.Check(nullptr != tintValue && tintValue->m_numericValue
-                == std::vector<float>{ 0.1f, 0.2f, 0.3f, 1.0f },
+                == ce::dynamic_array<float>{ 0.1f, 0.2f, 0.3f, 1.0f },
                 "float4 논리 값");
             check.Check(!MaterialScriptBinding::SetFloatVector(material, meta,
                 "tint", std::span<const float>(tint, 3)),
@@ -248,7 +249,7 @@ namespace RenderTest
             "제품 표면 SetFloat — 실제 meta 해석");
         const MaterialPropertyValue* roughness = FindValue(material, "roughness");
         check.Check(nullptr != roughness
-            && roughness->m_numericValue == std::vector<float>{ 0.75f },
+            && roughness->m_numericValue == ce::dynamic_array<float>{ 0.75f },
             "실사 논리 값");
         check.Check(!MaterialScriptBinding::SetFloat(material, "misspelled", 1.f),
             "실사 오타 거부");

@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
@@ -96,12 +97,12 @@ class RHISoftwareQueueRecorder final : public IRHIQueueRecorder
     void SetFrameDesc(const RHISoftwareBatchDesc& desc);
     bool WrapQueue(const own::shared_owner<IRHICommandQueue>& nativeQueue, own::shared_owner<IRHICommandQueue>& queue,
                    std::string& error);
-    bool Record(const own::shared_owner<IRHICommandQueue>& queue, const std::function<void(RHIEncoder&)>& commands,
+    bool Record(const own::shared_owner<IRHICommandQueue>& queue, const ce::owned_func<void(RHIEncoder&)>& commands,
                 ce::lifetime_token token, ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error) override;
     bool BeginRecording(const own::shared_owner<IRHICommandQueue>& queue, uint32_t targetCount,
                         ce::lifetime_token token, ce::pooled_owner<IRHIQueueRecording>& recording,
                         std::string& error) override;
-    bool ExecuteSubmission(const std::function<bool(std::string&)>& submit, std::string& error) override;
+    bool ExecuteSubmission(const ce::owned_func<bool(std::string&)>& submit, std::string& error) override;
     bool PrepareSubmissionBatch(const own::shared_owner<IRHICommandQueue>& queue,
                                 const ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error) override;
 

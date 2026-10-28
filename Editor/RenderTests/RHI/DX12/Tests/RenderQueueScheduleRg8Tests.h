@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
@@ -91,7 +92,7 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
             snapshot.passes[compatible.index].computeCompatible && !snapshot.passes[compatible.index].asyncCompute,
             "Viewer snapshot lost author intent.");
         // Contradictory compatibility hints and saturated timings cannot change authored placement.
-        std::vector<EnhancedRenderGraph::QueueHint> hints{{compute, false, 0, true}, {compatible, true, UINT64_MAX, true}};
+        ce::dynamic_array<EnhancedRenderGraph::QueueHint> hints{{compute, false, 0, true}, {compatible, true, UINT64_MAX, true}};
         require(graph.BuildQueueSchedule(caps, hints, true, plan, error), error);
         require(onCompute(compute) && !onCompute(compatible) && sameOrder(), "Timing or compatibility hint overrode author intent.");
         require(plan.waits.size() == expectedWaits.size() && plan.measuredPasses == 2, "Diagnostic samples changed waits.");
@@ -168,8 +169,8 @@ bool DX12Test::RunQueueScheduleTest(std::string& outLog)
         struct TimingFixture
         {
             own::unique_owner<EnhancedRenderGraph> graph;
-            std::vector<GpuPassTimingIdentity> identities;
-            std::vector<EnhancedRenderGraph::QueueHint> hints;
+            ce::dynamic_array<GpuPassTimingIdentity> identities;
+            ce::dynamic_array<EnhancedRenderGraph::QueueHint> hints;
         };
         const auto buildTiming = [&](uint64_t firstBytes, const std::string& literalName, bool swapUsages,
             uint32_t repeats, RGMeasurementDomain domain = RGMeasurementDomain::Normal)

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "ModelAnimationSampler.h"
 
 #include <mathematics/transform.hpp>
@@ -13,7 +14,7 @@ namespace assets::animation
         // 일치하면 이전 구간(t=1)이다(experiment 샘플러·실물 legacy와 같은 부동소수점
         // 경로 — animtick 골든이 이 비트를 잰다).
         template <typename Key>
-        [[nodiscard]] std::size_t LinearIntervalIndex(const std::vector<Key>& keys,
+        [[nodiscard]] std::size_t LinearIntervalIndex(const ce::dynamic_array<Key>& keys,
             double time) noexcept
         {
             std::size_t index = 0;
@@ -27,7 +28,7 @@ namespace assets::animation
         // Step은 "시각 이하의 마지막 키" 하나가 답이다. Linear 인덱스를 그대로 쓰면
         // 마지막 키 이후 구간에서 한 칸 뒤처지므로 보정한다.
         template <typename Key>
-        [[nodiscard]] std::size_t StepKeyIndex(const std::vector<Key>& keys,
+        [[nodiscard]] std::size_t StepKeyIndex(const ce::dynamic_array<Key>& keys,
             double time) noexcept
         {
             std::size_t index = LinearIntervalIndex(keys, time);
@@ -47,7 +48,7 @@ namespace assets::animation
         }
 
         template <class Key, class Value, class ValueOf, class Interpolate>
-        [[nodiscard]] Value SampleCachedKeys(const std::vector<Key>& keys, double time,
+        [[nodiscard]] Value SampleCachedKeys(const ce::dynamic_array<Key>& keys, double time,
             ModelInterpolationMode mode, std::size_t& cursor, Value fallback,
             ValueOf valueOf, Interpolate interpolate)
         {
@@ -147,7 +148,7 @@ namespace assets::animation
 
     std::size_t CountUniqueKeyTimes(const ModelAnimationAsset& clip, double eps)
     {
-        std::vector<double> times;
+        ce::dynamic_array<double> times;
         for (const ModelAnimationTrack& track : clip.tracks)
         {
             for (const ModelTranslationKey& key : track.translations) times.push_back(key.time);
@@ -170,7 +171,7 @@ namespace assets::animation
     }
 
     void BuildTrackTable(const ModelAnimationAsset& clip, std::size_t boneCount,
-        std::vector<const ModelAnimationTrack*>& outTable)
+        ce::dynamic_array<const ModelAnimationTrack*>& outTable)
     {
         outTable.assign(boneCount, nullptr);
         for (const ModelAnimationTrack& track : clip.tracks)
@@ -186,10 +187,10 @@ namespace assets::animation
         pose.finals.assign(boneCount, math::matrix4x4::identity());
         pose.hasTrack.assign(boneCount, 0);
 
-        std::vector<const ModelAnimationTrack*> trackOf;
+        ce::dynamic_array<const ModelAnimationTrack*> trackOf;
         BuildTrackTable(clip, boneCount, trackOf);
 
-        std::vector<math::matrix4x4> globals(boneCount, skeleton.rootTransform);
+        ce::dynamic_array<math::matrix4x4> globals(boneCount, skeleton.rootTransform);
         for (std::size_t boneIndex = 0; boneIndex < boneCount; ++boneIndex)
         {
             const ModelBoneAsset& bone = skeleton.bones[boneIndex];

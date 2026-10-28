@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
 #else
@@ -35,7 +36,7 @@ namespace experiment::cooked
         // 허용하지 않는다(아래 allowlist 가 어차피 거른다).
 
 
-        inline constexpr std::array<std::string_view, 5> kSupportedExtensions{
+        inline constexpr ce::fixed_array<std::string_view, 5> kSupportedExtensions{
             ".png", ".hdr", ".dds", ".jpg", ".jpeg"
         };
 
@@ -57,7 +58,7 @@ namespace experiment::cooked
         }
 
         [[nodiscard]] bool ReadInput(const std::filesystem::path& path,
-            std::uint64_t limit, std::vector<std::byte>& bytes, std::string& failure)
+            std::uint64_t limit, ce::dynamic_array<std::byte>& bytes, std::string& failure)
         {
 #ifdef _WIN32
             // Editor rename/save must remain possible during both initial
@@ -219,7 +220,7 @@ namespace experiment::cooked
         constexpr std::uint64_t kMaxMetaBytes = 16ull * 1024ull * 1024ull;
         std::string failure;
         const auto capture = [&](const std::filesystem::path& path, std::uint64_t limit,
-            std::vector<std::byte>& out)
+            ce::dynamic_array<std::byte>& out)
         {
             const bool read = request.captureSource
                 ? request.captureSource(path, out, failure) : ReadInput(path, limit, out, failure);
@@ -230,7 +231,7 @@ namespace experiment::cooked
             }
             return read;
         };
-        std::vector<std::byte> metaBytes;
+        ce::dynamic_array<std::byte> metaBytes;
         if (!capture(metaPath, kMaxMetaBytes, metaBytes))
         {
             AddIssue(result, "texture.meta", std::move(failure));
@@ -238,7 +239,7 @@ namespace experiment::cooked
         }
         const std::string_view metaText(reinterpret_cast<const char*>(metaBytes.data()), metaBytes.size());
         AssetId textureAssetId{};
-        std::vector<ModelIdentityIssue> identityIssues;
+        ce::dynamic_array<ModelIdentityIssue> identityIssues;
         if (!ReadAssetIdFromMeta(metaText, textureAssetId, identityIssues) || !IsAssetIdV4(textureAssetId))
         {
             AddIssue(result, "texture.meta", "Texture sidecar must contain a canonical UUIDv4 GUID.");
@@ -250,7 +251,7 @@ namespace experiment::cooked
             AddIssue(result, "texture.settings", std::move(failure));
             return result;
         }
-        std::vector<std::byte> bytes;
+        ce::dynamic_array<std::byte> bytes;
         if (!capture(source, kMaxSourceBytes, bytes) || bytes.empty())
         {
             AddIssue(result, "texture.read", failure.empty() ? "Source texture is empty." : std::move(failure));
@@ -275,8 +276,8 @@ namespace experiment::cooked
         }
         // Compare the captured inputs to the actual producer inputs, never to
         // the cooked bytes: cooking necessarily changes the representation.
-        std::vector<std::byte> currentSource;
-        std::vector<std::byte> currentMeta;
+        ce::dynamic_array<std::byte> currentSource;
+        ce::dynamic_array<std::byte> currentMeta;
         Sha256Digest sourceDigest{};
         Sha256Digest metaDigest{};
         if (!ReadInput(source, kMaxSourceBytes, currentSource, failure) ||

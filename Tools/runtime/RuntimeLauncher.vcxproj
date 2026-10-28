@@ -63,6 +63,7 @@
   <!-- Compile the canonical ABI constants with this independent static-CRT launcher. -->
   <ItemGroup><ClCompile Include="..\..\Engine\Contracts\Core\Creator.Core.ContentAbi.ixx"><CompileAs>CompileAsCppModule</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile></ItemGroup>
   <ItemGroup><ClCompile Include="..\..\Engine\Contracts\Core\Creator.Core.Distribution.ixx"><CompileAs>CompileAsCppModule</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile></ItemGroup>
+  <ItemGroup><ClCompile Include="..\..\Engine\Containers\Creator.Containers.h"><CompileAs>CompileAsHeaderUnit</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile></ItemGroup>
   <ItemGroup><ResourceCompile Include="EngineVersion.rc" /></ItemGroup>
   <ItemGroup Condition="'$(LauncherName)' == 'CreatorEditor'">
     <ResourceCompile Include="..\..\Editor\Resources\Windows\Academy_4Q.rc" />

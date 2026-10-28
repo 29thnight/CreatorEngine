@@ -1,3 +1,5 @@
+#include "../Foundation/EngineNodeSet.h"
+#include "../../Containers/ContainerAPI.h"
 #include "AuthoringCookedDocument.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Base64.h"
@@ -27,24 +29,24 @@ namespace Authoring
 			Sequence = 4u,
 		};
 
-		void WriteU8(std::vector<std::byte>& bytes, std::uint8_t value)
+		void WriteU8(ce::dynamic_array<std::byte>& bytes, std::uint8_t value)
 		{
 			bytes.push_back(static_cast<std::byte>(value));
 		}
 
-		void WriteU16(std::vector<std::byte>& bytes, std::uint16_t value)
+		void WriteU16(ce::dynamic_array<std::byte>& bytes, std::uint16_t value)
 		{
 			WriteU8(bytes, static_cast<std::uint8_t>(value));
 			WriteU8(bytes, static_cast<std::uint8_t>(value >> 8u));
 		}
 
-		void WriteU32(std::vector<std::byte>& bytes, std::uint32_t value)
+		void WriteU32(ce::dynamic_array<std::byte>& bytes, std::uint32_t value)
 		{
 			for (std::uint32_t shift = 0u; shift < 32u; shift += 8u)
 				WriteU8(bytes, static_cast<std::uint8_t>(value >> shift));
 		}
 
-		bool AppendString(std::vector<std::byte>& bytes, std::string_view value,
+		bool AppendString(ce::dynamic_array<std::byte>& bytes, std::string_view value,
 			std::string& error)
 		{
 			if (value.size() > kMaxScalarBytes
@@ -65,7 +67,7 @@ namespace Authoring
 
 		bool EncodeNode(const ReadNode& node, std::string_view key,
 			std::uint32_t depth, std::uint32_t& nodeCount,
-			std::vector<std::byte>& payload, std::string& error)
+			ce::dynamic_array<std::byte>& payload, std::string& error)
 		{
 			if (!node)
 			{
@@ -126,7 +128,7 @@ namespace Authoring
 
 			if (node.IsMap())
 			{
-				std::unordered_set<std::string> keys;
+				ce::engine_node_set<std::string> keys;
 				keys.reserve(node.Size());
 				for (const MapEntry entry : node.Map())
 				{
@@ -177,11 +179,11 @@ namespace Authoring
 	}
 
 	bool EncodeCookedDocument(const ReadNode& root,
-		std::vector<std::byte>& outBytes, std::string& error)
+		ce::dynamic_array<std::byte>& outBytes, std::string& error)
 	{
 		outBytes.clear();
 		error.clear();
-		std::vector<std::byte> payload;
+		ce::dynamic_array<std::byte> payload;
 		std::uint32_t nodeCount{};
 		if (!EncodeNode(root, {}, 0u, nodeCount, payload, error)) return false;
 		if (payload.size() > std::numeric_limits<std::uint32_t>::max()
@@ -215,7 +217,7 @@ namespace Authoring
 	bool EncodeCookedDocumentTextEnvelope(const ReadNode& root,
 		std::string& outText, std::string& error)
 	{
-		std::vector<std::byte> bytes;
+		ce::dynamic_array<std::byte> bytes;
 		if (!EncodeCookedDocument(root, bytes, error))
 		{
 			outText.clear();
@@ -236,7 +238,7 @@ namespace Authoring
 			error = "CEDO1 text envelope prefix가 없다";
 			return std::nullopt;
 		}
-		std::vector<std::uint8_t> decoded;
+		ce::dynamic_array<std::uint8_t> decoded;
 		if (!ce::base64::decode(text.substr(kCookedDocumentTextEnvelopePrefix.size()),
 			decoded))
 		{

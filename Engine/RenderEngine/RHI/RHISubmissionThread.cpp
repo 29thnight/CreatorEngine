@@ -1,3 +1,6 @@
+#include "../../Utility_Framework/Foundation/EngineStorage.h"
+#include "../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
 #else
@@ -185,12 +188,12 @@ struct RHISubmissionThread::Impl
     std::condition_variable drainWake;
     // Admission is bounded to three entries. Retain its backing capacity rather
     // than allocating a deque block for each large Entry on every enqueue.
-    std::vector<Entry> queue;
+    ce::dynamic_array<Entry> queue;
     static constexpr size_t kRetainedTickets = 64;
-    std::array<own::shared_owner<RHISubmissionTicket::State>, kRetainedTickets> ticketStorage;
-    std::vector<Retirement> retirements;
-    std::deque<std::pair<const void*, RHICommandFailure>> failures;
-    std::unordered_map<const void*, OwnerState> owners;
+    ce::fixed_array<own::shared_owner<RHISubmissionTicket::State>, kRetainedTickets> ticketStorage;
+    ce::dynamic_array<Retirement> retirements;
+    ce::segmented_deque<ce::pair<const void*, RHICommandFailure>> failures;
+    ce::engine_node_map<const void*, OwnerState> owners;
     std::thread thread;
     std::thread preparationThread;
     const void* preparingOwner{nullptr};
@@ -247,7 +250,7 @@ struct RHISubmissionThread::Impl
 
     size_t ExecutableEntryLocked() const
     {
-        std::array<const void*, RHISubmissionThread::kQueueCapacity> blocked{};
+        ce::fixed_array<const void*, RHISubmissionThread::kQueueCapacity> blocked{};
         size_t blockedCount = 0;
         for (size_t index = 0; index < queue.size(); ++index)
         {
@@ -644,7 +647,7 @@ RHISubmissionThread::RHISubmissionThread(uint64_t softwareByteCapacity) : m_impl
 RHISubmissionThread::~RHISubmissionThread()
 {
     Impl& impl = *m_impl;
-    std::vector<Impl::Retirement> completed;
+    ce::dynamic_array<Impl::Retirement> completed;
     {
         std::unique_lock lock(impl.mutex);
         impl.stats.accepting = false;
@@ -1240,8 +1243,8 @@ bool RHISubmissionThread::AbandonForDeviceError(const void* owner,
     }
 
     Impl& impl = *m_impl;
-    std::vector<own::shared_owner<RHISubmissionTicket::State>> cancelled;
-    std::vector<Impl::Entry> cancelledEntries;
+    ce::dynamic_array<own::shared_owner<RHISubmissionTicket::State>> cancelled;
+    ce::dynamic_array<Impl::Entry> cancelledEntries;
     uint64_t cancelledSoftwareBytes{};
     std::unique_lock lock(impl.mutex);
     const auto found = impl.owners.find(owner);

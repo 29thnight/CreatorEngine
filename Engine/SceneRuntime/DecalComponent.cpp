@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -196,9 +197,9 @@ void DecalComponent::RequestTexture(std::string_view reference, std::size_t slot
 void DecalComponent::ReplaceTextureOwner(const Texture* previous,
     const own::shared_owner<const Texture>& replacement)
 {
-    std::array<own::shared_owner<const Texture>*, 3> owners{
+    ce::fixed_array<own::shared_owner<const Texture>*, 3> owners{
         &m_decalTextureOwner, &m_normalTextureOwner, &m_ormTextureOwner };
-    std::array<const Texture**, 3> aliases{ &m_decalTexture, &m_normalTexture, &m_occluroughmetalTexture };
+    ce::fixed_array<const Texture**, 3> aliases{ &m_decalTexture, &m_normalTexture, &m_occluroughmetalTexture };
     for (std::size_t slot = 0; slot < owners.size(); ++slot)
     {
         if (*owners[slot] && &**owners[slot] == previous)
@@ -220,10 +221,10 @@ void DecalComponent::PollTextureRequests()
     {
         return;
     }
-    std::array<own::shared_owner<const Texture>*, 3> owners{
+    ce::fixed_array<own::shared_owner<const Texture>*, 3> owners{
         &m_decalTextureOwner, &m_normalTextureOwner, &m_ormTextureOwner };
-    std::array<const Texture**, 3> aliases{ &m_decalTexture, &m_normalTexture, &m_occluroughmetalTexture };
-    std::array<const std::string*, 3> references{ &m_diffusefileName, &m_normalFileName, &m_ormFileName };
+    ce::fixed_array<const Texture**, 3> aliases{ &m_decalTexture, &m_normalTexture, &m_occluroughmetalTexture };
+    ce::fixed_array<const std::string*, 3> references{ &m_diffusefileName, &m_normalFileName, &m_ormFileName };
     std::uint64_t resolverRevision{};
     if (retryOnRevision)
     {

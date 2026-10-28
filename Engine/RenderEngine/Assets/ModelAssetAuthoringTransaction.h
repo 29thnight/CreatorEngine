@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -67,8 +68,8 @@ namespace assets
         std::size_t subAssetCount{};
         std::size_t materialCount{};
         std::size_t embeddedTextureCount{};
-        std::vector<ModelAssetAuthoringIssue> issues{};
-        std::vector<ModelAssetAuthoringIssue> warnings{};
+        ce::dynamic_array<ModelAssetAuthoringIssue> issues{};
+        ce::dynamic_array<ModelAssetAuthoringIssue> warnings{};
         // 단계별 경과(ms, 순서대로) — 진단 전용. 실패 시엔 도달한 단계까지만 남는다.
         ModelAssetPhaseTimeline phases{};
 

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 // 렌더 측 프록시 로직만 남는다 — 컴포넌트를 읽는 생성자들은
 // ScriptBinder/PrimitiveProxyBridge.cpp에 있다 (PHASE 4-2 C1).
 #include "PrimitiveRenderProxy.h"
@@ -35,10 +36,10 @@ void FoliageRenderProxy::RebuildInstanceMap()
 	}
 }
 
-std::vector<FoliageRenderProxy::DrawSource>
+ce::dynamic_array<FoliageRenderProxy::DrawSource>
 FoliageRenderProxy::CaptureDrawSources() const
 {
-	std::vector<DrawSource> draws;
+	ce::dynamic_array<DrawSource> draws;
 	draws.reserve(m_foliageInstances.size());
 
 	// 타입 순서로 내보내 같은 mesh/material 인스턴스가 인접하게 남도록 한다.

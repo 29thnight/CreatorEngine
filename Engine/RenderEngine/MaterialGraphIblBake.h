@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -19,7 +20,7 @@ class Texture;
 
 namespace material_graph
 {
-    using IblVector = std::array<float, 4>;
+    using IblVector = ce::fixed_array<float, 4>;
 
     // Evaluated, spatially fixed sample. viewTier.w describes the reflection model:
     // 0 = legacy Core, 1 = compensated Principled GGX (including core graphs).
@@ -98,7 +99,7 @@ namespace material_graph
         IRenderDeviceServices* device_{};
         RHIBufferHandle buffer_;
         IblEnvironment environment_;
-        std::vector<IblBakePoint> points_;
+        ce::dynamic_array<IblBakePoint> points_;
         own::shared_owner<const SurfaceBatch> gpuPoints_;
         std::uint32_t count_{};
         own::shared_owner<const LX::Runtime::ComputeGeneration> pipeline_;

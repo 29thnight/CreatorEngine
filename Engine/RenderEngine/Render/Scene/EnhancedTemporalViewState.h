@@ -1,9 +1,11 @@
-﻿#if defined(CE_CONTRACT_STANDALONE)
+﻿#include "../../../Containers/ContainerAPI.h"
+#if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
 import Creator.Core.Ownership;
 #endif
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineOrderedMap.h"
 #include "../../MaterialGraphSceneInput.h"
 #include "../Temporal/TemporalUpscalerHost.h"
 #include "../Temporal/TemporalMeasurementProvenance.h"
@@ -22,15 +24,15 @@ struct EnhancedTemporalViewState
     FrameCameraSnapshot rasterCamera;
     FrameCameraSnapshot pendingHistoryCamera, previousHistoryCamera;
     own::shared_owner<const material_graph::SceneViewInput> previousInput;
-    using DecalKey = std::tuple<uint64_t, uint64_t>;
-    std::map<DecalKey, math::matrix4x4> previousDecals, pendingDecals;
-    using SpriteKey=std::tuple<uint64_t,uint64_t,uint64_t>;
+    using DecalKey = ce::tuple<uint64_t, uint64_t>;
+    ce::engine_ordered_map<DecalKey, math::matrix4x4> previousDecals, pendingDecals;
+    using SpriteKey=ce::tuple<uint64_t,uint64_t,uint64_t>;
     struct SpriteHistory
     {
         math::matrix4x4 world;math::vector4 uv;math::color color;
         uint64_t textureIdentity{};bool signedDistance{},enableDepth{};int canvasOrder{},layerOrder{};
     };
-    std::map<SpriteKey,SpriteHistory> previousSprites,pendingSprites;
+    ce::engine_ordered_map<SpriteKey,SpriteHistory> previousSprites,pendingSprites;
     math::matrix4x4 previousViewProjection{math::matrix4x4::identity()};
     uint64_t viewId{}, sceneEpoch{}, revision{}, settingsGeneration{}, resetGeneration{}, jitterIndex{};
     uint64_t submittedFrame{};
@@ -104,12 +106,12 @@ struct EnhancedTemporalViewState
         const auto previousInverse = math::try_inverse(previous);
         if (!previousInverse) return {TemporalStatus::InvalidInput};
         auto& output = frame.camera;
-        output.viewMatrix = std::bit_cast<std::array<float,16>>(camera.view);
-        output.projectionMatrix = std::bit_cast<std::array<float,16>>(camera.projection);
+        output.viewMatrix = std::bit_cast<ce::fixed_array<float,16>>(camera.view);
+        output.projectionMatrix = std::bit_cast<ce::fixed_array<float,16>>(camera.projection);
         output.cameraViewToClip = output.projectionMatrix;
-        output.clipToCameraView = std::bit_cast<std::array<float,16>>(camera.inverseProjection);
-        output.clipToPreviousClip = std::bit_cast<std::array<float,16>>(*currentInverse * previous);
-        output.previousClipToClip = std::bit_cast<std::array<float,16>>(*previousInverse * current);
+        output.clipToCameraView = std::bit_cast<ce::fixed_array<float,16>>(camera.inverseProjection);
+        output.clipToPreviousClip = std::bit_cast<ce::fixed_array<float,16>>(*currentInverse * previous);
+        output.previousClipToClip = std::bit_cast<ce::fixed_array<float,16>>(*previousInverse * current);
         output.position = {camera.eyePosition.x,camera.eyePosition.y,camera.eyePosition.z};
         output.up = {camera.up.x,camera.up.y,camera.up.z};
         output.right = {camera.right.x,camera.right.y,camera.right.z};

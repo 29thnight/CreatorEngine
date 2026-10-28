@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -71,16 +72,16 @@ namespace material_graph
         bool IsCurrent() const;
         IRenderDeviceServices* device_{};
         RasterSurfaceRequest request_;
-        std::vector<own::shared_owner<const MeshSurfaceBatch>> meshes_;
+        ce::dynamic_array<own::shared_owner<const MeshSurfaceBatch>> meshes_;
         own::shared_owner<const RasterSurfaceBatch> depthSource_;
-        std::vector<RHIBufferSlice> indices_;
-        std::array<RHITextureHandle, 6> targets_;
+        ce::dynamic_array<RHIBufferSlice> indices_;
+        ce::fixed_array<RHITextureHandle, 6> targets_;
         RHITextureHandle depth_;
         RHIBufferHandle buffer_;
         RHIRenderTargetBinding renderTargets_;
         RHIBindingTable inputs_, output_, opaqueOwners_;
         RHIBufferSlice constants_;
-        std::vector<RHIBufferSlice> drawConstants_;
+        ce::dynamic_array<RHIBufferSlice> drawConstants_;
         RHIPipelineHandle capturePipeline_;
         own::shared_owner<const LX::Runtime::ComputeGeneration> resolvePipeline_;
         bool doubleSided_{};
@@ -91,8 +92,8 @@ namespace material_graph
         mutable std::uint64_t graphEpoch_{};
         mutable RGHandle graphOutput_;
         mutable RGHandle graphDepth_;
-        mutable std::array<RGHandle, 6> graphTargets_;
-        mutable std::vector<std::uint8_t> coverage_;
+        mutable ce::fixed_array<RGHandle, 6> graphTargets_;
+        mutable ce::dynamic_array<std::uint8_t> coverage_;
         mutable bool validated_{};
         own::weak_owner<const RasterSurfaceBatch> self_;
     };

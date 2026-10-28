@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
@@ -14,9 +15,9 @@ namespace
         uint32_t failQuery{0}, failHeap{0}, failPlacement{0};
         mutable uint32_t queries{0};
         uint32_t heaps{0}, placements{0};
-        std::vector<RHITextureHandle> textures;
-        std::vector<RHIBufferHandle> buffers;
-        std::vector<own::weak_owner<RHITransientHeap>> heapOwners;
+        ce::dynamic_array<RHITextureHandle> textures;
+        ce::dynamic_array<RHIBufferHandle> buffers;
+        ce::dynamic_array<own::weak_owner<RHITransientHeap>> heapOwners;
 
         bool DescribeTransientAllocation(const RHITransientResourceDesc& desc,
             RHITransientAllocationInfo& info, std::string& error) const override
@@ -95,7 +96,7 @@ namespace
         }
         const auto declare = [](EnhancedRenderGraph& graph)
         {
-            std::array<RGHandle, 4> handles;
+            ce::fixed_array<RGHandle, 4> handles;
             for (uint32_t index = 0; index < handles.size(); ++index)
             {
                 const bool buffer = index >= 2;

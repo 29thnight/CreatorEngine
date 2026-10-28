@@ -1,4 +1,6 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineOrderedMap.h"
 
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -109,7 +111,7 @@ public:
 
     /// 완전히 빈 segment를 compatibility key마다 keepPerKey개만 남기고 제거한다.
     /// 반환 handle의 네이티브 heap/memory는 adapter가 이 호출 뒤 파괴한다.
-    std::vector<RHIPersistentHeapSegmentHandle> TrimEmptySegments(uint32_t keepPerKey);
+    ce::dynamic_array<RHIPersistentHeapSegmentHandle> TrimEmptySegments(uint32_t keepPerKey);
 
     bool ShouldUseDedicated(uint64_t requiredBytes) const;
     uint64_t ChooseSegmentBytes(uint64_t requiredBytes, uint64_t alignment) const;
@@ -133,9 +135,9 @@ private:
         uint32_t generation{ 1 };
         bool alive{ false };
         bool everAllocated{ false };
-        std::map<uint64_t, uint64_t> freeByOffset;
-        std::multimap<uint64_t, uint64_t> freeBySize;
-        std::map<uint64_t, uint64_t> allocatedByOffset;
+        ce::engine_ordered_map<uint64_t, uint64_t> freeByOffset;
+        ce::engine_ordered_multimap<uint64_t, uint64_t> freeBySize;
+        ce::engine_ordered_map<uint64_t, uint64_t> allocatedByOffset;
     };
 
     static bool AlignUp(uint64_t value, uint64_t alignment, uint64_t& outAligned);
@@ -145,8 +147,8 @@ private:
 
     mutable std::mutex m_mutex;
     RHIPersistentHeapConfig m_config;
-    std::vector<Segment> m_segments;
-    std::vector<uint32_t> m_freeSegmentSlots;
+    ce::dynamic_array<Segment> m_segments;
+    ce::dynamic_array<uint32_t> m_freeSegmentSlots;
     RHIPersistentHeapStats m_stats;
 };
 

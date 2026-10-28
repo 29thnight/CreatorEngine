@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineStorage.h"
 // LC5 (PHASE 14.5) — 장시간 명령의 operation 표 (§5.2 · §7.4).
 //
 // ── 왜 필요한가 ─────────────────────────────────────────────────────────
@@ -59,7 +61,7 @@ namespace CommandService
         ///   생산해야 하는데 오늘 그런 명령이 하나도 없다. 여기서 흘리는 것은
         ///   수명 전이(queued→running→completed)뿐이고, 그것만으로도 폴링을
         ///   없앨 수 있다. 진행률 생산자는 LC6 이후 domain 이 채운다.
-        std::vector<std::string> events;
+        ce::dynamic_array<std::string> events;
     };
 
     class OperationTable
@@ -92,7 +94,7 @@ namespace CommandService
         void TrimLocked();
 
         mutable std::mutex          m_mutex;
-        std::deque<OperationRecord> m_records;
+        ce::segmented_deque<OperationRecord> m_records;
         uint64_t                    m_nextId{ 1 };
     };
 }

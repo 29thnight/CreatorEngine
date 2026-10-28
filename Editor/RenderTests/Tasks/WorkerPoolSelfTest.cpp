@@ -1,3 +1,4 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -24,7 +25,7 @@ namespace RenderTest
         {
             // Source-only regression coverage for bounded cache ownership. A
             // logical eviction releases retention, never another consumer's pin.
-            std::map<std::string, asset_cache_detail::Entry<int>> cache;
+            ce::engine_ordered_map<std::string, asset_cache_detail::Entry<int>> cache;
             auto first = asset_cache_detail::Publish(cache, std::string("first"),
                 own::make_shared<const int>(1), sizeof(int), sizeof(int), 1u);
             const own::weak_owner<const int> firstLifetime(first);

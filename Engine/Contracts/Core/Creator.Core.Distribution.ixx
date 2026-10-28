@@ -2,7 +2,7 @@ module;
 #include "../../Utility_Framework/Runtime/EngineVersion.h"
 
 export module Creator.Core.Distribution;
-
+export import "Creator.Containers.h";
 import std;
 
 export namespace ce::distribution
@@ -22,7 +22,7 @@ export namespace ce::distribution
 
     const identity& current_identity();
 
-    inline std::map<std::string, std::string> read_metadata_file(const std::filesystem::path& path)
+    inline ce::ordered_node_map<std::string, std::string, std::less<>> read_metadata_file(const std::filesystem::path& path)
     {
         if (std::filesystem::file_size(path) > 4096)
         {
@@ -33,7 +33,7 @@ export namespace ce::distribution
         {
             throw std::runtime_error("Engine metadata is missing");
         }
-        std::map<std::string, std::string> values;
+        ce::ordered_node_map<std::string, std::string, std::less<>> values;
         std::string line;
         while (std::getline(stream, line))
         {

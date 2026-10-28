@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "SoundComponent.h"
 #include "SoundSystem.h"
 #include "Entity.h"
@@ -436,7 +437,7 @@ void SoundComponent::PushSettings()
 
 void SoundComponent::DrainEditorCommands()
 {
-    std::vector<QueuedPreview> commands;
+    ce::dynamic_array<QueuedPreview> commands;
     bool changed = false;
     SoundComponentSettings previous;
     {
@@ -555,8 +556,8 @@ void SoundComponent::TickUpdate(float)
         {
             playback.SetTransform(handle, position, velocity);
         }
-        std::erase_if(m_oneShots, [&](auto handle) { return !playback.IsAlive(handle); });
-        std::erase_if(m_previews, [&](auto handle) { return !playback.IsAlive(handle); });
+        ce::erase_if(m_oneShots, [&](auto handle) { return !playback.IsAlive(handle); });
+        ce::erase_if(m_previews, [&](auto handle) { return !playback.IsAlive(handle); });
     }
 }
 

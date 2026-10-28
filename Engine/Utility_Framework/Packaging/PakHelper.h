@@ -1,4 +1,6 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../Foundation/EngineOrderedSet.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -191,7 +193,7 @@ namespace
                 return false;
             }
 
-            constexpr std::array<std::wstring_view, 3> scriptExtensions{
+            constexpr ce::fixed_array<std::wstring_view, 3> scriptExtensions{
                 L".h",
                 L".hpp",
                 L".cpp"
@@ -204,7 +206,7 @@ namespace
                 std::string mountName;
             };
 
-            std::vector<SourceRoot> sourceRoots;
+            ce::dynamic_array<SourceRoot> sourceRoots;
             sourceRoots.push_back({ assetsRoot, "Assets" });
             if (!projectSettingsRoot.empty())
             {
@@ -573,7 +575,7 @@ namespace
 
             bool allSucceeded = true;
             std::size_t extractedCount = 0;
-            std::set<std::wstring> extractedPaths;
+            ce::engine_ordered_set<std::wstring> extractedPaths;
 
             for (const auto& entry : entries)
             {

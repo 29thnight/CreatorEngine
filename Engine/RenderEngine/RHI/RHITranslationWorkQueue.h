@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -34,7 +35,7 @@ class translation_work_queue final
     }
 
   private:
-    std::array<std::uint32_t, Capacity> order_{};
+    ce::fixed_array<std::uint32_t, Capacity> order_{};
     const std::size_t count_{};
     // 공유 claim 갱신이 읽기 전용 순서를 무효화하지 않도록 캐시 라인을 분리한다.
     alignas(64) std::atomic<std::size_t> next_{};

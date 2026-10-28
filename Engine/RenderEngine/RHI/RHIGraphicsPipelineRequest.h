@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "IRenderPipelineCache.h"
@@ -188,9 +189,9 @@ private:
     }
 
     RHIGraphicsPipelineDesc m_desc{};
-    std::vector<std::uint8_t> m_vs;
-    std::vector<std::uint8_t> m_ps;
-    std::vector<RHIInputElement> m_inputElements;
-    std::vector<std::string> m_semantics;
+    ce::dynamic_array<std::uint8_t> m_vs;
+    ce::dynamic_array<std::uint8_t> m_ps;
+    ce::dynamic_array<RHIInputElement> m_inputElements;
+    ce::dynamic_array<std::string> m_semantics;
     RHIPipelineHandle m_handle{};
 };

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 // LC3 (PHASE 14.5) — 명령 schema 의 단일 정본.
 //
@@ -134,7 +135,7 @@ namespace CommandCore
     struct CommandDescriptor
     {
         std::string              canonical;
-        std::vector<std::string> aliases;
+        ce::dynamic_array<std::string> aliases;
 
         /// 한 줄 요약. help 와 discovery 가 이것을 쓴다. 비어 있으면 등록 실패다.
         std::string              summary;
@@ -173,7 +174,7 @@ namespace CommandCore
         /// 등록 순서. snapshot 정렬은 이름으로 하지만, 원본 순서도 남긴다.
         std::size_t              registrationIndex{};
 
-        std::vector<CommandParameter> namedParameters;
+        ce::dynamic_array<CommandParameter> namedParameters;
         bool hasNamedInput{};
         bool undoable{false};
     };

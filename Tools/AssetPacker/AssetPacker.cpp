@@ -469,7 +469,7 @@ int wmain(int argc, wchar_t* argv[])
 
         // Re-open before promotion. This validates the header/index hash and makes a
         // partial candidate impossible to publish as the canonical package.
-        std::vector<Pak::Archive::FileInfo> archivedFiles;
+        ce::dynamic_array<Pak::Archive::FileInfo> archivedFiles;
         {
             const Pak::Archive archive(candidate);
             archivedFiles = archive.list();

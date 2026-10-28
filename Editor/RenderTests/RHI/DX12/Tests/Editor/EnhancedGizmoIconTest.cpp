@@ -1,3 +1,4 @@
+#include "../../../../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -249,7 +250,7 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
     // 아이콘 하나 (0,0,0), 크기 2 — 쿼드는 y∈[0,2] · 폭 2로 선다.
     // 실제 CameraGizmo.png를 줘서 중앙의 흰 도형과 같은 쿼드 안의 투명
     // 배경을 함께 본다. nullptr의 1x1 흰 폴백이면 투명 표본도 0.5가 된다.
-    std::vector<EnhancedGizmoIconPass::Icon> icons;
+    ce::dynamic_array<EnhancedGizmoIconPass::Icon> icons;
     {
         EnhancedGizmoIconPass::Icon icon{};
         icon.position = { 0.f, 0.f, 0.f };
@@ -416,7 +417,7 @@ bool DX12Test::RunGizmoIconTest(std::string& outLog)
         const Texture* const textureA = (batchTextureA ? &*batchTextureA.borrow() : nullptr);
         const Texture* const textureB = (batchTextureB ? &*batchTextureB.borrow() : nullptr);
 
-        std::vector<EnhancedGizmoIconPass::Icon> mixed;
+        ce::dynamic_array<EnhancedGizmoIconPass::Icon> mixed;
         for (int i = 0; i < 4; ++i)
         {
             EnhancedGizmoIconPass::Icon icon{};

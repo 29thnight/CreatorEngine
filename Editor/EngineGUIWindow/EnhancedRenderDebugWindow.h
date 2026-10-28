@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -37,7 +38,7 @@ private:
     ImGuiTextFilter m_graphFilter;
     own::shared_owner<const EnhancedRenderGraph::DiagnosticSnapshot> m_graphSnapshot;
     editor::compiled_graph::ViewModel m_graphModel;
-    std::vector<uint32_t> m_graphColumns, m_graphResources;
+    ce::dynamic_array<uint32_t> m_graphColumns, m_graphResources;
     uint32_t m_graphSelectedPass{UINT32_MAX}, m_graphSelectedResource{UINT32_MAX};
     bool m_graphFrozen{false}, m_graphShowCulled{false};
     bool m_graphModelDirty{true};

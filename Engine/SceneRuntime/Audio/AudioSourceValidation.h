@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../../RenderEngine/Assets/AudioClipSourceMetadata.h"
@@ -41,7 +42,7 @@ namespace wave
             std::string& failure)
         {
             std::uint64_t begin = 0u;
-            std::array<std::uint8_t, 10> tag{};
+            ce::fixed_array<std::uint8_t, 10> tag{};
             if (!ReadAt(stream, 0u, tag))
             {
                 failure = "MP3 header cannot be read";
@@ -67,7 +68,7 @@ namespace wave
             std::uint64_t end = size;
             if (size >= 128u)
             {
-                std::array<std::uint8_t, 3> trailer{};
+                ce::fixed_array<std::uint8_t, 3> trailer{};
                 if (!ReadAt(stream, size - 128u, trailer))
                 {
                     failure = "MP3 trailer cannot be read";
@@ -84,24 +85,24 @@ namespace wave
                 return false;
             }
 
-            constexpr std::array<std::uint16_t, 16> mpeg1Kbps{
+            constexpr ce::fixed_array<std::uint16_t, 16> mpeg1Kbps{
                 0,32,40,48,56,64,80,96,112,128,160,192,224,256,320,0 };
-            constexpr std::array<std::uint16_t, 16> mpeg2Kbps{
+            constexpr ce::fixed_array<std::uint16_t, 16> mpeg2Kbps{
                 0,8,16,24,32,40,48,56,64,80,96,112,128,144,160,0 };
-            constexpr std::array<std::uint32_t, 3> baseRates{ 44100u, 48000u, 32000u };
+            constexpr ce::fixed_array<std::uint32_t, 3> baseRates{ 44100u, 48000u, 32000u };
             std::uint64_t cursor = begin;
             std::uint32_t frameCount = 0u;
             std::uint32_t firstRate = 0u;
             std::uint32_t firstVersion = 0u;
             while (cursor < end)
             {
-                std::array<std::uint8_t, 4> raw{};
+                ce::fixed_array<std::uint8_t, 4> raw{};
                 if (end - cursor < raw.size() || !ReadAt(stream, cursor, raw))
                 {
                     failure = "MP3 ends inside a frame header";
                     return false;
                 }
-                const std::uint32_t header = Big32(raw);
+                const std::uint32_t header = Big32(std::span<const std::uint8_t, 4>(raw));
                 const std::uint32_t version = (header >> 19u) & 3u;
                 const std::uint32_t layer = (header >> 17u) & 3u;
                 const std::uint32_t bitrateIndex = (header >> 12u) & 15u;
@@ -155,7 +156,7 @@ namespace wave
 
             if (codec == assets::AudioCodec::Wav)
             {
-                std::array<std::uint8_t, 12> header{};
+                ce::fixed_array<std::uint8_t, 12> header{};
                 if (!ReadAt(stream, 0u, header))
                 {
                     failure = "WAV RIFF header cannot be read";
@@ -174,7 +175,7 @@ namespace wave
                 return true;
             }
 
-            std::array<std::uint8_t, 42> header{};
+            ce::fixed_array<std::uint8_t, 42> header{};
             if (!ReadAt(stream, 0u, header))
             {
                 failure = "FLAC STREAMINFO cannot be read";

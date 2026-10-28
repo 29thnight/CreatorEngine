@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -42,7 +43,7 @@ void TerrainComponent::Initialize()
 	m_layerHeightMap.clear();
 
 	// 한 번만 초기 메쉬 생성
-	std::vector<Vertex> verts(m_width * m_height);
+	ce::dynamic_array<Vertex> verts(m_width * m_height);
 	for (int i = 0; i < m_height; ++i)
 	{
 		for (int j = 0; j < m_width; ++j)
@@ -59,7 +60,7 @@ void TerrainComponent::Initialize()
 		}
 	}
 
-	std::vector<uint32_t> indices;
+	ce::dynamic_array<uint32_t> indices;
 	indices.reserve((m_width - 1) * (m_height - 1) * 6);
 
 	for (int i = 0; i < m_height - 1; ++i)
@@ -112,7 +113,7 @@ void TerrainComponent::Resize(int newWidth, int newHeight)
 
 	// 새 크기로 메시를 재생성합니다.
 	{
-		std::vector<Vertex> verts(m_width * m_height);
+		ce::dynamic_array<Vertex> verts(m_width * m_height);
 		for (int i = 0; i < m_height; ++i)
 		{
 			for (int j = 0; j < m_width; ++j)
@@ -125,7 +126,7 @@ void TerrainComponent::Resize(int newWidth, int newHeight)
 				);
 			}
 		}
-		std::vector<uint32_t> indices;
+		ce::dynamic_array<uint32_t> indices;
 		indices.reserve((m_width - 1) * (m_height - 1) * 6);
 		for (int i = 0; i < m_height - 1; ++i)
 		{
@@ -231,7 +232,7 @@ void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
 
 	if (0 > patchH || 0 > patchW) return;
 
-	std::vector<Vertex> patchVerts;
+	ce::dynamic_array<Vertex> patchVerts;
 	patchVerts.reserve(patchW * patchH);
 
 	for (int i = minY; i <= maxY; ++i)
@@ -270,7 +271,7 @@ void TerrainComponent::ApplyBrush(const TerrainBrush& brush) {
 		for (uint32_t i = 0; i < m_layers.size(); ++i)
 		{
 			// 브러시 영역만큼의 작은 데이터 패치를 생성합니다.
-			std::vector<BYTE> patchData;
+			ce::dynamic_array<BYTE> patchData;
 			patchData.reserve(patchW * patchH);
 
 			for (int r = minY; r <= maxY; ++r)
@@ -428,9 +429,9 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	}
 
     std::ifstream kindStream(descriptorPath, std::ios::binary);
-    std::array<unsigned char, 4> magic{};
+    ce::fixed_array<unsigned char, 4> magic{};
     kindStream.read(reinterpret_cast<char*>(magic.data()), magic.size());
-    if (kindStream && magic == std::array<unsigned char, 4>{ 0x4eu, 0x52u, 0x42u, 0x54u })
+    if (kindStream && magic == ce::fixed_array<unsigned char, 4>{ 0x4eu, 0x52u, 0x42u, 0x54u })
     {
         return LoadRunTimeTerrain(filePath);
     }
@@ -495,7 +496,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	};
 
 	fs::path heightMapPath = ResolvePath(root["heightmap"]);
-	auto tmpHeightMap = std::vector<float>(
+	auto tmpHeightMap = ce::dynamic_array<float>(
 		static_cast<std::size_t>(tmpWidth) * static_cast<std::size_t>(tmpHeight),
 		0.0f);
 	if (!LoadEditorHeightMap(heightMapPath, static_cast<float>(tmpWidth),
@@ -507,7 +508,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	}
 
 	auto tmpLayerHeightMap =
-		std::vector<std::vector<float>>(splatmaps.Size());
+		ce::dynamic_array<ce::dynamic_array<float>>(splatmaps.Size());
 	std::size_t splatIndex = 0;
 	for (const Authoring::ReadNode splatmap : splatmaps)
 	{
@@ -523,7 +524,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 		++splatIndex;
 	}
 
-	auto tmpLayerDescs = std::vector<TerrainLayer>();
+	auto tmpLayerDescs = ce::dynamic_array<TerrainLayer>();
 	tmpLayerDescs.reserve(layers.Size());
 	float tmpNextLayerID = 0;
 	for (const Authoring::ReadNode layerData : layers)
@@ -574,7 +575,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	std::swap(m_heightMap, tmpHeightMap);
 	RecalculateNormalsPatch(0, 0, m_width, m_height); // 높이맵 변경 후 노말 재계산
 	//메쉬 업데이트
-	std::vector<Vertex> patchVerts;
+	ce::dynamic_array<Vertex> patchVerts;
 	patchVerts.reserve(m_width * m_height);
 	for (int i = 0; i < m_height; ++i) {
 		for (int j = 0; j < m_width; ++j) {
@@ -638,7 +639,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	return true;
 }
 
-bool TerrainComponent::LoadEditorHeightMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out)
+bool TerrainComponent::LoadEditorHeightMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, ce::dynamic_array<float>& out)
 {
     TerrainSourceImage image;
     if (!AssetAuthoringPort::ReadTerrainSourceImage(pngPath, TerrainSourceImageKind::HeightBits, image)
@@ -650,7 +651,7 @@ bool TerrainComponent::LoadEditorHeightMap(std::filesystem::path& pngPath, float
     return true;
 }
 
-bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector<std::vector<float>>& out)
+bool TerrainComponent::LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, ce::dynamic_array<ce::dynamic_array<float>>& out)
 {
     if (dataWidth <= 0 || dataHeight <= 0 || layerIndex < 0 || static_cast<size_t>(layerIndex) >= out.size())
     {
@@ -810,7 +811,7 @@ void TerrainComponent::AddLayer(const std::wstring& path, const std::wstring& di
 
 	// 2. 컴포넌트의 CPU 측 데이터 구조를 업데이트합니다.
 	m_layers.push_back(newLayer);
-	m_layerHeightMap.push_back(std::vector<float>(m_width * m_height, 0.0f));
+	m_layerHeightMap.push_back(ce::dynamic_array<float>(m_width * m_height, 0.0f));
 	m_nextLayerID++;
 
 	// 3. 메인 업데이트 함수를 호출하여 GPU 상태 전체를 동기화합니다.
@@ -871,7 +872,7 @@ void TerrainComponent::RefreshTexture()
 }
 
 /// 브러쉬 마스크 텍스쳐 로드
-bool TerrainComponent::LoadBrushMaskTexture(const std::wstring& path, std::vector<uint8_t>& outMask, int& dataWidth, int& dataHeight)
+bool TerrainComponent::LoadBrushMaskTexture(const std::wstring& path, ce::dynamic_array<uint8_t>& outMask, int& dataWidth, int& dataHeight)
 {
     TerrainSourceImage image;
     if (!AssetAuthoringPort::ReadTerrainSourceImage(std::filesystem::path(path), TerrainSourceImageKind::Gray8, image))
@@ -927,7 +928,7 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
         {
             return false;
         }
-        std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+        ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(size));
         input.seekg(0);
         input.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
         ck::CookedTerrainView terrain;
@@ -940,13 +941,13 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
         // All offsets, dimensions, scalar values and trailing bytes are checked
         // before image/vector allocation. No source callback participates here.
         const auto pixels = static_cast<std::size_t>(terrain.width) * terrain.height;
-        std::vector<float> heights(pixels);
+        ce::dynamic_array<float> heights(pixels);
         for (std::size_t index = 0u; index < pixels; ++index)
         {
             heights[index] = ck::CookedTerrainHeight(terrain.heights, index);
         }
-        std::vector<std::vector<float>> weights(terrain.layerCount);
-        std::vector<TerrainLayer> layers;
+        ce::dynamic_array<ce::dynamic_array<float>> weights(terrain.layerCount);
+        ce::dynamic_array<TerrainLayer> layers;
         layers.reserve(terrain.layerCount);
         std::uint32_t nextLayerId{};
         for (std::size_t index = 0u; index < terrain.layerCount; ++index)
@@ -974,10 +975,10 @@ bool TerrainComponent::LoadRunTimeTerrain(const std::wstring& filePath)
         // Build replacement render inputs before publishing any live state.
         const auto width = static_cast<int>(terrain.width);
         const auto height = static_cast<int>(terrain.height);
-        std::vector<math::vector3> normals(pixels);
-        std::vector<Vertex> vertices;
+        ce::dynamic_array<math::vector3> normals(pixels);
+        ce::dynamic_array<Vertex> vertices;
         vertices.reserve(pixels);
-        std::vector<std::uint32_t> indices;
+        ce::dynamic_array<std::uint32_t> indices;
         indices.reserve(static_cast<std::size_t>(width - 1) * (height - 1) * 6u);
         for (int row = 0; row < height; ++row)
         {

@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #include "VertexWelding.h"
 
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -45,7 +47,7 @@ namespace experiment::importer
         //   조용히 값이 사라진다 — 목록이 정본인 이유가 이것이다.
         struct VertexKey final
         {
-            std::vector<std::uint32_t> words{};
+            ce::dynamic_array<std::uint32_t> words{};
 
             [[nodiscard]] bool operator==(const VertexKey& other) const noexcept
             {
@@ -72,7 +74,7 @@ namespace experiment::importer
         [[nodiscard]] VertexKey MakeKey(const VertexStreams& streams, std::uint32_t vertex)
         {
             VertexKey key;
-            std::apply([&](auto... members)
+            ce::apply([&](auto... members)
             {
                 const auto append = [&](auto member)
                 {
@@ -131,7 +133,7 @@ namespace experiment::importer
             const std::string context = "mesh[" + std::to_string(meshIndex) + "]";
             stats.verticesBefore += vertexCount;
 
-            std::unordered_map<VertexKey, std::uint32_t, VertexKeyHash> lookup;
+            ce::engine_node_map<VertexKey, std::uint32_t, VertexKeyHash> lookup;
             lookup.reserve(vertexCount);
 
             VertexStreams welded;
@@ -144,7 +146,7 @@ namespace experiment::importer
 
             // 원본 정점 -> 새 정점. 인덱스 순서대로 처음 만난 것에 번호를 주므로
             // 결과가 결정적이다(같은 입력이면 같은 바이트가 나온다).
-            std::vector<std::uint32_t> remap(vertexCount);
+            ce::dynamic_array<std::uint32_t> remap(vertexCount);
             for (std::uint32_t original = 0; original < vertexCount; ++original)
             {
                 VertexKey key = MakeKey(mesh.streams, original);

@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
@@ -60,7 +61,7 @@ bool DX12CommandListPool::Initialize(DX12DeviceResources& resources, uint32_t wo
     m_frameCount = frameCount;
     m_frameIndex = 0;
 
-    m_slots.assign(frameCount, std::vector<Slot>(workerCount));
+    m_slots.assign(frameCount, ce::dynamic_array<Slot>(workerCount));
     m_encoders.resize(workerCount);
 
     for (uint32_t frame = 0; frame < frameCount; ++frame)
@@ -400,7 +401,7 @@ bool DX12CommandListPool::SubmitRecordedCommands(uint32_t frameSlot, std::span<c
         return false;
     }
 
-    std::array<ID3D12CommandList*, kMaxWorkers> submission{};
+    ce::fixed_array<ID3D12CommandList*, kMaxWorkers> submission{};
     size_t submissionCount = 0;
     for (uint32_t worker : workerOrder)
     {

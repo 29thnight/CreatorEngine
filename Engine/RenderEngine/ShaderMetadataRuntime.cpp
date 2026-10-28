@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -42,7 +43,7 @@ namespace
                 ? SIZE_MAX : count * sizeof(std::filesystem::path::value_type));
         }
         template<class T>
-        void Vector(const std::vector<T>& values) noexcept
+        void Vector(const ce::dynamic_array<T>& values) noexcept
         {
             Add(values.capacity() > SIZE_MAX / sizeof(T) ? SIZE_MAX : values.capacity() * sizeof(T));
         }
@@ -123,7 +124,7 @@ std::uint64_t DataSystem::NextShaderMetaUseLocked() const noexcept
 }
 
 void DataSystem::TrimShaderMetaRetainedLocked(std::size_t targetBytes,
-    std::vector<own::shared_owner<const ShaderMeta>>& released)
+    ce::dynamic_array<own::shared_owner<const ShaderMeta>>& released)
 {
     // The caller reserves one entry per slot before making any cache mutation.
     while (m_shaderMetaRetainedBytes > targetBytes)
@@ -148,7 +149,7 @@ void DataSystem::TrimShaderMetaRetainedLocked(std::size_t targetBytes,
 
 void DataSystem::RetainShaderMetaLocked(ShaderMetaCacheSlot& slot,
     const own::shared_owner<const ShaderMeta>& owner, std::size_t charge,
-    std::vector<own::shared_owner<const ShaderMeta>>& released)
+    ce::dynamic_array<own::shared_owner<const ShaderMeta>>& released)
 {
     slot.lastUse = NextShaderMetaUseLocked();
     if (slot.retained || charge > m_shaderMetaRetainedBudgetBytes)
@@ -179,7 +180,7 @@ own::shared_owner<const ShaderMeta> DataSystem::LoadShaderMetaOwner(FileGuid gui
     std::uint64_t resolverRevision{};
     ShaderMetaHandle requested;
     own::shared_owner<AssetMetaRegistry> registry;
-    std::vector<own::shared_owner<const ShaderMeta>> released;
+    ce::dynamic_array<own::shared_owner<const ShaderMeta>> released;
     {
         std::lock_guard preparationLock(m_assetPreparationMutex);
         if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
@@ -285,7 +286,7 @@ own::shared_owner<const ShaderMeta> DataSystem::LoadShaderMetaOwner(FileGuid gui
         return {};
     }
     ShaderMeta loaded;
-    std::array<std::uint8_t, 32> documentDigest{};
+    ce::fixed_array<std::uint8_t, 32> documentDigest{};
     if (!ShaderMetaLoader::LoadFile(path, sourcePath, guid, loaded, outError, &documentDigest))
     {
         return {};
@@ -423,7 +424,7 @@ bool DataSystem::PublishCodeShaderReload(const own::shared_owner<const LX::Runti
         error = "Shader reload was superseded by a newer accepted generation";
         return false;
     }
-    std::vector<own::shared_owner<const ShaderMeta>> released;
+    ce::dynamic_array<own::shared_owner<const ShaderMeta>> released;
     released.reserve(m_shaderMetaSlots.size() + 1u);
     auto replacement = own::make_shared<LX::Runtime::ShaderGeneration>(*shader);
     replacement->codeHandle = { found->second + 1u, static_cast<std::uint32_t>(m_shaderMetaGenerationSerial + 1u) };
@@ -505,7 +506,7 @@ void DataSystem::InvalidateShaderMeta(FileGuid guid, bool remove)
 
 void DataSystem::SetShaderMetaRetainedBudgetBytes(std::size_t bytes)
 {
-    std::vector<own::shared_owner<const ShaderMeta>> released;
+    ce::dynamic_array<own::shared_owner<const ShaderMeta>> released;
     {
         std::lock_guard lock(m_shaderMetaMutex);
         if (m_shaderMetaRetainedBytes > bytes)
@@ -531,7 +532,7 @@ std::size_t DataSystem::ShaderMetaRetainedBudgetBytes() const
 
 void DataSystem::ClearShaderMetaCache()
 {
-    std::vector<ShaderMetaCacheSlot> released;
+    ce::dynamic_array<ShaderMetaCacheSlot> released;
     {
         std::lock_guard lock(m_shaderMetaMutex);
         released.swap(m_shaderMetaSlots);

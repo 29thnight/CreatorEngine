@@ -1,4 +1,8 @@
+#include "../Foundation/EngineNodeMap.h"
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../Foundation/EngineStorage.h"
+#include "../Foundation/EngineNodeSet.h"
 #include "LogEntry.h"
 #include "LogGroup.h"
 #include "../Foundation/StandardLibrary.h"
@@ -45,8 +49,8 @@ struct LogSnapshot
     // Occurrence order, payload restored from the owning group. This is the
     // shape the current log window consumes; the grouped view below is what
     // a collapsed list will read.
-    std::vector<LogEntry> entries;
-    std::vector<LogGroup> groups; // Ascending groupId.
+    ce::dynamic_array<LogEntry> entries;
+    ce::dynamic_array<LogGroup> groups; // Ascending groupId.
     std::uint64_t revision{};
     std::uint64_t clearGeneration{};
     std::uint64_t evictedEntries{};
@@ -71,9 +75,9 @@ struct LogDelta
     // replace what it holds rather than merge it. Set for a reader with no
     // state, after Clear, and whenever removals have aged out of the log.
     bool resynchronized{};
-    std::vector<LogGroup> changedGroups; // Ascending groupId.
-    std::vector<std::uint64_t> removedGroups;
-    std::vector<LogOccurrence> appendedOccurrences;
+    ce::dynamic_array<LogGroup> changedGroups; // Ascending groupId.
+    ce::dynamic_array<std::uint64_t> removedGroups;
+    ce::dynamic_array<LogOccurrence> appendedOccurrences;
     // Occurrences before this sequence are gone; a merging reader drops them.
     std::uint64_t oldestRetainedSequence{};
     LogCursor cursor; // Hand this back on the next call.
@@ -393,14 +397,14 @@ private:
 
     const LogStoreLimits m_limits;
     mutable std::mutex m_mutex;
-    std::deque<LogOccurrence> m_occurrences;
-    std::unordered_map<std::uint64_t, LogGroup> m_groups;
-    std::unordered_map<std::size_t, std::vector<std::uint64_t>> m_groupsByHash;
+    ce::segmented_deque<LogOccurrence> m_occurrences;
+    ce::engine_node_map<std::uint64_t, LogGroup> m_groups;
+    ce::engine_node_map<std::size_t, ce::dynamic_array<std::uint64_t>> m_groupsByHash;
     // Groups holding no retained occurrence, oldest first. Entries are checked
     // when popped, so a group logged again is skipped instead of removed.
-    std::deque<std::uint64_t> m_idleGroups;
-    std::unordered_set<std::uint64_t> m_idleMarks;
-    std::deque<RemovedGroup> m_removedGroups;
+    ce::segmented_deque<std::uint64_t> m_idleGroups;
+    ce::engine_node_set<std::uint64_t> m_idleMarks;
+    ce::segmented_deque<RemovedGroup> m_removedGroups;
     std::size_t m_textBytes{};
     std::uint64_t m_nextSequence{ 1 };
     std::uint64_t m_nextGroupId{ 1 };

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project>
+  <!-- Optional composition belongs to the host build, not to core C++ code.
+       false removes both the project reference and the archive root symbol.
+       Removing Engine/Effect altogether also leaves the hosts buildable. -->
+  <PropertyGroup>
+    <EngineEffectPackage Condition="'$(EngineEffectPackage)' == '' and Exists('$(SolutionDir)Engine\Effect\Effect.vcxproj')">true</EngineEffectPackage>
+    <EngineEffectPackage Condition="'$(EngineEffectPackage)' == ''">false</EngineEffectPackage>
+    <_EffectHost Condition="'$(Platform)' == 'x64' and ('$(MSBuildProjectName)' == 'CreatorEditor' or '$(MSBuildProjectName)' == 'Player')">true</_EffectHost>
+  </PropertyGroup>
+  <ItemGroup Condition="'$(_EffectHost)' == 'true' and '$(EngineEffectPackage)' == 'true'">
+    <ProjectReference Include="$(SolutionDir)Engine\Effect\Effect.vcxproj">
+      <Project>{F2E5DDF1-1960-4E81-80CA-E8CDBA100001}</Project>
+      <LinkLibraryDependencies>true</LinkLibraryDependencies>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemDefinitionGroup Condition="'$(_EffectHost)' == 'true' and '$(EngineEffectPackage)' == 'true'">
+    <Link><AdditionalOptions>/INCLUDE:ce_effect_package_anchor %(AdditionalOptions)</AdditionalOptions></Link>
+  </ItemDefinitionGroup>
+  <ItemDefinitionGroup Condition="'$(_EffectHost)' == 'true' and '$(EngineEffectPackageMap)' == 'true'">
+    <Link>
+      <GenerateMapFile>true</GenerateMapFile>
+      <MapFileName>$(IntDir)effect-package.map</MapFileName>
+    </Link>
+  </ItemDefinitionGroup>
+  <Target Name="ValidateEffectPackageSelection" BeforeTargets="PrepareForBuild" Condition="'$(_EffectHost)' == 'true'">
+    <Error Condition="'$(EngineEffectPackage)' != 'true' and '$(EngineEffectPackage)' != 'false'" Text="EngineEffectPackage must be true or false." />
+    <Error Condition="'$(EngineEffectPackage)' == 'true' and !Exists('$(SolutionDir)Engine\Effect\Effect.vcxproj')" Text="EngineEffectPackage=true requires Engine/Effect/Effect.vcxproj." />
+  </Target>
+</Project>

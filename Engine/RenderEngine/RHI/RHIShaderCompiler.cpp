@@ -1,3 +1,5 @@
+#include "../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -95,8 +97,8 @@ namespace
 
     thread_local RHIShaderBinary g_output = RHIShaderBinary::Dxil;
     std::mutex g_cacheMutex;
-    std::unordered_map<std::string, std::vector<std::uint8_t>> g_memoryCache;
-    std::unordered_map<std::string, RHIShaderCompiler::VerifiedShader> g_verifiedCache;
+    ce::engine_node_map<std::string, ce::dynamic_array<std::uint8_t>> g_memoryCache;
+    ce::engine_node_map<std::string, RHIShaderCompiler::VerifiedShader> g_verifiedCache;
     std::mutex g_progressMutex;
     RHIShaderCompiler::Progress g_progress;
     class CompileProgress;
@@ -320,7 +322,7 @@ namespace
         std::once_flag loadOnce;
         std::mutex slotsMutex;
         std::condition_variable slotFreed;
-        std::vector<own::unique_owner<SlangSlot>> slots;
+        ce::dynamic_array<own::unique_owner<SlangSlot>> slots;
 
         ~SlangRuntime()
         {
@@ -410,7 +412,7 @@ namespace
                 if (SLANG_FAILED(runtime.createGlobalSession(&desc, slot.globalSession.writeRef())))
                 {
                     lock.lock();
-                    std::erase_if(runtime.slots, [&](const auto& item) { return item.operator->() == &slot; });
+                    ce::erase_if(runtime.slots, [&](const auto& item) { return item.operator->() == &slot; });
                     lock.unlock();
                     runtime.slotFreed.notify_one();
                     outError = "Slang global session 추가 생성 실패";
@@ -462,7 +464,7 @@ namespace
     {
         std::ifstream file(path, std::ios::binary);
         if (!file) return false;
-        std::array<char, 64 * 1024> bytes{};
+        ce::fixed_array<char, 64 * 1024> bytes{};
         while (file)
         {
             file.read(bytes.data(), static_cast<std::streamsize>(bytes.size()));
@@ -827,10 +829,10 @@ namespace
 
     bool CollectSlangDependencies(slang::IModule& module,
         const std::filesystem::path& sourcePath, const std::string& sourceText,
-        std::vector<SourceUnit>& outUnits, std::string& outError)
+        ce::dynamic_array<SourceUnit>& outUnits, std::string& outError)
     {
         const std::filesystem::path root = NormalizePath(sourcePath);
-        std::unordered_map<std::wstring, std::filesystem::path> paths;
+        ce::engine_node_map<std::wstring, std::filesystem::path> paths;
         paths.emplace(root.native(), root);
 
         const SlangInt32 count = module.getDependencyFileCount();
@@ -848,7 +850,7 @@ namespace
         outUnits.reserve(paths.size());
         outUnits.push_back({ root, sourceText });
 
-        std::vector<std::filesystem::path> dependencies;
+        ce::dynamic_array<std::filesystem::path> dependencies;
         dependencies.reserve(paths.size());
         for (const auto& [key, path] : paths)
         {
@@ -870,7 +872,7 @@ namespace
 
     std::filesystem::path CacheDirectory()
     {
-        std::array<wchar_t, 32768> local{};
+        ce::fixed_array<wchar_t, 32768> local{};
         const DWORD length = GetEnvironmentVariableW(L"LOCALAPPDATA", local.data(),
             static_cast<DWORD>(local.size()));
         if (0 != length && length < local.size())
@@ -915,7 +917,7 @@ namespace
             return false;
         }
 
-        std::vector<std::uint8_t> bytes(static_cast<std::size_t>(header.byteCount));
+        ce::dynamic_array<std::uint8_t> bytes(static_cast<std::size_t>(header.byteCount));
         if (!file.read(reinterpret_cast<char*>(bytes.data()),
             static_cast<std::streamsize>(bytes.size()))) return false;
         const Hash128 content = HashBytes(bytes.data(), bytes.size());
@@ -1005,7 +1007,7 @@ namespace
         if (header.keyLo != keyHash.lo || header.keyHi != keyHash.hi) return false;
         std::error_code ec;
         if (std::filesystem::file_size(path, ec) != sizeof(header) + header.byteCount || ec) return false;
-        std::vector<std::uint8_t> bytes(static_cast<std::size_t>(header.byteCount));
+        ce::dynamic_array<std::uint8_t> bytes(static_cast<std::size_t>(header.byteCount));
         if (!file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size())))
             return false;
         const auto hash = HashBytes(bytes.data(), bytes.size());
@@ -1034,7 +1036,7 @@ namespace
             g_verifiedCache.insert_or_assign(key,
                 RHIShaderCompiler::VerifiedShader{blob, reflection, key});
         }
-        std::vector<std::uint8_t> bytes;
+        ce::dynamic_array<std::uint8_t> bytes;
         if (!rhi_shader_verified_cache::Encode(blob, reflection, bytes)) return;
         const auto directory = CacheDirectory();
         std::error_code ec;
@@ -1068,7 +1070,7 @@ namespace
     }
 
     std::string BuildCacheKey(const RHIShaderCompileRequest& request,
-        const std::vector<SourceUnit>& units, std::string_view compilerIdentity)
+        const ce::dynamic_array<SourceUnit>& units, std::string_view compilerIdentity)
     {
 #if CE_DEVELOPMENT
         ce::profile_scope profile{ce::marker<"ShaderCache.BuildKey">()};
@@ -1086,7 +1088,7 @@ namespace
         hash.Add(&request.output, sizeof(request.output));
         if (request.output == RHIShaderBinary::SpirV)
         {
-            const std::array shifts{VulkanBindingModel::kConstantBufferShift, VulkanBindingModel::kShaderResourceShift,
+            const ce::fixed_array shifts{VulkanBindingModel::kConstantBufferShift, VulkanBindingModel::kShaderResourceShift,
                 VulkanBindingModel::kUnorderedAccessShift, VulkanBindingModel::kSamplerShift};
             hash.Add(shifts.data(), sizeof(shifts));
         }
@@ -1136,12 +1138,12 @@ namespace
         return CacheDirectory() / (key + ".rsd");
     }
 
-    std::optional<std::vector<std::filesystem::path>> ReadDependencyList(const std::filesystem::path& path)
+    std::optional<ce::dynamic_array<std::filesystem::path>> ReadDependencyList(const std::filesystem::path& path)
     {
         std::ifstream file(path, std::ios::binary);
         std::string line;
         if (!std::getline(file, line) || line != kDependencyListMagic) return std::nullopt;
-        std::vector<std::filesystem::path> dependencies;
+        ce::dynamic_array<std::filesystem::path> dependencies;
         while (std::getline(file, line))
         {
             if (!line.empty()) dependencies.emplace_back(ce::strings::utf8_to_wide(line, true));
@@ -1149,7 +1151,7 @@ namespace
         return dependencies;
     }
 
-    void WriteDependencyList(const std::filesystem::path& path, const std::vector<SourceUnit>& units)
+    void WriteDependencyList(const std::filesystem::path& path, const ce::dynamic_array<SourceUnit>& units)
     {
         std::error_code ec;
         std::filesystem::create_directories(path.parent_path(), ec);
@@ -1177,12 +1179,12 @@ namespace
     // 기록한 의존 파일과 같은 이름의 파일이 다른 검색 위치에 생기면 Slang 은 그쪽을 읽을 수 있다.
     // 기록한 파일만 보면 이 변화를 못 보므로, 그런 후보가 하나라도 있으면 빠른 길을 쓰지 않는다.
     // 표기는 파일 이름과 폴더 하나를 붙인 이름("Includes/X.slang")까지 본다.
-    bool HasShadowCandidate(const std::vector<SourceUnit>& units, const RHIShaderCompileRequest& request)
+    bool HasShadowCandidate(const ce::dynamic_array<SourceUnit>& units, const RHIShaderCompileRequest& request)
     {
 #if CE_DEVELOPMENT
         ce::profile_scope profile{ce::marker<"ShaderCache.CheckShadowCandidates">()};
 #endif
-        std::vector<std::filesystem::path> locations;
+        ce::dynamic_array<std::filesystem::path> locations;
         const auto addLocation = [&locations](const std::filesystem::path& directory)
         {
             if (directory.empty() || std::ranges::find(locations, directory) != locations.end()) return;
@@ -1515,7 +1517,7 @@ namespace
                 std::ranges::sort(resource.fields, {},
                     [](const RHIShaderFieldReflection& field)
                     {
-                        return std::tie(field.byteOffset, field.name);
+                        return ce::tie(field.byteOffset, field.name);
                     });
             }
             reflection.resources.push_back(std::move(resource));
@@ -1524,7 +1526,7 @@ namespace
         std::ranges::sort(reflection.resources, {},
             [](const RHIShaderResourceReflection& resource)
             {
-                return std::tuple(resource.kind, resource.registerSpace,
+                return ce::tuple(resource.kind, resource.registerSpace,
                     resource.registerIndex, resource.name);
             });
         outReflection = std::move(reflection);
@@ -1539,7 +1541,7 @@ namespace
 struct RHIShaderCompiler::ModuleReuseState final
 {
     SlotLease lease;
-    std::vector<ReusedModule> modules;
+    ce::dynamic_array<ReusedModule> modules;
 };
 
 namespace
@@ -1577,14 +1579,14 @@ namespace
         // 빗나가거나 목록을 믿을 수 없으면 false 를 돌려 Slang 경로가 다시 해석하게 한다.
         static bool ReadCachedWithoutSlang(const RHIShaderCompileRequest& request,
             const std::filesystem::path& sourcePath, const std::string& sourceText, SlangStage stage,
-            const std::vector<std::filesystem::path>& recordedDependencies, std::string_view compilerIdentity,
+            const ce::dynamic_array<std::filesystem::path>& recordedDependencies, std::string_view compilerIdentity,
             RHIShaderBlob* outBlob, RHIShaderReflection* outReflection, std::string& outError,
-            std::string* outIdentity, std::vector<std::filesystem::path>* outDependencies, CompileProgress& progress)
+            std::string* outIdentity, ce::dynamic_array<std::filesystem::path>* outDependencies, CompileProgress& progress)
         {
 #if CE_DEVELOPMENT
             ce::profile_scope profile{ce::marker<"ShaderCache.CheckDependencies">()};
 #endif
-            std::vector<SourceUnit> units;
+            ce::dynamic_array<SourceUnit> units;
             units.reserve(recordedDependencies.size() + 1);
             units.push_back({ NormalizePath(sourcePath), sourceText });
             for (const auto& path : recordedDependencies)
@@ -1617,7 +1619,7 @@ namespace
         bool Process(const RHIShaderCompileRequest& request,
             RHIShaderBlob* outBlob, RHIShaderReflection* outReflection,
             std::string& outError, std::string* outIdentity = nullptr,
-            std::vector<std::filesystem::path>* outDependencies = nullptr)
+            ce::dynamic_array<std::filesystem::path>* outDependencies = nullptr)
         {
 #if CE_DEVELOPMENT
             ce::profile_scope profile{ce::marker<"ShaderCompiler.Process">()};
@@ -1660,7 +1662,7 @@ namespace
             slang::IGlobalSession& globalSession = *slot->globalSession;
             progress.Phase("Resolving shader dependencies");
 
-            std::vector<std::string> ownedArguments;
+            ce::dynamic_array<std::string> ownedArguments;
             ownedArguments.reserve(40);
             const auto addArgument = [&ownedArguments](std::string value)
             {
@@ -1748,7 +1750,7 @@ namespace
                 // Vulkan도 같은 offset을 사용해야 DXIL/SPIR-V reflection과 실제
                 // GPU 접근이 일치한다.
                 addArgument("-fvk-use-dx-layout");
-                const std::array<std::pair<const char*, std::uint32_t>, 4> shifts = {{
+                const ce::fixed_array<ce::pair<const char*, std::uint32_t>, 4> shifts = {{
                     { "-fvk-b-shift", VulkanBindingModel::kConstantBufferShift },
                     { "-fvk-t-shift", VulkanBindingModel::kShaderResourceShift },
                     { "-fvk-u-shift", VulkanBindingModel::kUnorderedAccessShift },
@@ -1772,7 +1774,7 @@ namespace
                 }
             }
 
-            std::vector<const char*> arguments;
+            ce::dynamic_array<const char*> arguments;
             arguments.reserve(ownedArguments.size());
             for (const std::string& argument : ownedArguments)
                 arguments.push_back(argument.c_str());
@@ -1823,7 +1825,7 @@ namespace
                 // target에 이미 있는 VulkanBindShift 중복본만 session에서 제외한다.
                 // 전용 API probe와 동일 버전 slangc의 SPIR-V decoration을 대조해
                 // b0/t100/u200/s300을 확인했다.
-                std::vector<slang::CompilerOptionEntry> sessionOptions;
+                ce::dynamic_array<slang::CompilerOptionEntry> sessionOptions;
                 sessionOptions.reserve(sessionDesc.compilerOptionEntryCount);
                 for (std::uint32_t i = 0; i < sessionDesc.compilerOptionEntryCount; ++i)
                 {
@@ -1865,7 +1867,7 @@ namespace
             }
 
             trace.frontMs = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now()-frontStart).count();
-            std::vector<SourceUnit> units;
+            ce::dynamic_array<SourceUnit> units;
             if (!CollectSlangDependencies(*shaderModule, sourcePath, sourceText,
                 units, outError))
             {
@@ -1973,7 +1975,7 @@ namespace
             ++trace.compiled;
             ++g_compiles;
             {
-                std::vector<std::uint8_t> bytes(outBlob->Size());
+                ce::dynamic_array<std::uint8_t> bytes(outBlob->Size());
                 std::memcpy(bytes.data(), outBlob->Data(), outBlob->Size());
                 std::lock_guard<std::mutex> guard(g_cacheMutex);
                 g_memoryCache.emplace(cacheKey, std::move(bytes));
@@ -2046,7 +2048,7 @@ bool RHIShaderCompiler::CanReuseDependencyResolution(std::span<const std::filesy
     RHIShaderCompileRequest request;
     request.options.includeDirectories.assign(includeDirectories.begin(), includeDirectories.end());
     // 소스 파일의 수명과 별개로 호출자가 전달한 source/include 검색 위치를 함께 검사한다.
-    std::vector<SourceUnit> units(1);
+    ce::dynamic_array<SourceUnit> units(1);
     units.reserve(dependencies.size() + 1);
     for (const auto& path : dependencies)
     {

@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿#include "../../../../Containers/ContainerAPI.h"
+#pragma once
 #include "../../Core/PassResourceRetirement.h"
 #include "../../../RHI/RHIFormat.h"
 #include "../../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -209,7 +210,7 @@ private:
     RGHandle m_traceResult;   // 행진 원본(노이즈가 살아 있다)
 
     // Hi-Z 피라미드. 밉마다 UAV가 필요해 핸들을 따로 든다.
-    std::array<RGHandle, kMaxHiZMips> m_hiZMips{};
+    ce::fixed_array<RGHandle, kMaxHiZMips> m_hiZMips{};
     uint32_t m_hiZMipCount{ 0 };
 
     // 히스토리는 그래프의 transient가 아니다 — 프레임을 넘겨 살아야 한다.
@@ -217,8 +218,8 @@ private:
     // GI와 깊이를 함께 든다. 깊이가 없으면 '재투영한 자리가 정말 같은
     // 표면인가'를 물을 수 없고, 그러면 카메라가 움직일 때 엉뚱한 픽셀의
     // 값을 섞게 된다 — 증상이 '움직이면 번진다'라서 노이즈로 오해하기 쉽다.
-    std::array<RHITextureHandle, kHistoryCount> m_history;
-    std::array<RHITextureHandle, kHistoryCount> m_historyDepth;
+    ce::fixed_array<RHITextureHandle, kHistoryCount> m_history;
+    ce::fixed_array<RHITextureHandle, kHistoryCount> m_historyDepth;
     uint32_t m_historyIndex{ 0 };
     bool     m_historyValid{ false };
 
@@ -229,11 +230,11 @@ private:
     ///   그렇게 주기 때문이다(만들자마자 다음 프레임 셰이더가 읽으므로
     ///   COMMON에서 출발시키면 첫 읽기 앞에 전이가 하나 더 붙는다).
     ///   EnsureHistory가 다시 만들면 여기도 되돌려야 한다.
-    std::array<RGHandle, kHistoryCount> m_historyHandle;
-    std::array<RGHandle, kHistoryCount> m_historyDepthHandle;
-    std::array<RHIResourceState, kHistoryCount> m_historyState{
+    ce::fixed_array<RGHandle, kHistoryCount> m_historyHandle;
+    ce::fixed_array<RGHandle, kHistoryCount> m_historyDepthHandle;
+    ce::fixed_array<RHIResourceState, kHistoryCount> m_historyState{
         RHIResourceState::ShaderResource, RHIResourceState::ShaderResource };
-    std::array<RHIResourceState, kHistoryCount> m_historyDepthState{
+    ce::fixed_array<RHIResourceState, kHistoryCount> m_historyDepthState{
         RHIResourceState::ShaderResource, RHIResourceState::ShaderResource };
 
     bool EnsureHistory(const EnhancedFrameContext& context, std::string& outError);

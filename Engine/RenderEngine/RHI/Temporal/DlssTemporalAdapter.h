@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
 #else
@@ -204,7 +205,7 @@ private:
 // consumption, including FG fences if TU/FG share resources. It may fail; no
 // resources are freed on failure. A failed destructor drain quarantines the
 // shared session rather than unloading live code or freeing active GPU memory.
-using DlssFinalConsumptionDrain = std::function<TemporalResult()>;
+using DlssFinalConsumptionDrain = ce::owned_func<TemporalResult()>;
 TemporalResult CreateDlssDX12Upscaler(DX12DeviceResources& resources,
     own::shared_owner<DlssTemporalAdapter> session, uint32_t viewportId, TemporalQuality quality,
     DlssFinalConsumptionDrain drain, own::unique_owner<ITemporalUpscaler>& upscaler);

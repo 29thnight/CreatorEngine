@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
@@ -72,16 +73,16 @@ struct TemporalExtent
 // necessary; zero-filled matrices never count as valid camera data.
 struct TemporalCamera
 {
-    std::array<float, 16> viewMatrix{};
-    std::array<float, 16> projectionMatrix{};
-    std::array<float, 16> cameraViewToClip{};
-    std::array<float, 16> clipToCameraView{};
-    std::array<float, 16> clipToPreviousClip{};
-    std::array<float, 16> previousClipToClip{};
-    std::array<float, 3> position{};
-    std::array<float, 3> up{};
-    std::array<float, 3> right{};
-    std::array<float, 3> forward{};
+    ce::fixed_array<float, 16> viewMatrix{};
+    ce::fixed_array<float, 16> projectionMatrix{};
+    ce::fixed_array<float, 16> cameraViewToClip{};
+    ce::fixed_array<float, 16> clipToCameraView{};
+    ce::fixed_array<float, 16> clipToPreviousClip{};
+    ce::fixed_array<float, 16> previousClipToClip{};
+    ce::fixed_array<float, 3> position{};
+    ce::fixed_array<float, 3> up{};
+    ce::fixed_array<float, 3> right{};
+    ce::fixed_array<float, 3> forward{};
     float aspectRatio{ 0.0f };
     bool valid{ false };
     bool orthographicProjection{ false };

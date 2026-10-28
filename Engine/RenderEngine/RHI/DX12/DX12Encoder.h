@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -73,7 +74,7 @@ class DX12Encoder final : public RHIEncoder
 
   private:
     uint64_t m_computeDispatches{};
-    std::vector<D3D12_RESOURCE_BARRIER> m_barrierScratch;
+    ce::dynamic_array<D3D12_RESOURCE_BARRIER> m_barrierScratch;
     /// 슬라이스를 GPU 주소로 푼다. 링은 리소스가 하나라 표 조회가 배열
     /// 인덱싱 한 번이다 — Allocate 의 175ns 에 비하면 묻힌다(encoderbench 로 잰다).
     D3D12_GPU_VIRTUAL_ADDRESS ResolveSlice(const RHIBufferSlice& slice) const;

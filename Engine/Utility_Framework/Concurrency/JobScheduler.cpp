@@ -1,7 +1,10 @@
 #if defined(CE_CONTRACT_STANDALONE)
+#include "../../Containers/ContainerAPI.h"
 #include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
 module Creator.Concurrency.Jobs;
+import std;
+import "Creator.Containers.h";
 import Creator.Core.Ownership;
 import Creator.Concurrency.JobGraph;
 #endif
@@ -9,14 +12,14 @@ namespace
 {
     // Completion propagation is iterative: long empty/failed dependency chains must
     // not recurse through thousands of finish() calls on a worker's stack.
-    void notify_dependents(std::vector<std::function<void(std::exception_ptr)>> ready, std::exception_ptr error)
+    void notify_dependents(ce::dynamic_array<ce::unique_func<void(std::exception_ptr)>> ready, std::exception_ptr error)
     {
         struct notification
         {
-            std::function<void(std::exception_ptr)> callback;
+            ce::unique_func<void(std::exception_ptr)> callback;
             std::exception_ptr error;
         };
-        thread_local std::vector<notification> notifications;
+        thread_local ce::dynamic_array<notification> notifications;
         thread_local bool pumping = false;
         for (auto& callback : ready)
         {
@@ -44,11 +47,11 @@ namespace job_detail
     {
         thread_pool& pool_;
         // Dispatch is installed by job_scheduler, the only thread_pool submission owner.
-        std::function<void(std::vector<std::function<void()>>, std::function<void(std::exception_ptr)>)> dispatch_;
-        std::function<void(std::size_t, std::function<void(std::size_t)>, std::function<void(std::exception_ptr)>)>
+        ce::unique_func<void(ce::dynamic_array<ce::unique_func<void()>>, ce::unique_func<void(std::exception_ptr)>)> dispatch_;
+        ce::unique_func<void(std::size_t, ce::unique_func<void(std::size_t)>, ce::unique_func<void(std::exception_ptr)>)>
             dispatch_indexed_;
-        std::function<void(std::span<const job_graph_node>, std::function<void(std::size_t)>,
-                           std::function<void(std::exception_ptr)>, own::shared_owner<job_graph_diagnostics>)>
+        ce::unique_func<void(std::span<const job_graph_node>, ce::unique_func<void(std::size_t)>,
+                           ce::unique_func<void(std::exception_ptr)>, own::shared_owner<job_graph_diagnostics>)>
             dispatch_graph_;
         mutable std::mutex mutex_;
         std::condition_variable done_;
@@ -65,17 +68,17 @@ namespace job_detail
         bool complete_{}, completing_{}, dispatched_{};
         std::size_t remaining_{};
         std::exception_ptr failure_;
-        std::vector<std::function<void()>> tasks_;
-        std::function<void(std::size_t)> indexed_task_;
+        ce::dynamic_array<ce::unique_func<void()>> tasks_;
+        ce::unique_func<void(std::size_t)> indexed_task_;
         std::size_t indexed_count_{};
-        std::vector<std::function<void(std::exception_ptr)>> continuations_;
-        std::function<void(std::exception_ptr)> terminal_observer_;
+        ce::dynamic_array<ce::unique_func<void(std::exception_ptr)>> continuations_;
+        ce::unique_func<void(std::exception_ptr)> terminal_observer_;
 
         void finish(std::exception_ptr error) noexcept
         {
-            std::vector<std::function<void()>> discarded;
-            std::function<void(std::size_t)> discarded_indexed;
-            std::function<void(std::exception_ptr)> terminal_observer;
+            ce::dynamic_array<ce::unique_func<void()>> discarded;
+            ce::unique_func<void(std::size_t)> discarded_indexed;
+            ce::unique_func<void(std::exception_ptr)> terminal_observer;
             {
                 std::lock_guard lock(mutex_);
                 if (complete_ || completing_)
@@ -104,7 +107,7 @@ namespace job_detail
                 }
                 terminal_observer = {};
             }
-            std::vector<std::function<void(std::exception_ptr)>> ready;
+            ce::dynamic_array<ce::unique_func<void(std::exception_ptr)>> ready;
             {
                 std::lock_guard lock(mutex_);
                 failure_ = error;
@@ -122,8 +125,8 @@ namespace job_detail
         }
         void prerequisite_complete(std::exception_ptr error) noexcept
         {
-            std::vector<std::function<void()>> work;
-            std::function<void(std::size_t)> indexed_task;
+            ce::dynamic_array<ce::unique_func<void()>> work;
+            ce::unique_func<void(std::size_t)> indexed_task;
             std::size_t indexed_count{};
             {
                 std::lock_guard lock(mutex_);
@@ -213,23 +216,24 @@ void job_handle::wait_assisting() const
         wait();
         return;
     }
-    state_->owner_->pool_.assist_until([this] { return is_complete(); });
+    const auto ready = [this] { return is_complete(); };
+    state_->owner_->pool_.assist_until(ready);
     wait();
 }
 
 job_scheduler::job_scheduler(thread_pool& pool) : state_(std::make_shared<job_detail::scheduler_state>(pool))
 {
     state_->dispatch_ =
-        [&pool](std::vector<std::function<void()>> tasks, std::function<void(std::exception_ptr)> complete)
+        [&pool](ce::dynamic_array<ce::unique_func<void()>> tasks, ce::unique_func<void(std::exception_ptr)> complete)
     {
         const auto count = tasks.size();
         pool.dispatch(count, [tasks = std::move(tasks)](std::size_t index) { tasks[index](); }, std::move(complete));
     };
-    state_->dispatch_indexed_ = [&pool](std::size_t count, std::function<void(std::size_t)> task,
-                                        std::function<void(std::exception_ptr)> complete)
+    state_->dispatch_indexed_ = [&pool](std::size_t count, ce::unique_func<void(std::size_t)> task,
+                                        ce::unique_func<void(std::exception_ptr)> complete)
     { pool.dispatch(count, std::move(task), std::move(complete)); };
-    state_->dispatch_graph_ = [&pool](std::span<const job_graph_node> nodes, std::function<void(std::size_t)> task,
-                                      std::function<void(std::exception_ptr)> complete,
+    state_->dispatch_graph_ = [&pool](std::span<const job_graph_node> nodes, ce::unique_func<void(std::size_t)> task,
+                                      ce::unique_func<void(std::exception_ptr)> complete,
                                       own::shared_owner<job_graph_diagnostics> diagnostics)
     { pool.dispatch_graph(nodes, std::move(task), std::move(complete), std::move(diagnostics)); };
 }
@@ -317,7 +321,7 @@ job_handle job_scheduler::submit_after(std::span<const job_handle> dependencies,
     }
     return job_handle(std::move(job));
 }
-job_handle job_scheduler::submit_indexed(std::size_t count, std::function<void(std::size_t)> task)
+job_handle job_scheduler::submit_indexed(std::size_t count, ce::unique_func<void(std::size_t)> task)
 {
     if (!count)
     {
@@ -343,7 +347,7 @@ job_handle job_scheduler::submit_indexed(std::size_t count, std::function<void(s
     job->prerequisite_complete({});
     return job_handle(std::move(job));
 }
-job_handle job_scheduler::submit_graph(std::span<const job_graph_node> nodes, std::function<void(std::size_t)> task,
+job_handle job_scheduler::submit_graph(std::span<const job_graph_node> nodes, ce::unique_func<void(std::size_t)> task,
                                        own::shared_owner<job_graph_diagnostics> diagnostics)
 {
     if (nodes.size() >= static_cast<std::size_t>((std::numeric_limits<std::int32_t>::max)()))
@@ -419,7 +423,7 @@ job_handle job_scheduler::submit_graph(std::span<const job_graph_node> nodes, st
     return job_handle(std::move(job));
 }
 job_handle job_scheduler::parallel_for(std::size_t count, std::size_t grain,
-                                       std::function<void(std::size_t, std::size_t)> task)
+                                       ce::owned_func<void(std::size_t, std::size_t)> task)
 {
     if (!grain)
     {

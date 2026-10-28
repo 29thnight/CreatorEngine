@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 // 에디터 창 런타임 표 (PHASE 21 M4 · 계획서 부록 B.3).
 //
 // 이 TU는 유니티 빌드에서 일부러 뺀다(Editor.vcxproj). `Commands/*.cpp`와
@@ -25,9 +26,9 @@ namespace editor
             return mutex;
         }
 
-        std::vector<std::pair<std::string, window_request>>& pending_requests()
+        ce::dynamic_array<ce::pair<std::string, window_request>>& pending_requests()
         {
-            static std::vector<std::pair<std::string, window_request>> requests;
+            static ce::dynamic_array<ce::pair<std::string, window_request>> requests;
             return requests;
         }
     }
@@ -45,7 +46,7 @@ namespace editor
 
     std::string apply_pending_window_requests(window_table& table)
     {
-        std::vector<std::pair<std::string, window_request>> requests;
+        ce::dynamic_array<ce::pair<std::string, window_request>> requests;
         {
             std::lock_guard lock(request_mutex());
             requests.swap(pending_requests());
@@ -123,7 +124,7 @@ namespace editor
     {
         window_registry_stats stats{};
 
-        const std::vector<window_entry>& entries = table.entries;
+        const ce::dynamic_array<window_entry>& entries = table.entries;
         stats.total = entries.size();
 
         for (const window_entry& entry : entries)

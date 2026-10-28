@@ -1,3 +1,5 @@
+#include "../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -79,7 +81,7 @@ namespace assets
         return {};
     }
 
-    bool NormalizeModelStableInputs(std::vector<StableKeyElement>& elements, std::string& failure)
+    bool NormalizeModelStableInputs(ce::dynamic_array<StableKeyElement>& elements, std::string& failure)
     {
         for (auto& element : elements)
         {
@@ -101,7 +103,7 @@ namespace assets
     }
 
     bool ReconcileAuthoredModelBindings(const experiment::importer::ImportedScene& scene,
-        const ModelSidecarV2& sidecar, std::vector<StableKeyAssignment>& out, std::string& failure)
+        const ModelSidecarV2& sidecar, ce::dynamic_array<StableKeyAssignment>& out, std::string& failure)
     {
         auto elements = CollectStableKeyElements(scene);
         if (!NormalizeModelStableInputs(elements, failure))
@@ -109,7 +111,7 @@ namespace assets
             return false;
         }
         // A source cook cannot mint or retire identities, even temporarily.
-        const auto refuseIssuance = [](std::array<std::uint8_t, kAuthoringKeyBytes>&, std::string& error)
+        const auto refuseIssuance = [](ce::fixed_array<std::uint8_t, kAuthoringKeyBytes>&, std::string& error)
         {
             error = "New stable identity required; run model authoring reconciliation before BuildAssetSet";
             return false;
@@ -124,7 +126,7 @@ namespace assets
             }
             return false;
         }
-        std::set<std::pair<SubAssetKind, std::string>> seen;
+        ce::engine_ordered_set<ce::pair<SubAssetKind, std::string>> seen;
         for (const auto& assignment : keys.assignments)
         {
             const auto prior = std::ranges::find_if(sidecar.subAssets, [&](const auto& record)

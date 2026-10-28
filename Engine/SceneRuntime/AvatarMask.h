@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
@@ -23,7 +24,7 @@ public:
 	BoneMask* RootMask{ nullptr };
 
 	bool IsBoneEnabled(const std::string& name);
-	std::vector<BoneMask*> m_BoneMasks;
+	ce::dynamic_array<BoneMask*> m_BoneMasks;
 	bool isHumanoid = true; 
 	bool useAll = false;
 	bool useUpper = true;

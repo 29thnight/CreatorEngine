@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 // PHASE 3.75 MBC11 — 모델 자산 경로의 단계별 경과 시간(읽기 전용 진단).
 //
@@ -15,5 +16,5 @@ namespace assets
         double milliseconds{};
     };
 
-    using ModelAssetPhaseTimeline = std::vector<ModelAssetPhaseMs>;
+    using ModelAssetPhaseTimeline = ce::dynamic_array<ModelAssetPhaseMs>;
 }

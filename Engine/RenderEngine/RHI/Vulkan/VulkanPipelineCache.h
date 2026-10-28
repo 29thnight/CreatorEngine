@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
@@ -121,10 +123,10 @@ struct VulkanPipelineLayoutEntry
     ///
     ///   그래서 레이아웃 엔트리가 든다 — 수명이 정확히 같기 때문이다. 캐시에
     ///   따로 모아 두면 "어느 레이아웃의 것인가"를 잃는다.
-    std::vector<VkSampler> staticSamplers;
+    ce::dynamic_array<VkSampler> staticSamplers;
 
     /// 루트 파라미터 번호 → binding·종류 (5c-4d). 인덱스가 곧 슬롯 번호다.
-    std::vector<VulkanLayoutSlot> paramSlots;
+    ce::dynamic_array<VulkanLayoutSlot> paramSlots;
     VulkanDescriptorRequirements descriptorRequirements;
     bool allowInputAssembler{false};
 
@@ -235,11 +237,11 @@ class VulkanPipelineCache : public IRenderPipelineCache, public IRenderRootSigna
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_PROPERTIES };
     job_scheduler& m_scheduler;
     // The worker captures only PendingGraphics. Layout/device stay alive until Shutdown joins every job.
-    std::unordered_map<uint64_t, own::shared_owner<PendingGraphics>> m_pendingGraphics;
-    std::vector<own::shared_owner<PendingGraphics>> m_abandonedGraphics;
+    ce::engine_node_map<uint64_t, own::shared_owner<PendingGraphics>> m_pendingGraphics;
+    ce::dynamic_array<own::shared_owner<PendingGraphics>> m_abandonedGraphics;
 
-    std::unordered_map<uint64_t, RHIPipelineLayoutHandle> m_layoutByHash;
-    std::unordered_map<uint64_t, RHIPipelineHandle> m_pipelineByHash;
+    ce::engine_node_map<uint64_t, RHIPipelineLayoutHandle> m_layoutByHash;
+    ce::engine_node_map<uint64_t, RHIPipelineHandle> m_pipelineByHash;
 
     struct PipelineSlot
     {
@@ -250,16 +252,16 @@ class VulkanPipelineCache : public IRenderPipelineCache, public IRenderRootSigna
     };
     // M5-C3b1: lookup에서 제거한 slot은 generation을 올려 재사용한다. VkPipeline은
     // 제출 완료를 이 cache가 직접 알기 전까지 retired 목록에 보존한다.
-    std::vector<PipelineSlot> m_pipelines;
-    std::vector<std::uint32_t> m_pipelineFree;
+    ce::dynamic_array<PipelineSlot> m_pipelines;
+    ce::dynamic_array<std::uint32_t> m_pipelineFree;
     struct RetiredPipeline
     {
         VkPipeline m_pipeline{VK_NULL_HANDLE};
         ce::lifetime_token m_lease;
     };
     RHICompletionRetireQueue<RetiredPipeline> m_retiredPipelines;
-    std::vector<RetiredPipeline> m_pinnedRetiredPipelines;
-    std::vector<VulkanPipelineLayoutEntry> m_layouts;
+    ce::dynamic_array<RetiredPipeline> m_pinnedRetiredPipelines;
+    ce::dynamic_array<VulkanPipelineLayoutEntry> m_layouts;
 
     Stats m_stats;
 };

@@ -5,7 +5,7 @@
 #error "Native consumers must import the named module directly."
 #endif
 
-
+#include "../../../Engine/Containers/Creator.Containers.h"
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // Standard alphabet, canonical padding and unused-bit validation.
@@ -65,7 +65,7 @@ namespace ce::base64
     }
 
     [[nodiscard]] inline bool decode(std::string_view encoded,
-        std::vector<std::uint8_t>& decoded)
+        ce::dynamic_array<std::uint8_t>& decoded)
     {
         decoded.clear();
         if (encoded.empty())

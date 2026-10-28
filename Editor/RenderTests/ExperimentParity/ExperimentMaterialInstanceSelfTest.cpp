@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -119,7 +120,7 @@ namespace RenderTest
             // base는 한 바이트도 안 바뀌었어야 한다.
             check.Check(PropertyEquals(*base, "sheen", 0.5f)
                 && base->properties.size() == 2u
-                && base->keywords == std::vector<std::string>{ "on" },
+                && base->keywords == ce::dynamic_array<std::string>{ "on" },
                 "base 불변성");
 
             // identity는 참조용으로 보존된다 — 인스턴스가 그 자산이라는 뜻이
@@ -191,14 +192,14 @@ namespace RenderTest
             check.Check(instance.BuildEffectiveMaterial(effective, error),
                 "keyword 효과 머테리얼 생성");
             check.Check(effective.keywords
-                == std::vector<std::string>{ "on", "off" },
+                == ce::dynamic_array<std::string>{ "on", "off" },
                 "override가 base keyword 뒤에 덧붙는다");
 
             experiment::ResolvedMaterial resolved;
             check.Check(experiment::ResolveMaterial(effective, services,
                 resolved, error), "효과 머테리얼 해석 (" + error + ")");
             check.Check(resolved.keywordSelections
-                == std::vector<std::uint16_t>{ 0 },
+                == ce::dynamic_array<std::uint16_t>{ 0 },
                 "override(off)가 base(on)의 같은 축 선택을 이긴다");
 
             // 같은 값 재추가는 축적 없이 뒤로 보낸다.
@@ -220,7 +221,7 @@ namespace RenderTest
             meta.keywords = { { "FOG", { "off", "on" } } };
             meta.properties = {
                 { "tint", "Tint", ShaderPropertyType::Float4,
-                  std::array<float, 4>{ 1.0f, 0.5f, 0.25f, 1.0f } },
+                  ce::fixed_array<float, 4>{ 1.0f, 0.5f, 0.25f, 1.0f } },
                 { "sheen", "Sheen", ShaderPropertyType::Float, 0.5f },
             };
             ShaderMetaBindingLayout layout;
@@ -258,8 +259,8 @@ namespace RenderTest
                 if (property.name == "sheen") property.value = 0.125f;
             }
 
-            std::vector<std::uint8_t> effectiveBytes;
-            std::vector<std::uint8_t> authoredBytes;
+            ce::dynamic_array<std::uint8_t> effectiveBytes;
+            ce::dynamic_array<std::uint8_t> authoredBytes;
             check.Check(experiment::BuildMaterialPropertyBlock(effective, meta,
                 layout, effectiveBytes, error),
                 "효과 머테리얼 packing (" + error + ")");

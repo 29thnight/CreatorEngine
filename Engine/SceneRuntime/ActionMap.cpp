@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineFunc.h"
+#include "../Containers/ContainerAPI.h"
 #include "ActionMap.h"
 #include "../Utility_Framework/Foundation/Core.Definition.h"
 #include "InputManager.h"
@@ -31,7 +33,7 @@ InputAction* ActionMap::AddAction()
 	return newAction;
 }
 
-void ActionMap::AddButtonAction(std::string name, size_t _playerindex, InputType _inputType, size_t _key, KeyState _state, std::function<void()> _action)
+void ActionMap::AddButtonAction(std::string name, size_t _playerindex, InputType _inputType, size_t _key, KeyState _state, ce::owned_func<void()> _action)
 {
 	InputAction* inputAction = nullptr;
 	bool isNew = true;
@@ -64,10 +66,10 @@ void ActionMap::AddButtonAction(std::string name, size_t _playerindex, InputType
 
 void ActionMap::AddButtonAction(std::string name, size_t _playerindex, InputType _inputType, size_t _key, KeyState _state, void(*_action)())
 {
-	AddButtonAction(name, _playerindex, _inputType, _key, _state, std::function<void()>(_action));
+	AddButtonAction(name, _playerindex, _inputType, _key, _state, ce::owned_func<void()>(_action));
 }
 
-void ActionMap::AddValueAction(std::string name, size_t _playerindex, InputValueType _inputValueType, InputType _inputType, std::vector<size_t> _keys, std::function<void(math::vector2)> _action)
+void ActionMap::AddValueAction(std::string name, size_t _playerindex, InputValueType _inputValueType, InputType _inputType, ce::dynamic_array<size_t> _keys, ce::owned_func<void(math::vector2)> _action)
 {
 	InputAction* inputAction =nullptr;
 	bool isNew = true;
@@ -111,7 +113,7 @@ void ActionMap::AddValueAction(std::string name, size_t _playerindex, InputValue
 		m_actions.push_back(inputAction);
 }
 
-void ActionMap::AddValueAction(std::string name, size_t _playerindex, InputValueType _inputValueType, InputType _inputType, std::vector<size_t> _keys, std::function<void(float)> _action)
+void ActionMap::AddValueAction(std::string name, size_t _playerindex, InputValueType _inputValueType, InputType _inputType, ce::dynamic_array<size_t> _keys, ce::owned_func<void(float)> _action)
 {
 
 	InputAction* inputAction = nullptr;
@@ -245,7 +247,7 @@ void ActionMap::CheckAction()
 }
 
 void ActionMap::CheckAction(int playerIndex, std::string_view scriptName,
-	const std::function<void(const std::string&)>& onFired)
+	const ce::owned_func<void(const std::string&)>& onFired)
 {
 	for (auto& action : m_actions)
 	{

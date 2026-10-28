@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/SceneBufferPoolMigration20261027.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>임시 GPU 버퍼 풀 STL 전환과 소유권 검증</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#변경과-보존-조건">변경과 보존 조건</a></li><li><a href="#실제-dx12-회귀">실제 DX12 회귀</a></li><li><a href="#실제-엔진-빌드와-실행">실제 엔진 빌드와 실행</a></li><li><a href="#성능-정본과-남은-사용처">성능 정본과 남은 사용처</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="SceneBufferPoolMigration20261027.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>임시 GPU 버퍼 풀 STL 전환과 소유권 검증</h1>
+<div class="meta"><p>성능 수용을 통과한 <code>Engine/Containers</code> 구현 62개 파일은 수정하지 않고, <code>MaterialGraphTransientBufferPool.h</code>의 소유 ID 맵과 배치 상태 비트셋을 전환했다. 기존 성능 합격 자료는 원시 결과와 입력 해시를 재검증했으며 성능 표본을 새로 수집한 것은 아니다. 이번 작업은 버퍼 소유권·할당·해제 계약과 실제 DX12/Editor 실행을 검증한다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
+<a class="map-row" href="#변경과-보존-조건"><span class="ve-label">§00</span><span class="map-name">변경과 보존 조건</span><span class="map-bar"><i style="width:46.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실제-dx12-회귀"><span class="ve-label">§01</span><span class="map-name">실제 DX12 회귀</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실제-엔진-빌드와-실행"><span class="ve-label">§02</span><span class="map-name">실제 엔진 빌드와 실행</span><span class="map-bar"><i style="width:21%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#성능-정본과-남은-사용처"><span class="ve-label">§03</span><span class="map-name">성능 정본과 남은 사용처</span><span class="map-bar"><i style="width:45.6%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「실제 DX12 회귀」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-변경과-보존-조건">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="변경과-보존-조건">변경과 보존 조건</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>사용처</th><th>변경</th><th>보존한 조건</th></tr></thead>
+<tbody><tr><td><code>AcquireBatch</code>의 <code>missing</code>, <code>capacityMiss</code></td><td><code>std::bitset&lt;Count&gt;</code> → <code>ce::fixed_bitset&lt;Count&gt;</code></td><td>초기 상태 0, 고정 크기·무할당 저장소, 요청별 생성/실패 표시</td></tr>
+<tr><td><code>owned</code></td><td><code>std::unordered_map&lt;uint32_t, Key&gt;</code> → <code>ce::node_hash_map</code></td><td>정수 ID와 Key의 값 소유, 조회 시 임시 키 할당 없음, 노드 삭제 시 즉시 저장소 해제</td></tr></tbody></table></div>
+<p>맵에는 <code>PoolNodes=false</code>를 명시했다. 버퍼가 캐시에 반환됐을 때는 추적 노드를 유지하고, 예산 초과나 종료 후 반환으로 실제 풀을 떠날 때 노드를 해제하는 기존 정책을 유지한다. 이 맵은 GPU 객체 자체를 소유하는 스마트 포인터가 아니라 ID와 재사용 조건을 기록한다. 네이티브 객체와 GPU 완료 후 은퇴는 기존 장치·호출자 소유 흐름이 담당한다. 잠금 범위, 장치 생성·해제 호출 위치, 64MiB 캐시 예산, 닫힌 풀 처리와 예외 롤백 코드는 바꾸지 않았다. 노드·인덱스의 전체 바이트 수가 STL과 같다는 주장은 하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-실제-dx12-회귀">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="실제-dx12-회귀">실제 DX12 회귀</h2></div>
+<div class="prose"><p>기존 <code>MaterialRenderBindingsProbe</code>를 현재 컨테이너·소유자 API에 맞춰 정리했다. 진단 출력 배열과 배치 인수를 엔진 API 타입으로 맞췄고, 서명·리소스 소유자는 <code>own</code> 타입과 양쪽을 유지하는 객체 주소 비교를 사용했다. 엔진 API를 이전 테스트에 맞춰 바꾸지는 않았다. 하네스의 실행 의존 경로도 현재 공용 런타임과 중첩 패키지 경로에 맞췄으며, 새 증거 디렉토리를 지정할 수 있게 했다.</p>
+<p>최종 결과는 <strong>Debug 8,778건·Release 8,775건 통과</strong>이다. 두 구성 모두 DebugLayer/GPUValidation을 켠 실제 DX12 장치에서 GPU 결과 64성분과 4프레임을 확인했다. 추가 풀 검사는 다음과 같다.</p>
+<ul>
+<li>65개 요청으로 비트 64를 통과해 모든 핸들이 유효하고 서로 다른지 확인했다.</li>
+<li>65개를 캐시에서 반복 재사용한 뒤에도 생성 수·소유 수가 유지된다. Debug CRT 후크에서 100회 배치 Acquire/Return의 호출 스레드 추가 할당이 0회였다. 다른 스레드나 프로세스 전체의 무할당을 뜻하지 않는다.</li>
+<li>65개가 외부에 대여된 상태에서 <code>Close</code>해도 소유 추적은 유지된다. 이후 반환한 65개 버퍼가 각각 한 번씩 해제된다.</li>
+<li>65번째 생성 요청을 의도적으로 거부하면 외부 반환 핸들은 전부 무효이며, 먼저 생성된 64개는 캐시로 반환된다. <code>Close</code>하면 이 64개가 해제된다.</li>
+<li>Debug에서는 닫힌 풀의 마지막 반환을 실제 장치 해제 호출 경계에서 관측했다. 장치의 네이티브 해제 함수에 들어가기 전에 추적 노드가 정확히 1회 해제됐다. 드라이버 내부 할당·해제는 이 CRT 측정에서 제외했다. 이는 GPU 실메모리의 물리적 반환 시간을 측정한 결과는 아니다.</li>
+<li>기존의 96개 작은 버퍼 보존, best-fit, 사용 플래그 분리, 예산 초과 반납 및 실패 배치 롤백 검사도 통과했다.</li>
+</ul>
+<p>Debug와 Release의 검사 수 차이는 Debug CRT 계측 세 검사 때문이다. 최종 증거는 <code>Build/Verification/ContainerMigration/SceneBufferPoolNative20261027verified/result.json</code>과 구성별 빌드·실행 로그이며, 요약은 <code>Build/container-scene-pool-native-verified.log</code>이다. 하네스의 앞선 API/의존 경로 오류 로그도 별도로 보존했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-실제-엔진-빌드와-실행">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="실제-엔진-빌드와-실행">실제 엔진 빌드와 실행</h2></div>
+<div class="prose"><p>변경한 풀을 포함해 Debug Editor를 재빌드했고, 기존 17명령 통합 검증을 실행했다. 두 번의 8,192건 전송, 실제 렌더 준비, Play/Stop·장면 복원 및 기존 물리·힙·장부 계약 검사가 통과했다. 제품 증거는 <code>Build/container-scene-pool-editor.log</code>와 <code>Build/Verification/ContainerMigration/SceneBufferPoolDebug1/acceptance.json</code>이다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-성능-정본과-남은-사용처">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="성능-정본과-남은-사용처">성능 정본과 남은 사용처</h2></div>
+<div class="prose"><p>정본 62개 파일의 저장된 해시는 모두 일치한다. 기존 <code>20261027-tailhint-full1</code>은 입력·바이너리와 원시 258개 조건/프로세스 결과를 다시 검증해 일반 82/82, MPSC 단일·주 기준 각각 4/4, FAA/PPL 6/6, 기타 큐 8/8 PASS를 유지했다. 재검증 기록은 외부 <code>CreatorContainers/results/20261027-scene-pool-baseline-reverify.log</code>이다. 새 사용처의 프레임 성능 향상이나 전체 OS 성능을 측정한 것은 아니다.</p>
+<p>명시적 STL 참조는 <strong>9,402 → 9,400건</strong>이다. <code>unordered_map</code>은 206 → 205건, <code>bitset</code>은 3 → 2건이며 후보 파일은 971개다. 외부 코드·생성물·정본 구현과 매크로 확장은 집계에서 제외했다. 전체 전환은 진행 중이며 감사 결과는 <code>Build/Verification/ContainerMigration/inventory-20261027-scene-pool.json</code>에 있다.</p>
+<p>다음 단계: <a href="NativeCacheMigration20261027.html">DX12 루트 시그니처·샘플러 캐시 전환</a>.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="SceneBufferPoolMigration20261027.md"><code>docs/analysis/SceneBufferPoolMigration20261027.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

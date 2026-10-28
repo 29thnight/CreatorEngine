@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/SmallArrayVarianceAcceptance20261026.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STL 소형 배열 편차 원인 분리와 전체 독립 수용 — 2026-10-26</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#이전-실패와-재현">이전 실패와 재현</a></li><li><a href="#실측한-분리-대조">실측한 분리 대조</a></li><li><a href="#측정-환경-제어">측정 환경 제어</a></li><li><a href="#남았던-조건의-최종-결과">남았던 조건의 최종 결과</a></li><li><a href="#원본해시범위-확인">원본·해시·범위 확인</a></li><li><a href="#일반-82개-전체-표">일반 82개 전체 표</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="SmallArrayVarianceAcceptance20261026.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>STL 소형 배열 편차 원인 분리와 전체 독립 수용 — 2026-10-26</h1>
+<div class="meta"><p><strong>일반 컨테이너 82/82와 고정 MPSC 4/4가 같은 SMT 제어 조건의 세 실행에서 모두 기준을 충족했다.</strong> 라이브러리 코드를 바꾸지 않고, 측정 CPU의 SMT 공유 상태를 고정한 비교 조건에서 일반 82개 전부를 각 3회 재검증했다. 엔진 통합 또는 모든 OS의 절대 성능 동등성을 입증한 것은 아니다.</p>
+<p>기준은 매 조건·반복의 custom/MSVC STL 또는 PPL 중앙값 ≤1.10, 양쪽 정렬 15표본 x[13]/x[1] ≤1.30이다. 느린 표본을 삭제하거나 실패 표본만 교체하지 않았고 한도를 완화하지 않았다. 일반 82개 각각을 새 프로세스에서 3회, 총 246개 프로세스로 실행했다. MPSC는 기존 8회 묶음뿐 아니라 이번 개별 전송 표본에서도 4/4를 통과했다. 반복 2는 조건 순서와 A/B 순서를 반전했다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
+<a class="map-row" href="#이전-실패와-재현"><span class="ve-label">§01</span><span class="map-name">이전 실패와 재현</span><span class="map-bar"><i style="width:5.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실측한-분리-대조"><span class="ve-label">§02</span><span class="map-name">실측한 분리 대조</span><span class="map-bar"><i style="width:43.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#측정-환경-제어"><span class="ve-label">§03</span><span class="map-name">측정 환경 제어</span><span class="map-bar"><i style="width:15.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#남았던-조건의-최종-결과"><span class="ve-label">§04</span><span class="map-name">남았던 조건의 최종 결과</span><span class="map-bar"><i style="width:2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#원본해시범위-확인"><span class="ve-label">§05</span><span class="map-name">원본·해시·범위 확인</span><span class="map-bar"><i style="width:23.6%"></i></span><span class="map-marks"><span class="chip risk" title="차단·중단">1</span></span></a>
+<a class="map-row" href="#일반-82개-전체-표"><span class="ve-label">§06</span><span class="map-name">일반 82개 전체 표</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「일반 82개 전체 표」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><div class="table-scroll"><table>
+<thead><tr><th>범위</th><th style="text-align:right">결과</th><th>조건</th></tr></thead>
+<tbody><tr><td>일반 컨테이너</td><td style="text-align:right">82/82</td><td>같은 기존 바이너리, 구현별 100ms 보정, 고정 1초 워밍업, SMT 상태 제어, 3회</td></tr>
+<tr><td>고정 MPSC 주 수용 조건</td><td style="text-align:right">4/4</td><td>기존 yield-batch8 프로토콜의 선행 검증 결과 유지</td></tr>
+<tr><td>이번 SMT 조건의 MPSC 개별 전송 추가 검사</td><td style="text-align:right">4/4</td><td>묶음 1회, 각 프로세스 15개 표본, 3프로세스</td></tr></tbody></table></div>
+</section>
+<section class="doc-sec" id="sec-이전-실패와-재현">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="이전-실패와-재현">이전 실패와 재현</h2></div>
+<div class="prose"><p>이전 array_growth/64 실패에서는 STL 배치가 약 101ms에서 142ms/152ms로 커진 뒤 다시 101ms로 돌아왔고 thread cycle도 함께 늘었다. 동일한 원본 검사 바이너리의 새로운 일반 조건 3회에서도 한 번 STL 편차 1.315가 재현됐다. 단순히 재실행하여 통과한 결과만 고르지 않았다. 이전 1.409 실패와 81/82 보고서는 <a href="MPSCVarianceAcceptance20261026.html">기존 기록</a>에 보존한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-실측한-분리-대조">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="실측한-분리-대조">실측한 분리 대조</h2></div>
+<div class="prose"><p>진단용 별도 바이너리는 같은 배열 작업에 페이지 폴트, working set/private 변화, 측정 논리 CPU와 SMT 형제 CPU 사용률, processor performance, DPC/interrupt 카운터를 붙였다. 진단 코드가 인라이닝·배치·캐시 상태를 바꿀 수 있으므로 그 절대 시간을 최종 성능 수용값으로 쓰지 않는다. 아래 원인 대조는 같은 진단 바이너리 안에서 비교한다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>진단 조건</th><th style="text-align:right">자체 ns/작업 중앙값</th><th style="text-align:right">STL ns/작업 중앙값</th><th style="text-align:right">형제 CPU 평균 사용률</th><th style="text-align:right">CPU 성능 카운터 평균</th><th style="text-align:right">정식 배치 페이지 폴트 합</th></tr></thead>
+<tbody><tr><td>no_burn</td><td class="num" style="text-align:right">6605</td><td class="num" style="text-align:right">14564</td><td class="num" style="text-align:right">3.0%</td><td class="num" style="text-align:right">118.9%</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>sibling_integer_burn</td><td class="num" style="text-align:right">11699</td><td class="num" style="text-align:right">23440</td><td class="num" style="text-align:right">100.0%</td><td class="num" style="text-align:right">118.9%</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>other_core_integer_burn</td><td class="num" style="text-align:right">9998</td><td class="num" style="text-align:right">14113</td><td class="num" style="text-align:right">1.3%</td><td class="num" style="text-align:right">118.9%</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>guard_and_sibling_burn</td><td class="num" style="text-align:right">9026</td><td class="num" style="text-align:right">14376</td><td class="num" style="text-align:right">100.0%</td><td class="num" style="text-align:right">118.9%</td><td class="num" style="text-align:right">0</td></tr></tbody></table></div>
+<p>형제 논리 CPU에 자체 정수 부하를 둔 경우와 다른 물리 코어에 같은 부하를 둔 경우를 분리했다. 형제 부하에서 큰 시간 증가가 재현되고 다른 물리 코어 부하의 영향은 작았다. 페이지 폴트나 CPU 성능 카운터 변화만으로 이 차이를 설명하기 어려웠다. <strong>SMT 공유 자원 경합이 이 작업을 흔들 수 있는 재현 가능한 경로임을 확인했다.</strong></p>
+<p>과거 실패 순간에는 동일한 CPU 문맥 카운터가 없으므로 그 실패의 단독 원인이 SMT였다고 소급 확정하지 않는다. 커널 스택/하드웨어 이벤트로 모든 원인을 분해한 것도 아니다. PageFaultCount는 프로세스 단위, PDH는 측정 전후 수집 구간의 카운터이므로 순수 작업 안의 비용과 정확히 일치한다고 해석하지 않는다.</p>
+<h3 id="할당해제와-채움합산의-분리">할당·해제와 채움·합산의 분리</h3>
+<p>원래 작업은 N=64 배열을 16번 생성·채움·합산·파괴한다. 분리 프로브는 별도 seed42의 값을 사용하므로 메인 전체 fixture의 구간별 순수 비용으로 해석하지 않는다. 실제 STL capacity 변경 순서를 추출해 할당/해제 순서만 실행하는 대조, reserve 경로, 기존 버퍼 채움/합산, 실제 확장을 따로 측정했다. 외부 TU의 noinline escape로 할당이나 버퍼 작업 제거를 막았다. trace allocator의 시계 호출은 계측 오버헤드가 있으므로 그 값을 비계측 전체 시간에서 직접 빼거나 순수 allocator 비율로 환산하지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>상태</th><th>경로</th><th style="text-align:right">ns/작업 중앙값</th><th style="text-align:right">계측 할당 호출/작업</th><th style="text-align:right">계측 요청 B/작업</th><th style="text-align:right">계측 allocate ns/작업</th><th style="text-align:right">계측 free ns/작업</th><th style="text-align:right">페이지 폴트 합</th></tr></thead>
+<tbody><tr><td>normal</td><td>alloc_free_sequence</td><td class="num" style="text-align:right">7882</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>normal</td><td>custom_growth</td><td class="num" style="text-align:right">6205</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>normal</td><td>fill_sum_existing</td><td class="num" style="text-align:right">221</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>normal</td><td>stl_growth</td><td class="num" style="text-align:right">10817</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>normal</td><td>stl_reserved</td><td class="num" style="text-align:right">2011</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>normal</td><td>stl_traced</td><td class="num" style="text-align:right">23397</td><td class="num" style="text-align:right">192</td><td class="num" style="text-align:right">36352</td><td class="num" style="text-align:right">8067</td><td class="num" style="text-align:right">6074</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>guard</td><td>alloc_free_sequence</td><td class="num" style="text-align:right">10547</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>guard</td><td>custom_growth</td><td class="num" style="text-align:right">8359</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>guard</td><td>fill_sum_existing</td><td class="num" style="text-align:right">283</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>guard</td><td>stl_growth</td><td class="num" style="text-align:right">13842</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>guard</td><td>stl_reserved</td><td class="num" style="text-align:right">2362</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td style="text-align:right">—</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>guard</td><td>stl_traced</td><td class="num" style="text-align:right">25275</td><td class="num" style="text-align:right">192</td><td class="num" style="text-align:right">36352</td><td class="num" style="text-align:right">9129</td><td class="num" style="text-align:right">6415</td><td class="num" style="text-align:right">0</td></tr></tbody></table></div>
+<p>—로 표시된 비계측 경로의 할당 열은 &#39;측정하지 않음&#39;이며 실제 할당이 0이라는 뜻이 아니다. reserve는 한 배열당 1회, 성장 경로는 추출한 capacity 단계 수만큼 할당한다. 이 표는 작은 배열의 반복 allocator 경로와 비할당 계산 경로를 구분하는 보조 증거다. 경로별 전체 시간을 더해 실제 확장 시간을 재구성하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-측정-환경-제어">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="측정-환경-제어">측정 환경 제어</h2></div>
+<div class="prose"><p>최종 검사 실행 파일은 그대로 두고 측정 논리 CPU4의 형제인 CPU5에 <strong>자체 pause 대기 프로세스</strong>만 두었다. 같은 우선순위 정책인 above-normal이며, 다른 프로세스의 affinity/우선순위나 OS 전원·SMT 설정을 바꾸지 않았다. ready/stop 이벤트, 최대 1시간 TTL과 finally 정리가 있으며 전체 작업 끝까지 살아 있었는지 및 종료를 확인했다.</p>
+<p>이 제어는 CPU5를 비워 두는 것이 아니라 일정한 pause 부하를 제공한다. 실제 절대 시간은 늘었다. 엔진에 넣는 최적화나 CPU 전력 절감이 아니며, 공유 자원 상태를 일정하게 만든 공정한 A/B 비교 조건이다. 일반 조건 3회 중 한 번 초과했던 원본 바이너리는 제어 조건의 집중 검사 3회에서 모두 통과했다. 그 뒤 한 건만 바꾸지 않고 일반 82개 전체를 다시 실행했다.</p>
+<p>검사 원본의 cold 호출 보정·통계 reserve·힙 캐시 정리·구현별 100ms 목표와 1초 워밍업·15표본 정책은 유지했다. 테스트 장비는 i7-8700K 6C/12T, Windows 11 Pro 10.0.26300, MSVC 19.50.35730/STL 145, Release /O2 /Ob2, iterator debug 0이다. 모든 자료는 이 명시된 조건의 warm-throughput 결과다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-남았던-조건의-최종-결과">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="남았던-조건의-최종-결과">남았던 조건의 최종 결과</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>조건</th><th style="text-align:right">세 반복 중앙 비율</th><th style="text-align:right">세 반복 비율 범위</th><th style="text-align:right">최대 양쪽 편차</th><th>수용</th></tr></thead>
+<tbody><tr><td>core, array_growth, 64</td><td class="num" style="text-align:right">0.605</td><td style="text-align:right">0.599–0.612</td><td class="num" style="text-align:right">1.049</td><td>True</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-원본해시범위-확인">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="원본해시범위-확인">원본·해시·범위 확인</h2></div>
+<div class="prose"><p>원시 표본에서 중앙값과 편차를 다시 계산했다. 제어 프로세스가 전체 작업 종료까지 유지됐고 246개 조건별 파일이 그 실행 구간 안에 생성됐음을 검사했다. 일반 검사 두 바이너리는 이전 실패 때와 같고 라이브러리 포함 헤더 22개도 MSVC/ASan/ClangCL/Linux ASan+UBSan/TSan 검사본과 같다. 따라서 라이브러리 코드를 느리게 만들거나 새 조건에 맞춰 바꾼 결과가 아니다. 새 진단/제어 코드는 모두 독립 experiments 디렉토리에 있다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>자료</th><th>링크/경로</th></tr></thead>
+<tbody><tr><td>전체 최종 범위 판정</td><td><a href="../../../CreatorContainers/results/20261026-smt-final-acceptance.json">smt-final-acceptance.json</a></td></tr>
+<tr><td>일반/MPSC 새 행렬</td><td><a href="../../../CreatorContainers/results/20261026-smt-acceptance-summary.json">summary.json</a></td></tr>
+<tr><td>제어·동일 바이너리·헤더 증거</td><td><a href="../../../CreatorContainers/results/20261026-smt-acceptance-control-proof.json">control-proof.json</a></td></tr>
+<tr><td>SMT 제어 프로세스 기록</td><td><a href="../../../CreatorContainers/results/20261026-smt-control-guard.json">guard.json</a></td></tr>
+<tr><td>원인 대조·할당 분해</td><td><a href="../../../CreatorContainers/results/20261026-small-array-diagnostics.json">small-array-diagnostics.json</a></td></tr>
+<tr><td>원시 프로세스별 표본</td><td>CreatorContainers/results/20261026-smt-acceptance-cases/</td></tr>
+<tr><td>진단/제어 코드</td><td>CreatorContainers/experiments/20261026-small-array/</td></tr>
+<tr><td><span class="chip risk">기존 실패 자료</span></td><td>results/20261026-final5-cases/3-core-array_growth-64.csv 등, 삭제하지 않음</td></tr></tbody></table></div>
+<p>재현은 새 태그로 with-guard.ps1 안에서 run-isolated-acceptance.ps1을 실행하고, summarize-mpsc-variance.ps1 및 verify-smt-acceptance.ps1로 검증한다. 같은 이름의 기존 원본은 덮어쓰지 않는다. 제어 프로세스는 실행 파일/소스 해시와 PID를 기록하고 테스트 뒤 종료한다.</p>
+<p>이로써 명시한 독립 성능 수용 기준은 충족했다. 실제 엔진 소비자의 overflow/수명/ABI/씬 전환·종료·프레임 p99와 GCC/macOS/ARM64 및 OS 간 성능 행렬은 별도 검증 범위다. 엔진 PPL 별칭이나 소비자는 이 작업에서 바꾸지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-일반-82개-전체-표">
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="일반-82개-전체-표">일반 82개 전체 표</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>작업, N</th><th style="text-align:right">중앙 비율</th><th style="text-align:right">세 반복 비율 범위</th><th style="text-align:right">최대 양쪽 편차</th><th>수용</th></tr></thead>
+<tbody><tr><td>core, array_growth, 23</td><td class="num" style="text-align:right">0.522</td><td style="text-align:right">0.512–0.523</td><td class="num" style="text-align:right">1.032</td><td>True</td></tr>
+<tr><td>core, array_growth, 24</td><td class="num" style="text-align:right">0.512</td><td style="text-align:right">0.485–0.520</td><td class="num" style="text-align:right">1.121</td><td>True</td></tr>
+<tr><td>core, array_growth, 4096</td><td class="num" style="text-align:right">0.588</td><td style="text-align:right">0.540–0.591</td><td class="num" style="text-align:right">1.017</td><td>True</td></tr>
+<tr><td>core, array_growth, 64</td><td class="num" style="text-align:right">0.605</td><td style="text-align:right">0.599–0.612</td><td class="num" style="text-align:right">1.049</td><td>True</td></tr>
+<tr><td>core, array_growth, 65536</td><td class="num" style="text-align:right">0.243</td><td style="text-align:right">0.187–0.809</td><td class="num" style="text-align:right">1.159</td><td>True</td></tr>
+<tr><td>core, array_growth, 8</td><td class="num" style="text-align:right">0.168</td><td style="text-align:right">0.167–0.169</td><td class="num" style="text-align:right">1.016</td><td>True</td></tr>
+<tr><td>core, array_reserved, 23</td><td class="num" style="text-align:right">0.888</td><td style="text-align:right">0.868–0.905</td><td class="num" style="text-align:right">1.023</td><td>True</td></tr>
+<tr><td>core, array_reserved, 24</td><td class="num" style="text-align:right">0.898</td><td style="text-align:right">0.891–0.905</td><td class="num" style="text-align:right">1.033</td><td>True</td></tr>
+<tr><td>core, array_reserved, 4096</td><td class="num" style="text-align:right">0.936</td><td style="text-align:right">0.936–0.942</td><td class="num" style="text-align:right">1.029</td><td>True</td></tr>
+<tr><td>core, array_reserved, 64</td><td class="num" style="text-align:right">0.876</td><td style="text-align:right">0.875–0.876</td><td class="num" style="text-align:right">1.044</td><td>True</td></tr>
+<tr><td>core, array_reserved, 65536</td><td class="num" style="text-align:right">0.919</td><td style="text-align:right">0.916–0.926</td><td class="num" style="text-align:right">1.073</td><td>True</td></tr>
+<tr><td>core, array_reserved, 8</td><td class="num" style="text-align:right">0.885</td><td style="text-align:right">0.874–0.887</td><td class="num" style="text-align:right">1.023</td><td>True</td></tr>
+<tr><td>core, fifo_batch, 23</td><td class="num" style="text-align:right">0.307</td><td style="text-align:right">0.306–0.309</td><td class="num" style="text-align:right">1.030</td><td>True</td></tr>
+<tr><td>core, fifo_batch, 24</td><td class="num" style="text-align:right">0.309</td><td style="text-align:right">0.308–0.312</td><td class="num" style="text-align:right">1.032</td><td>True</td></tr>
+<tr><td>core, fifo_batch, 4096</td><td class="num" style="text-align:right">0.319</td><td style="text-align:right">0.308–0.321</td><td class="num" style="text-align:right">1.065</td><td>True</td></tr>
+<tr><td>core, fifo_batch, 64</td><td class="num" style="text-align:right">0.308</td><td style="text-align:right">0.308–0.309</td><td class="num" style="text-align:right">1.032</td><td>True</td></tr>
+<tr><td>core, fifo_batch, 65536</td><td class="num" style="text-align:right">0.282</td><td style="text-align:right">0.278–0.294</td><td class="num" style="text-align:right">1.025</td><td>True</td></tr>
+<tr><td>core, fifo_batch, 8</td><td class="num" style="text-align:right">0.311</td><td style="text-align:right">0.309–0.312</td><td class="num" style="text-align:right">1.017</td><td>True</td></tr>
+<tr><td>core, map_build, 23</td><td class="num" style="text-align:right">0.146</td><td style="text-align:right">0.145–0.147</td><td class="num" style="text-align:right">1.016</td><td>True</td></tr>
+<tr><td>core, map_build, 24</td><td class="num" style="text-align:right">0.139</td><td style="text-align:right">0.138–0.139</td><td class="num" style="text-align:right">1.038</td><td>True</td></tr>
+<tr><td>core, map_build, 4096</td><td class="num" style="text-align:right">0.146</td><td style="text-align:right">0.143–0.146</td><td class="num" style="text-align:right">1.047</td><td>True</td></tr>
+<tr><td>core, map_build, 64</td><td class="num" style="text-align:right">0.106</td><td style="text-align:right">0.102–0.106</td><td class="num" style="text-align:right">1.051</td><td>True</td></tr>
+<tr><td>core, map_build, 65536</td><td class="num" style="text-align:right">0.209</td><td style="text-align:right">0.185–0.212</td><td class="num" style="text-align:right">1.290</td><td>True</td></tr>
+<tr><td>core, map_build, 8</td><td class="num" style="text-align:right">0.240</td><td style="text-align:right">0.239–0.243</td><td class="num" style="text-align:right">1.024</td><td>True</td></tr>
+<tr><td>core, map_hit, 23</td><td class="num" style="text-align:right">0.899</td><td style="text-align:right">0.898–0.901</td><td class="num" style="text-align:right">1.044</td><td>True</td></tr>
+<tr><td>core, map_hit, 24</td><td class="num" style="text-align:right">0.869</td><td style="text-align:right">0.865–0.877</td><td class="num" style="text-align:right">1.018</td><td>True</td></tr>
+<tr><td>core, map_hit, 4096</td><td class="num" style="text-align:right">0.719</td><td style="text-align:right">0.700–0.723</td><td class="num" style="text-align:right">1.074</td><td>True</td></tr>
+<tr><td>core, map_hit, 64</td><td class="num" style="text-align:right">0.898</td><td style="text-align:right">0.896–0.901</td><td class="num" style="text-align:right">1.029</td><td>True</td></tr>
+<tr><td>core, map_hit, 65536</td><td class="num" style="text-align:right">0.554</td><td style="text-align:right">0.551–0.566</td><td class="num" style="text-align:right">1.067</td><td>True</td></tr>
+<tr><td>core, map_hit, 8</td><td class="num" style="text-align:right">0.859</td><td style="text-align:right">0.859–0.861</td><td class="num" style="text-align:right">1.026</td><td>True</td></tr>
+<tr><td>core, map_miss, 23</td><td class="num" style="text-align:right">0.759</td><td style="text-align:right">0.759–0.762</td><td class="num" style="text-align:right">1.026</td><td>True</td></tr>
+<tr><td>core, map_miss, 24</td><td class="num" style="text-align:right">0.706</td><td style="text-align:right">0.703–0.708</td><td class="num" style="text-align:right">1.028</td><td>True</td></tr>
+<tr><td>core, map_miss, 4096</td><td class="num" style="text-align:right">0.559</td><td style="text-align:right">0.556–0.567</td><td class="num" style="text-align:right">1.064</td><td>True</td></tr>
+<tr><td>core, map_miss, 64</td><td class="num" style="text-align:right">0.802</td><td style="text-align:right">0.800–0.802</td><td class="num" style="text-align:right">1.020</td><td>True</td></tr>
+<tr><td>core, map_miss, 65536</td><td class="num" style="text-align:right">0.324</td><td style="text-align:right">0.300–0.334</td><td class="num" style="text-align:right">1.083</td><td>True</td></tr>
+<tr><td>core, map_miss, 8</td><td class="num" style="text-align:right">0.795</td><td style="text-align:right">0.792–0.795</td><td class="num" style="text-align:right">1.040</td><td>True</td></tr>
+<tr><td>core, string_append, 23</td><td class="num" style="text-align:right">0.600</td><td style="text-align:right">0.598–0.602</td><td class="num" style="text-align:right">1.011</td><td>True</td></tr>
+<tr><td>core, string_append, 24</td><td class="num" style="text-align:right">0.983</td><td style="text-align:right">0.980–0.988</td><td class="num" style="text-align:right">1.018</td><td>True</td></tr>
+<tr><td>core, string_append, 4096</td><td class="num" style="text-align:right">0.798</td><td style="text-align:right">0.774–0.806</td><td class="num" style="text-align:right">1.042</td><td>True</td></tr>
+<tr><td>core, string_append, 64</td><td class="num" style="text-align:right">0.731</td><td style="text-align:right">0.729–0.734</td><td class="num" style="text-align:right">1.008</td><td>True</td></tr>
+<tr><td>core, string_append, 65536</td><td class="num" style="text-align:right">0.852</td><td style="text-align:right">0.845–0.856</td><td class="num" style="text-align:right">1.080</td><td>True</td></tr>
+<tr><td>core, string_append, 8</td><td class="num" style="text-align:right">0.998</td><td style="text-align:right">0.998–0.998</td><td class="num" style="text-align:right">1.026</td><td>True</td></tr>
+<tr><td>core, string_copy, 23</td><td class="num" style="text-align:right">0.228</td><td style="text-align:right">0.227–0.228</td><td class="num" style="text-align:right">1.039</td><td>True</td></tr>
+<tr><td>core, string_copy, 24</td><td class="num" style="text-align:right">1.003</td><td style="text-align:right">1.000–1.020</td><td class="num" style="text-align:right">1.030</td><td>True</td></tr>
+<tr><td>core, string_copy, 4096</td><td class="num" style="text-align:right">1.004</td><td style="text-align:right">1.002–1.022</td><td class="num" style="text-align:right">1.045</td><td>True</td></tr>
+<tr><td>core, string_copy, 64</td><td class="num" style="text-align:right">1.003</td><td style="text-align:right">0.992–1.004</td><td class="num" style="text-align:right">1.014</td><td>True</td></tr>
+<tr><td>core, string_copy, 65536</td><td class="num" style="text-align:right">1.004</td><td style="text-align:right">1.001–1.005</td><td class="num" style="text-align:right">1.027</td><td>True</td></tr>
+<tr><td>core, string_copy, 8</td><td class="num" style="text-align:right">0.958</td><td style="text-align:right">0.955–0.961</td><td class="num" style="text-align:right">1.021</td><td>True</td></tr>
+<tr><td>core, string_find, 23</td><td class="num" style="text-align:right">0.871</td><td style="text-align:right">0.870–0.877</td><td class="num" style="text-align:right">1.026</td><td>True</td></tr>
+<tr><td>core, string_find, 24</td><td class="num" style="text-align:right">0.877</td><td style="text-align:right">0.875–0.880</td><td class="num" style="text-align:right">1.023</td><td>True</td></tr>
+<tr><td>core, string_find, 4096</td><td class="num" style="text-align:right">0.172</td><td style="text-align:right">0.172–0.174</td><td class="num" style="text-align:right">1.032</td><td>True</td></tr>
+<tr><td>core, string_find, 64</td><td class="num" style="text-align:right">0.457</td><td style="text-align:right">0.455–0.457</td><td class="num" style="text-align:right">1.015</td><td>True</td></tr>
+<tr><td>core, string_find, 65536</td><td class="num" style="text-align:right">0.170</td><td style="text-align:right">0.170–0.171</td><td class="num" style="text-align:right">1.018</td><td>True</td></tr>
+<tr><td>core, string_find, 8</td><td class="num" style="text-align:right">0.627</td><td style="text-align:right">0.621–0.640</td><td class="num" style="text-align:right">1.045</td><td>True</td></tr>
+<tr><td>core, string_view_construct, 23</td><td class="num" style="text-align:right">0.253</td><td style="text-align:right">0.250–0.259</td><td class="num" style="text-align:right">1.024</td><td>True</td></tr>
+<tr><td>core, string_view_construct, 24</td><td class="num" style="text-align:right">0.954</td><td style="text-align:right">0.953–0.970</td><td class="num" style="text-align:right">1.019</td><td>True</td></tr>
+<tr><td>core, string_view_construct, 4096</td><td class="num" style="text-align:right">1.003</td><td style="text-align:right">1.000–1.017</td><td class="num" style="text-align:right">1.034</td><td>True</td></tr>
+<tr><td>core, string_view_construct, 64</td><td class="num" style="text-align:right">0.965</td><td style="text-align:right">0.965–0.967</td><td class="num" style="text-align:right">1.036</td><td>True</td></tr>
+<tr><td>core, string_view_construct, 65536</td><td class="num" style="text-align:right">1.002</td><td style="text-align:right">0.999–1.005</td><td class="num" style="text-align:right">1.022</td><td>True</td></tr>
+<tr><td>core, string_view_construct, 8</td><td class="num" style="text-align:right">0.890</td><td style="text-align:right">0.876–0.892</td><td class="num" style="text-align:right">1.045</td><td>True</td></tr>
+<tr><td>expanded, age_expiration, 256</td><td class="num" style="text-align:right">0.770</td><td style="text-align:right">0.770–0.800</td><td class="num" style="text-align:right">1.066</td><td>True</td></tr>
+<tr><td>expanded, age_expiration, 4096</td><td class="num" style="text-align:right">0.104</td><td style="text-align:right">0.102–0.104</td><td class="num" style="text-align:right">1.010</td><td>True</td></tr>
+<tr><td>expanded, atom_duplicate, 256</td><td class="num" style="text-align:right">0.708</td><td style="text-align:right">0.707–0.709</td><td class="num" style="text-align:right">1.015</td><td>True</td></tr>
+<tr><td>expanded, atom_duplicate, 4096</td><td class="num" style="text-align:right">0.658</td><td style="text-align:right">0.657–0.660</td><td class="num" style="text-align:right">1.039</td><td>True</td></tr>
+<tr><td>expanded, fixed_arena_churn, 256</td><td class="num" style="text-align:right">0.481</td><td style="text-align:right">0.451–0.482</td><td class="num" style="text-align:right">1.020</td><td>True</td></tr>
+<tr><td>expanded, fixed_arena_churn, 4096</td><td class="num" style="text-align:right">0.478</td><td style="text-align:right">0.477–0.485</td><td class="num" style="text-align:right">1.009</td><td>True</td></tr>
+<tr><td>expanded, function_dispatch, 256</td><td class="num" style="text-align:right">0.872</td><td style="text-align:right">0.870–0.888</td><td class="num" style="text-align:right">1.013</td><td>True</td></tr>
+<tr><td>expanded, function_dispatch, 4096</td><td class="num" style="text-align:right">0.888</td><td style="text-align:right">0.883–0.893</td><td class="num" style="text-align:right">1.011</td><td>True</td></tr>
+<tr><td>expanded, lru_touch, 256</td><td class="num" style="text-align:right">0.312</td><td style="text-align:right">0.284–0.312</td><td class="num" style="text-align:right">1.019</td><td>True</td></tr>
+<tr><td>expanded, lru_touch, 4096</td><td class="num" style="text-align:right">0.330</td><td style="text-align:right">0.329–0.333</td><td class="num" style="text-align:right">1.025</td><td>True</td></tr>
+<tr><td>expanded, owned_array, 256</td><td class="num" style="text-align:right">0.950</td><td style="text-align:right">0.928–0.973</td><td class="num" style="text-align:right">1.025</td><td>True</td></tr>
+<tr><td>expanded, owned_array, 4096</td><td class="num" style="text-align:right">0.914</td><td style="text-align:right">0.894–0.973</td><td class="num" style="text-align:right">1.025</td><td>True</td></tr>
+<tr><td>expanded, radix_sort_u64, 256</td><td class="num" style="text-align:right">0.891</td><td style="text-align:right">0.885–0.892</td><td class="num" style="text-align:right">1.037</td><td>True</td></tr>
+<tr><td>expanded, radix_sort_u64, 4096</td><td class="num" style="text-align:right">0.419</td><td style="text-align:right">0.418–0.420</td><td class="num" style="text-align:right">1.014</td><td>True</td></tr>
+<tr><td>expanded, sequence_window, 256</td><td class="num" style="text-align:right">0.067</td><td style="text-align:right">0.066–0.068</td><td class="num" style="text-align:right">1.030</td><td>True</td></tr>
+<tr><td>expanded, sequence_window, 4096</td><td class="num" style="text-align:right">0.044</td><td style="text-align:right">0.044–0.044</td><td class="num" style="text-align:right">1.010</td><td>True</td></tr>
+<tr><td>expanded, slot_lifetime, 256</td><td class="num" style="text-align:right">0.212</td><td style="text-align:right">0.211–0.214</td><td class="num" style="text-align:right">1.032</td><td>True</td></tr>
+<tr><td>expanded, slot_lifetime, 4096</td><td class="num" style="text-align:right">0.183</td><td style="text-align:right">0.183–0.186</td><td class="num" style="text-align:right">1.009</td><td>True</td></tr>
+<tr><td>expanded, string_map_build, 256</td><td class="num" style="text-align:right">0.637</td><td style="text-align:right">0.621–0.637</td><td class="num" style="text-align:right">1.034</td><td>True</td></tr>
+<tr><td>expanded, string_map_build, 4096</td><td class="num" style="text-align:right">0.684</td><td style="text-align:right">0.684–0.691</td><td class="num" style="text-align:right">1.046</td><td>True</td></tr>
+<tr><td>expanded, string_map_hit, 256</td><td class="num" style="text-align:right">0.582</td><td style="text-align:right">0.581–0.585</td><td class="num" style="text-align:right">1.062</td><td>True</td></tr>
+<tr><td>expanded, string_map_hit, 4096</td><td class="num" style="text-align:right">0.598</td><td style="text-align:right">0.596–0.598</td><td class="num" style="text-align:right">1.015</td><td>True</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="SmallArrayVarianceAcceptance20261026.md"><code>docs/analysis/SmallArrayVarianceAcceptance20261026.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -19,7 +21,7 @@ namespace material_graph
     {
     public:
         static constexpr std::size_t InvalidIndex = (std::numeric_limits<std::size_t>::max)();
-        using Key = std::tuple<experiment::AssetId, std::uint64_t, std::uint64_t>;
+        using Key = ce::tuple<experiment::AssetId, std::uint64_t, std::uint64_t>;
 
         static Key Identity(const Instance& instance)
         {
@@ -92,7 +94,7 @@ namespace material_graph
 
     private:
         mutable std::mutex mutex_;
-        std::vector<own::shared_owner<const Instance>> instances_;
-        std::map<Key, std::size_t> indices_;
+        ce::dynamic_array<own::shared_owner<const Instance>> instances_;
+        ce::engine_ordered_map<Key, std::size_t> indices_;
     };
 }

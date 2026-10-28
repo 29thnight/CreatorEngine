@@ -1,4 +1,6 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -41,7 +43,7 @@ namespace experiment::importer
 
     // A request-owned source snapshot. Importers consume these exact bytes instead
     // of reopening a path after its content fingerprint has been calculated.
-    using ImportSourceBytes = own::shared_owner<const std::vector<std::byte>>;
+    using ImportSourceBytes = own::shared_owner<const ce::dynamic_array<std::byte>>;
 
     struct SceneNodeTag;
     struct ImportMeshTag;
@@ -78,7 +80,7 @@ namespace experiment::importer
         std::string name{};
         SceneNodeIndex parent{};
         TrsTransform local{};
-        std::vector<ImportMeshIndex> meshes{};
+        ce::dynamic_array<ImportMeshIndex> meshes{};
         // 이 노드가 스킨드 메시를 들고 있을 때의 skin. 계층 자체와는 무관하다.
         SkinIndex skin{};
     };
@@ -97,19 +99,19 @@ namespace experiment::importer
     // 스트림은 모두 같은 크기여야 한다(빈 스트림 = 그 속성 없음).
     struct VertexStreams final
     {
-        std::vector<math::vector3> positions{};
-        std::vector<math::vector3> normals{};
-        std::vector<math::vector2> uv0{};
-        std::vector<math::vector2> uv1{};
+        ce::dynamic_array<math::vector3> positions{};
+        ce::dynamic_array<math::vector3> normals{};
+        ce::dynamic_array<math::vector2> uv0{};
+        ce::dynamic_array<math::vector2> uv1{};
         // w = handedness(mikktspace 관례). 비어 있으면 탄젠트 생성 패스 대상.
-        std::vector<math::vector4> tangents{};
-        std::vector<math::vector4> colors{};
+        ce::dynamic_array<math::vector4> tangents{};
+        ce::dynamic_array<math::vector4> colors{};
 
         // 가변 길이 influence: 정점 i 의 것은 [offsets[i], offsets[i + 1]).
         // 4개 상한은 런타임 모델의 제약이지 source 의 제약이 아니므로 여기서는
         // 자르지 않는다. 클램프·재정규화는 변환 경계에서 계수와 함께 한다.
-        std::vector<std::uint32_t> influenceOffsets{};
-        std::vector<JointInfluence> influences{};
+        ce::dynamic_array<std::uint32_t> influenceOffsets{};
+        ce::dynamic_array<JointInfluence> influences{};
 
         [[nodiscard]] std::size_t VertexCount() const noexcept
         {
@@ -138,7 +140,7 @@ namespace experiment::importer
         //   AppendSkin 이 따로 다룬다.
         [[nodiscard]] static constexpr auto ValueStreams() noexcept
         {
-            return std::tuple{
+            return ce::tuple{
                 &VertexStreams::positions,
                 &VertexStreams::normals,
                 &VertexStreams::uv0,
@@ -160,16 +162,16 @@ namespace experiment::importer
     //   없다.
     //
     // 전제: std::vector<T> 의 크기는 T 와 무관하다(어느 표준 라이브러리든 3포인터).
-    static_assert(sizeof(std::vector<math::vector2>) == sizeof(std::vector<math::vector3>)
-        && sizeof(std::vector<math::vector4>) == sizeof(std::vector<math::vector3>)
-        && sizeof(std::vector<std::uint32_t>) == sizeof(std::vector<math::vector3>)
-        && sizeof(std::vector<JointInfluence>) == sizeof(std::vector<math::vector3>),
+    static_assert(sizeof(ce::dynamic_array<math::vector2>) == sizeof(ce::dynamic_array<math::vector3>)
+        && sizeof(ce::dynamic_array<math::vector4>) == sizeof(ce::dynamic_array<math::vector3>)
+        && sizeof(ce::dynamic_array<std::uint32_t>) == sizeof(ce::dynamic_array<math::vector3>)
+        && sizeof(ce::dynamic_array<JointInfluence>) == sizeof(ce::dynamic_array<math::vector3>),
         "std::vector 의 크기가 원소 타입을 탄다 — 아래 단정의 전제가 깨졌다");
 
     // 값 스트림(목록에 든 것) + 스킨 2개(influenceOffsets·influences) = 전부.
     static_assert(
         (std::tuple_size_v<decltype(VertexStreams::ValueStreams())> + 2)
-            * sizeof(std::vector<math::vector3>) == sizeof(VertexStreams),
+            * sizeof(ce::dynamic_array<math::vector3>) == sizeof(VertexStreams),
         "VertexStreams 의 필드와 ValueStreams() 목록이 어긋난다 — "
         "값 스트림을 더했으면 목록에도 더할 것(빠지면 재용접에서 조용히 소실된다)");
 
@@ -197,7 +199,7 @@ namespace experiment::importer
     inline void AppendValueStreams(const VertexStreams& source,
         std::size_t vertex, VertexStreams& out, Excluded... excluded)
     {
-        std::apply([&](auto... members)
+        ce::apply([&](auto... members)
         {
             const auto copyOne = [&](auto member)
             {
@@ -234,7 +236,7 @@ namespace experiment::importer
         std::string name{};
         ImportMaterialIndex material{};
         VertexStreams streams{};
-        std::vector<std::uint32_t> indices{};
+        ce::dynamic_array<std::uint32_t> indices{};
         // Exporter/DCC가 재export에도 보존한다고 명시한 ID다. 비어 있으면
         // ModelStableKeys가 이름 또는 authoring key로 내려간다. 배열 ordinal을
         // 여기에 넣으면 안 된다.
@@ -326,7 +328,7 @@ namespace experiment::importer
         std::string sourceKey{};
         std::string name{};
         std::filesystem::path sourcePath{};
-        std::vector<std::byte> embeddedBytes{};
+        ce::dynamic_array<std::byte> embeddedBytes{};
         std::string mimeType{};
         TextureColorSpace colorSpace{ TextureColorSpace::Linear };
         std::string persistentId{};
@@ -348,8 +350,8 @@ namespace experiment::importer
     {
         std::string name{};
         SceneNodeIndex skeletonRoot{};
-        std::vector<SceneNodeIndex> joints{};
-        std::vector<math::matrix4x4> inverseBind{};   // joints 와 같은 길이
+        ce::dynamic_array<SceneNodeIndex> joints{};
+        ce::dynamic_array<math::matrix4x4> inverseBind{};   // joints 와 같은 길이
         std::string persistentId{};
     };
 
@@ -371,9 +373,9 @@ namespace experiment::importer
         KeyInterpolation scaleInterpolation{ KeyInterpolation::Linear };
 
         // 시간 단위는 초(ImportedClip 참조). 오름차순 정렬은 임포터 의무.
-        std::vector<TranslationKey> translations{};
-        std::vector<RotationKey> rotations{};
-        std::vector<ScaleKey> scales{};       // math::vector3 — 비균등 scale 보존
+        ce::dynamic_array<TranslationKey> translations{};
+        ce::dynamic_array<RotationKey> rotations{};
+        ce::dynamic_array<ScaleKey> scales{};       // math::vector3 — 비균등 scale 보존
     };
 
     // 시간 정본은 **초**다. tick/ticksPerSecond 쌍은 FBX 관례이므로 임포터가
@@ -382,7 +384,7 @@ namespace experiment::importer
     {
         std::string name{};
         double durationSeconds{};
-        std::vector<ImportedChannel> channels{};
+        ce::dynamic_array<ImportedChannel> channels{};
         std::string persistentId{};
     };
 
@@ -446,20 +448,20 @@ namespace experiment::importer
         // ★ Add 를 반복 호출해 합치면 안 된다 — 원본 count 가 1 로 뭉개진다.
         //   메시 단위 병렬 패스가 스레드마다 sink 를 따로 두고 순서대로
         //   합칠 때 쓴다(결정론 유지).
-        void Absorb(std::vector<ImportNote> other);
+        void Absorb(ce::dynamic_array<ImportNote> other);
 
         [[nodiscard]] bool HasErrors() const noexcept;
         [[nodiscard]] std::span<const ImportNote> View() const noexcept
         {
             return notes_;
         }
-        [[nodiscard]] std::vector<ImportNote> Release() noexcept
+        [[nodiscard]] ce::dynamic_array<ImportNote> Release() noexcept
         {
             return std::move(notes_);
         }
 
     private:
-        std::vector<ImportNote> notes_{};
+        ce::dynamic_array<ImportNote> notes_{};
     };
 
     struct ImportMetadata final
@@ -480,13 +482,13 @@ namespace experiment::importer
     struct ImportedScene final
     {
         ImportMetadata metadata{};
-        std::vector<SceneNode> nodes{};
-        std::vector<ImportedMesh> meshes{};
-        std::vector<ImportedMaterial> materials{};
-        std::vector<ImportedTexture> textures{};
-        std::vector<ImportedSkin> skins{};
-        std::vector<ImportedClip> clips{};
-        std::vector<ImportNote> notes{};
+        ce::dynamic_array<SceneNode> nodes{};
+        ce::dynamic_array<ImportedMesh> meshes{};
+        ce::dynamic_array<ImportedMaterial> materials{};
+        ce::dynamic_array<ImportedTexture> textures{};
+        ce::dynamic_array<ImportedSkin> skins{};
+        ce::dynamic_array<ImportedClip> clips{};
+        ce::dynamic_array<ImportNote> notes{};
     };
 
     struct ImportOptions final
@@ -512,14 +514,14 @@ namespace experiment::importer
         // importer would otherwise open. It must enforce the source-root/reparse
         // boundary, pin immutable bytes, and record their path and digest. False
         // (including a missing file) fails the import, without a filesystem retry.
-        std::function<bool(const std::filesystem::path&, ImportSourceBytes&,
+        ce::owned_func<bool(const std::filesystem::path&, ImportSourceBytes&,
             std::string&)> readSourceDependency{};
     };
 
     struct ImportResult final
     {
         std::optional<ImportedScene> scene{};
-        std::vector<ImportNote> notes{};
+        ce::dynamic_array<ImportNote> notes{};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {
@@ -544,7 +546,7 @@ namespace experiment::importer
     // 임포터가 계약을 지켰는지 검사한다. 임포터 구현의 자가 검증이자,
     // 변환 경계가 전제로 삼는 불변식(정렬·인덱스 범위·스트림 길이 일치·
     // influence offset 단조·키 시간 정렬)의 정본이다.
-    [[nodiscard]] std::vector<ImportNote> ValidateImportedScene(
+    [[nodiscard]] ce::dynamic_array<ImportNote> ValidateImportedScene(
         const ImportedScene& scene);
 
     [[nodiscard]] std::string_view ToString(ImportNoteCode code) noexcept;

@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../Containers/ContainerAPI.h"
 #include "MaterialGraphShaderMeta.h"
 #include "MaterialGraphProduct.h"
 
@@ -41,7 +43,7 @@ std::string Quote(std::string_view text)
 
 std::string Digest(std::string_view text)
 {
-    return ce::hash::to_hex(ce::hash::sha256::compute(text.data(), text.size()));
+    return ce::crypto::to_hex(ce::crypto::sha256::compute(text.data(), text.size()));
 }
 
 const char* ColorSpace(LX::LXColorSpace value)
@@ -71,16 +73,16 @@ void Default(std::ostream& out, const LX::LXMaterialParameter& p)
     if (!LX::IsSocketValueValid(p.type, p.value))
         throw std::runtime_error("Invalid Graph parameter default");
     if (p.type == LX::PinType::Bool)
-        out << (std::get<bool>(p.value) ? "true" : "false");
+        out << (ce::get<bool>(p.value) ? "true" : "false");
     else if (p.type == LX::PinType::Int)
     {
-        const auto value = std::get<std::int64_t>(p.value);
+        const auto value = ce::get<std::int64_t>(p.value);
         if (value < INT32_MIN || value > INT32_MAX)
             throw std::runtime_error("Graph integer exceeds int32 range");
         out << value;
     }
     else if (p.type == LX::PinType::Float)
-        Float(out, std::get<double>(p.value));
+        Float(out, ce::get<double>(p.value));
     else
     {
         const auto array = [&out](const auto& values) {
@@ -94,9 +96,9 @@ void Default(std::ostream& out, const LX::LXMaterialParameter& p)
             out << ']';
         };
         if (p.type == LX::PinType::Color)
-            array(std::get<std::array<double, 4>>(p.value));
+            array(ce::get<ce::fixed_array<double, 4>>(p.value));
         else
-            array(std::get<std::array<double, 3>>(p.value));
+            array(ce::get<ce::fixed_array<double, 3>>(p.value));
     }
 }
 
@@ -183,7 +185,7 @@ std::string Document(const LX::LXMaterialProgram& program, FileGuid graphGuid, s
             out << ',';
         comma = true;
         out << "{\"name\":" << Quote(pass.name);
-        for (const auto& [name, stage] : {std::pair{"vs", pass.vertex}, {"ps", pass.pixel}, {"cs", pass.compute}})
+        for (const auto& [name, stage] : {ce::pair{"vs", pass.vertex}, {"ps", pass.pixel}, {"cs", pass.compute}})
             if (stage)
                 out << ',' << Quote(name) << ":{\"entry\":" << Quote(stage->entry) << '}';
         const auto& s = pass.state;
@@ -245,7 +247,7 @@ bool ResolveGeneratedBindings(const LX::LXMaterialProgram& program, const Shader
                               std::string& error)
 {
     ShaderMetaBindingLayout candidate;
-    std::vector<const RHIShaderReflection*> stages;
+    ce::dynamic_array<const RHIShaderReflection*> stages;
     for (const auto& reflection : reflections)
     {
         stages.push_back(&reflection);
@@ -255,7 +257,7 @@ bool ResolveGeneratedBindings(const LX::LXMaterialProgram& program, const Shader
     Budget reflectedBudget;
     reflectedBudget.textures = 112;
     reflectedBudget.samplers = 125;
-    std::vector<LX::LXMaterialDiagnostic> diagnostics;
+    ce::dynamic_array<LX::LXMaterialDiagnostic> diagnostics;
     if (!MergeMaterialReflections(stages, merged, diagnostics) ||
         !ResolveBindings(program, merged, reflectedBudget, bindings, diagnostics))
     {
@@ -265,10 +267,10 @@ bool ResolveGeneratedBindings(const LX::LXMaterialProgram& program, const Shader
     // Authoring properties describe logical texture slots. Validate the
     // physical bindless ABI above before projecting those slots for the
     // property packer; this projection is never a runtime root layout.
-    auto logicalReflections = std::vector<RHIShaderReflection>(reflections.begin(), reflections.end());
+    auto logicalReflections = ce::dynamic_array<RHIShaderReflection>(reflections.begin(), reflections.end());
     for (auto& reflection : logicalReflections)
     {
-        std::erase_if(reflection.resources, [](const auto& resource) {
+        ce::erase_if(reflection.resources, [](const auto& resource) {
             return resource.name == "lx_texture_table" || resource.name == "lx_sampler_table" ||
                    resource.name == "LXDescriptorIndices";
         });
@@ -420,8 +422,8 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
         // The cooked tree and diagnostic JSON must describe the same contract.
         // Rebuild the expected typed defaults directly from the verified program;
         // parsing the diagnostic JSON here would reintroduce the Player parser.
-        std::vector<ShaderPropertyDesc> properties;
-        std::vector<ShaderMaterialSampler> samplers;
+        ce::dynamic_array<ShaderPropertyDesc> properties;
+        ce::dynamic_array<ShaderMaterialSampler> samplers;
         for (const auto& p : program.parameters)
         {
             if (p.type == LX::PinType::Texture || p.type == LX::PinType::Sampler)
@@ -436,31 +438,31 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
             {
             case LX::PinType::Float:
                 property.type = ShaderPropertyType::Float;
-                property.defaultValue = static_cast<float>(std::get<double>(p.value));
+                property.defaultValue = static_cast<float>(ce::get<double>(p.value));
                 break;
             case LX::PinType::Int:
                 property.type = ShaderPropertyType::Int;
-                property.defaultValue = static_cast<std::int32_t>(std::get<std::int64_t>(p.value));
+                property.defaultValue = static_cast<std::int32_t>(ce::get<std::int64_t>(p.value));
                 break;
             case LX::PinType::Bool:
                 property.type = ShaderPropertyType::Bool;
-                property.defaultValue = std::get<bool>(p.value);
+                property.defaultValue = ce::get<bool>(p.value);
                 break;
             case LX::PinType::Vector:
             case LX::PinType::Normal: {
                 property.type = ShaderPropertyType::Float3;
                 property.semantic = p.type == LX::PinType::Normal ? "normal" : "vector";
-                const auto& value = std::get<std::array<double, 3>>(p.value);
-                property.defaultValue = std::array<float, 3>{static_cast<float>(value[0]), static_cast<float>(value[1]),
+                const auto& value = ce::get<ce::fixed_array<double, 3>>(p.value);
+                property.defaultValue = ce::fixed_array<float, 3>{static_cast<float>(value[0]), static_cast<float>(value[1]),
                                                              static_cast<float>(value[2])};
                 break;
             }
             case LX::PinType::Color: {
                 property.type = ShaderPropertyType::Float4;
                 property.semantic = "color";
-                const auto& value = std::get<std::array<double, 4>>(p.value);
+                const auto& value = ce::get<ce::fixed_array<double, 4>>(p.value);
                 property.defaultValue =
-                    std::array<float, 4>{static_cast<float>(value[0]), static_cast<float>(value[1]),
+                    ce::fixed_array<float, 4>{static_cast<float>(value[0]), static_cast<float>(value[1]),
                                          static_cast<float>(value[2]), static_cast<float>(value[3])};
                 break;
             }
@@ -497,8 +499,8 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
         // Every declared stage must have verified bytecode in each backend the
         // product carries (the editor carries only its renderer's). No extra
         // entry may silently belong to a different generated contract.
-        std::set<RHIShaderBinary> carried;
-        std::set<std::tuple<RHIShaderBinary, std::string, std::string>> declared, compiled;
+        ce::engine_ordered_set<RHIShaderBinary> carried;
+        ce::engine_ordered_set<ce::tuple<RHIShaderBinary, std::string, std::string>> declared, compiled;
         for (const auto& target : product.targets)
         {
             carried.insert(target.binary);
@@ -506,7 +508,7 @@ bool RestoreMaterialShaderMeta(const VerifiedProduct& product, FileGuid graphGui
         }
         for (const auto& pass : candidate.meta.passes)
             for (const auto& [stage, profile] :
-                 {std::pair{pass.vertex, "vs_"}, {pass.pixel, "ps_"}, {pass.compute, "cs_"}})
+                 {ce::pair{pass.vertex, "vs_"}, {pass.pixel, "ps_"}, {pass.compute, "cs_"}})
                 if (stage)
                     for (const auto backend : carried)
                         declared.emplace(backend, stage->entry, profile);

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -116,25 +117,25 @@ namespace assets
 
     struct StableKeyResult final
     {
-        std::vector<StableKeyAssignment> assignments{};
-        std::vector<StableKeyIssue> issues{};
+        ce::dynamic_array<StableKeyAssignment> assignments{};
+        ce::dynamic_array<StableKeyIssue> issues{};
 
         [[nodiscard]] bool Succeeded() const noexcept;
         [[nodiscard]] std::size_t CountOrigin(SubAssetKind kind, StableKeyOrigin origin) const noexcept;
     };
 
     // authoring key 발급기 — 기본은 CSPRNG. 검사가 결정적 값으로 갈아 끼울 수 있다.
-    using AuthoringKeyFactory = bool (*)(std::array<std::uint8_t, kAuthoringKeyBytes>& out,
+    using AuthoringKeyFactory = bool (*)(ce::fixed_array<std::uint8_t, kAuthoringKeyBytes>& out,
         std::string& outError);
     [[nodiscard]] bool CreateAuthoringKeyBytes(
-        std::array<std::uint8_t, kAuthoringKeyBytes>& out, std::string& outError) noexcept;
+        ce::fixed_array<std::uint8_t, kAuthoringKeyBytes>& out, std::string& outError) noexcept;
     [[nodiscard]] std::string MakeAuthoringStableKey(
         std::span<const std::uint8_t, kAuthoringKeyBytes> bytes);
 
     // ImportedScene → 요소 목록. 외부 텍스처(자기 .meta를 가진 것)는 subasset이 아니므로
     // 뺀다. 지문은 여기서 계산한다(재질=속성+슬롯 텍스처 지문, 텍스처=바이트, 메시=
     // 위치+인덱스, 스켈레톤=joint 이름+inverse bind, 애니메이션=채널 타깃 이름+키).
-    [[nodiscard]] std::vector<StableKeyElement> CollectStableKeyElements(
+    [[nodiscard]] ce::dynamic_array<StableKeyElement> CollectStableKeyElements(
         const experiment::importer::ImportedScene& scene);
 
     // 규칙 엔진. prior는 이전 sidecar v2의 subasset 기록(없으면 빈 span).

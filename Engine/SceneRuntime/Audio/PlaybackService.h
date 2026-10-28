@@ -1,4 +1,7 @@
+#include "../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineStorage.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -122,9 +125,9 @@ namespace wave
         [[nodiscard]] bool Enqueue(PlaybackCommand command);
         void Update();
         void Shutdown();
-        [[nodiscard]] std::vector<PlaybackCompletion> TakeCompletions();
+        [[nodiscard]] ce::dynamic_array<PlaybackCompletion> TakeCompletions();
         [[nodiscard]] bool TryTakeCompletion(PlaybackCompletion& completion);
-        [[nodiscard]] std::vector<PlaybackStarted> TakeStarted();
+        [[nodiscard]] ce::dynamic_array<PlaybackStarted> TakeStarted();
         [[nodiscard]] std::uint64_t DroppedCompletions() const noexcept { return m_droppedCompletions; }
         [[nodiscard]] const std::string& LastError() const noexcept { return m_lastError; }
         [[nodiscard]] AudioService& Audio() noexcept { return m_audio; }
@@ -147,7 +150,7 @@ namespace wave
             PlaybackRequest request;
             own::shared_owner<const SoundGraphProgram> graph;
             ParameterMap parameters;
-            std::vector<Child> children;
+            ce::dynamic_array<Child> children;
             std::uint64_t randomState{};
             float gain{ 1.0f };
             float pitch{ 1.0f };
@@ -159,18 +162,18 @@ namespace wave
         void Finish(PlaybackHandle playback, PlaybackEndReason reason);
         bool ApplySettings(Instance& instance);
         AudioService& m_audio;
-        std::vector<ScopeRecord> m_scopes;
-        std::vector<Instance> m_instances;
-        std::unordered_map<ClipKey, own::shared_owner<const SoundGraphProgram>> m_graphs;
-        std::unordered_map<ClipKey, SoundPreset> m_presets;
-        std::vector<PlaybackCompletion> m_completions;
-        std::vector<PlaybackStarted> m_started;
+        ce::dynamic_array<ScopeRecord> m_scopes;
+        ce::dynamic_array<Instance> m_instances;
+        ce::engine_node_map<ClipKey, own::shared_owner<const SoundGraphProgram>> m_graphs;
+        ce::engine_node_map<ClipKey, SoundPreset> m_presets;
+        ce::dynamic_array<PlaybackCompletion> m_completions;
+        ce::dynamic_array<PlaybackStarted> m_started;
         std::uint64_t m_droppedCompletions{};
         std::string m_lastError;
         // Only the bounded worker-to-game command mailbox is synchronized.
         // No device callback or ordinary owner-thread playback takes this lock.
         std::mutex m_commandMutex;
-        std::deque<PlaybackCommand> m_commands;
+        ce::segmented_deque<PlaybackCommand> m_commands;
         std::size_t m_pendingResults{};
         bool m_acceptCommands{ true };
         bool m_stopped{ false };

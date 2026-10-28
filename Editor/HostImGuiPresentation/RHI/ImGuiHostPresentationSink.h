@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -18,7 +19,7 @@ import Creator.Core.Ownership;
 // 셸이 아직 Initialize 전이어도 위임은 안전하다(비활성 셸은 no-op/0).
 struct ImGuiHostPresentationSink final : IDisplayPresentationSink
 {
-    explicit ImGuiHostPresentationSink(std::function<void()> onDisplayAvailable = {})
+    explicit ImGuiHostPresentationSink(ce::owned_func<void()> onDisplayAvailable = {})
         : m_onDisplayAvailable(std::move(onDisplayAvailable))
     {
     }
@@ -58,5 +59,5 @@ struct ImGuiHostPresentationSink final : IDisplayPresentationSink
     }
 
 private:
-    std::function<void()> m_onDisplayAvailable;
+    ce::owned_func<void()> m_onDisplayAvailable;
 };

@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #include "../../Engine/Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "ImGui.h"
@@ -74,7 +75,7 @@ private:
     void RecordRecent(const std::filesystem::path& path);
     void LoadRecents();
     void SaveRecents() const;
-    void CollectResults(std::vector<const editor::browser_directory_entry*>& out, size_t& supported);
+    void CollectResults(ce::dynamic_array<const editor::browser_directory_entry*>& out, size_t& supported);
     std::string RelativeUtf8(const std::filesystem::path& path) const;
     void ApplyRequests();
     void PublishSnapshot();
@@ -113,7 +114,7 @@ private:
 	std::filesystem::path m_sceneRenderProfileDirectory{};
 	std::filesystem::path		m_currentDirectory{};
 	Scope m_scope{ Scope::folder };
-    std::vector<Visit> m_history;
+    ce::dynamic_array<Visit> m_history;
     size_t m_historyIndex{};
     /// 목록 child 의 스크롤. child 안에서만 읽고 쓸 수 있어 한 프레임 늦게 적용한다.
     float m_fileListScrollY{};
@@ -124,7 +125,7 @@ private:
     float m_gridRowKey{ -2.f };
 
     // 최근 항목 — 프로젝트별, 개인 상태라 `Library/` 에 둔다(git 이 무시한다).
-    std::vector<std::filesystem::path> m_recents;
+    ce::dynamic_array<std::filesystem::path> m_recents;
     std::filesystem::path m_recentsFile{};
 
     /// 지금 고른 자산. 정적 `selectedMetaFilePath` 는 인스펙터가 쓰는 표기라
@@ -151,12 +152,12 @@ private:
     };
     bool m_resultsValid{};
     ResultKey m_resultKey{};
-    std::vector<const editor::browser_directory_entry*> m_results;
+    ce::dynamic_array<const editor::browser_directory_entry*> m_results;
     size_t m_resultSupported{};
     std::uint64_t m_resultRebuilds{};
 
     // 게시용 — 이번 프레임에 그린 결과.
-    std::vector<std::string> m_publishedResults;
+    ce::dynamic_array<std::string> m_publishedResults;
     size_t m_publishedResultCount{};
     std::uint64_t m_frames{};
     std::uint64_t m_requestsApplied{};
@@ -168,7 +169,7 @@ private:
     float m_tileSize{ 88.f };
     float m_treeDragStart{ 220.f };
     editor::windows::content_browser_layout m_layout{};
-    std::vector<editor::windows::content_browser_tile> m_visibleTiles;
+    ce::dynamic_array<editor::windows::content_browser_tile> m_visibleTiles;
     int m_typeFilter{ -1 };
     bool m_sortDescending{};
     std::string m_error;

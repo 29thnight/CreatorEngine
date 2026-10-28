@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "RenderArena.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Arena.h"
@@ -45,7 +46,7 @@ namespace ce
         static_assert(std::atomic<size_t>::is_always_lock_free);
         // Each exchange owns the entire set. No intrusive next pointer is read
         // after publication, so removal/republication cannot create an ABA link.
-        std::array<std::atomic<RenderArenaSet*>, MaxFreeSets> free{};
+        ce::fixed_array<std::atomic<RenderArenaSet*>, MaxFreeSets> free{};
         std::atomic<size_t> bytes{};
 
         ~State()

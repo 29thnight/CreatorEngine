@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "Component.h"
@@ -95,7 +96,7 @@ public:
 	//
 	// 형식은 "타입|값|이름". 이름을 마지막에 두는 이유는 표시 이름에 구분자가
 	// 섞여 들어와도 앞의 두 칸만 끊어 읽으면 되기 때문이다.
-	std::vector<std::string> m_fieldData{};
+	ce::dynamic_array<std::string> m_fieldData{};
 
 	// 관리 인스턴스의 현재 값을 m_fieldData로 옮겨 담는다(저장 직전·인스펙터 편집 후).
 	void CaptureFields();

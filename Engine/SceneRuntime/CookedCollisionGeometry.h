@@ -1,4 +1,5 @@
 #pragma once
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
 #else
@@ -16,7 +17,7 @@ struct cooked_geometry_record
     geometry_asset_key key;
     geometry_kind kind;
     std::uint64_t source_hash = 0;
-    std::vector<std::byte> payload;
+    ce::dynamic_array<std::byte> payload;
 };
 
 // CEPG v1 bundles immutable revisions under one CEMF asset UUID.
@@ -68,7 +69,7 @@ class CookedCollisionGeometry final
             source.form);
     }
 
-    static result<std::vector<std::byte>> Encode(std::span<const cooked_geometry_record> records)
+    static result<ce::dynamic_array<std::byte>> Encode(std::span<const cooked_geometry_record> records)
     {
         try
         {
@@ -89,7 +90,7 @@ class CookedCollisionGeometry final
                 size += 24 + record.payload.size();
             }
 
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
             bytes.reserve(size);
             Put(bytes, 0x47504543, 4); // CEPG
             Put(bytes, format_version, 4);
@@ -183,7 +184,7 @@ class CookedCollisionGeometry final
         return std::unexpected(
             error{error_code::invalid_argument, 0, "Invalid or incompatible cooked geometry artifact"});
     }
-    static void Put(std::vector<std::byte>& bytes, std::uint64_t value, unsigned count)
+    static void Put(ce::dynamic_array<std::byte>& bytes, std::uint64_t value, unsigned count)
     {
         for (unsigned index = 0; index < count; ++index)
             bytes.push_back(std::byte((value >> (index * 8)) & 255));

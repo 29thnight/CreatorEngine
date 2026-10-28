@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
 #else
@@ -147,11 +148,11 @@ namespace editor::sound_graph_editing
         {
             switch (wave::TypeOfParameter(value))
             {
-            case wave::ParameterType::Boolean: return ImGui::Checkbox(label, &std::get<bool>(value));
+            case wave::ParameterType::Boolean: return ImGui::Checkbox(label, &ce::get<bool>(value));
             case wave::ParameterType::Integer:
-                return ImGui::InputScalar(label, ImGuiDataType_S32, &std::get<std::int32_t>(value));
-            case wave::ParameterType::Float: return ImGui::InputFloat(label, &std::get<float>(value));
-            case wave::ParameterType::String: return ImGui::InputText(label, &std::get<std::string>(value));
+                return ImGui::InputScalar(label, ImGuiDataType_S32, &ce::get<std::int32_t>(value));
+            case wave::ParameterType::Float: return ImGui::InputFloat(label, &ce::get<float>(value));
+            case wave::ParameterType::String: return ImGui::InputText(label, &ce::get<std::string>(value));
             }
             return false;
         }
@@ -569,7 +570,7 @@ namespace editor::sound_graph_editing
             // remains editable below; large assets never stall the UI here.
             const auto& nodes = session.m_graph.nodes;
             const std::size_t count = std::min<std::size_t>(nodes.size(), 64u);
-            std::vector<unsigned int> depths(count, 0u);
+            ce::dynamic_array<unsigned int> depths(count, 0u);
             for (std::size_t pass = 0; pass < std::min<std::size_t>(count, 16u); ++pass)
             {
                 auto next = depths;
@@ -599,8 +600,8 @@ namespace editor::sound_graph_editing
             const float scale = ImGui::GetFontSize() / 13.0f;
             const float width = 164.0f * scale;
             const float height = 58.0f * scale;
-            std::array<unsigned int, 17> rows{};
-            std::vector<ImVec2> positions;
+            ce::fixed_array<unsigned int, 17> rows{};
+            ce::dynamic_array<ImVec2> positions;
             float maximumX = 0.0f;
             float maximumY = 0.0f;
             for (std::size_t index = 0; index < count; ++index)
@@ -761,7 +762,7 @@ namespace editor::sound_graph_editing
                         bool weighted = !node.weights.empty();
                         if (ImGui::Checkbox("Weighted", &weighted))
                         {
-                            node.weights = weighted ? std::vector<float>(node.inputs.size(), 1.0f) : std::vector<float>{};
+                            node.weights = weighted ? ce::dynamic_array<float>(node.inputs.size(), 1.0f) : ce::dynamic_array<float>{};
                             session.m_dirty = true;
                         }
                     }
@@ -829,7 +830,7 @@ namespace editor::sound_graph_editing
             session.m_dirty |= ImGui::DragFloat("Reverb send (dB)", &defaults.reverbSendDecibels, 0.1f, -80.0f, 10.0f);
             ImGui::TextDisabled("All serialized settings are also editable in the YAML tab.");
             ImGui::SeparatorText("Typed parameter overrides");
-            std::vector<std::string> names;
+            ce::dynamic_array<std::string> names;
             for (const auto& [name, value] : session.m_preset.parameters)
             {
                 names.push_back(name);

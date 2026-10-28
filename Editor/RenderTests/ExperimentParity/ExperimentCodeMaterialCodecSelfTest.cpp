@@ -1,3 +1,5 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "Experiment/Cooked/CookedCodeMaterial.h"
 #include "Experiment/Cooked/MaterialAssetSetProducer.h"
 #include "Experiment/Cooked/CookedShaderMeta.h"
@@ -40,11 +42,11 @@ namespace RenderTest
 
         struct CodeFixture final
         {
-            std::map<std::string, std::string> files;
-            std::vector<ck::CodeProgramCapturedInput> captures;
+            ce::engine_ordered_map<std::string, std::string> files;
+            ce::dynamic_array<ck::CodeProgramCapturedInput> captures;
             ck::CodeProgram program;
-            std::vector<std::byte> bytes;
-            std::vector<ck::AssetDependency> dependencies;
+            ce::dynamic_array<std::byte> bytes;
+            ce::dynamic_array<ck::AssetDependency> dependencies;
             std::string recipe, recipeMeta, materialText, materialMeta;
 
             bool Prepare(std::string& failure)
@@ -81,7 +83,7 @@ namespace RenderTest
                 {
                     return false;
                 }
-                std::vector<std::uint32_t> masks{0u};
+                ce::dynamic_array<std::uint32_t> masks{0u};
                 masks.insert(masks.end(), assets::kModelVertexMasks.begin(), assets::kModelVertexMasks.end());
                 std::ranges::sort(masks);
                 for (const auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
@@ -179,7 +181,7 @@ namespace RenderTest
             edge.scope = ck::AssetDependencyScope::External;
         }
         check.Check(ck::ReadCodeProgramArtifact(fixture.bytes, programRef, edges, decoded, failure), "explicit external exact hard edges accepted");
-        std::vector<std::byte> rejected;
+        ce::dynamic_array<std::byte> rejected;
         auto invalid = fixture.program; invalid.variants.pop_back();
         check.Check(!ck::EncodeCodeProgramArtifact(invalid, rejected, edges, failure), "incomplete backend/mask coverage rejected");
         invalid = fixture.program; invalid.variants[0].stages[0].profile = "ps_6_0";
@@ -263,8 +265,8 @@ namespace RenderTest
                     captures[i].bytes = CodeBytes(text);
                 }
             }
-            std::vector<std::byte> changedBundle;
-            std::vector<ck::AssetDependency> changedEdges;
+            ce::dynamic_array<std::byte> changedBundle;
+            ce::dynamic_array<ck::AssetDependency> changedEdges;
             if (!ck::EncodeCodeProgramArtifact(changed, changedBundle, changedEdges, failure))
             {
                 return false;

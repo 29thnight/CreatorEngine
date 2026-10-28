@@ -74,6 +74,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [BackendParityPlan.md](plans/BackendParityPlan.md) | PHASE 4.9 — DX12/Vulkan 교차 판정 복귀. 공수 미산정. |
 | [EditorAutomationCLIPlan.md](plans/EditorAutomationCLIPlan.md) | PHASE 14.5 · LC0~LC9 — 라이브 HTTP/JSON 명령·실행 중 Player 제어와 Commandlet 분리. 2026-09-15 재정의 뒤 소유 게이트 13칸 HEAD 재실행으로 조건 ① 닫음(초록 11·붉음 2는 게이트 결함). 남은 조건은 GUI 수동 하나, MCP 보류. |
 | [ScriptSurfacePlan.md](plans/ScriptSurfacePlan.md) | PHASE 9.5 — 현재 네이티브 계약에 맞춘 C# 스크립트 표면 재설계. |
+| [ParticleEffectRedesignPlan.md](plans/ParticleEffectRedesignPlan.md) | PHASE 10 — Niagara식 스택 + 모듈 그래프, 공통 IR·GPU·편집기·제품 수용 순서. |
 | [EnginePackagingPlan.md](plans/EnginePackagingPlan.md) | PHASE 10·11 등 — EffectSystem·Terrain의 의존 역전과 패키지 경계. 잔여 작업 유지. |
 | [ModelGeometryTextureImprovementPlan.md](plans/ModelGeometryTextureImprovementPlan.md) | 비동기 배치 완료 · 나머지 구조 개선은 제안 단계. 기존 PHASE의 완료·공수와 구분 |
 | [TexturePipelinePlan.md](plans/TexturePipelinePlan.md) | PHASE 12 · 구현·부분 수용 — 텍스처 import 설정·mip·cook·Player 소비와 편집 자동 처리. 전체 품질·성능 및 잔여 게이트는 계획과 검증 기록 참조. |
@@ -94,6 +95,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [AudioBackendModernizationPlan.md](plans/AudioBackendModernizationPlan.md) | PHASE 22 — FMOD 은퇴와 miniaudio 통합·오디오 회귀. |
 | [EngineDistributionAndLauncherPlan.md](plans/EngineDistributionAndLauncherPlan.md) | PHASE 23 — 엔진 배포·Launcher·프로젝트 관리와 설치 회귀. |
 | [SimulationEffectContractPlan.md](plans/SimulationEffectContractPlan.md) | PHASE 24 · 현재 리팩토링 이후의 미래 계획 · 구현 미착수 |
+| [NativeUIFrameworkPlan.md](plans/NativeUIFrameworkPlan.md) | FUI · 미래 계획 · 구현 미착수·공수 미산정 — UTF-16 공통 UI Core, 자체 편집기 위젯, ImGui 단계 전환·퇴역 |
 
 이전 PHASE 4 계열 원장과 Asset-first SRP 판단은
 [Phase4UnifiedPlan.md](plans/Phase4UnifiedPlan.md),
@@ -113,7 +115,7 @@ ScriptBinder API 문서 생성기(출력은 `API_DOCS/`)로 위 셋과 무관하
 | [RenderPipelineTargetArchitecture.md](design/RenderPipelineTargetArchitecture.md) | 기존 C++ Pass·LivePipelineDesc·RenderGraph 실행 경계. SRP/C# 저작 전환 취소 반영 |
 | [LatticeNodeSystem.md](design/LatticeNodeSystem.md) | Lattice(LX) 공통 그래프 계약·편집 UI 초안과 [화면 와이어프레임](design/LatticeEditorWireframe.svg) |
 | [EngineVersionPolicy.md](design/EngineVersionPolicy.md) | 확정 — 제품 세대·기능 릴리스·네 자리 엔진 빌드·API 계약·채널. 적용은 PHASE 23 DL5·DL6·DL10 |
-| [ContainerLibraryDesign.md](design/ContainerLibraryDesign.md) | `ce::dynamic_array` — 자체 컨테이너 설계와 기각 근거 |
+| [ContainerLibraryDesign.md](design/ContainerLibraryDesign.md) | C++23 독립 컨테이너·문자열 구현, MSVC STL 비교와 엔진 통합 게이트 |
 | [RhiGpuMemoryLifetimeDesign.md](design/RhiGpuMemoryLifetimeDesign.md) | RHI GPU 메모리 수명 |
 | [ResourceOwnershipDesign.html](design/ResourceOwnershipDesign.html) | 자원 소유권 |
 | [ReflectionDesign.md](design/ReflectionDesign.md) | 리플렉션 현재 설계 정본 — reflgen 서술·빌드 연동·런타임 등록소·소비자와 기각 근거 |

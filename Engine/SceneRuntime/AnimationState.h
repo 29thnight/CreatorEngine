@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -19,7 +20,7 @@ public:
    ~AnimationState();
    AnimationState(AnimationController* Owner, std::string name);
 
-	std::vector<AniTransition*> FindTransitions(const std::string& toStateName);
+	ce::dynamic_array<AniTransition*> FindTransitions(const std::string& toStateName);
 
 	void ClearBehaviour()
 	{
@@ -44,7 +45,7 @@ public:
 	[[reflgen::ignore]]
 	AnimationController* m_ownerController{};
 
-	std::vector<own::shared_owner<AniTransition>> Transitions;
+	ce::dynamic_array<own::shared_owner<AniTransition>> Transitions;
 	int index =0;
 	int AnimationIndex = 0;
 

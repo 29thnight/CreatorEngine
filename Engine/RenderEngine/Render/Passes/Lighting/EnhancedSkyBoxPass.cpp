@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #include "EnhancedSkyBoxPass.h"
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
@@ -185,7 +186,7 @@ void EnhancedSkyBoxPass::Declare(EnhancedRenderGraph& graph,
     const auto depthAccess = explicitAccess
         ? (ownsDepth ? RGAccessMode::Write : RGAccessMode::Read)
         : RGAccessMode::LegacyState;
-    std::vector<EnhancedRenderGraph::RGPassUsage> usages;
+    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> usages;
     usages.push_back({ m_output, RHIResourceState::RenderTarget, colorAccess });
     usages.push_back({ m_depth, ownsDepth
         ? RHIResourceState::DepthWrite : RHIResourceState::DepthRead, depthAccess });

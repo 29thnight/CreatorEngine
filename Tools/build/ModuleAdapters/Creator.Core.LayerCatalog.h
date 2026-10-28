@@ -5,7 +5,7 @@
 #error "Native consumers must import the named module directly."
 #endif
 
-
+#include "../../../Engine/Containers/Creator.Containers.h"
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "Creator.Core.Layers.h"
 
@@ -23,7 +23,7 @@ namespace ce::layers
     {
         std::uint64_t revision = 1;
         std::uint64_t next_id = 2;
-        std::array<std::optional<layer_definition>, 32> definitions{};
+        ce::fixed_array<std::optional<layer_definition>, 32> definitions{};
 
         const layer_definition* find(layer_id id) const noexcept
         {

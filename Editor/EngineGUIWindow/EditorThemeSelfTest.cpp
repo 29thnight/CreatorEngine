@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "../../Tools/regression/gcce_probe_cleanup.h"
 #include "EditorThemeSelfTest.h"
 #include "../EngineEntry/Editing/EditorSelectionHistory.h"
@@ -379,11 +380,11 @@ namespace editor
         // 같은 충돌이 다시 생기는 것을 막아야 한다.
         {
             using surface = widgets::section_header_surface;
-            constexpr std::array<surface, 4> surfaces{
+            constexpr ce::fixed_array<surface, 4> surfaces{
                 surface::Closed, surface::Open, surface::Hovered, surface::Held };
-            constexpr std::array<const char*, 4> names{
+            constexpr ce::fixed_array<const char*, 4> names{
                 "closed", "open", "hovered", "held" };
-            constexpr std::array<std::uint32_t, 4> expected{
+            constexpr ce::fixed_array<std::uint32_t, 4> expected{
                 0x343434, 0x484848, 0x525252, 0x2E70EA };
 
             for (std::size_t index = 0; index < surfaces.size(); ++index)
@@ -442,11 +443,11 @@ namespace editor
         // 대비가 2.1:1 이라 글자가 배경에 묻는다.
         {
             using axis = widgets::axis;
-            constexpr std::array<axis, 3> axes{ axis::X, axis::Y, axis::Z };
-            constexpr std::array<const char*, 3> axis_names{ "axis x", "axis y", "axis z" };
-            constexpr std::array<std::uint32_t, 3> axis_expected{
+            constexpr ce::fixed_array<axis, 3> axes{ axis::X, axis::Y, axis::Z };
+            constexpr ce::fixed_array<const char*, 3> axis_names{ "axis x", "axis y", "axis z" };
+            constexpr ce::fixed_array<std::uint32_t, 3> axis_expected{
                 0xD68C83, 0xA6C779, 0x83A9DC };
-            constexpr std::array<ThemeColor, 3> meaning{
+            constexpr ce::fixed_array<ThemeColor, 3> meaning{
                 ThemeColor::Error, ThemeColor::Positive, ThemeColor::Primary };
 
             for (std::size_t index = 0; index < axes.size(); ++index)
@@ -485,10 +486,10 @@ namespace editor
         // 같은 색으로 덮어 hover 와 press 를 잃었던 것과 같은 충돌이다.
         {
             using surface = widgets::mode_button_surface;
-            constexpr std::array<surface, 3> surfaces{
+            constexpr ce::fixed_array<surface, 3> surfaces{
                 surface::Idle, surface::Hovered, surface::Held };
-            constexpr std::array<const char*, 3> names{ "idle", "hovered", "held" };
-            constexpr std::array<std::uint32_t, 3> expected{
+            constexpr ce::fixed_array<const char*, 3> names{ "idle", "hovered", "held" };
+            constexpr ce::fixed_array<std::uint32_t, 3> expected{
                 0x2A2A2A, 0x484848, 0x525252 };
 
             for (std::size_t index = 0; index < surfaces.size(); ++index)
@@ -914,7 +915,7 @@ namespace editor
         // 규칙이 기본이면 규칙 자체가 검사 대상이다.
         {
             struct labelCase { const char* identifier; const char* expected; };
-            constexpr std::array<labelCase, 9> cases{{
+            constexpr ce::fixed_array<labelCase, 9> cases{{
                 { "m_nearPlane",  "Near Plane" },
                 { "m_isPrimary",  "Is Primary" },
                 { "position",     "Position" },
@@ -1109,7 +1110,7 @@ namespace editor
             using editor::picking::GatherRayHits;
 
             gc::domain pickingDomain;
-            std::vector<gc::trace_ref<Entity>> slots;
+            ce::dynamic_array<gc::trace_ref<Entity>> slots;
             slots.emplace_back(nullptr);
             auto front = Entity::Create(pickingDomain);
             gcce_probe::cleanup frontCleanup(*front);
@@ -1122,7 +1123,7 @@ namespace editor
             slots.emplace_back(back);
             slots.emplace_back(nullptr);
 
-            const std::vector<Entity*> occupants = CollectOccupants(slots);
+            const ce::dynamic_array<Entity*> occupants = CollectOccupants(slots);
             const bool nullFree = std::none_of(occupants.begin(), occupants.end(),
                 [](Entity* entity) { return nullptr == entity; });
             checks.expect(occupants.size() == 2, "scene pick", "tombstoned slots are dropped");
@@ -1131,7 +1132,7 @@ namespace editor
                 occupants[0] == frontRaw && occupants[1] == backRaw,
                 "scene pick", "occupants keep slot order");
 
-            std::vector<gc::trace_ref<Entity>> allHoles;
+            ce::dynamic_array<gc::trace_ref<Entity>> allHoles;
             allHoles.emplace_back(nullptr);
             allHoles.emplace_back(nullptr);
             checks.expect(CollectOccupants(allHoles).empty(), "scene pick", "all-hole slot map");
@@ -1156,10 +1157,10 @@ namespace editor
             using editor::picking::AdvanceCycleIndex;
 
             // 바닥 위에 놓인 모델. 레이가 둘 다 맞고 모델이 앞이다.
-            const std::vector<EntityHandle> stack{ {1,7,1}, {1,3,1} };
-            const std::vector<EntityHandle> other{ {1,9,1}, {1,3,1} };
+            const ce::dynamic_array<EntityHandle> stack{ {1,7,1}, {1,3,1} };
+            const ce::dynamic_array<EntityHandle> other{ {1,9,1}, {1,3,1} };
             // 같은 슬롯을 새 엔티티가 물려받은 경우. 포인터로 재면 ABA 로 같다.
-            const std::vector<EntityHandle> reborn{ {1,7,2}, {1,3,1} };
+            const ce::dynamic_array<EntityHandle> reborn{ {1,7,2}, {1,3,1} };
 
             // 시나리오마다 상태를 손으로 세운다. 앞 단정의 결과를 뒤가 물려받게
             // 이어 붙였더니, 리셋을 걷어낸 변이에서 커서가 마침 짝수라
@@ -1167,7 +1168,7 @@ namespace editor
             // 것이 아니라 자극조차 못 한 것이다. 커서 1(더미 중간)이 이 결함을
             // 드러내는 자리이므로 그 값을 단정마다 명시한다.
             {
-                std::vector<EntityHandle> last;
+                ce::dynamic_array<EntityHandle> last;
                 std::size_t cursor = 0;
                 checks.expect(AdvanceCycleIndex(stack, last, cursor) == 0,
                     "scene pick cycle", "first click takes the front");
@@ -1179,19 +1180,19 @@ namespace editor
             {
                 // 사고의 자리. 모델을 두 번 찍어 커서가 1 인 채로 다른 더미를
                 // 찍으면, 리셋이 없는 코드는 그 더미의 **뒤엣것**을 고른다.
-                std::vector<EntityHandle> last = stack;
+                ce::dynamic_array<EntityHandle> last = stack;
                 std::size_t cursor = 1;
                 checks.expect(AdvanceCycleIndex(other, last, cursor) == 0,
                     "scene pick cycle", "a different stack resets to the front");
             }
             {
-                std::vector<EntityHandle> last = other;
+                ce::dynamic_array<EntityHandle> last = other;
                 std::size_t cursor = 1;
                 checks.expect(AdvanceCycleIndex(stack, last, cursor) == 0,
                     "scene pick cycle", "returning to an earlier stack also resets");
             }
             {
-                std::vector<EntityHandle> last = stack;
+                ce::dynamic_array<EntityHandle> last = stack;
                 std::size_t cursor = 1;
                 checks.expect(AdvanceCycleIndex(reborn, last, cursor) == 0,
                     "scene pick cycle", "generation change is a different stack");
@@ -1199,13 +1200,13 @@ namespace editor
             {
                 // 반대쪽 단정. 리셋이 지나치게 세면(늘 0 으로 되돌리면) 겹침
                 // 순환 자체가 죽는데, 위 넷만으로는 그 변이가 전부 초록이다.
-                std::vector<EntityHandle> last = stack;
+                ce::dynamic_array<EntityHandle> last = stack;
                 std::size_t cursor = 1;
                 checks.expect(AdvanceCycleIndex(stack, last, cursor) == 1,
                     "scene pick cycle", "same stack keeps the cursor");
             }
             {
-                std::vector<EntityHandle> last = stack;
+                ce::dynamic_array<EntityHandle> last = stack;
                 std::size_t cursor = 3;
                 const bool cleared = AdvanceCycleIndex({}, last, cursor) == 0 &&
                     last.empty() && cursor == 0;

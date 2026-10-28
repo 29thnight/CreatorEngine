@@ -1,3 +1,4 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
 #include "LXNodeDefinition.h"
 
 #include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
@@ -25,7 +26,7 @@ LXNodeDefinitionRegistry::LXNodeDefinitionRegistry()
                                  PinType::Color, PinType::Normal, PinType::Texture});
 }
 
-bool LXNodeDefinitionRegistry::RegisterDomain(const std::string& name, std::set<PinType> allowedPins)
+bool LXNodeDefinitionRegistry::RegisterDomain(const std::string& name, ce::engine_ordered_set<PinType> allowedPins)
 {
     if (name.empty() || allowedPins.empty())
     {

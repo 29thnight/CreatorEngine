@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
@@ -38,8 +39,8 @@ public:
 
     ce::delegate_handle m_activeSceneChangedEventHandle{};
 
-    std::vector<HashedGuid> AttachObejctIndex;
-    std::vector<Entity*> AttachObjects;
+    ce::dynamic_array<HashedGuid> AttachObejctIndex;
+    ce::dynamic_array<Entity*> AttachObjects;
     void AttachObject(Entity* Object);
     void DetachObject(Entity* Object);
     void DetachAllObject();

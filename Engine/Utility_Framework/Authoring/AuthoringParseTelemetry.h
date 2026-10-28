@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../Foundation/StandardLibrary.h"
@@ -7,7 +8,7 @@ namespace Authoring
 	struct TextParseTelemetrySnapshot final
 	{
 		std::uint64_t calls{};
-		std::vector<std::string> contexts{};
+		ce::dynamic_array<std::string> contexts{};
 	};
 
 	// D6 runtime acceptance counter. Only actual text-to-tree parser entry points

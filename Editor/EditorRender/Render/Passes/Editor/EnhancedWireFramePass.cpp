@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "EnhancedWireFramePass.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/RHIEncoder.h"
@@ -92,7 +93,7 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
     desc.layout = root;
     desc.inputElements = kInputElements;
     desc.inputElementCount = _countof(kInputElements);
-    std::vector<RHIInputElement> modelElements;
+    ce::dynamic_array<RHIInputElement> modelElements;
     if (mask)
     {
         const auto consumed = assets::Bit(assets::VertexAttribute::Position)
@@ -132,7 +133,7 @@ bool EnhancedWireFramePass::CreatePipelines(const EnhancedFrameContext& context,
 }
 
 void EnhancedWireFramePass::CollectDraws(const EnhancedFrameContext& context,
-    const std::vector<EnhancedDrawItem>* draws)
+    const ce::dynamic_array<EnhancedDrawItem>* draws)
 {
     if (nullptr == draws) return;
 
@@ -194,8 +195,8 @@ bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
 {
     if (context.graphSceneInput)
     {
-        std::vector<EnhancedDrawItem> graphDraws;
-        std::vector<std::vector<math::matrix4x4>> poses;
+        ce::dynamic_array<EnhancedDrawItem> graphDraws;
+        ce::dynamic_array<ce::dynamic_array<math::matrix4x4>> poses;
         poses.reserve(context.graphSceneInput->Draws().size());
         for (const auto& source : context.graphSceneInput->Draws())
         {
@@ -276,7 +277,7 @@ bool EnhancedWireFramePass::PrepareFrame(const EnhancedFrameContext& context,
     }
     m_instances.resize(offset);
 
-    const auto place = [&](const std::vector<EnhancedDrawItem>* draws)
+    const auto place = [&](const ce::dynamic_array<EnhancedDrawItem>* draws)
     {
         if (nullptr == draws) return;
         for (const EnhancedDrawItem& draw : *draws)
@@ -397,7 +398,7 @@ void EnhancedWireFramePass::Declare(EnhancedRenderGraph& graph,
         ? (ownsDepth ? RGAccessMode::Write : RGAccessMode::ReadWrite) : RGAccessMode::LegacyState;
     const auto output = m_output;
     const auto depth = m_depth;
-    std::vector<EnhancedRenderGraph::RGPassUsage> usages;
+    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> usages;
     usages.push_back({ output, RHIResourceState::RenderTarget, colorAccess });
     usages.push_back({ depth, RHIResourceState::DepthWrite, depthAccess });
 

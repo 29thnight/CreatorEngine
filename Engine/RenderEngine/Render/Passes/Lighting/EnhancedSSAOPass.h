@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #pragma once
 #include "../../../RHI/RHIFormat.h"
 #include "../../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -117,11 +118,11 @@ class EnhancedSSAOPass : public EnhancedRenderPass
 
     static constexpr uint32_t kHistoryCount = 2;
     PassResourceRetirement m_resourceRetirement;
-    std::array<RHITextureHandle, kHistoryCount> m_history{};
-    std::array<RHITextureHandle, kHistoryCount> m_geometryHistory{};
-    std::array<RHIResourceState, kHistoryCount> m_historyState{RHIResourceState::ShaderResource,
+    ce::fixed_array<RHITextureHandle, kHistoryCount> m_history{};
+    ce::fixed_array<RHITextureHandle, kHistoryCount> m_geometryHistory{};
+    ce::fixed_array<RHIResourceState, kHistoryCount> m_historyState{RHIResourceState::ShaderResource,
                                                                RHIResourceState::ShaderResource};
-    std::array<RHIResourceState, kHistoryCount> m_geometryState{RHIResourceState::ShaderResource,
+    ce::fixed_array<RHIResourceState, kHistoryCount> m_geometryState{RHIResourceState::ShaderResource,
                                                                 RHIResourceState::ShaderResource};
     math::matrix4x4 m_previousView{math::matrix4x4::identity()};
     math::matrix4x4 m_previousViewProjection{math::matrix4x4::identity()};

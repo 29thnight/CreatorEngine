@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
 #else
@@ -979,7 +980,7 @@ void Editor::EditorMain::Update()
 			const double gcUs = static_cast<double>(ce::profiler_service::now() - gcStarted) *
 				1000000.0 / static_cast<double>(ce::profiler_service::ticks_per_second());
 			constexpr double kBytesPerMB = 1024.0 * 1024.0;
-			const std::array<ce::profile_counter_sample, 7> samples{{
+			const ce::fixed_array<ce::profile_counter_sample, 7> samples{{
 				{ ce::profile_counter_id::provider_gc_us, gcUs },
 				{ ce::profile_counter_id::gc_gen0_collections, static_cast<double>(gc.gen0Collections) },
 				{ ce::profile_counter_id::gc_gen1_collections, static_cast<double>(gc.gen1Collections) },

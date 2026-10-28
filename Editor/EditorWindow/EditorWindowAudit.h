@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 // 창 배선 감사 (PHASE 21 M4 4단계 · 계획서 부록 B.3의 "고아 0").
 //
@@ -24,18 +25,18 @@ namespace editor
         std::size_t bound{ 0 };
 
         /// 본문은 걸렸는데 표에 그 이름이 없다. 그 본문은 영영 불리지 않는다.
-        std::vector<std::string_view> orphan_bodies;
+        ce::dynamic_array<std::string_view> orphan_bodies;
 
         /// 표에는 있는데 본문이 걸릴 자리가 비었다. 창은 등록됐지만 뜨지 않는다.
         /// 자유 함수로 직접 부르는 창(애니메이터 셋)은 여기 세지 않는다 —
         /// 그런 창은 보관소를 쓰지 않으므로 비어 있는 것이 정상이다.
-        std::vector<std::string_view> bodyless_windows;
+        ce::dynamic_array<std::string_view> bodyless_windows;
 
         /// 같은 안정 식별자가 두 번 선언됐다. 뒤엣것이 앞엣것을 가린다.
-        std::vector<std::string_view> duplicate_ids;
+        ce::dynamic_array<std::string_view> duplicate_ids;
 
         /// 아무 창도 가지 않는 도킹 자리. 배치가 빈 노드를 만든다.
-        std::vector<std::string_view> empty_dock_slots;
+        ce::dynamic_array<std::string_view> empty_dock_slots;
 
         /// 넷 다 비어 있는가.
         bool clean() const noexcept

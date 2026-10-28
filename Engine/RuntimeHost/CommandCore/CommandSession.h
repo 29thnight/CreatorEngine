@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 // LC1 (PHASE 14.5) — session: 결과를 모으고 프로세스 종료 코드를 정한다.
 //
@@ -58,7 +59,7 @@ namespace CommandCore
         void SetFailFast(bool enabled) noexcept { m_failFast = enabled; }
         bool IsFailFast() const noexcept { return m_failFast; }
 
-        const std::vector<SessionEntry>& Entries() const noexcept { return m_entries; }
+        const ce::dynamic_array<SessionEntry>& Entries() const noexcept { return m_entries; }
 
         std::size_t CountOf(CommandStatus status) const noexcept;
 
@@ -76,7 +77,7 @@ namespace CommandCore
     private:
         CommandSession() = default;
 
-        std::vector<SessionEntry> m_entries;
+        ce::dynamic_array<SessionEntry> m_entries;
         CommandStatus             m_worst{ CommandStatus::Succeeded };
         uint64_t                  m_nextSequence{ 0 };
         bool                      m_failFast{ false };

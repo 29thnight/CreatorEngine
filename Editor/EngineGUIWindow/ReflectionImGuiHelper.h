@@ -1,3 +1,5 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #include "../EngineEntry/Editing/ReflectionUndo.h" // MakeCustomChangeCommand — 에디터 층 Undo(E1-6 이관)
 
@@ -56,9 +58,9 @@ namespace Meta
     {
         using DrawFn = void(*)(void* instance);
 
-        inline std::unordered_map<size_t, DrawFn>& Registry()
+        inline ce::engine_node_map<size_t, DrawFn>& Registry()
         {
-            static std::unordered_map<size_t, DrawFn> s_map;
+            static ce::engine_node_map<size_t, DrawFn> s_map;
             return s_map;
         }
 
@@ -83,7 +85,7 @@ namespace Meta
 
     struct MethodUiState
     {
-        std::vector<std::any> arguments;
+        ce::dynamic_array<std::any> arguments;
         std::string feedback;
         bool failed = false;
         int lastSeenFrame = 0;
@@ -118,7 +120,7 @@ namespace Meta
     {
         try
         {
-            std::vector<void*> arguments;
+            ce::dynamic_array<void*> arguments;
             arguments.reserve(state.arguments.size());
             for (std::any& argument : state.arguments)
             {
@@ -158,7 +160,7 @@ namespace Meta
 
         // ImGui ID는 상위 컴포넌트 ID, 인스턴스 포인터, 메서드 순서를 포함한다.
         // 접은 컴포넌트의 임시 입력도 잠시 보존하고 오래 안 쓴 상태는 회수한다.
-        static std::unordered_map<ImGuiID, MethodUiState> states;
+        static ce::engine_node_map<ImGuiID, MethodUiState> states;
         static int lastCleanupFrame = 0;
         const int frame = ImGui::GetFrameCount();
         if (frame - lastCleanupFrame >= 600)
@@ -261,7 +263,7 @@ namespace Meta
     {
         if (const reflgen::enum_descriptor* enumeration = field.enumeration())
         {
-            std::vector<const char*> items;
+            ce::dynamic_array<const char*> items;
             const long long prevValue = enumeration->read(value);
             int current_index = 0;
             const std::span<const reflgen::enum_descriptor::entry> entries = enumeration->entries();

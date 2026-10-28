@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 // 에디터 메뉴 런타임 표 (PHASE 21 M0 · 계획서 부록 A.5) — 선언을 항목으로 낮춘다.
 //
@@ -51,8 +52,8 @@ namespace editor
     // 상단 뿌리 하나가 드는 것. 두 목록인 까닭은 파일 머리 참조.
     struct top_menu_storage
     {
-        std::vector<menu_entry<global_target>> global_items;
-        std::vector<menu_entry<entity_target>> selection_items;
+        ce::dynamic_array<menu_entry<global_target>> global_items;
+        ce::dynamic_array<menu_entry<entity_target>> selection_items;
 
         bool empty() const noexcept
         {
@@ -72,9 +73,9 @@ namespace editor
     // static이라 프로그램 전체에 하나이고, 등록 사슬이 중앙 목록에서 시작하므로
     // 링커가 반드시 끌어온다.
     template<popup_host Host>
-    std::vector<menu_entry<popup_context_t<Host>>>& popup_menu_entries()
+    ce::dynamic_array<menu_entry<popup_context_t<Host>>>& popup_menu_entries()
     {
-        static std::vector<menu_entry<popup_context_t<Host>>> storage;
+        static ce::dynamic_array<menu_entry<popup_context_t<Host>>> storage;
         return storage;
     }
 
@@ -151,7 +152,7 @@ namespace editor
             "선언자에 static consteval auto for_editor()가 없다");
 
         constexpr auto declaration = Declarer::for_editor();
-        std::apply(
+        ce::apply(
             [declarer_name](const auto&... items)
             {
                 (detail::add_declared_item(items, declarer_name), ...);

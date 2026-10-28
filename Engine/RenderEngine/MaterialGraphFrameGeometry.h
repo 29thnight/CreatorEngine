@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -39,8 +40,8 @@ struct SceneFrameGeometry final
     static_assert(offsetof(Record, owner) == 68);
     IRenderDeviceServices* device{};
     own::shared_owner<TransientBufferPool> pool;
-    std::vector<Record> records{Record{}};
-    std::vector<own::shared_owner<const MeshSurfaceBatch>> geometry{nullptr};
+    ce::dynamic_array<Record> records{Record{}};
+    ce::dynamic_array<own::shared_owner<const MeshSurfaceBatch>> geometry{nullptr};
     uint32_t nextPrimitiveAddress{1};
     uint32_t FindRecord(uint32_t address) const
     {

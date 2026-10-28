@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -106,8 +107,8 @@ namespace RenderTest
             return false;
         }
         const auto observedBone = clip.tracks.back().bone;
-        std::vector<EntityHandle> roots;
-        std::vector<Instance> instances;
+        ce::dynamic_array<EntityHandle> roots;
+        ce::dynamic_array<Instance> instances;
         Entity* ddolRoot{};
         int checks = 0;
         const auto require = [&](bool ok, const std::string& name)
@@ -215,13 +216,13 @@ namespace RenderTest
             auto output = animation::make_task(animation::task_kind::output);
             output.dependency_a = blendIndex;
             recipe.set_output(recipe.append(output));
-            std::vector<int> executedClips;
+            ce::dynamic_array<int> executedClips;
             recipe.for_each_reachable([&](const animation::task& task)
             {
                 if (task.kind == animation::task_kind::sample_clip)
                     executedClips.push_back(task.clip_index);
             });
-            require(executedClips == std::vector<int>{ 22, 33 },
+            require(executedClips == ce::dynamic_array<int>{ 22, 33 },
                 "Both blend inputs execute in order; unreachable sample does not");
             bool rejectedForwardDependency = false;
             try
@@ -384,8 +385,8 @@ namespace RenderTest
                 auto layerOwnerRoot = Component::CreateManaged<Animator>(layerOwnerDomain);
                 Animator& layerOwner = *layerOwnerRoot;
                 gcce_probe::cleanup layerOwnerCleanup(layerOwner);
-                std::vector<own::shared_owner<AnimationController>> layers;
-                std::vector<std::uintptr_t> slotAddresses;
+                ce::dynamic_array<own::shared_owner<AnimationController>> layers;
+                ce::dynamic_array<std::uintptr_t> slotAddresses;
                 layers.reserve(10);
                 slotAddresses.reserve(10);
                 for (int index = 0; index < 10; ++index)
@@ -441,7 +442,7 @@ namespace RenderTest
             {
                 const auto tracks = generation->AnimationTracks(static_cast<int>(clipIndex));
                 require(tracks.size() == boneCount, "Cached table uses this generation's bone count");
-                std::vector<const assets::ModelAnimationTrack*> reference;
+                ce::dynamic_array<const assets::ModelAnimationTrack*> reference;
                 assets::animation::BuildTrackTable(generation->Animations()[clipIndex], boneCount, reference);
                 for (std::size_t bone = 0; bone < boneCount; ++bone)
                     require(tracks[bone] == reference[bone], "Cached clip/bone mapping matches source channels");
@@ -613,7 +614,7 @@ namespace RenderTest
                 pose.qualityOverride = 0;
                 pose.timeElapsed = fadeSampleTime;
                 job.Update(.05f);
-                std::array<math::vector3, 4> fadeOut{};
+                ce::fixed_array<math::vector3, 4> fadeOut{};
                 fadeOut[0] = pose.poseGlobals[ikEnd].translation();
                 pose.qualityOverride = 1;
                 for (int step = 1; step <= 3; ++step)
@@ -808,7 +809,7 @@ namespace RenderTest
                 animator.socketvec.push_back(socket);
                 instances.push_back(instance);
             }
-            std::vector<std::uintptr_t> recordAddresses;
+            ce::dynamic_array<std::uintptr_t> recordAddresses;
             recordAddresses.reserve(instances.size());
             for (const auto& item : instances)
                 recordAddresses.push_back(reinterpret_cast<std::uintptr_t>(&item.animator->GetInstance()));
@@ -922,11 +923,11 @@ namespace RenderTest
             // Shared immutable generation, distinct per-instance times. Compare the
             // parallel product palette with sequential samples of the same clip.
             setup(0, 1, true);
-            std::array<math::matrix4x4, kMaxBones> expected;
+            ce::fixed_array<math::matrix4x4, kMaxBones> expected;
             assets::animation::Pose referencePose;
-            std::vector<const math::matrix4x4*> scratchStorage;
-            std::vector<const void*> outputStorage;
-            std::vector<const Animation::TrackKeyCursor*> keyStorage;
+            ce::dynamic_array<const math::matrix4x4*> scratchStorage;
+            ce::dynamic_array<const void*> outputStorage;
+            ce::dynamic_array<const Animation::TrackKeyCursor*> keyStorage;
             for (const auto& item : instances)
             {
                 scratchStorage.push_back(item.animator->GetInstance().poseGlobals.data());
@@ -1214,7 +1215,7 @@ namespace RenderTest
             second->m_avatarMask->useAll = true;
             animator.m_animationControllers.push_back(second);
             job.Update(seconds(0.1));
-            std::vector<animation::task_kind> layerTasks;
+            ce::dynamic_array<animation::task_kind> layerTasks;
             animator.GetInstance().taskList.for_each_reachable([&](const animation::task& task)
             {
                 if (task.kind == animation::task_kind::prepare_composite
@@ -1222,18 +1223,18 @@ namespace RenderTest
                     || task.kind == animation::task_kind::materialize_composite)
                     layerTasks.push_back(task.kind);
             });
-            require(layerTasks == std::vector<animation::task_kind>{
+            require(layerTasks == ce::dynamic_array<animation::task_kind>{
                 animation::task_kind::prepare_composite,
                 animation::task_kind::blend_masked,
                 animation::task_kind::blend_masked,
                 animation::task_kind::materialize_composite },
                 "Both live layers compose in authored order before final materialization");
-            std::vector<animation::task_kind> interleavedTasks;
+            ce::dynamic_array<animation::task_kind> interleavedTasks;
             animator.GetInstance().taskList.for_each_reachable([&](const animation::task& task)
             {
                 interleavedTasks.push_back(task.kind);
             });
-            require(interleavedTasks == std::vector<animation::task_kind>{
+            require(interleavedTasks == ce::dynamic_array<animation::task_kind>{
                 animation::task_kind::prepare_composite,
                 animation::task_kind::sample_clip,
                 animation::task_kind::materialize,
@@ -1307,7 +1308,7 @@ namespace RenderTest
             }
             const float firstTimeBeforeReorder = firstPlayback->timeElapsed;
             const float secondTimeBeforeReorder = secondPlayback->timeElapsed;
-            std::vector<own::shared_owner<AnimationController>> extraLayers;
+            ce::dynamic_array<own::shared_owner<AnimationController>> extraLayers;
             for (int index = 0; index < 4; ++index)
             {
                 auto extra = own::make_shared<AnimationController>();
@@ -1331,7 +1332,7 @@ namespace RenderTest
                 "Retired extra layers release their playback slots");
             second->m_additive = true;
             job.Update(0.f);
-            std::vector<animation::task_kind> additiveTasks;
+            ce::dynamic_array<animation::task_kind> additiveTasks;
             animator.GetInstance().taskList.for_each_reachable([&](const animation::task& task)
             {
                 if (task.kind == animation::task_kind::prepare_composite
@@ -1341,7 +1342,7 @@ namespace RenderTest
                     || task.kind == animation::task_kind::materialize_composite)
                     additiveTasks.push_back(task.kind);
             });
-            require(additiveTasks == std::vector<animation::task_kind>{
+            require(additiveTasks == ce::dynamic_array<animation::task_kind>{
                 animation::task_kind::prepare_composite,
                 animation::task_kind::blend_masked,
                 animation::task_kind::make_additive,
@@ -1451,7 +1452,7 @@ namespace RenderTest
             }
             job.Update(seconds(0.1));
             require(Near(retained, animator.GetInstance().localTransforms[observedBone]), "Named-mask local retention");
-            std::vector<math::matrix4x4> maskedGlobals(boneCount, skeleton.rootTransform);
+            ce::dynamic_array<math::matrix4x4> maskedGlobals(boneCount, skeleton.rootTransform);
             for (std::size_t b = 0; b < boneCount; ++b)
             {
                 const auto parent = skeleton.bones[b].parent;
@@ -1540,7 +1541,7 @@ namespace RenderTest
                 "Legacy current-state YAML key mirrors the live instance during serialization");
             const auto currentTracks = generation->AnimationTracks(0);
             const auto nextTracks = generation->AnimationTracks(1);
-            std::vector<math::matrix4x4> blendGlobals(boneCount);
+            ce::dynamic_array<math::matrix4x4> blendGlobals(boneCount);
             for (float progress : { 0.f, 0.17f, 0.63f, 0.99f })
             {
                 first->GetPlayback().timeElapsed = static_cast<float>(clip.durationTicks * progress);
@@ -1575,7 +1576,7 @@ namespace RenderTest
             animator.GetPlaybackControl().blendT = 0.5f;
             animator.socketvec[0]->m_boneMatrix = math::matrix4x4{};
             job.Update(seconds(0.1));
-            std::vector<math::matrix4x4> globals(boneCount, skeleton.rootTransform);
+            ce::dynamic_array<math::matrix4x4> globals(boneCount, skeleton.rootTransform);
             for (std::size_t b = 0; b < boneCount; ++b)
             {
                 const auto parent = skeleton.bones[b].parent;
@@ -1674,7 +1675,7 @@ namespace RenderTest
             auto detachedAnimatorRoot = Component::CreateManaged<Animator>(detachedAnimatorDomain);
             Animator& detachedAnimator = *detachedAnimatorRoot;
             gcce_probe::cleanup detachedAnimatorCleanup(detachedAnimator);
-            std::array<bool, 5> offOwnerRejected{};
+            ce::fixed_array<bool, 5> offOwnerRejected{};
             std::thread offOwner([&]
             {
                 const auto rejected = [](auto&& call)

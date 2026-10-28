@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
@@ -61,7 +62,7 @@ public:
         std::span<const RHIUploadRequest> requests,
         std::span<RHIBufferSlice> outSlices,
         std::string& outError);
-    bool PinRecording(uint64_t recordingId, std::vector<ce::lifetime_token>& leases, std::string& outError);
+    bool PinRecording(uint64_t recordingId, ce::dynamic_array<ce::lifetime_token>& leases, std::string& outError);
     void OnSubmitted(uint64_t recordingId, RHICompletionPoint completion);
     void RejectSubmission(uint64_t recordingId, RHICompletionPoint completion);
     void AbortRecording(uint64_t recordingId);
@@ -112,7 +113,7 @@ private:
     VkDevice m_device{ VK_NULL_HANDLE };
     VulkanResourceTable* m_table{ nullptr };
     VkPhysicalDeviceMemoryProperties m_memoryProperties{};
-    std::vector<own::unique_owner<Segment>> m_segments;
+    ce::dynamic_array<own::unique_owner<Segment>> m_segments;
     uint64_t m_regularSegmentBytes{ 0 };
     uint64_t m_largeThreshold{ 0 };
     uint32_t m_standbyRegularSegments{ 0 };
@@ -222,7 +223,7 @@ class VulkanDescriptorPoolRecycler
         VkDescriptorPool handle{VK_NULL_HANDLE};
         VulkanDescriptorCounts capacity{};
     };
-    std::vector<std::vector<PoolPage>> m_pools;
+    ce::dynamic_array<ce::dynamic_array<PoolPage>> m_pools;
     uint64_t m_allocatedPoolDescriptors{};
     uint32_t m_maxIndexingPoolDescriptors{};
     own::shared_owner<VulkanDescriptorPoolBudget> m_poolBudget;

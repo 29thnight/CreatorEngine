@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "ResourceCounterWindow.h"
 #include "EditorWindowNames.h"
 #include "Windows/EditorStandardWindows.h"
@@ -143,7 +144,7 @@ void ResourceCounterWindow::Publish(std::uint32_t frame)
 	if (recordingResources)
 	{
 		auto& service = ce::profiler();
-		std::array<ce::profile_counter_sample, 11 + Diagnostics::kEngineResourceNames.size()> samples{};
+		ce::fixed_array<ce::profile_counter_sample, 11 + Diagnostics::kEngineResourceNames.size()> samples{};
 		std::size_t count = 0;
 		const auto add = [&samples, &count](ce::profile_counter_id id, double value)
 		{
@@ -154,7 +155,7 @@ void ResourceCounterWindow::Publish(std::uint32_t frame)
 		add(ce::profile_counter_id::resource_materials, static_cast<double>(snapshot.materials));
 		add(ce::profile_counter_id::resource_textures, static_cast<double>(snapshot.textures));
 		add(ce::profile_counter_id::resource_proxies, static_cast<double>(snapshot.proxies));
-		static const std::array extraIds{
+		static const ce::fixed_array extraIds{
 			ce::register_counter("UI textures", "count", ce::counter_category::resources),
 			ce::register_counter("Sprite sheets", "count", ce::counter_category::resources),
 			ce::register_counter("Retained assets", "count", ce::counter_category::resources),
@@ -162,7 +163,7 @@ void ResourceCounterWindow::Publish(std::uint32_t frame)
 			ce::register_counter("Animators", "count", ce::counter_category::resources),
 			ce::register_counter("Animation palettes", "count", ce::counter_category::resources),
 		};
-		const std::array extraValues{
+		const ce::fixed_array extraValues{
 			snapshot.uiTextures, snapshot.spriteSheets, snapshot.retainedAssets,
 			snapshot.uiProxies, snapshot.animators, snapshot.animationPalettes,
 		};
@@ -170,7 +171,7 @@ void ResourceCounterWindow::Publish(std::uint32_t frame)
 			add(extraIds[i], static_cast<double>(extraValues[i]));
 		static const auto engineIds = []
 		{
-			std::array<ce::profile_counter_id, Diagnostics::kEngineResourceNames.size()> ids{};
+			ce::fixed_array<ce::profile_counter_id, Diagnostics::kEngineResourceNames.size()> ids{};
 			for (std::size_t i = 0; i < ids.size(); ++i)
 				ids[i] = ce::register_counter(
 					std::string("Engine resource ") + std::string(Diagnostics::kEngineResourceNames[i]),

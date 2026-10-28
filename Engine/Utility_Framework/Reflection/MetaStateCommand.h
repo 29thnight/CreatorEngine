@@ -1,4 +1,5 @@
 #pragma once
+#include "../Foundation/EngineFunc.h"
 // CT3: 숨은 순서 의존을 끊는다 — 이 헤더는 Meta::Property(ReflectionType.h)와
 // std::function을 쓰면서 include가 0개였고, ReflectionRegister.h가 자기보다
 // 앞줄에서 ReflectionType.h를 포함해 줄 때만 컴파일됐다.
@@ -25,7 +26,7 @@ namespace Meta
 	class CustomChangeCommand : public IUndoableCommand
 	{
 	public:
-		CustomChangeCommand(std::function<void()> undoFunc, std::function<void()> redoFunc)
+		CustomChangeCommand(ce::owned_func<void()> undoFunc, ce::owned_func<void()> redoFunc)
 			: m_undoFunc(std::move(undoFunc)), m_redoFunc(std::move(redoFunc)) {
 		}
 
@@ -33,8 +34,8 @@ namespace Meta
 		void Redo() override { if (m_redoFunc) m_redoFunc(); }
 
 	private:
-		std::function<void()> m_undoFunc;
-		std::function<void()> m_redoFunc;
+		ce::owned_func<void()> m_undoFunc;
+		ce::owned_func<void()> m_redoFunc;
 	};
 
 }

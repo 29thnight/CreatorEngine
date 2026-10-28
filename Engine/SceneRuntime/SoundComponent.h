@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "Component.h"
 #include "SoundDefinition.h"
@@ -26,7 +27,7 @@ struct SoundComponentSettings final
     int reverbIndex{ 0 }; // Legacy input: slots 0..3 migrate to the named Room send.
     std::string reverbBus{ "Room" };
     Rolloff rolloff{ Rolloff::Inverse };
-    std::vector<CurvePoint> localRolloffCurve;
+    ce::dynamic_array<CurvePoint> localRolloffCurve;
     bool loop{ false };
     bool playOnStart{ false };
     bool spatial{ false };
@@ -101,7 +102,7 @@ public:
     int reverbIndex{ 0 }; // Legacy input: slots 0..3 migrate to the named Room send.
     std::string reverbBus{ "Room" };
     Rolloff rolloff{ Rolloff::Inverse };
-    std::vector<CurvePoint> localRolloffCurve;
+    ce::dynamic_array<CurvePoint> localRolloffCurve;
     bool loop{ false };
     bool playOnStart{ false };
     bool spatial{ false };
@@ -131,13 +132,13 @@ private:
     wave::PlaybackHandle m_playback;
 
     [[reflgen::ignore]]
-    std::vector<wave::PlaybackHandle> m_oneShots;
+    ce::dynamic_array<wave::PlaybackHandle> m_oneShots;
 
     [[reflgen::ignore]]
     wave::PlaybackHandle m_previewPlayback;
 
     [[reflgen::ignore]]
-    std::vector<wave::PlaybackHandle> m_previews;
+    ce::dynamic_array<wave::PlaybackHandle> m_previews;
 
     [[reflgen::ignore]]
     mutable std::mutex m_editorMutex;
@@ -146,7 +147,7 @@ private:
     std::optional<SoundComponentSettings> m_pendingSettings;
 
     [[reflgen::ignore]]
-    std::vector<QueuedPreview> m_previewCommands;
+    ce::dynamic_array<QueuedPreview> m_previewCommands;
 
     [[reflgen::ignore]]
     std::chrono::steady_clock::time_point m_previewVisibleUntil;

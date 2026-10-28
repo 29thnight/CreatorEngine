@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
@@ -118,8 +119,8 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
         RHIDisplayFrameMetadata displayMetadata;
         RHICompletionPoint publishedCompletion;
         uint64_t observedPublishedCompletion{0};
-        std::array<winrt::com_ptr<ID3D12Resource>, 4> temporalTextures;
-        std::array<HANDLE, 4> temporalHandles{};
+        ce::fixed_array<winrt::com_ptr<ID3D12Resource>, 4> temporalTextures;
+        ce::fixed_array<HANDLE, 4> temporalHandles{};
         RHITemporalDisplayResources temporalResources;
         TemporalFrame temporalFrame;
         TemporalMeasurementProvenance temporalProvenance;
@@ -146,7 +147,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
     bool asyncCompute{false};
     uint64_t computeSubmissions{0};
     DX12GpuProfiler::FrameTimings computeTimings;
-    std::vector<DX12GpuProfiler::PassTiming> computeMerged;
+    ce::dynamic_array<DX12GpuProfiler::PassTiming> computeMerged;
     EnhancedRenderGraph::QueueEndpoint graphics;
     own::shared_owner<DX12QueueRecorder> ownedRecorder;
     own::shared_owner<DX12SoftwareCommandValidator> softwareValidator;
@@ -164,12 +165,12 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
     uint64_t measuredOverlapSubmissions{0};
     bool evidenceTelemetry{false};
     GpuFrameToken currentProfilerToken;
-    std::array<GpuFrameToken, kFrameCount> reportedProfilerTokens{};
+    ce::fixed_array<GpuFrameToken, kFrameCount> reportedProfilerTokens{};
     uint64_t minimumMeasurementSubmitTick{0};
     uint64_t predictedGainNanoseconds{0};
     // 프레임마다 재사용하는 수집물. 문자열 버퍼를 지켜 할당을 없앤다.
     DX12GpuProfiler::FrameTimings profilerTimings;
-    std::vector<DX12GpuProfiler::PassTiming> profilerMerged;
+    ce::dynamic_array<DX12GpuProfiler::PassTiming> profilerMerged;
 
     static constexpr size_t kMaxTimingSignatureBytes = 1024 * 1024;
     EnhancedGpuMeasurementHistory gpuMeasurements;
@@ -183,7 +184,7 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
         bool collectMeasurements{false};
         uint64_t backendGeneration{0};
     };
-    std::array<MeasurementSubmission, kFrameCount> measurementSubmissions{};
+    ce::fixed_array<MeasurementSubmission, kFrameCount> measurementSubmissions{};
 
     const MeasurementSubmission* FindMeasurementSubmission(const GpuFrameToken& token) const
     {
@@ -336,8 +337,8 @@ struct EnhancedSceneRendererLiveDX12Adapter::Impl
     }
 
     winrt::com_ptr<ID3D12Resource> fogCloudNeutral;
-    std::vector<DisplayResource> activeDisplays;
-    std::vector<DisplayResource> retiredDisplays;
+    ce::dynamic_array<DisplayResource> activeDisplays;
+    ce::dynamic_array<DisplayResource> retiredDisplays;
     DisplayToken nextDisplayToken{ 1 };
     uint32_t commandPoolFrame{ 0 };
 };
@@ -551,7 +552,7 @@ void EnhancedSceneRendererLiveDX12Adapter::ShutdownPipeline()
 void EnhancedSceneRendererLiveDX12Adapter::ShutdownInterop()
 {
     Impl& impl = *m_impl;
-    const auto closeAll = [](std::vector<Impl::DisplayResource>& displays)
+    const auto closeAll = [](ce::dynamic_array<Impl::DisplayResource>& displays)
     {
         for (Impl::DisplayResource& display : displays)
         {
@@ -806,7 +807,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::SubmitOwnedGraph(const own::shared_ow
         }
         const auto& costs = view->nanoseconds;
         return signatureMatches && identity.passIndex < costs.size() ? costs[identity.passIndex] : std::nullopt;
-    }) : std::vector<EnhancedRenderGraph::QueueHint>{};
+    }) : ce::dynamic_array<EnhancedRenderGraph::QueueHint>{};
     const bool submitted =
         graph->SubmitQueues(graph, *recorder, graphics, impl.asyncCompute ? &compute : nullptr, hints,
                             impl.asyncCompute, std::move(owner), execution, outError);
@@ -1247,9 +1248,9 @@ bool EnhancedSceneRendererLiveDX12Adapter::CreateTemporalDisplayTextures(
         }
         constexpr DXGI_FORMAT formats[]{DXGI_FORMAT_R8G8B8A8_UNORM, DXGI_FORMAT_R8G8B8A8_UNORM,
             DXGI_FORMAT_R32_FLOAT, DXGI_FORMAT_R16G16_FLOAT};
-        std::array<winrt::com_ptr<ID3D12Resource>, 4> textures;
-        std::array<HANDLE, 4> handles{};
-        std::array<RHITextureHandle, 4> registered{};
+        ce::fixed_array<winrt::com_ptr<ID3D12Resource>, 4> textures;
+        ce::fixed_array<HANDLE, 4> handles{};
+        ce::fixed_array<RHITextureHandle, 4> registered{};
         const auto rollback = [&]
         {
             for (size_t index = 0; index < handles.size(); ++index)
@@ -1340,7 +1341,7 @@ void EnhancedSceneRendererLiveDX12Adapter::CollectRetiredDisplays()
 {
     Impl& impl = *m_impl;
     const auto completed = impl.resources.GetCompletedFenceValue();
-    std::erase_if(impl.retiredDisplays, [&](auto& display)
+    ce::erase_if(impl.retiredDisplays, [&](auto& display)
     {
         if (display.producerCompletionLost || (!display.producerComplete && display.producerCompletion > completed)
             || display.consumerLease.use_count() != 1
@@ -1591,10 +1592,10 @@ void EnhancedSceneRendererLiveDX12Adapter::ResolveProfilerFrame(const GpuFrameTo
 namespace
 {
     bool CollectQueueProfiler(DX12GpuProfiler& profiler,
-        DX12GpuProfiler::FrameTimings& scratch, std::vector<DX12GpuProfiler::PassTiming>& merged,
+        DX12GpuProfiler::FrameTimings& scratch, ce::dynamic_array<DX12GpuProfiler::PassTiming>& merged,
         const GpuFrameToken& token,
-        std::vector<EnhancedLivePassTiming>& outTimings,
-        std::vector<EnhancedLiveGpuSlice>& outSlices,
+        ce::dynamic_array<EnhancedLivePassTiming>& outTimings,
+        ce::dynamic_array<EnhancedLiveGpuSlice>& outSlices,
         EnhancedLiveGpuSpan& outSpan,
         double& outTotalMilliseconds, std::string& outError)
     {
@@ -1606,7 +1607,7 @@ namespace
 
         // ★ raw 조각은 timings 에 그대로 남아 있다. 이름으로 묶는 것은 **표시용**이고,
         //   GPU 타임라인은 묶지 않은 쪽을 그릴 것이다.
-        std::vector<DX12GpuProfiler::PassTiming> nativeTimings;
+        ce::dynamic_array<DX12GpuProfiler::PassTiming> nativeTimings;
         nativeTimings.swap(merged);
         profiler.MergeSlices(timings, nativeTimings);
 
@@ -1691,7 +1692,7 @@ namespace
 }
 
 bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& token,
-    std::vector<EnhancedLivePassTiming>& outTimings, std::vector<EnhancedLiveGpuSlice>& outSlices,
+    ce::dynamic_array<EnhancedLivePassTiming>& outTimings, ce::dynamic_array<EnhancedLiveGpuSlice>& outSlices,
     EnhancedLiveGpuSpan& outSpan, double& outTotalMilliseconds, std::string& outError)
 {
     auto& impl = *m_impl;
@@ -1704,8 +1705,8 @@ bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& 
     }
     if (submission && submission->computeToken.IsValid())
     {
-        std::vector<EnhancedLivePassTiming> computePasses;
-        std::vector<EnhancedLiveGpuSlice> computeSlices;
+        ce::dynamic_array<EnhancedLivePassTiming> computePasses;
+        ce::dynamic_array<EnhancedLiveGpuSlice> computeSlices;
         EnhancedLiveGpuSpan computeSpan;
         double computeTotal = 0;
         if (!CollectQueueProfiler(impl.computeProfiler, impl.computeTimings, impl.computeMerged,
@@ -1743,7 +1744,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& 
                 outSlices.push_back(std::move(slice));
             }
             // Union in QPC domain: never subtract raw ticks from different queues.
-            std::vector<std::pair<uint64_t, uint64_t>> intervals;
+            ce::dynamic_array<ce::pair<uint64_t, uint64_t>> intervals;
             for (const auto& slice : outSlices)
             {
                 intervals.emplace_back(slice.beginCpuTick, slice.endCpuTick);
@@ -1796,7 +1797,7 @@ bool EnhancedSceneRendererLiveDX12Adapter::CollectProfiler(const GpuFrameToken& 
             graphicsClock.cpuTicksPerSecond == computeClock.cpuTicksPerSecond));
     if (outSpan.overlapClockValid)
     {
-        std::vector<std::pair<uint64_t, uint64_t>> lanes[2];
+        ce::dynamic_array<ce::pair<uint64_t, uint64_t>> lanes[2];
         for (const auto& slice : outSlices)
         {
             if (slice.queueId < 2 && slice.endCpuTick > slice.beginCpuTick)

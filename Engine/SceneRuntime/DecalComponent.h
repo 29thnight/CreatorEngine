@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -63,13 +64,13 @@ private:
     void ReleaseManagedResources() override;
 
     [[reflgen::ignore]]
-    std::array<AssetDepot::AssetRequest<Texture>, 3> m_textureRequests{};
+    ce::fixed_array<AssetDepot::AssetRequest<Texture>, 3> m_textureRequests{};
     [[reflgen::ignore]]
-    std::array<bool, 3> m_texturePending{};
+    ce::fixed_array<bool, 3> m_texturePending{};
     [[reflgen::ignore]]
-    std::array<bool, 3> m_textureRetryOnRevision{};
+    ce::fixed_array<bool, 3> m_textureRetryOnRevision{};
     [[reflgen::ignore]]
-    std::array<std::uint64_t, 3> m_textureResolverRevisions{};
+    ce::fixed_array<std::uint64_t, 3> m_textureResolverRevisions{};
 
     std::string m_diffusefileName{};
     std::string m_normalFileName{};

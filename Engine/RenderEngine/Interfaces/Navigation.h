@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "../../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../../Utility_Framework/Foundation/Core.Minimal.h"
@@ -48,7 +49,7 @@ struct [[reflgen::reflect]] Navigation
 	// 쓴다 — "프리팹일 때만 뜻이 있는 평면 인덱스"보다 적용 범위가 넓다.
 	static constexpr uint32_t InvalidParentHops = (std::numeric_limits<uint32_t>::max)();
 	uint32_t parentHops{ InvalidParentHops };
-	std::vector<uint32_t> childOrdinals{};
+	ce::dynamic_array<uint32_t> childOrdinals{};
 
 	bool HasTarget() const noexcept { return parentHops != InvalidParentHops; }
 

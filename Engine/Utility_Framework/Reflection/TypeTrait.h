@@ -1,3 +1,5 @@
+#include "../Foundation/EngineNodeMap.h"
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -362,7 +364,7 @@ namespace TypeTrait
 	private:
 		// 정의는 TypeTrait.cpp — 인덱스는 "몇 번째로 물어봤는가"라 표가 갈리면
 		// 같은 타입이 모듈마다 다른 비트 자리를 갖는다(마스크가 조용히 어긋난다).
-		static std::unordered_map<HashedGuid, uint32_t>& Table();
+		static ce::engine_node_map<HashedGuid, uint32_t>& Table();
 
 		static inline uint32_t Assign(HashedGuid typeID)
 		{
@@ -421,7 +423,7 @@ namespace TypeTrait
 	private:
 		// 정의는 TypeTrait.cpp — 영속 UUID의 이름 대응표라 사본이 갈리면
 		// 등록한 쪽에서만 찾히고 다른 쪽 조회는 nullptr을 받는다.
-		static std::vector<std::pair<std::string, uuid::uuid16>>& Entries();
+		static ce::dynamic_array<ce::pair<std::string, uuid::uuid16>>& Entries();
 	};
 } // namespace TypeTrait
 

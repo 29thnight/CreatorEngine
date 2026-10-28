@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -33,8 +34,8 @@ struct RHIRecordingDiagnostics
     bool unitTimingsTruncated{false}, jobTimingsTruncated{false};
     uint64_t dispatchBeginNanoseconds{0}, waitBeginNanoseconds{0}, returnNanoseconds{0};
     own::shared_owner<job_graph_diagnostics> jobs;
-    std::vector<RHIRecordingTaskIdentity> tasks;
-    std::vector<RHIRecordingUnitTiming> units;
+    ce::dynamic_array<RHIRecordingTaskIdentity> tasks;
+    ce::dynamic_array<RHIRecordingUnitTiming> units;
     RHIRecordingTaskTopology topology;
 };
 

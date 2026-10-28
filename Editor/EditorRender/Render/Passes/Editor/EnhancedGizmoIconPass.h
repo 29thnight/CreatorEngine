@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #include "RHI/RHIFormat.h"
 #include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
@@ -71,7 +72,7 @@ public:
     /// 그 증상은 Close 실패(E_INVALIDARG)에 이은 디바이스 제거다(실측).
     void SetOutputFormat(RHIFormat format) { m_outputFormat = format; }
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
-    void SetIcons(const std::vector<Icon>* icons) { m_icons = icons; }
+    void SetIcons(const ce::dynamic_array<Icon>* icons) { m_icons = icons; }
     void SetKeepAlive(bool keepAlive) { m_keepAlive = keepAlive; }
 
     RGHandle GetOutput() const { return m_output; }
@@ -105,10 +106,10 @@ private:
     RGHandle m_output;
     bool     m_keepAlive{ false };
 
-    const std::vector<Icon>* m_icons{ nullptr };
+    const ce::dynamic_array<Icon>* m_icons{ nullptr };
 
-    std::vector<IconInstance> m_instances;
-    std::vector<Batch>        m_batches;
+    ce::dynamic_array<IconInstance> m_instances;
+    ce::dynamic_array<Batch>        m_batches;
 
     // 프레임 밀봉 값(3-2).
     math::matrix4x4 m_viewProjection{};

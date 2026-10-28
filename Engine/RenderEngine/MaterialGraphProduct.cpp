@@ -1,3 +1,6 @@
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -16,7 +19,7 @@ namespace
 {
 constexpr std::uint32_t MaxCompileTargets = 64;
 
-bool Fail(std::vector<LX::LXMaterialDiagnostic>& diagnostics, std::string code, std::string message,
+bool Fail(ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics, std::string code, std::string message,
           LX::LXMaterialSource source = {})
 {
     diagnostics.push_back({std::move(code), std::move(message), std::move(source)});
@@ -120,11 +123,11 @@ bool IsFloatTextureFormat(RHIFormat format)
     }
 }
 
-bool Pack(const ParameterBinding& binding, const LX::LXSocketValue& value, std::vector<std::uint8_t>& bytes)
+bool Pack(const ParameterBinding& binding, const LX::LXSocketValue& value, ce::dynamic_array<std::uint8_t>& bytes)
 {
     if (!LX::IsSocketValueValid(binding.parameter.type, value))
         return false;
-    std::array<std::uint32_t, 4> words{};
+    ce::fixed_array<std::uint32_t, 4> words{};
     const auto floating = [](double number, std::uint32_t& word) {
         const float converted = static_cast<float>(number);
         if (!std::isfinite(converted))
@@ -133,29 +136,29 @@ bool Pack(const ParameterBinding& binding, const LX::LXSocketValue& value, std::
         return true;
     };
     if (binding.parameter.type == LX::PinType::Bool)
-        words[0] = std::get<bool>(value) ? 1u : 0u;
+        words[0] = ce::get<bool>(value) ? 1u : 0u;
     else if (binding.parameter.type == LX::PinType::Int)
     {
-        const auto number = std::get<std::int64_t>(value);
+        const auto number = ce::get<std::int64_t>(value);
         if (number < INT32_MIN || number > INT32_MAX)
             return false;
         words[0] = std::bit_cast<std::uint32_t>(static_cast<std::int32_t>(number));
     }
     else if (binding.parameter.type == LX::PinType::Float)
     {
-        if (!floating(std::get<double>(value), words[0]))
+        if (!floating(ce::get<double>(value), words[0]))
             return false;
     }
     else if (binding.parameter.type == LX::PinType::Color)
     {
-        const auto& color = std::get<std::array<double, 4>>(value);
+        const auto& color = ce::get<ce::fixed_array<double, 4>>(value);
         for (std::size_t index = 0; index < color.size(); ++index)
             if (!floating(color[index], words[index]))
                 return false;
     }
     else
     {
-        const auto& vector = std::get<std::array<double, 3>>(value);
+        const auto& vector = ce::get<ce::fixed_array<double, 3>>(value);
         for (std::size_t index = 0; index < vector.size(); ++index)
             if (!floating(vector[index], words[index]))
                 return false;
@@ -167,14 +170,14 @@ bool Pack(const ParameterBinding& binding, const LX::LXSocketValue& value, std::
     return true;
 }
 
-bool ValidateTextureEncodings(const BindingLayout& layout, std::vector<LX::LXMaterialDiagnostic>& diagnostics)
+bool ValidateTextureEncodings(const BindingLayout& layout, ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics)
 {
     if (layout.textureEncodings.size() != layout.textures.size() || layout.textureEncodings.size() > 112u)
     {
         return Fail(diagnostics, "product.textureEncoding", "Texture encoding count differs from material textures.");
     }
-    std::set<std::uint32_t> slots;
-    std::set<std::uint32_t> offsets;
+    ce::engine_ordered_set<std::uint32_t> slots;
+    ce::engine_ordered_set<std::uint32_t> offsets;
     for (const auto& binding : layout.textureEncodings)
     {
         if (binding.slot >= 112u || binding.offset % 4u != 0 ||
@@ -199,25 +202,25 @@ bool ValidateTextureEncodings(const BindingLayout& layout, std::vector<LX::LXMat
 constexpr std::uint32_t CookMagic = 0x434D584Cu; // LXMC, little endian
 constexpr std::uint32_t TextLimit = 16u * 1024u * 1024u;
 
-void Word(std::vector<std::uint8_t>& bytes, std::uint32_t word)
+void Word(ce::dynamic_array<std::uint8_t>& bytes, std::uint32_t word)
 {
     for (unsigned shift = 0; shift < 32; shift += 8)
         bytes.push_back(static_cast<std::uint8_t>(word >> shift));
 }
 
-void Wide(std::vector<std::uint8_t>& bytes, std::uint64_t value)
+void Wide(ce::dynamic_array<std::uint8_t>& bytes, std::uint64_t value)
 {
     Word(bytes, static_cast<std::uint32_t>(value));
     Word(bytes, static_cast<std::uint32_t>(value >> 32));
 }
 
-void Block(std::vector<std::uint8_t>& bytes, std::span<const std::uint8_t> block)
+void Block(ce::dynamic_array<std::uint8_t>& bytes, std::span<const std::uint8_t> block)
 {
     Word(bytes, static_cast<std::uint32_t>(block.size()));
     bytes.insert(bytes.end(), block.begin(), block.end());
 }
 
-void Text(std::vector<std::uint8_t>& bytes, const std::string& text)
+void Text(ce::dynamic_array<std::uint8_t>& bytes, const std::string& text)
 {
     Block(bytes, {reinterpret_cast<const std::uint8_t*>(text.data()), text.size()});
 }
@@ -275,7 +278,7 @@ class Reader
     std::span<const std::uint8_t> bytes_;
 };
 
-void WriteLocation(std::vector<std::uint8_t>& bytes, const LX::LXMaterialSource& source)
+void WriteLocation(ce::dynamic_array<std::uint8_t>& bytes, const LX::LXMaterialSource& source)
 {
     Wide(bytes, source.scope);
     Wide(bytes, source.node);
@@ -299,7 +302,7 @@ bool ReadLocation(Reader& reader, LX::LXMaterialSource& source)
     return reader.Text(source.property, 4096, true);
 }
 
-void WriteParameter(std::vector<std::uint8_t>& bytes, const LX::LXMaterialParameter& parameter)
+void WriteParameter(ce::dynamic_array<std::uint8_t>& bytes, const LX::LXMaterialParameter& parameter)
 {
     Wide(bytes, parameter.id);
     Text(bytes, parameter.identifier);
@@ -356,7 +359,7 @@ bool ReadParameter(Reader& reader, LX::LXMaterialParameter& parameter)
     else if (parameter.type == LX::PinType::Color || parameter.type == LX::PinType::Vector ||
              parameter.type == LX::PinType::Normal)
     {
-        std::array<double, 4> components{};
+        ce::fixed_array<double, 4> components{};
         const auto count = parameter.type == LX::PinType::Color ? 4u : 3u;
         for (unsigned index = 0; index < count; ++index)
         {
@@ -367,7 +370,7 @@ bool ReadParameter(Reader& reader, LX::LXMaterialParameter& parameter)
         if (count == 4)
             parameter.value = components;
         else
-            parameter.value = std::array<double, 3>{components[0], components[1], components[2]};
+            parameter.value = ce::fixed_array<double, 3>{components[0], components[1], components[2]};
     }
     else if (parameter.type == LX::PinType::Texture || parameter.type == LX::PinType::Sampler)
     {
@@ -421,7 +424,7 @@ RHIShaderReflection LayoutReflection(const BindingLayout& layout)
 
 // A product may carry one backend (editor: only the running renderer's) or both
 // (AssetCooker). Whatever it carries must hold every surface/volume stage.
-bool BackendStagesComplete(const LX::LXMaterialProgram& program, std::map<RHIShaderBinary, unsigned>& stages)
+bool BackendStagesComplete(const LX::LXMaterialProgram& program, ce::engine_ordered_map<RHIShaderBinary, unsigned>& stages)
 {
     const auto required = (program.surface ? 3u : 0u) | (program.volume ? 4u : 0u);
     bool carried = false;
@@ -461,14 +464,14 @@ bool ValidateProduct(const VerifiedProduct& product, const Budget& budget, std::
     capabilities.deferredFeatures = product.selection.route == Route::Deferred ? program.features : 0;
     Selection selection;
     BindingLayout resolved;
-    std::vector<LX::LXMaterialDiagnostic> diagnostics;
+    ce::dynamic_array<LX::LXMaterialDiagnostic> diagnostics;
     if (!SelectRoute(program, capabilities, budget, selection, diagnostics) ||
         selection.tier != product.selection.tier || selection.route != product.selection.route ||
         !ResolveBindings(program, LayoutReflection(product.layout), budget, resolved, diagnostics) ||
         resolved != product.layout)
         return invalid();
-    std::set<LX::Id> ids;
-    std::set<std::string> identifiers;
+    ce::engine_ordered_set<LX::Id> ids;
+    ce::engine_ordered_set<std::string> identifiers;
     for (const auto& parameter : program.parameters)
     {
         if (parameter.id == 0 || parameter.identifier.empty() || parameter.identifier.size() > 4096 ||
@@ -479,7 +482,7 @@ bool ValidateProduct(const VerifiedProduct& product, const Budget& budget, std::
             !LX::IsSocketValueValid(parameter.type, parameter.value))
             return invalid();
     }
-    std::vector<std::uint8_t> defaults(product.layout.uniformBytes);
+    ce::dynamic_array<std::uint8_t> defaults(product.layout.uniformBytes);
     for (const auto& binding : product.layout.parameters)
         if (!Pack(binding, binding.parameter.value, defaults))
             return invalid();
@@ -493,8 +496,8 @@ bool ValidateProduct(const VerifiedProduct& product, const Budget& budget, std::
     for (const auto& range : program.sourceMap)
         if (range.firstLine == 0 || range.lastLine < range.firstLine || !locationValid(range.source))
             return invalid();
-    std::set<std::pair<std::string, std::string>> unique;
-    std::map<RHIShaderBinary, unsigned> stages;
+    ce::engine_ordered_set<ce::pair<std::string, std::string>> unique;
+    ce::engine_ordered_map<RHIShaderBinary, unsigned> stages;
     std::uint64_t bytes = 0;
     for (const auto& target : product.targets)
     {
@@ -526,7 +529,7 @@ bool ValidateProduct(const VerifiedProduct& product, const Budget& budget, std::
 } // namespace
 
 bool SelectRoute(const LX::LXMaterialProgram& program, const Capabilities& capabilities, const Budget& budget,
-                 Selection& result, std::vector<LX::LXMaterialDiagnostic>& diagnostics)
+                 Selection& result, ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics)
 {
     const auto requirements = LX::LXAnalyzeMaterialExecution(program.features);
     if (requirements.error != LX::LXMaterialExecutionError::None || (!program.surface && !program.volume) ||
@@ -707,12 +710,12 @@ std::string BuildBoundSource(const LX::LXMaterialProgram& program)
 }
 
 bool ResolveBindings(const LX::LXMaterialProgram& program, const RHIShaderReflection& reflection, const Budget& budget,
-                     BindingLayout& result, std::vector<LX::LXMaterialDiagnostic>& diagnostics)
+                     BindingLayout& result, ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics)
 {
     BindingLayout candidate;
     const RHIShaderResourceReflection* uniforms = nullptr;
     bool descriptorIndices{};
-    std::set<std::pair<RHIShaderResourceKind, std::uint32_t>> registers;
+    ce::engine_ordered_set<ce::pair<RHIShaderResourceKind, std::uint32_t>> registers;
     for (const auto& resource : reflection.resources)
     {
         if (resource.name == "LXDescriptorIndices")
@@ -744,7 +747,7 @@ bool ResolveBindings(const LX::LXMaterialProgram& program, const RHIShaderReflec
                 !registers.emplace(kind, resource.registerIndex).second)
                 return Fail(diagnostics, "product.resource",
                             "Reflected resource differs from LX bindless table: " + resource.name);
-            std::set<std::uint32_t> slots;
+            ce::engine_ordered_set<std::uint32_t> slots;
             for (const auto& logical : program.resources)
             {
                 if ((logical.kind == LX::LXMaterialResourceKind::Texture) != texture)
@@ -759,7 +762,7 @@ bool ResolveBindings(const LX::LXMaterialProgram& program, const RHIShaderReflec
         return Fail(diagnostics, "product.resource", "Reflected shader omits a generated material resource.");
     if (descriptorIndices != !program.resources.empty())
         return Fail(diagnostics, "product.bindless", "Missing or unexpected descriptor index ABI.");
-    std::set<LX::Id> parameterIds;
+    ce::engine_ordered_set<LX::Id> parameterIds;
     std::uint32_t packetOffset{};
     for (const auto& parameter : program.parameters)
     {
@@ -829,7 +832,7 @@ bool ResolveBindings(const LX::LXMaterialProgram& program, const RHIShaderReflec
 }
 
 bool MergeMaterialReflections(std::span<const RHIShaderReflection* const> stages, RHIShaderReflection& result,
-                              std::vector<LX::LXMaterialDiagnostic>& diagnostics)
+                              ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics)
 {
     RHIShaderReflection merged;
     for (const auto* stage : stages)
@@ -864,8 +867,8 @@ bool MergeMaterialReflections(std::span<const RHIShaderReflection* const> stages
 bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::path& sourceFile,
                    std::span<const CompileTarget> targets, const RHIShaderPermutation& permutation,
                    RHIShaderCompileOptions options, const Capabilities& capabilities, const Budget& budget,
-                   VerifiedProduct& result, std::vector<LX::LXMaterialDiagnostic>& diagnostics,
-                   std::vector<RHIShaderReflection>* materialReflections)
+                   VerifiedProduct& result, ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics,
+                   ce::dynamic_array<RHIShaderReflection>* materialReflections)
 {
     VerifiedProduct candidate;
     candidate.program = program;
@@ -882,8 +885,8 @@ bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::
                     "Host shader does not contain the requested bound material program.");
     if (targets.empty() || targets.size() > MaxCompileTargets)
         return Fail(diagnostics, "product.target", "Material compile target count is invalid.");
-    std::set<std::pair<RHIShaderBinary, std::string>> unique;
-    std::map<RHIShaderBinary, unsigned> stages;
+    ce::engine_ordered_set<ce::pair<RHIShaderBinary, std::string>> unique;
+    ce::engine_ordered_map<RHIShaderBinary, unsigned> stages;
     for (const auto& target : targets)
     {
         if (target.entry.empty() || target.entry.size() > 128 || !unique.emplace(target.binary, target.entry).second ||
@@ -904,12 +907,12 @@ bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::
     bool hasLayout = false;
     std::uint64_t compiledBytes = 0;
     const std::string name = sourceFile.string();
-    std::vector<CompileTarget> ordered(targets.begin(), targets.end());
+    ce::dynamic_array<CompileTarget> ordered(targets.begin(), targets.end());
     std::ranges::sort(ordered, [](const auto& a, const auto& b) {
-        return std::tie(a.binary, a.entry, a.profile) < std::tie(b.binary, b.entry, b.profile);
+        return ce::tie(a.binary, a.entry, a.profile) < ce::tie(b.binary, b.entry, b.profile);
     });
     candidate.targets = ordered;
-    std::map<RHIShaderBinary, std::vector<RHIShaderReflection>> reflections;
+    ce::engine_ordered_map<RHIShaderBinary, ce::dynamic_array<RHIShaderReflection>> reflections;
     // All stages of one backend share source and options: parse the module once.
     RHIShaderCompiler::ModuleReuseScope moduleReuse;
     for (const auto& target : ordered)
@@ -943,10 +946,10 @@ bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::
     std::ranges::sort(candidate.dependencies);
     candidate.dependencies.erase(std::unique(candidate.dependencies.begin(), candidate.dependencies.end()),
                                  candidate.dependencies.end());
-    std::vector<RHIShaderReflection> mergedReflections;
+    ce::dynamic_array<RHIShaderReflection> mergedReflections;
     for (const auto& [backend, consumingStages] : reflections)
     {
-        std::vector<const RHIShaderReflection*> views;
+        ce::dynamic_array<const RHIShaderReflection*> views;
         for (const auto& stage : consumingStages)
         {
             views.push_back(&stage);
@@ -1087,7 +1090,7 @@ bool DescribeComputeShader(const VerifiedProduct& product, RHIShaderBinary backe
 }
 
 bool PrepareUniforms(const BindingLayout& layout, std::span<const ParameterOverride> parameters,
-                     std::vector<std::uint8_t>& result, std::vector<LX::LXMaterialDiagnostic>& diagnostics)
+                     ce::dynamic_array<std::uint8_t>& result, ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics)
 {
     if (layout.uniformBytes > 65536)
         return Fail(diagnostics, "product.override", "Material constant buffer exceeds 64 KiB.");
@@ -1095,8 +1098,8 @@ bool PrepareUniforms(const BindingLayout& layout, std::span<const ParameterOverr
     {
         return false;
     }
-    std::vector<std::uint8_t> candidate(layout.uniformBytes);
-    std::set<LX::Id> overridden;
+    ce::dynamic_array<std::uint8_t> candidate(layout.uniformBytes);
+    ce::engine_ordered_set<LX::Id> overridden;
     for (const auto& parameter : parameters)
     {
         const auto found = std::ranges::find(layout.parameters, parameter.id,
@@ -1117,9 +1120,9 @@ bool PrepareUniforms(const BindingLayout& layout, std::span<const ParameterOverr
 
 bool PrepareResources(const BindingLayout& layout, std::span<const ParameterOverride> parameters,
                       std::span<const TextureBinding> textures, ResourcePacket& result,
-                      std::vector<LX::LXMaterialDiagnostic>& diagnostics)
+                      ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics)
 {
-    std::vector<std::uint8_t> uniforms;
+    ce::dynamic_array<std::uint8_t> uniforms;
     if (!PrepareUniforms(layout, parameters, uniforms, diagnostics))
         return false;
     return PrepareResourcesWithUniforms(layout, uniforms, textures, result, diagnostics);
@@ -1127,7 +1130,7 @@ bool PrepareResources(const BindingLayout& layout, std::span<const ParameterOver
 
 bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const std::uint8_t> uniforms,
                                   std::span<const TextureBinding> textures, ResourcePacket& result,
-                                  std::vector<LX::LXMaterialDiagnostic>& diagnostics)
+                                  ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics)
 {
     if (uniforms.size() != layout.uniformBytes || uniforms.size() > 65536)
         return Fail(diagnostics, "product.uniform", "Prepared common material uniform block has an invalid size.");
@@ -1139,8 +1142,8 @@ bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const s
     candidate.uniforms.assign(uniforms.begin(), uniforms.end());
     if (textures.size() != layout.textures.size())
         return Fail(diagnostics, "product.texture", "Texture owner count differs from material resource table.");
-    std::set<std::uint32_t> textureSlots;
-    std::set<std::uint64_t> texturePins;
+    ce::engine_ordered_set<std::uint32_t> textureSlots;
+    ce::engine_ordered_set<std::uint64_t> texturePins;
     for (const auto& binding : textures)
         if (!textureSlots.insert(binding.slot).second)
             return Fail(diagnostics, "product.texture", "Duplicate material texture owner slot.");
@@ -1178,7 +1181,7 @@ bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const s
     }
     for (const auto& resource : layout.samplers)
     {
-        std::array<std::string_view, 4> parts{};
+        ce::fixed_array<std::string_view, 4> parts{};
         std::string_view remaining = resource.reference;
         std::size_t count = 0;
         // getline does not produce an additional token for a trailing delimiter.
@@ -1225,7 +1228,7 @@ bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const s
     return true;
 }
 
-bool WriteCookedProgram(const VerifiedProduct& product, const Budget& budget, std::vector<std::uint8_t>& result,
+bool WriteCookedProgram(const VerifiedProduct& product, const Budget& budget, ce::dynamic_array<std::uint8_t>& result,
                         std::string& error)
 {
     if (!ValidateProduct(product, budget, error))
@@ -1238,7 +1241,7 @@ bool WriteCookedProgram(const VerifiedProduct& product, const Budget& budget, st
         error = "Oversized cooked material text.";
         return false;
     }
-    std::vector<std::uint8_t> bytes;
+    ce::dynamic_array<std::uint8_t> bytes;
     Word(bytes, CookMagic);
     Word(bytes, CookedProgramVersion);
     Word(bytes, LX::LXMaterialProgram::CompilerVersion);
@@ -1289,7 +1292,7 @@ bool WriteCookedProgram(const VerifiedProduct& product, const Budget& budget, st
     }
     auto ordered = product.targets;
     std::ranges::sort(ordered, [](const auto& a, const auto& b) {
-        return std::tie(a.binary, a.entry, a.profile) < std::tie(b.binary, b.entry, b.profile);
+        return ce::tie(a.binary, a.entry, a.profile) < ce::tie(b.binary, b.entry, b.profile);
     });
     Word(bytes, static_cast<std::uint32_t>(ordered.size()));
     for (const auto& target : ordered)

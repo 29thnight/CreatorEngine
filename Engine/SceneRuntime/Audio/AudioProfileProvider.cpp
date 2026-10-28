@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "AudioProfileProvider.h"
 #include "AudioHost.h"
 #include "PlaybackService.h"
@@ -15,19 +16,19 @@ namespace wave
         {
             return;
         }
-        static constexpr std::array names{
+        static constexpr ce::fixed_array names{
             "Audio.Active voices", "Audio.Physical voices", "Audio.Virtual voices", "Audio.Paused voices",
             "Audio.Stolen total", "Audio.Dropped total", "Audio.Backend failures total", "Audio.Playback instances",
             "Audio.Runtime update", "Audio.Stream bytes total", "Audio.Stream read failures total",
             "Audio.Callback p99 upper", "Audio.Callback maximum", "Audio.Callback over half period total",
             "Audio.Completion drops total", "Audio.Output mode",
             "Audio.Stream PCM reads total", "Audio.Stream starvation reads total" };
-        static constexpr std::array units{
+        static constexpr ce::fixed_array units{
             "voices", "voices", "voices", "voices", "voices", "voices", "count", "instances",
             "us", "B", "count", "us", "us", "count", "count", "mode", "count", "count" };
         static const auto ids = []
         {
-            std::array<ce::profile_counter_id, names.size()> result{};
+            ce::fixed_array<ce::profile_counter_id, names.size()> result{};
             for (std::size_t index = 0u; index < names.size(); ++index)
             {
                 result[index] = ce::register_counter(names[index], units[index], ce::counter_category::audio);
@@ -35,7 +36,7 @@ namespace wave
             return result;
         }();
         const auto counters = host.Counters();
-        const std::array values{
+        const ce::fixed_array values{
             static_cast<double>(counters.voices.active), static_cast<double>(counters.voices.physical),
             static_cast<double>(counters.voices.virtualized), static_cast<double>(counters.voices.paused),
             static_cast<double>(counters.voices.stolen), static_cast<double>(counters.voices.dropped),
@@ -47,7 +48,7 @@ namespace wave
             static_cast<double>(counters.callbackOverHalfPeriod), static_cast<double>(playback.DroppedCompletions()),
             static_cast<double>(host.Mode()), static_cast<double>(counters.streamPcmReads),
             static_cast<double>(counters.streamStarvationReads) };
-        std::array<ce::profile_counter_sample, names.size()> samples{};
+        ce::fixed_array<ce::profile_counter_sample, names.size()> samples{};
         std::size_t count = 0u;
         for (std::size_t index = 0u; index < values.size(); ++index)
         {

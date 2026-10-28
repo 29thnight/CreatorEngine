@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -42,7 +43,7 @@ struct TerrainBrush
 {
     struct BrushMask 
     {
-        std::vector<uint8_t> m_mask;
+        ce::dynamic_array<uint8_t> m_mask;
         int m_maskWidth{ 0 };
         int m_maskHeight{ 0 };
     };
@@ -59,13 +60,13 @@ struct TerrainBrush
     uint32_t m_foliageTypeID{ 0 };
 	int m_foliageDensity{ 10 }; // 식생 밀도
 
-	std::vector<BrushMask> m_masks; // 브러시 마스크들
-    std::vector<std::string> m_maskNames{}; // 마스크 이름들
+	ce::dynamic_array<BrushMask> m_masks; // 브러시 마스크들
+    ce::dynamic_array<std::string> m_maskNames{}; // 마스크 이름들
 
     void SetBrushMode(Mode mode) { m_mode = mode; }
 
 	void SetMaskID(uint32_t maskID) { m_maskID = maskID; }
-	std::vector<std::string>& GetMaskNames()
+	ce::dynamic_array<std::string>& GetMaskNames()
 	{
 		return m_maskNames;
 	}

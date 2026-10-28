@@ -1,3 +1,5 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -40,13 +42,13 @@ namespace EditorScriptAuthoring
             bool automatic{}, pending{}, sourcesChecked{};
             std::filesystem::path project, changedSource;
             std::chrono::steady_clock::time_point changedAt;
-            std::map<std::filesystem::path, std::string> attemptedSources;
+            ce::engine_ordered_map<std::filesystem::path, std::string> attemptedSources;
             ~Work() { if (job) CloseHandle(job); if (process) CloseHandle(process); }
         };
         Work& State() { static Work state; return state; }
-        std::map<std::filesystem::path, std::string> CaptureSources()
+        ce::engine_ordered_map<std::filesystem::path, std::string> CaptureSources()
         {
-            std::map<std::filesystem::path, std::string> sources;
+            ce::engine_ordered_map<std::filesystem::path, std::string> sources;
             const auto root = ce::paths::base_project_path() / "Assets/Script";
             if (!std::filesystem::exists(root))
             {
@@ -126,11 +128,11 @@ namespace EditorScriptAuthoring
             work.pending = false;
             work.sourcesChecked = false;
             std::filesystem::path program, workingDirectory;
-            std::vector<std::wstring> arguments;
+            ce::dynamic_array<std::wstring> arguments;
             std::filesystem::create_directories(work.log.parent_path());
             if (const auto checkout = ResolveEditorSourceCheckout(); !checkout.repository.empty())
             {
-                std::array<wchar_t, MAX_PATH> dotnet{};
+                ce::fixed_array<wchar_t, MAX_PATH> dotnet{};
                 if (!SearchPathW(nullptr, L"dotnet.exe", nullptr, static_cast<DWORD>(dotnet.size()), dotnet.data(), nullptr))
                     return FailWork(work, "Compiling scripts in a source checkout requires the .NET SDK (dotnet.exe on PATH).");
                 program = dotnet.data();
@@ -189,7 +191,7 @@ namespace EditorScriptAuthoring
             using namespace CommandCore;
             auto& clr = ClrHost::Get();
             if (!clr.IsReady()) return PreconditionFailed("script.clr_not_ready", "Script runtime is not ready");
-            std::vector<ScriptComponent*> scripts;
+            ce::dynamic_array<ScriptComponent*> scripts;
             // A reload replaces all managed instances, including multiple scripts per
             // entity and loaded scenes other than the currently selected scene.
             for (auto* scene : SceneManagers->GetScenes()) if (scene)

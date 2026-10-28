@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "MaterialPropertyPacker.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -50,13 +51,13 @@ namespace MaterialPropertyPacker
         }
         if (const auto* value = std::get_if<float>(&desc.defaultValue))
             outValue.m_numericValue = { *value };
-        else if (const auto* value = std::get_if<std::array<float, 2>>(&desc.defaultValue))
+        else if (const auto* value = std::get_if<ce::fixed_array<float, 2>>(&desc.defaultValue))
             outValue.m_numericValue.assign(value->begin(), value->end());
-        else if (const auto* value = std::get_if<std::array<float, 3>>(&desc.defaultValue))
+        else if (const auto* value = std::get_if<ce::fixed_array<float, 3>>(&desc.defaultValue))
             outValue.m_numericValue.assign(value->begin(), value->end());
-        else if (const auto* value = std::get_if<std::array<float, 4>>(&desc.defaultValue))
+        else if (const auto* value = std::get_if<ce::fixed_array<float, 4>>(&desc.defaultValue))
             outValue.m_numericValue.assign(value->begin(), value->end());
-        else if (const auto* value = std::get_if<std::array<float, 16>>(&desc.defaultValue))
+        else if (const auto* value = std::get_if<ce::fixed_array<float, 16>>(&desc.defaultValue))
             outValue.m_numericValue.assign(value->begin(), value->end());
         else if (const auto* value = std::get_if<std::int32_t>(&desc.defaultValue))
             outValue.m_integerValue = *value;
@@ -86,7 +87,7 @@ namespace MaterialPropertyPacker
 
     bool PackProperty(const ShaderPropertyDesc& desc,
         const ShaderMetaPropertyBinding& binding, const MaterialPropertyValue& value,
-        std::vector<std::uint8_t>& bytes, std::string& outError)
+        ce::dynamic_array<std::uint8_t>& bytes, std::string& outError)
     {
         if (ShaderPropertyType::Texture2D == desc.type)
             return RHIShaderResourceKind::Texture == binding.resourceKind;

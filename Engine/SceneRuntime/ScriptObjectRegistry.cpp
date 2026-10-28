@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -576,7 +577,7 @@ ScriptAssetResult ScriptObjectRegistry::ReadTexture(ScriptAssetToken token, Scri
     {
         return ScriptAssetResult::InvalidToken;
     }
-    const auto& texture = std::get<own::shared_owner<const Texture>>(slot->value);
+    const auto& texture = ce::get<own::shared_owner<const Texture>>(slot->value);
     if (!texture)
     {
         return ScriptAssetResult::InvalidToken;

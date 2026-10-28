@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 // 메뉴 그리기 배선 (PHASE 21 M1 · 계획서 부록 A.6).
 //
@@ -103,10 +104,10 @@ namespace editor
     {
         using context_type = popup_context_t<Host>;
 
-        const std::vector<menu_entry<context_type>>& entries = popup_menu_entries<Host>();
+        const ce::dynamic_array<menu_entry<context_type>>& entries = popup_menu_entries<Host>();
         if (entries.empty()) return false;
 
-        std::vector<detail::menu_item_view> views;
+        ce::dynamic_array<detail::menu_item_view> views;
         views.reserve(entries.size());
         for (const menu_entry<context_type>& entry : entries)
         {

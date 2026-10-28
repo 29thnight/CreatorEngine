@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -134,10 +135,10 @@ namespace experiment
 		// xyz는 단위 tangent, w는 bitangent handedness(-1 또는 +1).
 		math::vector4 tangent{};
 		// GPU BLENDINDICES/BLENDWEIGHT와 같은 분리 배치. 255는 미사용 slot이다.
-		std::array<PackedBoneIndex, MaxBoneInfluences> boneIndices{
+		ce::fixed_array<PackedBoneIndex, MaxBoneInfluences> boneIndices{
 			InvalidPackedBoneIndex, InvalidPackedBoneIndex,
 			InvalidPackedBoneIndex, InvalidPackedBoneIndex };
-		std::array<float, MaxBoneInfluences> boneWeights{};
+		ce::fixed_array<float, MaxBoneInfluences> boneWeights{};
 	};
 
 	// V2 논리 정점과 그 고정 GPU 배치가 어긋나지 않는지 직접 증명한다.
@@ -306,7 +307,7 @@ namespace experiment
 
 		VertexAttributeMask attributes_{ kCoreVertexAttributes };
 		std::uint32_t stride_{ StrideOf(kCoreVertexAttributes) };
-		std::vector<std::byte> bytes_{};
+		ce::dynamic_array<std::byte> bytes_{};
 	};
 
 	enum class TextureColorSpace : std::uint8_t
@@ -363,12 +364,12 @@ namespace experiment
 		AssetId shaderAssetId{};
 		std::string name{};
 		MaterialBlendMode blendMode{ MaterialBlendMode::Opaque };
-		std::vector<MaterialProperty> properties{};
-		std::vector<std::string> keywords{};
+		ce::dynamic_array<MaterialProperty> properties{};
+		ce::dynamic_array<std::string> keywords{};
 		// ShaderMeta 축 순서 기준 선택 인덱스(디스크 정본 호환 표면). 인덱스의
 		// 이름 해석은 shaderAssetId의 meta를 소유한 어댑터 책임이다. 이름 기반
 		// keywords가 채워져 있으면 그것이 정본이고 이 값은 보조다.
-		std::vector<std::uint16_t> keywordSelections{};
+		ce::dynamic_array<std::uint16_t> keywordSelections{};
         // Exact cooked hard owners. Copies/instance overrides retain the same
         // captured closure; authoring serialization never persists this pin.
         own::shared_owner<const AssetDepot::MaterialDocumentAssetOrigin> assetOrigin{};
@@ -379,7 +380,7 @@ namespace experiment
 		std::string name{};
 		MaterialIndex material{};
 		VertexBuffer vertices{};
-		std::vector<std::uint32_t> indices{};
+		ce::dynamic_array<std::uint32_t> indices{};
 		math::aabb bounds{};
 		// Mandatory cooked METEOR topology over finalized indexed geometry.
 		MeshletPayload meshlets{};
@@ -399,7 +400,7 @@ namespace experiment
 		// ★ math::matrix4x4 의 기본은 영행렬이므로 항등을 명시한다.
 		//   비워 두면 변환이 없는 노드가 조용히 모든 것을 원점으로 뭉갠다.
 		math::matrix4x4 localTransform{ math::matrix4x4::identity() };
-		std::vector<MeshIndex> meshes{};
+		ce::dynamic_array<MeshIndex> meshes{};
 	};
 
 	struct TranslationKey final
@@ -442,9 +443,9 @@ namespace experiment
 		InterpolationMode translationInterpolation{ InterpolationMode::Linear };
 		InterpolationMode rotationInterpolation{ InterpolationMode::Linear };
 		InterpolationMode scaleInterpolation{ InterpolationMode::Linear };
-		std::vector<TranslationKey> translations{};
-		std::vector<RotationKey> rotations{};
-		std::vector<ScaleKey> scales{};
+		ce::dynamic_array<TranslationKey> translations{};
+		ce::dynamic_array<RotationKey> rotations{};
+		ce::dynamic_array<ScaleKey> scales{};
 	};
 
 	struct AnimationClip final
@@ -453,7 +454,7 @@ namespace experiment
 		double durationTicks{};
 		double ticksPerSecond{};
 		bool looping{ true };
-		std::vector<AnimationChannel> channels{};
+		ce::dynamic_array<AnimationChannel> channels{};
 	};
 
 	struct Bone final
@@ -468,8 +469,8 @@ namespace experiment
 		BoneIndex rootBone{};
 		math::matrix4x4 rootTransform{ math::matrix4x4::identity() };
 		math::matrix4x4 globalInverseTransform{ math::matrix4x4::identity() };
-		std::vector<Bone> bones{};
-		std::vector<AnimationClip> clips{};
+		ce::dynamic_array<Bone> bones{};
+		ce::dynamic_array<AnimationClip> clips{};
 	};
 
 	// Skeleton 포인터를 소유하지 않는다. Model이 Skeleton과 AnimatorData를 같은
@@ -502,9 +503,9 @@ namespace experiment
 	struct ModelDraft final
 	{
 		ModelMetadata metadata{};
-		std::vector<ModelNode> nodes{};
-		std::vector<Mesh> meshes{};
-		std::vector<Material> materials{};
+		ce::dynamic_array<ModelNode> nodes{};
+		ce::dynamic_array<Mesh> meshes{};
+		ce::dynamic_array<Material> materials{};
 		std::optional<Skeleton> skeleton{};
 		std::optional<AnimatorData> animator{};
 	};

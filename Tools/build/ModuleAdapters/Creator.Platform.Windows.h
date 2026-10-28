@@ -8,7 +8,7 @@
 #pragma comment(lib, "ole32.lib")
 #pragma comment(lib, "runtimeobject.lib")
 
-
+#include "../../../Engine/Containers/Creator.Containers.h"
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
 #include "../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
@@ -124,7 +124,7 @@ namespace ce::platform::windows
 namespace ce::platform::windows
 {
     using window_message_interceptor =
-        std::function<std::optional<LRESULT>(HWND, UINT, WPARAM, LPARAM)>;
+        ce::owned_func<std::optional<LRESULT>(HWND, UINT, WPARAM, LPARAM)>;
 
     // Only the Win32 adapter sees SDK style bits, resource IDs and raw messages.
     struct window_desc : ::Core::WindowDesc

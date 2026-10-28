@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
 #else
@@ -94,7 +95,7 @@ namespace experiment::importer
 
         const fastgltf::Asset& asset = loaded.get();
 
-        std::vector<std::string> seen;
+        ce::dynamic_array<std::string> seen;
         const auto consider = [&](const fastgltf::DataSource& source,
             const std::string_view category) -> bool
         {

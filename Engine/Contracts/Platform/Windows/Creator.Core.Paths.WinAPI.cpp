@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if !defined(CE_CONTRACT_STANDALONE) || !defined(CE_PATHS_PLATFORM_SOURCE_IMPLEMENTED)
 #define CE_PATHS_PLATFORM_SOURCE_IMPLEMENTED
 #if defined(CE_CONTRACT_STANDALONE)
@@ -68,7 +69,7 @@ namespace ce::paths
 
     CE_PATHS_PLATFORM_DEFINITION std::filesystem::path resolve_process_executable_directory()
     {
-        std::array<wchar_t, MAX_PATH> buffer{};
+        ce::fixed_array<wchar_t, MAX_PATH> buffer{};
         const DWORD length =
             GetModuleFileNameW(GetModuleHandleW(nullptr), buffer.data(), static_cast<DWORD>(buffer.size()));
         if (0 == length || length >= buffer.size())

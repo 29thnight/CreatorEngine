@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -14,7 +15,7 @@ namespace ce::profiler_viewer
     inline constexpr std::uint32_t connection_timeout_ms = 10000;
     inline constexpr std::uint32_t io_timeout_ms = 500;
     inline constexpr std::uint32_t target_lease_ms = 3000;
-    using session_nonce = std::array<std::uint8_t, 16>;
+    using session_nonce = ce::fixed_array<std::uint8_t, 16>;
 
     struct connection_options
     {

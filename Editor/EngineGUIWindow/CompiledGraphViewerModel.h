@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -20,10 +21,10 @@ namespace editor::compiled_graph
             uint16_t version{};
             int reason{-1}; // -1: reachability-only edge
         };
-        std::vector<uint32_t> columns, resourceOffsets;
-        std::vector<Cell> cells;
-        std::vector<Edge> edges;
-        std::vector<uint32_t> parents, children;
+        ce::dynamic_array<uint32_t> columns, resourceOffsets;
+        ce::dynamic_array<Cell> cells;
+        ce::dynamic_array<Edge> edges;
+        ce::dynamic_array<uint32_t> parents, children;
         uint32_t focused{invalid};
 
         template<class Snapshot, class Access>
@@ -65,7 +66,7 @@ namespace editor::compiled_graph
                 }
             }
             std::sort(cells.begin(), cells.end(), [](const Cell& a, const Cell& b)
-                      { return std::tie(a.resource, a.pass) < std::tie(b.resource, b.pass); });
+                      { return ce::tie(a.resource, a.pass) < ce::tie(b.resource, b.pass); });
             size_t count = 0;
             for (size_t index = 0; index < cells.size(); ++index)
             {

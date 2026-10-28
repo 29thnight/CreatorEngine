@@ -1,4 +1,6 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../Engine/Utility_Framework/Foundation/EngineFunc.h"
 
 #include "../../Lattice/Material/LXMaterialGraph.h"
 #include "../../Lattice/ImGui/LXCanvas.h"
@@ -16,7 +18,7 @@ namespace editor::material_editing
         std::string group;
     };
 
-    std::vector<MaterialNodeMenuEntry> MaterialNodeMenuEntries(const LX::LXMaterialDefinitions& definitions,
+    ce::dynamic_array<MaterialNodeMenuEntry> MaterialNodeMenuEntries(const LX::LXMaterialDefinitions& definitions,
                                                                std::string_view search = {});
     std::optional<std::string> DrawMaterialNodeAddMenu(const LX::LXMaterialDefinitions& definitions,
         std::string& search);
@@ -48,8 +50,8 @@ namespace editor::material_editing
 
     void DrawMaterialContextSelector();
     MaterialBarAction DrawMaterialDataBar(std::string& name, bool dirty, bool editable, bool showGrid, bool snapToGrid,
-                                          const std::function<void()>& materialMenu,
-                                          const std::function<void()>& overlayMenu, bool automaticPreview = false);
+                                          const ce::owned_func<void()>& materialMenu,
+                                          const ce::owned_func<void()>& overlayMenu, bool automaticPreview = false);
     void DrawMaterialBreadcrumb(ImVec2 origin, ImVec2 size, const std::string& object, const std::string& mesh,
                                 const std::string& material, const std::string& status = {});
 } // namespace editor::material_editing

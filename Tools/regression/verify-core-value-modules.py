@@ -71,7 +71,7 @@ def main():
         ("Engine/SceneRuntime/Object.h", "m_name"),
         ("Engine/SceneRuntime/Entity.h", "m_tag"),
         ("Engine/SceneRuntime/Scene.h", "m_sceneName"),
-        ("Engine/RenderEngine/Interfaces/ColorGradingPassSetting.h", "textureFilePath"),
+        ("Engine/Utility_Framework/Runtime/RenderSettings/ColorGradingPassSetting.h", "textureFilePath"),
     ):
         if not re.search(rb"std::string\s+" + field.encode() + rb"\b", (ROOT / name).read_bytes()):
             failures.append(f"{name}: {field} must own its required text with std::string")

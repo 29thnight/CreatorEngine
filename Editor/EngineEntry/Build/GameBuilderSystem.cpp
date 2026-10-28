@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -95,7 +96,7 @@ namespace
 
 		const std::wstring backendName =
 			backend == RenderBackend::Vulkan ? L"vulkan" : L"dx12";
-		std::vector<std::wstring> arguments{
+		ce::dynamic_array<std::wstring> arguments{
 			buildToolPath.wstring(),
 			L"package-game",
 			L"-Config",
@@ -122,7 +123,7 @@ namespace
 			if (!commandLine.empty()) commandLine.push_back(L' ');
 			commandLine += QuoteWindowsArgument(argument);
 		}
-		std::vector<wchar_t> mutableCommand(commandLine.begin(), commandLine.end());
+		ce::dynamic_array<wchar_t> mutableCommand(commandLine.begin(), commandLine.end());
 		mutableCommand.push_back(L'\0');
 
 		STARTUPINFOW startupInfo{};

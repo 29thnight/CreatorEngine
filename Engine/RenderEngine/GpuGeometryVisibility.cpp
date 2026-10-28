@@ -1,4 +1,6 @@
-﻿#include "RenderArena.h"
+﻿#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Containers/ContainerAPI.h"
+#include "RenderArena.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Arena.h"
 #else
@@ -117,7 +119,7 @@ GeometryVisibilityConstants VisibilityConstants(const math::matrix4x4& matrix, s
     // col2 >= 0 and col3 - col2 >= 0, for both renderer backends.
     for (unsigned plane = 0; plane < 6; ++plane)
     {
-        std::array<double, 4> coefficients{};
+        ce::fixed_array<double, 4> coefficients{};
         for (unsigned row = 0; row < 4; ++row)
         {
             if (plane == 4)
@@ -156,8 +158,8 @@ GeometryVisibilityConstants VisibilityConstants(const math::matrix4x4& matrix, s
 struct GpuGeometryVisibility::MeshletInputs
 {
     GeometryVisibilityConstants constants;
-    std::vector<Candidate> candidates;
-    std::vector<Bin> bins;
+    ce::dynamic_array<Candidate> candidates;
+    ce::dynamic_array<Bin> bins;
 };
 
 struct GpuGeometryVisibility::BufferPool
@@ -165,13 +167,13 @@ struct GpuGeometryVisibility::BufferPool
     struct DeclarationScratch
     {
         ce::render_arena_resource m_arena;
-        std::array<ce::render_arena_buffer<EnhancedRenderGraph::RGPassUsage>, 5> m_uses;
+        ce::fixed_array<ce::render_arena_buffer<EnhancedRenderGraph::RGPassUsage>, 5> m_uses;
         ce::render_arena_buffer<size_t> m_normalize;
         ce::render_arena_buffer<const material_graph::MeshSurfaceBatch*> m_geometrySeen;
     };
     struct UploadScratch
     {
-        std::vector<RHIBindingDesc> m_vertices, m_topologies;
+        ce::dynamic_array<RHIBindingDesc> m_vertices, m_topologies;
     };
     // Declaration and upload assembly use independent per-thread scratch.
     // Callbacks retain copied usages and completed tables, never these ranges.
@@ -183,8 +185,8 @@ struct GpuGeometryVisibility::BufferPool
     };
     IRenderDeviceServices& device;
     std::mutex mutex;
-    std::vector<Entry> free;
-    std::vector<RHIReadback> freeReadbacks;
+    ce::dynamic_array<Entry> free;
+    ce::dynamic_array<RHIReadback> freeReadbacks;
     std::uint64_t readbackBytes{};
     std::uint64_t readbackStorageBytes{};
     std::uint64_t cachedBytes{};
@@ -541,7 +543,7 @@ namespace
         MeshletGroupLookup& operator=(const MeshletGroupLookup&) = delete;
 
         std::uint32_t FindOwner(std::uintptr_t stream, std::uintptr_t residency,
-                                const std::array<std::uint32_t, 16>& worldBits, std::span<const PackedBoneMatrix> pose,
+                                const ce::fixed_array<std::uint32_t, 16>& worldBits, std::span<const PackedBoneMatrix> pose,
                                 std::uint32_t bin)
         {
             const auto matches = [&](std::uint32_t owner)
@@ -609,14 +611,14 @@ namespace
         };
         struct Scratch
         {
-            std::array<Slot, 2u * kMeshletBinCapacity> m_slots;
+            ce::fixed_array<Slot, 2u * kMeshletBinCapacity> m_slots;
             std::uint32_t m_generation{};
             bool m_active{};
         };
         static_assert(sizeof(Slot) * 2u * kMeshletBinCapacity == 96u * 1024u);
 
         static std::uint32_t Hash(std::uintptr_t stream, std::uintptr_t residency,
-                                  const std::array<std::uint32_t, 16>& worldBits,
+                                  const ce::fixed_array<std::uint32_t, 16>& worldBits,
                                   std::span<const PackedBoneMatrix> pose)
         {
             std::uint32_t hash = 2166136261u;
@@ -738,7 +740,7 @@ bool GpuGeometryVisibility::PrepareMeshlets(
             {
                 return VisibilityFail(error, "Direct cluster groups require their sealed stream and residency.");
             }
-            std::array<std::uint32_t, 16> worldBits;
+            ce::fixed_array<std::uint32_t, 16> worldBits;
             const auto& world = geometry->ObjectToWorld();
             for (unsigned row = 0; row < 4; ++row)
             {
@@ -876,7 +878,7 @@ bool GpuGeometryVisibility::InitializeMeshletOcclusion(const EnhancedFrameContex
         return true;
     }
     const auto compile = [&](LX::Runtime::ComputePipeline& pipeline, const char* stage) {
-        std::vector<RHIPipelineLayoutParam> parameters{
+        ce::dynamic_array<RHIPipelineLayoutParam> parameters{
             RHILayout::Cbv(0),
             RHILayout::Srv(0),
             RHILayout::Srv(1),
@@ -1066,7 +1068,7 @@ bool GpuGeometryVisibility::PrepareInternal(
         {
             std::uint32_t offset{}, count{};
         };
-        std::vector<OutputRange> ranges(bins.size());
+        ce::dynamic_array<OutputRange> ranges(bins.size());
         for (const auto& candidate : candidates)
         {
             if (candidate.bin >= bins.size() || candidate.outputOffset % kOutputAlignment != 0)
@@ -1093,7 +1095,7 @@ bool GpuGeometryVisibility::PrepareInternal(
                 ++range.count;
             }
         }
-        std::vector<std::vector<std::uint8_t>> preservedSources(bins.size());
+        ce::dynamic_array<ce::dynamic_array<std::uint8_t>> preservedSources(bins.size());
         for (std::size_t bin = 0; bin < bins.size(); ++bin)
         {
             if (geometries.empty() && bins[bin].preservedInstanceCount != 0u)
@@ -1117,7 +1119,7 @@ bool GpuGeometryVisibility::PrepareInternal(
                 seen[candidate.sourceIndex] = 1u;
             }
         }
-        std::erase_if(ranges, [](const auto& range) { return range.count == 0; });
+        ce::erase_if(ranges, [](const auto& range) { return range.count == 0; });
         std::ranges::sort(ranges, {}, &OutputRange::offset);
         for (const auto& range : ranges)
         {
@@ -1279,7 +1281,7 @@ bool GpuGeometryVisibility::PrepareInternal(
             {(std::max)(std::size_t{1}, candidates.size()) * sizeof(Candidate), RHIUploadUsage::Raw, 256},
             {bins.size_bytes(), RHIUploadUsage::Raw, 256},
             {sizeof(constants), RHIUploadUsage::ConstantBuffer, 256}};
-        std::array<RHIBufferSlice, 3> uploads;
+        ce::fixed_array<RHIBufferSlice, 3> uploads;
         if (!m_device->ReserveUploadBatch(requests, uploads, error))
             return false;
         for (const auto& upload : uploads)
@@ -1572,7 +1574,7 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
         return;
     }
 
-    std::array<own::shared_owner<const Frame>, kSharedViewCapacity> ownerStorage;
+    ce::fixed_array<own::shared_owner<const Frame>, kSharedViewCapacity> ownerStorage;
     std::size_t ownerCount{};
     std::uint32_t pendingBins{};
     bool ordered{};
@@ -1720,7 +1722,7 @@ void GpuGeometryVisibility::Frame::DeclareMeshletBatch(EnhancedRenderGraph& grap
     }
     struct Declaration
     {
-        std::array<own::shared_owner<const Frame>, kSharedViewCapacity> owners;
+        ce::fixed_array<own::shared_owner<const Frame>, kSharedViewCapacity> owners;
         size_t count;
         own::shared_owner<SharedBatch> shared;
     };
@@ -1794,10 +1796,10 @@ void GpuGeometryVisibility::Frame::ConsumeStreamingFeedback(std::span<const own:
     struct Pending
     {
         own::shared_owner<assets::cluster::Stream> stream;
-        std::vector<std::uint32_t> words;
+        ce::dynamic_array<std::uint32_t> words;
         std::uint32_t groups{};
     };
-    std::map<assets::cluster::Stream*, Pending> pending;
+    ce::engine_ordered_map<assets::cluster::Stream*, Pending> pending;
     // The completion ledger has already detached these owners. Mapping, union
     // and streaming admission run without its mutex or any GPU wait.
     for (const auto& frame : frames)
@@ -1838,7 +1840,7 @@ void GpuGeometryVisibility::Frame::ConsumeStreamingFeedback(std::span<const own:
     for (auto& item : pending)
     {
         auto& collected = item.second;
-        std::vector<std::uint32_t> requests;
+        ce::dynamic_array<std::uint32_t> requests;
         for (std::size_t word = 0; word < collected.words.size(); ++word)
         {
             auto bits = collected.words[word];
@@ -2017,7 +2019,7 @@ void GpuGeometryVisibility::ShutdownAfterIdle()
 
 void GpuGeometryVisibility::OnUploadSubmitted(std::uint64_t recording, RHICompletionPoint completion)
 {
-    std::vector<own::shared_owner<const Frame>> ready;
+    ce::dynamic_array<own::shared_owner<const Frame>> ready;
     {
         std::lock_guard lock(m_recordingMutex);
         const auto found = m_recordings.find(recording);
@@ -2043,11 +2045,11 @@ void GpuGeometryVisibility::OnUploadCompleted(std::uint64_t completed)
 {
     if (!completed || completed == UINT64_MAX)
         return; // Device loss does not certify feedback or reusable GPU storage.
-    std::vector<own::shared_owner<const Frame>> ready;
+    ce::dynamic_array<own::shared_owner<const Frame>> ready;
     {
         std::lock_guard lock(m_recordingMutex);
         m_completed = (std::max)(m_completed, completed);
-        std::erase_if(m_recordings, [&](const auto& recording) {
+        ce::erase_if(m_recordings, [&](const auto& recording) {
             const auto& entry = recording.second;
             const bool complete = entry.submitted && !entry.quarantined && entry.completion &&
                                   entry.completion <= m_completed;

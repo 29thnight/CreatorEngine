@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #include "EnhancedVolumetricFogPass.h"
 #include "EnhancedVolumetricFogShaders.h"
 #include "../../Graph/EnhancedRenderGraph.h"
@@ -260,7 +261,7 @@ bool EnhancedVolumetricFogPass::CreateVolumes(const EnhancedFrameContext& contex
         return true;
     };
 
-    std::array<RHITextureHandle, 3> candidate{};
+    ce::fixed_array<RHITextureHandle, 3> candidate{};
     if (!makeVolume(candidate[0], L"Fog.VoxelTemp0")
         || !makeVolume(candidate[1], L"Fog.VoxelTemp1")
         || !makeVolume(candidate[2], L"Fog.VoxelFinal"))
@@ -329,7 +330,7 @@ bool EnhancedVolumetricFogPass::PrepareFrame(const EnhancedFrameContext& context
     // 0을 주는 것이 보통이라 결과는 같고, '보통'에 기대지 않게 된다.
     if (!m_volumesCleared)
     {
-        const std::array previousStates{m_voxelTempState[0], m_voxelTempState[1]};
+        const ce::fixed_array previousStates{m_voxelTempState[0], m_voxelTempState[1]};
         const auto previousFinalState = m_voxelFinalState;
         m_resourceRetirement.WatchRecording([this, previousStates, previousFinalState]
         {

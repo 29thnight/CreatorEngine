@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #include "../RHIResourceState.h"
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -37,7 +38,7 @@ inline RHITextureAspect DX12TextureAspects(const D3D12_RESOURCE_DESC& descriptio
 
 inline void AppendDX12TextureTransitions(ID3D12Resource& resource, D3D12_RESOURCE_STATES before,
                                          D3D12_RESOURCE_STATES after, const RHITextureSubresourceRange& range,
-                                         std::vector<D3D12_RESOURCE_BARRIER>& barriers,
+                                         ce::dynamic_array<D3D12_RESOURCE_BARRIER>& barriers,
                                          D3D12_RESOURCE_BARRIER_FLAGS flags = D3D12_RESOURCE_BARRIER_FLAG_NONE)
 {
     const D3D12_RESOURCE_DESC description = resource.GetDesc();

@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -156,7 +158,7 @@ public:
 	// draw packet은 Material* 대신 소유 snapshot을 보존한다.
 	bool BuildShaderPropertyBlock(const ShaderMeta& meta,
 		const ShaderMetaBindingLayout& layout,
-		std::vector<std::uint8_t>& outBytes, std::string& outError) const;
+		ce::dynamic_array<std::uint8_t>& outBytes, std::string& outError) const;
 	bool TrySetTextureGuid(std::string_view property, const FileGuid& guid);
 	bool TryGetTextureGuid(std::string_view property, FileGuid& outGuid) const;
 	bool TrySetKeywordSelection(std::string_view axis, std::string_view value);
@@ -232,8 +234,8 @@ public:
 	MaterialInfomation m_materialInfo;
 	MaterialFlowInformation m_flowInfo;
 	FileGuid m_shaderMetaGuid{};
-	std::vector<MaterialPropertyValue> m_propertyValues{};
-	std::vector<std::uint16_t> m_keywordSelections{};
+	ce::dynamic_array<MaterialPropertyValue> m_propertyValues{};
+	ce::dynamic_array<std::uint16_t> m_keywordSelections{};
 	FileGuid m_fileGuid{};
 	MaterialRenderingMode m_renderingMode{ MaterialRenderingMode::Opaque };
     bool m_doubleSided{ false };
@@ -244,7 +246,7 @@ public:
 	// typed setter/getter와 legacy payload 왕복을 위한 CPU byte view. 값의 저장
 	// 정본은 위 m_propertyValues이고 제품 draw packet은 그 정본에서 다시 pack한다.
     [[reflgen::ignore]]
-    std::unordered_map<std::string, std::vector<uint8_t>> m_cbufferValues{};
+    ce::engine_node_map<std::string, ce::dynamic_array<uint8_t>> m_cbufferValues{};
 
 private:
 	friend class DataSystem;
@@ -259,7 +261,7 @@ private:
 	ShaderMetaHandle m_shaderMetaHandle{};
 
 	[[reflgen::ignore]]
-	std::vector<MaterialTextureOwner> m_textureOwners{};
+	ce::dynamic_array<MaterialTextureOwner> m_textureOwners{};
 
     [[reflgen::ignore]]
     own::shared_owner<const material_graph::Instance> m_materialGraphInstance;

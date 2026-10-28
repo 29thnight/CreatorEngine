@@ -9,6 +9,9 @@ import Creator.Core.Ownership;
 import Creator.Core.Paths;
 #endif
 #include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(_DEBUG)
+#include <crtdbg.h>
+#endif
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
 #else
@@ -33,6 +36,47 @@ namespace
     using namespace material_graph;
     using namespace LX;
     std::size_t checks{};
+    unsigned poolAllocationChecks{};
+    unsigned poolReleaseChecks{};
+    unsigned nativeCacheAllocationChecks{};
+    unsigned nativeCacheReleaseChecks{};
+#if defined(_DEBUG)
+    thread_local bool observePoolAllocations = false;
+    thread_local unsigned poolAllocations = 0;
+    thread_local unsigned poolFrees = 0;
+    int PoolAllocationHook(int kind, void*, size_t, int, long, const unsigned char*, int)
+    {
+        if (observePoolAllocations && (kind == _HOOK_ALLOC || kind == _HOOK_REALLOC)) ++poolAllocations;
+        if (observePoolAllocations && kind == _HOOK_FREE) ++poolFrees;
+        return 1;
+    }
+    struct PoolAllocationScope
+    {
+        _CRT_ALLOC_HOOK previous;
+        PoolAllocationScope() : previous(_CrtSetAllocHook(PoolAllocationHook))
+        { poolAllocations = poolFrees = 0; observePoolAllocations = true; }
+        ~PoolAllocationScope() { observePoolAllocations = false; _CrtSetAllocHook(previous); }
+    };
+#endif
+    class ObservedPoolDevice final : public DX12DeviceResources
+    {
+      public:
+#if defined(_DEBUG)
+        bool observeNextRelease = false;
+        unsigned freesBeforeNativeRelease = 0;
+        void ReleaseBuffer(RHIBufferHandle handle) override
+        {
+            if (observeNextRelease)
+            {
+                freesBeforeNativeRelease = poolFrees;
+                observeNextRelease = false;
+                // Native bookkeeping and driver allocations are outside this check.
+                observePoolAllocations = false;
+            }
+            DX12DeviceResources::ReleaseBuffer(handle);
+        }
+#endif
+    };
 
     void Check(bool condition, const std::string& message)
     {
@@ -139,7 +183,7 @@ namespace
             }
             Connect(asset.graph, multiply, "Result", surface, pair ? "Emission Color" : "Base Color");
         }
-        std::vector<LXMaterialDiagnostic> diagnostics;
+        ce::dynamic_array<LXMaterialDiagnostic> diagnostics;
         const auto generated = GenerateMaterialSlang(asset, &diagnostics);
         Check(!!generated, "Generate four independent samplers");
         const auto file = root / "Build/Obj/MaterialProductProbe/render-bindings.slang";
@@ -306,7 +350,7 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
                   [&](const experiment::AssetId&, LXColorSpace, std::string&) { return texture; }, instance, error),
               "Build owning instance: " + error);
 
-        DX12DeviceResources device;
+        ObservedPoolDevice device;
         Check(device.Initialize(4, 1, error), "Actual DX12 device: " + error);
         Check(device.HasDebugMessageQueue(), "D3D12 validation is installed");
         {
@@ -329,8 +373,8 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
             desc.debugName = L"Pool regression renamed";
             for (std::size_t first = 0; first < handles.size(); first += 4)
             {
-                const std::array requests{desc, desc, desc, desc};
-                std::array<RHIBufferHandle, 4> acquired;
+                const ce::fixed_array requests{desc, desc, desc, desc};
+                ce::fixed_array<RHIBufferHandle, 4> acquired;
                 Check(pool.AcquireBatch(requests, acquired, error), "Pool compatible batch acquire: " + error);
                 for (std::size_t index = 0; index < acquired.size(); ++index)
                 {
@@ -375,9 +419,9 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
             desc.bytes = 4096;
             {
                 const auto before = pool.Snapshot();
-                std::array requests{desc, desc, desc, desc};
+                ce::fixed_array requests{desc, desc, desc, desc};
                 requests[1].initialState = RHIResourceState::IndirectArgument;
-                std::array<RHIBufferHandle, 4> acquired;
+                ce::fixed_array<RHIBufferHandle, 4> acquired;
                 Check(!pool.AcquireBatch(requests, acquired, error), "Reject incompatible native batch request");
                 for (const auto handle : acquired)
                 {
@@ -396,6 +440,90 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
             Check(!pool.Acquire(desc, active, error), "Closed pool rejects new resources");
         }
 
+        {
+            // Cross the first bitset word on both success and failed creation.
+            TransientBufferPool pool(device);
+            RHIBufferDesc desc;
+            desc.bytes = 256;
+            desc.debugName = L"Pool multiword regression";
+            ce::fixed_array<RHIBufferDesc, 65> requests;
+            requests.fill(desc);
+            ce::fixed_array<RHIBufferHandle, 65> handles{};
+            Check(pool.AcquireBatch(requests, handles, error), "Create 65 distinct pool owners: " + error);
+            bool unique = true;
+            for (std::size_t i = 0; i < handles.size(); ++i)
+            {
+                unique &= handles[i].IsValid();
+                for (std::size_t j = 0; j < i; ++j) unique &= handles[i].id != handles[j].id;
+            }
+            Check(unique && pool.Snapshot().ownedCount == 65, "Bit 64 creates and tracks its own buffer");
+            for (const auto handle : handles) pool.Return(handle);
+            Check(pool.AcquireBatch(requests, handles, error), "Warm 65-buffer pool path");
+            for (const auto handle : handles) pool.Return(handle);
+#if defined(_DEBUG)
+            unsigned allocated = 0;
+            bool recycled = true;
+            {
+                PoolAllocationScope scope;
+                for (unsigned iteration = 0; iteration < 100; ++iteration)
+                {
+                    recycled &= pool.AcquireBatch(requests, handles, error);
+                    for (const auto handle : handles) pool.Return(handle);
+                }
+                allocated = poolAllocations;
+            }
+            Check(recycled && allocated == 0, "Warmed pool lookup/acquire/return allocates zero on its calling thread");
+            ++poolAllocationChecks;
+#endif
+            Check(pool.Snapshot().creates == 65 && pool.Snapshot().cachedCount == 65,
+                  "Warmed batch does not create or lose resource owners");
+            Check(pool.AcquireBatch(requests, handles, error), "Keep owners outstanding at close");
+            pool.Close();
+            Check(pool.Snapshot().ownedCount == 65 && pool.Snapshot().cachedCount == 0,
+                  "Close retains every outstanding owner");
+            for (const auto handle : handles) pool.Return(handle);
+            Check(pool.Snapshot().ownedCount == 0 && pool.Snapshot().releases == 65,
+                  "Late returns release outstanding buffers exactly once");
+        }
+        {
+            TransientBufferPool pool(device);
+            RHIBufferDesc desc;
+            desc.bytes = 256;
+            ce::fixed_array<RHIBufferDesc, 65> requests;
+            requests.fill(desc);
+            // The final request is rejected by the native device, after 64 creations.
+            requests[64].initialState = RHIResourceState::IndirectArgument;
+            ce::fixed_array<RHIBufferHandle, 65> handles{};
+            Check(!pool.AcquireBatch(requests, handles, error), "Reject creation at the second bitset word");
+            bool hidden = true;
+            for (const auto handle : handles) hidden &= !handle.IsValid();
+            Check(hidden && pool.Snapshot().ownedCount == 64 && pool.Snapshot().cachedCount == 64,
+                  "Failed batch hides all handles and returns created buffers to the cache");
+            pool.Close();
+            Check(pool.Snapshot().ownedCount == 0 && pool.Snapshot().releases == 64,
+                  "Close releases cached owners from a failed batch exactly once");
+        }
+
+#if defined(_DEBUG)
+        {
+            TransientBufferPool pool(device);
+            RHIBufferDesc desc;
+            desc.bytes = 256;
+            RHIBufferHandle handle;
+            Check(pool.Acquire(desc, handle, error), "Create outstanding owner for node release check");
+            pool.Close();
+            unsigned observedFrees = 0;
+            {
+                PoolAllocationScope scope;
+                device.observeNextRelease = true;
+                pool.Return(handle);
+                observedFrees = device.freesBeforeNativeRelease;
+            }
+            Check(!device.observeNextRelease && observedFrees == 1 && pool.Snapshot().ownedCount == 0,
+                  "Closed return frees its tracking node before invoking native release");
+            ++poolReleaseChecks;
+        }
+#endif
         {
             thread_pool workers;
             job_scheduler jobs(workers);
@@ -624,6 +752,69 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
             Check(registry.LiveTextureCount() == 0 && !registry.Resolve(pinned) && resource->GetDesc().Width == 1,
                   "Texture registry clear drains owned slots and preserves external resource lifetime");
         }
+        {
+            DX12RootSignatureCache cache;
+            DX12SamplerHeap samplers;
+            Check(cache.Initialize(&device, error), "Isolated native root cache");
+            Check(samplers.Initialize(device.GetDevice(), 8, error), "Isolated native sampler cache");
+            const RHIPipelineLayoutParam params[] = {RHILayout::Cbv(0)};
+            const RHIPipelineLayoutDesc desc{params, {}, false};
+            const auto root = cache.GetOrCreate(desc, error);
+            const auto sampler = samplers.GetOrCreate(RHISampler::Point());
+            Check(root.IsValid() && sampler.ptr != 0, "Native cache initial owners");
+            // Keep native objects alive outside the shutdown measurement. Driver
+            // final-release activity must not be counted as tracking-node frees.
+            winrt::com_ptr<ID3D12RootSignature> retainedRoot;
+            retainedRoot.copy_from(device.Resolve(root).signature);
+            winrt::com_ptr<ID3D12DescriptorHeap> retainedHeap;
+            retainedHeap.copy_from(samplers.GetHeap());
+            bool same = true;
+#if defined(_DEBUG)
+            unsigned allocations = 0;
+            {
+                PoolAllocationScope scope;
+#endif
+                for (unsigned iteration = 0; iteration < 4096; ++iteration)
+                {
+                    same &= cache.GetOrCreate(desc, error).id == root.id;
+                    same &= samplers.GetOrCreate(RHISampler::Point()).ptr == sampler.ptr;
+                }
+#if defined(_DEBUG)
+                allocations = poolAllocations;
+            }
+            Check(allocations == 0, "Warmed root/sampler cache lookup allocates zero on calling thread");
+            ++nativeCacheAllocationChecks;
+#endif
+            Check(same && cache.GetCachedCount() == 1 && samplers.GetCachedCount() == 1 &&
+                      cache.GetStats().creates == 1 && samplers.GetStats().creates == 1,
+                  "Cache hits preserve native identity and create counts");
+#if defined(_DEBUG)
+            unsigned rootFrees = 0, samplerFrees = 0;
+            {
+                PoolAllocationScope scope;
+                cache.Shutdown();
+                rootFrees = poolFrees;
+            }
+            {
+                PoolAllocationScope scope;
+                samplers.Shutdown();
+                samplerFrees = poolFrees;
+            }
+            Check(rootFrees == 1 && samplerFrees == 1,
+                  "Each native cache clear immediately frees its one tracking node");
+            ++nativeCacheReleaseChecks;
+#else
+            cache.Shutdown();
+            samplers.Shutdown();
+#endif
+            Check(cache.GetCachedCount() == 0 && samplers.GetCachedCount() == 0 &&
+                      !cache.IsInitialized() && !samplers.IsInitialized(), "Shutdown empties native caches");
+            winrt::com_ptr<ID3D12Device> retainedDevice;
+            Check(SUCCEEDED(retainedRoot->GetDevice(IID_PPV_ARGS(retainedDevice.put()))) &&
+                      retainedHeap->GetDesc().NumDescriptors == 8,
+                  "External COM owners survive cache shutdown");
+            // No use of the non-owning root handle or sampler handle after shutdown.
+        }
         DX12RootSignatureCache roots;
         DX12PSOManager pipelines;
         ObservedTextureCache textures;
@@ -680,9 +871,9 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
         PipelineSlot pipeline;
         std::size_t gpuComponents = 0;
         RHIResourceState targetState = RHIResourceState::Common;
-        auto sharedLayout = std::make_shared<const PassLayout>(layout);
-        std::weak_ptr<const PassLayout> weakLayout = sharedLayout;
-        std::shared_ptr<const ResourcePacket> immutableNormalResources;
+        auto sharedLayout = own::make_shared<const PassLayout>(layout);
+        own::weak_owner<const PassLayout> weakLayout(sharedLayout);
+        own::shared_owner<const ResourcePacket> immutableNormalResources;
         for (unsigned frame = 0; frame < 4; ++frame)
         {
             Check(device.BeginFrame(error), "Actual BeginFrame");
@@ -704,7 +895,7 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
                 {
                     immutableNormalResources = normalPacket->resourceOwner;
                 }
-                Check(normalPacket->resourceOwner == immutableNormalResources &&
+                Check(material_graph_test::SamePinnedObject(normalPacket->resourceOwner, immutableNormalResources) &&
                           normalPacket->resources.uniforms.data() == immutableNormalResources->uniforms.data(),
                       "New recordings share immutable uniform storage without ResourcePacket vector copies");
             }
@@ -748,8 +939,8 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
                   "New immutable instance values");
             Check(bindings.Prepare(device, textures, instance, *sharedLayout, packet, error, {}, nullptr, sharedLayout),
                   "Actual RHI material prepare: " + error);
-            Check(packet->layout == sharedLayout, "New recordings retain the exact immutable program layout snapshot");
-            auto forgedLayout = std::make_shared<PassLayout>(layout);
+            Check(material_graph_test::SamePinnedObject(packet->layout, sharedLayout), "New recordings retain the exact immutable program layout snapshot");
+            auto forgedLayout = own::make_shared<PassLayout>(layout);
             ++forgedLayout->hostParameterCount;
             const auto snapshotAccepted = packet;
             Check(!bindings.Prepare(device, textures, instance, layout, packet, error, {}, nullptr, forgedLayout) &&
@@ -831,7 +1022,7 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
                                                          error),
                                     owner.owner});
             }
-            std::vector<LXMaterialDiagnostic> diagnostics;
+            ce::dynamic_array<LXMaterialDiagnostic> diagnostics;
             Check(pipeline.Publish(pipelines, product, RHIShaderBinary::Dxil, {.coreForward = true}, {},
                                    instance->description.parameters, uploaded, description, {}, diagnostics),
                   "Actual PSO publication");
@@ -897,7 +1088,10 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
         roots.Shutdown();
         device.Shutdown();
         std::cout << "LX_MATERIAL_RENDER_BINDINGS_OK checks=" << checks << " gpuComponents=" << gpuComponents
-                  << " samplerSlots=4 samplerTables=1 frames=4\n";
+                  << " samplerSlots=4 samplerTables=1 frames=4 poolAllocationChecks=" << poolAllocationChecks
+                  << " poolReleaseChecks=" << poolReleaseChecks
+                  << " nativeCacheAllocationChecks=" << nativeCacheAllocationChecks
+                  << " nativeCacheReleaseChecks=" << nativeCacheReleaseChecks << "\n";
     }
     void CheckSamplerGrammar()
     {
@@ -908,7 +1102,7 @@ float4 PSMain(float4 position : SV_Position) : SV_Target
         BindingLayout layout;
         layout.samplers.resize(1);
         ResourcePacket packet;
-        std::vector<LX::LXMaterialDiagnostic> diagnostics;
+        ce::dynamic_array<LX::LXMaterialDiagnostic> diagnostics;
         for (std::size_t minMag = 0; minMag < filters.size(); ++minMag)
         {
             for (std::size_t mip = 0; mip < filters.size(); ++mip)

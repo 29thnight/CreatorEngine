@@ -1,3 +1,8 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../../Engine/Utility_Framework/Foundation/EngineStorage.h"
+#include "../../../Engine/Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -353,7 +358,7 @@ void ConsoleCommandSystem::InitializeFromCommandLine()
             //   **뒤에 `--exec quit` 을 붙일 수가 없어** 무인 실행이 종료하지
             //   못하고 하네스 타임아웃까지 살아 있었다. 실제로 겪었다.
             //   `--` 가 없으면 끝까지 먹는 것은 그대로 둔다(대화형 편의).
-            std::vector<std::string> arguments;
+            ce::dynamic_array<std::string> arguments;
             int j = i + 1;
             for (; j < argc; ++j)
             {
@@ -582,7 +587,7 @@ void ConsoleCommandSystem::Enqueue(std::string command)
     m_pending.push_back(std::move(pending));
 }
 
-void ConsoleCommandSystem::EnqueueStructured(std::vector<std::string> arguments)
+void ConsoleCommandSystem::EnqueueStructured(ce::dynamic_array<std::string> arguments)
 {
     EnqueueStructured(std::move(arguments), CommandCompletion{});
 }
@@ -620,7 +625,7 @@ ConsoleCommandSystem::ServiceStatus ConsoleCommandSystem::SnapshotStatus() const
     return status;
 }
 
-bool ConsoleCommandSystem::EnqueueStructured(std::vector<std::string> arguments,
+bool ConsoleCommandSystem::EnqueueStructured(ce::dynamic_array<std::string> arguments,
                                              CommandCompletion completion,
                                              std::size_t serviceQueueCap)
 {
@@ -730,7 +735,7 @@ void ConsoleCommandSystem::Pump(const SceneBorrowFactory& acquireSceneBorrow)
     if (!SceneManagers->IsSceneLoading())
     {
         auto sceneBorrow = acquireSceneBorrow();
-        std::deque<EditorMutation> mutations;
+        ce::segmented_deque<EditorMutation> mutations;
         {
             std::lock_guard<std::mutex> guard(m_mutex);
             mutations.swap(m_editorMutations);
@@ -988,7 +993,7 @@ bool ConsoleCommandSystem::RunOne(PendingCommand pending, uint64_t frameIndex,
     return true;
 }
 
-void ConsoleCommandSystem::WaitForResult(std::function<std::optional<CommandCore::CommandResult>()> poll,
+void ConsoleCommandSystem::WaitForResult(ce::owned_func<std::optional<CommandCore::CommandResult>()> poll,
     bool needsSceneBorrow)
 {
     if ((!m_commandletMode && !m_executingFromService) || !m_executing.load(std::memory_order_acquire) ||
@@ -1046,7 +1051,7 @@ namespace
     // 출력은 저장·재로드 전후로 그대로 비교할 수 있게 인덱스 순서 고정·고정소수점이다.
     // 소수 4자리인 이유: 이 검사가 잡으려는 것은 값의 **소실**(0/항등으로 무너짐)이지
     // 십진 왕복의 마지막 비트 흔들림이 아니다 — 더 조이면 거짓 실패가 난다.
-    CommandCore::CommandResult HandleSceneTransformDigest(const std::vector<std::string>& parts)
+    CommandCore::CommandResult HandleSceneTransformDigest(const ce::dynamic_array<std::string>& parts)
     {
         Scene* scene = SceneManagers->GetActiveScene();
         if (nullptr == scene)
@@ -1222,7 +1227,7 @@ namespace
     //
     // ★★ 인자 없이 부르는 것은 오류가 아니라 **조회**다. 조회를 InvalidArguments
     //   로 내면 상태를 물어본 실행이 exit 2 로 끝난다.
-    CommandCore::CommandResult HandleSceneFlag(const std::vector<std::string>& parts)
+    CommandCore::CommandResult HandleSceneFlag(const ce::dynamic_array<std::string>& parts)
     {
         struct Flag
         {
@@ -1320,7 +1325,7 @@ namespace
     // 그래서 이 명령은 둘을 **나란히** 찍는다. 이름 조회(FindBone 직접 호출)와
     // 순회 도달성(조상 사슬이 전부 부모의 children에 실려 있는가)은 서로 다른
     // 고장이고, 어느 하나만 보면 반드시 오진한다.
-    CommandCore::CommandResult HandleSceneBoneDump(const std::vector<std::string>& parts)
+    CommandCore::CommandResult HandleSceneBoneDump(const ce::dynamic_array<std::string>& parts)
     {
         Scene* scene = SceneManagers->GetActiveScene();
         if (nullptr == scene)
@@ -1487,7 +1492,7 @@ namespace
     // MSVC의 블록 중첩 상한에 닿아 있어(C1061, 실측) 한 줄만 더해도 컴파일이
     // 깨진다. scene.dirtytraversal·scene.bonecache 등이 쓰는 것과 같은 관례로
     // 함수로 빼고 Execute 앞머리에서 return한다.
-    CommandCore::CommandResult HandlePrefabObjectGuid(const std::vector<std::string>& parts)
+    CommandCore::CommandResult HandlePrefabObjectGuid(const ce::dynamic_array<std::string>& parts)
     {
         // 진단용(트랙 P · P4-a 게이트). prefab.status의 집계 수치(씬 인스턴스/
         // 등록 개수)만으로는 "그 값이 맞는 값인가"를 볼 수 없다 — 중첩 프리팹
@@ -1604,7 +1609,7 @@ namespace
         }
     }
 
-    CommandCore::CommandResult HandleSceneTransformStats(const std::vector<std::string>& parts)
+    CommandCore::CommandResult HandleSceneTransformStats(const ce::dynamic_array<std::string>& parts)
     {
         Scene* scene = SceneManagers->GetActiveScene();
         if (nullptr == scene)
@@ -1703,7 +1708,7 @@ namespace
 		}
 	}
 
-	CommandCore::CommandResult HandleSceneTransformWriteStats(const std::vector<std::string>& parts)
+	CommandCore::CommandResult HandleSceneTransformWriteStats(const ce::dynamic_array<std::string>& parts)
 	{
 		Scene* scene = SceneManagers->GetActiveScene();
 		if (nullptr == scene)
@@ -1769,7 +1774,7 @@ namespace
 			prefab.Root().Child("position").Child("x").SetScalar(8.f);
 			Meta::DeserializePrefab(
 				&transform, prefab.Root().Read(),
-				std::unordered_set<std::string>{});
+				ce::engine_node_set<std::string>{});
 
 			scene->Reparent(scene->HandleOf(child->m_index),
 				scene->HandleOf(probe->m_index));
@@ -1815,7 +1820,7 @@ namespace
 		return CommandCore::Ok("scene.transformwritestats", std::move(data));
 	}
 
-	CommandCore::CommandResult HandleSceneSparseResolver(const std::vector<std::string>& parts)
+	CommandCore::CommandResult HandleSceneSparseResolver(const ce::dynamic_array<std::string>& parts)
 	{
 		Scene* scene = SceneManagers->GetActiveScene();
 		if (!scene)
@@ -1880,7 +1885,7 @@ namespace
 			const int frames = (std::max)(4, std::atoi(parts[3].c_str()));
 			const bool wasSparse = Scene::IsSparseSpatialResolverEnabled();
 			Entity* root = nullptr;
-			std::vector<Entity*> nodes;
+			ce::dynamic_array<Entity*> nodes;
 			nodes.reserve(objectCount);
 			{
 				[[maybe_unused]] auto bulk = scene->BeginHierarchyBulkBuild();
@@ -1929,8 +1934,8 @@ namespace
 				Scene::SetSparseSpatialResolverEnabled(sparse);
 				scene->MarkSpatialTransformsDirty();
 				scene->SyncDerivedState(TransformSyncPoint::Benchmark);
-				std::vector<double> syncSamples;
-				std::vector<double> resolveSamples;
+				ce::dynamic_array<double> syncSamples;
+				ce::dynamic_array<double> resolveSamples;
 				syncSamples.reserve(frames);
 				resolveSamples.reserve(frames);
 				SpatialResolveMetrics last{};
@@ -1969,7 +1974,7 @@ namespace
 				}
 				std::ranges::sort(syncSamples);
 				std::ranges::sort(resolveSamples);
-				const auto medianOf = [](const std::vector<double>& values)
+				const auto medianOf = [](const ce::dynamic_array<double>& values)
 				{
 					return 0 == (values.size() & 1)
 						? (values[values.size() / 2 - 1] + values[values.size() / 2]) * 0.5
@@ -1982,8 +1987,8 @@ namespace
 			constexpr Scenario scenarios[] = {
 				Scenario::Idle, Scenario::Leaf, Scenario::RandomOnePercent,
 				Scenario::Root, Scenario::Full };
-			std::array<BenchResult, std::size(scenarios)> legacy{};
-			std::array<BenchResult, std::size(scenarios)> sparse{};
+			ce::fixed_array<BenchResult, std::size(scenarios)> legacy{};
+			ce::fixed_array<BenchResult, std::size(scenarios)> sparse{};
 			for (size_t i = 0; i < std::size(scenarios); ++i)
 				legacy[i] = runScenario(false, scenarios[i]);
 			for (size_t i = 0; i < std::size(scenarios); ++i)
@@ -2131,7 +2136,7 @@ namespace
 		return CommandCore::Ok("scene.sparseresolver probe PASS", std::move(data));
 	}
 
-	CommandCore::CommandResult HandleSceneTransformPull(const std::vector<std::string>& parts)
+	CommandCore::CommandResult HandleSceneTransformPull(const ce::dynamic_array<std::string>& parts)
 	{
 		Scene* scene = SceneManagers->GetActiveScene();
 		if (!scene)
@@ -2404,7 +2409,7 @@ namespace ConsoleCmd
         }
     };
 
-    using Table = std::unordered_map<std::string, CommandEntry>;
+    using Table = ce::engine_node_map<std::string, CommandEntry>;
 
     Table& CommandletTable() { static Table table; return table; }
 
@@ -2434,8 +2439,8 @@ namespace ConsoleCmd
                 const auto* registrationSeed = CommandCore::FindDescriptorSeed(*names.begin());
                 const bool commandlet = registrationSeed && registrationSeed->commandlet;
                 Table& destination = commandlet ? CommandletTable() : t;
-                std::vector<const char*> accepted;
-                std::vector<const char*> rejected;
+                ce::dynamic_array<const char*> accepted;
+                ce::dynamic_array<const char*> rejected;
                 for (const char* n : names)
                 {
                     // 같은 이름을 두 번 등록하면 조용히 한쪽이 먹힌다.
@@ -2621,7 +2626,7 @@ CommandCore::CommandResult ConsoleCommandSystem::Execute(const std::string& line
 }
 
 CommandCore::CommandResult ConsoleCommandSystem::ExecuteParsed(
-    const std::vector<std::string>& parts, const std::string& diagnosticLine,
+    const ce::dynamic_array<std::string>& parts, const std::string& diagnosticLine,
     const SceneBorrowFactory& acquireSceneBorrow)
 {
     if (parts.empty()) return CommandCore::Ok();

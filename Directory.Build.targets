@@ -36,6 +36,7 @@
 -->
 <Project>
   <Import Project="$(MSBuildThisFileDirectory)Tools\build\Contracts.targets" />
+  <Import Project="$(MSBuildThisFileDirectory)Tools\build\EffectPackage.targets" />
   <ItemDefinitionGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">
     <ClCompile>
       <PreprocessorDefinitions Condition="'$(EngineDxDeepCapture)' == 'true' and '$(EngineShipping)' != 'true' and '$(Platform)' == 'x64'">CE_DX_TIMING_CAPTURE=1;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -186,7 +187,7 @@
     <ReflgenRegistrationHeaders />
     <ReflgenAttributeHeaders />
   </PropertyGroup>
-  <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'Physics' and '$(MSBuildProjectName)' != 'EngineDiagnostics' and '$(MSBuildProjectName)' != 'DxCaptureHelper' and '$(MSBuildProjectName)' != 'ProfilerViewer' and '$(MSBuildProjectName)' != 'GCCE'">
+  <ItemGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'Physics' and '$(MSBuildProjectName)' != 'EngineDiagnostics' and '$(MSBuildProjectName)' != 'DxCaptureHelper' and '$(MSBuildProjectName)' != 'ProfilerViewer' and '$(MSBuildProjectName)' != 'GCCE' and '$(MSBuildProjectName)' != 'RuntimeLauncher'">
     <!-- [[reflgen::reflect]] 타입을 가진 모듈 — header 를 ClInclude 로 가진 프로젝트가 생성한다. -->
     <_EngineReflgenModule Include="$(MSBuildThisFileDirectory)Engine\RenderEngine\RenderEngine.vcxproj" />
     <_EngineReflgenModule Include="$(MSBuildThisFileDirectory)Engine\SceneRuntime\SceneRuntime.vcxproj" />
@@ -195,13 +196,25 @@
     <ReflgenReference Include="@(_EngineReflgenModule)" Exclude="$(MSBuildProjectFullPath)" />
   </ItemGroup>
 
+  <!-- RuntimeLauncher loads the runtime through HostAbi and owns no reflected
+       Scene/Editor types. Injecting their reflection headers into its container
+       provider imports Creator.Containers back into its own partitions. -->
   <!-- Physics/diagnostics have no reflected engine types or Scene/Editor dependencies. -->
   <ItemDefinitionGroup Condition="'$(MSBuildProjectName)' == 'Physics'">
     <ClCompile>
       <AdditionalIncludeDirectories>$(_EngineVcpkgInstalledDir)$(_EngineVcpkgTriplet)\include\physx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
-  <Import Project="$(EngineReflgenTargets)" Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'DxCaptureHelper' and '$(MSBuildProjectName)' != 'ProfilerViewer' and '$(MSBuildProjectName)' != 'GCCE' and Exists('$(EngineReflgenTargets)')" />
+  <Import Project="$(EngineReflgenTargets)" Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'DxCaptureHelper' and '$(MSBuildProjectName)' != 'ProfilerViewer' and '$(MSBuildProjectName)' != 'GCCE' and '$(MSBuildProjectName)' != 'RuntimeLauncher' and Exists('$(EngineReflgenTargets)')" />
+  <!-- Only explicitly marked module interfaces are reflection providers. The
+       engine also compiles implementation modules with unsupported inheritance. -->
+  <ItemGroup Condition="'$(ReflgenTargetsImported)' == 'true'">
+    <_CreatorUnmarkedIfc Include="@(_ReflgenPrimary)" Exclude="@(_ReflgenPrimary->WithMetadataValue('ReflgenIfc', 'true'))" />
+    <_ReflgenPrimary Remove="@(_CreatorUnmarkedIfc)" />
+    <ClCompile Update="@(_CreatorUnmarkedIfc)">
+      <ModuleOutputFile>$(IntDir)%(Filename).ixx.ifc</ModuleOutputFile>
+    </ClCompile>
+  </ItemGroup>
 
   <!--
     vcpkg 의 MSBuild 통합은 vcpkg.json·vcpkg-configuration.json 이 바뀔 때만 다시 설치한다 — overlay port 만 바꾸면
@@ -229,7 +242,7 @@
   <Target Name="_EngineRequireReflgen"
           BeforeTargets="ClCompile"
           DependsOnTargets="$(_EngineRequireReflgenAfter)"
-          Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'DxCaptureHelper' and '$(MSBuildProjectName)' != 'ProfilerViewer' and '$(MSBuildProjectName)' != 'GCCE' and '$(ReflgenTargetsImported)' != 'true' and '$(DesignTimeBuild)' != 'true'">
+          Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'DxCaptureHelper' and '$(MSBuildProjectName)' != 'ProfilerViewer' and '$(MSBuildProjectName)' != 'GCCE' and '$(MSBuildProjectName)' != 'RuntimeLauncher' and '$(ReflgenTargetsImported)' != 'true' and '$(DesignTimeBuild)' != 'true'">
     <Error Condition="Exists('$(EngineReflgenTargets)')"
            Text="reflgen was installed by vcpkg during this build, after its MSBuild targets could be imported. Build again (once per environment)." />
     <Error Condition="!Exists('$(EngineReflgenTargets)')"

@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
 #else
@@ -9,6 +11,7 @@ import Creator.Core.Delegate;
 import Creator.Core.Layers;
 #endif
 #pragma once
+#include "../Utility_Framework/Foundation/EngineNodeSet.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -289,7 +292,7 @@ struct TransformWriteMetrics
 	uint64_t windowStartEpoch = 0;
 	uint64_t total = 0;
 	uint64_t invalidHandle = 0;
-	std::array<uint64_t, kTransformWriteReasonCount> byReason{};
+	ce::fixed_array<uint64_t, kTransformWriteReasonCount> byReason{};
 };
 
 class [[reflgen::reflect]] Scene : public gc::managed
@@ -358,7 +361,7 @@ public:
 
 	// Strong scene-graph edges. External users borrow pointers or resolve handles;
 	// detached DDOL transfers retain explicit owner-thread roots.
-	std::vector<gc::trace_ref<Entity>> m_Entities;
+	ce::dynamic_array<gc::trace_ref<Entity>> m_Entities;
 
 	[[reflgen::ignore]]
 	job_handle m_AIJob;
@@ -414,14 +417,14 @@ public:
     // 평행한지만 센다. 기존 회귀 출력 이름은 호환을 위해 유지한다.
     size_t CountHierarchyStoreMismatches() const;
     // Detach an Entity subtree from this scene for DontDestroyOnLoad rebind
-    void DetachEntityHierarchy(Entity* root, std::vector<DetachedEntityTransfer>& detached);
+    void DetachEntityHierarchy(Entity* root, ce::dynamic_array<DetachedEntityTransfer>& detached);
     // === C안: 공식 경로로 기존 객체(DDOL)를 이 씬에 부착 ===
     // 단일 객체를 붙임(부모 인덱스는 이 씬 기준). 유니크 네임/Tag/Layer/루트 children/Transform 부모까지 처리.
     Entity::Index AttachExistingEntity(gc::root_ref<Entity> entity, Entity::Index parentIndex);
     // DDOL 서브트리를 한꺼번에 붙임. parent/child 인덱스는 go들이 원래 갖고 있던 서브트리 상대관계를 따름.
     // 반환: oldIndex -> newIndex 매핑(이 씬 기준)
-    std::unordered_map<Entity::Index, Entity::Index>
-        AttachExistingEntityHierarchy(std::vector<DetachedEntityTransfer>& entities);
+    ce::engine_node_map<Entity::Index, Entity::Index>
+        AttachExistingEntityHierarchy(ce::dynamic_array<DetachedEntityTransfer>& entities);
     Entity* GetEntity(std::string_view name);
 	void AddSelectedEntity(Entity* entity);
 	void RemoveSelectedEntity(Entity* entity);
@@ -482,11 +485,11 @@ private:
     // 증가하고, 그 값 그대로 다음 입주자에게 물려준다 — 0은 절대 나오지
     // 않는다(EntityHandle의 "무효"와 겹치면 안 되므로 0을 건너뛴다).
     [[reflgen::ignore]]
-    std::vector<uint32_t> m_generations;
+    ce::dynamic_array<uint32_t> m_generations;
 
     // tombstone(= nullptr)된 슬롯의 인덱스. 다음 할당이 여기서 먼저 꺼내 쓴다.
     [[reflgen::ignore]]
-    std::vector<uint32_t> m_freeSlots;
+    ce::dynamic_array<uint32_t> m_freeSlots;
 
     // ── 씬 식별자 (트랙 W — EntityHandle에 씬 스코프 도입) ──
     //
@@ -505,7 +508,7 @@ private:
     [[reflgen::ignore]]
     std::uint32_t m_incrementalConstructions{ 0 };
     [[reflgen::ignore]]
-    std::vector<EntityHandle> m_transientDiagnosticRoots;
+    ce::dynamic_array<EntityHandle> m_transientDiagnosticRoots;
 
     // 씬 생성마다 단조 증가하는 일련번호 발급. SceneManager::m_scenes에서의
     // 위치(vector index)는 쓰지 않는다 — 씬이 삭제되면 그 위치가 다음 씬에게
@@ -540,7 +543,7 @@ private:
     own::shared_owner<AIUpdateBatch> m_aiUpdateBatch;
 
     [[reflgen::ignore]]
-    std::vector<own::shared_owner<AIUpdateBatch>> m_completedAIUpdates;
+    ce::dynamic_array<own::shared_owner<AIUpdateBatch>> m_completedAIUpdates;
 
     [[reflgen::ignore]]
     bool m_aiTickBoundaryReached = false;
@@ -880,8 +883,8 @@ public:
 	void RemoveCanvas(Entity* canvas);
 	// 소유가 아니라 캐시다 — 원소는 핸들이고, 쓰는 쪽이 Resolve로 그 자리에서
 	// 확인한다(트랙 E5-R2). 아래 필드 선언의 주석에 사유가 있다.
-	std::vector<EntityHandle>& GetCanvases() { return Canvases; }
-	std::unordered_map<std::string, EntityHandle>& GetCanvasMap() { return CanvasMap; }
+	ce::dynamic_array<EntityHandle>& GetCanvases() { return Canvases; }
+	ce::engine_node_map<std::string, EntityHandle>& GetCanvasMap() { return CanvasMap; }
 	// 해석까지 끝난 값을 준다(fail-closed — 이 씬에 없으면 nullptr).
 	Entity* FindCanvasName(std::string_view name);
 	// 이름 등록부(m_entityNameSet)를 함께 옮기는 유일한 이름 변경 창구. m_name 을
@@ -905,7 +908,7 @@ private:
 	struct TransformUpdateAccumulator;
 	void UpdateModelRecursive(Entity::Index entityIndex, math::matrix4x4 model,
 		bool parentChanged = false,
-		std::unordered_set<Entity::Index>* visited = nullptr, int depth = 0,
+		ce::engine_node_set<Entity::Index>* visited = nullptr, int depth = 0,
 		TransformUpdateAccumulator* diagnostics = nullptr);
 
 	// UI 레이아웃 순회의 유일한 구현. 부모의 rect·배율·변경 여부를 받아 자신을
@@ -917,7 +920,7 @@ private:
 	// 잘못된 값으로 덮어써서 캔버스 스케일러를 무력화한다.
 	void LayoutUINode(Entity* obj, const math::rect& parentRect,
 		float parentScale, bool parentChanged, bool isTopLevel, int depth,
-		std::unordered_set<Entity*>& visited);
+		ce::engine_node_set<Entity*>& visited);
 
 	// 순회 진입 가드 단일화(SceneGraphRedesignPlan §4 트랙 S, S2) —
 	// UpdateModelRecursive·LayoutUINode가 손으로 각자 구현하던 "방문 집합
@@ -937,7 +940,7 @@ private:
 	// nullptr을 돌려주므로 순환이 있어도 중복 처리 없이 자연히 멈춘다(추적 확인,
 	// 최종 보고 참고). 억지 수렴은 이 저장소에서 반복된 실패 양식이라 피했다.
 	template<typename Key>
-	static bool TryEnterTraversal(std::unordered_set<Key>& visited, const Key& key,
+	static bool TryEnterTraversal(ce::engine_node_set<Key>& visited, const Key& key,
 		int depth, const char* traversalLabel, std::string_view nodeName);
 
 	static constexpr int kTraversalMaxDepth = 64;
@@ -966,7 +969,7 @@ public:
 	mutable std::mutex m_lastAnimatorPoseMetricsMutex;
 
 	[[reflgen::ignore]]
-	std::unordered_map<const Animator*, AnimatorPoseUploadMetrics> m_lastAnimatorPoseMetrics;
+	ce::engine_node_map<const Animator*, AnimatorPoseUploadMetrics> m_lastAnimatorPoseMetrics;
 private:
 	AnimatorPoseUploadMetrics PublishAnimatorPoseImpl(Animator& animator);
 public:
@@ -1080,11 +1083,11 @@ private:
 		TransformUpdateAccumulator* diagnostics, TransformUpdateMetrics* metrics,
 		SpatialResolveMetrics& sparseMetrics);
 	bool ResolveSpatialTransformsSparse(uint64_t dirtyEpoch,
-		std::vector<EntityHandle> dirtyRoots, bool forceFull,
+		ce::dynamic_array<EntityHandle> dirtyRoots, bool forceFull,
 		TransformUpdateAccumulator* diagnostics, TransformUpdateMetrics* metrics,
 		SpatialResolveMetrics& sparseMetrics);
 	uint64_t TakeSpatialDirtySnapshot(
-		std::vector<EntityHandle>& dirtyRoots, bool& forceFull);
+		ce::dynamic_array<EntityHandle>& dirtyRoots, bool& forceFull);
 
     // scene.dirtytraversal 콘솔 토글의 저장소 (위 IsDirtyTraversalEnabled 참고).
     // C++17 inline 정적 멤버 — 별도 .cpp 정의가 필요 없다.
@@ -1097,7 +1100,7 @@ private:
 	static inline std::atomic_bool s_sparseSpatialResolverEnabled = true;
 
 	[[reflgen::ignore]]
-	std::array<TransformUpdateMetrics, kTransformSyncPointCount>
+	ce::fixed_array<TransformUpdateMetrics, kTransformSyncPointCount>
 		m_transformUpdateMetrics{};
 
 	[[reflgen::ignore]]
@@ -1137,7 +1140,7 @@ private:
 	std::atomic<uint64_t> m_transformInvalidPublishCount{ 0 };
 
 	[[reflgen::ignore]]
-	std::array<std::atomic<uint64_t>, kTransformWriteReasonCount>
+	ce::fixed_array<std::atomic<uint64_t>, kTransformWriteReasonCount>
 		m_transformWriteReasonCounts{};
 
 	[[reflgen::ignore]]
@@ -1147,7 +1150,7 @@ private:
 	uint64_t m_transformInvalidPublishBaseline = 0;
 
 	[[reflgen::ignore]]
-	std::array<uint64_t, kTransformWriteReasonCount>
+	ce::fixed_array<uint64_t, kTransformWriteReasonCount>
 		m_transformWriteReasonBaselines{};
 
 	[[reflgen::ignore]]
@@ -1169,7 +1172,7 @@ private:
 	bool m_hasLastUILayoutScreenRect = false;
 
     [[reflgen::ignore]]
-    std::unordered_set<std::string> m_entityNameSet{};
+    ce::engine_node_set<std::string> m_entityNameSet{};
 
 private:
     friend class PhysicsBodyComponent;
@@ -1183,13 +1186,13 @@ private:
     std::mutex m_physicsTransformMutex;
 
     [[reflgen::ignore]]
-    std::vector<EntityHandle> m_physicsTransformDirty;
+    ce::dynamic_array<EntityHandle> m_physicsTransformDirty;
 
     [[reflgen::ignore]]
-    std::vector<EntityHandle> m_physicsTransformDrain;
+    ce::dynamic_array<EntityHandle> m_physicsTransformDrain;
 
     [[reflgen::ignore]]
-    std::vector<ScenePhysicsSimulation::layer_assignment> m_physicsLayerAssignments;
+    ce::dynamic_array<ScenePhysicsSimulation::layer_assignment> m_physicsLayerAssignments;
 
     [[reflgen::ignore]]
     ScenePhysicsSimulation m_physicsSimulation;
@@ -1198,7 +1201,7 @@ private:
     ce::physics::CollisionGeometryLibrary m_collisionGeometry;
 
     [[reflgen::ignore]]
-    std::unordered_map<ScenePhysicsSimulation::binding_id, PhysicsBodyComponent*> m_physicsBodies;
+    ce::engine_node_map<ScenePhysicsSimulation::binding_id, PhysicsBodyComponent*> m_physicsBodies;
 
     struct PhysicsContactOwner
     {
@@ -1207,17 +1210,17 @@ private:
     };
 
     [[reflgen::ignore]]
-    std::unordered_map<ScenePhysicsSimulation::binding_id, PhysicsContactOwner> m_physicsContactOwners;
+    ce::engine_node_map<ScenePhysicsSimulation::binding_id, PhysicsContactOwner> m_physicsContactOwners;
 
     [[reflgen::ignore]]
-    std::vector<ScenePhysicsSimulation::binding_id> m_retiredPhysicsContactOwners;
+    ce::dynamic_array<ScenePhysicsSimulation::binding_id> m_retiredPhysicsContactOwners;
 
 
     [[reflgen::ignore]]
-    std::unordered_map<ScenePhysicsSimulation::binding_id, CharacterMovementComponent*> m_physicsCharacters;
+    ce::engine_node_map<ScenePhysicsSimulation::binding_id, CharacterMovementComponent*> m_physicsCharacters;
 
     [[reflgen::ignore]]
-    std::vector<TransformWorldWrite> m_physicsTransformWrites;
+    ce::dynamic_array<TransformWorldWrite> m_physicsTransformWrites;
 
 private:
 	// 이 씬에 속한 캔버스의 캐시. 소유가 아니다 — 수명은 m_Entities가 쥔다.
@@ -1237,10 +1240,10 @@ private:
 	// 이송된 캔버스는 다음 해석에서 조용히 걸러진다. 등록 이벤트를 놓쳐도
 	// 안전한 방향으로만 틀린다는 것이 이 캐시의 계약이다.
 	[[reflgen::ignore]]
-	std::vector<EntityHandle>	Canvases;
+	ce::dynamic_array<EntityHandle>	Canvases;
 
 	[[reflgen::ignore]]
-	std::unordered_map<std::string, EntityHandle> CanvasMap;
+	ce::engine_node_map<std::string, EntityHandle> CanvasMap;
 
 public:
 	// 이 씬의 EntityHandle::sceneId (트랙 W). Resolve/HandleOf가 내부적으로
@@ -1253,12 +1256,12 @@ public:
     Entity*					m_selectedEntity = nullptr;
 
 	[[reflgen::ignore]]
-	std::vector<Entity*>	m_selectedEntities;
+	ce::dynamic_array<Entity*>	m_selectedEntities;
 
 	// CaptureSelectionForSimulation 이 채우는 게임 스레드 전용 사본. 포인터는
 	// 비교에만 쓰고 역참조하지 않는다.
 	[[reflgen::ignore]]
-	std::vector<Entity*>	m_simulationSelection;
+	ce::dynamic_array<Entity*>	m_simulationSelection;
 
     [[reflgen::ignore]]
     ce::delegate_handle		resetObjHandle{};

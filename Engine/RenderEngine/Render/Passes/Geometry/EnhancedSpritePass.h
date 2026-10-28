@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -63,13 +64,13 @@ public:
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context) override;
     // Called after color composition. The array is motion, reactive,
     // transparency, responsive, depth, in the shared temporal input formats.
-    std::array<RGHandle, 5> DeclareTemporal(EnhancedRenderGraph& graph,
-        const EnhancedFrameContext& context, std::array<RGHandle, 5> outputs);
+    ce::fixed_array<RGHandle, 5> DeclareTemporal(EnhancedRenderGraph& graph,
+        const EnhancedFrameContext& context, ce::fixed_array<RGHandle, 5> outputs);
     void Shutdown() override;
 
     void SetOutputFormat(RHIFormat format) { m_outputFormat = format; }
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
-    void SetItems(const std::vector<Item>* items,
+    void SetItems(const ce::dynamic_array<Item>* items,
         own::shared_owner<TextureFramePins> texturePins = {})
     {
         m_items = items;
@@ -84,7 +85,7 @@ private:
     GpuGeometryVisibility m_visibility;
     own::shared_owner<const GpuGeometryVisibility::Frame> m_visibilityFrame;
     bool m_gpuVisibilityEnabled{ false };
-    std::vector<math::vector4> m_visibilitySpheres;
+    ce::dynamic_array<math::vector4> m_visibilitySpheres;
 
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError);
 
@@ -119,10 +120,10 @@ private:
     Inputs m_inputs{};
     RHIFormat m_outputFormat{ kOutputFormat };
     RGHandle m_output;
-    const std::vector<Item>* m_items{ nullptr };
+    const ce::dynamic_array<Item>* m_items{ nullptr };
     own::shared_owner<TextureFramePins> m_texturePins;
-    std::vector<Instance> m_instances;
-    std::vector<Batch> m_batches;
+    ce::dynamic_array<Instance> m_instances;
+    ce::dynamic_array<Batch> m_batches;
     math::matrix4x4 m_viewProjection{ math::matrix4x4::identity() };
     static_assert(std::is_same_v<decltype(m_viewProjection), math::matrix4x4>);
     uint32_t m_width{ 0 };

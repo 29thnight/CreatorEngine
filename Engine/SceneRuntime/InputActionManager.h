@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "ActionMap.h"
@@ -31,7 +32,7 @@ public:
 		}
 		m_actionMaps.clear();
 	}
-	std::vector<ActionMap*> m_actionMaps;
+	ce::dynamic_array<ActionMap*> m_actionMaps;
 
 private:
 };

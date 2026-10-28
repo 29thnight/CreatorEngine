@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
@@ -136,7 +137,7 @@ namespace Editor
         ::editor::windows::viewport_mode m_priorMode{};
         bool m_priorHostFocused{};
         std::uint32_t m_priorSceneId{};
-        std::vector<std::size_t> m_priorSelection;   ///< instanceID — 백업이 보존한다
+        ce::dynamic_array<std::size_t> m_priorSelection;   ///< instanceID — 백업이 보존한다
         std::size_t m_priorPrimary{};
         bool m_hasPrior{};
     };

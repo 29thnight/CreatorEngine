@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "../Foundation/StandardLibrary.h"
 
@@ -43,7 +44,7 @@ namespace SerializationProfile
 
 	struct Snapshot
 	{
-		std::array<StageSample, kStageCount> stages{};
+		ce::fixed_array<StageSample, kStageCount> stages{};
 
 		const StageSample& operator[](Stage stage) const
 		{

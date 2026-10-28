@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "VulkanEncoder.h"
 #include "VulkanRecordingResources.h"
 #include "VulkanPipelineCache.h"
@@ -233,7 +234,7 @@ void VulkanEncoder::SetConstantBuffer(RHIBindPoint bindPoint, uint32_t slot,
 
 void VulkanEncoder::UpsertBinding(size_t bindPointIndex, const PendingBinding& binding)
 {
-    std::vector<PendingBinding>& current = m_pending[bindPointIndex];
+    ce::dynamic_array<PendingBinding>& current = m_pending[bindPointIndex];
     for (PendingBinding& item : current)
     {
         const bool sameParam = UINT32_MAX != binding.param && item.param == binding.param;
@@ -258,7 +259,7 @@ void VulkanEncoder::ReplaceTableBindings(size_t bindPointIndex, uint32_t firstBi
     current.reserve(current.size() + bindings.size());
     // Replace the complete table in one scan. Per-element Upsert made a fully
     // populated 4096-element shader array quadratic in its descriptor count.
-    std::erase_if(current, [&](const PendingBinding& item) {
+    ce::erase_if(current, [&](const PendingBinding& item) {
         return item.param == UINT32_MAX && item.binding >= firstBinding &&
             uint64_t(item.binding) - firstBinding < bindingCount;
     });
@@ -269,7 +270,7 @@ void VulkanEncoder::ReplaceTableBindings(size_t bindPointIndex, uint32_t firstBi
 bool VulkanEncoder::FlushDescriptors(RHIBindPoint bindPoint)
 {
     const size_t index = static_cast<size_t>(bindPoint);
-    std::vector<PendingBinding>& pending = m_pending[index];
+    ce::dynamic_array<PendingBinding>& pending = m_pending[index];
     if (pending.empty() || !m_descriptorsDirty[index])
     {
         return true;

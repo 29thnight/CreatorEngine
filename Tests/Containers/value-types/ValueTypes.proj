@@ -1,0 +1,11 @@
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+    <EngineRoot>$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\'))</EngineRoot>
+  </PropertyGroup>
+  <Target Name="Build">
+    <MSBuild Projects="$(EngineRoot)Tools\regression\ValueTypesProbe.vcxproj;$(EngineRoot)Tools\regression\ValueTypesBenchmark.vcxproj"
+      RemoveProperties="SolutionDir" BuildInParallel="false"
+      Properties="Configuration=$(Configuration);Platform=x64;SolutionDir=$(EngineRoot);UseDynamicDebugging=false;LinkIncremental=false" />
+  </Target>
+</Project>

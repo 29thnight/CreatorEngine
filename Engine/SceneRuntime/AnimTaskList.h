@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -276,7 +277,7 @@ namespace animation
         template <class Visit>
         void for_each_task_snapshot(Visit&& visit) const
         {
-            std::vector<std::uint8_t> reachable(m_tasks.size(), 0);
+            ce::dynamic_array<std::uint8_t> reachable(m_tasks.size(), 0);
             if (m_output != invalid_task) reachable[m_output] = 1;
             for (std::size_t index = m_tasks.size(); index-- > 0;)
             {
@@ -290,12 +291,12 @@ namespace animation
         }
 
     private:
-        std::vector<task> m_tasks{};
-        std::vector<std::uint8_t> m_reachable{};
-        std::vector<std::uint8_t> m_removed{};
-        std::vector<std::uint32_t> m_alias{};
-        std::vector<std::uint32_t> m_remap{};
-        std::vector<task> m_rewritten{};
+        ce::dynamic_array<task> m_tasks{};
+        ce::dynamic_array<std::uint8_t> m_reachable{};
+        ce::dynamic_array<std::uint8_t> m_removed{};
+        ce::dynamic_array<std::uint32_t> m_alias{};
+        ce::dynamic_array<std::uint32_t> m_remap{};
+        ce::dynamic_array<task> m_rewritten{};
         std::uint32_t m_output{ invalid_task };
     };
 }

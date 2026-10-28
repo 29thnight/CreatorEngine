@@ -198,7 +198,7 @@ namespace
             && oldSource.Metadata().frameCount == 4800u, "Editor import preserves requested load/spatial policy and actual PCM metadata");
         std::vector<std::byte> payload(oldSource.PayloadSize());
         Check(oldSource.ReadPayload(0u, payload, error) && payload == original
-            && ce::hash::sha256::compute(payload.data(), payload.size()) == oldSource.Metadata().payloadSha256,
+            && ce::crypto::sha256::compute(payload.data(), payload.size()) == oldSource.Metadata().payloadSha256,
             "Editor cached source contains full original encoded payload with matching digest");
         const auto changed = ReadBytes(formats / "impulse.wav");
         WriteBytes(mutableSource, changed);
@@ -211,7 +211,7 @@ namespace
         payload.resize(newSource.PayloadSize());
         Check(newSource.ReadPayload(0u, payload, error) && payload == changed,
             "New mounted source reads newly authored bytes");
-        const auto generation = work / "cache" / (ce::hash::to_hex(newSource.Metadata().payloadSha256)
+        const auto generation = work / "cache" / (ce::crypto::to_hex(newSource.Metadata().payloadSha256)
             + "-Stream-PointMono-v1");
         const experiment::AssetId id{ uuid::parse(Guid(1u).Text()) };
         const auto artifact = generation / ck::MakeDerivedAudioClipArtifactPath(id);
@@ -225,7 +225,7 @@ namespace
         Check(!wave::ImportEditorAudioClip(mutableSource, work / "cache", Guid(1u),
             "Stream", "PointMono", untouched, error), "Corrupt existing immutable cache artifact fails instead of being overwritten");
         Check(ReadBytes(artifact) == corrupt, "Rejected import leaves corrupt existing target byte-identical");
-        const auto oldGeneration = work / "cache" / (ce::hash::to_hex(oldSource.Metadata().payloadSha256)
+        const auto oldGeneration = work / "cache" / (ce::crypto::to_hex(oldSource.Metadata().payloadSha256)
             + "-Stream-PointMono-v1");
         fs::rename(oldGeneration, work / "retired-generation");
         const auto substitute = oldGeneration / ck::MakeDerivedAudioClipArtifactPath(id);
@@ -328,7 +328,7 @@ namespace
             "Resident", "PointMono", untouched, error) && fs::is_empty(outside),
             "Symlink cache root rejected before creating any outside artifact");
         const auto nestedCache = work / "nested-cache";
-        const auto nestedGeneration = nestedCache / (ce::hash::to_hex(newSource.Metadata().payloadSha256)
+        const auto nestedGeneration = nestedCache / (ce::crypto::to_hex(newSource.Metadata().payloadSha256)
             + "-Resident-PointMono-v1");
         fs::create_directories(nestedGeneration);
         fs::create_directory_symlink(outside, nestedGeneration / "Derived");

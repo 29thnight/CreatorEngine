@@ -8,7 +8,7 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[2]
 MODULE_SOURCES = runpy.run_path(str(ROOT / "Tools/build/generate-module-adapters.py"))["MODULE_SOURCES"]
 MODULES = {
-    "Creator.Core.Sha256": rb"\bce::hash::(?:sha256|sha256_digest|to_hex)\b",
+    "Creator.Core.Sha256": rb"\bce::crypto::(?:sha256|sha256_digest|to_hex)\b",
     "Creator.Core.Strings": rb"\bce::strings::(?:to_lower\w*|ascii_to_lower\w*|equals_ascii_case_insensitive|is_space|trim(?:_view)?|split|tokenize_preserve_quotes|unquote|split_endpoint|remove_whitespace|contains_case_insensitive)\b",
     "Creator.Platform.Windows.Strings": rb"\bce::strings::(?:try_)?(?:ansi_to_utf8|utf8_to_ansi|wide_to_utf8|utf8_to_wide)\b",
 }

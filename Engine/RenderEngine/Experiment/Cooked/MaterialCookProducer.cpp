@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "MaterialCookProducer.h"
 
 #include "CookSupport.h"
@@ -96,7 +97,7 @@ MaterialCookProductResult BuildMaterialCookProduct(const MaterialCookProductRequ
     }
 
     AssetId shaderMetaAssetId{};
-    std::vector<AssetId> dependencies;
+    ce::dynamic_array<AssetId> dependencies;
     std::size_t texturePropertyCount = 0u;
     std::string materialName;
     if (root["lattice_material"])
@@ -197,7 +198,7 @@ MaterialCookProductResult BuildMaterialCookProduct(const MaterialCookProductRequ
         return result;
     }
 
-    std::vector<std::byte> bytes;
+    ce::dynamic_array<std::byte> bytes;
     std::string encodeError;
     if (!Authoring::EncodeCookedDocument(root, bytes, encodeError))
     {

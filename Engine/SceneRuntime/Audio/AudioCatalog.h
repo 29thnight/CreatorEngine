@@ -1,4 +1,6 @@
+#include "../../Utility_Framework/Foundation/EngineNodeMap.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineNodeSet.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -36,9 +38,9 @@ namespace wave
     private:
         AudioService& m_audio;
         PlaybackService& m_playback;
-        std::unordered_map<ClipKey, std::string> m_clipStamps;
-        std::unordered_set<ClipKey> m_assets;
-        std::unordered_map<ClipKey, own::shared_owner<const SoundGraphProgram>> m_editorGraphs;
-        std::unordered_map<std::string, std::string> m_legacyAliases;
+        ce::engine_node_map<ClipKey, std::string> m_clipStamps;
+        ce::engine_node_set<ClipKey> m_assets;
+        ce::engine_node_map<ClipKey, own::shared_owner<const SoundGraphProgram>> m_editorGraphs;
+        ce::engine_node_map<std::string, std::string> m_legacyAliases;
     };
 }

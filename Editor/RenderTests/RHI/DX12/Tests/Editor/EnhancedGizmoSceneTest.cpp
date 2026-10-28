@@ -1,3 +1,4 @@
+#include "../../../../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -80,7 +81,7 @@ bool DX12Test::RunGizmoSceneTest(std::string& outLog)
     const FrameCameraSnapshot cameraSnapshot = sceneCamera->CaptureFrameSnapshot();
 
     // 와이어프레임 대상 — 커맨드 빌드가 채워 둔 큐에서 메시·월드만 복사.
-    std::vector<EnhancedDrawItem> draws;
+    ce::dynamic_array<EnhancedDrawItem> draws;
     {
         RenderScene* renderScene = SceneManagers->GetRenderScene();
         if (nullptr != renderScene)

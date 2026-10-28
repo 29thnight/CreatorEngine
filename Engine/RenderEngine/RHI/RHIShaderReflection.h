@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -58,7 +59,7 @@ struct RHIShaderResourceReflection
     std::uint32_t registerSpace{};
     std::uint32_t arrayElements{ 1 };
     std::uint32_t byteSize{};
-    std::vector<RHIShaderFieldReflection> fields;
+    ce::dynamic_array<RHIShaderFieldReflection> fields;
 
     bool operator==(const RHIShaderResourceReflection&) const = default;
 };
@@ -68,7 +69,7 @@ struct RHIShaderResourceReflection
 struct RHIShaderReflection
 {
     RHIShaderStage stage{ RHIShaderStage::Vertex };
-    std::vector<RHIShaderResourceReflection> resources;
+    ce::dynamic_array<RHIShaderResourceReflection> resources;
 
     bool operator==(const RHIShaderReflection&) const = default;
 };

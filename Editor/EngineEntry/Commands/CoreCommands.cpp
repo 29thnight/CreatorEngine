@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -311,7 +312,7 @@ namespace ConsoleCmd
         //   LC6 은 핸들러 8,700 줄을 도메인 파일 일곱 개로 옮긴다. 등록 줄을
         //   빠뜨리는 것이 그 작업의 대표적 사고라, 표를 옮기기 전에 엔진이
         //   스스로 잡게 만든다.
-        std::vector<std::string> problems = registry.Problems();
+        ce::dynamic_array<std::string> problems = registry.Problems();
         const auto& commandletProblems = CommandCore::CommandRegistry::Commandlets().Problems();
         problems.insert(problems.end(), commandletProblems.begin(), commandletProblems.end());
         for (std::size_t i = 0; i < CommandCore::DescriptorSeedCount(); ++i)
@@ -468,7 +469,7 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_wait(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
 
         // ★ `atoi` 는 실패를 0 으로 돌려준다.
         //
@@ -520,7 +521,7 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_window_resize(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
 
         // 해상도 독립 검증용(PHASE 7). 창을 실제로 리사이즈해 엔진의 리사이즈 경로를
         // 그대로 태운다 — g_ClientRect 갱신부터 UI 리플로우까지 실제 흐름을 검증해야
@@ -611,7 +612,7 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_lifecycle_trace(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
 
         // 생명주기 호출 순서를 받아 적는다(PHASE 9-0).
         //
@@ -692,7 +693,7 @@ namespace ConsoleCmd
     static CommandCore::CommandResult Cmd_lifecycle_dump(const ConsoleCommandContext& ctx)
     {
         using namespace CommandCore;
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
 
         if (parts.size() > 2) return InvalidArguments("lifecycle.dump [path]");
         const std::string path = ResolveTestArtifactPath("Traces",
@@ -726,7 +727,7 @@ namespace ConsoleCmd
     {
         using namespace CommandCore;
         if (ctx.parts.size() < 2 || ctx.parts.size() > 3) return InvalidArguments("lifecycle.stress <mode> [count]");
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
 
         // 파괴·생성을 몰아쳐 수명 경로를 흔든다(PHASE 9-0의 ASan 재현용).
         //
@@ -1411,7 +1412,7 @@ namespace ConsoleCmd
         else if (args.size() >= 2 && "key" == args[1])
         {
             if (args.size() < 3) return InvalidArguments(usage);
-            std::vector<std::string> keys(args.begin() + 2, args.end());
+            ce::dynamic_array<std::string> keys(args.begin() + 2, args.end());
             std::string error;
             if (!::editor::nav::request_keys(keys, error))
                 return Fail("editor.nav.key", error);
@@ -1449,7 +1450,7 @@ namespace ConsoleCmd
         data.Set("keysPending", CommandData::Int(static_cast<long long>(view.keysPending)));
         data.Set("keysDelivered", CommandData::Int(static_cast<long long>(view.keysDelivered)));
 
-        const auto names = [](const std::vector<std::string>& source)
+        const auto names = [](const ce::dynamic_array<std::string>& source)
         {
             auto array = CommandData::Array();
             for (const std::string& name : source) array.Append(CommandData::String(name));
@@ -1820,7 +1821,7 @@ namespace ConsoleCmd
         data.Set("truncated", CommandData::Int(static_cast<long long>(view.truncated)));
         data.Set("unbalanced", CommandData::Int(static_cast<long long>(view.unbalanced)));
 
-        const auto names = [](const std::vector<std::string>& source)
+        const auto names = [](const ce::dynamic_array<std::string>& source)
         {
             auto array = CommandData::Array();
             for (const std::string& name : source) array.Append(CommandData::String(name));

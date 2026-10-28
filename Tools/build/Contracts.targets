@@ -8,12 +8,17 @@
     <_CreatorAssertionsEnabled Condition="'$(Configuration)' == 'Debug'">true</_CreatorAssertionsEnabled>
     <_CreatorAssertionsEnabled Condition="'$(Configuration)' == 'Release'">false</_CreatorAssertionsEnabled>
   </PropertyGroup>
+  <!-- Reflection's project-reference query can request a WinRT projection
+       before the normal SDK reference expansion. Supply the same SDK metadata. -->
+  <PropertyGroup Condition="'$(MSBuildProjectName)' == 'EngineContracts' and '$(CppWinRTSDKReferences)' == '' and Exists('$(WindowsSdkDir)UnionMetadata\$(WindowsSDKVersion)Windows.winmd')">
+    <CppWinRTSDKReferences>$(WindowsSdkDir)UnionMetadata\$(WindowsSDKVersion)Windows.winmd</CppWinRTSDKReferences>
+  </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">
     <ClCompile>
       <ScanSourceForModuleDependencies>true</ScanSourceForModuleDependencies>
       <SDLCheck>true</SDLCheck>
       <AdditionalOptions>/utf-8 /Zc:preprocessor %(AdditionalOptions)</AdditionalOptions>
-      <AdditionalIncludeDirectories>$(_CreatorContractsRoot)Engine\Platform\WindowsSDK;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>$(_CreatorContractsRoot)Engine\Containers;$(_CreatorContractsRoot)Engine\Platform\WindowsSDK;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <PreprocessorDefinitions>NOMINMAX;WIN32_LEAN_AND_MEAN;UNICODE;_UNICODE;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)' == 'Debug' and '$(MSBuildProjectName)' != 'RuntimeLauncher'">_DEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <PreprocessorDefinitions Condition="'$(Configuration)' == 'Release'">NDEBUG;%(PreprocessorDefinitions)</PreprocessorDefinitions>
@@ -107,7 +112,7 @@
        the already-built public module references to that late compiler input. -->
   <Target Name="ReferenceStandardModulesInReflgenSource" AfterTargets="_ReflgenComputeInputs"
           DependsOnTargets="DeduplicateCreatorReflgenSource"
-          Condition="'$(ReflgenTargetsImported)' == 'true' and '@(ReferencedProjectsPublicModules)' != ''">
+          Condition="'$(ReflgenTargetsImported)' == 'true' and '$(ReflgenBackend)' != 'Auto' and '@(ReferencedProjectsPublicModules)' != ''">
     <ItemGroup>
       <_CreatorReflgenModuleReference Include="@(ReferencedProjectsPublicModules)"
             Condition="'%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Delegate.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Concurrency.Jobs.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Uuid.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Layers.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.BitFlag.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Sha256.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Strings.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Platform.Windows.Strings.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.DynamicBitset.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.WorkPartition.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.SpinLock.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Stopwatch.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.RingBuffer.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.BoundedMemory.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Base64.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.ContentAbi.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.LayerCatalog.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.EngineMode.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Progress.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Paths.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Ownership.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.HeapAllocator.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Arena.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.LifetimeToken.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Core.Distribution.ixx' or '%(ReferencedProjectsPublicModules.Filename)' == 'Creator.Concurrency.JobGraph.ixx'">

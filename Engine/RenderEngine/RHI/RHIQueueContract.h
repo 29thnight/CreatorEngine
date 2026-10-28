@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -190,7 +191,7 @@ class RHICompletionSet
     void Reset() { *this = {}; }
 
   private:
-    std::array<RHITimelinePoint, kCapacity> m_points{};
+    ce::fixed_array<RHITimelinePoint, kCapacity> m_points{};
     size_t m_size{0};
     bool m_valid{true};
 };

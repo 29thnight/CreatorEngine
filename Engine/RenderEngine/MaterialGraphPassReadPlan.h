@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include "MaterialGraphRenderBindings.h"
@@ -36,7 +37,7 @@ namespace material_graph
         {
             ce::render_vector<size_t> geometry;
             ce::render_vector<RHITextureHandle> textures;
-            std::array<ce::render_vector<EnhancedRenderGraph::RGPassUsage>, 2> usageTemplates;
+            ce::fixed_array<ce::render_vector<EnhancedRenderGraph::RGPassUsage>, 2> usageTemplates;
         };
 
         template<class Draws, class Shadows>
@@ -165,6 +166,6 @@ namespace material_graph
         size_t m_drawCount{}, m_shadowCount{};
         ce::render_vector<Identity> m_identities;
         ce::render_vector<RHITextureHandle> m_textures;
-        std::array<Reads, static_cast<size_t>(Pass::Count)> m_reads;
+        ce::fixed_array<Reads, static_cast<size_t>(Pass::Count)> m_reads;
     };
 } // namespace material_graph

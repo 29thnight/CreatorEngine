@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
@@ -30,7 +31,7 @@ namespace
                 error = "RG7 device removal interface unavailable";
                 return false;
             }
-            std::vector<ID3D12CommandList*> lists;
+            ce::dynamic_array<ID3D12CommandList*> lists;
             for (auto worker : order)
             {
                 lists.push_back(Get(worker));

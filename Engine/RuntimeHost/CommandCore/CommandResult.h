@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 // LC1 (PHASE 14.5) — 명령 결과의 정본.
 //
@@ -83,8 +84,8 @@ namespace CommandCore
         double      AsDouble() const noexcept { return m_double; }
         const std::string& AsString() const noexcept { return m_string; }
 
-        const std::vector<CommandData>& Items() const noexcept { return m_array; }
-        const std::vector<std::pair<std::string, CommandData>>& Fields() const noexcept { return m_object; }
+        const ce::recursive_array<CommandData>& Items() const noexcept { return m_array; }
+        const ce::recursive_array<ce::pair<std::string, CommandData>>& Fields() const noexcept { return m_object; }
 
         /// Array 에 값을 더한다. Array 가 아니면 Array 로 만든 뒤 더한다.
         void Append(CommandData value);
@@ -103,8 +104,8 @@ namespace CommandCore
         double      m_double{};
         std::string m_string;
 
-        std::vector<CommandData>                         m_array;
-        std::vector<std::pair<std::string, CommandData>> m_object;
+        ce::recursive_array<CommandData>                         m_array;
+        ce::recursive_array<ce::pair<std::string, CommandData>> m_object;
     };
 
     // ── 결과 ────────────────────────────────────────────────────────────

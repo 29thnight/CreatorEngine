@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include <mathematics/transform.hpp>
@@ -140,8 +141,8 @@ namespace Animation
         }
 
     private:
-        std::vector<math::vector3> m_translations{};
-        std::vector<math::quaternion> m_rotations{};
-        std::vector<math::vector3> m_scales{};
+        ce::dynamic_array<math::vector3> m_translations{};
+        ce::dynamic_array<math::quaternion> m_rotations{};
+        ce::dynamic_array<math::vector3> m_scales{};
     };
 }

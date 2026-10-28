@@ -1,0 +1,27 @@
+[
+  {
+    "Algorithm": "SHA256",
+    "Hash": "2E0B4F46D6BBBA3B26247344D0E27BCAA660AB779EFC8CDC880528B36E57B93A",
+    "Path": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\Engine\\Containers\\modules\\node_hash_map.ixx"
+  },
+  {
+    "Algorithm": "SHA256",
+    "Hash": "73DBD57E750B28696D8A4C8755E2124B7B186D450408C62880E64FE7D1F17EF6",
+    "Path": "C:\\Users\\idene\\source\\repos\\CreatorContainers\\experiments\\20261026-node-map-ablation\\Creator.NodeMapProbe.ixx"
+  },
+  {
+    "Algorithm": "SHA256",
+    "Hash": "E53788B018EBFFA69BCB44E69F0AAA46361000CE2901AE38930658564D4ABF38",
+    "Path": "C:\\Users\\idene\\source\\repos\\CreatorContainers\\experiments\\20261026-node-map-ablation\\benchmark.cpp"
+  },
+  {
+    "Algorithm": "SHA256",
+    "Hash": "72F553C8AF5F5CE32BF0F5FFC016412BDC96C542F18246B5B91536A2D01D845B",
+    "Path": "C:\\Users\\idene\\source\\repos\\CreatorContainers\\experiments\\20261026-node-map-ablation\\correctness.cpp"
+  },
+  {
+    "Algorithm": "SHA256",
+    "Hash": "5884835F32D6E8D27F5408B420034E64E016FCF5D6BA3A656FAF0CCC70AF7598",
+    "Path": "C:\\Users\\idene\\source\\repos\\CreatorContainers\\experiments\\20261026-node-map-ablation\\generate.ps1"
+  }
+]

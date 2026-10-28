@@ -1,0 +1,9 @@
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <PropertyGroup>
+    <EngineRoot Condition="'$(EngineRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\'))</EngineRoot>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+  </PropertyGroup>
+  <Target Name="Build">
+    <MSBuild Projects="$(EngineRoot)Tools\regression\StorageMigrationProbe.vcxproj;$(EngineRoot)Tools\regression\StoragePerformanceProbe.vcxproj" Targets="Build" BuildInParallel="false" Properties="Configuration=$(Configuration);Platform=x64;SolutionDir=$(EngineRoot);UseDynamicDebugging=false;LinkIncremental=false" />
+  </Target>
+</Project>

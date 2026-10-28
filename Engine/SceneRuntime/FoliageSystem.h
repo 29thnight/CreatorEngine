@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Reflection/ClassProperty.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -42,7 +43,7 @@ public:
     size_t GetCount() const noexcept { return m_foliages.size(); }
 
 private:
-    std::vector<FoliageComponent*> m_foliages;
+    ce::dynamic_array<FoliageComponent*> m_foliages;
 };
 
 #if defined(CE_SCENE_HEADLESS)

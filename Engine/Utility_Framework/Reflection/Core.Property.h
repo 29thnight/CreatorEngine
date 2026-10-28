@@ -1,10 +1,11 @@
+#include "../Foundation/EngineFunc.h"
 #include "../Foundation/StandardLibrary.h"
 
 template<typename T>
 struct Property
 {
-    std::function<T()> get;
-    std::function<void(const T&)> set;
+    ce::owned_func<T()> get;
+    ce::owned_func<void(const T&)> set;
     T value;
 
     // implicit conversion to T

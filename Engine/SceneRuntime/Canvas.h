@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include <mathematics/vector2.hpp>
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
@@ -95,7 +96,7 @@ public:
 	// OnRemovingFromScene에서 비우고, 새 씬의 OnAddedToScene 이후 UIManager가
 	// 현재 sceneId/index/generation으로 다시 연결한다.
 	[[reflgen::ignore]]
-	std::vector<EntityHandle> UIObjs;
+	ce::dynamic_array<EntityHandle> UIObjs;
 
 	std::string CanvasName = "Canvas";
 

@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "../VulkanSelfTest.h"
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/Vulkan/VulkanPipelineCache.h"
@@ -52,8 +53,8 @@ namespace
         float cornerMaskBand{ 0.f };
         float exceptCornerMaskBand{ 0.f };
         bool passThrough{ false };
-        std::array<EnhancedRenderGraph::Stats, kSsrRhiVariantCount> graphs{};
-        std::vector<float> rgba;
+        ce::fixed_array<EnhancedRenderGraph::Stats, kSsrRhiVariantCount> graphs{};
+        ce::dynamic_array<float> rgba;
     };
 
     float SsrRhiBandMax(const RHIReadbackImage& image, uint32_t slice,

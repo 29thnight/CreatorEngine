@@ -1,0 +1,11 @@
+<Project DefaultTargets="Build">
+  <PropertyGroup>
+    <EngineRoot Condition="'$(EngineRoot)' == ''">$([System.IO.Path]::GetFullPath('$(MSBuildThisFileDirectory)..\..\..\'))</EngineRoot>
+    <Configuration Condition="'$(Configuration)' == ''">Release</Configuration>
+  </PropertyGroup>
+  <Target Name="Build">
+    <MSBuild Projects="$(EngineRoot)Tools\regression\OrderedSetMigrationProbe.vcxproj;$(EngineRoot)Tools\regression\OrderedSetPerformanceProbe.vcxproj"
+             Targets="Build" BuildInParallel="false"
+             Properties="Configuration=$(Configuration);Platform=x64;SolutionDir=$(EngineRoot);UseDynamicDebugging=false;LinkIncremental=false" />
+  </Target>
+</Project>

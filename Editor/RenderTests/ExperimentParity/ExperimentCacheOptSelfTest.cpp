@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "ExperimentParity/ExperimentCacheOptSelfTest.h"
 
 #include "Experiment/Import/VertexCacheOptimization.h"
@@ -30,8 +31,8 @@ namespace RenderTest
         // 같은 값이 나와야 한다 — 그것이 이 패스가 지켜야 할 유일한 불변식이다.
         struct TriangleKey final
         {
-            std::array<float, 9> positions{};   // 세 정점의 xyz
-            std::array<float, 3> uvx{};         // 정점이 실제로 따라왔는지 함께 본다
+            ce::fixed_array<float, 9> positions{};   // 세 정점의 xyz
+            ce::fixed_array<float, 3> uvx{};         // 정점이 실제로 따라왔는지 함께 본다
 
             [[nodiscard]] bool operator<(const TriangleKey& other) const noexcept
             {
@@ -47,9 +48,9 @@ namespace RenderTest
             }
         };
 
-        [[nodiscard]] std::vector<TriangleKey> TriangleSet(const im::ImportedMesh& mesh)
+        [[nodiscard]] ce::dynamic_array<TriangleKey> TriangleSet(const im::ImportedMesh& mesh)
         {
-            std::vector<TriangleKey> keys;
+            ce::dynamic_array<TriangleKey> keys;
             const auto& s = mesh.streams;
             for (std::size_t t = 0; t + 2 < mesh.indices.size(); t += 3)
             {
@@ -161,7 +162,7 @@ namespace RenderTest
         // ★ 이 한 건이 없으면 실자산의 "개선 0"이 패스 미실행과 구분되지 않는다.
         {
             const im::ImportedMesh before = MakeScrambledGrid(24);
-            const std::vector<TriangleKey> expected = TriangleSet(before);
+            const ce::dynamic_array<TriangleKey> expected = TriangleSet(before);
 
             im::ImportNoteSink notes;
             im::ImportedScene scene = MakeScene(before);
@@ -192,7 +193,7 @@ namespace RenderTest
                 "격자: overfetch 가 나빠지지 않았다");
 
             // ★ 기하 불변식 — 순서만 바뀌고 삼각형 집합은 같아야 한다.
-            const std::vector<TriangleKey> actual = TriangleSet(scene.meshes[0]);
+            const ce::dynamic_array<TriangleKey> actual = TriangleSet(scene.meshes[0]);
             check.Check(!actual.empty(), "격자: 결과 인덱스가 범위 안이다");
             check.Check(actual == expected, "격자: 삼각형 집합이 값으로 동일하다");
             check.Check(scene.meshes[0].indices.size() == before.indices.size(),
@@ -238,7 +239,7 @@ namespace RenderTest
                     static_cast<std::uint32_t>(mesh.streams.influences.size()));
             }
             // 원본에서 "위치 -> joint" 대응을 기억해 둔다.
-            std::vector<std::pair<float, std::uint32_t>> expected;
+            ce::dynamic_array<ce::pair<float, std::uint32_t>> expected;
             for (std::size_t v = 0; v < vertexCount; ++v)
             {
                 expected.emplace_back(mesh.streams.positions[v].x
@@ -252,7 +253,7 @@ namespace RenderTest
             im::OptimizeVertexCache(scene, options, notes);
 
             const im::VertexStreams& s = scene.meshes[0].streams;
-            std::vector<std::pair<float, std::uint32_t>> actual;
+            ce::dynamic_array<ce::pair<float, std::uint32_t>> actual;
             for (std::size_t v = 0; v < s.VertexCount(); ++v)
             {
                 const std::span<const im::JointInfluence> influences = s.InfluencesOf(v);
@@ -281,7 +282,7 @@ namespace RenderTest
         {
             im::ImportedMesh mesh = MakeScrambledGrid(4);
             mesh.indices.pop_back();          // 3의 배수가 아니게 만든다
-            const std::vector<std::uint32_t> before = mesh.indices;
+            const ce::dynamic_array<std::uint32_t> before = mesh.indices;
 
             im::ImportNoteSink notes;
             im::ImportedScene scene = MakeScene(std::move(mesh));
@@ -309,13 +310,13 @@ namespace RenderTest
         // UV determinant가 0인 삼각형을 직접 넣어 Mathematics normalize/cross/dot 치환이
         // finite 결과와 96-byte vertex stride를 유지하는지 고정한다.
         {
-            std::vector<Vertex> quadVertices{
+            ce::dynamic_array<Vertex> quadVertices{
                 Vertex{ {-1.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 1.0f} },
                 Vertex{ {-1.0f,  1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f} },
                 Vertex{ { 1.0f,  1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 0.0f} },
                 Vertex{ { 1.0f, -1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {1.0f, 1.0f} },
             };
-            const std::vector<uint32> quadIndices{ 0, 1, 2, 0, 2, 3 };
+            const ce::dynamic_array<uint32> quadIndices{ 0, 1, 2, 0, 2, 3 };
             Mesh quad("meshoptimizer-math-quad", quadVertices, quadIndices);
             const MeshOptimizer::LOD::Optional quadLods =
                 MeshOptimizer::GenerateLODs(quad, { 1.0f });
@@ -328,12 +329,12 @@ namespace RenderTest
                     && MeshOptimizerLodIsFinite(quadLods->front(), true),
                 "legacy MeshOptimizer: quad normal/tangent/bitangent finite");
 
-            std::vector<Vertex> degenerateUvVertices{
+            ce::dynamic_array<Vertex> degenerateUvVertices{
                 Vertex{ {0.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f} },
                 Vertex{ {1.0f, 0.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f} },
                 Vertex{ {0.0f, 1.0f, 0.0f}, {0.0f, 0.0f, 1.0f}, {0.0f, 0.0f} },
             };
-            const std::vector<uint32> triangleIndices{ 0, 1, 2 };
+            const ce::dynamic_array<uint32> triangleIndices{ 0, 1, 2 };
             Mesh degenerateUv(
                 "meshoptimizer-degenerate-uv", degenerateUvVertices, triangleIndices);
             const MeshOptimizer::LOD::Optional degenerateLods =

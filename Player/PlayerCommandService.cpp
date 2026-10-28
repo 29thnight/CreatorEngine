@@ -1,3 +1,4 @@
+#include "../Engine/Containers/ContainerAPI.h"
 #include "PlayerCommandService.h"
 
 // ── Shipping 갈래 ───────────────────────────────────────────────────────
@@ -128,7 +129,7 @@ namespace PlayerCommandService
 		class PlayerGateway final : public CommandService::ICommandGateway
 		{
 		public:
-			CommandService::CommandOutcome Execute(const std::vector<std::string>& arguments,
+			CommandService::CommandOutcome Execute(const ce::dynamic_array<std::string>& arguments,
 			                                       int timeoutMs) override
 			{
 				struct Slot
@@ -220,7 +221,7 @@ namespace PlayerCommandService
 				return (nullptr != descriptor) && descriptor->executesUserCode;
 			}
 
-			bool ExecuteAsync(const std::vector<std::string>& arguments,
+			bool ExecuteAsync(const ce::dynamic_array<std::string>& arguments,
 			                  AsyncCompletion onDone) override
 			{
 				return PlayerCmd::CommandHost::Get().Enqueue(arguments,

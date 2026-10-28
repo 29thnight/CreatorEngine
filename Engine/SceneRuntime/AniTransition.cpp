@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "AniTransition.h"
 #include "AnimationController.h"
 #include "AnimationState.h"
@@ -62,7 +63,7 @@ bool AniTransition::CheckTransiton(bool isBlend)
 	return false;
 }
 
-std::vector<TransCondition> AniTransition::GetConditions()
+ce::dynamic_array<TransCondition> AniTransition::GetConditions()
 {
 	return conditions;
 }

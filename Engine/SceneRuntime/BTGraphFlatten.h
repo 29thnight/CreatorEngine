@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "ClrHost.h"
 #include "BTBuildGraph.h"
@@ -22,17 +24,17 @@ namespace BTFlatten
     /// 자식 순서는 저작 그래프의 Children 순서를 그대로 childOrder에 싣는다 —
     /// Sequence·Selector는 자식 순서가 곧 실행 순서라, 여기서 흔들리면 같은 그래프가
     /// 다른 행동을 한다.
-    inline std::vector<ClrHost::ScriptBTNodeDesc> Flatten(const BTBuildGraph& graph)
+    inline ce::dynamic_array<ClrHost::ScriptBTNodeDesc> Flatten(const BTBuildGraph& graph)
     {
-        std::vector<ClrHost::ScriptBTNodeDesc> out;
+        ce::dynamic_array<ClrHost::ScriptBTNodeDesc> out;
         out.reserve(graph.NodeList.size());
 
         // 부모 → 자식 순서·가중치를 먼저 훑는다.
         //
         // 자식 쪽에는 "내가 부모의 몇 번째인가"가 없고 부모의 Children에만 있다.
         // 그 정보를 자식 항목으로 옮겨 실어야 관리 측이 순서를 복원할 수 있다.
-        std::unordered_map<size_t, int>   orderById;
-        std::unordered_map<size_t, float> weightById;
+        ce::engine_node_map<size_t, int>   orderById;
+        ce::engine_node_map<size_t, float> weightById;
 
         for (const BTBuildNode& parent : graph.NodeList)
         {
@@ -86,9 +88,9 @@ namespace BTFlatten
     /// 나타나 원인을 짚기 어렵다.
     ///
     /// 네이티브 BlackBoard는 이제 저작·직렬화 전용이다 — BTBuildGraph와 같은 자리다.
-    inline std::vector<ClrHost::ScriptBBEntry> FlattenBlackBoard(const BlackBoard& board)
+    inline ce::dynamic_array<ClrHost::ScriptBBEntry> FlattenBlackBoard(const BlackBoard& board)
     {
-        std::vector<ClrHost::ScriptBBEntry> out;
+        ce::dynamic_array<ClrHost::ScriptBBEntry> out;
 
         auto copyText = [](char* dst, size_t cap, const std::string& src)
         {

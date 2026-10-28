@@ -1,4 +1,5 @@
 #pragma once
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
 #else
@@ -35,7 +36,7 @@ class CollisionGeometryIO final
                 return std::unexpected(
                     error{error_code::invalid_argument, 0, "Collision geometry file missing or too large"});
 
-            std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+            ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(size));
             input.seekg(0);
             if (!input.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size())))
                 return std::unexpected(error{error_code::invalid_argument, 0, "Collision geometry file read failed"});

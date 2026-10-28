@@ -1,3 +1,7 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../../Engine/Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -119,10 +123,10 @@ namespace
             error = "Code shader pass/keyword changes require compatible material contracts; prior generation retained";
             return {};
         }
-        std::vector<RHIShaderReflection> reflections;
-        ce::hash::sha256 identity;
+        ce::dynamic_array<RHIShaderReflection> reflections;
+        ce::crypto::sha256 identity;
         const auto source = meta.ResolveSource(metadataPath);
-        std::map<std::filesystem::path, std::string> inputs;
+        ce::engine_ordered_map<std::filesystem::path, std::string> inputs;
         inputs.emplace(metadataPath, ReadModelRecoveryText(metadataPath));
         inputs.emplace(source, ReadModelRecoveryText(source));
         if (previous.codeProgram)
@@ -177,14 +181,14 @@ namespace
                     error = "Code shader dependency escapes the project Assets directory";
                     return {};
                 }
-                ce::hash::sha256 hash;
+                ce::crypto::sha256 hash;
                 hash.update(bytes.data(), bytes.size());
                 program->inputs.push_back({ relative.generic_string(), bytes.size(), hash.finish() });
             }
             std::ranges::sort(program->inputs, {}, &experiment::cooked::CodeProgramInput::path);
             meta = program->meta;
-            std::vector<std::byte> encoded;
-            std::vector<experiment::cooked::AssetDependency> edges;
+            ce::dynamic_array<std::byte> encoded;
+            ce::dynamic_array<experiment::cooked::AssetDependency> edges;
             if (!experiment::cooked::EncodeCodeProgramArtifact(*program, encoded, edges, error))
             {
                 return {};
@@ -241,7 +245,7 @@ namespace
         {
             return {};
         }
-        meta.codeProgramIdentity = ce::hash::to_hex(identity.finish());
+        meta.codeProgramIdentity = ce::crypto::to_hex(identity.finish());
         own::shared_owner<const LX::Runtime::ShaderGeneration> result;
         if (!LX::Runtime::CreateCodeShader(meta, layout, previous.codeHandle, result, error))
         {
@@ -628,7 +632,7 @@ namespace
 		std::filesystem::path destination{};
 		// 상대 경로다. 원본 폴더와 destinationDirectory 양쪽에 **같은 모양으로**
 		// 붙는다 — 그 동일함이 곧 상대 URI 가 새 자리에서 풀리는 이유다.
-		std::vector<std::filesystem::path> sidecars{};
+		ce::dynamic_array<std::filesystem::path> sidecars{};
 		// 사이드카가 있어 전용 폴더를 쓰는 임포트인가.
 		bool isBundle{ false };
 	};
@@ -697,7 +701,7 @@ namespace
 	// 제자리 임포트가 정확히 그 경우이고, copy_file 은 자기 자신 위에 복사하면
 	// 실패한다. 새로 생긴 파일만 created 에 담는다(되돌리기 대상).
 	bool CopyImportedFile(const std::filesystem::path& source, const std::filesystem::path& destination,
-		std::vector<std::filesystem::path>& created)
+		ce::dynamic_array<std::filesystem::path>& created)
 	{
 		std::error_code error;
 		const bool existed = std::filesystem::exists(destination, error) && !error;
@@ -735,7 +739,7 @@ namespace
 
 	// 임포트가 실패했을 때 이번 호출이 새로 만든 것만 거둔다. 원래 있던 파일은
 	// 건드리지 않는다 — 덮어쓴 자산을 지우면 실패가 자료 손실이 된다.
-	std::filesystem::path RollbackImport(const std::vector<std::filesystem::path>& created,
+	std::filesystem::path RollbackImport(const ce::dynamic_array<std::filesystem::path>& created,
 		const ImportPlan& plan)
 	{
 		for (const std::filesystem::path& path : created)
@@ -939,7 +943,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
                 else if (work->shader)
                 {
                     // Prepare every dependent material before changing any accepted instance.
-                    std::vector<std::pair<MeshRenderer*, own::shared_owner<Material>>> replacements;
+                    ce::dynamic_array<ce::pair<MeshRenderer*, own::shared_owner<Material>>> replacements;
                     for (auto* scene : SceneManagers->GetScenes())
                     {
                         if (!scene)
@@ -997,8 +1001,8 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
             return;
         }
         m_shaderDirty = false;
-        std::map<uuid::uuid16, own::shared_owner<const material_graph::Generation>> graphs;
-        std::map<const LX::Runtime::ShaderGeneration*, own::shared_owner<const LX::Runtime::Instance>> codes;
+        ce::engine_ordered_map<uuid::uuid16, own::shared_owner<const material_graph::Generation>> graphs;
+        ce::engine_ordered_map<const LX::Runtime::ShaderGeneration*, own::shared_owner<const LX::Runtime::Instance>> codes;
         const auto collect = [&](const Material& material)
         {
             if (const auto graph = material.GetMaterialGraphInstance())
@@ -1165,11 +1169,11 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
     struct AutomaticSave
     {
         std::string expectedDisk;
-        std::function<bool(const std::string&, std::string&)> write;
+        ce::owned_func<bool(const std::string&, std::string&)> write;
         std::chrono::steady_clock::time_point changedAt;
     };
 
-    void QueueAutomaticSave(const std::filesystem::path& path, std::function<bool(const std::string&, std::string&)> write)
+    void QueueAutomaticSave(const std::filesystem::path& path, ce::owned_func<bool(const std::string&, std::string&)> write)
     {
         std::lock_guard lock(m_automaticSaveMutex);
         const auto key = path.lexically_normal();
@@ -1185,7 +1189,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
 
     void TickAutomaticSaves(bool flush = false)
     {
-        std::map<std::filesystem::path, AutomaticSave> ready;
+        ce::engine_ordered_map<std::filesystem::path, AutomaticSave> ready;
         {
             std::lock_guard lock(m_automaticSaveMutex);
             const auto now = std::chrono::steady_clock::now();
@@ -1285,8 +1289,8 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
     void TickAutomaticChanges()
     {
         TickAutomaticSaves();
-        std::erase_if(m_modelReloads, [](const auto& job) { return job.is_complete(); });
-        std::vector<std::filesystem::path> changed;
+        ce::erase_if(m_modelReloads, [](const auto& job) { return job.is_complete(); });
+        ce::dynamic_array<std::filesystem::path> changed;
         {
             std::lock_guard lock(m_modifiedMutex);
             const auto now = std::chrono::steady_clock::now();
@@ -1341,7 +1345,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
                 models.push_back(work->generation);
             }
         }
-        std::map<uuid::uuid16, std::uint64_t> modelGenerations;
+        ce::engine_ordered_map<uuid::uuid16, std::uint64_t> modelGenerations;
         for (const auto& model : models)
         {
             modelGenerations.emplace(model->Identity().modelId, model->Identity().generation);
@@ -1436,8 +1440,8 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         {
             return;
         }
-        std::map<std::uint64_t, own::shared_owner<const Texture>> owners;
-        std::map<Scene*, std::unordered_set<std::uint64_t>> sceneOwners;
+        ce::engine_ordered_map<std::uint64_t, own::shared_owner<const Texture>> owners;
+        ce::engine_ordered_map<Scene*, ce::engine_node_set<std::uint64_t>> sceneOwners;
         Scene* collectingScene{};
         const auto collect = [&](const own::shared_owner<const Texture>& texture)
         {
@@ -1649,7 +1653,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
 
     struct TextureImportWork final
     {
-        std::array<ModelSourceStamp, 2> stamps{};
+        ce::fixed_array<ModelSourceStamp, 2> stamps{};
         own::shared_owner<std::atomic<std::uint64_t>> latestRevision{
             own::make_shared<std::atomic<std::uint64_t>>(0u) };
         job_handle completion{};
@@ -1838,7 +1842,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
             return false;
         }
         const auto key = source.lexically_normal();
-        const std::array stamps{ ReadModelSourceStamp(source),
+        const ce::fixed_array stamps{ ReadModelSourceStamp(source),
             ReadModelSourceStamp(source.string() + ".meta") };
         if (!stamps[0].present || !stamps[1].present)
         {
@@ -1872,7 +1876,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         });
         try
         {
-            const std::array dependencies{ m_textureCookTail };
+            const ce::fixed_array dependencies{ m_textureCookTail };
             const auto preceding = m_textureCookTail.valid() && !m_textureCookTail.is_complete()
                 ? std::span<const job_handle>(dependencies) : std::span<const job_handle>{};
             work.completion = ce::get_job_scheduler().submit_after(preceding, std::move(jobs));
@@ -1894,7 +1898,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         experiment::AssetId textureAssetId{};
         std::string artifactPath;
         std::uint64_t byteSize{};
-        ce::hash::sha256_digest contentSha256{};
+        ce::crypto::sha256_digest contentSha256{};
         std::uint32_t formatVersion{};
     };
     static constexpr std::string_view kTextureGenerationRecord = "generation.record";
@@ -1933,7 +1937,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         add(cooked::TextureImportRecipe(settings));
         add(std::to_string(cooked::kTextureArtifactVersion) + "/" +
             std::to_string(cooked::kCookedTextureRepresentationVersion));
-        std::array<char, 65536> chunk;
+        ce::fixed_array<char, 65536> chunk;
         while (sourceStream)
         {
             sourceStream.read(chunk.data(), chunk.size());
@@ -1945,9 +1949,9 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
             return false;
         }
         // Half the digest keeps the generation path short (Windows path limits).
-        ce::hash::sha256_digest digest;
+        ce::crypto::sha256_digest digest;
         if (!hash.Finish(digest, failure)) return false;
-        key = ce::hash::to_hex(digest).substr(0, 32);
+        key = ce::crypto::to_hex(digest).substr(0, 32);
         return true;
     }
 
@@ -1958,7 +1962,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
                << FileGuid(record.textureAssetId.value).ToString() << '\n'
                << record.artifactPath << '\n'
                << record.byteSize << '\n'
-               << ce::hash::to_hex(record.contentSha256) << '\n'
+               << ce::crypto::to_hex(record.contentSha256) << '\n'
                << record.formatVersion << '\n';
         output.close();
         return !output.fail();
@@ -2000,7 +2004,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         }
         TextureGenerationHash hash;
         std::uint64_t read = 0;
-        std::array<char, 65536> chunk;
+        ce::fixed_array<char, 65536> chunk;
         while (artifact)
         {
             artifact.read(chunk.data(), chunk.size());
@@ -2010,7 +2014,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         }
         std::string hashFailure;
         if (!hash.Finish(candidate.contentSha256, hashFailure)) return false;
-        if (!artifact.eof() || read != candidate.byteSize || ce::hash::to_hex(candidate.contentSha256) != digest)
+        if (!artifact.eof() || read != candidate.byteSize || ce::crypto::to_hex(candidate.contentSha256) != digest)
         {
             return false;
         }
@@ -2052,7 +2056,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
     }
 
     void CookTextureGeneration(const std::filesystem::path& source,
-        const std::array<ModelSourceStamp, 2>& stamps, std::uint64_t revision)
+        const ce::fixed_array<ModelSourceStamp, 2>& stamps, std::uint64_t revision)
     {
         const auto timingStart = std::chrono::steady_clock::now();
         auto keyFinished = timingStart, recordFinished = timingStart;
@@ -2206,7 +2210,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
                 source.string().c_str(), int(reusedGeneration), static_cast<unsigned long long>(record.byteSize),
                 ms(timingStart, keyFinished), ms(keyFinished, recordFinished), ms(recordFinished, end), ms(timingStart, end));
         }
-        const std::array after{ ReadModelSourceStamp(source),
+        const ce::fixed_array after{ ReadModelSourceStamp(source),
             ReadModelSourceStamp(source.string() + ".meta") };
         {
             std::lock_guard lock(m_authoringMutex);
@@ -2348,8 +2352,8 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
 		const std::filesystem::path headerPath = m_root.parent_path() / "ProjectSetting/AssetIdentity.asset";
 		assets::IdentityEpochHeader header;
 		assets::ModelSidecarV2 sidecar;
-		std::vector<assets::EpochHeaderIssue> headerIssues;
-		std::vector<assets::SidecarIssue> sidecarIssues;
+		ce::dynamic_array<assets::EpochHeaderIssue> headerIssues;
+		ce::dynamic_array<assets::SidecarIssue> sidecarIssues;
 		if (!assets::ReadIdentityEpochHeader(ReadModelRecoveryText(headerPath), header, headerIssues)
 			|| !assets::ReadModelSidecarV2(ReadModelRecoveryText(meta), sidecar, sidecarIssues)
 			|| sidecar.assetId != expectedId.m_guid
@@ -2367,7 +2371,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
         const auto current = assets::LoadModelAssetGeneration(load);
         if (current.Succeeded() && assets::ModelMaterialGraphsPresent(m_root, *current.generation)) return true;
 
-		const auto inputs = std::array{ ReadModelSourceStamp(source),
+		const auto inputs = ce::fixed_array{ ReadModelSourceStamp(source),
 			ReadModelSourceStamp(meta), ReadModelSourceStamp(headerPath) };
 		if (const auto failed = m_failedModelRecovery.find(source);
 			failed != m_failedModelRecovery.end() && failed->second == inputs)
@@ -2507,7 +2511,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
             std::string next;
             bool existed{};
         };
-        std::vector<SavedFile> files;
+        ce::dynamic_array<SavedFile> files;
         Authoring::WriteDocument materialDocument;
         Material serializedMaterial(material);
         if (!DataSystems->SerializeMaterialPayload(serializedMaterial, materialDocument.Root()))
@@ -2980,7 +2984,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
 
 		auto WriteHeightPng = [&](const std::filesystem::path& destination)
 		{
-			std::vector<uint8_t> bytes(pixelCount * 4);
+			ce::dynamic_array<uint8_t> bytes(pixelCount * 4);
 			for (size_t index = 0; index < pixelCount; ++index)
 			{
 				uint32_t bits{};
@@ -3002,9 +3006,9 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
 		};
 
 		auto WriteSplatPng = [&](const std::filesystem::path& destination,
-			const std::vector<float>& weights)
+			const ce::dynamic_array<float>& weights)
 		{
-			std::vector<uint8_t> bytes(pixelCount);
+			ce::dynamic_array<uint8_t> bytes(pixelCount);
 			for (size_t index = 0; index < pixelCount; ++index)
 			{
 				bytes[index] = static_cast<uint8_t>(
@@ -3020,8 +3024,8 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
 		const std::filesystem::path stagedHeight = stagingDirectory / "HeightMap.png";
 		if (!WriteHeightPng(stagedHeight)) return false;
 
-		std::vector<std::filesystem::path> stagedSplats;
-		std::vector<std::filesystem::path> stagedTextures;
+		ce::dynamic_array<std::filesystem::path> stagedSplats;
+		ce::dynamic_array<std::filesystem::path> stagedTextures;
 		stagedSplats.reserve(request.layers.size());
 		stagedTextures.reserve(request.layers.size());
 		for (size_t index = 0; index < request.layers.size(); ++index)
@@ -3271,7 +3275,7 @@ struct EditorAssetDatabase::Impl final : efsw::FileWatchListener,
 
 		// 실패하면 이번 임포트가 새로 만든 것만 지운다. 반쯤 실린 자산을 트리에
 		// 남기면 다음 임포트·watcher 가 그것을 정상 자산으로 본다.
-		std::vector<std::filesystem::path> created;
+		ce::dynamic_array<std::filesystem::path> created;
 		const std::filesystem::path sourceDirectory = source.parent_path();
 		if (!CopyImportedFile(source, plan.destination, created))
 			return RollbackImport(created, plan);
@@ -3682,9 +3686,9 @@ private:
 		}
 	}
 
-	std::vector<std::string> ExtractFunctionNames(const std::filesystem::path& source) const
+	ce::dynamic_array<std::string> ExtractFunctionNames(const std::filesystem::path& source) const
 	{
-		std::vector<std::string> functions;
+		ce::dynamic_array<std::string> functions;
 		std::ifstream input(source);
 		std::string line;
 		const std::regex functionRegex(
@@ -3940,7 +3944,7 @@ private:
 			audioClip.Child("codec").SetScalar(assets::AudioCodecName(audioMetadata.codec));
 			audioClip.Child("payloadSize").SetScalar(audioMetadata.payloadSize);
 			audioClip.Child("sourceContentHash").SetScalar(
-				ce::hash::to_hex(audioMetadata.sourceContentHash));
+				ce::crypto::to_hex(audioMetadata.sourceContentHash));
 		}
 		if (extension == ".cpp")
 		{
@@ -3994,7 +3998,7 @@ private:
 	}
 
     bool ReadMaterialAuthoringFingerprint(const std::filesystem::path& path,
-                                          std::optional<ce::hash::sha256_digest>& fingerprint) const
+                                          std::optional<ce::crypto::sha256_digest>& fingerprint) const
     {
         std::error_code error;
         const bool exists = std::filesystem::exists(path, error);
@@ -4012,8 +4016,8 @@ private:
         {
             return false;
         }
-        ce::hash::sha256 hash;
-        std::array<char, 65536> buffer;
+        ce::crypto::sha256 hash;
+        ce::fixed_array<char, 65536> buffer;
         while (input)
         {
             input.read(buffer.data(), buffer.size());
@@ -4029,7 +4033,7 @@ private:
 
     void RememberMaterialAuthoringWrite(const std::filesystem::path& path)
     {
-        std::optional<ce::hash::sha256_digest> fingerprint;
+        std::optional<ce::crypto::sha256_digest> fingerprint;
         if (ReadMaterialAuthoringFingerprint(path, fingerprint))
         {
             m_materialAuthoringWrites[path.lexically_normal()] = fingerprint;
@@ -4047,7 +4051,7 @@ private:
         {
             return false;
         }
-        std::optional<ce::hash::sha256_digest> actual;
+        std::optional<ce::crypto::sha256_digest> actual;
         if (ReadMaterialAuthoringFingerprint(path, actual) && actual == found->second)
         {
             return true;
@@ -4346,31 +4350,31 @@ private:
     std::chrono::steady_clock::time_point m_nextLiveRefresh{};
     std::atomic<std::uint64_t> m_modelRefreshEpoch{ 1u };
     std::uint64_t m_observedModelRefreshEpoch{};
-    std::map<uuid::uuid16, own::shared_owner<AutomaticModelLoad>> m_automaticModelLoads;
-    std::vector<job_handle> m_modelReloads;
+    ce::engine_ordered_map<uuid::uuid16, own::shared_owner<AutomaticModelLoad>> m_automaticModelLoads;
+    ce::dynamic_array<job_handle> m_modelReloads;
     std::mutex m_automaticSaveMutex;
-    std::map<std::filesystem::path, AutomaticSave> m_automaticSaves;
-    std::map<std::filesystem::path, std::string> m_automaticSaveErrors;
+    ce::engine_ordered_map<std::filesystem::path, AutomaticSave> m_automaticSaves;
+    ce::engine_ordered_map<std::filesystem::path, std::string> m_automaticSaveErrors;
     std::mutex m_modifiedMutex;
     std::uint64_t m_shaderRevision{};
     bool m_shaderDirty{};
-    std::vector<own::shared_owner<ShaderReload>> m_shaderReloads;
-    std::map<std::filesystem::path, std::chrono::steady_clock::time_point> m_modifiedPaths;
-    std::map<uuid::uuid16, std::uint64_t> m_liveModelGenerations;
+    ce::dynamic_array<own::shared_owner<ShaderReload>> m_shaderReloads;
+    ce::engine_ordered_map<std::filesystem::path, std::chrono::steady_clock::time_point> m_modifiedPaths;
+    ce::engine_ordered_map<uuid::uuid16, std::uint64_t> m_liveModelGenerations;
     std::uint64_t m_liveTextureRevision{};
     bool m_liveTexturePending{};
-    std::map<std::uint64_t, TextureRefresh> m_liveTextureRefresh;
+    ce::engine_ordered_map<std::uint64_t, TextureRefresh> m_liveTextureRefresh;
 	std::filesystem::path m_root;
 	std::mutex m_authoringMutex;
     bool m_stopping{};
-    std::map<std::filesystem::path, TextureImportWork> m_textureImports;
+    ce::engine_ordered_map<std::filesystem::path, TextureImportWork> m_textureImports;
     job_handle m_textureCookTail;
-    std::map<std::filesystem::path, std::optional<ce::hash::sha256_digest>> m_materialAuthoringWrites;
-	std::map<std::filesystem::path, std::array<ModelSourceStamp, 3>> m_failedModelRecovery;
-	std::map<std::filesystem::path, ModelSourceStamp> m_modelSourceImports;
+    ce::engine_ordered_map<std::filesystem::path, std::optional<ce::crypto::sha256_digest>> m_materialAuthoringWrites;
+	ce::engine_ordered_map<std::filesystem::path, ce::fixed_array<ModelSourceStamp, 3>> m_failedModelRecovery;
+	ce::engine_ordered_map<std::filesystem::path, ModelSourceStamp> m_modelSourceImports;
 	ModelRecoveryStats m_modelRecoveryStats;
 	std::unique_ptr<efsw::FileWatcher> m_watcher;
-	const std::unordered_set<std::string> m_registeredFiles{
+	const ce::engine_node_set<std::string> m_registeredFiles{
 		".fbx", ".gltf", ".obj", ".glb",
 		".png", ".dds", ".jpg", ".jpeg", ".hdr",
 		".hlsl", ".slang", ".shadermeta", ".shader", ".shadergraph", ".cpp", ".fs",
@@ -4458,10 +4462,10 @@ void EditorAssetDatabase::WriteTextureImportSettings(Authoring::WriteNode root,
     {
         return;
     }
-    constexpr std::array colorSpaces{ "Source", "Linear", "Srgb" };
-    constexpr std::array compressionModes{ "None", "Auto", "BC1", "BC3", "BC5", "BC7" };
-    constexpr std::array mipPolicies{ "PreserveAuthored", "GenerateFull" };
-    constexpr std::array qualities{ "Fast", "Normal", "High" };
+    constexpr ce::fixed_array colorSpaces{ "Source", "Linear", "Srgb" };
+    constexpr ce::fixed_array compressionModes{ "None", "Auto", "BC1", "BC3", "BC5", "BC7" };
+    constexpr ce::fixed_array mipPolicies{ "PreserveAuthored", "GenerateFull" };
+    constexpr ce::fixed_array qualities{ "Fast", "Normal", "High" };
     const auto node = root.Child("importSettings");
     node.Child("importerVersion").SetScalar(experiment::cooked::kTextureImporterVersion);
     node.Child("colorSpace").SetScalar(colorSpaces[static_cast<std::size_t>(settings.colorSpace)]);

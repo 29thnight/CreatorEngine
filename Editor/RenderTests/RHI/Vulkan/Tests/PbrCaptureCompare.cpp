@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "../VulkanSelfTest.h"
 
 #include "../../../../../Engine/Utility_Framework/Authoring/AuthoringRymlErrorPolicy.h"
@@ -47,7 +48,7 @@ namespace
     }
 
     bool ReadManifest(const std::filesystem::path& directory,
-        std::vector<AttachmentInfo>& out, std::string& backend, std::string& error)
+        ce::dynamic_array<AttachmentInfo>& out, std::string& backend, std::string& error)
     {
         std::string text;
         if (!ReadText(directory / "manifest.json", text, error)) return false;
@@ -143,7 +144,7 @@ namespace
     }
 
     bool ReadFloats(const std::filesystem::path& path, std::uint64_t expected,
-        std::vector<float>& out, std::string& error)
+        ce::dynamic_array<float>& out, std::string& error)
     {
         std::ifstream input(path, std::ios::binary | std::ios::ate);
         if (!input) { error = "readback을 열 수 없다: " + path.string(); return false; }
@@ -201,7 +202,7 @@ bool RunPbrCaptureCompare(const std::string& leftDirectory,
     std::string& outLog)
 {
     std::string error;
-    std::vector<AttachmentInfo> left, right;
+    ce::dynamic_array<AttachmentInfo> left, right;
     std::string leftBackend, rightBackend;
     if (!ReadManifest(leftDirectory, left, leftBackend, error)
         || !ReadManifest(rightDirectory, right, rightBackend, error))
@@ -218,7 +219,7 @@ bool RunPbrCaptureCompare(const std::string& leftDirectory,
     }
 
     bool passed = true;
-    std::vector<CompareResult> results;
+    ce::dynamic_array<CompareResult> results;
     for (const AttachmentInfo& info : left)
     {
         const auto found = std::find_if(right.begin(), right.end(),
@@ -239,7 +240,7 @@ bool RunPbrCaptureCompare(const std::string& leftDirectory,
 
         const std::uint64_t samples = static_cast<std::uint64_t>(info.width)
             * info.height * info.channels;
-        std::vector<float> a, b;
+        ce::dynamic_array<float> a, b;
         if (!ReadFloats(std::filesystem::path(leftDirectory) / info.file, samples, a, error)
             || !ReadFloats(std::filesystem::path(rightDirectory) / found->file, samples, b, error))
         {

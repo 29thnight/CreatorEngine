@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -123,7 +125,7 @@ class ResidentBufferFrame final
         IRenderDeviceServices* device{};
         own::shared_owner<TransientBufferPool> pool;
         RHIBufferHandle buffer;
-        std::vector<std::byte> bytes;
+        ce::dynamic_array<std::byte> bytes;
         uint32_t stride{};
         uint64_t serial{};
         mutable std::atomic<bool> copyRecorded{false};
@@ -140,7 +142,7 @@ class ResidentBufferFrame final
     };
     own::shared_owner<const Version> version_, base_;
     RHIBufferSlice staging_;
-    std::vector<Copy> copies_;
+    ce::dynamic_array<Copy> copies_;
     std::string name_;
     uint64_t recording_{}, uploadBytes_{}, copyBytes_{};
     mutable const EnhancedRenderGraph* graphOwner_{};
@@ -159,7 +161,7 @@ class ResidentBufferFrame final
 class ResidentBufferCache final : private IRHIUploadTransactionListener
 {
   public:
-    using Key = std::tuple<uint64_t, uint64_t, uint32_t>; // scene epoch, view, table
+    using Key = ce::tuple<uint64_t, uint64_t, uint32_t>; // scene epoch, view, table
     ResidentBufferCache() = default;
     ~ResidentBufferCache() { ShutdownAfterIdle(); }
     ResidentBufferCache(const ResidentBufferCache&) = delete;
@@ -340,7 +342,7 @@ class ResidentBufferCache final : private IRHIUploadTransactionListener
         own::shared_owner<const Version> version;
         uint64_t lastUse{};
     };
-    using BaselineMap = std::map<Key, Baseline>;
+    using BaselineMap = ce::engine_ordered_map<Key, Baseline>;
     struct Prepared
     {
         Key key;
@@ -348,7 +350,7 @@ class ResidentBufferCache final : private IRHIUploadTransactionListener
     };
     struct Recording
     {
-        std::vector<Prepared> versions;
+        ce::dynamic_array<Prepared> versions;
         uint64_t completion{};
         bool submitted{}, accepted{}, confirmed{};
     };
@@ -457,7 +459,7 @@ class ResidentBufferCache final : private IRHIUploadTransactionListener
     own::shared_owner<TransientBufferPool> pool_;
     std::mutex mutex_;
     BaselineMap baselines_;
-    std::map<uint64_t, Recording> recordings_;
+    ce::engine_ordered_map<uint64_t, Recording> recordings_;
     uint64_t serial_{}, completed_{}, cachedBytes_{};
 };
 } // namespace material_graph

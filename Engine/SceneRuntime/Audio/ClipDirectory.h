@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -24,8 +25,8 @@ namespace wave
         std::size_t collided{ 0 };      // 이름이 이미 있어 뒤엣것을 버렸다
 
         // 판정용. 무엇이 왜 빠졌는지 사람이 읽을 수 있어야 한다.
-        std::vector<std::string> rejectedFiles;
-        std::vector<std::string> collidedKeys;
+        ce::dynamic_array<std::string> rejectedFiles;
+        ce::dynamic_array<std::string> collidedKeys;
 
         [[nodiscard]] std::size_t Examined() const noexcept
         {

@@ -109,7 +109,7 @@ def render(name):
             else:
                 lines.append(line)
         elif header_unit:
-            provider = ("Engine/Contracts/External/" if header_unit[1] in ["Creator.Ownership.h", "Creator.MemoryProvider.h"] else "Engine/Platform/WindowsSDK/") + header_unit[1]
+            provider = ("Engine/Containers/" if header_unit[1] == "Creator.Containers.h" else "Engine/Contracts/External/" if header_unit[1] in ["Creator.Ownership.h", "Creator.MemoryProvider.h"] else "Engine/Platform/WindowsSDK/") + header_unit[1]
             lines.append(f'#include "../../../{provider}"')
         elif match:
             dependency = match[1]

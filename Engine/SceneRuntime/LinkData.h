@@ -1,4 +1,6 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
 #pragma once
+#include "../Containers/ContainerAPI.h"
 #include <mathematics/transform.hpp>
 
 
@@ -38,7 +40,7 @@ public:
 	inline void SetIsDead(const bool& isDead) { m_isDead = isDead; }
 	inline const bool& GetIsDead() const { return m_isDead; }
 
-	inline std::unordered_map<std::string, LinkData*>& GetChildrenLinkData() { return m_childLinkData; }
+	inline ce::engine_node_map<std::string, LinkData*>& GetChildrenLinkData() { return m_childLinkData; }
 	inline LinkData* GetChildLinkData(const std::string& name) {
 		auto iter = m_childLinkData.find(name);
 		if (iter != m_childLinkData.end()) {
@@ -47,7 +49,7 @@ public:
 		return nullptr;
 	}
 	inline void AddChildLinkData(const std::string& name, LinkData* linkData) {
-		m_childLinkData.insert(std::make_pair(name, linkData));
+		m_childLinkData.insert(ce::make_pair(name, linkData));
 	}
 	inline void RemoveChildLinkData(const std::string& name) {
 		auto iter = m_childLinkData.find(name);
@@ -129,5 +131,5 @@ private:
 	float m_capsuleRadius;
 	float m_capsuleHalfHeight;
 
-	std::unordered_map<std::string, LinkData*> m_childLinkData;
+	ce::engine_node_map<std::string, LinkData*> m_childLinkData;
 };

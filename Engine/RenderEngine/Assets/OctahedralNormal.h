@@ -1,9 +1,10 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "QuantizedGeometry.h"
 
 namespace assets::cluster
 {
-    inline std::array<float, 3> DecodeOctahedralNormal(uint32_t code)
+    inline ce::fixed_array<float, 3> DecodeOctahedralNormal(uint32_t code)
     {
         quantized::Require(code < 16777216u && (code & 4095u) != 2048u && ((code >> 12) & 4095u) != 2048u,
                            "Octahedral signed code");
@@ -17,7 +18,7 @@ namespace assets::cluster
         const float inverse = 1.f / std::sqrt(x * x + y * y + z * z);
         return {x * inverse, y * inverse, z * inverse};
     }
-    inline uint32_t EncodeOctahedralNormal(const std::array<float, 3>& normal)
+    inline uint32_t EncodeOctahedralNormal(const ce::fixed_array<float, 3>& normal)
     {
         const double length = std::abs(double(normal[0])) + std::abs(double(normal[1])) + std::abs(double(normal[2]));
         quantized::Require(std::isfinite(length) && length > 0, "Octahedral normal direction");

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -27,13 +28,13 @@ class SceneSubsurfaceFrame
     std::span<const RHITextureHandle> Inputs() const;
     RHIBufferHandle Reflection() const;
     RHIBufferHandle Irradiance() const;
-    const std::array<RGHandle, 7>& DeclareInputs(EnhancedRenderGraph& graph) const;
-    const std::array<RGHandle, 7>& GraphInputs(const EnhancedRenderGraph& graph) const
+    const ce::fixed_array<RGHandle, 7>& DeclareInputs(EnhancedRenderGraph& graph) const;
+    const ce::fixed_array<RGHandle, 7>& GraphInputs(const EnhancedRenderGraph& graph) const
     {
         CheckCurrent(graph);
         return graphInputs_;
     }
-    std::array<RGHandle, 7> DeclareCaptureOutputs(EnhancedRenderGraph& graph) const;
+    ce::fixed_array<RGHandle, 7> DeclareCaptureOutputs(EnhancedRenderGraph& graph) const;
     void DeclareReflection(EnhancedRenderGraph& graph, const SceneLookupFrame& lookup, RGHandle owners) const;
     void DeclareFilter(EnhancedRenderGraph& graph, RGHandle owners) const;
     RGHandle GraphReflection(const EnhancedRenderGraph& graph) const;
@@ -45,15 +46,15 @@ class SceneSubsurfaceFrame
     std::uint32_t width_{}, height_{};
     std::uint64_t recording_{}, descriptors_{};
     RHITextureHandle environment_;
-    std::array<RHITextureHandle, 7> inputs_{};
+    ce::fixed_array<RHITextureHandle, 7> inputs_{};
     RHIBufferHandle reflection_, irradiance_;
     own::shared_owner<const LX::Runtime::ComputeGeneration> bake_, filter_;
-    std::vector<RHIBufferSlice> constants_;
+    ce::dynamic_array<RHIBufferSlice> constants_;
     RHIBindingTable outputs_;
     own::weak_owner<const SceneSubsurfaceFrame> self_;
     mutable const EnhancedRenderGraph* graph_{};
     mutable std::uint64_t graphEpoch_{};
-    mutable std::array<RGHandle, 7> graphInputs_{};
+    mutable ce::fixed_array<RGHandle, 7> graphInputs_{};
     mutable RGHandle graphReflection_, graphIrradiance_;
     void CheckCurrent(const EnhancedRenderGraph& graph) const;
 };

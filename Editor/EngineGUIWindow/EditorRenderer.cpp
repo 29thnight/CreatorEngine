@@ -1,3 +1,4 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -463,7 +464,7 @@ void EditorRenderer::Render()
     }
 }
 
-void EditorRenderer::EndRender(std::function<void()> onRecorded)
+void EditorRenderer::EndRender(ce::owned_func<void()> onRecorded)
 {
     ::editor::windows::begin_shell_cost(::editor::windows::shell_cost_section::shell_endrender);
     // PHASE 21 W0 전반(계획서 §1.9): 밖에서 배치를 볼 수단.

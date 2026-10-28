@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #ifndef NOMINMAX
 #define NOMINMAX
 #endif
@@ -22,7 +23,7 @@ namespace editor::profiler_view
         std::filesystem::path pick_file(bool save, const wchar_t* filter,
                                        const wchar_t* title, const wchar_t* extension)
         {
-            std::array<wchar_t, 32768> filename{};
+            ce::fixed_array<wchar_t, 32768> filename{};
             OPENFILENAMEW options{};
             options.lStructSize = sizeof(options);
             options.hwndOwner = static_cast<HWND>(ImGui::GetMainViewport()->PlatformHandleRaw);

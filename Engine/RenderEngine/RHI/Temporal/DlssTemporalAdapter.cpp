@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
 #else
@@ -105,7 +107,7 @@ namespace
         }
     }
 
-    sl::float4x4 ToMatrix(const std::array<float, 16>& values)
+    sl::float4x4 ToMatrix(const ce::fixed_array<float, 16>& values)
     {
         sl::float4x4 result;
         for (uint32_t row = 0; row < 4; ++row)
@@ -113,7 +115,7 @@ namespace
         return result;
     }
 
-    sl::float3 ToVector(const std::array<float, 3>& values)
+    sl::float3 ToVector(const ce::fixed_array<float, 3>& values)
     {
         return { values[0], values[1], values[2] };
     }
@@ -198,7 +200,7 @@ struct DlssTemporalAdapter::Implementation
     {
         sl::FrameToken* token{ nullptr };
         uint64_t allocationSerial{ 0 };
-        std::unordered_map<uint32_t, TemporalFrame> viewports;
+        ce::engine_node_map<uint32_t, TemporalFrame> viewports;
         bool presented{ false };
         bool sleepIssued{ false }, sleepInProgress{ false };
     };
@@ -248,9 +250,9 @@ struct DlssTemporalAdapter::Implementation
     ce::lifetime_token pendingFrameGenerationOwner;
     uint64_t pendingPresentedFrames{ 0 };
     DlssPacingOwner pacingOwner{ DlssPacingOwner::Unspecified };
-    std::unordered_map<uint64_t, Frame> frames;
-    std::unordered_map<uint32_t, Viewport> viewports;
-    std::unordered_map<uint32_t, SpatialViewport> spatialViewports;
+    ce::engine_node_map<uint64_t, Frame> frames;
+    ce::engine_node_map<uint32_t, Viewport> viewports;
+    ce::engine_node_map<uint32_t, SpatialViewport> spatialViewports;
     SpatialPostSnapshot spatialCapabilities;
 
     PFun_slInit* init{ nullptr };

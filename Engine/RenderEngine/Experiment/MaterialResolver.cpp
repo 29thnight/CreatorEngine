@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -26,8 +27,8 @@ namespace experiment
     }
 
     bool NormalizeMaterialKeywordSelections(const Material& material,
-        const std::vector<ShaderKeywordAxis>& axes,
-        std::vector<std::uint16_t>& outSelections, std::string& outError)
+        const ce::dynamic_array<ShaderKeywordAxis>& axes,
+        ce::dynamic_array<std::uint16_t>& outSelections, std::string& outError)
     {
         if (material.keywordSelections.size() > axes.size())
         {
@@ -35,7 +36,7 @@ namespace experiment
                 + material.name;
             return false;
         }
-        std::vector<std::uint16_t> selections(axes.size(), 0);
+        ce::dynamic_array<std::uint16_t> selections(axes.size(), 0);
         for (std::size_t axis = 0; axis < material.keywordSelections.size(); ++axis)
         {
             if (material.keywordSelections[axis] >= axes[axis].values.size())
@@ -242,7 +243,7 @@ namespace experiment
         }
 
         // ── 2. keyword 정규화 — 이름이 정본, 인덱스는 보조 ────────────────
-        std::vector<std::uint16_t> selections;
+        ce::dynamic_array<std::uint16_t> selections;
         if (!NormalizeMaterialKeywordSelections(material, meta->keywords,
             selections, outError))
         {
@@ -251,7 +252,7 @@ namespace experiment
 
         // ── 3. texture GUID → generation owner (cooked 우선, source 폴백) ─
         ResolvedMaterialNotes notes{};
-        std::vector<ResolvedMaterialTexture> textures;
+        ce::dynamic_array<ResolvedMaterialTexture> textures;
         for (const MaterialProperty& property : material.properties)
         {
             const auto* reference = std::get_if<TextureReference>(&property.value);

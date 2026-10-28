@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 
 #include "CommandCore/CommandResult.h"
@@ -15,5 +16,5 @@ namespace editor::material_editing
     void TickPendingRequests();
     void DrawInspectorPreview(MeshRenderer& renderer);
     bool CapturePreviewRequest(EnhancedLiveViewRequest& request);
-    CommandCore::CommandResult Command(const std::vector<std::string>& parts);
+    CommandCore::CommandResult Command(const ce::dynamic_array<std::string>& parts);
 } // namespace editor::material_editing

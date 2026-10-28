@@ -8,6 +8,23 @@ import Creator.Core.Paths;
 #include "RHI/DX12/DX12PSOManager.h"
 #include "RHI/RHIShaderCompiler.h"
 #include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+#if defined(_DEBUG)
+#include <crtdbg.h>
+namespace {
+thread_local bool observing = false;
+thread_local unsigned allocations = 0, frees = 0;
+int AllocationHook(int kind, void*, size_t, int, long, const unsigned char*, int) {
+    if(observing && (kind==_HOOK_ALLOC || kind==_HOOK_REALLOC)) ++allocations;
+    if(observing && kind==_HOOK_FREE) ++frees;
+    return 1;
+}
+struct AllocationScope {
+    _CRT_ALLOC_HOOK previous;
+    AllocationScope():previous(_CrtSetAllocHook(AllocationHook)) { allocations=frees=0; observing=true; }
+    ~AllocationScope() { observing=false; _CrtSetAllocHook(previous); }
+};
+}
+#endif
 
 static void Check(bool value,const char* name) { if(!value)throw std::runtime_error(name); std::cout<<"CHECK "<<name<<'\n'; }
 int main(int argc,char** argv) try {
@@ -48,8 +65,24 @@ float4 PS(Vertex vertex):SV_Target0 { return float4(1,0,0,1); }
     RHIPipelineHandle handle;
     const auto state=pipelines.RequestMesh(temporary,handle,error);
     const auto duplicate=pipelines.RequestMesh(desc,handle,error);
+    bool duplicatesPending=true;
+#if defined(_DEBUG)
+    unsigned pendingAllocations=0;
+    {
+        AllocationScope scope;
+#endif
+        for(unsigned i=0;i<4096;++i)
+            duplicatesPending &= pipelines.RequestMesh(desc,handle,error)==RHIPipelineRequestState::Pending;
+#if defined(_DEBUG)
+        pendingAllocations=allocations;
+    }
+#endif
     std::fill(mesh.begin(),mesh.end(),std::byte{});std::fill(pixel.begin(),pixel.end(),std::byte{});
     release.set_value();blocker.wait();
+    Check(duplicatesPending,"blocked worker keeps duplicate pending requests nonblocking and deduplicated");
+#if defined(_DEBUG)
+    Check(pendingAllocations==0,"4096 pending cache hits allocate zero on calling thread");
+#endif
     Check(state==RHIPipelineRequestState::Pending&&duplicate==RHIPipelineRequestState::Pending&&pipelines.GetStats().m_asyncSubmissions==1,
         "nonblocking mesh admission deduplicates and owns borrowed shader bytes");
     const auto ready=[&]{
@@ -58,12 +91,56 @@ float4 PS(Vertex vertex):SV_Target0 { return float4(1,0,0,1); }
         throw std::runtime_error("mesh preparation timeout");
     };
     ready();Check(handle.IsValid()&&pipelines.GetStats().m_asyncWorkerExecutions>0,"worker compilation with owner handle publication");
+    const auto first=handle;
+    const auto compiled=pipelines.GetStats().compiles;
+    bool sameReady=true;
+#if defined(_DEBUG)
+    unsigned readyAllocations=0;
+    {
+        AllocationScope scope;
+#endif
+        for(unsigned i=0;i<4096;++i)
+            sameReady &= pipelines.RequestMesh(desc,handle,error)==RHIPipelineRequestState::Ready && handle==first;
+#if defined(_DEBUG)
+        readyAllocations=allocations;
+    }
+    Check(readyAllocations==0,"4096 completed cache hits allocate zero on calling thread");
+#endif
+    Check(sameReady && pipelines.GetStats().compiles==compiled,"completed cache hits preserve identity and compile count");
+    // These test PSOs were never submitted to the GPU. Synthetic completion
+    // points exercise retirement policy without claiming actual fence progress.
+    bool invalidated=false;
+#if defined(_DEBUG)
+    unsigned invalidationFrees=0;
+    {
+        AllocationScope scope;
+#endif
+        invalidated=pipelines.InvalidatePipeline(first,{7});
+#if defined(_DEBUG)
+        invalidationFrees=frees;
+    }
+    Check(invalidationFrees==1,"single invalidation immediately frees its tracking node");
+#endif
+    Check(invalidated && !device.Resolve(first).IsValid(),"invalidation removes the old non-owning pipeline handle");
+    Check(pipelines.GetStats().retiredPipelines==1 && pipelines.CollectRetiredPipelines({6})==0 &&
+          pipelines.CollectRetiredPipelines({7})==1,"native PSO ownership waits for its retirement completion");
+    ready();Check(handle!=first,"recreated pipeline has a fresh generation");
     const auto old=handle;desc.cullMode=RHICullMode::None;
     Check(pipelines.RequestMesh(desc,handle,error)==RHIPipelineRequestState::Pending,"second native mesh request admitted");
     pipelines.InvalidatePipelines();ready();Check(handle.IsValid()&&handle!=old,"invalidation drains pending mesh work before re-admission");
+    Check(!device.Resolve(old).IsValid() && pipelines.CollectRetiredPipelines({UINT64_MAX})==0 &&
+          pipelines.GetStats().retiredPipelines==1,"completion-zero quarantine survives all ordinary collections");
     auto invalid=desc;invalid.msBytecode=nullptr;
     Check(pipelines.RequestMesh(invalid,handle,error)==RHIPipelineRequestState::Failed&&!handle.IsValid(),"invalid mesh request publishes no handle");
-    desc.cullMode=RHICullMode::Front; pipelines.RequestMesh(desc,handle,error);
+    desc.cullMode=RHICullMode::Front;
+    Check(pipelines.RequestMesh(desc,handle,error)==RHIPipelineRequestState::Pending,
+        "shutdown starts with an owned pending compile");
     pipelines.Shutdown();roots.Shutdown();device.Shutdown();jobs.shutdown();
-    std::cout<<"EDITOR_MESH_PSO_OK\n";return 0;
+    std::cout<<"EDITOR_MESH_PSO_OK pendingHits=4096 readyHits=4096 ownership=1 quarantine=1";
+#if defined(_DEBUG)
+    std::cout<<" allocationChecks=2 nodeFreeChecks=1";
+#else
+    std::cout<<" allocationChecks=0 nodeFreeChecks=0";
+#endif
+    std::cout<<"\n";return 0;
 } catch(const std::exception& error){std::cerr<<error.what()<<'\n';return 1;}

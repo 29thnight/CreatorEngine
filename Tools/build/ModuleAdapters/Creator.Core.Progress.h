@@ -5,18 +5,18 @@
 #error "Native consumers must import the named module directly."
 #endif
 
-
+#include "../../../Engine/Containers/Creator.Containers.h"
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace ce::progress
 {
     struct sink
     {
-        std::function<void()> launch;
-        std::function<void(const std::wstring&)> set_title;
-        std::function<void(const std::wstring&)> set_status;
-        std::function<void(float)> set_progress;
-        std::function<void()> close;
+        ce::owned_func<void()> launch;
+        ce::owned_func<void(const std::wstring&)> set_title;
+        ce::owned_func<void(const std::wstring&)> set_status;
+        ce::owned_func<void(float)> set_progress;
+        ce::owned_func<void()> close;
     };
 
     // The implementation unit owns one registry per linked runtime image.

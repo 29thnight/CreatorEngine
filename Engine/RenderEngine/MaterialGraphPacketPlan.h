@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -24,10 +25,10 @@ namespace material_graph
             uint32_t first{}, count{};
         };
         uint32_t capacity{}, dispatchWidth{}, sliceCapacity{}, scratchWords{}, argumentWords{};
-        std::vector<uint32_t> capacities;
-        std::vector<ScanLevel> levels;
-        std::vector<BucketRange> buckets;
-        std::vector<std::array<uint32_t, 4>> values, selectors;
+        ce::dynamic_array<uint32_t> capacities;
+        ce::dynamic_array<ScanLevel> levels;
+        ce::dynamic_array<BucketRange> buckets;
+        ce::dynamic_array<ce::fixed_array<uint32_t, 4>> values, selectors;
 
         bool Matches(uint32_t requestedCapacity, uint32_t requestedWidth, uint32_t requestedSlice,
                      std::span<const uint32_t> requestedBuckets) const
@@ -39,7 +40,7 @@ namespace material_graph
         {
             return sizeof(*this) + capacities.capacity() * sizeof(uint32_t) + levels.capacity() * sizeof(ScanLevel) +
                    buckets.capacity() * sizeof(BucketRange) +
-                   (values.capacity() + selectors.capacity()) * sizeof(std::array<uint32_t, 4>);
+                   (values.capacity() + selectors.capacity()) * sizeof(ce::fixed_array<uint32_t, 4>);
         }
         static own::shared_owner<const PacketDispatchPlan> Build(uint32_t capacity, uint32_t dispatchWidth,
                                                                uint32_t sliceCapacity,
@@ -178,7 +179,7 @@ namespace material_graph
         }
 
       private:
-        std::array<own::shared_owner<const PacketDispatchPlan>, EntryLimit> entries_{};
+        ce::fixed_array<own::shared_owner<const PacketDispatchPlan>, EntryLimit> entries_{};
         size_t next_{}, bytes_{}, hits_{}, builds_{};
     };
 } // namespace material_graph

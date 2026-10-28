@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿#include "../Containers/ContainerAPI.h"
+#pragma once
 
 #include "Component.h"
 #include "ScenePhysicsSimulation.h"
@@ -22,7 +23,7 @@ class [[reflgen::reflect]] PhysicsBodyComponent final : public meta::identity<Ph
     }
 
     PhysicsBodyComponent() = default;
-    PhysicsBodyComponent(ce::physics::body_kind motion, std::vector<PhysicsShapeDefinition> shapes);
+    PhysicsBodyComponent(ce::physics::body_kind motion, ce::dynamic_array<PhysicsShapeDefinition> shapes);
 
     void OnAddedToScene() override;
     void OnRemovingFromScene() override;
@@ -33,10 +34,10 @@ class [[reflgen::reflect]] PhysicsBodyComponent final : public meta::identity<Ph
     void OnDeserialized(const Authoring::NodeView& view);
 
     std::span<const PhysicsShapeDefinition> Shapes() const noexcept { return m_shapes; }
-    ce::physics::result<void> SetShapes(std::vector<PhysicsShapeDefinition> shapes);
+    ce::physics::result<void> SetShapes(ce::dynamic_array<PhysicsShapeDefinition> shapes);
 
     // Runtime controls; use current world scale, preserve simulated pose and velocities.
-    ce::physics::result<void> ReplaceShapes(std::vector<PhysicsShapeDefinition> shapes);
+    ce::physics::result<void> ReplaceShapes(ce::dynamic_array<PhysicsShapeDefinition> shapes);
     ce::physics::result<void> RefreshRuntimeShapes();
 
     ce::physics::result<ce::physics::body_definition> CaptureDefinition() const;
@@ -55,7 +56,7 @@ class [[reflgen::reflect]] PhysicsBodyComponent final : public meta::identity<Ph
     [[reflgen::hidden]]
     std::uint32_t m_shapeSchema = 1;
     [[reflgen::hidden]]
-    std::vector<PhysicsShapeDefinition> m_shapes{PhysicsShapeDefinition{}};
+    ce::dynamic_array<PhysicsShapeDefinition> m_shapes{PhysicsShapeDefinition{}};
     float m_mass = 1.f;
     bool m_gravityEnabled = true;
     ce::physics::axis_lock m_translationLocks = ce::physics::axis_lock::none;

@@ -1,3 +1,4 @@
+#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../build/ModuleAdapters/Creator.Core.Strings.h"
 #else
@@ -10,7 +11,7 @@ import Creator.Core.Strings;
 // 없다. 화면이 숫자를 만들면 그 숫자를 검사할 자리가 화면뿐이 된다.
 #include "ProfilerView.h"
 
-#include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
+
 
 #include "ImGui.h"
 #include "ProfileMarker.h"

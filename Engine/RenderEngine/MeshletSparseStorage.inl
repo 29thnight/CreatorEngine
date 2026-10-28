@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
 // Included inside material_graph. One stable virtual buffer per sealed chunk.
 struct MeshletSparseStorage
 {
@@ -6,9 +7,9 @@ struct MeshletSparseStorage
     own::shared_owner<RHISharedSparsePagePool::Allocation> allocation;
     RHIBufferHandle buffer;
     uint64_t virtualBytes{}, revision{}, serial{}, committedSerial{};
-    std::map<uint32_t, own::shared_owner<const std::vector<std::byte>>> committedPackets;
-    std::vector<std::byte> committedMetadata;
-    std::map<uint32_t, uint32_t> committedTiles;
+    ce::engine_ordered_map<uint32_t, own::shared_owner<const ce::dynamic_array<std::byte>>> committedPackets;
+    ce::dynamic_array<std::byte> committedMetadata;
+    ce::engine_ordered_map<uint32_t, uint32_t> committedTiles;
     explicit MeshletSparseStorage(IRenderDeviceServices& owner)
         : device(owner), pool(RHISharedSparsePagePool::ForDevice(owner))
     {
@@ -21,9 +22,9 @@ struct MeshletSparseStorage
             pool->SetEvictable(allocation, value);
         }
     }
-    static std::map<uint32_t, uint32_t> WantedTiles(const SparseClusterPayload& payload, uint64_t metadataBytes)
+    static ce::engine_ordered_map<uint32_t, uint32_t> WantedTiles(const SparseClusterPayload& payload, uint64_t metadataBytes)
     {
-        std::map<uint32_t, uint32_t> wanted;
+        ce::engine_ordered_map<uint32_t, uint32_t> wanted;
         const auto metadataTiles = (metadataBytes + RHISparseTileBytes - 1) / RHISparseTileBytes;
         for (uint32_t tile = 0; tile < metadataTiles; ++tile)
         {
@@ -40,7 +41,7 @@ struct MeshletSparseStorage
         return wanted;
     }
     template<typename Rebuild>
-    bool PrepareResidentCut(SparseClusterPayload& payload, std::vector<std::byte>& metadata,
+    bool PrepareResidentCut(SparseClusterPayload& payload, ce::dynamic_array<std::byte>& metadata,
                             own::shared_owner<const assets::cluster::ResidentSet>& cut,
                             std::span<const experiment::MeshClusterGroup> groups, uint64_t& admission, bool& limited,
                             Rebuild&& rebuild, std::string& error)
@@ -117,7 +118,7 @@ struct MeshletSparseStorage
                 }
                 return true;
             };
-            std::erase_if(committedPackets, [&](const auto& item) { return !intact(item.first, item.second->size()); });
+            ce::erase_if(committedPackets, [&](const auto& item) { return !intact(item.first, item.second->size()); });
             if (!intact(0, committedMetadata.size()))
             {
                 committedMetadata.clear();
@@ -141,7 +142,7 @@ struct MeshletSparseStorage
         return found == committedPackets.end() || found->second.operator->() != packet.bytes.operator->();
     }
     void Commit(uint64_t uploadSerial, uint64_t uploadRevision, const SparseClusterPayload& payload,
-                const std::vector<std::byte>& metadata)
+                const ce::dynamic_array<std::byte>& metadata)
     {
         // Only the latest completed upload can prove the current mapping contents.
         if (uploadSerial == serial && uploadSerial >= committedSerial && uploadRevision == Revision())

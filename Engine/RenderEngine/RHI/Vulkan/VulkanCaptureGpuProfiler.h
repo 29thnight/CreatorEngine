@@ -1,4 +1,6 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineOrderedMap.h"
 #include "VulkanDeviceResources.h"
 #include "VulkanEncoder.h"
 #include "../IRHIGpuProfiler.h"
@@ -72,7 +74,7 @@ public:
         period_ = properties.limits.timestampPeriod;
         uint32_t count = 0;
         VulkanApi::vkGetPhysicalDeviceQueueFamilyProperties(resources_.GetPhysicalDevice(), &count, nullptr);
-        std::vector<VkQueueFamilyProperties> families(count);
+        ce::dynamic_array<VkQueueFamilyProperties> families(count);
         VulkanApi::vkGetPhysicalDeviceQueueFamilyProperties(resources_.GetPhysicalDevice(), &count, families.data());
         bits_ = families.at(resources_.GetQueueFamily()).timestampValidBits;
         if (!bits_ || period_ <= 0.f) { error = "Vulkan queue timestamps unsupported"; return false; }
@@ -135,7 +137,7 @@ public:
     struct Timing { std::string name; double milliseconds; };
     uint32_t SliceCount() const { return used_.load(); }
     std::span<const QueryRecord> GetQueries() const { return {m_queries.data(), m_collectedQueries}; }
-    bool Collect(std::vector<Timing>& passes, double& spanMs, double& busyMs, std::string& error)
+    bool Collect(ce::dynamic_array<Timing>& passes, double& spanMs, double& busyMs, std::string& error)
     {
         m_collectedQueries = 0;
         if (pool_ == VK_NULL_HANDLE || !resources_.IsInitialized())
@@ -155,14 +157,14 @@ public:
         const uint32_t count = used_.load();
         if (!count || count > kCapacity || failed_.load())
         { error = "Vulkan capture timestamp coverage incomplete"; return false; }
-        std::vector<uint64_t> ticks(count * 2);
+        ce::dynamic_array<uint64_t> ticks(count * 2);
         if (VulkanApi::vkGetQueryPoolResults(resources_.GetDevice(), pool_, 0, count * 2,
                 ticks.size() * sizeof(uint64_t), ticks.data(), sizeof(uint64_t),
                 VK_QUERY_RESULT_64_BIT) != VK_SUCCESS)
         { error = "Vulkan capture timestamps not complete"; return false; }
         const uint64_t mask = bits_ == 64 ? ~uint64_t{0} : (uint64_t{1} << bits_) - 1;
-        std::vector<std::pair<uint64_t, uint64_t>> intervals;
-        std::map<std::string, double> totals;
+        ce::dynamic_array<ce::pair<uint64_t, uint64_t>> intervals;
+        ce::engine_ordered_map<std::string, double> totals;
         for (uint32_t i = 0; i < count; ++i)
         {
             const uint64_t begin = ticks[i * 2] & mask, end = ticks[i * 2 + 1] & mask;
@@ -224,7 +226,7 @@ private:
     VkQueryPool pool_{VK_NULL_HANDLE};
     std::atomic<uint32_t> used_{0};
     std::atomic<bool> failed_{false};
-    std::array<QueryRecord, kCapacity> m_queries;
+    ce::fixed_array<QueryRecord, kCapacity> m_queries;
     uint32_t m_collectedQueries{};
     float period_{};
     uint32_t bits_{};

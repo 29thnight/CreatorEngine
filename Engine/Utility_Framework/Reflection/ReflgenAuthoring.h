@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 // reflgen 직렬화의 Authoring 백엔드 (reflgen 도입 P5) — reflgen::writer·reader 를 저작 트리(ryml) 위에 둔다.
 //
@@ -176,7 +177,7 @@ namespace Authoring
 		bool m_rootUsed = false;
 		bool m_record = false;
 		bool m_inlineNext = false;
-		std::vector<Frame> m_frames;
+		ce::dynamic_array<Frame> m_frames;
 	};
 
 	class ReflgenReader final : public reflgen::reader
@@ -239,14 +240,15 @@ namespace Authoring
 			return node.AsStringChecked();
 		}
 
-		std::vector<std::byte> read_bytes() override
+        // CE_STL_ABI_BOUNDARY: reflgen::reader owns this virtual return type.
+        std::vector<std::byte> read_bytes() override
 		{
-			std::vector<std::uint8_t> decoded;
+			ce::dynamic_array<std::uint8_t> decoded;
 			if (!ce::base64::decode(read_string(), decoded))
 			{
 			    Fail("invalid base64");
 			}
-			std::vector<std::byte> bytes(decoded.size());
+			std::vector<std::byte> bytes(decoded.size()); // SDK-owned result buffer.
 			for (std::size_t i = 0; i < decoded.size(); ++i) bytes[i] = static_cast<std::byte>(decoded[i]);
 			return bytes;
 		}
@@ -373,6 +375,6 @@ namespace Authoring
 
 		ReadNode m_root;
 		bool m_rootTaken = false;
-		std::vector<Frame> m_frames;
+		ce::dynamic_array<Frame> m_frames;
 	};
 }

@@ -1,4 +1,5 @@
-﻿#if defined(CE_CONTRACT_STANDALONE)
+﻿#include "../../../Containers/ContainerAPI.h"
+#if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
 import Creator.Core.Ownership;
@@ -26,7 +27,7 @@ import winrt_base;
 uint64_t DX12TextureCache::RetireUnused(uint64_t fenceValue, RHIAssetEvictionPass* evictionPass)
 {
     uint64_t retired = 0;
-    std::vector<RHIAssetEvictionCandidate> candidates;
+    ce::dynamic_array<RHIAssetEvictionCandidate> candidates;
     candidates.reserve(m_entries.size());
     for (const auto& pair : m_entries)
     {
@@ -365,9 +366,9 @@ bool DX12TextureCache::UploadFromCpuPixels(const TextureImageView& image, const 
 
     const uint32_t subresourceCount = image.SubresourceCount();
 
-    std::vector<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> footprints(subresourceCount);
-    std::vector<UINT> rowCounts(subresourceCount);
-    std::vector<UINT64> rowSizes(subresourceCount);
+    ce::dynamic_array<D3D12_PLACED_SUBRESOURCE_FOOTPRINT> footprints(subresourceCount);
+    ce::dynamic_array<UINT> rowCounts(subresourceCount);
+    ce::dynamic_array<UINT64> rowSizes(subresourceCount);
     UINT64 totalBytes = 0;
     device->GetCopyableFootprints(&desc, 0, subresourceCount, 0, footprints.data(), rowCounts.data(), rowSizes.data(),
                                   &totalBytes);

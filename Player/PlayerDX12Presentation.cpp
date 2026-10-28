@@ -1,3 +1,4 @@
+#include "../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -721,12 +722,12 @@ namespace Player
             DX12DeviceResources m_resources;
             own::unique_owner<TemporalDX12> m_temporal;
             HWND m_window{nullptr};
-            std::array<winrt::com_ptr<ID3D12Resource>, DX12DeviceResources::kFrameCount> m_proxyBuffers;
+            ce::fixed_array<winrt::com_ptr<ID3D12Resource>, DX12DeviceResources::kFrameCount> m_proxyBuffers;
             winrt::com_ptr<ID3D12DescriptorHeap> m_proxyRtv;
             winrt::com_ptr<ID3D12DescriptorHeap> m_srvHeap;
             winrt::com_ptr<ID3D12RootSignature> m_rootSignature;
             winrt::com_ptr<ID3D12PipelineState> m_pipeline;
-            std::array<SharedImage, DX12DeviceResources::kFrameCount> m_sharedImages{};
+            ce::fixed_array<SharedImage, DX12DeviceResources::kFrameCount> m_sharedImages{};
             size_t m_nextSharedImage{0};
             DisplayUse m_pendingUse;
             DisplayUse m_submittedUse;

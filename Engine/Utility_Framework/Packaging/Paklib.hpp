@@ -1,3 +1,5 @@
+#include "../Foundation/EngineNodeMap.h"
+#include "../../Containers/ContainerAPI.h"
 // PakLib.hpp — header-only minimal packer/loader (Unreal Pak 스타일)
 // Feature: chunked container, optional compression (LZ4 hook), AES-256-CTR encryption via Windows CNG (bcrypt.h),
 //          end-of-file index with SHA-256 integrity, UTF-8 paths, streaming I/O.
@@ -71,22 +73,22 @@ namespace Pak {
     // ----------------------------- AES-256-CTR ----------------------------------
     namespace Crypto {
         struct Aes256Ctr {
-            BCRYPT_ALG_HANDLE hAlg{}; BCRYPT_KEY_HANDLE hKey{}; std::array<u8, 16> iv{}; // 128-bit counter/nonce
-            std::vector<u8> keyObject{}; // BCrypt key handle borrows this storage.
+            BCRYPT_ALG_HANDLE hAlg{}; BCRYPT_KEY_HANDLE hKey{}; ce::fixed_array<u8, 16> iv{}; // 128-bit counter/nonce
+            ce::dynamic_array<u8> keyObject{}; // BCrypt key handle borrows this storage.
             Aes256Ctr() = default;
             Aes256Ctr(const Aes256Ctr&) = delete;
             Aes256Ctr& operator=(const Aes256Ctr&) = delete;
             ~Aes256Ctr() { if (hKey) BCryptDestroyKey(hKey); if (hAlg) BCryptCloseAlgorithmProvider(hAlg, 0); }
 
-            static std::array<u8, 16> makeCtrIV(const u8 salt[16], u64 fileId) {
-                std::array<u8, 16> out{}; // 0..7: salt[0..7], 8..15: salt[8..15] xor fileId
+            static ce::fixed_array<u8, 16> makeCtrIV(const u8 salt[16], u64 fileId) {
+                ce::fixed_array<u8, 16> out{}; // 0..7: salt[0..7], 8..15: salt[8..15] xor fileId
                 std::memcpy(out.data(), salt, 16);
                 u64 ctr = fileId; // per-file unique start counter
                 for (int i = 0; i < 8; i++) out[8 + i] ^= (u8)((ctr >> (i * 8)) & 0xFF);
                 return out;
             }
 
-            void init(const std::array<u8, 32>& key, std::array<u8, 16> iv_) {
+            void init(const ce::fixed_array<u8, 32>& key, ce::fixed_array<u8, 16> iv_) {
                 if (hKey) { BCryptDestroyKey(hKey); hKey = nullptr; }
                 if (hAlg) { BCryptCloseAlgorithmProvider(hAlg, 0); hAlg = nullptr; }
                 NTSTATUS st = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_AES_ALGORITHM, nullptr, 0); if (st < 0) fail("BCryptOpenAlgorithmProvider");
@@ -101,7 +103,7 @@ namespace Pak {
 
             // CTR = XOR(Plain, E_k(IV++))
             void crypt_inplace(u8* data, size_t len) {
-                std::array<u8, 16> ctr = iv; u8 keystream[16]; DWORD out = 0; u8 block[16]{};
+                ce::fixed_array<u8, 16> ctr = iv; u8 keystream[16]; DWORD out = 0; u8 block[16]{};
                 size_t off = 0;
                 while (off < len) {
                     // ECB encrypt ctr -> keystream
@@ -117,14 +119,14 @@ namespace Pak {
             }
         };
 
-        inline std::array<u8, 32> sha256(std::span<const u8> data) {
+        inline ce::fixed_array<u8, 32> sha256(std::span<const u8> data) {
             BCRYPT_ALG_HANDLE hAlg{}; BCRYPT_HASH_HANDLE hHash{}; NTSTATUS st;
             st = BCryptOpenAlgorithmProvider(&hAlg, BCRYPT_SHA256_ALGORITHM, nullptr, 0); if (st < 0) fail("Open SHA256");
             DWORD objLen = 0, r = 0; st = BCryptGetProperty(hAlg, BCRYPT_OBJECT_LENGTH, (PUCHAR)&objLen, sizeof(objLen), &r, 0); if (st < 0) fail("Get OBJLEN");
             std::unique_ptr<u8[]> obj(new u8[objLen]{});
             st = BCryptCreateHash(hAlg, &hHash, obj.get(), objLen, nullptr, 0, 0); if (st < 0) fail("CreateHash");
             st = BCryptHashData(hHash, (PUCHAR)data.data(), (ULONG)data.size(), 0); if (st < 0) fail("HashData");
-            std::array<u8, 32> digest{}; st = BCryptFinishHash(hHash, digest.data(), (ULONG)digest.size(), 0); if (st < 0) fail("FinishHash");
+            ce::fixed_array<u8, 32> digest{}; st = BCryptFinishHash(hHash, digest.data(), (ULONG)digest.size(), 0); if (st < 0) fail("FinishHash");
             BCryptDestroyHash(hHash); BCryptCloseAlgorithmProvider(hAlg, 0); return digest;
         }
     }
@@ -140,25 +142,25 @@ namespace Pak {
         struct ICodec {
             virtual ~ICodec() = default;
             virtual std::string name() const = 0;
-            virtual std::vector<u8> compress(std::span<const u8> src) = 0;
-            virtual std::vector<u8> decompress(std::span<const u8> src, size_t uncompressedSize) = 0;
+            virtual ce::dynamic_array<u8> compress(std::span<const u8> src) = 0;
+            virtual ce::dynamic_array<u8> decompress(std::span<const u8> src, size_t uncompressedSize) = 0;
         };
 
         struct NoCompression final : ICodec {
             std::string name() const override { return "none"; }
-            std::vector<u8> compress(std::span<const u8> src) override { return std::vector<u8>(src.begin(), src.end()); }
-            std::vector<u8> decompress(std::span<const u8> src, size_t) override { return std::vector<u8>(src.begin(), src.end()); }
+            ce::dynamic_array<u8> compress(std::span<const u8> src) override { return ce::dynamic_array<u8>(src.begin(), src.end()); }
+            ce::dynamic_array<u8> decompress(std::span<const u8> src, size_t) override { return ce::dynamic_array<u8>(src.begin(), src.end()); }
         };
 
         // LZ4 hook (외부 라이브러리 연결 지점)
         struct LZ4Codec final : ICodec {
             std::string name() const override { return "lz4"; }
 
-            std::vector<u8> compress(std::span<const u8> src) override {
+            ce::dynamic_array<u8> compress(std::span<const u8> src) override {
 #ifdef PAK_WITH_LZ4
                 const int srcSize = static_cast<int>(src.size());
                 const int maxDst = LZ4_compressBound(srcSize);
-                std::vector<u8> out(static_cast<size_t>(maxDst));
+                ce::dynamic_array<u8> out(static_cast<size_t>(maxDst));
                 const int n = LZ4_compress_default(
                     reinterpret_cast<const char*>(src.data()),
                     reinterpret_cast<char*>(out.data()),
@@ -169,13 +171,13 @@ namespace Pak {
                 return out;
 #else
                 // LZ4 미연동 시, 패스스루 (빌더/리더가 동일 경로를 사용해야 함)
-                return std::vector<u8>(src.begin(), src.end());
+                return ce::dynamic_array<u8>(src.begin(), src.end());
 #endif
             }
 
-            std::vector<u8> decompress(std::span<const u8> src, size_t uncompressedSize) override {
+            ce::dynamic_array<u8> decompress(std::span<const u8> src, size_t uncompressedSize) override {
 #ifdef PAK_WITH_LZ4
-                std::vector<u8> out(uncompressedSize);
+                ce::dynamic_array<u8> out(uncompressedSize);
                 const int n = LZ4_decompress_safe(
                     reinterpret_cast<const char*>(src.data()),
                     reinterpret_cast<char*>(out.data()),
@@ -187,7 +189,7 @@ namespace Pak {
                 return out;
 #else
                 // LZ4 미연동 시, 패스스루
-                std::vector<u8> out(src.begin(), src.end());
+                ce::dynamic_array<u8> out(src.begin(), src.end());
                 if (out.size() != uncompressedSize) out.resize(uncompressedSize);
                 return out;
 #endif
@@ -242,7 +244,7 @@ namespace Pak {
 
     struct Entry {
         std::string path; u64 pathHash{}; u64 fileId{}; u64 uncompressedSize{}; u64 dataOfs{}; u32 chunkSize{}; u32 chunkCount{}; u8 flags{}; // bit0=enc, bit1=comp
-        std::vector<ChunkInfo> chunks; // per-file chunk table
+        ce::dynamic_array<ChunkInfo> chunks; // per-file chunk table
     };
 
     // ------------------------------ Builder -------------------------------------
@@ -252,9 +254,9 @@ namespace Pak {
         std::filesystem::path m_out;
         BuildOptions m_opt;
         std::unique_ptr<Compression::ICodec> m_codec;
-        std::optional<std::array<u8, 32>> m_key; // AES-256
+        std::optional<ce::fixed_array<u8, 32>> m_key; // AES-256
         Header m_header{};
-        std::vector<Entry> m_entries;
+        ce::dynamic_array<Entry> m_entries;
 
     public:
         explicit Builder(std::filesystem::path outPak, BuildOptions opt = {}) : m_out(std::move(outPak)), m_opt(opt) {
@@ -265,19 +267,19 @@ namespace Pak {
             m_header.chunkSize = m_opt.chunkSize;
         }
 
-        const std::optional<std::array<u8, 32>>& key() const { return m_key; }
+        const std::optional<ce::fixed_array<u8, 32>>& key() const { return m_key; }
 
-        void setKey(const std::array<u8, 32>& k) { m_key = k; }
+        void setKey(const ce::fixed_array<u8, 32>& k) { m_key = k; }
         void setKeyFromHex(std::string_view hex) {
             ensure(hex.size() == 64, "key hex must be 64 chars for 32 bytes");
-            std::array<u8, 32> k{}; for (size_t i = 0; i < 32; i++) { unsigned v; std::sscanf(std::string(hex.substr(2 * i, 2)).c_str(), "%02x", &v); k[i] = (u8)v; }
+            ce::fixed_array<u8, 32> k{}; for (size_t i = 0; i < 32; i++) { unsigned v; std::sscanf(std::string(hex.substr(2 * i, 2)).c_str(), "%02x", &v); k[i] = (u8)v; }
             m_key = k;
         }
 
         void addFile(std::string_view virtualPath, const std::filesystem::path& srcFile) {
             std::ifstream in(srcFile, std::ios::binary); ensure(in.good(), "open src file");
             in.seekg(0, std::ios::end); size_t size = (size_t)in.tellg(); in.seekg(0);
-            std::vector<u8> buf(size); in.read((char*)buf.data(), size);
+            ce::dynamic_array<u8> buf(size); in.read((char*)buf.data(), size);
             addMemory(virtualPath, std::as_bytes(std::span{ buf }));
         }
 
@@ -288,7 +290,7 @@ namespace Pak {
             e.chunkCount = (u32)((bytes.size() + e.chunkSize - 1) / e.chunkSize);
             e.chunks.reserve(e.chunkCount);
             m_entries.emplace_back(std::move(e));
-            m_payloads.emplace_back(std::vector<u8>((const u8*)bytes.data(), (const u8*)bytes.data() + bytes.size()));
+            m_payloads.emplace_back(ce::dynamic_array<u8>((const u8*)bytes.data(), (const u8*)bytes.data() + bytes.size()));
         }
 
         void finish() {
@@ -310,11 +312,11 @@ namespace Pak {
                 e.dataOfs = tell();
                 size_t off = 0; u32 chunkIdx = 0;
                 // per-file CTR iv
-                std::array<u8, 16> iv{}; if (m_opt.encrypt && m_key) { iv = Crypto::Aes256Ctr::makeCtrIV(m_header.salt, e.fileId); }
+                ce::fixed_array<u8, 16> iv{}; if (m_opt.encrypt && m_key) { iv = Crypto::Aes256Ctr::makeCtrIV(m_header.salt, e.fileId); }
                 while (off < mem.size()) {
                     size_t n = std::min<size_t>(e.chunkSize, mem.size() - off);
                     std::span<const u8> src{ mem.data() + off, n };
-                    std::vector<u8> out = ((e.flags & 2) ? m_codec->compress(src) : std::vector<u8>(src.begin(), src.end()));
+                    ce::dynamic_array<u8> out = ((e.flags & 2) ? m_codec->compress(src) : ce::dynamic_array<u8>(src.begin(), src.end()));
                     // encrypt in-place
                     if (e.flags & 1) {
                         Crypto::Aes256Ctr aes; aes.init(m_key.value(), iv); aes.crypt_inplace(out.data(), out.size());
@@ -348,7 +350,7 @@ namespace Pak {
             {
                 // compute SHA256 over [hashStart..hashEnd)
                 _fseeki64(fp, hashStart, SEEK_SET);
-                std::vector<u8> idx; idx.resize((size_t)(hashEnd - hashStart));
+                ce::dynamic_array<u8> idx; idx.resize((size_t)(hashEnd - hashStart));
                 fread(idx.data(), 1, idx.size(), fp);
                 auto digest = Crypto::sha256(idx);
                 std::memcpy(ih.indexHash, digest.data(), 32);
@@ -369,17 +371,17 @@ namespace Pak {
         }
 
     private:
-        std::vector<std::vector<u8>> m_payloads; // source data per entry
+        ce::dynamic_array<ce::dynamic_array<u8>> m_payloads; // source data per entry
     };
 
     // ------------------------------- Archive ------------------------------------
-    struct OpenOptions { std::optional<std::array<u8, 32>> key; };
+    struct OpenOptions { std::optional<ce::fixed_array<u8, 32>> key; };
 
     class Archive {
         // Declared first, released after every file/index reader has gone away.
         // This also protects archives retained independently of a byte source.
         AssetDepot::ArtifactStoreGuard m_storeGuard;
-        std::filesystem::path m_path; Header m_hdr{}; IndexHeader m_ih{}; std::vector<Entry> m_entries; std::unordered_map<u64, size_t> m_hashToIndex; std::optional<std::array<u8, 32>> m_key;
+        std::filesystem::path m_path; Header m_hdr{}; IndexHeader m_ih{}; ce::dynamic_array<Entry> m_entries; ce::engine_node_map<u64, size_t> m_hashToIndex; std::optional<ce::fixed_array<u8, 32>> m_key;
         // Index and payload reads must refer to the same mounted file. Deny
         // writers while this archive is alive; the lock protects FILE's cursor
         // when multiple audio workers read different entries concurrently.
@@ -412,7 +414,7 @@ namespace Pak {
             // verify index hash
             {
                 u64 hashStart = _ftelli64(fp);
-                std::vector<u8> idx; idx.resize((size_t)(m_hdr.indexSize - sizeof(IndexHeader)));
+                ce::dynamic_array<u8> idx; idx.resize((size_t)(m_hdr.indexSize - sizeof(IndexHeader)));
                 read(idx.data(), idx.size());
                 auto digest = Crypto::sha256(idx);
                 ensure(std::memcmp(digest.data(), m_ih.indexHash, 32) == 0, "index hash mismatch");
@@ -430,8 +432,8 @@ namespace Pak {
         }
 
         struct FileInfo { std::string path; u64 size; bool encrypted; bool compressed; };
-        std::vector<FileInfo> list() const {
-            std::vector<FileInfo> out; out.reserve(m_entries.size());
+        ce::dynamic_array<FileInfo> list() const {
+            ce::dynamic_array<FileInfo> out; out.reserve(m_entries.size());
             for (auto const& e : m_entries) out.push_back({ e.path, e.uncompressedSize, (bool)(e.flags & 1), (bool)(e.flags & 2) });
             return out;
         }
@@ -460,7 +462,7 @@ namespace Pak {
             std::FILE* const fp = m_file.get();
             ensure(fp != nullptr, "pak mount is closed");
 
-            std::array<u8, 16> ctr{};
+            ce::fixed_array<u8, 16> ctr{};
             if (e.flags & 1) {
                 ensure(m_key.has_value(), "pak key required");
                 ctr = Crypto::Aes256Ctr::makeCtrIV(m_hdr.salt, e.fileId);
@@ -486,7 +488,7 @@ namespace Pak {
                         "pak chunk offset exceeds seek range");
                     ensure(_fseeki64(fp, chunkInfo.ofs, SEEK_SET) == 0,
                         "seek pak range chunk");
-                    std::vector<u8> encoded(chunkInfo.compSize);
+                    ce::dynamic_array<u8> encoded(chunkInfo.compSize);
                     ensure(std::fread(encoded.data(), 1, encoded.size(), fp)
                         == encoded.size(), "read pak range chunk");
                     if (e.flags & 1) {
@@ -494,7 +496,7 @@ namespace Pak {
                         aes.init(*m_key, ctr);
                         aes.crypt_inplace(encoded.data(), encoded.size());
                     }
-                    std::vector<u8> plain;
+                    ce::dynamic_array<u8> plain;
                     if (e.flags & 2) {
                         Compression::LZ4Codec lz4;
                         plain = lz4.decompress(encoded, chunkInfo.uncompSize);
@@ -523,7 +525,7 @@ namespace Pak {
             ensure(copied == out.size(), "pak range is incomplete");
         }
 
-        std::vector<u8> readAll(std::string_view virtualPath) const {
+        ce::dynamic_array<u8> readAll(std::string_view virtualPath) const {
             const auto index = findExact(virtualPath);
             ensure(index.has_value(), "not found");
             return readByIndex(*index);
@@ -543,7 +545,7 @@ namespace Pak {
             return it->second;
         }
 
-        std::vector<u8> readByIndex(size_t idx) const {
+        ce::dynamic_array<u8> readByIndex(size_t idx) const {
             const Entry& e = m_entries[idx];
             std::lock_guard lock(m_readMutex);
             std::FILE* const fp = m_file.get(); ensure(fp != nullptr, "pak mount is closed");
@@ -551,13 +553,13 @@ namespace Pak {
             auto seek = [&](u64 ofs) { _fseeki64(fp, ofs, SEEK_SET); };
 
             // prepare crypto
-            std::array<u8, 16> ctr{}; std::optional<Crypto::Aes256Ctr> aes;
+            ce::fixed_array<u8, 16> ctr{}; std::optional<Crypto::Aes256Ctr> aes;
             if (e.flags & 1) { ensure(m_key.has_value(), "key required"); ctr = Crypto::Aes256Ctr::makeCtrIV(m_hdr.salt, e.fileId); aes.emplace(); aes->init(m_key.value(), ctr); }
 
-            std::vector<u8> out; out.resize((size_t)e.uncompressedSize); size_t outOff = 0;
+            ce::dynamic_array<u8> out; out.resize((size_t)e.uncompressedSize); size_t outOff = 0;
             for (u32 c = 0; c < e.chunkCount; c++) {
                 const auto& ci = e.chunks[c];
-                seek(ci.ofs); std::vector<u8> chunk; chunk.resize(ci.compSize); read(chunk.data(), chunk.size());
+                seek(ci.ofs); ce::dynamic_array<u8> chunk; chunk.resize(ci.compSize); read(chunk.data(), chunk.size());
                 if (e.flags & 1) { // decrypt in-place
                     aes->crypt_inplace(chunk.data(), chunk.size());
                     // advance CTR blocks
@@ -565,7 +567,7 @@ namespace Pak {
                     // reinit with advanced ctr for next chunk
                     aes->init(m_key.value(), ctr);
                 }
-                std::vector<u8> plain;
+                ce::dynamic_array<u8> plain;
                 if (e.flags & 2) { // compressed
                     // If LZ4 integrated, use it; else pass-through (builder produced pass-through if not integrated)
                     Compression::LZ4Codec lz4; plain = lz4.decompress(chunk, ci.uncompSize);
@@ -581,9 +583,9 @@ namespace Pak {
     };
 
     // ------------------------------ Helpers -------------------------------------
-    inline std::array<u8, 32> deriveKeyFromPassphrase(std::string_view pass, std::span<const u8> salt) {
+    inline ce::fixed_array<u8, 32> deriveKeyFromPassphrase(std::string_view pass, std::span<const u8> salt) {
         // 매우 단순한 KDF (데모용). 실제 서비스에서는 PBKDF2/Argon2 권장.
-        std::vector<u8> buf; buf.reserve(pass.size() + salt.size());
+        ce::dynamic_array<u8> buf; buf.reserve(pass.size() + salt.size());
         buf.insert(buf.end(), pass.begin(), pass.end()); buf.insert(buf.end(), salt.begin(), salt.end());
         return Crypto::sha256(buf);
     }

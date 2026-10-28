@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #if !defined(CE_CONTRACT_STANDALONE) || !defined(CE_PATHS_SOURCE_IMPLEMENTED)
 #define CE_PATHS_SOURCE_IMPLEMENTED
 #if defined(CE_CONTRACT_STANDALONE)
@@ -95,7 +96,7 @@ namespace ce::paths
         animator_path = animator_path.lexically_normal();
         //dir not exist -> create dir
 
-        std::vector<std::filesystem::path> directories = {
+        ce::dynamic_array<std::filesystem::path> directories = {
             data_path,
             shader_source_path,
             model_source_path,

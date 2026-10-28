@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "ExperimentParity/ExperimentTextureCookSelfTest.h"
 #include "ExperimentParity/ExperimentTexturePipelineSelfTest.h"
 
@@ -102,7 +103,7 @@ namespace RenderTest
         }
 
         [[nodiscard]] std::string BytesToString(
-            const std::vector<std::byte>& bytes)
+            const ce::dynamic_array<std::byte>& bytes)
         {
             std::string text;
             text.resize(bytes.size());
@@ -171,7 +172,7 @@ namespace RenderTest
             return {};
         }
 
-        void StoreWord(std::vector<std::byte>& bytes, std::size_t offset, std::uint64_t value,
+        void StoreWord(ce::dynamic_array<std::byte>& bytes, std::size_t offset, std::uint64_t value,
             std::size_t width = 4u)
         {
             for (std::size_t index = 0; index < width; ++index)
@@ -180,7 +181,7 @@ namespace RenderTest
             }
         }
 
-        void CheckMalformedArtifacts(Checker& check, const std::vector<std::byte>& valid)
+        void CheckMalformedArtifacts(Checker& check, const ce::dynamic_array<std::byte>& valid)
         {
             struct Mutation final
             {

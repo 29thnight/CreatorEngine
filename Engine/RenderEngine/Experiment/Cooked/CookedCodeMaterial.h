@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "CookedAssetManifest.h"
@@ -38,12 +39,12 @@ namespace experiment::cooked
     {
         RHIShaderBinary backend{};
         std::uint32_t passIndex{};
-        std::vector<std::uint16_t> keywordSelections;
+        ce::dynamic_array<std::uint16_t> keywordSelections;
         std::uint32_t vertexAttributeMask{};
         bool referencePath{};
         RHIShaderPermutationKey materialPermutationKey{};
         RHIShaderPermutation permutation;
-        std::vector<CodeProgramStage> stages;
+        ce::dynamic_array<CodeProgramStage> stages;
     };
 
     // Value-only linked-program product. No source, device, compiler, manager,
@@ -57,38 +58,38 @@ namespace experiment::cooked
         std::string compilerStamp; // Lowercase SHA-256 of the verified compiler/toolchain.
         std::string formatStamp{ kCodeProgramFormatStamp };
         std::string abiStamp{ kCodeProgramAbiStamp };
-        std::vector<CodeProgramInput> inputs;
-        std::vector<std::byte> metadataBytes;
+        ce::dynamic_array<CodeProgramInput> inputs;
+        ce::dynamic_array<std::byte> metadataBytes;
         ShaderMeta meta;
         ShaderMetaBindingLayout layout;
-        std::vector<CodeProgramVariant> variants;
+        ce::dynamic_array<CodeProgramVariant> variants;
     };
 
     struct AuthoredMaterialDocument final
     {
         Material material;
         AssetId programAssetId{};
-        std::vector<AssetId> defaultTextureAssetIds;
+        ce::dynamic_array<AssetId> defaultTextureAssetIds;
     };
 
     [[nodiscard]] std::size_t CodeProgramRetainedBytes(const CodeProgram& program) noexcept;
 
     [[nodiscard]] bool EncodeAuthoredMaterialArtifact(const AuthoredMaterialDocument& document,
-        std::vector<std::byte>& bytes, std::vector<AssetDependency>& dependencies, std::string& failure);
+        ce::dynamic_array<std::byte>& bytes, ce::dynamic_array<AssetDependency>& dependencies, std::string& failure);
     [[nodiscard]] bool ReadAuthoredMaterialArtifact(std::span<const std::byte> bytes,
         const TypedAssetReference& expected, std::span<const AssetDependency> dependencies,
         AuthoredMaterialDocument& result, std::string& failure);
     [[nodiscard]] bool EncodeCodeProgramArtifact(const CodeProgram& program,
-        std::vector<std::byte>& bytes, std::vector<AssetDependency>& dependencies, std::string& failure);
+        ce::dynamic_array<std::byte>& bytes, ce::dynamic_array<AssetDependency>& dependencies, std::string& failure);
     [[nodiscard]] bool ReadCodeProgramArtifact(std::span<const std::byte> bytes,
         const TypedAssetReference& expected, std::span<const AssetDependency> dependencies,
         CodeProgram& result, std::string& failure);
     // The explicit verified bundle is the same bounded wire representation;
     // derive its dependency values before checking against a catalog entry.
     [[nodiscard]] bool ReadVerifiedCodeProgram(std::span<const std::byte> bytes,
-        CodeProgram& result, std::vector<AssetDependency>& dependencies, std::string& failure);
+        CodeProgram& result, ce::dynamic_array<AssetDependency>& dependencies, std::string& failure);
     [[nodiscard]] bool CollectCodeProgramDefaultTextures(const ShaderMeta& meta,
-        std::vector<AssetId>& result, std::string& failure);
+        ce::dynamic_array<AssetId>& result, std::string& failure);
     [[nodiscard]] bool ValidateAuthoredMaterialBinding(const AuthoredMaterialDocument& document,
         const CodeProgram& program, std::string& failure);
 }

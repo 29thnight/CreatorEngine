@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../../Containers/ContainerAPI.h"
 #include "TextureImportSettings.h"
 #include "../../../Utility_Framework/Authoring/AuthoringParsedDocument.h"
 
@@ -9,7 +11,7 @@ namespace experiment::cooked
     {
         template<class T>
         bool TextureSettingsEnum(Authoring::ReadNode node, T& value,
-            std::initializer_list<std::pair<std::string_view, T>> choices)
+            std::initializer_list<ce::pair<std::string_view, T>> choices)
         {
             if (!node.IsScalar())
             {
@@ -122,7 +124,7 @@ namespace experiment::cooked
                 return false;
             }
             auto parsed = inOutSettings;
-            std::set<std::string_view> seen;
+            ce::engine_ordered_set<std::string_view> seen;
             for (const auto entry : node.Map())
             {
                 const auto key = entry.key.Scalar();

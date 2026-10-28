@@ -1,4 +1,5 @@
-﻿#if defined(CE_CONTRACT_STANDALONE)
+﻿#include "../Engine/Containers/ContainerAPI.h"
+#if defined(CE_CONTRACT_STANDALONE)
 #include "../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
 import Creator.Core.Paths;
@@ -43,7 +44,7 @@ namespace
 
 	std::filesystem::path ResolvePlayerRuntimeOwnerRoot()
 	{
-		std::array<wchar_t, MAX_PATH> buffer{};
+		ce::fixed_array<wchar_t, MAX_PATH> buffer{};
 		const DWORD length = GetTempPathW(
 			static_cast<DWORD>(buffer.size()), buffer.data());
 		if (0 == length || length >= buffer.size()) return {};

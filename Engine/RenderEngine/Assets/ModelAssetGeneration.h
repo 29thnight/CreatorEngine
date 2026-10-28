@@ -1,4 +1,6 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -102,9 +104,9 @@ namespace assets
         }
         friend auto operator<=>(const ModelMeshHandle& a, const ModelMeshHandle& b) noexcept
         {
-            return std::tie(a.modelId, a.meshId, a.generation, a.domain, a.asset, a.Blob(), a.resolverRevision,
+            return ce::tie(a.modelId, a.meshId, a.generation, a.domain, a.asset, a.Blob(), a.resolverRevision,
                             a.mountId, a.assetSetId, a.manifestRevision) <=>
-                   std::tie(b.modelId, b.meshId, b.generation, b.domain, b.asset, b.Blob(), b.resolverRevision,
+                   ce::tie(b.modelId, b.meshId, b.generation, b.domain, b.asset, b.Blob(), b.resolverRevision,
                             b.mountId, b.assetSetId, b.manifestRevision);
         }
         friend bool operator==(const ModelMeshHandle& a, const ModelMeshHandle& b) noexcept { return (a <=> b) == 0; }
@@ -172,9 +174,9 @@ namespace assets
         std::string name{};
         bool transparent{};
         bool masked{};
-        std::vector<ModelMaterialProperty> properties{};
-        std::vector<std::string> keywords{};
-        std::vector<std::uint16_t> keywordSelections{};
+        ce::dynamic_array<ModelMaterialProperty> properties{};
+        ce::dynamic_array<std::string> keywords{};
+        ce::dynamic_array<std::uint16_t> keywordSelections{};
     };
 
     struct ModelMeshAsset final
@@ -185,8 +187,8 @@ namespace assets
         std::uint32_t vertexAttributeMask{};
         std::uint32_t vertexStride{};
         std::uint64_t vertexLayoutHash{};
-        std::vector<std::byte> vertexBytes{};
-        std::vector<std::uint32_t> indices{};
+        ce::dynamic_array<std::byte> vertexBytes{};
+        ce::dynamic_array<std::uint32_t> indices{};
         math::aabb bounds{};
         experiment::MeshletPayload meshlets{};
         experiment::MeshLodChain coarseLods{};
@@ -217,8 +219,8 @@ namespace assets
         bool cookedPayload{};
         bool cookedHasAlpha{};
         bool cookedColorSpaceLocked{};
-        std::vector<ModelTextureSubresource> subresources{};
-        std::vector<std::byte> pixels{};
+        ce::dynamic_array<ModelTextureSubresource> subresources{};
+        ce::dynamic_array<std::byte> pixels{};
     };
 
     struct ModelNodeAsset final
@@ -226,7 +228,7 @@ namespace assets
         std::string name{};
         std::uint32_t parent{ kInvalidModelAssetIndex };
         math::matrix4x4 localTransform{ math::matrix4x4::identity() };
-        std::vector<uuid::uuid16> meshes{};
+        ce::dynamic_array<uuid::uuid16> meshes{};
     };
 
     struct ModelBoneAsset final
@@ -266,9 +268,9 @@ namespace assets
         ModelInterpolationMode translationInterpolation{ ModelInterpolationMode::Linear };
         ModelInterpolationMode rotationInterpolation{ ModelInterpolationMode::Linear };
         ModelInterpolationMode scaleInterpolation{ ModelInterpolationMode::Linear };
-        std::vector<ModelTranslationKey> translations{};
-        std::vector<ModelRotationKey> rotations{};
-        std::vector<ModelScaleKey> scales{};
+        ce::dynamic_array<ModelTranslationKey> translations{};
+        ce::dynamic_array<ModelRotationKey> rotations{};
+        ce::dynamic_array<ModelScaleKey> scales{};
     };
 
     struct ModelAnimationEvent final
@@ -284,8 +286,8 @@ namespace assets
         double durationTicks{};
         double ticksPerSecond{};
         bool looping{ true };
-        std::vector<ModelAnimationTrack> tracks{};
-        std::vector<ModelAnimationEvent> events{};
+        ce::dynamic_array<ModelAnimationTrack> tracks{};
+        ce::dynamic_array<ModelAnimationEvent> events{};
     };
 
     struct ModelSkeletonAsset final
@@ -294,7 +296,7 @@ namespace assets
         std::uint32_t rootBone{ kInvalidModelAssetIndex };
         math::matrix4x4 rootTransform{ math::matrix4x4::identity() };
         math::matrix4x4 globalInverseTransform{ math::matrix4x4::identity() };
-        std::vector<ModelBoneAsset> bones{};
+        ce::dynamic_array<ModelBoneAsset> bones{};
     };
 
     struct ModelAnimatorAsset final
@@ -395,14 +397,14 @@ namespace assets
 
         ModelAssetGeneration(LoadKey, ModelAssetGenerationIdentity identity,
             std::string name, std::filesystem::path sourcePath,
-            std::vector<ModelNodeAsset> nodes,
-            std::vector<ModelMeshAsset> meshes,
-            std::vector<ModelMaterialAsset> materials,
-            std::vector<ModelTextureAsset> textures,
+            ce::dynamic_array<ModelNodeAsset> nodes,
+            ce::dynamic_array<ModelMeshAsset> meshes,
+            ce::dynamic_array<ModelMaterialAsset> materials,
+            ce::dynamic_array<ModelTextureAsset> textures,
             std::optional<ModelSkeletonAsset> skeleton,
-            std::vector<ModelAnimationAsset> animations,
+            ce::dynamic_array<ModelAnimationAsset> animations,
             std::optional<ModelAnimatorAsset> animator,
-            std::vector<ModelGpuUploadDescriptor> gpuDescriptors);
+            ce::dynamic_array<ModelGpuUploadDescriptor> gpuDescriptors);
 
         ModelAssetGeneration(const ModelAssetGeneration&) = delete;
         ModelAssetGeneration& operator=(const ModelAssetGeneration&) = delete;
@@ -436,23 +438,23 @@ namespace assets
         ModelAssetGenerationIdentity identity_{};
         std::string name_{};
         std::filesystem::path sourcePath_{};
-        std::vector<ModelNodeAsset> nodes_{};
-        std::vector<ModelMeshAsset> meshes_{};
-        std::vector<ModelMaterialAsset> materials_{};
-        std::vector<ModelTextureAsset> textures_{};
+        ce::dynamic_array<ModelNodeAsset> nodes_{};
+        ce::dynamic_array<ModelMeshAsset> meshes_{};
+        ce::dynamic_array<ModelMaterialAsset> materials_{};
+        ce::dynamic_array<ModelTextureAsset> textures_{};
         std::optional<ModelSkeletonAsset> skeleton_{};
-        std::vector<ModelAnimationAsset> animations_{};
-        std::vector<std::vector<const ModelAnimationTrack*>> m_animationTracks{};
+        ce::dynamic_array<ModelAnimationAsset> animations_{};
+        ce::dynamic_array<ce::dynamic_array<const ModelAnimationTrack*>> m_animationTracks{};
         std::optional<ModelAnimatorAsset> animator_{};
-        std::vector<ModelGpuUploadDescriptor> gpuDescriptors_{};
+        ce::dynamic_array<ModelGpuUploadDescriptor> gpuDescriptors_{};
     };
 
     // One immutable owner table per recorded frame, shared by its selected views.
     // Draw records carry a table index or a stable handle, never another owner.
     struct ModelAssetGenerationPins final
     {
-        std::vector<ModelAssetGeneration::Shared> generations{};
-        std::vector<own::shared_owner<const ModelMeshDescriptor>> meshes{};
+        ce::dynamic_array<ModelAssetGeneration::Shared> generations{};
+        ce::dynamic_array<own::shared_owner<const ModelMeshDescriptor>> meshes{};
     };
 
     // Scoped CPU-use/upload handoff, separate from durable descriptor frame pins.
@@ -465,15 +467,15 @@ namespace assets
 
     struct ModelGeometryPreparationPins final
     {
-        std::vector<ModelGeometryPreparationPin> entries{};
+        ce::dynamic_array<ModelGeometryPreparationPin> entries{};
     };
 
     struct ModelAssetGenerationLoadResult final
     {
         ModelAssetGeneration::Shared generation{};
-        std::vector<ModelAssetGenerationIssue> issues{};
+        ce::dynamic_array<ModelAssetGenerationIssue> issues{};
         // Recoverable optional acceleration-data failures; indexed geometry remains valid.
-        std::vector<ModelAssetGenerationIssue> warnings{};
+        ce::dynamic_array<ModelAssetGenerationIssue> warnings{};
         // 단계별 경과(ms, 순서대로) — 진단 전용. 실패 시엔 도달한 단계까지만 남는다.
         ModelAssetPhaseTimeline phases{};
 
@@ -552,8 +554,8 @@ namespace assets
 
         private:
             friend class ModelAssetGenerationCache;
-            std::map<Key, Entry> generations_{};
-            std::map<uuid::uuid16, Key> currentByAsset_{};
+            ce::engine_ordered_map<Key, Entry> generations_{};
+            ce::engine_ordered_map<uuid::uuid16, Key> currentByAsset_{};
         };
 
         [[nodiscard]] ModelAssetPublishResult Publish(
@@ -575,19 +577,19 @@ namespace assets
         void Clear();
         [[nodiscard]] ModelAssetGenerationCacheSnapshot Snapshot() const;
         // MBC9 — current generation 전수(에디터 목록용). 정렬은 ModelId 순.
-        [[nodiscard]] std::vector<ModelAssetGeneration::Shared> SnapshotCurrent() const;
+        [[nodiscard]] ce::dynamic_array<ModelAssetGeneration::Shared> SnapshotCurrent() const;
 
     private:
         [[nodiscard]] ModelAssetGeneration::Shared AcquireLocked(
             const Key& key, Entry& entry) const;
         void RetainLocked(Entry& entry, const ModelAssetGeneration::Shared& generation,
-            std::vector<ModelAssetGeneration::Shared>& released) const;
+            ce::dynamic_array<ModelAssetGeneration::Shared>& released) const;
         void TrimRetainedLocked(std::size_t budget,
-            std::vector<ModelAssetGeneration::Shared>& released) const;
+            ce::dynamic_array<ModelAssetGeneration::Shared>& released) const;
 
         mutable std::mutex mutex_{};
-        mutable std::map<Key, Entry> generations_{};
-        std::map<uuid::uuid16, Key> currentByAsset_{};
+        mutable ce::engine_ordered_map<Key, Entry> generations_{};
+        ce::engine_ordered_map<uuid::uuid16, Key> currentByAsset_{};
         std::size_t retentionBudgetBytes_{ 256u * 1024u * 1024u };
         mutable std::size_t retainedBytes_{};
         mutable std::uint64_t accessSerial_{};

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Arena.h"
@@ -112,7 +113,7 @@ namespace ce
         void Reset() noexcept;
 
       private:
-        std::array<render_arena_resource, DomainCount> m_resources;
+        ce::fixed_array<render_arena_resource, DomainCount> m_resources;
     };
 
     using RenderArenaLease = pooled_owner<RenderArenaSet>;

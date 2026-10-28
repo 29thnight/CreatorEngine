@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/Foundation/EngineNodeSet.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
 #else
@@ -28,7 +29,7 @@ namespace wave
 
         // 이미 적재된 것을 먼저 모은다. 두 번 훑어도 같은 결과여야 하고, 같은
         // 이름이 두 번 오면 **뒤엣것을 버렸다는 사실이 남아야** 한다.
-        std::unordered_set<ClipKey> known;
+        ce::engine_node_set<ClipKey> known;
         for (const ClipKey& key : service.ListClipKeys())
         {
             known.insert(key);

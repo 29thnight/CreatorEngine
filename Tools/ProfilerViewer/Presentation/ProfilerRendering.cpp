@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 // Rendering - Live presentation belongs only to the ordinary-privilege viewer.
 // Engine data arrives through the immutable, bounded diagnostics snapshot; this
 // translation unit deliberately has no renderer, RHI, scene, or editor registry.
@@ -497,7 +498,7 @@ namespace editor::profiler_view
             }
             else
             {
-                std::vector<rendering_pass_timing> ordered = displayed.passTimings;
+                ce::dynamic_array<rendering_pass_timing> ordered = displayed.passTimings;
                 if (m_sortByDuration)
                 {
                     std::stable_sort(ordered.begin(), ordered.end(),

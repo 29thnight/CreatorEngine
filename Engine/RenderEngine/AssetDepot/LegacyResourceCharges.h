@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "LegacyResourceCache.h"
@@ -15,7 +16,7 @@ namespace asset_cache_detail
     public:
         void Add(std::size_t bytes) noexcept { AddCharge(bytes_, bytes); }
         template<class T>
-        void Vector(const std::vector<T>& values) noexcept
+        void Vector(const ce::dynamic_array<T>& values) noexcept
         {
             Add(values.capacity() > SIZE_MAX / sizeof(T) ? SIZE_MAX : values.capacity() * sizeof(T));
         }
@@ -30,7 +31,7 @@ namespace asset_cache_detail
             Add(capacity > SIZE_MAX / sizeof(std::filesystem::path::value_type)
                 ? SIZE_MAX : capacity * sizeof(std::filesystem::path::value_type));
         }
-        void Properties(const std::vector<MaterialPropertyValue>& values) noexcept
+        void Properties(const ce::dynamic_array<MaterialPropertyValue>& values) noexcept
         {
             Vector(values);
             for (const auto& value : values)

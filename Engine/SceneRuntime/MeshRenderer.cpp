@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -304,7 +306,7 @@ namespace
 		if (const Authoring::ReadNode selections = materialNode["keywordSelections"];
 			selections && selections.IsSequence())
 		{
-			std::vector<std::uint16_t> values;
+			ce::dynamic_array<std::uint16_t> values;
 			values.reserve(selections.Size());
 			for (const Authoring::ReadNode selection : selections)
 			{
@@ -344,7 +346,7 @@ namespace
             }
 			owned->m_keywordSelections = std::move(values);
 		}
-        std::vector<experiment::MaterialProperty> propertyOverrides;
+        ce::dynamic_array<experiment::MaterialProperty> propertyOverrides;
 		if (const Authoring::ReadNode overrides = materialNode["overrides"];
 			overrides && overrides.IsSequence())
 		{
@@ -669,7 +671,7 @@ bool MeshRenderer::RefreshMaterialAsset()
     }
     const auto scenePins = GetOwner() && GetOwner()->GetScene()
         ? GetOwner()->GetScene()->PreparedTextureImagePins() : nullptr;
-    const auto preparedTextures = scenePins ? scenePins->Owners() : std::vector<own::shared_owner<const Texture>>{};
+    const auto preparedTextures = scenePins ? scenePins->Owners() : ce::dynamic_array<own::shared_owner<const Texture>>{};
     if (!m_unresolvedMaterialReference.empty())
     {
         std::string error;
@@ -893,7 +895,7 @@ void MeshRenderer::OnDeserialized(const Authoring::NodeView& view)
 	const Authoring::ReadNode node = Authoring::NodeViewAccess::Node(view);
     const auto scenePins = GetOwner() && GetOwner()->GetScene()
         ? GetOwner()->GetScene()->PreparedTextureImagePins() : nullptr;
-    const auto preparedTextures = scenePins ? scenePins->Owners() : std::vector<own::shared_owner<const Texture>>{};
+    const auto preparedTextures = scenePins ? scenePins->Owners() : ce::dynamic_array<own::shared_owner<const Texture>>{};
 
     // Graph textures may be embedded in this model. Publish the immutable
     // model owner before resolving an inline graph instance's texture GUIDs.
@@ -1217,7 +1219,7 @@ bool MeshRenderer::RefreshModelGeneration(assets::ModelAssetGeneration::Shared g
         if (graph)
         {
             // Physical embedded owners follow the model while scene overrides stay intact.
-            std::set<const Texture*> replaced;
+            ce::engine_ordered_set<const Texture*> replaced;
             for (const auto& texture : graph->textures)
             {
                 if (texture.owner && !replaced.contains(&*texture.owner)

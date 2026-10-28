@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -32,7 +33,7 @@ namespace ExperimentMaterialSealing
     /// 물음을 하나로 둔다: "이 재질의 `normalMap` 슬롯에 owner 가 실제로 있는가".
     /// 슬롯 자체가 없으면(ShaderMeta 가 선언하지 않은 재질) 0 이다.
     static std::uint32_t DeriveUseNormalMap(
-        const std::vector<SealTextureOwner>& textures)
+        const ce::dynamic_array<SealTextureOwner>& textures)
     {
         for (const SealTextureOwner& texture : textures)
         {
@@ -63,7 +64,7 @@ namespace ExperimentMaterialSealing
         if (hasMatrix)
         {
             compatibleMeta = meta;
-            std::erase_if(compatibleMeta.properties, [](const auto& property) { return property.type == ShaderPropertyType::Float4x4; });
+            ce::erase_if(compatibleMeta.properties, [](const auto& property) { return property.type == ShaderPropertyType::Float4x4; });
         }
         if (!ExperimentMaterialMigration::ConvertLegacyMaterial(legacy, hasMatrix ? compatibleMeta : meta,
             source.material, outError))
@@ -215,7 +216,7 @@ namespace ExperimentMaterialSealing
 
         // meta 선언 순서를 유지한다 — SealCore가 이 순서를 전제하지는 않지만
         // (이름으로 찾는다) 진단 로그와 게이트 대조가 순서에 기댄다.
-        std::vector<SealTextureOwner> textures;
+        ce::dynamic_array<SealTextureOwner> textures;
         for (const ShaderPropertyDesc& desc : meta.properties)
         {
             if (ShaderPropertyType::Texture2D != desc.type) continue;
@@ -289,20 +290,20 @@ namespace ExperimentMaterialSealing
 
     bool SealCore(const SealSource& source, const ShaderMeta& meta,
         const ShaderMetaBindingLayout& layout,
-        std::vector<std::uint8_t>& outPropertyBytes,
-        std::vector<EnhancedMaterialTextureBinding>& outTextureBindings,
+        ce::dynamic_array<std::uint8_t>& outPropertyBytes,
+        ce::dynamic_array<EnhancedMaterialTextureBinding>& outTextureBindings,
         std::string& outError,
         own::shared_owner<const LX::Runtime::Instance>* outRuntime,
         ShaderMetaHandle handle)
     {
-        std::vector<MaterialTextureOwner> owners;
+        ce::dynamic_array<MaterialTextureOwner> owners;
         for (const auto& texture : source.textures) owners.push_back({texture.propertyName, texture.owner});
         own::shared_owner<const LX::Runtime::Instance> runtime;
         bool prepared;
         if (source.hasCodeValues)
         {
             own::shared_owner<const LX::Runtime::ShaderGeneration> shader;
-            std::vector<std::uint16_t> keywords;
+            ce::dynamic_array<std::uint16_t> keywords;
             prepared = LX::Runtime::CreateCodeShader(meta, layout, handle, shader, outError) &&
                 experiment::NormalizeMaterialKeywordSelections(source.material, meta.keywords, keywords, outError) &&
                 LX::Runtime::BuildInstance(std::move(shader), source.codeValues, keywords, owners, runtime, outError);
@@ -314,7 +315,7 @@ namespace ExperimentMaterialSealing
             return false;
         }
 
-        std::vector<EnhancedMaterialTextureBinding> bindings;
+        ce::dynamic_array<EnhancedMaterialTextureBinding> bindings;
         bindings.reserve(static_cast<std::size_t>(std::count_if(
             meta.properties.begin(), meta.properties.end(),
             [](const ShaderPropertyDesc& property)

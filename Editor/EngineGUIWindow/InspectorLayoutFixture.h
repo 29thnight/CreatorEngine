@@ -1,4 +1,7 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
 // PHASE 21 W2-I3 — 리플렉션 경로의 **모양** 자극물.
 //
 // 왜 합성인가. W2-I3 의 남은 몫은 경로가 아니라 중첩 구조체·배열·맵이라는 모양이다.
@@ -42,7 +45,7 @@ namespace editor::inspector
         int depth{ 2 };
         std::string title{ "branch title" };
         InspectorFixtureLeaf leaf{};
-        std::vector<float> samples{ 0.25f, 0.5f, 0.75f };
+        ce::dynamic_array<float> samples{ 0.25f, 0.5f, 0.75f };
     };
 
     struct [[reflgen::reflect]] InspectorLayoutFixture
@@ -57,16 +60,16 @@ namespace editor::inspector
         math::vector3 position{ -12.5f, 3.25f, 1024.f };
         math::vector4 plane{ 0.f, 1.f, 0.f, -2.5f };
         InspectorFixtureBranch branch{};
-        std::vector<float> weights{ 0.1f, 0.2f, 0.3f };                       // 스칼라 시퀀스
-        std::vector<std::string> names{ "alpha", "a much longer element name that should clip" };
-        std::vector<math::vector3> points{ { 1.f, 2.f, 3.f }, { -100.f, 2000.f, 0.5f } }; // 드로어 원소
-        std::vector<std::uint16_t> smallIds{ 3, 65535 };                      // 폭만 다른 정수
-        std::array<float, 3> fixed{ 1.f, 2.f, 3.f };                           // 크기 고정
-        std::set<int> tags{ 4, 8, 15 };                                        // 읽기 전용 원소
-        std::map<std::string, float> scores{
+        ce::dynamic_array<float> weights{ 0.1f, 0.2f, 0.3f };                       // 스칼라 시퀀스
+        ce::dynamic_array<std::string> names{ "alpha", "a much longer element name that should clip" };
+        ce::dynamic_array<math::vector3> points{ { 1.f, 2.f, 3.f }, { -100.f, 2000.f, 0.5f } }; // 드로어 원소
+        ce::dynamic_array<std::uint16_t> smallIds{ 3, 65535 };                      // 폭만 다른 정수
+        ce::fixed_array<float, 3> fixed{ 1.f, 2.f, 3.f };                           // 크기 고정
+        ce::engine_ordered_set<int> tags{ 4, 8, 15 };                                        // 읽기 전용 원소
+        ce::engine_ordered_map<std::string, float> scores{
             { "short", 1.f },
             { "a very long map key that must be clipped by the label column", 2.f } };
-        std::map<std::string, InspectorFixtureLeaf> leaves{ { "first", {} }, { "second", {} } };
-        std::vector<InspectorFixtureBranch> branches{ {}, {} };                // reflect 원소
+        ce::engine_ordered_map<std::string, InspectorFixtureLeaf> leaves{ { "first", {} }, { "second", {} } };
+        ce::dynamic_array<InspectorFixtureBranch> branches{ {}, {} };                // reflect 원소
     };
 }

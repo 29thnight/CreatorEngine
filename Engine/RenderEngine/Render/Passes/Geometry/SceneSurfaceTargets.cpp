@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #include "SceneSurfaceTargets.h"
 #include "../../../../Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -42,7 +43,7 @@ void SceneSurfaceTargets::DeclareVisibility(EnhancedRenderGraph& graph, const En
         {{visibility, RHIResourceState::RenderTarget, access}, {depth, RHIResourceState::DepthWrite, access}},
         [visibility, depth, resources = context.resources](const EnhancedRenderGraph::ExecuteContext& execution)
         {
-            const std::array colors{execution.ResolveHandle(visibility)};
+            const ce::fixed_array colors{execution.ResolveHandle(visibility)};
             const auto depthTarget = RHIDepthTargetDesc::Depth(execution.ResolveHandle(depth), kDepthFormat);
             const auto targets = resources->CreateRenderTargets(colors, &depthTarget);
             if (!targets.IsValid())
@@ -65,8 +66,8 @@ void SceneSurfaceTargets::DeclareSurface(EnhancedRenderGraph& graph, const Enhan
     }
     static const char* names[5] = {
         "GBuffer.Diffuse", "GBuffer.MetalRough", "GBuffer.Normal", "GBuffer.Emissive", "GBuffer.Bitmask"};
-    std::array<RGHandle, 5> colors{};
-    std::vector<EnhancedRenderGraph::RGPassUsage> usages;
+    ce::fixed_array<RGHandle, 5> colors{};
+    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> usages;
     const auto access = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder
         ? RGAccessMode::LegacyState : RGAccessMode::Write;
     for (uint32_t index = 0; index < colors.size(); ++index)
@@ -88,7 +89,7 @@ void SceneSurfaceTargets::DeclareSurface(EnhancedRenderGraph& graph, const Enhan
     graph.AddPass("METEOR.Scene.SurfaceResolve.Clear", usages,
         [colors, resources = context.resources](const EnhancedRenderGraph::ExecuteContext& execution)
         {
-            std::array<RHITextureHandle, 5> handles{};
+            ce::fixed_array<RHITextureHandle, 5> handles{};
             for (uint32_t index = 0; index < handles.size(); ++index)
             {
                 handles[index] = execution.ResolveHandle(colors[index]);

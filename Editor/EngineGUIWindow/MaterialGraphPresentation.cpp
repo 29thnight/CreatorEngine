@@ -1,3 +1,7 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "MaterialGraphPresentation.h"
 #include "../../Lattice/Core/LXNodeDefinition.h"
 #include "../ImGuiHelper/EditorIcons.h"
@@ -194,10 +198,10 @@ bool BeginHeaderCombo(const char* id, HeaderIcon icon, const char* label, float 
 }
 } // namespace
 
-std::vector<MaterialNodeMenuEntry> MaterialNodeMenuEntries(const LX::LXMaterialDefinitions& definitions,
+ce::dynamic_array<MaterialNodeMenuEntry> MaterialNodeMenuEntries(const LX::LXMaterialDefinitions& definitions,
                                                            std::string_view search)
 {
-    std::map<std::string, std::size_t> titleCounts;
+    ce::engine_ordered_map<std::string, std::size_t> titleCounts;
     for (const auto& [type, schema] : definitions.schemas)
     {
         const auto* definition = definitions.nodes->Find(type);
@@ -207,7 +211,7 @@ std::vector<MaterialNodeMenuEntry> MaterialNodeMenuEntries(const LX::LXMaterialD
         }
     }
 
-    std::vector<MaterialNodeMenuEntry> entries;
+    ce::dynamic_array<MaterialNodeMenuEntry> entries;
     for (const auto& [type, schema] : definitions.schemas)
     {
         const auto* definition = definitions.nodes->Find(type);
@@ -248,7 +252,7 @@ std::optional<std::string> DrawMaterialNodeAddMenu(const LX::LXMaterialDefinitio
         }
         ImGui::PopID();
     };
-    std::set<std::string> drawnGroups;
+    ce::engine_ordered_set<std::string> drawnGroups;
     for (const auto& entry : entries)
     {
         if (entry.group.empty())
@@ -317,8 +321,8 @@ void DrawMaterialContextSelector()
 }
 
 MaterialBarAction DrawMaterialDataBar(std::string& name, bool dirty, bool editable, bool showGrid, bool snapToGrid,
-                                      const std::function<void()>& materialMenu,
-                                      const std::function<void()>& overlayMenu, bool automaticPreview)
+                                      const ce::owned_func<void()>& materialMenu,
+                                      const ce::owned_func<void()>& overlayMenu, bool automaticPreview)
 {
     const float scale = LX::CanvasUiScale();
     ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2{});
@@ -538,7 +542,7 @@ LX::LXNodeItemRegistry MaterialItems(const LX::LXMaterialDefinitions& definition
             continue;
         }
         const auto& spec = definition->defaults;
-        std::vector<LXNodeRow> rows;
+        ce::dynamic_array<LXNodeRow> rows;
         for (const auto& [key, value] : spec.properties)
         {
             // Blender's renderer selector is reference metadata. CreatorEngine

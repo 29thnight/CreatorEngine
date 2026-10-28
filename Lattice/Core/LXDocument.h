@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 
 #include "LXGraph.h"
@@ -25,7 +26,7 @@ struct LXCreateGroup
 {
     std::string name;
     LXGraph body;
-    std::vector<LXGroupSocket> sockets;
+    ce::dynamic_array<LXGroupSocket> sockets;
 };
 
 struct LXCreateGroupInstance
@@ -37,7 +38,7 @@ struct LXCreateGroupInstance
 
 struct LXCollapseToGroup
 {
-    std::vector<Id> nodes;
+    ce::dynamic_array<Id> nodes;
     std::string name;
     Id idFloor = 0;
 };
@@ -53,7 +54,7 @@ struct LXUpdateGroup
     Id group = 0;
     std::string name;
     LXGraph body;
-    std::vector<LXGroupSocket> sockets;
+    ce::dynamic_array<LXGroupSocket> sockets;
 };
 
 struct LXAddGroupBoundaryNode
@@ -84,7 +85,7 @@ struct LXRemoveNode
 
 struct LXRemoveNodes
 {
-    std::vector<Id> nodes;
+    ce::dynamic_array<Id> nodes;
 };
 
 struct LXAddConnectedNode
@@ -151,7 +152,7 @@ struct LXSetNodePosition
 
 struct LXSetNodePositions
 {
-    std::vector<NodePosition> positions;
+    ce::dynamic_array<NodePosition> positions;
 };
 
 struct LXSetNodeCollapsed
@@ -167,7 +168,7 @@ struct LXAddFrame
     float y = 0.0f;
     float width = 0.0f;
     float height = 0.0f;
-    std::vector<Id> members;
+    ce::dynamic_array<Id> members;
 };
 
 struct LXRemoveFrame
@@ -256,8 +257,8 @@ struct LXCommandResult
     std::string message;
     std::uint64_t revision = 0;
     Id created = 0;
-    std::vector<Id> createdNodes;
-    std::vector<Issue> issues;
+    ce::dynamic_array<Id> createdNodes;
+    ce::dynamic_array<Issue> issues;
 };
 
 class LXDocument
@@ -279,9 +280,9 @@ class LXDocument
     const LXGraph& Graph() const { return graph_; }
     LXGraph& GraphForCanvas() { return graph_; }
     LXCommandResult Execute(const LXCommand& command, std::uint64_t expectedRevision);
-    bool PreviewNodePositions(const std::vector<NodePosition>& positions);
-    LXCommandResult FinishNodePositionPreview(const std::vector<NodePosition>& start,
-                                              const std::vector<NodePosition>& final);
+    bool PreviewNodePositions(const ce::dynamic_array<NodePosition>& positions);
+    LXCommandResult FinishNodePositionPreview(const ce::dynamic_array<NodePosition>& start,
+                                              const ce::dynamic_array<NodePosition>& final);
     bool PreviewFramePosition(Id frame, float x, float y);
     LXCommandResult FinishFramePositionPreview(Id frame, float startX, float startY, float finalX, float finalY);
     bool Reload(std::string* error = nullptr);

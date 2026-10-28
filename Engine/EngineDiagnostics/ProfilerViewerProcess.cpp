@@ -1,3 +1,6 @@
+#include "../Utility_Framework/Foundation/EngineFunc.h"
+#include "../Utility_Framework/Foundation/EngineStorage.h"
+#include "../Containers/ContainerAPI.h"
 #include "ProfilerViewerProcess.h"
 #include "ProfilerViewerTransport.h"
 #include "ProfileScope.h"
@@ -46,7 +49,7 @@ namespace ce::profiler_viewer
             {
                 return false;
             }
-            std::vector<std::byte> storage(bytes);
+            ce::dynamic_array<std::byte> storage(bytes);
             auto* attributes = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(storage.data());
             if (!InitializeProcThreadAttributeList(attributes, 1, 0, &bytes))
             {
@@ -81,7 +84,7 @@ namespace ce::profiler_viewer
 
         security::handle create_pipe(const connection_options& options)
         {
-            std::vector<std::byte> sid;
+            ce::dynamic_array<std::byte> sid;
             if (!security::logon_sid(GetCurrentProcess(), sid))
             {
                 return {};
@@ -160,7 +163,7 @@ namespace ce::profiler_viewer
             command kind{};
             std::uint64_t value = 0;
             std::uint64_t capture_generation = 0;
-            std::vector<std::byte> diagnostic;
+            ce::dynamic_array<std::byte> diagnostic;
         };
 
         struct publication
@@ -173,7 +176,7 @@ namespace ce::profiler_viewer
 
         struct encoded_blob
         {
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
             message_kind begin = message_kind::capture_begin;
             std::uint64_t clear_revision = 0;
             std::uint64_t capture_generation = 0;
@@ -197,7 +200,7 @@ namespace ce::profiler_viewer
         mutable std::mutex mutex;
         launch_status launch;
         target_identity target;
-        std::deque<engine_detail::queued_command> commands;
+        ce::segmented_deque<engine_detail::queued_command> commands;
         std::shared_ptr<const engine_detail::publication> latest;
         diagnostic_publisher publish_diagnostics;
         diagnostic_handler apply_diagnostic;
@@ -500,11 +503,11 @@ namespace ce::profiler_viewer
             capture_session_ptr last_capture;
             std::shared_ptr<const diagnostic_encoder> last_diagnostics;
             std::future<engine_detail::encoded_blob> encoding;
-            std::future<std::vector<std::byte>> diagnostic_encoding;
-            std::vector<std::byte> diagnostic_outgoing;
+            std::future<ce::dynamic_array<std::byte>> diagnostic_encoding;
+            ce::dynamic_array<std::byte> diagnostic_outgoing;
             std::size_t diagnostic_offset = 0;
             std::uint64_t diagnostic_transfer_id = 0;
-            std::vector<std::byte> outgoing;
+            ce::dynamic_array<std::byte> outgoing;
             std::size_t outgoing_offset = 0;
             message_kind outgoing_kind = message_kind::capture_part;
             std::uint64_t transfer_id = 0;
@@ -658,7 +661,7 @@ namespace ce::profiler_viewer
                     {
                         last_diagnostics = publication->diagnostic_encoder;
                         diagnostic_encoding_busy.store(true, std::memory_order_release);
-                        std::packaged_task<std::vector<std::byte>()> task([owner = shared_from_this(), frozen = last_diagnostics]
+                        std::packaged_task<ce::dynamic_array<std::byte>()> task([owner = shared_from_this(), frozen = last_diagnostics]
                         {
                             struct release_slot
                             {
@@ -685,7 +688,7 @@ namespace ce::profiler_viewer
                     }
                     if (outgoing.empty() && !encoding.valid() && !encoding_busy.load(std::memory_order_acquire))
                     {
-                        std::function<engine_detail::encoded_blob()> encode;
+                        ce::owned_func<engine_detail::encoded_blob()> encode;
                         if (publication->snapshot.capture && publication->snapshot.capture != last_capture)
                         {
                             last_capture = publication->snapshot.capture;
@@ -902,7 +905,7 @@ namespace ce::profiler_viewer
         {
             return;
         }
-        std::deque<engine_detail::queued_command> commands;
+        ce::segmented_deque<engine_detail::queued_command> commands;
         target_identity identity;
         {
             std::unique_lock lock(owner.mutex, std::try_to_lock);

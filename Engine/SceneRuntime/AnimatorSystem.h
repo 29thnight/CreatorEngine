@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -38,8 +40,8 @@ struct AnimatorLayerMaskCache final
     bool m_useAll{};
     bool m_useUpper{};
     bool m_useLower{};
-    std::vector<NamedBone> m_namedBones{};
-    std::vector<float> m_weights{};
+    ce::dynamic_array<NamedBone> m_namedBones{};
+    ce::dynamic_array<float> m_weights{};
 };
 
 struct AnimatorIKBinding final
@@ -127,8 +129,8 @@ struct AnimInstance final
     };
 
     std::uint32_t slot{};
-    std::vector<math::matrix4x4> localTransforms{};
-    std::vector<math::matrix4x4> finalTransforms{};
+    ce::dynamic_array<math::matrix4x4> localTransforms{};
+    ce::dynamic_array<math::matrix4x4> finalTransforms{};
 #if CE_DEVELOPMENT && !CE_SHIPPING
     // Transient diagnostic owner; never serialized or set by ordinary playback.
     // The fixture publishes its palette on GT after the animation batch joins.
@@ -141,33 +143,33 @@ struct AnimInstance final
     bool editorPreviewPlaying{};
     bool editorPreviewPaused{};
     bool captureTaskExecution{};
-    std::vector<std::uint32_t> executedTaskIndices{};
+    ce::dynamic_array<std::uint32_t> executedTaskIndices{};
     float timeElapsed{};
     float nextTimeElapsed{};
     AnimatorPlaybackControl control{};
-    std::vector<math::matrix4x4> poseGlobals{};
+    ce::dynamic_array<math::matrix4x4> poseGlobals{};
     // Reused parent-first reachability scratch for IK subtree recomputation.
-    std::vector<std::uint8_t> ikAffectedBones{};
+    ce::dynamic_array<std::uint8_t> ikAffectedBones{};
     float optionalIKWeight{ 1.f };
     // Local-space inertial offsets bridge a snapped L4 pose back to full blending.
-    std::vector<Animation::AdditiveDelta> blendRecoveryOffsets{};
+    ce::dynamic_array<Animation::AdditiveDelta> blendRecoveryOffsets{};
     Animation::LocalPose blendRecoverySourcePose{};
     float blendRecoveryElapsed{};
     bool blendRecoveryPending{};
     bool blendRecoveryActive{};
     bool l4SnappedBlend{};
-    std::vector<Animation::LocalTransform> bindLocals{};
+    ce::dynamic_array<Animation::LocalTransform> bindLocals{};
     std::uint64_t bindSkeletonSerial{};
     std::uint32_t activeBoneCount{};
     std::uint32_t evaluatedBoneSamples{};
     Animation::LocalPose l6PreviousPose{};
     Animation::LocalPose l6LatestPose{};
-    std::vector<math::matrix4x4> l6PreviousLocals{};
-    std::vector<math::matrix4x4> l6LatestLocals{};
-    std::vector<math::matrix4x4> l6PreviousFinals{};
-    std::vector<math::matrix4x4> l6LatestFinals{};
-    std::vector<math::matrix4x4> l6PreviousGlobals{};
-    std::vector<math::matrix4x4> l6LatestGlobals{};
+    ce::dynamic_array<math::matrix4x4> l6PreviousLocals{};
+    ce::dynamic_array<math::matrix4x4> l6LatestLocals{};
+    ce::dynamic_array<math::matrix4x4> l6PreviousFinals{};
+    ce::dynamic_array<math::matrix4x4> l6LatestFinals{};
+    ce::dynamic_array<math::matrix4x4> l6PreviousGlobals{};
+    ce::dynamic_array<math::matrix4x4> l6LatestGlobals{};
     float l6PublishedAlpha{ 1.f };
     std::uint8_t l6Phase{};
     std::uint8_t l6NextPhase{};
@@ -181,32 +183,32 @@ struct AnimInstance final
     std::uint64_t poseStorageGrowths{};
     std::size_t workerPoseBufferCount{};
     std::uintptr_t workerPosePoolIdentity{};
-    std::array<const void*, 3> workerCurrentStorage{};
-    std::vector<std::array<Animation::ClipSamplingCursor, 2>> samplingCursors{};
+    ce::fixed_array<const void*, 3> workerCurrentStorage{};
+    ce::dynamic_array<ce::fixed_array<Animation::ClipSamplingCursor, 2>> samplingCursors{};
     animation::task_list taskList{};
-    std::vector<AnimatorIKBinding> ikBindings{};
-    std::vector<AnimatorIKSnapshot> ikSnapshots{};
-    std::vector<AnimatorBoneTransformBinding> boneTransformBindings{};
-    std::vector<AnimatorBoneTransformSnapshot> boneTransformSnapshots{};
+    ce::dynamic_array<AnimatorIKBinding> ikBindings{};
+    ce::dynamic_array<AnimatorIKSnapshot> ikSnapshots{};
+    ce::dynamic_array<AnimatorBoneTransformBinding> boneTransformBindings{};
+    ce::dynamic_array<AnimatorBoneTransformSnapshot> boneTransformSnapshots{};
     float significance{ 1.f };
     float projectedHeight{ 1.f };
     animation::quality_stage qualityStage{ animation::quality_stage::l0 };
     std::uint16_t budgetPromotionFrames{};
     // -1 selects the camera policy. Product probes may force L0-L6 or L7.
     int qualityOverride{ -1 };
-    std::vector<std::span<const assets::ModelAnimationTrack* const>> layerTrackTables{};
-    std::vector<AnimatorLayerMaskCache> layerMaskCaches{};
-    std::vector<std::uint8_t> layerSelected{};
-    std::vector<std::size_t> eventOrderScratch{};
-    std::vector<ScriptComponent*> eventScriptsScratch{};
-    std::vector<std::uint8_t> boneRegions{};
+    ce::dynamic_array<std::span<const assets::ModelAnimationTrack* const>> layerTrackTables{};
+    ce::dynamic_array<AnimatorLayerMaskCache> layerMaskCaches{};
+    ce::dynamic_array<std::uint8_t> layerSelected{};
+    ce::dynamic_array<std::size_t> eventOrderScratch{};
+    ce::dynamic_array<ScriptComponent*> eventScriptsScratch{};
+    ce::dynamic_array<std::uint8_t> boneRegions{};
     bool tickPathLogged{};
     // Dense lookup order is independent of authored controller layer order.
     // Page records keep in-progress transitions stable while layers grow.
-    std::vector<std::unique_ptr<ControllerSlot[]>> controllerPages{};
-    std::vector<ControllerSlot*> freeControllerSlots{};
-    std::vector<ControllerSlot*> controllerSlots{};
-    std::unordered_map<std::uint64_t, std::size_t> controllerSlotById{};
+    ce::dynamic_array<std::unique_ptr<ControllerSlot[]>> controllerPages{};
+    ce::dynamic_array<ControllerSlot*> freeControllerSlots{};
+    ce::dynamic_array<ControllerSlot*> controllerSlots{};
+    ce::engine_node_map<std::uint64_t, std::size_t> controllerSlotById{};
 
     [[nodiscard]] ControllerPlayback& GetControllerPlayback(
         std::uint64_t id, own::weak_owner<AnimationController> owner)
@@ -357,14 +359,14 @@ private:
         bool occupied{};
     };
     std::mutex m_instanceMutex{};
-    std::vector<InstanceSlot> m_instanceSlots{};
-    std::vector<std::uint32_t> m_freeInstanceSlots{};
+    ce::dynamic_array<InstanceSlot> m_instanceSlots{};
+    ce::dynamic_array<std::uint32_t> m_freeInstanceSlots{};
     // Records are contiguous within each page and never relocate. The dense
     // pointer order can swap/pop without invalidating a worker's record address.
-    std::vector<std::unique_ptr<AnimInstance[]>> m_instancePages{};
-    std::vector<AnimInstance*> m_freeInstanceRecords{};
-    std::vector<AnimInstance*> m_instances{};
-    std::vector<Animator*> m_animators;
+    ce::dynamic_array<std::unique_ptr<AnimInstance[]>> m_instancePages{};
+    ce::dynamic_array<AnimInstance*> m_freeInstanceRecords{};
+    ce::dynamic_array<AnimInstance*> m_instances{};
+    ce::dynamic_array<Animator*> m_animators;
     const std::thread::id m_ownerThreadId{ std::this_thread::get_id() };
 };
 

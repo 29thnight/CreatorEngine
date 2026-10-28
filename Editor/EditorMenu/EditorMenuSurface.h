@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 // 에디터 메뉴 표면 정의 (PHASE 21 M0 · 계획서 부록 A.3) — std만 의존한다.
 //
@@ -67,7 +68,7 @@ namespace editor
         count,
     };
 
-    inline constexpr std::array all_top_menu_roots{
+    inline constexpr ce::fixed_array all_top_menu_roots{
         top_menu_root::file,
         top_menu_root::edit,
         top_menu_root::settings,
@@ -76,7 +77,7 @@ namespace editor
         top_menu_root::help,
     };
 
-    inline constexpr std::array all_popup_hosts{
+    inline constexpr ce::fixed_array all_popup_hosts{
         popup_host::hierarchy,
         popup_host::content_browser_folder,
         popup_host::content_browser_asset,

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "RHIPipelineState.h"
@@ -20,17 +21,17 @@
 namespace ModelVertexInput
 {
     [[nodiscard]] bool BuildInputElements(assets::VertexAttributeMask mask,
-        std::vector<RHIInputElement>& outElements, std::string& outError);
+        ce::dynamic_array<RHIInputElement>& outElements, std::string& outError);
 
     [[nodiscard]] bool BuildInputElements(assets::VertexAttributeMask layoutMask,
         assets::VertexAttributeMask consumedMask,
-        std::vector<RHIInputElement>& outElements, std::string& outError);
+        ce::dynamic_array<RHIInputElement>& outElements, std::string& outError);
 
     // PSO descriptor가 빌리는 배열의 주소는 프로세스 수명 동안 안정적이다.
-    [[nodiscard]] const std::vector<RHIInputElement>* ResolveInputElements(
+    [[nodiscard]] const ce::dynamic_array<RHIInputElement>* ResolveInputElements(
         assets::VertexAttributeMask mask, std::string& outError);
 
-    [[nodiscard]] const std::vector<RHIInputElement>* ResolveInputElements(
+    [[nodiscard]] const ce::dynamic_array<RHIInputElement>* ResolveInputElements(
         assets::VertexAttributeMask layoutMask,
         assets::VertexAttributeMask consumedMask, std::string& outError);
 

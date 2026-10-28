@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -31,7 +32,7 @@ struct AnimatorClipOverride final
 {
 	int clipIndex{ -1 };
 	std::optional<bool> loopOverride{};
-	std::vector<KeyFrameEvent> events{};
+	ce::dynamic_array<KeyFrameEvent> events{};
 };
 
 // Scene-authored target. Gameplay may update the world-space target and pole
@@ -89,7 +90,7 @@ struct AnimatorAnimationBinding final
 {
     own::shared_owner<const assets::ModelAnimationDescriptor> descriptor{};
     own::shared_owner<const assets::ModelSkeletonPayload> skeleton{};
-    std::vector<AnimatorAnimationClipPin> clips{};
+    ce::dynamic_array<AnimatorAnimationClipPin> clips{};
     // CEMCv11 compatibility only. A v3 binding never owns this aggregate.
     own::shared_owner<const assets::ModelAssetGeneration> legacyGeneration{};
     std::uint64_t skeletonSerial{};
@@ -292,16 +293,16 @@ public:
     bool m_ForceFullQuality{ false };
 
     [[reflgen::hidden]]
-    std::vector<TwoBoneIKConstraint> m_TwoBoneIKConstraints{};
+    ce::dynamic_array<TwoBoneIKConstraint> m_TwoBoneIKConstraints{};
 
     [[reflgen::hidden]]
-    std::vector<BoneTransformConstraint> m_BoneTransformConstraints{};
+    ce::dynamic_array<BoneTransformConstraint> m_BoneTransformConstraints{};
 
     [[reflgen::ignore]]
-    std::vector<Socket*> socketvec;
+    ce::dynamic_array<Socket*> socketvec;
 
-    std::vector<own::shared_owner<AnimationController>> m_animationControllers{};
-    std::vector<ConditionParameter*> Parameters;
+    ce::dynamic_array<own::shared_owner<AnimationController>> m_animationControllers{};
+    ce::dynamic_array<ConditionParameter*> Parameters;
 
     [[reflgen::ignore]]
     mutable std::mutex m_paramMutex;
@@ -353,7 +354,7 @@ private:
             float weight{ 1.f };
         };
         own::weak_owner<AnimationController> controller{};
-        std::vector<Bone> bones{};
+        ce::dynamic_array<Bone> bones{};
     };
 
     [[reflgen::ignore]]
@@ -375,9 +376,9 @@ private:
     [[reflgen::ignore]]
     std::uint64_t m_poseSkeletonSerial{};
     [[reflgen::ignore]]
-    std::vector<RequestedAnimationClip> m_requestedClips{};
+    ce::dynamic_array<RequestedAnimationClip> m_requestedClips{};
     [[reflgen::ignore]]
-    std::vector<DeferredAvatarMask> m_deferredAvatarMasks{};
+    ce::dynamic_array<DeferredAvatarMask> m_deferredAvatarMasks{};
 
     void ResetAnimationPose();
     void RestoreDeferredAvatarMasks();
@@ -386,7 +387,7 @@ public:
     // I5-D4e-2 — 클립별 이벤트·루프 오버라이드(위 구조 주석 참조). 영속은
     // OnAfterSerialize가 기존 씬 표기(m_Skeleton 서브트리)에 되입힌다.
     [[reflgen::ignore]]
-    std::vector<AnimatorClipOverride> m_clipOverrides{};
+    ce::dynamic_array<AnimatorClipOverride> m_clipOverrides{};
 
     void StopAnimation(float duration)
     {

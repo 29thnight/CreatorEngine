@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -240,8 +242,8 @@ private:
         RHIUploadTransactionState uploadState{ RHIUploadTransactionState::Recording };
     };
 
-    std::unordered_map<HashedGuid, Resident> m_entries;
-    std::unordered_map<HashedGuid, Entry> m_descriptions;
+    ce::engine_node_map<HashedGuid, Resident> m_entries;
+    ce::engine_node_map<HashedGuid, Entry> m_descriptions;
 
     /// 은퇴했으나 아직 GPU가 놓아 주지 않은 리소스(③). 완료값과 바이트는
     /// 공통 RHICompletionRetireQueue가 보관한다.
@@ -269,7 +271,7 @@ private:
         uint64_t completionValue{ 0 };
         RHIUploadTransactionState state{ RHIUploadTransactionState::Recording };
     };
-    std::vector<FallbackTransaction> m_fallbackTransactions;
+    ce::dynamic_array<FallbackTransaction> m_fallbackTransactions;
 
     DX12PersistentHeap m_persistentHeap;
     Stats m_stats;

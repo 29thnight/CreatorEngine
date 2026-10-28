@@ -5,7 +5,7 @@
 #error "Native consumers must import the named module directly."
 #endif
 
-
+#include "../../../Engine/Containers/Creator.Containers.h"
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace ce
@@ -101,7 +101,7 @@ namespace ce
 
       private:
         static constexpr std::size_t bits_per_block_ = 64;
-        using block_type = std::bitset<bits_per_block_>;
+        using block_type = ce::fixed_bitset<bits_per_block_>;
 
         static std::size_t block_count(std::size_t size) noexcept
         {
@@ -125,7 +125,7 @@ namespace ce
             }
         }
 
-        std::vector<block_type> blocks_;
+        ce::dynamic_array<block_type> blocks_;
         std::size_t size_{};
     };
 } // namespace ce

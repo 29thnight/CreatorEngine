@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineFunc.h"
 // PHASE 14 P3 — reader 상태.
 //
 // §6.4 가 "UI selection 과 정렬은 reader 쪽 별도 상태" 라고 적은 그 상태다.
@@ -29,7 +31,7 @@ namespace ce
     struct timeline_depth
     {
         std::uint16_t depth_ = 0;
-        std::vector<timeline_interval> intervals_;
+        ce::dynamic_array<timeline_interval> intervals_;
     };
 
     // 하나의 불변 핸들로 공개한다. 인덱스는 이 집계를, 이름 사전과 시계는
@@ -38,14 +40,14 @@ namespace ce
     {
         capture_session_ptr capture_;
         frame_aggregate aggregate_;
-        std::vector<thread_summary> threads_;
-        std::unordered_map<std::uint16_t, std::vector<timeline_depth>> lanes_;
+        ce::dynamic_array<thread_summary> threads_;
+        ce::node_hash_map<std::uint16_t, ce::dynamic_array<timeline_depth>> lanes_;
         std::uint32_t first_frame_ = 0;
         std::uint32_t last_frame_ = 0;
     };
 
     using prepared_capture_window_ptr = std::shared_ptr<const prepared_capture_window>;
-    using preparation_dispatch = std::function<void(std::function<void()>)>;
+    using preparation_dispatch = ce::owned_func<void(ce::owned_func<void()>)>;
 
     namespace detail::profile_reader_impl
     {
@@ -218,7 +220,7 @@ namespace ce
         void clamp_view() const;
         void ensure_view() const;
         void rebase_view_to_window() const;
-        std::pair<profile_tick, profile_tick> window_ticks() const;
+        ce::pair<profile_tick, profile_tick> window_ticks() const;
         void request_preparation(bool window) const;
         void cancel_preparation();
 

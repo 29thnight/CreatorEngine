@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineStorage.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -61,7 +63,7 @@ public:
         return &*textures_[index].borrow();
     }
 
-    std::vector<own::shared_owner<const Texture>> Owners() const
+    ce::dynamic_array<own::shared_owner<const Texture>> Owners() const
     {
         std::lock_guard lock(mutex_);
         return textures_;
@@ -126,7 +128,7 @@ public:
 
 private:
     mutable std::mutex mutex_;
-    std::vector<own::shared_owner<const Texture>> textures_;
-    std::unordered_map<std::uint64_t, std::size_t> indices_;
-    std::unordered_map<std::uint64_t, own::shared_owner<const Texture::CodecImage>> images_;
+    ce::dynamic_array<own::shared_owner<const Texture>> textures_;
+    ce::engine_extractable_map<std::uint64_t, std::size_t> indices_;
+    ce::engine_extractable_map<std::uint64_t, own::shared_owner<const Texture::CodecImage>> images_;
 };

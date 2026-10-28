@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -47,14 +48,14 @@ namespace ce::profiler_viewer::diagnostics
         bool valid{};
         bool hasDirectionalLight{};
         std::uint32_t lightIndex{};
-        std::array<float, 3> lightDirection{};
+        ce::fixed_array<float, 3> lightDirection{};
         float shadowDistance{};
         float slopeScale{};
         std::uint32_t casterCandidates{};
         bool gpuVisibilityActive{};
         std::uint64_t gpuSubmittedCandidates{};
         std::uint64_t gpuSubmittedBins{};
-        std::array<rendering_shadow_cascade, 3> cascades{};
+        ce::fixed_array<rendering_shadow_cascade, 3> cascades{};
     };
 
     struct rendering_display
@@ -109,8 +110,8 @@ namespace ce::profiler_viewer::diagnostics
         std::string skinningFallback;
         std::uint32_t decalCount{};
         std::uint32_t decalBatchCount{};
-        std::array<rendering_shadow_stats, rendering_view_count> shadow{};
-        std::array<rendering_display, rendering_view_count> views{};
+        ce::fixed_array<rendering_shadow_stats, rendering_view_count> shadow{};
+        ce::fixed_array<rendering_display, rendering_view_count> views{};
         double cpuMs{};
         double gpuMs{};
         rendering_temporal_provenance temporalProvenance, gpuTemporalProvenance;
@@ -123,8 +124,8 @@ namespace ce::profiler_viewer::diagnostics
         std::string lastGpuCollectError;
         std::uint64_t graveyardCount{};
         std::string lastError;
-        std::vector<rendering_pass_timing> passTimings;
-        std::vector<std::string> validationMessages;
+        ce::dynamic_array<rendering_pass_timing> passTimings;
+        ce::dynamic_array<std::string> validationMessages;
         std::uint64_t omittedPassTimings{};
         std::uint64_t omittedValidationMessages{};
         bool textTruncated{};
@@ -133,7 +134,7 @@ namespace ce::profiler_viewer::diagnostics
     // Explicit little-endian fields, bounded strings/counts, finite floats, exact
     // consumption, and schema validation. Reads v1/v2/v3; writes v3. Failed
     // decode never changes output. Old payloads cannot prove spatial exclusion.
-    std::vector<std::byte> encode_rendering(const rendering_snapshot& snapshot);
+    ce::dynamic_array<std::byte> encode_rendering(const rendering_snapshot& snapshot);
     bool decode_rendering(std::span<const std::byte> bytes, rendering_snapshot& snapshot);
     // Delayed GPU data must identify this completed display, including its extent.
     bool matches_gpu_measurement(const rendering_snapshot& snapshot, const rendering_display& display);

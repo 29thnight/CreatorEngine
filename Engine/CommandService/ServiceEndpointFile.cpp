@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 // LC4 (PHASE 14.5) — endpoint 파일.
 //
 // ★ 이 파일도 Win32 API 를 쓴다(프로세스 생존 확인·파일 ACL). 소켓과 같은
@@ -83,7 +84,7 @@ namespace CommandService
         ///
         ///   이제 프로세스 토큰의 SID 로 명시적 DACL 을 만들고 상속을 끊는다
         ///   (`PROTECTED_DACL_SECURITY_INFORMATION`).
-        bool BuildOwnerOnlyDacl(std::vector<unsigned char>& outSelfRelative, std::string& outError)
+        bool BuildOwnerOnlyDacl(ce::dynamic_array<unsigned char>& outSelfRelative, std::string& outError)
         {
             HANDLE token = nullptr;
             if (!::OpenProcessToken(::GetCurrentProcess(), TOKEN_QUERY, &token))
@@ -94,7 +95,7 @@ namespace CommandService
 
             DWORD size = 0;
             ::GetTokenInformation(token, TokenUser, nullptr, 0, &size);
-            std::vector<unsigned char> buffer(size);
+            ce::dynamic_array<unsigned char> buffer(size);
             if (0 == size || !::GetTokenInformation(token, TokenUser, buffer.data(), size, &size))
             {
                 ::CloseHandle(token);
@@ -191,7 +192,7 @@ namespace CommandService
         //
         //   쓴 뒤에 권한을 고치면 그 사이에 토큰이 노출된 파일이 존재한다.
         //   `CreateFileW` 에 보안 서술자를 주면 그 창이 없다.
-        std::vector<unsigned char> descriptor;
+        ce::dynamic_array<unsigned char> descriptor;
         if (!BuildOwnerOnlyDacl(descriptor, outError))
         {
             // ★ 권한을 못 세우면 **쓰지 않는다.**

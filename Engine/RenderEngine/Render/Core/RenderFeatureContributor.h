@@ -1,4 +1,6 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -56,7 +58,7 @@ struct RenderFeatureContext
     /// 각 실행 슬롯이 소유한 준비 데이터를 제공한다.
     const EnhancedGizmoSceneData* gizmoScene{ nullptr };
     uint32_t viewCount{1};
-    std::function<const EnhancedGizmoSceneData*(uint32_t)> gizmoSceneForView;
+    ce::owned_func<const EnhancedGizmoSceneData*(uint32_t)> gizmoSceneForView;
     uint32_t renderWidth{}, renderHeight{}, displayWidth{}, displayHeight{};
 };
 
@@ -133,5 +135,5 @@ class RenderFeatureContributors
         RenderFeatureStage stage;
         own::shared_owner<IRenderFeatureContributor> contributor;
     };
-    std::vector<Entry> m_entries;
+    ce::dynamic_array<Entry> m_entries;
 };

@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -53,13 +54,13 @@ struct EnhancedPbrCapture
     bool replayExtensions{ false }; // Optional archive/replay diagnostics, not BASE-0 acceptance.
     bool latticeReplayExtension{ false }; // Independent material archive opt-in.
     std::optional<EnhancedCameraReplayInput> cameraReplay;
-    std::vector<uint8_t> cameraInputBytes;
+    ce::dynamic_array<uint8_t> cameraInputBytes;
     std::optional<EnhancedDrawReplayInput> drawReplay;
-    std::vector<uint8_t> drawInputBytes;
+    ce::dynamic_array<uint8_t> drawInputBytes;
     std::optional<EnhancedLatticeReplayInput> latticeReplay;
-    std::vector<uint8_t> latticeInputBytes;
+    ce::dynamic_array<uint8_t> latticeInputBytes;
     Diagnostics::Document manifest;
-    std::array<RHIReadback, 12> readbacks{};
+    ce::fixed_array<RHIReadback, 12> readbacks{};
     struct StageReadback
     {
         std::string name;
@@ -71,8 +72,8 @@ struct EnhancedPbrCapture
         std::string name;
         size_t readbackIndex{};
     };
-    std::vector<StageReadback> stageReadbacks;
-    std::vector<StageDiagnostic> stages;
+    ce::dynamic_array<StageReadback> stageReadbacks;
+    ce::dynamic_array<StageDiagnostic> stages;
 
     bool DeclareHistory(IRenderDeviceServices& resources, EnhancedRenderGraph& graph,
         RGHandle handle, uint32_t width, uint32_t height, std::string& error)
@@ -271,7 +272,7 @@ struct EnhancedPbrCapture
         }
         const auto matrix = [](Diagnostics::Node node, const math::matrix4x4& value)
         {
-            std::array<float, 16> values;
+            ce::fixed_array<float, 16> values;
             static_assert(sizeof(value) == sizeof(values));
             std::memcpy(values.data(), &value, sizeof(value));
             node.SetSequence();
@@ -285,7 +286,7 @@ struct EnhancedPbrCapture
         for (const auto& light : lights)
         {
             // EnhancedLight has an asserted packed 16-float layout.
-            std::array<float, 16> values;
+            ce::fixed_array<float, 16> values;
             std::memcpy(values.data(), &light, sizeof(light));
             auto node = root["lights"].Append();
             node.SetSequence();
@@ -485,7 +486,7 @@ struct EnhancedPbrCapture
             const auto& geometry = draw.geometry->Source()->Geometry();
             WriteMeshIdentity(item, geometry.handle);
             item["world"].SetSequence();
-            std::array<float, 16> world;
+            ce::fixed_array<float, 16> world;
             std::memcpy(world.data(), &draw.geometry->Source()->World(), sizeof(world));
             for (float value : world) item["world"].Append() << value;
             item["pose"].SetSequence();
@@ -872,7 +873,7 @@ struct EnhancedPbrCapture
         node["budgetMB"] << memory.budgetMB;
     }
 
-    void RecordGpuTiming(const std::vector<EnhancedLivePassTiming>& passes,
+    void RecordGpuTiming(const ce::dynamic_array<EnhancedLivePassTiming>& passes,
         const EnhancedLiveGpuSpan& span, double totalMs, const std::string& error)
     {
         auto node = manifest.Root()["measurement"];
@@ -1062,7 +1063,7 @@ struct EnhancedPbrCapture
                     return false;
                 }
                 const uint32_t channels = i == 7 ? 2 : i == 4 || i >= 8 ? 1 : 4;
-                std::vector<float> pixels;
+                ce::dynamic_array<float> pixels;
                 pixels.reserve(static_cast<size_t>(image.width) * image.height * channels);
                 float minimum = std::numeric_limits<float>::max();
                 float maximum = std::numeric_limits<float>::lowest();
@@ -1110,7 +1111,7 @@ struct EnhancedPbrCapture
                 uint32_t width{}, height{};
                 uint64_t nonfinite{};
             };
-            std::vector<StageImage> stageImages;
+            ce::dynamic_array<StageImage> stageImages;
             stageImages.reserve(stageReadbacks.size());
             for (const auto& stage : stageReadbacks)
             {
@@ -1119,7 +1120,7 @@ struct EnhancedPbrCapture
                 {
                     return false;
                 }
-                std::vector<float> pixels;
+                ce::dynamic_array<float> pixels;
                 pixels.reserve(static_cast<size_t>(image.width) * image.height * 4);
                 uint64_t nonfinite = 0;
                 for (uint32_t y = 0; y < image.height; ++y)

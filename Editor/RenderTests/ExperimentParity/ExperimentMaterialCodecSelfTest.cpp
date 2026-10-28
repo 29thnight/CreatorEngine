@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "ExperimentParity/ExperimentMaterialCodecSelfTest.h"
 
 #include "Experiment/AssetIdentity.h"
@@ -38,38 +39,38 @@ namespace RenderTest
         {
             if (left.index() != right.index()) return false;
             if (const auto* value = std::get_if<bool>(&left))
-                return *value == std::get<bool>(right);
+                return *value == ce::get<bool>(right);
             if (const auto* value = std::get_if<std::int32_t>(&left))
-                return *value == std::get<std::int32_t>(right);
+                return *value == ce::get<std::int32_t>(right);
             if (const auto* value = std::get_if<std::uint32_t>(&left))
-                return *value == std::get<std::uint32_t>(right);
+                return *value == ce::get<std::uint32_t>(right);
             if (const auto* value = std::get_if<float>(&left))
-                return *value == std::get<float>(right);
+                return *value == ce::get<float>(right);
             if (const auto* value = std::get_if<math::vector2>(&left))
             {
-                const auto& other = std::get<math::vector2>(right);
+                const auto& other = ce::get<math::vector2>(right);
                 return value->x == other.x && value->y == other.y;
             }
             if (const auto* value = std::get_if<math::vector3>(&left))
             {
-                const auto& other = std::get<math::vector3>(right);
+                const auto& other = ce::get<math::vector3>(right);
                 return value->x == other.x && value->y == other.y
                     && value->z == other.z;
             }
             if (const auto* value = std::get_if<math::vector4>(&left))
             {
-                const auto& other = std::get<math::vector4>(right);
+                const auto& other = ce::get<math::vector4>(right);
                 return value->x == other.x && value->y == other.y
                     && value->z == other.z && value->w == other.w;
             }
             if (const auto* value = std::get_if<std::string>(&left))
-                return *value == std::get<std::string>(right);
+                return *value == ce::get<std::string>(right);
             if (const auto* value =
                 std::get_if<experiment::TextureReference>(&left))
             {
                 // logicalName/fallbackPath는 정본이 아니라 저장되지 않는다 —
                 // 보존 대상 필드만 비교한다.
-                const auto& other = std::get<experiment::TextureReference>(right);
+                const auto& other = ce::get<experiment::TextureReference>(right);
                 return value->assetId == other.assetId
                     && value->colorSpace == other.colorSpace
                     && value->coordinates == other.coordinates
@@ -240,8 +241,8 @@ namespace RenderTest
             check.Check(RoundTrip(material, restored, dumped, error)
                 && restored.blendMode == material.blendMode
                 && restored.properties.size() == 2
-                && std::get<bool>(restored.properties[0].value)
-                && std::get<float>(restored.properties[1].value) == .375f,
+                && ce::get<bool>(restored.properties[0].value)
+                && ce::get<float>(restored.properties[1].value) == .375f,
                 "W4 MASK/doubleSided/cutoff authoring round trip");
         }
 

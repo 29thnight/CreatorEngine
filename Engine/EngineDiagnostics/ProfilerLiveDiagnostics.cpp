@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "ProfilerLiveDiagnostics.h"
 #include "ProfilerViewerProtocol.h"
 
@@ -19,7 +20,7 @@ namespace ce::profiler_viewer::diagnostics
 
         struct writer
         {
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
 
             template<class T> bool scalar(const T& value)
             {
@@ -253,7 +254,7 @@ namespace ce::profiler_viewer::diagnostics
         }
 
         template<class T, class Visit>
-        bool write_rows(writer& ar, const std::vector<T>& rows, std::size_t maximum, Visit visit)
+        bool write_rows(writer& ar, const ce::dynamic_array<T>& rows, std::size_t maximum, Visit visit)
         {
             if (rows.size() > maximum || !ar(static_cast<std::uint32_t>(rows.size())))
             {
@@ -270,7 +271,7 @@ namespace ce::profiler_viewer::diagnostics
         }
 
         template<class T, class Visit>
-        bool read_rows(reader& ar, std::vector<T>& rows, std::size_t maximum, Visit visit)
+        bool read_rows(reader& ar, ce::dynamic_array<T>& rows, std::size_t maximum, Visit visit)
         {
             std::uint32_t count{};
             if (!ar(count) || count > maximum || count > ar.bytes.size() - ar.offset)
@@ -309,7 +310,7 @@ namespace ce::profiler_viewer::diagnostics
         }
     }
 
-    bool encode_snapshot(const snapshot& value, std::vector<std::byte>& bytes)
+    bool encode_snapshot(const snapshot& value, ce::dynamic_array<std::byte>& bytes)
     {
         bytes.clear();
         writer ar;
@@ -402,7 +403,7 @@ namespace ce::profiler_viewer::diagnostics
         return true;
     }
 
-    bool encode_request(const request& value, std::vector<std::byte>& bytes)
+    bool encode_request(const request& value, ce::dynamic_array<std::byte>& bytes)
     {
         bytes.clear();
         writer ar;

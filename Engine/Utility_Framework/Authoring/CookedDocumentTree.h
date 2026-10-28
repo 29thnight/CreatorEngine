@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "../Foundation/StandardLibrary.h"
 
@@ -19,7 +20,7 @@ namespace Cedo
         Kind kind = Kind::Null;
         std::string key;
         std::string value;
-        std::vector<Node> children;
+        ce::recursive_array<Node> children;
 
         const Node* Find(std::string_view name) const noexcept
         {

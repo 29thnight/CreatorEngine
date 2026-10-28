@@ -1,4 +1,8 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Utility_Framework/Foundation/EngineNodeSet.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -34,7 +38,7 @@ import Creator.Concurrency.Jobs;
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 template <typename T>
-using DataContainer = std::unordered_map<std::string, asset_cache_detail::Entry<T>>;
+using DataContainer = ce::engine_node_map<std::string, asset_cache_detail::Entry<T>>;
 
 class Material;
 
@@ -53,12 +57,12 @@ struct AssetBundleLoadResult
     AssetDepot::AssetRequestStatus status{ AssetDepot::AssetRequestStatus::Pending };
     AssetDepot::AssetRequestError error{ AssetDepot::AssetRequestError::None };
     std::string message;
-    std::vector<assets::ModelAssetGeneration::Shared> models;
-    std::vector<own::shared_owner<const Material>> materials;
-    std::vector<own::shared_owner<const Texture>> textures;
-    std::vector<own::shared_owner<FontAsset>> fonts;
+    ce::dynamic_array<assets::ModelAssetGeneration::Shared> models;
+    ce::dynamic_array<own::shared_owner<const Material>> materials;
+    ce::dynamic_array<own::shared_owner<const Texture>> textures;
+    ce::dynamic_array<own::shared_owner<FontAsset>> fonts;
     own::shared_owner<TextureFramePins> textureImages;
-    std::vector<PreparedTextureImageRequest> imageRequests;
+    ce::dynamic_array<PreparedTextureImageRequest> imageRequests;
     // Nonblocking, including for direct LoadAssetBundle result owners.
     bool PollImages();
 };
@@ -106,7 +110,7 @@ struct RuntimeTexturePublication final
 {
     enum class State { Queued, Loading, Failed, Superseded };
     experiment::cooked::AssetSetManifest manifest{};
-    std::vector<std::byte> manifestBytes{};
+    ce::dynamic_array<std::byte> manifestBytes{};
     own::shared_owner<const experiment::cooked::ArtifactByteSource> byteSource{};
     own::shared_owner<std::atomic<std::uint64_t>> latestRevision{};
     std::uint64_t revision{};
@@ -312,7 +316,7 @@ public:
         std::uint64_t resolverRevision{};
         std::atomic<bool> cancelled{};
         AssetBundleLoadResult result;
-        std::vector<AssetDepot::AssetRequest<Texture>> descriptorRequests;
+        ce::dynamic_array<AssetDepot::AssetRequest<Texture>> descriptorRequests;
         job_handle work;
     };
     // Nonblocking submission returns the actual result owner. Jobs and shutdown
@@ -405,7 +409,7 @@ public:
 		assets::ModelAssetGenerationHandle handle) const;
 	[[nodiscard]] assets::ModelAssetGenerationCacheSnapshot
 		SnapshotModelAssetGenerations() const;
-	[[nodiscard]] std::vector<assets::ModelAssetGeneration::Shared>
+	[[nodiscard]] ce::dynamic_array<assets::ModelAssetGeneration::Shared>
 		SnapshotCurrentModelAssetGenerations() const;
 	// MBC11 — generation 로드의 출처 계수(읽기 전용). cooked catalog가 마운트돼 그 안의
 	// generation 레코드로 읽었으면 catalog, 아니면 Library(저작 정본).
@@ -460,16 +464,16 @@ public:
         std::span<const std::byte> manifestBytes,
         own::shared_owner<const experiment::cooked::ArtifactByteSource> byteSource,
         const experiment::cooked::AssetSetMountOptions& options,
-        std::vector<experiment::cooked::AssetManifestIssue>& outIssues,
+        ce::dynamic_array<experiment::cooked::AssetManifestIssue>& outIssues,
         AssetDepot::AssetMountId replaceMount = {});
     [[nodiscard]] bool UnmountAssetSet(AssetDepot::AssetMountId mountId,
-        std::vector<experiment::cooked::AssetManifestIssue>& outIssues);
+        ce::dynamic_array<experiment::cooked::AssetManifestIssue>& outIssues);
 
     template<class T>
-    [[nodiscard]] std::vector<AssetDepot::AssetLink<T>> ListRootLinks(
+    [[nodiscard]] ce::dynamic_array<AssetDepot::AssetLink<T>> ListRootLinks(
         AssetDepot::AssetMountId mountId) const
     {
-        std::vector<AssetDepot::AssetLink<T>> result;
+        ce::dynamic_array<AssetDepot::AssetLink<T>> result;
         for (const auto& reference : ListAssetSetRoots(mountId, AssetDepot::AssetLink<T>::kKind))
         {
             AssetDepot::AssetLink<T> link;
@@ -511,12 +515,12 @@ public:
     // outside Assets). The cache also separates role/compression/color space;
     // Texture::m_assetPath stays the source path suitable for serialization.
 	own::shared_owner<const Texture> LoadSharedTexture(std::string_view filePath, TextureFileType type = TextureFileType::Texture);
-	std::vector<std::pair<std::string, own::shared_owner<const Texture>>> SnapshotTextures(TextureFileType type = TextureFileType::Texture);
+	ce::dynamic_array<ce::pair<std::string, own::shared_owner<const Texture>>> SnapshotTextures(TextureFileType type = TextureFileType::Texture);
     // CPU SDF fonts use catalog GUID + normalized resolved path identity, never
     // the basename. Accepts a catalog GUID or a source path; an empty path
     // selects the bundled engine default.
     own::shared_owner<FontAsset> LoadFontShared(std::string_view path, std::string& error);
-    std::vector<std::pair<std::string, own::shared_owner<FontAsset>>> SnapshotFonts() const;
+    ce::dynamic_array<ce::pair<std::string, own::shared_owner<FontAsset>>> SnapshotFonts() const;
     std::size_t SnapshotFontCount() const;
     std::uint64_t GetFontCacheRevision() const noexcept
     {
@@ -533,7 +537,7 @@ public:
     bool ReloadMaterialAsset(FileGuid guid, std::string& error);
     bool PublishMaterialAsset(own::shared_owner<Material> candidate, const own::shared_owner<const Material>& expectedCurrent,
                               std::string& error, own::shared_owner<const Material>* published = nullptr);
-	std::vector<std::pair<std::string, own::shared_owner<const Material>>> SnapshotMaterials();
+	ce::dynamic_array<ce::pair<std::string, own::shared_owner<const Material>>> SnapshotMaterials();
 	own::shared_owner<const Material> RegisterImportedMaterial(
 		own::shared_owner<const Material> material, std::string_view baseName);
 	// M5-B1: standalone Material YAML의 단일 codec. scene embedded material은
@@ -653,7 +657,7 @@ private:
 	DataContainer<Texture>		Textures;
 	DataContainer<Texture>		UITextures;
 	DataContainer<Texture>		SpriteSheets;
-	std::unordered_map<int, std::unordered_set<std::string>> m_retainedAssets;
+	ce::engine_node_map<int, ce::engine_node_set<std::string>> m_retainedAssets;
 
 public:
 	std::string m_trasfarShader{};
@@ -676,7 +680,7 @@ private:
 	// 쓴다 — LoadAuthoredMaterialShared는 파일 파싱 중 legacy 캐시를 건드리지
 	// 않으므로 m_materialMutex와 겹칠 이유가 없다.
 	std::mutex m_authoredMaterialMutex;
-	std::unordered_map<FileGuid,
+	ce::engine_node_map<FileGuid,
 		asset_cache_detail::Entry<experiment::Material>> m_authoredMaterials;
 
 	// MBC5 정본 cache. {ModelId,generation}을 주소 키로 쓰고 current generation
@@ -685,10 +689,10 @@ private:
 	// MBC7 — generation embedded texture owner. 값은 generation 픽셀에서 만든
 	// Texture고, 소유자 색인은 retire가 generation 단위로 걷기 위한 역참조다.
 	mutable std::mutex m_modelGenerationTextureMutex;
-	std::map<assets::ModelTextureHandle, asset_cache_detail::Entry<Texture>>
+	ce::engine_ordered_map<assets::ModelTextureHandle, asset_cache_detail::Entry<Texture>>
 		m_modelGenerationTextures;
-	std::map<assets::ModelAssetGenerationHandle,
-		std::vector<assets::ModelTextureHandle>> m_modelGenerationTextureOwners;
+	ce::engine_ordered_map<assets::ModelAssetGenerationHandle,
+		ce::dynamic_array<assets::ModelTextureHandle>> m_modelGenerationTextureOwners;
 	mutable ModelGenerationTextureCacheSnapshot m_modelGenerationTextureStats;
 	// I7-C1 — cooked catalog. immutable 표라 교체는 포인터 하나 바꾸기다.
 	own::shared_owner<const experiment::cooked::CookedAssetCatalog> m_cookedCatalog;
@@ -700,20 +704,20 @@ private:
     std::uint64_t m_assetDepotRevision{};
     std::uint64_t m_nextAssetMountId{ 1u };
     // Frame-boundary authoring overlays, guarded by m_assetPreparationMutex.
-    std::map<FileGuid, AssetDepot::AssetMountId> m_authoredTextureMounts;
+    ce::engine_ordered_map<FileGuid, AssetDepot::AssetMountId> m_authoredTextureMounts;
     bool PublishAuthoredTexture(const RuntimeAssetChange& change);
-    [[nodiscard]] std::vector<experiment::cooked::TypedAssetReference> ListAssetSetRoots(
+    [[nodiscard]] ce::dynamic_array<experiment::cooked::TypedAssetReference> ListAssetSetRoots(
         AssetDepot::AssetMountId mountId, experiment::cooked::CookedAssetKind kind) const;
 	// I7-C2 — 마운트 때 한 번 판정한 stale 집합. 해석마다 stat을 두 번 하면
 	// sealing이 매 프레임 그 값을 문다.
-	std::unordered_set<FileGuid> m_cookedStaleAssets;
+	ce::engine_node_set<FileGuid> m_cookedStaleAssets;
 	std::atomic<std::uint64_t> m_generationFromCatalog{ 0 };
 	std::atomic<std::uint64_t> m_generationFromLibrary{ 0 };
 	std::atomic<std::uint64_t> m_generationLoadFailed{ 0 };
 
 private:
     static constexpr std::size_t kMaxCachedFonts = 32u;
-    std::unordered_map<std::string, own::shared_owner<FontAsset>> m_fonts;
+    ce::engine_node_map<std::string, own::shared_owner<FontAsset>> m_fonts;
     std::atomic<std::uint64_t> m_fontCacheRevision{ 1 };
     own::shared_owner<FontAsset> LoadFontFile(const std::filesystem::path& path, std::string& error) const;
     bool ReloadCachedFont(const std::filesystem::path& path, FileGuid guid, std::string& error);
@@ -832,21 +836,21 @@ private:
     bool PublishRuntimeAsset(const own::shared_owner<PreparedRuntimeAsset>& asset, std::string& error);
     void DrainAssetPreparations();
     bool ValidatePreparedMaterialTextures(Material& material, std::string& error);
-    std::vector<assets::ModelAssetGeneration::Shared> SnapshotPreparedModelAssets() const;
+    ce::dynamic_array<assets::ModelAssetGeneration::Shared> SnapshotPreparedModelAssets() const;
     const own::shared_owner<AssetDepot::AssetRequestCounters> m_assetRequestCounters{
         own::make_shared<AssetDepot::AssetRequestCounters>() };
     mutable std::mutex m_assetPreparationMutex;
     std::size_t m_assetRootHandoffs{};
     // Policy is a request recipe, not another asset generation. Each policy's
     // valid preparation ticket remains independently publishable.
-    using AssetPreparationKey = std::pair<FileGuid, assets::ModelColliderPreparationPolicy>;
-    std::map<AssetPreparationKey, own::weak_owner<PreparedRuntimeAsset>> m_assetPreparations;
-    std::vector<own::weak_owner<SceneAssetPreparation>> m_sceneAssetPreparations;
-    std::vector<own::shared_owner<PreparedRuntimeAsset>> m_retiredAssetPreparations;
-    std::vector<own::weak_owner<AssetBundlePreparation>> m_assetBundlePreparations;
+    using AssetPreparationKey = ce::pair<FileGuid, assets::ModelColliderPreparationPolicy>;
+    ce::engine_ordered_map<AssetPreparationKey, own::weak_owner<PreparedRuntimeAsset>> m_assetPreparations;
+    ce::dynamic_array<own::weak_owner<SceneAssetPreparation>> m_sceneAssetPreparations;
+    ce::dynamic_array<own::shared_owner<PreparedRuntimeAsset>> m_retiredAssetPreparations;
+    ce::dynamic_array<own::weak_owner<AssetBundlePreparation>> m_assetBundlePreparations;
     // Completion owns callback/capture teardown, even after a weak request expires.
-    std::vector<job_handle> m_assetWork;
-    std::vector<job_handle> m_assetPreparationLanes;
+    ce::dynamic_array<job_handle> m_assetWork;
+    ce::dynamic_array<job_handle> m_assetPreparationLanes;
     std::size_t m_nextAssetPreparationLane{};
     std::uint64_t m_assetPreparationEpoch{ 1 };
     bool m_assetPreparationStopping{};
@@ -899,24 +903,24 @@ private:
         bool codeProgram{};
         own::weak_owner<const ShaderMeta> current;
         own::shared_owner<const ShaderMeta> retained;
-        std::array<std::uint8_t, 32> documentDigest{};
+        ce::fixed_array<std::uint8_t, 32> documentDigest{};
         bool hasDocumentDigest{};
         mutable std::uint64_t lastUse{};
         std::size_t retainedBytes{};
     };
     void RetainShaderMetaLocked(ShaderMetaCacheSlot& slot,
         const own::shared_owner<const ShaderMeta>& owner, std::size_t charge,
-        std::vector<own::shared_owner<const ShaderMeta>>& released);
+        ce::dynamic_array<own::shared_owner<const ShaderMeta>>& released);
     void TrimShaderMetaRetainedLocked(std::size_t targetBytes,
-        std::vector<own::shared_owner<const ShaderMeta>>& released);
+        ce::dynamic_array<own::shared_owner<const ShaderMeta>>& released);
     std::uint64_t NextShaderMetaUseLocked() const noexcept;
     void ClearShaderMetaCache();
     [[nodiscard]] bool RegisterCodeShaderMetadataLocked(LX::Runtime::ShaderGeneration& shader,
         AssetDepot::MaterialProgramAssetOrigin& origin, std::string& failure);
     mutable std::mutex m_shaderMetaMutex;
-    std::unordered_map<FileGuid, std::uint32_t> m_shaderMetaSlotByGuid;
-    std::vector<ShaderMetaCacheSlot> m_shaderMetaSlots;
-    std::vector<std::uint32_t> m_shaderMetaFreeSlots;
+    ce::engine_node_map<FileGuid, std::uint32_t> m_shaderMetaSlotByGuid;
+    ce::dynamic_array<ShaderMetaCacheSlot> m_shaderMetaSlots;
+    ce::dynamic_array<std::uint32_t> m_shaderMetaFreeSlots;
     std::size_t m_shaderMetaRetainedBudgetBytes = 16u * 1024u * 1024u;
     std::size_t m_shaderMetaRetainedBytes{};
     mutable std::uint64_t m_shaderMetaUseSerial{};
@@ -927,9 +931,9 @@ private:
                                   std::string& failure) const;
     std::mutex m_sceneMaterialMutex;
     bool m_recordingSceneMaterials{};
-    std::vector<std::pair<FileGuid, std::filesystem::path>> m_sceneMaterials;
+    ce::dynamic_array<ce::pair<FileGuid, std::filesystem::path>> m_sceneMaterials;
     std::mutex m_pendingAssetChangeMutex;
-	std::vector<RuntimeAssetChange> m_pendingAssetChanges;
+	ce::dynamic_array<RuntimeAssetChange> m_pendingAssetChanges;
 
     // Private transaction-local values only, never another cache/manager.
     // Destruction is deliberately after all outer admission/catalog guards.
@@ -937,23 +941,23 @@ private:
     {
         assets::ModelAssetGenerationCache::RetiredEntries models;
         material_graph::GenerationStore::RetiredEntries graphs;
-        std::unordered_map<std::string, own::shared_owner<FontAsset>> fonts;
+        ce::engine_node_map<std::string, own::shared_owner<FontAsset>> fonts;
         DataContainer<Material> materials;
-        std::unordered_map<FileGuid, asset_cache_detail::Entry<experiment::Material>> authoredMaterials;
+        ce::engine_node_map<FileGuid, asset_cache_detail::Entry<experiment::Material>> authoredMaterials;
         DataContainer<Texture> textures;
         DataContainer<Texture> uiTextures;
         DataContainer<Texture> spriteSheets;
-        std::map<assets::ModelTextureHandle, asset_cache_detail::Entry<Texture>> modelTextures;
-        std::map<assets::ModelAssetGenerationHandle, std::vector<assets::ModelTextureHandle>> modelTextureOwners;
-        std::unordered_map<FileGuid, std::uint32_t> shaderSlotsByGuid;
-        std::vector<ShaderMetaCacheSlot> shaderSlots;
-        std::vector<std::uint32_t> shaderFreeSlots;
-        std::map<AssetPreparationKey, own::weak_owner<PreparedRuntimeAsset>> preparations;
-        std::vector<own::weak_owner<SceneAssetPreparation>> scenes;
-        std::vector<own::weak_owner<AssetBundlePreparation>> bundles;
-        std::vector<own::shared_owner<PreparedRuntimeAsset>> preparationPins;
-        std::vector<own::shared_owner<SceneAssetPreparation>> scenePins;
-        std::vector<own::shared_owner<AssetBundlePreparation>> bundlePins;
+        ce::engine_ordered_map<assets::ModelTextureHandle, asset_cache_detail::Entry<Texture>> modelTextures;
+        ce::engine_ordered_map<assets::ModelAssetGenerationHandle, ce::dynamic_array<assets::ModelTextureHandle>> modelTextureOwners;
+        ce::engine_node_map<FileGuid, std::uint32_t> shaderSlotsByGuid;
+        ce::dynamic_array<ShaderMetaCacheSlot> shaderSlots;
+        ce::dynamic_array<std::uint32_t> shaderFreeSlots;
+        ce::engine_ordered_map<AssetPreparationKey, own::weak_owner<PreparedRuntimeAsset>> preparations;
+        ce::dynamic_array<own::weak_owner<SceneAssetPreparation>> scenes;
+        ce::dynamic_array<own::weak_owner<AssetBundlePreparation>> bundles;
+        ce::dynamic_array<own::shared_owner<PreparedRuntimeAsset>> preparationPins;
+        ce::dynamic_array<own::shared_owner<SceneAssetPreparation>> scenePins;
+        ce::dynamic_array<own::shared_owner<AssetBundlePreparation>> bundlePins;
     };
 
 };

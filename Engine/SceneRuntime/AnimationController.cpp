@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -376,7 +377,7 @@ void AnimationController::DeleteState(std::string stateName)
 	{
 		auto& transitions = state->Transitions;
 
-		std::erase_if(transitions, [&](const own::shared_owner<AniTransition>& t)
+		ce::erase_if(transitions, [&](const own::shared_owner<AniTransition>& t)
 		{
 			return t->GetCurState() == stateName
 				|| t->GetNextState() == stateName;
@@ -395,7 +396,7 @@ void AnimationController::DeleteTransiton(const std::string& fromStateName, cons
 	auto& transitions = state->Transitions;
 	auto& playback = GetPlayback();
 
-	std::erase_if(transitions, [&](const own::shared_owner<AniTransition>& t)
+	ce::erase_if(transitions, [&](const own::shared_owner<AniTransition>& t)
 	{
 		const bool remove = t->GetCurState() == fromStateName
 			&& t->GetNextState() == toStateName;

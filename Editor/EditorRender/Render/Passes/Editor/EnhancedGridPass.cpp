@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "EnhancedGridPass.h"
 #include "Render/Graph/EnhancedRenderGraph.h"
 #include "RHI/RHIEncoder.h"
@@ -256,7 +257,7 @@ void EnhancedGridPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
         ? (ownsDepth && !resampleDepth ? RGAccessMode::Write : RGAccessMode::ReadWrite) : RGAccessMode::LegacyState;
     const auto output = m_output;
     const auto depth = m_depth;
-    std::vector<EnhancedRenderGraph::RGPassUsage> usages;
+    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> usages;
     usages.push_back({ output, RHIResourceState::RenderTarget, colorAccess });
     usages.push_back({ depth, RHIResourceState::DepthWrite, depthAccess });
 

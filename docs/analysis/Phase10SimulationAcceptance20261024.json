@@ -1,0 +1,250 @@
+{
+  "phase": "10-2b-1",
+  "date": "2026-10-24",
+  "passed": true,
+  "scope": "CPU sampled inputs and fixed-step oracle; real DX12 minimal fixed-kernel graph/compute/completion/buffer readback",
+  "cpuRuns": [
+    {
+      "executableSha256": "6031501B5B57B7CBD76F64E9ED0B93AA94979E8D1413BBC41D6FD31F5DE42D81",
+      "exitCode": 0,
+      "checks": 274,
+      "configuration": "Debug"
+    },
+    {
+      "executableSha256": "35CD22558E66CAB2FDC6B37283EBDB53FC61809B70235DDE6CF9BC54D33F5128",
+      "exitCode": 0,
+      "checks": 274,
+      "configuration": "Release"
+    }
+  ],
+  "gpu": {
+    "runs": [
+      {
+        "exitCode": 0,
+        "name": "positive"
+      },
+      {
+        "exitCode": 1,
+        "name": "negative"
+      }
+    ],
+    "tolerance": "abs(actual-reference) <= 2e-5 * max(1,abs(reference)); finite required",
+    "executableSha256": "C6878BB0535B8AF93F6D43414FA14AE2ABDD4442108D5CC88C05BD84BF1A919C",
+    "barriers": 300,
+    "components": 1082120,
+    "validation": 0,
+    "maxParticles": 4096,
+    "backend": "DX12",
+    "configuration": "Debug",
+    "cases": 60
+  },
+  "nativeRegression": [
+    {
+      "checks": 56,
+      "configuration": "Debug",
+      "test": "EffectStateTests",
+      "sha256": "F33B24B5DE2A310B4C1C57E7C9088C685D7D23F3D08BE2C34989281D5E51C634"
+    },
+    {
+      "checks": 51,
+      "configuration": "Debug",
+      "test": "EffectDefinitionTests",
+      "sha256": "132CB11E227FDCB32DB71050C386578AAA5108E8E78C239C502B88EE9BEEC03F"
+    },
+    {
+      "checks": 56,
+      "configuration": "Release",
+      "test": "EffectStateTests",
+      "sha256": "0291789A60599389514F812E3F0097AF9E8EB5E98F2642D7F90CD3FBB1ABA240"
+    },
+    {
+      "checks": 51,
+      "configuration": "Release",
+      "test": "EffectDefinitionTests",
+      "sha256": "13EBDD699609731A7C5778E8410F9AF037DF2333428A5181FA46E01837513ECE"
+    }
+  ],
+  "productConfiguration": "Debug",
+  "productRuns": [
+    {
+      "absent": 1,
+      "host": "CreatorEditor",
+      "packageIncluded": false,
+      "exitCode": 0,
+      "initialized": 0,
+      "map": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\artifacts\\phase10-2b1-20261024\\transport\\product\\excluded/CreatorEditor.map",
+      "shutdown": 0,
+      "hostSha256": "6E611B9E58FB737F36EE3C4A3A3BFF059B15D2348C564CE47F7698C5BDB2194F"
+    },
+    {
+      "absent": 1,
+      "host": "Player",
+      "packageIncluded": false,
+      "exitCode": 0,
+      "initialized": 0,
+      "map": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\artifacts\\phase10-2b1-20261024\\transport\\product\\excluded/Player.map",
+      "shutdown": 0,
+      "hostSha256": "77E20139F892EB9257B0ADF88EAE4157B08ED3BC39279A49A3071B8022358632"
+    },
+    {
+      "absent": 0,
+      "host": "CreatorEditor",
+      "packageIncluded": true,
+      "exitCode": 0,
+      "initialized": 1,
+      "map": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\artifacts\\phase10-2b1-20261024\\transport\\product\\included/CreatorEditor.map",
+      "shutdown": 1,
+      "hostSha256": "0ABD42913FD70C690FFE2E396EBCA43A99D5444BCDA9EB60EDA3688D2CFBCDF2"
+    },
+    {
+      "absent": 0,
+      "host": "Player",
+      "packageIncluded": true,
+      "exitCode": 0,
+      "initialized": 1,
+      "map": "C:\\Users\\idene\\source\\repos\\CreatorEngine\\artifacts\\phase10-2b1-20261024\\transport\\product\\included/Player.map",
+      "shutdown": 1,
+      "hostSha256": "187A731EA27A6DA49D9661C5E099B9FBC574D1F35F75F93E65A27D923FADC485"
+    }
+  ],
+  "resizeDimensions": [
+    "386x152",
+    "546x258"
+  ],
+  "sources": [
+    {
+      "sha256": "2747E66EE07B87BD1A9C26A49803B6011E1EE9B04E68FC74D672EB85B29933DC",
+      "path": "Engine/Effect/Effect.vcxproj"
+    },
+    {
+      "sha256": "0903301E0046BD7D0BBEBDE19BD57230EAC34D4ACB13CDA7349D6A90320D9470",
+      "path": "Engine/Effect/EffectDefinition.cpp"
+    },
+    {
+      "sha256": "07CC30E54D9B16EDB3B80A4B86E21399BFCF5B953D77CE13BB93B8BC8B7B424A",
+      "path": "Engine/Effect/EffectDefinition.h"
+    },
+    {
+      "sha256": "67C4AE32B26DE0065476B85FB27761D6161F621FDBB25BDB5A70203CFFF0D4C7",
+      "path": "Engine/Effect/EffectModuleIR.cpp"
+    },
+    {
+      "sha256": "FE83AD65EA6AD5E6211521E045ABEC3E0CDF7E0E9EDE19B311FF89874780AD27",
+      "path": "Engine/Effect/EffectModuleIR.h"
+    },
+    {
+      "path": "Engine/Effect/EffectPackage.cpp",
+      "sha256": "424A9BB61E16B2B57B31E07010214943D69050B976D9B9F7C02833A119C36892"
+    },
+    {
+      "path": "Engine/Effect/EffectRenderContributor.cpp",
+      "sha256": "3E0E87A1D1EFF29908CB8216D64D6891EF9D70E64004FEAF877554F819D62163"
+    },
+    {
+      "path": "Engine/Effect/EffectRenderContributor.h",
+      "sha256": "2EC3170EA27EC27D531E86768F8A79E31F0F3A0EA6AC89872D3A9CF78AAA3BEF"
+    },
+    {
+      "sha256": "383539450DD925C80994632CFC753DEC450D3D15C6A67B1D3D57BD55872C94FC",
+      "path": "Engine/Effect/EffectSimulation.cpp"
+    },
+    {
+      "sha256": "35F7218DA7BFA7BFBCDE0BCF87462EF1137DFCBD88E6D10BE6AD06E4892084EE",
+      "path": "Engine/Effect/EffectSimulation.h"
+    },
+    {
+      "path": "Engine/Effect/EffectState.cpp",
+      "sha256": "3ED257BED9E505AE5557B50AAC995D4E9FB01D0873AB517489E07FFCF4B5B38E"
+    },
+    {
+      "path": "Engine/Effect/EffectState.h",
+      "sha256": "7534558D709963E7C4FA7F11C227A2CE2B07031013ABB38825AF8E83442349F8"
+    },
+    {
+      "sha256": "ADA87ECA564CD01C0F51BFF4C7A1825D8564D7CE8CB6E5DA18D3D3CE5428554B",
+      "path": "Engine/Effect/Shaders/EffectSimulation.slang"
+    },
+    {
+      "path": "Engine/RenderEngine/Effects/EffectFrame.h",
+      "sha256": "836CED4FD17753EF1A8D0B6AC854AD0526FDBB84945CEF2F7F74626BFBF50502"
+    },
+    {
+      "path": "Engine/RenderEngine/Effects/IEffectSystem.h",
+      "sha256": "81C5C0998B32FDBA01FAC651B383D6692A91F6FB3DB13CD6088A0DA478CD4238"
+    },
+    {
+      "path": "Engine/RenderEngine/Render/Graph/EnhancedRenderPass.h",
+      "sha256": "17FE5E51ED913E2E3374AFE75870507C5C9B93778DAEE4A64EFAABD24D2D6B1C"
+    },
+    {
+      "path": "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp",
+      "sha256": "B671A5E896C8EBB069C8BC42F2F3CADBF5E7B90EEFFE39D809714FCF84661B2B"
+    },
+    {
+      "path": "Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.h",
+      "sha256": "758B56B76A67AE9B2C4BA8A6FBE391F7FC154CDA4808316AD6D388CB830513A1"
+    },
+    {
+      "path": "Engine/RuntimeHost/EngineBootstrap.h",
+      "sha256": "0945654FE33FDA49B58DED6C043C429CD6E0CA03C265B371D3375398B18BE573"
+    },
+    {
+      "path": "Engine/SceneRuntime/SceneManager.cpp",
+      "sha256": "7FD93E816475994CB72E1DB5A6F68588622569E393706B3C6CDD6259224570A0"
+    },
+    {
+      "sha256": "90A28B3076738490DABA30D827E562C1250D9B79FB688A421528002B3E0ED3A2",
+      "path": "Tools/regression/EffectModuleIRTests.cpp"
+    },
+    {
+      "sha256": "63336985E846556FEEAFDCBD2DCC1D3799A429DE3CB30278EEC4EECE154C88AC",
+      "path": "Tools/regression/EffectModuleIRTests.vcxproj"
+    },
+    {
+      "sha256": "F31CE231690CF492E9665A4F0CB8D61073B5B7AC0EFE7CF5C11C1A982F27C1D4",
+      "path": "Tools/regression/EffectSimulationGpuProbe.cpp"
+    },
+    {
+      "sha256": "5F0382B0EEA1E55CB3C22C53778EA3F9C767A21171061CFB37BE4D1ED3E312E1",
+      "path": "Tools/regression/EffectSimulationGpuProbe.vcxproj"
+    },
+    {
+      "path": "Tools/regression/EffectStateTests.cpp",
+      "sha256": "3428FEB511026A67CF6936B2F74820B2882AF47FC1FD84F1CFC2D0D03B69D578"
+    },
+    {
+      "path": "Tools/regression/EffectStateTests.vcxproj",
+      "sha256": "9B6FA5C34CE409EC36C8AD3EE9575DCBEF29C5E7F3F398B40B7AA042CCC2A986"
+    },
+    {
+      "sha256": "08B21873720954FB796F82CA44FBA75FB2B30D4C265EC66E4361211176B492DE",
+      "path": "Tools/regression/verify-effect-module-ir.ps1"
+    },
+    {
+      "path": "Tools/regression/verify-effect-package.ps1",
+      "sha256": "62FA1013394E836F01BB079C458CB2BDE42A682654FD864490495646E751E25E"
+    },
+    {
+      "sha256": "1B4FB616011BB6A7B72BD0291AF33CF4F4EA81112C7F4FF6C6DBF6CC5387E863",
+      "path": "Tools/regression/verify-effect-simulation-gpu.ps1"
+    },
+    {
+      "path": "Tools/regression/verify-effect-transport.ps1",
+      "sha256": "FF02CA57E0FB98420CD0A67138E3246DCDE1D9F339A51AED5F03AD724166866B"
+    }
+  ],
+  "artifacts": {
+    "transport": "artifacts/phase10-2b1-20261024/transport/result.json",
+    "cpu": "artifacts/phase10-2b1-20261024/cpu/result.json",
+    "product": "artifacts/phase10-2b1-20261024/transport/product/result.json",
+    "gpu": "artifacts/phase10-2b1-20261024/gpu-full/result.json"
+  },
+  "limitations": [
+    "Fixed GPU kernel has constant initialization and Gravity-then-Drag; not general module IR GPU lowering",
+    "CPU random/curve/gradient supported; GPU sampling and sphere/cone initialization remain pending",
+    "GPU arithmetic overflow reporting and transactional rollback remain pending",
+    "No product snapshot/burst acknowledgement or concurrent in-flight particle-resource integration",
+    "Debug product matrix verifies existing package/transport/HDR boundary, not product particle execution",
+    "No Billboard/pixel/performance, Vulkan or Release/Shipping GPU/product acceptance"
+  ]
+}

@@ -1,3 +1,5 @@
+#include "../../Utility_Framework/Foundation/EngineFunc.h"
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
@@ -91,7 +93,7 @@ bool RHIQueueCommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, cons
         RHICommandFailure failure;
         bool succeeded{};
     };
-    std::array<TargetResult, kMaximumTargets> results;
+    ce::fixed_array<TargetResult, kMaximumTargets> results;
     uint32_t jobs = 1;
     if (options.mode == RHICommandTranslationMode::Parallel && order.size() > 1)
     {
@@ -102,7 +104,7 @@ bool RHIQueueCommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, cons
             (std::max)(uint64_t{1}, (std::min)({uint64_t(options.maxTranslationJobs), uint64_t(workers),
                                                 uint64_t(order.size()), budget})));
     }
-    std::array<uint64_t, kMaximumTargets> costs{};
+    ce::fixed_array<uint64_t, kMaximumTargets> costs{};
     if (jobs > 1)
     {
         for (size_t index = 0; index < order.size(); ++index)
@@ -354,7 +356,7 @@ struct RHISoftwareQueueState : own::enable_owner_from_this<RHISoftwareQueueState
     std::mutex m_recordingMutex;
     std::mutex m_preparationMutex;
     std::recursive_mutex m_submissionMutex;
-    std::array<RHISoftwareQueueCommandBatch*, kRetainedRecordings> m_idle{};
+    ce::fixed_array<RHISoftwareQueueCommandBatch*, kRetainedRecordings> m_idle{};
     ~RHISoftwareQueueState()
     {
         for (auto* batch : m_idle)
@@ -508,7 +510,7 @@ bool RHISoftwareQueueCommandBatch::Finish(ce::pooled_owner<IRHIQueueCommandBatch
         error = "Software queue recording is sealed or its upload/descriptor version changed.";
         return false;
     }
-    std::array<uint32_t, kMaximumTargets> order{};
+    ce::fixed_array<uint32_t, kMaximumTargets> order{};
     size_t count{};
     for (uint32_t target = 0; target < m_targets; ++target)
     {
@@ -769,7 +771,7 @@ bool RHISoftwareQueueRecorder::WrapQueue(const own::shared_owner<IRHICommandQueu
 }
 
 bool RHISoftwareQueueRecorder::Record(const own::shared_owner<IRHICommandQueue>& queue,
-                                      const std::function<void(RHIEncoder&)>& commands, ce::lifetime_token token,
+                                      const ce::owned_func<void(RHIEncoder&)>& commands, ce::lifetime_token token,
                                       ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error)
 {
     batch.reset();
@@ -829,7 +831,7 @@ bool RHISoftwareQueueRecorder::BeginRecording(const own::shared_owner<IRHIComman
     return true;
 }
 
-bool RHISoftwareQueueRecorder::ExecuteSubmission(const std::function<bool(std::string&)>& submit, std::string& error)
+bool RHISoftwareQueueRecorder::ExecuteSubmission(const ce::owned_func<bool(std::string&)>& submit, std::string& error)
 {
     if (!submit)
     {

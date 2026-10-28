@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "MeshletCompression.h"
 
@@ -66,7 +67,7 @@ namespace assets::cluster
         return result;
     }
 
-    inline std::vector<std::byte> EncodeTopologyPage(std::span<const std::byte> attributes,
+    inline ce::dynamic_array<std::byte> EncodeTopologyPage(std::span<const std::byte> attributes,
                                                      const experiment::MeshletPayload& topology,
                                                      const experiment::MeshletDescriptor& descriptor,
                                                      uint32_t sourceVertexLimit, uint32_t primitiveLimit)
@@ -83,7 +84,7 @@ namespace assets::cluster
         const auto primitives = (triangles + descriptor.triangleCount * 3ull + 3) & ~uint64_t(3);
         const auto size = (primitives + descriptor.triangleCount * 4ull + 15) & ~uint64_t(15);
         Require(size <= MaximumBytes && size <= UINT32_MAX, "QMC2 page size");
-        std::vector<std::byte> result(size);
+        ce::dynamic_array<std::byte> result(size);
         Put(result, 0, TopologyPageMagic);
         Put(result, 4, 1);
         Put(result, 8, 32);
@@ -123,12 +124,12 @@ namespace assets::cluster
         Require(view.vertices == descriptor.vertexCount && view.triangles == descriptor.triangleCount &&
                     Word(view.attributes, 8) == mask && std::isfinite(positionError) && positionError >= 0,
                 "QMC2 metadata/page disagreement");
-        std::vector<std::byte> raw;
+        ce::dynamic_array<std::byte> raw;
         std::string error;
         Require(Decode(view.attributes, raw, error), "QMC2 malformed attribute payload");
         const auto stride = StrideOf(mask);
         // Layout and authenticated bounds are constant for every vertex in this page.
-        std::array<uint32_t, kVertexAttributeTable.size() * 4> scalarOffsets{};
+        ce::fixed_array<uint32_t, kVertexAttributeTable.size() * 4> scalarOffsets{};
         std::size_t scalarCount{};
         for (const auto& attribute : kVertexAttributeTable)
         {

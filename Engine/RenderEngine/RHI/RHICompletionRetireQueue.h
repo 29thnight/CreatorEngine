@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "RHIResourceTypes.h"
@@ -120,7 +121,7 @@ private:
         Payload payload;
     };
 
-    std::vector<Entry> m_entries;
+    ce::dynamic_array<Entry> m_entries;
     uint64_t m_pendingBytes{ 0 };
     size_t m_quarantinedCount{ 0 };
 };

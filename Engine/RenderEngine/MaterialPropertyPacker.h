@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "MaterialPropertyValue.h"
 #include "ShaderMeta.h"
@@ -26,5 +27,5 @@ namespace MaterialPropertyPacker
 
     bool PackProperty(const ShaderPropertyDesc& desc,
         const ShaderMetaPropertyBinding& binding, const MaterialPropertyValue& value,
-        std::vector<std::uint8_t>& bytes, std::string& outError);
+        ce::dynamic_array<std::uint8_t>& bytes, std::string& outError);
 }

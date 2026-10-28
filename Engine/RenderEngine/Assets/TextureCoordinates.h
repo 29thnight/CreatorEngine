@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -8,8 +9,8 @@ namespace assets
     struct TextureCoordinates final
     {
         std::uint32_t set{};
-        std::array<float, 2> offset{};
-        std::array<float, 2> scale{1.f, 1.f};
+        ce::fixed_array<float, 2> offset{};
+        ce::fixed_array<float, 2> scale{1.f, 1.f};
         float rotation{};
         bool IsValid() const noexcept
         {

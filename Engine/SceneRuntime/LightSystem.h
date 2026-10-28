@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Reflection/ClassProperty.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -44,7 +45,7 @@ public:
     size_t GetCount() const noexcept { return m_lights.size(); }
 
 private:
-    std::vector<LightComponent*> m_lights;
+    ce::dynamic_array<LightComponent*> m_lights;
 };
 
 #if defined(CE_SCENE_HEADLESS)

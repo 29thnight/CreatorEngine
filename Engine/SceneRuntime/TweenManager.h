@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineStorage.h"
 
 #include "EntityHandle.h"
 
@@ -198,7 +200,7 @@ public:
     [[nodiscard]] size_t ActiveCount() const noexcept
     {
         size_t total = 0;
-        std::apply([&total](const auto&... pools)
+        ce::apply([&total](const auto&... pools)
         {
             ((total += CountActive(pools)), ...);
         }, m_pools);
@@ -216,7 +218,7 @@ public:
 
         {
             FlagScope updating{ m_updating };
-            std::apply([&](auto&... pools)
+            ce::apply([&](auto&... pools)
             {
                 (AdvancePool(pools, deltaSeconds, context), ...);
             }, m_pools);
@@ -227,11 +229,11 @@ public:
                 return;
             }
 
-            std::apply([&](auto&... pools)
+            ce::apply([&](auto&... pools)
             {
                 (SweepPool(pools), ...);
             }, m_pools);
-            std::apply([](auto&... pools)
+            ce::apply([](auto&... pools)
             {
                 (ActivatePending(pools), ...);
             }, m_pools);
@@ -239,7 +241,7 @@ public:
 
         {
             FlagScope dispatching{ m_dispatching };
-            std::apply([&](auto&... pools)
+            ce::apply([&](auto&... pools)
             {
                 (DispatchPool(pools, context), ...);
             }, m_pools);
@@ -294,9 +296,9 @@ private:
     struct Pool
     {
         // push_back 중 기존 slot reference가 유지되어야 apply 재진입 Play가 안전하다.
-        std::deque<Slot<Value>> slots;
-        std::vector<uint32_t> freeSlots;
-        std::vector<CompletionRecord<Value>> completions;
+        ce::segmented_deque<Slot<Value>> slots;
+        ce::dynamic_array<uint32_t> freeSlots;
+        ce::dynamic_array<CompletionRecord<Value>> completions;
     };
 
     class FlagScope final
@@ -311,7 +313,7 @@ private:
         bool& m_flag;
     };
 
-    using Pools = std::tuple<
+    using Pools = ce::tuple<
         Pool<float>,
         Pool<math::vector2>,
         Pool<math::vector3>,
@@ -323,13 +325,13 @@ private:
     template<TweenManagedValue Value>
     Pool<Value>& PoolOf() noexcept
     {
-        return std::get<Pool<Value>>(m_pools);
+        return ce::get<Pool<Value>>(m_pools);
     }
 
     template<TweenManagedValue Value>
     const Pool<Value>& PoolOf() const noexcept
     {
-        return std::get<Pool<Value>>(m_pools);
+        return ce::get<Pool<Value>>(m_pools);
     }
 
     template<TweenManagedValue Value>
@@ -439,7 +441,7 @@ private:
     template<TweenManagedValue Value>
     void DispatchPool(Pool<Value>& pool, Context& context) noexcept
     {
-        std::vector<CompletionRecord<Value>> completions =
+        ce::dynamic_array<CompletionRecord<Value>> completions =
             std::move(pool.completions);
         pool.completions.clear();
         for (const CompletionRecord<Value>& completion : completions)
@@ -478,7 +480,7 @@ private:
 
     void ClearNow()
     {
-        std::apply([](auto&... pools)
+        ce::apply([](auto&... pools)
         {
             (ClearPool(pools), ...);
         }, m_pools);

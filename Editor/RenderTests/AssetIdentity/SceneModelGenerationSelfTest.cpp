@@ -1,3 +1,4 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -299,7 +300,7 @@ namespace RenderTest
             return false;
         }
 
-        std::map<uuid::uuid16, own::shared_owner<const Texture>> ownersBefore;
+        ce::engine_ordered_map<uuid::uuid16, own::shared_owner<const Texture>> ownersBefore;
         for (const assets::ModelTextureAsset& texture : before->Textures())
         {
             ownersBefore[texture.textureId] =

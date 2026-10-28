@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "ModelVertexLayout.h"
 #include <mathematics/vector3.hpp>
@@ -9,27 +10,27 @@ namespace assets::cpu_geometry
 // meshlets, coarse LODs, material data or decoded GPU pages are retained.
 struct Geometry
 {
-    std::vector<math::vector3> positions;
-    std::vector<uint32_t> indices;
+    ce::dynamic_array<math::vector3> positions;
+    ce::dynamic_array<uint32_t> indices;
 };
 inline constexpr uint32_t Magic = 0x50434543u; // CECP
 inline constexpr uint32_t MaxVertices = 1u << 20, MaxIndices = 12u << 20;
 inline constexpr uint64_t MaxBytes = 24ull + uint64_t(MaxVertices) * 12 + uint64_t(MaxIndices) * 4;
-inline std::string Path(const std::array<uint8_t,32>& digest)
+inline std::string Path(const ce::fixed_array<uint8_t,32>& digest)
 {
     constexpr char hex[] = "0123456789abcdef";
     std::string path = "Derived/CpuGeometry/";
     for (auto byte : digest) { path += hex[byte >> 4]; path += hex[byte & 15]; }
     return path + ".cecpu";
 }
-inline std::vector<std::byte> Encode(uint32_t mask, uint32_t count, std::span<const std::byte> vertices,
+inline ce::dynamic_array<std::byte> Encode(uint32_t mask, uint32_t count, std::span<const std::byte> vertices,
                                      std::span<const uint32_t> indices)
 {
     const auto stride = StrideOf(mask);
     if (!IsSupportedModelVertexLayout(mask) || count < 3 || count > MaxVertices ||
         vertices.size() != uint64_t(count) * stride || indices.empty() || indices.size() > MaxIndices || indices.size() % 3)
         throw std::runtime_error("Invalid exact CPU geometry extent");
-    std::vector<std::byte> out;
+    ce::dynamic_array<std::byte> out;
     out.reserve(24 + uint64_t(count) * 12 + indices.size() * 4);
     const auto word = [&](uint32_t value) { for (uint32_t shift = 0; shift < 32; shift += 8) out.push_back(std::byte(value >> shift)); };
     word(Magic); word(1); word(count); word(static_cast<uint32_t>(indices.size())); word(12); word(0);

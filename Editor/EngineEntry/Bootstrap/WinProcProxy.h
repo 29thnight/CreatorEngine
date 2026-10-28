@@ -1,4 +1,6 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Engine/Utility_Framework/Foundation/EngineStorage.h"
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #ifndef WIN32_LEAN_AND_MEAN
 #define WIN32_LEAN_AND_MEAN
@@ -13,7 +15,7 @@ import "Creator.WinAPI.h";
 class WinProcProxy : public Singleton<WinProcProxy>
 {
 public:
-	using Message		= std::tuple<HWND, UINT, WPARAM, LPARAM>;
+	using Message		= ce::tuple<HWND, UINT, WPARAM, LPARAM>;
 public:
 	friend class Singleton;
 	WinProcProxy()	= default;
@@ -30,8 +32,8 @@ private:
     struct QueuedMessage
     {
         Message message;
-        std::array<BYTE, 256> keyboardState{};
+        ce::fixed_array<BYTE, 256> keyboardState{};
         bool hasKeyboardState{};
     };
-    std::queue<QueuedMessage> m_messageQueue;
+    ce::storage_queue<QueuedMessage> m_messageQueue;
 };

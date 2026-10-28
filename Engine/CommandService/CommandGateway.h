@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineFunc.h"
 // LC4 (PHASE 14.5) — 서비스가 엔진에 닿는 유일한 창구.
 //
 // ── 왜 인터페이스인가 (§12) ─────────────────────────────────────────────
@@ -46,7 +48,7 @@ namespace CommandService
 
         // Pure schema validation before queuing; no engine state may be read here.
         virtual bool BuildNamedArguments(const std::string&, const JsonValue&,
-                                        std::vector<std::string>&, std::string& error)
+                                        ce::dynamic_array<std::string>&, std::string& error)
         {
             error = "Named parameters are not supported for this command";
             return false;
@@ -59,7 +61,7 @@ namespace CommandService
         ///
         /// `timeoutMs` 안에 끝나지 않으면 `timedOut` 을 세워 돌려준다. **명령을
         /// 죽이지는 않는다** — 이미 시작한 GT 작업을 중간에 끊는 것이 더 위험하다(§5.2).
-        virtual CommandOutcome Execute(const std::vector<std::string>& arguments,
+        virtual CommandOutcome Execute(const ce::dynamic_array<std::string>& arguments,
                                        int timeoutMs) = 0;
 
         /// 명령의 비용 등급(LC3 descriptor). 없는 명령이면 false.
@@ -82,8 +84,8 @@ namespace CommandService
         ///
         /// 상한에서 거절되면 false — 그때 넣지 **않은** 것이므로 `onDone` 도
         /// 불리지 않는다.
-        using AsyncCompletion = std::function<void(const CommandOutcome&)>;
-        virtual bool ExecuteAsync(const std::vector<std::string>& arguments,
+        using AsyncCompletion = ce::owned_func<void(const CommandOutcome&)>;
+        virtual bool ExecuteAsync(const ce::dynamic_array<std::string>& arguments,
                                   AsyncCompletion onDone) = 0;
 
         /// 서비스 큐 깊이. 관측용이다(`/health`).
@@ -144,7 +146,7 @@ namespace CommandService
         };
         struct WarmupSnapshot
         {
-            std::vector<WarmupStage> stages;
+            ce::dynamic_array<WarmupStage> stages;
             std::size_t reached{ 0 };
             double      elapsedMs{ 0.0 };
             std::string last;          ///< 마지막으로 도달한 단계의 이름

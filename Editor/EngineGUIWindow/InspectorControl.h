@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 
 // PHASE 21 W2-I — Inspector 를 밖에서 읽고 폭을 정하는 창구.
@@ -77,7 +78,7 @@ namespace editor::windows
         /// 지금 편집 중인 ImGui 아이템. 폭을 바꾸는 동안 이 값이 살아 있어야
         /// *"편집 중 ID/Undo 손실"* 이 없다고 말할 수 있다.
         std::uint32_t activeId{};
-        std::vector<inspector_body> bodies{};
+        ce::dynamic_array<inspector_body> bodies{};
     };
 
     /// 본문 폭을 논리 px 로 정한다. 0 이하면 끈다.

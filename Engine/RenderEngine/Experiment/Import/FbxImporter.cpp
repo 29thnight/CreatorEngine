@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
 #else
@@ -138,9 +140,9 @@ namespace experiment::importer
         // 믿지 않고 루트에서 BFS 로 직접 만든다.
         struct FbxNodeOrder final
         {
-            std::vector<const ufbx_node*> ordered{};
+            ce::dynamic_array<const ufbx_node*> ordered{};
             // ufbx typed_id → IR node index
-            std::vector<std::uint32_t> nodeToIr{};
+            ce::dynamic_array<std::uint32_t> nodeToIr{};
         };
 
         [[nodiscard]] FbxNodeOrder OrderFbxNodes(const ufbx_scene& scene)
@@ -150,7 +152,7 @@ namespace experiment::importer
                 (std::numeric_limits<std::uint32_t>::max)());
             order.ordered.reserve(scene.nodes.count);
 
-            std::vector<const ufbx_node*> queue;
+            ce::dynamic_array<const ufbx_node*> queue;
             for (std::size_t i = 0; i < scene.nodes.count; ++i)
             {
                 const ufbx_node* node = scene.nodes.data[i];
@@ -228,16 +230,16 @@ namespace experiment::importer
             const bool hasColor = mesh.vertex_color.exists;
             const bool hasSkin = skin.deformer != nullptr;
 
-            std::unordered_map<FbxCornerKey, std::uint32_t, FbxCornerKeyHash> lookup;
+            ce::engine_node_map<FbxCornerKey, std::uint32_t, FbxCornerKeyHash> lookup;
             lookup.reserve(part.num_triangles * 3);
             // 코너 → ufbx 정점 인덱스. 스킨 가중치가 정점 단위라 따로 들고 간다.
-            std::vector<std::uint32_t> vertexOfNew;
+            ce::dynamic_array<std::uint32_t> vertexOfNew;
 
             if (hasSkin) streams.influenceOffsets.push_back(0);
 
             // n-gon 이 있을 수 있어 ufbx 의 삼각화를 쓴다. 대각선 선택 규약을
             // 우리가 다시 정하면 노멀맵 이음매가 달라진다.
-            std::vector<std::uint32_t> triangleCorners(
+            ce::dynamic_array<std::uint32_t> triangleCorners(
                 (std::max<std::size_t>)(mesh.max_face_triangles, 1) * 3);
 
             for (std::size_t f = 0; f < part.face_indices.count; ++f)
@@ -503,7 +505,7 @@ namespace experiment::importer
         // ── 스킨 ────────────────────────────────────────────────────────
         // ufbx 는 skin deformer 를 메시에 붙인다. IR 은 skin 을 따로 들고
         // 노드가 참조하므로 먼저 수집해 deformer → skin index 표를 만든다.
-        std::unordered_map<const ufbx_skin_deformer*, std::uint32_t> skinOfDeformer;
+        ce::engine_node_map<const ufbx_skin_deformer*, std::uint32_t> skinOfDeformer;
         for (std::size_t m = 0; m < loaded->meshes.count; ++m)
         {
             const ufbx_mesh* mesh = loaded->meshes.data[m];
@@ -547,7 +549,7 @@ namespace experiment::importer
         }
 
         // ── 머테리얼 ────────────────────────────────────────────────────
-        std::unordered_map<const ufbx_material*, std::uint32_t> materialIndex;
+        ce::engine_node_map<const ufbx_material*, std::uint32_t> materialIndex;
         scene.materials.reserve(loaded->materials.count);
         for (std::size_t i = 0; i < loaded->materials.count; ++i)
         {

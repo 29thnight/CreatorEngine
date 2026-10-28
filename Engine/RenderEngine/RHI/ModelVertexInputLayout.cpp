@@ -1,3 +1,5 @@
+#include "../../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -26,14 +28,14 @@ namespace ModelVertexInput
     }
 
     bool BuildInputElements(assets::VertexAttributeMask mask,
-        std::vector<RHIInputElement>& outElements, std::string& outError)
+        ce::dynamic_array<RHIInputElement>& outElements, std::string& outError)
     {
         return BuildInputElements(mask, mask, outElements, outError);
     }
 
     bool BuildInputElements(assets::VertexAttributeMask layoutMask,
         assets::VertexAttributeMask consumedMask,
-        std::vector<RHIInputElement>& outElements, std::string& outError)
+        ce::dynamic_array<RHIInputElement>& outElements, std::string& outError)
     {
         if (!assets::IsSupportedModelVertexLayout(layoutMask))
         {
@@ -49,7 +51,7 @@ namespace ModelVertexInput
             return false;
         }
 
-        std::vector<RHIInputElement> elements;
+        ce::dynamic_array<RHIInputElement> elements;
         for (const assets::VertexAttributeDesc& desc
             : assets::kVertexAttributeTable)
         {
@@ -82,21 +84,21 @@ namespace ModelVertexInput
         return true;
     }
 
-    const std::vector<RHIInputElement>* ResolveInputElements(
+    const ce::dynamic_array<RHIInputElement>* ResolveInputElements(
         assets::VertexAttributeMask mask, std::string& outError)
     {
         return ResolveInputElements(mask, mask, outError);
     }
 
-    const std::vector<RHIInputElement>* ResolveInputElements(
+    const ce::dynamic_array<RHIInputElement>* ResolveInputElements(
         assets::VertexAttributeMask layoutMask,
         assets::VertexAttributeMask consumedMask, std::string& outError)
     {
         static std::mutex mutex;
-        using CacheKey = std::pair<assets::VertexAttributeMask,
+        using CacheKey = ce::pair<assets::VertexAttributeMask,
             assets::VertexAttributeMask>;
-        static std::map<CacheKey,
-            own::unique_owner<const std::vector<RHIInputElement>>> cache;
+        static ce::engine_ordered_map<CacheKey,
+            own::unique_owner<const ce::dynamic_array<RHIInputElement>>> cache;
         std::lock_guard lock(mutex);
         const CacheKey key{ layoutMask, consumedMask };
         if (const auto found = cache.find(key); found != cache.end())
@@ -104,10 +106,10 @@ namespace ModelVertexInput
             outError.clear();
             return found->second.operator->();
         }
-        std::vector<RHIInputElement> elements;
+        ce::dynamic_array<RHIInputElement> elements;
         if (!BuildInputElements(layoutMask, consumedMask, elements, outError))
             return nullptr;
-        auto stable = own::make_unique<const std::vector<RHIInputElement>>(
+        auto stable = own::make_unique<const ce::dynamic_array<RHIInputElement>>(
             std::move(elements));
         const auto* result = stable.operator->();
         cache.emplace(key, std::move(stable));
@@ -124,7 +126,7 @@ namespace ModelVertexInput
             return false;
         }
         if (!permutation.Enable("MODEL_VERTEX_LAYOUT", outError)) return false;
-        std::vector<std::string_view> enabledAxes;
+        ce::dynamic_array<std::string_view> enabledAxes;
         for (const assets::VertexAttributeDesc& desc : assets::kVertexAttributeTable)
         {
             if (desc.permutationAxis == nullptr || !assets::Has(mask, desc.attribute))

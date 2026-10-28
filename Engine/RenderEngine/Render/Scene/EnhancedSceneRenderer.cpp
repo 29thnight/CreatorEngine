@@ -1,3 +1,9 @@
+#include "../../../Utility_Framework/Foundation/EngineStorage.h"
+#include "../../../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../../Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -42,6 +48,7 @@ import Creator.Platform.Windows;
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 #include "../Graph/ShadowCasterBounds.h"
 #include "EnhancedSceneRenderer.h"
+#include "../../Effects/IEffectSystem.h"
 #include "PreparedViewInputPool.h"
 #include "EnhancedTemporalViewState.h"
 #include "../Passes/PostProcess/EnhancedTemporalInputsPass.h"
@@ -147,11 +154,11 @@ namespace EnhancedSceneRenderer
     {
         std::mutex mutex;
         EnhancedTemporalFixtureStamp published;
-        std::array<EnhancedTemporalFixtureSubmission,
+        ce::fixed_array<EnhancedTemporalFixtureSubmission,
             static_cast<size_t>(EnhancedLiveDisplayTarget::Count)> previous;
-        std::array<EnhancedTemporalFixtureSubmission,
+        ce::fixed_array<EnhancedTemporalFixtureSubmission,
             static_cast<size_t>(EnhancedLiveDisplayTarget::Count)> acknowledged;
-        std::array<std::vector<EnhancedTemporalFixtureSubmission>,
+        ce::fixed_array<ce::dynamic_array<EnhancedTemporalFixtureSubmission>,
             static_cast<size_t>(EnhancedLiveDisplayTarget::Count)> warmup;
     };
 
@@ -407,7 +414,7 @@ namespace
     {
         ModelGenerationMix result;
         if (!input) return result;
-        std::vector<std::pair<uuid::uuid16, std::uint64_t>> drawn;
+        ce::dynamic_array<ce::pair<uuid::uuid16, std::uint64_t>> drawn;
         drawn.reserve(input->Draws().size());
         for (const auto& draw : input->Draws())
         {
@@ -444,8 +451,8 @@ namespace
     // storage. SceneViewInput copies/seals it before any GPU submission.
     struct MaterialPreviewSphere
     {
-        std::vector<std::byte> vertices;
-        std::vector<uint32_t> indices;
+        ce::dynamic_array<std::byte> vertices;
+        ce::dynamic_array<uint32_t> indices;
         RHIModelMeshView mesh;
         MaterialPreviewSphere()
         {
@@ -491,8 +498,8 @@ namespace
 
     struct MaterialPreviewFloor
     {
-        std::vector<std::byte> vertices;
-        std::vector<uint32_t> indices;
+        ce::dynamic_array<std::byte> vertices;
+        ce::dynamic_array<uint32_t> indices;
         RHIModelMeshView mesh;
         explicit MaterialPreviewFloor(unsigned color)
         {
@@ -729,7 +736,7 @@ namespace
     EnhancedLiveShadowStats CaptureShadowStats(const PipelineT& p)
     {
         const EnhancedShadowPass::DebugStats source = p.Execution().shadow.GetDebugStats();
-        const std::array<uint32_t, 3> graphCasters = p.Execution().graphMaterials.ShadowCasterCounts();
+        const ce::fixed_array<uint32_t, 3> graphCasters = p.Execution().graphMaterials.ShadowCasterCounts();
         EnhancedLiveShadowStats stats;
         stats.valid = true;
         stats.hasDirectionalLight = source.hasDirectionalLight;
@@ -761,11 +768,11 @@ namespace
     struct LivePreparedView
     {
         FrameCameraSnapshot camera{};
-        std::vector<EnhancedDrawItem> shadowDraws;
-        std::vector<EnhancedLight> lights;
-        std::vector<EnhancedDecalPass::Item> decals;
-        std::vector<EnhancedSpritePass::Item> sprites;
-        std::vector<EnhancedUIPass::Rect> uiRects;
+        ce::dynamic_array<EnhancedDrawItem> shadowDraws;
+        ce::dynamic_array<EnhancedLight> lights;
+        ce::dynamic_array<EnhancedDecalPass::Item> decals;
+        ce::dynamic_array<EnhancedSpritePass::Item> sprites;
+        ce::dynamic_array<EnhancedUIPass::Rect> uiRects;
         own::shared_owner<const EnhancedGizmoSceneData> gizmoData;
         own::shared_owner<TextureFramePins> texturePins;
         own::shared_owner<const assets::ModelAssetGenerationPins> modelPins;
@@ -820,7 +827,7 @@ namespace
 
     struct LiveViewExecutionStorage
     {
-        std::array<LiveViewExecution, kEnhancedMaxLiveCameraViews> executions;
+        ce::fixed_array<LiveViewExecution, kEnhancedMaxLiveCameraViews> executions;
         uint32_t selectedView{};
         RenderFeatureContributors featureContributors;
 
@@ -947,10 +954,10 @@ namespace
             DisplaySlot      slots[kSlotsPerView];
             // History slots and completed/fresh geometry yield several exact CPU
             // shapes. These bounded templates retain no native resources.
-            std::array<own::shared_owner<const EnhancedRenderGraph::StructuralSchedule>,
+            ce::fixed_array<own::shared_owner<const EnhancedRenderGraph::StructuralSchedule>,
                 EnhancedRenderGraph::MaxStructuralSchedules> structuralSchedules;
             int              displaySlot{ -1 };   // DX11이 표시 중인 슬롯(-1 = 아직 없음)
-            std::vector<int> pendingQueue;        // 제출 순서의 인플라이트 슬롯들
+            ce::dynamic_array<int> pendingQueue;        // 제출 순서의 인플라이트 슬롯들
             uint64_t         promotionCount{ 0 }; // GPU 완료 뒤 표시로 승격한 횟수
             uint64_t         gpuTimingSubmissions{ 0 }; // Per-view cadence; neither view can starve the other.
             uint32_t         promotedSlotMask{ 0 }; // 실제 사용한 슬롯 인덱스 집합
@@ -1165,9 +1172,9 @@ namespace
         };
         Slot slots[kSlotCount];
 
-        static std::vector<uint8_t> TonemapToRgba8(const RHIReadbackImage& image)
+        static ce::dynamic_array<uint8_t> TonemapToRgba8(const RHIReadbackImage& image)
         {
-            std::vector<uint8_t> output(static_cast<size_t>(image.width) * image.height * 4u);
+            ce::dynamic_array<uint8_t> output(static_cast<size_t>(image.width) * image.height * 4u);
             if (RHIFormat::RGBA8Unorm == image.format ||
                 RHIFormat::RGBA8UnormSrgb == image.format)
             {
@@ -1209,8 +1216,8 @@ namespace
         }
 
         bool Initialize(uint32_t newWidth, uint32_t newHeight, FrameCameraSnapshot& camera,
-                        const std::vector<EnhancedDrawItem>& draws, const std::vector<EnhancedDrawItem>& forwardDraws,
-                        std::vector<EnhancedLight>& lights,
+                        const ce::dynamic_array<EnhancedDrawItem>& draws, const ce::dynamic_array<EnhancedDrawItem>& forwardDraws,
+                        ce::dynamic_array<EnhancedLight>& lights,
                         const RHIGpuPresentationCapabilities& presentationCapabilities, std::string& outError)
         {
             configuredPresentation = presentationCapabilities;
@@ -1536,7 +1543,7 @@ namespace
                     {
                         if (!slot.sharedImage && presentationSink)
                         {
-                            std::vector<uint8_t> rgba = TonemapToRgba8(image);
+                            ce::dynamic_array<uint8_t> rgba = TonemapToRgba8(image);
                             presentationSink->SubmitCpuFrame(kDisplayKeyBase + slot.viewIndex + 1u, image.width,
                                                              image.height, rgba.data(), image.width * 4u, metadata);
                         }
@@ -2035,7 +2042,7 @@ namespace
                 capture->manifest.Root()["measurement"]["validationLayerEnabled"] << resources.IsValidationEnabled();
                 const auto memory = resources.QueryVideoMemory();
                 capture->RecordMemory(memory);
-                std::vector<VulkanCaptureGpuProfiler::Timing> nativeTimings;
+                ce::dynamic_array<VulkanCaptureGpuProfiler::Timing> nativeTimings;
                 EnhancedLiveGpuSpan captureSpan;
                 std::string timingError;
                 if (!retainedCaptureProfiler->Collect(nativeTimings, captureSpan.queueSpanMs,
@@ -2046,7 +2053,7 @@ namespace
                     return false;
                 }
                 captureSpan.sliceCount = retainedCaptureProfiler->SliceCount();
-                std::vector<EnhancedLivePassTiming> captureTimings;
+                ce::dynamic_array<EnhancedLivePassTiming> captureTimings;
                 for (const auto& timing : nativeTimings)
                     captureTimings.push_back({timing.name, timing.milliseconds, timing.milliseconds});
                 capture->RecordGpuTiming(captureTimings, captureSpan, captureSpan.busyMs, timingError);
@@ -2143,7 +2150,7 @@ namespace
             // source-free package does not contain the shader recipe inputs.
             if (request.allowSourceProcessing)
             {
-                ce::hash::sha256_digest recipe;
+                ce::crypto::sha256_digest recipe;
                 if (!assets::EnvironmentRecipeIdentity(request.shaders,
                         cooked.cubeSize, cooked.brdfSize, recipe, error))
                 {
@@ -2200,14 +2207,14 @@ namespace
             return false;
         }
         const auto length = static_cast<std::streamsize>(input.tellg());
-        std::vector<std::byte> bytes(static_cast<size_t>(length));
+        ce::dynamic_array<std::byte> bytes(static_cast<size_t>(length));
         input.seekg(0);
         if (!input.read(reinterpret_cast<char*>(bytes.data()), length))
         {
             error = "HDR source read failed";
             return false;
         }
-        ce::hash::sha256 hash;
+        ce::crypto::sha256 hash;
         hash.update(bytes.data(), bytes.size());
         if (hash.finish() != identity.source)
         {
@@ -2597,7 +2604,7 @@ namespace
         static constexpr size_t kMaxDeltasPerSubmission = 65536;
         mutable std::mutex renderQueueMutex;
         std::condition_variable renderQueueWake;
-        std::deque<FrameSubmission> renderQueue;
+        ce::segmented_deque<FrameSubmission> renderQueue;
         std::thread renderThread;
         bool renderThreadStarted{ false };
         bool renderThreadStartFailed{ false };
@@ -2853,9 +2860,9 @@ namespace
         // 핸들 open의 수명도 같은 락으로 직렬화한다. 실제 기록/제출에는 잡지 않는다.
         mutable std::mutex displayLifetimeMutex;
         EnhancedLiveDisplaySnapshot displaySnapshot{};
-        std::array<uint64_t, kEnhancedLiveDisplayTargetCount>
+        ce::fixed_array<uint64_t, kEnhancedLiveDisplayTargetCount>
             displayPresentationKeys{};
-        std::array<std::chrono::steady_clock::time_point,
+        ce::fixed_array<std::chrono::steady_clock::time_point,
             kEnhancedLiveDisplayTargetCount> displayMissingSince{};
 
         static uint32_t DisplayTargetIndex(EnhancedLiveDisplayTarget target)
@@ -2872,7 +2879,7 @@ namespace
             displaySnapshot.width = frame.width;
             displaySnapshot.height = frame.height;
 
-            std::array<bool, kEnhancedLiveDisplayTargetCount> active{};
+            ce::fixed_array<bool, kEnhancedLiveDisplayTargetCount> active{};
             const uint32_t viewCount = (std::min)(frame.viewCount,
                 EnhancedSceneRenderer::kMaxLiveCameraViews);
             for (uint32_t i = 0; i < viewCount; ++i)
@@ -3040,7 +3047,7 @@ namespace
             math::aabb           worldBounds{};
             bool                 hasBounds{ false };
         };
-        std::vector<PooledDraw>       drawPool;
+        ce::dynamic_array<PooledDraw>       drawPool;
         own::shared_owner<const assets::ModelAssetGenerationPins> modelFramePins{};
         assets::ModelGeometryPreparationPins geometryFramePins{};
         struct GeometryDemand final
@@ -3052,10 +3059,10 @@ namespace
             std::uint64_t seenFrame{};
             // A preparation cohort survives deferred cameras. Marking a view
             // consumed performs no allocation after native queue acceptance.
-            std::map<std::pair<uint64_t, uint64_t>, bool> views;
+            ce::engine_ordered_map<ce::pair<uint64_t, uint64_t>, bool> views;
         };
-        std::map<assets::ModelMeshHandle, GeometryDemand> geometryDemands{};
-        std::set<std::pair<uint64_t, uint64_t>> geometryDemandViews{};
+        ce::engine_ordered_map<assets::ModelMeshHandle, GeometryDemand> geometryDemands{};
+        ce::engine_ordered_set<ce::pair<uint64_t, uint64_t>> geometryDemandViews{};
 
         struct PooledSprite
         {
@@ -3078,45 +3085,45 @@ namespace
             bool replayNeeded{};
             bool bootstrap{};
             uint64_t bootstrapSceneEpoch{};
-            std::set<std::pair<uint64_t, uint64_t>> views;
+            ce::engine_ordered_set<ce::pair<uint64_t, uint64_t>> views;
         };
         // Retain both pending requests and ready results until staging consumes
         // them. Another view/resource can remain Pending at a zero CPU budget.
-        std::unordered_map<std::uint64_t, ImageDemand> imageDemands;
-        std::pair<uint64_t, uint64_t> imageAdmissionView{};
+        ce::engine_node_map<std::uint64_t, ImageDemand> imageDemands;
+        ce::pair<uint64_t, uint64_t> imageAdmissionView{};
         struct ImageBootstrapViews
         {
             uint64_t sceneEpoch{};
-            std::set<uint64_t> pending;
-            std::set<uint64_t> admitted;
+            ce::engine_ordered_set<uint64_t> pending;
+            ce::engine_ordered_set<uint64_t> admitted;
         };
         std::optional<ImageBootstrapViews> imageBootstrapViews;
 
         own::shared_owner<material_graph::InstanceFramePins> graphFramePins;
-        std::vector<PooledSprite> spritePool;
+        ce::dynamic_array<PooledSprite> spritePool;
         RenderScene::UIProxySnapshot uiProxySnapshot;
-        std::vector<UIRenderProxy*> uiProxyPointers;
+        ce::dynamic_array<UIRenderProxy*> uiProxyPointers;
 
         // 뷰마다 다시 만드는 최종 2D/3D 스프라이트 목록.
-        std::vector<EnhancedSpritePass::Item> worldSprites;
-        std::vector<EnhancedUIPass::Rect> uiRects;
+        ce::dynamic_array<EnhancedSpritePass::Item> worldSprites;
+        ce::dynamic_array<EnhancedUIPass::Rect> uiRects;
         uint32_t                      lastPoolDraws{ 0 };
         uint32_t                      lastCulledDraws{ 0 };
 
         // Empty live native lists retained for the standalone capture/replay
         // and common pass-input contracts. Scene materials use graphViewInput.
         // Legacy reference and capture APIs receive an explicitly empty stream.
-        const std::vector<EnhancedDrawItem> emptyReferenceDraws;
-        std::vector<EnhancedDrawItem> shadowDraws;
+        const ce::dynamic_array<EnhancedDrawItem> emptyReferenceDraws;
+        ce::dynamic_array<EnhancedDrawItem> shadowDraws;
 
-        std::vector<EnhancedDrawItem> graphDraws;
-        std::vector<size_t> graphShadowIndices;
+        ce::dynamic_array<EnhancedDrawItem> graphDraws;
+        ce::dynamic_array<size_t> graphShadowIndices;
         // Same ordering as graphDraws/SceneDrawInput::sourceIndex. Eligibility
         // remains aligned when optional graph candidates are removed.
         ce::dynamic_bitset graphShadowEligible;
         ce::dynamic_bitset graphViewRequired;
         own::shared_owner<const material_graph::SceneViewInput> graphViewInput;
-        std::vector<EnhancedLight>    lights;
+        ce::dynamic_array<EnhancedLight>    lights;
         // 마지막으로 민 뷰의 광원 선별 근거. status가 "씬에 몇 개인데 뷰가
         // 몇 개를 봤고 패스 한도에 몇 개가 걸리는지"를 답하는 데 쓴다 —
         // 목록만 보면 잘린 사실이 안 보인다.
@@ -3127,8 +3134,8 @@ namespace
         // 데칼은 frameContext가 아니라 패스에 직접 건넨다(SetDecals) —
         // 그리는 패스가 하나뿐이라 컨텍스트에 실을 이유가 없다. 여기 두는
         // 것은 매 프레임 재할당을 피하기 위해서다.
-        std::vector<EnhancedDecalPass::Item> decals;
-        const std::vector<EnhancedDecalPass::Item> previewDecals;
+        ce::dynamic_array<EnhancedDecalPass::Item> decals;
+        const ce::dynamic_array<EnhancedDecalPass::Item> previewDecals;
         bool materialPreviewView{false};
         own::shared_owner<const EnhancedGizmoSceneData> gizmoData;
 
@@ -3140,10 +3147,10 @@ namespace
         float    totalSeconds{ 0.f };
         LiveViewScheduler viewScheduler;
 
-        std::array<LiveViewScheduleRequest, LiveViewScheduler::Capacity> ViewScheduleRequests(
+        ce::fixed_array<LiveViewScheduleRequest, LiveViewScheduler::Capacity> ViewScheduleRequests(
             const EnhancedLiveFramePacket& frame, bool includeDiagnosticRequests = false)
         {
-            std::array<LiveViewScheduleRequest, LiveViewScheduler::Capacity> requests{};
+            ce::fixed_array<LiveViewScheduleRequest, LiveViewScheduler::Capacity> requests{};
             const uint32_t count = (std::min)(frame.viewCount, kEnhancedMaxLiveCameraViews);
             for (uint32_t index = 0; index < count; ++index)
             {
@@ -3203,7 +3210,7 @@ namespace
         // 검증 레이어 메시지. Debug에서만 쌓이고, 같은 문장이 매 프레임
         // 반복되므로 처음 본 것만 찍는다 — 안 그러면 콘솔이 도배돼 정작
         // 첫 원인을 못 본다.
-        std::unordered_set<std::string> reportedValidation;
+        ce::engine_node_set<std::string> reportedValidation;
 
         // W8 — 인코더가 조용히 버린 명령. 놓인 PSO 핸들·만료된 descriptor
         // 버전·주소 0이 여기 모인다. 0이 아니면 그 프레임의 그림을 믿으면 안 된다.
@@ -3228,9 +3235,9 @@ namespace
         // mixed 모델 중 가장 새 generation. 모든 모델의 최댓값을 쓰면 다른 모델의
         // 큰 번호가 재임포트의 전진을 가린다.
         uint64_t lastMixedNewestGeneration{ 0 };
-        std::array<uint32_t, kEnhancedLiveDisplayTargetCount> viewSpriteCounts{};
-        std::array<uint32_t, kEnhancedLiveDisplayTargetCount> viewUICounts{};
-        std::array<EnhancedLiveShadowStats, kEnhancedLiveDisplayTargetCount> viewShadowStats{};
+        ce::fixed_array<uint32_t, kEnhancedLiveDisplayTargetCount> viewSpriteCounts{};
+        ce::fixed_array<uint32_t, kEnhancedLiveDisplayTargetCount> viewUICounts{};
+        ce::fixed_array<EnhancedLiveShadowStats, kEnhancedLiveDisplayTargetCount> viewShadowStats{};
         double   lastGpuMs{ 0.0 };
         double   lastCpuMs{ 0.0 };
         double   lastNativeRecordMs{ 0.0 };
@@ -3291,7 +3298,7 @@ namespace
         // 마지막으로 수집에 성공한 프레임의 패스별 GPU 시간. 수집은 매
         // 프레임 되지 않으므로(리드백이 준비된 프레임에만) 마지막 성공분을
         // 유지한다 — 비우면 창이 깜빡인다.
-        std::vector<EnhancedLivePassTiming> lastPassTimings;
+        ce::dynamic_array<EnhancedLivePassTiming> lastPassTimings;
 
         // 렌더 디버그 창에 건네는 완성본. 창은 CE 렌더 스레드에서 그려지고
         // 위의 상태는 전부 RenderThread가 고치므로, 창이 상태를 직접 순회하면
@@ -3299,8 +3306,8 @@ namespace
         // 창은 락을 잡아 복사만 한다.
         std::mutex                debugMutex;
         EnhancedLiveDebugSnapshot debugSnapshot;
-        std::array<LiveGraphSnapshot, kEnhancedLiveDisplayTargetCount> graphSnapshots{};
-        std::array<bool, kEnhancedLiveDisplayTargetCount> graphSnapshotRequests{};
+        ce::fixed_array<LiveGraphSnapshot, kEnhancedLiveDisplayTargetCount> graphSnapshots{};
+        ce::fixed_array<bool, kEnhancedLiveDisplayTargetCount> graphSnapshotRequests{};
 
         bool HasGraphSnapshotRequest(EnhancedLiveDisplayTarget target)
         {
@@ -4027,6 +4034,12 @@ namespace
             {
                 std::lock_guard<std::mutex> lock(featureContributorMutex);
                 p.featureContributors = featureContributors;
+            }
+            // Runtime package composition is independent from the Host's
+            // replaceable overlay list. The pipeline retains the copied owner.
+            if (auto effectContributor = ce::effects::CaptureEffectContributor())
+            {
+                if (!p.featureContributors.Add(std::move(effectContributor), outError)) return false;
             }
             RenderFeatureContext featureContext{};
             featureContext.ldrFormat = EnhancedPostChainPass::kLDRFormat;
@@ -4795,7 +4808,7 @@ namespace
                 node.declare=[&p](LiveBlackboard& bb,EnhancedRenderGraph& graph,const EnhancedFrameContext& ctx,const LiveFrameBinding&) {
                     const char* slots[]{LiveSlots::kTemporalMotion,LiveSlots::kTemporalReactive,LiveSlots::kTemporalTransparency,
                         LiveSlots::kTemporalResponsive,LiveSlots::kTemporalDepth};
-                    std::array<RGHandle,5> targets;for(unsigned i=0;i<5;++i)targets[i]=bb.Get(slots[i]);
+                    ce::fixed_array<RGHandle,5> targets;for(unsigned i=0;i<5;++i)targets[i]=bb.Get(slots[i]);
                     if (!targets[0].IsValid()) return; // No temporal consumers in this view.
                     targets = p.Execution().sprite.DeclareTemporal(graph, ctx, targets);
                     for(unsigned i=0;i<5;++i)bb.Set(slots[i],targets[i]);
@@ -5274,7 +5287,7 @@ namespace
 
         static bool AppendImageToPlane(const UIRenderProxy::ImageData& image,
             const CanvasPlane& plane, bool enableDepth,
-            std::vector<EnhancedSpritePass::Item>& output, TextureFramePins& texturePins)
+            ce::dynamic_array<EnhancedSpritePass::Item>& output, TextureFramePins& texturePins)
         {
             if (!plane.valid) return false;
 
@@ -5318,7 +5331,7 @@ namespace
         }
 
         static void AppendTextToPlane(const UIRenderProxy::TextData& text,
-            const CanvasPlane& plane, bool enableDepth, std::vector<EnhancedSpritePass::Item>& output,
+            const CanvasPlane& plane, bool enableDepth, ce::dynamic_array<EnhancedSpritePass::Item>& output,
             TextureFramePins& texturePins)
         {
             if (!plane.valid)
@@ -5327,7 +5340,7 @@ namespace
             }
             // Overlay and plane paths consume exactly the same glyph rectangles,
             // including alignment, fallback, line wrapping and whole-block flips.
-            std::vector<EnhancedUIPass::Rect> glyphs;
+            ce::dynamic_array<EnhancedUIPass::Rect> glyphs;
             EnhancedUIPass::AppendTextRects(text, glyphs, texturePins);
             const float rootWidth = text.canvasRect.z;
             const float rootHeight = text.canvasRect.w;
@@ -5370,7 +5383,7 @@ namespace
 
         template<typename TUIData>
         static void AppendCanvasOutline(const TUIData& image,
-            const CanvasPlane& plane, std::vector<EnhancedSpritePass::Item>& output)
+            const CanvasPlane& plane, ce::dynamic_array<EnhancedSpritePass::Item>& output)
         {
             if (!plane.valid) return;
             const float width = math::length(plane.right);
@@ -5591,7 +5604,7 @@ namespace
             // A ready request owns its CPU result independently of cache budgets.
             // Keep relevant requests across active Pending frames, but never let
             // a removed/disabled/rebound proxy leave that result pinned forever.
-            std::set<assets::ModelMeshHandle> activeMeshes;
+            ce::engine_ordered_set<assets::ModelMeshHandle> activeMeshes;
             const auto proxies = renderScene->GetPrimitiveProxySnapshot();
             for (const auto& primitive : proxies)
             {
@@ -5625,7 +5638,7 @@ namespace
                 }
                 else
                 {
-                    std::erase_if(position->second.views,
+                    ce::erase_if(position->second.views,
                         [this](const auto& view) { return !geometryDemandViews.contains(view.first); });
                     ++position;
                 }
@@ -5686,8 +5699,8 @@ namespace
             }
 
             assets::ModelAssetGenerationPins modelPins;
-            std::map<assets::ModelAssetGenerationHandle, std::size_t> modelPinIndices;
-            std::map<assets::ModelMeshHandle, std::size_t> meshPinIndices;
+            ce::engine_ordered_map<assets::ModelAssetGenerationHandle, std::size_t> modelPinIndices;
+            ce::engine_ordered_map<assets::ModelMeshHandle, std::size_t> meshPinIndices;
             struct BuildGuard final
             {
                 LiveState& state;
@@ -6067,7 +6080,7 @@ namespace
                     demand.bootstrap = false;
                 }
             }
-            std::erase_if(imageDemands, [&](const auto& item)
+            ce::erase_if(imageDemands, [&](const auto& item)
             {
                 const auto& demand = item.second;
                 if (demand.bootstrapSceneEpoch == epoch && demand.views.empty())
@@ -6081,8 +6094,8 @@ namespace
 
         void ReconcileImageDemands(const EnhancedLiveFramePacket& frame, bool renderable)
         {
-            std::set<std::pair<uint64_t, uint64_t>> currentViews;
-            std::set<uint64_t> currentSceneViews;
+            ce::engine_ordered_set<ce::pair<uint64_t, uint64_t>> currentViews;
+            ce::engine_ordered_set<uint64_t> currentSceneViews;
             if (renderable)
             {
                 for (uint32_t index = 0; index < (std::min)(frame.viewCount,
@@ -6110,7 +6123,7 @@ namespace
             }
             if (imageBootstrapViews && imageBootstrapViews->sceneEpoch == frame.sceneEpoch)
             {
-                std::erase_if(imageBootstrapViews->pending,
+                ce::erase_if(imageBootstrapViews->pending,
                     [&](uint64_t view) { return !currentSceneViews.contains(view); });
                 for (const auto view : currentSceneViews)
                 {
@@ -6127,9 +6140,9 @@ namespace
             }
             for (auto& [identity, demand] : imageDemands)
             {
-                std::erase_if(demand.views, [&](const auto& view) { return !currentViews.contains(view); });
+                ce::erase_if(demand.views, [&](const auto& view) { return !currentViews.contains(view); });
             }
-            std::erase_if(imageDemands, [&](const auto& item)
+            ce::erase_if(imageDemands, [&](const auto& item)
             {
                 const auto& demand = item.second;
                 if (!demand.views.empty() || (demand.bootstrap
@@ -6172,8 +6185,8 @@ namespace
                     }
                 }
             }
-            std::set<std::pair<uint64_t, uint64_t>> currentViews;
-            std::set<uint64_t> currentSceneViews;
+            ce::engine_ordered_set<ce::pair<uint64_t, uint64_t>> currentViews;
+            ce::engine_ordered_set<uint64_t> currentSceneViews;
             for (uint32_t index = 0; index < frame.viewCount; ++index)
             {
                 const auto& view = frame.views[index];
@@ -6199,7 +6212,7 @@ namespace
             }
             if (imageBootstrapViews && imageBootstrapViews->sceneEpoch == frame.sceneEpoch)
             {
-                std::erase_if(imageBootstrapViews->pending,
+                ce::erase_if(imageBootstrapViews->pending,
                     [&](uint64_t view) { return !currentSceneViews.contains(view); });
                 for (const auto view : currentSceneViews)
                 {
@@ -6219,16 +6232,16 @@ namespace
             {
                 textureFramePins->Retain(fogBlueNoise);
             }
-            std::unordered_set<std::uint64_t> current;
+            ce::engine_node_set<std::uint64_t> current;
             for (const auto& texture : textureFramePins->Owners())
             {
                 current.insert(TextureFramePins::Identity(&*texture));
             }
             for (auto& [identity, demand] : imageDemands)
             {
-                std::erase_if(demand.views, [&](const auto& view) { return !currentViews.contains(view); });
+                ce::erase_if(demand.views, [&](const auto& view) { return !currentViews.contains(view); });
             }
-            std::erase_if(imageDemands, [&](const auto& item)
+            ce::erase_if(imageDemands, [&](const auto& item)
             {
                 const auto& demand = item.second;
                 if ((current.contains(item.first) && !demand.views.empty())
@@ -6391,7 +6404,7 @@ namespace
             std::string& error)
         {
             error.clear();
-            std::unordered_set<std::uint64_t> needed;
+            ce::engine_node_set<std::uint64_t> needed;
             const auto requireTexture = [&](const Texture* texture)
             {
                 if (texture)
@@ -6491,7 +6504,7 @@ namespace
                     demand.views.erase(imageAdmissionView);
                 }
             }
-            std::erase_if(imageDemands, [&](const auto& item)
+            ce::erase_if(imageDemands, [&](const auto& item)
             {
                 if (!item.second.bootstrap && item.second.views.empty() && !needed.contains(item.first))
                 {
@@ -6571,7 +6584,7 @@ namespace
             }
             // Upload calls synchronously copied every source row. GPU staging
             // and native allocation retirement retain their own completion pins.
-            std::erase_if(imageDemands, [&](const auto& item)
+            ce::erase_if(imageDemands, [&](const auto& item)
             {
                 if (item.second.replayNeeded && pbrCapture
                     && pbrCapture->result.state == EnhancedPbrCaptureState::Pending)
@@ -6590,6 +6603,8 @@ namespace
             auto& execution = p.Execution();
             execution.frameContext.frameId = packet.frameId;
             execution.frameContext.sceneEpoch = packet.sceneEpoch;
+            execution.frameContext.effects = viewPacket.displayTarget == EnhancedLiveDisplayTarget::MaterialPreview
+                ? ce::effects::EffectFrameOwner{} : packet.effects;
             auto& view = p.views[index];
             activeTemporal = &view.temporal;
             const auto control = TemporalRuntimeControl::Get().Snapshot();
@@ -6730,8 +6745,8 @@ namespace
                 if (activeTemporal) inputView.temporalFrame = activeTemporal->frame;
                 inputView.camera = cameraSnapshot;
                 std::string error;
-                static const std::array<MaterialPreviewFloor, 2> floor{MaterialPreviewFloor{0}, MaterialPreviewFloor{1}};
-                std::array<EnhancedDrawItem, 3> previewDraws{};
+                static const ce::fixed_array<MaterialPreviewFloor, 2> floor{MaterialPreviewFloor{0}, MaterialPreviewFloor{1}};
+                ce::fixed_array<EnhancedDrawItem, 3> previewDraws{};
                 size_t previewDrawCount = 1;
                 previewDraws[0] = std::move(draw);
                 for (unsigned i = 0; i < floor.size(); ++i)
@@ -6839,7 +6854,7 @@ namespace
 
             // Scene View에서는 Overlay도 Canvas Transform 평면으로 미리 본다.
             // Camera/World Space는 Game View에서도 실제 3D 평면을 쓴다.
-            std::unordered_set<size_t> outlinedCanvases;
+            ce::engine_node_set<size_t> outlinedCanvases;
             for (UIRenderProxy* proxy : uiProxyPointers)
             {
                 if (nullptr == proxy || !proxy->IsEnabled())
@@ -8008,8 +8023,8 @@ namespace
                     EnhancedIBLGenerator::kSceneReflectionSampleCount,
                     dx12.Resources().DescribeTexture(p.ibl.GetImportanceMaps()[2]));
                 capture->RecordMemory(dx12.QueryVideoMemory());
-                std::vector<EnhancedLivePassTiming> captureTimings;
-                std::vector<EnhancedLiveGpuSlice> captureSlices;
+                ce::dynamic_array<EnhancedLivePassTiming> captureTimings;
+                ce::dynamic_array<EnhancedLiveGpuSlice> captureSlices;
                 EnhancedLiveGpuSpan captureSpan;
                 double captureTotalMs = 0.0;
                 std::string timingError;
@@ -8297,7 +8312,7 @@ namespace
         ProxyCommandQueueController::Batch compacted;
         compacted.reserve(batch.size());
         compacted.take_palettes_from(batch);
-        std::unordered_map<ProxyUpdateKey, size_t, ProxyUpdateKeyHash> latestUpdates;
+        ce::engine_node_map<ProxyUpdateKey, size_t, ProxyUpdateKeyHash> latestUpdates;
         uint64_t superseded = 0;
 
         for (ProxyCommand& command : batch)
@@ -8528,8 +8543,8 @@ namespace
                         }
                         ++state.gpuCollects;
 
-                        thread_local std::vector<EnhancedLiveGpuSlice> slices;
-                        thread_local std::vector<EnhancedLivePassTiming> timings;
+                        thread_local ce::dynamic_array<EnhancedLiveGpuSlice> slices;
+                        thread_local ce::dynamic_array<EnhancedLivePassTiming> timings;
                         EnhancedLiveGpuSpan span{};
                         std::string collectError;
                         GpuCaptureCompletion captureCompletion{ view.slots[slotIndex].profilerToken };
@@ -9775,6 +9790,7 @@ EnhancedLiveFramePacket EnhancedSceneRenderer::BuildLiveFramePacket(
     }
     frame.frameId = ++state.publishedFrameId;
     frame.sceneEpoch = state.sceneEpoch;
+    frame.effects = ce::effects::CaptureEffectFrame();
     frame.deltaSeconds = deltaSeconds;
     state.publishedTotalSeconds += deltaSeconds;
     frame.totalSeconds = state.publishedTotalSeconds;
@@ -10140,7 +10156,7 @@ EnhancedTemporalFixtureSubmission EnhancedSceneRenderer::GetTemporalFixtureSubmi
     return exchange.acknowledged[static_cast<size_t>(target)];
 }
 
-std::vector<EnhancedTemporalFixtureSubmission> EnhancedSceneRenderer::GetTemporalFixtureWarmup(
+ce::dynamic_array<EnhancedTemporalFixtureSubmission> EnhancedSceneRenderer::GetTemporalFixtureWarmup(
     EnhancedLiveDisplayTarget target)
 {
     if (target >= EnhancedLiveDisplayTarget::Count) return {};

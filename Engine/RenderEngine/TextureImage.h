@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "RHI/RHIFormat.h"
 
@@ -195,7 +196,7 @@ public:
 
         // 자리를 두 번 돈다. 픽셀 버퍼를 먼저 확정해야 서브리소스가 그 안을
         // 가리킬 수 있고, vector 가 자라면서 주소가 바뀌는 일이 없어진다.
-        std::vector<size_t> offsets;
+        ce::dynamic_array<size_t> offsets;
         offsets.reserve(static_cast<size_t>(arraySize) * mipLevels);
         size_t total = 0;
         for (uint32_t item = 0; item < arraySize; ++item)
@@ -286,6 +287,6 @@ private:
     uint32_t  m_arraySize{ 0 };
     bool      m_isCube{ false };
 
-    std::vector<std::byte>       m_pixels;
-    std::vector<TextureSubimage> m_subresources;
+    ce::dynamic_array<std::byte>       m_pixels;
+    ce::dynamic_array<TextureSubimage> m_subresources;
 };

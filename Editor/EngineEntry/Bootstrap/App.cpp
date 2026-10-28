@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -516,7 +517,7 @@ uint32_t Core::App::PublishRenderFrame()
 	::editor::windows::note_view_submission(
 		!editorDemanded && nullptr != editorCamera,
 		!gameDemanded && nullptr != gameCamera);
-	const std::vector<own::shared_owner<const Material>> requiredMaterials =
+	const ce::dynamic_array<own::shared_owner<const Material>> requiredMaterials =
 		SceneManagers->CaptureRequiredRenderMaterials();
 	const EnhancedRequiredAssetPacket requiredAssets =
 		EnhancedSceneRenderer::BuildRequiredAssetPacket(requiredMaterials);
@@ -836,7 +837,7 @@ LRESULT Core::App::HandleDropFileEvent(HWND hWnd, WPARAM wParam, LPARAM lParam)
 
 	if (nFiles > 0)
 	{
-		std::vector<wchar_t> fileName(MAX_PATH);
+		ce::dynamic_array<wchar_t> fileName(MAX_PATH);
 		for (UINT i = 0; i < nFiles; ++i)
 		{
 			DragQueryFile(hDrop, i, fileName.data(), MAX_PATH);

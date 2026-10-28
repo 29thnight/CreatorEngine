@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "../VulkanSelfTest.h"
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/Vulkan/VulkanPipelineCache.h"
@@ -105,7 +106,7 @@ namespace
             return gizmo.GetLastVertexCount();
         };
 
-        const std::array<uint32_t, 6> actual = {
+        const ce::fixed_array<uint32_t, 6> actual = {
             countOf([&] { gizmo.AddWireCircle(
                 { 0, 0, 0 }, 1.f, { 0, 1, 0 }, { 1, 1, 1, 1 }); }),
             countOf([&] { gizmo.AddWireSphere(
@@ -125,7 +126,7 @@ namespace
                 gizmo.AddBoundingFrustum(frustum, { 1, 1, 1, 1 });
             }),
         };
-        constexpr std::array<uint32_t, 6> expected = {
+        constexpr ce::fixed_array<uint32_t, 6> expected = {
             128, 384, 24, 1056, 128, 24
         };
         return actual == expected;

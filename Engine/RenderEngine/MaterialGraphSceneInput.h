@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -121,7 +122,7 @@ class SceneViewInput
     SceneInputView view_;
     SurfaceView surface_;
     math::matrix4x4 viewProjection_;
-    std::vector<SceneDrawInput> draws_;
+    ce::dynamic_array<SceneDrawInput> draws_;
     SceneInputCost cost_;
     float geometryMaxPixelError_{1.f};
     own::shared_owner<const assets::ModelAssetGenerationPins> modelPins_;

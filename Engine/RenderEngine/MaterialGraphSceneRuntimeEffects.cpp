@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -61,9 +63,9 @@ struct SceneRuntimeEffectBundle
         }
     }
     IRenderDeviceServices& device;
-    std::array<RHITextureHandle, 14> inputs{};
+    ce::fixed_array<RHITextureHandle, 14> inputs{};
     RHITextureHandle tileDepth, color, depth;
-    std::array<RHIResourceState, 14> inputStates{};
+    ce::fixed_array<RHIResourceState, 14> inputStates{};
     RHIResourceState tileDepthState = RHIResourceState::Common;
     RHIResourceState colorState = RHIResourceState::Common;
     RHIResourceState depthState = RHIResourceState::Common;
@@ -169,7 +171,7 @@ struct SceneRuntimeEffectPool
         bundle->Release();
         effectBytes -= bundle->effectBytes;
         snapshotBytes -= bundle->snapshotBytes;
-        std::erase_if(bundles, [&](const auto& value) { return value.operator->() == bundle.operator->(); });
+        ce::erase_if(bundles, [&](const auto& value) { return value.operator->() == bundle.operator->(); });
     }
 
     void Submitted(std::uint64_t recording, RHICompletionPoint completion)
@@ -314,8 +316,8 @@ struct SceneRuntimeEffectPool
 
     IRenderDeviceServices& device;
     std::mutex mutex;
-    std::vector<own::shared_owner<SceneRuntimeEffectBundle>> bundles;
-    std::map<std::uint64_t, UploadReservation> uploads;
+    ce::dynamic_array<own::shared_owner<SceneRuntimeEffectBundle>> bundles;
+    ce::engine_ordered_map<std::uint64_t, UploadReservation> uploads;
     std::uint64_t effectBytes{}, snapshotBytes{}, uploadBytes{}, completed{};
 };
 
@@ -452,7 +454,7 @@ bool SceneRuntimeEffectsResources::Prepare(const EnhancedFrameContext& context, 
         }
         bundle.ready = true;
     }
-    std::array<RHIBindingDesc, 14> inputs;
+    ce::fixed_array<RHIBindingDesc, 14> inputs;
     for (unsigned i = 0; i < inputs.size(); ++i)
     {
         inputs[i] = RHIBindingDesc::Srv2D(bundle.inputs[i], RHIFormat::RGBA32Float);
@@ -636,7 +638,7 @@ void SceneRuntimeEffectsFrame::RecordDepth(const EnhancedRenderGraph::ExecuteCon
     encoder.Draw(3, 1);
 }
 
-std::array<RGHandle, 14> SceneRuntimeEffectsFrame::DeclareCaptureOutputs(EnhancedRenderGraph& graph,
+ce::fixed_array<RGHandle, 14> SceneRuntimeEffectsFrame::DeclareCaptureOutputs(EnhancedRenderGraph& graph,
                                                                          unsigned part) const
 {
     CheckCurrent(graph);

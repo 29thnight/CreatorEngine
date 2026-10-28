@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -28,7 +30,7 @@ namespace material_graph
 
         bool ResourceCount(std::span<const LX::LXMaterialResource> resources, std::uint32_t limit, std::uint32_t& count)
         {
-            std::set<std::uint32_t> slots;
+            ce::engine_ordered_set<std::uint32_t> slots;
             count = 0;
             for (const auto& resource : resources)
             {
@@ -72,10 +74,10 @@ namespace material_graph
         {
             std::uint32_t next = layout.hostParameterCount;
             for (const auto& [slot, used] :
-                 {std::pair{layout.uniformSlot, layout.material.uniformBytes != 0},
-                  std::pair{layout.textureSlot, !layout.material.textures.empty()},
-                  std::pair{layout.samplerSlot, !layout.material.samplers.empty()},
-                  std::pair{layout.descriptorIndexSlot,
+                 {ce::pair{layout.uniformSlot, layout.material.uniformBytes != 0},
+                  ce::pair{layout.textureSlot, !layout.material.textures.empty()},
+                  ce::pair{layout.samplerSlot, !layout.material.samplers.empty()},
+                  ce::pair{layout.descriptorIndexSlot,
                             !layout.material.textures.empty() || !layout.material.samplers.empty()}})
             {
                 if (slot.has_value() != used || (used && *slot != next++))
@@ -131,7 +133,7 @@ namespace material_graph
         }
         if (descriptions.size() * 2 >= textureSlots.size())
         {
-            std::vector<std::uint32_t> grown(textureSlots.size() * 2);
+            ce::dynamic_array<std::uint32_t> grown(textureSlots.size() * 2);
             for (std::size_t index = 0; index < descriptions.size(); ++index)
             {
                 auto target = hashTexture(descriptions[index]) & (grown.size() - 1);
@@ -210,7 +212,7 @@ namespace material_graph
         PassLayout candidate;
         candidate.material = material;
         candidate.hostParameterCount = static_cast<std::uint32_t>(hostParameters.size());
-        std::vector<RHIPipelineLayoutParam> parameters(hostParameters.begin(), hostParameters.end());
+        ce::dynamic_array<RHIPipelineLayoutParam> parameters(hostParameters.begin(), hostParameters.end());
         if (material.uniformBytes)
         {
             candidate.uniformSlot = static_cast<std::uint32_t>(parameters.size());
@@ -369,7 +371,7 @@ namespace material_graph
             return Fail(error, "Material texture slots exceed the fixed descriptor contract.");
         }
         nextDetail(ce::marker<"BindingPrepareTextures">());
-        std::array<RHITextureEntry, 64> uploadedStorage{};
+        ce::fixed_array<RHITextureEntry, 64> uploadedStorage{};
         const auto uploaded = std::span(uploadedStorage).first(candidate->instance->textures.size());
         std::size_t uploadedCount{};
         for (const auto& texture : std::span(candidate->instance->textures))
@@ -422,14 +424,14 @@ namespace material_graph
         {
             ce::profile_scope descriptionProfile{ce::marker<"MaterialBindingsCpuDescription">()};
             auto resources = own::make_shared<ResourcePacket>();
-            std::vector<TextureBinding> bindings;
+            ce::dynamic_array<TextureBinding> bindings;
             bindings.reserve(uploaded.size());
             for (std::size_t i = 0; i < uploaded.size(); ++i)
             {
                 const auto& texture = instance->textures[i];
                 bindings.push_back({texture.slot, uploaded[i], texture.owner});
             }
-            std::vector<LX::LXMaterialDiagnostic> diagnostics;
+            ce::dynamic_array<LX::LXMaterialDiagnostic> diagnostics;
             const bool prepared = candidate->instance->generation->cooked.product.materialShader
                                       ? PrepareResourcesWithUniforms(layout.material, candidate->instance->uniforms,
                                                                      bindings, *resources, diagnostics)
@@ -472,16 +474,16 @@ namespace material_graph
                                 std::span(candidate->textureValues).first(resources.textures.size()),
                                 resources.samplers,
                                 {}};
-        auto descriptorIndices = description ? description->descriptorIndices : std::array<std::uint32_t, 128>{};
+        auto descriptorIndices = description ? description->descriptorIndices : ce::fixed_array<std::uint32_t, 128>{};
         nextDetail(ce::marker<"BindingPrepareSamplers">());
         if (layout.samplerSlot)
         {
             // The cooker accepts exactly these 36 filter/address combinations.
             // Stable indices are independent of instance order and frame lifetime.
-            const std::array modes{RHIAddressMode::Wrap, RHIAddressMode::Clamp, RHIAddressMode::Mirror};
+            const ce::fixed_array modes{RHIAddressMode::Wrap, RHIAddressMode::Clamp, RHIAddressMode::Mirror};
             if (!bindlessSamplers_.IsValid())
             {
-                std::array<RHISamplerDesc, BindlessSamplerCapacity> descriptions;
+                ce::fixed_array<RHISamplerDesc, BindlessSamplerCapacity> descriptions;
                 for (unsigned filter = 0; filter < 2; ++filter)
                 {
                     for (unsigned mip = 0; mip < 2; ++mip)
@@ -662,7 +664,7 @@ namespace material_graph
                 {
                     // 완성된 테이블 크기를 먼저 확보해 실제 텍스처 복사 뒤 null padding으로
                     // 확장할 때 같은 cold 게시 경로에서 저장 공간을 다시 할당하지 않는다.
-                    std::vector<RHIBindingDesc> descriptions;
+                    ce::dynamic_array<RHIBindingDesc> descriptions;
                     descriptions.reserve(BindlessTextureCapacity);
                     descriptions.assign(frame.descriptions.begin(), frame.descriptions.end());
                     descriptions.resize(BindlessTextureCapacity,

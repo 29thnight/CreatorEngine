@@ -1,3 +1,4 @@
+#include "../../Utility_Framework/Foundation/EngineNodeMap.h"
 #pragma once
 
 #include "RHIPersistentHeapPolicy.h"
@@ -121,7 +122,7 @@ private:
 
     struct OwnerState
     {
-        std::unordered_map<RHIDeviceMemoryBudgetDomain, OwnerDomainState> domains;
+        ce::engine_node_map<RHIDeviceMemoryBudgetDomain, OwnerDomainState> domains;
     };
 
     static uint64_t SaturatingAdd(uint64_t left, uint64_t right);
@@ -131,9 +132,9 @@ private:
 
     mutable std::mutex m_mutex;
     RHIDeviceMemoryBudgetCoordinatorConfig m_config;
-    std::unordered_map<RHIDeviceMemoryBudgetDomain, DomainState> m_domains;
-    std::unordered_map<RHIDeviceMemoryBudgetOwner, OwnerState> m_owners;
-    std::unordered_map<uint64_t, RHIDeviceMemoryGrowthTicket> m_tickets;
+    ce::engine_node_map<RHIDeviceMemoryBudgetDomain, DomainState> m_domains;
+    ce::engine_node_map<RHIDeviceMemoryBudgetOwner, OwnerState> m_owners;
+    ce::engine_node_map<uint64_t, RHIDeviceMemoryGrowthTicket> m_tickets;
     uint64_t m_nextTicketId{ 1 };
     RHIDeviceMemoryBudgetOwner m_nextOwnerId{ 1 };
     RHIDeviceMemoryBudgetCoordinatorStats m_stats;

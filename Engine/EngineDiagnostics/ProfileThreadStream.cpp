@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "ProfileThreadStream.h"
 
 #include <stdint.h>
@@ -172,7 +173,7 @@ namespace ce
 			count = (std::min)(target_free - m_freeCount, limit - m_chunkCount);
 		}
 		// 미리 보충하는 페이지는 잠금 밖의 수집 스레드에서 할당한다.
-		std::vector<std::unique_ptr<event_chunk>> fresh;
+		ce::dynamic_array<std::unique_ptr<event_chunk>> fresh;
 		try
 		{
 			fresh.reserve(count);

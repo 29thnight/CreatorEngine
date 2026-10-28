@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "DxCaptureSubmission.h"
 
 #if !CE_SHIPPING && CE_DX_TIMING_CAPTURE
@@ -17,7 +18,7 @@ namespace ce::dx_capture
         // Static storage and SRWLOCK have no teardown that can race late RHI
         // singleton destruction. No session-owned pointer reaches a producer.
         SRWLOCK submission_lock = SRWLOCK_INIT;
-        std::array<record, maximum_queued_records> submission_records{};
+        ce::fixed_array<record, maximum_queued_records> submission_records{};
         std::atomic<submission_session> active_session{ 0 };
         std::uint32_t latest_session = 0;
         std::uint32_t queue_head = 0;

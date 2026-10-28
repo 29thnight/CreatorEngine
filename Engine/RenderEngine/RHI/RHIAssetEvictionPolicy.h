@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -25,7 +26,7 @@ struct RHIAssetEvictionSelectionEntry
 
 struct RHIAssetEvictionSelection
 {
-    std::vector<RHIAssetEvictionSelectionEntry> entries;
+    ce::dynamic_array<RHIAssetEvictionSelectionEntry> entries;
     uint32_t pressureProtectedRecent{ 0 };
     uint32_t pressureUploadPending{ 0 };
 };
@@ -63,7 +64,7 @@ RHIAssetEvictionPass BeginRHIAssetEvictionPass(bool memoryPressure,
 /// pressure 상태에서는 나머지 회수 목표까지 pressure threshold를 넘은 항목을
 /// last-used 오름차순, 같은 시각이면 큰 자산 우선으로 고른다.
 RHIAssetEvictionSelection SelectRHIAssetEvictionCandidates(
-    const std::vector<RHIAssetEvictionCandidate>& candidates,
+    const ce::dynamic_array<RHIAssetEvictionCandidate>& candidates,
     uint64_t currentFrame, const RHIAssetEvictionPass* pass = nullptr,
     const RHIAssetEvictionConfig& config = RHIAssetEvictionConfig{});
 

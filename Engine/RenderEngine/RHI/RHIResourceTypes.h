@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
@@ -917,7 +918,7 @@ struct RHITextureDesc
 /// CPU로 읽어 온 이미지. 포맷을 알고 있어 호출부가 디코더를 다시 만들지 않는다.
 struct RHIReadbackImage
 {
-    std::vector<uint8_t> data;
+    ce::dynamic_array<uint8_t> data;
     uint32_t    width{ 0 };
     uint32_t    height{ 0 };
     uint32_t    rowPitch{ 0 };

@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 // 애니메이터 인스펙터 본문 (PHASE 21 M4 3b 뒤).
 //
 // 편집 창 셋(Event · Animation Controllers · AvatarMask)의 본문은 여기 있지
@@ -166,7 +167,7 @@ namespace
     }
 
     template<class Constraint>
-    void DrawConstraintList(Animator& animator, std::vector<Constraint>& constraints,
+    void DrawConstraintList(Animator& animator, ce::dynamic_array<Constraint>& constraints,
         const char* title, const char* field)
     {
         ImGui::PushID(field);

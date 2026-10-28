@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../Experiment/Cooked/CookedModelSubAssetCodec.h"
@@ -15,11 +16,11 @@ namespace assets
         // Loadable entries are captured metadata, not opened child files.
         // A typed entry with no byteSource records absence in this snapshot.
         experiment::cooked::ResolvedAssetEntry skeleton{};
-        std::vector<experiment::cooked::ResolvedAssetEntry> clips{};
-        std::vector<experiment::cooked::ResolvedAssetEntry> meshes{};
+        ce::dynamic_array<experiment::cooked::ResolvedAssetEntry> clips{};
+        ce::dynamic_array<experiment::cooked::ResolvedAssetEntry> meshes{};
         // Sorted, unique source-node uses, derived once from summary.nodes.
         // Declared but uninstantiated meshes do not demand collider geometry.
-        std::vector<experiment::AssetId> instantiatedMeshes{};
+        ce::dynamic_array<experiment::AssetId> instantiatedMeshes{};
         std::size_t metadataBytes{};
 
         [[nodiscard]] bool Instantiates(const experiment::AssetId& mesh) const noexcept

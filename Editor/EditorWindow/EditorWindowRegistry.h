@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 // 에디터 창 런타임 표 (PHASE 21 M4 · 계획서 부록 B.3) — 선언을 항목으로 낮춘다.
 //
@@ -76,7 +77,7 @@ namespace editor
     {
         /// 선언 순서 그대로다. `unordered_map` 순회가 비결정적이라 골든이
         /// 흔들리던 문제(계획서 §1.3-4)를 이 순서가 대체한다.
-        std::vector<window_entry> entries;
+        ce::dynamic_array<window_entry> entries;
     };
 
     /// 제품이 쓰는 표. 이름이 "프로세스에 하나" 임을 드러낸다 — 그 사실을
@@ -183,7 +184,7 @@ namespace editor
             "선언자에 static consteval auto for_editor()가 없다");
 
         constexpr auto declaration = Declarer::for_editor();
-        std::apply(
+        ce::apply(
             [&table, declarer_name](const auto&... items)
             {
                 (detail::add_declared_window(table, items, declarer_name), ...);

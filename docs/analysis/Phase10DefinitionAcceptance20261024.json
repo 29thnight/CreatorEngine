@@ -1,0 +1,111 @@
+{
+  "scope": "CPU authoring schema/validation, native Effect archive consumer; not simulation/render/serialization acceptance",
+  "passed": true,
+  "runs": [
+    {
+      "executableSha256": "F834CE8897786B897C4C701E4790F0147FBE45233D8C439FDFC6963A8484C1C0",
+      "configuration": "Debug",
+      "exitCode": 0,
+      "checks": 51
+    },
+    {
+      "executableSha256": "28E3613ABCD01A14A5D2AF22C4DFC2438B27F171BEDEDEB1594992ADD0890788",
+      "configuration": "Release",
+      "exitCode": 0,
+      "checks": 51
+    }
+  ],
+  "sources": [
+    {
+      "sha256": "CBC1CDF953226A62EBD715CBC24F1B8C364C151273A3B82552D21EC053869338",
+      "path": "Engine/Effect/EffectDefinition.h"
+    },
+    {
+      "sha256": "6560B995984A9FD9061E90120E469502A49CA085653F446549281AA751B90EB5",
+      "path": "Engine/Effect/EffectDefinition.cpp"
+    },
+    {
+      "sha256": "8088ECF46CE43B617C7CDA1F79F61632F07D7A7EB6520AA70B1CF41A886A0B4C",
+      "path": "Engine/Effect/Effect.vcxproj"
+    },
+    {
+      "sha256": "C9A6CDD979D9DEA5BFC792369ACD9354DEC63D40B33A9865348E32653DA467C5",
+      "path": "Tools/regression/EffectDefinitionTests.cpp"
+    },
+    {
+      "sha256": "36BF56E59BC9A90055423D08908A127799D8EDE58F3860FA024E0F88FBA8B250",
+      "path": "Tools/regression/EffectDefinitionTests.vcxproj"
+    },
+    {
+      "sha256": "6FFCF889856838EA16B5EAED2B37432F0B1F9037B9DC6AA80D8186713B259D9B",
+      "path": "Tools/regression/fixtures/EffectExplosionDefinition.h"
+    },
+    {
+      "sha256": "13CA5D9371AD198C46E872DA5CCA23B71DBD3D4DBD6CC36AB2F728251CC0435F",
+      "path": "Tools/regression/verify-effect-definition.ps1"
+    }
+  ],
+  "date": "2026-10-24",
+  "baselineRevision": "d86fe25e0763d24183bf63150e7e307b3b0d286b",
+  "sourceHashFormat": "SHA256 of raw file bytes",
+  "artifactRoot": "artifacts/phase10-1b-20261024",
+  "packageRegression": {
+    "status": "passed",
+    "configuration": "Debug",
+    "runs": [
+      {
+        "host": "CreatorEditor",
+        "initialized": 0,
+        "packageIncluded": false,
+        "exitCode": 0,
+        "absent": 1,
+        "map": "artifacts/phase10-1b-20261024/package-regression/excluded/CreatorEditor.map",
+        "shutdown": 0,
+        "hostSha256": "C85EFC74894268ED5578938E5D6169EB71FA25A64488300F412805C158B094F5"
+      },
+      {
+        "host": "Player",
+        "initialized": 0,
+        "packageIncluded": false,
+        "exitCode": 0,
+        "absent": 1,
+        "map": "artifacts/phase10-1b-20261024/package-regression/excluded/Player.map",
+        "shutdown": 0,
+        "hostSha256": "E2D04A816326CFFD4EFAB3FC1615E1F6FC0AB1244AFCE2BC2DBFEDDFE5C082B5"
+      },
+      {
+        "host": "CreatorEditor",
+        "initialized": 1,
+        "packageIncluded": true,
+        "exitCode": 0,
+        "absent": 0,
+        "map": "artifacts/phase10-1b-20261024/package-regression/included/CreatorEditor.map",
+        "shutdown": 1,
+        "hostSha256": "332E4D4690096BCE84956C8A5D3A6F8DAABC90E96AE8254ED03470A7B0D9869A"
+      },
+      {
+        "host": "Player",
+        "initialized": 1,
+        "packageIncluded": true,
+        "exitCode": 0,
+        "absent": 0,
+        "map": "artifacts/phase10-1b-20261024/package-regression/included/Player.map",
+        "shutdown": 1,
+        "hostSha256": "2D8FA9A9312C4AF7054F9FC901B3963A352494FD9A8C156D66E0F53377F84072"
+      }
+    ],
+    "pakSha256": "6A35273EA5E741C0067C90B043C41989B2013611141AFC87628B607F2F7FA676",
+    "artifactRoot": "artifacts/phase10-1b-20261024/package-regression",
+    "contentScope": "Reused private cooked camera/light fixture from 10-1a; current native binaries. No particle content."
+  },
+  "limitations": [
+    "Logical C++ schema only; no file codec or save/load round trip",
+    "Clock and module descriptors do not execute simulation",
+    "Random key validated; GPU random distribution not implemented",
+    "No module graph/IR, renderer, Editor authoring UI or performance acceptance"
+  ],
+  "randomReference": {
+    "goldenKey": "1302758027843302164",
+    "independentLittleEndianFnvReference": "passed"
+  }
+}

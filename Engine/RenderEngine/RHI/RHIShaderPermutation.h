@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -37,9 +38,9 @@ public:
 
     bool Empty() const { return m_entries.empty(); }
     std::size_t Size() const { return m_entries.size(); }
-    const std::vector<Entry>& Entries() const { return m_entries; }
+    const ce::dynamic_array<Entry>& Entries() const { return m_entries; }
     RHIShaderPermutationKey Key() const;
 
 private:
-    std::vector<Entry> m_entries;
+    ce::dynamic_array<Entry> m_entries;
 };

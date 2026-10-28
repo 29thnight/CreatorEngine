@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
 #else
@@ -47,10 +49,10 @@ struct DX12QueueServiceState
     uint64_t nextRecording{1};
     bool submissionClient{false};
     int testRejection{0};
-    std::vector<own::shared_owner<DX12ServiceQueue>> queues;
+    ce::dynamic_array<own::shared_owner<DX12ServiceQueue>> queues;
     own::shared_owner<IRHITimelineFence> primaryTimeline;
     winrt::com_ptr<ID3D12CommandQueue> primaryQueue;
-    std::vector<winrt::com_ptr<ID3D12Fence>> primaryWaits;
+    ce::dynamic_array<winrt::com_ptr<ID3D12Fence>> primaryWaits;
 };
 
 namespace
@@ -71,7 +73,7 @@ namespace
         std::mutex mutex;
         bool active{true};
         uint64_t created{0}, reused{0}, leased{0};
-        std::vector<own::unique_owner<DX12QueueRecordingStorage>> free;
+        ce::dynamic_array<own::unique_owner<DX12QueueRecordingStorage>> free;
     };
 
     // Only batch retirement (or a never-submitted recording) releases this lease.
@@ -101,7 +103,7 @@ namespace
     {
       public:
         static constexpr uint32_t kMaxTargets = 8;
-        using Targets = std::array<own::shared_owner<DX12QueueRecordingLease>, kMaxTargets>;
+        using Targets = ce::fixed_array<own::shared_owner<DX12QueueRecordingLease>, kMaxTargets>;
         own::shared_owner<IRHICommandQueue> queue;
         own::shared_owner<Targets> leases{own::make_shared<Targets>()};
         uint32_t targetCount{};
@@ -146,7 +148,7 @@ namespace
                 return false;
             }
             finished = true;
-            std::array<ID3D12CommandList*, kMaxTargets> lists{};
+            ce::fixed_array<ID3D12CommandList*, kMaxTargets> lists{};
             for (uint32_t target = 0; target < targetCount; ++target)
             {
                 auto& lease = (*leases)[target];
@@ -169,7 +171,7 @@ namespace
     };
 
     bool QueueOperation(const own::shared_owner<DX12QueueServiceState>& state,
-        const std::function<HRESULT()>& operation, std::string& error)
+        const ce::owned_func<HRESULT()>& operation, std::string& error)
     {
         HRESULT result = E_FAIL;
         auto* const commandFailure = RHICommandFailureScope::Current();
@@ -192,7 +194,7 @@ namespace
     }
 
     bool DispatchQueueOperation(const own::shared_owner<DX12QueueServiceState>& state,
-        const std::function<bool()>& operation, std::string& error)
+        const ce::owned_func<bool()>& operation, std::string& error)
     {
         bool accepted = false;
         std::string dispatchError;
@@ -223,8 +225,8 @@ namespace
         bool consumed{false};
         winrt::com_ptr<ID3D12CommandAllocator> allocator;
         winrt::com_ptr<ID3D12GraphicsCommandList> list;
-        std::array<winrt::com_ptr<ID3D12CommandList>, DX12QueueRecording::kMaxTargets> inlineLists;
-        std::vector<winrt::com_ptr<ID3D12CommandList>> sealedLists;
+        ce::fixed_array<winrt::com_ptr<ID3D12CommandList>, DX12QueueRecording::kMaxTargets> inlineLists;
+        ce::dynamic_array<winrt::com_ptr<ID3D12CommandList>> sealedLists;
         uint32_t sealedListCount{};
         winrt::com_ptr<ID3D12Resource> source, destination;
         ce::lifetime_token token;
@@ -269,16 +271,16 @@ namespace
         own::shared_owner<DX12QueueRecordingPool> recordingPool{own::make_shared<DX12QueueRecordingPool>()};
         // Keep waited fences alive until the entire service has drained. Resource
         // submission/retirement is intentionally not exposed by this primitive API.
-        std::vector<own::shared_owner<DX12ServiceTimeline>> waits;
-        std::vector<winrt::com_ptr<ID3D12Fence>> testGates;
+        ce::dynamic_array<own::shared_owner<DX12ServiceTimeline>> waits;
+        ce::dynamic_array<winrt::com_ptr<ID3D12Fence>> testGates;
         struct Retirement
         {
             ce::pooled_owner<DX12ServiceBatch> batch;
             uint64_t value;
             ce::profile_rhi_context rhiContext;
         };
-        std::vector<Retirement> pending;
-        std::vector<ID3D12CommandList*> submissionLists;
+        ce::dynamic_array<Retirement> pending;
+        ce::dynamic_array<ID3D12CommandList*> submissionLists;
         bool faulted{false};
         RHIQueueIdentity GetIdentity() const override { return timeline->identity; }
         bool Signal(uint64_t value, RHITimelinePoint& point, std::string& error) override
@@ -377,7 +379,7 @@ namespace
             lists.clear();
             struct ClearSubmissionLists
             {
-                std::vector<ID3D12CommandList*>& lists;
+                ce::dynamic_array<ID3D12CommandList*>& lists;
                 ~ClearSubmissionLists() { lists.clear(); }
             } clearLists{lists};
             const auto sealed = recording->GetSealedLists();
@@ -445,7 +447,7 @@ namespace
             // fresh vector allocation on every collection. The initial fence
             // snapshot prevents a reentrant token destructor from extending this
             // collection to newly submitted work indefinitely.
-            std::array<Retirement, 8> released{};
+            ce::fixed_array<Retirement, 8> released{};
             size_t total{};
             for (;;)
             {
@@ -463,7 +465,7 @@ namespace
                             }
                         }
                     }
-                    std::erase_if(pending, [](const Retirement& entry) { return !entry.batch; });
+                    ce::erase_if(pending, [](const Retirement& entry) { return !entry.batch; });
                 }
                 for (size_t index = 0; index < count; ++index)
                 {
@@ -486,7 +488,7 @@ namespace
     };
 
     void ReleaseServiceOwners(const own::shared_owner<DX12QueueServiceState>& state,
-        std::vector<ce::pooled_owner<DX12ServiceBatch>>& released)
+        ce::dynamic_array<ce::pooled_owner<DX12ServiceBatch>>& released)
     {
         for (const auto& queue : state->queues)
         {
@@ -712,8 +714,8 @@ bool DX12QueueService::JoinPrimaryQueue(ID3D12CommandQueue* queue,
 bool DX12QueueService::Shutdown(std::string& error)
 {
     error.clear();
-    std::vector<ce::pooled_owner<DX12ServiceBatch>> released;
-    std::vector<own::shared_owner<DX12ServiceQueue>> queues;
+    ce::dynamic_array<ce::pooled_owner<DX12ServiceBatch>> released;
+    ce::dynamic_array<own::shared_owner<DX12ServiceQueue>> queues;
     winrt::com_ptr<ID3D12CommandQueue> primary;
     {
         std::lock_guard lock(state_->admission);
@@ -738,7 +740,7 @@ bool DX12QueueService::Shutdown(std::string& error)
     // Final markers cover waits accepted after the last public Signal. Public
     // waits only accept already-issued signals, so this primitive API cannot
     // create a wait on a future, unissued value.
-    std::vector<std::pair<winrt::com_ptr<ID3D12Fence>, uint64_t>> markers;
+    ce::dynamic_array<ce::pair<winrt::com_ptr<ID3D12Fence>, uint64_t>> markers;
     markers.reserve(queues.size());
     for (const auto& queue : queues)
     {
@@ -939,7 +941,7 @@ IRenderDeviceServices& DX12QueueRecorder::DeviceServices() const
 }
 
 bool DX12QueueRecorder::Record(const own::shared_owner<IRHICommandQueue>& queue,
-    const std::function<void(RHIEncoder&)>& commands, ce::lifetime_token token,
+    const ce::owned_func<void(RHIEncoder&)>& commands, ce::lifetime_token token,
     ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error)
 {
     batch.reset();
@@ -1042,7 +1044,7 @@ bool DX12QueueRecorder::BeginRecording(const own::shared_owner<IRHICommandQueue>
     return true;
 }
 
-bool DX12QueueRecorder::ExecuteSubmission(const std::function<bool(std::string&)>& submit,
+bool DX12QueueRecorder::ExecuteSubmission(const ce::owned_func<bool(std::string&)>& submit,
     std::string& error)
 {
     if (GetRHISubmissionThread().IsCurrentThread())

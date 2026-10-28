@@ -56,6 +56,7 @@
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\Containers\Creator.Containers.h"><CompileAs>CompileAsHeaderUnit</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="..\Platform\WindowsSDK\Creator.WinAPI.h"><CompileAs>CompileAsHeaderUnit</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile><AdditionalOptions>/I&quot;$(SolutionDir)Tools\build\StdModuleHeaders&quot; %(AdditionalOptions)</AdditionalOptions><DisableSpecificWarnings>5260;%(DisableSpecificWarnings)</DisableSpecificWarnings></ClCompile>
     <ClCompile Include="..\Platform\WindowsSDK\Creator.GraphicsSDK.h"><AdditionalIncludeDirectories>$(CreatorSdkDependencyIncludeDir);%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories><CompileAs>CompileAsHeaderUnit</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile><AdditionalOptions>/I&quot;$(SolutionDir)Tools\build\StdModuleHeaders&quot; %(AdditionalOptions)</AdditionalOptions><DisableSpecificWarnings>5260;%(DisableSpecificWarnings)</DisableSpecificWarnings></ClCompile>
     <ClCompile Include="..\Platform\WindowsSDK\Creator.LegacyGraphicsSDK.h"><CompileAs>CompileAsHeaderUnit</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile><AdditionalOptions>/I&quot;$(SolutionDir)Tools\build\StdModuleHeaders&quot; %(AdditionalOptions)</AdditionalOptions><DisableSpecificWarnings>5260;%(DisableSpecificWarnings)</DisableSpecificWarnings></ClCompile>
@@ -104,4 +105,6 @@
   <Import Project="$(CreatorCppWinRTPackageRoot)build\native\Microsoft.Windows.CppWinRT.targets" Condition="Exists('$(CreatorCppWinRTPackageRoot)build\native\Microsoft.Windows.CppWinRT.targets')" />
   <Import Project="..\..\Tools\build\WindowsAppSdkModules.targets" />
   <Import Project="..\..\Tools\build\Contracts.targets" />
+  <ItemGroup>
+  </ItemGroup>
 </Project>

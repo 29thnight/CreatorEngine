@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -38,11 +40,11 @@ class StringTable final
         return ref;
     }
 
-    [[nodiscard]] const std::vector<char>& Bytes() const noexcept { return bytes_; }
+    [[nodiscard]] const ce::dynamic_array<char>& Bytes() const noexcept { return bytes_; }
 
   private:
-    std::vector<char> bytes_{};
-    std::unordered_map<std::string, StringRef> lookup_{};
+    ce::dynamic_array<char> bytes_{};
+    ce::engine_node_map<std::string, StringRef> lookup_{};
 };
 
 // std::filesystem::path 는 u8 로 왕복한다. `.string()` 은 Windows 에서
@@ -81,17 +83,17 @@ class ByteWriter final
     }
 
     template<typename T>
-    void PodArray(const std::vector<T>& values)
+    void PodArray(const ce::dynamic_array<T>& values)
     {
         static_assert(std::is_trivially_copyable_v<T>);
         Raw(values.data(), values.size() * sizeof(T));
     }
 
-    [[nodiscard]] const std::vector<std::byte>& Bytes() const noexcept { return bytes_; }
+    [[nodiscard]] const ce::dynamic_array<std::byte>& Bytes() const noexcept { return bytes_; }
     [[nodiscard]] std::size_t Size() const noexcept { return bytes_.size(); }
 
   private:
-    std::vector<std::byte> bytes_{};
+    ce::dynamic_array<std::byte> bytes_{};
 };
 
 [[nodiscard]] std::uint64_t AlignUp(std::uint64_t value) noexcept
@@ -129,7 +131,7 @@ class ByteCursor final
     }
 
     template<typename T>
-    bool Array(std::uint32_t count, std::vector<T>& values)
+    bool Array(std::uint32_t count, ce::dynamic_array<T>& values)
     {
         static_assert(std::is_trivially_copyable_v<T>);
         if (!ok_ || offset_ > bytes_.size() || count > (bytes_.size() - offset_) / sizeof(T))
@@ -166,7 +168,7 @@ class ByteCursor final
     bool ok_{true};
 };
 
-void Reject(std::vector<ModelLoadIssue>& issues, std::string context, std::string message)
+void Reject(ce::dynamic_array<ModelLoadIssue>& issues, std::string context, std::string message)
 {
     issues.push_back(ModelLoadIssue{// ★ Warning 이다. 캐시 거부는 정상 폴백이지 실패가 아니다.
                                     //   Error 로 내면 진짜 실패를 찾을 때 잡음이 된다.
@@ -178,7 +180,7 @@ void Reject(std::vector<ModelLoadIssue>& issues, std::string context, std::strin
 // 정확히 맞지 않으면 거부한다 — 딱 맞지 않는데 읽으면 끝이 잘린다.
 template<typename T>
 [[nodiscard]] bool ViewArray(std::span<const std::byte> file, const SectionEntry& entry, std::span<const T>& out,
-                             std::vector<ModelLoadIssue>& issues, const char* what)
+                             ce::dynamic_array<ModelLoadIssue>& issues, const char* what)
 {
     if (entry.offset > file.size() || entry.bytes > file.size() - entry.offset)
     {
@@ -202,14 +204,14 @@ template<typename T>
     return static_cast<std::uint64_t>(begin) + count <= size;
 }
 
-void RejectWrite(std::vector<ModelLoadIssue>& issues, ModelLoadIssueCode code, std::string context, std::string message)
+void RejectWrite(ce::dynamic_array<ModelLoadIssue>& issues, ModelLoadIssueCode code, std::string context, std::string message)
 {
     issues.push_back(ModelLoadIssue{ModelLoadIssueSeverity::Error, code, std::move(context), std::move(message)});
 }
 
-[[nodiscard]] bool ValidateCookedAssetReferences(const ModelDraft& draft, std::vector<ModelLoadIssue>& issues)
+[[nodiscard]] bool ValidateCookedAssetReferences(const ModelDraft& draft, ce::dynamic_array<ModelLoadIssue>& issues)
 {
-    std::vector<AssetId> ownedIdentities;
+    ce::dynamic_array<AssetId> ownedIdentities;
     if (!draft.metadata.assetId.IsValid())
     {
         RejectWrite(issues, ModelLoadIssueCode::InvalidAssetIdentity, "metadata.assetId",
@@ -273,8 +275,8 @@ CookedWriteResult Write(const ModelDraft& draft)
     StringTable strings;
 
     // ── 노드 ────────────────────────────────────────────────────────
-    std::vector<CookedNode> nodes;
-    std::vector<std::uint32_t> nodeMeshes;
+    ce::dynamic_array<CookedNode> nodes;
+    ce::dynamic_array<std::uint32_t> nodeMeshes;
     nodes.reserve(draft.nodes.size());
     for (const ModelNode& node : draft.nodes)
     {
@@ -290,14 +292,14 @@ CookedWriteResult Write(const ModelDraft& draft)
     }
 
     // ── 메시 ────────────────────────────────────────────────────────
-    std::vector<CookedMesh> meshes;
-    std::vector<std::byte> vertexBytes;
-    std::vector<std::uint32_t> indices;
-    std::vector<CookedMeshletMesh> meshletMeshes;
-    std::vector<MeshletDescriptor> meshletDescriptors;
-    std::vector<std::uint32_t> meshletVertices;
-    std::vector<std::uint8_t> meshletTriangles;
-    std::vector<std::uint32_t> meshletPrimitives;
+    ce::dynamic_array<CookedMesh> meshes;
+    ce::dynamic_array<std::byte> vertexBytes;
+    ce::dynamic_array<std::uint32_t> indices;
+    ce::dynamic_array<CookedMeshletMesh> meshletMeshes;
+    ce::dynamic_array<MeshletDescriptor> meshletDescriptors;
+    ce::dynamic_array<std::uint32_t> meshletVertices;
+    ce::dynamic_array<std::uint8_t> meshletTriangles;
+    ce::dynamic_array<std::uint32_t> meshletPrimitives;
     VertexAttributeMask vertexAttributeMaskUnion = 0;
     std::uint32_t maxVertexStride = 0;
     meshes.reserve(draft.meshes.size());
@@ -415,12 +417,12 @@ CookedWriteResult Write(const ModelDraft& draft)
     }
 
     // ── 스켈레톤 · 클립 · 키 ────────────────────────────────────────
-    std::vector<CookedBone> bones;
-    std::vector<CookedClip> clips;
-    std::vector<CookedChannel> channels;
-    std::vector<TranslationKey> translations;
-    std::vector<RotationKey> rotations;
-    std::vector<ScaleKey> scales;
+    ce::dynamic_array<CookedBone> bones;
+    ce::dynamic_array<CookedClip> clips;
+    ce::dynamic_array<CookedChannel> channels;
+    ce::dynamic_array<TranslationKey> translations;
+    ce::dynamic_array<RotationKey> rotations;
+    ce::dynamic_array<ScaleKey> scales;
     CookedSkeletonHeader skeletonHeader{};
 
     if (draft.skeleton.has_value())
@@ -563,7 +565,7 @@ CookedWriteResult Write(const ModelDraft& draft)
         std::uint64_t bytes{};
     };
 
-    const std::vector<PendingSection> pending{
+    const ce::dynamic_array<PendingSection> pending{
         {SectionKind::Strings, static_cast<std::uint32_t>(strings.Bytes().size()), strings.Bytes().data(),
          strings.Bytes().size()},
         {SectionKind::Metadata, 1u, &metadata, sizeof(metadata)},
@@ -606,7 +608,7 @@ CookedWriteResult Write(const ModelDraft& draft)
     const std::uint64_t tableBytes = pending.size() * sizeof(SectionEntry);
     std::uint64_t cursor = AlignUp(sizeof(FileHeader) + tableBytes);
 
-    std::vector<SectionEntry> table;
+    ce::dynamic_array<SectionEntry> table;
     table.reserve(pending.size());
     for (const PendingSection& section : pending)
     {
@@ -626,7 +628,7 @@ CookedWriteResult Write(const ModelDraft& draft)
     header.fileBytes = cursor;
     header.sectionCount = static_cast<std::uint32_t>(pending.size());
 
-    std::vector<std::byte> file(static_cast<std::size_t>(cursor), std::byte{});
+    ce::dynamic_array<std::byte> file(static_cast<std::size_t>(cursor), std::byte{});
     std::memcpy(file.data(), &header, sizeof(header));
     std::memcpy(file.data() + sizeof(header), table.data(), static_cast<std::size_t>(tableBytes));
     for (std::size_t i = 0; i < pending.size(); ++i)
@@ -643,7 +645,7 @@ CookedWriteResult Write(const ModelDraft& draft)
 // 읽기
 // ════════════════════════════════════════════════════════════════════
 
-bool Read(std::span<const std::byte> bytes, ModelDraft& outDraft, std::vector<ModelLoadIssue>& issues)
+bool Read(std::span<const std::byte> bytes, ModelDraft& outDraft, ce::dynamic_array<ModelLoadIssue>& issues)
 {
     outDraft = ModelDraft{};
     ModelDraft decoded{};
@@ -699,7 +701,7 @@ bool Read(std::span<const std::byte> bytes, ModelDraft& outDraft, std::vector<Mo
         return false;
     }
 
-    std::vector<SectionEntry> table(header.sectionCount);
+    ce::dynamic_array<SectionEntry> table(header.sectionCount);
     if (header.sectionCount)
     {
         std::memcpy(table.data(), bytes.data() + sizeof(FileHeader), static_cast<std::size_t>(tableBytes));
@@ -707,7 +709,7 @@ bool Read(std::span<const std::byte> bytes, ModelDraft& outDraft, std::vector<Mo
 
     // ★ 없는 섹션을 0개로 읽지 않는다. 그러면 손상된 파일이 "빈 모델"로
     //   통과해 버린다 — 이 저장소가 이미 겪은 거짓 통과 양식이다.
-    std::vector<const SectionEntry*> byKind(static_cast<std::size_t>(SectionKind::Count), nullptr);
+    ce::dynamic_array<const SectionEntry*> byKind(static_cast<std::size_t>(SectionKind::Count), nullptr);
     const auto requiredSections = static_cast<std::uint32_t>(SectionKind::MeshletMeshes);
     const auto meshletSectionEnd = static_cast<std::uint32_t>(SectionKind::CoarseLods);
     const auto allowedSections = static_cast<std::uint32_t>(SectionKind::Count);
@@ -1194,8 +1196,8 @@ bool Read(std::span<const std::byte> bytes, ModelDraft& outDraft, std::vector<Mo
                     reference.fallbackPath = Utf8ToPath(readString(cursor.Pod<StringRef>()));
                     reference.colorSpace = static_cast<TextureColorSpace>(cursor.Pod<std::uint8_t>());
                     reference.coordinates.set = cursor.Pod<std::uint32_t>();
-                    reference.coordinates.offset = cursor.Pod<std::array<float, 2>>();
-                    reference.coordinates.scale = cursor.Pod<std::array<float, 2>>();
+                    reference.coordinates.offset = cursor.Pod<ce::fixed_array<float, 2>>();
+                    reference.coordinates.scale = cursor.Pod<ce::fixed_array<float, 2>>();
                     reference.coordinates.rotation = cursor.Pod<float>();
                     reference.sampler.minMag = static_cast<RHIFilterMode>(cursor.Pod<std::uint8_t>());
                     reference.sampler.mip = static_cast<RHIFilterMode>(cursor.Pod<std::uint8_t>());
@@ -1271,7 +1273,7 @@ ModelDecodeResult CookedModelDecoder::Decode(const ModelLoadRequest& request)
         return result;
     }
 
-    std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+    ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(size));
     {
         // ★ std::ifstream 을 쓰지 않는다. 실측(Gunner 1.85MB, 30회 최솟값):
         //

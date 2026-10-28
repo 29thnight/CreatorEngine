@@ -1,4 +1,6 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
@@ -36,7 +38,7 @@ namespace AssetDepot
         // Present only on accepted code-program metadata snapshots. The
         // descriptor identity stays separate; this pins compiled blob backing.
         std::optional<experiment::cooked::ResolvedAssetEntry> codeProgramSource{};
-        std::vector<own::shared_owner<const Texture>> codeProgramTextures{};
+        ce::dynamic_array<own::shared_owner<const Texture>> codeProgramTextures{};
     };
 
     struct ShaderMetaAssetWork final
@@ -44,7 +46,7 @@ namespace AssetDepot
         ShaderMetaAssetKey key{};
         experiment::cooked::ResolvedAssetEntry resolved{};
         own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog{};
-        std::vector<own::weak_owner<AssetRequestState<ShaderMeta>>> consumers{};
+        ce::dynamic_array<own::weak_owner<AssetRequestState<ShaderMeta>>> consumers{};
         std::uint64_t epoch{};
         std::uint64_t requestId{};
         job_handle completion{};
@@ -54,7 +56,7 @@ namespace AssetDepot
         own::shared_owner<const ShaderMeta> asset{};
         // Scheduler captures outlive their completion lock. Evicted source and
         // metadata owners are released with those captures, after outer unlock.
-        std::vector<own::shared_owner<const ShaderMeta>> retiredAssets{};
+        ce::dynamic_array<own::shared_owner<const ShaderMeta>> retiredAssets{};
     };
 
     struct ShaderMetaAssetCacheEntry final
@@ -66,7 +68,7 @@ namespace AssetDepot
         std::uint64_t lastUse{};
     };
 
-    using ShaderMetaAssetEntries = std::map<ShaderMetaAssetKey, ShaderMetaAssetCacheEntry>;
+    using ShaderMetaAssetEntries = ce::engine_ordered_map<ShaderMetaAssetKey, ShaderMetaAssetCacheEntry>;
 
     struct MaterialPipelineAssetKey final
     {
@@ -86,7 +88,7 @@ namespace AssetDepot
     struct MaterialProgramAssetOrigin final
     {
         experiment::cooked::ResolvedAssetEntry resolved{};
-        std::vector<MaterialAssetTexturePin> defaultTextures{};
+        ce::dynamic_array<MaterialAssetTexturePin> defaultTextures{};
         // Calculated from the actual immutable Texture pins before publication.
         // Shared representations can be overcharged, never hidden as pointers.
         std::size_t defaultTextureChargeBytes{};
@@ -98,7 +100,7 @@ namespace AssetDepot
     {
         experiment::cooked::ResolvedAssetEntry resolved{};
         own::shared_owner<const LX::Runtime::ShaderGeneration> codeProgram{};
-        std::vector<MaterialAssetTexturePin> textures{};
+        ce::dynamic_array<MaterialAssetTexturePin> textures{};
     };
 
     struct MaterialAssetTextureRequest final
@@ -113,14 +115,14 @@ namespace AssetDepot
         MaterialPipelineAssetKey key{};
         experiment::cooked::ResolvedAssetEntry resolved{};
         own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog{};
-        std::vector<MaterialAssetTextureRequest> textures{};
+        ce::dynamic_array<MaterialAssetTextureRequest> textures{};
         // Empty for a Program leaf; a Material owns its exact Program request.
         AssetRequest<material_graph::Generation> program{};
         AssetRequest<LX::Runtime::ShaderGeneration> codeProgram{};
         AssetRequest<experiment::Material> authoredMaterial{};
         // Captured typed metadata leaf, read only by the accepted CPU worker.
         std::optional<experiment::cooked::ResolvedAssetEntry> shaderMetadata{};
-        std::vector<own::weak_owner<AssetRequestState<T>>> consumers{};
+        ce::dynamic_array<own::weak_owner<AssetRequestState<T>>> consumers{};
         std::uint64_t epoch{};
         std::uint64_t requestId{};
         std::uint64_t programGeneration{};
@@ -129,7 +131,7 @@ namespace AssetDepot
         AssetRequestError error{ AssetRequestError::None };
         std::string message{};
         own::shared_owner<const T> asset{};
-        std::vector<own::shared_owner<const T>> retiredAssets{};
+        ce::dynamic_array<own::shared_owner<const T>> retiredAssets{};
     };
 
     template<class T>
@@ -143,7 +145,7 @@ namespace AssetDepot
     };
 
     template<class T>
-    using MaterialPipelineAssetEntries = std::map<MaterialPipelineAssetKey, MaterialPipelineAssetCacheEntry<T>>;
+    using MaterialPipelineAssetEntries = ce::engine_ordered_map<MaterialPipelineAssetKey, MaterialPipelineAssetCacheEntry<T>>;
 
     template<class T>
     struct MaterialPipelineAssetCache final
@@ -160,15 +162,15 @@ namespace AssetDepot
     struct MaterialAssetRetiredEntries final
     {
         ShaderMetaAssetEntries shaderMetadata{};
-        std::vector<own::shared_owner<AssetRequestState<ShaderMeta>>> shaderMetaConsumers{};
+        ce::dynamic_array<own::shared_owner<AssetRequestState<ShaderMeta>>> shaderMetaConsumers{};
         MaterialPipelineAssetEntries<material_graph::Generation> programs{};
         MaterialPipelineAssetEntries<Material> materials{};
         MaterialPipelineAssetEntries<LX::Runtime::ShaderGeneration> codePrograms{};
         MaterialPipelineAssetEntries<experiment::Material> authoredMaterials{};
-        std::vector<own::shared_owner<AssetRequestState<material_graph::Generation>>> programConsumers{};
-        std::vector<own::shared_owner<AssetRequestState<Material>>> materialConsumers{};
-        std::vector<own::shared_owner<AssetRequestState<LX::Runtime::ShaderGeneration>>> codeProgramConsumers{};
-        std::vector<own::shared_owner<AssetRequestState<experiment::Material>>> authoredMaterialConsumers{};
+        ce::dynamic_array<own::shared_owner<AssetRequestState<material_graph::Generation>>> programConsumers{};
+        ce::dynamic_array<own::shared_owner<AssetRequestState<Material>>> materialConsumers{};
+        ce::dynamic_array<own::shared_owner<AssetRequestState<LX::Runtime::ShaderGeneration>>> codeProgramConsumers{};
+        ce::dynamic_array<own::shared_owner<AssetRequestState<experiment::Material>>> authoredMaterialConsumers{};
     };
 
     struct ShaderMetaAssetCacheSnapshot final

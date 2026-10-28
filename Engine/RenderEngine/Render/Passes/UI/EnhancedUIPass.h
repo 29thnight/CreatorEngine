@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -115,7 +116,7 @@ public:
     void SetInputs(const Inputs& inputs) { m_inputs = inputs; }
     void SetOutputFormat(RHIFormat format) { m_outputFormat = format; }
     void SetSeparateLayer(bool value) { m_separateLayer = value; }
-    void SetRects(const std::vector<Rect>* rects,
+    void SetRects(const ce::dynamic_array<Rect>* rects,
         own::shared_owner<TextureFramePins> texturePins = {})
     {
         m_rects = rects;
@@ -139,7 +140,7 @@ public:
     /// SDF 텍스트는 texturePins가 있어야 펼칠 수 있다.
     static uint32_t BuildRectsFromQueue(
         class UIRenderProxy* const* proxies, size_t count,
-        std::vector<Rect>& outRects,
+        ce::dynamic_array<Rect>& outRects,
         float screenWidth = 0.f, float screenHeight = 0.f,
         TextureFramePins* texturePins = nullptr);
 
@@ -148,7 +149,7 @@ public:
     /// texturePins가 업로드까지 각 아틀라스 스냅샷을 보존한다.
     /// 잘못된 레이아웃/글리프가 있으면 false이며, 유효 글리프는 남긴다.
     static bool AppendTextRects(const UIRenderProxy::TextData& text,
-        std::vector<Rect>& outRects, TextureFramePins& texturePins,
+        ce::dynamic_array<Rect>& outRects, TextureFramePins& texturePins,
         float offsetX = 0.f, float offsetY = 0.f);
 
     RGHandle GetOutput() const { return m_output; }
@@ -192,10 +193,10 @@ private:
     bool m_separateLayer{};
     RGHandle m_output;
 
-    const std::vector<Rect>* m_rects{ nullptr };
+    const ce::dynamic_array<Rect>* m_rects{ nullptr };
 
-    std::vector<RectInstance> m_instances;
-    std::vector<Batch>        m_batches;
+    ce::dynamic_array<RectInstance> m_instances;
+    ce::dynamic_array<Batch>        m_batches;
 
     uint32_t m_lastRectCount{ 0 };
     uint32_t m_lastBatchCount{ 0 };

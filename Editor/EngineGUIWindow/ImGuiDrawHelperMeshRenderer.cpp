@@ -1,3 +1,5 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -145,7 +147,7 @@ namespace
         ImGui::PushID(renderer.GetOwner()->GetScene());
         ImGui::PushID(std::to_string(renderer.GetOwner()->m_index).c_str());
         ImGui::PushID(std::to_string(renderer.GetInstanceID()).c_str());
-        static std::vector<std::filesystem::path> assets;
+        static ce::dynamic_array<std::filesystem::path> assets;
         static ImGuiTextFilter filter;
         static std::string name, error;
         static bool assignSaved = false;
@@ -365,18 +367,18 @@ namespace
                               : ImGui::DragFloat("##Value", &number, .01f, 0, 100);
                 value = double(number);
             }
-            else if (auto* color = std::get_if<std::array<double, 4>>(&value))
+            else if (auto* color = std::get_if<ce::fixed_array<double, 4>>(&value))
             {
                 float values[]{float((*color)[0]), float((*color)[1]), float((*color)[2]), float((*color)[3])};
                 edited = parameter.identifier == "baseColor" ? ImGui::ColorEdit3("##Value", values)
                                                              : ImGui::ColorEdit4("##Value", values);
-                value = std::array<double, 4>{values[0], values[1], values[2], values[3]};
+                value = ce::fixed_array<double, 4>{values[0], values[1], values[2], values[3]};
             }
-            else if (auto* vector = std::get_if<std::array<double, 3>>(&value))
+            else if (auto* vector = std::get_if<ce::fixed_array<double, 3>>(&value))
             {
                 float values[]{float((*vector)[0]), float((*vector)[1]), float((*vector)[2])};
                 edited = ImGui::DragFloat3("##Value", values, .01f);
-                value = std::array<double, 3>{values[0], values[1], values[2]};
+                value = ce::fixed_array<double, 3>{values[0], values[1], values[2]};
             }
             else if (auto* boolean = std::get_if<bool>(&value))
             {
@@ -693,7 +695,7 @@ namespace
     void DrawMaterialTextureSlot(const editor::widgets::property_sheet& sheet, Material& mat,
         const char* label, std::string_view propertyName, std::string& legacyNameField,
         const own::shared_owner<const Texture>& current, bool compress,
-        const std::function<void(own::shared_owner<const Texture>)>& apply,
+        const ce::owned_func<void(own::shared_owner<const Texture>)>& apply,
         experiment::MaterialInstance* instance) // I5-D5c3
     {
         ImGui::PushID(propertyName.data(),

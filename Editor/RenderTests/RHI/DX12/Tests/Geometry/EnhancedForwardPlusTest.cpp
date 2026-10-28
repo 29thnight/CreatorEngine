@@ -1,3 +1,4 @@
+#include "../../../../../../Engine/Containers/ContainerAPI.h"
 #include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
@@ -68,7 +69,7 @@ bool DX12Test::RunForwardPlusTest(std::string& outLog)
     // 광원: 깊이 0.6이 뷰 z ≈ 0.25이므로 그 근처 화면 중앙에 반경 0.05짜리
     // 점광 하나. 중앙 타일에는 닿고 구석에는 절대 닿지 않는 크기다.
     const float surfaceViewZ = 0.25f;
-    std::vector<EnhancedLight> lights(1);
+    ce::dynamic_array<EnhancedLight> lights(1);
     lights[0].position = math::vector4(0.f, 0.f, surfaceViewZ, 1.f);   // 점광
     lights[0].attenuation = math::vector4(1.f, 0.f, 0.f, 0.05f);       // 반경
 

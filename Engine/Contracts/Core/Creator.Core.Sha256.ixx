@@ -2,12 +2,12 @@ module;
 #include "../Compiler/Creator.RotateIntrinsic.h"
 
 export module Creator.Core.Sha256;
-
+export import "Creator.Containers.h";
 import std;
 
-export namespace ce::hash
+export namespace ce::crypto
 {
-    using sha256_digest = std::array<std::uint8_t, 32>;
+    using sha256_digest = ce::fixed_array<std::uint8_t, 32>;
 
     class sha256
     {
@@ -166,4 +166,4 @@ export namespace ce::hash
         }
         return s;
     }
-} // namespace ce::hash
+} // namespace ce::crypto

@@ -1,3 +1,4 @@
+#include "../../../../Engine/Containers/ContainerAPI.h"
 #include "../Textures/TextureSourceProcessing.h"
 #include "Interfaces/AssetAuthoringPort.h"
 #include "Experiment/Cooked/CookedTerrain.h"
@@ -12,7 +13,7 @@ namespace Authoring
     {
         struct TerrainSourceLocks final
         {
-            std::vector<HANDLE> files;
+            ce::dynamic_array<HANDLE> files;
             ~TerrainSourceLocks()
             {
                 for (const auto file : files)
@@ -42,7 +43,7 @@ namespace Authoring
         };
 
         bool ReadTerrainCookBytes(const std::filesystem::path& path, std::uint64_t maximum,
-            std::vector<std::byte>& bytes)
+            ce::dynamic_array<std::byte>& bytes)
         {
             std::ifstream input(path, std::ios::binary | std::ios::ate);
             const auto size = input.tellg();
@@ -58,7 +59,7 @@ namespace Authoring
     }
 
     bool CookTerrainSource(const std::filesystem::path& source, const std::filesystem::path& terrainRoot,
-        std::vector<std::byte>& artifact, std::string& failure)
+        ce::dynamic_array<std::byte>& artifact, std::string& failure)
     {
         namespace ck = experiment::cooked;
         artifact.clear();
@@ -71,7 +72,7 @@ namespace Authoring
         try
         {
             TerrainSourceLocks locks;
-            std::vector<std::byte> descriptor;
+            ce::dynamic_array<std::byte> descriptor;
             if (!locks.Pin(source) || !ReadTerrainCookBytes(source, 16u * 1024u * 1024u, descriptor))
             {
                 return fail("Cannot capture terrain descriptor: " + source.string());
@@ -117,7 +118,7 @@ namespace Authoring
             {
                 return fail("Cannot capture exact terrain height image: " + heightPath.string());
             }
-            std::vector<std::byte> heightBytes(heights.heights.size() * 4u);
+            ce::dynamic_array<std::byte> heightBytes(heights.heights.size() * 4u);
             for (std::size_t index = 0u; index < heights.heights.size(); ++index)
             {
                 const auto bits = std::bit_cast<std::uint32_t>(heights.heights[index]);
@@ -127,10 +128,10 @@ namespace Authoring
                 }
             }
             view.heights = heightBytes;
-            std::array<TerrainSourceImage, ck::kCookedTerrainMaxLayers> masks;
-            std::array<std::vector<std::byte>, ck::kCookedTerrainMaxLayers> textures;
-            std::array<std::string, ck::kCookedTerrainMaxLayers> names;
-            std::array<std::string, ck::kCookedTerrainMaxLayers> references;
+            ce::fixed_array<TerrainSourceImage, ck::kCookedTerrainMaxLayers> masks;
+            ce::fixed_array<ce::dynamic_array<std::byte>, ck::kCookedTerrainMaxLayers> textures;
+            ce::fixed_array<std::string, ck::kCookedTerrainMaxLayers> names;
+            ce::fixed_array<std::string, ck::kCookedTerrainMaxLayers> references;
             std::size_t index{};
             for (const auto layer : layers)
             {
@@ -154,7 +155,7 @@ namespace Authoring
                 }
                 output.gray = std::as_bytes(std::span(masks[index].gray));
                 const auto diffusePath = resolve(layer["diffuseTexturePath"]);
-                std::vector<std::byte> diffuse;
+                ce::dynamic_array<std::byte> diffuse;
                 if (!locks.Pin(diffusePath) || !ReadTerrainCookBytes(diffusePath, 512ull * 1024ull * 1024ull, diffuse))
                 {
                     return fail("Cannot capture terrain diffuse source: " + diffusePath.string());
@@ -163,7 +164,7 @@ namespace Authoring
                 const auto metaPath = std::filesystem::path(diffusePath.wstring() + L".meta");
                 if (std::filesystem::is_regular_file(metaPath))
                 {
-                    std::vector<std::byte> metadata;
+                    ce::dynamic_array<std::byte> metadata;
                     if (!locks.Pin(metaPath) || !ReadTerrainCookBytes(metaPath, 16u * 1024u * 1024u, metadata)
                         || !ck::ParseTextureImportSettings(std::string_view(
                             reinterpret_cast<const char*>(metadata.data()), metadata.size()), settings, failure))

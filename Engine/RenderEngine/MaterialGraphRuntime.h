@@ -1,4 +1,7 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineFunc.h"
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -51,7 +54,7 @@ namespace material_graph
         std::size_t RetainedPayloadBytes() const noexcept;
     };
 
-    using GenerationLoader = std::function<bool(CookedProgram&, std::string&)>;
+    using GenerationLoader = ce::owned_func<bool(CookedProgram&, std::string&)>;
 
     // Validate a completed cooked payload and derive its content identity/routing
     // before publishing its immutable owner, including AssetDepot decode paths.
@@ -135,7 +138,7 @@ namespace material_graph
 
         private:
             friend class GenerationStore;
-            std::map<experiment::AssetId, Entry> entries_;
+            ce::engine_ordered_map<experiment::AssetId, Entry> entries_;
         };
 
         // Non-reload requests share one preparation for the current revision.
@@ -178,11 +181,11 @@ namespace material_graph
 
     private:
         void RetainLocked(Entry& entry, const own::shared_owner<const Generation>& owner,
-                          std::vector<own::shared_owner<const Generation>>& released);
-        void TrimRetainedLocked(std::vector<own::shared_owner<const Generation>>& released);
+                          ce::dynamic_array<own::shared_owner<const Generation>>& released);
+        void TrimRetainedLocked(ce::dynamic_array<own::shared_owner<const Generation>>& released);
         std::uint64_t NextUseLocked() const noexcept;
         mutable std::mutex mutex_;
-        std::map<experiment::AssetId, Entry> entries_;
+        ce::engine_ordered_map<experiment::AssetId, Entry> entries_;
         std::size_t retainedBudgetBytes_ = 128u * 1024u * 1024u;
         std::size_t retainedBytes_{};
         mutable std::uint64_t useSerial_{};
@@ -203,8 +206,8 @@ namespace material_graph
     struct InstanceDescription
     {
         experiment::AssetId graphId;
-        std::vector<ParameterOverride> parameters;
-        std::vector<TextureOverride> textures;
+        ce::dynamic_array<ParameterOverride> parameters;
+        ce::dynamic_array<TextureOverride> textures;
     };
 
     struct InstanceTexture
@@ -227,11 +230,11 @@ namespace material_graph
         std::shared_ptr<std::atomic<bool>> editorPreviewSubmitted;
         own::shared_owner<const Generation> generation;
         InstanceDescription description;
-        std::vector<InstanceTexture> textures;
+        ce::dynamic_array<InstanceTexture> textures;
     };
 
     using TextureLoader =
-        std::function<own::shared_owner<const Texture>(const experiment::AssetId&, LX::LXColorSpace, std::string&)>;
+        ce::owned_func<own::shared_owner<const Texture>(const experiment::AssetId&, LX::LXColorSpace, std::string&)>;
     bool BuildInstance(own::shared_owner<const Generation> generation, const InstanceDescription& description,
                        const TextureLoader& loadTexture, own::shared_owner<const Instance>& result, std::string& error);
 

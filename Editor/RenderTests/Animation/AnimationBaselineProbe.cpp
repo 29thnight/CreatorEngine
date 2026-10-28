@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -66,8 +67,8 @@ namespace RenderTest
             configured.cpuBudgetMs = budgetMs;
             RuntimeSettings::Get().SetAnimationBudgetSettings(configured);
         }
-        std::vector<EntityHandle> roots;
-        std::vector<Animator*> animators;
+        ce::dynamic_array<EntityHandle> roots;
+        ce::dynamic_array<Animator*> animators;
         // The commandlet is synchronous on the owner thread. Frames are sealed
         // here so 120 samples cannot accumulate unbounded palette allocations.
         // No render-thread execution or GPU upload time is claimed by this probe.

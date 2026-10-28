@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 // 쿠킹 포맷의 쓰기/읽기. 포맷 지식은 CookedModelFormat.h 와 이 짝뿐이다.
@@ -20,8 +21,8 @@ namespace experiment::cooked
 {
     struct CookedWriteResult final
     {
-        std::vector<std::byte> bytes{};
-        std::vector<ModelLoadIssue> issues{};
+        ce::dynamic_array<std::byte> bytes{};
+        ce::dynamic_array<ModelLoadIssue> issues{};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {
@@ -40,7 +41,7 @@ namespace experiment::cooked
     // 아닌 이유는 이것이 정상 폴백 경로이기 때문이다. 로그에서 "캐시가 낡았다"가
     // 실패로 보이면 진짜 실패를 찾을 때 방해가 된다.
     [[nodiscard]] bool Read(std::span<const std::byte> bytes,
-        ModelDraft& outDraft, std::vector<ModelLoadIssue>& issues);
+        ModelDraft& outDraft, ce::dynamic_array<ModelLoadIssue>& issues);
 
     // ModelLoadRequest::cookedPath 를 읽어 Decode 한다.
     // 경로를 **만들지 않는다** — 호출자가 준 것만 연다.

@@ -1,3 +1,6 @@
+#include "../../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
 #else
@@ -45,7 +48,7 @@ namespace assets
         {
             uuid::uuid16 assetId{};
             std::filesystem::path relativePath{};
-            std::vector<std::byte> bytes{};
+            ce::dynamic_array<std::byte> bytes{};
             std::string fingerprint{};
         };
 
@@ -91,7 +94,7 @@ namespace assets
         }
 
         [[nodiscard]] bool Mbc3ReadBytes(const std::filesystem::path& path,
-            std::vector<std::byte>& out)
+            ce::dynamic_array<std::byte>& out)
         {
             std::ifstream stream(path, std::ios::binary);
             if (!stream) return false;
@@ -348,11 +351,11 @@ namespace assets
         // 프로젝트(asset root)마다 한 벌. 저작 transaction은 프로젝트 writer
         // mutex를 들고 있으므로 같은 프로젝트끼리는 이미 직렬화돼 있지만, asset
         // root가 다른 두 프로젝트는 서로 다른 mutex를 들고 이 표를 동시에 만진다.
-        [[nodiscard]] std::map<std::string, Mbc3CorpusCacheEntry>& Mbc3CorpusCacheFor(
+        [[nodiscard]] ce::engine_ordered_map<std::string, Mbc3CorpusCacheEntry>& Mbc3CorpusCacheFor(
             const std::filesystem::path& assetRoot)
         {
-            static std::map<std::string,
-                std::map<std::string, Mbc3CorpusCacheEntry>> caches;
+            static ce::engine_ordered_map<std::string,
+                ce::engine_ordered_map<std::string, Mbc3CorpusCacheEntry>> caches;
             return caches[assetRoot.lexically_normal().generic_string()];
         }
 
@@ -362,7 +365,7 @@ namespace assets
             const IdentityEpochHeader& header, const ModelSidecarV2& candidate,
             std::string& failure)
         {
-            std::map<uuid::uuid16, std::string> identities;
+            ce::engine_ordered_map<uuid::uuid16, std::string> identities;
             const auto addIdentity = [&](const uuid::uuid16& id,
                 std::string context) -> bool
                 {
@@ -387,9 +390,9 @@ namespace assets
                 };
 
             const std::lock_guard<std::mutex> cacheGuard(Mbc3CorpusCacheMutex());
-            std::map<std::string, Mbc3CorpusCacheEntry>& cache =
+            ce::engine_ordered_map<std::string, Mbc3CorpusCacheEntry>& cache =
                 Mbc3CorpusCacheFor(assetRoot);
-            std::set<std::string> seen;
+            ce::engine_ordered_set<std::string> seen;
 
             std::error_code error;
             for (const auto& entry : std::filesystem::recursive_directory_iterator(
@@ -449,7 +452,7 @@ namespace assets
                     }
                     else if (parsed.Root()["schemaVersion"].As(0u) == 2u)
                     {
-                        std::vector<SidecarIssue> issues;
+                        ce::dynamic_array<SidecarIssue> issues;
                         if (!ReadModelSidecarV2(text, parsedEntry.document, issues))
                         {
                             failure = "schema v2 model sidecar corpus가 유효하지 않다: "
@@ -467,7 +470,7 @@ namespace assets
                 }
                 if (!cached->schemaV2) continue;
 
-                std::vector<SidecarIssue> issues;
+                ce::dynamic_array<SidecarIssue> issues;
                 if (!ValidateModelSidecarV2Closure(cached->document, header, issues))
                 {
                     failure = "schema v2 model sidecar corpus가 유효하지 않다: "
@@ -478,7 +481,7 @@ namespace assets
                 if (!addDocument(cached->document, entry.path())) return false;
             }
             // 사라진 sidecar의 항목은 걷는다 — 표가 프로젝트 수명 동안 자란다.
-            std::erase_if(cache, [&seen](const auto& pair)
+            ce::erase_if(cache, [&seen](const auto& pair)
                 { return !seen.contains(pair.first); });
             if (error)
             {
@@ -493,11 +496,11 @@ namespace assets
             const std::filesystem::path& logicalSource,
             const im::ImportedScene& scene, const ModelSidecarV2& sidecar,
             experiment::ModelDraft& outDraft,
-            std::vector<Mbc3PreparedTexture>& outTextures,
+            ce::dynamic_array<Mbc3PreparedTexture>& outTextures,
             std::string& failure)
         {
-            std::vector<experiment::AssetId> materialIds(scene.materials.size());
-            std::vector<experiment::AssetId> textureIds(scene.textures.size());
+            ce::dynamic_array<experiment::AssetId> materialIds(scene.materials.size());
+            ce::dynamic_array<experiment::AssetId> textureIds(scene.textures.size());
             for (const ModelSubAssetRecord& record : sidecar.subAssets)
             {
                 if (record.kind == SubAssetKind::Material)
@@ -542,7 +545,7 @@ namespace assets
                 return false;
             }
 
-            std::vector<std::string> resolutionFailures;
+            ce::dynamic_array<std::string> resolutionFailures;
             im::ConversionOptions options{};
             options.modelAssetId = experiment::AssetId{ sidecar.assetId };
             options.modelName = logicalSource.stem().string();
@@ -661,7 +664,7 @@ namespace assets
         [[nodiscard]] std::string Mbc3WriteGenerationRecord(
             const ModelSidecarV2& sidecar, std::string_view sidecarFingerprint,
             std::string_view modelFingerprint,
-            const std::vector<Mbc3PreparedTexture>& textures)
+            const ce::dynamic_array<Mbc3PreparedTexture>& textures)
         {
             Authoring::WriteDocument document;
             const Authoring::WriteNode root = document.Root();
@@ -801,7 +804,7 @@ namespace assets
             return result;
         }
 
-        std::vector<std::byte> headerBytes;
+        ce::dynamic_array<std::byte> headerBytes;
         if (!Mbc3ReadBytes(request.identityHeaderPath, headerBytes))
         {
             Mbc3AddIssue(result, "identity.header",
@@ -812,7 +815,7 @@ namespace assets
         const std::string headerText{
             reinterpret_cast<const char*>(headerBytes.data()), headerBytes.size() };
         IdentityEpochHeader header;
-        std::vector<EpochHeaderIssue> headerIssues;
+        ce::dynamic_array<EpochHeaderIssue> headerIssues;
         if (!ReadIdentityEpochHeader(headerText, header, headerIssues))
         {
             Mbc3AddIssue(result, "identity.header", headerIssues.empty()
@@ -888,7 +891,7 @@ namespace assets
         bool hasPriorV2 = false;
         if (hadSidecar)
         {
-            std::vector<SidecarIssue> priorIssues;
+            ce::dynamic_array<SidecarIssue> priorIssues;
             if (ReadModelSidecarV2(originalSidecar, prior, priorIssues))
             {
                 priorIssues.clear();
@@ -919,7 +922,7 @@ namespace assets
         }
 
         markPhase("lock+header+sidecar");
-        std::vector<std::byte> sourceBytes;
+        ce::dynamic_array<std::byte> sourceBytes;
         if (!Mbc3ReadBytes(source, sourceBytes) || sourceBytes.empty())
         {
             Mbc3AddIssue(result, "source.read", "model source가 비었거나 읽을 수 없다.");
@@ -958,7 +961,7 @@ namespace assets
         if (Mbc3Inject(request, ModelAuthoringFailurePoint::AfterDecode,
             result, "inject.after-decode")) return result;
 
-        std::vector<StableKeyElement> elements =
+        ce::dynamic_array<StableKeyElement> elements =
             CollectStableKeyElements(*imported.scene);
         if (!NormalizeModelStableInputs(elements, failure))
         {
@@ -1026,7 +1029,7 @@ namespace assets
         }
         const std::uint64_t generation = lastGeneration + 1u;
         ModelSidecarV2 sidecar;
-        std::vector<SidecarIssue> sidecarIssues;
+        ce::dynamic_array<SidecarIssue> sidecarIssues;
         if (!BuildModelSidecarV2(header, modelAuthoringKey, generation,
             sourceFingerprint, keys.assignments, sidecar, sidecarIssues))
         {
@@ -1085,7 +1088,7 @@ namespace assets
         }
 
         experiment::ModelDraft draft;
-        std::vector<Mbc3PreparedTexture> textures;
+        ce::dynamic_array<Mbc3PreparedTexture> textures;
         if (!Mbc3BuildDraft(assetRoot, logicalSource, *imported.scene,
             sidecar, draft, textures, failure))
         {
@@ -1121,7 +1124,7 @@ namespace assets
         generation_streaming::Bundle streaming;
         try
         {
-            std::vector<uuid::uuid16> meshIds, materialIds; uuid::uuid16 skeletonId{};
+            ce::dynamic_array<uuid::uuid16> meshIds, materialIds; uuid::uuid16 skeletonId{};
             for (const auto& entry : sidecar.subAssets)
             {
                 if (entry.kind == SubAssetKind::Mesh) meshIds.push_back(entry.assetId);
@@ -1192,7 +1195,7 @@ namespace assets
         {
             const auto path = cleanup.stage / file.path;
             std::filesystem::create_directories(path.parent_path(),error);
-            std::vector<std::byte> restored;
+            ce::dynamic_array<std::byte> restored;
             if (error || !Mbc3WriteBytes(path,file.bytes,failure) || !Mbc3ReadBytes(path,restored) || restored != file.bytes)
             { Mbc3AddIssue(result,"streaming.stage",failure); return result; }
         }
@@ -1241,9 +1244,9 @@ namespace assets
                 : sidecarIssues.front().message);
             return result;
         }
-        std::vector<std::byte> stagedModel;
+        ce::dynamic_array<std::byte> stagedModel;
         experiment::ModelDraft restoredDraft;
-        std::vector<experiment::ModelLoadIssue> modelIssues;
+        ce::dynamic_array<experiment::ModelLoadIssue> modelIssues;
         if (!Mbc3ReadBytes(cleanup.stage / "metadata.cemc", stagedModel)
             || Mbc3Fingerprint(stagedModel) != streaming.metadataFingerprint
             || !ck::Read(stagedModel, restoredDraft, modelIssues)
@@ -1263,7 +1266,7 @@ namespace assets
         }
         for (const Mbc3PreparedTexture& texture : textures)
         {
-            std::vector<std::byte> stagedTexture;
+            ce::dynamic_array<std::byte> stagedTexture;
             if (!Mbc3ReadBytes(cleanup.stage / texture.relativePath, stagedTexture)
                 || stagedTexture != texture.bytes
                 || Mbc3Fingerprint(stagedTexture) != texture.fingerprint)
@@ -1314,7 +1317,7 @@ namespace assets
         }
         if (!sourceUnchanged)
         {
-            std::vector<std::byte> currentSource;
+            ce::dynamic_array<std::byte> currentSource;
             if (!Mbc3ReadBytes(source, currentSource)
                 || Mbc3Fingerprint(currentSource) != sourceFingerprint)
             {

@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "ExperimentParity/ExperimentWeldSelfTest.h"
 
 #include "Experiment/Import/VertexWelding.h"
@@ -127,7 +128,7 @@ namespace RenderTest
             check.Check(6 == mesh.indices.size(), "중복 메시: 인덱스 수 보존(삼각형 2개)");
 
             // ★ 인덱스가 실제로 재사상됐는가. 개수만 보면 remap 을 빼먹어도 통과한다.
-            const std::vector<std::uint32_t> expected{ 0, 1, 2, 0, 1, 2 };
+            const ce::dynamic_array<std::uint32_t> expected{ 0, 1, 2, 0, 1, 2 };
             check.Check(mesh.indices == expected, "중복 메시: 인덱스가 앞쪽 정점으로 재사상됐다");
 
             // 값이 살아남았는가 — 합치면서 스트림을 빠뜨리지 않았는지 본다.

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include "RHI/RHIShaderReflection.h"
@@ -27,8 +28,8 @@ struct ShaderMetaBindingLayout
     std::uint32_t constantBufferRegister{};
     std::uint32_t constantBufferSpace{};
     std::uint32_t constantBufferByteSize{};
-    std::vector<ShaderMetaPropertyBinding> properties;
-    std::vector<RHIShaderResourceReflection> samplers;
+    ce::dynamic_array<ShaderMetaPropertyBinding> properties;
+    ce::dynamic_array<RHIShaderResourceReflection> samplers;
 
     bool operator==(const ShaderMetaBindingLayout&) const = default;
 };

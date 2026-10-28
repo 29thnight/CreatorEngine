@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 // 에디터 창 배선 자가 검사 (PHASE 21 M4 1단계).
 //
 // 이 TU도 유니티에서 뺀다 — EditorWindowRegistry.cpp와 같은 이유.
@@ -143,7 +144,7 @@ namespace editor
         register_declarer_windows<selftest_windows>(table, "selftest_windows");
 
         // ① 선언 순서가 표 순서인가. unordered_map 순회를 이 순서가 대체한다.
-        const std::vector<window_entry>& entries = table.entries;
+        const ce::dynamic_array<window_entry>& entries = table.entries;
         if (entries.size() != 3)
         {
             fail(report, "창 3개가 실리지 않았다 (size=" +

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -21,9 +22,9 @@ struct TemporalMotionFixtureAssetOptions final
 struct TemporalMotionFixtureAssets final
 {
     own::shared_owner<const experiment::cooked::ArtifactByteSource> source;
-    std::vector<std::byte> manifest;
+    ce::dynamic_array<std::byte> manifest;
     // 경로/크기/해시는 게시할 바로 그 bytes의 기록이다. 원본은 source의 Size/ReadAt으로 읽는다.
-    std::vector<experiment::cooked::AssetBlobRecord> artifacts;
+    ce::dynamic_array<experiment::cooked::AssetBlobRecord> artifacts;
     experiment::cooked::AssetSetMountOptions mountOptions;
     AssetDepot::AssetLink<assets::ModelAnimationDescriptor> model;
     AssetDepot::AssetLink<assets::ModelMeshDescriptor> staticMesh;

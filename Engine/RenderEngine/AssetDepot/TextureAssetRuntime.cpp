@@ -1,3 +1,5 @@
+#include "../../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
@@ -245,7 +247,7 @@ AssetDepot::AssetRequest<Texture> DataSystem::RequestTextureAsyncFromSnapshot(
     }
 
     // Metadata-only traversal on an immutable snapshot, outside the shared lock.
-    std::vector<texture_cooked::ResolvedAssetEntry> closure;
+    ce::dynamic_array<texture_cooked::ResolvedAssetEntry> closure;
     texture_cooked::AssetCatalogLookupIssue issue;
     const auto lookup = catalog->CollectHardClosure(link.ToReference(), closure, issue);
     if (lookup != texture_cooked::AssetLookupStatus::Found)
@@ -268,7 +270,7 @@ AssetDepot::AssetRequest<Texture> DataSystem::RequestTextureAsyncFromSnapshot(
         }
     }
 
-    std::map<texture_cooked::AssetIdentity, own::shared_owner<TextureAssetWork>> selected;
+    ce::engine_ordered_map<texture_cooked::AssetIdentity, own::shared_owner<TextureAssetWork>> selected;
     AssetDepot::TextureAssetRetiredEntries retired;
     std::lock_guard preparationLock(m_assetPreparationMutex);
     if (m_assetPreparationStopping)
@@ -331,7 +333,7 @@ AssetDepot::AssetRequest<Texture> DataSystem::RequestTextureAsyncFromSnapshot(
                 "Texture generation request identity space exhausted.");
         }
         work->requestId = m_textureAssets.nextRequestId++;
-        std::vector<job_handle> dependencies;
+        ce::dynamic_array<job_handle> dependencies;
         for (const auto& dependency : resolved.entry.dependencies)
         {
             if (dependency.kind != texture_cooked::AssetDependencyKind::Hard)
@@ -973,7 +975,7 @@ AssetDepot::AssetRequest<Texture::CodecImage> DataSystem::RequestTextureImageAsy
         retired.imagePins.reserve(m_textureAssets.images.size());
         m_textureAssets.imageRequests.reserve(m_textureAssets.imageRequests.size() + 1u);
         TrimTextureAssetsLocked(retired);
-        std::erase_if(m_textureAssets.imageRequests, [](const auto& weak) { return weak.expired(); });
+        ce::erase_if(m_textureAssets.imageRequests, [](const auto& weak) { return weak.expired(); });
         m_textureAssets.imageRequests.emplace_back(consumer);
         work = StartTextureImageWorkLocked(origin->imageKey,
             origin->resolved, origin->imageSource);
@@ -1112,7 +1114,7 @@ void DataSystem::RunTextureImageWork(own::shared_owner<AssetDepot::TextureImageW
         }
         AssetByteObservation inputObservation(m_textureAssets.imageInputStagingBytes);
         AssetByteObservation resultObservation(m_textureAssets.imageDecodedResultStagingBytes);
-        std::vector<std::byte> bytes;
+        ce::dynamic_array<std::byte> bytes;
         if (error == AssetRequestError::None)
         {
             bytes.resize(static_cast<std::size_t>(byteSize));
@@ -1272,7 +1274,7 @@ void DataSystem::SetTextureImageCacheBudget(std::size_t bytes)
 
 AssetDepot::TextureImageCacheSnapshot DataSystem::SnapshotTextureImageCache() const
 {
-    std::vector<own::shared_owner<AssetDepot::AssetRequestState<Texture::CodecImage>>> requestPins;
+    ce::dynamic_array<own::shared_owner<AssetDepot::AssetRequestState<Texture::CodecImage>>> requestPins;
     std::lock_guard lock(m_assetPreparationMutex);
     requestPins.reserve(m_textureAssets.imageRequests.size());
     for (const auto& weak : m_textureAssets.imageRequests)

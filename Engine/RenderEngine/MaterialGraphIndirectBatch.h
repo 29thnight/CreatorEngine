@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -23,19 +24,19 @@ namespace material_graph
         struct Bucket
         {
             std::size_t representative{};
-            std::vector<std::uint32_t> roots;
+            ce::dynamic_array<std::uint32_t> roots;
             std::uint32_t offset{}, count{};
         };
         IRenderDeviceServices* device{};
         own::shared_owner<TransientBufferPool> pool;
         own::shared_owner<const GpuGeometryVisibility::Frame> visibility;
         own::shared_owner<const LX::Runtime::ComputeGeneration> pipeline;
-        std::array<own::shared_owner<const LX::Runtime::ComputeGeneration>, 6> packetPipelines;
+        ce::fixed_array<own::shared_owner<const LX::Runtime::ComputeGeneration>, 6> packetPipelines;
         own::unique_owner<PacketDispatchWork> packetWork;
         // Physical buckets outlive the active span, preserving every roots buffer.
-        std::vector<Bucket> m_bucketStorage;
+        ce::dynamic_array<Bucket> m_bucketStorage;
         std::span<Bucket> buckets;
-        std::vector<uint32_t> m_capacities;
+        ce::dynamic_array<uint32_t> m_capacities;
         bool m_packetMode{};
 
         Bucket& AppendBucket()
@@ -165,7 +166,7 @@ namespace material_graph
         RHIBufferHandle RangeBuffer() const { return PacketMode() ? packetWork->ranges : RHIBufferHandle{}; }
         uint32_t PacketCapacity() const { return PacketMode() ? packetWork->values.packetCapacity : 0; }
 
-        bool Upload(std::span<const std::uint32_t> words, std::span<const std::array<std::uint32_t, 4>> records,
+        bool Upload(std::span<const std::uint32_t> words, std::span<const ce::fixed_array<std::uint32_t, 4>> records,
                     std::uint32_t outputBytes, std::string& error)
         {
             // The native indirect signature consumes ascending, unique root slots.
@@ -202,7 +203,7 @@ namespace material_graph
             };
             templates = upload(words.data(), words.size_bytes());
             commands = upload(records.data(), records.size_bytes());
-            const std::array<std::uint32_t, 16> values{commandCount};
+            const ce::fixed_array<std::uint32_t, 16> values{commandCount};
             constants = device->UploadConstants(values.data(), sizeof(values));
             RHIBufferDesc desc;
             desc.bytes = outputBytes;
@@ -371,6 +372,6 @@ namespace material_graph
         void ClearAfterIdle() { m_batches.clear(); }
 
       private:
-        std::vector<own::shared_owner<IndirectMaterialBatch>> m_batches;
+        ce::dynamic_array<own::shared_owner<IndirectMaterialBatch>> m_batches;
     };
 } // namespace material_graph

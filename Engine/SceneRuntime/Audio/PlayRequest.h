@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include <mathematics/vector3.hpp>
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -41,7 +42,7 @@ namespace wave
         float maximumDistance{ 50.0f };
         RolloffKind rolloff{ RolloffKind::Inverse };
         // Distances are world units. Stable sorting keeps the last duplicate point.
-        std::vector<RolloffPoint> customRolloff;
+        ce::dynamic_array<RolloffPoint> customRolloff;
         // Runtime projection: applied to the spatial branch only.
         float attenuationGain{ 1.0f };
         // Shared Doppler projection keeps both source branches phase-aligned.

@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/FullContainerMigration20261026.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>전체 컨테이너 전환 진행 기록</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#검사-범위">검사 범위</a></li><li><a href="#적용한-배열-전환">적용한 배열 전환</a></li><li><a href="#실측과-현재-검증-경계">실측과 현재 검증 경계</a></li><li><a href="#현재-바이너리의-추가-성능-검사">현재 바이너리의 추가 성능 검사</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="FullContainerMigration20261026.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>전체 컨테이너 전환 진행 기록</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 4개의 분량 막대">
+<a class="map-row" href="#검사-범위"><span class="ve-label">§01</span><span class="map-name">검사 범위</span><span class="map-bar"><i style="width:29.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#적용한-배열-전환"><span class="ve-label">§02</span><span class="map-name">적용한 배열 전환</span><span class="map-bar"><i style="width:76.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실측과-현재-검증-경계"><span class="ve-label">§03</span><span class="map-name">실측과 현재 검증 경계</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#현재-바이너리의-추가-성능-검사"><span class="ve-label">§04</span><span class="map-name">현재 바이너리의 추가 성능 검사</span><span class="map-bar"><i style="width:95%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 4개 가운데 「실측과 현재 검증 경계」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><blockquote>
+<p>2026-10-27 전체 모듈 재수용: 일반 <strong>78/82</strong>, MPSC 주 수용 <strong>3/4</strong>, PPL 확장 큐 <strong>5/6</strong>으로 전체 미통과다. 새 엔진 정본으로 측정한 결과와 잔여 STL 사용처는 <a href="EngineContainersReacceptance20261027.html">재수용 보고서</a>에 기록했다.</p>
+</blockquote>
+<blockquote>
+<p>2026-10-27 문자열 갱신: <code>ce::string</code>/<code>string_view</code>는 UTF-16 기본 타입으로 구현했고 UTF-8·ImGui 캐시/입력, 실제 한글 IME와 Editor Debug 실행 검증을 통과했다. 후속 문자열 성능은 기존 기준으로 <strong>57/57</strong>이며 UTF-8 2KB 추가 미달을 해소했다. <a href="Utf8AppendOptimization20261027.html">추가 원인 분리·최종 재수용</a>, <a href="Utf16StringIntegration20261027.html">초기 구현·측정 상세</a>. 기존 STL 문자열 전체 전환 완료를 뜻하지 않는다.</p>
+</blockquote>
+<p>2026년 10월 27일 추가 최적화 후 노드 맵 정본은 성능 수용 54/54를 통과했다. <a href="NodeMapOptimizationAcceptance20261027.html">노드 맵 추가 분리·최종 수용</a>에 최신 결과를 기록했다. 아래의 과거 노드 맵 미달 수치는 당시 검사 기록이다.</p>
+<p>노드 맵의 중복 탐색·키 삭제 경로를 각각 분리한 후속 실측은 <a href="NodeMapAblation20261026.html">노드 맵 변경별 계측</a>에 기록했다. 두 변경을 합쳐도 전체 성능 수용에는 미달했다.</p>
+<p>이 문서는 초기 통합 이후의 전체 STL 저장소 교체 작업을 기록한다. 전체 교체는 진행 중이며 완료 판정이 아니다. 구현 정본은 계속 <code>Engine/Containers</code>이고 외부 <code>CreatorContainers</code>는 이 소스를 직접 빌드한다.</p>
+</section>
+<section class="doc-sec" id="sec-검사-범위">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="검사-범위">검사 범위</h2></div>
+<div class="prose"><p>Engine, Editor, Lattice, Player, HeadlessHost의 추적 C++ 소스를 검사한다. 주석과 문자열 리터럴을 토큰 단위로 제외하며 컨테이너 저장소, 함수 인수, 반환 타입과 정적 호출을 포함한다. ThirdParty와 Tools의 비교용 STL 사용, 빌드 산출물은 집계 밖이다.</p>
+<p>전환 전 코드 참조 14,489건 중 vector 교체 후에는 10,468건이 남았다. 후자는 1,017개 파일의 참조 수이며 객체 개수가 아니다. 원시는 <code>Build/Verification/ContainerMigration/baseline-lexical-20261026.json</code>과 <code>current-full.json</code>에 보존했다. 문자열 8,073건, 고정 배열 1,168건, unordered_map 212건 등은 아직 남아 있다. vector 2건은 reflgen SDK가 요구하는 반환 타입과 해당 반환 버퍼다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-적용한-배열-전환">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="적용한-배열-전환">적용한 배열 전환</h2></div>
+<div class="prose"><p>688개 파일의 vector 참조를 엔진 소유 <code>ce::dynamic_array</code>로 변경했다. 주석·리터럴·파일 인코딩을 보존하는 전환 도구와 회귀 검사를 추가했다. 재귀 JSON, 문서 노드와 명령 결과 트리는 불완전 타입을 지원하는 <code>ce::recursive_array</code>를 사용한다. 일반 배열은 이동 전용 타입의 복사 불가 특성을 유지한다.</p>
+<p>프로파일 캡처 배열은 기존 전용 힙의 수명을 유지하는 <code>capture_byte_allocator</code>를 사용한다. <code>arena_vector</code>도 내부 배열로 교체했으며, 중첩 할당자 전달·다른 영역으로의 이동 대입·복사 시 원본 arena에서 분리되는 규칙을 유지한다. GPU 프로파일러의 이동 불가능한 원자 객체는 개수 지정 생성 경로에서 이동 코드를 생성하지 않는다.</p>
+<p>컨테이너 파티션은 25개로 확장했다. <code>fixed_array</code>는 집합 초기화·구조적 바인딩·연속 반복자·비교와 <code>to_array</code> 생성을 제공한다. <code>node_hash_map</code>은 재해시 중에도 키와 값 주소를 보존하며, 삽입 준비 단계의 할당·생성 실패 시 기존 인덱스를 보존한다. <code>fixed_bitset</code>도 추가했지만 기존 bitset 사용처 전환은 아직 하지 않았다. 새 구현의 존재가 모든 사용처 전환 또는 성능 수용 완료를 뜻하지 않는다.</p>
+<p>고정 배열은 MSVC STL 비교에서 9조건 × 3프로세스 27/27을 통과했다(<code>20261026-fixed-array-accept1</code>). 이후 310개 파일의 명시적 배열 타입과 3개 파일의 <code>to_array</code> 생성 경로를 내부 구현으로 전환했다. 고정 길이 span 경계 3곳은 직접 생성으로 길이 제약을 유지한다. Clang의 import 전용 구조적 바인딩은 특수화뿐 아니라 tuple 프로토콜의 원래 이름도 재수출해야 함을 재현 코드로 확인하고 수정했다.</p>
+<p>이 단계의 명시적 코드 참조는 엔진 본체 9,300건, 빌드에 연결되는 Tools/ProfilerViewer와 Tools/runtime 70건이 남았다. 해당 도구의 vector 소비자 7개 파일도 함께 전환했다. 원시는 <code>after-fixed-array-pass.json</code>과 <code>production-tool-remaining.json</code>이다. 문자열, 맵, 집합, deque, 복사 가능한 함수 객체 등이 다음 전환 범위다. 명시적 타입 검색만으로 자동 추론된 외부 라이브러리 소유 반환값까지 모두 제거했다고 판정하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-실측과-현재-검증-경계">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="실측과-현재-검증-경계">실측과 현재 검증 경계</h2></div>
+<div class="prose"><p>배열 확장 API 측정에서 fill 루프가 매 원소마다 객체의 길이를 갱신하는 비용을 어셈블리로 확인했다. 길이를 한 번 갱신하도록 수정한 뒤 count_construct 비율은 64원소 1.620292에서 0.890916, 4,096원소 2.987234에서 0.523080으로 바뀌었다. 이후 복사 편차는 16/32바이트 정렬 대조군으로 분리했다. 큰 기본 힙 블록의 정렬을 조정한 <code>20261026-array-api-accept2</code>는 12조건 × 3프로세스, 36/36을 통과했고 최대 비율은 1.054487이었다.</p>
+<p>이 성능 결과는 해당 시점 입력 스냅샷의 결과다. 이후 추가한 중첩 할당자·이동 불가능 타입 지원까지 포함한 전체 모듈 성능 재수용은 별도로 필요하다. 기존 82조건 수용 결과를 현재 전체 전환의 성능 증거로 대체하지 않는다.</p>
+<p>최신 <code>20261026-array-factory-asan</code>은 MSVC named module 메모리 검사 12/12를 통과했다. <code>20261026-array-factory-tsan</code>은 Linux Clang 18에서 25개 파티션과 주 모듈, 실행 검사 10건을 통과했다. <code>Build/container-arrays-rhi-debug1.log</code>의 소프트웨어 RHI 검사는 39개 encoder 메서드, 중첩 allocator, 소유 payload, 다른 스레드 해제와 arena 수명 검사를 통과했다. 이 검사는 native GPU 명령 실행 수용을 뜻하지 않는다.</p>
+<p>배열 전환 후 Editor Debug 전체 빌드(<code>Build/container-arrays-debug3.log</code>)와 새 exe/runtime DLL의 실제 실행이 통과했다. <code>AllArraysDebug1/acceptance.json</code>은 17개 명령, 새 GPU 프레임 완료, 2회 × 8,192개 정확히 한 번 전달, 물리 저장소, 지오메트리 발행 롤백, Play/Stop 장면 복원과 정상 종료를 확인한다. 별도의 실제 엔진 모듈 소유권 검사도 23건 통과했다(<code>Build/container-arrays-ownership-debug.log</code>).</p>
+<p>런처는 자신의 static CRT로 동일한 컨테이너 소스를 컴파일한다. HostAbi만 소비하고 반영 타입을 사용하지 않는 런처에 공통 reflection 주입이 걸려 컨테이너 파티션이 주 모듈을 다시 import하는 순환을 실제 모듈 의존 파일에서 확인했다. 런처를 해당 reflection 주입 대상에서 제외한 뒤 각 파티션의 정상 의존성 및 새 런처 실행을 확인했다. 엔진의 반영 타입 소비자는 기존 주입을 유지한다.</p>
+<p>Editor Release 빌드와 새 바이너리의 동일한 17개 실행 검사도 통과했다(<code>Build/container-arrays-editor-release.log</code>, <code>AllArraysRelease1/acceptance.json</code>). Player Debug와 Release 빌드도 통과했다(<code>Build/container-arrays-player-debug.log</code>, <code>Build/container-arrays-player-release.log</code>). Player는 빌드 검증 범위이며 패키징된 게임 실행을 수용한 것은 아니다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-현재-바이너리의-추가-성능-검사">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="현재-바이너리의-추가-성능-검사">현재 바이너리의 추가 성능 검사</h2></div>
+<div class="prose"><p>확장 동적 배열 API는 <code>20261026-engine-array-api1</code>에서 12조건 × 3프로세스 36/36을 통과했다. 모든 15개 원시 샘플을 유지하며, 매 반복 비율 ≤ 1.10 및 양쪽 시간 편차 x[13]/x[1] ≤ 1.30을 적용했다. 최대 비율은 1.077361이다.</p>
+<p>고정 배열의 <code>20261026-engine-fixed-array1</code>은 26/27이다. 4,096원소 transform의 비율은 1.007145였지만 custom 편차가 1.556168이었다. 해당 조건의 두 샘플은 약 17~18ms의 추가 경과 시간에 해당한다. 당시 CPU 시간 자료가 없어 이 두 지연의 원인은 확정하지 않는다. 실패 원시 자료와 소스·바이너리를 <code>20261026-engine-fixed-array1-snapshot</code>에 보존했다.</p>
+<p>스레드 CPU 시간 및 실행 사이클을 함께 기록한 <code>20261026-fixed-cpu-30ms2</code>와 <code>20261026-fixed-cpu-100ms2</code>는 각각 27/27을 통과했다. 최대 비율은 각각 1.039648과 1.040592이며 같은 임계값과 전체 샘플을 유지했다. 이전 지연은 이 수집에서 재현되지 않았다. 100ms는 기존 전체 모듈 수용과 동일한 측정 배치 길이다. CPU 계측을 추가한 사실과 배치 길이 변경을 구분하며 이전 실패를 삭제하거나 통과로 바꾸지 않는다.</p>
+<p>새 <code>node_hash_map</code>은 <code>20261026-engine-node-map1</code>에서 15/36만 통과했다. 따라서 기존 unordered_map 사용처의 일괄 전환에는 아직 적용하지 않았다. 실패·생성·재해시 롤백과 참조 안정성의 기능 검사 통과가 성능 통과를 뜻하지 않는다.</p>
+<p><code>20261026-node-map-controls1</code>은 같은 실행 파일로 기본 해시와 identity 해시를 3회씩 비교한다. 4,096개 키의 실패 조회 비율 중앙값은 각각 1.207498과 1.403115였다. 이 대조는 해시 연산뿐 아니라 버킷 분포도 바꾸므로 순수 해시 계산 비용으로 해석할 수 없다. 현재 키 패턴에서 혼합 해시 제거가 미달을 해결하지 않고 악화시킨다는 결과다. 인덱스 탐색·노드 할당 비용 분리 및 최적화가 추가로 필요하다. 해당 대조군을 기본 구현의 성능 수용으로 취급하지 않는다.</p>
+<p>측정은 엔진 빌드와 실제 실행 검사를 종료한 뒤 따로 수행했다. 기존 환경에서 사용하던 CPU4 측정 스레드와 CPU5 SMT helper를 사용했으며 helper 생존 기간과 정상 종료를 각각 guard 영수증에 남겼다. 다른 프로그램의 우선순위·affinity나 OS 설정을 변경하지 않았다.</p>
+<p>당시에는 82조건 및 전체 큐 성능 재수용이 남아 있었다. 현재 결과는 문서 상단의 후속 보고서를 따른다. 초기 통합 문서의 기존 PASS는 초기 통합 당시의 범위이며 현재 전체 컨테이너 교체 완료 판정은 아니다. 남은 문자열·맵·집합·deque·함수 객체 등의 9,370개 명시적 참조와 자동 추론된 외부 API 반환 경계까지 후속 전환해야 한다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="FullContainerMigration20261026.md"><code>docs/analysis/FullContainerMigration20261026.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "EditorLayoutPreset.h"
 #include "EditorWindowNames.h"
 
@@ -11,7 +12,7 @@ namespace editor
         //
         // 재정의가 **비어 있다.** 선언의 `.dock(...)` 이 그대로 답이고, 그래서
         // "현재 외관을 유지한다" 가 값의 일치가 아니라 출처의 동일성으로 선다.
-        constexpr std::array<layout_override, 0> kCompact{};
+        constexpr ce::fixed_array<layout_override, 0> kCompact{};
 
         // ── ② Level Editing — 뷰포트를 넓힌다 ──────────────────────────────
         //
@@ -19,7 +20,7 @@ namespace editor
         // 줄이되 Hierarchy 에는 더 준다(오른쪽 열 안에서 Inspector 를 아래로
         // 밀어 `right_lower` 비율을 낮춘다). 아래 탭 셋 중 Content Browser 만
         // 남긴다 — 탭이 셋이면 어차피 하나만 돌고, 나머지는 자리만 차지한다.
-        constexpr std::array kLevelEditing{
+        constexpr ce::fixed_array kLevelEditing{
             layout_override{ EditorWindowName::kAssetBundle, dock_slot::bottom,
                              preset_visibility::closed },
             layout_override{ EditorWindowName::kResourceCounter, dock_slot::bottom,
@@ -33,7 +34,7 @@ namespace editor
         // UI 는 값을 만지는 시간이 길다. 오른쪽 열을 넓히고 그 안에서 Inspector
         // 가 대부분을 갖게 한다. 입력 맵을 떠 있는 창에서 오른쪽 아래로 끌어와
         // 함께 연다 — UI 작업에서 늘 같이 보는 짝이다.
-        constexpr std::array kUiEditing{
+        constexpr ce::fixed_array kUiEditing{
             layout_override{ EditorWindowName::kInputActionMaps, dock_slot::right_lower,
                              preset_visibility::opened },
             layout_override{ EditorWindowName::kAssetBundle, dock_slot::bottom,
@@ -45,7 +46,7 @@ namespace editor
         // 셋 다 선언에서는 `floating` 이다. 렌더링을 들여다보는 동안에는 떠
         // 있는 창을 옮겨 놓는 일부터 하게 되므로, 이 preset 이 아래 탭으로
         // 모아 열어 준다. 별도 ProfilerViewer는 명시적 열기 요청으로만 연다.
-        constexpr std::array kRenderingDebug{
+        constexpr ce::fixed_array kRenderingDebug{
             layout_override{ EditorWindowName::kRenderPass, dock_slot::bottom,
                              preset_visibility::opened },
             layout_override{ EditorWindowName::kRenderPassDebug, dock_slot::bottom,
@@ -60,7 +61,7 @@ namespace editor
         // Inspector 가 오른쪽 전체 높이이며 아래가 프로젝트 창이다. 그래서 이
         // preset 은 `right_lower` 를 쓰지 않는다 — 빌더가 그 노드를 만들지도
         // 않는다(만들면 아무도 안 들어오는 빈 노드가 남는다).
-        constexpr std::array kLegacyUnity{
+        constexpr ce::fixed_array kLegacyUnity{
             layout_override{ EditorWindowName::kHierarchy, dock_slot::left,
                              preset_visibility::opened },
             layout_override{ EditorWindowName::kInspector, dock_slot::right_upper,
@@ -71,7 +72,7 @@ namespace editor
                              preset_visibility::closed },
         };
 
-        constexpr std::array kPresets{
+        constexpr ce::fixed_array kPresets{
             layout_preset{ "sbox_compact", "S&Box Compact",
                            layout_split{ 0.f, 0.22f, 0.45f, 0.28f }, kCompact },
             layout_preset{ "level_editing", "Level Editing",

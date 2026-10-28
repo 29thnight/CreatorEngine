@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "ShaderMetaCookProducer.h"
 
 #include "CookSupport.h"
@@ -147,7 +148,7 @@ namespace experiment::cooked
             return result;
         }
 
-        std::vector<std::byte> bytes;
+        ce::dynamic_array<std::byte> bytes;
         std::string encodeError;
         if (!Authoring::EncodeCookedDocument(
             document.Root(), bytes, encodeError))

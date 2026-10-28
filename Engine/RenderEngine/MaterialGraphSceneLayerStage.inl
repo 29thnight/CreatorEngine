@@ -13,7 +13,7 @@ void SceneHost::LayerStage::DeclareForwardGBuffer(const own::shared_owner<const 
         desc.height = frame->input->View().height;
         desc.allowRenderTarget = true;
         auto targets =
-            std::array{&this->forwardGbuffer.diffuse, &this->forwardGbuffer.metalRough, &this->forwardGbuffer.normal,
+            ce::fixed_array{&this->forwardGbuffer.diffuse, &this->forwardGbuffer.metalRough, &this->forwardGbuffer.normal,
                        &this->forwardGbuffer.emissive, &this->forwardGbuffer.bitmask};
         for (unsigned i = 0; i < targets.size(); ++i)
         {
@@ -72,7 +72,7 @@ void SceneHost::LayerStage::DeclareForwardGBuffer(const own::shared_owner<const 
         [this, frame = frame, inputs, index](const auto& execution)
         {
             frame->CheckCurrent(execution.graph);
-            std::array<RHITextureHandle, 5> colors;
+            ce::fixed_array<RHITextureHandle, 5> colors;
             const auto handles = Colors(inputs);
             for (unsigned i = 0; i < colors.size(); ++i)
             {
@@ -148,7 +148,7 @@ bool SceneHost::LayerStage::PrepareBlended(const FrameInput& frame,
     for (std::size_t first = 0; first < order.size();)
     {
         const auto pipeline = mergePipeline(order[first].index);
-        std::vector<std::size_t> group{order[first++].index};
+        ce::dynamic_array<std::size_t> group{order[first++].index};
         while (first < order.size() && pipeline.IsValid() && mergePipeline(order[first].index) == pipeline)
             group.push_back(order[first++].index);
         blendedRanges.push_back({std::move(group), {}});
@@ -169,7 +169,7 @@ bool SceneHost::LayerStage::PrepareBlended(const FrameInput& frame,
             const auto& list = frame.raster->layers;
             blendedCommands->visibility = list;
             ce::render_arena_buffer<uint32_t> words{frame.m_cpuStorage->Resource(2)};
-            ce::render_arena_buffer<std::array<uint32_t, 4>> records{frame.m_cpuStorage->Resource(2)};
+            ce::render_arena_buffer<ce::fixed_array<uint32_t, 4>> records{frame.m_cpuStorage->Resource(2)};
             ce::render_arena_buffer<uint32_t> roots{frame.m_cpuStorage->Resource(2)};
             uint32_t outputBytes{};
             const auto& order = range.inputs;

@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿#include "../Containers/ContainerAPI.h"
+#pragma once
 #include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 
@@ -18,7 +19,7 @@ struct [[reflgen::reflect]] CurvePoint
 
 static inline float clamp01(float v) { return v < 0.f ? 0.f : (v > 1.f ? 1.f : v); }
 
-static inline void BuildLinearCurve(std::vector<CurvePoint>& curve,
+static inline void BuildLinearCurve(ce::dynamic_array<CurvePoint>& curve,
     float minD, float maxD)
 {
     minD = std::max(0.0f, minD);
@@ -30,7 +31,7 @@ static inline void BuildLinearCurve(std::vector<CurvePoint>& curve,
     curve.push_back({ maxD,  0.f });
 }
 
-static inline void BuildInverseCurve(std::vector<CurvePoint>& curve,
+static inline void BuildInverseCurve(ce::dynamic_array<CurvePoint>& curve,
     float minD, float maxD)
 {
     minD = std::max(0.01f, minD);

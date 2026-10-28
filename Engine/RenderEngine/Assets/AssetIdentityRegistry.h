@@ -1,4 +1,6 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
 #else
@@ -54,7 +56,7 @@ namespace assets
 
     struct IdentityRegistryEntry final
     {
-        std::vector<std::uint8_t> canonicalInput{};
+        ce::dynamic_array<std::uint8_t> canonicalInput{};
         uuid::uuid16 uuid{};
         std::string context{}; // 진단용 — 어느 sidecar/어느 subasset이었나
     };
@@ -71,13 +73,13 @@ namespace assets
         // (불일치면 RecomputeMismatch) tuple/UUID 충돌만 판정한다. 검사 도구가
         // sidecar에 적힌 값을 그대로 넣을 때 쓴다.
         [[nodiscard]] IdentityRegisterResult RegisterDerived(
-            std::vector<std::uint8_t> canonicalInput, const uuid::uuid16& uuid,
+            ce::dynamic_array<std::uint8_t> canonicalInput, const uuid::uuid16& uuid,
             std::string context);
 
         // ★ 검사 전용 — 재유도 대조 없이 넣는다. UUID 충돌 분기(다른 tuple, 같은
         //   UUID)는 실제 SHA-256 충돌 없이는 만들 수 없으므로, selftest가 이 seam으로
         //   충돌 상태를 조립해 판정 코드를 태운다. 제품 writer는 부르지 않는다.
-        void InsertUncheckedForTest(std::vector<std::uint8_t> canonicalInput,
+        void InsertUncheckedForTest(ce::dynamic_array<std::uint8_t> canonicalInput,
             const uuid::uuid16& uuid, std::string context);
 
         [[nodiscard]] bool Contains(const uuid::uuid16& uuid) const noexcept;
@@ -91,17 +93,17 @@ namespace assets
 
         // 전 항목을 다시 검산한다: 재유도 일치 · uuid→tuple 단사 · tuple→uuid 단사.
         // 실패 항목마다 한 줄을 outIssues에 남기고 false.
-        [[nodiscard]] bool VerifyBijection(std::vector<std::string>& outIssues) const;
+        [[nodiscard]] bool VerifyBijection(ce::dynamic_array<std::string>& outIssues) const;
 
         void Clear() noexcept;
 
     private:
         [[nodiscard]] IdentityRegisterResult Insert(
-            std::vector<std::uint8_t> canonicalInput, const uuid::uuid16& uuid,
+            ce::dynamic_array<std::uint8_t> canonicalInput, const uuid::uuid16& uuid,
             std::string context);
 
-        std::vector<IdentityRegistryEntry> m_entries{};
-        std::map<std::vector<std::uint8_t>, std::size_t> m_byInput{};
-        std::map<uuid::uuid16, std::size_t> m_byUuid{};
+        ce::dynamic_array<IdentityRegistryEntry> m_entries{};
+        ce::engine_ordered_map<ce::dynamic_array<std::uint8_t>, std::size_t> m_byInput{};
+        ce::engine_ordered_map<uuid::uuid16, std::size_t> m_byUuid{};
     };
 }

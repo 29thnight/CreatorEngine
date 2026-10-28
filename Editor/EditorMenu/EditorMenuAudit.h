@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 // 메뉴 배선 감사 (PHASE 21 M2 · 계획서 부록 A.5).
 //
@@ -37,15 +38,15 @@ namespace editor
 
         /// 같은 표면 안에서 같은 하위 경로가 두 번. 뒤엣것이 앞엣것과 같은 자리를
         /// 다투고, 어느 쪽이 눌렸는지 사용자가 알 수 없다. "표면:경로" 형태.
-        std::vector<std::string> path_conflicts;
+        ce::dynamic_array<std::string> path_conflicts;
 
         /// 하위 경로가 빈 항목. 그리는 쪽이 "(unnamed)" 로 대신 그리므로 화면에서
         /// 사라지지는 않지만, 이름 없는 메뉴가 서는 것은 선언 쪽 실수다.
-        std::vector<std::string> unnamed_items;
+        ce::dynamic_array<std::string> unnamed_items;
 
         /// 중앙 목록에 있는데 항목을 하나도 내지 않은 선언자. `for_editor()` 가 빈
         /// 묶음을 돌려주거나, 실릴 자리가 없어 조용히 사라진 경우다.
-        std::vector<std::string> silent_declarers;
+        ce::dynamic_array<std::string> silent_declarers;
 
         bool clean() const noexcept
         {

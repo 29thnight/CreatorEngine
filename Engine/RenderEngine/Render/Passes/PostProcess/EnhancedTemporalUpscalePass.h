@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #pragma once
 #include "../../Graph/EnhancedRenderPass.h"
 #include "../../Temporal/TemporalUpscalerHost.h"
@@ -9,14 +10,14 @@ class EnhancedTemporalUpscalePass final : public EnhancedRenderPass
 public:
     const char* GetName() const override { return "Temporal.Upscale"; }
     bool Initialize(const EnhancedFrameContext&, std::string&) override { return true; }
-    void SetInputs(TemporalUpscalerHost& host, const std::array<RGHandle, 6>& inputs,
+    void SetInputs(TemporalUpscalerHost& host, const ce::fixed_array<RGHandle, 6>& inputs,
         bool spatialScales, bool& applied, float exposure = 1.f)
     { m_host = &host; m_inputs = inputs; m_spatialScales = spatialScales; m_applied = &applied; m_exposure = exposure; }
     void Declare(EnhancedRenderGraph&, const EnhancedFrameContext&) override;
     RGHandle GetOutput() const { return m_output; }
 private:
     TemporalUpscalerHost* m_host{};
-    std::array<RGHandle, 6> m_inputs{};
+    ce::fixed_array<RGHandle, 6> m_inputs{};
     bool m_spatialScales{};
     bool* m_applied{};
     float m_exposure{1.f};

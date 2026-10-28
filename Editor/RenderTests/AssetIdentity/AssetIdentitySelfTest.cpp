@@ -1,3 +1,5 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "AssetIdentity/AssetIdentitySelfTest.h"
 #include "AssetIdentity/AssetIdentityTestVectors.inl"
 
@@ -42,9 +44,9 @@ namespace RenderTest
             }
         };
 
-        [[nodiscard]] std::vector<std::uint8_t> FromHex(std::string_view hex)
+        [[nodiscard]] ce::dynamic_array<std::uint8_t> FromHex(std::string_view hex)
         {
-            std::vector<std::uint8_t> out;
+            ce::dynamic_array<std::uint8_t> out;
             out.reserve(hex.size() / 2u);
             auto nibble = [](char c) -> int
             {
@@ -73,7 +75,7 @@ namespace RenderTest
         }
 
         [[nodiscard]] assets::IdentityInput MakeInput(const vec::ProfileVector& v,
-            const std::vector<std::uint8_t>& namespaceBytes)
+            const ce::dynamic_array<std::uint8_t>& namespaceBytes)
         {
             assets::IdentityInput input;
             input.domain = v.domain;
@@ -84,7 +86,7 @@ namespace RenderTest
         }
 
         [[nodiscard]] bool BcryptSha256(std::span<const std::uint8_t> bytes,
-            ce::hash::sha256_digest& out, std::string& error)
+            ce::crypto::sha256_digest& out, std::string& error)
         {
             experiment::cooked::Sha256Digest digest{};
             const std::span<const std::byte> view{
@@ -108,16 +110,16 @@ namespace RenderTest
         outLog += "  [1] SHA-256 KAT·BCrypt 대조\n";
         for (const vec::ShaVector& v : vec::kShaVectors)
         {
-            const std::vector<std::uint8_t> input = FromHex(v.inputHex);
-            const ce::hash::sha256_digest digest =
-                ce::hash::sha256::compute(input.data(), input.size());
-            check.Check(ce::hash::to_hex(digest) == v.sha256Hex,
+            const ce::dynamic_array<std::uint8_t> input = FromHex(v.inputHex);
+            const ce::crypto::sha256_digest digest =
+                ce::crypto::sha256::compute(input.data(), input.size());
+            check.Check(ce::crypto::to_hex(digest) == v.sha256Hex,
                 std::string("KAT ") + v.name);
         }
         {
             // million 'a' — 블록 경계를 15,625번 넘는다. 스트리밍 Update로 넣어
             // 버퍼 이월 경로도 태운다.
-            ce::hash::sha256 sha;
+            ce::crypto::sha256 sha;
             const std::string chunk(4099, 'a'); // 64의 배수가 아닌 조각
             std::size_t remaining = 1'000'000u;
             while (remaining > 0)
@@ -126,7 +128,7 @@ namespace RenderTest
                 sha.update(chunk.data(), take);
                 remaining -= take;
             }
-            check.Check(ce::hash::to_hex(sha.finish()) == vec::kMillionASha256,
+            check.Check(ce::crypto::to_hex(sha.finish()) == vec::kMillionASha256,
                 "KAT million 'a' (스트리밍)");
         }
         {
@@ -135,17 +137,17 @@ namespace RenderTest
             bool bcryptAvailable = true;
             for (std::size_t length = 0; length <= 300u && bcryptAvailable; length += 7u)
             {
-                std::vector<std::uint8_t> buffer(length);
+                ce::dynamic_array<std::uint8_t> buffer(length);
                 for (std::size_t i = 0; i < length; ++i)
                     buffer[i] = static_cast<std::uint8_t>((i * 31u + length * 7u + 3u) & 0xFFu);
-                ce::hash::sha256_digest reference{};
+                ce::crypto::sha256_digest reference{};
                 if (!BcryptSha256(buffer, reference, bcryptError))
                 {
                     bcryptAvailable = false;
                     break;
                 }
                 ++total;
-                if (ce::hash::sha256::compute(buffer.data(), buffer.size()) == reference)
+                if (ce::crypto::sha256::compute(buffer.data(), buffer.size()) == reference)
                     ++agreed;
             }
             check.Check(bcryptAvailable, "BCrypt 대조군 사용 가능 (" + bcryptError + ")");
@@ -159,17 +161,17 @@ namespace RenderTest
         // ── 2. 프로필 벡터(Python 독립 유도) ─────────────────────────────────
         outLog += "  [2] 프로필 벡터\n";
         std::size_t vectorCount = 0;
-        std::set<std::string> seenUuids;
-        std::set<std::string> seenInputs;
+        ce::engine_ordered_set<std::string> seenUuids;
+        ce::engine_ordered_set<std::string> seenInputs;
         for (const vec::ProfileVector& v : vec::kProfileVectors)
         {
             ++vectorCount;
-            const std::vector<std::uint8_t> ns = FromHex(v.namespaceHex);
+            const ce::dynamic_array<std::uint8_t> ns = FromHex(v.namespaceHex);
             const assets::IdentityInput input = MakeInput(v, ns);
 
             // 바이트 배치 자체를 단정한다 — UUID만 맞추면 "우연히 같은 값"과
             // "같은 배치"를 못 가른다.
-            std::vector<std::uint8_t> bytes;
+            ce::dynamic_array<std::uint8_t> bytes;
             assets::IdentityIssue issue{};
             std::string context;
             const bool built = (std::string_view(v.profile) == assets::kIdentityProfile)
@@ -179,9 +181,9 @@ namespace RenderTest
             {
                 check.Check(built && bytes == FromHex(v.inputHex),
                     std::string("입력 바이트열 ") + v.name);
-                const ce::hash::sha256_digest digest =
-                    ce::hash::sha256::compute(bytes.data(), bytes.size());
-                check.Check(ce::hash::to_hex(digest) == v.sha256Hex,
+                const ce::crypto::sha256_digest digest =
+                    ce::crypto::sha256::compute(bytes.data(), bytes.size());
+                check.Check(ce::crypto::to_hex(digest) == v.sha256Hex,
                     std::string("입력 SHA-256 ") + v.name);
                 const assets::IdentityDerivation derived = assets::DeriveIdentity(input);
                 check.Check(derived.Succeeded()
@@ -250,7 +252,7 @@ namespace RenderTest
                 // ★ namespace 바이트는 span으로 참조된다 — 임시 vector를 바로 넘기면
                 //   표현식이 끝나는 순간 dangling이다(첫 실행에서 registry 구간 5건이
                 //   정확히 그렇게 붉었다). 항상 지역 변수에 담아 넘긴다.
-                const std::vector<std::uint8_t> v0Ns = FromHex(v0->namespaceHex);
+                const ce::dynamic_array<std::uint8_t> v0Ns = FromHex(v0->namespaceHex);
                 const assets::IdentityDerivation v0AsV1 =
                     assets::DeriveIdentity(MakeInput(*v0, v0Ns));
                 check.Check(v0AsV1.Succeeded()
@@ -324,7 +326,7 @@ namespace RenderTest
         // ── 5. fail-closed ───────────────────────────────────────────────────
         outLog += "  [5] fail-closed\n";
         {
-            const std::vector<std::uint8_t> ns(16, 0x11u);
+            const ce::dynamic_array<std::uint8_t> ns(16, 0x11u);
             auto expectIssue = [&](assets::IdentityInput input,
                 assets::IdentityIssue expected, const char* label)
             {
@@ -428,19 +430,19 @@ namespace RenderTest
         outLog += "  [7] bit 설정\n";
         {
             std::size_t ok = 0;
-            const std::vector<std::uint8_t> ns(32, 0x5Au);
+            const ce::dynamic_array<std::uint8_t> ns(32, 0x5Au);
             for (int i = 0; i < 256; ++i)
             {
                 const std::string key = "k/" + std::to_string(i);
                 assets::IdentityInput input;
                 input.domain = "model"; input.namespaceBytes = ns;
                 input.kind = "model"; input.stableKey = key;
-                std::vector<std::uint8_t> bytes;
+                ce::dynamic_array<std::uint8_t> bytes;
                 assets::IdentityIssue issue{};
                 std::string context;
                 if (!assets::BuildIdentityInputBytes(input, bytes, issue, context)) continue;
-                const ce::hash::sha256_digest digest =
-                    ce::hash::sha256::compute(bytes.data(), bytes.size());
+                const ce::crypto::sha256_digest digest =
+                    ce::crypto::sha256::compute(bytes.data(), bytes.size());
                 const uuid::uuid16 uuid = assets::DeriveUuidFromIdentityInputBytes(bytes);
                 bool same = assets::IsUuidV8(uuid);
                 for (std::size_t b = 0; b < 16; ++b)
@@ -465,7 +467,7 @@ namespace RenderTest
             for (const vec::ProfileVector& v : vec::kProfileVectors)
             {
                 if (std::string_view(v.profile) != assets::kIdentityProfile) continue;
-                const std::vector<std::uint8_t> ns = FromHex(v.namespaceHex);
+                const ce::dynamic_array<std::uint8_t> ns = FromHex(v.namespaceHex);
                 const assets::IdentityInput input = MakeInput(v, ns);
                 const assets::IdentityRegisterResult r =
                     registry.Register(input, v.name, uuid::parse(v.uuid));
@@ -485,7 +487,7 @@ namespace RenderTest
             const auto* v0 = FindVector("mutation.profile-v0");
             if (v0)
             {
-                const std::vector<std::uint8_t> v0Ns = FromHex(v0->namespaceHex);
+                const ce::dynamic_array<std::uint8_t> v0Ns = FromHex(v0->namespaceHex);
                 const assets::IdentityRegisterResult r = registry.Register(
                     MakeInput(*v0, v0Ns), "mutation.profile-v0");
                 check.Check(r.outcome == assets::IdentityRegisterOutcome::DuplicateTuple
@@ -500,8 +502,8 @@ namespace RenderTest
             if (beta && alpha)
             {
                 assets::IdentityRegistry fresh;
-                const std::vector<std::uint8_t> betaNs = FromHex(beta->namespaceHex);
-                const std::vector<std::uint8_t> alphaNs = FromHex(alpha->namespaceHex);
+                const ce::dynamic_array<std::uint8_t> betaNs = FromHex(beta->namespaceHex);
+                const ce::dynamic_array<std::uint8_t> alphaNs = FromHex(alpha->namespaceHex);
                 const assets::IdentityRegisterResult r = fresh.Register(
                     MakeInput(*beta, betaNs), "beta-with-alpha-uuid",
                     uuid::parse(alpha->uuid));
@@ -532,7 +534,7 @@ namespace RenderTest
                 check.Check(r4.outcome == assets::IdentityRegisterOutcome::UuidCollision
                     && r4.conflictingContext == "forged-collision",
                     "다른 tuple·같은 UUID → UuidCollision(forged-collision)");
-                std::vector<std::string> issues;
+                ce::dynamic_array<std::string> issues;
                 check.Check(!forged.VerifyBijection(issues) && !issues.empty(),
                     "위조 항목이 있는 registry는 VerifyBijection 실패");
                 bool sawMismatch = false;
@@ -541,14 +543,14 @@ namespace RenderTest
                 check.Check(sawMismatch, "VerifyBijection이 재유도 불일치를 보고");
             }
 
-            std::vector<std::string> issues;
+            ce::dynamic_array<std::string> issues;
             check.Check(registry.VerifyBijection(issues) && issues.empty(),
                 "정상 registry의 VerifyBijection 통과 (" + std::to_string(issues.size()) + " issues)");
 
             // 잘못된 입력은 InvalidInput + 사유.
             assets::IdentityInput bad;
             bad.domain = "model"; bad.kind = "model"; bad.stableKey = "e\xCC\x81";
-            const std::vector<std::uint8_t> ns(32, 0x01u);
+            const ce::dynamic_array<std::uint8_t> ns(32, 0x01u);
             bad.namespaceBytes = ns;
             const assets::IdentityRegisterResult rBad = registry.Register(bad, "bad");
             check.Check(rBad.outcome == assets::IdentityRegisterOutcome::InvalidInput

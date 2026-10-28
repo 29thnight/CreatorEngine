@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -175,7 +176,7 @@ namespace editor
         //   right_upper 다). 면제한 탓에 `undocked` 는 중앙 창만 셌고,
         //   §1.4 가 기록한 "그려지는데 자리를 잃은 패널" 은 이 감사가
         //   구조적으로 볼 수 없었다 — 바로 그 사고를 잡으려고 만든 수인데도.
-        const std::vector<window_entry>& entries = process_windows().entries;
+        const ce::dynamic_array<window_entry>& entries = process_windows().entries;
         snapshot.moving_window = context->MovingWindow ? context->MovingWindow->Name : "";
         const auto* hovered = context->HoveredWindowUnderMovingWindow;
         snapshot.hovered_window_under_moving = hovered ? hovered->RootWindowDockTree->Name : "";
@@ -288,7 +289,7 @@ namespace editor
             const auto token = static_cast<ThemeColor>(index);
             snapshot.theme_tokens.emplace_back(ThemeColorName(token), pack_rgba(ThemeColorValue(token)));
         }
-        const std::pair<ImGuiCol, ThemeColor> mappings[] = {
+        const ce::pair<ImGuiCol, ThemeColor> mappings[] = {
             { ImGuiCol_WindowBg, ThemeColor::Canvas }, { ImGuiCol_ChildBg, ThemeColor::Panel },
             { ImGuiCol_PopupBg, ThemeColor::Panel }, { ImGuiCol_MenuBarBg, ThemeColor::Chrome },
             { ImGuiCol_FrameBg, ThemeColor::Chrome }, { ImGuiCol_FrameBgHovered, ThemeColor::PanelRaised },

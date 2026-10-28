@@ -1,5 +1,5 @@
 export module Creator.Core.RingBuffer;
-
+export import "Creator.Containers.h";
 import std;
 
 export namespace ce
@@ -25,9 +25,9 @@ export namespace ce
             }
         }
 
-        std::vector<T> get_all() const
+        ce::dynamic_array<T> get_all() const
         {
-            std::vector<T> result;
+            ce::dynamic_array<T> result;
             if (buffer_.size() < capacity_)
             {
                 result = buffer_;
@@ -62,7 +62,7 @@ export namespace ce
         }
 
       private:
-        std::vector<T> buffer_;
+        ce::dynamic_array<T> buffer_;
         std::size_t head_{};
         std::size_t capacity_;
         bool cleared_{};

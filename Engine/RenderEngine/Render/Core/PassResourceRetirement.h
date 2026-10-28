@@ -1,4 +1,6 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 
 #include "../../RHI/IRenderDeviceServices.h"
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -64,7 +66,7 @@ public:
         }
     }
 
-    void WatchRecording(std::function<void()> rejected, std::function<void()> accepted = {})
+    void WatchRecording(ce::owned_func<void()> rejected, ce::owned_func<void()> accepted = {})
     {
         watches_.push_back({device_->GetCurrentUploadRecordingId(), std::move(rejected), std::move(accepted)});
     }
@@ -136,7 +138,7 @@ private:
 
     void Collect() noexcept
     {
-        std::erase_if(retired_, [&](const Retired& item)
+        ce::erase_if(retired_, [&](const Retired& item)
         {
             if (item.recording || item.waitForIdle || item.completion > completed_)
             {
@@ -207,16 +209,16 @@ private:
     }
 
     IRenderDeviceServices* device_{};
-    std::vector<Retired> retired_;
+    ce::dynamic_array<Retired> retired_;
     std::uint64_t submitted_{}, completed_{};
     std::uint64_t abortedRecording_{}, acceptedRecording_{};
     bool submittedWithoutCompletion_{};
     struct Watch
     {
         std::uint64_t recording;
-        std::function<void()> rejected, accepted;
+        ce::owned_func<void()> rejected, accepted;
     };
-    std::vector<Watch> watches_;
+    ce::dynamic_array<Watch> watches_;
 
     void ResolveWatches(std::uint64_t recording, bool accepted) noexcept
     {

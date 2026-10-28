@@ -12,7 +12,7 @@ inline result<triangle_mesh_source> BuildModelCollisionMesh(const assets::cpu_ge
     if (geometry.positions.size() < 3 || geometry.positions.size() > assets::cpu_geometry::MaxVertices ||
         geometry.indices.empty() || geometry.indices.size() > assets::cpu_geometry::MaxIndices || geometry.indices.size() % 3)
         return std::unexpected(error{error_code::invalid_argument,0,"Invalid exact CPU collision geometry"});
-    triangle_mesh_source source; source.points = geometry.positions; source.triangles.reserve(geometry.indices.size() / 3);
+    triangle_mesh_source source; source.points.assign(geometry.positions.begin(), geometry.positions.end()); source.triangles.reserve(geometry.indices.size() / 3);
     for (const auto& point : source.points)
         for (const auto value : math::components(point)) if (!std::isfinite(value))
             return std::unexpected(error{error_code::invalid_argument,0,"Nonfinite exact CPU collision position"});

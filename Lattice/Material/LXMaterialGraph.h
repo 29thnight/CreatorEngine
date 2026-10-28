@@ -1,4 +1,7 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
 
 #include "../Core/LXNodeDefinition.h"
 
@@ -35,8 +38,8 @@ struct LXMaterialNodeState
 
 struct LXMaterialScopeState
 {
-    std::map<Id, LXMaterialNodeState> nodes;
-    std::map<Id, LXMaterialSocketState> sockets;
+    ce::engine_ordered_map<Id, LXMaterialNodeState> nodes;
+    ce::engine_ordered_map<Id, LXMaterialSocketState> sockets;
 
     bool operator==(const LXMaterialScopeState&) const = default;
 };
@@ -44,14 +47,14 @@ struct LXMaterialScopeState
 struct LXMaterialNodeSchema
 {
     std::uint32_t revision = 1;
-    std::vector<LXMaterialSocketState> sockets;
-    std::map<std::string, std::set<std::string>> enumProperties;
+    ce::dynamic_array<LXMaterialSocketState> sockets;
+    ce::engine_ordered_map<std::string, ce::engine_ordered_set<std::string>> enumProperties;
 };
 
 struct LXMaterialDefinitions
 {
     std::shared_ptr<const LXNodeDefinitionRegistry> nodes;
-    std::map<std::string, LXMaterialNodeSchema> schemas;
+    ce::engine_ordered_map<std::string, LXMaterialNodeSchema> schemas;
 };
 
 LXMaterialDefinitions CreateMaterialDefinitions();
@@ -77,16 +80,16 @@ class LXMaterialAsset
     Id graphId = 1;
     Id activeOutput = 0;
     LXGraph graph;
-    std::vector<LXMaterialParameter> blackboard;
+    ce::dynamic_array<LXMaterialParameter> blackboard;
     // Scope 0 is the root; other scope IDs are stable shared group-definition IDs.
-    std::map<Id, LXMaterialScopeState> scopes;
+    ce::engine_ordered_map<Id, LXMaterialScopeState> scopes;
 
     const LXMaterialDefinitions& Definitions() const { return definitions_; }
     Id CreateNode(const std::string& type, float x, float y, std::string title = {});
-    Id CollapseToGroup(const std::vector<Id>& nodes, std::string name);
+    Id CollapseToGroup(const ce::dynamic_array<Id>& nodes, std::string name);
     LXMaterialSocketState SocketState(Id scope, const Pin& pin) const;
     LXMaterialNodeState NodeState(Id scope, const Node& node) const;
-    std::vector<Issue> Validate() const;
+    ce::dynamic_array<Issue> Validate() const;
     bool Equals(const LXMaterialAsset& other) const;
     bool Save(const std::filesystem::path& path, std::string* error = nullptr) const;
     static std::optional<LXMaterialAsset> Load(const std::filesystem::path& path,

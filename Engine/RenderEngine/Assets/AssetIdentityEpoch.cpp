@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "AssetIdentityEpoch.h"
 #include "AssetIdentityHex.h"
 
@@ -18,14 +19,14 @@ namespace assets
 {
     namespace
     {
-        void AddIssue(std::vector<EpochHeaderIssue>& issues, EpochHeaderIssueCode code,
+        void AddIssue(ce::dynamic_array<EpochHeaderIssue>& issues, EpochHeaderIssueCode code,
             std::string context, std::string message)
         {
             issues.push_back({ code, std::move(context), std::move(message) });
         }
 
         [[nodiscard]] bool ReadScalar(const Authoring::ReadNode& parent, const char* key,
-            std::string& out, std::vector<EpochHeaderIssue>& issues, bool required = true)
+            std::string& out, ce::dynamic_array<EpochHeaderIssue>& issues, bool required = true)
         {
             const Authoring::ReadNode node = parent[key];
             if (!node)
@@ -75,7 +76,7 @@ namespace assets
     }
 
     bool ValidateIdentityEpochHeader(const IdentityEpochHeader& header,
-        std::vector<EpochHeaderIssue>& outIssues)
+        ce::dynamic_array<EpochHeaderIssue>& outIssues)
     {
         const std::size_t before = outIssues.size();
         if (header.identityProfile != kIdentityProfile)
@@ -108,7 +109,7 @@ namespace assets
 
     std::string WriteIdentityEpochHeader(const IdentityEpochHeader& header)
     {
-        std::vector<EpochHeaderIssue> issues;
+        ce::dynamic_array<EpochHeaderIssue> issues;
         if (!ValidateIdentityEpochHeader(header, issues)) return {};
 
         Authoring::WriteDocument document;
@@ -127,7 +128,7 @@ namespace assets
     }
 
     bool ReadIdentityEpochHeader(std::string_view documentBytes, IdentityEpochHeader& out,
-        std::vector<EpochHeaderIssue>& outIssues)
+        ce::dynamic_array<EpochHeaderIssue>& outIssues)
     {
         const std::size_t before = outIssues.size();
         IdentityEpochHeader parsed;
@@ -165,7 +166,7 @@ namespace assets
         std::string seedHex;
         if (ReadScalar(root, "identityEpochSeed", seedHex, outIssues))
         {
-            std::vector<std::uint8_t> seedBytes;
+            ce::dynamic_array<std::uint8_t> seedBytes;
             if (!TryParseLowerHex(seedHex, seedBytes, kEpochSeedBytes))
             {
                 AddIssue(outIssues, EpochHeaderIssueCode::InvalidSeed, "identityEpochSeed",

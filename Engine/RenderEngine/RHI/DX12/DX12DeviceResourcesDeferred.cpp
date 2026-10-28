@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -200,7 +201,7 @@ bool DX12DeviceResources::SealImmediateSoftware(std::string& error)
     desc.descriptorVersion = GetDescriptorVersionToken();
     desc.lifetimeToken = m_deferred->bindings;
     RHISoftwareBatch batch;
-    const std::array<uint32_t, 1> order{0};
+    const ce::fixed_array<uint32_t, 1> order{0};
     if (!m_deferred->recorder.FinishRecording(order, desc, batch, error))
     {
         return false;

@@ -1,4 +1,6 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
 #else
@@ -196,7 +198,7 @@ class DX12DescriptorRecycler
 
     winrt::com_ptr<ID3D12Device> m_device;
     D3D12_DESCRIPTOR_HEAP_TYPE m_type{D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV};
-    std::vector<own::unique_owner<Page>> m_pages;
+    ce::dynamic_array<own::unique_owner<Page>> m_pages;
     RHIDescriptorVersionPolicy m_versions;
     RHIDescriptorVersionHandle m_activeVersion{};
     Page* m_activePage{nullptr};
@@ -360,8 +362,9 @@ class DX12SamplerHeap
     uint32_t m_used{0};
 
     mutable std::mutex m_mutex;
-    std::unordered_map<uint64_t, D3D12_GPU_DESCRIPTOR_HANDLE> m_cache;
+    ce::node_hash_map<uint64_t, D3D12_GPU_DESCRIPTOR_HANDLE, ce::hash<uint64_t>,
+        ce::equal_to<uint64_t>, ce::heap_allocator, false> m_cache;
     // 키는 범위의 샘플러별 해시 전체(순서 포함)다.
-    std::map<std::vector<uint64_t>, D3D12_GPU_DESCRIPTOR_HANDLE> m_rangeCache;
+    ce::engine_ordered_map<ce::dynamic_array<uint64_t>, D3D12_GPU_DESCRIPTOR_HANDLE> m_rangeCache;
     Stats m_stats;
 };

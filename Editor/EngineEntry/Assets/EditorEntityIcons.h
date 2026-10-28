@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -10,7 +11,7 @@ namespace editor
         const wchar_t* filename;
     };
 
-    inline constexpr std::array EntityIconPresets{
+    inline constexpr ce::fixed_array EntityIconPresets{
         EntityIconPreset{"", "Entity", L"Entity.png"},
         EntityIconPreset{"game-manager", "Game Manager", L"EntityManager.png"},
         EntityIconPreset{"camera", "Camera", L"EntityCamera.png"},

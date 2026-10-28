@@ -1,3 +1,5 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -78,8 +80,8 @@ namespace editor::memory_profiler
                 }
             }
 
-            using texture_pair = std::pair<std::string, own::shared_owner<const Texture>>;
-            std::vector<std::pair<object_kind, texture_pair>> textures;
+            using texture_pair = ce::pair<std::string, own::shared_owner<const Texture>>;
+            ce::dynamic_array<ce::pair<object_kind, texture_pair>> textures;
             const auto copy = [&](DataSystem::TextureFileType type, object_kind kind)
             {
                 for (auto& [name, texture] : data->SnapshotTextures(type))
@@ -98,9 +100,9 @@ namespace editor::memory_profiler
 			});
             // Keep every sampled payload alive until pointer deduplication is
             // complete. A descriptor by itself proves no CPU pixel residency.
-            std::vector<own::shared_owner<const Texture::CodecImage>> imagePins;
+            ce::dynamic_array<own::shared_owner<const Texture::CodecImage>> imagePins;
             imagePins.reserve(textures.size());
-            std::unordered_set<const std::byte*> seenPixels;
+            ce::engine_node_set<const std::byte*> seenPixels;
             for (const auto& [kind, entry] : textures)
             {
                 if (!entry.second)

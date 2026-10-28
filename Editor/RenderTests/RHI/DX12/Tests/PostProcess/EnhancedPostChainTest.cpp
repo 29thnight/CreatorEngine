@@ -1,3 +1,4 @@
+#include "../../../../../../Engine/Containers/ContainerAPI.h"
 #include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
@@ -204,10 +205,10 @@ bool DX12Test::RunPostChainTest(std::string& outLog)
     {
         EnhancedPostChainPass::ToneMapper mapper;
         const char*                       name;
-        std::vector<float>                r;
-        std::vector<float>                g;
-        std::vector<float>                b;
-        std::vector<float>                preAA;
+        ce::dynamic_array<float>                r;
+        ce::dynamic_array<float>                g;
+        ce::dynamic_array<float>                b;
+        ce::dynamic_array<float>                preAA;
     };
     Frame frames[2] = {
         { EnhancedPostChainPass::ToneMapper::ACES, "ACES", {}, {}, {}, {} },
@@ -353,7 +354,7 @@ bool DX12Test::RunPostChainTest(std::string& outLog)
             else
             {
                 const auto fill = [&](uint32_t slice, uint32_t channel,
-                    std::vector<float>& out)
+                    ce::dynamic_array<float>& out)
                 {
                     out.resize(static_cast<size_t>(kPostWidth) * kPostHeight);
                     for (uint32_t y = 0; y < kPostHeight; ++y)
@@ -395,12 +396,12 @@ bool DX12Test::RunPostChainTest(std::string& outLog)
     // 체인 자체의 단정은 ACES 결과로 본다. 톤매퍼는 곡선만 다르고 블룸·
     // 비네트·FXAA는 같은 코드를 지나므로, 둘 다 재는 것은 같은 것을 두 번
     // 재는 셈이다. 톤매퍼끼리의 대조는 그 뒤에 따로 한다.
-    const std::vector<float>& finalPixels = frames[0].r;
-    const std::vector<float>& preAAPixels = frames[0].preAA;
+    const ce::dynamic_array<float>& finalPixels = frames[0].r;
+    const ce::dynamic_array<float>& preAAPixels = frames[0].preAA;
 
     if (passed)
     {
-        const auto at = [&](const std::vector<float>& v, uint32_t x, uint32_t y)
+        const auto at = [&](const ce::dynamic_array<float>& v, uint32_t x, uint32_t y)
         {
             return v[static_cast<size_t>(y) * kPostWidth + x];
         };
@@ -455,7 +456,7 @@ bool DX12Test::RunPostChainTest(std::string& outLog)
         //
         // 열마다 세로 이웃 차이의 최댓값을 취한다. 그 최댓값이 나오는 자리가
         // 곧 계단이 걸친 행이라, 평평한 부분이 섞이지 않는다.
-        const auto stripeDiff = [&](const std::vector<float>& v)
+        const auto stripeDiff = [&](const ce::dynamic_array<float>& v)
         {
             double sum = 0.0;
             uint32_t count = 0;

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -23,9 +24,9 @@ AnimationState::AnimationState(AnimationController* Owner, std::string name) : m
 {
 }
 
-std::vector<AniTransition*> AnimationState::FindTransitions(const std::string& toStateName)
+ce::dynamic_array<AniTransition*> AnimationState::FindTransitions(const std::string& toStateName)
 {
-	std::vector<AniTransition*> aniTransitions;
+	ce::dynamic_array<AniTransition*> aniTransitions;
 	for (auto& sharedtrans : Transitions)
 	{
 		auto trans = sharedtrans.operator->();

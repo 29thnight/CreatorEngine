@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Foundation/EngineNodeSet.h"
 #include "Entity.h"
 #include "Component.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -74,8 +75,8 @@ namespace GameObjectInlDetail
     inline constexpr int kComponentsInChildrenMaxDepth = 64;
 
     template<typename T>
-    static void CollectComponentsInChildren(Entity* node, std::vector<T*>& out,
-        std::unordered_set<const Entity*>& visited, int depth)
+    static void CollectComponentsInChildren(Entity* node, ce::dynamic_array<T*>& out,
+        ce::engine_node_set<const Entity*>& visited, int depth)
     {
         if (nullptr == node) return;
         if (depth > kComponentsInChildrenMaxDepth) return; // 과深/순환 방어. 조용히 끊는다 —
@@ -98,17 +99,17 @@ namespace GameObjectInlDetail
 }
 
 template<typename T>
-inline std::vector<T*> Entity::GetComponentsInChildren()
+inline ce::dynamic_array<T*> Entity::GetComponentsInChildren()
 {
-    std::vector<T*> comps;
-    std::unordered_set<const Entity*> visited;
+    ce::dynamic_array<T*> comps;
+    ce::engine_node_set<const Entity*> visited;
     GameObjectInlDetail::CollectComponentsInChildren<T>(this, comps, visited, 0);
     return comps;
 }
 
 template<typename T>
-inline std::vector<T*> Entity::GetComponentsInchildrenDynamicCast() {
-    std::vector<T*> comps;
+inline ce::dynamic_array<T*> Entity::GetComponentsInchildrenDynamicCast() {
+    ce::dynamic_array<T*> comps;
     for (const Entity::Index childIndex : GetChildrenIndices())
     {
         if (Entity* childObj = EntityAt(childIndex))
@@ -144,9 +145,9 @@ inline bool Entity::HasComponent()
 }
 
 template<typename T>
-inline std::vector<T*> Entity::GetComponents()
+inline ce::dynamic_array<T*> Entity::GetComponents()
 {
-    std::vector<T*> comps;
+    ce::dynamic_array<T*> comps;
     for (auto& component : m_components)
     {
         if (T* casted = dynamic_cast<T*>(component.get()))
@@ -156,7 +157,7 @@ inline std::vector<T*> Entity::GetComponents()
 }
 
 template<typename T>
-inline void Entity::CollectComponents(std::vector<T*>& out)
+inline void Entity::CollectComponents(ce::dynamic_array<T*>& out)
 {
     out.clear();
     for (auto& component : m_components)

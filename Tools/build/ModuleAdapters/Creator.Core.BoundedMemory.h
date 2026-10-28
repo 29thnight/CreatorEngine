@@ -5,7 +5,7 @@
 #error "Native consumers must import the named module directly."
 #endif
 
-
+#include "../../../Engine/Containers/Creator.Containers.h"
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace ce
@@ -353,8 +353,8 @@ namespace ce
             free_ = index;
         }
 
-        std::array<slot, capacity_value> slots_;
-        std::array<std::uint64_t, word_count_> live_{};
+        ce::fixed_array<slot, capacity_value> slots_;
+        ce::fixed_array<std::uint64_t, word_count_> live_{};
         std::size_t free_{};
         std::size_t size_{};
     };

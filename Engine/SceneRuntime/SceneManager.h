@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
@@ -174,8 +175,8 @@ public:
 	void RemoveDontDestroyOnLoad(Object* objPtr);
 	void RebindEventDontDestroyOnLoadObjects(Scene* scene);
 
-	const std::vector<Scene*>& GetScenes() const { return m_scenes; }
-	std::vector<Object*>& GetDontDestroyOnLoadObjects() { return m_dontDestroyOnLoadObjects; }
+	const ce::dynamic_array<Scene*>& GetScenes() const { return m_scenes; }
+	ce::dynamic_array<Object*>& GetDontDestroyOnLoadObjects() { return m_dontDestroyOnLoadObjects; }
     void SetActiveScene(Scene* scene);
     [[nodiscard]] std::uint64_t SceneContextEpoch() const noexcept
     {
@@ -214,10 +215,10 @@ public:
 	bool IsEditorSceneLoaded() const { return m_sessionPolicy.RestoresAuthoring() && m_isSimulationSessionActive; }
     InputActionManager* GetInputActionManager() { return m_inputActionManager.operator->(); }
 
-    std::vector<MeshRenderer*> GetAllMeshRenderers() const;
+    ce::dynamic_array<MeshRenderer*> GetAllMeshRenderers() const;
     // GT frame sealing용. 활성 Scene의 mesh/foliage가 실제 소유한 Material을
     // cache 소속 여부와 무관하게 owner snapshot으로 돌려준다.
-    std::vector<own::shared_owner<const Material>> CaptureRequiredRenderMaterials() const;
+    ce::dynamic_array<own::shared_owner<const Material>> CaptureRequiredRenderMaterials() const;
 
 	void RequestRenderProfileApply();
 	bool IsRenderProfileApplyPending() const { return m_renderProfileApplyPending; }
@@ -294,8 +295,8 @@ private:
     void SetCommittedSimulation(bool committed);
     void AdvanceSceneContextEpoch();
     std::thread::id m_sceneLoadOwner{std::this_thread::get_id()};
-    std::vector<own::shared_owner<PendingSceneLoad>> m_pendingSceneLoads;
-    std::array<SceneLoadRequestStatus, 64u> m_completedSceneLoads{};
+    ce::dynamic_array<own::shared_owner<PendingSceneLoad>> m_pendingSceneLoads;
+    ce::fixed_array<SceneLoadRequestStatus, 64u> m_completedSceneLoads{};
     std::uint64_t m_nextSceneLoadRequestId{ 1u };
     std::atomic_size_t m_pendingSceneLoadCount{0};
     size_t m_sceneLoadEpoch = 0;
@@ -327,13 +328,13 @@ private:
         GameObjectIndex fileIndex{ -1 };
 		GameObjectIndex fileParentIndex{ -1 };
 		GameObjectIndex fileRootIndex{ 0 };
-		std::vector<GameObjectIndex> fileChildrenIndices{};
+		ce::dynamic_array<GameObjectIndex> fileChildrenIndices{};
 		// DDOL 파일 절은 계층 파일 인덱스가 슬롯 인덱스로 리맵된 뒤에만
 		// SetDontDestroyOnLoad를 실행한다. 로드 중간의 Store에는 bootstrap 값만
 		// 있고 파일 스킴은 위 DTO에 격리되어 있다.
 		bool makeDontDestroy{ false };
     };
-    using LoadIndexBatch = std::vector<LoadIndexEntry>;
+    using LoadIndexBatch = ce::dynamic_array<LoadIndexEntry>;
 
     void DesirealizeGameObject(const reflgen::type_descriptor* type, const Authoring::NodeView& itNode, LoadIndexBatch* batch = nullptr, bool strict = false);
     void DesirealizeGameObject(Scene* targetScene, const reflgen::type_descriptor* type, const Authoring::NodeView& itNode, LoadIndexBatch* batch = nullptr);
@@ -347,8 +348,8 @@ private:
     std::atomic<std::uint64_t>          m_sceneContextEpoch{ 1u };
     std::atomic<Scene*>                 m_sceneToActivate{};
     // Compatibility enumeration only, never a lifetime owner.
-    std::vector<Scene*>                 m_scenes{};
-    std::vector<gc::root_ref<Scene>>     m_sceneRoots{};
+    ce::dynamic_array<Scene*>                 m_scenes{};
+    ce::dynamic_array<gc::root_ref<Scene>>     m_sceneRoots{};
 
     // 재생 시작 직전의 에디터 씬 스냅샷. 정지하면 이 노드로 같은 Scene 객체를
     // 되채운다(EnterPlayMode/ExitPlayMode 주석 참조).
@@ -358,10 +359,10 @@ private:
     own::weak_owner<ProjectLayerSettings> m_projectLayers;
     std::shared_ptr<const project_layer_snapshot> m_editorLayerBackup;
     Authoring::Document                 m_editorSceneBackup{};
-    std::vector<size_t>                 m_editorScenePersistentIds{};
+    ce::dynamic_array<size_t>                 m_editorScenePersistentIds{};
     // 소유는 활성 Scene(또는 이송 중 아래 transfer vector)에만 있다.
-    std::vector<Object*>                m_dontDestroyOnLoadObjects{};
-    std::vector<DetachedEntityTransfer> m_detachedDontDestroyOnLoadObjects{};
+    ce::dynamic_array<Object*>                m_dontDestroyOnLoadObjects{};
+    ce::dynamic_array<DetachedEntityTransfer> m_detachedDontDestroyOnLoadObjects{};
     AssetBundle                         m_dontDestroyOnLoadAssetsBundle{};
     std::atomic<Scene*>                 m_activeScene{};
     std::atomic<RenderScene*>           m_ActiveRenderScene{ nullptr };

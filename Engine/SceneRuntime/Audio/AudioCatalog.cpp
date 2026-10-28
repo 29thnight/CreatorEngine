@@ -1,3 +1,6 @@
+#include "../../Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -24,8 +27,8 @@ namespace wave
     namespace
     {
         namespace ck = experiment::cooked;
-        using Graphs = std::unordered_map<ClipKey, own::shared_owner<const SoundGraphProgram>>;
-        using Presets = std::unordered_map<ClipKey, SoundPreset>;
+        using Graphs = ce::engine_node_map<ClipKey, own::shared_owner<const SoundGraphProgram>>;
+        using Presets = ce::engine_node_map<ClipKey, SoundPreset>;
 
 
 
@@ -50,7 +53,7 @@ namespace wave
         }
 
         bool ValidatePresets(const Presets& presets, const Graphs& graphs,
-            const std::unordered_map<ClipKey, std::string>& clips, std::string& error)
+            const ce::engine_node_map<ClipKey, std::string>& clips, std::string& error)
         {
             for (const auto& [id, preset] : presets)
             {
@@ -81,7 +84,7 @@ namespace wave
             return true;
         }
 
-        void AddAlias(std::unordered_map<std::string, std::string>& aliases,
+        void AddAlias(ce::engine_node_map<std::string, std::string>& aliases,
             const std::filesystem::path& path, const ClipKey& id)
         {
             const auto utf8 = path.stem().u8string();
@@ -118,15 +121,15 @@ namespace wave
             std::string loadMode;
             std::string spatialKind;
         };
-        std::unordered_map<ClipKey, ImportSettings> importSettings;
-        std::unordered_map<ClipKey, std::filesystem::path> clipPaths;
-        std::unordered_map<ClipKey, std::string> clips;
-        std::unordered_map<ClipKey, SoundGraphDefinition> definitions;
+        ce::engine_node_map<ClipKey, ImportSettings> importSettings;
+        ce::engine_node_map<ClipKey, std::filesystem::path> clipPaths;
+        ce::engine_node_map<ClipKey, std::string> clips;
+        ce::engine_node_map<ClipKey, SoundGraphDefinition> definitions;
         Graphs graphs;
         Presets presets;
-        std::unordered_map<std::string, std::string> aliases;
-        std::unordered_set<ClipKey> identities;
-        std::unordered_set<ClipKey> invalidAssets;
+        ce::engine_node_map<std::string, std::string> aliases;
+        ce::engine_node_set<ClipKey> identities;
+        ce::engine_node_set<ClipKey> invalidAssets;
         std::string diagnostics;
         const auto invalid = [&](const ClipKey& id, const std::string& detail)
         {
@@ -295,7 +298,7 @@ namespace wave
                 m_playback.UnregisterAsset(id);
             }
         }
-        std::erase_if(m_assets, [&](const ClipKey& id) { return !invalidAssets.contains(id); });
+        ce::erase_if(m_assets, [&](const ClipKey& id) { return !invalidAssets.contains(id); });
         for (const auto& [id, graph] : graphs)
         {
             m_playback.UnregisterAsset(id);
@@ -331,9 +334,9 @@ namespace wave
             error = "Audio catalog requires a mounted artifact byte source";
             return false;
         }
-        std::unordered_map<ClipKey, std::string> clips;
-        std::vector<ck::CookedAudioClipSource> clipSources;
-        std::unordered_map<ClipKey, SoundGraphDefinition> definitions;
+        ce::engine_node_map<ClipKey, std::string> clips;
+        ce::dynamic_array<ck::CookedAudioClipSource> clipSources;
+        ce::engine_node_map<ClipKey, SoundGraphDefinition> definitions;
         Graphs graphs;
         Presets presets;
         for (const auto& entry : catalog.Entries())
@@ -370,7 +373,7 @@ namespace wave
                     error = "Cooked sound asset metadata/size mismatch: " + id.Text();
                     return false;
                 }
-                std::vector<std::byte> payload(static_cast<std::size_t>(size));
+                ce::dynamic_array<std::byte> payload(static_cast<std::size_t>(size));
                 ck::Sha256Digest digest;
                 if (!source.ReadAt(entry.artifactPath, 0u, payload, error)
                     || !ck::ComputeSha256(payload, digest, error) || digest != entry.contentSha256)
@@ -411,7 +414,7 @@ namespace wave
         {
             return false;
         }
-        const auto validateDependencies = [&](const ClipKey& key, std::vector<experiment::AssetId> expected)
+        const auto validateDependencies = [&](const ClipKey& key, ce::dynamic_array<experiment::AssetId> expected)
         {
             experiment::AssetId id;
             if (!experiment::TryParseCanonicalAssetId(key.Text(), id))
@@ -431,7 +434,7 @@ namespace wave
         };
         for (const auto& [id, graph] : definitions)
         {
-            std::vector<experiment::AssetId> dependencies;
+            ce::dynamic_array<experiment::AssetId> dependencies;
             for (const auto& node : graph.nodes)
             {
                 if (node.kind == SoundNodeKind::Clip)

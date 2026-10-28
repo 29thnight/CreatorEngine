@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/StorageBatchMigration20261028.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>저장 컨테이너 잔여 전환 — 2026-10-28</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#구현-정본과-표준-라이브러리-경계">구현 정본과 표준 라이브러리 경계</a></li><li><a href="#계약과-실제-소비처-연결">계약과 실제 소비처 연결</a></li><li><a href="#msvc-stl-대비-최종-성능-수용">MSVC STL 대비 최종 성능 수용</a></li><li><a href="#해시-진단과-메모리-비용">해시 진단과 메모리 비용</a></li><li><a href="#기능소유권빌드실행">기능·소유권·빌드·실행</a></li><li><a href="#정본문자열미추적-작업-보존">정본·문자열·미추적 작업 보존</a></li><li><a href="#근거와-재현">근거와 재현</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="StorageBatchMigration20261028.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>저장 컨테이너 잔여 전환 — 2026-10-28</h1>
+<div class="meta"><p>자체 구현 ce::segmented_deque와 queue·stack·priority_queue, 노드 추출 가능한 해시 맵을 추가하고 <strong>49건·32파일</strong>을 전환했다. Effect의 erase_if 연결 1파일도 함께 변경했다. 기존 합격 정본 <strong>74파일과 문자열은 유지</strong>했다. 실제 Editor Debug 빌드·실행과 새 모듈 성능 수용은 통과했다.</p>
+<p>조사 범위는 Engine·Editor·Lattice·Player·HeadlessHost의 추적·미추적 소스다. 저장 컨테이너 참조는 51건에서 <strong>2건</strong>으로 줄었다. 남은 2건은 ReflgenAuthoring.h의 외부 SDK 가상 함수 read_bytes 반환형과 그 결과 버퍼다. 반환 타입을 변경하면 override/ABI가 깨지므로 원본을 유지했다. 문자열 8,388건, callable 264건은 대기 범위이며 전체 STL 제거 완료를 의미하지 않는다.</p>
+</div>
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">15<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 15"><i class="ok" style="flex:15"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 15</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 7개의 분량 막대">
+<a class="map-row" href="#구현-정본과-표준-라이브러리-경계"><span class="ve-label">§00</span><span class="map-name">구현 정본과 표준 라이브러리 경계</span><span class="map-bar"><i style="width:85.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#계약과-실제-소비처-연결"><span class="ve-label">§01</span><span class="map-name">계약과 실제 소비처 연결</span><span class="map-bar"><i style="width:70.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#msvc-stl-대비-최종-성능-수용"><span class="ve-label">§02</span><span class="map-name">MSVC STL 대비 최종 성능 수용</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">15</span></span></a>
+<a class="map-row" href="#해시-진단과-메모리-비용"><span class="ve-label">§03</span><span class="map-name">해시 진단과 메모리 비용</span><span class="map-bar"><i style="width:65.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#기능소유권빌드실행"><span class="ve-label">§04</span><span class="map-name">기능·소유권·빌드·실행</span><span class="map-bar"><i style="width:63.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#정본문자열미추적-작업-보존"><span class="ve-label">§05</span><span class="map-name">정본·문자열·미추적 작업 보존</span><span class="map-bar"><i style="width:32.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#근거와-재현"><span class="ve-label">§06</span><span class="map-name">근거와 재현</span><span class="map-bar"><i style="width:61.4%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 7개 가운데 「MSVC STL 대비 최종 성능 수용」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-구현-정본과-표준-라이브러리-경계">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="구현-정본과-표준-라이브러리-경계">구현 정본과 표준 라이브러리 경계</h2></div>
+<div class="prose"><ul>
+<li>정본: <a href="../../Engine/Containers/storage/Creator.Containers.Storage.ixx">Creator.Containers.Storage.ixx</a></li>
+<li>생성 헤더: <a href="../../Engine/Containers/storage/storage.h">storage.h</a>, sync-storage.ps1로 동기화</li>
+<li>엔진 별칭: <a href="../../Engine/Utility_Framework/Foundation/EngineStorage.h">EngineStorage.h</a></li>
+<li>독립 테스트 입구: 외부 CreatorContainers/storage/StorageValidation.proj. 엔진 정본과 테스트 프로젝트를 직접 참조하며 구현 복사본은 없다.</li>
+</ul>
+<p>segmented_deque는 직접 할당하는 요소 블록과 순환 포인터 디렉토리를 사용한다. 디렉토리가 확장돼도 살아 있는 요소를 이동하지 않는다. 블록 크기는 요소 크기에 따라 32 / 8 / 1개다. queue와 stack도 이 자체 저장소를 사용하며 priority_queue는 기본적으로 기존 합격 dynamic_array에 heap 알고리즘을 적용한다.</p>
+<p>해시 확장은 기존 정본을 수정하지 않고 별도 구현으로 추가했다. 독립 노드, 제어 바이트 인덱스와 이동 전용 node_type을 사용한다. 저장된 키는 읽기 전용으로 노출하고, 추출한 노드에서만 키를 바꿀 수 있다. 복사한 value_type의 키 참조도 복사본 자신의 키에 연결된다.</p>
+<p>std::deque/queue/stack/priority_queue/unordered_map를 저장소로 감싼 구현이 아니다. allocator_traits, optional allocator 상태, iterator·tuple 프로토콜 및 heap·이동 알고리즘 등 표준 라이브러리 보조 기능은 사용한다. 표준 라이브러리 의존 전체 제거나 모든 STL API 호환을 주장하지 않는다. allocator는 raw pointer 범위를 지원하며, 해시 확장은 기존 ce 바이트 allocator 정책을 따른다. typed STL allocator 전파 규칙은 deque에서 검사했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-계약과-실제-소비처-연결">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="계약과-실제-소비처-연결">계약과 실제 소비처 연결</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>구분</th><th style="text-align:right">전환 참조</th><th>계약</th></tr></thead>
+<tbody><tr><td>deque</td><td class="num" style="text-align:right">34</td><td>양끝 확장 시 요소 주소 유지, 조회 무할당, pop/erase 시 값과 소유 자원 즉시 파괴</td></tr>
+<tr><td>queue / stack / priority_queue</td><td class="num" style="text-align:right">8</td><td>FIFO/LIFO/비교 순서, unique 소유권, 기존 render arena 컨테이너 유지</td></tr>
+<tr><td>추출 가능한 hash map</td><td class="num" style="text-align:right">7</td><td>생존 노드 주소, 추출 후 키 변경, 중복 거절 노드 보존, 롤백, 잠금 해제 뒤 마지막 소유자 파괴</td></tr>
+<tr><td>외부 SDK ABI</td><td style="text-align:right">2 유지</td><td>SDK 지정 반환형과 소유 버퍼 타입 보존</td></tr></tbody></table></div>
+<p>TextureFramePins의 이미지 추출은 잠금 안에서 수행하고 마지막 소유자 파괴는 잠금 밖에서 유지한다. ScenePhysicsSimulation은 기존 준비·예약 뒤 핸들 교체 경로를 유지했다. 물리 맵의 keys/values 뷰는 참조를 반환하는 transform 뷰로 연결했고, 구조적 바인딩도 지원한다. Effect의 삭제 조건은 그대로 두고 자체 deque용 ce::erase_if로 연결했다.</p>
+<p>일반 heap 해시 노드는 erase/clear 시 개별 해제한다. deque는 요소 소멸자를 즉시 호출하고 요소가 모두 빠진 블록을 해제한다. 살아 있는 다른 요소와 공유하는 블록을 요소마다 별도 해제하지는 않는다. allocator가 다른 노드의 삽입은 노드를 보존하며 거절한다. 예약된 실제 교체·롤백 경로의 노드 전송은 무할당을 검사했다. 일반 삽입의 용량 확장과 tombstone 정리는 할당할 수 있다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-msvc-stl-대비-최종-성능-수용">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="msvc-stl-대비-최종-성능-수용">MSVC STL 대비 최종 성능 수용</h2></div>
+<div class="prose"><p>Windows / Intel Core i7-8700K(논리 12스레드) / MSVC 19.51, Release <strong>모듈 바이너리</strong>를 측정했다. CPU 4 High 우선순위, CPU 5의 별도 pause 통제 부하를 사용했다. 다른 프로세스나 OS 설정은 바꾸지 않았다.</p>
+<p>각 측정은 양측 1초 예열, 15표본, 표본당 100ms 누적이다. 15조건을 같은 바이너리로 3회 반복했고 두 번째는 CE/STL 순서를 뒤집었다. <strong>675쌍 / 1,350측 표본</strong>이다. 매 반복·매 조건의 중앙값 CE/STL ≤ 1.10, 양측 정렬 표본 x[13]/x[1] ≤ 1.30 기준을 반올림 전 값으로 적용해 <strong>45/45 통과</strong>했다. 표본 제거·캠페인 이어 붙이기는 하지 않았다.</p>
+<p>최대 시간 비율은 <strong>1.0968561485594</strong>, CE 최대 편차 <strong>1.11273300940224</strong>, STL 최대 편차 <strong>1.10033332983913</strong>이다. 다음은 조건별 세 반복 중 최대 시간 비율이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>조건 / 요소 수</th><th style="text-align:right">CE/STL 최대</th><th>판정</th></tr></thead>
+<tbody><tr><td>deque_fifo, 128</td><td class="num" style="text-align:right">0.5332</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>deque_fifo, 4096</td><td class="num" style="text-align:right">0.5296</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>deque_fill, 128</td><td class="num" style="text-align:right">0.4896</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>deque_fill, 4096</td><td class="num" style="text-align:right">0.5079</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>deque_index, 128</td><td class="num" style="text-align:right">1.0770</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>deque_index, 4096</td><td class="num" style="text-align:right">1.0640</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>hash_aligned64_hit, 4096</td><td class="num" style="text-align:right">0.4073</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>hash_fill, 4096</td><td class="num" style="text-align:right">1.0522</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>hash_hit, 4096</td><td class="num" style="text-align:right">0.6689</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>hash_random64_hit, 4096</td><td class="num" style="text-align:right">0.4327</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>hash_random64_miss, 4096</td><td class="num" style="text-align:right">0.5613</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>hash_rekey, 4096</td><td class="num" style="text-align:right">0.8854</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>heap, 4096</td><td class="num" style="text-align:right">1.0969</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>queue, 4096</td><td class="num" style="text-align:right">0.4970</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>stack, 4096</td><td class="num" style="text-align:right">0.6316</td><td><span class="chip ok">PASS</span></td></tr></tbody></table></div>
+<p>정수 deque의 크기 128/4096, 어댑터 4096, 해시 연속 정수·임의 64비트·128바이트 간격 주소 형태 키를 검사했다. 모든 키 타입·대형 값·다른 OS의 성능이나 엔진 프레임 시간 향상에 대한 측정은 아니다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-해시-진단과-메모리-비용">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="해시-진단과-메모리-비용">해시 진단과 메모리 비용</h2></div>
+<div class="prose"><p>초기 진단에서 해시 조회 약 1.50배, 노드 키 왕복 약 1.64배로 미달했다. 내부 조회의 키 참조 간접 접근, iterator 재검사, 정수 hash 정책, 노드 핸들의 비어 있는 heap allocator 상태를 분리해 개선했다. 모듈 바이너리에서는 임의 키 miss와 노드 왕복이 다시 미달해 최종 모듈 기준으로 다시 수용했다. 디스어셈블과 실패 원시 CSV도 보존했다. PMU 하드웨어 카운터를 사용하지 않아 캐시 stall 등을 단일 확정 원인으로 주장하지 않는다.</p>
+<p>최종 해시 확장의 기본 max_load_factor는 0.45다. 인덱스를 더 넓게 잡아 miss의 충돌 탐색을 줄이는 정책이며 비용이 있다. 별도 counting allocator로 uint64 → unsigned 4096개를 실제 검사한 결과는 다음과 같다. CRT 메타데이터·프래그먼테이션은 포함하지 않은 <strong>allocator 요청 바이트</strong>다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>항목</th><th style="text-align:right">CE</th><th style="text-align:right">MSVC STL</th></tr></thead>
+<tbody><tr><td>bucket 수</td><td class="num" style="text-align:right">16,384</td><td class="num" style="text-align:right">4,096</td></tr>
+<tr><td>생존 요청 바이트</td><td class="num" style="text-align:right">245,760</td><td class="num" style="text-align:right">196,640</td></tr>
+<tr><td>default node handle 크기</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">16</td></tr></tbody></table></div>
+<p>이 조건에서 생존 요청 바이트는 약 <strong>25% 증가</strong>했다. 조회 8,192회 중 추가 할당 0, 노드 한 개 erase 시 해제 1회, 전체 파괴 후 생존 바이트 0도 확인했다. 속도 수용을 메모리 사용량의 우위로 표현하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-기능소유권빌드실행">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="기능소유권빌드실행">기능·소유권·빌드·실행</h2></div>
+<div class="prose"><ul>
+<li>최종 모듈 Debug / Release: 각각 <strong>48,244검사 통과</strong>. 20,000회 deque 모델 대조, 대형 앞쪽 확장, 256바이트 정렬, 소유자 수명, 복사/이동과 노드 주소를 검사했다.</li>
+<li>allocator: SOCCC와 비전파 allocator 간 이동, 서로 다른 allocator swap 거절, 디렉토리 초기화 도중 예외와 기존 요소가 있는 확장 실패 후 복구를 검사했다. 임의 생성자 예외 후 기존 요소도 보존했다.</li>
+<li>최종 standalone ASAN: <strong>48,244검사 통과</strong>. 실제 Editor 전체를 ASAN으로 계측한 결과는 아니다.</li>
+<li>실제 CreatorEditor <strong>Debug 빌드 성공</strong>. 최초 빌드에서 발견한 erase_if·뷰 연결 문제를 수정한 후 다시 빌드했다. 기존 빌드 경고는 남아 있으며 경고 0을 주장하지 않는다.</li>
+<li>실제 Editor <strong>17명령 통과</strong>. 검사 2회 × 8,192전송, 새 저장 컨테이너 주소·추출·키 변경·중복 롤백, PhysX 검사, GPU 새 프레임, Play/Stop, 장면 객체·변환 복원, 정상 종료를 확인했다.</li>
+<li>외부 독립 테스트 입구 Release 빌드 성공. 실제 Editor Release와 모든 오디오/Vulkan 런타임 경로 실행은 이번 검증 범위가 아니다.</li>
+<li>생성 어댑터 31개와 모듈/헤더 동기화 확인.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-정본문자열미추적-작업-보존">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="정본문자열미추적-작업-보존">정본·문자열·미추적 작업 보존</h2></div>
+<div class="prose"><p>기존 합격 정본 74파일은 SHA256이 동일하다. 이전 전체 82항목/PPL 수용의 원시 결과 266파일과 고정 입력 131파일, ordered set/map 확장 결과도 해시가 같다. 이 이전 전체 성능을 이번에 새로 측정한 것은 아니다.</p>
+<p>전환 대상 32파일을 원본과 대조했다. 타입·include 및 물리 키/값 참조 뷰 연결을 제외한 코드는 유지했다. EffectState.cpp는 erase_if 연결만 바꿨다. 허용한 소비처·검사 연결을 제외한 기존 소스 1,464개(미추적 16개 포함)는 동일하다. 미추적 Effect 작업과 문자열 타입을 보존했다. 커밋·푸시는 수행하지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-근거와-재현">
+<div class="sec-head"><p class="ve-label">§06</p><h2 id="근거와-재현">근거와 재현</h2></div>
+<div class="prose"><p>근거 루트: <span class="local-record">StorageBatch20261028 <small>로컬 기록 · 사이트 미포함</small> (<code>Build/Verification/ContainerMigration/StorageBatch20261028</code>)</span></p>
+<ul>
+<li>performance-final/result.json: 45개 판정, 고정 입력·바이너리·원시 CSV·CPU helper 해시</li>
+<li>native-accepted2/result.json / asan-accepted2/result.json</li>
+<li>editor-final/acceptance.json / editor-build2.log</li>
+<li>memory.log / consumer-equivalence.json / preservation.json / baseline-retained.json</li>
+<li>remaining-accepted/classification.json / migration-batch.json</li>
+</ul>
+<p>재현 입구는 Tools/regression/verify-storage-migration.ps1, verify-storage-asan.ps1, verify-storage-performance.ps1이다. 각 스크립트의 OutputDirectory는 새 디렉토리여야 한다. 성능 스크립트는 이 로컬 환경의 CPU4/5 및 외부 테스트 CPU helper를 요구한다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="StorageBatchMigration20261028.md"><code>docs/analysis/StorageBatchMigration20261028.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

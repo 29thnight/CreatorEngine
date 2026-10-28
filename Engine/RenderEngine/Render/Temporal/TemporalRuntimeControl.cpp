@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -235,7 +236,7 @@ TemporalProductSettings TemporalProductSettingsFromRuntime(const TemporalRuntime
 }
 
 uint32_t TemporalSupportedInterpolatedFrameCount(TemporalProvider provider, TemporalBackend backend,
-                                                 const std::vector<TemporalCapabilities>& capabilities)
+                                                 const ce::dynamic_array<TemporalCapabilities>& capabilities)
 {
     uint32_t maximum = 0;
     bool observed = false;

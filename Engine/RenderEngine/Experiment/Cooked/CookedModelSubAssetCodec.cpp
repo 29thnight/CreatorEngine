@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -46,7 +48,7 @@ bool V8(const AssetId& value)
 
 struct WireWriter final
 {
-    std::vector<std::byte> bytes{};
+    ce::dynamic_array<std::byte> bytes{};
 
     template<class T>
     void Integer(T value)
@@ -199,7 +201,7 @@ void Layout(const Skeleton& skeleton, WireWriter& wire)
     Require(!skeleton.bones.empty() && skeleton.bones.size() <= kModelSubAssetMaxBones &&
                 IsInRange(skeleton.rootBone, skeleton.bones.size()),
             "Invalid skeleton bone count or root");
-    std::set<std::string> names;
+    ce::engine_ordered_set<std::string> names;
     wire.Text("ce.ordered-bone-layout.v1");
     wire.Integer(static_cast<std::uint32_t>(skeleton.bones.size()));
     wire.Integer(skeleton.rootBone.Value());
@@ -228,7 +230,7 @@ void Mode(InterpolationMode mode)
 }
 
 template<class Key>
-void Keys(WireWriter& wire, const std::vector<Key>& keys, double duration, std::uint64_t& total)
+void Keys(WireWriter& wire, const ce::dynamic_array<Key>& keys, double duration, std::uint64_t& total)
 {
     Require(keys.size() <= kMaxKeys && total + keys.size() <= kMaxKeys, "Animation key budget exceeded");
     total += keys.size();
@@ -259,7 +261,7 @@ void Keys(WireWriter& wire, const std::vector<Key>& keys, double duration, std::
 }
 
 template<class Key>
-void Keys(WireReader& wire, std::vector<Key>& keys, double duration, std::uint64_t& total)
+void Keys(WireReader& wire, ce::dynamic_array<Key>& keys, double duration, std::uint64_t& total)
 {
     constexpr auto width = std::is_same_v<Key, RotationKey> ? 24u : 20u;
     const auto count = wire.Count(kMaxKeys, width);
@@ -439,7 +441,7 @@ void GeometryBase(const ModelGeometryArtifact& value)
 }
 
 template<class T>
-void GeometryArray(WireWriter& wire, const std::vector<T>& values)
+void GeometryArray(WireWriter& wire, const ce::dynamic_array<T>& values)
 {
     Require(values.size() <= kModelSubAssetMaxBytes / sizeof(T), "Geometry array exceeds byte budget");
     wire.Integer(static_cast<std::uint32_t>(values.size()));
@@ -450,7 +452,7 @@ void GeometryArray(WireWriter& wire, const std::vector<T>& values)
 }
 
 template<class T>
-void GeometryArray(WireReader& wire, std::vector<T>& values)
+void GeometryArray(WireReader& wire, ce::dynamic_array<T>& values)
 {
     const auto count = wire.Count(kModelSubAssetMaxBytes / sizeof(T), sizeof(T));
     values.reserve(count);
@@ -672,7 +674,7 @@ void Descriptor(const ModelDescriptorArtifact& value)
     Require(value.meshes.size() <= kMaxDescriptorEntries && value.nodes.size() <= kMaxDescriptorEntries &&
                 value.materials.size() <= kMaxDescriptorEntries,
             "Model descriptor exceeds metadata budget");
-    std::set<AssetId> ids{value.modelAssetId};
+    ce::engine_ordered_set<AssetId> ids{value.modelAssetId};
     if (value.skeletonAssetId.IsValid())
     {
         ids.insert(value.skeletonAssetId);
@@ -683,7 +685,7 @@ void Descriptor(const ModelDescriptorArtifact& value)
                 "Invalid or duplicate descriptor clip identity");
         Timing(clip.durationTicks, clip.ticksPerSecond);
     }
-    std::set<AssetId> materials;
+    ce::engine_ordered_set<AssetId> materials;
     for (const auto& material : value.materials)
     {
         Require(V8(material.materialAssetId) && ids.insert(material.materialAssetId).second,
@@ -694,7 +696,7 @@ void Descriptor(const ModelDescriptorArtifact& value)
                 "Invalid descriptor material blend mode");
         materials.insert(material.materialAssetId);
     }
-    std::set<AssetId> meshes;
+    ce::engine_ordered_set<AssetId> meshes;
     for (const auto& mesh : value.meshes)
     {
         Require(V8(mesh.meshAssetId) && ids.insert(mesh.meshAssetId).second,
@@ -719,7 +721,7 @@ void Descriptor(const ModelDescriptorArtifact& value)
                     references + node.meshAssetIds.size() <= kMaxDescriptorEntries,
                 "Descriptor mesh reference budget exceeded");
         references += node.meshAssetIds.size();
-        std::set<AssetId> local;
+        ce::engine_ordered_set<AssetId> local;
         for (const auto id : node.meshAssetIds)
         {
             Require(meshes.contains(id) && local.insert(id).second,
@@ -830,7 +832,7 @@ bool ValidateModelDescriptorDependencies(const ModelDescriptorArtifact& descript
     return Checked(
         [&] {
             Descriptor(descriptor);
-            std::set<TypedAssetReference> expected;
+            ce::engine_ordered_set<TypedAssetReference> expected;
             if (descriptor.skeletonAssetId.IsValid())
             {
                 expected.insert({{descriptor.skeletonAssetId, {}}, CookedAssetKind::Skeleton});
@@ -863,7 +865,7 @@ bool ValidateModelDescriptorDependencies(const ModelDescriptorArtifact& descript
 
 #include "CookedModelStreaming.inl"
 
-bool WriteSkeletonArtifact(const SkeletonArtifact& value, std::vector<std::byte>& out, std::string& failure)
+bool WriteSkeletonArtifact(const SkeletonArtifact& value, ce::dynamic_array<std::byte>& out, std::string& failure)
 {
     return Checked(
         [&] {
@@ -919,7 +921,7 @@ bool ReadSkeletonArtifact(std::span<const std::byte> bytes, SkeletonArtifact& ou
         failure);
 }
 
-bool WriteAnimationClipArtifact(const AnimationClipArtifact& value, std::vector<std::byte>& out, std::string& failure)
+bool WriteAnimationClipArtifact(const AnimationClipArtifact& value, ce::dynamic_array<std::byte>& out, std::string& failure)
 {
     return Checked(
         [&] {
@@ -934,7 +936,7 @@ bool WriteAnimationClipArtifact(const AnimationClipArtifact& value, std::vector<
             wire.Double(value.clip.ticksPerSecond);
             wire.Integer(static_cast<std::uint8_t>(value.clip.looping));
             wire.Integer(static_cast<std::uint32_t>(value.clip.channels.size()));
-            std::set<std::uint32_t> channels;
+            ce::engine_ordered_set<std::uint32_t> channels;
             std::uint64_t total{};
             for (const auto& channel : value.clip.channels)
             {
@@ -976,7 +978,7 @@ bool ReadAnimationClipArtifact(std::span<const std::byte> bytes, AnimationClipAr
             ClipHeader(value);
             const auto count = wire.Count(value.requiredBoneCount, 19u);
             value.clip.channels.reserve(count);
-            std::set<std::uint32_t> channels;
+            ce::engine_ordered_set<std::uint32_t> channels;
             std::uint64_t total{};
             for (std::uint32_t index = 0; index < count; ++index)
             {
@@ -1002,7 +1004,7 @@ bool ReadAnimationClipArtifact(std::span<const std::byte> bytes, AnimationClipAr
         failure);
 }
 
-bool WriteModelDescriptorArtifact(const ModelDescriptorArtifact& value, std::vector<std::byte>& out,
+bool WriteModelDescriptorArtifact(const ModelDescriptorArtifact& value, ce::dynamic_array<std::byte>& out,
                                   std::string& failure)
 {
     return Checked(

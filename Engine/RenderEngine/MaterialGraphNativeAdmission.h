@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Foundation/EngineNodeSet.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 namespace material_graph::detail
@@ -17,6 +18,6 @@ public:
         return true;
     }
 private:
-    std::unordered_set<const void*> admitted_;
+    ce::engine_node_set<const void*> admitted_;
 };
 }

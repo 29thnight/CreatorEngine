@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "LifecycleTrace.h"
 #include "Component.h"
 #include "../Utility_Framework/Reflection/ReflectionRegister.h"
@@ -40,7 +41,7 @@ namespace Lifecycle
         };
 
         std::mutex          g_mutex;
-        std::vector<Entry>  g_entries;
+        ce::dynamic_array<Entry>  g_entries;
         uint64_t            g_frame{ 0 };
         int                 g_tickFramesRemaining{ 0 };
 
@@ -125,7 +126,7 @@ namespace Lifecycle
 
     bool Trace::Dump(const std::string& path)
     {
-        std::vector<Entry> snapshot;
+        ce::dynamic_array<Entry> snapshot;
         bool overflowed = false;
         {
             std::lock_guard<std::mutex> guard(g_mutex);

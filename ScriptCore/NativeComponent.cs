@@ -78,6 +78,16 @@ internal static class NativeComponentTable
         [typeof(Canvas)]         = new(handle => new Canvas         { OwnerHandle = handle }, Native.HasCanvas),
         [typeof(UIButton)]       = new(handle => new UIButton       { OwnerHandle = handle }, Native.HasButton),
         [typeof(MeshRenderer)]   = new(handle => new MeshRenderer   { OwnerHandle = handle }, Native.HasMesh),
+        [typeof(BehaviorTreeComponent)] = new(h => new BehaviorTreeComponent { OwnerHandle = h }, h => Native.HasExtraComponent(h, 0)),
+        [typeof(BoneComponent)] = new(h => new BoneComponent { OwnerHandle = h }, h => Native.HasExtraComponent(h, 1)),
+        [typeof(DecalComponent)] = new(h => new DecalComponent { OwnerHandle = h }, h => Native.HasExtraComponent(h, 2)),
+        [typeof(FoliageComponent)] = new(h => new FoliageComponent { OwnerHandle = h }, h => Native.HasExtraComponent(h, 3)),
+        [typeof(PlayerInputComponent)] = new(h => new PlayerInputComponent { OwnerHandle = h }, h => Native.HasExtraComponent(h, 4)),
+        [typeof(SceneRenderProfileComponent)] = new(h => new SceneRenderProfileComponent { OwnerHandle = h }, h => Native.HasExtraComponent(h, 5)),
+        [typeof(SpriteRenderer)] = new(h => new SpriteRenderer { OwnerHandle = h }, h => Native.HasExtraComponent(h, 6)),
+        [typeof(SpriteSheetComponent)] = new(h => new SpriteSheetComponent { OwnerHandle = h }, h => Native.HasExtraComponent(h, 7)),
+        [typeof(StateMachineComponent)] = new(h => new StateMachineComponent { OwnerHandle = h }, h => Native.HasExtraComponent(h, 8)),
+        [typeof(TerrainComponent)] = new(h => new TerrainComponent { OwnerHandle = h }, h => Native.HasExtraComponent(h, 9)),
 
     };
 

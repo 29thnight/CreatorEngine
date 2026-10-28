@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -71,7 +72,7 @@ namespace RenderTest
             meta.name = "MigrateProbe";
             meta.properties = {
                 { "baseColor", "Base Color", ShaderPropertyType::Float4,
-                  std::array<float, 4>{ 1.0f, 1.0f, 1.0f, 1.0f } },
+                  ce::fixed_array<float, 4>{ 1.0f, 1.0f, 1.0f, 1.0f } },
                 { "metallic", "Metallic", ShaderPropertyType::Float, 0.0f },
                 { "roughness", "Roughness", ShaderPropertyType::Float, 1.0f },
                 { "albedoMap", "Albedo Map", ShaderPropertyType::Texture2D,
@@ -138,8 +139,8 @@ namespace RenderTest
             check.Check(chained, what + " — 사슬 왕복 (" + error + ")");
             if (!chained) return false;
 
-            std::vector<std::uint8_t> originalBytes;
-            std::vector<std::uint8_t> restoredBytes;
+            ce::dynamic_array<std::uint8_t> originalBytes;
+            ce::dynamic_array<std::uint8_t> restoredBytes;
             check.Check(legacy.BuildShaderPropertyBlock(contract.meta,
                 contract.layout, originalBytes, error),
                 what + " — 원본 bytes (" + error + ")");
@@ -195,7 +196,7 @@ namespace RenderTest
                 && MaterialRenderingMode::Transparent == restored.m_renderingMode,
                 "identity/이름/renderingMode 보존");
             check.Check(restored.m_keywordSelections
-                == std::vector<std::uint16_t>{ 1 },
+                == ce::dynamic_array<std::uint16_t>{ 1 },
                 "keyword 인덱스 보존");
             const auto albedoValue = std::find_if(
                 restored.m_propertyValues.begin(),
@@ -239,11 +240,11 @@ namespace RenderTest
             MigrateContract flowContract = MakeContract();
             flowContract.meta.properties.push_back(
                 { "flowUvScroll", "Flow UV Scroll", ShaderPropertyType::Float2,
-                  std::array<float, 2>{ 0.0f, 0.0f } });
+                  ce::fixed_array<float, 2>{ 0.0f, 0.0f } });
             flowContract.meta.properties.push_back(
                 { "flowWindVector", "Flow Wind Vector",
                   ShaderPropertyType::Float4,
-                  std::array<float, 4>{ 0.0f, 0.0f, 0.0f, 0.0f } });
+                  ce::fixed_array<float, 4>{ 0.0f, 0.0f, 0.0f, 0.0f } });
 
             Material legacy;
             legacy.m_name = "MigrateFlow";
@@ -303,7 +304,7 @@ namespace RenderTest
                 material, &contract.meta, withMeta, error),
                 "keywords 정규화 (" + error + ")");
             check.Check(withMeta.m_keywordSelections
-                == std::vector<std::uint16_t>{ 1 },
+                == ce::dynamic_array<std::uint16_t>{ 1 },
                 "이름 keywords가 인덱스로 정규화된다");
 
             Material withoutMeta;
@@ -400,7 +401,7 @@ namespace RenderTest
                 && MaterialRenderingMode::Transparent == material.m_renderingMode,
                 "identity/renderingMode 변환");
             check.Check(material.m_keywordSelections
-                == std::vector<std::uint16_t>{ 1 },
+                == ce::dynamic_array<std::uint16_t>{ 1 },
                 "이름 keywords가 실제 ShaderMeta로 정규화된다");
             const auto tint = std::find_if(material.m_propertyValues.begin(),
                 material.m_propertyValues.end(),
@@ -410,7 +411,7 @@ namespace RenderTest
                 });
             check.Check(tint != material.m_propertyValues.end()
                 && tint->m_numericValue
-                    == std::vector<float>{ 0.125f, 0.25f, 0.5f, 1.0f },
+                    == ce::dynamic_array<float>{ 0.125f, 0.25f, 0.5f, 1.0f },
                 "논리 값 변환");
         }
 
@@ -456,7 +457,7 @@ namespace RenderTest
                     });
                 check.Check(roughness
                     != renderer.m_Material->m_propertyValues.end()
-                    && roughness->m_numericValue == std::vector<float>{ 0.125f },
+                    && roughness->m_numericValue == ce::dynamic_array<float>{ 0.125f },
                     "postLoad 재해석의 논리 값");
             }
 
@@ -771,7 +772,7 @@ namespace RenderTest
                         });
                     roughnessApplied = found
                         != reloaded.m_Material->m_propertyValues.end()
-                        && found->m_numericValue == std::vector<float>{ 0.25f };
+                        && found->m_numericValue == ce::dynamic_array<float>{ 0.25f };
                 }
                 check.Check(nullptr != reloaded.m_Material && roughnessApplied
                     && reloaded.m_materialBaseGuid == base->m_fileGuid,

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -78,7 +79,7 @@ struct Selection
 };
 
 bool SelectRoute(const LX::LXMaterialProgram& program, const Capabilities& capabilities, const Budget& budget,
-                 Selection& result, std::vector<LX::LXMaterialDiagnostic>& diagnostics);
+                 Selection& result, ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics);
 
 inline constexpr std::uint32_t TextureRegister = 16384;
 inline constexpr std::uint32_t SamplerRegister = 3;
@@ -134,18 +135,18 @@ inline std::string TextureEncodingUniformName(std::uint32_t slot)
 struct BindingLayout
 {
     std::uint32_t uniformBytes{};
-    std::vector<ParameterBinding> parameters;
-    std::vector<TextureEncodingBinding> textureEncodings;
-    std::vector<LX::LXMaterialResource> textures;
-    std::vector<LX::LXMaterialResource> samplers;
+    ce::dynamic_array<ParameterBinding> parameters;
+    ce::dynamic_array<TextureEncodingBinding> textureEncodings;
+    ce::dynamic_array<LX::LXMaterialResource> textures;
+    ce::dynamic_array<LX::LXMaterialResource> samplers;
 
     bool operator==(const BindingLayout&) const = default;
 };
 
 bool ResolveBindings(const LX::LXMaterialProgram& program, const RHIShaderReflection& reflection, const Budget& budget,
-                     BindingLayout& result, std::vector<LX::LXMaterialDiagnostic>& diagnostics);
+                     BindingLayout& result, ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics);
 bool MergeMaterialReflections(std::span<const RHIShaderReflection* const> stages, RHIShaderReflection& result,
-                              std::vector<LX::LXMaterialDiagnostic>& diagnostics);
+                              ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics);
 
 struct CompileTarget
 {
@@ -159,13 +160,13 @@ struct VerifiedProduct
     LX::LXMaterialProgram program;
     Selection selection;
     BindingLayout layout;
-    std::vector<LX::LXMaterialShaderArtifact> shaders;
-    std::vector<CompileTarget> targets;
+    ce::dynamic_array<LX::LXMaterialShaderArtifact> shaders;
+    ce::dynamic_array<CompileTarget> targets;
     // Meta, source, common binding layout and bytecode share this generation.
     own::shared_owner<const GeneratedMaterialShader> materialShader;
     // Sorted union of the files every target compile read (root source excluded).
     // In memory only: the cooked product format does not carry it.
-    std::vector<std::filesystem::path> dependencies;
+    ce::dynamic_array<std::filesystem::path> dependencies;
 };
 
 // The file starts with BuildBoundSource(program), followed by a host pass.
@@ -173,8 +174,8 @@ struct VerifiedProduct
 bool VerifyProduct(const LX::LXMaterialProgram& program, const std::filesystem::path& sourceFile,
                    std::span<const CompileTarget> targets, const RHIShaderPermutation& permutation,
                    RHIShaderCompileOptions options, const Capabilities& capabilities, const Budget& budget,
-                   VerifiedProduct& result, std::vector<LX::LXMaterialDiagnostic>& diagnostics,
-                   std::vector<RHIShaderReflection>* materialReflections = nullptr);
+                   VerifiedProduct& result, ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics,
+                   ce::dynamic_array<RHIShaderReflection>* materialReflections = nullptr);
 
 // Describe the selected cooked stages using their sealed compiler/dependency
 // identity. Empty entry names select an unambiguous single surface pair.
@@ -201,26 +202,26 @@ struct TextureBinding
 
 struct ResourcePacket
 {
-    std::vector<std::uint8_t> uniforms;
-    std::vector<RHIBindingDesc> textures;
-    std::vector<RHISamplerDesc> samplers;
+    ce::dynamic_array<std::uint8_t> uniforms;
+    ce::dynamic_array<RHIBindingDesc> textures;
+    ce::dynamic_array<RHISamplerDesc> samplers;
     // One pin per Texture representation, deduplicated by m_assetId.
-    std::vector<own::shared_owner<const Texture>> owners;
+    ce::dynamic_array<own::shared_owner<const Texture>> owners;
 };
 
 // CPU instance packing uses the same reflected layout as the render packet.
 bool PrepareUniforms(const BindingLayout& layout, std::span<const ParameterOverride> parameters,
-                     std::vector<std::uint8_t>& result, std::vector<LX::LXMaterialDiagnostic>& diagnostics);
+                     ce::dynamic_array<std::uint8_t>& result, ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics);
 
 bool PrepareResources(const BindingLayout& layout, std::span<const ParameterOverride> parameters,
                       std::span<const TextureBinding> textures, ResourcePacket& result,
-                      std::vector<LX::LXMaterialDiagnostic>& diagnostics);
+                      ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics);
 
 // The common Material packer has already produced this immutable instance's
 // uniform block. Build resource descriptors without packing those values again.
 bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const std::uint8_t> uniforms,
                                   std::span<const TextureBinding> textures, ResourcePacket& result,
-                                  std::vector<LX::LXMaterialDiagnostic>& diagnostics);
+                                  ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics);
 
 // Cook payloads use a versioned, bounded binary envelope. Backend/entry pairs
 // are unique and the exact dependency-bearing semantic key is retained.
@@ -240,7 +241,7 @@ struct CookedProgram
 // Previous products cannot be rebound to this host; assets must be recooked.
 // 13: packet material byte loads share the verified reflected uniform packing.
 inline constexpr std::uint32_t CookedProgramVersion = 13;
-bool WriteCookedProgram(const VerifiedProduct& product, const Budget& budget, std::vector<std::uint8_t>& result,
+bool WriteCookedProgram(const VerifiedProduct& product, const Budget& budget, ce::dynamic_array<std::uint8_t>& result,
                         std::string& error);
 bool ReadCookedProgram(std::span<const std::uint8_t> bytes, const Budget& budget, CookedProgram& result,
                        std::string& error);

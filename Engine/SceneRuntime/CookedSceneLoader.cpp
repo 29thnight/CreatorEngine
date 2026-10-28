@@ -1,3 +1,6 @@
+#include "../Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
@@ -15,7 +18,7 @@ import Creator.Core.Layers;
 namespace
 {
     std::mutex readersMutex;
-    std::unordered_map<std::string, CookedSceneLoader::ComponentReader> componentReaders;
+    ce::engine_node_map<std::string, CookedSceneLoader::ComponentReader> componentReaders;
 
     using V3 = math::vector3;
     struct Q4 { float x, y, z, w; };
@@ -108,7 +111,7 @@ void CookedSceneLoader::Load(Scene& scene, const std::filesystem::path& path)
     if (size < 0 || static_cast<std::uint64_t>(size) > Cedo::max_document_bytes)
         throw std::runtime_error("Cooked scene missing or too large");
 
-    std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+    ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(size));
     input.seekg(0);
     if (!input.read(reinterpret_cast<char*>(bytes.data()), bytes.size()))
         throw std::runtime_error("Cooked scene read failed");
@@ -128,7 +131,7 @@ void CookedSceneLoader::Load(Scene& scene, const std::filesystem::path& path)
 
     // File slots can be sparse and parents can appear later in the document.
     // This temporary remap is discarded after admission; Scene owns runtime slots.
-    std::unordered_map<std::int64_t, std::size_t> positions;
+    ce::engine_node_map<std::int64_t, std::size_t> positions;
     const auto indexValue = [](const Cedo::Node& node) -> std::int64_t {
         const auto value = Number<std::int64_t>(node);
         if (value < -1 || value > (std::numeric_limits<std::uint32_t>::max)()) throw std::runtime_error("Invalid cooked slot reference");
@@ -140,8 +143,8 @@ void CookedSceneLoader::Load(Scene& scene, const std::filesystem::path& path)
         if (fileIndex < 0 || (i == 0 && fileIndex != 0) || !positions.emplace(fileIndex, i).second)
             throw std::runtime_error("Duplicate or invalid cooked file slot");
     }
-    std::unordered_set<std::uint64_t> identities;
-    std::vector<int> parents(source->children.size(), -1);
+    ce::engine_node_set<std::uint64_t> identities;
+    ce::dynamic_array<int> parents(source->children.size(), -1);
     for (std::size_t i = 0; i < source->children.size(); ++i)
     {
         const auto& node = source->children[i];
@@ -252,7 +255,7 @@ void CookedSceneLoader::Load(Scene& scene, const std::filesystem::path& path)
                 body->m_initialLinearVelocity = Vector3(component, "m_initialLinearVelocity", {});
                 body->m_initialAngularVelocity = Vector3(component, "m_initialAngularVelocity", {});
                 if (Number<int>(component, "m_shapeSchema", 1) != 1) throw std::runtime_error("Unknown shape schema");
-                std::vector<PhysicsShapeDefinition> shapes;
+                ce::dynamic_array<PhysicsShapeDefinition> shapes;
                 for (const auto& shape : Required(component, "m_shapes").children)
                 {
                     PhysicsShapeDefinition value;
@@ -362,7 +365,7 @@ void CookedSceneLoader::Load(Scene& scene, const std::filesystem::path& path)
         if (const auto* children = node.Find("m_childrenIndices"))
         {
             if (children->kind != Cedo::Kind::Sequence) throw std::runtime_error("Invalid cooked child inventory");
-            std::vector<EntityHandle> order;
+            ce::dynamic_array<EntityHandle> order;
             for (const auto& child : children->children)
             {
                 const auto found = positions.find(indexValue(child));

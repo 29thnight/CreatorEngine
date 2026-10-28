@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "EnhancedRenderPass.h"
@@ -57,7 +58,7 @@ namespace EnhancedMaterialSeal
     }
 
     inline void AppendTextureBindings(EnhancedSealDigest& digest,
-        const std::vector<EnhancedMaterialTextureBinding>& bindings) noexcept
+        const ce::dynamic_array<EnhancedMaterialTextureBinding>& bindings) noexcept
     {
         digest.U64(static_cast<std::uint64_t>(bindings.size()));
         for (const auto& binding : bindings) AppendTextureBinding(digest, binding);
@@ -66,11 +67,11 @@ namespace EnhancedMaterialSeal
     inline void AppendShared(EnhancedSealDigest& digest, ShaderMetaHandle handle,
         const RHIShaderPermutationKey& permutation,
         const ShaderMetaBindingLayout& layout,
-        const std::vector<std::uint16_t>& keywordSelections,
-        const std::vector<std::uint8_t>& propertyBytes,
+        const ce::dynamic_array<std::uint16_t>& keywordSelections,
+        const ce::dynamic_array<std::uint8_t>& propertyBytes,
         const EnhancedMaterialCoverage& coverage,
         std::uint32_t useNormalMap,
-        const std::vector<EnhancedMaterialTextureBinding>& bindings) noexcept
+        const ce::dynamic_array<EnhancedMaterialTextureBinding>& bindings) noexcept
     {
         digest.U32(handle.slot);
         digest.U32(handle.generation);
@@ -125,7 +126,7 @@ namespace EnhancedMaterialSeal
     // texture table만 접은 값 — 한 프레임 안에서 같은 seal이 서로 다른 SRV
     // 묶음으로 그려졌는지 판정할 때 쓴다.
     [[nodiscard]] inline std::uint64_t ComputeTextureDigest(
-        const std::vector<EnhancedMaterialTextureBinding>& bindings) noexcept
+        const ce::dynamic_array<EnhancedMaterialTextureBinding>& bindings) noexcept
     {
         EnhancedSealDigest digest;
         AppendTextureBindings(digest, bindings);

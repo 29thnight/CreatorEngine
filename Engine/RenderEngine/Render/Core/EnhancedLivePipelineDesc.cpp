@@ -1,3 +1,6 @@
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #include "EnhancedLivePipelineDesc.h"
 #include "../../../EngineDiagnostics/ProfileScope.h"
 
@@ -43,7 +46,7 @@ void LivePipelineDesc::AddNode(LivePassNode node)
 
 bool LiveResources::IsBuiltin(std::string_view slot) noexcept
 {
-    static constexpr auto names = std::to_array<std::string_view>({
+    static constexpr auto names = ce::to_array<std::string_view>({
         LiveSlots::kGBufferDiffuse,
         LiveSlots::kGBufferMetalRough,
         LiveSlots::kGBufferNormal,
@@ -138,10 +141,10 @@ bool LivePipelineDesc::CompileFeaturePlan(std::string& outError) const
         std::string publisher;
         LiveResourceContract contract;
         bool typed{};
-        std::vector<uint32_t> readers;
+        ce::dynamic_array<uint32_t> readers;
     };
-    std::unordered_map<std::string, PublishedSlot> published;
-    std::unordered_map<std::string, uint32_t> nodeNames;
+    ce::engine_node_map<std::string, PublishedSlot> published;
+    ce::engine_node_map<std::string, uint32_t> nodeNames;
     m_planNodes.clear();
     m_planResources.clear();
     m_planConsumers.clear();
@@ -174,7 +177,7 @@ bool LivePipelineDesc::CompileFeaturePlan(std::string& outError) const
             const std::string_view writable = node.m_contributorStage == RenderFeatureStage::BeforePresent
                                                   ? LiveSlots::kDisplayLdr
                                                   : LiveSlots::kLitColor;
-            const auto validateWrites = [&](const std::vector<std::string>& slots)
+            const auto validateWrites = [&](const ce::dynamic_array<std::string>& slots)
             {
                 for (const std::string& slot : slots)
                 {
@@ -220,7 +223,7 @@ bool LivePipelineDesc::CompileFeaturePlan(std::string& outError) const
             addDependency(found->second);
         }
         const auto validateContractList =
-            [&](const std::vector<std::string>& names, const std::vector<LiveResourceBinding>& contracts)
+            [&](const ce::dynamic_array<std::string>& names, const ce::dynamic_array<LiveResourceBinding>& contracts)
         {
             if (contracts.empty())
             {
@@ -255,9 +258,9 @@ bool LivePipelineDesc::CompileFeaturePlan(std::string& outError) const
         {
             return false;
         }
-        const auto consume = [&](const std::vector<std::string>& names,
-                                 const std::vector<LiveResourceBinding>& contracts,
-                                 std::vector<CompiledResourceUse>& uses, bool modifies)
+        const auto consume = [&](const ce::dynamic_array<std::string>& names,
+                                 const ce::dynamic_array<LiveResourceBinding>& contracts,
+                                 ce::dynamic_array<CompiledResourceUse>& uses, bool modifies)
         {
             for (size_t index = 0; index < names.size(); ++index)
             {
@@ -599,9 +602,9 @@ void LivePipelineDesc::ValidatePublishedResources(const CompiledNode& node, cons
 
 void LivePipelineDesc::DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGraph& graph,
     const EnhancedFrameContext& context, const LiveFrameBinding& binding,
-    const std::function<void(const LivePassNode&, const LiveBlackboard&)>& afterDeclare) const
+    const ce::owned_func<void(const LivePassNode&, const LiveBlackboard&)>& afterDeclare) const
 {
-    using Observer = std::function<void(const LivePassNode&, const LiveBlackboard&)>;
+    using Observer = ce::owned_func<void(const LivePassNode&, const LiveBlackboard&)>;
     const auto invoke = [](const void* observer, const LivePassNode& node, const LiveBlackboard& values)
     { (*static_cast<const Observer*>(observer))(node, values); };
     DeclareAllImpl(blackboard, graph, context, binding, &afterDeclare, afterDeclare ? +invoke : nullptr);
@@ -723,7 +726,7 @@ bool LivePipelineDesc::HasConsumer(std::string_view slot, const EnhancedFrameCon
 
 std::string LivePipelineDesc::Dump() const
 {
-    const auto joinSlots = [](const std::vector<std::string>& slots) -> std::string
+    const auto joinSlots = [](const ce::dynamic_array<std::string>& slots) -> std::string
     {
         std::string joined;
         for (size_t i = 0; i < slots.size(); ++i)
@@ -934,7 +937,7 @@ bool LivePipelineDesc::RunSelfTest(std::string& outLog)
     {
         blackboard.Reset();
         bool cleared = true;
-        const std::array<std::string_view, 7> keys{
+        const ce::fixed_array<std::string_view, 7> keys{
             "METEOR.Test.OwnedSlotNameAfterSourceDestruction", "METEOR.Test.BoundedView",
             std::string_view{"METEOR\0Slot", 11}, "METEOR", "", "METEOR.Test.List", "empty-list"};
         for (const auto key : keys)
@@ -951,7 +954,7 @@ bool LivePipelineDesc::RunSelfTest(std::string& outLog)
     {
         const std::string scalarKey = "METEOR.Test.OwnedScalarAfterQueryDestruction";
         const std::string listKey = "METEOR.Test.OwnedListAfterQueryDestruction";
-        std::vector<RGHandle> copiedList;
+        ce::dynamic_array<RGHandle> copiedList;
         bool preserved = true;
         {
             LiveBlackboard board;

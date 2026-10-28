@@ -738,7 +738,7 @@ namespace
             failure = "해시할 파일을 열 수 없다: " + path.string();
             return false;
         }
-        ce::hash::sha256 hash;
+        ce::crypto::sha256 hash;
         std::array<char, 64u * 1024u> buffer{};
         size = 0u;
         while (input)
@@ -1032,7 +1032,7 @@ namespace
         std::string artifactPath{};
         std::array<std::byte, ck::kAudioClipHeaderBytes> header{};
         ck::CookedAssetManifestEntry manifestEntry{};
-        ce::hash::sha256_digest payloadSha256{};
+        ce::crypto::sha256_digest payloadSha256{};
         std::uint64_t payloadBytes{};
     };
 
@@ -1181,7 +1181,7 @@ namespace
                     || !assets::InspectAudioClipSource(source, inspected, inspectionError)
                     || codec.Scalar() != assets::AudioCodecName(inspected.codec)
                     || size.Scalar() != std::to_string(inspected.payloadSize)
-                    || hash.Scalar() != ce::hash::to_hex(inspected.sourceContentHash))
+                    || hash.Scalar() != ce::crypto::to_hex(inspected.sourceContentHash))
                 {
                     failure = "audio source/meta stamp가 유효하지 않거나 다르다: "
                         + source.string() + " (" + inspectionError + ")";
@@ -1283,8 +1283,8 @@ namespace
                 failure = "audio artifact source를 열 수 없다: " + input.source.string();
                 return false;
             }
-            ce::hash::sha256 payloadHash;
-            ce::hash::sha256 artifactHash;
+            ce::crypto::sha256 payloadHash;
+            ce::crypto::sha256 artifactHash;
             artifactHash.update(header.data(), header.size());
             std::array<char, 64u * 1024u> buffer{};
             std::uint64_t size = 0u;
@@ -1344,7 +1344,7 @@ namespace
         }
         output.write(reinterpret_cast<const char*>(product.header.data()),
             static_cast<std::streamsize>(product.header.size()));
-        ce::hash::sha256 payloadHash;
+        ce::crypto::sha256 payloadHash;
         std::array<char, 64u * 1024u> buffer{};
         std::uint64_t copied = 0u;
         while (input)

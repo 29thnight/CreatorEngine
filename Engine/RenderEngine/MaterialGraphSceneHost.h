@@ -1,4 +1,7 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Utility_Framework/Foundation/EngineOrderedSet.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -81,7 +84,7 @@ struct SceneGeometryRouteAudit
         bool meshShader{}, indirect{};
     };
     std::uint64_t sourceFrameId{}, sceneEpoch{}, viewId{};
-    std::vector<Draw> draws;
+    ce::dynamic_array<Draw> draws;
 };
 
 // Producer lists and consumer work have separate graph contracts.
@@ -89,7 +92,7 @@ struct SceneFirstCullOutputs
 {
     RGHandle list;
 };
-using SceneShadowResources = std::array<RGHandle, 3>;
+using SceneShadowResources = ce::fixed_array<RGHandle, 3>;
 struct SceneFinalCullOutputs
 {
     RGHandle list, blendedList;
@@ -107,7 +110,7 @@ struct SceneLayerWork
 struct SceneColorInputs
 {
     RGHandle layer;
-    std::array<RGHandle, 2> material;
+    ce::fixed_array<RGHandle, 2> material;
 };
 
 class SceneHost final : private IRHIUploadTransactionListener
@@ -132,12 +135,12 @@ class SceneHost final : private IRHIUploadTransactionListener
     // Actual indirect submissions: opaque tile packets + ordered Temporal layers.
     uint32_t TemporalBucketSubmissionCount() const;
     uint32_t BlendedBucketSubmissionCount() const;
-    std::array<uint32_t, 2> LayerBucketCounts() const;
+    ce::fixed_array<uint32_t, 2> LayerBucketCounts() const;
     // Actual ExecuteIndirect calls, recorded after successful bucket submission.
-    std::array<uint32_t, 3> ShadowBucketSubmissionCounts() const;
+    ce::fixed_array<uint32_t, 3> ShadowBucketSubmissionCounts() const;
     // Logical mesh commands per cascade, before GPU culling.
     // A bucket can contain multiple commands in one native submission.
-    std::array<uint32_t, 3> RecordedShadowMeshletDrawCounts() const;
+    ce::fixed_array<uint32_t, 3> RecordedShadowMeshletDrawCounts() const;
     struct ShadowMeshletOutput
     {
         unsigned cascade{}, bin{};
@@ -145,7 +148,7 @@ class SceneHost final : private IRHIUploadTransactionListener
     };
     // Final light-space selection buffers. Static depth can be supplied by the
     // cache instead of replaying these lists; see CurrentShadowCacheStats.
-    std::vector<ShadowMeshletOutput> ShadowMeshletOutputs() const;
+    ce::dynamic_array<ShadowMeshletOutput> ShadowMeshletOutputs() const;
     own::shared_owner<const GpuGeometryVisibility::Frame> ShadowFirstMeshletWork(unsigned cascade) const;
     bool UsesShadowDepthPrediction() const;
 
@@ -157,14 +160,14 @@ class SceneHost final : private IRHIUploadTransactionListener
     void EnableGeometryRouteAudit(bool enabled) const;
     SceneGeometryRouteAudit RecordedGeometryRoutes() const;
     // Prepared caster bins per cascade. GPU survivor counts are not read back here.
-    std::array<uint32_t, 3> ShadowCasterCounts() const;
+    ce::fixed_array<uint32_t, 3> ShadowCasterCounts() const;
     // CPU-prepared camera meshlet work (opaque union + ordered blended list),
     // not GPU-visible counts.
     GpuGeometryVisibility::PreparedStats CameraVisibilityStats() const;
     // Diagnostic owner for submitted GPU work-list/argument readback gates.
     own::shared_owner<const GpuGeometryVisibility::Frame> CameraMeshletWork() const;
     own::shared_owner<const GpuGeometryVisibility::Frame> CameraDepthMeshletWork() const;
-    std::array<GpuGeometryVisibility::PreparedStats, 3> ShadowVisibilityStats() const;
+    ce::fixed_array<GpuGeometryVisibility::PreparedStats, 3> ShadowVisibilityStats() const;
     MeshSurfaceCacheStats GeometryStats() const { return geometry_.CacheStats(); }
     // Select only exact requested graph instances and coverage for the current
     // view. Pending requests defer the whole frame; failed requests reject it.
@@ -177,7 +180,7 @@ class SceneHost final : private IRHIUploadTransactionListener
     bool Prepare(const EnhancedFrameContext& context, own::shared_owner<const SceneViewInput> input,
                  RHITextureHandle environment, RHITextureHandle irradiance, RHITextureHandle prefiltered,
                  const EnhancedShadowData& shadow, const SceneHostBudget& budget, std::string& error,
-                 std::uint64_t environmentGeneration, std::array<RHITextureHandle, 3> importance = {},
+                 std::uint64_t environmentGeneration, ce::fixed_array<RHITextureHandle, 3> importance = {},
                  RHITextureHandle source = {});
     bool PreparationDeferred() const
     {
@@ -185,9 +188,9 @@ class SceneHost final : private IRHIUploadTransactionListener
     }
     bool SelectionDeferred() const { return selectionDeferred_; }
     // Temporal.Inputs: opaque visibility/tile restoration; ordered layer replay only.
-    std::array<RGHandle, 5> DeclareTemporal(EnhancedRenderGraph& graph, RGHandle visibility,
-                                            const std::array<RGHandle, 2>& material, RGHandle layerList,
-                                            std::array<RGHandle, 5> targets) const;
+    ce::fixed_array<RGHandle, 5> DeclareTemporal(EnhancedRenderGraph& graph, RGHandle visibility,
+                                            const ce::fixed_array<RGHandle, 2>& material, RGHandle layerList,
+                                            ce::fixed_array<RGHandle, 5> targets) const;
     // Stage contract: each stage returns the handle it publishes and each
     // consumer takes that exact handle (live blackboard slots). Empty frames
     // publish invalid handles. A wrong or missing handle throws.
@@ -226,11 +229,11 @@ class SceneHost final : private IRHIUploadTransactionListener
     // Independent graph producers; consumers must pass the published versions.
     SceneSurfaceTargets::Outputs DeclareVisibility(EnhancedRenderGraph& graph, const SceneFinalCullOutputs& cull,
                                                    const SceneSurfaceTargets::Outputs& targets) const;
-    std::array<RGHandle, 2> DeclareMaterialWork(EnhancedRenderGraph& graph, RGHandle geometry,
+    ce::fixed_array<RGHandle, 2> DeclareMaterialWork(EnhancedRenderGraph& graph, RGHandle geometry,
                                                 RGHandle visibility) const;
     SceneSurfaceTargets::Outputs DeclareSurfaceResolve(EnhancedRenderGraph& graph, RGHandle geometry,
                                                        const SceneSurfaceTargets::Outputs& targets,
-                                                       const std::array<RGHandle, 2>& material) const;
+                                                       const ce::fixed_array<RGHandle, 2>& material) const;
     // Convenience composition for standalone rendering fixtures, using the same producers.
     SceneSurfaceTargets::Outputs DeclareGBuffer(EnhancedRenderGraph& graph, const SceneFinalCullOutputs& cull,
                                                 const SceneSurfaceTargets::Outputs& inputs) const;
@@ -244,8 +247,8 @@ class SceneHost final : private IRHIUploadTransactionListener
         std::size_t index{}, geometryKey{};
         float depth{};
     };
-    std::vector<ForwardDraw> BlendedDraws() const;
-    RGHandle DeclareBlended(EnhancedRenderGraph& graph, const std::vector<std::size_t>& indices,
+    ce::dynamic_array<ForwardDraw> BlendedDraws() const;
+    RGHandle DeclareBlended(EnhancedRenderGraph& graph, const ce::dynamic_array<std::size_t>& indices,
                             const SceneLayerWork& commands, RGHandle lighting, RGHandle shadowMap,
                             const EnhancedForwardLighting& forward) const;
     // METEOR.Scene.Blended: every blended draw back to front over the composed
@@ -301,11 +304,11 @@ class SceneHost final : private IRHIUploadTransactionListener
     struct Preparation;
     struct PreparationScratch;
     struct Slot;
-    using SlotKey = std::tuple<std::uint64_t, std::uint64_t, std::uint64_t>;
+    using SlotKey = ce::tuple<std::uint64_t, std::uint64_t, std::uint64_t>;
     void DeclareSharedFirst(EnhancedRenderGraph& graph, RGHandle geometry) const;
     struct Recording
     {
-        std::vector<own::shared_owner<const Frame>> owners;
+        ce::dynamic_array<own::shared_owner<const Frame>> owners;
         own::shared_owner<const Frame> publication;
         RHISubmissionTicket ticket;
         std::uint64_t completion{};
@@ -315,22 +318,22 @@ class SceneHost final : private IRHIUploadTransactionListener
                         own::shared_owner<const Program>& result, std::string& error);
     void PruneFailedPreparations(const own::shared_owner<const Generation>& requested = {});
     IRenderDeviceServices* device_{};
-    std::array<own::shared_owner<const PassReadPlan>, 8> m_passReadPlans;
+    ce::fixed_array<own::shared_owner<const PassReadPlan>, 8> m_passReadPlans;
     size_t m_nextPassReadPlan{};
     MeshSurfaceEvaluator geometry_;
     GpuGeometryVisibility visibility_;
     GpuGeometryOcclusion cameraOcclusion_;
     GpuGeometryOcclusion shadowOcclusion_;
-    std::map<std::pair<std::uint64_t, std::uint64_t>, std::vector<own::shared_owner<ShadowCache>>> shadowCaches_;
-    std::vector<own::weak_owner<ShadowCache>> shadowCacheAllocations_;
+    ce::engine_ordered_map<ce::pair<std::uint64_t, std::uint64_t>, ce::dynamic_array<own::shared_owner<ShadowCache>>> shadowCaches_;
+    ce::dynamic_array<own::weak_owner<ShadowCache>> shadowCacheAllocations_;
     struct ShadowHistory
     {
-        std::array<own::shared_owner<GpuGeometryOcclusion::History>, 3> cascades;
+        ce::fixed_array<own::shared_owner<GpuGeometryOcclusion::History>, 3> cascades;
         std::uint64_t revision{}, temporalRevision{}, frameId{};
     };
-    std::map<std::pair<std::uint64_t, std::uint64_t>, std::vector<ShadowHistory>> shadowHistories_;
+    ce::engine_ordered_map<ce::pair<std::uint64_t, std::uint64_t>, ce::dynamic_array<ShadowHistory>> shadowHistories_;
     // Last bucket shape written to stdout; the line is printed only when it changes.
-    std::optional<std::pair<std::uint32_t, std::size_t>> loggedMaterialBuckets_;
+    std::optional<ce::pair<std::uint32_t, std::size_t>> loggedMaterialBuckets_;
     // Per-frame scene buffers return here after their frame retires.
     own::shared_owner<TransientBufferPool> bufferPool_;
     ResidentBufferCache sceneResidentBuffers_;
@@ -340,33 +343,33 @@ class SceneHost final : private IRHIUploadTransactionListener
         FrameCameraSnapshot camera;
         std::uint64_t temporalRevision{};
     };
-    std::map<std::pair<std::uint64_t, std::uint64_t>, std::vector<CameraHistory>> cameraHistories_;
+    ce::engine_ordered_map<ce::pair<std::uint64_t, std::uint64_t>, ce::dynamic_array<CameraHistory>> cameraHistories_;
     RenderBindingCache bindings_;
     LX::Runtime::ComputePipeline indirectCommands_;
-    std::array<LX::Runtime::ComputePipeline, 6> packetPipelines_;
+    ce::fixed_array<LX::Runtime::ComputePipeline, 6> packetPipelines_;
     HybridVisibilityPipelines hybridPipelines_;
     LX::Runtime::GraphicsPipeline shadowMerge_;
-    std::array<LX::Runtime::ComputePipeline, 6> materialWorkPipelines_;
+    ce::fixed_array<LX::Runtime::ComputePipeline, 6> materialWorkPipelines_;
     own::shared_owner<ScenePrimitiveCacheResources> m_primitiveCacheResources;
     SceneLookupCache lookup_;
     SceneRuntimeEffectsResources runtimeEffects_;
     SceneSubsurfaceResources subsurface_;
     SceneRefractionResources refraction_;
     SceneVolumeResources volume_;
-    std::vector<own::shared_owner<const Program>> programs_;
+    ce::dynamic_array<own::shared_owner<const Program>> programs_;
     own::shared_owner<const Frame> frame_;
     job_scheduler& scheduler_;
     own::unique_owner<PreparationScratch> m_preparationScratch;
     std::atomic_flag m_preparing{};
     IRenderDeviceServices* programDevice_{};
-    std::vector<own::unique_owner<Preparation>> preparations_;
-    std::map<SlotKey, own::unique_owner<Slot>> slots_;
+    ce::dynamic_array<own::unique_owner<Preparation>> preparations_;
+    ce::engine_ordered_map<SlotKey, own::unique_owner<Slot>> slots_;
     bool selectionDeferred_{};
-    std::map<std::uint64_t, Recording> recordings_;
+    ce::engine_ordered_map<std::uint64_t, Recording> recordings_;
     mutable std::mutex recordingMutex_;
     std::uint64_t completed_{}, selectionSerial_{};
     SceneProgramStats stats_;
-    std::set<std::pair<std::uint64_t, bool>> loggedPlacementPhases_;
+    ce::engine_ordered_set<ce::pair<std::uint64_t, bool>> loggedPlacementPhases_;
     bool CommitSubmittedFrame(const own::shared_owner<const Frame>& frame, RHICompletionPoint completion,
                               std::string& error);
     void PollSubmittedFrames();

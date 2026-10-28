@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "Experiment/Cooked/CookedAssetManifest.h"
 
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
@@ -83,7 +84,7 @@ namespace RenderTest
             return manifest;
         }
 
-        void SetU32(std::vector<std::byte>& bytes, std::size_t offset, std::uint32_t value)
+        void SetU32(ce::dynamic_array<std::byte>& bytes, std::size_t offset, std::uint32_t value)
         {
             for (unsigned index = 0u; index < 4u; ++index)
             {
@@ -105,7 +106,7 @@ namespace RenderTest
             return false;
         }
         ck::AssetSetManifest decoded;
-        std::vector<ck::AssetManifestIssue> issues;
+        ce::dynamic_array<ck::AssetManifestIssue> issues;
         check.Check(ck::ReadAssetSetManifest(encoded.bytes, decoded, issues), "v3 round trip reads");
         for (const auto& entry : manifest.entries)
         {
@@ -218,11 +219,11 @@ namespace RenderTest
         check.Check(rejected(invalid), "overlong UTF-8 path rejected");
 
         // Every failed reader must preserve the previous, valid output.
-        const auto rejectBytes = [&](const std::vector<std::byte>& bytes)
+        const auto rejectBytes = [&](const ce::dynamic_array<std::byte>& bytes)
         {
             auto output = manifest;
             output.revision = 987u;
-            std::vector<ck::AssetManifestIssue> errors;
+            ce::dynamic_array<ck::AssetManifestIssue> errors;
             const bool read = ck::ReadAssetSetManifest(bytes, output, errors);
             return !read && !errors.empty() && output.revision == 987u
                 && output.entries.size() == manifest.entries.size();
@@ -230,7 +231,7 @@ namespace RenderTest
         bool everyTruncationRejected = true;
         for (std::size_t size = 0u; size < encoded.bytes.size(); ++size)
         {
-            const std::vector<std::byte> truncated(encoded.bytes.begin(), encoded.bytes.begin() + size);
+            const ce::dynamic_array<std::byte> truncated(encoded.bytes.begin(), encoded.bytes.begin() + size);
             everyTruncationRejected = rejectBytes(truncated) && everyTruncationRejected;
         }
         check.Check(everyTruncationRejected, "all truncation boundaries fail transactionally");

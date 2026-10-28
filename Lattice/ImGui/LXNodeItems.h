@@ -1,4 +1,8 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
 
 #include "../Core/LXGraph.h"
 
@@ -38,7 +42,7 @@ struct LXNodeItemSpec
     std::string styleRole;
     std::string label;
     std::string valuePin;
-    std::vector<std::string> choices;
+    ce::dynamic_array<std::string> choices;
     std::string propertyKey;
 };
 
@@ -53,10 +57,10 @@ struct LXNodeRow
 class LXNodeItemRegistry
 {
   public:
-    using TextureResolver = std::function<ImTextureID(const std::string& assetId)>;
-    using PinPredicate = std::function<bool(const Pin&)>;
-    using ResourceEditor = std::function<std::optional<std::string>()>;
-    using HeaderDecoration = std::function<void(const Node&, ImVec2 center, float scale, bool hovered)>;
+    using TextureResolver = ce::owned_func<ImTextureID(const std::string& assetId)>;
+    using PinPredicate = ce::owned_func<bool(const Pin&)>;
+    using ResourceEditor = ce::owned_func<std::optional<std::string>()>;
+    using HeaderDecoration = ce::owned_func<void(const Node&, ImVec2 center, float scale, bool hovered)>;
 
     // A passive trailing header decoration. The canvas reserves its width and
     // handles hover without adding a clickable item or changing node geometry.
@@ -107,7 +111,7 @@ class LXNodeItemRegistry
         const LXNodeItemRegistry& registry_;
     };
 
-    void RegisterRows(std::string nodeType, std::vector<LXNodeRow> rows)
+    void RegisterRows(std::string nodeType, ce::dynamic_array<LXNodeRow> rows)
     {
         rows_.insert_or_assign(std::move(nodeType), std::move(rows));
         visibleRows_.clear();
@@ -125,7 +129,7 @@ class LXNodeItemRegistry
 
     bool SectionOpen(const Node& node, const std::string& section) const
     {
-        if (section.empty() || openSections_.contains({node.id, section}))
+        if (section.empty() || openSections_.contains(ce::pair<Id, std::string>{node.id, section}))
         {
             return true;
         }
@@ -147,7 +151,7 @@ class LXNodeItemRegistry
 
     void ToggleSection(const Node& node, const std::string& section) const
     {
-        const auto key = std::make_pair(node.id, section);
+        const auto key = ce::make_pair(node.id, section);
         if (!openSections_.erase(key))
         {
             openSections_.insert(key);
@@ -155,9 +159,9 @@ class LXNodeItemRegistry
         visibleRows_.erase(node.id);
     }
 
-    std::vector<LXNodeRow> Rows(const Node& node) const { return VisibleRows(node); }
+    ce::dynamic_array<LXNodeRow> Rows(const Node& node) const { return VisibleRows(node); }
 
-    const std::vector<LXNodeRow>& VisibleRows(const Node& node) const
+    const ce::dynamic_array<LXNodeRow>& VisibleRows(const Node& node) const
     {
         const auto cached = visibleRows_.find(node.id);
         if (rowCacheDepth_ > 0 && cached != visibleRows_.end())
@@ -168,9 +172,9 @@ class LXNodeItemRegistry
     }
 
   private:
-    std::vector<LXNodeRow> BuildRows(const Node& node) const
+    ce::dynamic_array<LXNodeRow> BuildRows(const Node& node) const
     {
-        std::vector<LXNodeRow> result;
+        ce::dynamic_array<LXNodeRow> result;
         const auto layout = rows_.find(node.type);
         if (layout == rows_.end())
         {
@@ -227,9 +231,9 @@ class LXNodeItemRegistry
         return item == type->second.end() ? nullptr : &item->second;
     }
 
-    std::vector<std::string> Keys(const Node& node) const
+    ce::dynamic_array<std::string> Keys(const Node& node) const
     {
-        std::vector<std::string> keys;
+        ce::dynamic_array<std::string> keys;
         if (HasRows(node))
         {
             for (const auto& row : VisibleRows(node))
@@ -283,15 +287,15 @@ class LXNodeItemRegistry
     }
 
   private:
-    std::map<std::string, std::map<std::string, LXNodeItemSpec>> definitions_;
+    ce::engine_ordered_map<std::string, ce::engine_ordered_map<std::string, LXNodeItemSpec>> definitions_;
     TextureResolver textureResolver_;
     ResourceEditor resourceEditor_;
     HeaderDecoration headerDecoration_;
     float headerDecorationWidth_ = 0.0f;
-    std::map<std::string, std::vector<LXNodeRow>> rows_;
-    mutable std::set<std::pair<Id, std::string>> openSections_;
+    ce::engine_ordered_map<std::string, ce::dynamic_array<LXNodeRow>> rows_;
+    mutable ce::engine_ordered_set<ce::pair<Id, std::string>> openSections_;
     PinPredicate visible_, connected_;
-    mutable std::map<Id, std::vector<LXNodeRow>> visibleRows_;
+    mutable ce::engine_ordered_map<Id, ce::dynamic_array<LXNodeRow>> visibleRows_;
     mutable unsigned rowCacheDepth_ = 0;
 };
 

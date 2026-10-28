@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -56,10 +57,10 @@ namespace
     std::filesystem::path MotionFixturePath(std::string_view text)
     { return std::filesystem::path(std::u8string(text.begin(),text.end())); }
     namespace ck = experiment::cooked;
-    constexpr std::array<const char*, 7> kRoutes{
+    constexpr ce::fixed_array<const char*, 7> kRoutes{
         "static", "skinned", "instanced", "decal", "alpha", "sprite", "meshlet" };
     constexpr math::vector3 kPosition{ 0.f, 0.f, 4.f };
-    constexpr std::array<math::vector3, 7> kDisplacements{
+    constexpr ce::fixed_array<math::vector3, 7> kDisplacements{
         math::vector3{ .25f, .125f, 0.f }, {}, {},
         math::vector3{ -.5f, .25f, 0.f }, { .1875f, -.375f, 0.f },
         { .125f, .0625f, 0.f }, { -.125f, -.25f, 0.f } };
@@ -71,7 +72,7 @@ namespace
     struct BuildResult
     {
         TemporalMotionFixtureAssets assets;
-        std::vector<std::pair<std::string, std::string>> inputAssets;
+        ce::dynamic_array<ce::pair<std::string, std::string>> inputAssets;
         std::string error;
         bool succeeded{};
     };
@@ -91,7 +92,7 @@ namespace
         TemporalProvider sdkProvider{TemporalProvider::None};
         TemporalQuality sdkQualitySetting{TemporalQuality::Quality};
         unsigned sdkStep{1};
-        std::vector<EnhancedTemporalFixtureSubmission> sdkWarmup;
+        ce::dynamic_array<EnhancedTemporalFixtureSubmission> sdkWarmup;
         gc::root_ref<Scene> scene;
         gc::root_ref<Entity> root, moving, receiver;
         gc::root_ref<Component> routeComponent;
@@ -101,8 +102,8 @@ namespace
         gc::root_ref<FoliageComponent> foliage;
         gc::root_ref<DecalComponent> decal;
         gc::root_ref<RectTransformComponent> spriteRect;
-        std::array<std::uint64_t, 2> instances{};
-        std::vector<std::pair<gc::weak_ref<Component>, bool>> previousComponents;
+        ce::fixed_array<std::uint64_t, 2> instances{};
+        ce::dynamic_array<ce::pair<gc::weak_ref<Component>, bool>> previousComponents;
         std::optional<TemporalNativeCaptureExclusion> exclusion;
         own::shared_owner<BuildResult> build;
         job_handle buildJob;
@@ -113,7 +114,7 @@ namespace
         AssetDepot::AssetRequest<Material> opaqueMaterial, alphaMaterial, receiverMaterial;
         AssetDepot::AssetRequest<Texture> opaqueTexture, alphaTexture;
         Diagnostics::Document manifest;
-        std::vector<std::pair<std::string, std::string>> inputAssets;
+        ce::dynamic_array<ce::pair<std::string, std::string>> inputAssets;
         std::string inputHash;
         std::string assetSourceIdentity;
         bool assetCacheHit{};
@@ -180,7 +181,7 @@ namespace
             throw std::runtime_error(error);
         }
         key += "|" + options.targetPlatform + "|" + options.targetAbi + "|" + options.shaderDirectory.string();
-        std::vector<std::filesystem::path> sources;
+        ce::dynamic_array<std::filesystem::path> sources;
         for (const auto& entry : std::filesystem::recursive_directory_iterator(options.shaderDirectory))
         {
             const auto extension = entry.path().extension();
@@ -280,7 +281,7 @@ namespace
         session.alphaTexture = {};
         if (session.mount.IsValid())
         {
-            std::vector<ck::AssetManifestIssue> issues;
+            ce::dynamic_array<ck::AssetManifestIssue> issues;
             if (!DataSystems->UnmountAssetSet(session.mount, issues))
             {
                 session.status.error += " Fixture asset mount cleanup failed.";
@@ -396,7 +397,7 @@ namespace
         }
         if (session.foliage)
         {
-            const std::array<math::vector3, 2> positions{
+            const ce::fixed_array<math::vector3, 2> positions{
                 math::vector3{ -1.5f, 0.f, 4.f } + (current ? math::vector3{ -.375f, .1875f, 0.f } : math::vector3{}),
                 math::vector3{ 1.5f, 0.f, 4.f } + (current ? math::vector3{ .25f, -.125f, 0.f } : math::vector3{}) };
             for (std::size_t index = 0; index < positions.size(); ++index)
@@ -634,7 +635,7 @@ namespace
         auto geometry = node["geometry"];
         geometry.SetMap();
         geometry["vertices"].SetSequence();
-        const std::array<math::vector3, 4> positions{
+        const ce::fixed_array<math::vector3, 4> positions{
             math::vector3{ -1.f, -1.f, 0.f }, { 1.f, -1.f, 0.f },
             { 1.f, 1.f, 0.f }, { -1.f, 1.f, 0.f } };
         for (std::size_t index = 0; index < positions.size(); ++index)
@@ -768,7 +769,7 @@ namespace
     {
         const auto& assets = session.build->assets;
         session.inputAssets = session.build->inputAssets;
-        std::vector<ck::AssetManifestIssue> issues;
+        ce::dynamic_array<ck::AssetManifestIssue> issues;
         session.mount = DataSystems->MountAssetSet(assets.manifest, assets.source, assets.mountOptions, issues);
         if (!session.mount.IsValid())
         {
@@ -983,7 +984,7 @@ bool TemporalMotionFixture::Begin(const std::string& directory, std::string& err
             // Shader/blob export and hashing stay off the game thread too.
             for (const auto& artifact : result->assets.artifacts)
             {
-                std::vector<std::byte> bytes(static_cast<std::size_t>(artifact.byteSize));
+                ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(artifact.byteSize));
                 if (!result->assets.source->ReadAt(artifact.artifactPath, 0, bytes, result->error))
                 {
                     result->succeeded = false;

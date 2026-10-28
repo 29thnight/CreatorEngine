@@ -1,5 +1,11 @@
 #pragma once
+#include "../Containers/ContainerAPI.h"
 
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Concurrency.h"
+#else
+import "Creator.Containers.h";
+#endif
 #include "CollisionGeometryCodec.h"
 #include "CookedCollisionGeometry.h"
 #include "../Physics/PhysicsScene.h"
@@ -30,10 +36,10 @@ class CollisionGeometryLibrary final
             return std::unexpected(owner.error());
         ce::profile_scope scope{ce::marker<"Physics.GeometryResolve">()};
 
-        if (const auto found = m_assets.find(key); found != m_assets.end())
+        if (const auto* found = m_assets.find(key))
         {
             ++m_stats.cache_hits;
-            return found->second.asset;
+            return found->asset;
         }
 
         auto source = std::invoke(std::forward<Loader>(loader), key);
@@ -59,10 +65,10 @@ class CollisionGeometryLibrary final
             return std::unexpected(error{error_code::wrong_phase, 0, "Reentrant cooked geometry import"});
 
         ce::profile_scope scope{ce::marker<"Physics.GeometryArtifactResolve">()};
-        if (const auto found = m_assets.find(key); found != m_assets.end())
+        if (const auto* found = m_assets.find(key))
         {
             ++m_stats.cache_hits;
-            return found->second.asset;
+            return found->asset;
         }
 
         m_publishing = true;
@@ -76,8 +82,8 @@ class CollisionGeometryLibrary final
             if (!record) return std::unexpected(record.error());
 
             auto prepared = m_assets;
-            auto payload = std::make_shared<const std::vector<std::byte>>(std::move(record->payload));
-            const auto added = prepared.emplace(key, entry{{}, payload}).first;
+            auto payload = std::make_shared<const ce::dynamic_array<std::byte>>(std::move(record->payload));
+            const auto added = prepared.try_emplace(key, entry{{}, payload});
             scene_config config;
             config.workers = 1;
             auto importer = PhysicsScene::create(config);
@@ -87,7 +93,7 @@ class CollisionGeometryLibrary final
             auto asset = (*importer)->load_geometry_blob(record->kind, *payload);
             if (!asset) return std::unexpected(asset.error());
 
-            added->second.asset = *asset;
+            added->asset = *asset;
             m_assets.swap(prepared);
             ++m_stats.imports;
             m_stats.assets = m_assets.size();
@@ -129,24 +135,24 @@ class CollisionGeometryLibrary final
         try
         {
             const auto found = m_assets.find(source.key);
-            if (found != m_assets.end() && *found->second.source != *encoded)
+            if (found != nullptr && *found->source != *encoded)
                 return std::unexpected(
                     error{error_code::invalid_argument, 0, "Existing geometry revision has different contents"});
 
-            if (found != m_assets.end())
+            if (found != nullptr)
             {
                 if (!std::invoke(std::forward<Publisher>(publisher), std::span<const std::byte>(*encoded)))
                     return std::unexpected(
                         error{error_code::invalid_argument, 0, "Collision geometry host publication failed"});
                 ++m_stats.cache_hits;
-                return found->second.asset;
+                return found->asset;
             }
 
-            // flat_map insertion can clear its storage on an exception; mutate
+            // Prepare changes transactionally; mutate
             // a prepared copy so allocation failure never destroys the live cache.
             auto prepared = m_assets;
-            auto payload = std::make_shared<const std::vector<std::byte>>(std::move(*encoded));
-            const auto added = prepared.emplace(source.key, entry{{}, payload}).first;
+            auto payload = std::make_shared<const ce::dynamic_array<std::byte>>(std::move(*encoded));
+            const auto added = prepared.try_emplace(source.key, entry{{}, payload});
             scene_config config;
             config.workers = 1;
             auto cooker = PhysicsScene::create(config);
@@ -175,7 +181,7 @@ class CollisionGeometryLibrary final
                 return std::unexpected(cooked.error());
             }
 
-            added->second.asset = *cooked;
+            added->asset = *cooked;
             if (!std::invoke(std::forward<Publisher>(publisher), std::span<const std::byte>(*payload)))
             {
                 ++m_stats.failures;
@@ -211,7 +217,7 @@ class CollisionGeometryLibrary final
     struct entry
     {
         std::shared_ptr<const CollisionGeometry> asset;
-        std::shared_ptr<const std::vector<std::byte>> source;
+        std::shared_ptr<const ce::dynamic_array<std::byte>> source;
     };
 
     result<void> RequireOwner() const
@@ -222,7 +228,14 @@ class CollisionGeometryLibrary final
     }
 
     std::thread::id m_owner = std::this_thread::get_id();
-    std::flat_map<geometry_asset_key, entry> m_assets;
+    struct key_hash {
+        uint64_t operator()(const geometry_asset_key& key) const noexcept {
+            uint64_t value = ce::mix_hash(key.revision);
+            for (auto byte : key.asset.data_) value = ce::mix_hash(value ^ byte);
+            return value;
+        }
+    };
+    ce::basic_flat_hash_map<geometry_asset_key, entry, key_hash> m_assets;
     statistics m_stats;
     bool m_publishing = false;
 };

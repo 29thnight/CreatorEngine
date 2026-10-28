@@ -1,4 +1,7 @@
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 #include "../../RenderArena.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
@@ -191,7 +194,7 @@ public:
     };
     // 대여·반납·비우기는 동일한 producer 스레드가 소유한다. GPU 완료 토큰도 그
     // 스레드에서 회수해 graph를 파괴하며, 풀 소유자는 모든 토큰을 drain한 뒤 파괴한다.
-    std::unordered_map<uint64_t, std::vector<Entry>> freeList;
+    ce::engine_node_map<uint64_t, ce::dynamic_array<Entry>> freeList;
     struct AliasHeapMemory
     {
         uint64_t domainId{0}; // Process-local accounting state identity, shared by its graphs.
@@ -218,8 +221,8 @@ public:
         IRenderDeviceServices* owner{nullptr};
         own::shared_owner<RHITransientHeap> heap;
         RHITransientAllocationInfo allocation;
-        std::vector<RHITransientResourceDesc> descriptions;
-        std::vector<AliasedEntry> entries;
+        ce::dynamic_array<RHITransientResourceDesc> descriptions;
+        ce::dynamic_array<AliasedEntry> entries;
         void TrackHeap(const own::shared_owner<AliasHeapAccounting>& accounting);
         void SetCached(bool cached);
         ~AliasedGroup();
@@ -227,7 +230,7 @@ public:
         own::shared_owner<AliasHeapAccounting> m_accounting;
         bool m_cached{false};
     };
-    using AllocationKey = std::array<uint64_t, 7>;
+    using AllocationKey = ce::fixed_array<uint64_t, 7>;
     struct AllocationKeyHash
     {
         size_t operator()(const AllocationKey& key) const noexcept
@@ -244,8 +247,8 @@ public:
     // Clear before the owning device shuts down, on the same producer thread.
     void ClearAliasingCache();
     IRenderDeviceServices* aliasOwner{nullptr};
-    std::vector<own::shared_owner<AliasedGroup>> freeAliasedGroups;
-    std::unordered_map<AllocationKey, RHITransientAllocationInfo, AllocationKeyHash> allocationCache;
+    ce::dynamic_array<own::shared_owner<AliasedGroup>> freeAliasedGroups;
+    ce::engine_node_map<AllocationKey, RHITransientAllocationInfo, AllocationKeyHash> allocationCache;
     uint64_t freeAliasBytes{0};
     uint64_t maxFreeAliasBytes{128ull * 1024 * 1024};
     size_t maxFreeAliasGroups{32};
@@ -294,7 +297,7 @@ public:
         //   같은 방식).
     };
 
-    using ExecuteCallback = std::function<void(const ExecuteContext&)>;
+    using ExecuteCallback = ce::owned_func<void(const ExecuteContext&)>;
 
     // Graph ownership pins declaration data until recording consumers finish.
     // Callbacks capture only stable pointers/spans; Reset releases the data after
@@ -327,7 +330,7 @@ public:
     /// 물려받지 않으므로, 루트 시그니처·PSO·렌더 타깃·뷰포트·힙 바인딩을
     /// 조각마다 세워야 한다. 클리어처럼 한 번만 해야 하는 것은 slice==0에서만.
     using SplitExecuteCallback =
-        std::function<void(const ExecuteContext&, uint32_t slice, uint32_t sliceCount)>;
+        ce::owned_func<void(const ExecuteContext&, uint32_t slice, uint32_t sliceCount)>;
 
     struct Stats
     {
@@ -566,9 +569,9 @@ public:
     // Every usage payload is copied once into the graph's non-pmr frame arena.
     // Rvalue lists are emptied after copying and retain their caller-owned capacity.
     // Pass stores an immutable view, never a second vector copy or caller storage.
-    RGPassId AddPass(std::string_view name, const std::vector<RGPassUsage>& usages, ExecuteCallback execute,
+    RGPassId AddPass(std::string_view name, const ce::dynamic_array<RGPassUsage>& usages, ExecuteCallback execute,
                      bool hasSideEffect = false);
-    RGPassId AddPass(std::string_view name, std::vector<RGPassUsage>&& usages, ExecuteCallback execute,
+    RGPassId AddPass(std::string_view name, ce::dynamic_array<RGPassUsage>&& usages, ExecuteCallback execute,
                      bool hasSideEffect = false);
     RGPassId AddPass(std::string_view name, std::span<const RGPassUsage> usages, ExecuteCallback execute,
                      bool hasSideEffect = false);
@@ -605,7 +608,7 @@ public:
     struct RepeatedPhase
     {
         std::string name;
-        std::vector<RGPassUsage> usages;
+        ce::dynamic_array<RGPassUsage> usages;
     };
     struct RepeatedPhaseView
     {
@@ -613,13 +616,13 @@ public:
         std::span<const RGPassUsage> usages;
     };
     using RepeatedExecuteCallback =
-        std::function<void(const ExecuteContext&, uint32_t iterationIndex, uint32_t phaseIndex)>;
+        ce::owned_func<void(const ExecuteContext&, uint32_t iterationIndex, uint32_t phaseIndex)>;
     static constexpr uint32_t kMaxRepeatedPhases = 16;
     static constexpr uint32_t kMaxPassRepetitions = 1024;
 
     // 외부 버전은 한 번 발행한다. 내부 단계는 그 핸들을 그대로 쓰며,
     // usage.state는 해당 자원의 첫 단계 상태다. 반복은 같은 인코더에서 직렬 기록한다.
-    RGPassId AddRepeatedPass(std::string_view name, std::vector<RGPassUsage> usages, std::vector<RepeatedPhase> phases,
+    RGPassId AddRepeatedPass(std::string_view name, ce::dynamic_array<RGPassUsage> usages, ce::dynamic_array<RepeatedPhase> phases,
                              uint32_t repeatCount, RepeatedExecuteCallback execute, bool hasSideEffect = false,
                              uint32_t recordCost = 0);
     // Views are copied before returning. Reset retains the owned phase/name/usage
@@ -646,9 +649,9 @@ public:
     ///
     /// 조각 수(maxSlices)와는 여전히 다른 값이다. 조각 수는 '얼마나 쪼갤 수
     /// 있나'라 워커 수에 눌리고, 이 값은 '병렬로 갈 만한가'를 정한다.
-    RGPassId AddSplitPass(std::string_view name, const std::vector<RGPassUsage>& usages, SplitExecuteCallback execute,
+    RGPassId AddSplitPass(std::string_view name, const ce::dynamic_array<RGPassUsage>& usages, SplitExecuteCallback execute,
                           uint32_t maxSlices, bool hasSideEffect = false, uint32_t recordCost = 0);
-    RGPassId AddSplitPass(std::string_view name, std::vector<RGPassUsage>&& usages, SplitExecuteCallback execute,
+    RGPassId AddSplitPass(std::string_view name, ce::dynamic_array<RGPassUsage>&& usages, SplitExecuteCallback execute,
                           uint32_t maxSlices, bool hasSideEffect = false, uint32_t recordCost = 0);
     RGPassId AddSplitPass(std::string_view name, std::initializer_list<RGPassUsage> usages,
                           SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect = false,
@@ -690,8 +693,8 @@ public:
         // Caller-owned reusable vectors indexed by the program's logical slots.
         // Transient resource slots contain empty ResourceBindings.
         ce::lifetime_token owner;
-        std::vector<ResourceBinding> resources;
-        std::vector<PassBinding> passes;
+        ce::dynamic_array<ResourceBinding> resources;
+        ce::dynamic_array<PassBinding> passes;
     };
     own::shared_owner<const GraphProgram> SnapshotProgram() const;
     void InheritProgram(const own::shared_owner<const GraphProgram>& program);
@@ -718,8 +721,8 @@ public:
     {
         struct Entry { uint16_t pass; RHIQueueKind queue; };
         struct Wait { uint16_t producer, consumer; uint32_t resource; };
-        std::vector<Entry> entries; // Submission order; a topological order of the DAG.
-        std::vector<Wait> waits;
+        ce::dynamic_array<Entry> entries; // Submission order; a topological order of the DAG.
+        ce::dynamic_array<Wait> waits;
         uint64_t compileGeneration{0};
         // Historical prediction schema fields; authored placement leaves these zero.
         uint64_t predictedSerialNanoseconds{0};
@@ -751,7 +754,7 @@ public:
     // Preserve compiled order. Only DeclareAsyncCompute selects a compute queue;
     // queue support and legal resource states gate that request. Timings never gate it.
     bool BuildQueueSchedule(const RHIQueueCapabilities& capabilities,
-        const std::vector<QueueHint>& hints, bool enableAsyncCompute,
+        const ce::dynamic_array<QueueHint>& hints, bool enableAsyncCompute,
         QueueSchedule& output, std::string& outError) const;
 
     // Select after Compile, before recording. Graphics-only plans reuse the primary
@@ -789,8 +792,8 @@ public:
             RGQueueFallbackReason::None;
     }
     uint32_t GetQueueExecutionMode() const { return m_queueExecutionMode; }
-    std::vector<QueueHint> MeasuredQueueHints(
-        const std::function<std::optional<uint64_t>(const GpuPassTimingIdentity&)>& measurement) const;
+    ce::dynamic_array<QueueHint> MeasuredQueueHints(
+        const ce::owned_func<std::optional<uint64_t>(const GpuPassTimingIdentity&)>& measurement) const;
 
     struct QueueEndpoint
     {
@@ -821,7 +824,7 @@ public:
         struct Batch
         {
             RHIQueueKind queue{RHIQueueKind::Graphics};
-            std::vector<uint16_t> passes; // Empty first/last batches are prologue/epilogue.
+            ce::dynamic_array<uint16_t> passes; // Empty first/last batches are prologue/epilogue.
             uint32_t barriers{0};
             bool submitted{false};
         };
@@ -832,8 +835,8 @@ public:
         };
         QueueExecution execution;
         QueueSchedule schedule;
-        std::vector<Batch> batches;
-        std::vector<Wait> waits; // Actual reduced queue waits, including prefix and final join.
+        ce::dynamic_array<Batch> batches;
+        ce::dynamic_array<Wait> waits; // Actual reduced queue waits, including prefix and final join.
         bool specialized{false};
         uint32_t requestedExecutionMode{0}, effectiveExecutionMode{0};
         RGMeasurementDomain measurementDomain{RGMeasurementDomain::Normal};
@@ -845,7 +848,7 @@ public:
     // All callbacks are recorded before any submission. Retained batches pin self.
     bool SubmitQueues(const own::shared_owner<EnhancedRenderGraph>& self,
         IRHIQueueRecorder& recorder, QueueEndpoint& graphics, QueueEndpoint* compute,
-        const std::vector<QueueHint>& hints, bool enableAsyncCompute,
+        const ce::dynamic_array<QueueHint>& hints, bool enableAsyncCompute,
         ce::lifetime_token owner, QueueExecution& output, std::string& outError);
 
     // Compile이 정한 순서대로 배리어를 넣고 패스를 기록한다.
@@ -893,16 +896,16 @@ public:
         int32_t compiledIndex{-1};
         bool culled, sideEffect;
         uint32_t recordCost, maxSlices;
-        std::vector<DiagnosticUsage> usages;
-        std::vector<DiagnosticBarrier> barriers;
+        ce::dynamic_array<DiagnosticUsage> usages;
+        ce::dynamic_array<DiagnosticBarrier> barriers;
         struct Phase
         {
             std::string name;
-            std::vector<DiagnosticUsage> usages;
-            std::vector<DiagnosticBarrier> firstBarriers, repeatBarriers;
+            ce::dynamic_array<DiagnosticUsage> usages;
+            ce::dynamic_array<DiagnosticBarrier> firstBarriers, repeatBarriers;
         };
         uint32_t repeatCount{1};
-        std::vector<Phase> phases;
+        ce::dynamic_array<Phase> phases;
         bool computeCompatible{false}, asyncCompute{false};
     };
     struct DiagnosticResource
@@ -920,13 +923,13 @@ public:
     {
         struct VersionEdge { uint32_t producer, consumer, resource; uint16_t version; enum class Reason { RAW, WAR, WAW, RecordingSideEffect } reason; };
         struct ReachabilityEdge { uint32_t producer, consumer, resource; };
-        std::vector<DiagnosticPass> passes;
-        std::vector<DiagnosticResource> resources;
-        std::vector<uint16_t> executeOrder;
-        std::vector<ReachabilityEdge> reachabilityEdges;
-        std::vector<VersionEdge> versionEdges;
-        std::vector<int32_t> dependencyWaves; // authored pass index; -1 is culled/unavailable
-        std::vector<uint16_t> criticalPath;
+        ce::dynamic_array<DiagnosticPass> passes;
+        ce::dynamic_array<DiagnosticResource> resources;
+        ce::dynamic_array<uint16_t> executeOrder;
+        ce::dynamic_array<ReachabilityEdge> reachabilityEdges;
+        ce::dynamic_array<VersionEdge> versionEdges;
+        ce::dynamic_array<int32_t> dependencyWaves; // authored pass index; -1 is culled/unavailable
+        ce::dynamic_array<uint16_t> criticalPath;
         uint64_t generation{0};
         uint64_t graphEpoch{0};
         uint64_t dependencyHash{0};
@@ -974,7 +977,7 @@ public:
     bool CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) const;
 
     // 검증·진단용. Compile 뒤에 유효하다.
-    const std::vector<uint16_t>& GetExecuteOrder() const;
+    const ce::dynamic_array<uint16_t>& GetExecuteOrder() const;
     /// 패스를 여러 커맨드 리스트에 나눠 기록하고 선언 순서의 batch로 밀봉한다.
     ///
     /// ── 왜 이 순서인가 ──
@@ -1066,16 +1069,16 @@ private:
         uint64_t allocationBytes{0};
         std::string name;
         struct Version { uint16_t parent; bool modify; bool atomicMin64{false}; };
-        std::vector<Version> versionStorage;
+        ce::dynamic_array<Version> versionStorage;
         std::span<Version> versions;
     };
 
     struct PhaseBarrierPlan
     {
-        std::vector<RHITransition> transitions;
-        std::vector<RHIBufferTransition> bufferTransitions;
-        std::vector<RHITextureHandle> uavBarriers;
-        std::vector<RHIBufferHandle> uavBufferBarriers;
+        ce::dynamic_array<RHITransition> transitions;
+        ce::dynamic_array<RHIBufferTransition> bufferTransitions;
+        ce::dynamic_array<RHITextureHandle> uavBarriers;
+        ce::dynamic_array<RHIBufferHandle> uavBufferBarriers;
 
         void clear()
         {
@@ -1094,12 +1097,12 @@ private:
         ce::dynamic_bitset incoming, outgoing, batchEnds, retainedGraphicsTextures, sharedReadTextures;
     };
     own::unique_owner<QueueSubmissionScratch> m_queueSubmissionScratch;
-    std::vector<std::vector<uint16_t>> m_queueBatchPassScratch;
+    ce::dynamic_array<ce::dynamic_array<uint16_t>> m_queueBatchPassScratch;
     void ResetQueueDiagnostics();
 
     struct PhaseBarrierPlans
     {
-        std::vector<PhaseBarrierPlan> storage;
+        ce::dynamic_array<PhaseBarrierPlan> storage;
         size_t active{};
 
         bool empty() const { return active == 0; }
@@ -1153,18 +1156,18 @@ private:
         bool                     recordingIndependent{ false };
         // ★ 이 패스 직전에 한 번에 낸다. 계획 단계는 네 중립 배열만 만들고,
         //   기록 시점에 `RHIBarrierBatch`로 묶어 백엔드 인코더에 넘긴다.
-        std::vector<RHITransition>    transitions;
-        std::vector<RHIBufferTransition> bufferTransitions;
-        std::vector<RHITextureHandle> uavBarriers;
-        std::vector<RHIBufferHandle>  uavBufferBarriers;
-        std::vector<RHITransition> finalTransitions;
-        std::vector<RHIBufferTransition> finalBufferTransitions;
-        std::vector<RHITextureHandle> aliasTextures;
-        std::vector<RHIBufferHandle> aliasBuffers;
-        std::vector<uint16_t> poisonBuffers;
-        std::vector<std::pair<uint16_t, RHIRenderTargetBinding>> aliasClears;
+        ce::dynamic_array<RHITransition>    transitions;
+        ce::dynamic_array<RHIBufferTransition> bufferTransitions;
+        ce::dynamic_array<RHITextureHandle> uavBarriers;
+        ce::dynamic_array<RHIBufferHandle>  uavBufferBarriers;
+        ce::dynamic_array<RHITransition> finalTransitions;
+        ce::dynamic_array<RHIBufferTransition> finalBufferTransitions;
+        ce::dynamic_array<RHITextureHandle> aliasTextures;
+        ce::dynamic_array<RHIBufferHandle> aliasBuffers;
+        ce::dynamic_array<uint16_t> poisonBuffers;
+        ce::dynamic_array<ce::pair<uint16_t, RHIRenderTargetBinding>> aliasClears;
         uint32_t repeatCount{1};
-        std::vector<RepeatedPhase> phaseStorage;
+        ce::dynamic_array<RepeatedPhase> phaseStorage;
         std::span<RepeatedPhase> phases;
         bool repeated{false};
         RepeatedExecuteCallback repeatedExecute;
@@ -1239,20 +1242,20 @@ private:
         bool previousWrite{true};
         uint16_t atomicVersion{RGHandle::kInvalid};
     };
-    std::vector<ResourceRangeSchema> m_rangeSchemas;
+    ce::dynamic_array<ResourceRangeSchema> m_rangeSchemas;
     struct SubresourceScratch
     {
-        std::vector<std::vector<SubresourceCell>> accessCells, stateCells;
-        std::vector<uint64_t> offsets;
-        std::vector<uint32_t> mips, layers;
-        std::vector<RHIResourceState> finalStates;
+        ce::dynamic_array<ce::dynamic_array<SubresourceCell>> accessCells, stateCells;
+        ce::dynamic_array<uint64_t> offsets;
+        ce::dynamic_array<uint32_t> mips, layers;
+        ce::dynamic_array<RHIResourceState> finalStates;
         ce::dynamic_bitset externalResources;
     };
     own::unique_owner<SubresourceScratch> m_subresourceScratch;
     bool m_hasSubresourceUsages{false};
     bool ValidateSubresources(std::string& outError);
     bool BuildSubresourceDependencies(std::string& outError);
-    void BuildSubresourceCells(uint16_t resource, bool states, std::vector<SubresourceCell>& cells,
+    void BuildSubresourceCells(uint16_t resource, bool states, ce::dynamic_array<SubresourceCell>& cells,
                                SubresourceScratch& scratch) const;
     bool CoversSubresource(uint16_t resource, const RGPassUsage& usage, const SubresourceCell& cell, bool states) const;
     void PlanSubresourceBarriers(const ce::dynamic_bitset* batchEnds, PhaseBarrierPlan* prologue,
@@ -1310,10 +1313,10 @@ private:
     std::span<Resource> m_resources;
     // Declaration-local indices. Reset removes every entry, and generation bits
     // remain part of the key. Duplicate imports keep the original first match.
-    std::unordered_map<uint32_t, uint16_t> m_importedTextures, m_importedBuffers;
-    std::vector<uint16_t> m_atomicResources;
+    ce::engine_node_map<uint32_t, uint16_t> m_importedTextures, m_importedBuffers;
+    ce::dynamic_array<uint16_t> m_atomicResources;
     RGTransientPool* m_transientPool{ nullptr };
-    std::vector<own::shared_owner<RGTransientPool::AliasedGroup>> m_transientHeaps;
+    ce::dynamic_array<own::shared_owner<RGTransientPool::AliasedGroup>> m_transientHeaps;
     own::shared_owner<RGTransientPool::AliasHeapAccounting> m_aliasHeapAccounting;
     bool m_aliasing{false}, m_extendLifetimes{false};
     bool m_poison{false};
@@ -1322,8 +1325,8 @@ private:
     ce::render_arena_objects m_declarationData;
     ce::render_vector<Pass> m_passStorage;
     std::span<Pass> m_passes;
-    std::vector<FinalStateRequirement> m_finalStateRequirements;
-    std::vector<uint16_t> m_executeOrder;
+    ce::dynamic_array<FinalStateRequirement> m_finalStateRequirements;
+    ce::dynamic_array<uint16_t> m_executeOrder;
     own::shared_owner<const std::string> m_timingSignature;
     // Byte offset of each pass's culled field inside m_timingSignature.
     ce::render_vector<size_t> m_signatureCulledOffsets;
@@ -1340,17 +1343,17 @@ private:
     RGOrderPolicy m_orderPolicy{ RGOrderPolicy::DependencyOrder };
     bool BuildExplicitOrder(std::string& outError);
     void BuildDependencyWaves();
-    std::vector<int32_t> m_dependencyWaves;
-    std::vector<uint16_t> m_criticalPath;
+    ce::dynamic_array<int32_t> m_dependencyWaves;
+    ce::dynamic_array<uint16_t> m_criticalPath;
     // Queue state ownership remains conservative at whole-resource granularity.
     // Range declarations refine hazards and native barriers; queue planning may
     // add waits for disjoint ranges when backend state ownership requires it.
     struct QueuePlanningScratch;
     mutable own::unique_owner<QueuePlanningScratch> m_queuePlanningScratch;
     mutable std::mutex m_queuePlanningMutex;
-    void BuildQueueDependencies(const std::vector<RHIQueueKind>& queues, QueuePlanningScratch& scratch,
-        std::vector<std::vector<uint16_t>>& predecessors,
-        std::vector<std::vector<uint16_t>>& successors) const;
+    void BuildQueueDependencies(const ce::dynamic_array<RHIQueueKind>& queues, QueuePlanningScratch& scratch,
+        ce::dynamic_array<ce::dynamic_array<uint16_t>>& predecessors,
+        ce::dynamic_array<ce::dynamic_array<uint16_t>>& successors) const;
     bool IsComputeStateCompatible(uint16_t pass) const;
     void UpdateResourceUses();
     RGMeasurementDomain m_measurementDomain{RGMeasurementDomain::Normal};
@@ -1358,7 +1361,7 @@ private:
     RGHandle VersionHandle(uint16_t index, uint16_t version) const;
     RGHandle AdvanceVersion(RGHandle previous, bool modify);
     bool ValidVersionHandle(RGHandle handle, bool allowUnwritten = false) const;
-    std::vector<DiagnosticSnapshot::VersionEdge> m_versionEdges;
+    ce::dynamic_array<DiagnosticSnapshot::VersionEdge> m_versionEdges;
     // 그래프 소유자마다 불변 구조 후보를 정해진 상한까지 Reset 뒤에도 보관한다.
     // No native handles, callbacks, allocation plans or barrier states are cached.
 public:
@@ -1376,15 +1379,15 @@ public:
             ResourceRangeSchema importedSchema;
             std::string name;
             bool imported{false}, bufferKind{false}, firstImport{true};
-            std::vector<Resource::Version> versions;
+            ce::dynamic_array<Resource::Version> versions;
             bool used{false};
             uint32_t firstUse{UINT32_MAX}, lastUse{0};
         };
         struct PassDeclaration
         {
             std::string name;
-            std::vector<RGPassUsage> usages;
-            std::vector<RepeatedPhase> phases;
+            ce::dynamic_array<RGPassUsage> usages;
+            ce::dynamic_array<RepeatedPhase> phases;
             uint32_t maxSlices{1}, recordCost{0}, repeatCount{1};
             bool hasSideEffect{false}, computeCompatible{false}, asyncCompute{false};
             bool recordingSideEffect{false}, recordingIndependent{false};
@@ -1395,15 +1398,15 @@ public:
         RGMeasurementDomain measurementDomain{RGMeasurementDomain::Normal};
         bool aliasing{false}, extendLifetimes{false}, poison{false};
         uint32_t dependencyWaveCount{0};
-        std::vector<ResourceDeclaration> resources;
-        std::vector<PassDeclaration> passes;
-        std::vector<FinalStateRequirement> finalStateRequirements;
+        ce::dynamic_array<ResourceDeclaration> resources;
+        ce::dynamic_array<PassDeclaration> passes;
+        ce::dynamic_array<FinalStateRequirement> finalStateRequirements;
         own::shared_owner<const std::string> key;
         own::shared_owner<const std::string> timingSignature;
-        std::vector<uint16_t> order, criticalPath;
-        std::vector<int32_t> waves;
+        ce::dynamic_array<uint16_t> order, criticalPath;
+        ce::dynamic_array<int32_t> waves;
         ce::dynamic_bitset culled;
-        std::vector<DiagnosticSnapshot::VersionEdge> edges;
+        ce::dynamic_array<DiagnosticSnapshot::VersionEdge> edges;
     };
     class GraphProgram
     {
@@ -1415,14 +1418,14 @@ public:
       private:
         friend class EnhancedRenderGraph;
         own::shared_owner<const StructuralSchedule> m_schedule;
-        std::vector<size_t> m_usageOffsets;
-        std::vector<RGPassUsage> m_usages;
+        ce::dynamic_array<size_t> m_usageOffsets;
+        ce::dynamic_array<RGPassUsage> m_usages;
     };
 
 private:
     own::shared_owner<const StructuralSchedule> m_structuralSchedule;
     own::shared_owner<const StructuralSchedule> m_alternateSchedule;
-    std::array<own::shared_owner<const StructuralSchedule>, MaxStructuralSchedules - 2> m_additionalSchedules;
+    ce::fixed_array<own::shared_owner<const StructuralSchedule>, MaxStructuralSchedules - 2> m_additionalSchedules;
     own::shared_owner<const StructuralSchedule> m_activeStructuralSchedule;
     own::shared_owner<const GraphProgram> m_graphProgram;
     own::shared_owner<const GraphProgram> m_bindingProgram;
@@ -1437,15 +1440,15 @@ private:
     void InvalidateProgramBinding() noexcept { m_programBindingValidated = false; }
     bool MatchesStructuralSchedule(const StructuralSchedule& schedule) const;
     void CaptureStructuralDeclarations(StructuralSchedule& schedule) const;
-    const std::vector<int32_t>& DependencyWaves() const
+    const ce::dynamic_array<int32_t>& DependencyWaves() const
     {
         return m_activeStructuralSchedule ? m_activeStructuralSchedule->waves : m_dependencyWaves;
     }
-    const std::vector<uint16_t>& CriticalPath() const
+    const ce::dynamic_array<uint16_t>& CriticalPath() const
     {
         return m_activeStructuralSchedule ? m_activeStructuralSchedule->criticalPath : m_criticalPath;
     }
-    const std::vector<DiagnosticSnapshot::VersionEdge>& VersionEdges() const
+    const ce::dynamic_array<DiagnosticSnapshot::VersionEdge>& VersionEdges() const
     {
         return m_activeStructuralSchedule ? m_activeStructuralSchedule->edges : m_versionEdges;
     }

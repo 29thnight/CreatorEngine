@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "RHIShaderBlob.h"
@@ -16,7 +17,7 @@ inline constexpr std::uint32_t kMaxNameBytes = 16384;
 
 struct Writer
 {
-    std::vector<std::uint8_t> bytes;
+    ce::dynamic_array<std::uint8_t> bytes;
     bool valid{true};
     void Raw(const void* data, std::size_t size)
     {
@@ -65,7 +66,7 @@ struct Reader
 };
 
 inline bool Encode(const RHIShaderBlob& blob, const RHIShaderReflection& reflection,
-                   std::vector<std::uint8_t>& payload)
+                   ce::dynamic_array<std::uint8_t>& payload)
 {
     if (!blob.IsValid() || blob.Size() > kMaxBlobBytes || reflection.resources.size() > kMaxResources)
         return false;

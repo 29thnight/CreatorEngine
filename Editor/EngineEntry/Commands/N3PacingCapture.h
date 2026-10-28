@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #include "CharacterMovementComponent.h"
 #include "PhysicsBodyComponent.h"
@@ -12,7 +13,7 @@ namespace N3Pacing
     inline void Vector(Diagnostics::Node node, math::vector3 v)
     { node.SetSequence(); node.Append()<<v.x;node.Append()<<v.y;node.Append()<<v.z; }
     inline math::vector3 Translation(const math::matrix4x4& matrix)
-    {std::array<float,16> v;std::memcpy(v.data(),&matrix,sizeof(matrix));return {v[12],v[13],v[14]};}
+    {ce::fixed_array<float,16> v;std::memcpy(v.data(),&matrix,sizeof(matrix));return {v[12],v[13],v[14]};}
     struct Recorder final : Runtime::SimulationAdapter
     {
         std::uint64_t sceneEpoch{}, exchangeEpoch{}, first{}, last{}, previousFrameTick{};
@@ -143,7 +144,7 @@ namespace N3Pacing
         root["ticks"].SetSequence();root["frames"].SetSequence();
         if(SceneManagers->SimulationCommands().Bind(status.epoch,record)!=Runtime::TickResult::Ok)return Fail("n3.bind","Adapter busy");
         for(auto tick=record->first;tick<=record->last;++tick){
-            std::uint64_t sequence{};const std::array<std::byte,1> payload{std::byte{1}};
+            std::uint64_t sequence{};const ce::fixed_array<std::byte,1> payload{std::byte{1}};
             if(SceneManagers->SimulationCommands().Submit(status.epoch,tick,0x4e335043,payload,sequence)!=Runtime::TickResult::Ok){
                 SceneManagers->ResetSimulationCommands();return Fail("n3.submit","Cannot submit copied tick inputs");}
         }

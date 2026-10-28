@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "RHIShaderBlob.h"
@@ -19,7 +20,7 @@ struct RHIShaderCompileOptions
     bool bufferInt64Atomics{}; // SM6.6 / SPIR-V Int64Atomics; included in cache identity
     // Generated material modules can live in the runtime cache. Their common
     // modules are resolved here; Slang reports the actual dependency files.
-    std::vector<std::filesystem::path> includeDirectories;
+    ce::dynamic_array<std::filesystem::path> includeDirectories;
     // Fine pixel-quad derivatives require explicit SPIR-V DerivativeControl.
     // Request the capability only for hosts that use ddx_fine/ddy_fine.
     bool fineDerivatives{};
@@ -64,7 +65,7 @@ namespace RHIShaderCompiler
         std::string dependencyIdentity;
         // Files Slang actually read for this module, excluding the root source.
         // Callers with their own caches key on exactly these, not a directory scan.
-        std::vector<std::filesystem::path> dependencies;
+        ce::dynamic_array<std::filesystem::path> dependencies;
     };
 
     struct Stats

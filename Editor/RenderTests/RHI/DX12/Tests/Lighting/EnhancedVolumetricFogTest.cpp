@@ -1,3 +1,5 @@
+#include "../../../../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../../../../../Engine/Containers/ContainerAPI.h"
 #include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
@@ -188,7 +190,7 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
         // 한 장(또는 배열 한 슬라이스)을 바이트 단위로 채워 올린다.
         const auto upload = [&](ID3D12Resource* target, DXGI_FORMAT format,
             uint32_t width, uint32_t height, uint32_t bytesPerTexel, uint32_t subresource,
-            const std::function<void(uint32_t, uint32_t, void*)>& fill) -> bool
+            const ce::owned_func<void(uint32_t, uint32_t, void*)>& fill) -> bool
         {
             const uint32_t rawPitch = width * bytesPerTexel;
             const uint64_t pitch = (rawPitch + D3D12_TEXTURE_DATA_PITCH_ALIGNMENT - 1)
@@ -318,7 +320,7 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
 
     bool passed = true;
     uint32_t lastPassCount = 0;
-    std::array<RHIResourceState, 5> inputStates;
+    ce::fixed_array<RHIResourceState, 5> inputStates;
     inputStates.fill(RHIResourceState::PixelShaderResource);
 
     // 한 프레임을 돌려 격자와 합성 결과를 받아 온다. 그래프는 매번 새로 만든다.
@@ -326,7 +328,7 @@ bool DX12Test::RunVolumetricFogTest(std::string& outLog)
         uint32_t lightCount, RHIReadbackImage& outVoxel, RHIReadbackImage& outScreen) -> bool
     {
         // 방향광 하나(또는 없음). 방향광은 감쇠가 1이라 격자 전체가 빛을 받는다.
-        std::vector<EnhancedLight> lights;
+        ce::dynamic_array<EnhancedLight> lights;
         for (uint32_t i = 0; i < lightCount; ++i)
         {
             EnhancedLight light{};

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "CommandResult.h"
@@ -408,7 +409,7 @@ namespace CommandCore
         }
     }
 
-    inline CommandResult ExecuteTemporalCommand(const std::vector<std::string>& parts,
+    inline CommandResult ExecuteTemporalCommand(const ce::dynamic_array<std::string>& parts,
         TemporalPresentationTarget target)
     {
         using namespace TemporalCommandDetail;

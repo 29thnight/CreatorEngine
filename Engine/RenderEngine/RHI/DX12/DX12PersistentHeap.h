@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
 #pragma once
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
@@ -97,7 +98,7 @@ private:
     ID3D12Device* m_device{ nullptr };
     winrt::com_ptr<IDXGIAdapter3> m_adapter;
     RHIPersistentHeapPolicy m_policy;
-    std::unordered_map<uint64_t, winrt::com_ptr<ID3D12Heap>> m_segments;
+    ce::engine_node_map<uint64_t, winrt::com_ptr<ID3D12Heap>> m_segments;
     RHIDeviceMemoryBudgetCoordinator* m_budgetCoordinator{ nullptr };
     RHIDeviceMemoryBudgetOwner m_budgetOwner{ 0 };
     uint64_t m_softBudgetBytes{ 0 };

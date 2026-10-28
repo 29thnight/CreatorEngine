@@ -1,3 +1,4 @@
+#include "../Engine/Containers/ContainerAPI.h"
 #include "../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../Tools/build/ModuleAdapters/Creator.Platform.Windows.Strings.h"
@@ -37,17 +38,17 @@ namespace
         }
     };
 
-    std::vector<std::filesystem::path> LoadedModules()
+    ce::dynamic_array<std::filesystem::path> LoadedModules()
     {
-        std::vector<HMODULE> modules(256);
+        ce::dynamic_array<HMODULE> modules(256);
         DWORD bytes = 0;
         if (!EnumProcessModules(GetCurrentProcess(), modules.data(), static_cast<DWORD>(modules.size()*sizeof(HMODULE)), &bytes))
             throw std::runtime_error("Module inventory failed");
         if (bytes > modules.size()*sizeof(HMODULE)) throw std::runtime_error("Module inventory exceeded capacity");
-        std::vector<std::filesystem::path> result;
+        ce::dynamic_array<std::filesystem::path> result;
         for (std::size_t i = 0; i < bytes / sizeof(HMODULE); ++i)
         {
-            std::vector<wchar_t> path(32768);
+            ce::dynamic_array<wchar_t> path(32768);
             const auto size = GetModuleFileNameW(modules[i], path.data(), static_cast<DWORD>(path.size()));
             if (!size || size == path.size()) throw std::runtime_error("Module path inventory failed");
             result.emplace_back(std::wstring(path.data(), size));

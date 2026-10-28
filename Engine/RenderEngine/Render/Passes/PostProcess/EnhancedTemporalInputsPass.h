@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #pragma once
 #include "../../Graph/EnhancedRenderPass.h"
 
@@ -10,9 +11,9 @@ public:
     bool Initialize(const EnhancedFrameContext&, std::string&) override;
     void SetDepth(RGHandle depth) { m_depth = depth; }
     void Declare(EnhancedRenderGraph&, const EnhancedFrameContext&) override;
-    const std::array<RGHandle,5>& Outputs() const { return m_outputs; }
+    const ce::fixed_array<RGHandle,5>& Outputs() const { return m_outputs; }
 private:
     RHIPipelineHandle m_pipeline;
     RGHandle m_depth;
-    std::array<RGHandle,5> m_outputs{}; // motion/reactive/transparency/responsive/depth
+    ce::fixed_array<RGHandle,5> m_outputs{}; // motion/reactive/transparency/responsive/depth
 };

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include <stdint.h>
@@ -109,9 +110,9 @@ namespace ce::dx_capture
         const recording_summary& summary() const { return summary_; }
 
     private:
-        std::vector<record> records_;
-        std::vector<execution_link> executions_;
-        std::vector<work_link> works_;
+        ce::dynamic_array<record> records_;
+        ce::dynamic_array<execution_link> executions_;
+        ce::dynamic_array<work_link> works_;
         recording_summary summary_;
 
         friend struct recording_decoder;
@@ -128,7 +129,7 @@ namespace ce::dx_capture
     read_recording(const std::filesystem::path& path, recording_limits limits = {});
 
     // 합성 fixture와 작은 내보내기용. records[0]은 session이어야 한다.
-    std::expected<std::vector<std::byte>, file_error>
+    std::expected<ce::dynamic_array<std::byte>, file_error>
     encode_recording(std::span<const record> records, bool source_stopped_cleanly,
                      recording_limits limits = {});
 

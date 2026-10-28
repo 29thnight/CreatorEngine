@@ -1,4 +1,7 @@
-﻿#if defined(CE_CONTRACT_STANDALONE)
+﻿#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
+#if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
 import Creator.Core.Ownership;
@@ -49,15 +52,15 @@ namespace ModelSceneInstantiation
         assets::ModelSceneAssetInputs granular;
         std::string name;
         Options options;
-        std::vector<ObjectRecipe> objects;
-        std::vector<own::shared_owner<Material>> materials;
-        std::vector<own::shared_owner<const material_graph::Instance>> previewInstances;
-        std::vector<own::shared_owner<const experiment::Material>> authored;
-        std::vector<std::uint32_t> meshMaterials;
-        std::vector<EntityHandle> handles;
-        std::vector<std::size_t> renderers;
-        std::vector<ce::physics::triangle_mesh_source> collisionMeshes;
-        std::vector<std::optional<ce::physics::geometry_asset_key>> collisionKeys;
+        ce::dynamic_array<ObjectRecipe> objects;
+        ce::dynamic_array<own::shared_owner<Material>> materials;
+        ce::dynamic_array<own::shared_owner<const material_graph::Instance>> previewInstances;
+        ce::dynamic_array<own::shared_owner<const experiment::Material>> authored;
+        ce::dynamic_array<std::uint32_t> meshMaterials;
+        ce::dynamic_array<EntityHandle> handles;
+        ce::dynamic_array<std::size_t> renderers;
+        ce::dynamic_array<ce::physics::triangle_mesh_source> collisionMeshes;
+        ce::dynamic_array<std::optional<ce::physics::geometry_asset_key>> collisionKeys;
         std::size_t created{ 0 };
         std::size_t activated{ 0 };
         bool animatorReady{ false };
@@ -138,8 +141,8 @@ namespace ModelSceneInstantiation
         if (options.createMeshCollider && impl->hasBones)
             return reject(); // Static triangle assets cannot follow animated skin deformation.
 
-        std::map<uuid::uuid16, std::uint32_t> meshIndices;
-        std::map<uuid::uuid16, std::uint32_t> materialIndices;
+        ce::engine_ordered_map<uuid::uuid16, std::uint32_t> meshIndices;
+        ce::engine_ordered_map<uuid::uuid16, std::uint32_t> materialIndices;
         for (std::uint32_t i = 0; i < meshes.size(); ++i) meshIndices.emplace(meshes[i].meshId, i);
         for (std::uint32_t i = 0; i < materials.size(); ++i) materialIndices.emplace(materials[i].materialId, i);
         impl->meshMaterials.resize(meshes.size(), assets::kInvalidModelAssetIndex);
@@ -149,9 +152,9 @@ namespace ModelSceneInstantiation
 
         // 기존 계층 규약을 작업 스레드에서 평탄화한다. 부모는 항상 먼저 만들어진다.
         impl->objects.push_back({ impl->generation->Name() });
-        std::unordered_map<std::string, std::size_t> boneCandidates;
+        ce::engine_node_map<std::string, std::size_t> boneCandidates;
         boneCandidates.emplace(impl->generation->Name(), 0);
-        std::vector<std::size_t> attachPoints(nodes.size());
+        ce::dynamic_array<std::size_t> attachPoints(nodes.size());
         for (std::size_t i = 0; i < nodes.size(); ++i)
         {
             const auto& node = nodes[i];
@@ -190,7 +193,7 @@ namespace ModelSceneInstantiation
         }
         if (impl->hasBones)
         {
-            std::vector<std::size_t> boneAttach(skeleton->bones.size());
+            ce::dynamic_array<std::size_t> boneAttach(skeleton->bones.size());
             for (std::size_t i = 0; i < skeleton->bones.size(); ++i)
             {
                 if (i == skeleton->rootBone) continue;
@@ -345,8 +348,8 @@ namespace ModelSceneInstantiation
         {
             return reject();
         }
-        std::map<experiment::AssetId, std::uint32_t> meshIndices;
-        std::map<experiment::AssetId, std::uint32_t> materialIndices;
+        ce::engine_ordered_map<experiment::AssetId, std::uint32_t> meshIndices;
+        ce::engine_ordered_map<experiment::AssetId, std::uint32_t> materialIndices;
         for (std::uint32_t index = 0u; index < meshes.size(); ++index)
         {
             meshIndices.emplace(meshes[index].meshAssetId, index);
@@ -364,8 +367,8 @@ namespace ModelSceneInstantiation
             }
         }
         impl->objects.push_back({ impl->name });
-        std::unordered_map<std::string, std::size_t> boneCandidates;
-        std::vector<std::size_t> attachPoints(nodes.size());
+        ce::engine_node_map<std::string, std::size_t> boneCandidates;
+        ce::dynamic_array<std::size_t> attachPoints(nodes.size());
         for (std::size_t index = 0u; index < nodes.size(); ++index)
         {
             const auto& node = nodes[index];
@@ -412,7 +415,7 @@ namespace ModelSceneInstantiation
         }
         if (impl->hasBones)
         {
-            std::vector<std::size_t> boneAttach(skeleton->bones.size());
+            ce::dynamic_array<std::size_t> boneAttach(skeleton->bones.size());
             for (std::size_t index = 0u; index < skeleton->bones.size(); ++index)
             {
                 if (index == skeleton->rootBone)
@@ -613,7 +616,7 @@ namespace ModelSceneInstantiation
                     shape.geometryRevision = key->revision;
                     shape.staticFriction = shape.dynamicFriction = shape.restitution = 0;
                     auto* body = object->AddComponent<PhysicsBodyComponent>(ce::physics::body_kind::static_body,
-                        std::vector<PhysicsShapeDefinition>{std::move(shape)});
+                        ce::dynamic_array<PhysicsShapeDefinition>{std::move(shape)});
 
                     if (!body)
                         return fail();

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -63,12 +64,12 @@ bool PublishSceneSource(const std::filesystem::path& path, std::string_view sour
 
 bool TargetLess(const CompileTarget& left, const CompileTarget& right)
 {
-    return std::tie(left.binary, left.entry, left.profile) < std::tie(right.binary, right.entry, right.profile);
+    return ce::tie(left.binary, left.entry, left.profile) < ce::tie(right.binary, right.entry, right.profile);
 }
 
-std::vector<ShaderPassDesc> SceneMetaPasses(const LX::LXMaterialProgram& program)
+ce::dynamic_array<ShaderPassDesc> SceneMetaPasses(const LX::LXMaterialProgram& program)
 {
-    std::vector<ShaderPassDesc> passes;
+    ce::dynamic_array<ShaderPassDesc> passes;
     const auto graphics = [&](std::string name, std::string vertex, std::string pixel,
                               ShaderPassQueue queue = ShaderPassQueue::Opaque, bool writeDepth = false) {
         ShaderPassDesc pass;
@@ -119,10 +120,10 @@ std::vector<ShaderPassDesc> SceneMetaPasses(const LX::LXMaterialProgram& program
 }
 } // namespace
 
-std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& program,
+ce::dynamic_array<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& program,
                                                std::optional<RHIShaderBinary> only)
 {
-    std::vector<CompileTarget> targets;
+    ce::dynamic_array<CompileTarget> targets;
     for (const auto backend : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
     {
         if (only && *only != backend)
@@ -224,8 +225,8 @@ bool CompileSceneProduct(const LX::LXMaterialProgram& program, const std::filesy
     capabilities.coreForward = capabilities.layeredLookup = capabilities.refraction = capabilities.subsurface =
         capabilities.volume = true;
     VerifiedProduct candidate;
-    std::vector<RHIShaderReflection> reflections;
-    std::vector<LX::LXMaterialDiagnostic> diagnostics;
+    ce::dynamic_array<RHIShaderReflection> reflections;
+    ce::dynamic_array<LX::LXMaterialDiagnostic> diagnostics;
     if (!VerifyProduct(sceneProgram, sourceFile, SceneCompileTargets(sceneProgram, backend), permutation, options, capabilities,
                        budget, candidate, diagnostics, &reflections))
     {
@@ -269,7 +270,7 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
                       std::string& error)
 {
     // Every backend the product carries must be complete; the requested one must be carried.
-    std::vector<CompileTarget> expected;
+    ce::dynamic_array<CompileTarget> expected;
     for (const auto carried : {RHIShaderBinary::Dxil, RHIShaderBinary::SpirV})
     {
         if (!HasSceneBackend(product, carried))
@@ -295,8 +296,8 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
     {
         const auto& target = expected[index];
         const auto& recorded = actual[index];
-        if (std::tie(target.binary, target.entry, target.profile) !=
-            std::tie(recorded.binary, recorded.entry, recorded.profile))
+        if (ce::tie(target.binary, target.entry, target.profile) !=
+            ce::tie(recorded.binary, recorded.entry, recorded.profile))
         {
             return Fail(error, "METEOR cooked Scene stage/profile differs from its feature requirements.");
         }
@@ -313,7 +314,7 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
             continue;
         }
         using Member = RHIShaderCompiler::VerifiedShader SceneShaderSet::*;
-        const std::pair<std::string_view, Member> members[]{
+        const ce::pair<std::string_view, Member> members[]{
             {"LXSceneVS", &SceneShaderSet::vertex},
             {"LXSceneTemporalVS", &SceneShaderSet::temporalVertex},
             {"LXSceneTemporalPS", &SceneShaderSet::temporal},
@@ -335,7 +336,7 @@ bool LoadSceneShaders(const VerifiedProduct& product, RHIShaderBinary backend, S
             {"LXSceneRuntimeEffects0PS", &SceneShaderSet::runtimeEffects0},
             {"LXSceneRuntimeEffects1PS", &SceneShaderSet::runtimeEffects1},
             {"LXSceneVolumeCoefficientCS", &SceneShaderSet::volume}};
-        const auto member = std::ranges::find(members, target.entry, &std::pair<std::string_view, Member>::first);
+        const auto member = std::ranges::find(members, target.entry, &ce::pair<std::string_view, Member>::first);
         if (member == std::end(members))
         {
             return Fail(error, "METEOR cooked Scene entry has no installed consumer.");

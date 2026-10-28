@@ -4,6 +4,7 @@
 import Creator.Core.Ownership;
 #endif
 #pragma once
+#include "../Utility_Framework/Foundation/EngineFunc.h"
 // PHASE 3.75 MBC9 — 모델 자산의 씬 인스턴스화. legacy `Model`/`ModelLoader`
 // (Assimp 산물·역브리지)와 experiment 핸들이 은퇴하고, 씬에 세우는 정본 입력은
 // immutable `assets::ModelAssetGeneration` 하나다.
@@ -36,7 +37,7 @@ namespace ModelSceneInstantiation
         // Applies to legacy generation preparation. Typed inputs carry their
         // effective collider policy from DataSystem::PrepareModelAsset.
         bool createMeshCollider{ false };
-        std::function<ce::physics::result<ce::physics::geometry_asset_key>(
+        ce::owned_func<ce::physics::result<ce::physics::geometry_asset_key>(
             Scene&, std::uint32_t, const ce::physics::triangle_mesh_source&)> collisionGeometry;
         // Source compatibility only; typed inputs already resolve this choice.
         bool useCookedColliderDefault{ true };

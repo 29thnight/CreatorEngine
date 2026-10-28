@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -15,7 +16,7 @@ namespace material_graph
 struct HybridVisibilityPipelines final
 {
     enum Stage : unsigned { Initialize, PrepareClassify, Classify, PrepareSoftware, Rasterize, Count };
-    std::array<LX::Runtime::ComputePipeline, Count> compute;
+    ce::fixed_array<LX::Runtime::ComputePipeline, Count> compute;
     // Final surface writes visibility + depth; the occluder stage writes depth only.
     LX::Runtime::GraphicsPipeline resolve, resolveDepth;
     bool Prepare(const EnhancedFrameContext& context, std::string& error)
@@ -107,9 +108,9 @@ struct SceneHybridVisibility final
     own::shared_owner<TransientBufferPool> pool;
     own::shared_owner<const SceneFrameGeometry> geometry;
     own::shared_owner<const GpuGeometryVisibility::Frame> visible;
-    std::array<own::shared_owner<const LX::Runtime::ComputeGeneration>, Pipeline::Count> compute;
+    ce::fixed_array<own::shared_owner<const LX::Runtime::ComputeGeneration>, Pipeline::Count> compute;
     own::shared_owner<const LX::Runtime::GraphicsGeneration> resolve;
-    std::vector<std::array<uint32_t, 4>> records;
+    ce::dynamic_array<ce::fixed_array<uint32_t, 4>> records;
     RHIBufferSlice constants, metadata;
     RHIBufferHandle keys, routes, work, dispatchArguments;
     RHIBindingTable vertices, topologies;
@@ -251,7 +252,7 @@ struct SceneHybridVisibility final
             topologies = sharedPreparation->topologies;
             return true;
         }
-        std::vector<RHIBindingDesc> v, t;
+        ce::dynamic_array<RHIBindingDesc> v, t;
         v.reserve(geometry->geometry.size() - 1);
         t.reserve(geometry->geometry.size() - 1);
         for (size_t i = 1; i < geometry->geometry.size(); ++i)
@@ -503,7 +504,7 @@ struct SceneHybridVisibility final
             [owner, outputs](const auto& x) {
                 auto& e = *x.encoder;
                 const auto depth = RHIDepthTargetDesc::Depth(x.ResolveHandle(outputs.depth), RHIFormat::D32Float);
-                const std::array colors{x.ResolveHandle(outputs.visibility)};
+                const ce::fixed_array colors{x.ResolveHandle(outputs.visibility)};
                 const auto targets = owner->device->CreateRenderTargets(colors, &depth);
                 if (!targets.IsValid())
                 {

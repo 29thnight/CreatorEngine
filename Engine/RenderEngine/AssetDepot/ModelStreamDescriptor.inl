@@ -37,7 +37,7 @@ own::shared_owner<const assets::ModelMeshDescriptor> DecodeModelStreamDescriptor
     charge = AddModelCharge(charge, stream->flatDescriptors->capacity() * sizeof(experiment::MeshletDescriptor));
     charge = AddModelCharge(charge, stream->counts.capacity() * sizeof(model_cooked::ModelStreamLodCounts) * 2);
     charge = AddModelCharge(charge, stream->lods.groups.capacity() * sizeof(experiment::MeshClusterGroup) * 2);
-    charge = AddModelCharge(charge, sizeof(assets::cluster::Archive) + stream->archive->packets.capacity() * sizeof(std::vector<std::byte>));
+    charge = AddModelCharge(charge, sizeof(assets::cluster::Archive) + stream->archive->packets.capacity() * sizeof(ce::dynamic_array<std::byte>));
     charge = AddModelCharge(charge, stream->archive->fileOffsets.capacity() * sizeof(uint64_t) * 2);
     charge = AddModelCharge(charge, stream->archive->packetSizes.capacity() * sizeof(uint32_t) * 2);
     charge = AddModelCharge(charge, stream->pageHashes.capacity() * sizeof(model_cooked::Sha256Digest) * 2);

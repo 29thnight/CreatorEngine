@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -102,12 +103,12 @@ namespace material_graph
     {
         ce::profile_scope profile{ce::marker<"MaterialSceneInputSeal">()};
         const auto& camera = view.camera;
-        const std::array eye{camera.eyePosition.x, camera.eyePosition.y, camera.eyePosition.z, 0.f};
+        const ce::fixed_array eye{camera.eyePosition.x, camera.eyePosition.y, camera.eyePosition.z, 0.f};
         if (!std::isfinite(budget.geometryMaxPixelError) || budget.geometryMaxPixelError < 0 || !view.frameId ||
             !view.sceneEpoch || !view.viewId || !view.width || !view.height ||
             std::uint64_t(view.width) * view.height > UINT32_MAX || !budget.draws || draws.size() > budget.draws ||
-            !budget.chunks || !Finite(eye) || !Finite(std::bit_cast<std::array<float, 16>>(camera.view)) ||
-            !Finite(std::bit_cast<std::array<float, 16>>(camera.projection)) || !math::try_inverse(camera.view) ||
+            !budget.chunks || !Finite(eye) || !Finite(std::bit_cast<ce::fixed_array<float, 16>>(camera.view)) ||
+            !Finite(std::bit_cast<ce::fixed_array<float, 16>>(camera.projection)) || !math::try_inverse(camera.view) ||
             !math::try_inverse(camera.projection))
         {
             return Fail(error,
@@ -123,7 +124,7 @@ namespace material_graph
         // Asset identity and draw ordering do not distinguish independently
         // moving objects. Reject ambiguous correspondence instead of selecting
         // whichever previous draw happens to appear first.
-        using TemporalKey = std::tuple<std::uint64_t, std::uint64_t, std::uint64_t, assets::ModelMeshHandle>;
+        using TemporalKey = ce::tuple<std::uint64_t, std::uint64_t, std::uint64_t, assets::ModelMeshHandle>;
         struct PreviousDraw
         {
             TemporalKey key;
@@ -206,7 +207,7 @@ namespace material_graph
         candidate->view_ = view;
         candidate->geometryMaxPixelError_ = budget.geometryMaxPixelError;
         candidate->viewProjection_ = camera.view * camera.projection;
-        if (!Finite(std::bit_cast<std::array<float, 16>>(candidate->viewProjection_)))
+        if (!Finite(std::bit_cast<ce::fixed_array<float, 16>>(candidate->viewProjection_)))
         {
             return Fail(error, "Scene graph view/projection product exceeds the spatial input range.");
         }

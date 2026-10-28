@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -17,8 +18,8 @@ import Creator.Core.Uuid;
 namespace assets::generation_streaming
 {
 namespace ck = experiment::cooked;
-struct File { std::string path; std::vector<std::byte> bytes; };
-struct Bundle { std::vector<File> files; std::string metadataFingerprint, manifestFingerprint; };
+struct File { std::string path; ce::dynamic_array<std::byte> bytes; };
+struct Bundle { ce::dynamic_array<File> files; std::string metadataFingerprint, manifestFingerprint; };
 inline std::string Fingerprint(std::span<const std::byte> bytes)
 {
     ck::Sha256Digest digest{}; std::string failure;
@@ -36,7 +37,7 @@ inline Bundle Build(const experiment::ModelDraft& draft, std::span<const uuid::u
     ck::AssetSetManifest manifest; manifest.assetSetId = draft.metadata.assetId; manifest.revision = generation;
     manifest.targetPlatform = "win-x64"; manifest.targetAbi = "model-stream-v1";
     const auto add = [&](ck::TypedAssetReference reference, uint32_t representation, uint32_t schema,
-                         std::string path, std::vector<std::byte> bytes, std::vector<ck::AssetDependency> dependencies) {
+                         std::string path, ce::dynamic_array<std::byte> bytes, ce::dynamic_array<ck::AssetDependency> dependencies) {
         ck::AssetBlobRecord blob; std::string failure;
         if (!ck::ComputeSha256(bytes,blob.contentSha256,failure)) throw std::runtime_error(failure);
         blob.byteSize = bytes.size(); blob.kind = reference.kind; blob.representation = representation; blob.schemaVersion = schema;
@@ -58,26 +59,26 @@ inline Bundle Build(const experiment::ModelDraft& draft, std::span<const uuid::u
         skeleton.skeleton = *draft.skeleton; skeleton.skeleton.clips.clear();
         if (skeletonId.is_nil() || !ck::ComputeBoneLayoutDigest(skeleton.skeleton,skeleton.boneLayoutSha256,failure))
             throw std::runtime_error("Authoring stream skeleton: " + failure);
-        std::vector<std::byte> bytes;
+        ce::dynamic_array<std::byte> bytes;
         if (!ck::WriteSkeletonArtifact(skeleton,bytes,failure)) throw std::runtime_error(failure);
         add(reference(skeletonId,ck::CookedAssetKind::Skeleton),ck::kSkeletonRepresentation,ck::kSkeletonArtifactVersion,
             "Derived/Skeleton.cesl",std::move(bytes),{});
     }
     ck::ModelDescriptorArtifact summary; summary.modelAssetId = draft.metadata.assetId;
     summary.name = draft.metadata.name; summary.skeletonAssetId = experiment::AssetId{skeletonId}; summary.createMeshCollider = colliderDefault;
-    std::vector<ck::AssetDependency> modelDependencies;
+    ce::dynamic_array<ck::AssetDependency> modelDependencies;
     if (draft.skeleton) modelDependencies.push_back(edge(skeletonId,ck::CookedAssetKind::Skeleton,ck::AssetDependencyKind::Loadable));
     for (size_t index = 0; index < draft.meshes.size(); ++index)
     {
         const auto& mesh = draft.meshes[index]; ck::ModelGeometryArtifact geometry; geometry.mesh = mesh;
-        std::vector<ck::AssetDependency> dependencies;
+        ce::dynamic_array<ck::AssetDependency> dependencies;
         if (Has(mesh.vertices.AttributeMask(),VertexAttribute::BoneIndices))
         {
             geometry.requiredBoneCount = static_cast<uint32_t>(skeleton.skeleton.bones.size());
             if (!ck::ComputeSkinBindingDigest(skeleton.skeleton,geometry.requiredSkinBindingSha256,failure)) throw std::runtime_error(failure);
             dependencies.push_back(edge(skeletonId,ck::CookedAssetKind::Skeleton,ck::AssetDependencyKind::Hard));
         }
-        std::vector<std::byte> bytes; ck::Sha256Digest metadataDigest{};
+        ce::dynamic_array<std::byte> bytes; ck::Sha256Digest metadataDigest{};
         if (!ck::WriteModelGeometryArtifact(geometry,bytes,failure) || !ck::ModelGeometryStreamMetadataDigest(bytes,metadataDigest,failure))
             throw std::runtime_error(failure);
         const auto path = "Derived/Geometry/" + ck::ModelGeometryStreamDirectory(metadataDigest) + "/" + uuid::to_string(meshIds[index]) + ".cege";
@@ -100,7 +101,7 @@ inline Bundle Build(const experiment::ModelDraft& draft, std::span<const uuid::u
         for (auto index : node.meshes) value.meshAssetIds.push_back(experiment::AssetId{meshIds[index.Value()]});
         summary.nodes.push_back(std::move(value));
     }
-    std::vector<std::byte> summaryBytes;
+    ce::dynamic_array<std::byte> summaryBytes;
     if (!ck::WriteModelDescriptorArtifact(summary,summaryBytes,failure)) throw std::runtime_error(failure);
     add(reference(draft.metadata.assetId.value,ck::CookedAssetKind::Model),ck::kModelDescriptorRepresentation,ck::kModelDescriptorVersion,
         "Derived/model.cemd",std::move(summaryBytes),std::move(modelDependencies));
@@ -117,14 +118,14 @@ inline Bundle Build(const experiment::ModelDraft& draft, std::span<const uuid::u
 struct Loaded
 {
     ck::ModelDescriptorArtifact summary;
-    std::vector<own::shared_owner<const ModelMeshDescriptor>> meshes;
+    ce::dynamic_array<own::shared_owner<const ModelMeshDescriptor>> meshes;
 };
-inline std::vector<std::byte> Read(const std::filesystem::path& path, uint64_t maximum)
+inline ce::dynamic_array<std::byte> Read(const std::filesystem::path& path, uint64_t maximum)
 {
     std::ifstream file(path,std::ios::binary | std::ios::ate);
     const auto size = file ? file.tellg() : std::streampos(-1);
     if (size < 0 || uint64_t(size) > maximum) throw std::runtime_error("Generation stream file extent: " + path.string());
-    std::vector<std::byte> bytes(static_cast<size_t>(size)); file.seekg(0);
+    ce::dynamic_array<std::byte> bytes(static_cast<size_t>(size)); file.seekg(0);
     if (!bytes.empty() && !file.read(reinterpret_cast<char*>(bytes.data()),bytes.size())) throw std::runtime_error("Generation stream short read");
     return bytes;
 }
@@ -132,7 +133,7 @@ inline Loaded Load(const std::filesystem::path& root, std::string_view manifestF
 {
     const auto bytes = Read(root / "streaming.cemf",16ull << 20);
     if (Fingerprint(bytes) != manifestFingerprint) throw std::runtime_error("Generation streaming manifest SHA-256");
-    ck::AssetSetManifest manifest; std::vector<ck::AssetManifestIssue> issues;
+    ck::AssetSetManifest manifest; ce::dynamic_array<ck::AssetManifestIssue> issues;
     if (!ck::ReadAssetSetManifest(bytes,manifest,issues) || manifest.assetSetId.value != modelId || manifest.revision != generation)
         throw std::runtime_error("Generation streaming manifest identity");
     auto source = own::make_shared<ck::LooseArtifactByteSource>(root);

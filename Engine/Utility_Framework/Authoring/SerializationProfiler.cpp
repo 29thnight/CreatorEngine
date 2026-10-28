@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "SerializationProfiler.h"
 
 #include "../Foundation/StandardLibrary.h"
@@ -10,12 +11,12 @@ namespace
 
 	// 원자 배열 두 벌. 씬 로드는 메인 스레드지만 저장/소환 경로가 워커에서 불릴 수
 	// 있으므로 relaxed 누산으로 둔다 — 판정은 로드 완료 뒤 한 번만 읽는다.
-	std::array<std::atomic<uint64_t>, SerializationProfile::kStageCount> g_nanos{};
-	std::array<std::atomic<uint64_t>, SerializationProfile::kStageCount> g_calls{};
+	ce::fixed_array<std::atomic<uint64_t>, SerializationProfile::kStageCount> g_nanos{};
+	ce::fixed_array<std::atomic<uint64_t>, SerializationProfile::kStageCount> g_calls{};
 
 	// Reset이 지우지 않는 부팅 슬롯. CLI가 켜기 전에 이미 끝난 구간을 잃지 않는다.
-	std::array<std::atomic<uint64_t>, SerializationProfile::kStageCount> g_bootNanos{};
-	std::array<std::atomic<uint64_t>, SerializationProfile::kStageCount> g_bootCalls{};
+	ce::fixed_array<std::atomic<uint64_t>, SerializationProfile::kStageCount> g_bootNanos{};
+	ce::fixed_array<std::atomic<uint64_t>, SerializationProfile::kStageCount> g_bootCalls{};
 }
 
 namespace SerializationProfile

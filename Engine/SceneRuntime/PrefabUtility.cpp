@@ -1,3 +1,6 @@
+#include "../Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
 #else
@@ -44,9 +47,9 @@ namespace
 	// Meta::DeserializePrefab에 넘길 제외 집합을 만든다. m_index는 슬롯 정체성이므로
 	// 항상 제외한다. 계층은 H3에서 Entity 리플렉션 필드가 아니어서 이 목록에조차
 	// 들어오지 않고, HierarchyStore topology가 그대로 보존된다.
-	std::unordered_set<std::string> CollectGameObjectOverrideNames(const Entity& obj)
+	ce::engine_node_set<std::string> CollectGameObjectOverrideNames(const Entity& obj)
 	{
-		std::unordered_set<std::string> names{ "m_index" };
+		ce::engine_node_set<std::string> names{ "m_index" };
 		for (const auto& ov : obj.m_prefabOverrides)
 		{
 			if (ov.m_componentType.empty())
@@ -60,7 +63,7 @@ namespace
 	void SeedTypeOverrides(const reflgen::type_descriptor& type, const std::string& componentType,
 		const Authoring::ReadNode& currentNode,
 		const Authoring::ReadNode& snapshotNode,
-		std::vector<PrefabOverride>& out, int componentSlot = -1)
+		ce::dynamic_array<PrefabOverride>& out, int componentSlot = -1)
 	{
 		for (const reflgen::field_info& field : type.fields())
 		{
@@ -124,7 +127,7 @@ namespace
 			// 순번은 **타입별 누적**이다 — 절대 인덱스가 아니다.
 			// ApplyComponentDiff의 nextOrdinal과 같은 규칙이어야 하고, 그쪽도
 			// obj.m_components 순서로 센다(직렬화 순서가 곧 그 순서다).
-			std::unordered_map<std::string, int> slotByType;
+			ce::engine_node_map<std::string, int> slotByType;
 			const size_t count = std::min(currComponents.Size(), snapComponents.Size());
 			for (size_t i = 0; i < count; ++i)
 			{
@@ -146,10 +149,10 @@ namespace
 	//
 	// slot < 0인 기록은 "타입 전체"를 뜻한다(순번 필드가 없던 시절 데이터).
 	// 그 경우 예전 행동 그대로 그 타입의 모든 컴포넌트에 걸린다.
-	std::unordered_set<std::string> CollectComponentOverrideNames(
+	ce::engine_node_set<std::string> CollectComponentOverrideNames(
 		const Entity& obj, const std::string& componentTypeName, int slot)
 	{
-		std::unordered_set<std::string> names;
+		ce::engine_node_set<std::string> names;
 		for (const auto& ov : obj.m_prefabOverrides)
 		{
 			if (ov.m_componentType != componentTypeName)
@@ -188,7 +191,7 @@ namespace
 		// 쪽은 FindTypeByInstance가 실제 런타임 typeID로 조회하므로 이름 충돌
 		// 걱정이 없다(K1-b UUID·이름 폴백은 newComponents 쪽 ExtractTypeFromYAML
 		// 에서만 필요하다).
-		std::unordered_map<std::string, std::vector<size_t>> existingByType;
+		ce::engine_node_map<std::string, ce::dynamic_array<size_t>> existingByType;
 		for (size_t i = 0; i < originalCount; ++i)
 		{
 			const auto comp = obj.m_components[i];
@@ -200,7 +203,7 @@ namespace
 		}
 
 		ce::dynamic_bitset kept(originalCount, false);
-		std::unordered_map<std::string, size_t> nextOrdinal;
+		ce::engine_node_map<std::string, size_t> nextOrdinal;
 
 		for (const Authoring::ReadNode node : newComponents)
 		{
@@ -318,7 +321,7 @@ namespace
 			}
 			comp.reset();
 		}
-		std::erase_if(obj.m_components, [](const gc::trace_ref<Component>& c) { return c == nullptr; });
+		ce::erase_if(obj.m_components, [](const gc::trace_ref<Component>& c) { return c == nullptr; });
 
 		// m_componentIds·m_componentTypeMask를 한 번에 다시 세운다 — GameObject의
 		// 기존 공개 API(내부에서 RebuildComponentTypeMask도 함께 부른다). 파괴분만큼
@@ -545,7 +548,7 @@ void PrefabUtility::ForgetScene(const Scene* scene)
 
     for (auto& [guid, instances] : m_instanceMap)
     {
-        std::erase_if(instances, [&](const InstanceRef& ref) { return ref.scene == scene; });
+        ce::erase_if(instances, [&](const InstanceRef& ref) { return ref.scene == scene; });
     }
 }
 
@@ -624,7 +627,7 @@ void PrefabUtility::UnregisterInstance(Entity* instance)
     // (세대 검사가 다음 읽기에서 걸러주긴 하지만, 즉시 지우는 편이 더 싸다 — P2)
     for (auto& [guid, instances] : m_instanceMap)
     {
-        std::erase_if(instances, [&](const InstanceRef& ref)
+        ce::erase_if(instances, [&](const InstanceRef& ref)
         {
             return ref.scene == scene && ref.handle == handle;
         });
@@ -655,7 +658,7 @@ size_t PrefabUtility::UpdateInstances(const Prefab* prefab, const Scene* exclude
 
     // 세대 검사로 죽은 인스턴스를 자동 걸러낸다(P0의 수동 erase 방어를 대체 —
     // SceneGraphRedesignPlan P2). 훑는 김에 목록에서도 지운다.
-    std::erase_if(it->second, [](const InstanceRef& ref) { return Resolve(ref) == nullptr; });
+    ce::erase_if(it->second, [](const InstanceRef& ref) { return Resolve(ref) == nullptr; });
 
     for (const InstanceRef& ref : it->second)
     {

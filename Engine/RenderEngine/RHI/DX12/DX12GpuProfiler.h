@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -97,7 +98,7 @@ class DX12GpuProfiler : public IRHIGpuProfiler
     struct FrameTimings
     {
         GpuFrameToken token{};
-        std::vector<PassSlice> slices; // 기록 순서 그대로
+        ce::dynamic_array<PassSlice> slices; // 기록 순서 그대로
         uint64_t queueBeginTicks{0};
         uint64_t queueEndTicks{0};
         uint64_t busyTicks{0};
@@ -174,7 +175,7 @@ class DX12GpuProfiler : public IRHIGpuProfiler
     /// raw 조각을 이름으로 묶어 표시용으로 만든다. 원본은 그대로 둔다.
     ///
     /// 분할 패스를 그대로 나열하면 "GBuffer 가 여섯 번 있다" 가 되어 읽을 수 없다.
-    void MergeSlices(const FrameTimings& timings, std::vector<PassTiming>& outTimings);
+    void MergeSlices(const FrameTimings& timings, ce::dynamic_array<PassTiming>& outTimings);
 
     /// 지금 시점의 표본을 새로 뜬다.
     ///
@@ -233,12 +234,12 @@ class DX12GpuProfiler : public IRHIGpuProfiler
         uint32_t slices{0};
         uint64_t duration{0};
     };
-    std::vector<std::pair<std::string_view, MergedSpan>> m_mergeScratch;
-    std::vector<size_t> m_mergeBuckets;
+    ce::dynamic_array<ce::pair<std::string_view, MergedSpan>> m_mergeScratch;
+    ce::dynamic_array<size_t> m_mergeBuckets;
 
     // busy 계산용 스크래치. 조각을 정렬해 훑어야 하는데 원본 순서를 깨면
     // 안 되므로 사본을 둔다.
-    std::vector<std::pair<uint64_t, uint64_t>> m_busyScratch;
+    ce::dynamic_array<ce::pair<uint64_t, uint64_t>> m_busyScratch;
 
     // 큐를 붙잡아 둔다. 표본을 다시 뜨려면 필요하고, 주파수만 받아 두고
     // 놓아 버리면 그 뒤로는 두 시계를 맞출 수단이 없다.
@@ -274,7 +275,7 @@ class DX12GpuProfiler : public IRHIGpuProfiler
     //   한 벌이었고, 그래서 질의 힙·리드백은 슬롯별로 갈라져 있는데 **CPU 쪽
     //   기록만 한 벌**이었다. 인플라이트 제출이 둘이면 뒤에 온 것이 앞의 이름·
     //   질의 인덱스를 덮어 썼다.
-    std::vector<PassRecord> m_records;
+    ce::dynamic_array<PassRecord> m_records;
 
     // 슬롯·패스 쌍을 평탄 인덱스로 바꾼다. 두 자리에서 같은 산술을 적으면
     // 한쪽만 고칠 때 조용히 어긋난다.
@@ -288,9 +289,9 @@ class DX12GpuProfiler : public IRHIGpuProfiler
     struct PassSlots
     {
         explicit PassSlots(size_t count) : m_values(count) {}
-        std::vector<std::atomic<uint32_t>> m_values;
+        ce::dynamic_array<std::atomic<uint32_t>> m_values;
     };
     own::unique_owner<PassSlots> m_slotUsedPasses;
-    std::vector<GpuFrameToken> m_slotTokens;
+    ce::dynamic_array<GpuFrameToken> m_slotTokens;
     double m_lastTotalMs{0.0};
 };

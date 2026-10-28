@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineStorage.h"
+#include "../Containers/ContainerAPI.h"
 #include "ProfilerViewerClient.h"
 #include "ProfilerViewerTransport.h"
 
@@ -50,7 +52,7 @@ namespace ce::profiler_viewer
         transport::security::handle stop{CreateEventW(nullptr, TRUE, FALSE, nullptr)};
         mutable std::mutex mutex;
         std::shared_ptr<const client_snapshot> published = std::make_shared<const client_snapshot>();
-        std::deque<transport::packet> commands;
+        ce::segmented_deque<transport::packet> commands;
         bool command_pending = false;
         std::uint64_t command_baseline = 0;
 
@@ -176,8 +178,8 @@ namespace ce::profiler_viewer
                 publish(current);
                 auto heartbeat_at = std::uint64_t{0};
                 auto last_received = GetTickCount64();
-                std::vector<std::byte> incoming;
-                std::vector<std::byte> diagnostic_incoming;
+                ce::dynamic_array<std::byte> incoming;
+                ce::dynamic_array<std::byte> diagnostic_incoming;
                 std::uint32_t diagnostic_expected_size = 0;
                 std::uint64_t diagnostic_transfer_id = 0;
                 std::uint64_t diagnostic_previous_transfer = 0;
@@ -191,7 +193,7 @@ namespace ce::profiler_viewer
                 std::uint64_t queued_capture_generation = 0;
                 std::uint64_t decoding_capture_generation = 0;
                 std::future<std::expected<capture_session_ptr, capture_file_error>> decoding;
-                std::shared_ptr<std::vector<std::byte>> queued_decode;
+                std::shared_ptr<ce::dynamic_array<std::byte>> queued_decode;
                 message_kind incoming_kind = message_kind::capture_part;
                 bool healthy = true;
                 bool outgoing_order_known = true;
@@ -210,7 +212,7 @@ namespace ce::profiler_viewer
                         outgoing_order_known = healthy;
                         heartbeat_at = now;
                     }
-                    std::deque<packet> requests;
+                    ce::segmented_deque<packet> requests;
                     {
                         std::lock_guard lock(mutex);
                         requests.swap(commands);
@@ -347,7 +349,7 @@ namespace ce::profiler_viewer
                                 diagnostic_incoming.insert(diagnostic_incoming.end(), value.payload.begin() + in.offset, value.payload.end());
                                 if (diagnostic_incoming.size() == diagnostic_expected_size)
                                 {
-                                    current.diagnostics = std::make_shared<const std::vector<std::byte>>(std::move(diagnostic_incoming));
+                                    current.diagnostics = std::make_shared<const ce::dynamic_array<std::byte>>(std::move(diagnostic_incoming));
                                     diagnostic_incoming.clear();
                                     diagnostic_expected_size = 0;
                                     diagnostic_previous_transfer = diagnostic_transfer_id;
@@ -383,7 +385,7 @@ namespace ce::profiler_viewer
                                 incoming.insert(incoming.end(), value.payload.begin() + in.offset, value.payload.end());
                                 if (incoming.size() == expected_size)
                                 {
-                                    queued_decode = std::make_shared<std::vector<std::byte>>(std::move(incoming));
+                                    queued_decode = std::make_shared<ce::dynamic_array<std::byte>>(std::move(incoming));
                                     queued_clear_revision = incoming_clear_revision;
                                     queued_capture_generation = incoming_capture_generation;
                                     incoming.clear();

@@ -1,5 +1,5 @@
 export module Creator.Platform.Windows;
-
+export import "Creator.Containers.h";
 import std;
 import "Creator.WinAPI.h";
 import winrt_base;
@@ -115,7 +115,7 @@ export namespace ce::platform::windows
 export namespace ce::platform::windows
 {
     using window_message_interceptor =
-        std::function<std::optional<LRESULT>(HWND, UINT, WPARAM, LPARAM)>;
+        ce::owned_func<std::optional<LRESULT>(HWND, UINT, WPARAM, LPARAM)>;
 
     // Only the Win32 adapter sees SDK style bits, resource IDs and raw messages.
     struct window_desc : ::Core::WindowDesc

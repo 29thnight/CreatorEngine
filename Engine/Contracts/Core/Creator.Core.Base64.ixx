@@ -1,5 +1,5 @@
 export module Creator.Core.Base64;
-
+export import "Creator.Containers.h";
 import std;
 
 // Standard alphabet, canonical padding and unused-bit validation.
@@ -59,7 +59,7 @@ export namespace ce::base64
     }
 
     [[nodiscard]] inline bool decode(std::string_view encoded,
-        std::vector<std::uint8_t>& decoded)
+        ce::dynamic_array<std::uint8_t>& decoded)
     {
         decoded.clear();
         if (encoded.empty())

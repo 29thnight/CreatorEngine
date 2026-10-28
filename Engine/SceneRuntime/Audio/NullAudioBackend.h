@@ -1,4 +1,8 @@
+#include "../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineStorage.h"
+#include "../../Utility_Framework/Foundation/EngineNodeSet.h"
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "AudioBackend.h"
@@ -102,16 +106,16 @@ namespace wave
         DeviceSettings m_settings{};
         ListenerState m_listener{};
 
-        std::unordered_set<ClipKey> m_clips;
-        std::unordered_map<ClipKey, ClipInfo> m_clipInfo;
-        std::unordered_map<std::uint64_t, ClipInfo> m_clipLeases;
+        ce::engine_node_set<ClipKey> m_clips;
+        ce::engine_node_map<ClipKey, ClipInfo> m_clipInfo;
+        ce::engine_node_map<std::uint64_t, ClipInfo> m_clipLeases;
         std::uint64_t m_nextClipLease{ 1u };
         ReverbPreset m_reverbPreset{ ReverbPreset::Room };
-        std::unordered_map<std::uint16_t, float> m_busVolumes;
+        ce::engine_node_map<std::uint16_t, float> m_busVolumes;
 
         // id 는 1부터 매긴다 — 0 은 언제나 무효다.
-        std::deque<Voice> m_voices;
-        std::vector<std::size_t> m_freeVoices;
+        ce::segmented_deque<Voice> m_voices;
+        ce::dynamic_array<std::size_t> m_freeVoices;
         std::size_t m_startAttempts{ 0 };
     };
 }

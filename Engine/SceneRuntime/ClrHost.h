@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 #if defined(CE_CONTRACT_STANDALONE)
@@ -120,7 +121,7 @@ public:
 	void FlushAniEvents();
 
 	// 등록된 애니메이션 상태 스크립트 이름 목록 — 애니메이터 편집기의 선택 목록용.
-	std::vector<std::string> GetAniBehaviorTypeNames();
+	ce::dynamic_array<std::string> GetAniBehaviorTypeNames();
 
 	// ── 이름으로 부르는 콜백 ──
 	//
@@ -276,7 +277,7 @@ public:
 
 	/// 갈래별 사용자 노드 타입 이름 — BT 편집기의 선택 목록용.
 	/// 편집기가 메뉴를 열 때만 도는 경로라 틱 규약과 무관하다.
-	std::vector<std::string> GetBTNodeTypeNames(BTNodeKind kind);
+	ce::dynamic_array<std::string> GetBTNodeTypeNames(BTNodeKind kind);
 
 	/// 이 이름의 사용자 노드가 등록됐는가. 편집기가 노드를 그릴 때 노드마다 부르므로
 	/// 목록을 받아 훑는 대신 판정만 받는다.
@@ -302,7 +303,7 @@ public:
 
 	// 등록된 스크립트 타입 이름 목록 — 에디터의 컴포넌트 추가 메뉴용.
 	// 선택 바인딩이라 구 어셈블리에서는 빈 목록을 돌려줄 수 있다.
-	std::vector<std::string> GetComponentTypeNames();
+	ce::dynamic_array<std::string> GetComponentTypeNames();
 
 
 	// 마지막 틱에서 관리 측이 보고한 활성 스크립트 수(경계 로그·진단용).
@@ -449,7 +450,7 @@ public:
 	/// 표식된 static 메서드 하나를 부른다. **게임 스레드 전용**이다(관리 호출 규약).
 	InvokeResult InvokeCallableStatic(const std::string& typeName,
 	                                  const std::string& methodName,
-	                                  const std::vector<std::string>& args);
+	                                  const ce::dynamic_array<std::string>& args);
 
 	int  GetFieldCount(int instanceId);
 	std::string GetFieldName(int instanceId, int index);
@@ -559,13 +560,13 @@ private:
 	TypeNamesFn    m_fnGetAniBehaviorTypeNames{ nullptr };
 
 	// 한 프레임에 모이는 충돌 이벤트. 매 프레임 clear 하되 용량은 유지한다.
-	std::vector<ScriptContact> m_physicsEvents;
-	std::vector<ScriptAniEvent> m_aniEvents;
+	ce::dynamic_array<ScriptContact> m_physicsEvents;
+	ce::dynamic_array<ScriptAniEvent> m_aniEvents;
 
 	// AI 틱 큐. 담는 쪽이 잡 스레드라 플래그로 보호한다(위 주석 참고).
-	std::vector<ScriptAITick> m_aiTicks;
+	ce::dynamic_array<ScriptAITick> m_aiTicks;
 	std::atomic_flag m_aiTickFlag{};
-	std::vector<ScriptMessage> m_scriptMessages;
+	ce::dynamic_array<ScriptMessage> m_scriptMessages;
 	std::atomic_flag           m_scriptMessageFlag{};   // 잡 스레드가 함께 담는다
 	CreateFn     m_fnCreateComponent{ nullptr };
 	DestroyFn    m_fnDestroyComponent{ nullptr };

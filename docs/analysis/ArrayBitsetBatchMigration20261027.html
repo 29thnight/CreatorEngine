@@ -1,0 +1,277 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/ArrayBitsetBatchMigration20261027.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>배열·비트셋 61건 배치 전환</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#변경-범위">변경 범위</a></li><li><a href="#cpu모듈-회귀">CPU·모듈 회귀</a></li><li><a href="#실제-dx12-gpu-검사">실제 DX12 GPU 검사</a></li><li><a href="#실제-엔진-빌드실행">실제 엔진 빌드·실행</a></li><li><a href="#정본-유지와-잔여량">정본 유지와 잔여량</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="ArrayBitsetBatchMigration20261027.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>배열·비트셋 61건 배치 전환</h1>
+<div class="meta"><p>문자열 타입은 유지하고, 앞선 경계 분류에서 지정한 배열·비트셋 타입 참조 61건을 엔진 소스 8개 파일에서 한 배치로 전환했다. 성능 수용을 통과한 <code>Engine/Containers</code> 구현 62개 파일은 변경하지 않았다. 미추적 Effect 파일과 다른 미추적 소스는 삭제·초기화·스테이징하지 않고 작업 전 사본과 해시를 보존했다.</p>
+</div>
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">8<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 8"><i class="ok" style="flex:8"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 8</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
+<a class="map-row" href="#변경-범위"><span class="ve-label">§00</span><span class="map-name">변경 범위</span><span class="map-bar"><i style="width:70.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#cpu모듈-회귀"><span class="ve-label">§01</span><span class="map-name">CPU·모듈 회귀</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">8</span></span></a>
+<a class="map-row" href="#실제-dx12-gpu-검사"><span class="ve-label">§02</span><span class="map-name">실제 DX12 GPU 검사</span><span class="map-bar"><i style="width:46.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실제-엔진-빌드실행"><span class="ve-label">§03</span><span class="map-name">실제 엔진 빌드·실행</span><span class="map-bar"><i style="width:42.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#정본-유지와-잔여량"><span class="ve-label">§04</span><span class="map-name">정본 유지와 잔여량</span><span class="map-bar"><i style="width:73.1%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「CPU·모듈 회귀」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-변경-범위">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="변경-범위">변경 범위</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>변경</th><th style="text-align:right">참조 수</th><th>파일</th></tr></thead>
+<tbody><tr><td><code>std::vector</code> → <code>ce::dynamic_array</code></td><td class="num" style="text-align:right">58</td><td>EffectDefinition.h/cpp, EffectModuleIR.h/cpp, EffectState.h, EffectFrame.h</td></tr>
+<tr><td><code>std::array</code> → <code>ce::fixed_array</code></td><td class="num" style="text-align:right">1</td><td>EffectFrame.h의 16 float 행렬</td></tr>
+<tr><td><code>std::bitset</code> → <code>ce::fixed_bitset</code></td><td class="num" style="text-align:right">2</td><td>Creator.Core.DynamicBitset.ixx의 64비트 블록, RHISoftwareRecorder.cpp의 8비트 검사</td></tr></tbody></table></div>
+<p>엔진 소스의 작업 전·후 차이는 위 타입 토큰 치환뿐인지 확인했다. 문자열·DefinitionId·정렬 맵·집합·deque·소유자 타입과 알고리즘은 유지했다. API 인수·반환과 중첩 배열을 함께 바꾸고, 실제 소비자인 <code>EffectDefinitionTests.cpp</code>의 진단 배열 타입을 맞췄다. DynamicBitset 소스 도구 어댑터는 생성 스크립트로 갱신했다.</p>
+<p>배열은 값을 소유하며 제거 시 값의 소멸자를 실행한다. <code>clear</code> 후 예약된 배열 저장소는 유지한다. 조회에 새 할당을 추가하지 않고, 삭제한 값이 소유하던 문자열 버퍼는 그 시점에 해제한다. 성장 시 용량 수열·총 할당 바이트 수까지 MSVC vector와 같다는 주장은 하지 않는다. 기존 합격 dynamic_array의 성장 정책을 사용한다.</p>
+<p>EffectState의 owner thread 제한, 세대 핸들·scene epoch, 불변 프레임 공동 소유, 버스트 승인·보관·과부하 거부, Shutdown 순서와 슬롯 재사용 흐름은 변경하지 않았다. 배열 원소 주소를 성장 이후까지 고정한다는 계약을 새로 만들지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-cpu모듈-회귀">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="cpu모듈-회귀">CPU·모듈 회귀</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>검증</th><th style="text-align:right">Debug</th><th style="text-align:right">Release</th></tr></thead>
+<tbody><tr><td>Effect 정의·진단·샘플링</td><td style="text-align:right"><span class="chip ok">54건 PASS</span></td><td style="text-align:right"><span class="chip ok">54건 PASS</span></td></tr>
+<tr><td>Effect IR 컴파일·평가·롤백</td><td style="text-align:right"><span class="chip ok">274건 PASS</span></td><td style="text-align:right"><span class="chip ok">274건 PASS</span></td></tr>
+<tr><td>Effect 상태·수명·배열 회귀</td><td style="text-align:right"><span class="chip ok">65건 PASS</span></td><td style="text-align:right"><span class="chip ok">62건 PASS</span></td></tr>
+<tr><td>실제 DynamicBitset 모듈 소비</td><td style="text-align:right"><span class="chip ok">8개 경계 × 2 초기값 PASS</span></td><td style="text-align:right"><span class="chip ok">동일 PASS</span></td></tr></tbody></table></div>
+<p>DynamicBitset 검사는 0/1/63/64/65/127/128/129 크기에서 assign·성장·축소·추가·비트 변경·copy/move·padding/count와 범위 초과 거부를 확인했다. 테스트는 named module을 실제로 import한다.</p>
+<p>Effect 상태 검사에 다음 검증을 추가했다.</p>
+<ul>
+<li>프레임 배열을 4,096회 조회하는 동안 Debug CRT 후크에서 호출 스레드 할당 0회.</li>
+<li>96자 문자열 두 개를 담은 실제 EffectFrame 배열에서 erase와 clear를 수행해, 제거 대상 문자열 버퍼 주소가 각각 정확히 1회 해제됐는지 확인.</li>
+<li>clear 이후 배열의 data·capacity가 유지되고, erase 후 생존 값과 16 float identity 행렬이 올바른지 확인.</li>
+<li>문자열 타입은 <code>std::string</code>, transform 크기는 16 float임을 컴파일 시 확인.</li>
+<li>인스턴스 해제·생산자 Shutdown 후에도 보유 중인 프레임의 문자열·배열 값이 유효하며, 마지막 프레임 소유자를 놓으면 weak owner가 만료됨을 확인.</li>
+<li>기존 불변 다중 뷰, stale generation/epoch 거부, 스레드 소유권, 버스트 승인·오래된 승인 격리와 한도 초과 거부 회귀도 유지.</li>
+</ul>
+<p>Debug에서 검사 3건이 더 많은 이유는 CRT 할당·문자열 버퍼 해제 검사다. 초기 계측은 전체 CRT free가 1회라는 가정을 사용해 실패했다. 실제 erase/clear의 전체 free는 각각 2회였고, 계측을 수정해 제거 대상 문자열 버퍼의 주소를 직접 추적했다. 최종 결과는 각 버퍼 해제 1회다. 다른 CRT 관리 메모리의 해제를 문자열 버퍼 해제로 세지 않는다. 초기 실패 로그도 <code>cpu</code> 디렉토리에 보존했다. 정본 구현을 이 검사에 맞춰 변경하지 않았다.</p>
+<p>CPU 증거는 <code>Build/Verification/ContainerMigration/ArrayBitsetBatch20261027/definition</code>, <code>ir</code>, <code>cpu-verified</code> 아래의 결과·구성별 빌드·실행 로그다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-실제-dx12-gpu-검사">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="실제-dx12-gpu-검사">실제 DX12 GPU 검사</h2></div>
+<div class="prose"><p>기존 EffectSimulationGpuProbe를 현재 경로 모듈 API로 복구했다. 삭제된 <code>PathFinder.h</code>와 InternalPath 호출 때문에 최초 빌드가 실패했으며, 현재 <code>Creator.Core.Paths</code>와 동일한 경로 설정을 사용하도록 하네스만 수정했다. 시뮬레이션 커널·수치 기준은 바꾸지 않았다.</p>
+<p>실제 DX12 그래프·compute·제출·완료·readback 경로에서 <strong>60조건, 1,082,120성분, barrier 300건, validation 오류 0건</strong>을 통과했다. GPUValidation을 켰으며 CPU 기준값을 의도적으로 바꾸는 음성 검사는 예상대로 실패했다. 이 결과는 기존 고정 커널의 수치·RHI 검증이며 임의 IR 그래프의 GPU lowering 검증은 아니다.</p>
+<p>최종 증거는 <code>Build/Verification/ContainerMigration/ArrayBitsetBatch20261027/gpu-verified/result.json</code>과 positive/negative 실행 로그다. 최초 하네스 빌드 실패는 <code>gpu/build.log</code>에 보존했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-실제-엔진-빌드실행">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="실제-엔진-빌드실행">실제 엔진 빌드·실행</h2></div>
+<div class="prose"><p>Effect 패키지를 포함한 Debug Editor를 최종 소스로 빌드하고 기존 17명령 제품 검증을 통과했다. 실제 새 GPU 프레임, 렌더 프록시, 두 번의 8,192건 전송, Play/Stop·장면 복원과 정상 종료를 확인했다. Effect package의 초기화·종료가 각각 한 번이고 tick 13회·snapshot 18회·HDR 선언/기록 각 35회임을 확인했다. 이는 제품 프레임 전달 관측이며 Editor에서 임의의 Effect 그래프를 실행했다는 뜻은 아니다.</p>
+<p>제품 증거는 <code>Build/container-array-bitset-editor.log</code>, <code>Build/Verification/ContainerMigration/ArrayBitsetBatch20261027/editor/acceptance.json</code> 및 <code>effect-product-observations.json</code>이다. GPU 고정 커널 검사와 Editor 프레임 전달 관측은 서로 다른 범위이며 모두 완료 결과를 기록한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-정본-유지와-잔여량">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="정본-유지와-잔여량">정본 유지와 잔여량</h2></div>
+<div class="prose"><p>기존 <code>20261027-tailhint-full1</code>의 원시 258개 조건/프로세스 결과(각 15표본)와 입력·바이너리 해시를 재검증했다. 일반 82/82, MPSC 단일·주 기준 각 4/4, FAA/PPL 6/6, 기타 큐 8/8 PASS를 유지했다. 성능 표본을 새로 수집하거나 이번 Effect 사용처의 프레임 속도 개선을 주장하지 않는다. 기록은 외부 <code>CreatorContainers/results/20261027-array-bitset-baseline-reverify.log</code>다.</p>
+<p>같은 감사 기준에서 명시적 STL 참조는 <strong>9,396 → 9,335건</strong>, 후보 파일은 969개다. 문자열 참조 8,379건은 그대로이고 함수 래퍼 264건도 그대로다. 저장 컨테이너는 <strong>753 → 692건</strong>이다. 남은 vector 2건은 reflgen SDK 반환 경계이며 이번 61건에는 포함하지 않았다. 기존 배열·비트셋 전환 후보는 모두 닫혔다.</p>
+<p>잔여 분류는 <code>Build/Verification/ContainerMigration/ArrayBitsetBatch20261027/remaining-boundaries/classification.json</code>과 CSV에 있다. 정렬·deque의 설계 필요 범위와 외부 ABI는 별도로 유지한다. 전체 컨테이너 전환 완료를 뜻하지 않는다.</p>
+<p>작업 전 사본·해시는 <code>Build/Verification/ContainerMigration/ArrayBitsetBatch20261027/before</code>와 <code>before.json</code>에 있다. 정본 해시·최종 입력·검증 결과는 같은 배치의 최종 기록에 묶었다. 이전 분류: <a href="NonStringContainerBoundaries20261027.html">문자열 제외 컨테이너 경계</a>.</p>
+<p>다음 단계: <a href="HashMapBatchMigration20261027.html">해시 맵 194건 배치 전환</a>. 해당 단계 이후 잔여 저장 컨테이너 참조는 498건이다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="ArrayBitsetBatchMigration20261027.md"><code>docs/analysis/ArrayBitsetBatchMigration20261027.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

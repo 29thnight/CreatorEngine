@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
@@ -46,10 +47,10 @@ public:
 	bool CheckTransiton(bool isBlend = false);
 	float GetBlendTime() { return blendTime; }
 	float GetExitTime() { return exitTime; }
-	std::vector<TransCondition> GetConditions();
+	ce::dynamic_array<TransCondition> GetConditions();
 
 public:
-	std::vector<TransCondition> conditions{};
+	ce::dynamic_array<TransCondition> conditions{};
 
 	[[reflgen::ignore]]
 	AnimationController* m_ownerController{};

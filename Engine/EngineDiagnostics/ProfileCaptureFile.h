@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 // PHASE 14 P6 — `.ceprof` 캡처 파일(§8).
 //
@@ -68,14 +69,14 @@ namespace ce
     // 게이트가 **디스크 없이** 절단과 손상을 자극하는 자리다. 바이트 열을 한
     // 칸씩 잘라 가며 decode 에 넣으면 "어디서 끊겨도 멈추지 않는다" 를 전수로
     // 증명할 수 있다 — 파일로는 그 수만큼 디스크를 써야 한다.
-    std::vector<std::byte> encode_capture(const capture_session& capture);
+    ce::dynamic_array<std::byte> encode_capture(const capture_session& capture);
 
     std::expected<capture_session_ptr, capture_file_error>
     decode_capture(std::span<const std::byte> bytes);
 
     // IPC entry points preflight allocation/count/work limits before calling the
     // versioned codec. No partial snapshot is presented as a complete one.
-    std::expected<std::vector<std::byte>, capture_file_error>
+    std::expected<ce::dynamic_array<std::byte>, capture_file_error>
     encode_capture_bounded(const capture_session& capture, std::size_t max_wire_bytes);
     std::expected<capture_session_ptr, capture_file_error>
     decode_capture_bounded(std::span<const std::byte> bytes, std::size_t max_wire_bytes);

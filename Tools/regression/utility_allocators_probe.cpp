@@ -215,7 +215,7 @@ namespace
         {
             std::byte bytes[4096];
         };
-        ce::heap_allocator<item> allocator;
+        ce::stl_heap_allocator<item> allocator;
         auto* memory = allocator.allocate(2);
         require(aligned(memory, alignof(item)) && mi_check_owned(memory), "Heap allocator lost alignment or provider.");
         std::memset(memory, 0xA5, sizeof(item) * 2);

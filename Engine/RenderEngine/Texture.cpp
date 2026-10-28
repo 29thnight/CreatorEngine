@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -397,7 +398,7 @@ own::shared_owner<const Texture> Texture::LoadSharedFromPath(const std::filesyst
         {
             return {};
         }
-        std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+        ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(size));
         stream.seekg(0);
         stream.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
         if (!stream || stream.peek() != std::char_traits<char>::eof())
@@ -639,7 +640,7 @@ std::size_t Texture::DescriptorByteSize() const noexcept
         add(value.capacity());
         add(1u);
     };
-    const auto addVector = [&]<class T>(const std::vector<T>& values)
+    const auto addVector = [&]<class T>(const ce::dynamic_array<T>& values)
     {
         const auto maximum = (std::numeric_limits<std::size_t>::max)();
         add(values.capacity() > maximum / sizeof(T) ? maximum : values.capacity() * sizeof(T));

@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
@@ -39,7 +41,7 @@ struct AIComponentSnapshot
 
 struct AIUpdateSnapshot
 {
-    std::vector<AIComponentSnapshot> m_components;
+    ce::dynamic_array<AIComponentSnapshot> m_components;
     std::optional<math::bounding_frustum> m_cameraFrustum;
     float m_deltaSeconds = 0.0f;
 };
@@ -50,7 +52,7 @@ struct AIUpdateBatch
 
     const AIUpdateSnapshot m_snapshot;
     // 단일 워커만 쓰고 Scene이 완료 토큰을 회수한 뒤에만 읽는다.
-    std::vector<size_t> m_visibleIndices;
+    ce::dynamic_array<size_t> m_visibleIndices;
 };
 
 class AIManager : public Singleton<AIManager>
@@ -73,7 +75,7 @@ public:
     // Capture/Apply는 게임 스레드 전용이고 Cull만 공용 워커에서 실행한다.
     own::shared_owner<AIUpdateBatch> CaptureAIUpdate(Scene& scene, float deltaSeconds,
         const std::optional<math::bounding_frustum>& cameraFrustum);
-    static void CullAIUpdate(const AIUpdateSnapshot& snapshot, std::vector<size_t>& visibleIndices);
+    static void CullAIUpdate(const AIUpdateSnapshot& snapshot, ce::dynamic_array<size_t>& visibleIndices);
     void ApplyAIUpdate(Scene& scene, const AIUpdateBatch& batch);
 	size_t GetRegisteredAIComponentCount() const;
 	bool IsAIComponentRegistered(const IAIComponent* aiComponent) const;
@@ -119,13 +121,13 @@ private:
 
     // Scene이 컴포넌트를 소유한다. 비소유 주소는 게임 스레드 레지스트리 안에만
     // 남긴다. 새 등록은 끝에 추가하고, 해지 시 남은 등록의 상대 순서를 유지한다.
-    std::vector<AIRegistration> m_aiComponentMap;
-    std::unordered_map<uint64_t, IAIComponent*> m_aiRegistrationsById;
+    ce::dynamic_array<AIRegistration> m_aiComponentMap;
+    ce::engine_node_map<uint64_t, IAIComponent*> m_aiRegistrationsById;
     uint64_t m_nextAIRegistrationId = 1;
     // 등록·해지·Capture·Apply는 게임 스레드가 직렬화한다. 이 잠금은 레지스트리
     // 조회만 보호하며 컴포넌트 수명을 워커까지 연장하는 수단이 아니다.
     mutable std::mutex m_aiComponentMutex;
-	std::unordered_map<FileGuid, own::shared_owner<BTBuildGraph>> m_btBuildGraphCache; // BT 빌드 그래프 캐시
+	ce::engine_node_map<FileGuid, own::shared_owner<BTBuildGraph>> m_btBuildGraphCache; // BT 빌드 그래프 캐시
 };
 
 #if defined(CE_SCENE_HEADLESS)

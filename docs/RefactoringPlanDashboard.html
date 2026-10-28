@@ -227,8 +227,8 @@
   <div class="meta">
     범위: 렌더러 안정화 · 자원 소유권 모델 재설계 · 차세대 GPU 렌더링 구상 · 구조적 커플링 제거 · 코드 정리 ·
     근거: <a href="analysis/EngineStructureAnalysis.html">구조 분석 보고서</a> 12장 ·
-    실행 계획 25종 · 미래 계획 3종 · <a href="plans/archive/README.html">보관 19종</a> · <a href="#doc-index">문서 색인</a> ·
-수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-10-22</span>
+    실행 계획 25종 · 미래 계획 4종 · <a href="plans/archive/README.html">보관 19종</a> · <a href="#doc-index">문서 색인</a> ·
+수립일: 2026-07-29 · 최종 갱신: <span id="last-updated">2026-10-28</span>
   </div>
 
   <div class="kpis">
@@ -483,7 +483,9 @@
       <div class="why">라이브 HTTP/JSON 명령·실행 중 Player 제어와 Commandlet 분리. <a href="analysis/PowerShell5EditorShutdownAcceptance20261023.html">PS5/7 연결 종료 수용</a>. 소비자7파일 이주·상한0/관측0. <a href="analysis/AnimationCookAcceptance20261023.html">애니메이션 쿠커 수정·제품 후속 검증</a>. Inspector/일반 GUI 종결은 잔여, MCP 보류.</div></div>
     <div class="doc"><a href="plans/ScriptSurfacePlan.html">ScriptSurfacePlan.md</a><span class="tie">PHASE 9.5</span>
       <div class="why">F# 저작·공통 관리 실행기 · 필요한 일반 멤버만 정적 등록(API45). 빈 훅 없는 템플릿·VS Code 작성 도우미. <a href="design/FSharpScriptingContract.html">현재 계약</a> · <a href="analysis/FSharpOptionalLifecycleAcceptance20261023.html">선택적 저작 수용</a></div></div>
-    <div class="doc"><a href="plans/EnginePackagingPlan.html">EnginePackagingPlan.md</a><span class="tie">PHASE 10·11 등</span>
+    <div class="doc"><a href="plans/ParticleEffectRedesignPlan.html">ParticleEffectRedesignPlan.md</a><span class="tie">PHASE 10</span>
+      <div class="why">Niagara식 단계별 스택 + 모듈 그래프. 저작 계약·공통 IR·GPU·스택/그래프 편집기 구현 순서.</div></div>
+    <div class="doc"><a href="plans/EnginePackagingPlan.html">EnginePackagingPlan.md</a><span class="tie">PHASE 11 등</span>
       <div class="why">EffectSystem·Terrain의 의존 역전과 패키지 경계. 잔여 작업 유지.</div></div>
     <div class="doc"><a href="plans/ModelGeometryTextureImprovementPlan.html">ModelGeometryTextureImprovementPlan.md</a><span class="tie">비동기 배치 완료 · G2 텍스처 캐시 경로 키 완료 · 나머지 구조 개선 제안</span>
       <div class="why">모델·Vertex·Mesh·Texture 경계와 로딩 개선. 기존 PHASE를 대체하거나 새 공수로 합산하지 않는다.</div></div>
@@ -524,6 +526,8 @@
 
     <div class="doc is-ref"><a href="plans/SimulationEffectContractPlan.html">SimulationEffectContractPlan.md</a><span class="tie">PHASE 24 · C# 계약 중단 · PrSM 기존 작업 연계</span>
       <div class="why">F# 단독 저작·공통 관리 런타임과 C++ 계약 OnTickSimulate 고정 틱 유지. OnSimulate·Scope.Delay는 복원하지 않는다. Verse식 계약은 기존 PrSM LLVM 언어 명세·컴파일러로 이관한다. PrSM 기존 구현과 CreatorEngine 제품 통합 잔여를 구분하며 미래 공수는 현재 집계에 포함하지 않는다.</div></div>
+    <div class="doc is-ref"><a href="plans/NativeUIFrameworkPlan.html">NativeUIFrameworkPlan.md</a><span class="tie">FUI · 미래 계획 · 구현 미착수 · 공수 미산정</span>
+      <div class="why">char16_t 공통 UI Core와 자체 편집기 위젯·도킹. PHASE 16·21의 기존 계약을 유지하며 대표 패널 비교 수용 후 ImGui를 단계 전환·퇴역한다. FUI0~8은 현재 진행률·공수 집계에서 제외한다.</div></div>
     <div class="doc is-ref"><a href="plans/NativeObjectMemoryPolicyPlan.html">NativeObjectMemoryPolicyPlan.md</a><span class="tie">PHASE 25 · 미래 계획 · 구현 미착수</span>
       <div class="why">Scene·Entity·Component 네이티브 GC와 C# GC 병행. 에셋은 스마트 포인터 유지 또는 ownership_cpp 단계 적용. SGCL v18/MSVC 채택 게이트와 분리하며 현재 실행 공수에 포함하지 않는다.</div></div>
   </div>
@@ -2194,21 +2198,21 @@ const TASKS = [
     detail: "EffectSystem 프로젝트 56파일 19,639줄, 파티클 셰이더 30종, EffectComponent(C++·C#·generated), ClrHost의 스크립트 API 20항목, 엔진 배선 6파일을 제거한다. 남는 것은 없다 — 이 페이즈는 진짜 백지에서 시작한다.",
     refs: "사용자 판단(2026-08-08)", priority: "P3", days: 0.5, status: "done",
     note: "제거 목록: ① EffectSystem/ 56파일(19,639줄) + vcxproj + sln 등록 + 참조 프로젝트 4곳의 include 경로·ProjectReference. ② 셰이더 30종(BillBoard·MeshParticle 10종·Trail 4종·모듈 CS 8종 등)과 고아 .meta. Gizmo_billboard 셋은 남겼다 — 파티클이 아니라 기즈모용이다. ③ ScriptBinder/EffectComponent.{h,cpp,generated.h}. ④ ClrHost의 API 테이블 필드 20 + 구현 블록 + 대입 20줄(172줄), 그리고 C# 대응(Native.cs 135줄, EffectComponent.cs, Component.cs 팩토리 항목, GameScripts 2파일) — 경계 양쪽을 함께 지워야 테이블 순서가 어긋나지 않는다. ⑤ 엔진 배선: App.cpp·Dx11Main.cpp·EngineBootstrap.h(생성·종료 단계)·LifecycleRegistry.cpp·GameMain.cpp·GameApp.cpp. ★ 저작 자산은 지울 것이 없었다 — EffectManager가 읽던 PathFinder::Relative(\"Effect\\\\\") 디렉터리가 저장소에 존재하지 않는다. ★ 딸려 나온 것(유니티 빌드의 전이 include): ParticleSystem.h가 RenderScene.h·RenderPassData.h·Camera.h를 Scene.cpp·Terrain.cpp·SceneManager.cpp에 전이로 공급하고 있었다. 이 프로젝트에서 다섯 번째로 밟은 같은 함정이라 세 파일에 직접 include를 넣어 닫았다. ★ 빌드 검증: Debug x64 전체 0오류·0경고(2026-08-08). ── 무관한 기존 결함 하나를 밟았고 함께 고쳤다: Academy_4Q의 PreBuildEvent가 version.txt에서 EngineVersion.h를 생성하는데 for /F 줄이 MSBuild 실행 환경에서만 조용히 실패한다(같은 명령을 cmd에서 직접 돌리면 정상이고, 같은 자리에 CRLF로 다시 넣은 동등한 for 줄도 정상이다 — 원본의 그 줄만 실행되지 않는다). 그 결과 첫 줄이 파일을 '#pragma once'로 덮어쓴 상태만 남아 ENGINE_VERSION이 미정의가 되고, EngineSetting.h를 컴파일하는 순간 C2065로 터진다. ★ 실패가 조용한 것이 이 결함의 값이다 — for /F는 입력을 못 읽어도 오류를 내지 않으므로 빌드 로그에 아무 흔적이 없고, 증상이 나타나는 곳(EngineSetting.h:142)은 원인에서 멀다. 고친 방법: 배치 두 줄을 걷고 MSBuild 네이티브 타겟(GenerateEngineVersionHeader = ReadLinesFromFile + WriteLinesToFile)으로 옮겼다. 배치도 % 확장도 리다이렉션도 경로에서 빠지므로 깨질 자리 자체가 없어진다. ★ 그리고 고치는 도중 그 자리가 애초에 틀렸다는 것이 드러났다 — Academy_4Q에만 타겟을 두고 헤더를 지운 채 빌드하니 Utility_Framework가 먼저 터졌다. EngineSetting.h를 컴파일하는 프로젝트는 여섯인데(EngineEntry · EngineGUIWindow · RenderEngine · ScriptBinder · TrainAsis · Utility_Framework) 헤더를 만드는 것은 Academy_4Q 하나였고, ScriptBinder는 Utility_Framework를 참조하지도 않아 순서 보장이 없다. 즉 클린 클론의 첫 빌드는 원래도 깨졌고, 이 파일이 .gitignore 대상이라 한 번 생기면 남는 탓에 드러나지 않았을 뿐이다. 그래서 타겟을 Directory.Build.targets로 올려 모든 vcxproj가 자기 빌드 전에 보장하게 했다. 부수 이득: WriteOnlyWhenDifferent 덕에 해시가 바뀔 때만 파일을 쓴다 — 배치판은 매 빌드마다 mtime을 갱신해 EngineSetting.h를 포함하는 모든 번역 단위를 다시 컴파일시키고 있었고, 지금은 그것이 병렬 빌드의 동시 쓰기 경합 창까지 좁힌다. 검증: 헤더를 지운 상태에서 전체 빌드 0오류(이것이 결정적 검증이다) · 재실행 시 mtime 불변 · version.txt 부재 시 \"unknown\" 폴백." },
-  { phase: 10, id: "10-1", title: "패키지 경계 먼저 — Effect 프로젝트와 IEffectSystem",
-    detail: "코드를 쓰기 전에 경계를 세운다. ★ 순서를 이렇게 잡은 근거는 실측이다: 구 EffectSystem은 엔진 안에서 다 만든 뒤 41차 슬라이스에서 54파일을 떼어내야 했고, 그러고도 패키지화가 끝나지 않은 채 제거됐다. 내용: RenderEngine에 순수 가상 IEffectSystem(생성·갱신·기록·프레임 경계)을 두고 엔진은 포인터 하나만 든다(null이면 이펙트만 없는 채로 돈다). 프록시 명령 큐는 이펙트 전용이 아니라 범용으로 아래층에 둔다 — 구 구조는 최하층 EngineBootstrap이 EffectProxyController를 이름으로 알고 있었고 그것이 떼어냄을 막았다. 정적 자기 등록을 붙이면 프로젝트를 빼는 것만으로 등록자가 링크되지 않아 앱 코드가 한 줄도 안 바뀐다. 완료 기준: 빈 Effect 프로젝트를 넣었다 뺐다 해도 빌드·실행이 그대로다 — 이 항목 이후 모든 슬라이스에서 계속 참이어야 한다.",
-    refs: "구 10-3의 교훈 · EnginePackagingPlan §4.1", priority: "P3", days: 4, status: "todo", note: "" },
-  { phase: 10, id: "10-2", title: "파티클 GPU 버퍼 토대와 시뮬레이션 체인",
-    detail: "모듈들이 공유하는 파티클 배열의 DX12 수명·상태 관리부터 세운다. 드라이버가 해 주던 UAV↔SRV 해저드를 DX12에서는 배리어로 명시해야 하고, 체인이 최대 9단이라 여기가 이 페이즈의 핵심 엔지니어링이다 — 구 코드를 지웠어도 이 사실은 그대로다. ★ 구조는 구 계통을 따라가지 않는다: ping-pong 버퍼 둘로 모듈마다 입출력을 맞바꾸던 형태는 즉시 컨텍스트 시절의 선택이고, DX12에서는 배리어 계획을 먼저 정하고 버퍼 구성을 거기 맞춘다. 검증이 픽셀이 아니라 숫자다 — 파티클 버퍼를 리드백해 '생명이 dt만큼 줄었나' '속도×dt만큼 움직였나'를 정확한 값으로 단정하고, 모듈마다 켬/끔 대조군을 붙인다. 완료 기준: 기본 시뮬 체인이 돌고 모듈별 A/B가 통과.",
-    refs: "10-1 선행 · 3-6 계승", priority: "P3", days: 7, status: "todo", note: "" },
-  { phase: 10, id: "10-3", title: "렌더 모듈 — 빌보드·메시·트레일",
-    detail: "세 렌더 경로를 EnhancedRenderPass 규약 위에 쓴다. 구 계통에서 확인해 둔 사실: 전부 평범한 DrawIndexedInstanced/DrawIndexed이고, 정점 셰이더가 SV_InstanceID로 파티클 SRV를 직접 읽는 구조는 DX12에서 그대로 성립한다. append/consume·CopyStructureCount·간접 드로우가 저장소 전체에 0건이었으므로 어려운 구조를 새로 뚫을 일이 없다. 블렌드·깊이 프리셋은 PSO 필드로 둔다. 트레일 생성은 CPU/GPU 선택을 이 자리에서 판단한다 — 구 계통은 CPU였고 GPU 버전(TrailMeshGenerate.cs)은 쓰이지 않은 채 죽어 있었다. 완료 기준: 세 렌더 모듈이 화면에 나온다.",
-    refs: "10-2 선행", priority: "P3", days: 8, status: "todo", note: "" },
-  { phase: 10, id: "10-4", title: "저작 형식과 에디터 재작성",
-    detail: "이펙트 정의의 직렬화 형식과 편집 UI를 새로 정한다. ★ 여기서 자유도가 크다: 구 형식(PathFinder::Relative(\"Effect\\\\\") 아래 .json)의 저작 자산이 저장소에 하나도 없었다 — 호환 부담이 0이다. 컴포넌트도 새로 만든다(구 EffectComponent와 그 스크립트 API 20항목은 10-0에서 사라졌다). C# 바인딩은 경계 양쪽을 같은 커밋에서 세운다 — 테이블 순서가 어긋나면 조용히 엉뚱한 함수를 부른다.",
-    refs: "10-3 선행", priority: "P3", days: 5, status: "todo", note: "" },
-  { phase: 10, id: "10-5", title: "떼어냄 검증 — 빼도 도는가",
-    detail: "Effect 프로젝트를 솔루션에서 빼고 나머지가 빌드·실행되는지 본다. 10-1의 역전이 실제로 성립했는지를 재는 유일한 방법이다 — 인터페이스를 만들어 두고 어딘가에 타입 참조가 남아 있으면 여기서 링크가 깨진다. ★ 10-1 이후 계속 참이었어야 하므로, 여기서 처음 실패한다면 그 사이 어느 슬라이스가 경계를 넘은 것이고 그 지점을 찾는 것이 이 항목의 실제 내용이다.",
-    refs: "11-6과 같은 형태", priority: "P3", days: 2, status: "todo", note: "" },
+  { phase: 10, id: "10-1", title: "패키지 경계와 저작 계약 — 스택·모듈 그래프 토대",
+    detail: "빈 Effect 패키지와 공용 경계를 먼저 세워 포함/제외 Editor·Player 빌드·실행을 확인한다(10-1a). 이어 Effect/Emitter/Module 스키마, 단계·시계·속성·난수·입력 계약을 확정한다(10-1b). snapshot 전달과 시뮬레이션/HDR 단계 기여를 연결한다(10-1c). 코어가 Effect 구체 타입을 알지 않게 하며 기존 UI 뒤 오버레이 확장점은 그대로 사용하지 않는다.",
+    refs: "ParticleEffectRedesignPlan · 10-1a~c", priority: "P3", days: 4, status: "done", earnedDays: 0, note: "2026-10-24: 10-1a/b/c 경계 수용 완료. 공용 committed tick → 불변 snapshot → typed HDR 입력 경계, 세대/epoch·버스트 journal·독립 소유 수명 구현. Debug/Release 전송 56·스키마 51개씩, Debug 제품 포함/제외 4조합·scene reload·resize 캡처 통과. GPU simulation/draw와 Release 제품 수용은 후속. 기존 4일/기성은 재산정하지 않았다." },
+  { phase: 10, id: "10-2", title: "공통 모듈 IR·그래프 변환과 GPU 시뮬레이션",
+    detail: "기본 모듈과 사용자 모듈 그래프를 동일한 타입 IR로 변환하고 작은 그래프 변환기·CPU 기준 평가기를 먼저 세운다(10-2a). 이후 GPU spawn·초기화·수명·이동과 갱신 모듈을 구현한다(10-2b). 고정 seed/dt readback을 기준 평가기와 비교하고 모듈별 on/off·용량 초과·배리어·완료 후 재사용을 검증한다. 모듈 하나를 dispatch 하나에 고정하지 않는다.",
+    refs: "10-1 선행 · ParticleEffectRedesignPlan · 10-2a~b", priority: "P3", days: 7, status: "progress", earnedDays: 0, note: "2026-10-24: 10-2a 및 10-2b-1 수용. CPU 표본 입력/step 274개씩, 실제 DX12 고정 커널 60조합·1,082,120 성분 비교·validation 0. 일반 IR GPU 변환·표본/형상·제품 snapshot/burst 소비·동시 프레임 수명은 잔여. 그래프 UI는 10-4b. 기존 7일/기성은 재산정하지 않았다." },
+  { phase: 10, id: "10-3", title: "렌더 모듈 — Billboard 선행, Mesh·Trail 확장",
+    detail: "Billboard와 HDR·깊이·머티리얼·temporal 정책을 먼저 실제 화면으로 검증한다(10-3a). 이를 10-4a 스택 편집기와 10-4b 모듈 그래프 편집기의 수용 기반으로 쓴다. 이후 Mesh·Trail을 확장하고 실제 제품 화면으로 검증한다(10-3b). Trail CPU/GPU 선택은 작업량과 측정으로 결정한다.",
+    refs: "10-2b → 10-3a → 10-4a/b → 10-3b · ParticleEffectRedesignPlan", priority: "P3", days: 8, status: "todo", note: "스택/그래프 편집기는 Mesh·Trail 완료를 기다리지 않고 Billboard 기반으로 먼저 수용한다." },
+  { phase: 10, id: "10-4", title: "Niagara식 스택·모듈 그래프 편집기와 제품 저작 경로",
+    detail: "10-1b에서 고정한 형식 위에 이미터별 단계 스택, 입력·커브·그라데이션·노출 파라미터와 미리보기·pause/step·저장/로드를 구현한다(10-4a). 사용자 정의 모듈 내부의 타입 노드 그래프, 공통 IR 컴파일, 재사용 에셋·진단·undo/redo·reload를 연결한다(10-4b). Mesh·Trail 후 컴포넌트·스크립트 제어·cook/Player 왕복을 닫는다(10-4c). Material Graph는 표면 외형을 계속 소유한다.",
+    refs: "10-3a → 10-4a → 10-4b → 10-3b → 10-4c · ParticleEffectRedesignPlan", priority: "P3", days: 5, status: "todo", note: "2026-10-22 저작 방향 확정. 기존 5일은 범위 확장 전 값이며 전체 스택+그래프+제품화의 확정 견적이 아니다. 이미터 간 이벤트 그래프는 첫 범위에서 보류." },
+  { phase: 10, id: "10-5", title: "패키지 제거 수용과 성능 기준선",
+    detail: "Effect 프로젝트와 링크 의존을 실제 제외하고 Editor·Player가 빌드·실행되는지 확인한다. 이 조건은 10-1a 이후 매 슬라이스에서 유지한다. 최종 고정 입자 수·해상도·seed·모듈 조합으로 CPU/GPU 시간과 메모리를 측정한다.",
+    refs: "10-4c 선행 · ParticleEffectRedesignPlan", priority: "P3", days: 2, status: "todo", note: "소스/문서 검사, 독립 프로브와 실제 제품 수용을 구분한다." },
 
   // ---------- PHASE 11: 지형 DX12 재설계와 패키지화 (최후순위) ----------
   //

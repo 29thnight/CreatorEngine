@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "ManagedAssembly.h"
 import "Creator.WinAPI.h";
 #include <nethost.h>
@@ -28,7 +29,7 @@ namespace Runtime
         const auto root = privateRuntime.wstring();
         get_hostfxr_parameters parameters{sizeof(get_hostfxr_parameters), nullptr, root.c_str()};
         const bool privateHost = std::filesystem::is_directory(privateRuntime / L"host" / L"fxr");
-        std::vector<wchar_t> path(32768);
+        ce::dynamic_array<wchar_t> path(32768);
         auto size = path.size();
         if (get_hostfxr_path(path.data(), &size, privateHost ? &parameters : nullptr) != 0)
         {

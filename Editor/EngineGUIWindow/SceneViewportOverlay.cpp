@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "SceneViewportOverlay.h"
 #include "EditorCameraRig.h"
 #include "EditorTheme.h"
@@ -30,7 +31,7 @@ namespace editor::scene_overlay_detail
 {
     std::mutex snapshotMutex;
     SceneOverlaySnapshot snapshot;
-    std::array<std::optional<bool>, 3> requestedVisibility;
+    ce::fixed_array<std::optional<bool>, 3> requestedVisibility;
     constexpr const char* tools[]{EditorIcon::Select, EditorIcon::Move, EditorIcon::Rotate, EditorIcon::Scale};
     constexpr const char* toolNames[]{"Select (Q)", "Move (W)", "Rotate (E)", "Scale (R)"};
     constexpr const char* snapNames[]{"Translation snap", "Rotation snap", "Scale snap"};
@@ -143,8 +144,8 @@ void editor::SceneViewportOverlay::Draw(
         : EditorIcon::Label<EditorIcon::Perspective, " Perspective">;
     const char* shading = gizmos && gizmos->IsWireFrameEnabled()
         ? EditorIcon::Label<EditorIcon::Lit, " Lit + Wire"> : EditorIcon::Label<EditorIcon::Lit, " Lit">;
-    std::array<std::string, 3> snapLabels;
-    std::array<float, 3> snapWidths;
+    ce::fixed_array<std::string, 3> snapLabels;
+    ce::fixed_array<float, 3> snapWidths;
     for (int i = 0; i < 3; ++i)
     {
         char value[48]{};

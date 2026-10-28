@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 // PHASE 3.75 MBC11 — legacy v1 model subasset sidecar 리더(`guid` + subAssets schema 1)와
 // import 결과 대조(`ValidateModelCookIdentity`)는 은퇴했다. 모델 신원은 schema v2(UUIDv8,
@@ -31,5 +32,5 @@ namespace experiment::cooked
     // 임의 asset sidecar의 최상위 guid만 읽는다. canonical UUIDv4 외의 표기는
     // legacy 호환 없이 거부한다(모델 sidecar는 여기로 오지 않는다 — v2 리더가 본다).
     [[nodiscard]] bool ReadAssetIdFromMeta(std::string_view yaml,
-        AssetId& outAssetId, std::vector<ModelIdentityIssue>& outIssues);
+        AssetId& outAssetId, ce::dynamic_array<ModelIdentityIssue>& outIssues);
 }

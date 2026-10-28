@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
@@ -114,7 +115,7 @@ class DX12UploadSegmentAllocator
 
     ID3D12Device* m_device{nullptr};
     DX12ResourceTable* m_table{nullptr};
-    std::vector<own::unique_owner<Segment>> m_segments;
+    ce::dynamic_array<own::unique_owner<Segment>> m_segments;
     uint64_t m_regularSegmentBytes{0};
     uint64_t m_largeThreshold{0};
     uint32_t m_standbyRegularSegments{0};

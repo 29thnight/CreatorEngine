@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "TemporalReconstruction.h"
 
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -72,7 +73,7 @@ TemporalResult ValidateTemporalFrame(const TemporalFrame& frame)
 TemporalResult ValidateTemporalCamera(const TemporalCamera& camera)
 {
     if (!camera.valid || !IsPositiveFinite(camera.aspectRatio)) return { TemporalStatus::InvalidInput };
-    const auto validMatrix = [](const std::array<float, 16>& matrix)
+    const auto validMatrix = [](const ce::fixed_array<float, 16>& matrix)
     {
         bool nonzero = false;
         for (float value : matrix)
@@ -90,7 +91,7 @@ TemporalResult ValidateTemporalCamera(const TemporalCamera& camera)
         if (!std::isfinite(camera.position[index]) || !std::isfinite(camera.up[index]) ||
             !std::isfinite(camera.right[index]) || !std::isfinite(camera.forward[index]))
             return { TemporalStatus::InvalidInput };
-    const auto dot = [](const std::array<float, 3>& left, const std::array<float, 3>& right)
+    const auto dot = [](const ce::fixed_array<float, 3>& left, const ce::fixed_array<float, 3>& right)
     {
         return left[0] * right[0] + left[1] * right[1] + left[2] * right[2];
     };

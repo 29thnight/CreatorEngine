@@ -5,17 +5,28 @@ import "Creator.MemoryProvider.h";
 
 export namespace ce
 {
+    struct heap_byte_allocator
+    {
+        void* allocate(std::size_t bytes,std::size_t alignment)
+        {
+            if(!alignment || (alignment&(alignment-1)))throw std::bad_alloc{};
+            if(void* memory=mi_malloc_aligned(bytes,alignment))return memory;
+            throw std::bad_alloc{};
+        }
+        void deallocate(void* memory,std::size_t,std::size_t)noexcept{mi_free(memory);}
+        bool operator==(const heap_byte_allocator&)const noexcept{return true;}
+    };
     template<typename T>
-    class heap_allocator
+    class stl_heap_allocator
     {
       public:
         using value_type = T;
         using is_always_equal = std::true_type;
         using propagate_on_container_move_assignment = std::true_type;
 
-        heap_allocator() noexcept = default;
+        stl_heap_allocator() noexcept = default;
         template<typename U>
-        heap_allocator(const heap_allocator<U>&) noexcept
+        stl_heap_allocator(const stl_heap_allocator<U>&) noexcept
         {
         }
 
@@ -36,7 +47,7 @@ export namespace ce
         void deallocate(T* memory, std::size_t) noexcept { mi_free(memory); }
 
         template<typename U>
-        bool operator==(const heap_allocator<U>&) const noexcept
+        bool operator==(const stl_heap_allocator<U>&) const noexcept
         {
             return true;
         }

@@ -1,4 +1,7 @@
+#include "../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -12,7 +15,7 @@ import Creator.Core.Ownership;
 namespace wave
 {
     using ParameterValue = std::variant<bool, std::int32_t, float, std::string>;
-    using ParameterMap = std::unordered_map<std::string, ParameterValue>;
+    using ParameterMap = ce::engine_node_map<std::string, ParameterValue>;
 
     enum class ParameterType : std::uint8_t { Boolean, Integer, Float, String };
     enum class SoundNodeKind : std::uint8_t { Clip, Random, Switch, Layer, GainPitch, Parameter, Output };
@@ -38,11 +41,11 @@ namespace wave
     {
         std::uint32_t id{};
         SoundNodeKind kind{ SoundNodeKind::Clip };
-        std::vector<std::uint32_t> inputs;
+        ce::dynamic_array<std::uint32_t> inputs;
         ClipKey clip;
-        std::vector<float> weights;
+        ce::dynamic_array<float> weights;
         std::string parameter;
-        std::vector<ParameterValue> cases;
+        ce::dynamic_array<ParameterValue> cases;
         float gain{ 1.0f };
         float pitch{ 1.0f };
         std::string gainParameter;
@@ -52,8 +55,8 @@ namespace wave
     struct SoundGraphDefinition final
     {
         std::uint32_t schemaVersion{ 1u };
-        std::vector<ParameterDefinition> parameters;
-        std::vector<SoundNode> nodes;
+        ce::dynamic_array<ParameterDefinition> parameters;
+        ce::dynamic_array<SoundNode> nodes;
         std::uint32_t output{};
         std::uint32_t maximumVoices{ 32u };
     };
@@ -63,7 +66,7 @@ namespace wave
     struct SoundGraphProgram final
     {
         SoundGraphDefinition definition;
-        std::unordered_map<std::uint32_t, std::size_t> nodeIndices;
+        ce::engine_node_map<std::uint32_t, std::size_t> nodeIndices;
         std::uint32_t maximumVoices{};
     };
 
@@ -84,10 +87,10 @@ namespace wave
 
     [[nodiscard]] ParameterType TypeOfParameter(const ParameterValue& value) noexcept;
     [[nodiscard]] own::shared_owner<const SoundGraphProgram> CompileSoundGraph(
-        const SoundGraphDefinition& definition, const std::function<bool(const ClipKey&)>& hasClip,
+        const SoundGraphDefinition& definition, const ce::owned_func<bool(const ClipKey&)>& hasClip,
         std::string& error);
     [[nodiscard]] bool ResolveGraphParameters(const SoundGraphProgram& program,
         const ParameterMap& supplied, ParameterMap& resolved, std::string& error);
     [[nodiscard]] bool EvaluateSoundGraph(const SoundGraphProgram& program, const ParameterMap& parameters,
-        std::uint64_t& randomState, std::vector<GraphVoice>& voices, std::string& error);
+        std::uint64_t& randomState, ce::dynamic_array<GraphVoice>& voices, std::string& error);
 }

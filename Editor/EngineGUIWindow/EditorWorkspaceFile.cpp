@@ -1,3 +1,6 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "EditorWorkspaceFile.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
@@ -24,11 +27,11 @@ namespace editor::workspace
         { if (!condition) throw std::runtime_error(message); }
     }
 
-    std::string migrate_ini(std::string_view ini, const std::vector<alias>& aliases)
+    std::string migrate_ini(std::string_view ini, const ce::dynamic_array<alias>& aliases)
     {
         require(ini.size() <= max_file_size, "Layout exceeds size limit");
         struct section { std::string header, body, identity; bool canonical{}; };
-        std::vector<section> sections;
+        ce::dynamic_array<section> sections;
         std::istringstream input{std::string(ini)}; std::string line;
         const std::regex window(R"(^\[Window\]\[(.*)\]$)");
         while (std::getline(input, line))
@@ -66,7 +69,7 @@ namespace editor::workspace
             }
         }
         // Canonical entry wins; otherwise keep the last docked alias over an undocked one.
-        std::map<std::string, std::size_t> winners;
+        ce::engine_ordered_map<std::string, std::size_t> winners;
         for (std::size_t i = 0; i < sections.size(); ++i)
         {
             const auto& s = sections[i]; if (s.identity.empty()) continue;
@@ -106,8 +109,8 @@ namespace editor::workspace
         {
             require(!ini.empty() && ini.size() <= max_file_size && ini.find('\0') == std::string::npos, "Empty or invalid layout");
             std::istringstream input{std::string(ini)}; std::string line;
-            std::set<std::uint32_t> nodes; std::map<std::uint32_t, std::uint32_t> parents;
-            std::vector<std::uint32_t> docks; std::set<std::string> windows;
+            ce::engine_ordered_set<std::uint32_t> nodes; ce::engine_ordered_map<std::uint32_t, std::uint32_t> parents;
+            ce::dynamic_array<std::uint32_t> docks; ce::engine_ordered_set<std::string> windows;
             bool docking = false, known = false; int roots = 0, dockSpaces = 0;
             const std::regex id(R"(\bID=0x([0-9A-Fa-f]+))"), parent(R"(\bParent=0x([0-9A-Fa-f]+))");
             const std::regex dock(R"(^DockId=0x([0-9A-Fa-f]+))"), size(R"(^Size=(-?[0-9]+),(-?[0-9]+)$)");
@@ -160,7 +163,7 @@ namespace editor::workspace
             for (const auto dockId:docks) require(nodes.contains(dockId), "Window refers to missing dock node");
             for (const auto& [node,p]:parents)
             {
-                std::set<std::uint32_t> seen; auto current=node;
+                ce::engine_ordered_set<std::uint32_t> seen; auto current=node;
                 while(current)
                 {
                     require(seen.insert(current).second && parents.contains(current), "Broken or cyclic dock hierarchy");
@@ -211,7 +214,7 @@ namespace editor::workspace
         in >> keyName >> version;
         require(keyName=="CreatorWorkspace" && version>=oldest_readable_schema && version<=schema_version,
             "Unsupported workspace schema");
-        std::set<std::string> fields;
+        ce::engine_ordered_set<std::string> fields;
         while(in >> keyName)
         {
             if(keyName!="panel") require(fields.insert(keyName).second, "Duplicate workspace field");
@@ -282,7 +285,7 @@ namespace editor::workspace
         { error="Workspace name begins or ends with a space or a dot"; return false; }
         std::string upper(name);
         for(char& c : upper) c=static_cast<char>(std::toupper(static_cast<unsigned char>(c)));
-        static const std::set<std::string> devices{
+        static const ce::engine_ordered_set<std::string> devices{
             "CON","PRN","AUX","NUL",
             "COM1","COM2","COM3","COM4","COM5","COM6","COM7","COM8","COM9",
             "LPT1","LPT2","LPT3","LPT4","LPT5","LPT6","LPT7","LPT8","LPT9" };

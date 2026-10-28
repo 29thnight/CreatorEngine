@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "RHISoftwareCommandList.h"
 
@@ -167,7 +168,7 @@ struct RHISoftwareBindRenderTargetsArguments
 struct RHISoftwareClearRenderTargetsArguments
 {
     RHIRenderTargetBinding binding;
-    std::array<float, 4> rgba;
+    ce::fixed_array<float, 4> rgba;
 };
 
 struct RHISoftwareClearDepthTargetArguments
@@ -200,7 +201,7 @@ struct RHISoftwareCopyResourceArguments
 struct RHISoftwareClearUnorderedAccessArguments
 {
     RHIBindingDesc view;
-    std::array<float, 4> rgba;
+    ce::fixed_array<float, 4> rgba;
 };
 
 struct RHISoftwareCopyToReadbackArguments
@@ -251,7 +252,7 @@ struct RHISoftwareCopyTextureArguments
 struct RHISoftwareClearRenderTargetRectArguments
 {
     RHIRenderTargetBinding binding;
-    std::array<float, 4> rgba;
+    ce::fixed_array<float, 4> rgba;
     RHIRect rect;
 };
 

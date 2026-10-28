@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -115,7 +116,7 @@ namespace experiment
 
         template <std::size_t Count>
         [[nodiscard]] bool ParseFloats(const Authoring::ReadNode& node,
-            const char* context, std::array<float, Count>& out,
+            const char* context, ce::fixed_array<float, Count>& out,
             std::string& outError)
         {
             if (!node.IsSequence() || node.Size() != Count)
@@ -250,21 +251,21 @@ namespace experiment
                 }
                 else if (key == "float2")
                 {
-                    std::array<float, 2> floats{};
+                    ce::fixed_array<float, 2> floats{};
                     if (!ParseFloats(value, name.c_str(), floats, outError))
                         return false;
                     outValue = math::vector2{ floats[0], floats[1] };
                 }
                 else if (key == "float3")
                 {
-                    std::array<float, 3> floats{};
+                    ce::fixed_array<float, 3> floats{};
                     if (!ParseFloats(value, name.c_str(), floats, outError))
                         return false;
                     outValue = math::vector3{ floats[0], floats[1], floats[2] };
                 }
                 else if (key == "float4")
                 {
-                    std::array<float, 4> floats{};
+                    ce::fixed_array<float, 4> floats{};
                     if (!ParseFloats(value, name.c_str(), floats, outError))
                         return false;
                     outValue = math::vector4{ floats[0], floats[1], floats[2],

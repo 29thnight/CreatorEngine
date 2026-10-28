@@ -5,6 +5,7 @@ This tests queue/state transitions, not RenderScene payloads or GPU completion.
 import argparse
 from pathlib import Path
 import subprocess
+import re
 
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument('--source', type=Path, help='Optional pre-change Scene.cpp snapshot')
@@ -18,6 +19,9 @@ work.mkdir(parents=True, exist_ok=True)
 source = (args.source or repo / 'Engine/SceneRuntime/Scene.cpp').read_text(encoding='utf-8')
 state = source[source.index('struct SceneRenderRegistryState\n'):source.index('\nScene::Scene(gc::domain&')]
 commit = source[source.index('\tusing Kind = SceneRenderRegistryState::Kind;', source.index('void Scene::CommitRenderProxies()')):source.index('\nsize_t Scene::RenderProxyComponentCount()')]
+# The extracted native branch starts below the outer headless guard.
+if '#if' not in commit:
+    commit = re.sub(r'\n#endif(?=\n}\s*$)', '', commit)
 publish = source[source.index('bool Scene::PublishRenderProxyDirty(Component*'):source.index('\nsize_t Scene::PublishRenderProxyDirty(EntityHandle')]
 contracts = (repo / 'Engine/SceneRuntime/RenderProxyDirty.h').read_text(encoding='utf-8')
 contracts = contracts[contracts.index('enum class ProxyDirty'):]

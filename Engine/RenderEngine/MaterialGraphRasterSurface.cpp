@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -25,7 +26,7 @@ bool SameView(const SurfaceView& a, const SurfaceView& b)
 
 bool ValidCamera(const math::matrix4x4& camera)
 {
-    std::array<std::array<double, 4>, 4> matrix;
+    ce::fixed_array<ce::fixed_array<double, 4>, 4> matrix;
     for (unsigned r = 0; r < 4; ++r)
     {
         for (unsigned c = 0; c < 4; ++c)
@@ -115,7 +116,7 @@ bool RasterSurfaceBatch::ValidateReadback(std::span<const SurfacePoint> points, 
     {
         return Fail(error, "Raster validation needs completed recording, exact pixels and accepted mesh sources.");
     }
-    std::vector<std::uint8_t> coverage(points.size());
+    ce::dynamic_array<std::uint8_t> coverage(points.size());
     for (std::size_t i = 0; i < points.size(); ++i)
     {
         auto point = points[i];
@@ -128,7 +129,7 @@ bool RasterSurfaceBatch::ValidateReadback(std::span<const SurfacePoint> points, 
             }
             point.position[3] = 0;
         }
-        const auto values = std::bit_cast<std::array<float, 20>>(point);
+        const auto values = std::bit_cast<ce::fixed_array<float, 20>>(point);
         if (!std::ranges::all_of(values, [&](float value) {
                 return covered ? (std::isfinite(value) && std::abs(value) <= 1e6f) : value == 0;
             }))
@@ -179,7 +180,7 @@ bool RasterSurfaceBatch::Declare(EnhancedRenderGraph& graph, std::string& error)
     {
         return Fail(error, "Raster declaration needs its prepared owner, current descriptors and a fresh graph.");
     }
-    std::vector<EnhancedRenderGraph::RGPassUsage> captureUsage, resolveUsage;
+    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> captureUsage, resolveUsage;
     const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
     const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
     const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
@@ -470,7 +471,7 @@ bool RasterSurfaceCollector::PrepareImpl(IRenderDeviceServices& device, const Ra
                            ? RHIDepthTargetDesc::DepthReadOnly(candidate->depth_, RHIFormat::D32Float)
                            : RHIDepthTargetDesc::Depth(candidate->depth_, RHIFormat::D32Float);
     candidate->renderTargets_ = device.CreateRenderTargets(candidate->targets_, &depth);
-    std::array<RHIBindingDesc, 6> inputs;
+    ce::fixed_array<RHIBindingDesc, 6> inputs;
     for (std::size_t i = 0; i < inputs.size(); ++i)
     {
         inputs[i] = RHIBindingDesc::Srv2D(candidate->targets_[i], RHIFormat::RGBA32Float);
@@ -481,7 +482,7 @@ bool RasterSurfaceCollector::PrepareImpl(IRenderDeviceServices& device, const Ra
     struct Constants
     {
         math::matrix4x4 viewProjection;
-        std::array<std::uint32_t, 4> viewportTexture;
+        ce::fixed_array<std::uint32_t, 4> viewportTexture;
         IblVector lod;
     };
     const Constants constants{request.viewProjection,

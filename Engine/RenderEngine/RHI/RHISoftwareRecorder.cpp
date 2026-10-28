@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -61,7 +62,7 @@ namespace
         static constexpr size_t MaxBytes = 16 * 1024 * 1024;
         static_assert(std::atomic<RHISoftwareRecordingStorage*>::is_always_lock_free);
         static_assert(std::atomic<size_t>::is_always_lock_free);
-        std::array<std::atomic<RHISoftwareRecordingStorage*>, 8> free{};
+        ce::fixed_array<std::atomic<RHISoftwareRecordingStorage*>, 8> free{};
         std::atomic<size_t> bytes{};
         ~SoftwareStoragePool()
         {
@@ -255,7 +256,7 @@ bool RHISoftwareRecorder::FinishRecording(std::span<const uint32_t> targetOrder,
         outError = "Software batch output, queue identity, backend generation or lifetime owner is invalid.";
         return false;
     }
-    std::bitset<8> seen;
+    ce::fixed_bitset<8> seen;
     for (const uint32_t target : targetOrder)
     {
         if (target >= m_storage->activeTargetCount || seen.test(target) ||

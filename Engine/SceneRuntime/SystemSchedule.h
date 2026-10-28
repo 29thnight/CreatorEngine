@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineNodeSet.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 class Component;
@@ -61,13 +63,13 @@ public:
     // 옛 RegistryTick이 이 자리에서 그 셋을 순회하며 컴포넌트의 가상 Update/
     // LateUpdate/FixedUpdate를 불렀는데, RegistryTick 자체가 소멸하며(위 클래스
     // 주석 참고) 이 접근자들도 부를 곳이 없어졌다.
-    std::vector<Component*>& PendingInitializeList() { return m_pendingInitialize; }
-    std::vector<Component*>& PendingSimulationList() { return m_pendingSimulation; }
-    std::vector<Component*>& DestroyWatchList() { return m_destroyWatchList; }
+    ce::dynamic_array<Component*>& PendingInitializeList() { return m_pendingInitialize; }
+    ce::dynamic_array<Component*>& PendingSimulationList() { return m_pendingSimulation; }
+    ce::dynamic_array<Component*>& DestroyWatchList() { return m_destroyWatchList; }
 
-    const std::vector<Component*>& PendingInitializeList() const { return m_pendingInitialize; }
-    const std::vector<Component*>& PendingSimulationList() const { return m_pendingSimulation; }
-    const std::vector<Component*>& DestroyWatchList() const { return m_destroyWatchList; }
+    const ce::dynamic_array<Component*>& PendingInitializeList() const { return m_pendingInitialize; }
+    const ce::dynamic_array<Component*>& PendingSimulationList() const { return m_pendingSimulation; }
+    const ce::dynamic_array<Component*>& DestroyWatchList() const { return m_destroyWatchList; }
 
     // ── 명시 구독 API (트랙 L4 정본) ──
     //
@@ -108,18 +110,18 @@ public:
     void Clear();
 
 private:
-    std::vector<Component*>& ListFor(Phase phase);
+    ce::dynamic_array<Component*>& ListFor(Phase phase);
 
-    std::vector<Component*> m_pendingInitialize;
-    std::vector<Component*> m_pendingSimulation;
-    std::vector<Component*> m_destroyWatchList;
+    ce::dynamic_array<Component*> m_pendingInitialize;
+    ce::dynamic_array<Component*> m_pendingSimulation;
+    ce::dynamic_array<Component*> m_destroyWatchList;
 
     // 컴포넌트별 편입 경로. UnsubscribeAll에서 어느 카운터를 줄일지 여기서
     // 판정한다 — 같은 컴포넌트가 여러 페이즈에 걸쳐 있어도 집합이라 중복
     // 계산되지 않는다(암묵 경로가 한 컴포넌트를 여러 리스트에 동시에 밀어
     // 넣는 것이 정상 동작이므로).
-    std::unordered_set<Component*> m_implicitOrigin;
-    std::unordered_set<Component*> m_explicitOrigin;
+    ce::engine_node_set<Component*> m_implicitOrigin;
+    ce::engine_node_set<Component*> m_explicitOrigin;
 };
 
 // ── 구현부 (헤더 전용) ──
@@ -133,7 +135,7 @@ namespace SystemSchedule_Internal
     // Scene.cpp의 옛 RemoveFromList와 동일한 규약: swap-and-pop, 순서 비보존.
     // 보존해야 하는 것은 단계 사이의 순서이지 같은 단계 안의 순서가 아니고,
     // erase로 앞당기면 제거가 O(n)이 되어 씬 전환마다 수천 번 돈다(옛 주석 그대로 승계).
-    inline bool RemoveFromList(std::vector<Component*>& list, Component* target)
+    inline bool RemoveFromList(ce::dynamic_array<Component*>& list, Component* target)
     {
         for (size_t i = 0; i < list.size(); ++i)
         {
@@ -146,7 +148,7 @@ namespace SystemSchedule_Internal
     }
 }
 
-inline std::vector<Component*>& SystemSchedule::ListFor(Phase phase)
+inline ce::dynamic_array<Component*>& SystemSchedule::ListFor(Phase phase)
 {
     switch (phase)
     {

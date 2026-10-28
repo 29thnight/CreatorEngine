@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -202,7 +203,7 @@ std::terminate_handler g_previousTerminate{ nullptr };
             return;
         }
 
-        std::vector<std::filesystem::path> logFiles;
+        ce::dynamic_array<std::filesystem::path> logFiles;
         for (const auto& entry : std::filesystem::directory_iterator(directory, ec))
         {
             if (ec) break;
@@ -322,7 +323,7 @@ void DebugClass::Initialize(std::string_view sessionName)
     logSink = std::make_shared<LogSink>(m_logStore);
     htmlSink = std::make_shared<HtmlFileSink>(m_logFilePath, false);
 
-    std::vector<spdlog::sink_ptr> sinks{ logSink, htmlSink };
+    ce::dynamic_array<spdlog::sink_ptr> sinks{ logSink, htmlSink };
 
 #ifdef _DEBUG
     // 디버거 출력 창에도 함께 흘려보내면 IDE에서 바로 확인할 수 있다.

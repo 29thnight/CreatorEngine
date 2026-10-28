@@ -1,3 +1,6 @@
+#include "../../../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -19,7 +22,7 @@ namespace experiment::cooked
     CookedAssetCatalog CookedAssetCatalog::Load(
         std::span<const std::byte> manifestBytes,
         std::filesystem::path derivedRoot,
-        std::vector<AssetManifestIssue>& outIssues)
+        ce::dynamic_array<AssetManifestIssue>& outIssues)
     {
         CookedAssetCatalog catalog;
 
@@ -77,7 +80,7 @@ namespace experiment::cooked
     }
 
     bool CookedAssetCatalog::ReadCollisionGeometry(const AssetId& assetId, const ArtifactByteSource& bytes,
-        std::vector<std::byte>& out, std::string& failure) const
+        ce::dynamic_array<std::byte>& out, std::string& failure) const
     {
         out.clear();
         const auto* entry = Find(assetId);
@@ -102,7 +105,7 @@ namespace experiment::cooked
         }
         try
         {
-            std::vector<std::byte> prepared(static_cast<std::size_t>(size));
+            ce::dynamic_array<std::byte> prepared(static_cast<std::size_t>(size));
             if (!source.ReadAt(entry->artifactPath, 0, prepared, failure))
             {
                 return false;
@@ -148,7 +151,7 @@ namespace experiment::cooked
     }
 
     bool CookedAssetCatalog::CollectClosure(const AssetId& root,
-        std::vector<AssetId>& outOrdered, std::string& outFailure) const
+        ce::dynamic_array<AssetId>& outOrdered, std::string& outFailure) const
     {
         outOrdered.clear();
         outFailure.clear();
@@ -167,9 +170,9 @@ namespace experiment::cooked
         enum class State : std::uint8_t { Enter, Emit };
         struct Frame final { AssetId id; State state; };
 
-        std::set<AssetId> visited;
-        std::set<AssetId> emitted;
-        std::vector<Frame> stack;
+        ce::engine_ordered_set<AssetId> visited;
+        ce::engine_ordered_set<AssetId> emitted;
+        ce::dynamic_array<Frame> stack;
         stack.push_back({ root, State::Enter });
 
         while (!stack.empty())
@@ -257,7 +260,7 @@ namespace experiment::cooked
                 + ", " + manifest.blobs[entry.blobIndex].artifactPath;
         }
 
-        [[nodiscard]] bool MountIssue(std::vector<AssetManifestIssue>& outIssues,
+        [[nodiscard]] bool MountIssue(ce::dynamic_array<AssetManifestIssue>& outIssues,
             std::string context, std::string message)
         {
             outIssues.push_back({ std::move(context), std::move(message) });
@@ -276,7 +279,7 @@ namespace experiment::cooked
     bool CookedAssetCatalog::WithMountedAssetSet(const AssetSetManifest& manifest,
         own::shared_owner<const ArtifactByteSource> byteSource, AssetDepot::AssetMountId mountId,
         std::uint64_t nextResolverRevision, const AssetSetMountOptions& options,
-        CookedAssetCatalog& outCatalog, std::vector<AssetManifestIssue>& outIssues) const
+        CookedAssetCatalog& outCatalog, ce::dynamic_array<AssetManifestIssue>& outIssues) const
     {
         return AddMountedAssetSetCandidate(manifest, std::move(byteSource), mountId,
             nextResolverRevision, options, true, outCatalog, outIssues);
@@ -284,7 +287,7 @@ namespace experiment::cooked
 
     bool CookedAssetCatalog::WithMountedAssetSets(std::span<const AssetSetMountInput> inputs,
         std::uint64_t nextResolverRevision, CookedAssetCatalog& outCatalog,
-        std::vector<AssetManifestIssue>& outIssues) const
+        ce::dynamic_array<AssetManifestIssue>& outIssues) const
     {
         outIssues.clear();
         if (&outCatalog == this || inputs.empty() || inputs.size() > 64u
@@ -318,7 +321,7 @@ namespace experiment::cooked
     bool CookedAssetCatalog::AddMountedAssetSetCandidate(const AssetSetManifest& manifest,
         own::shared_owner<const ArtifactByteSource> byteSource, AssetDepot::AssetMountId mountId,
         std::uint64_t nextResolverRevision, const AssetSetMountOptions& options, bool validateHardGraph,
-        CookedAssetCatalog& outCatalog, std::vector<AssetManifestIssue>& outIssues) const
+        CookedAssetCatalog& outCatalog, ce::dynamic_array<AssetManifestIssue>& outIssues) const
     {
         outIssues.clear();
         if (&outCatalog == this)
@@ -355,7 +358,7 @@ namespace experiment::cooked
         {
             return false;
         }
-        std::set<AssetIdentity> overrides;
+        ce::engine_ordered_set<AssetIdentity> overrides;
         for (const AssetIdentity& identity : options.overrideIdentities)
         {
             if (!overrides.insert(identity).second)
@@ -426,7 +429,7 @@ namespace experiment::cooked
 
     bool CookedAssetCatalog::WithoutMountedAssetSet(AssetDepot::AssetMountId mountId,
         std::uint64_t nextResolverRevision, CookedAssetCatalog& outCatalog,
-        std::vector<AssetManifestIssue>& outIssues) const
+        ce::dynamic_array<AssetManifestIssue>& outIssues) const
     {
         outIssues.clear();
         if (&outCatalog == this)
@@ -444,7 +447,7 @@ namespace experiment::cooked
         }
 
         CookedAssetCatalog candidate = *this;
-        std::erase_if(candidate.m_mounts, [mountId](const MountedAssetSet& mount)
+        ce::erase_if(candidate.m_mounts, [mountId](const MountedAssetSet& mount)
         {
             return mount.mountId == mountId;
         });
@@ -511,10 +514,10 @@ namespace experiment::cooked
         return AssetLookupStatus::Found;
     }
 
-    std::vector<TypedAssetReference> CookedAssetCatalog::ListRoots(
+    ce::dynamic_array<TypedAssetReference> CookedAssetCatalog::ListRoots(
         AssetDepot::AssetMountId mountId, CookedAssetKind kind) const
     {
-        std::vector<TypedAssetReference> roots;
+        ce::dynamic_array<TypedAssetReference> roots;
         const auto mount = std::ranges::find_if(m_mounts, [mountId](const MountedAssetSet& mounted)
         {
             return mounted.mountId == mountId;
@@ -534,7 +537,7 @@ namespace experiment::cooked
     }
 
     AssetLookupStatus CookedAssetCatalog::TraverseHardClosure(const TypedAssetReference& root,
-        std::map<AssetIdentity, std::uint8_t>& states, std::vector<ResolvedAssetEntry>* outOrdered,
+        ce::engine_ordered_map<AssetIdentity, std::uint8_t>& states, ce::dynamic_array<ResolvedAssetEntry>* outOrdered,
         AssetCatalogLookupIssue& outIssue) const
     {
         struct Frame final
@@ -542,7 +545,7 @@ namespace experiment::cooked
             MountedEntryLocation location{};
             std::size_t nextDependency{};
         };
-        std::vector<Frame> stack;
+        ce::dynamic_array<Frame> stack;
         const auto fail = [&](AssetLookupStatus status, const TypedAssetReference& asset)
         {
             outIssue = {};
@@ -660,7 +663,7 @@ namespace experiment::cooked
                 }
             }
         }
-        std::map<AssetIdentity, std::uint8_t> states;
+        ce::engine_ordered_map<AssetIdentity, std::uint8_t> states;
         for (const auto& [identity, location] : m_mountedEntries)
         {
             const AssetSetEntry& entry = m_mounts[location.mountIndex].manifest.entries[location.entryIndex];
@@ -696,13 +699,13 @@ namespace experiment::cooked
     }
 
     AssetLookupStatus CookedAssetCatalog::CollectHardClosure(const TypedAssetReference& root,
-        std::vector<ResolvedAssetEntry>& outOrdered, AssetCatalogLookupIssue& outIssue) const
+        ce::dynamic_array<ResolvedAssetEntry>& outOrdered, AssetCatalogLookupIssue& outIssue) const
     {
         const TypedAssetReference reference = root;
         outOrdered.clear();
         outIssue = {};
-        std::map<AssetIdentity, std::uint8_t> states;
-        std::vector<ResolvedAssetEntry> candidate;
+        ce::engine_ordered_map<AssetIdentity, std::uint8_t> states;
+        ce::dynamic_array<ResolvedAssetEntry> candidate;
         const AssetLookupStatus status = TraverseHardClosure(reference, states, &candidate, outIssue);
         if (status == AssetLookupStatus::Found)
         {

@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../Containers/ContainerAPI.h"
 #include "ProfileCaptureFile.h"
 
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -12,7 +14,7 @@ namespace ce::detail::capture_file_impl
     static_assert(std::endian::native == std::endian::little,
                   ".ceprof 는 little-endian 이다 — 이 기계에서는 바이트를 뒤집어 써야 한다");
 
-    constexpr std::array<char, 8> kMagic{ 'C', 'E', 'P', 'R', 'O', 'F', '\0', '\0' };
+    constexpr ce::fixed_array<char, 8> kMagic{ 'C', 'E', 'P', 'R', 'O', 'F', '\0', '\0' };
     constexpr std::size_t kHeaderBytes = 16;       // magic 8 · version 4 · chunk_count 4
     constexpr std::size_t kChunkEntryBytes = 32;   // type · version · offset · size · crc · reserved
 
@@ -45,9 +47,9 @@ namespace ce::detail::capture_file_impl
     //
     // 이 라이브러리는 ProjectReference 0 이다. 스무 줄을 위해 압축 라이브러리를
     // 끌어오면 그 계약이 깨진다.
-    constexpr std::array<std::uint32_t, 256> make_crc_table()
+    constexpr ce::fixed_array<std::uint32_t, 256> make_crc_table()
     {
-        std::array<std::uint32_t, 256> table{};
+        ce::fixed_array<std::uint32_t, 256> table{};
         for (std::uint32_t i = 0; i < 256; ++i)
         {
             std::uint32_t value = i;
@@ -59,7 +61,7 @@ namespace ce::detail::capture_file_impl
         }
         return table;
     }
-    constexpr std::array<std::uint32_t, 256> kCrcTable = make_crc_table();
+    constexpr ce::fixed_array<std::uint32_t, 256> kCrcTable = make_crc_table();
 
     std::uint32_t crc32(std::span<const std::byte> bytes)
     {
@@ -97,11 +99,11 @@ namespace ce::detail::capture_file_impl
             m_bytes.insert(m_bytes.end(), value.begin(), value.end());
         }
 
-        std::vector<std::byte> take() { return std::move(m_bytes); }
+        ce::dynamic_array<std::byte> take() { return std::move(m_bytes); }
         std::size_t size() const { return m_bytes.size(); }
 
     private:
-        std::vector<std::byte> m_bytes;
+        ce::dynamic_array<std::byte> m_bytes;
     };
 
     // ── 읽는 쪽 ──────────────────────────────────────────────────────────────
@@ -163,7 +165,7 @@ namespace ce::detail::capture_file_impl
     };
 
     // ── 청크 몸통 ────────────────────────────────────────────────────────────
-    std::vector<std::byte> encode_environment(const capture_session& capture)
+    ce::dynamic_array<std::byte> encode_environment(const capture_session& capture)
     {
         byte_writer out;
         out.put(static_cast<std::uint64_t>(capture.environment().ticks_per_second));
@@ -172,7 +174,7 @@ namespace ce::detail::capture_file_impl
         return out.take();
     }
 
-    std::vector<std::byte> encode_markers(const capture_session& capture)
+    ce::dynamic_array<std::byte> encode_markers(const capture_session& capture)
     {
         byte_writer out;
         out.put(capture.marker_count());
@@ -186,7 +188,7 @@ namespace ce::detail::capture_file_impl
         return out.take();
     }
 
-    std::vector<std::byte> encode_threads(const capture_session& capture)
+    ce::dynamic_array<std::byte> encode_threads(const capture_session& capture)
     {
         byte_writer out;
         out.put(static_cast<std::uint32_t>(capture.threads().size()));
@@ -220,7 +222,7 @@ namespace ce::detail::capture_file_impl
         out.put(value.cpu.task);
     }
 
-    std::vector<std::byte> encode_frames(const capture_session& capture)
+    ce::dynamic_array<std::byte> encode_frames(const capture_session& capture)
     {
         byte_writer out;
         out.put(capture.frame_count());
@@ -239,7 +241,7 @@ namespace ce::detail::capture_file_impl
         return out.take();
     }
 
-    std::vector<std::byte> encode_counters(const capture_session& capture)
+    ce::dynamic_array<std::byte> encode_counters(const capture_session& capture)
     {
         byte_writer out;
         out.put(capture.dropped_counters());
@@ -263,7 +265,7 @@ namespace ce::detail::capture_file_impl
         return out.take();
     }
 
-    std::vector<std::byte> encode_render_measurements(const capture_session& capture)
+    ce::dynamic_array<std::byte> encode_render_measurements(const capture_session& capture)
     {
         byte_writer out;
         out.put(capture.frame_count());
@@ -279,7 +281,7 @@ namespace ce::detail::capture_file_impl
         return out.take();
     }
 
-    std::vector<std::byte> encode_counter_descriptors(const capture_session& capture)
+    ce::dynamic_array<std::byte> encode_counter_descriptors(const capture_session& capture)
     {
         byte_writer out;
         out.put(static_cast<std::uint32_t>(capture.counter_descriptors().size()));
@@ -321,7 +323,7 @@ namespace ce::detail::capture_file_impl
         return finish(in);
     }
 
-    parse_result parse_markers(byte_reader in, std::vector<capture_marker>& markers)
+    parse_result parse_markers(byte_reader in, ce::dynamic_array<capture_marker>& markers)
     {
         std::uint32_t count = 0;
         if (!in.get(count) || !in.can_hold(count, kMarkerMinBytes))
@@ -342,7 +344,7 @@ namespace ce::detail::capture_file_impl
         return finish(in);
     }
 
-    parse_result parse_threads(byte_reader in, std::vector<thread_info>& threads)
+    parse_result parse_threads(byte_reader in, ce::dynamic_array<thread_info>& threads)
     {
         std::uint32_t count = 0;
         if (!in.get(count) || !in.can_hold(count, kThreadMinBytes))
@@ -419,7 +421,7 @@ namespace ce::detail::capture_file_impl
         return {};
     }
 
-    parse_result parse_frames(byte_reader in, std::vector<frame_record>& frames, std::uint32_t version)
+    parse_result parse_frames(byte_reader in, ce::dynamic_array<frame_record>& frames, std::uint32_t version)
     {
         std::uint32_t count = 0;
         if (!in.get(count) || !in.can_hold(count, kFrameHeadBytes))
@@ -443,7 +445,7 @@ namespace ce::detail::capture_file_impl
         return finish(in);
     }
 
-    parse_result parse_counters(byte_reader in, std::vector<frame_record>& frames,
+    parse_result parse_counters(byte_reader in, ce::dynamic_array<frame_record>& frames,
                                 std::uint64_t& dropped, std::uint32_t version)
     {
         std::uint32_t count = 0;
@@ -460,7 +462,7 @@ namespace ce::detail::capture_file_impl
                 return std::unexpected(capture_file_error::malformed);
             }
             frame.counters.reserve(samples);
-            std::set<std::tuple<std::uint16_t, std::uint64_t, std::uint64_t, std::uint64_t>> identities;
+            ce::engine_ordered_set<ce::tuple<std::uint16_t, std::uint64_t, std::uint64_t, std::uint64_t>> identities;
             for (std::uint32_t i = 0; i < samples; ++i)
             {
                 std::uint16_t id = 0;
@@ -490,7 +492,7 @@ namespace ce::detail::capture_file_impl
         return finish(in);
     }
 
-    parse_result parse_counter_descriptors(byte_reader in, std::vector<capture_counter>& values)
+    parse_result parse_counter_descriptors(byte_reader in, ce::dynamic_array<capture_counter>& values)
     {
         std::uint32_t count = 0;
         if (!in.get(count) || count > 65535 || !in.can_hold(count, 14))
@@ -517,7 +519,7 @@ namespace ce::detail::capture_file_impl
         return finish(in);
     }
 
-    parse_result parse_render_measurements(byte_reader in, std::vector<frame_record>& frames, bool allow_presenter,
+    parse_result parse_render_measurements(byte_reader in, ce::dynamic_array<frame_record>& frames, bool allow_presenter,
                                            bool allow_rhi)
     {
         std::uint32_t count = 0;
@@ -556,7 +558,7 @@ namespace ce::detail::capture_file_impl
         std::uint32_t crc = 0;
     };
 
-    std::expected<std::vector<chunk_entry>, capture_file_error>
+    std::expected<ce::dynamic_array<chunk_entry>, capture_file_error>
     read_chunk_table(std::span<const std::byte> bytes)
     {
         // 매직을 볼 수 있을 만큼도 없으면 "잘렸다" 다. 매직이 다르면 캡처가 아니다.
@@ -585,7 +587,7 @@ namespace ce::detail::capture_file_impl
             return std::unexpected(capture_file_error::malformed);
         }
 
-        std::vector<chunk_entry> entries(count);
+        ce::dynamic_array<chunk_entry> entries(count);
         for (chunk_entry& entry : entries)
         {
             std::uint32_t reserved = 0;
@@ -636,10 +638,10 @@ namespace ce
         return "알 수 없는 오류";
     }
 
-    std::vector<std::byte> encode_capture(const capture_session& capture)
+    ce::dynamic_array<std::byte> encode_capture(const capture_session& capture)
     {
         using namespace ce::detail::capture_file_impl;
-        const std::array<std::pair<chunk_type, std::vector<std::byte>>, 7> chunks{ {
+        const ce::fixed_array<ce::pair<chunk_type, ce::dynamic_array<std::byte>>, 7> chunks{ {
             { chunk_type::environment, encode_environment(capture) },
             { chunk_type::markers,     encode_markers(capture) },
             { chunk_type::threads,     encode_threads(capture) },
@@ -675,7 +677,7 @@ namespace ce
         return out.take();
     }
 
-    std::expected<std::vector<std::byte>, capture_file_error>
+    std::expected<ce::dynamic_array<std::byte>, capture_file_error>
     encode_capture_bounded(const capture_session& capture, std::size_t max_wire_bytes)
     {
         // Fixed cardinalities also bound decoder work (not only wire bytes).
@@ -868,10 +870,10 @@ namespace ce
             return std::unexpected(capture_file_error::truncated);
         }
 
-        std::vector<frame_record>   frames;
-        std::vector<thread_info>    threads;
-        std::vector<capture_marker> markers;
-        std::vector<capture_counter> counterDescriptors;
+        ce::dynamic_array<frame_record>   frames;
+        ce::dynamic_array<thread_info>    threads;
+        ce::dynamic_array<capture_marker> markers;
+        ce::dynamic_array<capture_counter> counterDescriptors;
         capture_environment         environment{};
         bool                        complete = true;
         std::uint32_t               unacked = 0;
@@ -996,7 +998,7 @@ namespace ce
         std::filesystem::path temporary;
         try
         {
-            const std::vector<std::byte> bytes = encode_capture(capture);
+            const ce::dynamic_array<std::byte> bytes = encode_capture(capture);
             std::error_code error;
             const auto parent = path.has_parent_path() ? path.parent_path() : std::filesystem::path(".");
             static std::atomic<std::uint64_t> next_id{0};
@@ -1065,7 +1067,7 @@ namespace ce
             return std::unexpected(recording.error());
         }
         std::ifstream input(path, std::ios::binary);
-        std::array<std::byte, 12> header{};
+        ce::fixed_array<std::byte, 12> header{};
         if (!input.read(reinterpret_cast<char*>(header.data()), header.size()))
         {
             return std::unexpected(capture_file_error::open_failed);

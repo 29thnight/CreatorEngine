@@ -1,3 +1,5 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -119,7 +121,7 @@ namespace
 
     // UI borrows the live scene under the presentation lock. Queue only its
     // generation-checked root handle and owned operation data, never that borrow.
-    void queue_hierarchy_edit(Scene* scene, std::function<CommandCore::CommandResult(Scene&)> edit)
+    void queue_hierarchy_edit(Scene* scene, ce::owned_func<CommandCore::CommandResult(Scene&)> edit)
     {
         const auto root = scene ? scene->HandleOf(0) : EntityHandle{};
         ConsoleCommandSystem::Get().EnqueueEditorMutation([root, edit = std::move(edit)]
@@ -133,9 +135,9 @@ namespace
         });
     }
 
-    std::vector<EntityHandle> copy_selection(Scene* scene)
+    ce::dynamic_array<EntityHandle> copy_selection(Scene* scene)
     {
-        std::vector<EntityHandle> handles;
+        ce::dynamic_array<EntityHandle> handles;
         for (auto* object : scene->m_selectedEntities)
         {
             if (object)
@@ -146,11 +148,11 @@ namespace
         return handles;
     }
 
-    void paste_selection(Scene* scene, std::vector<EntityHandle> handles)
+    void paste_selection(Scene* scene, ce::dynamic_array<EntityHandle> handles)
     {
         queue_hierarchy_edit(scene, [handles = std::move(handles)](Scene& current)
         {
-            std::vector<Entity*> objects;
+            ce::dynamic_array<Entity*> objects;
             for (const auto handle : handles)
             {
                 auto* object = current.Resolve(handle);
@@ -311,7 +313,7 @@ void HierarchyWindow::DrawSceneObjectRow(Entity* obj, const editor::hierarchy_fl
             const auto found = std::find(newList.begin(), newList.end(), obj);
             if (shift) { if (found != newList.end()) newList.erase(found); else newList.push_back(obj); }
             else newList = {obj};
-            std::vector<EntityHandle> targets;
+            ce::dynamic_array<EntityHandle> targets;
             for (auto* object : newList) if (object) targets.push_back(scene->HandleOf(object->m_index));
             EditorObjectOperations::Select(scene, targets);
 		}

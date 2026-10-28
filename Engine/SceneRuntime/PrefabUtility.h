@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
@@ -103,14 +105,14 @@ private:
     //
 	// 캐시는 같은 파일을 상대/절대 경로로 중복 로드하지 않기 위해 경로를 쓴다.
 	// 자산 정체성은 호출 경로와 무관하게 catalog(.meta) GUID 하나만 사용한다.
-    std::unordered_map<std::string, std::unique_ptr<Prefab>> m_prefabCache{};
+    ce::engine_node_map<std::string, std::unique_ptr<Prefab>> m_prefabCache{};
 
     // 새로 만든 프리팹의 소유자.
     //
     // 로드 경로만 막으면 절반만 막는 것이다 — CreatePrefab도 new Prefab을 돌려주고,
     // 호출자 넷(모델 임포트 셋, 콘솔 prefab.create)이 전부 저장만 하고 버린다.
     // 캐시와 달리 키가 없다(저장 전이라 경로가 아직 없다).
-    std::vector<std::unique_ptr<Prefab>> m_createdPrefabs{};
+    ce::dynamic_array<std::unique_ptr<Prefab>> m_createdPrefabs{};
 
     // 프리팹 인스턴스 추적 (SceneGraphRedesignPlan P2).
     //
@@ -128,7 +130,7 @@ private:
         Scene* scene{ nullptr };
         EntityHandle handle{};
     };
-    std::unordered_map<FileGuid, std::vector<InstanceRef>> m_instanceMap{};
+    ce::engine_node_map<FileGuid, ce::dynamic_array<InstanceRef>> m_instanceMap{};
 
     // ref를 지금 살아있는 Entity*로 푼다. 셋 중 하나라도 아니면 nullptr:
     //   - scene이 비었거나 handle이 무효

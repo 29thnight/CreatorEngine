@@ -1,4 +1,7 @@
+#include "../../../../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../../../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
 #include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "RHI/RHIFormat.h"
 
@@ -97,7 +100,7 @@ private:
     bool CreatePipelines(const EnhancedFrameContext& context, std::string& outError,
                          assets::VertexAttributeMask mask = 0);
     void CollectDraws(const EnhancedFrameContext& context,
-        const std::vector<EnhancedDrawItem>* draws);
+        const ce::dynamic_array<EnhancedDrawItem>* draws);
 
     struct Batch
     {
@@ -135,14 +138,14 @@ private:
     bool     m_keepAlive{ false };
 
     // 메시별 인스턴스 수집(프레임마다 다시 만든다).
-    std::vector<Batch>        m_batches;
-    std::vector<InstanceData> m_instances;   // 배치 순서로 연속
+    ce::dynamic_array<Batch>        m_batches;
+    ce::dynamic_array<InstanceData> m_instances;   // 배치 순서로 연속
 
     // 본 팔레트. 애니메이터별로 한 번만 담고 인스턴스가 오프셋으로 가리킨다.
-    std::vector<PackedBoneMatrix>            m_bonePalettes;
-    std::unordered_map<uint64_t, uint32_t>  m_boneOffsets;
+    ce::dynamic_array<PackedBoneMatrix>            m_bonePalettes;
+    ce::engine_node_map<uint64_t, uint32_t>  m_boneOffsets;
 
-    std::unordered_map<std::size_t, RHIMeshBinding> m_geometry;
+    ce::engine_node_map<std::size_t, RHIMeshBinding> m_geometry;
 
     // 프레임 밀봉 값(3-2).
     math::matrix4x4 m_viewProjection{ math::matrix4x4::identity() };
@@ -155,5 +158,5 @@ private:
     uint32_t m_height{ 0 };
 
     RHIPipelineHandle m_pso;
-    std::map<assets::VertexAttributeMask, RHIPipelineHandle> m_modelPsos;
+    ce::engine_ordered_map<assets::VertexAttributeMask, RHIPipelineHandle> m_modelPsos;
 };

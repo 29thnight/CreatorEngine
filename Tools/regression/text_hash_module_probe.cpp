@@ -15,7 +15,7 @@ import Creator.Platform.Windows.Strings;
 
 std::array<std::uint8_t, 32> text_cng_reference(std::span<const std::uint8_t> bytes);
 
-ce::hash::sha256_digest text_hash_identity(std::string_view text);
+ce::crypto::sha256_digest text_hash_identity(std::string_view text);
 std::string text_lower_identity(std::string_view text);
 
 int main()
@@ -30,11 +30,11 @@ int main()
         }
     };
     const auto hex = [](std::string_view text)
-    { return ce::hash::to_hex(ce::hash::sha256::compute(text.data(), text.size())); };
+    { return ce::crypto::to_hex(ce::crypto::sha256::compute(text.data(), text.size())); };
     check(hex("") == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855");
     check(hex("abc") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad");
     check(hex(std::string(1000000, 'a')) == "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0");
-    static_assert(sizeof(ce::hash::sha256_digest) == 32);
+    static_assert(sizeof(ce::crypto::sha256_digest) == 32);
     for (std::size_t size : {0u, 1u, 55u, 56u, 63u, 64u, 65u, 127u, 128u, 129u, 65535u, 65536u, 65537u})
     {
         std::vector<std::uint8_t> bytes(size);
@@ -44,10 +44,10 @@ int main()
         }
         const auto expected = text_cng_reference(bytes);
         check(expected.size() == 32);
-        check(ce::hash::sha256::compute(bytes.data(), bytes.size()) == expected);
+        check(ce::crypto::sha256::compute(bytes.data(), bytes.size()) == expected);
         for (std::size_t chunk : {1u, 13u, 64u, 65536u})
         {
-            ce::hash::sha256 hash;
+            ce::crypto::sha256 hash;
             hash.update(nullptr, 0);
             for (std::size_t offset = 0; offset < bytes.size(); offset += chunk)
             {
@@ -56,7 +56,7 @@ int main()
             check(hash.finish() == expected);
         }
     }
-    check(text_hash_identity("abc") == ce::hash::sha256::compute("abc", 3));
+    check(text_hash_identity("abc") == ce::crypto::sha256::compute("abc", 3));
     check(text_lower_identity("ABC") == "abc");
     check(ce::strings::to_lower(std::string_view("ABCD", 2)) == "ab");
     check(ce::strings::to_lower(std::string_view("A\0B", 3)) == std::string("a\0b", 3));

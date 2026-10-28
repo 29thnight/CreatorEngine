@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #include "RHI/RHIFormat.h"
 #include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
@@ -71,8 +72,8 @@ public:
     // GT 수집이 패스를 인스턴스화하지 않기 위해서다. 아래 Add*는 자가 검증
     // 편의용 위임 래퍼이고, E5가 self-test를 옮기면 함께 걷을 수 있다.
     void ResetLines() { m_lines.Reset(); }
-    void SetVertices(const std::vector<Vertex>& vertices) { m_lines.Set(vertices); }
-    const std::vector<Vertex>& GetVertices() const { return m_lines.GetVertices(); }
+    void SetVertices(const ce::dynamic_array<Vertex>& vertices) { m_lines.Set(vertices); }
+    const ce::dynamic_array<Vertex>& GetVertices() const { return m_lines.GetVertices(); }
 
     void AddLine(const math::vector3& p0, const math::vector3& p1,
         const math::color& color)

@@ -1,3 +1,5 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -124,7 +126,7 @@ namespace RenderTest
             EnhancedDrawItem replayDraw{};
             replayDraw.worldMatrix = math::matrix4x4::identity();
             replayDraw.modelMeshView = view;
-            std::array replayDraws{ replayDraw };
+            ce::fixed_array replayDraws{ replayDraw };
             EnhancedDrawReplayInput replay;
             EnhancedDrawReplayInput decodedReplay;
             std::string replayError;
@@ -148,7 +150,7 @@ namespace RenderTest
             check.Check(payload->Matches(*other) && firstKey != secondKey
                 && HashModelMeshHandle(firstKey) != HashModelMeshHandle(secondKey),
                 "compatible raw decode sharing keeps logical mesh GPU identities distinct");
-            std::array<EnhancedDrawItem, 2> collidingDraws{};
+            ce::fixed_array<EnhancedDrawItem, 2> collidingDraws{};
             collidingDraws[0].geometryKey = 1u;
             collidingDraws[1].geometryKey = 1u;
             collidingDraws[0].modelMeshView.handle = firstKey;
@@ -318,7 +320,7 @@ namespace RenderTest
                 if (!before) { check.Check(false, "runtime failure probe lost setup generation"); return; }
                 check.Check(instance.BindModelGeneration(before, 0), "existing instance bound");
                 const auto instanceHandle = instance.GetModelMeshHandle();
-                std::vector<own::shared_owner<const Texture>> owners;
+                ce::dynamic_array<own::shared_owner<const Texture>> owners;
                 for (const auto& texture : before->Textures())
                     owners.push_back(DataSystems->ResolveModelGenerationTexture(*before, texture.textureId));
                 check.Check(std::ranges::all_of(owners, [](const auto& owner) { return !!owner; }),
@@ -372,7 +374,7 @@ namespace RenderTest
             const auto before = DataSystems->LoadModelAssetGeneration(guid);
             if (!before) { check.Check(false, "runtime recovery setup"); return; }
             instance.BindModelGeneration(before, 0);
-            std::vector<own::shared_owner<const Texture>> oldOwners;
+            ce::dynamic_array<own::shared_owner<const Texture>> oldOwners;
             for (const auto& texture : before->Textures())
                 oldOwners.push_back(DataSystems->ResolveModelGenerationTexture(*before, texture.textureId));
             const auto cacheBefore = DataSystems->SnapshotModelAssetGenerations();
@@ -865,7 +867,7 @@ namespace RenderTest
         check.Check(std::filesystem::is_directory(generationRoot),
             "corpus generation root 존재");
 
-        std::vector<std::filesystem::path> sources;
+        ce::dynamic_array<std::filesystem::path> sources;
         std::error_code error;
         if (std::filesystem::is_directory(assetsRoot, error) && !error)
         {
@@ -893,7 +895,7 @@ namespace RenderTest
         check.Check(sources.size() >= 14u, "MBC4 model corpus 14개 이상 발견");
 
         assets::ModelAssetGenerationCache cache;
-        std::set<uuid::uuid16> modelIds;
+        ce::engine_ordered_set<uuid::uuid16> modelIds;
         std::size_t loadedCount = 0u;
         std::size_t meshCount = 0u;
         std::size_t materialCount = 0u;

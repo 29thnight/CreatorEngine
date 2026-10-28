@@ -1,4 +1,6 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
 
 #include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -28,7 +30,7 @@ enum class PinType : std::uint8_t
 };
 
 using LXSocketValue =
-    std::variant<std::monostate, bool, std::int64_t, double, std::array<double, 3>, std::array<double, 4>, std::string>;
+    std::variant<std::monostate, bool, std::int64_t, double, ce::fixed_array<double, 3>, ce::fixed_array<double, 4>, std::string>;
 
 bool IsSocketValueValid(PinType type, const LXSocketValue& value);
 
@@ -63,8 +65,8 @@ struct Node
     Id id = 0;
     std::string type;
     std::string title;
-    std::vector<Pin> pins;
-    std::map<std::string, std::string> properties;
+    ce::dynamic_array<Pin> pins;
+    ce::engine_ordered_map<std::string, std::string> properties;
     std::optional<DynamicPinRule> dynamicPins;
     Id groupId = 0;
 };
@@ -102,8 +104,8 @@ struct ViewLayout
 
 struct LXLayout
 {
-    std::map<Id, NodeLayout> nodes;
-    std::map<Id, FrameLayout> frames;
+    ce::engine_ordered_map<Id, NodeLayout> nodes;
+    ce::engine_ordered_map<Id, FrameLayout> frames;
     ViewLayout view;
 
     bool operator==(const LXLayout&) const = default;
@@ -135,7 +137,7 @@ struct LXGroupDefinition
 {
     Id id = 0;
     std::string name;
-    std::vector<LXGroupSocket> sockets;
+    ce::dynamic_array<LXGroupSocket> sockets;
     std::shared_ptr<const LXGraph> body;
 };
 
@@ -148,16 +150,16 @@ struct NodePosition
 
 struct GraphFragment
 {
-    std::vector<Node> nodes;
-    std::vector<Link> links;
+    ce::dynamic_array<Node> nodes;
+    ce::dynamic_array<Link> links;
     LXLayout layout;
-    std::map<Id, LXGroupDefinition> groups;
+    ce::engine_ordered_map<Id, LXGroupDefinition> groups;
 };
 
 struct LXGroupCollapseMapping
 {
-    std::map<Id, Id> nodes;
-    std::map<Id, Id> pins;
+    ce::engine_ordered_map<Id, Id> nodes;
+    ce::engine_ordered_map<Id, Id> pins;
 };
 
 struct Issue
@@ -179,8 +181,8 @@ struct NodeSpec
 {
     std::string type;
     std::string title;
-    std::vector<Pin> pins;
-    std::map<std::string, std::string> properties;
+    ce::dynamic_array<Pin> pins;
+    ce::engine_ordered_map<std::string, std::string> properties;
     std::optional<DynamicPinRule> dynamicPins;
 };
 
@@ -193,9 +195,9 @@ class LXGraph
                      std::shared_ptr<const LXNodeDefinitionRegistry> definitions = nullptr);
     const std::string& Domain() const { return domain_; }
     const std::shared_ptr<const LXNodeDefinitionRegistry>& Definitions() const { return definitions_; }
-    const std::vector<Node>& Nodes() const { return nodes_; }
-    const std::vector<Link>& Links() const { return links_; }
-    const std::map<Id, LXGroupDefinition>& Groups() const { return groups_; }
+    const ce::dynamic_array<Node>& Nodes() const { return nodes_; }
+    const ce::dynamic_array<Link>& Links() const { return links_; }
+    const ce::engine_ordered_map<Id, LXGroupDefinition>& Groups() const { return groups_; }
     const LXGroupDefinition* FindGroup(Id id) const;
     const LXLayout& Layout() const { return layout_; }
     Id NextId() const { return nextId_; }
@@ -210,24 +212,24 @@ class LXGraph
     Id AddGroupBoundaryPin(Id node, std::string identifier, std::string name, PinType type, LXSocketValue value = {});
     bool RemoveGroupBoundaryPin(Id pin);
     Id AddConnectedNode(const NodeSpec& spec, float x, float y, Id existingPin, std::size_t specPinIndex);
-    Id CreateGroup(std::string name, const LXGraph& body, std::vector<LXGroupSocket> sockets);
+    Id CreateGroup(std::string name, const LXGraph& body, ce::dynamic_array<LXGroupSocket> sockets);
     Id CreateGroupInstance(Id group, float x, float y);
-    Id CollapseToGroup(const std::vector<Id>& nodes, std::string name, Id idFloor = 0,
+    Id CollapseToGroup(const ce::dynamic_array<Id>& nodes, std::string name, Id idFloor = 0,
                        LXGroupCollapseMapping* mapping = nullptr);
     bool ReplaceGroupBody(Id group, const LXGraph& body, bool* contentChanged = nullptr);
-    bool UpdateGroup(Id group, std::string name, const LXGraph& body, std::vector<LXGroupSocket> sockets,
+    bool UpdateGroup(Id group, std::string name, const LXGraph& body, ce::dynamic_array<LXGroupSocket> sockets,
                      bool* contentChanged = nullptr);
     bool RemoveNode(Id id);
-    bool RemoveNodes(const std::vector<Id>& ids);
+    bool RemoveNodes(const ce::dynamic_array<Id>& ids);
     Id AddDynamicPin(Id node, const std::string& name);
     bool RemoveDynamicPin(Id pin);
     bool MoveDynamicPin(Id pin, int direction);
-    GraphFragment CopyNodes(const std::vector<Id>& ids) const;
-    std::vector<Id> PasteNodes(const GraphFragment& fragment, float offsetX, float offsetY);
+    GraphFragment CopyNodes(const ce::dynamic_array<Id>& ids) const;
+    ce::dynamic_array<Id> PasteNodes(const GraphFragment& fragment, float offsetX, float offsetY);
     bool SetNodePosition(Id id, float x, float y, bool undoable = true);
-    bool SetNodePositions(const std::vector<NodePosition>& positions, bool undoable = true);
+    bool SetNodePositions(const ce::dynamic_array<NodePosition>& positions, bool undoable = true);
     bool SetNodeCollapsed(Id id, bool collapsed);
-    Id AddFrame(std::string label, float x, float y, float width, float height, const std::vector<Id>& members = {});
+    Id AddFrame(std::string label, float x, float y, float width, float height, const ce::dynamic_array<Id>& members = {});
     bool RenameFrame(Id id, std::string label);
     bool RemoveFrame(Id id);
     bool MoveFrame(Id id, float x, float y, bool undoable = true);
@@ -240,7 +242,7 @@ class LXGraph
     std::optional<Id> Connect(Id first, Id second, std::string* reason = nullptr);
     std::optional<Id> ReplaceInputConnection(Id first, Id second, std::string* reason = nullptr);
     bool Disconnect(Id link);
-    std::vector<Issue> Validate(bool checkSharedCopies = true) const;
+    ce::dynamic_array<Issue> Validate(bool checkSharedCopies = true) const;
     bool Undo(bool* contentChanged = nullptr);
     bool Redo(bool* contentChanged = nullptr);
     bool CanUndo() const { return !undo_.empty(); }
@@ -256,10 +258,10 @@ class LXGraph
 
     struct Snapshot
     {
-        std::vector<Node> nodes;
-        std::vector<Link> links;
+        ce::dynamic_array<Node> nodes;
+        ce::dynamic_array<Link> links;
         LXLayout layout;
-        std::map<Id, LXGroupDefinition> groups;
+        ce::engine_ordered_map<Id, LXGroupDefinition> groups;
         Id nextId;
     };
     Snapshot Capture() const;
@@ -276,22 +278,22 @@ class LXGraph
     void Write(std::ostream& out) const;
     bool MatchesGroupInstance(const Node& node) const;
     bool MatchesGroupDefinition(const LXGroupDefinition& definition) const;
-    bool UpdateGroupLocal(Id group, std::string name, const LXGraph& body, std::vector<LXGroupSocket> sockets,
+    bool UpdateGroupLocal(Id group, std::string name, const LXGraph& body, ce::dynamic_array<LXGroupSocket> sockets,
                           bool allowAssignedNewIds = false);
     bool SynchronizeGroupCopies();
     bool SynchronizeGroupCopies(Id group, const LXGroupDefinition& source, bool& changed);
-    bool SynchronizeGroupBoundaryPins(LXGraph& body, const std::vector<LXGroupSocket>& sockets) const;
+    bool SynchronizeGroupBoundaryPins(LXGraph& body, const ce::dynamic_array<LXGroupSocket>& sockets) const;
     bool CanEditNode(const Node& node) const;
     bool AllowsPin(PinType type) const;
     std::string domain_;
     std::shared_ptr<const LXNodeDefinitionRegistry> definitions_;
-    std::vector<Node> nodes_;
-    std::vector<Link> links_;
-    std::map<Id, LXGroupDefinition> groups_;
+    ce::dynamic_array<Node> nodes_;
+    ce::dynamic_array<Link> links_;
+    ce::engine_ordered_map<Id, LXGroupDefinition> groups_;
     LXLayout layout_;
     Id nextId_ = 1;
-    std::vector<Snapshot> undo_;
-    std::vector<Snapshot> redo_;
+    ce::dynamic_array<Snapshot> undo_;
+    ce::dynamic_array<Snapshot> redo_;
 };
 
 const char* PinTypeName(PinType type);

@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -291,7 +292,7 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_scene_new(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
 
         // 빈 씬에서 시작한다. 기능별 테스트 씬은 '무엇이 들어 있는지'를 전부
@@ -329,7 +330,7 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_scene_save(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
 
         if (parts.size() < 2)
@@ -594,7 +595,7 @@ namespace ConsoleCmd
         if (!scene) return PreconditionFailed("scene.none", "No active scene");
 
         const auto started = std::chrono::steady_clock::now();
-        std::vector<Entity::Index> created;
+        ce::dynamic_array<Entity::Index> created;
         created.reserve(static_cast<size_t>(count));
         long long failed = 0;
         for (long long i = 0; i < count; ++i)
@@ -881,7 +882,7 @@ namespace ConsoleCmd
                 "Renderer index must be an integer", "material.index_invalid");
         }
 
-        std::vector<float> values;
+        ce::dynamic_array<float> values;
         values.reserve(ctx.parts.size() - 4);
         for (size_t i = 4; i < ctx.parts.size(); ++i)
         {
@@ -1019,7 +1020,7 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_prefab_overrides(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
 
         // prefab.overrides <오브젝트>
@@ -1102,7 +1103,7 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_prefab_update(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
 
         // prefab.update <소스 오브젝트> <프리팹 이름>
@@ -1300,7 +1301,7 @@ namespace ConsoleCmd
 			}
 		}
 
-		std::vector<std::string> rows;
+		ce::dynamic_array<std::string> rows;
 		size_t entityCount = 0;
 		size_t overrideCount = 0;
 		for (const auto& owner : scene->m_Entities)
@@ -1477,7 +1478,7 @@ namespace ConsoleCmd
         using namespace CommandCore;
         if (ctx.parts.size() > 2) return InvalidArguments("component.list [filter]");
         const std::string filter = ctx.parts.size() == 2 ? ctx.parts[1] : "";
-        std::vector<std::string> names;
+        ce::dynamic_array<std::string> names;
         for (const auto& [name, type] : ComponentFactorys->m_componentTypes)
             if (filter.empty() || name.find(filter) != std::string::npos) names.push_back(name);
         std::sort(names.begin(), names.end());
@@ -1491,7 +1492,7 @@ namespace ConsoleCmd
 
     static CommandCore::CommandResult Cmd_prefab_create(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
         const std::string& cmd = ctx.cmd;
 
         if (parts.size() < 3)
@@ -1713,7 +1714,7 @@ namespace ConsoleCmd
     //   기존 소비자가 읽고 있다.
     static CommandCore::CommandResult Cmd_undo_state(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
         const std::string label = (parts.size() >= 2) ? parts[1] : "state";
 
         Meta::UndoManager* undo = Meta::UndoManager::GetInstance();
@@ -1759,7 +1760,7 @@ namespace ConsoleCmd
 
 static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
         const std::string label = (parts.size() >= 2) ? parts[1] : "selection";
 
         Scene* scene = SceneManagers->GetActiveScene();
@@ -1791,7 +1792,7 @@ static CommandCore::CommandResult Cmd_scene_selection(const ConsoleCommandContex
 
     static CommandCore::CommandResult Cmd_scene_dump(const ConsoleCommandContext& ctx)
     {
-        const std::vector<std::string>& parts = ctx.parts;
+        const ce::dynamic_array<std::string>& parts = ctx.parts;
 
         // 활성 씬의 오브젝트 계층을 로그로 남긴다. 재생/정지 전후로 찍어 비교하면
         // 무엇이 사라졌는지가 그대로 드러난다.

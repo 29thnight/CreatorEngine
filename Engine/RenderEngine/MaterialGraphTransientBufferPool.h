@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -51,7 +52,7 @@ namespace material_graph
             {
                 return;
             }
-            static const std::array names{"Scene pool requests",        "Scene pool hits",
+            static const ce::fixed_array names{"Scene pool requests",        "Scene pool hits",
                                           "Scene pool creates",         "Scene pool failures",
                                           "Scene pool returns",         "Scene pool releases",
                                           "Scene pool capacity misses", "Scene pool unavailable misses",
@@ -60,7 +61,7 @@ namespace material_graph
                                           "Scene pool owned count",     "Scene pool peak owned count"};
             static const auto ids = []
             {
-                std::array<ce::profile_counter_id, names.size()> result{};
+                ce::fixed_array<ce::profile_counter_id, names.size()> result{};
                 for (std::size_t index = 0; index < names.size(); ++index)
                 {
                     result[index] =
@@ -69,12 +70,12 @@ namespace material_graph
                 return result;
             }();
             const auto value = Snapshot();
-            const std::array values{
+            const ce::fixed_array values{
                 value.requests,       value.hits,           value.creates,        value.failures,
                 value.returns,        value.releases,       value.capacityMisses, value.unavailableMisses,
                 value.budgetReleases, value.unknownReturns, value.cachedBytes,    value.cachedCount,
                 value.ownedCount,     value.peakOwnedCount};
-            std::array<ce::profile_counter_sample, names.size()> samples{};
+            ce::fixed_array<ce::profile_counter_sample, names.size()> samples{};
             for (std::size_t index = 0; index < samples.size(); ++index)
             {
                 samples[index] = {ids[index], static_cast<double>(values[index])};
@@ -88,22 +89,22 @@ namespace material_graph
 
         bool Acquire(const RHIBufferDesc& desc, RHIBufferHandle& handle, std::string& error)
         {
-            const std::array descriptions{desc};
-            std::array<RHIBufferHandle, 1> handles{};
+            const ce::fixed_array descriptions{desc};
+            ce::fixed_array<RHIBufferHandle, 1> handles{};
             const bool success = AcquireBatch(descriptions, handles, error);
             handle = handles[0];
             return success;
         }
 
         template<std::size_t Count>
-        bool AcquireBatch(const std::array<RHIBufferDesc, Count>& descriptions,
-                          std::array<RHIBufferHandle, Count>& handles, std::string& error)
+        bool AcquireBatch(const ce::fixed_array<RHIBufferDesc, Count>& descriptions,
+                          ce::fixed_array<RHIBufferHandle, Count>& handles, std::string& error)
         {
             static_assert(Count > 0);
             ce::profile_scope acquire{ce::marker<"SceneBufferPoolAcquire">()};
             handles.fill({});
-            std::array<Key, Count> keys{};
-            std::bitset<Count> missing, capacityMiss;
+            ce::fixed_array<Key, Count> keys{};
+            ce::fixed_bitset<Count> missing, capacityMiss;
             {
                 ce::profile_scope lookup{ce::marker<"SceneBufferPoolLookup">()};
                 std::unique_lock lock(mutex, std::defer_lock);
@@ -285,7 +286,7 @@ namespace material_graph
         void Close()
         {
             ce::profile_scope close{ce::marker<"SceneBufferPoolClose">()};
-            std::vector<Entry> retired;
+            ce::dynamic_array<Entry> retired;
             {
                 std::lock_guard lock(mutex);
                 closed = true;
@@ -312,8 +313,10 @@ namespace material_graph
         };
         IRenderDeviceServices& device;
         std::mutex mutex;
-        std::vector<Entry> free;
-        std::unordered_map<std::uint32_t, Key> owned;
+        ce::dynamic_array<Entry> free;
+        // Preserve immediate node release when a resource leaves the pool.
+        ce::node_hash_map<std::uint32_t, Key, ce::hash<std::uint32_t>,
+            ce::equal_to<std::uint32_t>, ce::heap_allocator, false> owned;
         std::uint64_t cachedBytes{};
         bool closed{};
         Statistics statistics;

@@ -1,3 +1,4 @@
+#include "../../../../../../Engine/Containers/ContainerAPI.h"
 // METEOR blended stream check: light tiles + METEOR.Scene.Blended over the
 // composed opaque scene, on the real cooked fixture route.
 #include "GraphSceneFixture.h"
@@ -18,7 +19,7 @@ namespace
     constexpr uint32_t kBlendSize = 64;
 
     // Camera-facing quad on the z = depth plane.
-    void BuildQuad(std::vector<Vertex>& vertices, std::vector<uint32_t>& indices, float half, float depth)
+    void BuildQuad(ce::dynamic_array<Vertex>& vertices, ce::dynamic_array<uint32_t>& indices, float half, float depth)
     {
         vertices.assign(4, Vertex{});
         const float corners[4][2]{{-half, -half}, {half, -half}, {half, half}, {-half, half}};
@@ -96,7 +97,7 @@ bool DX12Test::RunBlendedStreamTest(std::string& outLog)
     light.position = {0.f, 0.f, 0.f, 0.f};
     light.direction = {0.f, 0.f, 1.f, 0.f};
     light.color = math::color(1.f, 1.f, 1.f, 1.f);
-    const std::vector<EnhancedLight> lights{light};
+    const ce::dynamic_array<EnhancedLight> lights{light};
     context.lights = &lights;
 
     GraphSceneFixture fixture;
@@ -107,8 +108,8 @@ bool DX12Test::RunBlendedStreamTest(std::string& outLog)
         resources.Shutdown();
         return false;
     }
-    std::vector<Vertex> groundVertices, planeVertices;
-    std::vector<uint32_t> groundIndices, planeIndices;
+    ce::dynamic_array<Vertex> groundVertices, planeVertices;
+    ce::dynamic_array<uint32_t> groundIndices, planeIndices;
     BuildQuad(groundVertices, groundIndices, 6.f, 0.f);
     BuildQuad(planeVertices, planeIndices, 1.5f, 0.f);
     const auto groundMesh = fixture.AddMesh(groundVertices, groundIndices);
@@ -126,7 +127,7 @@ bool DX12Test::RunBlendedStreamTest(std::string& outLog)
 
     const auto render = [&](bool withPlane, BlendCapture& capture) -> bool
     {
-        std::vector<EnhancedDrawItem> draws{fixture.Draw(groundMesh, math::matrix4x4::identity())};
+        ce::dynamic_array<EnhancedDrawItem> draws{fixture.Draw(groundMesh, math::matrix4x4::identity())};
         // Product rule: light tiles run only for frames with blended draws.
         context.forwardLightingConsumer = withPlane;
         if (withPlane)

@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #include "AnimationDiagnostics.h"
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
@@ -9,7 +10,7 @@ namespace RenderTest
         int m_qualityStage{ -1 };
         double m_budgetMs{};
         std::uint32_t m_lowDetailBoneCount{};
-        std::vector<AnimationFrameMetrics> m_frames;
+        ce::dynamic_array<AnimationFrameMetrics> m_frames;
     };
     // CPU baseline only: commit real palette snapshots, discard batches after timing.
     bool RunAnimationBaselineProbe(const std::string& modelPath, std::size_t actors,

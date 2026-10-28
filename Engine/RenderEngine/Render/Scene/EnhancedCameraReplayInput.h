@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../../FrameCameraSnapshot.h"
@@ -14,7 +15,7 @@ struct EnhancedCameraReplayInput
     FrameCameraSnapshot camera{};
 
     static constexpr size_t kSize = 368;
-    static constexpr std::array<uint8_t, 8> kMagic{'C','E','C','A','M','0','0','1'};
+    static constexpr ce::fixed_array<uint8_t, 8> kMagic{'C','E','C','A','M','0','0','1'};
 
     static uint64_t Checksum(std::span<const uint8_t> bytes)
     {
@@ -23,16 +24,16 @@ struct EnhancedCameraReplayInput
         return hash;
     }
 
-    std::vector<uint8_t> Encode() const
+    ce::dynamic_array<uint8_t> Encode() const
     {
-        std::vector<uint8_t> bytes(kMagic.begin(), kMagic.end());
+        ce::dynamic_array<uint8_t> bytes(kMagic.begin(), kMagic.end());
         const auto word = [&](uint32_t value) {
             for (unsigned shift = 0; shift < 32; shift += 8)
                 bytes.push_back(static_cast<uint8_t>(value >> shift));
         };
         const auto scalar = [&](float value) { word(std::bit_cast<uint32_t>(value)); };
         const auto matrix = [&](const math::matrix4x4& value) {
-            std::array<float, 16> values;
+            ce::fixed_array<float, 16> values;
             static_assert(sizeof(value) == sizeof(values));
             std::memcpy(values.data(), &value, sizeof(values));
             for (float v : values) scalar(v);
@@ -73,7 +74,7 @@ struct EnhancedCameraReplayInput
             return value;
         };
         const auto matrix = [&](math::matrix4x4& value) {
-            std::array<float, 16> values;
+            ce::fixed_array<float, 16> values;
             for (float& v : values) v = scalar();
             std::memcpy(&value, values.data(), sizeof(values));
         };
@@ -105,7 +106,7 @@ struct EnhancedCameraReplayInput
         std::error_code ec;
         if (!path.is_absolute() || std::filesystem::file_size(path, ec) != kSize || ec)
         { error = "camera replay requires an absolute file of the exact supported size"; return false; }
-        std::array<uint8_t, kSize> bytes{};
+        ce::fixed_array<uint8_t, kSize> bytes{};
         std::ifstream stream(path, std::ios::binary);
         stream.read(reinterpret_cast<char*>(bytes.data()), bytes.size());
         if (!stream || stream.peek() != std::char_traits<char>::eof())

@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 // 메뉴 그리기 배선 (PHASE 21 M1 · 계획서 부록 A.6).
 //
 // 이 TU 는 유니티 빌드에서 일부러 뺀다(Editor.vcxproj) — `EditorMenuRegistry.cpp`
@@ -21,9 +22,9 @@ namespace editor
         // 빈 경로는 이름 없는 항목이 되어 ImGui 에서 보이지 않으므로, 선언이
         // 빈 경로를 주면 action_id 를 라벨로 쓴다 — 자가 검사가 잡기 전에
         // 화면에서 사라지는 것보다 이름이 이상한 채 보이는 것이 낫다.
-        std::vector<std::string> split_path(std::string_view path, std::string_view fallback)
+        ce::dynamic_array<std::string> split_path(std::string_view path, std::string_view fallback)
         {
-            std::vector<std::string> parts;
+            ce::dynamic_array<std::string> parts;
             std::size_t begin = 0;
             while (begin <= path.size())
             {
@@ -77,7 +78,7 @@ namespace editor
             // 한 번만 열리고 한 번만 닫힌다. order 를 맨 앞에 두면 같은 하위
             // 메뉴가 두 번 열릴 수 있다. 그래서 order 는 계약대로 "같은 하위
             // 메뉴 안 안정 정렬"이고(A.4), 하위 메뉴끼리의 순서는 경로순이다.
-            std::vector<std::size_t> order(items.size());
+            ce::dynamic_array<std::size_t> order(items.size());
             for (std::size_t i = 0; i < items.size(); ++i) { order[i] = i; }
 
             std::stable_sort(order.begin(), order.end(),
@@ -91,7 +92,7 @@ namespace editor
                 });
 
             std::size_t pressed = no_menu_item;
-            std::vector<open_level> stack;
+            ce::dynamic_array<open_level> stack;
 
             const auto close_down_to = [&stack](std::size_t depth)
             {
@@ -105,7 +106,7 @@ namespace editor
             for (const std::size_t index : order)
             {
                 const menu_item_view& item = items[index];
-                const std::vector<std::string> parts = split_path(item.sub_path, "(unnamed)");
+                const ce::dynamic_array<std::string> parts = split_path(item.sub_path, "(unnamed)");
                 const std::size_t parentDepth = parts.size() - 1;
 
                 // 이미 열린 것과 겹치는 만큼만 남기고 닫는다.
@@ -193,7 +194,7 @@ namespace editor
         // 사용자에게는 한 메뉴로 보여야 하므로 여기서 접는다.
         const std::size_t globalCount = storage.global_items.size();
 
-        std::vector<detail::menu_item_view> views;
+        ce::dynamic_array<detail::menu_item_view> views;
         views.reserve(storage.size());
 
         const global_target always{};

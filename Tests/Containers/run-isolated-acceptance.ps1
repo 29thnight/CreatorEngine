@@ -1,0 +1,54 @@
+param([string]$Tag='20261026-final5',[string]$ManifestTag='20261026-final4')
+$ErrorActionPreference='Stop'
+$root=$PSScriptRoot; . "$PSScriptRoot/implementation-root.ps1"; $implementation=Get-ContainerImplementationRoot;$out=Join-Path $root 'results'
+if(Get-ChildItem $out -Filter "$Tag-*" -ErrorAction SilentlyContinue){throw 'Use a fresh tag; never overwrite an earlier run'}
+$cmake='C:/Program Files/Microsoft Visual Studio/18/Community/Common7/IDE/CommonExtensions/Microsoft/CMake/CMake/bin/cmake.exe'
+& $cmake -S $root -B "$root/build" "-DCE_IMPLEMENTATION_ROOT=$implementation"
+if($LASTEXITCODE){throw 'Canonical configure failed'}
+& $cmake --build "$root/build" --config Release --target container_tests library_benchmark mpsc_benchmark
+if($LASTEXITCODE){throw 'Canonical benchmark build failed'}
+$cases=@()
+foreach($kind in @('core','expanded')){
+ $target=if($kind -eq 'core'){'container_tests'}else{'library_benchmark'}
+ $points=@(Get-Content "$out/$ManifestTag-$kind-1.csv"|Where-Object {$_ -like 'summary,*'})
+ $expected=if($kind -eq 'core'){60}else{22}
+ if($points.Count -ne $expected){throw 'Incomplete case manifest'}
+ foreach($row in $points){$p=$row.Split(',');$cases+=[pscustomobject]@{kind=$kind;target=$target;name=$p[1];n=[int]$p[2]}}
+}
+if(@($cases|Group-Object kind,name,n).Count -ne 82){throw 'Duplicate case manifest'}
+$caseDir=Join-Path $out "$Tag-cases"
+New-Item -ItemType Directory -Path $caseDir | Out-Null
+$cases|ConvertTo-Json|Set-Content "$out/$Tag-manifest.json" -Encoding utf8
+$env:CE_BENCH_CONTROLLED='1';$env:CE_BENCH_GROUPED='1';$env:CE_BENCH_RESET_HEAP='1'
+$env:CE_BENCH_INDEPENDENT='1';$env:CE_BENCH_BATCH_NS='100000000'
+Remove-Item Env:CE_BENCH_LEGACY,Env:CE_BENCH_LFH,Env:CE_BENCH_UNRESERVED_STATS,Env:CE_BENCH_AFFINITY,Env:CE_BENCH_PRIORITY -ErrorAction SilentlyContinue
+foreach($run in 1..3){
+ if($run -eq 2){$env:CE_BENCH_REVERSE='1';$order=@($cases);[array]::Reverse($order)}else{Remove-Item Env:CE_BENCH_REVERSE -ErrorAction SilentlyContinue;$order=$cases}
+ foreach($kind in @('core','expanded')){Set-Content "$out/$Tag-$kind-$run.csv" "case_process_isolation,$run" -Encoding utf8}
+ $index=0
+ foreach($point in $order){
+  $id="$($point.name),$($point.n)";$env:CE_BENCH_ONLY_CASE=$id
+  $data=@(& "$root/build/Release/$($point.target).exe")
+  if($LASTEXITCODE -ne 0){throw "Measurement failed: $id"}
+  $summaries=@($data|Where-Object {$_ -like 'summary,*'})
+  if($summaries.Count -ne 1 -or $summaries[0] -notlike "summary,$id,*"){throw "Wrong case: $id"}
+  $data|Set-Content "$caseDir/$run-$($point.kind)-$($point.name)-$($point.n).csv" -Encoding utf8
+  $data|Add-Content "$out/$Tag-$($point.kind)-$run.csv" -Encoding utf8
+  ++$index
+  Write-Output "Isolated repeat $run [$index/82] $($summaries[0])"
+ }
+ Remove-Item Env:CE_BENCH_ONLY_CASE -ErrorAction SilentlyContinue
+ & "$root/build/Release/mpsc_benchmark.exe"|Set-Content "$out/$Tag-mpsc-$run.csv" -Encoding utf8
+ if($LASTEXITCODE -ne 0){throw 'MPSC measurement failed'}
+}
+$receipt=[ordered]@{implementationRoot=$implementation;
+ timestamp=(Get-Date -Format o);targetBatchNanoseconds=100000000;controlsTag=$ManifestTag
+ cpu=(Get-CimInstance Win32_Processor|Select-Object Name,NumberOfCores,NumberOfLogicalProcessors)
+ os=(Get-CimInstance Win32_OperatingSystem|Select-Object Caption,Version)
+ sources=@(Get-ChildItem "$implementation/include","$root/tests" -Recurse -File|Get-FileHash -Algorithm SHA256|Select-Object Path,Hash)
+ scripts=@(Get-FileHash "$root/CMakeLists.txt","$root/run-isolated-acceptance.ps1" -Algorithm SHA256|Select-Object Path,Hash)
+ binaries=@('container_tests','library_benchmark','mpsc_benchmark'|ForEach-Object {Get-FileHash "$root/build/Release/$_.exe" -Algorithm SHA256|Select-Object Path,Hash})
+ policy='All 82 cases, no selection by result, each in a new process, three repeats per case (246 general processes). No rebuild during collection; each selected executable is reused unchanged. Inputs generated outside benchmark calls; selection skips measurements, not fixture generation. Repeat 2 reverses both case order and A/B side order. Independent 100ms target per side, pre-reserved statistics, immediate fixed 1-second warmup per side, own-process heap optimization, logical CPU4 and above-normal measuring thread. All 15 samples retained. Every case/repeat ratio <=1.10 and both-side x[13]/x[1] <=1.30. MPSC unchanged 4 conditions per process, 3 processes, separate physical producer cores. Controls/profiles remain under controlsTag, not relabeled.'
+}
+$receipt|ConvertTo-Json -Depth 8|Set-Content "$out/$Tag-environment.json" -Encoding utf8
+Remove-Item Env:CE_BENCH_CONTROLLED,Env:CE_BENCH_GROUPED,Env:CE_BENCH_RESET_HEAP,Env:CE_BENCH_INDEPENDENT,Env:CE_BENCH_BATCH_NS,Env:CE_BENCH_ONLY_CASE,Env:CE_BENCH_REVERSE -ErrorAction SilentlyContinue

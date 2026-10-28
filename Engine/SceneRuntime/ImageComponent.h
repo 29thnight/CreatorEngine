@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -77,15 +78,15 @@ public:
 	// SetSizeDelta 호출이 주석 처리돼 두 경로의 동작이 달랐다).
 	void RefreshTransformFromRect();
 
-	const std::vector<own::shared_owner<const Texture>>& GetTextures() const { return textures; }
-	const std::vector<std::string>& GetTexturePaths() const { return texturePaths; }
+	const ce::dynamic_array<own::shared_owner<const Texture>>& GetTextures() const { return textures; }
+	const ce::dynamic_array<std::string>& GetTexturePaths() const { return texturePaths; }
 private:
 	friend class ProxyCommand;
 	friend class UIRenderProxy;
-	std::vector<std::string> 				texturePaths;
+	ce::dynamic_array<std::string> 				texturePaths;
 
 	[[reflgen::ignore]]
-	std::vector<own::shared_owner<const Texture>>	textures;
+	ce::dynamic_array<own::shared_owner<const Texture>>	textures;
 
 public:
 	[[reflgen::ignore]]

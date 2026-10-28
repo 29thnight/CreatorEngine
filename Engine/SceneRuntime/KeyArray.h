@@ -2,7 +2,7 @@
 #include "../Utility_Framework/Reflection/TypeIO.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 
-constexpr auto keyboardButtons = std::to_array(
+constexpr auto keyboardButtons = ce::to_array(
 {
     KeyBoard::A,
     KeyBoard::B,
@@ -79,7 +79,7 @@ constexpr auto keyboardButtons = std::to_array(
     KeyBoard::None,
 });
 
-constexpr auto controllerButtons = std::to_array(
+constexpr auto controllerButtons = ce::to_array(
 {
     ControllerButton::A,
     ControllerButton::B,

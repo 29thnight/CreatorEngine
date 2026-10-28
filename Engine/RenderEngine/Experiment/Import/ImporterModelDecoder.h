@@ -1,4 +1,6 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -34,10 +36,10 @@ namespace experiment::importer
         //   비워 두면 conversion.modelAssetId 를 그대로 쓰고, 그것도 nil 이면
         //   게시 검증이 InvalidAssetIdentity 로 막는다 — 디코더가 정체성을
         //   지어내지 않는다는 뜻이다.
-        std::function<AssetId(const std::filesystem::path&)> resolveModelAsset{};
+        ce::owned_func<AssetId(const std::filesystem::path&)> resolveModelAsset{};
 
         // 비워 두면 sourcePath 의 stem 을 쓴다.
-        std::function<std::string(const std::filesystem::path&)> resolveModelName{};
+        ce::owned_func<std::string(const std::filesystem::path&)> resolveModelName{};
     };
 
     class ImporterModelDecoder final : public IModelDecoder
@@ -48,7 +50,7 @@ namespace experiment::importer
 
         // 임포터를 직접 주입한다(검사에서 한 포맷만 태우고 싶을 때).
         ImporterModelDecoder(ImporterDecoderOptions options,
-            std::vector<own::unique_owner<IAssetImporter>> importers);
+            ce::dynamic_array<own::unique_owner<IAssetImporter>> importers);
 
         [[nodiscard]] ModelDecodeResult Decode(
             const ModelLoadRequest& request) override;
@@ -59,7 +61,7 @@ namespace experiment::importer
 
     private:
         ImporterDecoderOptions options_{};
-        std::vector<own::unique_owner<IAssetImporter>> importers_{};
+        ce::dynamic_array<own::unique_owner<IAssetImporter>> importers_{};
     };
 
     // ImportNote → ModelLoadIssue. 코드 표가 서로 달라 억지로 사상하면 로그가

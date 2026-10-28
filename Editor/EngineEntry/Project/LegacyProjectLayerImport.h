@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.LayerCatalog.h"
@@ -24,7 +25,7 @@ inline ce::layers::result<project_layer_snapshot> ImportLegacyProjectLayers(cons
         ProjectLayerSettings defaults;
         auto migration = *defaults.Snapshot();
         const auto tags_path = directory / "TagManager.asset";
-        std::vector<std::string> names{"Default", "TransparentFX", "Ignore RayCast", "Water", "UI"};
+        ce::dynamic_array<std::string> names{"Default", "TransparentFX", "Ignore RayCast", "Water", "UI"};
         std::string parse_error;
         if (std::filesystem::exists(tags_path))
         {

@@ -1,3 +1,4 @@
+#include "../../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -184,7 +185,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, const std::string& mode
     // MBC9 — typed generation이 유일한 모델 지오메트리 출처다(Assimp·legacy Mesh 은퇴).
     const assets::ModelAssetGeneration::Shared sceneModel =
         DataSystems->LoadModelAssetGenerationByPath(scenePath.string());
-    std::vector<RHIModelMeshView> sceneMeshes;
+    ce::dynamic_array<RHIModelMeshView> sceneMeshes;
     RHIModelMeshView sceneMesh{};
     math::aabb sceneMeshBounds{};
     uint64_t sceneVertexBytes = 0;
@@ -318,11 +319,11 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, const std::string& mode
         constexpr uint32_t kAllocationsPerWorker = 8;
         constexpr uint64_t kAllocationBytes = 1ull * 1024 * 1024;
         const RHIUploadStats beforeParallel = resources.GetUploadStats();
-        std::array<std::array<RHIBufferSlice, kAllocationsPerWorker>,
+        ce::fixed_array<ce::fixed_array<RHIBufferSlice, kAllocationsPerWorker>,
             kWorkerCount> workerSlices{};
         std::atomic<uint32_t> ready{ 0 };
         std::atomic<bool> go{ false };
-        std::vector<std::thread> workers;
+        ce::dynamic_array<std::thread> workers;
         workers.reserve(kWorkerCount);
         for (uint32_t worker = 0; worker < kWorkerCount; ++worker)
         {
@@ -347,7 +348,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, const std::string& mode
         go.store(true, std::memory_order_release);
         for (std::thread& worker : workers) worker.join();
 
-        std::vector<RHIBufferSlice> sorted;
+        ce::dynamic_array<RHIBufferSlice> sorted;
         sorted.reserve(kWorkerCount * kAllocationsPerWorker);
         uint32_t invalidParallel = 0;
         for (const auto& perWorker : workerSlices)
@@ -502,7 +503,7 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, const std::string& mode
         const auto component = [](const math::vector3& value, uint32_t axis) {
             return 0 == axis ? value.x : (1 == axis ? value.y : value.z);
         };
-        std::array<uint32_t, 3> axes = { 0, 1, 2 };
+        ce::fixed_array<uint32_t, 3> axes = { 0, 1, 2 };
         std::sort(axes.begin(), axes.end(), [&](uint32_t a, uint32_t b) {
             return component(meshMax, a) - component(meshMin, a) >
                 component(meshMax, b) - component(meshMin, b);
@@ -809,11 +810,11 @@ bool RunVulkanSelfTest(const std::string& outputPngPath, const std::string& mode
             resources.GetResourceTable().Resolve(cacheHit.indices.buffer).IsValid();
 
         const uint64_t cursorBeforeReject = resources.GetUploadUsedBytes();
-        const std::array<RHIUploadRequest, 2> impossible = {{
+        const ce::fixed_array<RHIUploadRequest, 2> impossible = {{
             { 1, RHIUploadUsage::BufferCopy, 1 },
             { (std::numeric_limits<uint64_t>::max)(), RHIUploadUsage::BufferCopy, 1 }
         }};
-        std::array<RHIBufferSlice, 2> rejectedSlices{};
+        ce::fixed_array<RHIBufferSlice, 2> rejectedSlices{};
         for (size_t i = 0; i < rejectedSlices.size(); ++i)
         {
             rejectedSlices[i].buffer.id = static_cast<uint32_t>(100 + i);

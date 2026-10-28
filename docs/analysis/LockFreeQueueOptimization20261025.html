@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/LockFreeQueueOptimization20261025.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>락 프리 큐 병목 분리·최적화 수용 (2026-10-25)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#원인을-실제로-분리한-방법">원인을 실제로 분리한 방법</a></li><li><a href="#같은-조건의-ppl-수용-측정">같은 조건의 PPL 수용 측정</a></li><li><a href="#메모리-정책">메모리 정책</a></li><li><a href="#락-프리-보장-경계">락 프리 보장 경계</a></li><li><a href="#정확성경쟁-검사">정확성·경쟁 검사</a></li><li><a href="#재현원본">재현·원본</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="LockFreeQueueOptimization20261025.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>락 프리 큐 병목 분리·최적화 수용 (2026-10-25)</h1>
+<div class="meta"><p>독립 성능 게이트: <strong>PASS</strong>. 기본 <code>push</code>/<code>try_pop</code> API의 6개 조건을 비교했다. 프로세스 5회 각각의 전송 중앙값과 큐 소멸 포함 중앙값이 모두 PPL의 1.10배 이내인지 판정한다. 토큰 전용 경로나 할당을 뺀 공개 경로의 수치로 대체하지 않았다. 엔진의 기존 PPL 별칭은 바꾸지 않았다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 6개의 분량 막대">
+<a class="map-row" href="#원인을-실제로-분리한-방법"><span class="ve-label">§00</span><span class="map-name">원인을 실제로 분리한 방법</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#같은-조건의-ppl-수용-측정"><span class="ve-label">§01</span><span class="map-name">같은 조건의 PPL 수용 측정</span><span class="map-bar"><i style="width:69.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#메모리-정책"><span class="ve-label">§02</span><span class="map-name">메모리 정책</span><span class="map-bar"><i style="width:33%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#락-프리-보장-경계"><span class="ve-label">§03</span><span class="map-name">락 프리 보장 경계</span><span class="map-bar"><i style="width:49.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#정확성경쟁-검사"><span class="ve-label">§04</span><span class="map-name">정확성·경쟁 검사</span><span class="map-bar"><i style="width:41.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#재현원본"><span class="ve-label">§05</span><span class="map-name">재현·원본</span><span class="map-bar"><i style="width:37.6%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 6개 가운데 「원인을 실제로 분리한 방법」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-원인을-실제로-분리한-방법">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="원인을-실제로-분리한-방법">원인을 실제로 분리한 방법</h2></div>
+<div class="prose"><p>이전 MS 연결 큐의 소스·실행 파일은 <code>baseline/20261025-before-profile</code>에 보존했다. 같은 계측 코드에서 할당, 레코드 확보, 두 hazard 경로, 공개/제거/퇴역 CAS, 회수 전체, 개별 해제를 기록했다. 스레드별 64회당 1회만 RDTSCP로 표본을 취하고 컴파일러 장벽·LFENCE로 경계를 고정했다. 계측은 별도 바이너리에서 수행하고 최종 성능은 계측을 끈 실행 파일로 비교했다.</p>
+<p>아래는 생산자당 100,000개, 총 400,000개를 전달한 별도의 8B·4생산자·1소비자 진단 실행이다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>8B · 4P1C 분리 계측</th><th style="text-align:right">이전</th><th style="text-align:right">최종</th></tr></thead>
+<tbody><tr><td>할당 호출 수</td><td class="num" style="text-align:right">400000</td><td class="num" style="text-align:right">6256</td></tr>
+<tr><td>원소 노드 개별 해제 수</td><td class="num" style="text-align:right">400000</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>첫 hazard 보호 호출 수</td><td class="num" style="text-align:right">1461480</td><td class="num" style="text-align:right">805655</td></tr>
+<tr><td>두 번째 hazard 발행 수</td><td class="num" style="text-align:right">400011</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>원소 공개 CAS 재시도</td><td class="num" style="text-align:right">312585</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>할당 scope 평균 cycles</td><td class="num" style="text-align:right">358.00</td><td class="num" style="text-align:right">3492.93</td></tr>
+<tr><td>공개 CAS scope 평균 cycles</td><td class="num" style="text-align:right">189.89</td><td class="num" style="text-align:right">137.32</td></tr>
+<tr><td>제거 scope 평균 cycles</td><td class="num" style="text-align:right">130.25</td><td class="num" style="text-align:right">86.87</td></tr>
+<tr><td>원소 퇴역 CAS 호출 수</td><td class="num" style="text-align:right">400000</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>등록/조회 scope 평균 cycles</td><td class="num" style="text-align:right">116.97</td><td class="num" style="text-align:right">85.93</td></tr>
+<tr><td>첫 hazard scope 평균 cycles</td><td class="num" style="text-align:right">254.52</td><td class="num" style="text-align:right">83.93</td></tr>
+<tr><td>회수 1회 scope 평균 cycles</td><td class="num" style="text-align:right">7358.97</td><td class="num" style="text-align:right">3098.21</td></tr></tbody></table></div>
+<p>타이머 쌍 평균은 이전 42.82 cycles, 최종 43.98 cycles다. scope 평균은 이 비용을 포함한 원시 관측치다. 중첩·병렬 구간이 있으므로 합산해 벽시계 기여율로 만들지 않는다. 공개 CAS는 이전의 노드 연결과 최종 슬롯 공개이며, 세그먼트 연결 CAS 재시도는 이 항목에 포함하지 않았다. 이전 할당 scope에는 작은 노드와 T 생성, 최종에는 슬랩/세그먼트 생성이 들어가므로 평균 1회 비용을 동일한 단위 작업으로 해석하지 않는다. 회수는 배치 CAS와 세그먼트 해제를 여전히 포함한다. PMU 캐시 미스는 측정하지 않았다.</p>
+<p>관측 결과를 반영한 변경:</p>
+<ul>
+<li>원소별 heap 할당/해제를 값 크기에 따른 슬롯 묶음의 슬랩과 재사용으로 바꿨다. pop은 값 이동과 T 소멸을 즉시 끝내며 저장 공간만 재사용한다.</li>
+<li>반복되는 전역 노드 연결 CAS를 FAA 배열 세그먼트로 바꿨다. 생산자가 예약 뒤 멈추면 소비자는 빈 슬롯을 taken으로 표시하고 진행한다. 늦은 생산자는 공개에 실패해 다른 슬롯에서 재시도한다. 새 세그먼트에는 첫 값을 미리 준비하여 빈 예약을 서로 건너뛰는 상황에서도 진행하도록 한다.</li>
+<li>슬롯에서 포인터를 가져간 소비자만 값 저장소를 소유하므로 두 번째 hazard를 없앴다. hazard는 세그먼트 수명에 사용하며 검증 없이 해제하지 않는다.</li>
+<li>호출마다 레코드를 CAS로 확보하는 대신 스레드별 등록을 쓴다. TLS에 큐 주소가 없으므로 큐가 먼저 파괴돼도 종료 콜백이 그 큐를 만지지 않는다. 보호 대상 변경·회수 때 조회 경계도 초기화한다.</li>
+<li>재사용 목록 전체를 atomic exchange로 넘겨 소유권을 분리한다. live/slab 표시는 정렬된 포인터 하위 비트의 사유 메타데이터이며 ABA 세대 번호가 아니다.</li>
+<li>소멸 때 슬랩이 이미 소유한 캐시 노드 목록을 다시 걷던 중복 비용도 없앴다. 독립 prepared 노드가 섞인 경우에는 보수적인 정리 경로를 유지한다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-같은-조건의-ppl-수용-측정">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="같은-조건의-ppl-수용-측정">같은 조건의 PPL 수용 측정</h2></div>
+<div class="prose"><p>Windows 11 Pro 10.0.26300, i7-8700K 6C/12T, MSVC 19.50.35730 / STL 145, x64 Release <code>/O2 /Ob3 /MD</code>, iterator debug 0, C++23 요청. 이전 구현도 같은 옵션으로 재컴파일했고, 각 실행 파일 안의 자체 큐와 PPL에 동일한 옵션을 적용했다.</p>
+<p>생산자당 65,536개, 워밍업 2회, 표본 15개, A/B 순서 교대, 독립 프로세스 5회다. 이전/최종 프로세스 순서도 교대했다. 값 생성과 모든 payload 워드의 체크섬을 양쪽에 동일하게 넣었다. 기본 push/pop과 성공 pop 64회마다 수행하는 회수를 포함한다. 토큰, 사전 원소 할당, 메모리 풀 예열을 사용하지 않았다. 최초 스레드 등록과 종료도 데이터 전송·join 측정에 포함된다.</p>
+<p>단위는 원소당 ns. 비율은 프로세스별 중앙값 비율 5개의 중앙값이며 범위는 그 5개 비율의 최소~최대다. <code>8/4/1</code>은 8B 값·4생산자·1소비자다. 1 미만이면 자체 큐가 빠르다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>값 / 생산자·소비자</th><th style="text-align:right">이전 ns/원소</th><th style="text-align:right">최종 ns/원소</th><th style="text-align:right">PPL ns/원소</th><th style="text-align:right">최종/PPL</th><th>5회 범위</th><th>소멸 포함 비율 / 최대</th></tr></thead>
+<tbody><tr><td>8/1/1</td><td class="num" style="text-align:right">135.65</td><td class="num" style="text-align:right">28.72</td><td class="num" style="text-align:right">61.77</td><td class="num" style="text-align:right">0.465</td><td>0.437~0.506</td><td>0.481 / 0.522</td></tr>
+<tr><td>128/1/1</td><td class="num" style="text-align:right">134.50</td><td class="num" style="text-align:right">47.20</td><td class="num" style="text-align:right">123.61</td><td class="num" style="text-align:right">0.377</td><td>0.375~0.404</td><td>0.404 / 0.434</td></tr>
+<tr><td>8/4/1</td><td class="num" style="text-align:right">175.25</td><td class="num" style="text-align:right">44.14</td><td class="num" style="text-align:right">43.01</td><td class="num" style="text-align:right">1.028</td><td>1.008~1.031</td><td>1.075 / 1.091</td></tr>
+<tr><td>128/4/1</td><td class="num" style="text-align:right">198.08</td><td class="num" style="text-align:right">67.32</td><td class="num" style="text-align:right">104.37</td><td class="num" style="text-align:right">0.651</td><td>0.618~0.680</td><td>0.737 / 0.766</td></tr>
+<tr><td>8/4/4</td><td class="num" style="text-align:right">199.76</td><td class="num" style="text-align:right">54.99</td><td class="num" style="text-align:right">88.71</td><td class="num" style="text-align:right">0.609</td><td>0.560~0.643</td><td>0.630 / 0.669</td></tr>
+<tr><td>128/4/4</td><td class="num" style="text-align:right">202.16</td><td class="num" style="text-align:right">59.92</td><td class="num" style="text-align:right">93.47</td><td class="num" style="text-align:right">0.647</td><td>0.628~0.663</td><td>0.713 / 0.731</td></tr></tbody></table></div>
+<p>큐 생성과 스레드 생성은 타이머 밖이며 전송에는 시작 신호·데이터 전달·join을 포함한다. 큐 객체까지 실제로 파괴하는 비용을 별도로 재서 합쳤다. 소멸 포함 열은 정리 작업을 측정 밖으로 옮긴 효과도 점검한다. 콜드 캐시·p99·다른 PC의 절대 성능 보장은 아니다. 다른 프로그램, 전원 정책, affinity는 바꾸지 않았다. Linux 검증과 Windows 성능 측정은 동시에 실행하지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-메모리-정책">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="메모리-정책">메모리 정책</h2></div>
+<div class="prose"><p>8B 값 슬롯은 실제 16B, 256개 슬롯 블록은 4104B, 세그먼트는 2240B, 기본 큐 객체는 4480B다. 다음은 진단 실행에서 센 생성·해제와 sizeof로 계산한 종료 직전 요청 바이트다. 최초 세그먼트 1개를 포함하며 CRT 관리 정보·RSS·실행 중 최대치는 포함하지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>8B 계측 부하</th><th style="text-align:right">할당한 값 슬롯 수</th><th>세그먼트 생성 / 해제</th><th style="text-align:right">종료 직전 요청 메모리</th></tr></thead>
+<tbody><tr><td>1/1</td><td class="num" style="text-align:right">1792</td><td>390 / 390</td><td style="text-align:right">35448 B</td></tr>
+<tr><td>4/1</td><td class="num" style="text-align:right">162048</td><td>5623 / 5623</td><td style="text-align:right">2604552 B</td></tr>
+<tr><td>4/4</td><td class="num" style="text-align:right">46592</td><td>5753 / 5752</td><td style="text-align:right">755888 B</td></tr></tbody></table></div>
+<p>슬랩은 고수위에 맞춰 늘고 clear/소멸까지 유지된다. reclaim은 값 공간을 재사용 목록으로 돌리고 안전한 세그먼트를 해제한다. release_retired도 슬랩 일부를 개별 해제하지 않는다. 별도로 준비한 독립 값 노드는 안전한 시점에 개별 해제할 수 있다. 잔존 원소의 clear/소멸 순서는 보장하지 않으므로 처리 순서가 필요하면 명시적으로 FIFO drain한다. PPL과 동일 메모리 예산을 맞춘 비교는 아니다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-락-프리-보장-경계">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="락-프리-보장-경계">락 프리 보장 경계</h2></div>
+<div class="prose"><ul>
+<li>다른 특정 생산자의 예약 완료를 기다리지 않는다. 회수자는 보호 중인 세그먼트를 보류 목록에 넣고 돌아온다. 사용 중인 등록 슬롯을 기다리며 빼앗지 않는다.</li>
+<li>기본 <code>MaxParticipants=64</code>는 <strong>T/한도/Hook 특수화별로 등록되어 살아 있는 스레드 수</strong>다. 종료 시 해제되며 한도 초과는 queue_operation_limit다. 초기 구현의 활성 호출 한도와 다르므로 엔진의 참여 스레드 수를 통합 전에 확인한다.</li>
+<li><code>register_current_thread()</code>로 초기 TLS 등록을 작업자 준비 단계에 둘 수 있다. 콜드 등록의 C++ 런타임, 큐 생성, 슬랩/세그먼트 캐시 미스의 CRT 할당, 사용자 T 연산까지 포함해 모든 호출이 무조건 락 프리라고 주장하지 않는다.</li>
+<li>prepare는 값과 세그먼트 경계용 예비 공간을 마련한다. 등록이 끝난 스레드의 publish는 경계에서도 추가 할당·해제 없이 공개하며 try_pop도 정상 경로에서 할당·회수하지 않는다. 미사용 예비 공간은 호출자의 prepared handle 소멸 때 정리한다.</li>
+<li>T 이동 대입/소멸은 noexcept, 동일 큐 재진입은 금지다. 선택적 access_token은 생성 스레드·큐에 묶인다. 수용 표는 토큰을 쓰지 않는다. clear/소멸은 모든 참여 작업이 끝난 뒤에만 한다.</li>
+</ul>
+<p>공개 헤더는 STL 컨테이너·std::atomic·std::mutex·PPL 없이 컴파일러 원자 primitive와 C/C++ 언어 런타임을 사용한다. 알고리즘의 진행 논거에 중단 회귀를 더했으며 테스트를 모든 인터리빙의 형식 증명으로 표현하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-정확성경쟁-검사">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="정확성경쟁-검사">정확성·경쟁 검사</h2></div>
+<div class="prose"><ul>
+<li>Windows MSVC Release CTest 6/6, 핵심 전체 20회 반복 통과.</li>
+<li>MSVC AddressSanitizer 10회 반복, ClangCL 20.1.8 Release 및 공개 헤더 독립 실행 통과.</li>
+<li>WSL Ubuntu x86_64 Clang 18.1.3 GNU 원자 백엔드 Release 2/2, ThreadSanitizer 5회 반복 통과. Linux 성능 수용을 대신하지 않는다.</li>
+<li>1P1C/4P1C/4P4C의 ID별 정확히 한 번 소비·생산자별 FIFO, 추가 8P8C, 이동 전용 소유권 40,000개, 3스레드×4연산 이력 100개를 검사했다.</li>
+<li>예약 직후 중단을 빈 큐와 256슬롯 경계에서 만들고 다른 참여자가 3,000회 전송·회수 후 재개했다. 공개 직후 중단, 소비자 보호 직후 중단과 10,000회 회수 진행도 검사했다.</li>
+<li>등록 한도를 채운 채 작업자가 멈춰 있어도 회수자는 대기하지 않는다. TLS보다 짧은 큐 수명 200회, 예비 세그먼트 공개의 무할당, 예외 뒤 소유권 보존, 128B 정렬, 실제 파일 경로, clear·재사용을 검사했다.</li>
+</ul>
+<p>검사에서 데이터 레이스나 메모리 오류가 검출되지 않았다는 범위다. 모든 스케줄·ARM64/macOS·엔진 ABI/모듈/씬 전환/종료·프레임 성능은 미검증이다. 독립 성능 수용과 엔진 통합 수용을 구분한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-재현원본">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="재현원본">재현·원본</h2></div>
+<div class="prose"><p><code>C:/Users/idene/source/repos/CreatorContainers</code>에서 Windows는 run-queue-optimization.ps1, Linux/TSan은 run-linux-validation.ps1, 표는 summarize-queue-optimization.ps1로 재현한다. 구현은 include/ce/faa_lock_free_queue.h, 선택 별칭은 include/ce/lock_free_queue.h다. 엔진의 기존 PPL 별칭은 변경하지 않았다.</p>
+<p>원시 표본: results/acceptance-{baseline,final}-{1..5}.csv. 분리 계측: profile-{before,after}-{small,large}.csv. 테스트·환경·소스/바이너리 해시: optimization-* 파일. 이전 소스/실행 파일은 baseline, 계측한 이전 소스는 diagnostics, 중간 후보는 experiments에 보존했다.</p>
+<p>알고리즘 참고: <a href="https://concurrencyfreaks.blogspot.com/2016/11/faaarrayqueue-mpmc-lock-free-queue-part.html">Ramalhete/Correia의 FAA 배열 큐 설명</a>, <a href="https://ftp.cs.rochester.edu/research/synchronization/pseudocode/queues.html">Michael–Scott 원전</a>, <a href="https://research.ibm.com/publications/safe-memory-reclamation-for-dynamic-lock-free-objects-using-atomic-reads-and-writes">Michael의 hazard pointer 연구</a>. 값 저장소·참여자 등록·수명·계측은 독립 라이브러리에서 작성했다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="LockFreeQueueOptimization20261025.md"><code>docs/analysis/LockFreeQueueOptimization20261025.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "TemporalProductSettings.h"
@@ -21,7 +22,7 @@ namespace TemporalProductSettingsIO
         {
             return false;
         }
-        constexpr std::array<std::string_view, 14> fields{
+        constexpr ce::fixed_array<std::string_view, 14> fields{
             "schemaVersion", "enabled", "upscaler", "quality", "frameGenerator", "interpolatedFrameCount",
             "latencyMode", "fallbackAa", "spatialMode", "spatialRenderScale", "spatialSharpness",
             "digitalVibrance", "vibranceIntensity", "saturationBoost" };

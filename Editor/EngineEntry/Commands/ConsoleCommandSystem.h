@@ -1,4 +1,7 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../../Engine/Utility_Framework/Foundation/EngineStorage.h"
 #include "CommandCore/CommandResult.h"
 
 #include <stdio.h>
@@ -18,7 +21,7 @@ struct ConsoleCommandContext
     const std::string&              cmd;
 
     // 공백으로 자른 토큰. parts[0]이 cmd다.
-    const std::vector<std::string>& parts;
+    const ce::dynamic_array<std::string>& parts;
 
     // 입력 원문 한 줄. 경로처럼 공백이 들어가는 인자는 토큰이 아니라
     // 여기서 명령어 길이만큼 잘라 쓴다.
@@ -57,7 +60,7 @@ class ConsoleCommandSystem
 public:
     static ConsoleCommandSystem& Get();
     // Installed and cleared by the Editor host; accessed on the game thread.
-    void SetAudioDiagnosticsReader(std::function<CommandCore::CommandData()> reader)
+    void SetAudioDiagnosticsReader(ce::owned_func<CommandCore::CommandData()> reader)
     {
         m_audioDiagnosticsReader = std::move(reader);
     }
@@ -70,13 +73,13 @@ public:
     void InitializeFromCommandLine();
 
     // 매 프레임 게임 스레드에서 호출한다. 큐에 쌓인 명령을 실행한다.
-    using SceneBorrowFactory = std::function<std::unique_lock<std::mutex>()>;
+    using SceneBorrowFactory = ce::owned_func<std::unique_lock<std::mutex>()>;
     void Pump(const SceneBorrowFactory& acquireSceneBorrow);
 
     // Constructed on the GameThread before the presentation thread starts. The
     // owner never changes; a scene mutex is a borrow fence, not GC ownership.
     bool IsGameThread() const noexcept { return m_gameThread == std::this_thread::get_id(); }
-    using EditorMutation = std::function<CommandCore::CommandResult()>;
+    using EditorMutation = ce::owned_func<CommandCore::CommandResult()>;
     // Capture owned values and generation handles only, never Scene/Entity/
     // Component pointers or GC roots. Accepted means queued, not completed.
     CommandCore::CommandResult EnqueueEditorMutation(EditorMutation mutation);
@@ -98,7 +101,7 @@ public:
     ///   `{"args":["Big Boss","Main Characters"]}` 로 가져온 값을 라인으로 이어
     ///   붙였다 다시 자르면 그 과정에서 따옴표가 새는데, 이 경로는 이을 일이 없다.
     ///   LC4 의 수신 스레드가 쓸 진입점이고, 오늘은 `--exec-args` 가 같은 문을 쓴다.
-    void EnqueueStructured(std::vector<std::string> arguments);
+    void EnqueueStructured(ce::dynamic_array<std::string> arguments);
 
     /// 명령 하나의 실행이 끝났을 때 불린다. **게임 스레드에서 불린다.**
     struct CommandTiming
@@ -108,7 +111,7 @@ public:
         double   executedMs{ 0.0 };
     };
     using CommandCompletion =
-        std::function<void(const CommandCore::CommandResult&, const CommandTiming&)>;
+        ce::owned_func<void(const CommandCore::CommandResult&, const CommandTiming&)>;
 
     /// 결과를 받을 사람이 있는 구조화 주입(LC4 의 HTTP 수신 스레드).
     ///
@@ -124,7 +127,7 @@ public:
     /// `serviceQueueCap` 이 0 이 아니면 그 상한을 **적재와 같은 락 안에서**
     /// 확인하고, 넘으면 넣지 않고 false 를 돌려준다. 검사와 적재를 떼어 놓으면
     /// 동시 요청이 전부 검사를 통과한 뒤 차례로 들어와 상한을 넘긴다.
-    bool EnqueueStructured(std::vector<std::string> arguments, CommandCompletion completion,
+    bool EnqueueStructured(ce::dynamic_array<std::string> arguments, CommandCompletion completion,
                            std::size_t serviceQueueCap = 0);
 
     /// 서비스 큐의 깊이. 상한을 넘으면 수신 스레드가 429 를 낸다(§7.3).
@@ -203,7 +206,7 @@ public:
     // Default polls may only inspect thread-safe owned status. Any callback that
     // borrows/mutates live scene or presentation-owned state must opt into the
     // fence. Never synchronously wait for PT while holding that fence.
-    void WaitForResult(std::function<std::optional<CommandCore::CommandResult>()> poll,
+    void WaitForResult(ce::owned_func<std::optional<CommandCore::CommandResult>()> poll,
                        bool needsSceneBorrow = false);
 
     /// help.
@@ -240,7 +243,7 @@ private:
     bool m_commandletDone{false};
     std::string m_commandletScript;
     std::string m_commandletError;
-    std::vector<std::string> m_commandletArguments;
+    ce::dynamic_array<std::string> m_commandletArguments;
 
     ConsoleCommandSystem() = default;
     ~ConsoleCommandSystem() = default;
@@ -258,7 +261,7 @@ private:
     ///
     /// 라인 경로와 구조화 경로가 **정확히 여기서 만난다.** 두 입력이 같은
     /// invocation 을 만든다는 §14.2 의 단정이 성립하는 이유다.
-    CommandCore::CommandResult ExecuteParsed(const std::vector<std::string>& parts,
+    CommandCore::CommandResult ExecuteParsed(const ce::dynamic_array<std::string>& parts,
                                              const std::string& diagnosticLine,
                                              const SceneBorrowFactory& acquireSceneBorrow);
 
@@ -293,7 +296,7 @@ private:
         std::string                           text;
 
         /// 구조화 입력의 토큰(`[0]` 이 명령 이름). 비어 있으면 라인 입력이다.
-        std::vector<std::string>              arguments;
+        ce::dynamic_array<std::string>              arguments;
 
         std::chrono::steady_clock::time_point enqueuedAt{};
         uint64_t                              enqueuedFrame{};
@@ -316,11 +319,11 @@ private:
     //
     // 나누는 것은 구현 편의가 아니라 **기존 측정 의미의 보존**이다. 배치 큐는
     // 프레임당 정확히 하나를 유지하고, 서비스 큐만 예산만큼 드레인한다.
-    std::deque<PendingCommand> m_pending;         ///< 배치(--exec·--script·stdin)
-    std::deque<PendingCommand> m_servicePending;  ///< 서비스(HTTP)
+    ce::segmented_deque<PendingCommand> m_pending;         ///< 배치(--exec·--script·stdin)
+    ce::segmented_deque<PendingCommand> m_servicePending;  ///< 서비스(HTTP)
     mutable std::mutex m_mutex;
     const std::thread::id m_gameThread{ std::this_thread::get_id() };
-    std::deque<EditorMutation> m_editorMutations;
+    ce::segmented_deque<EditorMutation> m_editorMutations;
     bool m_acceptEditorMutations{ true }; // protected by m_mutex
 
     /// 서비스 큐 상한. 0 이면 무제한. 서비스가 `Start` 에서 밀어 넣는다.
@@ -369,13 +372,13 @@ private:
 
     // wait N : N 프레임 동안 다음 명령을 보류한다.
     int m_waitFrames{ 0 };
-    std::function<std::optional<CommandCore::CommandResult>()> m_waitResult;
+    ce::owned_func<std::optional<CommandCore::CommandResult>()> m_waitResult;
     bool m_waitNeedsSceneBorrow{};
-    std::function<void(const CommandCore::CommandResult&)> m_finishWait;
+    ce::owned_func<void(const CommandCore::CommandResult&)> m_finishWait;
 
     // --script가 파일을 못 열었는가. 명령이 하나도 없는 무인 실행은 종료시킨다.
     bool m_scriptLoadFailed{ false };
-    std::function<CommandCore::CommandData()> m_audioDiagnosticsReader;
+    ce::owned_func<CommandCore::CommandData()> m_audioDiagnosticsReader;
 
     // ── LC9: 배치 결과 JSONL ────────────────────────────────────────────
     //

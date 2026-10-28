@@ -1,4 +1,5 @@
 #pragma once
+#include "../Containers/ContainerAPI.h"
 #include "PhysicsGeometry.h"
 #include "PhysicsCharacter.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -9,7 +10,7 @@ namespace ce::physics
 struct body_definition
 {
     body_desc properties;
-    std::vector<ShapeInstance> shapes;
+    ce::dynamic_array<ShapeInstance> shapes;
 
     [[nodiscard]] static result<body_definition> copy(const body_desc& value,
                                                       std::source_location location = std::source_location::current())
@@ -118,7 +119,7 @@ struct command_stamp
     std::uint32_t producer = 0; // 0: main; 1: required AI; 2..255: explicit deterministic priority.
     std::uint64_t sequence = 0; // Nonzero, strictly increasing within a producer's committed history.
 
-    [[nodiscard]] auto order() const noexcept { return std::tuple{tick.value, producer, sequence}; }
+    [[nodiscard]] auto order() const noexcept { return ce::tuple{tick.value, producer, sequence}; }
 };
 
 struct command
@@ -181,7 +182,7 @@ struct collision_event
 {
     event_kind kind;
     event_endpoint first, second;
-    std::array<contact_point, contact_point_capacity> contacts{};
+    ce::fixed_array<contact_point, contact_point_capacity> contacts{};
     std::uint32_t contact_count = 0;
     std::uint32_t required_contacts = 0; // Never silently treat a partial manifold as complete.
 };
@@ -234,10 +235,10 @@ struct tick_snapshot
     tick_id tick;
     bool step_succeeded = false;
     std::optional<error> failure;
-    std::vector<command_outcome> commands;
-    std::vector<collision_event> events;
-    std::vector<active_body_pose> active_poses;
-    std::vector<character_pose> characters;
+    ce::dynamic_array<command_outcome> commands;
+    ce::dynamic_array<collision_event> events;
+    ce::dynamic_array<active_body_pose> active_poses;
+    ce::dynamic_array<character_pose> characters;
     step_statistics statistics;
 };
 

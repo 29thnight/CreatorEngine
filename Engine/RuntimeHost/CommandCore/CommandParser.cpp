@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "CommandParser.h"
 
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -96,7 +97,7 @@ namespace CommandCore
     namespace
     {
         /// [begin, end) 토큰을 공백 하나로 잇는다. 둘 이상이면 legacy 로 센다.
-        std::string JoinRange(const std::vector<std::string>& parts,
+        std::string JoinRange(const ce::dynamic_array<std::string>& parts,
                               std::size_t begin, std::size_t end, bool* usedLegacyJoin)
         {
             std::string joined;
@@ -117,12 +118,12 @@ namespace CommandCore
         }
     }
 
-    std::string JoinFrom(const std::vector<std::string>& parts, std::size_t index)
+    std::string JoinFrom(const ce::dynamic_array<std::string>& parts, std::size_t index)
     {
         return JoinRange(parts, index, parts.size(), nullptr);
     }
 
-    TrailingNameSplit SplitTrailingName(const std::vector<std::string>& parts,
+    TrailingNameSplit SplitTrailingName(const ce::dynamic_array<std::string>& parts,
                                         std::size_t                     firstIndex,
                                         std::size_t                     trailingCount)
     {
@@ -153,9 +154,9 @@ namespace CommandCore
         LegacyJoinCounter().store(0, std::memory_order_relaxed);
     }
 
-    std::vector<std::string> CommandInvocation::ToLegacyParts() const
+    ce::dynamic_array<std::string> CommandInvocation::ToLegacyParts() const
     {
-        std::vector<std::string> parts;
+        ce::dynamic_array<std::string> parts;
         parts.reserve(arguments.size() + 1);
         parts.push_back(commandId);
         for (const std::string& argument : arguments) parts.push_back(argument);

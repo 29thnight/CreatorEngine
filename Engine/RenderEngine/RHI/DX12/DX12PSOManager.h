@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -180,7 +181,7 @@ private:
     winrt::com_ptr<ID3D12Device1>          m_device;
     winrt::com_ptr<ID3D12PipelineLibrary>  m_library;
     // 라이브러리는 넘겨받은 블롭을 복사하지 않는다 — 라이브러리보다 오래 살려야 한다.
-    std::vector<uint8_t>           m_libraryBlob;
+    ce::dynamic_array<uint8_t>           m_libraryBlob;
     std::wstring                   m_cachePath;
     bool                           m_libraryLoadedFromDisk{ false };
 
@@ -194,14 +195,18 @@ private:
     void RetireCacheEntryLocked(CacheEntry& entry, RHICompletionPoint retireAfter);
 
     struct PendingCompile;
-    using PendingCompiles = std::unordered_map<uint64_t, own::shared_owner<PendingCompile>>;
+    // Removing a map entry releases its node immediately; workers keep their
+    // own shared owner until compilation completes.
+    using PendingCompiles = ce::node_hash_map<uint64_t, own::shared_owner<PendingCompile>,
+        ce::hash<uint64_t>, ce::equal_to<uint64_t>, ce::heap_allocator, false>;
     void WaitForPendingCompiles(const PendingCompiles& pending);
 
     job_scheduler& m_scheduler; // Engine-owned executor outlives this cache.
     std::mutex m_lifecycleMutex;
     mutable std::mutex m_mutex;
     bool m_acceptingRequests{ false };
-    std::unordered_map<uint64_t, CacheEntry> m_cache;
+    ce::node_hash_map<uint64_t, CacheEntry, ce::hash<uint64_t>,
+        ce::equal_to<uint64_t>, ce::heap_allocator, false> m_cache;
     PendingCompiles m_pending;
     RHICompletionRetireQueue<winrt::com_ptr<ID3D12PipelineState>> m_retiredPipelines;
     winrt::com_ptr<ID3D12PipelineState> m_fallback;

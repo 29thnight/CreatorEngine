@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -38,18 +40,18 @@ namespace material_graph
     struct BindlessMaterialFrame
     {
         std::mutex mutex;
-        std::vector<RHIBindingDesc> descriptions;
-        using TextureKey = std::tuple<std::uint32_t, RHIFormat, std::uint32_t, std::uint32_t>;
+        ce::dynamic_array<RHIBindingDesc> descriptions;
+        using TextureKey = ce::tuple<std::uint32_t, RHIFormat, std::uint32_t, std::uint32_t>;
         // Index + 1; zero is empty. Start with 128 slots and grow at half load.
         // Registration is serialized by mutex; submitted frames retain this table.
         // Small frames never allocate/zero the maximum 32 KiB index.
-        std::vector<std::uint32_t> textureSlots;
+        ce::dynamic_array<std::uint32_t> textureSlots;
         std::uint32_t RegisterTexture(const RHIBindingDesc& description);
         RHIBindingTable textures;
         std::size_t publishedSize{};
         // Frame ownership pins complete immutable table values, including backend
         // version. Readers never touch the mutable descriptions or owner vector.
-        std::vector<own::unique_owner<const RHIBindingTable>> publishedTables;
+        ce::dynamic_array<own::unique_owner<const RHIBindingTable>> publishedTables;
         std::atomic<const RHIBindingTable*> publishedTable{};
     };
 
@@ -72,7 +74,7 @@ namespace material_graph
         // CPU bytes and sampler descriptions are immutable across recordings.
         // Only the texture registration handles belong to this recording.
         own::shared_owner<const ResourcePacket> resourceOwner;
-        std::array<RHIBindingDesc, 64> textureValues{};
+        ce::fixed_array<RHIBindingDesc, 64> textureValues{};
         RenderResourceView resources;
         RHIBufferSlice uniforms;
         RHIBindingTable textures;
@@ -81,7 +83,7 @@ namespace material_graph
         RHIBufferSlice descriptorIndices;
         // CPU values for the recording's shared packet material table. GPU upload
         // addresses are deliberately not persisted as material identity.
-        std::array<std::uint32_t, 128> descriptorIndexValues{};
+        ce::fixed_array<std::uint32_t, 128> descriptorIndexValues{};
         const IRenderDeviceServices* device{};
         std::uint64_t recordingId{};
         std::uint64_t descriptorVersion{};
@@ -155,17 +157,17 @@ namespace material_graph
         {
             own::weak_owner<const Instance> instance;
             own::shared_owner<const ResourcePacket> resources;
-            std::vector<RHITextureEntry> textureShapes;
-            std::array<std::uint32_t, 128> descriptorIndices{};
+            ce::dynamic_array<RHITextureEntry> textureShapes;
+            ce::fixed_array<std::uint32_t, 128> descriptorIndices{};
             std::uint64_t lastUse{};
             std::size_t bytes{};
         };
         IRenderDeviceServices* device_{};
-        std::map<InstanceFramePins::Key, std::vector<own::weak_owner<const RenderBindings>>> prepared_;
+        ce::engine_ordered_map<InstanceFramePins::Key, ce::dynamic_array<own::weak_owner<const RenderBindings>>> prepared_;
         std::uint64_t preparedRecording_{}, preparedDescriptorVersion_{};
         own::shared_owner<BindlessMaterialFrame> bindless_;
         RHISamplerTable bindlessSamplers_;
-        std::map<InstanceFramePins::Key, CpuDescription> descriptions_;
+        ce::engine_ordered_map<InstanceFramePins::Key, CpuDescription> descriptions_;
         std::uint64_t descriptionClock_{};
         std::size_t descriptionBytes_{};
     };

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "ModelData.h"
@@ -21,7 +22,7 @@ namespace experiment::clip
 	[[nodiscard]] inline std::size_t CountUniqueKeyTimes(
 		const experiment::AnimationClip& clip, double eps = 1e-6)
 	{
-		std::vector<double> times;
+		ce::dynamic_array<double> times;
 		for (const experiment::AnimationChannel& channel : clip.channels)
 		{
 			for (const experiment::TranslationKey& key : channel.translations)

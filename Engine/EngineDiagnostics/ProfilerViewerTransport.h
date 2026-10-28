@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 // Private Windows transport/codec shared by the two ordinary-token endpoints.
@@ -13,7 +14,7 @@ namespace ce::profiler_viewer::transport
 
     struct writer
     {
-        std::vector<std::byte> bytes;
+        ce::dynamic_array<std::byte> bytes;
         template<class T> void put(T value)
         {
             static_assert(std::is_unsigned_v<T>);
@@ -158,7 +159,7 @@ namespace ce::profiler_viewer::transport
             codec(recording.source_stopped) && codec(recording.finalized) && codec(recording.complete);
     }
 
-    inline std::vector<std::byte> encode_status(const client_snapshot& value)
+    inline ce::dynamic_array<std::byte> encode_status(const client_snapshot& value)
     {
         writer out;
         out(value.target.session_generation);
@@ -245,7 +246,7 @@ namespace ce::profiler_viewer::transport
     struct packet
     {
         message_kind kind = message_kind::hello;
-        std::vector<std::byte> payload;
+        ce::dynamic_array<std::byte> payload;
     };
 
     // A process-wide eight-slot allocation ceiling also bounds the pathological
@@ -257,7 +258,7 @@ namespace ce::profiler_viewer::transport
     {
         OVERLAPPED overlapped{};
         security::handle event{CreateEventW(nullptr, TRUE, FALSE, nullptr)};
-        std::vector<std::byte> bytes;
+        ce::dynamic_array<std::byte> bytes;
         bool reserved = false;
         operation()
         {
@@ -458,7 +459,7 @@ namespace ce::profiler_viewer::transport
                std::count(path.begin(), path.end(), L'\\') <= 64 && path.find(L'\0') == std::wstring::npos;
     }
 
-    inline std::vector<std::byte> encode_artifact(const security::pinned_image& pin, std::uint64_t generation,
+    inline ce::dynamic_array<std::byte> encode_artifact(const security::pinned_image& pin, std::uint64_t generation,
                                                 std::uint64_t source_id)
     {
         artifact_identity identity;

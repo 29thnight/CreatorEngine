@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include "RHI/RHIShaderPermutation.h"
@@ -21,7 +22,7 @@ struct ShaderMetaPermutation
 {
     FileGuid metaGuid{};
     std::uint32_t passIndex{};
-    std::vector<ShaderKeywordSelection> selections;
+    ce::dynamic_array<ShaderKeywordSelection> selections;
     RHIShaderPermutationKey key{};
     RHIShaderPermutation defines;
 };
@@ -51,6 +52,6 @@ namespace ShaderPermutationDomain
     // 결과를 잘라내지 않고 실패한다. B3 cook도 이 함수의 결과를 소비한다.
     bool EnumerateForBuild(const ShaderMeta& meta,
         std::uint64_t maxCompileRequests,
-        std::vector<ShaderMetaPermutation>& outPermutations,
+        ce::dynamic_array<ShaderMetaPermutation>& outPermutations,
         ShaderMetaPermutationStats& outStats, std::string& outError);
 }

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.DynamicBitset.h"
@@ -91,7 +92,7 @@ public:
 	void DetachChild(size_t index, Index childIndex)
 	{
 		if (!IsOccupied(index)) return;
-		if (std::erase(m_childrenIndices[index], childIndex) > 0) ++m_revision;
+		if (ce::erase(m_childrenIndices[index], childIndex) > 0) ++m_revision;
 	}
 
 	void ClearChildren(size_t index)
@@ -101,7 +102,7 @@ public:
 		++m_revision;
 	}
 
-	void SetChildren(size_t index, std::vector<Index> children)
+	void SetChildren(size_t index, ce::dynamic_array<Index> children)
 	{
 		if (!IsOccupied(index)) return;
 		m_childrenIndices[index] = std::move(children);
@@ -129,12 +130,12 @@ public:
 	std::uint64_t Revision() const noexcept { return m_revision; }
 	Index ParentOf(size_t index) const { return m_parentIndices.at(index); }
 	Index RootOf(size_t index) const { return m_rootIndices.at(index); }
-	const std::vector<Index>& ChildrenOf(size_t index) const { return m_childrenIndices.at(index); }
+	const ce::dynamic_array<Index>& ChildrenOf(size_t index) const { return m_childrenIndices.at(index); }
 
 private:
-	std::vector<Index> m_parentIndices;
-	std::vector<Index> m_rootIndices;
-	std::vector<std::vector<Index>> m_childrenIndices;
+	ce::dynamic_array<Index> m_parentIndices;
+	ce::dynamic_array<Index> m_rootIndices;
+	ce::dynamic_array<ce::dynamic_array<Index>> m_childrenIndices;
 	ce::dynamic_bitset m_occupied;
 	std::uint64_t m_revision{ 1 };   ///< 0 은 "아직 아무것도 못 봤다" 로 남겨 둔다
 };

@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 // PHASE 21 W2-1 — 키보드 탐색 계약을 **잴 수 있게** 만든다.
 //
@@ -93,7 +94,7 @@ namespace editor::nav
         /// ★ 판정 ① — nav 가 custom widget 위에 섰고 커서를 보여야 하는데
         ///   그 프레임에 아무도 커서를 그리지 않은 횟수. 0 이어야 한다.
         std::uint64_t silentFrames{ 0 };
-        std::vector<std::string> silentWidgets;
+        ce::dynamic_array<std::string> silentWidgets;
 
         /// nav 가 선 아이템의 그리기를 **표준 위젯에 넘긴** 프레임 수.
         ///
@@ -112,10 +113,10 @@ namespace editor::nav
         ///   `ItemAdd` 에 `ImGuiItemFlags_Disabled` 를 주지 않으면 탐색이 죽은
         ///   버튼에 멈추고, 사용자는 눌러도 아무 일이 없는 자리에 갇힌다.
         std::uint64_t disabledFrames{ 0 };
-        std::vector<std::string> disabledWidgets;
+        ce::dynamic_array<std::string> disabledWidgets;
 
         /// nav 가 머문 custom widget 들. **자극이 닿았는지**를 이것으로 본다.
-        std::vector<std::string> visitedWidgets;
+        ce::dynamic_array<std::string> visitedWidgets;
 
         /// 테마가 정한 nav 커서 색(`0xRRGGBBAA`). 그리는 곳이 없으면 이 값이
         /// 옳아도 화면에는 아무것도 없다 — 실제로 그런 상태였다.
@@ -147,7 +148,7 @@ namespace editor::nav
 
     /// CLI 가 키를 예약한다. 이름은 tab · up · down · left · right · enter ·
     /// space · escape. 하나라도 모르면 아무것도 넣지 않고 거짓을 돌려준다.
-    bool request_keys(const std::vector<std::string>& keys, std::string& outError);
+    bool request_keys(const ce::dynamic_array<std::string>& keys, std::string& outError);
     bool request_text(const std::string& text, std::string& outError);
 
     // ── 포인터 주입 (PHASE 21 W2-3) ───────────────────────────────────────

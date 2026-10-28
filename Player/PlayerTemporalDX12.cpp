@@ -1,3 +1,5 @@
+#include "../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -71,7 +73,7 @@ namespace Player
         TemporalFrameGenerationConfig configuration;
         TemporalRuntimeSettings settings;
         TemporalResult requestedResult;
-        std::vector<TemporalCapabilities> capabilities;
+        ce::dynamic_array<TemporalCapabilities> capabilities;
         own::unique_owner<ITemporalFrameGenerator> generator;
 #if CREATOR_ENABLE_FSR_SDK && CREATOR_ENABLE_FSR_DX12_SDK
         FsrFrameGeneratorDX12* fsr{nullptr}; // Borrowed from generator.
@@ -80,7 +82,7 @@ namespace Player
         own::shared_owner<DlssTemporalAdapter> dlss;
         AntiLag2DX12Adapter antiLag;
         bool antiLagActive{false};
-        std::array<bool, 4> failedProviders{};
+        ce::fixed_array<bool, 4> failedProviders{};
         std::string failureReason;
         winrt::com_ptr<IDXGISwapChain3> dlssSwapchain;
         HANDLE finalEvent{nullptr};
@@ -90,8 +92,8 @@ namespace Player
             TemporalProvider presenterProvider{TemporalProvider::None};
             uint32_t presenterInterpolatedFrameCount{0};
             uint64_t presenterGeneration{0};
-            std::array<winrt::com_ptr<ID3D12Resource>, 4> textures;
-            std::array<RHITextureHandle, 4> handles{};
+            ce::fixed_array<winrt::com_ptr<ID3D12Resource>, 4> textures;
+            ce::fixed_array<RHITextureHandle, 4> handles{};
         };
         own::shared_owner<Pins> pins;
 
@@ -211,7 +213,7 @@ namespace Player
             {
                 return false;
             }
-            std::array<D3D12_RESOURCE_BARRIER, 4> barriers{};
+            ce::fixed_array<D3D12_RESOURCE_BARRIER, 4> barriers{};
             for (size_t index = 0; index < barriers.size(); ++index)
             {
                 barriers[index].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -1341,7 +1343,7 @@ namespace Player
             return true;
         }
         auto* commands = state.resources.GetCommandList();
-        std::array<D3D12_RESOURCE_BARRIER, 4> barriers{};
+        ce::fixed_array<D3D12_RESOURCE_BARRIER, 4> barriers{};
         for (size_t index = 0; index < barriers.size(); ++index)
         {
             barriers[index].Type = D3D12_RESOURCE_BARRIER_TYPE_TRANSITION;
@@ -1370,14 +1372,14 @@ namespace Player
                         provenance.requestedGeneration == state.generation &&
                         provenance.testFaultRevision == fault.revision &&
                         provenance.testFaultMode == static_cast<uint8_t>(fault.mode)
-                    ? std::function<bool()>{[fault, provenance]()
+                    ? ce::owned_func<bool()>{[fault, provenance]()
                                             {
                                                 return TemporalRuntimeControl::Get().ConsumeTestFault(
                                                     fault, TemporalTestFaultMode::FrameGenerationEvaluate,
                                                     TemporalProvider::Fsr, provenance.realFrameId, provenance.viewId,
                                                     provenance.sceneEpoch);
                                             }}
-                    : std::function<bool()>{});
+                    : ce::owned_func<bool()>{});
         }
 #endif
         auto result = state.generator->Prepare(inputs, encoder);

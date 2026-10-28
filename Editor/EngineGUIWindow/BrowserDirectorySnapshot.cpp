@@ -1,3 +1,4 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -37,7 +38,7 @@ namespace
 
     struct cache_state
     {
-        std::unordered_map<std::string, cache_slot> slots;
+        ce::engine_node_map<std::string, cache_slot> slots;
         browser_cache_stats stats{};
         int frameBudget{ kRescanBudget };
         std::uint64_t generation{ 1 };

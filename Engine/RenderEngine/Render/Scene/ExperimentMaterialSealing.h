@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -38,10 +39,10 @@ namespace ExperimentMaterialSealing
         experiment::Material material{};
         // Code shaders can carry generic values absent from the model authoring
         // variant (notably Float4x4). Never lower those through a BSDF socket.
-        std::vector<::MaterialPropertyValue> codeValues;
+        ce::dynamic_array<::MaterialPropertyValue> codeValues;
         bool hasCodeValues{};
         // 이름→generation owner. legacy에서는 GetTextureMapShared가 채운다.
-        std::vector<SealTextureOwner> textures{};
+        ce::dynamic_array<SealTextureOwner> textures{};
         // ShaderMeta 논리 밖의 draw 상태 — Forward snapshot 전용. flow의
         // totalSeconds/deltaSeconds는 프레임 시각이므로 seal 호출부가 채운다.
         // PBR-S3/I5-M5에서 논리 property 승격 후보다.
@@ -121,8 +122,8 @@ namespace ExperimentMaterialSealing
 
     [[nodiscard]] bool SealCore(const SealSource& source, const ShaderMeta& meta,
         const ShaderMetaBindingLayout& layout,
-        std::vector<std::uint8_t>& outPropertyBytes,
-        std::vector<EnhancedMaterialTextureBinding>& outTextureBindings,
+        ce::dynamic_array<std::uint8_t>& outPropertyBytes,
+        ce::dynamic_array<EnhancedMaterialTextureBinding>& outTextureBindings,
         std::string& outError,
         own::shared_owner<const LX::Runtime::Instance>* outRuntime = nullptr,
         ShaderMetaHandle handle = {});

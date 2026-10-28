@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include <stddef.h>
@@ -56,7 +57,7 @@ namespace experiment
         std::uint32_t meshletCount{};
     };
 
-    using MeshletGeometryDigest = std::array<std::uint8_t, 32>;
+    using MeshletGeometryDigest = ce::fixed_array<std::uint8_t, 32>;
 
     // Owned alongside the original indexed geometry in the same immutable Model
     // generation. No side cache, source GUID, timestamp, or runtime buffer handle.
@@ -64,12 +65,12 @@ namespace experiment
     {
         MeshletBuildSettings settings{};
         MeshletGeometryDigest geometryDigest{};
-        std::vector<MeshletDescriptor> descriptors{};
-        std::vector<std::uint32_t> vertexRemap{};
-        std::vector<std::uint8_t> triangleIndices{};
+        ce::dynamic_array<MeshletDescriptor> descriptors{};
+        ce::dynamic_array<std::uint32_t> vertexRemap{};
+        ce::dynamic_array<std::uint8_t> triangleIndices{};
         // Final indexed triangle ordinal, not the source file's polygon ordinal.
         // Micro-triangle corners preserve that indexed triangle's exact order.
-        std::vector<std::uint32_t> primitiveRemap{};
+        ce::dynamic_array<std::uint32_t> primitiveRemap{};
         MeshletLodRange lod0{};
 
         [[nodiscard]] bool HasMeshlets() const noexcept { return !descriptors.empty(); }

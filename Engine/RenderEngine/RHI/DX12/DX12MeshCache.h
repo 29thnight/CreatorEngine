@@ -1,4 +1,7 @@
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineOrderedMap.h"
 // HashedGuid 정의. 유니티 빌드가 전이로 공급하던 것이라 단독 빌드에서 드러났다.
 //
 // TypeTrait.h는 boost/uuid를 함께 끌어오는데, boost가 쓰는
@@ -146,8 +149,8 @@ private:
         DX12PersistentHeap::Allocation vertexBuffer;
         DX12PersistentHeap::Allocation indexBuffer;
         DX12PersistentHeap::Allocation meshletBuffer;
-        std::array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods> coarseIndexBuffers;
-        std::array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods> coarseMeshletBuffers;
+        ce::fixed_array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods> coarseIndexBuffers;
+        ce::fixed_array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods> coarseMeshletBuffers;
         Entry entry;
 
         /// 정점+인덱스 합계. ③(미사용 은퇴)이 뺄 때 쓴다 — 은퇴 시점에
@@ -161,8 +164,8 @@ private:
 
     void ReleaseCoarseHandles(const Entry& entry);
     void ReleaseCoarseAllocations(
-        std::array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods>& indices,
-        std::array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods>& meshlets);
+        ce::fixed_array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods>& indices,
+        ce::fixed_array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods>& meshlets);
 
     void RecordBufferUpload(const void* data, uint64_t bytes,
         const RHIBufferSlice& staging, D3D12_RESOURCE_STATES finalState,
@@ -182,8 +185,8 @@ private:
     // 텍스처 캐시와 같은 이유다. 자산 수명이 shared_ptr 공동 소유라 죽은 뒤
     // 같은 주소에 새 메시가 올라오면 이전 것의 정점 버퍼를 돌려줬다.
     // Mesh는 m_hashingMesh를 이미 들고 있어 새로 만들 것이 없었다.
-    std::unordered_map<HashedGuid, Buffers> m_entries;
-    std::map<assets::ModelMeshHandle, Buffers> m_modelEntries;
+    ce::engine_node_map<HashedGuid, Buffers> m_entries;
+    ce::engine_ordered_map<assets::ModelMeshHandle, Buffers> m_modelEntries;
 
     /// 은퇴했으나 아직 GPU가 놓아 주지 않은 것들(③). 정점·인덱스 둘을
     /// 함께 든다 — 하나만 놓으면 나머지가 어디에도 안 잡힌다.
@@ -192,8 +195,8 @@ private:
         DX12PersistentHeap::Allocation vertexBuffer;
         DX12PersistentHeap::Allocation indexBuffer;
         DX12PersistentHeap::Allocation meshletBuffer;
-        std::array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods> coarseIndexBuffers;
-        std::array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods> coarseMeshletBuffers;
+        ce::fixed_array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods> coarseIndexBuffers;
+        ce::fixed_array<DX12PersistentHeap::Allocation, kRHIMaxCoarseMeshLods> coarseMeshletBuffers;
     };
     RHICompletionRetireQueue<RetiredBuffers> m_retireQueue;
     DX12PersistentHeap m_persistentHeap;

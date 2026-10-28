@@ -295,6 +295,9 @@ internal unsafe struct ScriptApiTable
     public delegate* unmanaged<SimulationStatus*, int> Simulation_Status;
     public delegate* unmanaged<ulong, ulong, uint, byte*, int, ulong*, int> Simulation_Submit;
     public delegate* unmanaged<ulong, ulong, SimulationSnapshot*, byte*, int, int> Simulation_Read;
+    public delegate* unmanaged<ObjectHandle, int, int> ExtraComponent_Exists;
+    public delegate* unmanaged<ObjectHandle, int, int> ExtraComponent_GetEnabled;
+    public delegate* unmanaged<ObjectHandle, int, int, void> ExtraComponent_SetEnabled;
 }
 
 /// <summary>엔진 API 접근점. 표를 정적으로 들고 있어 호출 비용을 최소화한다.</summary>
@@ -302,7 +305,16 @@ internal static unsafe class Native
 {
     /// <summary>네이티브와 맞춰야 하는 표 버전. 필드를 추가하면 반드시 올린다.</summary>
     // v42 requires the fixed-tick OnTickSimulate bootstrap entry point (table layout unchanged).
-    public const int ExpectedVersion = 45;
+    public const int ExpectedVersion = 46;
+
+    internal static bool HasExtraComponent(ObjectHandle handle, int kind)
+        => Entered() && _api.ExtraComponent_Exists != null && _api.ExtraComponent_Exists(handle, kind) != 0;
+    internal static bool ExtraComponentGetEnabled(ObjectHandle handle, int kind)
+        => Entered() && _api.ExtraComponent_GetEnabled != null && _api.ExtraComponent_GetEnabled(handle, kind) == 1;
+    internal static void ExtraComponentSetEnabled(ObjectHandle handle, int kind, bool enabled)
+    {
+        if (Entered() && _api.ExtraComponent_SetEnabled != null) _api.ExtraComponent_SetEnabled(handle, kind, enabled ? 1 : 0);
+    }
 
     private static ScriptApiTable _api;
     private static bool _bound;
@@ -409,7 +421,8 @@ internal static unsafe class Native
         if (table->StructSize != sizeof(ScriptApiTable)) return false;
         if (table->Asset_RequestTyped == null || table->Asset_TryAcquireTyped == null ||
             table->Camera_NotifyCameraCut == null || table->Simulation_Status == null ||
-            table->Simulation_Submit == null || table->Simulation_Read == null)
+            table->Simulation_Submit == null || table->Simulation_Read == null || table->ExtraComponent_Exists == null ||
+            table->ExtraComponent_GetEnabled == null || table->ExtraComponent_SetEnabled == null)
         {
             return false;
         }

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "Mesh.h"
 #include "Camera.h"
 #include "MeshOptimizer.h"
@@ -14,14 +15,14 @@
 // 앞선 정리에서 비워지고 indexCount 대입 한 줄만 남아 있었다. 껍데기를
 // 함수로 감싸 두면 "여기서 GPU 자원이 생긴다"로 읽히므로 호출부에 편다.
 
-Mesh::Mesh(std::string_view _name, const std::vector<Vertex>& _vertices, const std::vector<uint32>& _indices) :
+Mesh::Mesh(std::string_view _name, const ce::dynamic_array<Vertex>& _vertices, const ce::dynamic_array<uint32>& _indices) :
 	m_name(_name),
 	m_vertices(_vertices),
 	m_indices(_indices)
 {
 }
 
-Mesh::Mesh(std::string_view _name, std::vector<Vertex>&& _vertices, std::vector<uint32>&& _indices) :
+Mesh::Mesh(std::string_view _name, ce::dynamic_array<Vertex>&& _vertices, ce::dynamic_array<uint32>&& _indices) :
 	m_name(_name), m_vertices(std::move(_vertices)), m_indices(std::move(_indices))
 {
 }
@@ -65,7 +66,7 @@ bool Mesh::HasLODs() const
 }
 
 // [NEW] Generate LODs
-void Mesh::GenerateLODs(const std::vector<float>&lodThresholds)
+void Mesh::GenerateLODs(const ce::dynamic_array<float>&lodThresholds)
 {
 	if (m_vertices.empty() || m_indices.empty())
 	{
@@ -86,7 +87,7 @@ void Mesh::GenerateLODs(const std::vector<float>&lodThresholds)
 	m_LODs.push_back(lod0_resource);
 
 	// Generate simplified LODs using MeshOptimizer
-	std::optional<std::vector<MeshOptimizer::LOD>> generatedLODs =
+	std::optional<ce::dynamic_array<MeshOptimizer::LOD>> generatedLODs =
 		MeshOptimizer::GenerateLODs(
 			*this, // Pass the current Mesh object (which has GetVertices/GetIndices)
 			lodThresholds);

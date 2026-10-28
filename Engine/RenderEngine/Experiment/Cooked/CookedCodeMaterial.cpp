@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../../Containers/ContainerAPI.h"
 #include "CookedCodeMaterial.h"
 
 #include "CookedShaderMeta.h"
@@ -76,7 +78,7 @@ namespace experiment::cooked
             { return (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'f'); });
         }
 
-        bool AddEdge(std::vector<AssetDependency>& edges, const AssetId& owner,
+        bool AddEdge(ce::dynamic_array<AssetDependency>& edges, const AssetId& owner,
             const AssetId& target, CookedAssetKind kind, std::string& failure)
         {
             if (!ValidId(target) || owner == target)
@@ -100,8 +102,8 @@ namespace experiment::cooked
             {
                 return Fail(failure, "Code material typed dependency count differs.");
             }
-            std::vector<TypedAssetReference> targets;
-            std::set<AssetIdentity> keys;
+            ce::dynamic_array<TypedAssetReference> targets;
+            ce::engine_ordered_set<AssetIdentity> keys;
             for (const auto& edge : expected)
             {
                 if (edge.kind != AssetDependencyKind::Hard ||
@@ -124,7 +126,7 @@ namespace experiment::cooked
         }
 
         bool MaterialEdges(const AuthoredMaterialDocument& document,
-            std::vector<AssetDependency>& edges, std::string& failure)
+            ce::dynamic_array<AssetDependency>& edges, std::string& failure)
         {
             if (!ValidId(document.material.assetId) || !IsAssetIdV4(document.material.shaderAssetId) ||
                 !AddEdge(edges, document.material.assetId, document.programAssetId, CookedAssetKind::MaterialProgram, failure) ||
@@ -138,7 +140,7 @@ namespace experiment::cooked
             {
                 return Fail(failure, "Authored material default textures must be sorted and unique.");
             }
-            std::set<std::string> names;
+            ce::engine_ordered_set<std::string> names;
             for (const auto& property : document.material.properties)
             {
                 if (property.name.empty() || !names.insert(property.name).second)
@@ -163,13 +165,13 @@ namespace experiment::cooked
             return true;
         }
 
-        bool ProgramEdges(const CodeProgram& program, std::vector<AssetDependency>& edges, std::string& failure)
+        bool ProgramEdges(const CodeProgram& program, ce::dynamic_array<AssetDependency>& edges, std::string& failure)
         {
             if (!AddEdge(edges, program.programAssetId, program.shaderMetaAssetId, CookedAssetKind::ShaderMeta, failure))
             {
                 return false;
             }
-            std::vector<AssetId> defaults;
+            ce::dynamic_array<AssetId> defaults;
             if (!CollectCodeProgramDefaultTextures(program.meta, defaults, failure))
             {
                 return false;
@@ -185,7 +187,7 @@ namespace experiment::cooked
             return true;
         }
 
-        using VariantKey = std::tuple<RHIShaderBinary, std::uint32_t, std::vector<std::uint16_t>, std::uint32_t, bool>;
+        using VariantKey = ce::tuple<RHIShaderBinary, std::uint32_t, ce::dynamic_array<std::uint16_t>, std::uint32_t, bool>;
         VariantKey Key(const CodeProgramVariant& value)
         {
             return {value.backend, value.passIndex, value.keywordSelections, value.vertexAttributeMask, value.referencePath};
@@ -204,7 +206,7 @@ namespace experiment::cooked
                 return Fail(failure, "Code program identity, compiler/format/ABI recipe or bounded inventory is invalid.");
             }
             std::string previous;
-            std::set<std::string> inputPaths;
+            ce::engine_ordered_set<std::string> inputPaths;
             for (const auto& input : program.inputs)
             {
                 if (!Path(input.path) || (!previous.empty() && input.path <= previous) || !input.byteSize ||
@@ -251,7 +253,7 @@ namespace experiment::cooked
             {
                 return Fail(failure, "Code program must carry complete backend/pass/keyword/vertex-mask/reference-path coverage.");
             }
-            std::set<VariantKey> keys;
+            ce::engine_ordered_set<VariantKey> keys;
             bool firstLayout = true;
             for (auto& variant : program.variants)
             {
@@ -294,7 +296,7 @@ namespace experiment::cooked
                 {
                     return Fail(failure, "Code program variant has incomplete or extra stages.");
                 }
-                std::vector<RHIShaderReflection> reflections;
+                ce::dynamic_array<RHIShaderReflection> reflections;
                 for (std::size_t index = 0; index < variant.stages.size(); ++index)
                 {
                     auto& stage = variant.stages[index];
@@ -337,7 +339,7 @@ namespace experiment::cooked
 
         struct Writer final
         {
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
             void Raw(std::span<const std::byte> value)
             {
                 if (value.size() > kCodeProgramMaxBytes - bytes.size())
@@ -437,7 +439,7 @@ namespace experiment::cooked
             void Add(std::size_t count) noexcept { bytes = count > SIZE_MAX - bytes ? SIZE_MAX : bytes + count; }
             void Text(const std::string& value) noexcept { Add(value.capacity()); Add(1u); }
             template<class T>
-            void Vector(const std::vector<T>& value) noexcept
+            void Vector(const ce::dynamic_array<T>& value) noexcept
             { Add(value.capacity() > SIZE_MAX / sizeof(T) ? SIZE_MAX : value.capacity() * sizeof(T)); }
             void Path(const std::filesystem::path& value) noexcept
             {
@@ -445,7 +447,7 @@ namespace experiment::cooked
                 Add(count > SIZE_MAX / sizeof(std::filesystem::path::value_type) ? SIZE_MAX :
                     count * sizeof(std::filesystem::path::value_type));
             }
-            void Resources(const std::vector<RHIShaderResourceReflection>& values) noexcept
+            void Resources(const ce::dynamic_array<RHIShaderResourceReflection>& values) noexcept
             {
                 Vector(values);
                 for (const auto& resource : values)
@@ -527,9 +529,9 @@ namespace experiment::cooked
         return charge.bytes;
     }
 
-    bool CollectCodeProgramDefaultTextures(const ShaderMeta& meta, std::vector<AssetId>& result, std::string& failure)
+    bool CollectCodeProgramDefaultTextures(const ShaderMeta& meta, ce::dynamic_array<AssetId>& result, std::string& failure)
     {
-        std::vector<AssetId> defaults;
+        ce::dynamic_array<AssetId> defaults;
         for (const auto& property : meta.properties)
         {
             if (property.type != ShaderPropertyType::Texture2D)
@@ -556,11 +558,11 @@ namespace experiment::cooked
     }
 
     bool EncodeAuthoredMaterialArtifact(const AuthoredMaterialDocument& document,
-        std::vector<std::byte>& bytes, std::vector<AssetDependency>& dependencies, std::string& failure)
+        ce::dynamic_array<std::byte>& bytes, ce::dynamic_array<AssetDependency>& dependencies, std::string& failure)
     {
         try
         {
-            std::vector<AssetDependency> edges;
+            ce::dynamic_array<AssetDependency> edges;
             if (!MaterialEdges(document, edges, failure))
             {
                 return false;
@@ -586,7 +588,7 @@ namespace experiment::cooked
             {
                 return false;
             }
-            std::vector<std::byte> candidate;
+            ce::dynamic_array<std::byte> candidate;
             if (!Authoring::EncodeCookedDocument(staging.Root().Read(), candidate, failure))
             {
                 return false;
@@ -643,12 +645,12 @@ namespace experiment::cooked
                 }
                 candidate.defaultTextureAssetIds.push_back(id);
             }
-            std::vector<AssetDependency> edges;
+            ce::dynamic_array<AssetDependency> edges;
             if (!MaterialEdges(candidate, edges, failure) || !MatchEdges(dependencies, edges, failure))
             {
                 return false;
             }
-            std::vector<std::byte> canonical;
+            ce::dynamic_array<std::byte> canonical;
             if (!EncodeAuthoredMaterialArtifact(candidate, canonical, edges, failure) ||
                 !std::ranges::equal(bytes, canonical))
             {
@@ -664,8 +666,8 @@ namespace experiment::cooked
         }
     }
 
-    bool EncodeCodeProgramArtifact(const CodeProgram& program, std::vector<std::byte>& bytes,
-        std::vector<AssetDependency>& dependencies, std::string& failure)
+    bool EncodeCodeProgramArtifact(const CodeProgram& program, ce::dynamic_array<std::byte>& bytes,
+        ce::dynamic_array<AssetDependency>& dependencies, std::string& failure)
     {
         try
         {
@@ -674,7 +676,7 @@ namespace experiment::cooked
             {
                 return false;
             }
-            std::vector<AssetDependency> edges;
+            ce::dynamic_array<AssetDependency> edges;
             if (!ProgramEdges(candidate, edges, failure))
             {
                 return false;
@@ -711,7 +713,7 @@ namespace experiment::cooked
                 for (const auto& stage : variant.stages)
                 {
                     writer.Integer(static_cast<std::uint8_t>(stage.stage)); writer.Text(stage.entry); writer.Text(stage.profile);
-                    std::vector<std::uint8_t> payload;
+                    ce::dynamic_array<std::uint8_t> payload;
                     if (!rhi_shader_verified_cache::Encode(stage.bytecode, stage.reflection, payload))
                     {
                         return Fail(failure, "Code program verified stage payload cannot be serialized.");
@@ -731,7 +733,7 @@ namespace experiment::cooked
     }
 
     bool ReadVerifiedCodeProgram(std::span<const std::byte> bytes, CodeProgram& result,
-        std::vector<AssetDependency>& dependencies, std::string& failure)
+        ce::dynamic_array<AssetDependency>& dependencies, std::string& failure)
     {
         try
         {
@@ -831,7 +833,7 @@ namespace experiment::cooked
             {
                 return false;
             }
-            std::vector<AssetDependency> edges;
+            ce::dynamic_array<AssetDependency> edges;
             if (!ProgramEdges(candidate, edges, failure))
             {
                 return false;
@@ -855,7 +857,7 @@ namespace experiment::cooked
             return Fail(failure, "Code program requires a global MaterialProgram identity.");
         }
         CodeProgram candidate;
-        std::vector<AssetDependency> edges;
+        ce::dynamic_array<AssetDependency> edges;
         if (!ReadVerifiedCodeProgram(bytes, candidate, edges, failure) || !MatchEdges(dependencies, edges, failure))
         {
             return false;
@@ -876,7 +878,7 @@ namespace experiment::cooked
         {
             return Fail(failure, "Authored material program/metadata identities do not match the selected code product.");
         }
-        std::vector<AssetId> defaults;
+        ce::dynamic_array<AssetId> defaults;
         if (!CollectCodeProgramDefaultTextures(program.meta, defaults, failure))
         {
             return false;
@@ -885,12 +887,12 @@ namespace experiment::cooked
         {
             return Fail(failure, "Authored material default texture closure differs from the selected code product.");
         }
-        std::vector<AssetDependency> edges;
+        ce::dynamic_array<AssetDependency> edges;
         if (!MaterialEdges(document, edges, failure))
         {
             return false;
         }
-        std::vector<std::uint16_t> selections;
+        ce::dynamic_array<std::uint16_t> selections;
         if (!NormalizeMaterialKeywordSelections(document.material, program.meta.keywords, selections, failure))
         {
             return false;

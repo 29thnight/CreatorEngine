@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 // 창 배선 감사 (PHASE 21 M4 4단계).
 //
 // 이 TU도 유니티에서 뺀다 — EditorWindowRegistry.cpp와 같은 이유.
@@ -67,7 +68,7 @@ namespace editor
             return stable_id == EditorWindowName::kFrameProfiler;
         }
 
-        bool contains(const std::vector<std::string_view>& names, std::string_view one)
+        bool contains(const ce::dynamic_array<std::string_view>& names, std::string_view one)
         {
             return names.end() != std::find(names.begin(), names.end(), one);
         }
@@ -77,8 +78,8 @@ namespace editor
     {
         window_audit audit;
 
-        const std::vector<window_entry>& entries = table.entries;
-        const std::vector<std::string_view> bodies = windows::bound_window_bodies();
+        const ce::dynamic_array<window_entry>& entries = table.entries;
+        const ce::dynamic_array<std::string_view> bodies = windows::bound_window_bodies();
 
         audit.declared = entries.size();
         audit.bound = bodies.size();
@@ -94,7 +95,7 @@ namespace editor
 
         // ② 선언은 있는데 걸릴 자리가 비었다. 자유 함수로 그리는 창은 뺀다.
         // ③ 같은 이름이 두 번 선언됐다.
-        std::vector<std::string_view> seen;
+        ce::dynamic_array<std::string_view> seen;
         seen.reserve(entries.size());
         for (const window_entry& entry : entries)
         {
@@ -141,7 +142,7 @@ namespace editor
     namespace
     {
         void append_list(std::string& out, const char* label,
-                         const std::vector<std::string_view>& names)
+                         const ce::dynamic_array<std::string_view>& names)
         {
             out += label;
             out += '=';

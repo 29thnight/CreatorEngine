@@ -21,6 +21,7 @@
   <ItemGroup>
     <ClInclude Include="Packaging/ArtifactStoreGuard.h" />
     <ClInclude Include="Foundation/BaseTypeDef.h" />
+    <ClInclude Include="Foundation/ManagedObjectContract.h" />
     <ClInclude Include="Reflection/ClassProperty.h" />
     <ClInclude Include="Reflection/MetaPolymorphic.h" />
     <ClInclude Include="Packaging/PakHelper.h" />
@@ -72,6 +73,7 @@
     <ClInclude Include="Time/TimeSystem.h" />
     <ClInclude Include="Foundation/StandardLibrary.h" />
     <ClInclude Include="Runtime/RuntimeSettings.h" />
+    <ClInclude Include="Runtime/RenderBackend.h" />
     <ClInclude Include="Runtime/TemporalProductSettings.h" />
     <ClInclude Include="Runtime/TemporalProductSettingsIO.h" />
     <ClInclude Include="Foundation/IObject.h" />
@@ -114,7 +116,10 @@
     <ClCompile Include="Authoring/SerializationProfiler.cpp" />
     <ClCompile Include="../Platform/Windows/AppBackendWinAPI/Creator.AppBackend.WinAPI.ixx"><CompileAs>CompileAsCppModule</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="../Platform/Windows/AppBackendWinAPI/AppBackendWinAPI.Crash.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
-    <ClCompile Include="../Platform/Windows/AppBackendWinAPI/AppBackendWinAPI.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
+    <ClCompile Include="../Platform/Windows/AppBackendWinAPI/AppBackendWinAPI.cpp">
+      <IncludeInUnityFile>false</IncludeInUnityFile>
+      <AdditionalOptions>/reference "Creator.AppBackend.WinAPI=$(IntDir)Creator.AppBackend.WinAPI.ixx.ifc" %(AdditionalOptions)</AdditionalOptions>
+    </ClCompile>
     <ClCompile Include="Runtime/PathFinder.cpp"><CompileAs>CompileAsCpp</CompileAs><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="Runtime/RuntimeSettings.cpp"><IncludeInUnityFile>false</IncludeInUnityFile></ClCompile>
     <ClCompile Include="Diagnostics/LogSystem.cpp" />

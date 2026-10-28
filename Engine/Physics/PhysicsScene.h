@@ -1,4 +1,5 @@
 #pragma once
+#include "../Containers/ContainerAPI.h"
 #include "PhysicsTypes.h"
 #include "PhysicsGeometry.h"
 #include "PhysicsStep.h"
@@ -17,8 +18,8 @@ enum class resource_kind : std::uint8_t
 struct resource_statistics
 {
     bool enabled = false;
-    std::array<std::uint64_t, static_cast<std::size_t>(resource_kind::count)> created{};
-    std::array<std::uint64_t, static_cast<std::size_t>(resource_kind::count)> released{};
+    ce::fixed_array<std::uint64_t, static_cast<std::size_t>(resource_kind::count)> created{};
+    ce::fixed_array<std::uint64_t, static_cast<std::size_t>(resource_kind::count)> released{};
 
     bool balanced() const noexcept { return created == released; }
 };
@@ -163,7 +164,7 @@ class PhysicsScene final
 
     // Opaque SDK payload. Identity/revision/integrity belong to the artifact codec.
     static std::uint32_t sdk_version() noexcept;
-    [[nodiscard]] result<std::vector<std::byte>> cook_geometry_blob(const geometry_cook_input& input);
+    [[nodiscard]] result<ce::dynamic_array<std::byte>> cook_geometry_blob(const geometry_cook_input& input);
     [[nodiscard]] result<std::shared_ptr<const CollisionGeometry>> load_geometry_blob(
         geometry_kind kind, std::span<const std::byte> bytes);
 

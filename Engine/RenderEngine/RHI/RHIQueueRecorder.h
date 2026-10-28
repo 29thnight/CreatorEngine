@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
@@ -49,7 +50,7 @@ public:
     virtual ~IRHIQueueRecorder() = default;
     virtual IRenderDeviceServices& DeviceServices() const = 0;
     virtual bool Record(const own::shared_owner<IRHICommandQueue>& queue,
-        const std::function<void(RHIEncoder&)>& commands, ce::lifetime_token token,
+        const ce::owned_func<void(RHIEncoder&)>& commands, ce::lifetime_token token,
         ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error) = 0;
     // Zero keeps compatibility with serial recording adapters. A positive count
     // opts into owned targets, including the one-target small-workload path.
@@ -61,7 +62,7 @@ public:
         error = "Queue recorder does not support independent command targets.";
         return false;
     }
-    void RunParallel(const std::function<void(uint32_t)>& job, uint32_t targetCount)
+    void RunParallel(const ce::owned_func<void(uint32_t)>& job, uint32_t targetCount)
     {
         RHIRunCommandRecordingJobs(m_scheduler, job, targetCount);
     }
@@ -75,7 +76,7 @@ public:
     }
     // Backend may marshal the entire transaction to its submission owner once.
     // Return after CPU admission, never wait for GPU completion here.
-    virtual bool ExecuteSubmission(const std::function<bool(std::string&)>& submit,
+    virtual bool ExecuteSubmission(const ce::owned_func<bool(std::string&)>& submit,
         std::string& error)
     {
         return submit(error);

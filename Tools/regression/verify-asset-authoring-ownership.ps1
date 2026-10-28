@@ -184,7 +184,7 @@ Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
 Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'SaveToWICFile'
 Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
-    'file::copy_file'
+    '(?:file|std::filesystem)::copy_file'
 Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'GUID_WICPixelFormat32bppBGRA'
 Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
@@ -194,7 +194,7 @@ Assert-DoesNotMatch "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
 Assert-DoesNotMatch "Engine\SceneRuntime\Terrain.cpp" `
     'stb_image|stbi_'
 Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
-    'file::rename\(stagingDirectory, finalGeneration'
+    '(?:file|std::filesystem)::rename\(stagingDirectory, finalGeneration'
 Assert-Matches "Editor\EngineEntry\Assets\EditorAssetDatabase.cpp" `
     'MoveFileExW\(descriptorTemporary\.c_str\(\), descriptorPath\.c_str\(\)'
 

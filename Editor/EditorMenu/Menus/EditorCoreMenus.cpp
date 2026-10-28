@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 // 에디터 기본 메뉴 동작 본문 (PHASE 21 M1).
 //
 // 이 TU 도 유니티에서 뺀다(Editor.vcxproj) — 선언 계층의 다른 구현 TU 와 같은
@@ -46,7 +47,7 @@ namespace editor::menus
         }
 
         /// 명령 하나를 게임 스레드로 넘긴다. completion 은 GT 에서 불리므로 짧다.
-        void run_command(std::string name, std::vector<std::string> arguments = {})
+        void run_command(std::string name, ce::dynamic_array<std::string> arguments = {})
         {
             if (arguments.empty())
             {

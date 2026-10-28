@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineStorage.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.LayerCatalog.h"
 #else
@@ -140,8 +142,8 @@ result<void> ScenePhysicsSimulation::Unregister(binding_id id)
             return removed;
     }
     m_entries.erase(position);
-    std::erase_if(m_render, [id](const render_pose& value) { return value.binding == id; });
-    std::erase_if(m_changed, [id](const changed_pose& value) { return value.binding == id; });
+    ce::erase_if(m_render, [id](const render_pose& value) { return value.binding == id; });
+    ce::erase_if(m_changed, [id](const changed_pose& value) { return value.binding == id; });
     return {};
 }
 
@@ -298,7 +300,7 @@ result<void> ScenePhysicsSimulation::SetEnabled(binding_id id, bool enabled)
     }
     value.enabled = enabled;
     value.previous = value.state.transform;
-    std::erase_if(m_render, [id](const render_pose& item) { return item.binding == id; });
+    ce::erase_if(m_render, [id](const render_pose& item) { return item.binding == id; });
     return {};
 }
 
@@ -325,7 +327,7 @@ result<void> ScenePhysicsSimulation::CommitLayers(const project_layer_snapshot& 
     };
     try
     {
-        std::vector<change> changes;
+        ce::dynamic_array<change> changes;
         binding_id previous = 0;
         for (const auto& assignment : assignments)
         {
@@ -421,14 +423,14 @@ result<void> ScenePhysicsSimulation::Start(const scene_config& config)
         if (!created)
             return std::unexpected(created.error());
         auto candidate = std::move(*created);
-        std::unordered_map<std::uint64_t, binding_id> handles;
-        std::vector<std::pair<binding_id, body_handle>> prepared;
+        ce::engine_extractable_map<std::uint64_t, binding_id> handles;
+        ce::dynamic_array<ce::pair<binding_id, body_handle>> prepared;
         handles.reserve(m_entries.size());
         prepared.reserve(m_entries.size());
         m_changed.reserve(m_entries.size());
-        std::vector<binding_id> ordered;
+        ce::dynamic_array<binding_id> ordered;
         ordered.reserve(m_entries.size());
-        for (const auto id : m_entries | std::views::keys)
+        for (const auto id : m_entries | std::views::transform([](const auto& entry) -> const auto& { return entry.first; }))
             ordered.push_back(id);
         std::ranges::sort(ordered);
         for (const auto id : ordered)
@@ -442,7 +444,7 @@ result<void> ScenePhysicsSimulation::Start(const scene_config& config)
             handles.emplace(Key(*body), id);
             prepared.emplace_back(id, *body);
         }
-        std::vector<std::pair<binding_id, character_handle>> preparedCharacters;
+        ce::dynamic_array<ce::pair<binding_id, character_handle>> preparedCharacters;
         preparedCharacters.reserve(m_characters.size());
         m_changedCharacters.reserve(m_characters.size());
         for (const auto id : m_characterOrder)
@@ -455,7 +457,7 @@ result<void> ScenePhysicsSimulation::Start(const scene_config& config)
                 return std::unexpected(created.error());
             preparedCharacters.emplace_back(id, *created);
         }
-        for (auto& value : m_characters | std::views::values)
+        for (auto& value : m_characters | std::views::transform([](auto& entry) -> auto& { return entry.second; }))
             Reset(value);
         for (const auto& [id, handle] : preparedCharacters)
             m_characters.at(id).handle = handle;
@@ -543,7 +545,7 @@ result<std::uint32_t> ScenePhysicsSimulation::AdvanceInternal(double seconds, bo
     }
     if (++m_publication == 0)
     {
-        for (auto& value : m_entries | std::views::values)
+        for (auto& value : m_entries | std::views::transform([](auto& entry) -> auto& { return entry.second; }))
             value.publication = 0;
         m_publication = 1;
     }
@@ -827,8 +829,8 @@ result<void> ScenePhysicsSimulation::UnregisterCharacter(binding_id id)
             return removed;
     }
     m_characters.erase(found);
-    std::erase(m_characterOrder, id);
-    std::erase_if(m_changedCharacters, [id](const auto& value) { return value.binding == id; });
+    ce::erase(m_characterOrder, id);
+    ce::erase_if(m_changedCharacters, [id](const auto& value) { return value.binding == id; });
     return {};
 }
 

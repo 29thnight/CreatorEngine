@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Sha256.h"
 #else
@@ -27,13 +28,13 @@ namespace experiment::cooked
         std::uint64_t frameCount{};
         std::uint64_t payloadOffset{ kAudioClipHeaderBytes };
         std::uint64_t payloadBytes{};
-        ce::hash::sha256_digest payloadSha256{};
+        ce::crypto::sha256_digest payloadSha256{};
     };
 
-    [[nodiscard]] inline std::array<std::byte, kAudioClipHeaderBytes>
+    [[nodiscard]] inline ce::fixed_array<std::byte, kAudioClipHeaderBytes>
         WriteAudioClipHeader(const CookedAudioClipHeader& value) noexcept
     {
-        std::array<std::byte, kAudioClipHeaderBytes> bytes{};
+        ce::fixed_array<std::byte, kAudioClipHeaderBytes> bytes{};
         const auto put = [&bytes](std::size_t offset, std::uint64_t number,
             unsigned width) noexcept
         {

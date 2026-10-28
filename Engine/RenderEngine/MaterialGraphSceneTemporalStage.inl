@@ -1,10 +1,10 @@
 // Stage implementation included by MaterialGraphSceneHost.cpp inside material_graph.
-std::array<RGHandle, 5> SceneHost::TemporalStage::DeclareTemporal(const own::shared_owner<const Frame>& prepared,
+ce::fixed_array<RGHandle, 5> SceneHost::TemporalStage::DeclareTemporal(const own::shared_owner<const Frame>& prepared,
                                                                   EnhancedRenderGraph& graph,
                                                                   RGHandle expectedVisibility, RGHandle visibility,
-                                                                  const std::array<RGHandle, 2>& material,
+                                                                  const ce::fixed_array<RGHandle, 2>& material,
                                                                   RGHandle layerList,
-                                                                  std::array<RGHandle, 5> targets) const
+                                                                  ce::fixed_array<RGHandle, 5> targets) const
 {
     const auto& frame = prepared;
     if (!frame || frame->draws.empty())
@@ -43,7 +43,7 @@ std::array<RGHandle, 5> SceneHost::TemporalStage::DeclareTemporal(const own::sha
             {
                 frame->CheckCurrent(execution.graph);
                 auto& encoder = *execution.encoder;
-                std::array<RHITextureHandle, 4> colors;
+                ce::fixed_array<RHITextureHandle, 4> colors;
                 for (unsigned i = 0; i < 4; ++i)
                     colors[i] = execution.ResolveHandle(targets[i]);
                 const auto depth = RHIDepthTargetDesc::Depth(execution.ResolveHandle(targets[4]), RHIFormat::D32Float);
@@ -113,7 +113,7 @@ std::array<RGHandle, 5> SceneHost::TemporalStage::DeclareTemporal(const own::sha
         {
             frame->CheckCurrent(execution.graph);
             auto& encoder = *execution.encoder;
-            std::array<RHITextureHandle, 4> colors;
+            ce::fixed_array<RHITextureHandle, 4> colors;
             for (unsigned i = 0; i < colors.size(); ++i)
                 colors[i] = execution.ResolveHandle(targets[i]);
             const auto depth = RHIDepthTargetDesc::Depth(execution.ResolveHandle(targets[4]), RHIFormat::D32Float);

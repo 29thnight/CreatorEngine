@@ -1,4 +1,6 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -39,7 +41,7 @@ namespace
         camera.nearPlane = 0.5f;
         camera.farPlane = 1000.f;
         frame.camera = &camera;
-        std::vector<EnhancedLight> lights(1);
+        ce::dynamic_array<EnhancedLight> lights(1);
         lights[0].position = {0.f, 0.f, 0.f, 0.f};
         lights[0].direction = {0.f, -1.f, 0.f, 0.f};
         lights[0].color = {1.f, 1.f, 1.f, 1.f};
@@ -59,7 +61,7 @@ namespace
         line.SetOutputFormat(RHIFormat::RGBA8Unorm);
         struct Cleanup
         {
-            std::function<void()> run;
+            ce::owned_func<void()> run;
             ~Cleanup() { run(); }
         } cleanup{[&] {
             resources.AbortFrame();
@@ -99,16 +101,16 @@ namespace
             const uint32_t white = 0xffffffff;
             own::shared_owner<const Texture> texture(Texture::CreateFromPixels(1, 1, "RG5.Final.White", RHIFormat::RGBA8Unorm, &white));
             require(texture != nullptr, "Final fixture texture");
-            std::vector<Vertex> vertices(4);
+            ce::dynamic_array<Vertex> vertices(4);
             vertices[0].position = {-1.f, 0.f, 2.f};
             vertices[1].position = {1.f, 0.f, 2.f};
             vertices[2].position = {1.f, 0.f, 4.f};
             vertices[3].position = {-1.f, 0.f, 4.f};
             Mesh quad("RG5.Final.Quad", vertices, {0, 1, 2, 0, 2, 3});
-            std::vector<EnhancedDrawItem> draws(1);
+            ce::dynamic_array<EnhancedDrawItem> draws(1);
             draws[0].mesh = &quad;
             draws[0].worldMatrix = math::matrix4x4::identity();
-            std::vector<EnhancedUIPass::Rect> rects(2);
+            ce::dynamic_array<EnhancedUIPass::Rect> rects(2);
             rects[0].left = 4.f;
             rects[0].top = 4.f;
             rects[0].right = 24.f;
@@ -118,18 +120,18 @@ namespace
             rects[1] = rects[0];
             rects[1].left = 28.f;
             rects[1].right = 48.f;
-            std::vector<EnhancedGizmoIconPass::Icon> icons(2);
+            ce::dynamic_array<EnhancedGizmoIconPass::Icon> icons(2);
             icons[0].position = {0.f, 1.f, 3.f};
             icons[0].size = 0.7f;
             icons[0].texture = (texture ? &*texture.borrow() : nullptr);
             icons[1] = icons[0];
             icons[1].position.x = 1.f;
-            const std::vector<EnhancedDrawItem> emptyDraws;
-            const std::vector<EnhancedUIPass::Rect> emptyRects;
-            const std::vector<EnhancedGizmoIconPass::Icon> emptyIcons;
-            std::array<std::vector<float>, fixtures> references;
-            std::array<uint32_t, 7> contributions{};
-            std::vector<float> historyPixels;
+            const ce::dynamic_array<EnhancedDrawItem> emptyDraws;
+            const ce::dynamic_array<EnhancedUIPass::Rect> emptyRects;
+            const ce::dynamic_array<EnhancedGizmoIconPass::Icon> emptyIcons;
+            ce::fixed_array<ce::dynamic_array<float>, fixtures> references;
+            ce::fixed_array<uint32_t, 7> contributions{};
+            ce::dynamic_array<float> historyPixels;
             // Product graphs reuse transients through a pool. Recreating and
             // destroying them every frame is not a renderer path under test.
             RGTransientPool transientPool;
@@ -194,7 +196,7 @@ namespace
                     graph.SetTransientPool(&transientPool);
                     const auto read = policy == 0 ? RGAccessMode::LegacyState : RGAccessMode::Read;
                     const auto write = policy == 0 ? RGAccessMode::LegacyState : RGAccessMode::Write;
-                    const auto clear = [&](const char* name, RHIFormat format, std::array<float, 4> value, uint32_t layers = 1) {
+                    const auto clear = [&](const char* name, RHIFormat format, ce::fixed_array<float, 4> value, uint32_t layers = 1) {
                         RGTextureDesc desc{};
                         desc.width = desc.height = size;
                         desc.arraySize = layers;
@@ -226,7 +228,7 @@ namespace
                     struct Readbacks
                     {
                         DX12DeviceResources& resources;
-                        std::vector<RHIReadback> handles;
+                        ce::dynamic_array<RHIReadback> handles;
                         ~Readbacks()
                         {
                             for (auto& handle : handles)
@@ -235,8 +237,8 @@ namespace
                             }
                         }
                     } readbacks{resources};
-                    std::vector<RGHandle> stages;
-                    std::vector<RHIFormat> formats;
+                    ce::dynamic_array<RGHandle> stages;
+                    ce::dynamic_array<RHIFormat> formats;
                     const auto capture = [&](RGHandle handle, RHIFormat format) {
                         RHIReadback readback;
                         require(handle.IsValid() && resources.CreateReadback(size, size, format, 1, readback, error), error);
@@ -336,12 +338,12 @@ namespace
                     require(graph.Execute(error) && resources.EndFrame(error), "Final execute: " + error);
                     resources.WaitForGpu();
                     require(displayState == RHIResourceState::PixelShaderResource, "Present final state was not restored");
-                    std::vector<std::vector<float>> pixels;
+                    ce::dynamic_array<ce::dynamic_array<float>> pixels;
                     for (size_t i = 0; i < readbacks.handles.size(); ++i)
                     {
                         RHIReadbackImage image;
                         require(resources.MapReadback(readbacks.handles[i], image, error), error);
-                        std::vector<float> values;
+                        ce::dynamic_array<float> values;
                         for (uint32_t y = 0; y < size; ++y)
                         {
                             for (uint32_t x = 0; x < size; ++x)

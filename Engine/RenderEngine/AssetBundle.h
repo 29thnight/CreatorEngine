@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "AssetEntry.h"
@@ -42,5 +43,5 @@ struct [[reflgen::reflect]] AssetBundle
 
 	std::string name; // Name of the asset bundle
 	std::string path; // Path to the asset bundle file
-	std::vector<AssetEntry> assets; // List of assets contained in the bundle
+	ce::dynamic_array<AssetEntry> assets; // List of assets contained in the bundle
 };

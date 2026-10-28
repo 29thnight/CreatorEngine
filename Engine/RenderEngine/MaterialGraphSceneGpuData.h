@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -21,15 +23,15 @@ struct SceneGpuData final
     struct alignas(16) Record
     {
         SceneGeometryIdentity identity;
-        std::array<math::vector4, 3> worldColumns, previousWorldColumns;
+        ce::fixed_array<math::vector4, 3> worldColumns, previousWorldColumns;
         // current vertex, previous vertex, topology page slot, vertex count
-        std::array<uint32_t, 4> geometry{};
+        ce::fixed_array<uint32_t, 4> geometry{};
         // uniform byte offset, descriptor byte offset, owner, coverage flags
-        std::array<uint32_t, 4> material{};
+        ce::fixed_array<uint32_t, 4> material{};
         // cutoff float bits, visibility record, chunk, source meshlet capacity
-        std::array<uint32_t, 4> surface{};
+        ce::fixed_array<uint32_t, 4> surface{};
         // temporal valid, distinct previous pose, material bucket, reserved
-        std::array<uint32_t, 4> history{0, 0, UINT32_MAX, 0};
+        ce::fixed_array<uint32_t, 4> history{0, 0, UINT32_MAX, 0};
     };
     static_assert(sizeof(Record) == 224);
     static_assert(offsetof(Record, geometry) == 160);
@@ -44,22 +46,22 @@ struct SceneGpuData final
             RHIBufferHandle buffer;
             uint32_t elements{};
         };
-        std::vector<Vertex> vertices;
-        std::vector<RHIBufferSlice> topology;
-        std::vector<own::shared_owner<const MeshSurfaceBatch>> owners;
+        ce::dynamic_array<Vertex> vertices;
+        ce::dynamic_array<RHIBufferSlice> topology;
+        ce::dynamic_array<own::shared_owner<const MeshSurfaceBatch>> owners;
         RHIBindingTable vertexTable, topologyTable;
     };
-    std::vector<Record> records{Record{}};
-    std::vector<uint32_t> recordPages{UINT32_MAX};
-    std::vector<Page> pages;
+    ce::dynamic_array<Record> records{Record{}};
+    ce::dynamic_array<uint32_t> recordPages{UINT32_MAX};
+    ce::dynamic_array<Page> pages;
     // Offset zero is a valid all-zero default, including material-less passes.
-    std::vector<std::byte> materialBytes = std::vector<std::byte>(512);
-    std::map<const RenderBindings*, std::pair<uint32_t, uint32_t>> materialOffsets;
+    ce::dynamic_array<std::byte> materialBytes = ce::dynamic_array<std::byte>(512);
+    ce::engine_ordered_map<const RenderBindings*, ce::pair<uint32_t, uint32_t>> materialOffsets;
     own::shared_owner<const ResidentBufferFrame> recordBuffer, materialBuffer;
     RHIBufferSlice viewConstants;
-    std::array<RHIBufferSlice, 3> shadowConstants;
+    ce::fixed_array<RHIBufferSlice, 3> shadowConstants;
 
-    bool AppendMaterial(const RenderBindings& bindings, std::pair<uint32_t, uint32_t>& offsets,
+    bool AppendMaterial(const RenderBindings& bindings, ce::pair<uint32_t, uint32_t>& offsets,
                         std::string& error)
     {
         if (const auto found = materialOffsets.find(&bindings); found != materialOffsets.end())
@@ -176,7 +178,7 @@ struct SceneGpuData final
     {
         for (auto& page : pages)
         {
-            std::array<RHIBindingDesc, kGeometryPageSize> vertices, topology;
+            ce::fixed_array<RHIBindingDesc, kGeometryPageSize> vertices, topology;
             for (uint32_t i = 0; i < kGeometryPageSize; ++i)
             {
                 // Fully bound arrays avoid requiring partially-bound descriptors.

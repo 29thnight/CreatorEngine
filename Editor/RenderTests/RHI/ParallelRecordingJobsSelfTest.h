@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
@@ -35,7 +36,7 @@ bool VerifyParallelRecordingJobs(IRHIParallelCommandPool& pool, Resources& resou
             scheduler.start(physicalWorkers);
             for (const uint32_t requested : { 1u, 4u, 99u })
             {
-                std::array<std::atomic<uint32_t>, 4> visits{};
+                ce::fixed_array<std::atomic<uint32_t>, 4> visits{};
                 std::atomic<uint32_t> invalid{ 0 };
                 pool.RunParallel([&](uint32_t lane)
                 {

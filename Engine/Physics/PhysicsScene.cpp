@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "PhysicsScene.h"
 #include "PhysicsTestHooks.h"
 #include "PhysicsSensorPairs.h"
@@ -42,8 +43,8 @@ bool resource_probe_enabled() noexcept
 }
 
 constexpr auto resource_count = static_cast<std::size_t>(resource_kind::count);
-std::array<std::atomic<std::uint64_t>, resource_count> resources_created{};
-std::array<std::atomic<std::uint64_t>, resource_count> resources_released{};
+ce::fixed_array<std::atomic<std::uint64_t>, resource_count> resources_created{};
+ce::fixed_array<std::atomic<std::uint64_t>, resource_count> resources_released{};
 
 void record_resource(resource_kind kind, bool released = false) noexcept
 {
@@ -346,13 +347,13 @@ class task_dispatcher final : public physx::PxCpuDispatcher
     std::mutex m_mutex;
     std::condition_variable_any m_wake;
     std::condition_variable m_idle;
-    std::vector<task_entry> m_queue;
+    ce::dynamic_array<task_entry> m_queue;
     scene_id m_identity;
     std::atomic<std::uint64_t> next_task{1};
     std::size_t m_head = 0, m_size = 0, m_outstanding = 0;
     // drain includes each worker's final publication, not only SDK task release.
     std::size_t m_active_batches = 0;
-    std::vector<std::jthread> m_workers;
+    ce::dynamic_array<std::jthread> m_workers;
 };
 
 result<scene_id> allocate_scene_id(std::source_location location)
@@ -376,7 +377,7 @@ bool finite(math::vector3 value)
 // handling can inflate them into a different shape. All tests use relative units.
 bool convex_has_volume(std::span<const math::vector3> points)
 {
-    using vector = std::array<double, 3>;
+    using vector = ce::fixed_array<double, 3>;
     const auto first = math::components(points.front());
     const auto offset = [&](math::vector3 point) -> vector {
         const auto value = math::components(point);
@@ -428,7 +429,7 @@ bool convex_has_volume(std::span<const math::vector3> points)
 void configure_convex_area(physx::PxCookingParams& params, std::span<const math::vector3> points)
 {
     const auto first = math::components(points.front());
-    std::array<double, 3> low{first[0], first[1], first[2]}, high = low;
+    ce::fixed_array<double, 3> low{first[0], first[1], first[2]}, high = low;
     for (const auto point : points)
     {
         const auto components = math::components(point);
@@ -519,7 +520,7 @@ class snapshot_pool final : public std::enable_shared_from_this<snapshot_pool>
 
   private:
     std::mutex m_mutex;
-    std::vector<std::unique_ptr<tick_snapshot>> m_free;
+    ce::dynamic_array<std::unique_ptr<tick_snapshot>> m_free;
     std::uint32_t m_capacity, m_created = 0;
 };
 
@@ -554,9 +555,9 @@ struct body_record
     body_kind kind;
     body_handle handle;
     std::uint64_t changed_tick = 0;
-    std::vector<shape_identity> identities;
-    std::vector<physx::PxShape*> shapes;
-    std::vector<std::shared_ptr<const CollisionGeometry>> assets;
+    ce::dynamic_array<shape_identity> identities;
+    ce::dynamic_array<physx::PxShape*> shapes;
+    ce::dynamic_array<std::shared_ptr<const CollisionGeometry>> assets;
     sdk_owner<physx::PxRigidActor> actor; // Release before its userData and cooked asset owners.
 };
 
@@ -612,14 +613,14 @@ class character_filter final : public physx::PxQueryFilterCallback, public physx
 class event_collector final : public physx::PxSimulationEventCallback
 {
   public:
-    event_collector(std::uint32_t capacity, const std::vector<std::unique_ptr<body_record>>& retired)
+    event_collector(std::uint32_t capacity, const ce::dynamic_array<std::unique_ptr<body_record>>& retired)
         : m_retired(retired), m_capacity(capacity), m_sensors(capacity)
     {
         events.reserve(capacity);
     }
 
     std::mutex mutex;
-    std::vector<collision_event> events;
+    ce::dynamic_array<collision_event> events;
     step_statistics statistics;
 
     void onConstraintBreak(physx::PxConstraintInfo*, physx::PxU32) override {}
@@ -644,7 +645,7 @@ class event_collector final : public physx::PxSimulationEventCallback
             collision_event event{};
             event.first = *first;
             event.second = *second;
-            std::array<physx::PxContactPairPoint, contact_point_capacity> points;
+            ce::fixed_array<physx::PxContactPairPoint, contact_point_capacity> points;
             event.required_contacts = pair.contactCount;
             auto capacity = static_cast<physx::PxU32>(points.size());
 #if defined(CE_PHYSICS_TESTING)
@@ -657,9 +658,9 @@ class event_collector final : public physx::PxSimulationEventCallback
                                          engine(points[point].impulse), points[point].separation};
 
             for (const auto [flag, kind] :
-                 {std::pair{physx::PxPairFlag::eNOTIFY_TOUCH_FOUND, event_kind::contact_begin},
-                  std::pair{physx::PxPairFlag::eNOTIFY_TOUCH_PERSISTS, event_kind::contact_persist},
-                  std::pair{physx::PxPairFlag::eNOTIFY_TOUCH_LOST, event_kind::contact_end}})
+                 {ce::pair{physx::PxPairFlag::eNOTIFY_TOUCH_FOUND, event_kind::contact_begin},
+                  ce::pair{physx::PxPairFlag::eNOTIFY_TOUCH_PERSISTS, event_kind::contact_persist},
+                  ce::pair{physx::PxPairFlag::eNOTIFY_TOUCH_LOST, event_kind::contact_end}})
             {
                 if (pair.events.isSet(flag))
                 {
@@ -756,7 +757,7 @@ class event_collector final : public physx::PxSimulationEventCallback
 
         statistics.dropped_contacts += event.required_contacts - event.contact_count;
         // Canonical endpoint order also canonicalizes manifold orientation.
-        if (std::tuple{event.second.body, event.second.shape} < std::tuple{event.first.body, event.first.shape})
+        if (ce::tuple{event.second.body, event.second.shape} < ce::tuple{event.first.body, event.first.shape})
         {
             std::swap(event.first, event.second);
             for (auto index : std::views::iota(0u, event.contact_count))
@@ -769,7 +770,7 @@ class event_collector final : public physx::PxSimulationEventCallback
         events.push_back(event); // Reserved at scene creation; callback path never allocates.
     }
 
-    const std::vector<std::unique_ptr<body_record>>& m_retired;
+    const ce::dynamic_array<std::unique_ptr<body_record>>& m_retired;
     std::uint32_t m_capacity;
     sensor_pairs m_sensors;
 };
@@ -859,7 +860,7 @@ class query_collector final : public physx::PxHitCallback<Hit>
     query_result summary;
 
   private:
-    std::array<Hit, 32> scratch;
+    ce::fixed_array<Hit, 32> scratch;
     std::span<query_hit> output;
 };
 
@@ -910,8 +911,8 @@ struct PhysicsSceneChannel::storage
     std::atomic<bool> failed{false};
     std::atomic<std::uint32_t> fetch_failure{0};
     std::mutex command_mutex;
-    std::vector<command> queued, ready;
-    std::array<std::uint64_t, 256> committed_sequences{};
+    ce::dynamic_array<command> queued, ready;
+    ce::fixed_array<std::uint64_t, 256> committed_sequences{};
     std::uint64_t closed_tick = 0;
     std::atomic<std::uint64_t> command_rejections{0}, command_overflows{0};
     std::uint32_t command_capacity = 0;
@@ -940,15 +941,15 @@ struct PhysicsScene::implementation
     bool gpu_requested = false;
     execution_backend backend = execution_backend::cpu;
     gpu_fallback_reason gpu_fallback = gpu_fallback_reason::none;
-    std::vector<body_slot> bodies;
+    ce::dynamic_array<body_slot> bodies;
     std::uint32_t free_body_slot = UINT32_MAX;
-    std::vector<character_slot> characters;
+    ce::dynamic_array<character_slot> characters;
     std::uint32_t free_character_slot = UINT32_MAX;
-    std::vector<std::unique_ptr<body_record>> retired;
+    ce::dynamic_array<std::unique_ptr<body_record>> retired;
     std::mutex& command_mutex = access->command_mutex;
-    std::vector<command>& queued = access->queued;
-    std::vector<command>& ready = access->ready;
-    std::array<std::uint64_t, 256>& committed_sequences = access->committed_sequences;
+    ce::dynamic_array<command>& queued = access->queued;
+    ce::dynamic_array<command>& ready = access->ready;
+    ce::fixed_array<std::uint64_t, 256>& committed_sequences = access->committed_sequences;
     std::uint64_t& closed_tick = access->closed_tick;
     std::atomic<std::uint64_t>& command_rejections = access->command_rejections;
     std::atomic<std::uint64_t>& command_overflows = access->command_overflows;
@@ -1294,7 +1295,7 @@ result<void> PhysicsScene::apply_force(body_handle body, math::vector3 linear, m
             error{error_code::invalid_argument, 0, "Force requires a dynamic body and finite vectors", location});
 
     ce::profile_scope scope{ce::marker<"Physics.ApplyForce">()};
-    constexpr std::array modes{physx::PxForceMode::eFORCE, physx::PxForceMode::eIMPULSE,
+    constexpr ce::fixed_array modes{physx::PxForceMode::eFORCE, physx::PxForceMode::eIMPULSE,
                                physx::PxForceMode::eACCELERATION, physx::PxForceMode::eVELOCITY_CHANGE};
     auto* actor = (*record)->actor->is<physx::PxRigidDynamic>();
     actor->addForce(sdk(linear), modes[std::to_underlying(mode)]);
@@ -1505,7 +1506,7 @@ result<void> PhysicsScene::finish_step(std::source_location location)
         m_state->event_sink->events.clear();
         m_state->event_sink->statistics = {};
         std::ranges::sort(snapshot.events, {}, [](const collision_event& event) {
-            return std::tuple{event.first.body, event.first.shape, event.second.body, event.second.shape, event.kind};
+            return ce::tuple{event.first.body, event.first.shape, event.second.body, event.second.shape, event.kind};
         });
     }
     if (snapshot.step_succeeded)
@@ -1603,7 +1604,7 @@ result<void> PhysicsScene::finish_step(std::source_location location)
     {
         ce::profile_scope scope{ce::marker<"Physics.Counters">()};
         const ce::cpu_span_context owner{snapshot.scene.value, snapshot.tick.value, 0};
-        const std::array samples{
+        const ce::fixed_array samples{
             ce::profile_counter_sample{ce::profile_counter_id::physics_bodies, static_cast<double>(statistics.bodies),
                                        owner},
             ce::profile_counter_sample{ce::profile_counter_id::physics_shapes, static_cast<double>(statistics.shapes),
@@ -1776,7 +1777,7 @@ result<physx::PxGeometryHolder> PhysicsScene::implementation::resolve(const geom
 
 std::uint32_t PhysicsScene::sdk_version() noexcept { return PX_PHYSICS_VERSION; }
 
-result<std::vector<std::byte>> PhysicsScene::cook_geometry_blob(const geometry_cook_input& input)
+result<ce::dynamic_array<std::byte>> PhysicsScene::cook_geometry_blob(const geometry_cook_input& input)
 {
     if (auto phase = m_state->require_idle(std::source_location::current()); !phase)
         return std::unexpected(phase.error());
@@ -1827,7 +1828,7 @@ result<std::vector<std::byte>> PhysicsScene::cook_geometry_blob(const geometry_c
                 const auto count = std::uint64_t(value.rows) * value.columns;
                 if (value.rows < 2 || value.columns < 2 || count > UINT32_MAX || count != value.heights.size()) return false;
 
-                std::vector<physx::PxHeightFieldSample> samples(static_cast<std::size_t>(count));
+                ce::dynamic_array<physx::PxHeightFieldSample> samples(static_cast<std::size_t>(count));
                 for (auto index : std::views::iota(std::size_t{}, samples.size()))
                 {
                     samples[index].height = value.heights[index];
@@ -1847,7 +1848,7 @@ result<std::vector<std::byte>> PhysicsScene::cook_geometry_blob(const geometry_c
             return std::unexpected(error{error_code::cooking_failed, 0, "SDK geometry blob cooking failed"});
 
         const auto* begin = reinterpret_cast<const std::byte*>(stream.getData());
-        return std::vector<std::byte>(begin, begin + stream.getSize());
+        return ce::dynamic_array<std::byte>(begin, begin + stream.getSize());
     }
     catch (const std::bad_alloc&)
     {
@@ -1997,7 +1998,7 @@ result<std::shared_ptr<const CollisionGeometry>> PhysicsScene::cook_heightfield(
         auto state = std::make_unique<CollisionGeometry::implementation>();
         state->runtime = m_state->runtime;
         state->kind = geometry_kind::heightfield;
-        std::vector<physx::PxHeightFieldSample> samples(static_cast<std::size_t>(count));
+        ce::dynamic_array<physx::PxHeightFieldSample> samples(static_cast<std::size_t>(count));
         const std::mdspan<const std::int16_t, std::dextents<std::size_t, 2>> heights(input.heights.data(), input.rows,
                                                                                      input.columns);
         for (auto row : std::views::iota(0u, input.rows))
@@ -2246,9 +2247,9 @@ result<body_handle> PhysicsScene::create_body(const body_desc& desc, std::source
     try
     {
         // Validate the entire definition before allocating any SDK actor/material/shape.
-        std::vector<physx::PxGeometryHolder> forms;
+        ce::dynamic_array<physx::PxGeometryHolder> forms;
         forms.reserve(desc.shapes.size());
-        std::vector<std::uint32_t> ids;
+        ce::dynamic_array<std::uint32_t> ids;
         ids.reserve(desc.shapes.size());
         for (const auto& shape : desc.shapes)
         {

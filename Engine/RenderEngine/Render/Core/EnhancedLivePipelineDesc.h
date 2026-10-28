@@ -1,4 +1,7 @@
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 
 #include "../Graph/EnhancedRenderGraph.h"
@@ -380,7 +383,7 @@ class LiveBlackboard
         std::copy_n(handles.data(), handles.size(), destination.handles.data());
         destination.generation = m_generation;
     }
-    void SetList(std::string_view slot, const std::vector<RGHandle>& handles)
+    void SetList(std::string_view slot, const ce::dynamic_array<RGHandle>& handles)
     {
         SetList(slot, std::span<const RGHandle>{handles});
     }
@@ -388,10 +391,10 @@ class LiveBlackboard
     {
         SetList(slot, std::span<const RGHandle>{handles.begin(), handles.size()});
     }
-    std::vector<RGHandle> GetList(std::string_view slot) const
+    ce::dynamic_array<RGHandle> GetList(std::string_view slot) const
     {
         const auto found = m_slots.find(slot);
-        return found == m_slots.end() || found->second.generation != m_generation ? std::vector<RGHandle>{}
+        return found == m_slots.end() || found->second.generation != m_generation ? ce::dynamic_array<RGHandle>{}
                                                                                   : found->second.handles;
     }
 
@@ -438,7 +441,7 @@ class LiveBlackboard
 
     struct Slot
     {
-        std::vector<RGHandle> handles;
+        ce::dynamic_array<RGHandle> handles;
         uint64_t generation{};
         uint64_t writePermission{};
     };
@@ -502,9 +505,9 @@ class LiveBlackboard
     // 174d073에서 고친 빌린 키 저장 뒤 원본 문자열 변경 문제가 재발하지 않도록 저장 키는 std::string으로 소유한다.
     // 조회 문자열과 iterator는 호출 밖에서 보관하지 않는다. GetListView만 현재 세대의 값 범위를 빌린다.
     // 저장 키와 조회 view에 같은 해시·문자 비교를 적용해 주소와 종료 문자에 의존하지 않는다.
-    std::unordered_map<std::string, Slot, SlotHash, std::equal_to<>> m_slots;
+    ce::engine_node_map<std::string, Slot, SlotHash, std::equal_to<>> m_slots;
     uint64_t m_generation{1};
-    std::vector<Slot*> m_boundSlots;
+    ce::dynamic_array<Slot*> m_boundSlots;
     const void* m_boundPlan{};
     uint64_t m_boundRevision{};
     uint64_t m_writeScope{};
@@ -521,7 +524,7 @@ struct LiveFrameBinding
     uint32_t         viewIndex{ 0 };
     RHITextureHandle sharedTarget{};
     RHIReadback      readbackTarget{};
-    std::array<RHITextureHandle,4> temporalTargets{};
+    ce::fixed_array<RHITextureHandle,4> temporalTargets{};
 
     // 뷰의 표시 성격(LiveViewFlags 비트 조합). 화면 UI는 kScreenSpaceUI 뷰에만,
     // Host가 기여한 씬 오버레이는 kSceneOverlay 뷰에만 그린다 — 게임 뷰는
@@ -541,27 +544,27 @@ struct LivePassNode
     // ── 데이터 절반 ──
 
     /// 앞선 노드가 발행해 두어야 읽을 수 있다.
-    std::vector<std::string> reads;
+    ce::dynamic_array<std::string> reads;
 
     /// 이 노드가 처음 발행한다. 같은 슬롯을 둘이 발행하면 Validate가 잡는다.
-    std::vector<std::string> writes;
+    ce::dynamic_array<std::string> writes;
 
     /// 읽고 → 같은 이름으로 재발행한다.
     ///
     /// 꺼졌을 때 기존 값이 그대로 남는다. 새 required 출력을 발행하는
     /// 조건부 노드는 disabledPassthroughs로 호환 입력을 지정해야 한다.
-    std::vector<std::string> modifies;
+    ce::dynamic_array<std::string> modifies;
 
-    std::vector<LiveResourceBinding> inputContracts, outputContracts, updateContracts;
+    ce::dynamic_array<LiveResourceBinding> inputContracts, outputContracts, updateContracts;
     struct DisabledPassthrough
     {
         LiveResourceBinding output;
         LiveResourceBinding input;
     };
-    std::vector<DisabledPassthrough> disabledPassthroughs;
+    ce::dynamic_array<DisabledPassthrough> disabledPassthroughs;
     /// CPU-side ordering that cannot be inferred from a GPU resource (e.g. a
     /// shared lighting preparation result). Names are resolved only at assembly.
-    std::vector<std::string> dependsOn;
+    ce::dynamic_array<std::string> dependsOn;
     uint32_t requiredViewFlags{};
 
     void Inputs(std::initializer_list<LiveResourceBinding> resources)
@@ -601,35 +604,35 @@ struct LivePassNode
     // ── 접착 절반 ──
 
     /// 비활성이면 declare를 건너뛴다. 비면 항상 활성.
-    std::function<bool()> active;
+    ce::owned_func<bool()> active;
 
     /// 이 노드가 미는 패스. viewIndex로 뷰당 인스턴스를 고른다(공유면 무시).
     ///
     /// 이것만 있으면 Initialize/PrepareFrame/Shutdown의 기본 구현이 성립한다 —
     /// 그 셋을 따로 적는 노드는 특별한 사정이 있는 것뿐이다(포그의 지연
     /// 초기화, 데칼의 SetDecals 선행). 패스가 없는 노드(live_present)는 비운다.
-    std::function<EnhancedRenderPass*(uint32_t viewIndex)> instance;
+    ce::owned_func<EnhancedRenderPass*(uint32_t viewIndex)> instance;
 
     /// 기본(instance->Initialize)을 대신할 초기화. 포그처럼 처음 켜질 때까지
     /// 자원을 잡지 않아야 하는 노드가 빈 람다를 넣어 기본을 끈다.
-    std::function<bool(const EnhancedFrameContext&, std::string&, uint32_t viewIndex)> initialize;
+    ce::owned_func<bool(const EnhancedFrameContext&, std::string&, uint32_t viewIndex)> initialize;
 
     /// 기본(instance->PrepareFrame)을 대신할 프레임 준비.
-    std::function<bool(const EnhancedFrameContext&, std::string&, uint32_t viewIndex)> prepare;
+    ce::owned_func<bool(const EnhancedFrameContext&, std::string&, uint32_t viewIndex)> prepare;
 
     /// 기본(instance->Shutdown)을 대신할 해제.
-    std::function<void()> shutdown;
+    ce::owned_func<void()> shutdown;
 
     /// 블랙보드에서 꺼내 타입 있는 Inputs로 옮기고, 패스의 Declare를 부르고,
     /// 결과를 다시 블랙보드에 넣는다. 지금 RenderOnce의 블록 하나와 일대일이다.
-    std::function<void(LiveBlackboard&, EnhancedRenderGraph&,
+    ce::owned_func<void(LiveBlackboard&, EnhancedRenderGraph&,
         const EnhancedFrameContext&, const LiveFrameBinding&)> declare;
 
     /// 이번 프레임에 reads의 이 슬롯을 실제로 소비하는가. 비면 활성일 때 항상 소비한다.
     /// 선택적 생산자(Temporal.Inputs)가 소비자 이름을 몰라도 되게 하는 근거다.
-    std::function<bool(const std::string& slot, const EnhancedFrameContext&, const LiveFrameBinding&)> consumes;
+    ce::owned_func<bool(const std::string& slot, const EnhancedFrameContext&, const LiveFrameBinding&)> consumes;
     /// LitColor 출력이 표시 해상도인가(시간 업스케일). 캡처 단계 크기의 근거.
-    std::function<bool(const LiveFrameBinding&)> displayResolutionOutput;
+    ce::owned_func<bool(const LiveFrameBinding&)> displayResolutionOutput;
 
     bool IsActive() const { return !active || active(); }
     bool IsActive(const LiveFrameBinding& binding) const
@@ -651,7 +654,7 @@ struct LivePassNodeSnapshot
 {
     std::string name;
     bool conditional{}, active{}, perView{};
-    std::vector<std::string> reads, writes, modifies;
+    ce::dynamic_array<std::string> reads, writes, modifies;
 };
 
 class LivePipelineDesc
@@ -717,7 +720,7 @@ public:
     /// 그 노드의 modifies 슬롯은 값이 그대로 남아 뒤 노드가 이어받는다.
     void DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGraph& graph,
         const EnhancedFrameContext& context, const LiveFrameBinding& binding,
-        const std::function<void(const LivePassNode&, const LiveBlackboard&)>& afterDeclare = {}) const;
+        const ce::owned_func<void(const LivePassNode&, const LiveBlackboard&)>& afterDeclare = {}) const;
 
     // Declaration observers run synchronously and are never retained. Borrow a
     // caller's functor instead of constructing an owning std::function every
@@ -725,7 +728,7 @@ public:
     template<class Observer>
         requires(std::is_class_v<std::remove_cvref_t<Observer>> &&
                  !std::is_same_v<std::remove_cvref_t<Observer>,
-                                 std::function<void(const LivePassNode&, const LiveBlackboard&)>> &&
+                                 ce::owned_func<void(const LivePassNode&, const LiveBlackboard&)>> &&
                  std::is_invocable_r_v<void, Observer&, const LivePassNode&, const LiveBlackboard&>)
     void DeclareAll(LiveBlackboard& blackboard, EnhancedRenderGraph& graph, const EnhancedFrameContext& context,
                     const LiveFrameBinding& binding, Observer&& afterDeclare) const
@@ -750,9 +753,9 @@ public:
     /// 이 덤프가 없으면 "이 패스가 어디 끼는지"를 알려면 RenderOnce를 정독해야
     /// 한다. 기본 폰트가 라틴 전용인 디버그 창에서 읽히도록 출력 어휘는 영문이다.
     std::string Dump() const;
-    std::vector<LivePassNodeSnapshot> SnapshotNodes() const
+    ce::dynamic_array<LivePassNodeSnapshot> SnapshotNodes() const
     {
-        std::vector<LivePassNodeSnapshot> result;
+        ce::dynamic_array<LivePassNodeSnapshot> result;
         result.reserve(m_nodes.size());
         for (const auto& node : m_nodes)
             result.push_back({node.name, bool(node.active), node.IsActive(), node.perView, node.reads, node.writes, node.modifies});
@@ -785,9 +788,9 @@ private:
   struct CompiledNode
   {
       uint32_t node{};
-      std::vector<CompiledResourceUse> inputs, outputs, updates;
-      std::vector<CompiledPassthrough> disabledPassthroughs;
-      std::vector<uint32_t> dependencies;
+      ce::dynamic_array<CompiledResourceUse> inputs, outputs, updates;
+      ce::dynamic_array<CompiledPassthrough> disabledPassthroughs;
+      ce::dynamic_array<uint32_t> dependencies;
   };
   bool CompileFeaturePlan(std::string& outError) const;
   void DeclareAllImpl(LiveBlackboard& blackboard, EnhancedRenderGraph& graph, const EnhancedFrameContext& context,
@@ -795,13 +798,13 @@ private:
                       void (*afterDeclare)(const void*, const LivePassNode&, const LiveBlackboard&)) const;
   void ValidatePublishedResources(const CompiledNode& node, const LiveBlackboard& blackboard,
                                   const EnhancedRenderGraph& graph, const EnhancedFrameContext& context) const;
-  std::vector<LivePassNode> m_nodes;
+  ce::dynamic_array<LivePassNode> m_nodes;
   std::string_view m_currentContributor;
   RenderFeatureStage m_currentContributionStage{RenderFeatureStage::BeforePresent};
   uint64_t m_revision{1};
   mutable uint64_t m_compiledRevision{};
   mutable uint64_t m_planBindingId{};
-  mutable std::vector<CompiledNode> m_planNodes;
-  mutable std::vector<LiveResourceBinding> m_planResources;
-  mutable std::vector<std::vector<CompiledConsumer>> m_planConsumers;
+  mutable ce::dynamic_array<CompiledNode> m_planNodes;
+  mutable ce::dynamic_array<LiveResourceBinding> m_planResources;
+  mutable ce::dynamic_array<ce::dynamic_array<CompiledConsumer>> m_planConsumers;
 };

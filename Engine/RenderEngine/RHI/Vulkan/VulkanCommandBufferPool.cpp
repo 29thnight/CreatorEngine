@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -368,7 +369,7 @@ bool VulkanCommandBufferPool::SubmitRecordedCommands(uint32_t frameSlot,
         return false;
     }
 
-    std::array<VkCommandBuffer, kMaxWorkers> buffers{};
+    ce::fixed_array<VkCommandBuffer, kMaxWorkers> buffers{};
     size_t count = 0;
     if (workerOrder.size() > buffers.size())
     {

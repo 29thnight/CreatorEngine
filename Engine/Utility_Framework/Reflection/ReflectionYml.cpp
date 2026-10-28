@@ -1,3 +1,4 @@
+#include "../Foundation/EngineNodeMap.h"
 // 헤더 인라인 Meyers 싱글턴을 여기로 내렸다 (PlayerModuleBoundaryAnalysis Step 0).
 //
 // 왜: `static T& Get() {{ static T instance; return instance; }}` 를 헤더에 두면
@@ -15,9 +16,9 @@ namespace Meta::Typed
 {
     // 등록은 ReflectionTypedYml.h의 썽크가, 조회는 SceneRuntime의
     // ComponentFactory가 한다 — 표가 갈리면 그 사이가 끊긴다.
-    std::unordered_map<size_t, TypeOps>& OpsRegistry()
+    ce::engine_node_map<size_t, TypeOps>& OpsRegistry()
     {
-        static std::unordered_map<size_t, TypeOps> s_map;
+        static ce::engine_node_map<size_t, TypeOps> s_map;
         return s_map;
     }
 }

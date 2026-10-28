@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -370,7 +372,7 @@ namespace experiment::cooked
             // small interval of expired records between new captures.
             if (++pinsSincePrune_ == 64u)
             {
-                std::erase_if(files_, [](const auto& item) { return item.second.expired(); });
+                ce::erase_if(files_, [](const auto& item) { return item.second.expired(); });
                 pinsSincePrune_ = 0u;
             }
             const std::string key(path);
@@ -431,7 +433,7 @@ namespace experiment::cooked
         }
 
         mutable std::mutex filesMutex_;
-        mutable std::unordered_map<std::string, own::weak_owner<PinnedFile>> files_;
+        mutable ce::engine_node_map<std::string, own::weak_owner<PinnedFile>> files_;
         mutable std::size_t pinsSincePrune_{};
         [[nodiscard]] bool Resolve(std::string_view virtualPath,
             std::filesystem::path& out, std::string& failure) const

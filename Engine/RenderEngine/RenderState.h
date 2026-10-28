@@ -1,4 +1,5 @@
-﻿#pragma once
+﻿#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#pragma once
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 
 class RenderPerformanceState : public Singleton<RenderPerformanceState>
@@ -25,7 +26,7 @@ public:
 	}
 
 private:
-	std::unordered_map<std::string, double> m_renderStates;
+	ce::engine_node_map<std::string, double> m_renderStates;
 };
 
 static auto RenderStatistics = RenderPerformanceState::GetInstance();

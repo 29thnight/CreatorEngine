@@ -8,6 +8,8 @@
 //--------------------------------------------------------------------------------------
 
 #pragma once
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Containers/ContainerAPI.h"
 
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -168,7 +170,7 @@ public:
                         frame.origin.y = float(dy) * pivotY;
                     }
 
-                    mSprites.insert(std::pair<std::wstring, SpriteFrame>(std::wstring(name), frame));
+                    mSprites.emplace(std::wstring(name), frame);
                 }
 
                 inFile.ignore(1000, '\n');
@@ -349,7 +351,7 @@ private:
     }
 
 private:
-    std::map<std::wstring, SpriteFrame>                 mSprites;
+    ce::engine_ordered_map<std::wstring, SpriteFrame>                 mSprites;
 
     static inline LONG SrcWidth(const SpriteFrame& f) { return f.sourceRect.right - f.sourceRect.left; }
     static inline LONG SrcHeight(const SpriteFrame& f) { return f.sourceRect.bottom - f.sourceRect.top; }

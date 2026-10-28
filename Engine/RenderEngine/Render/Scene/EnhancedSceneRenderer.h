@@ -1,4 +1,5 @@
-﻿#if defined(CE_CONTRACT_STANDALONE)
+﻿#include "../../../Containers/ContainerAPI.h"
+#if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
 import Creator.Core.Ownership;
@@ -25,6 +26,7 @@ class TextureFramePins;
 struct EnhancedGizmoSceneData;
 struct EnhancedGizmoIconTextures;
 struct IRenderFeatureContributor;
+namespace ce::effects { struct EffectFrame; }
 struct IDisplayPresentationSink;
 struct ShaderMeta;
 namespace material_graph { struct SceneMaterialSource; }
@@ -181,7 +183,7 @@ struct EnhancedLiveViewPacket
     EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
     own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;
-    std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
+    ce::fixed_array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
     LiveViewUpdatePolicy updatePolicy{};
     uint64_t contentRevision{};
 };
@@ -195,7 +197,7 @@ struct EnhancedLiveViewRequest
     EnhancedLiveDisplayTarget displayTarget{ EnhancedLiveDisplayTarget::Game };
     EnhancedLiveViewFlags viewFlags{ EnhancedLiveViewFlags::ScreenSpaceUI };
     own::shared_owner<const material_graph::SceneMaterialSource> materialPreview;
-    std::array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
+    ce::fixed_array<own::shared_owner<const material_graph::SceneMaterialSource>, 2> materialPreviewFloor;
     LiveViewUpdatePolicy updatePolicy{};
     // OnDemand 뷰의 입력이 바뀔 때 Host가 올린다. historyRevision은
     // 카메라 history의 신원이므로 일반 dirty 표시와 별개로 유지한다.
@@ -238,7 +240,7 @@ struct EnhancedRequiredShaderMetaAsset
 
 struct EnhancedRequiredAssetPacket
 {
-    std::vector<EnhancedRequiredShaderMetaAsset> shaderMetas;
+    ce::dynamic_array<EnhancedRequiredShaderMetaAsset> shaderMetas;
 
     void RequireShaderMeta(EnhancedShaderMetaDomain domain, const FileGuid& guid)
     {
@@ -253,7 +255,7 @@ struct EnhancedRequiredAssetPacket
 
     void Canonicalize()
     {
-        std::erase_if(shaderMetas, [](const auto& request)
+        ce::erase_if(shaderMetas, [](const auto& request)
         {
             return FileGuid{} == request.guid;
         });
@@ -285,6 +287,7 @@ struct EnhancedRequiredAssetPacket
 /// a bounded queue without changing the renderer's input contract again.
 struct EnhancedLiveFramePacket
 {
+    own::shared_owner<const ce::effects::EffectFrame> effects;
     uint64_t frameId{ 0 };
     EnhancedTemporalFixtureStamp temporalFixture;
     // Queue coalescing cannot prove that this is the first exact posed step.
@@ -313,12 +316,12 @@ struct EnhancedLiveFramePacket
     own::shared_owner<TextureFramePins> preparedTextureImages;
     // 첫 항목은 제품 GBuffer primary meta다. 뒤에는 GT가 DataSystem의 material
     // generation 집합에서 함께 밀봉한 material별 meta가 GUID 순서로 붙는다.
-    std::vector<EnhancedShaderMetaFrameSnapshot> gbufferShaderMetas;
+    ce::dynamic_array<EnhancedShaderMetaFrameSnapshot> gbufferShaderMetas;
     // M6-P2b: 첫 항목은 제품 Forward primary meta다. P2c가 water/wind 등
     // material별 Forward pass를 연결할 때 같은 owner 배열을 확장한다.
-    std::vector<EnhancedShaderMetaFrameSnapshot> forwardShaderMetas;
+    ce::dynamic_array<EnhancedShaderMetaFrameSnapshot> forwardShaderMetas;
     uint32_t viewCount{ 0 };
-    std::array<EnhancedLiveViewPacket, kEnhancedMaxLiveCameraViews> views{};
+    ce::fixed_array<EnhancedLiveViewPacket, kEnhancedMaxLiveCameraViews> views{};
 
     const EnhancedShaderMetaFrameSnapshot* FindGBufferShaderMeta(
         const FileGuid& guid) const
@@ -488,7 +491,7 @@ struct EnhancedLiveDisplaySnapshot
     uint64_t resizeGeneration{ 0 };
     uint32_t width{ 0 };
     uint32_t height{ 0 };
-    std::array<EnhancedLiveDisplayEntrySnapshot,
+    ce::fixed_array<EnhancedLiveDisplayEntrySnapshot,
         kEnhancedLiveDisplayTargetCount> targets{};
 
     const EnhancedLiveDisplayEntrySnapshot& Get(
@@ -779,7 +782,7 @@ struct EnhancedLiveShadowStats
     bool     valid{ false };            // 이번 실행에서 이 뷰를 한 번이라도 준비했는가
     bool     hasDirectionalLight{ false };
     uint32_t lightIndex{ 0 };
-    std::array<float, 3> lightDirection{};
+    ce::fixed_array<float, 3> lightDirection{};
     float    shadowDistance{ 0.f };
     float    slopeScale{ 0.f };
     uint32_t casterCandidates{ 0 };     // 재질 그래프가 아닌 캐스터
@@ -787,7 +790,7 @@ struct EnhancedLiveShadowStats
     bool visibilityCountsExact{ true };
     uint64_t gpuSubmittedCandidates{ 0 };
     uint64_t gpuSubmittedBins{ 0 };
-    std::array<EnhancedLiveShadowCascade, 3> cascades{};
+    ce::fixed_array<EnhancedLiveShadowCascade, 3> cascades{};
 };
 
 /// 렌더 디버그 창이 읽는 상시 러너의 한 시점 스냅샷.
@@ -842,7 +845,7 @@ struct EnhancedLiveDebugSnapshot
     /// 표시 대상(EnhancedLiveDisplayTarget)마다의 그림자 수치. 그림자 패스
     /// 인스턴스는 뷰들이 나눠 쓰므로 뷰마다 따로 담아 두어야 창이 고른 뷰의
     /// 값을 보여 준다.
-    std::array<EnhancedLiveShadowStats, kEnhancedLiveDisplayTargetCount> shadow{};
+    ce::fixed_array<EnhancedLiveShadowStats, kEnhancedLiveDisplayTargetCount> shadow{};
     double   cpuMs{ 0.0 };
     double   gpuMs{ 0.0 };
     // Last successful native graph recording, retained with its own submission.
@@ -915,16 +918,16 @@ struct EnhancedLiveDebugSnapshot
     /// 파이프라인 재구축이나 활성 상태 변경 때만 다시 만들고 창에는 복사본을 준다.
     bool pipelineDescriptionValid{ false };
     std::string pipelineDescription;
-    std::vector<LivePassNodeSnapshot> pipelineNodes;
+    ce::dynamic_array<LivePassNodeSnapshot> pipelineNodes;
 
     /// 마지막으로 수집에 성공한 프레임의 패스별 GPU 시간. 선언 순서 그대로다.
-    std::vector<EnhancedLivePassTiming> passTimings;
+    ce::dynamic_array<EnhancedLivePassTiming> passTimings;
     uint64_t materialGeometryUploads{}, materialGeometryUploadBytes{}, materialGeometryCacheHits{};
     uint64_t materialGeometryResidentBytes{}, materialGeometryEntries{};
     uint64_t materialGeometryTransforms{}, materialGeometryTransformHits{}, materialGeometryOutputBytes{};
 
     /// 활성 백엔드에서 지금까지 처음 관측한 검증 메시지(Debug 빌드에서만 쌓인다).
-    std::vector<std::string> validationMessages;
+    ce::dynamic_array<std::string> validationMessages;
 };
 
 // CreatorEngine의 단독 DX12 씬 렌더러(메인 런타임 facade). RHI self-test·
@@ -978,7 +981,7 @@ namespace EnhancedSceneRenderer
     void ClearTemporalFixtureSession(uint64_t sessionId);
     EnhancedTemporalFixtureSubmission GetTemporalFixtureSubmission(
         EnhancedLiveDisplayTarget target);
-    std::vector<EnhancedTemporalFixtureSubmission> GetTemporalFixtureWarmup(EnhancedLiveDisplayTarget target);
+    ce::dynamic_array<EnhancedTemporalFixtureSubmission> GetTemporalFixtureWarmup(EnhancedLiveDisplayTarget target);
 
     // ── 메인 런타임 렌더러 (PHASE 3-9 승격) ──
     //

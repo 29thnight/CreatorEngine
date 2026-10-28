@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -17,7 +18,7 @@ import Creator.Core.Ownership;
 own::shared_owner<AIUpdateBatch> AIManager::CaptureAIUpdate(Scene& scene, float deltaSeconds,
     const std::optional<math::bounding_frustum>& cameraFrustum)
 {
-    std::vector<AIRegistration> registrations;
+    ce::dynamic_array<AIRegistration> registrations;
     {
         std::scoped_lock lock(m_aiComponentMutex);
         registrations.reserve(m_aiComponentMap.size());
@@ -74,7 +75,7 @@ own::shared_owner<AIUpdateBatch> AIManager::CaptureAIUpdate(Scene& scene, float 
     return batch;
 }
 
-void AIManager::CullAIUpdate(const AIUpdateSnapshot& snapshot, std::vector<size_t>& visibleIndices)
+void AIManager::CullAIUpdate(const AIUpdateSnapshot& snapshot, ce::dynamic_array<size_t>& visibleIndices)
 {
     // Scene/Entity/Component/CLR에 접근하지 않는다. 출력 순서도 캡처 순서 그대로다.
     for (size_t index = 0; index < snapshot.m_components.size(); ++index)
@@ -165,7 +166,7 @@ void AIManager::RegisterAIComponent(Entity* gameObject, IAIComponent* aiComponen
     {
         throw std::overflow_error("AI registration identity exhausted");
     }
-    std::erase_if(m_aiComponentMap, [this, aiComponent](const AIRegistration& entry) noexcept
+    ce::erase_if(m_aiComponentMap, [this, aiComponent](const AIRegistration& entry) noexcept
     {
         if (entry.m_component != aiComponent)
         {
@@ -195,7 +196,7 @@ void AIManager::UnRegisterAIComponent(Entity* gameObject, IAIComponent* aiCompon
     }
 
     std::scoped_lock lock(m_aiComponentMutex);
-    std::erase_if(m_aiComponentMap, [this, aiComponent](const AIRegistration& entry) noexcept
+    ce::erase_if(m_aiComponentMap, [this, aiComponent](const AIRegistration& entry) noexcept
     {
         if (entry.m_component && entry.m_component != aiComponent)
         {
@@ -229,7 +230,7 @@ bool AIManager::IsAIComponentRegistered(const IAIComponent* aiComponent) const
 
 void AIManager::ClearTreeInAIComponent()
 {
-    std::vector<AIRegistration> snapshot;
+    ce::dynamic_array<AIRegistration> snapshot;
     {
         std::scoped_lock lock(m_aiComponentMutex);
         for (const auto& entry : m_aiComponentMap)
@@ -263,7 +264,7 @@ void AIManager::InitalizeBehaviorTreeSystem()
     // ?댁떇?먭퀬(B1), ?ъ슜???몃뱶???앹꽦湲곌? 留뚮뱺 ?깅줉?쒓? ?좊떎(B5). ?ㅼ씠?곕툕??
     // ?щ낯???④린硫?"?ш린???덈뒗???湲곗뿏 ?녿뒗 ?몃뱶"媛 ?앷릿??
 
-    std::vector<AIRegistration> snapshot;
+    ce::dynamic_array<AIRegistration> snapshot;
     {
         std::scoped_lock lock(m_aiComponentMutex);
         for (const auto& entry : m_aiComponentMap)

@@ -20,7 +20,7 @@ foreach ($config in $configs) {
             $old = 'state_->done_.wait(lock, [this] { return state_->complete_; });'
             if (-not $text.Contains($old)) { throw 'Barrier mutation target missing' }
             $source = Join-Path $out 'MissingBarrier.cpp'
-            [IO.File]::WriteAllText($source, $text.Replace($old, '{}').Replace('../../../Tools/build/ModuleAdapters/', ($repo.Replace('\','/') + '/Tools/build/ModuleAdapters/')))
+            [IO.File]::WriteAllText($source, $text.Replace($old, '{}').Replace('../../../Tools/build/ModuleAdapters/', ($repo.Replace('\','/') + '/Tools/build/ModuleAdapters/')).Replace('../../Containers/ContainerAPI.h', ($repo.Replace('\','/') + '/Engine/Containers/ContainerAPI.h')))
         }
         $exe = Join-Path $out "$name.exe"
         $flags = if ($config -eq 'Debug') {'/MDd /Od /RTC1 /D_DEBUG'} else {'/MD /O2 /DNDEBUG'}

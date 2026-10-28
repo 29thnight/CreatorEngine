@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 // LC2 (PHASE 14.5) — 배치 라인 문법이 사는 유일한 곳.
 //
@@ -34,7 +35,7 @@ namespace CommandCore
 {
     struct TokenizeResult
     {
-        std::vector<std::string> tokens;
+        ce::dynamic_array<std::string> tokens;
 
         bool        ok{ true };
         std::string errorCode;      ///< "parse.unclosed_quote" 등
@@ -56,7 +57,7 @@ namespace CommandCore
     ///   문법은 quote 다). 그 형식에서는 공백 **연속**이 하나로 접히므로,
     ///   공백이 값의 일부인 자유 형식 payload 는 따옴표로 감싸야 정확하다.
     ///   세어 두면 LC9 가 "아무도 안 쓴다"를 근거로 규약을 뗄 수 있다.
-    std::string JoinFrom(const std::vector<std::string>& parts, std::size_t index);
+    std::string JoinFrom(const ce::dynamic_array<std::string>& parts, std::size_t index);
 
     /// "마지막 토큰이 뒤 이름, 그 앞이 앞 이름" 형태를 푼다.
     ///
@@ -80,7 +81,7 @@ namespace CommandCore
     /// `trailingCount == 1` 이면 `trailing` 에 마지막 토큰이 담긴다. 2 이상이면
     /// 호출자가 뒤 토큰들을 직접 읽는다(`animator.param <오브젝트> <이름> <타입>`
     /// 처럼 뒤가 둘인 명령이 있다).
-    TrailingNameSplit SplitTrailingName(const std::vector<std::string>& parts,
+    TrailingNameSplit SplitTrailingName(const ce::dynamic_array<std::string>& parts,
                                         std::size_t                     firstIndex,
                                         std::size_t                     trailingCount = 1);
 
@@ -110,7 +111,7 @@ namespace CommandCore
         uint64_t                 sequence{};
         CommandSource            source{ CommandSource::ExecArgument };
         std::string              commandId;
-        std::vector<std::string> arguments;   ///< commandId 를 포함하지 않는다
+        ce::dynamic_array<std::string> arguments;   ///< commandId 를 포함하지 않는다
         std::string              sourceName;  ///< script 경로 · "--exec" · "stdin"
         uint32_t                 sourceLine{};
         std::string              correlationId;
@@ -118,6 +119,6 @@ namespace CommandCore
         /// 핸들러가 오늘 기대하는 형태(`parts[0]` 이 명령 이름).
         ///
         /// 이행이 끝나면 사라진다 — 그때 핸들러는 `arguments` 만 본다.
-        std::vector<std::string> ToLegacyParts() const;
+        ce::dynamic_array<std::string> ToLegacyParts() const;
     };
 }

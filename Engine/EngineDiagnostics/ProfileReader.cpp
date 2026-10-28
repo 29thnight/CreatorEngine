@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Containers/ContainerAPI.h"
 #include "ProfileReader.h"
 
 #include <stdint.h>
@@ -105,7 +107,7 @@ namespace ce::detail::profile_reader_impl
             {
                 return {};
             }
-            std::map<std::uint16_t, std::vector<timeline_interval>> depths;
+            ce::engine_ordered_map<std::uint16_t, ce::dynamic_array<timeline_interval>> depths;
             for (std::uint32_t index = thread.span_begin; index < thread.span_end && index < spans.size(); ++index)
             {
                 const profile_event& span = spans[index];
@@ -601,7 +603,7 @@ namespace ce
                                    m_preparation->selection_failed_);
     }
 
-    std::pair<profile_tick, profile_tick> capture_reader::window_ticks() const
+    ce::pair<profile_tick, profile_tick> capture_reader::window_ticks() const
     {
         m_viewWindowFirst = graph_first();
         m_viewWindowLast = graph_last();

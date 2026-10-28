@@ -5,7 +5,7 @@
 #error "Native consumers must import the named module directly."
 #endif
 
-
+#include "../../../Engine/Containers/Creator.Containers.h"
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
 #include "Creator.Platform.Windows.h"
@@ -15,7 +15,7 @@ enum class AppCrashDumpMode { Mini, Full };
 class AppBackendWinAPI final : public Core::IWindowBackend
 {
 public:
-    using MessageHandler = std::function<LRESULT(HWND, WPARAM, LPARAM)>;
+    using MessageHandler = ce::owned_func<LRESULT(HWND, WPARAM, LPARAM)>;
 
     AppBackendWinAPI(HINSTANCE instance, const WindowsWindowDesc& desc);
     ~AppBackendWinAPI() override;

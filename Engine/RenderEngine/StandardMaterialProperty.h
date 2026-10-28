@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -31,7 +32,7 @@ namespace standard_material::property
     inline constexpr std::string_view AoMap{ "aoMap" };
     inline constexpr std::string_view EmissiveMap{ "emissiveMap" };
 
-    inline constexpr std::array All{
+    inline constexpr ce::fixed_array All{
         BaseColor,
         Metallic,
         Roughness,

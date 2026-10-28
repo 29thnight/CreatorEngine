@@ -1,3 +1,5 @@
+#include "../../../../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -190,7 +192,7 @@ namespace
             return false;
         }
 
-        const auto* tint = std::get_if<std::array<float, 4>>(
+        const auto* tint = std::get_if<ce::fixed_array<float, 4>>(
             &meta.properties[0].defaultValue);
         const auto* roughness = std::get_if<float>(
             &meta.properties[1].defaultValue);
@@ -305,7 +307,7 @@ passes:
         }
 
         ShaderMetaPermutationStats stats;
-        std::vector<ShaderMetaPermutation> permutations;
+        ce::dynamic_array<ShaderMetaPermutation> permutations;
         const bool enumerated = ShaderPermutationDomain::EnumerateForBuild(
             meta, ShaderPermutationDomain::kDefaultBuildCompileLimit,
             permutations, stats, error);
@@ -323,7 +325,7 @@ passes:
             && "1" == permutations[1].defines.Entries()[0].value
             && !(permutations[0].key == permutations[1].key);
 
-        std::vector<ShaderMetaPermutation> capped;
+        ce::dynamic_array<ShaderMetaPermutation> capped;
         ShaderMetaPermutationStats cappedStats;
         std::string capError;
         const bool capRejected = !ShaderPermutationDomain::EnumerateForBuild(
@@ -331,7 +333,7 @@ passes:
             && 2 == cappedStats.compileRequests && capped.empty()
             && std::string::npos != capError.find("상한");
 
-        const std::array<std::uint16_t, 1> highSelection{ 1 };
+        const ce::fixed_array<std::uint16_t, 1> highSelection{ 1 };
         ShaderMetaPermutation resolvedHigh;
         std::string resolveError;
         const bool resolveMatches = fixturePermutationMatches
@@ -348,8 +350,8 @@ passes:
         };
         ShaderMeta reorderedAxes = authoredOrder;
         std::ranges::reverse(reorderedAxes.keywords);
-        const std::array<std::uint16_t, 2> authoredValues{ 1, 0 };
-        const std::array<std::uint16_t, 2> reorderedValues{ 0, 1 };
+        const ce::fixed_array<std::uint16_t, 2> authoredValues{ 1, 0 };
+        const ce::fixed_array<std::uint16_t, 2> reorderedValues{ 0, 1 };
         ShaderMetaPermutation authoredPermutation;
         ShaderMetaPermutation reorderedPermutation;
         std::string canonicalError;
@@ -503,7 +505,7 @@ passes:
         void ClearRenderTargetRect(const RHIRenderTargetBinding&, const float[4],
             const RHIRect&) override {}
 
-        std::vector<CopyRecord> copies;
+        ce::dynamic_array<CopyRecord> copies;
         uint32_t barrierBatches{ 0 };
         uint32_t textureTransitions{ 0 };
         uint32_t bufferTransitions{ 0 };
@@ -522,7 +524,7 @@ passes:
         }
         void UnregisterUploadTransactionListener(IRHIUploadTransactionListener* listener) override
         {
-            std::erase(listeners, listener);
+            ce::erase(listeners, listener);
         }
         void AcceptRecording(RHICompletionPoint completion = {1})
         {
@@ -532,7 +534,7 @@ passes:
                 listener->OnUploadAccepted(recording, completion);
             }
         }
-        std::vector<IRHIUploadTransactionListener*> listeners;
+        ce::dynamic_array<IRHIUploadTransactionListener*> listeners;
         RHIBufferSlice UploadConstants(const void*, size_t) override { return {}; }
         RHISamplerTable CreateSamplers(std::span<const RHISamplerDesc>) override { return {}; }
         RHIEncoder& GetImmediateEncoder() override { return encoder; }
@@ -546,8 +548,8 @@ passes:
             std::span<const RHIColorTargetDesc>, const RHIDepthTargetDesc*) override { return {}; }
         // The fixture owns history handles 123/124 and every resource it creates.
         // Unknown or released handles remain invalid under graph import validation.
-        std::unordered_map<uint32_t, RHITextureInfo> textures{{123, {4, 4, 1, 1, RHIFormat::RGBA8Unorm}}};
-        std::unordered_map<uint32_t, RHIBufferInfo> buffers{{124, {256}}};
+        ce::engine_node_map<uint32_t, RHITextureInfo> textures{{123, RHITextureInfo{4, 4, 1, 1, RHIFormat::RGBA8Unorm}}};
+        ce::engine_node_map<uint32_t, RHIBufferInfo> buffers{{124, RHIBufferInfo{256}}};
         RHITextureInfo DescribeTexture(RHITextureHandle handle) const override
         {
             const auto found = textures.find(handle.id);
@@ -647,8 +649,8 @@ passes:
 
         R6bFakeReadbackEncoder encoder;
         uint64_t currentRecording{ 1 };
-        std::vector<RHITextureHandle> releasedTextures;
-        std::vector<RHIBufferHandle> releasedBuffers;
+        ce::dynamic_array<RHITextureHandle> releasedTextures;
+        ce::dynamic_array<RHIBufferHandle> releasedBuffers;
         uint32_t textureReleaseFailures{};
         uint32_t nextHandle{ 100 };
         uint32_t liveReadbacks{ 0 };
@@ -803,7 +805,7 @@ passes:
         using A = RGAccessMode;
         const auto mode = RGSchedulingMode::ExplicitSingleWriter;
         const auto fail = [&](const char* why) { error=why; return false; };
-        std::array<int,4> permutation{0,1,2,3};
+        ce::fixed_array<int,4> permutation{0,1,2,3};
         do {
             EnhancedRenderGraph g(services,mode);
             const auto a=g.CreateTexture(desc("a")), b=g.CreateTexture(desc("b"));
@@ -815,9 +817,9 @@ passes:
             }
             if(!g.Compile(error)) return false;
             const auto& order=g.GetExecuteOrder();
-            std::vector<int> chain;
+            ce::dynamic_array<int> chain;
             for(const auto i:order) if(permutation[i]!=3) chain.push_back(permutation[i]);
-            if(order.size()!=4 || chain!=std::vector<int>{0,1,2}) return fail("shuffle RAW chain/culling failure");
+            if(order.size()!=4 || chain!=ce::dynamic_array<int>{0,1,2}) return fail("shuffle RAW chain/culling failure");
             // The independent pass is always ready. It must win over every
             // larger authored index while ready, including newly unblocked work.
             const auto independent=std::find(permutation.begin(),permutation.end(),3)-permutation.begin();
@@ -877,7 +879,7 @@ passes:
         // a discard Write overwrites it, regardless of declaration order.
         for (const bool buffer:{false,true})
         {
-            std::array<int,5> permutation{0,1,2,3,4};
+            ce::fixed_array<int,5> permutation{0,1,2,3,4};
             do {
                 EnhancedRenderGraph g(services,mode);
                 const auto initial=buffer ? g.ImportBuffer(RHIBufferHandle{124},RHIResourceState::Common,"buffer") : g.CreateTexture(d);
@@ -891,8 +893,8 @@ passes:
                     if(p==4) g.AddPass("W2",{{c,RHIResourceState::CopyDest,A::Write}},nullptr,true);
                 }
                 if(!g.Compile(error)) return false;
-                std::vector<int> actual; for(const auto p:g.GetExecuteOrder()) actual.push_back(permutation[p]);
-                if(actual!=std::vector<int>{0,1,2,3,4}) return fail("RAW/WAR/WAW shuffle order");
+                ce::dynamic_array<int> actual; for(const auto p:g.GetExecuteOrder()) actual.push_back(permutation[p]);
+                if(actual!=ce::dynamic_array<int>{0,1,2,3,4}) return fail("RAW/WAR/WAW shuffle order");
                 EnhancedRenderGraph::DiagnosticSnapshot snap;
                 if(!g.CaptureDiagnosticSnapshot(snap)) return fail("version snapshot missing");
                 using Reason=EnhancedRenderGraph::DiagnosticSnapshot::VersionEdge::Reason;
@@ -938,7 +940,7 @@ passes:
         g.Reset(); initial=g.ImportTexture(RHITextureHandle{123},RHIResourceState::CopySource,"history"); b=g.Modify(initial);
         g.AddPass("Modify",{{b,RHIResourceState::CopyDest,A::ReadWrite}},nullptr);
         g.AddPass("external-read",{{initial,RHIResourceState::CopySource,A::Read}},nullptr,true);
-        if(!g.Compile(error) || g.GetExecuteOrder()!=std::vector<uint16_t>{1,0}) return fail("import v0 WAR failure");
+        if(!g.Compile(error) || g.GetExecuteOrder()!=ce::dynamic_array<uint16_t>{1,0}) return fail("import v0 WAR failure");
         g.Reset(); initial=g.CreateTexture(d); a=g.Write(initial); b=g.Modify(a);
         g.AddPass("cycle-old-read",{{a,RHIResourceState::CopySource,A::Read},{b,RHIResourceState::CopySource,A::Read}},nullptr,true);
         g.AddPass("writer",{{a,RHIResourceState::CopyDest,A::Write}},nullptr);
@@ -962,7 +964,7 @@ passes:
         const auto mode=RGSchedulingMode::ExplicitVersioned;
         const auto fail=[&](const char* why){error=why; return false;};
         RGTextureDesc d{}; d.width=4; d.height=4; d.allowRenderTarget=true; d.allowUnorderedAccess=true; d.name="live";
-        std::array<int,5> permutation{0,1,2,3,4};
+        ce::fixed_array<int,5> permutation{0,1,2,3,4};
         do {
             EnhancedRenderGraph g(services,mode);
             const auto a=g.Write(g.CreateTexture(d)), dead=g.Write(a), b=g.Write(dead);
@@ -976,8 +978,8 @@ passes:
             }
             g.AddPass("dead-resource",{{unused,RHIResourceState::RenderTarget,A::Write}},nullptr);
             if(!g.Compile(error)) return false;
-            std::vector<int> actual; for(const auto p:g.GetExecuteOrder()) { if(p>=permutation.size()) return fail("dead resource survived"); actual.push_back(permutation[p]); }
-            if(actual!=std::vector<int>{0,1,3,4} || g.GetStats().passesCulled!=2) return fail("dead version/order mismatch");
+            ce::dynamic_array<int> actual; for(const auto p:g.GetExecuteOrder()) { if(p>=permutation.size()) return fail("dead resource survived"); actual.push_back(permutation[p]); }
+            if(actual!=ce::dynamic_array<int>{0,1,3,4} || g.GetStats().passesCulled!=2) return fail("dead version/order mismatch");
             EnhancedRenderGraph::DiagnosticSnapshot snap;
             if(!g.CaptureDiagnosticSnapshot(snap) || snap.resources[1].used || snap.resources[0].firstUse!=0 || snap.resources[0].lastUse!=3)
                 return fail("sorted lifetime/dead allocation mismatch");
@@ -1004,20 +1006,20 @@ passes:
         auto a=g.Write(initial), b=g.Write(a);
         g.AddPass("discarded",{{a,RHIResourceState::RenderTarget,A::Write}},nullptr);
         g.AddPass("output",{{b,RHIResourceState::RenderTarget,A::Write}},nullptr);
-        if(!g.Compile(error) || g.GetExecuteOrder()!=std::vector<uint16_t>{1}) return fail("import final version root mismatch");
+        if(!g.Compile(error) || g.GetExecuteOrder()!=ce::dynamic_array<uint16_t>{1}) return fail("import final version root mismatch");
         g.Reset(); a=g.Write(g.CreateTexture(d)); b=g.Write(a);
         g.AddPass("output-read",{{b,RHIResourceState::CopySource,A::Read}},nullptr,true);
         g.AddPass("dead-input",{{a,RHIResourceState::RenderTarget,A::Write}},nullptr);
         g.AddPass("dead-reader",{{a,RHIResourceState::CopySource,A::Read}},nullptr);
         g.AddPass("output-write",{{b,RHIResourceState::RenderTarget,A::Write}},nullptr);
-        if(!g.Compile(error) || g.GetExecuteOrder()!=std::vector<uint16_t>{3,0}) return fail("WAR kept dead reader/producer alive");
+        if(!g.Compile(error) || g.GetExecuteOrder()!=ce::dynamic_array<uint16_t>{3,0}) return fail("WAR kept dead reader/producer alive");
         g.Reset(); a=g.Write(g.CreateTexture(d));
         g.AddPass("dead-invalid-access",{{a,RHIResourceState::RenderTarget}},nullptr);
         if(g.Compile(error)) return fail("dead invalid declaration bypassed validation");
         g.Reset(); initial=g.CreateTexture(d); a=g.Write(initial); b=g.Modify(a);
         g.AddPass("Modify",{{b,RHIResourceState::UnorderedAccess,A::ReadWrite}},nullptr,true);
         g.AddPass("input",{{a,RHIResourceState::UnorderedAccess,A::Write}},nullptr);
-        if(!g.Compile(error) || g.GetExecuteOrder()!=std::vector<uint16_t>{1,0}) return fail("Modify input culled");
+        if(!g.Compile(error) || g.GetExecuteOrder()!=ce::dynamic_array<uint16_t>{1,0}) return fail("Modify input culled");
         for(const bool buffer:{false,true}) {
             g.Reset(); initial=buffer ? g.ImportBuffer(RHIBufferHandle{124},RHIResourceState::UnorderedAccess,"uav-buffer") : g.ImportTexture(RHITextureHandle{123},RHIResourceState::UnorderedAccess,"uav-texture");
             a=g.Modify(initial); b=g.Modify(a);
@@ -1025,7 +1027,7 @@ passes:
             g.AddPass("R1",{{a,RHIResourceState::UnorderedAccess,A::Read}},nullptr,true);
             g.AddPass("R1-again",{{a,RHIResourceState::UnorderedAccess,A::Read}},nullptr,true);
             g.AddPass("W2",{{b,RHIResourceState::UnorderedAccess,A::ReadWrite}},nullptr);
-            if(!g.Compile(error) || g.GetExecuteOrder()!=std::vector<uint16_t>{0,1,2,3}) return fail("UAV access order mismatch");
+            if(!g.Compile(error) || g.GetExecuteOrder()!=ce::dynamic_array<uint16_t>{0,1,2,3}) return fail("UAV access order mismatch");
             for(uint16_t p=0;p<4;++p) if(g.GetPassBarrierCount({p})!=(p==2?0u:1u)) return fail("UAV write/read hazard mismatch");
         }
         const auto stale=a; g.Reset(); initial=g.Write(g.CreateTexture(d));
@@ -1040,7 +1042,7 @@ passes:
         R6bFakeReadbackServices services;
         using A=RGAccessMode;
         RGTextureDesc d{}; d.width=4; d.height=4; d.allowRenderTarget=true; d.name="wave";
-        std::array<int,4> permutation{0,1,2,3};
+        ce::fixed_array<int,4> permutation{0,1,2,3};
         do {
             EnhancedRenderGraph g(services,RGSchedulingMode::ExplicitVersioned);
             const auto a=g.Write(g.CreateTexture(d)), b=g.Write(g.CreateTexture(d));
@@ -1055,8 +1057,8 @@ passes:
             EnhancedRenderGraph::DiagnosticSnapshot s;
             if(!g.Compile(error) || !g.CaptureDiagnosticSnapshot(s)) return false;
             for(size_t p=0;p<4;++p) if(s.dependencyWaves[p]!=(permutation[p]==3 ? 0 : permutation[p])) { error="dependency wave mismatch"; return false; }
-            std::vector<int> path; for(const auto p:s.criticalPath) path.push_back(permutation[p]);
-            if(path!=std::vector<int>{0,1,2} || s.dependencyWaves[4]!=-1 || g.GetStats().dependencyWaveCount!=3)
+            ce::dynamic_array<int> path; for(const auto p:s.criticalPath) path.push_back(permutation[p]);
+            if(path!=ce::dynamic_array<int>{0,1,2} || s.dependencyWaves[4]!=-1 || g.GetStats().dependencyWaveCount!=3)
             { error="critical path/culled wave mismatch"; return false; }
             if(dump.empty()) {
                 dump="RG4_DIAGNOSTIC waves=";
@@ -1217,7 +1219,7 @@ passes:
                     const unsigned first = part ? 8 : 0;
                     const unsigned count = part ? 3 : 8;
                     const auto targets = owner->DeclareCaptureOutputs(graph, first, count);
-                    std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+                    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> uses;
                     for (unsigned i = first; i < first + count; ++i)
                     {
                         if (targets[i].version != iteration + 1)
@@ -1325,8 +1327,8 @@ passes:
         draw.worldMatrix = math::matrix4x4::identity();
         draw.coverage.flags = EnhancedMaterialCoverage::Enabled;
         GraphSceneFixture geometryFixture;
-        std::vector<::Vertex> vertices(4);
-        const std::array<math::vector3, 4> positions{{{0,0,0}, {1,0,0}, {0,1,0}, {0,0,1}}};
+        ce::dynamic_array<::Vertex> vertices(4);
+        const ce::fixed_array<math::vector3, 4> positions{{{0,0,0}, {1,0,0}, {0,1,0}, {0,0,1}}};
         for (size_t i = 0; i < vertices.size(); ++i)
         {
             vertices[i].position = positions[i];
@@ -1340,7 +1342,7 @@ passes:
         geometryFixture.BuildPins(*descriptorPins, geometryPins);
         auto second = draw;
         second.geometryKey = 2;
-        const std::array<EnhancedDrawItem, 2> draws{draw, second};
+        const ce::fixed_array<EnhancedDrawItem, 2> draws{draw, second};
         SceneInputView view{1, 1, 1, 1, 4, 4};
         view.camera.view = math::matrix4x4::identity();
         view.camera.projection = math::matrix4x4::identity();
@@ -1374,10 +1376,10 @@ passes:
         bindings->instancePinIndex = instancePins->Retain(instance);
         bindings->instance = instancePins->Borrow(bindings->instancePinIndex);
         bindings->instancePins = std::move(instancePins);
-        const std::array<float, 3> normal{0, 0, 1};
+        const ce::fixed_array<float, 3> normal{0, 0, 1};
         const auto constants = resources.UploadConstants(normal.data(), sizeof(normal));
         const SceneVolumeBinding binding{bindings, coefficientFixture.GetGeneration(), constants};
-        const std::array<SceneVolumeBinding, 2> coefficientBindings{binding, binding};
+        const ce::fixed_array<SceneVolumeBinding, 2> coefficientBindings{binding, binding};
         LX::Runtime::CompiledCompute transform;
         MeshSurfaceEvaluator geometry;
         if (!LX::Runtime::CompileCompute(RHIShaderSource::Resolve("MaterialGraphMeshSurface.slang").string(),
@@ -1426,7 +1428,7 @@ passes:
             graph.AddPass("RG5.SpecialLighting", {{lighting, RHIResourceState::RenderTarget, RGAccessMode::Write}}, nullptr);
             for (unsigned iteration = 0; iteration < 2; ++iteration)
             {
-                std::vector<EnhancedRenderGraph::RGPassUsage> captures;
+                ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> captures;
                 const auto lookupTargets = lookup->DeclareCaptureOutputs(graph, 0, 11);
                 const auto refractionTargets = refraction->DeclareCaptureOutputs(graph);
                 const auto subsurfaceTargets = subsurface->DeclareCaptureOutputs(graph);
@@ -1589,13 +1591,13 @@ passes:
                 const RenderBindings* bindings{};
                 bool blended{}, shadowEnabled{}, staticShadow{};
             };
-            std::array<RHIBindingDesc, 2> textures{};
+            ce::fixed_array<RHIBindingDesc, 2> textures{};
             textures[0].resource.id = 11;
             textures[1].resource.id = 11;
             RenderBindings bindings;
             bindings.resources.textures = textures;
-            std::array<Draw, 2> draws{{{&program, &bindings}, {&program, &bindings}}};
-            std::array<Draw, 2> shadows{{{&program, &bindings, false, true, true},
+            ce::fixed_array<Draw, 2> draws{{{&program, &bindings}, {&program, &bindings}}};
+            ce::fixed_array<Draw, 2> shadows{{{&program, &bindings, false, true, true},
                                          {&program, &bindings, false, true, false}}};
             const PassReadPlan plan(draws, shadows);
             for (const auto pass : {PassReadPlan::Pass::Surface, PassReadPlan::Pass::StaticShadow,
@@ -1689,7 +1691,7 @@ passes:
                     error = "RG5 Surface output lineage lost copy/depth Modify";
                     return false;
                 }
-                std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+                ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> uses{
                     {surface.depth, RHIResourceState::DepthWrite, RGAccessMode::ReadWrite}};
                 for (const auto color : {surface.diffuse, surface.metalRough, surface.normal, surface.emissive, surface.bitmask})
                 {
@@ -1723,7 +1725,7 @@ passes:
             bool writeRejected = false, stateRejected = false;
             try
             {
-                std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+                ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> uses{
                     {lighting, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite},
                     {lighting, RHIResourceState::RenderTarget, RGAccessMode::ReadWrite}};
                 NormalizeSceneReads(graph, uses);
@@ -1734,7 +1736,7 @@ passes:
             }
             try
             {
-                std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+                ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> uses{
                     {opaqueDepth, RHIResourceState::CopySource, RGAccessMode::Read},
                     {opaqueDepth, RHIResourceState::DepthRead, RGAccessMode::Read}};
                 NormalizeSceneReads(graph, uses);
@@ -1781,12 +1783,12 @@ passes:
                 "LXTransformMesh", {}, {}, shader, error) ||
             !evaluator.Initialize(resources, roots, pipelines, shader.stage.bytecode, error,
                                   std::move(shader.description))) return false;
-        for (const auto dimensions : std::array<std::array<uint32_t, 2>, 6>{{
+        for (const auto dimensions : ce::fixed_array<ce::fixed_array<uint32_t, 2>, 6>{{
                  {1,33}, {16,33}, {64,33}, {256,33}, {512,33}, {512,4095}}})
         {
             const uint32_t count = dimensions[0], pointCount = dimensions[1];
-            std::vector<Vertex> vertices(pointCount), skinned(pointCount);
-            std::vector<uint32_t> indices(pointCount);
+            ce::dynamic_array<Vertex> vertices(pointCount), skinned(pointCount);
+            ce::dynamic_array<uint32_t> indices(pointCount);
             for (uint32_t i = 0; i < pointCount; ++i)
             {
                 vertices[i].position = {float(i / 3) * .01f, float(i % 3) * .01f, .25f};
@@ -1797,9 +1799,9 @@ passes:
             }
             const auto staticMesh = fixture.AddMesh(vertices, indices), skinMesh = fixture.AddMesh(skinned, indices);
             if (!resources.BeginFrame(error)) return false;
-            std::vector<own::shared_owner<const material_graph::MeshSurfaceBatch>> owners;
-            std::vector<const material_graph::MeshSurfaceBatch*> batches;
-            std::vector<RHIReadback> readbacks(count);
+            ce::dynamic_array<own::shared_owner<const material_graph::MeshSurfaceBatch>> owners;
+            ce::dynamic_array<const material_graph::MeshSurfaceBatch*> batches;
+            ce::dynamic_array<RHIReadback> readbacks(count);
             for (uint32_t i = 0; i < count; ++i)
             {
                 auto world = math::matrix4x4::identity();
@@ -1808,7 +1810,7 @@ passes:
                 auto draw = fixture.Draw(i % 2 ? skinMesh : staticMesh, world);
                 auto bone = math::matrix4x4::identity(); bone.m[3][0] = float(i % 7) * .1f;
                 if (i % 2) { draw.bonePalette = &bone; draw.boneCount = 1; }
-                const std::vector<float> lods(pointCount, float(i % 4) * .5f);
+                const ce::dynamic_array<float> lods(pointCount, float(i % 4) * .5f);
                 own::shared_owner<const material_graph::MeshSurfaceInput> input;
                 const material_graph::SurfaceView view{{0, 0, 1000, 0}, 1, 1, uint64_t(i + 1)};
                 own::shared_owner<const material_graph::MeshSurfaceBatch> batch;
@@ -1897,16 +1899,16 @@ passes:
             !evaluator.Initialize(resources, roots, pipelines, shader.stage.bytecode, error,
                                   std::move(shader.description))) return false;
         constexpr uint32_t count = 512, points = 1026;
-        std::vector<Vertex> vertices(points);
-        std::vector<uint32_t> indices(points);
+        ce::dynamic_array<Vertex> vertices(points);
+        ce::dynamic_array<uint32_t> indices(points);
         for (uint32_t i = 0; i < points; ++i) {
             vertices[i].position = {float(i / 3) * .01f, float(i % 3) * .01f, .25f};
             vertices[i].normal = {0,0,1}; vertices[i].tangent = {1,0,0}; vertices[i].bitangent = {0,1,0};
             indices[i] = i;
         }
         const auto mesh = fixture.AddMesh(vertices, indices);
-        std::vector<own::shared_owner<const material_graph::MeshSurfaceInput>> inputs(count);
-        const std::vector<float> lods(points, 0.f);
+        ce::dynamic_array<own::shared_owner<const material_graph::MeshSurfaceInput>> inputs(count);
+        const ce::dynamic_array<float> lods(points, 0.f);
         const material_graph::SurfaceView view{{0,0,1000,0},1,1,1};
         for (uint32_t i = 0; i < count; ++i) {
             auto world = math::matrix4x4::identity(); world.m[3][0] = float(i);
@@ -1948,9 +1950,9 @@ passes:
                 if (!material_graph::MeshSurfaceInput::Seal(fixture.Draw(mesh, world), view, lods, inputs[0], error)) return false;
             }
             if (!resources.BeginFrame(error)) return false;
-            std::vector<own::shared_owner<const material_graph::MeshSurfaceBatch>> owners;
-            std::vector<const material_graph::MeshSurfaceBatch*> batches;
-            std::vector<RHIReadback> readbacks(count);
+            ce::dynamic_array<own::shared_owner<const material_graph::MeshSurfaceBatch>> owners;
+            ce::dynamic_array<const material_graph::MeshSurfaceBatch*> batches;
+            ce::dynamic_array<RHIReadback> readbacks(count);
             for (uint32_t i = 0; i < count; ++i) {
                 own::shared_owner<const material_graph::MeshSurfaceBatch> batch;
                 if (!evaluator.Prepare(resources, inputs[i], batch, error, true) ||
@@ -2048,7 +2050,7 @@ passes:
         frame.rootSignatures = &rootSignatures;
         frame.width = 4;
         frame.height = 4;
-        std::vector<EnhancedLight> lights;
+        ce::dynamic_array<EnhancedLight> lights;
         frame.lights = &lights;
         EnhancedLightTilePass tiles;
         if (!tiles.Initialize(frame, error) || !tiles.PrepareFrame(frame, error))
@@ -2400,8 +2402,8 @@ passes:
                 {
                     return false;
                 }
-                const std::vector<uint16_t> expected =
-                    reverse ? std::vector<uint16_t>{1, 0} : std::vector<uint16_t>{0, 1};
+                const ce::dynamic_array<uint16_t> expected =
+                    reverse ? ce::dynamic_array<uint16_t>{1, 0} : ce::dynamic_array<uint16_t>{0, 1};
                 if (snapshot.executeOrder != expected || snapshot.versionEdges.size() != 1)
                 {
                     error = "RG5 order policy changed version DAG";
@@ -2444,7 +2446,7 @@ passes:
                 const auto output = gbuffer.GetOutputs();
                 const RGHandle handles[] = {output.diffuse, output.metalRough, output.normal,        output.emissive,
                                             output.bitmask, output.depth, output.visibility, shadow.GetShadowMap()};
-                std::vector<EnhancedRenderGraph::RGPassUsage> reads;
+                ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> reads;
                 for (const auto handle : handles)
                 {
                     if (!handle.IsValid() || (mode == RGSchedulingMode::ExplicitVersioned &&
@@ -2465,7 +2467,7 @@ passes:
                     return false;
                 }
                 // Visibility and surface colors now have independent clear producers.
-                if (snapshot.executeOrder != std::vector<uint16_t>{0, 1, 2, 3} || snapshot.resources.size() != std::size(handles) ||
+                if (snapshot.executeOrder != ce::dynamic_array<uint16_t>{0, 1, 2, 3} || snapshot.resources.size() != std::size(handles) ||
                     graph.GetStats().passesExecuted != 4)
                 {
                     error = "RG5 product producer/consumer plan mismatch";
@@ -2519,7 +2521,7 @@ passes:
         graph.AddPass("dead", {{dead, RHIResourceState::RenderTarget}}, nullptr);
         graph.AddPass("consumer", {{a, RHIResourceState::ShaderResource}}, nullptr, true);
         if (!graph.Compile(error) || !graph.CaptureDiagnosticSnapshot(snapshot)) return false;
-        if (snapshot.executeOrder != std::vector<uint16_t>{0, 1, 3}
+        if (snapshot.executeOrder != ce::dynamic_array<uint16_t>{0, 1, 3}
             || !snapshot.passes[2].culled || snapshot.passes[2].compiledIndex != -1
             || snapshot.resources[0].firstUse != 0 || snapshot.resources[0].lastUse != 2
             || snapshot.resources[1].used || snapshot.reachabilityEdges.size() != 1
@@ -3161,8 +3163,8 @@ namespace
             if (!gate.WaitUntilEntered()) return false;
             const auto* vs = static_cast<const std::uint8_t*>(base.vsBytecode);
             const auto* ps = static_cast<const std::uint8_t*>(base.psBytecode);
-            std::vector<std::uint8_t> ownedVs(vs, vs + base.vsSize);
-            std::vector<std::uint8_t> ownedPs(ps, ps + base.psSize);
+            ce::dynamic_array<std::uint8_t> ownedVs(vs, vs + base.vsSize);
+            ce::dynamic_array<std::uint8_t> ownedPs(ps, ps + base.psSize);
             RHIGraphicsPipelineDesc temporary = base;
             temporary.vsBytecode = ownedVs.data();
             temporary.psBytecode = ownedPs.data();
@@ -3202,7 +3204,7 @@ namespace
 
         // A driver compile failure must become Failed, preserve existing cache entries,
         // and leave neither an exception nor a permanently pending result for the caller.
-        const std::array<std::uint8_t, 16> invalidBytecode{};
+        const ce::fixed_array<std::uint8_t, 16> invalidBytecode{};
         RHIGraphicsPipelineDesc invalid = base;
         invalid.psBytecode = invalidBytecode.data();
         invalid.psSize = invalidBytecode.size();
@@ -4043,11 +4045,11 @@ bool DX12Test::RunUploadSegmentTest(const std::string& modelPath, std::string& o
         }
 
         const RHIUploadStats before = ring.GetStats();
-        std::array<std::array<RHIBufferSlice, kAllocationsPerWorker>,
+        ce::fixed_array<ce::fixed_array<RHIBufferSlice, kAllocationsPerWorker>,
             kWorkerCount> workerSlices{};
         std::atomic<uint32_t> ready{ 0 };
         std::atomic<bool> go{ false };
-        std::vector<std::thread> workers;
+        ce::dynamic_array<std::thread> workers;
         workers.reserve(kWorkerCount);
         for (uint32_t worker = 0; worker < kWorkerCount; ++worker)
         {
@@ -4072,7 +4074,7 @@ bool DX12Test::RunUploadSegmentTest(const std::string& modelPath, std::string& o
         go.store(true, std::memory_order_release);
         for (std::thread& worker : workers) worker.join();
 
-        std::vector<RHIBufferSlice> sorted;
+        ce::dynamic_array<RHIBufferSlice> sorted;
         sorted.reserve(kWorkerCount * kAllocationsPerWorker);
         uint32_t invalid = 0;
         for (const auto& perWorker : workerSlices)
@@ -4139,11 +4141,11 @@ bool DX12Test::RunUploadSegmentTest(const std::string& modelPath, std::string& o
         const bool staleInvalid = nullptr == resources.Resolve(parallelHandleForTrim);
 
         const uint64_t cursorBeforeReject = ring.GetRecordingUsedBytes();
-        const std::array<RHIUploadRequest, 2> impossible = {{
+        const ce::fixed_array<RHIUploadRequest, 2> impossible = {{
             { 1, RHIUploadUsage::BufferCopy, 1 },
             { (std::numeric_limits<uint64_t>::max)(), RHIUploadUsage::BufferCopy, 1 }
         }};
-        std::array<RHIBufferSlice, 2> rejectedSlices{};
+        ce::fixed_array<RHIBufferSlice, 2> rejectedSlices{};
         for (size_t i = 0; i < rejectedSlices.size(); ++i)
         {
             rejectedSlices[i].buffer.id = static_cast<uint32_t>(100 + i);
@@ -4212,7 +4214,7 @@ bool DX12Test::RunUploadSegmentTest(const std::string& modelPath, std::string& o
             // MBC9 — typed generation이 유일한 모델 지오메트리 출처다(Assimp·legacy Mesh 은퇴).
             const assets::ModelAssetGeneration::Shared sceneModel =
                 DataSystems->LoadModelAssetGenerationByPath(scenePath.string());
-            std::vector<RHIModelMeshView> sceneMeshes;
+            ce::dynamic_array<RHIModelMeshView> sceneMeshes;
             uint64_t sceneUploadBytes = 0;
             if (sceneModel)
             {
@@ -4610,7 +4612,7 @@ static bool ValidateBase0CameraReplay(std::string& error)
     EnhancedCameraReplayInput accepted;
     if (!EnhancedCameraReplayInput::Decode(bytes, accepted, error) || accepted.Encode() != bytes)
     { error = "camera replay lost input bits"; return false; }
-    const auto reject = [&](std::vector<uint8_t> bad, bool reseal) {
+    const auto reject = [&](ce::dynamic_array<uint8_t> bad, bool reseal) {
         if (reseal)
         {
             const auto hash = EnhancedCameraReplayInput::Checksum(std::span(bad).first(bad.size() - 8));
@@ -4648,8 +4650,8 @@ static bool ValidateBase0CameraReplay(std::string& error)
 
 static bool ValidateBase0DrawReplay(std::string& error)
 {
-    std::array<float, assets::StrideOf(assets::kCoreVertexAttributes) / sizeof(float)> vertex{};
-    std::array<uint32_t, 3> indices{0,0,0};
+    ce::fixed_array<float, assets::StrideOf(assets::kCoreVertexAttributes) / sizeof(float)> vertex{};
+    ce::fixed_array<uint32_t, 3> indices{0,0,0};
     auto bone=math::matrix4x4::identity();
     EnhancedDrawItem item;
     assets::TryParseCanonicalUuidV8("11111111-1111-8111-8111-111111111111", item.modelMeshView.handle.modelId);
@@ -4661,7 +4663,7 @@ static bool ValidateBase0DrawReplay(std::string& error)
     item.modelMeshView.vertexLayoutHash=assets::VertexLayoutHash(assets::kCoreVertexAttributes);
     item.modelMeshView.indexData=indices.data(); item.modelMeshView.indexCount=3;
     item.worldMatrix=math::matrix4x4::identity(); item.bonePalette=&bone; item.boneCount=1;
-    std::array<EnhancedDrawItem,1> opaque{item},forward{item},graph{item};
+    ce::fixed_array<EnhancedDrawItem,1> opaque{item},forward{item},graph{item};
     EnhancedDrawReplayInput sealed;
     if (!EnhancedDrawReplayInput::Seal(opaque,forward,graph,sealed,error)) return false;
     bone=math::matrix4x4{}; // Producer storage can change after sealing.
@@ -4669,7 +4671,7 @@ static bool ValidateBase0DrawReplay(std::string& error)
     EnhancedDrawReplayInput accepted;
     if (!EnhancedDrawReplayInput::Decode(bytes,accepted,error) || accepted.Encode()!=bytes)
     { error="draw replay roundtrip lost bits"; return false; }
-    const auto reject=[&](std::vector<uint8_t> bad, bool reseal) {
+    const auto reject=[&](ce::dynamic_array<uint8_t> bad, bool reseal) {
         if (reseal)
         {
             const auto hash=EnhancedCameraReplayInput::Checksum(std::span(bad).first(bad.size()-8));
@@ -4719,7 +4721,7 @@ static bool ValidateBase0DrawReplay(std::string& error)
 
 static bool ValidateBase0LatticeReplay(std::string& error)
 {
-    std::array<float, assets::StrideOf(assets::kCoreVertexAttributes) / sizeof(float)> vertex{}; std::array<uint32_t,3> indices{0,0,0};
+    ce::fixed_array<float, assets::StrideOf(assets::kCoreVertexAttributes) / sizeof(float)> vertex{}; ce::fixed_array<uint32_t,3> indices{0,0,0};
     EnhancedDrawItem item;
     assets::TryParseCanonicalUuidV8("11111111-1111-8111-8111-111111111111",item.modelMeshView.handle.modelId);
     assets::TryParseCanonicalUuidV8("22222222-2222-8222-8222-222222222222",item.modelMeshView.handle.meshId);
@@ -4748,8 +4750,8 @@ static bool ValidateBase0LatticeReplay(std::string& error)
         parameter(900, LX::PinType::Float, 0.5, 0, 4);
         parameter(902, LX::PinType::Bool, true, 4, 4);
         parameter(903, LX::PinType::Int, int64_t(7), 8, 4);
-        parameter(904, LX::PinType::Vector, std::array<double, 3>{1, 2, 3}, 12, 12);
-        parameter(905, LX::PinType::Color, std::array<double, 4>{1, .5, .25, 1}, 24, 16);
+        parameter(904, LX::PinType::Vector, ce::fixed_array<double, 3>{1, 2, 3}, 12, 12);
+        parameter(905, LX::PinType::Color, ce::fixed_array<double, 4>{1, .5, .25, 1}, 24, 16);
         product.layout.uniformBytes = 40;
         experiment::AssetId textureId;
         experiment::TryParseCanonicalAssetId("22222222-2222-4222-8222-222222222222", textureId);
@@ -4766,12 +4768,12 @@ static bool ValidateBase0LatticeReplay(std::string& error)
     own::shared_owner<const material_graph::Instance> source;
     if(!texture || !material_graph::BuildInstance(generation,description,[&](const auto&,auto,std::string&){return texture;},source,error)) return false;
     item.materialGraphInstance=source;
-    std::array<EnhancedDrawItem,2> graph{item,item};
+    ce::fixed_array<EnhancedDrawItem,2> graph{item,item};
     EnhancedLatticeReplayInput sealed;
     if(!EnhancedLatticeReplayInput::Seal(graph,sealed,error)) return false;
     auto bytes=sealed.Encode(); EnhancedLatticeReplayInput accepted;
     if(!EnhancedLatticeReplayInput::Decode(bytes,accepted,error) || accepted.Encode()!=bytes) return false;
-    const auto reject=[&](std::vector<uint8_t> bad,bool reseal) {
+    const auto reject=[&](ce::dynamic_array<uint8_t> bad,bool reseal) {
         if(reseal) {
             const auto hash=EnhancedCameraReplayInput::Checksum(std::span(bad).first(bad.size()-8));
             for(unsigned i=0;i<8;++i) bad[bad.size()-8+i]=static_cast<uint8_t>(hash>>(8*i));
@@ -5254,7 +5256,7 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
                 const float black[]={0.f,0.f,0.f,1.f};
                 c.encoder->ClearRenderTargets(resources.CreateRenderTargets(colors),black);
             });
-        if(!graph.Compile(error) || graph.GetExecuteOrder()!=(phase==3 ? std::vector<uint16_t>{2,1,4,0} : (versioned ? std::vector<uint16_t>{2,1,3,0} : std::vector<uint16_t>{1,0}))
+        if(!graph.Compile(error) || graph.GetExecuteOrder()!=(phase==3 ? ce::dynamic_array<uint16_t>{2,1,4,0} : (versioned ? ce::dynamic_array<uint16_t>{2,1,3,0} : ce::dynamic_array<uint16_t>{1,0}))
             || !resources.BeginFrame(error) || !graph.Execute(error) || !resources.EndFrame(error))
         { outLog += tag+"_GPU_FAILED " + error + "\n"; return false; }
         resources.WaitForGpu();
@@ -5273,7 +5275,7 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
     {
         DX12CommandListPool pool;
         if(!pool.Initialize(resources,4,DX12DeviceResources::kFrameCount,error)) return false;
-        std::vector<uint8_t> expected;
+        ce::dynamic_array<uint8_t> expected;
         for(const int variant:{0,1,2,4,-4,8,16,32})
         {
             if(!resources.BeginFrame(error)) return false;
@@ -5332,7 +5334,7 @@ bool DX12Test::RunRenderGraphTest(std::string& outLog, bool replayExtensions)
                 for(int i=0;i<4;++i)
                     g.AddPass("balance.padding",{},[&](const auto&){++padding;},true);
             }
-            const auto order = balancedFixture ? std::vector<uint16_t>{2,1,0,3,4,5,6,7} : std::vector<uint16_t>{2,1,0,3};
+            const auto order = balancedFixture ? ce::dynamic_array<uint16_t>{2,1,0,3,4,5,6,7} : ce::dynamic_array<uint16_t>{2,1,0,3};
             if(!g.Compile(error) || g.GetExecuteOrder()!=order) return false;
             if(independentGpu)
             {
@@ -5746,8 +5748,8 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
         constexpr uint32_t kThreads = 8;
         constexpr uint32_t kPerThread = 256;
 
-        std::vector<std::vector<std::pair<uint64_t, uint64_t>>> ranges(kThreads);
-        std::vector<std::thread> threads;
+        ce::dynamic_array<ce::dynamic_array<ce::pair<uint64_t, uint64_t>>> ranges(kThreads);
+        ce::dynamic_array<std::thread> threads;
 
         for (uint32_t t = 0; t < kThreads; ++t)
         {
@@ -5770,7 +5772,7 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
         }
         for (auto& thread : threads) thread.join();
 
-        std::vector<std::pair<uint64_t, uint64_t>> all;
+        ce::dynamic_array<ce::pair<uint64_t, uint64_t>> all;
         for (auto& list : ranges) all.insert(all.end(), list.begin(), list.end());
         std::sort(all.begin(), all.end());
 
@@ -5803,8 +5805,8 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
         constexpr uint32_t kThreads = 8;
         constexpr uint32_t kPerThread = 128;
 
-        std::vector<std::vector<std::pair<uint64_t, uint64_t>>> ranges(kThreads);
-        std::vector<std::thread> threads;
+        ce::dynamic_array<ce::dynamic_array<ce::pair<uint64_t, uint64_t>>> ranges(kThreads);
+        ce::dynamic_array<std::thread> threads;
 
         for (uint32_t t = 0; t < kThreads; ++t)
         {
@@ -5826,7 +5828,7 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
         }
         for (auto& thread : threads) thread.join();
 
-        std::vector<std::pair<uint64_t, uint64_t>> all;
+        ce::dynamic_array<ce::pair<uint64_t, uint64_t>> all;
         for (auto& list : ranges) all.insert(all.end(), list.begin(), list.end());
         std::sort(all.begin(), all.end());
 
@@ -5909,7 +5911,7 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
     std::atomic<uint32_t> callerRecordings{ 0 };
 
     // 순차/병렬을 같은 코드로 돌린다. 그래야 차이가 '병렬이라서'로 좁혀진다.
-    const auto renderOnce = [&](uint32_t workers, std::vector<uint8_t>& outPixels,
+    const auto renderOnce = [&](uint32_t workers, ce::dynamic_array<uint8_t>& outPixels,
         EnhancedRenderGraph::Stats& outStats, std::string& outStepError) -> bool
     {
         if (!resources.BeginFrame(outStepError)) return false;
@@ -6005,8 +6007,8 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
         return true;
     };
 
-    std::vector<uint8_t> sequential;
-    std::vector<uint8_t> parallel;
+    ce::dynamic_array<uint8_t> sequential;
+    ce::dynamic_array<uint8_t> parallel;
     EnhancedRenderGraph::Stats sequentialStats{};
     EnhancedRenderGraph::Stats parallelStats{};
 
@@ -6030,7 +6032,7 @@ bool DX12Test::RunParallelRecordTest(std::string& outLog)
     bool repeatedPixels = true;
     for (uint32_t iteration = 0; iteration < DX12DeviceResources::kFrameCount * 2; ++iteration)
     {
-        std::vector<uint8_t> repeated;
+        ce::dynamic_array<uint8_t> repeated;
         EnhancedRenderGraph::Stats repeatedStats{};
         if (!renderOnce(4, repeated, repeatedStats, error) || repeated != sequential ||
             4 != repeatedStats.recordedLists)

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -377,11 +378,11 @@ namespace wave
         };
 
         bool CopyBounded(const std::filesystem::path& source, CacheFile& output,
-            std::uint64_t size, const ce::hash::sha256_digest& expected, std::string& error)
+            std::uint64_t size, const ce::crypto::sha256_digest& expected, std::string& error)
         {
             std::ifstream input(source, std::ios::binary);
-            ce::hash::sha256 hash;
-            std::array<std::byte, 64u * 1024u> block{};
+            ce::crypto::sha256 hash;
+            ce::fixed_array<std::byte, 64u * 1024u> block{};
             std::uint64_t remaining = size;
             while (input && remaining != 0u)
             {
@@ -490,7 +491,7 @@ namespace wave
         }
         // Content and import settings select a new immutable generation. Old
         // playbacks keep their own byte-source root across source edits.
-        const auto generationName = ce::hash::to_hex(original.sourceContentHash)
+        const auto generationName = ce::crypto::to_hex(original.sourceContentHash)
             + "-" + std::string(loadMode) + "-" + std::string(spatialKind) + "-v1";
         auto destinationDirectory = cache->Child(generationName, true, false, error);
         for (const auto& segment : { std::string("Derived"), std::string("Audio"), key.Text().substr(0u, 2u) })
@@ -517,9 +518,9 @@ namespace wave
         {
             return false;
         }
-        ce::hash::sha256 artifactHash;
+        ce::crypto::sha256 artifactHash;
         artifactHash.update(header.data(), header.size());
-        std::array<std::byte, 64u * 1024u> block{};
+        ce::fixed_array<std::byte, 64u * 1024u> block{};
         std::uint64_t remaining = original.payloadSize;
         while (input && remaining != 0u)
         {

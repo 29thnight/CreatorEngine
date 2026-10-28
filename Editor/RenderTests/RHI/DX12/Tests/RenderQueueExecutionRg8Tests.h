@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
@@ -7,6 +8,7 @@ import winrt_base;
 #include "RHI/DX12/DX12CommandListPool.h"
 #include "../../../../../Engine/RenderEngine/RenderAllocator.h"
 #pragma once
+#include "../../../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
 #else
@@ -79,7 +81,7 @@ namespace Rg8QueueExecutionTests
         explicit FaultRecorder(IRHIQueueRecorder& recorder) : m_recorder(recorder) {}
         IRenderDeviceServices& DeviceServices() const override { return m_recorder.DeviceServices(); }
         bool Record(const own::shared_owner<IRHICommandQueue>& queue,
-            const std::function<void(RHIEncoder&)>& commands, ce::lifetime_token token,
+            const ce::owned_func<void(RHIEncoder&)>& commands, ce::lifetime_token token,
             ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error) override
         {
             const auto fault = own::dynamic_owner_cast<FaultQueue>(queue);
@@ -181,7 +183,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             device.ReleaseTexture(handle);
             require(!retained, "Automatically decaying texture advertised explicit-state retention.");
         }
-        std::vector<uint8_t> baseline;
+        ce::dynamic_array<uint8_t> baseline;
         RHITimelinePoint foreignCompletion;
         for (uint32_t mode = 0; mode < 2; ++mode)
         {
@@ -404,7 +406,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             WaitFailure,
             UnfencedSubmission
         };
-        std::vector<uint8_t> overlapBaseline, readReadBaseline;
+        ce::dynamic_array<uint8_t> overlapBaseline, readReadBaseline;
         std::ostringstream overlapEvidence;
         overlapEvidence << std::setprecision(17);
         overlapEvidence << "{\"schemaVersion\":1,\"scope\":\"native-correctness\",\"cases\":[";
@@ -514,10 +516,10 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             };
             RGHandle shadow{};
             RGPassId shadowPass{};
-            std::vector<EnhancedRenderGraph::QueueHint> hints;
-            std::vector<uint16_t> callbacks;
+            ce::dynamic_array<EnhancedRenderGraph::QueueHint> hints;
+            ce::dynamic_array<uint16_t> callbacks;
             RGPassId gbuffer, rawPass, filterPass, deferred, readback;
-            std::vector<EnhancedRenderGraph::RGPassUsage> gbufferUsages{
+            ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> gbufferUsages{
                 {depth, RHIResourceState::UnorderedAccess, RGAccessMode::Write}};
             if (!withShadow)
             {
@@ -569,7 +571,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                     }
                     dispatch(context, transformPipeline, raw, filtered, 128);
                 });
-            std::vector<EnhancedRenderGraph::RGPassUsage> deferredUsages{
+            ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> deferredUsages{
                 {depth, RHIResourceState::ShaderResource, RGAccessMode::Read},
                 {filtered, RHIResourceState::ShaderResource, RGAccessMode::Read},
                 {output, RHIResourceState::UnorderedAccess, RGAccessMode::Write},
@@ -641,7 +643,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             require(schedule.usesCompute == moved && !schedule.predictionComplete &&
                 !schedule.predictionCalibrated && schedule.entries.size() == compiledOrder.size(),
                 "Overlap execution did not expose its complete uncalibrated plan.");
-            std::vector<uint16_t> scheduledOrder;
+            ce::dynamic_array<uint16_t> scheduledOrder;
             for (const auto& entry : schedule.entries)
             {
                 scheduledOrder.push_back(entry.pass);
@@ -658,7 +660,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                     DX12QueueService::QueryRecordingPool(overlapGraphics.queue).leased == 0 &&
                     DX12QueueService::QueryRecordingPool(nativeCompute).leased == 0,
                     "Reordered recording failure submitted work or retained a recording lease.");
-                require(callbacks == std::vector<uint16_t>{gbuffer.index, shadowPass.index, rawPass.index, filterPass.index} &&
+                require(callbacks == ce::dynamic_array<uint16_t>{gbuffer.index, shadowPass.index, rawPass.index, filterPass.index} &&
                     storage->state == RHIResourceState::Common && !graph->Execute(error),
                     "Reordered recording failure wrote back state or allowed ordinary execution.");
                 graph->Reset();
@@ -688,11 +690,11 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
                 };
                 require(resourceWait(gbuffer, rawPass, depth) && resourceWait(rawPass, deferred, depth) &&
                     resourceWait(filterPass, deferred, filtered), "Native overlap lost RAW or read/read ownership edges.");
-                require(diagnostics.batches[1].passes == std::vector<uint16_t>{gbuffer.index} &&
-                    diagnostics.batches[2].passes == std::vector<uint16_t>{shadowPass.index} &&
-                    diagnostics.batches[3].passes == std::vector<uint16_t>{rawPass.index, filterPass.index} &&
+                require(diagnostics.batches[1].passes == ce::dynamic_array<uint16_t>{gbuffer.index} &&
+                    diagnostics.batches[2].passes == ce::dynamic_array<uint16_t>{shadowPass.index} &&
+                    diagnostics.batches[3].passes == ce::dynamic_array<uint16_t>{rawPass.index, filterPass.index} &&
                     diagnostics.batches[3].queue == RHIQueueKind::Compute &&
-                    diagnostics.batches[4].passes == std::vector<uint16_t>{deferred.index, readback.index} &&
+                    diagnostics.batches[4].passes == ce::dynamic_array<uint16_t>{deferred.index, readback.index} &&
                     diagnostics.batches[4].queue == RHIQueueKind::Graphics &&
                     diagnostics.waits[0].producerBatch == 1 && diagnostics.waits[0].consumerBatch == 3 &&
                     diagnostics.waits[1].producerBatch == 3 && diagnostics.waits[1].consumerBatch == 4,
@@ -825,7 +827,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             storage = storageWeak.lock();
             require(storage != nullptr, "Joined overlap graph lost pinned readback storage.");
             const auto verifyPayload = [&](const RHIReadback& readbackHandle, uint32_t multiplier, uint32_t addend,
-                std::vector<uint8_t>* expected)
+                ce::dynamic_array<uint8_t>* expected)
             {
                 RHIReadbackImage image;
                 require(device.MapReadback(readbackHandle, image, error), error);
@@ -880,7 +882,7 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             device.AbortFrame();
         }
         graphics.profiler = compute.profiler = nullptr;
-        std::vector<uint8_t> parallelBaseline;
+        ce::dynamic_array<uint8_t> parallelBaseline;
         for (const int variant : {1, 2, 4, -4, -2})
         {
             const bool smallFallback = variant == -4;
@@ -896,8 +898,8 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             graph->SetParallelRecordCostThreshold(smallFallback ? 100u : 0u);
             graph->SetQueueExecutionMode(2);
             const auto output = graph->Write(graph->CreateBuffer({1024, true, false, "parallel-queue-output"}));
-            std::array<RHIBindingTable, 4> tileBindings{};
-            std::array<std::atomic<uint32_t>, 4> slices{};
+            ce::fixed_array<RHIBindingTable, 4> tileBindings{};
+            ce::fixed_array<std::atomic<uint32_t>, 4> slices{};
             std::atomic<uint32_t> completedSlices{0}, independentCalls{0};
             const auto produce = graph->AddSplitPass("parallel-queue-produce",
                 {{output, RHIResourceState::UnorderedAccess, RGAccessMode::Write}},
@@ -1047,8 +1049,8 @@ bool DX12Test::RunQueueExecutionTest(std::string& outLog)
             }
         } frameCleanup{device, frameGate.get()};
         require(device.EnqueueQueueTestGate(frameGraphics.queue, frameGate.get(), 1, error), error);
-        std::vector<own::shared_owner<Storage>> frameStorage;
-        std::vector<own::weak_owner<EnhancedRenderGraph>> frameGraphs;
+        ce::dynamic_array<own::shared_owner<Storage>> frameStorage;
+        ce::dynamic_array<own::weak_owner<EnhancedRenderGraph>> frameGraphs;
         DX12CommandListPool framePreparation;
         require(framePreparation.Initialize(device, 2, 3, error), error);
         uint64_t firstFrameFence = 0;

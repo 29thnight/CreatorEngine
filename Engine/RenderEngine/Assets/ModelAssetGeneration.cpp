@@ -1,3 +1,6 @@
+#include "../../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -78,7 +81,7 @@ namespace assets
             std::filesystem::path modelArtifactPath{};
             std::string modelArtifactFingerprint{};
             std::string streamingManifestFingerprint{}, streamingMetadataFingerprint{};
-            std::vector<GenerationSubAsset> subAssets{};
+            ce::dynamic_array<GenerationSubAsset> subAssets{};
         };
 
         void AddIssue(ModelAssetGenerationLoadResult& result,
@@ -89,7 +92,7 @@ namespace assets
         }
 
         [[nodiscard]] bool ReadBytes(const std::filesystem::path& path,
-            std::vector<std::byte>& out)
+            ce::dynamic_array<std::byte>& out)
         {
             std::ifstream stream(path, std::ios::binary);
             if (!stream) return false;
@@ -109,7 +112,7 @@ namespace assets
         [[nodiscard]] bool ReadText(const std::filesystem::path& path,
             std::string& out)
         {
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
             if (!ReadBytes(path, bytes)) return false;
             out.assign(reinterpret_cast<const char*>(bytes.data()), bytes.size());
             return true;
@@ -222,7 +225,7 @@ namespace assets
                 failure = "generation record subAssets sequence가 없다.";
                 return false;
             }
-            std::set<uuid::uuid16> ids;
+            ce::engine_ordered_set<uuid::uuid16> ids;
             for (std::size_t index = 0; index < subAssets.Size(); ++index)
             {
                 const Authoring::ReadNode node = subAssets.At(index);
@@ -297,10 +300,10 @@ namespace assets
         }
 
         template <typename T>
-        [[nodiscard]] std::vector<const ModelSubAssetRecord*> RecordsOf(
+        [[nodiscard]] ce::dynamic_array<const ModelSubAssetRecord*> RecordsOf(
             const ModelSidecarV2& sidecar, T kind)
         {
-            std::vector<const ModelSubAssetRecord*> out;
+            ce::dynamic_array<const ModelSubAssetRecord*> out;
             for (const ModelSubAssetRecord& record : sidecar.subAssets)
             {
                 if (record.kind == kind) out.push_back(&record);
@@ -308,7 +311,7 @@ namespace assets
             return out;
         }
 
-        [[nodiscard]] bool CopyTexturePixels(const std::vector<std::byte>& encoded,
+        [[nodiscard]] bool CopyTexturePixels(const ce::dynamic_array<std::byte>& encoded,
             ModelTextureColorSpace colorSpace, ModelTextureAsset& out,
             std::string& failure, bool cooked, bool allowSource)
         {
@@ -407,11 +410,11 @@ namespace assets
                 stream.read(reinterpret_cast<char*>(&value), sizeof(value));
                 return static_cast<bool>(stream);
             };
-            std::array<char, 8> magic{};
+            ce::fixed_array<char, 8> magic{};
             std::uint32_t width{}, height{}, levels{}, arrays{}, format{}, space{}, count{};
             std::uint64_t bytes{};
             stream.read(magic.data(), magic.size());
-            if (!stream || magic != std::array<char, 8>{'C','E','I','M','0','0','0','1'} ||
+            if (!stream || magic != ce::fixed_array<char, 8>{'C','E','I','M','0','0','0','1'} ||
                 !read(width) || !read(height) || !read(levels) || !read(arrays) ||
                 !read(format) || !read(space) || !read(count) || !read(bytes) ||
                 !width || !height || width > 16384 || height > 16384 ||
@@ -465,7 +468,7 @@ namespace assets
         {
             // Runtime prepares bytes; the Editor owns staging and atomic publication.
             // A missing host writer leaves the decoded in-memory texture usable.
-            std::vector<std::byte> payload;
+            ce::dynamic_array<std::byte> payload;
             payload.reserve(44u + texture.subresources.size() * 32u + texture.pixels.size());
 
             const auto append = [&payload](std::span<const std::byte> bytes) {
@@ -475,7 +478,7 @@ namespace assets
                 append(std::as_bytes(std::span{ &value, std::size_t{ 1 } }));
             };
 
-            constexpr std::array<char, 8> magic{'C','E','I','M','0','0','0','1'};
+            constexpr ce::fixed_array<char, 8> magic{'C','E','I','M','0','0','0','1'};
             append(std::as_bytes(std::span{ magic }));
             write(texture.width);
             write(texture.height);
@@ -513,10 +516,10 @@ namespace assets
 
         [[nodiscard]] bool IsValidAggregate(
             const ModelAssetGenerationIdentity& identity,
-            const std::vector<ModelMeshAsset>& meshes,
-            const std::vector<ModelMaterialAsset>& materials,
-            const std::vector<ModelTextureAsset>& textures,
-            const std::vector<ModelGpuUploadDescriptor>& descriptors)
+            const ce::dynamic_array<ModelMeshAsset>& meshes,
+            const ce::dynamic_array<ModelMaterialAsset>& materials,
+            const ce::dynamic_array<ModelTextureAsset>& textures,
+            const ce::dynamic_array<ModelGpuUploadDescriptor>& descriptors)
         {
             if (!IsUuidV8(identity.modelId) || identity.generation == 0u
                 || identity.identityProfile != kIdentityProfile
@@ -557,14 +560,14 @@ namespace assets
 
     ModelAssetGeneration::ModelAssetGeneration(LoadKey, ModelAssetGenerationIdentity identity,
         std::string name, std::filesystem::path sourcePath,
-        std::vector<ModelNodeAsset> nodes,
-        std::vector<ModelMeshAsset> meshes,
-        std::vector<ModelMaterialAsset> materials,
-        std::vector<ModelTextureAsset> textures,
+        ce::dynamic_array<ModelNodeAsset> nodes,
+        ce::dynamic_array<ModelMeshAsset> meshes,
+        ce::dynamic_array<ModelMaterialAsset> materials,
+        ce::dynamic_array<ModelTextureAsset> textures,
         std::optional<ModelSkeletonAsset> skeleton,
-        std::vector<ModelAnimationAsset> animations,
+        ce::dynamic_array<ModelAnimationAsset> animations,
         std::optional<ModelAnimatorAsset> animator,
-        std::vector<ModelGpuUploadDescriptor> gpuDescriptors)
+        ce::dynamic_array<ModelGpuUploadDescriptor> gpuDescriptors)
         : identity_(std::move(identity)), name_(std::move(name)),
         sourcePath_(std::move(sourcePath)), nodes_(std::move(nodes)),
         meshes_(std::move(meshes)), materials_(std::move(materials)),
@@ -811,7 +814,7 @@ namespace assets
 
         std::string headerText;
         IdentityEpochHeader header;
-        std::vector<EpochHeaderIssue> headerIssues;
+        ce::dynamic_array<EpochHeaderIssue> headerIssues;
         if (!ReadText(request.identityHeaderPath, headerText)
             || !ReadIdentityEpochHeader(headerText, header, headerIssues))
         {
@@ -825,7 +828,7 @@ namespace assets
         std::filesystem::path generationPath = request.generationPath;
         std::string sidecarText;
         ModelSidecarV2 sidecar;
-        std::vector<SidecarIssue> sidecarIssues;
+        ce::dynamic_array<SidecarIssue> sidecarIssues;
         if (!request.canonicalSidecarPath.empty()
             && !ReadText(request.canonicalSidecarPath, sidecarText))
         {
@@ -911,7 +914,7 @@ namespace assets
         markPhase("identity+sidecar");
         phaseProfile.reset();
         phaseProfile.emplace(ce::marker<"ModelGen.CemcRead">());
-        std::vector<std::byte> cookedBytes;
+        ce::dynamic_array<std::byte> cookedBytes;
         std::optional<generation_streaming::Loaded> streaming;
         {
             try { streaming = generation_streaming::Load(generationPath,record.streamingManifestFingerprint,sidecar.assetId,sidecar.generation); }
@@ -942,7 +945,7 @@ namespace assets
         phaseProfile.reset();
         phaseProfile.emplace(ce::marker<"ModelGen.CemcDecode">());
         experiment::ModelDraft draft;
-        std::vector<experiment::ModelLoadIssue> cookedIssues;
+        ce::dynamic_array<experiment::ModelLoadIssue> cookedIssues;
         if (!ck::Read(cookedBytes, draft, cookedIssues))
         {
             AddIssue(result, ModelAssetGenerationIssueCode::CookedModelRejected,
@@ -956,7 +959,7 @@ namespace assets
             result.warnings.push_back({ ModelAssetGenerationIssueCode::CookedModelRejected,
                 issue.context, issue.message });
         }
-        const std::vector<experiment::ModelLoadIssue> validation =
+        const ce::dynamic_array<experiment::ModelLoadIssue> validation =
             experiment::ModelLoader::Validate(draft);
         if (!validation.empty() || draft.metadata.assetId.value != sidecar.assetId)
         {
@@ -990,12 +993,12 @@ namespace assets
             return result;
         }
 
-        std::set<uuid::uuid16> embeddedTextureIds;
+        ce::engine_ordered_set<uuid::uuid16> embeddedTextureIds;
         for (const ModelSubAssetRecord* texture : textureRecords)
             embeddedTextureIds.insert(texture->assetId);
 
-        std::map<uuid::uuid16, ModelTextureColorSpace> textureColorSpaces;
-        std::vector<ModelMaterialAsset> materials;
+        ce::engine_ordered_map<uuid::uuid16, ModelTextureColorSpace> textureColorSpaces;
+        ce::dynamic_array<ModelMaterialAsset> materials;
         materials.reserve(draft.materials.size());
         for (std::size_t index = 0; index < draft.materials.size(); ++index)
         {
@@ -1058,7 +1061,7 @@ namespace assets
             materials.push_back(std::move(material));
         }
 
-        std::vector<ModelMeshAsset> meshes;
+        ce::dynamic_array<ModelMeshAsset> meshes;
         meshes.reserve(streaming->meshes.size());
         {
             if (!draft.meshes.empty() || streaming->summary.materials.size() != materials.size() ||
@@ -1078,7 +1081,7 @@ namespace assets
             }
         }
 
-        std::vector<ModelNodeAsset> nodes;
+        ce::dynamic_array<ModelNodeAsset> nodes;
         nodes.reserve(draft.nodes.size());
         for (experiment::ModelNode& source : draft.nodes)
         {
@@ -1104,7 +1107,7 @@ namespace assets
         }
 
         std::optional<ModelSkeletonAsset> skeleton;
-        std::vector<ModelAnimationAsset> animations;
+        ce::dynamic_array<ModelAnimationAsset> animations;
         if (draft.skeleton)
         {
             ModelSkeletonAsset target;
@@ -1171,7 +1174,7 @@ namespace assets
             animator = target;
         }
 
-        std::vector<ModelTextureAsset> textures;
+        ce::dynamic_array<ModelTextureAsset> textures;
         markPhase("materials+meshes+skeleton");
         phaseProfile.reset();
         phaseProfile.emplace(ce::marker<"ModelGen.Textures">());
@@ -1187,7 +1190,7 @@ namespace assets
                     "textures", "generation record에서 TextureId를 찾지 못했다.");
                 return result;
             }
-            std::vector<std::byte> encoded;
+            ce::dynamic_array<std::byte> encoded;
             std::optional<ce::profile_scope> textureStep;
             textureStep.emplace(ce::marker<"ModelGen.TextureRead">());
             if (!ReadBytes(generationPath / generationRecord->artifactPath, encoded)
@@ -1246,7 +1249,7 @@ namespace assets
             textures.push_back(std::move(texture));
         }
 
-        std::vector<ModelGpuUploadDescriptor> descriptors;
+        ce::dynamic_array<ModelGpuUploadDescriptor> descriptors;
         markPhase("textures-read+sha+decode");
         phaseProfile.reset();
         phaseProfile.emplace(ce::marker<"ModelGen.Descriptors">());
@@ -1327,7 +1330,7 @@ namespace assets
     }
 
     void ModelAssetGenerationCache::TrimRetainedLocked(std::size_t budget,
-        std::vector<ModelAssetGeneration::Shared>& released) const
+        ce::dynamic_array<ModelAssetGeneration::Shared>& released) const
     {
         while (retainedBytes_ > budget)
         {
@@ -1352,7 +1355,7 @@ namespace assets
 
     void ModelAssetGenerationCache::RetainLocked(Entry& entry,
         const ModelAssetGeneration::Shared& generation,
-        std::vector<ModelAssetGeneration::Shared>& released) const
+        ce::dynamic_array<ModelAssetGeneration::Shared>& released) const
     {
         if (entry.retained || entry.estimatedBytes > retentionBudgetBytes_)
         {
@@ -1382,7 +1385,7 @@ namespace assets
         candidate.identity = generation->Identity();
         candidate.live = generation;
         candidate.estimatedBytes = generation->EstimatedCpuBytes();
-        std::vector<ModelAssetGeneration::Shared> released;
+        ce::dynamic_array<ModelAssetGeneration::Shared> released;
         std::lock_guard lock(mutex_);
         released.reserve(generations_.size() + 2);
         const Key incoming = generation->Handle();
@@ -1476,7 +1479,7 @@ namespace assets
     ModelAssetGeneration::Shared ModelAssetGenerationCache::ResolveCurrent(
         const uuid::uuid16& modelId) const
     {
-        std::vector<ModelAssetGeneration::Shared> released;
+        ce::dynamic_array<ModelAssetGeneration::Shared> released;
         std::lock_guard lock(mutex_);
         const auto current = currentByAsset_.find(modelId);
         if (current != currentByAsset_.end())
@@ -1500,7 +1503,7 @@ namespace assets
     ModelAssetGeneration::Shared ModelAssetGenerationCache::Resolve(
         ModelAssetGenerationHandle handle) const
     {
-        std::vector<ModelAssetGeneration::Shared> released;
+        ce::dynamic_array<ModelAssetGeneration::Shared> released;
         std::lock_guard lock(mutex_);
         const auto current = currentByAsset_.find(handle.modelId);
         if (current != currentByAsset_.end() && current->second == handle)
@@ -1540,7 +1543,7 @@ namespace assets
         {
             *outRetiredHandle = {};
         }
-        std::vector<ModelAssetGeneration::Shared> released;
+        ce::dynamic_array<ModelAssetGeneration::Shared> released;
         std::lock_guard lock(mutex_);
         const auto current = currentByAsset_.find(modelId);
         if (current == currentByAsset_.end())
@@ -1570,7 +1573,7 @@ namespace assets
 
     void ModelAssetGenerationCache::SetRetentionBudgetBytes(std::size_t bytes)
     {
-        std::vector<ModelAssetGeneration::Shared> released;
+        ce::dynamic_array<ModelAssetGeneration::Shared> released;
         std::lock_guard lock(mutex_);
         released.reserve(generations_.size());
         retentionBudgetBytes_ = bytes;
@@ -1625,10 +1628,10 @@ namespace assets
         return snapshot;
     }
 
-    std::vector<ModelAssetGeneration::Shared> ModelAssetGenerationCache::SnapshotCurrent() const
+    ce::dynamic_array<ModelAssetGeneration::Shared> ModelAssetGenerationCache::SnapshotCurrent() const
     {
         std::lock_guard lock(mutex_);
-        std::vector<ModelAssetGeneration::Shared> current;
+        ce::dynamic_array<ModelAssetGeneration::Shared> current;
         current.reserve(currentByAsset_.size());
         for (const auto& [modelId, key] : currentByAsset_)
         {

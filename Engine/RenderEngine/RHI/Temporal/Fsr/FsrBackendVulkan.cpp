@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
 #else
@@ -164,7 +165,7 @@ TemporalResult FsrFrameGeneratorVulkan::Initialize(VulkanDeviceResources& resour
     if (native.description.imageColorSpace != colorSpace) return Invalid();
     uint32_t familyCount = 0;
     VulkanApi::vkGetPhysicalDeviceQueueFamilyProperties(queues.physicalDevice, &familyCount, nullptr);
-    std::vector<VkQueueFamilyProperties> families(familyCount);
+    ce::dynamic_array<VkQueueFamilyProperties> families(familyCount);
     VulkanApi::vkGetPhysicalDeviceQueueFamilyProperties(queues.physicalDevice, &familyCount, families.data());
     if (queues.gameQueue.familyIndex >= familyCount || queues.presentQueue.familyIndex >= familyCount ||
         queues.imageAcquireQueue.familyIndex >= familyCount ||

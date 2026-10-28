@@ -1,4 +1,6 @@
+#include "../Foundation/EngineNodeMap.h"
 #pragma once
+#include "../Foundation/EngineNodeSet.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
 #else
@@ -68,7 +70,7 @@ namespace Meta::Typed
 	// 정의는 ReflectionYml.cpp — 직렬화 훅 표는 프로세스에 하나여야 한다.
 	// 사본이 갈리면 등록한 쪽과 조회하는 쪽이 다른 표를 보고, 훅이 조용히
 	// 없는 것처럼 동작한다(ComponentFactory가 이 표로 디스패치한다).
-	std::unordered_map<size_t, TypeOps>& OpsRegistry();
+	ce::engine_node_map<size_t, TypeOps>& OpsRegistry();
 
 	inline const TypeOps* FindTypeOps(size_t typeID)
 	{
@@ -350,7 +352,7 @@ namespace Meta
 	// 인스턴스가 원본 오브젝트의 이름과 instanceID 를 받는다(verify-prefab-override-write 가 잡는다).
 	inline void DeserializePrefab(void* instance, const reflgen::type_descriptor& type,
 		const Authoring::ReadNode& newNode,
-		const std::unordered_set<std::string>& overriddenProperties)
+		const ce::engine_node_set<std::string>& overriddenProperties)
 	{
 		ScopedPropertyChangeSource sourceScope(PropertyChangeSource::Prefab);
 		Authoring::WriteDocument patchedDocument = SerializeDocument(instance, type);
@@ -374,14 +376,14 @@ namespace Meta
 
 	inline void DeserializePrefab(IObject* instance, const reflgen::type_descriptor& type,
 		const Authoring::ReadNode& newNode,
-		const std::unordered_set<std::string>& overriddenProperties)
+		const ce::engine_node_set<std::string>& overriddenProperties)
 	{
 		DeserializePrefab(ObjectAddress(instance, type), type, newNode, overriddenProperties);
 	}
 
 	template<typename T>
 	inline void DeserializePrefab(T* instance, const Authoring::ReadNode& newNode,
-		const std::unordered_set<std::string>& overriddenProperties)
+		const ce::engine_node_set<std::string>& overriddenProperties)
 	{
 		if (const reflgen::type_descriptor* type = FindRegistered<T>("DeserializePrefab"))
 		{

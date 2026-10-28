@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "Canvas.h"
 #include "Entity.h"
 #include "ImageComponent.h"
@@ -108,7 +109,7 @@ void Canvas::RemoveUIObject(Entity* obj)
 	if (nullptr == obj) return;
 
 	Scene* scene = GetOwner() ? GetOwner()->GetScene() : nullptr;
-	std::erase_if(UIObjs, [&](const EntityHandle& handle)
+	ce::erase_if(UIObjs, [&](const EntityHandle& handle)
 	{
 		Entity* resolved = scene ? scene->Resolve(handle) : nullptr;
 		return !resolved || resolved == obj;

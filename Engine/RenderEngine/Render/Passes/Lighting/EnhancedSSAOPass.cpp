@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #include "EnhancedSSAOPass.h"
 #include "../../../RHI/RHIEncoder.h"
 #include "../../../RHI/RHIShaderCompiler.h"
@@ -123,7 +124,7 @@ bool EnhancedSSAOPass::EnsureHistory(const EnhancedFrameContext& context, std::s
     {
         return true;
     }
-    std::array<RHITextureHandle, kHistoryCount> history{}, geometry{};
+    ce::fixed_array<RHITextureHandle, kHistoryCount> history{}, geometry{};
     RHITextureDesc desc{};
     desc.width = m_width;
     desc.height = m_height;
@@ -240,10 +241,10 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                                                std::span<const RHIFormat> formats, bool keepAlive,
                                                bool computeCompatible)
     {
-        std::array<EnhancedRenderGraph::RGPassUsage, 11> usages{};
-        std::array<RGHandle, 8> inputs{};
-        std::array<RGHandle, 3> outputs{};
-        std::array<RHIFormat, 3> outputFormats{};
+        ce::fixed_array<EnhancedRenderGraph::RGPassUsage, 11> usages{};
+        ce::fixed_array<RGHandle, 8> inputs{};
+        ce::fixed_array<RGHandle, 3> outputs{};
+        ce::fixed_array<RHIFormat, 3> outputFormats{};
         size_t count{};
         for (size_t i = 0; i < srvs.size(); ++i)
         {
@@ -263,8 +264,8 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
                  inputCount = srvs.size(), outputCount = uavs.size(), width = m_width,
                  height = m_height](const EnhancedRenderGraph::ExecuteContext& execute)
                 {
-                    std::array<RHIBindingDesc, 8> inputBindings{};
-                    std::array<RHIBindingDesc, 3> outputBindings{};
+                    ce::fixed_array<RHIBindingDesc, 8> inputBindings{};
+                    ce::fixed_array<RHIBindingDesc, 3> outputBindings{};
                     for (size_t i = 0; i < inputCount; ++i)
                     {
                         const auto handle = execute.ResolveHandle(inputs[i]);
@@ -304,7 +305,7 @@ void EnhancedSSAOPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameCo
 
     const uint32_t readIndex = m_historyIndex;
     const uint32_t writeIndex = 1 - readIndex;
-    std::array<RGHandle, kHistoryCount> history{}, geometry{};
+    ce::fixed_array<RGHandle, kHistoryCount> history{}, geometry{};
     constexpr const char* historyNames[]{"SSAO.History.Read", "SSAO.History.Write"};
     constexpr const char* geometryNames[]{"SSAO.GeometryHistory.Read", "SSAO.GeometryHistory.Write"};
     for (uint32_t role = 0; role < kHistoryCount; ++role)

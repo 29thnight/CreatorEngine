@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -144,8 +145,8 @@ struct Builder
         {
             const Id coordinates = Node("LXTextureCoordinates", -960, row);
             asset.graph.SetSocketValue(Pin(coordinates, "Offset"),
-                                       std::array<double, 3>{uv.offset[0], uv.offset[1], 0});
-            asset.graph.SetSocketValue(Pin(coordinates, "Scale"), std::array<double, 3>{uv.scale[0], uv.scale[1], 1});
+                                       ce::fixed_array<double, 3>{uv.offset[0], uv.offset[1], 0});
+            asset.graph.SetSocketValue(Pin(coordinates, "Scale"), ce::fixed_array<double, 3>{uv.scale[0], uv.scale[1], 1});
             asset.graph.SetSocketValue(Pin(coordinates, "Rotation"), double(uv.rotation));
             Connect(Pin(coordinates, "Vector", Direction::Output), sample, "Vector");
             row += 190;
@@ -167,7 +168,7 @@ struct Builder
         const Id bsdf = Node("ShaderNodeBsdfPrincipled", 140, 0);
         const auto base = Value(material, "baseColor", math::vector4{1, 1, 1, 1});
         Id color = Parameter("baseColor", "Base Color", PinType::Color,
-                             std::array<double, 4>{base.x, base.y, base.z, 1}, LXColorSpace::Linear);
+                             ce::fixed_array<double, 4>{base.x, base.y, base.z, 1}, LXColorSpace::Linear);
         const auto baseMap = Texture("baseColorMap", "Base Color Texture", LXColorSpace::SRGB);
         if (baseMap)
             color = Multiply(color, Pin(*baseMap, "Color", Direction::Output), PinType::Color, -260, 0);
@@ -194,7 +195,7 @@ struct Builder
         }
         const auto emissive = Value(material, "emissive", math::vector3{});
         Id emission = Parameter("emissive", "Emission Color", PinType::Color,
-                                std::array<double, 4>{emissive.x, emissive.y, emissive.z, 1}, LXColorSpace::Linear);
+                                ce::fixed_array<double, 4>{emissive.x, emissive.y, emissive.z, 1}, LXColorSpace::Linear);
         if (const auto texture = Texture("emissiveMap", "Emission Texture", LXColorSpace::SRGB))
             emission = Multiply(emission, Pin(*texture, "Color", Direction::Output), PinType::Color, -270, 930);
         Connect(emission, bsdf, "Emission Color");
@@ -275,7 +276,7 @@ std::optional<LX::LXMaterialAsset> BuildModelMaterialGraph(const experiment::Mat
     try
     {
         auto graph = Builder{material}.Build();
-        std::vector<LXMaterialDiagnostic> diagnostics;
+        ce::dynamic_array<LXMaterialDiagnostic> diagnostics;
         const auto program = GenerateMaterialSlang(graph, &diagnostics);
         if (!program)
         {
@@ -320,7 +321,7 @@ ModelMaterialGraphPublication::~ModelMaterialGraphPublication()
         {
             return {};
         }
-        std::vector<LXMaterialDiagnostic> diagnostics;
+        ce::dynamic_array<LXMaterialDiagnostic> diagnostics;
         if (!GenerateMaterialSlang(graph, &diagnostics))
         {
             error = diagnostics.empty() ? "Default graph generation failed" : diagnostics.front().message;
@@ -373,7 +374,7 @@ bool ModelMaterialGraphPublication::Prepare(const std::filesystem::path& assets,
             return false;
         }
         for (const auto& [destination, payload] :
-             std::array{std::pair{path, text}, std::pair{meta, "guid: " + uuid::to_string(graphId) + "\n"}})
+             ce::fixed_array{ce::pair{path, text}, ce::pair{meta, "guid: " + uuid::to_string(graphId) + "\n"}})
         {
             static std::atomic<std::uint64_t> serial{};
             const auto staging =

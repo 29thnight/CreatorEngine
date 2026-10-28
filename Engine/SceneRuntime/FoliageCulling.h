@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "../Utility_Framework/Foundation/Mathematics.Intersect.h"
@@ -9,11 +10,12 @@ namespace foliage
 // Owner-thread pass over already sealed poses. The resolver borrows bounds
 // from the component's existing owners; neither poses nor owners are copied.
 template <typename Instance, size_t Extent, typename BoundsResolver>
-void CullSealedInstances(std::span<Instance, Extent> instances, size_t typeCount,
+size_t CullSealedInstances(std::span<Instance, Extent> instances, size_t typeCount,
     BoundsResolver&& resolveBounds,
     const std::optional<math::bounding_frustum>& cameraFrustum, bool playing)
 {
-    if (typeCount == 0) return;
+    size_t transformed = 0;
+    if (typeCount == 0) return 0;
     for (auto& instance : instances)
     {
         if (static_cast<size_t>(instance.m_foliageTypeID) >= typeCount) continue;
@@ -26,11 +28,13 @@ void CullSealedInstances(std::span<Instance, Extent> instances, size_t typeCount
         if (playing)
         {
             const math::aabb worldBounds = math::transform(*bounds, instance.m_worldMatrix);
+            ++transformed;
             instance.m_isCulled = cameraFrustum.has_value() && !worldBounds.is_empty() &&
                 !math::intersects(*cameraFrustum, worldBounds);
         }
         else instance.m_isCulled = false;
     }
+    return transformed;
 }
 
 // Component-local, non-owning derived values only. No asset pointers/owners are
@@ -45,13 +49,17 @@ class WorldBoundsCache
         bool dirty{true};
         bool hasBounds{};
     };
-    std::vector<Entry> entries_;
+    ce::dynamic_array<Entry> entries_;
 
 public:
     WorldBoundsCache() = default;
     WorldBoundsCache(const WorldBoundsCache&) = delete;
     WorldBoundsCache& operator=(const WorldBoundsCache&) = delete;
     void Clear() noexcept { entries_.clear(); } // retain capacity for reload
+    size_t AllocatedBytes() const noexcept { return entries_.capacity() * sizeof(Entry); }
+    size_t ActiveBytes() const noexcept { return entries_.size() * sizeof(Entry); }
+    // Explicit diagnostic baseline only; ordinary invalidation retains capacity.
+    void ReleaseStorage() noexcept { ce::dynamic_array<Entry>{}.swap(entries_); }
     void InvalidateAll() noexcept
     {
         for (auto& entry : entries_) entry.dirty = true;

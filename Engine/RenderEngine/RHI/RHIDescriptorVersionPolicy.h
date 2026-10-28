@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
@@ -335,7 +336,7 @@ class RHIDescriptorVersionPolicy
         return nullptr;
     }
 
-    std::vector<Slot> m_slots;
+    ce::dynamic_array<Slot> m_slots;
     uint32_t m_peakVersions{0};
     uint64_t m_creates{0};
     uint64_t m_reuses{0};

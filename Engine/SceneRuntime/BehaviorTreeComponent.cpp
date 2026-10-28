@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -121,7 +122,7 @@ void BehaviorTreeComponent::SendGraphToManaged(const BTBuildGraph& graph)
 		m_treeInstanceId = -1;
 	}
 
-	const std::vector<ClrHost::ScriptBTNodeDesc> nodes = BTFlatten::Flatten(graph);
+	const ce::dynamic_array<ClrHost::ScriptBTNodeDesc> nodes = BTFlatten::Flatten(graph);
 	if (nodes.empty())
 	{
 		Debug::PrintLog(spdlog::level::err, "[BT] 그래프가 비어 있어 트리를 만들지 못했다: " + name);
@@ -130,7 +131,7 @@ void BehaviorTreeComponent::SendGraphToManaged(const BTBuildGraph& graph)
 
 	// 저작 블랙보드를 함께 실어 보낸다. 이걸 빠뜨리면 관리 측 트리가 빈 블랙보드로
 	// 시작해 노드가 읽는 값이 전부 기본값이 된다 — 기존 BT 에셋이 다르게 움직인다.
-	std::vector<ClrHost::ScriptBBEntry> entries;
+	ce::dynamic_array<ClrHost::ScriptBBEntry> entries;
 	if (nullptr != m_blackboard) entries = BTFlatten::FlattenBlackBoard(*m_blackboard);
 
 	// 노드가 몇 개든, 블랙보드 항목이 몇 개든 경계 통과는 한 번이다.

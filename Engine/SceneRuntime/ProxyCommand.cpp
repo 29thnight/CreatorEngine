@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -144,7 +145,7 @@ ProxyCommand::ProxyCommand(MeshRenderer* component, uint64_t sceneEpoch) :
 			// Preserve the old bind-pose fallback when no generation is bound yet.
 			static const auto identity = []
 			{
-			std::array<math::matrix4x4, kMaxBones> matrices{};
+			ce::fixed_array<math::matrix4x4, kMaxBones> matrices{};
 			matrices.fill(math::matrix4x4::identity());
 			return matrices;
 			}();

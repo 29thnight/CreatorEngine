@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -35,7 +37,7 @@ class SceneRuntimeEffectsFrame
     void DeclareBackground(EnhancedRenderGraph& graph, RGHandle color, RGHandle depth) const;
     RGHandle DeclareDepthOutput(EnhancedRenderGraph& graph) const;
     void RecordDepth(const EnhancedRenderGraph::ExecuteContext& execution, RGHandle source, std::size_t tile) const;
-    std::array<RGHandle, 14> DeclareCaptureOutputs(EnhancedRenderGraph& graph, unsigned part) const;
+    ce::fixed_array<RGHandle, 14> DeclareCaptureOutputs(EnhancedRenderGraph& graph, unsigned part) const;
     std::span<const RHITextureHandle> Inputs() const;
     RHITextureHandle Depth() const;
     RHIRenderTargetBinding CaptureTargets(unsigned part) const;
@@ -74,17 +76,17 @@ class SceneRuntimeEffectsFrame
     own::shared_owner<SceneRuntimeEffectBundle> bundle_;
     std::uint64_t recording_{}, descriptors_{}, lease_{};
     bool transmission_{};
-    std::vector<SceneRuntimeEffectTile> tiles_;
+    ce::dynamic_array<SceneRuntimeEffectTile> tiles_;
     own::shared_owner<const LX::Runtime::GraphicsGeneration> depthCopy_;
     RHIBindingTable inputs_, background_;
     RHIRenderTargetBinding depthTarget_;
-    std::array<RHIRenderTargetBinding, 2> captureTargets_{};
+    ce::fixed_array<RHIRenderTargetBinding, 2> captureTargets_{};
     mutable std::mutex depthBindingMutex_;
-    mutable std::map<std::uint64_t, RHIBindingTable> depthBindings_;
+    mutable ce::engine_ordered_map<std::uint64_t, RHIBindingTable> depthBindings_;
     own::weak_owner<const SceneRuntimeEffectsFrame> self_;
     mutable const EnhancedRenderGraph* graph_{};
     mutable std::uint64_t graphEpoch_{};
-    mutable std::array<RGHandle, 14> graphInputs_{};
+    mutable ce::fixed_array<RGHandle, 14> graphInputs_{};
     mutable RGHandle graphTileDepth_, graphColor_, graphDepth_;
 };
 

@@ -1,3 +1,4 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
 #pragma once
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -113,6 +114,6 @@ public:
 
 private:
 	mutable std::shared_mutex m_mutex;
-    std::unordered_map<FileGuid, std::filesystem::path> m_guidToPath;
-    std::unordered_map<std::filesystem::path, FileGuid> m_pathToGuid;
+    ce::engine_node_map<FileGuid, std::filesystem::path> m_guidToPath;
+    ce::engine_node_map<std::filesystem::path, FileGuid> m_pathToGuid;
 };

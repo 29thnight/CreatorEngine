@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -50,7 +51,7 @@ namespace ce::profiler_viewer
         source_artifact_ptr dx_source;
         std::uint64_t dx_source_id = 0;
         bool dx_source_finalized = false;
-        std::shared_ptr<const std::vector<std::byte>> diagnostics;
+        std::shared_ptr<const ce::dynamic_array<std::byte>> diagnostics;
         std::uint64_t revision = 0;
         std::uint64_t clear_revision = 0;
         bool clear_pending = false;

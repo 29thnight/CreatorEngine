@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "ImGui.h"
 #include "OutputLogWindow.h"
 #include "EditorTheme.h"
@@ -230,7 +231,7 @@ namespace editor
             ImGuiWindowFlags_AlwaysVerticalScrollbar);
 
         const ImGuiStyle& style = ImGui::GetStyle();
-        const std::vector<OutputLogRow>& rows = m_view.Rows();
+        const ce::dynamic_array<OutputLogRow>& rows = m_view.Rows();
         const float textHeight = ImGui::GetTextLineHeight();
         const float gutter = MeasureText(EditorIcon::Warning) + style.ItemSpacing.x * 2.0f;
 

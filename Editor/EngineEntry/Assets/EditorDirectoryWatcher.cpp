@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "EditorDirectoryWatcher.h"
 
 #ifndef NOMINMAX
@@ -98,7 +99,7 @@ namespace
 	}
 
 	bool ParseClassicNotifications(const std::byte* buffer, DWORD byteCount,
-		std::vector<NativeNotification>& notifications)
+		ce::dynamic_array<NativeNotification>& notifications)
 	{
 		std::size_t offset = 0;
 		while (offset < byteCount)
@@ -135,7 +136,7 @@ namespace
 	}
 
 	bool ParseExtendedNotifications(const std::byte* buffer, DWORD byteCount,
-		std::vector<NativeNotification>& notifications)
+		ce::dynamic_array<NativeNotification>& notifications)
 	{
 		std::size_t offset = 0;
 		while (offset < byteCount)
@@ -348,7 +349,7 @@ private:
 			}
 			if (WAIT_TIMEOUT == waitResult)
 			{
-				std::vector<Change> expired;
+				ce::dynamic_array<Change> expired;
 				FlushExpiredRenames(expired);
 				Dispatch(expired);
 				continue;
@@ -398,7 +399,7 @@ private:
 				continue;
 			}
 
-			std::vector<NativeNotification> nativeNotifications;
+			ce::dynamic_array<NativeNotification> nativeNotifications;
 			const bool parsed = m_usingExtendedNotifications
 				? ParseExtendedNotifications(
 					m_buffer.data(), byteCount, nativeNotifications)
@@ -417,7 +418,7 @@ private:
 				continue;
 			}
 
-			std::vector<Change> changes;
+			ce::dynamic_array<Change> changes;
 			ProcessNotifications(nativeNotifications, changes);
 			FlushExpiredRenames(changes);
 
@@ -436,8 +437,8 @@ private:
 	}
 
 	void ProcessNotifications(
-		const std::vector<NativeNotification>& nativeNotifications,
-		std::vector<Change>& changes)
+		const ce::dynamic_array<NativeNotification>& nativeNotifications,
+		ce::dynamic_array<Change>& changes)
 	{
 		for (const NativeNotification& notification : nativeNotifications)
 		{
@@ -467,7 +468,7 @@ private:
 	}
 
 	void RememberOldName(const NativeNotification& notification,
-		const std::filesystem::path& oldPath, std::vector<Change>& changes)
+		const std::filesystem::path& oldPath, ce::dynamic_array<Change>& changes)
 	{
 		if (notification.hasFileId)
 		{
@@ -488,7 +489,7 @@ private:
 	}
 
 	void CompleteRename(const NativeNotification& notification,
-		const std::filesystem::path& newPath, std::vector<Change>& changes)
+		const std::filesystem::path& newPath, ce::dynamic_array<Change>& changes)
 	{
 		auto oldName = m_pendingRenames.end();
 		if (notification.hasFileId)
@@ -515,7 +516,7 @@ private:
 		m_pendingRenames.erase(oldName);
 	}
 
-	void FlushExpiredRenames(std::vector<Change>& changes)
+	void FlushExpiredRenames(ce::dynamic_array<Change>& changes)
 	{
 		const auto now = std::chrono::steady_clock::now();
 		auto pending = m_pendingRenames.begin();
@@ -551,7 +552,7 @@ private:
 			static_cast<std::int64_t>((std::numeric_limits<DWORD>::max)() - 1)));
 	}
 
-	void Dispatch(const std::vector<Change>& changes) noexcept
+	void Dispatch(const ce::dynamic_array<Change>& changes) noexcept
 	{
 		for (const Change& change : changes)
 		{
@@ -628,8 +629,8 @@ private:
 	HANDLE m_ioEvent{};
 	HANDLE m_stopEvent{};
 	OVERLAPPED m_overlapped{};
-	std::vector<std::byte> m_buffer{};
-	std::vector<PendingRename> m_pendingRenames{};
+	ce::dynamic_array<std::byte> m_buffer{};
+	ce::dynamic_array<PendingRename> m_pendingRenames{};
 	ReadDirectoryChangesExFunction m_readExtended{};
 	bool m_usingExtendedNotifications{};
 	bool m_readOutstanding{};

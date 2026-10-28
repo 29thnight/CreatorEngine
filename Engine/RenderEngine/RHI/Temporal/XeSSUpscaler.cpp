@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -374,7 +375,7 @@ class XeSSUpscalerBridgeDX12 final : public ITemporalUpscaler
 {
 public:
     XeSSUpscalerBridgeDX12(DX12DeviceResources& resources, const XeSSUpscalerConfig& config,
-        std::function<TemporalResult()> drain)
+        ce::owned_func<TemporalResult()> drain)
         : m_resources(resources), m_config(config), m_drain(std::move(drain)),
           m_adapter(own::make_unique<XeSSUpscalerDX12>()) {}
     ~XeSSUpscalerBridgeDX12() override
@@ -451,14 +452,14 @@ public:
 private:
     DX12DeviceResources& m_resources;
     XeSSUpscalerConfig m_config;
-    std::function<TemporalResult()> m_drain;
+    ce::owned_func<TemporalResult()> m_drain;
     own::unique_owner<XeSSUpscalerDX12> m_adapter;
 };
 }
 #endif
 
 TemporalResult CreateXeSSUpscalerDX12(DX12DeviceResources& resources, const wchar_t* runtimeDirectory,
-    const XeSSUpscalerConfig& config, std::function<TemporalResult()> drain,
+    const XeSSUpscalerConfig& config, ce::owned_func<TemporalResult()> drain,
     own::unique_owner<ITemporalUpscaler>& upscaler)
 {
     if (upscaler) return { TemporalStatus::AlreadyInitialized };
@@ -695,7 +696,7 @@ class XeSSUpscalerBridgeVulkan final : public ITemporalUpscaler
 {
 public:
     XeSSUpscalerBridgeVulkan(VulkanDeviceResources& resources, const XeSSUpscalerConfig& config,
-        std::function<TemporalResult()> drain, own::unique_owner<XeSSUpscalerVulkan> adapter)
+        ce::owned_func<TemporalResult()> drain, own::unique_owner<XeSSUpscalerVulkan> adapter)
         : m_resources(resources), m_config(config), m_drain(std::move(drain)), m_adapter(std::move(adapter)) {}
     ~XeSSUpscalerBridgeVulkan() override
     {
@@ -782,7 +783,7 @@ public:
 private:
     VulkanDeviceResources& m_resources;
     XeSSUpscalerConfig m_config;
-    std::function<TemporalResult()> m_drain;
+    ce::owned_func<TemporalResult()> m_drain;
     own::unique_owner<XeSSUpscalerVulkan> m_adapter;
 };
 }
@@ -790,7 +791,7 @@ private:
 
 TemporalResult CreateXeSSUpscalerVulkan(VulkanDeviceResources& resources,
     own::unique_owner<XeSSUpscalerVulkan>& preparedRuntime, const XeSSUpscalerConfig& config,
-    std::function<TemporalResult()> drain, own::unique_owner<ITemporalUpscaler>& upscaler)
+    ce::owned_func<TemporalResult()> drain, own::unique_owner<ITemporalUpscaler>& upscaler)
 {
     if (upscaler) return { TemporalStatus::AlreadyInitialized };
     if (!drain || !preparedRuntime) return { TemporalStatus::InvalidInput };

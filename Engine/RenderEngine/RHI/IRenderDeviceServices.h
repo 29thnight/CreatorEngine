@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -263,7 +264,7 @@ public:
     // the supplied buffer is retained. Unsupported backends reject preparation.
     virtual bool EncodeIndirectBuffer(const RHIBufferSlice&, uint64_t&) const { return false; }
     // Native 16-byte index-buffer view used only inside an indirect command.
-    virtual bool EncodeIndirectIndexBuffer(const RHIBufferSlice&, RHIFormat, std::array<uint32_t, 4>&) const { return false; }
+    virtual bool EncodeIndirectIndexBuffer(const RHIBufferSlice&, RHIFormat, ce::fixed_array<uint32_t, 4>&) const { return false; }
 
     /// 그래프 밖에서 상태를 바꾼다. 지금 열려 있는 커맨드 리스트에 기록한다.
     ///

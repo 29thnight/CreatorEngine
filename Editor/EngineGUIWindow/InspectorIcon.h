@@ -1,3 +1,4 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
 #pragma once
 #include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -63,7 +64,7 @@ namespace editor::inspector
     }();
 
     /// 타입 ID → 글리프. 그리는 쪽은 런타임 타입만 들고 있으므로 표가 필요하다.
-    std::unordered_map<std::size_t, const char*>& inspector_icon_table();
+    ce::engine_node_map<std::size_t, const char*>& inspector_icon_table();
 
     inline void set_inspector_icon(std::size_t typeID, const char* glyph) noexcept
     {

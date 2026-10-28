@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "ModelData.h"
@@ -32,8 +33,8 @@ namespace experiment::sampler
 
 	struct Pose final
 	{
-		std::vector<math::matrix4x4> finals{};   // 게시 bone index 기준
-		std::vector<std::uint8_t> hasChannel{};
+		ce::dynamic_array<math::matrix4x4> finals{};   // 게시 bone index 기준
+		ce::dynamic_array<std::uint8_t> hasChannel{};
 	};
 
 	void EvaluatePose(const experiment::Skeleton& skeleton,

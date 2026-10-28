@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -73,7 +74,7 @@ public:
 
     void RefreshTexture();
 
-    std::vector<TerrainLayer> GetLayerCount() const { return m_layers; }
+    ce::dynamic_array<TerrainLayer> GetLayerCount() const { return m_layers; }
     TerrainLayer* GetLayerDesc(uint32_t layerID)
     {
         for (auto& desc : m_layers)
@@ -87,7 +88,7 @@ public:
         //throw std::runtime_error("Layer ID not found");
     }
 
-    std::vector<const char*> GetLayerNames()
+    ce::dynamic_array<const char*> GetLayerNames()
     {
         m_layerNames.clear(); // 이전 이름들 초기화
         for (const auto& desc : m_layers)
@@ -102,7 +103,7 @@ public:
     TerrainBrush* GetCurrentBrush() { return m_currentBrush; }
 
     //브러시 마스크 관련
-    bool LoadBrushMaskTexture(const std::wstring& path, std::vector<uint8_t>& outMask, int& dataWidth, int& dataHeight);
+    bool LoadBrushMaskTexture(const std::wstring& path, ce::dynamic_array<uint8_t>& outMask, int& dataWidth, int& dataHeight);
     void SetBrushMaskTexture(TerrainBrush* brush, const std::wstring& path);
 
     // Collider용 접근자
@@ -123,9 +124,9 @@ public:
 
 private:
 
-    bool LoadEditorHeightMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, std::vector<float>& out);
+    bool LoadEditorHeightMap(std::filesystem::path& pngPath, float dataWidth, float dataHeight, float minH, float maXH, ce::dynamic_array<float>& out);
 
-    bool LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, std::vector<std::vector<float>>& out);
+    bool LoadEditorSplatMap(std::filesystem::path& pngPath, int dataWidth, int dataHeight, int layerIndex, ce::dynamic_array<ce::dynamic_array<float>>& out);
 public:
     FileGuid m_trrainAssetGuid{};// 에셋 가이드
 
@@ -136,16 +137,16 @@ private:
     friend class ProxyCommand;
 
     [[reflgen::ignore]]
-    std::vector<float> m_heightMap;
+    ce::dynamic_array<float> m_heightMap;
 
     [[reflgen::ignore]]
-    std::vector<math::vector3> m_vNormalMap;
+    ce::dynamic_array<math::vector3> m_vNormalMap;
 
     [[reflgen::ignore]]
-    std::vector<TerrainLayer>            m_layers; // 레이어 정보들
+    ce::dynamic_array<TerrainLayer>            m_layers; // 레이어 정보들
 
     [[reflgen::ignore]]
-    std::vector<std::vector<float>>      m_layerHeightMap; // 레이어별 높이 맵 가중치 (각 레이어마다 m_width * m_height 크기의 벡터를 가짐)
+    ce::dynamic_array<ce::dynamic_array<float>>      m_layerHeightMap; // 레이어별 높이 맵 가중치 (각 레이어마다 m_width * m_height 크기의 벡터를 가짐)
 
     // 지형 메시를 한 덩어리로 가진다면, 필요 시 분할 대응 가능
 
@@ -179,7 +180,7 @@ private:
 
     //== window 공용으로 사용 불가능
     [[reflgen::ignore]]
-    std::vector<const char*>             m_layerNames; // 레이어 이름들 (디버깅용)
+    ce::dynamic_array<const char*>             m_layerNames; // 레이어 이름들 (디버깅용)
 
     [[reflgen::ignore]]
     uint32 m_terrainID{ 0 }; // 지형 ID

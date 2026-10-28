@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include <mathematics/vector2.hpp>
 #include "BTBuildNode.h"
@@ -7,12 +9,12 @@ struct [[reflgen::reflect]] BTBuildGraph
 {
    public:
 	[[reflgen::ignore]]
-	std::unordered_map<HashedGuid, BTBuildNode*> Nodes;
+	ce::engine_node_map<HashedGuid, BTBuildNode*> Nodes;
 
 	[[reflgen::ignore]]
 	BTBuildNode* SelectedNode{ nullptr };
 
-	std::vector<BTBuildNode> NodeList;
+	ce::dynamic_array<BTBuildNode> NodeList;
 
 	BTBuildGraph()
 	{
@@ -92,7 +94,7 @@ struct [[reflgen::reflect]] BTBuildGraph
 				{
 					otherNode->ParentID = HashedGuid(); // 부모 ID 초기화
 				}
-				std::erase_if(otherNode->Children, 
+				ce::erase_if(otherNode->Children,
 					[&id](const HashedGuid& childId) { return childId == id; }); // 자식 ID 제거
 			}
 
@@ -140,7 +142,7 @@ struct [[reflgen::reflect]] BTBuildGraph
 		return HashedGuid();
 	}
 
-	std::vector<std::string> GetRegisteredKey() const
+	ce::dynamic_array<std::string> GetRegisteredKey() const
 	{
 		// 빌드 메뉴에서 사용할 노드 타입 목록 반환:
 		// 스크립트가 필요한 Action 노드 및 Condition 노드는 외부에서 따로 처리함.

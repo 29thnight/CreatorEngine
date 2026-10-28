@@ -1,3 +1,5 @@
+#include "../../Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../../Containers/ContainerAPI.h"
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -34,7 +36,7 @@ namespace wave
         void CheckFields(const ReadNode& node, std::initializer_list<std::string_view> allowed)
         {
             Require(node.IsMap(), "Expected a sound asset object");
-            std::unordered_set<std::string> seen;
+            ce::engine_node_set<std::string> seen;
             for (const auto item : node.Map())
             {
                 const auto name = item.key.AsString();
@@ -116,7 +118,7 @@ namespace wave
         void WriteParameters(WriteNode node, const ParameterMap& values)
         {
             node.SetMap();
-            std::vector<std::string> names;
+            ce::dynamic_array<std::string> names;
             for (const auto& [name, value] : values)
             {
                 names.push_back(name);
@@ -397,7 +399,7 @@ namespace wave
         return PresetDocument(preset).Dump();
     }
 
-    bool CookSoundGraph(const SoundGraphDefinition& graph, std::vector<std::byte>& out, std::string& error)
+    bool CookSoundGraph(const SoundGraphDefinition& graph, ce::dynamic_array<std::byte>& out, std::string& error)
     {
         if (!CompileSoundGraph(graph, [](const ClipKey& key) { return key.IsGuid(); }, error))
         {
@@ -426,7 +428,7 @@ namespace wave
         }
     }
 
-    bool CookSoundPreset(const SoundPreset& preset, std::vector<std::byte>& out, std::string& error)
+    bool CookSoundPreset(const SoundPreset& preset, ce::dynamic_array<std::byte>& out, std::string& error)
     {
         if (!preset.source.asset.IsGuid() || preset.source.kind == SoundSourceKind::Preset)
         {

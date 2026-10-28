@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -68,9 +69,9 @@ namespace experiment
 		std::uint64_t generation_{ NextGeneration() };
 		ModelMetadata metadata_{};
 		NodeIndex rootNode_{};
-		std::vector<ModelNode> nodes_{};
-		std::vector<Mesh> meshes_{};
-		std::vector<Material> materials_{};
+		ce::dynamic_array<ModelNode> nodes_{};
+		ce::dynamic_array<Mesh> meshes_{};
+		ce::dynamic_array<Material> materials_{};
 		std::optional<Skeleton> skeleton_{};
 		std::optional<AnimatorData> animator_{};
 	};

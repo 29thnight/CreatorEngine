@@ -1,4 +1,6 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
@@ -78,7 +80,7 @@ class IRHIParallelCommandPool
     /// 첫 예외를 전파한다. 중지 중 제출과 공용 워커의 중첩 동기 호출은 거절한다.
     /// Initialize/BeginFrame/Open/RunParallel/Close/Shutdown은 owner가 직렬화한다.
     /// 따라서 반환 뒤에는 기록 Job이 자원을 참조하지 않는다. GPU 완료 대기는 별도다.
-    void RunParallel(const std::function<void(uint32_t)>& job, uint32_t workerCount)
+    void RunParallel(const ce::owned_func<void(uint32_t)>& job, uint32_t workerCount)
     {
         if (0 == workerCount)
         {
@@ -92,14 +94,14 @@ class IRHIParallelCommandPool
         RHIRunCommandRecordingJobs(m_scheduler, job, workerCount);
     }
 
-    void RunTaskGraph(const RHIRecordingTaskGraph& graph, const std::function<void(uint32_t)>& job,
+    void RunTaskGraph(const RHIRecordingTaskGraph& graph, const ce::owned_func<void(uint32_t)>& job,
                       const RHIRecordingExecutionOptions& options = {})
     {
         if (!IsInitialized())
         {
             throw std::logic_error("command recording pool is not initialized");
         }
-        std::array<uint32_t, kMaxWorkers> previous;
+        ce::fixed_array<uint32_t, kMaxWorkers> previous;
         previous.fill(UINT32_MAX);
         for (uint32_t index = 0; index < graph.nodes.size(); ++index)
         {
@@ -134,7 +136,7 @@ class IRHIParallelCommandPool
             return false;
         }
 
-        std::array<bool, kMaxWorkers> seen{};
+        ce::fixed_array<bool, kMaxWorkers> seen{};
         for (const uint32_t worker : workerOrder)
         {
             if (worker >= GetWorkerCount() || worker >= kMaxWorkers)

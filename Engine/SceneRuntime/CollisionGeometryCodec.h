@@ -1,4 +1,5 @@
 #pragma once
+#include "../Containers/ContainerAPI.h"
 
 #include "CollisionGeometrySource.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -12,14 +13,14 @@ class CollisionGeometryCodec final
   public:
     static constexpr std::size_t max_bytes = 64 * 1024 * 1024;
 
-    static result<std::vector<std::byte>> Encode(const CollisionGeometrySource& source)
+    static result<ce::dynamic_array<std::byte>> Encode(const CollisionGeometrySource& source)
     {
         if (auto valid = ValidateCollisionGeometrySource(source); !valid)
             return std::unexpected(valid.error());
 
         try
         {
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
             const auto payloadSize = std::visit(
                 [](const auto& input) -> std::size_t {
                     using T = std::remove_cvref_t<decltype(input)>;
@@ -129,7 +130,7 @@ class CollisionGeometryCodec final
                     (kind == 1 && !triangles) || count * 12 + triangles * 12 != bytes.size() - cursor)
                     return Corrupt();
 
-                std::vector<math::vector3> points;
+                ce::dynamic_array<math::vector3> points;
                 points.reserve(static_cast<std::size_t>(count));
                 for (std::uint64_t i = 0; i < count; ++i)
                 {
@@ -173,7 +174,7 @@ class CollisionGeometryCodec final
         return std::unexpected(error{error_code::invalid_argument, 0, "Corrupt collision geometry source"});
     }
 
-    static void Put(std::vector<std::byte>& output, std::uint64_t value, std::size_t width)
+    static void Put(ce::dynamic_array<std::byte>& output, std::uint64_t value, std::size_t width)
     {
         for (std::size_t i = 0; i < width; ++i)
             output.push_back(std::byte((value >> (i * 8)) & 255));

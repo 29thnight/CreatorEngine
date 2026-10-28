@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -28,7 +29,7 @@ class UIRenderProxy : public own::enable_owner_from_this<UIRenderProxy>
 public:
     struct ImageData
     {
-		std::vector<own::shared_owner<const Texture>>   textures;
+		ce::dynamic_array<own::shared_owner<const Texture>>   textures;
         own::shared_owner<const Texture>                texture{ nullptr };
 		math::vector2                           origin{};
         math::vector3                          position{};

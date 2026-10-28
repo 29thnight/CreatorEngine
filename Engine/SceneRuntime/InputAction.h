@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineFunc.h"
 #include <mathematics/vector2.hpp>
 #include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
@@ -110,9 +112,9 @@ public:
 	void SetValueType(InputValueType _inputValueType) { valueType = _inputValueType; };
 
 	[[reflgen::ignore]]
-	std::vector<size_t> key = { 0 };
+	ce::dynamic_array<size_t> key = { 0 };
 
-	void SetKey(std::vector<size_t> _key) { key = _key; };
+	void SetKey(ce::dynamic_array<size_t> _key) { key = _key; };
 	void SetControllerButton(ControllerButton _btn);
 
 
@@ -136,9 +138,9 @@ public:
 	ControllerButton m_controllerButton = ControllerButton::None;
 
 	[[reflgen::ignore]]
-	std::function<void()> buttonAction;
+	ce::owned_func<void()> buttonAction;
 
 	[[reflgen::ignore]]
-	std::function<void(std::any)> valueAction;
+	ce::owned_func<void(std::any)> valueAction;
 
 };

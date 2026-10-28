@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
 
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -8,7 +9,7 @@ class EditorPlatform final
 {
 public:
 	using OpenFileOverride =
-		std::function<bool(const std::filesystem::path& filepath)>;
+		ce::owned_func<bool(const std::filesystem::path& filepath)>;
 
 	static EditorPlatform& Get() noexcept;
 

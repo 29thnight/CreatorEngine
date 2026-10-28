@@ -1,4 +1,5 @@
 #pragma once
+#include "../Containers/ContainerAPI.h"
 #include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 
@@ -40,8 +41,8 @@ struct [[reflgen::reflect]] AssetEntry
 
 	friend auto operator<=>(const AssetEntry& lhs, const AssetEntry& rhs)
 	{
-		return std::tie(lhs.assetTypeID, lhs.assetName)
-			<=> std::tie(rhs.assetTypeID, rhs.assetName);
+		return ce::tie(lhs.assetTypeID, lhs.assetName)
+			<=> ce::tie(rhs.assetTypeID, rhs.assetName);
 	}
 
 	friend bool operator==(const AssetEntry& lhs, const AssetEntry& rhs)

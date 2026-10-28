@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #include <mathematics/matrix4x4.hpp>
 #include "../../FrameCameraSnapshot.h"
@@ -60,13 +61,13 @@ inline float BlendStart(float split, float band) { return split - std::fabs(spli
 
 // Shared by pre-budget scene selection and shadow projection. Camera visibility
 // and caster relevance must use the same receiver coverage, including overlap.
-inline std::array<ReceiverCascade, 3> ReceiverCascades(const FrameCameraSnapshot& camera,
+inline ce::fixed_array<ReceiverCascade, 3> ReceiverCascades(const FrameCameraSnapshot& camera,
     math::vector3 lightDirection, float distance, float blendBand, unsigned mapSize = 2048)
 {
     const auto inverseProjection = math::inverse(camera.projection);
     const float nearPlane = camera.isOrthographic ? camera.nearPlane : (std::max)(camera.nearPlane, .001f);
     const float farPlane = (std::max)(nearPlane + .001f, (std::min)(camera.farPlane, distance));
-    std::array<float, 4> splits{nearPlane, 0, 0, farPlane};
+    ce::fixed_array<float, 4> splits{nearPlane, 0, 0, farPlane};
     for (unsigned i = 1; i < 3; ++i)
     {
         const float ratio = float(i) / 3.f;
@@ -75,11 +76,11 @@ inline std::array<ReceiverCascade, 3> ReceiverCascades(const FrameCameraSnapshot
             : .75f * nearPlane * std::pow(farPlane / nearPlane, ratio) + .25f * uniform;
     }
     const float xy[4][2]{{1, 1}, {1, -1}, {-1, 1}, {-1, -1}};
-    std::array<ReceiverCascade, 3> result;
+    ce::fixed_array<ReceiverCascade, 3> result;
     for (unsigned i = 0; i < 3; ++i)
     {
         const float from = i == 0 ? nearPlane : (std::max)(nearPlane, BlendStart(splits[i], blendBand));
-        std::array<math::vector3, 8> corners;
+        ce::fixed_array<math::vector3, 8> corners;
         math::vector3 center{};
         for (unsigned j = 0; j < 4; ++j)
         {
@@ -108,7 +109,7 @@ inline bool CastsInto(const Sphere& receiver, const Sphere& caster, math::vector
 }
 
 inline bool RelevantToView(bool visible, const Sphere& caster,
-    const std::array<ReceiverCascade, 3>& receivers, math::vector3 direction, bool hasShadowLight)
+    const ce::fixed_array<ReceiverCascade, 3>& receivers, math::vector3 direction, bool hasShadowLight)
 {
     if (visible) return true;
     if (!hasShadowLight) return false;

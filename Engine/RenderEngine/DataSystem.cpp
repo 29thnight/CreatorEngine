@@ -1,3 +1,7 @@
+#include "../Utility_Framework/Foundation/EngineFunc.h"
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -120,14 +124,14 @@ namespace
     using asset_cache_detail::LegacyMaterialRetainedBytes;
     using asset_cache_detail::LegacyAuthoredMaterialRetainedBytes;
 
-	constexpr std::array<char, 4> kMaterialPayloadMagic{ 'C', 'E', 'M', 'T' };
+	constexpr ce::fixed_array<char, 4> kMaterialPayloadMagic{ 'C', 'E', 'M', 'T' };
 	constexpr std::uint16_t kMaterialPayloadVersion = 2;
 	constexpr std::uint16_t kMaterialPayloadCookedDocumentEncoding = 2;
 	constexpr std::uint32_t kMaxMaterialPayloadBytes = 4u * 1024u * 1024u;
 
 	void WriteU16(std::ostream& output, std::uint16_t value)
 	{
-		const std::array<char, 2> bytes{
+		const ce::fixed_array<char, 2> bytes{
 			static_cast<char>(value & 0xffu),
 			static_cast<char>((value >> 8u) & 0xffu)
 		};
@@ -136,7 +140,7 @@ namespace
 
 	void WriteU32(std::ostream& output, std::uint32_t value)
 	{
-		const std::array<char, 4> bytes{
+		const ce::fixed_array<char, 4> bytes{
 			static_cast<char>(value & 0xffu),
 			static_cast<char>((value >> 8u) & 0xffu),
 			static_cast<char>((value >> 16u) & 0xffu),
@@ -147,7 +151,7 @@ namespace
 
 	bool ReadU16(std::istream& input, std::uint16_t& value)
 	{
-		std::array<unsigned char, 2> bytes{};
+		ce::fixed_array<unsigned char, 2> bytes{};
 		input.read(reinterpret_cast<char*>(bytes.data()), bytes.size());
 		if (!input) return false;
 		value = static_cast<std::uint16_t>(bytes[0])
@@ -157,7 +161,7 @@ namespace
 
 	bool ReadU32(std::istream& input, std::uint32_t& value)
 	{
-		std::array<unsigned char, 4> bytes{};
+		ce::fixed_array<unsigned char, 4> bytes{};
 		input.read(reinterpret_cast<char*>(bytes.data()), bytes.size());
 		if (!input) return false;
 		value = static_cast<std::uint32_t>(bytes[0])
@@ -399,7 +403,7 @@ namespace
         DataSystem::TextureFileType type)
     {
         const std::filesystem::path requested(name);
-        const std::array candidates{ requested,
+        const ce::fixed_array candidates{ requested,
             requested.is_relative() ? ce::paths::relative() / requested : requested,
             ce::paths::relative(std::string(TextureFallbackDirectory(type))) / requested.filename() };
         for (const auto& candidate : candidates)
@@ -474,28 +478,28 @@ struct DataSystem::SceneAssetPreparation
     std::atomic<bool> cancelled{}, finished{};
     std::atomic<unsigned> phase{}; // Discovery, models, graphs, resources, ready.
     std::atomic<std::size_t> completed{}, total{};
-    std::vector<own::shared_owner<PreparedRuntimeAsset>> models, graphs;
-    std::vector<AssetDepot::AssetRequest<assets::ModelMeshDescriptor>> meshRequests;
-    std::vector<own::shared_owner<const assets::ModelMeshDescriptor>> meshPins;
+    ce::dynamic_array<own::shared_owner<PreparedRuntimeAsset>> models, graphs;
+    ce::dynamic_array<AssetDepot::AssetRequest<assets::ModelMeshDescriptor>> meshRequests;
+    ce::dynamic_array<own::shared_owner<const assets::ModelMeshDescriptor>> meshPins;
     own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog;
-    std::map<FileGuid, AssetDepot::AssetRequest<Material>> materialRequests;
-    std::map<FileGuid, AssetDepot::AssetRequest<experiment::Material>> authoredRequests;
-    std::map<FileGuid, AssetDepot::AssetRequest<material_graph::Generation>> programRequests;
-    std::vector<own::shared_owner<const material_graph::Generation>> programPins;
-    std::map<FileGuid, std::filesystem::path> graphPaths;
-    std::vector<std::vector<std::byte>> materialDocuments;
+    ce::engine_ordered_map<FileGuid, AssetDepot::AssetRequest<Material>> materialRequests;
+    ce::engine_ordered_map<FileGuid, AssetDepot::AssetRequest<experiment::Material>> authoredRequests;
+    ce::engine_ordered_map<FileGuid, AssetDepot::AssetRequest<material_graph::Generation>> programRequests;
+    ce::dynamic_array<own::shared_owner<const material_graph::Generation>> programPins;
+    ce::engine_ordered_map<FileGuid, std::filesystem::path> graphPaths;
+    ce::dynamic_array<ce::dynamic_array<std::byte>> materialDocuments;
     AssetBundle resources;
     // Written only by the resource worker and retained through the caller's
     // scene-construction handoff. Cache-budget eviction cannot drop preload pins.
-    std::vector<own::shared_owner<const Material>> materialPins;
-    std::vector<own::shared_owner<const experiment::Material>> authoredMaterialPins;
-    std::vector<own::shared_owner<const Texture>> texturePins;
-    std::vector<own::shared_owner<FontAsset>> fontPins;
+    ce::dynamic_array<own::shared_owner<const Material>> materialPins;
+    ce::dynamic_array<own::shared_owner<const experiment::Material>> authoredMaterialPins;
+    ce::dynamic_array<own::shared_owner<const Texture>> texturePins;
+    ce::dynamic_array<own::shared_owner<FontAsset>> fontPins;
     own::shared_owner<TextureFramePins> textureImages{ own::make_shared<TextureFramePins>() };
-    std::vector<PreparedTextureImageRequest> imageRequests;
-    std::map<std::pair<AssetDepot::AssetLink<Texture>, AssetDepot::TextureAssetVariant>,
+    ce::dynamic_array<PreparedTextureImageRequest> imageRequests;
+    ce::engine_ordered_map<ce::pair<AssetDepot::AssetLink<Texture>, AssetDepot::TextureAssetVariant>,
         AssetDepot::AssetRequest<Texture>> descriptorRequests;
-    std::vector<material_graph::InstanceDescription> graphImageDescriptions;
+    ce::dynamic_array<material_graph::InstanceDescription> graphImageDescriptions;
     job_handle resourceWork;
     std::string error;
 };
@@ -549,13 +553,13 @@ job_handle DataSystem::AssetBundlePreparation::Completion() const
 
 void DataSystem::AssetBundlePreparation::Cancel()
 {
-    std::vector<PreparedTextureImageRequest> retiredRequests;
-    std::vector<AssetDepot::AssetRequest<Texture>> retiredDescriptors;
+    ce::dynamic_array<PreparedTextureImageRequest> retiredRequests;
+    ce::dynamic_array<AssetDepot::AssetRequest<Texture>> retiredDescriptors;
     own::shared_owner<TextureFramePins> retiredImages;
-    std::vector<assets::ModelAssetGeneration::Shared> retiredModels;
-    std::vector<own::shared_owner<const Material>> retiredMaterials;
-    std::vector<own::shared_owner<const Texture>> retiredTextures;
-    std::vector<own::shared_owner<FontAsset>> retiredFonts;
+    ce::dynamic_array<assets::ModelAssetGeneration::Shared> retiredModels;
+    ce::dynamic_array<own::shared_owner<const Material>> retiredMaterials;
+    ce::dynamic_array<own::shared_owner<const Texture>> retiredTextures;
+    ce::dynamic_array<own::shared_owner<FontAsset>> retiredFonts;
     {
         std::lock_guard lock(mutex);
         bool pending = result.status == AssetDepot::AssetRequestStatus::Pending;
@@ -600,7 +604,7 @@ job_handle DataSystem::SubmitAssetWorkLocked(job_group work,
     {
         throw std::runtime_error("Asset work is shutting down or invalidated.");
     }
-    std::erase_if(m_assetWork, [](const auto& handle) { return handle.is_complete(); });
+    ce::erase_if(m_assetWork, [](const auto& handle) { return handle.is_complete(); });
     // Allocate tracking storage first: no accepted DataSystem capture may be
     // orphaned by an allocation failure after scheduler submission.
     m_assetWork.emplace_back();
@@ -670,8 +674,8 @@ own::shared_owner<DataSystem::PreparedRuntimeAsset> DataSystem::PrepareRuntimeAs
         }
         m_assetPreparations.erase(found); // Failed/expired requests may be retried.
     }
-    std::erase_if(m_assetPreparations, [](const auto& entry) { return entry.second.expired(); });
-    std::erase_if(m_retiredAssetPreparations, [](const auto& entry) { return entry->work.is_complete(); });
+    ce::erase_if(m_assetPreparations, [](const auto& entry) { return entry.second.expired(); });
+    ce::erase_if(m_retiredAssetPreparations, [](const auto& entry) { return entry->work.is_complete(); });
     auto asset = own::make_shared<PreparedRuntimeAsset>();
     asset->guid = guid;
     asset->path = path;
@@ -748,7 +752,7 @@ own::shared_owner<DataSystem::PreparedRuntimeAsset> DataSystem::PrepareRuntimeAs
             asset->error = "Unexpected asset preparation failure.";
         }
     });
-    const std::array dependencies{lane};
+    const ce::fixed_array dependencies{lane};
     asset->work = lane.valid()
         ? SubmitAssetWorkLocked(std::move(work), dependencies)
         : SubmitAssetWorkLocked(std::move(work));
@@ -889,14 +893,14 @@ DataSystem::ModelPreparation DataSystem::PrepareModelAssetFromSnapshot(
             }
         }
     }
-    using MeshRequest = std::pair<experiment::AssetId, AssetDepot::AssetRequest<assets::ModelMeshDescriptor>>;
-    using GeometryRequest = std::pair<experiment::AssetId, AssetDepot::AssetRequest<assets::ModelCpuGeometryPayload>>;
-    using MaterialRequest = std::pair<experiment::AssetId, AssetDepot::AssetRequest<Material>>;
-    std::vector<MeshRequest> meshes;
-    std::vector<GeometryRequest> geometry;
-    std::vector<MaterialRequest> materials;
+    using MeshRequest = ce::pair<experiment::AssetId, AssetDepot::AssetRequest<assets::ModelMeshDescriptor>>;
+    using GeometryRequest = ce::pair<experiment::AssetId, AssetDepot::AssetRequest<assets::ModelCpuGeometryPayload>>;
+    using MaterialRequest = ce::pair<experiment::AssetId, AssetDepot::AssetRequest<Material>>;
+    ce::dynamic_array<MeshRequest> meshes;
+    ce::dynamic_array<GeometryRequest> geometry;
+    ce::dynamic_array<MaterialRequest> materials;
     AssetDepot::AssetRequest<assets::ModelSkeletonPayload> skeleton;
-    std::vector<job_handle> dependencies;
+    ce::dynamic_array<job_handle> dependencies;
     const auto add = [&](const auto& request)
     {
         const auto completion = request.Completion();
@@ -1424,14 +1428,14 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
             std::lock_guard catalogLock(m_cookedCatalogMutex);
             preparation->catalog = m_cookedCatalog;
         }
-        std::erase_if(m_sceneAssetPreparations, [](const auto& weak) { return weak.expired(); });
+        ce::erase_if(m_sceneAssetPreparations, [](const auto& weak) { return weak.expired(); });
         m_sceneAssetPreparations.emplace_back(preparation);
     }
     // Follow current scene/material/prefab references, including the first open.
     // Historical ScenePreload lists are not a correctness dependency.
-    std::map<FileGuid, std::filesystem::path> models;
-    std::unordered_set<FileGuid> seen, requestedMeshes;
-    std::vector<std::pair<FileGuid, std::filesystem::path>> documents;
+    ce::engine_ordered_map<FileGuid, std::filesystem::path> models;
+    ce::engine_node_set<FileGuid> seen, requestedMeshes;
+    ce::dynamic_array<ce::pair<FileGuid, std::filesystem::path>> documents;
     const auto discover = [&](FileGuid guid, bool meshReference = false)
     {
         if (guid == FileGuid{} || (!seen.insert(guid).second && !meshReference))
@@ -1494,7 +1498,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
             == experiment::cooked::AssetLookupStatus::Found)
         {
             const AssetDepot::TextureAssetVariant variant;
-            preparation->descriptorRequests.try_emplace(std::pair{ imageLink, variant },
+            preparation->descriptorRequests.try_emplace(ce::pair{ imageLink, variant },
                 RequestTextureAsyncFromSnapshot(imageLink, variant, captured, preparation->epoch));
             return;
         }
@@ -1568,7 +1572,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
             variant.role = static_cast<std::uint32_t>(TextureFileType::Texture) + 1u;
             variant.colorSpace = field == "m_diffusefileName"
                 ? AssetDepot::TextureAssetColorSpace::Source : AssetDepot::TextureAssetColorSpace::Linear;
-            preparation->descriptorRequests.try_emplace(std::pair{ link, variant },
+            preparation->descriptorRequests.try_emplace(ce::pair{ link, variant },
                 RequestTextureAsyncFromSnapshot(link, variant, preparation->catalog, preparation->epoch));
         }
         else if (status == experiment::cooked::AssetLookupStatus::TypeMismatch
@@ -1587,7 +1591,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
             preparation->resources.AddAsset(asset);
         }
     };
-    std::function<void(const Authoring::ReadNode&, std::size_t)> walk;
+    ce::owned_func<void(const Authoring::ReadNode&, std::size_t)> walk;
     walk = [&](const Authoring::ReadNode& node, std::size_t depth)
     {
         if (depth > 256)
@@ -1652,7 +1656,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
                                 || name == standard_material::property::AoMap
                             ? AssetDepot::TextureAssetColorSpace::Linear
                             : AssetDepot::TextureAssetColorSpace::Source;
-                        preparation->descriptorRequests.try_emplace(std::pair{ textureLink, variant },
+                        preparation->descriptorRequests.try_emplace(ce::pair{ textureLink, variant },
                             RequestTextureAsyncFromSnapshot(textureLink, variant, preparation->catalog,
                                 preparation->epoch));
                     }
@@ -1660,7 +1664,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
             }
             if (const auto material = node["m_Material"]; material && material.IsMap())
             {
-                std::vector<std::byte> bytes;
+                ce::dynamic_array<std::byte> bytes;
                 std::string error;
                 if (!Authoring::EncodeCookedDocument(material, bytes, error))
                 {
@@ -1687,7 +1691,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
                     }
                     if (node["m_propertyName"].Scalar() == "m_Material")
                     {
-                        std::vector<std::byte> bytes;
+                        ce::dynamic_array<std::byte> bytes;
                         if (!Authoring::EncodeCookedDocument(document->Root().Read(), bytes, error))
                         {
                             throw std::runtime_error(error);
@@ -1794,7 +1798,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
         }
         discover(guid);
     }
-    std::erase_if(preparation->resources.assets, [](const AssetEntry& entry)
+    ce::erase_if(preparation->resources.assets, [](const AssetEntry& entry)
     {
         const auto type = static_cast<ManagedAssetType>(entry.assetTypeID);
         return type == ManagedAssetType::Model;
@@ -1835,7 +1839,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
             {
                 AssetDepot::TextureAssetVariant variant;
                 variant.role = static_cast<std::uint32_t>(textureType) + 1u;
-                preparation->descriptorRequests.try_emplace(std::pair{ link, variant },
+                preparation->descriptorRequests.try_emplace(ce::pair{ link, variant },
                     RequestTextureAsyncFromSnapshot(link, variant, preparation->catalog, preparation->epoch));
             }
         }
@@ -2109,7 +2113,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                 AssetDepot::TextureAssetVariant variant;
                 variant.colorSpace = binding.colorSpace == LX::LXColorSpace::SRGB
                     ? AssetDepot::TextureAssetColorSpace::Srgb : AssetDepot::TextureAssetColorSpace::Linear;
-                const auto key = std::pair{ link, variant };
+                const auto key = ce::pair{ link, variant };
                 if (!preparation->descriptorRequests.contains(key))
                 {
                     preparation->descriptorRequests.emplace(key, RequestTextureAsyncFromSnapshot(link, variant, preparation->catalog, preparation->epoch));
@@ -2140,7 +2144,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                 AssetDepot::TextureAssetVariant variant;
                 variant.colorSpace = binding->colorSpace == LX::LXColorSpace::SRGB
                     ? AssetDepot::TextureAssetColorSpace::Srgb : AssetDepot::TextureAssetColorSpace::Linear;
-                const auto key = std::pair{ link, variant };
+                const auto key = ce::pair{ link, variant };
                 if (!preparation->descriptorRequests.contains(key))
                 {
                     preparation->descriptorRequests.emplace(key, RequestTextureAsyncFromSnapshot(link, variant, preparation->catalog, preparation->epoch));
@@ -2204,7 +2208,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
             const AssetDecoderApartment apartment;
             // Only CPU texture owners/material instances. RHI upload/fences and
             // Scene/Entity construction stay on their existing owning threads.
-            std::vector<own::shared_owner<const Texture>> preparedTextures;
+            ce::dynamic_array<own::shared_owner<const Texture>> preparedTextures;
             preparedTextures.reserve(preparation->descriptorRequests.size());
             for (const auto& [key, request] : preparation->descriptorRequests)
             {
@@ -2245,7 +2249,7 @@ bool DataSystem::PollSceneAssets(const own::shared_owner<SceneAssetPreparation>&
                         preparation->authoredMaterialPins.push_back(std::move(authored));
                     }
                     Material material(*base);
-                    std::vector<experiment::MaterialProperty> propertyOverrides;
+                    ce::dynamic_array<experiment::MaterialProperty> propertyOverrides;
                     for (const auto override : node["overrides"])
                     {
                         experiment::MaterialProperty property;
@@ -2498,7 +2502,7 @@ bool DataSystem::ValidatePreparedMaterialTextures(Material& material, std::strin
             return false;
         }
     }
-    const std::array<std::pair<std::string_view, std::string_view>, 5> legacyNames{{
+    const ce::fixed_array<ce::pair<std::string_view, std::string_view>, 5> legacyNames{{
         {standard_material::property::BaseColorMap, material.m_baseColorTexName},
         {standard_material::property::NormalMap, material.m_normalTexName},
         {standard_material::property::OrmMap, material.m_ORM_TexName},
@@ -2655,10 +2659,10 @@ void DataSystem::DrainAssetPreparations()
         // rejection for a completed job and tear down its captured service.
         throw std::logic_error("DataSystem shutdown requires the lifecycle owner thread.");
     }
-    std::vector<own::shared_owner<PreparedRuntimeAsset>> assets;
-    std::vector<own::shared_owner<SceneAssetPreparation>> scenes;
-    std::vector<own::shared_owner<AssetBundlePreparation>> bundles;
-    std::vector<job_handle> work;
+    ce::dynamic_array<own::shared_owner<PreparedRuntimeAsset>> assets;
+    ce::dynamic_array<own::shared_owner<SceneAssetPreparation>> scenes;
+    ce::dynamic_array<own::shared_owner<AssetBundlePreparation>> bundles;
+    ce::dynamic_array<job_handle> work;
     {
         std::lock_guard lock(m_assetPreparationMutex);
         if (m_assetRootHandoffs != 0u)
@@ -3255,7 +3259,7 @@ own::shared_owner<const Texture> DataSystem::ResolveModelGenerationTexture(
         charge, kLegacyTextureBudgetBytes, kLegacyCacheBudgetEntries);
     for (auto reverse = m_modelGenerationTextureOwners.begin(); reverse != m_modelGenerationTextureOwners.end();)
     {
-        std::erase_if(reverse->second, [this](const auto& handle)
+        ce::erase_if(reverse->second, [this](const auto& handle)
         {
             return !m_modelGenerationTextures.contains(handle);
         });
@@ -3448,7 +3452,7 @@ DataSystem::SnapshotModelAssetGenerations() const
 	return m_modelAssetGenerations.Snapshot();
 }
 
-std::vector<assets::ModelAssetGeneration::Shared>
+ce::dynamic_array<assets::ModelAssetGeneration::Shared>
 DataSystem::SnapshotCurrentModelAssetGenerations() const
 {
     std::lock_guard admissionLock(m_assetPreparationMutex);
@@ -3477,7 +3481,7 @@ void DataSystem::InsertMaterial(own::shared_owner<const Material> material)
     }
 }
 
-std::vector<std::pair<std::string, own::shared_owner<const Texture>>>
+ce::dynamic_array<ce::pair<std::string, own::shared_owner<const Texture>>>
 DataSystem::SnapshotTextures(TextureFileType type)
 {
     std::lock_guard admissionLock(m_assetPreparationMutex);
@@ -3487,12 +3491,12 @@ DataSystem::SnapshotTextures(TextureFileType type)
     }
     std::lock_guard guard(m_textureMutex);
     auto& cache = TextureCacheFor(type);
-    std::erase_if(cache, [this](const auto& value)
+    ce::erase_if(cache, [this](const auto& value)
     {
         return value.second.resolverRevision != m_assetDepotRevision;
     });
     asset_cache_detail::PruneExpired(cache);
-    std::vector<std::pair<std::string, own::shared_owner<const Texture>>> result;
+    ce::dynamic_array<ce::pair<std::string, own::shared_owner<const Texture>>> result;
     for (auto& [key, entry] : cache)
     {
         if (auto owner = asset_cache_detail::Acquire(entry, m_assetDepotRevision))
@@ -3688,7 +3692,7 @@ bool DataSystem::PublishMaterialGraphGeneration(
         own::shared_owner<const Material> previous;
         own::shared_owner<const Material> next;
     };
-    std::vector<Replacement> replacements;
+    ce::dynamic_array<Replacement> replacements;
     decltype(Materials) updated;
     std::uint64_t revision{}, epoch{}, resolverRevision{};
     bool targetFound = false;
@@ -3837,7 +3841,7 @@ bool DataSystem::PublishMaterialGraphGeneration(
     return true;
 }
 
-std::vector<std::pair<std::string, own::shared_owner<const Material>>> DataSystem::SnapshotMaterials()
+ce::dynamic_array<ce::pair<std::string, own::shared_owner<const Material>>> DataSystem::SnapshotMaterials()
 {
     std::lock_guard admissionLock(m_assetPreparationMutex);
     if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
@@ -3845,12 +3849,12 @@ std::vector<std::pair<std::string, own::shared_owner<const Material>>> DataSyste
         return {};
     }
     std::lock_guard guard(m_materialMutex);
-    std::erase_if(Materials, [this](const auto& value)
+    ce::erase_if(Materials, [this](const auto& value)
     {
         return value.second.resolverRevision != m_assetDepotRevision;
     });
     asset_cache_detail::PruneExpired(Materials);
-    std::vector<std::pair<std::string, own::shared_owner<const Material>>> result;
+    ce::dynamic_array<ce::pair<std::string, own::shared_owner<const Material>>> result;
     for (auto& [key, entry] : Materials)
     {
         if (auto owner = asset_cache_detail::Acquire(entry, m_assetDepotRevision))
@@ -4047,7 +4051,7 @@ bool DataSystem::SerializeMaterialPayload(Material& material,
                 return false;
             }
         }
-        std::erase_if(serializable.properties, [](const auto& property)
+        ce::erase_if(serializable.properties, [](const auto& property)
         {
             return property.type == ShaderPropertyType::Float4x4;
         });
@@ -4115,7 +4119,7 @@ bool DataSystem::SerializeMaterialPayload(Material& material,
 
 	// unordered_map 순회 순서를 디스크 형상으로 새지 않는다. legacy CB payload도
 	// 이름순으로 고정해야 save-load-resave diff 0을 안정적으로 판정할 수 있다.
-	std::vector<std::string_view> names;
+	ce::dynamic_array<std::string_view> names;
 	names.reserve(material.m_cbufferValues.size());
 	for (const auto& [name, data] : material.m_cbufferValues)
 	{
@@ -4150,7 +4154,7 @@ namespace
 {
 // 코드 생성 전 원본 키를 비교하되 실제 include 내용과 도구 신원 검사는 생략하지 않는다.
 // 생성 소스의 임시 경로는 캐시 수명에 포함하지 않고 include 가림 검사는 하위 RHI와 공유한다.
-constexpr std::array<char, 8> kMaterialGraphCacheMagic{'L','X','S','C','A','C','H','3'};
+constexpr ce::fixed_array<char, 8> kMaterialGraphCacheMagic{'L','X','S','C','A','C','H','3'};
 constexpr std::uint32_t kMaterialGraphCacheMaxDependencies = 4096;
 
 std::string MaterialGraphCacheHeader(std::string_view sourceKey, const std::filesystem::path& shaderDirectory,
@@ -4188,12 +4192,12 @@ std::string MaterialGraphCacheHeader(std::string_view sourceKey, const std::file
     return header;
 }
 
-bool HashMaterialGraphDependency(const std::filesystem::path& path, ce::hash::sha256_digest& result)
+bool HashMaterialGraphDependency(const std::filesystem::path& path, ce::crypto::sha256_digest& result)
 {
     std::ifstream stream(path, std::ios::binary);
     if (!stream) return false;
-    ce::hash::sha256 hash;
-    std::array<char, 65536> chunk;
+    ce::crypto::sha256 hash;
+    ce::fixed_array<char, 65536> chunk;
     while (stream)
     {
         stream.read(chunk.data(), chunk.size());
@@ -4219,11 +4223,11 @@ std::string MaterialGraphDependencyKey(const std::filesystem::path& dependency, 
     return canonical.generic_string();
 }
 
-using MaterialGraphDependencyDigests = std::vector<std::pair<std::string, ce::hash::sha256_digest>>;
+using MaterialGraphDependencyDigests = ce::dynamic_array<ce::pair<std::string, ce::crypto::sha256_digest>>;
 
 std::string MaterialGraphEnvironmentKey(std::string_view header, const MaterialGraphDependencyDigests& dependencies)
 {
-    ce::hash::sha256 hash;
+    ce::crypto::sha256 hash;
     const auto append = [&](std::string_view value) {
         const auto length = std::to_string(value.size()) + ':';
         hash.update(length.data(), length.size());
@@ -4236,7 +4240,7 @@ std::string MaterialGraphEnvironmentKey(std::string_view header, const MaterialG
         append(key);
         hash.update(digest.data(), digest.size());
     }
-    return ce::hash::to_hex(hash.finish());
+    return ce::crypto::to_hex(hash.finish());
 }
 
 bool CaptureMaterialGraphDependencies(std::span<const std::filesystem::path> paths, const std::filesystem::path& shaderDirectory,
@@ -4258,7 +4262,7 @@ bool CaptureMaterialGraphDependencies(std::span<const std::filesystem::path> pat
     result.reserve(paths.size());
     for (const auto& path : paths)
     {
-        ce::hash::sha256_digest digest{};
+        ce::crypto::sha256_digest digest{};
         if (!HashMaterialGraphDependency(path, digest))
         {
             error = "Material include dependency cannot be read: " + path.string();
@@ -4287,7 +4291,7 @@ bool MaterialGraphDependenciesResolve(std::span<const std::filesystem::path> dep
         return false;
     }
     // 공통 include뿐 아니라 생성 소스 옆/상위 경로도 원래 RHI 검사와 같은 후보로 확인한다.
-    std::vector<std::filesystem::path> includeDirectories{shaderDirectory / "Includes", sourceDirectory};
+    ce::dynamic_array<std::filesystem::path> includeDirectories{shaderDirectory / "Includes", sourceDirectory};
     if (!nextCacheDirectory.empty())
     {
         // 기존 직접 생성 경로에서 다음 요청의 isolated scratch 경로로 옮기는 경우도 포함한다.
@@ -4307,7 +4311,7 @@ bool ReadMaterialGraphCache(const std::filesystem::path& path, std::string_view 
     };
     std::ifstream file(path, std::ios::binary);
     if (!file) return miss("file");
-    std::array<char, 8> magic{};
+    ce::fixed_array<char, 8> magic{};
     std::uint64_t headerSize{};
     file.read(magic.data(), magic.size());
     file.read(reinterpret_cast<char*>(&headerSize), sizeof(headerSize));
@@ -4320,7 +4324,7 @@ bool ReadMaterialGraphCache(const std::filesystem::path& path, std::string_view 
     file.read(reinterpret_cast<char*>(&dependencyCount), sizeof(dependencyCount));
     if (!file || dependencyCount == 0 || dependencyCount > kMaterialGraphCacheMaxDependencies) return false;
     MaterialGraphDependencyDigests dependencies;
-    std::vector<std::filesystem::path> paths;
+    ce::dynamic_array<std::filesystem::path> paths;
     dependencies.reserve(dependencyCount);
     paths.reserve(dependencyCount);
     for (std::uint32_t index = 0; index < dependencyCount; ++index)
@@ -4329,12 +4333,12 @@ bool ReadMaterialGraphCache(const std::filesystem::path& path, std::string_view 
         file.read(reinterpret_cast<char*>(&keySize), sizeof(keySize));
         if (!file || keySize == 0 || keySize > 4096) return false;
         std::string key(keySize, '\0');
-        ce::hash::sha256_digest expected{};
+        ce::crypto::sha256_digest expected{};
         file.read(key.data(), static_cast<std::streamsize>(key.size()));
         file.read(reinterpret_cast<char*>(expected.data()), static_cast<std::streamsize>(expected.size()));
         if (!file) return miss("file");
         const std::filesystem::path stored(key);
-        ce::hash::sha256_digest actual{};
+        ce::crypto::sha256_digest actual{};
         if (!HashMaterialGraphDependency(stored.is_absolute() ? stored : shaderDirectory / stored, actual) ||
             actual != expected)
             return miss("dependency");
@@ -4353,7 +4357,7 @@ bool ReadMaterialGraphCache(const std::filesystem::path& path, std::string_view 
     std::uint64_t productSize{};
     file.read(reinterpret_cast<char*>(&productSize), sizeof(productSize));
     if (!file || productSize == 0 || productSize > (128ull << 20)) return false;
-    std::vector<std::uint8_t> bytes(static_cast<std::size_t>(productSize));
+    ce::dynamic_array<std::uint8_t> bytes(static_cast<std::size_t>(productSize));
     file.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size()));
     if (!file || file.peek() != std::char_traits<char>::eof()) return false;
     std::string validation;
@@ -4378,7 +4382,7 @@ void WriteMaterialGraphCache(const std::filesystem::path& path, std::string_view
 {
     // 의존 목록이 비면 무엇이 바뀌어도 맞히는 캐시가 된다. 그런 캐시는 쓰지 않는다.
     if (dependencies.empty() || dependencies.size() > kMaterialGraphCacheMaxDependencies) return;
-    std::vector<std::uint8_t> bytes;
+    ce::dynamic_array<std::uint8_t> bytes;
     std::string error;
     if (!material_graph::WriteCookedProgram(product, {}, bytes, error)) return;
     static std::atomic<std::uint64_t> serial{};
@@ -4449,7 +4453,7 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
     {
         return false;
     }
-    const auto sourceRevision = ce::hash::to_hex(ce::hash::sha256::compute(cacheHeader.data(), cacheHeader.size()));
+    const auto sourceRevision = ce::crypto::to_hex(ce::crypto::sha256::compute(cacheHeader.data(), cacheHeader.size()));
     const auto source = (scratchDirectory.empty() ? cacheDirectory : scratchDirectory) /
                         (guid.ToString() + "-" + sourceRevision + ".slang");
     std::error_code filesystemError;
@@ -4495,7 +4499,7 @@ bool CompileAuthoringMaterial(const LX::LXMaterialAsset& asset, FileGuid guid, m
     }
     step.reset();
     step.emplace(ce::marker<"Material.GenerateSlang">());
-    std::vector<LX::LXMaterialDiagnostic> diagnostics;
+    ce::dynamic_array<LX::LXMaterialDiagnostic> diagnostics;
     const auto program = LX::GenerateMaterialSlang(asset, &diagnostics);
     if (!program)
     {
@@ -4804,7 +4808,7 @@ void DataSystem::PrewarmSceneMaterials(const std::filesystem::path& scene)
         m_sceneMaterials.clear();
     }
     ce::profile_scope profile{ ce::marker<"Material.Prewarm">() };
-    std::vector<std::pair<FileGuid, std::filesystem::path>> graphs;
+    ce::dynamic_array<ce::pair<FileGuid, std::filesystem::path>> graphs;
     {
         std::ifstream list(SceneMaterialListPath(scene), std::ios::binary);
         std::string line;
@@ -4885,7 +4889,7 @@ void DataSystem::PrewarmSceneMaterials(const std::filesystem::path& scene)
 
 void DataSystem::CommitSceneMaterials(const std::filesystem::path& scene)
 {
-    std::vector<std::pair<FileGuid, std::filesystem::path>> graphs;
+    ce::dynamic_array<ce::pair<FileGuid, std::filesystem::path>> graphs;
     {
         std::lock_guard lock(m_sceneMaterialMutex);
         if (!m_recordingSceneMaterials) return;
@@ -4911,7 +4915,7 @@ own::shared_owner<const material_graph::Generation> DataSystem::ResolveMaterialG
     return m_materialGraphGenerations.Current(experiment::AssetId{guid.m_guid});
 }
 
-std::vector<assets::ModelAssetGeneration::Shared> DataSystem::SnapshotPreparedModelAssets() const
+ce::dynamic_array<assets::ModelAssetGeneration::Shared> DataSystem::SnapshotPreparedModelAssets() const
 {
     std::lock_guard admissionLock(m_assetPreparationMutex);
     if (m_assetPreparationStopping || m_assetInvalidationDepth != 0)
@@ -4919,7 +4923,7 @@ std::vector<assets::ModelAssetGeneration::Shared> DataSystem::SnapshotPreparedMo
         return {};
     }
     auto current = m_modelAssetGenerations.SnapshotCurrent();
-    std::map<uuid::uuid16, assets::ModelAssetGeneration::Shared> byModel;
+    ce::engine_ordered_map<uuid::uuid16, assets::ModelAssetGeneration::Shared> byModel;
     for (auto& model : current)
     {
         byModel.emplace(model->Identity().modelId, std::move(model));
@@ -4941,7 +4945,7 @@ std::vector<assets::ModelAssetGeneration::Shared> DataSystem::SnapshotPreparedMo
             }
         }
     }
-    std::vector<assets::ModelAssetGeneration::Shared> result;
+    ce::dynamic_array<assets::ModelAssetGeneration::Shared> result;
     result.reserve(byModel.size());
     for (auto& [id, model] : byModel)
     {
@@ -5026,7 +5030,7 @@ bool DataSystem::ConfigureModelMaterialGraph(Material& material, const assets::M
                 description.textures.push_back({parameter.id, experiment::AssetId{current->m_textureGuid.m_guid}});
             continue;
         }
-        std::vector<float> before;
+        ce::dynamic_array<float> before;
         std::visit(
             [&](const auto& value) {
                 using T = std::decay_t<decltype(value)>;
@@ -5048,7 +5052,7 @@ bool DataSystem::ConfigureModelMaterialGraph(Material& material, const assets::M
             description.parameters.push_back({parameter.id, double(after.front())});
         else if (parameter.type == LX::PinType::Color && before.size() >= 3 && after.size() >= 3 &&
                  !std::equal(before.begin(), before.begin() + 3, after.begin()))
-            description.parameters.push_back({parameter.id, std::array<double, 4>{after[0], after[1], after[2], 1}});
+            description.parameters.push_back({parameter.id, ce::fixed_array<double, 4>{after[0], after[1], after[2], 1}});
     }
     if (!ConfigureMaterialGraph(material, generation, description, error, &model))
     {
@@ -5366,7 +5370,7 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
             {
                 return false;
             }
-            std::vector<MaterialTextureOwner> textures;
+            ce::dynamic_array<MaterialTextureOwner> textures;
             for (const auto& texture : resolved.textures)
             {
                 textures.push_back({ texture.propertyName, texture.owner });
@@ -5433,7 +5437,7 @@ bool DataSystem::DeserializeMaterialPayload(Material& material,
 				if (name.empty() || material.m_cbufferValues.contains(name))
 					return false;
 				const std::string encoded = entry["data"].AsString();
-				std::vector<std::uint8_t> binary;
+				ce::dynamic_array<std::uint8_t> binary;
 				if (!ce::base64::decode(encoded, binary))
 				{
 				    return false;
@@ -5459,7 +5463,7 @@ bool DataSystem::HasVersionedMaterialBinaryPayload(std::istream& input) const
 	const std::istream::pos_type position = input.tellg();
 	if (position == std::istream::pos_type(-1)) return false;
 
-	std::array<char, kMaterialPayloadMagic.size()> magic{};
+	ce::fixed_array<char, kMaterialPayloadMagic.size()> magic{};
 	input.read(magic.data(), magic.size());
 	const bool matches = input.gcount() == static_cast<std::streamsize>(magic.size())
 		&& magic == kMaterialPayloadMagic;
@@ -5473,7 +5477,7 @@ bool DataSystem::SerializeMaterialBinaryPayload(Material& material,
 {
 	Authoring::WriteDocument document;
 	if (!SerializeMaterialPayload(material, document.Root())) return false;
-	std::vector<std::byte> payload;
+	ce::dynamic_array<std::byte> payload;
 	std::string encodeError;
 	if (!Authoring::EncodeCookedDocument(document.Root().Read(), payload, encodeError))
 	{
@@ -5498,7 +5502,7 @@ bool DataSystem::SerializeMaterialBinaryPayload(Material& material,
 bool DataSystem::DeserializeMaterialBinaryPayload(Material& material,
 	std::istream& input)
 {
-	std::array<char, kMaterialPayloadMagic.size()> magic{};
+	ce::fixed_array<char, kMaterialPayloadMagic.size()> magic{};
 	input.read(magic.data(), magic.size());
 	std::uint16_t version{};
 	std::uint16_t encoding{};
@@ -5516,7 +5520,7 @@ bool DataSystem::DeserializeMaterialBinaryPayload(Material& material,
 		return false;
 	}
 
-	std::vector<std::byte> payload(payloadSize);
+	ce::dynamic_array<std::byte> payload(payloadSize);
 	if (payloadSize != 0)
 		input.read(reinterpret_cast<char*>(payload.data()),
 			static_cast<std::streamsize>(payload.size()));
@@ -6297,10 +6301,13 @@ own::shared_owner<FontAsset> DataSystem::LoadFontShared(std::string_view request
     }
 }
 
-std::vector<std::pair<std::string, own::shared_owner<FontAsset>>> DataSystem::SnapshotFonts() const
+ce::dynamic_array<ce::pair<std::string, own::shared_owner<FontAsset>>> DataSystem::SnapshotFonts() const
 {
     std::lock_guard lock(m_fontMutex);
-    return { m_fonts.begin(), m_fonts.end() };
+    ce::dynamic_array<ce::pair<std::string, own::shared_owner<FontAsset>>> snapshot;
+    snapshot.reserve(m_fonts.size());
+    for (const auto& entry : m_fonts) snapshot.emplace_back(entry.first, entry.second);
+    return snapshot;
 }
 
 std::size_t DataSystem::SnapshotFontCount() const
@@ -6315,7 +6322,7 @@ bool DataSystem::ReloadCachedFont(const std::filesystem::path& source, FileGuid 
     {
         const auto path = normalize_font_path(source);
         const auto prefix = guid.ToString() + "|";
-        std::vector<std::string> keys;
+        ce::dynamic_array<std::string> keys;
         {
             std::lock_guard lock(m_fontMutex);
             for (const auto& [key, font] : m_fonts)
@@ -6408,7 +6415,7 @@ void DataSystem::QueueAssetChange(RuntimeAssetChange change)
 
 std::size_t DataSystem::DrainQueuedAssetChanges()
 {
-	std::vector<RuntimeAssetChange> pending;
+	ce::dynamic_array<RuntimeAssetChange> pending;
 	{
 		std::lock_guard lock(m_pendingAssetChangeMutex);
 		pending.swap(m_pendingAssetChanges);
@@ -6447,7 +6454,7 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
         }
         if (retired.IsValid())
         {
-            std::vector<experiment::cooked::AssetManifestIssue> issues;
+            ce::dynamic_array<experiment::cooked::AssetManifestIssue> issues;
             if (!UnmountAssetSet(retired, issues))
             {
                 QueueAssetChange(change);
@@ -6592,7 +6599,7 @@ bool DataSystem::ApplyAssetChange(const RuntimeAssetChange& change)
                 m_assetPreparationEpoch, m_assetDepotRevision, change.path.string().c_str());
         InvalidateModelAssetsLocked(retiredModels);
         InvalidateMaterialAssetsLocked(retiredMaterials);
-        std::erase_if(m_retiredAssetPreparations, [](const auto& asset)
+        ce::erase_if(m_retiredAssetPreparations, [](const auto& asset)
         {
             return asset->work.is_complete();
         });
@@ -6742,7 +6749,7 @@ void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
         }
         const auto prefix = guid.ToString() + "|";
         std::lock_guard lock(m_fontMutex);
-        const auto removed = std::erase_if(m_fonts, [&](const auto& item)
+        const auto removed = ce::erase_if(m_fonts, [&](const auto& item)
         {
             return item.second->GetPath() == normalized || (guid != FileGuid{} && item.first.starts_with(prefix));
         });
@@ -6848,12 +6855,12 @@ void DataSystem::RetireCachedAsset(RuntimeAssetType assetType,
         // A source publication invalidates every role/representation, including
         // UI and sprite uses loaded from the same file in their separate maps.
         const auto materialPrefix = MaterialTextureKeyPrefix(path);
-        const std::array roleKeys{
+        const ce::fixed_array roleKeys{
             key,
             TextureRoleCacheKey(key, TextureFileType::MaterialTexture),
             TextureRoleCacheKey(key, TextureFileType::TerrainTexture),
             TextureRoleCacheKey(key, TextureFileType::HDR)};
-        std::vector<own::shared_owner<const Texture>> released;
+        ce::dynamic_array<own::shared_owner<const Texture>> released;
         {
             std::lock_guard lock(m_textureMutex);
             for (auto* cache : { &Textures, &UITextures, &SpriteSheets })
@@ -6906,12 +6913,12 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
     struct RetiredBundleResults final
     {
         bool detached{};
-        std::vector<assets::ModelAssetGeneration::Shared> models;
-        std::vector<own::shared_owner<const Material>> materials;
-        std::vector<own::shared_owner<const Texture>> textures;
-        std::vector<own::shared_owner<FontAsset>> fonts;
-        std::vector<PreparedTextureImageRequest> imageRequests;
-        std::vector<AssetDepot::AssetRequest<Texture>> descriptorRequests;
+        ce::dynamic_array<assets::ModelAssetGeneration::Shared> models;
+        ce::dynamic_array<own::shared_owner<const Material>> materials;
+        ce::dynamic_array<own::shared_owner<const Texture>> textures;
+        ce::dynamic_array<own::shared_owner<FontAsset>> fonts;
+        ce::dynamic_array<PreparedTextureImageRequest> imageRequests;
+        ce::dynamic_array<AssetDepot::AssetRequest<Texture>> descriptorRequests;
         own::shared_owner<TextureFramePins> images;
     };
     // This local outlives the admission guard even if scheduler failure invokes
@@ -6945,7 +6952,7 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
     request->result.textureImages = own::make_shared<TextureFramePins>();
     // Resolve registered path identities without filesystem probes. Mounted
     // typed images become scheduler dependencies, never worker-to-worker waits.
-    std::vector<job_handle> descriptorDependencies;
+    ce::dynamic_array<job_handle> descriptorDependencies;
     own::shared_owner<const experiment::cooked::CookedAssetCatalog> imageCatalog;
     {
         std::lock_guard admissionLock(m_assetPreparationMutex);
@@ -7002,7 +7009,7 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
         detachResults();
         return request;
     }
-    std::erase_if(m_assetBundlePreparations, [](const auto& request) { return request.expired(); });
+    ce::erase_if(m_assetBundlePreparations, [](const auto& request) { return request.expired(); });
     job_group jobs;
     for (const auto& entry : bundle.assets)
     {
@@ -7091,7 +7098,7 @@ own::shared_owner<DataSystem::AssetBundlePreparation> DataSystem::SubmitAssetBun
             default:
                 break;
             }
-            std::vector<PreparedTextureImageRequest> images;
+            ce::dynamic_array<PreparedTextureImageRequest> images;
             const auto prepareImage = [&](const own::shared_owner<const Texture>& descriptor)
             {
                 if (descriptor)
@@ -7319,7 +7326,7 @@ void DataSystem::UnloadUnusedAssets()
         retained != m_retainedAssets.end())
     {
         std::lock_guard lock(m_fontMutex);
-        const auto removed = std::erase_if(m_fonts, [&](const auto& item)
+        const auto removed = ce::erase_if(m_fonts, [&](const auto& item)
         {
             return !retained->second.contains(item.first);
         });
@@ -7382,7 +7389,7 @@ bool DataSystem::MountCookedCatalog(const std::filesystem::path& derivedRoot,
 		return false;
 	}
 
-	std::vector<std::byte> bytes;
+	ce::dynamic_array<std::byte> bytes;
 	{
 		std::ifstream input(manifestPath, std::ios::binary);
 		if (!input)
@@ -7405,7 +7412,7 @@ bool DataSystem::MountCookedCatalog(const std::filesystem::path& derivedRoot,
 		}
 	}
 
-	std::vector<experiment::cooked::AssetManifestIssue> issues;
+	ce::dynamic_array<experiment::cooked::AssetManifestIssue> issues;
 	// Load는 실패하면 **빈 catalog**를 준다(부분 표를 내놓지 않는 계약).
 	auto catalog = own::make_shared<const experiment::cooked::CookedAssetCatalog>(
 		experiment::cooked::CookedAssetCatalog::Load(bytes, derivedRoot, issues));
@@ -7489,7 +7496,7 @@ bool DataSystem::MountCookedCatalog(const std::filesystem::path& derivedRoot,
 	// 보증하며, 여기서 mtime을 비교하면 정상 패키지가 대량 stale로 오판된다.
 	// registry가 GUID를 못 푸는 entry(모델 안의 subasset 등)는 부모 모델 entry가
 	// 대신 책임진다.
-	std::unordered_set<FileGuid> stale;
+	ce::engine_node_set<FileGuid> stale;
 	if (authoring)
 	{
 		for (const experiment::cooked::CookedAssetManifestEntry& entry
@@ -7796,7 +7803,7 @@ bool DataSystem::RebuildCookedMaterialInstance(Material& material, std::string& 
     {
         return false;
     }
-    std::vector<MaterialTextureOwner> owners;
+    ce::dynamic_array<MaterialTextureOwner> owners;
     for (const auto& texture : resolved.textures)
     {
         owners.push_back({ texture.propertyName, texture.owner });

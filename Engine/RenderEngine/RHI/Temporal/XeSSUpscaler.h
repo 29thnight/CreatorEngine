@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -83,7 +84,7 @@ private:
 };
 
 TemporalResult CreateXeSSUpscalerDX12(DX12DeviceResources& resources, const wchar_t* runtimeDirectory,
-    const XeSSUpscalerConfig& config, std::function<TemporalResult()> drain,
+    const XeSSUpscalerConfig& config, ce::owned_func<TemporalResult()> drain,
     own::unique_owner<ITemporalUpscaler>& upscaler);
 
 #if CREATOR_ENABLE_XESS_VULKAN_SDK
@@ -149,5 +150,5 @@ private:
 // On success ownership moves into the neutral adapter; failure retains it.
 TemporalResult CreateXeSSUpscalerVulkan(VulkanDeviceResources& resources,
     own::unique_owner<XeSSUpscalerVulkan>& preparedRuntime, const XeSSUpscalerConfig& config,
-    std::function<TemporalResult()> drain, own::unique_owner<ITemporalUpscaler>& upscaler);
+    ce::owned_func<TemporalResult()> drain, own::unique_owner<ITemporalUpscaler>& upscaler);
 #endif

@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -93,17 +94,18 @@ private:
 	void LoadPresentationResources();
 	void ReleasePresentationResources() noexcept;
 
-	ce::concurrent_queue<std::filesystem::path> m_textureImportQueue;
-	std::vector<std::filesystem::path> m_pendingTexturePaths;
+	bool HasPendingTextureImports();
+	ce::lock_free_queue<std::filesystem::path> m_textureImportQueue;
+	ce::dynamic_array<std::filesystem::path> m_pendingTexturePaths;
 	int m_selectedTextureKind{};
 
-	std::unordered_map<std::string, FileType> m_extensionTypes;
+	ce::string_hash_map<FileType> m_extensionTypes;
 	own::shared_owner<const EnhancedGizmoIconTextures> m_gizmoIconTextures;
-    std::array<own::shared_owner<const Texture>, 2> m_directoryIcons;
+    ce::fixed_array<own::shared_owner<const Texture>, 2> m_directoryIcons;
     own::shared_owner<const Texture> m_engineIcon;
-    std::array<own::shared_owner<const Texture>, editor::EntityIconPresets.size()> m_entityIcons;
+    ce::fixed_array<own::shared_owner<const Texture>, editor::EntityIconPresets.size()> m_entityIcons;
     own::shared_owner<const Texture> m_projectIcon;
-    std::array<own::shared_owner<const Texture>, static_cast<size_t>(FileType::End)> m_fileIcons;
+    ce::fixed_array<own::shared_owner<const Texture>, static_cast<size_t>(FileType::End)> m_fileIcons;
 	own::shared_owner<const Material> m_previewedMaterial;
 	own::shared_owner<const Material> m_selectedMaterial;
 	ImFont* m_smallFont{};

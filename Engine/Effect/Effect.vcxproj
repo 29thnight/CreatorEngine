@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup Label="ProjectConfigurations">
+    <ProjectConfiguration Include="Debug|x64"><Configuration>Debug</Configuration><Platform>x64</Platform></ProjectConfiguration>
+    <ProjectConfiguration Include="Release|x64"><Configuration>Release</Configuration><Platform>x64</Platform></ProjectConfiguration>
+  </ItemGroup>
+  <PropertyGroup Label="Globals">
+    <ProjectGuid>{F2E5DDF1-1960-4E81-80CA-E8CDBA100001}</ProjectGuid>
+    <RootNamespace>Effect</RootNamespace>
+    <WindowsTargetPlatformVersion>10.0</WindowsTargetPlatformVersion>
+    <VcpkgEnabled>false</VcpkgEnabled>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.Default.props" />
+  <PropertyGroup Label="Configuration">
+    <ConfigurationType>StaticLibrary</ConfigurationType>
+    <!-- Whole-solution builds also visit explicitly disabled optional projects.
+         Do not compile or emit an archive for that selection. Host references
+         and anchor are independently removed by EffectPackage.targets. -->
+    <ConfigurationType Condition="'$(EngineEffectPackage)' == 'false'">Utility</ConfigurationType>
+    <PlatformToolset>v145</PlatformToolset>
+    <UseDebugLibraries Condition="'$(Configuration)' == 'Debug'">true</UseDebugLibraries>
+    <UseDebugLibraries Condition="'$(Configuration)' != 'Debug'">false</UseDebugLibraries>
+    <EnableUnitySupport>false</EnableUnitySupport>
+  </PropertyGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
+  <ItemDefinitionGroup>
+    <ClCompile>
+      <LanguageStandard>stdcpp23</LanguageStandard>
+      <ExceptionHandling>Sync</ExceptionHandling>
+      <WarningLevel>Level4</WarningLevel>
+      <TreatWarningAsError>true</TreatWarningAsError>
+      <ConformanceMode>true</ConformanceMode>
+      <AdditionalIncludeDirectories>$(SolutionDir)Engine\Utility_Framework;$(SolutionDir)Engine\RenderEngine;$(SolutionDir)Engine\RenderEngine\Interfaces;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalOptions>/utf-8 %(AdditionalOptions)</AdditionalOptions>
+      <RuntimeLibrary Condition="'$(Configuration)' == 'Debug'">MultiThreadedDebugDLL</RuntimeLibrary>
+      <RuntimeLibrary Condition="'$(Configuration)' != 'Debug'">MultiThreadedDLL</RuntimeLibrary>
+      <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
+    </ClCompile>
+  </ItemDefinitionGroup>
+  <ItemGroup Condition="'$(EngineEffectPackage)' != 'false'">
+    <ClCompile Include="EffectPackage.cpp" />
+    <ClCompile Include="EffectDefinition.cpp" />
+    <ClCompile Include="EffectModuleIR.cpp" />
+    <ClCompile Include="EffectSimulation.cpp"><DisableSpecificWarnings>4189;%(DisableSpecificWarnings)</DisableSpecificWarnings></ClCompile>
+    <ClCompile Include="EffectState.cpp" />
+    <ClCompile Include="EffectRenderContributor.cpp">
+      <!-- Public graph headers include TypeTrait's pre-existing debug-only hr
+           local. Keep /WX for this package; suppress only that header warning. -->
+      <DisableSpecificWarnings>4189;%(DisableSpecificWarnings)</DisableSpecificWarnings>
+    </ClCompile>
+    <ClInclude Include="EffectDefinition.h" />
+    <ClInclude Include="EffectModuleIR.h" />
+    <ClInclude Include="EffectSimulation.h" />
+    <None Include="Shaders\EffectSimulation.slang" />
+    <ClInclude Include="EffectState.h" />
+    <ClInclude Include="EffectRenderContributor.h" />
+  </ItemGroup>
+  <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
+</Project>

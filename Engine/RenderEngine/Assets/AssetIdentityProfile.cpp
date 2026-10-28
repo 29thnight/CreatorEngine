@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Platform.Windows.Strings.h"
@@ -38,7 +39,7 @@ namespace assets
             "mesh", "material", "texture", "skeleton", "animation",
         };
 
-        void AppendU32BE(std::vector<std::uint8_t>& out, std::uint32_t value)
+        void AppendU32BE(ce::dynamic_array<std::uint8_t>& out, std::uint32_t value)
         {
             out.push_back(static_cast<std::uint8_t>((value >> 24) & 0xFFu));
             out.push_back(static_cast<std::uint8_t>((value >> 16) & 0xFFu));
@@ -47,7 +48,7 @@ namespace assets
         }
 
         // 길이 접두 + 바이트. U32BE 범위를 넘으면 false.
-        [[nodiscard]] bool AppendField(std::vector<std::uint8_t>& out,
+        [[nodiscard]] bool AppendField(ce::dynamic_array<std::uint8_t>& out,
             std::span<const std::uint8_t> bytes)
         {
             if (bytes.size() > static_cast<std::size_t>(
@@ -93,7 +94,7 @@ namespace assets
         }
 
         [[nodiscard]] bool BuildWithProfile(std::string_view profile,
-            const IdentityInput& input, std::vector<std::uint8_t>& out,
+            const IdentityInput& input, ce::dynamic_array<std::uint8_t>& out,
             IdentityIssue& outIssue, std::string& outContext) noexcept
         {
             out.clear();
@@ -172,7 +173,7 @@ namespace assets
             const IdentityInput& input) noexcept
         {
             IdentityDerivation result;
-            std::vector<std::uint8_t> bytes;
+            ce::dynamic_array<std::uint8_t> bytes;
             if (!BuildWithProfile(profile, input, bytes, result.issue, result.context))
             {
                 return result;
@@ -248,7 +249,7 @@ namespace assets
     }
 
     bool BuildIdentityInputBytes(const IdentityInput& input,
-        std::vector<std::uint8_t>& out, IdentityIssue& outIssue,
+        ce::dynamic_array<std::uint8_t>& out, IdentityIssue& outIssue,
         std::string& outContext) noexcept
     {
         return BuildWithProfile(kIdentityProfile, input, out, outIssue, outContext);
@@ -257,8 +258,8 @@ namespace assets
     uuid::uuid16 DeriveUuidFromIdentityInputBytes(
         std::span<const std::uint8_t> canonicalInput) noexcept
     {
-        const ce::hash::sha256_digest digest =
-            ce::hash::sha256::compute(canonicalInput.data(), canonicalInput.size());
+        const ce::crypto::sha256_digest digest =
+            ce::crypto::sha256::compute(canonicalInput.data(), canonicalInput.size());
 
         uuid::uuid16 uuid;
         std::memcpy(uuid.data_.data(), digest.data(), kUuidBytes);

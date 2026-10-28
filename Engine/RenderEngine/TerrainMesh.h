@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "Mesh.h"
 
@@ -20,8 +21,8 @@ class TerrainMesh
 {
 public:
     // meshWidth: 정점 격자의 가로 폭(m_width). 패치 갱신의 행 계산에 쓴다.
-    TerrainMesh(std::string_view name, const std::vector<Vertex>& vertices,
-                const std::vector<uint32>& indices, uint32_t meshWidth)
+    TerrainMesh(std::string_view name, const ce::dynamic_array<Vertex>& vertices,
+                const ce::dynamic_array<uint32>& indices, uint32_t meshWidth)
         : m_name(name), m_vertices(vertices), m_indices(indices), m_meshWidth(meshWidth)
     {
     }
@@ -29,8 +30,8 @@ public:
     ~TerrainMesh() = default;
 
     std::string GetName() const { return m_name; }
-    const std::vector<Vertex>& GetVertices() const { return m_vertices; }
-    const std::vector<uint32>& GetIndices() const { return m_indices; }
+    const ce::dynamic_array<Vertex>& GetVertices() const { return m_vertices; }
+    const ce::dynamic_array<uint32>& GetIndices() const { return m_indices; }
     uint32_t GetMeshWidth() const { return m_meshWidth; }
 
     /// 자료가 바뀔 때마다 오른다. 지형 패스가 "올린 것이 최신인가"를 이 값으로
@@ -71,8 +72,8 @@ public:
 
 private:
     std::string m_name;
-    std::vector<Vertex> m_vertices;
-    std::vector<uint32> m_indices;
+    ce::dynamic_array<Vertex> m_vertices;
+    ce::dynamic_array<uint32> m_indices;
     uint32_t m_meshWidth;    // 격자 가로 폭
 
     uint32_t m_revision{ 0 };

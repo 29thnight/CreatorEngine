@@ -1,3 +1,7 @@
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
+#include "../../../Utility_Framework/Foundation/EngineStorage.h"
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #include "../../RenderArena.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Arena.h"
@@ -87,7 +91,7 @@ namespace
         }
     }
 
-    void CopyPassUsages(std::vector<EnhancedRenderGraph::RGPassUsage>& destination,
+    void CopyPassUsages(ce::dynamic_array<EnhancedRenderGraph::RGPassUsage>& destination,
                         std::span<const EnhancedRenderGraph::RGPassUsage> source)
     {
         if (destination.size() != source.size())
@@ -172,12 +176,12 @@ namespace
             uint32_t id{}, epoch{};
             uint16_t index{};
         };
-        std::array<Slot, kCapacity> m_slots{};
+        ce::fixed_array<Slot, kCapacity> m_slots{};
         uint32_t m_epoch{1};
         size_t m_size{};
     };
 
-    void ResetImportedIndices(std::unordered_map<uint32_t, uint16_t>& indices)
+    void ResetImportedIndices(ce::engine_node_map<uint32_t, uint16_t>& indices)
     {
         constexpr size_t kMaximumRetainedIndices = 4096;
         if (indices.size() > kMaximumRetainedIndices)
@@ -191,7 +195,7 @@ namespace
         }
     }
 
-    bool RememberImportedIndex(ImportedIndexCache& cache, std::unordered_map<uint32_t, uint16_t>& indices, uint32_t id,
+    bool RememberImportedIndex(ImportedIndexCache& cache, ce::engine_node_map<uint32_t, uint16_t>& indices, uint32_t id,
                                uint16_t index)
     {
         switch (cache.Remember(id, index))
@@ -317,7 +321,7 @@ RHITextureHandle EnhancedRenderGraph::ExecuteContext::ResolveHandle(RGHandle han
 struct EnhancedRenderGraph::DeclarationWork
 {
     ImportedIndexCache importedTextures, importedBuffers;
-    std::array<job_handle, 8> pending;
+    ce::fixed_array<job_handle, 8> pending;
     size_t pendingCount{}, nextPacket{};
 };
 
@@ -335,17 +339,17 @@ struct EnhancedRenderGraph::QueuePlanningScratch
     double dependencyMilliseconds{0};
     struct ReadEpoch
     {
-        std::vector<uint16_t> frontier, before;
+        ce::dynamic_array<uint16_t> frontier, before;
         RHIResourceState state{RHIResourceState::Common};
         RHIQueueKind queue{RHIQueueKind::Graphics};
         bool immutableRead{false};
         uint16_t atomicVersion{RGHandle::kInvalid};
     };
-    std::vector<ReadEpoch> resources;
+    ce::dynamic_array<ReadEpoch> resources;
     ce::dynamic_bitset sharedReadTextures;
-    std::vector<const QueueHint*> byPass;
-    std::vector<std::vector<uint16_t>> predecessors, successors;
-    std::vector<RHIQueueKind> queues;
+    ce::dynamic_array<const QueueHint*> byPass;
+    ce::dynamic_array<ce::dynamic_array<uint16_t>> predecessors, successors;
+    ce::dynamic_array<RHIQueueKind> queues;
 };
 
 void EnhancedRenderGraph::JoinDeclarationPackets()
@@ -465,7 +469,7 @@ void EnhancedRenderGraph::DispatchDeclarationPackets(bool finish)
             DeclarationPacket packet;
             size_t cost{};
         };
-        std::array<Range, kMaximumRanges> ranges;
+        ce::fixed_array<Range, kMaximumRanges> ranges;
         Resource* resources;
         ResourceDeclaration* resourceDeclarations;
         Pass* passes;
@@ -1450,7 +1454,7 @@ RGPassId EnhancedRenderGraph::InitializePass(std::string_view name, bool hasSide
     return id;
 }
 
-RGPassId EnhancedRenderGraph::AddPass(std::string_view name, const std::vector<RGPassUsage>& usages,
+RGPassId EnhancedRenderGraph::AddPass(std::string_view name, const ce::dynamic_array<RGPassUsage>& usages,
                                       ExecuteCallback execute, bool hasSideEffect)
 {
     ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddPass">()};
@@ -1465,7 +1469,7 @@ RGPassId EnhancedRenderGraph::AddPass(std::string_view name, const std::vector<R
     return id;
 }
 
-RGPassId EnhancedRenderGraph::AddPass(std::string_view name, std::vector<RGPassUsage>&& usages, ExecuteCallback execute,
+RGPassId EnhancedRenderGraph::AddPass(std::string_view name, ce::dynamic_array<RGPassUsage>&& usages, ExecuteCallback execute,
                                       bool hasSideEffect)
 {
     ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddPass">()};
@@ -1511,8 +1515,8 @@ RGPassId EnhancedRenderGraph::AddPass(std::string_view name, std::span<const RGP
     return id;
 }
 
-RGPassId EnhancedRenderGraph::AddRepeatedPass(std::string_view name, std::vector<RGPassUsage> usages,
-                                              std::vector<RepeatedPhase> phases, uint32_t repeatCount,
+RGPassId EnhancedRenderGraph::AddRepeatedPass(std::string_view name, ce::dynamic_array<RGPassUsage> usages,
+                                              ce::dynamic_array<RepeatedPhase> phases, uint32_t repeatCount,
                                               RepeatedExecuteCallback execute, bool hasSideEffect, uint32_t recordCost)
 {
     ce::profile_scope declarationDetail{ce::marker<"RenderGraphDeclareAddRepeatedPass">()};
@@ -1596,7 +1600,7 @@ RGPassId EnhancedRenderGraph::AddSplitPass(std::string_view name, std::span<cons
     return id;
 }
 
-RGPassId EnhancedRenderGraph::AddSplitPass(std::string_view name, const std::vector<RGPassUsage>& usages,
+RGPassId EnhancedRenderGraph::AddSplitPass(std::string_view name, const ce::dynamic_array<RGPassUsage>& usages,
                                            SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect,
                                            uint32_t recordCost)
 {
@@ -1614,7 +1618,7 @@ RGPassId EnhancedRenderGraph::AddSplitPass(std::string_view name, const std::vec
     return id;
 }
 
-RGPassId EnhancedRenderGraph::AddSplitPass(std::string_view name, std::vector<RGPassUsage>&& usages,
+RGPassId EnhancedRenderGraph::AddSplitPass(std::string_view name, ce::dynamic_array<RGPassUsage>&& usages,
                                            SplitExecuteCallback execute, uint32_t maxSlices, bool hasSideEffect,
                                            uint32_t recordCost)
 {
@@ -1931,7 +1935,7 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
         };
         ce::render_arena_vector<uint16_t> previousWriters{arena};
         ce::render_arena_vector<uint16_t> current{arena};
-        ce::render_arena_vector<std::pair<uint16_t, uint16_t>> pendingReaders{arena};
+        ce::render_arena_vector<ce::pair<uint16_t, uint16_t>> pendingReaders{arena};
         for (size_t r = 0; r < m_resources.size(); ++r)
         {
             previousWriters.clear();
@@ -2103,7 +2107,7 @@ bool EnhancedRenderGraph::BuildExplicitOrder(std::string& outError)
                 {from, to, RGHandle::kInvalid, 0, DiagnosticSnapshot::VersionEdge::Reason::RecordingSideEffect});
         }
     }
-    std::priority_queue<uint16_t, ce::render_arena_vector<uint16_t>, std::greater<uint16_t>> ready{
+    ce::storage_priority_queue<uint16_t, ce::render_arena_vector<uint16_t>, std::greater<uint16_t>> ready{
         std::greater<uint16_t>{}, ce::render_arena_vector<uint16_t>{arena}};
     for (size_t p = 0; p < count; ++p)
     {
@@ -2532,7 +2536,7 @@ bool EnhancedRenderGraph::CreateAliasedTransients(std::string& outError)
               {
                   // Candidates were collected in resource order. The explicit tie break
                   // preserves stable_sort's result without its temporary heap buffer.
-                  return std::pair{m_resources[left].firstUse, left} < std::pair{m_resources[right].firstUse, right};
+                  return ce::pair{m_resources[left].firstUse, left} < ce::pair{m_resources[right].firstUse, right};
               });
     for (auto index : candidates)
     {
@@ -3650,7 +3654,7 @@ bool EnhancedRenderGraph::CaptureDiagnosticSnapshot(DiagnosticSnapshot& output) 
                                         usage.handle.version, usage.handle.kind, usage.textureRange,
                                         usage.bufferRange});
             }
-            const auto copyPlan = [&](const PhaseBarrierPlan& plan, std::vector<DiagnosticBarrier>& barriers)
+            const auto copyPlan = [&](const PhaseBarrierPlan& plan, ce::dynamic_array<DiagnosticBarrier>& barriers)
             {
                 for (const auto& barrier : plan.transitions)
                 {
@@ -3867,7 +3871,7 @@ void EnhancedRenderGraph::BuildDependencyWaves()
     }
 }
 
-const std::vector<uint16_t>& EnhancedRenderGraph::GetExecuteOrder() const
+const ce::dynamic_array<uint16_t>& EnhancedRenderGraph::GetExecuteOrder() const
 {
     return m_activeStructuralSchedule ?
         m_activeStructuralSchedule->order : m_executeOrder;
@@ -4054,7 +4058,7 @@ void EnhancedRenderGraph::CaptureStructuralDeclarations(StructuralSchedule& sche
         declaration.firstUse = resource.firstUse;
         declaration.lastUse = resource.lastUse;
     }
-    const auto forgetEpochs = [](std::vector<RGPassUsage>& usages)
+    const auto forgetEpochs = [](ce::dynamic_array<RGPassUsage>& usages)
     {
         for (auto& usage : usages)
         {
@@ -4095,7 +4099,7 @@ void EnhancedRenderGraph::CaptureStructuralDeclarations(StructuralSchedule& sche
 
 void EnhancedRenderGraph::InheritStructuralSchedule(const EnhancedRenderGraph& previous)
 {
-    std::array<own::shared_owner<const StructuralSchedule>, MaxStructuralSchedules> schedules;
+    ce::fixed_array<own::shared_owner<const StructuralSchedule>, MaxStructuralSchedules> schedules;
     schedules[0] = previous.m_structuralSchedule;
     schedules[1] = previous.m_alternateSchedule;
     std::copy(previous.m_additionalSchedules.begin(), previous.m_additionalSchedules.end(), schedules.begin() + 2);
@@ -4849,11 +4853,11 @@ void EnhancedRenderGraph::PatchTimingSignatureReachability()
     m_timingSignature = own::make_shared<const std::string>(std::move(signature));
 }
 
-std::vector<EnhancedRenderGraph::QueueHint> EnhancedRenderGraph::MeasuredQueueHints(
-    const std::function<std::optional<uint64_t>(const GpuPassTimingIdentity&)>& measurement) const
+ce::dynamic_array<EnhancedRenderGraph::QueueHint> EnhancedRenderGraph::MeasuredQueueHints(
+    const ce::owned_func<std::optional<uint64_t>(const GpuPassTimingIdentity&)>& measurement) const
 {
     const auto& executeOrder = GetExecuteOrder();
-    std::vector<QueueHint> hints;
+    ce::dynamic_array<QueueHint> hints;
     if (!m_compiled || !m_timingSignature)
     {
         return hints;
@@ -4963,9 +4967,9 @@ bool EnhancedRenderGraph::CanShareTextureReads(uint16_t index) const
     return accessed;
 }
 
-void EnhancedRenderGraph::BuildQueueDependencies(const std::vector<RHIQueueKind>& queues, QueuePlanningScratch& scratch,
-                                                 std::vector<std::vector<uint16_t>>& predecessors,
-                                                 std::vector<std::vector<uint16_t>>& successors) const
+void EnhancedRenderGraph::BuildQueueDependencies(const ce::dynamic_array<RHIQueueKind>& queues, QueuePlanningScratch& scratch,
+                                                 ce::dynamic_array<ce::dynamic_array<uint16_t>>& predecessors,
+                                                 ce::dynamic_array<ce::dynamic_array<uint16_t>>& successors) const
 {
     const auto& executeOrder = GetExecuteOrder();
     QueuePlanningScratch::Timer timer{scratch.dependencyMilliseconds};
@@ -5088,7 +5092,7 @@ bool EnhancedRenderGraph::SelectExecutionQueues(const RHIQueueCapabilities& capa
 }
 
 bool EnhancedRenderGraph::BuildQueueSchedule(const RHIQueueCapabilities& capabilities,
-    const std::vector<QueueHint>& hints, bool enableAsyncCompute,
+    const ce::dynamic_array<QueueHint>& hints, bool enableAsyncCompute,
     QueueSchedule& output, std::string& outError) const
 {
     std::lock_guard planningLock{m_queuePlanningMutex};
@@ -5636,16 +5640,16 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
         own::shared_owner<const StructuralSchedule> schedule;
         uint32_t workers{0}, waveCount{1};
         bool balanced{false};
-        std::vector<RecordingShape> shapes;
-        std::vector<uint32_t> unitWorker, unitWave;
-        std::vector<std::vector<size_t>> workerUnits;
+        ce::dynamic_array<RecordingShape> shapes;
+        ce::dynamic_array<uint32_t> unitWorker, unitWave;
+        ce::dynamic_array<ce::dynamic_array<size_t>> workerUnits;
         RHIRecordingTaskGraph taskGraph;
     };
     // CPU metadata only: no callbacks, encoders, native handles or frame owners.
     // A bounded owner-thread cache also serves graph storage in other frame slots.
     // Workers cannot recursively record, so an active entry cannot be evicted by
     // its callbacks. Exact immutable schedule identity and unit shapes gate reuse.
-    static thread_local std::array<std::optional<CachedRecordingPlan>, MaxStructuralSchedules * 2> cachedPlans;
+    static thread_local ce::fixed_array<std::optional<CachedRecordingPlan>, MaxStructuralSchedules * 2> cachedPlans;
     static thread_local size_t nextCachedPlan = 0;
     const bool cacheEligible = bindingAware && !recordingSideEffects && workers > 1 &&
         m_activeStructuralSchedule && unitCount <= 4096;
@@ -5686,8 +5690,8 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
     if (!selectedPlan)
     {
         ce::profile_scope profile{ce::marker<"RenderCommandRecord.Plan">()};
-        std::vector<RHIRecordingPassDependencies> recordingPasses;
-        std::vector<uint32_t> unitPasses;
+        ce::dynamic_array<RHIRecordingPassDependencies> recordingPasses;
+        ce::dynamic_array<uint32_t> unitPasses;
         // 단일 target에서는 의존 계획을 소비하지 않으므로 매 기록의 임시 배열도 만들지 않는다.
         if (m_scheduling == RGSchedulingMode::ExplicitVersioned && workers > 1)
         {
@@ -5718,9 +5722,9 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
         m_stats.recordingBalanced = false;
         if (m_scheduling == RGSchedulingMode::ExplicitVersioned && workers > 1)
         {
-            std::vector<uint32_t> passWave(m_passes.size()), targetWave(workers);
-            std::vector<uint32_t> passCompletionTarget(m_passes.size());
-            const auto planWaves = [&](const std::vector<uint32_t>& targets, std::vector<uint32_t>& waves)
+            ce::dynamic_array<uint32_t> passWave(m_passes.size()), targetWave(workers);
+            ce::dynamic_array<uint32_t> passCompletionTarget(m_passes.size());
+            const auto planWaves = [&](const ce::dynamic_array<uint32_t>& targets, ce::dynamic_array<uint32_t>& waves)
             {
                 std::ranges::fill(std::span{passWave}, 0u);
                 std::ranges::fill(std::span{targetWave}, 0u);
@@ -5779,7 +5783,7 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
                 // These are CPU command-recording work units, never GPU timings.
                 // Base callback + declared resource uses + declared draw-batch cost.
                 // Split callbacks share the declared work; every slice has overhead.
-                std::vector<uint64_t> costs(unitCount);
+                ce::dynamic_array<uint64_t> costs(unitCount);
                 uint64_t total = 0;
                 for (size_t i = 0; i < unitCount; ++i)
                 {
@@ -5794,7 +5798,7 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
                     total += costs[i];
                 }
                 // Contiguous nonempty blocks: target order remains GPU execute order.
-                std::vector<uint32_t> candidate(unitCount);
+                ce::dynamic_array<uint32_t> candidate(unitCount);
                 uint64_t prefix = 0;
                 uint32_t target = 0;
                 for (size_t i = 0; i < unitCount; ++i)
@@ -5812,7 +5816,7 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
                 // for a target: separate target blocks may still execute serially.
                 const uint32_t maximumWaves = waveCount;
                 const auto criticalWork =
-                    [&](const std::vector<uint32_t>& targets, const std::vector<uint32_t>& waves, uint32_t count)
+                    [&](const ce::dynamic_array<uint32_t>& targets, const ce::dynamic_array<uint32_t>& waves, uint32_t count)
                 {
                     auto& graph = m_recordingTrialGraph;
                     if (kDependencyRecordingEnabled &&
@@ -5822,7 +5826,7 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
                     {
                         return graph.CriticalWork();
                     }
-                    std::vector<uint64_t> sums(size_t(count) * workers, 0);
+                    ce::dynamic_array<uint64_t> sums(size_t(count) * workers, 0);
                     for (size_t i = 0; i < unitCount; ++i)
                     {
                         sums[size_t(waves[i]) * workers + targets[i]] += costs[i];
@@ -5840,9 +5844,9 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
                     return result;
                 };
                 uint64_t best = criticalWork(unitWorker, unitWave, waveCount);
-                const auto consider = [&](const std::vector<uint32_t>& targets)
+                const auto consider = [&](const ce::dynamic_array<uint32_t>& targets)
                 {
-                    std::vector<uint32_t> waves(unitCount);
+                    ce::dynamic_array<uint32_t> waves(unitCount);
                     const uint32_t count = planWaves(targets, waves);
                     if (count > maximumWaves)
                     {
@@ -6019,7 +6023,7 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
                 {
                     // 캐시 재사용도 현재 unit과 동일한 빌더로 이유를 복원한다.
                     // 실행할 DAG와 일치할 때만 공개하며 진단이 실행 계획을 바꾸지는 않는다.
-                    std::vector<RHIRecordingPassDependencies> recordingPasses(m_passes.size());
+                    ce::dynamic_array<RHIRecordingPassDependencies> recordingPasses(m_passes.size());
                     for (size_t pass = 0; pass < m_passes.size(); ++pass)
                     {
                         recordingPasses[pass].independent = m_passes[pass].recordingIndependent;
@@ -6028,7 +6032,7 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
                     {
                         recordingPasses[edge.consumer].producers.push_back(edge.producer);
                     }
-                    std::vector<uint32_t> unitPasses;
+                    ce::dynamic_array<uint32_t> unitPasses;
                     unitPasses.reserve(unitCount);
                     for (const auto& unit : units)
                     {
@@ -6091,7 +6095,7 @@ bool EnhancedRenderGraph::RecordParallelInternal(IRHIParallelCommandPool& pool, 
 #if !CE_SHIPPING
     const auto recordingContext = ce::current_cpu_context;
 #endif
-    static const std::array workerMarkers{
+    static const ce::fixed_array workerMarkers{
         ce::marker<"RenderCommandRecord.Worker0">(), ce::marker<"RenderCommandRecord.Worker1">(),
         ce::marker<"RenderCommandRecord.Worker2">(), ce::marker<"RenderCommandRecord.Worker3">(),
         ce::marker<"RenderCommandRecord.Worker4">(), ce::marker<"RenderCommandRecord.Worker5">(),

@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Containers/ContainerAPI.h"
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Platform/WindowsSDK/Creator.ComSupport.h"
@@ -94,7 +95,9 @@ private:
     winrt::com_ptr<ID3D12Device> m_device;
 
     mutable std::mutex m_mutex;
-    std::unordered_map<uint64_t, CacheEntry> m_cache;
+    // Cache removal destroys COM owners and frees nodes immediately.
+    ce::node_hash_map<uint64_t, CacheEntry, ce::hash<uint64_t>,
+        ce::equal_to<uint64_t>, ce::heap_allocator, false> m_cache;
     Stats m_stats;
 };
 

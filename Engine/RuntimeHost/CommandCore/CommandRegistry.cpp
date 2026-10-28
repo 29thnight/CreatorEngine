@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "CommandRegistry.h"
 
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -123,7 +124,7 @@ namespace CommandCore
                              + " (" + std::string(canonical) + ")");
     }
 
-    const std::vector<CommandDescriptor>& CommandRegistry::Sorted() const
+    const ce::dynamic_array<CommandDescriptor>& CommandRegistry::Sorted() const
     {
         if (m_sortedDirty)
         {
@@ -195,7 +196,7 @@ namespace CommandCore
 
     std::string RenderHelp(const CommandRegistry& registry)
     {
-        const std::vector<CommandDescriptor>& sorted = registry.Sorted();
+        const ce::dynamic_array<CommandDescriptor>& sorted = registry.Sorted();
 
         // 이름 열 폭을 실제 내용에서 정한다. 손으로 맞춘 공백은 명령을 하나
         // 더할 때마다 어긋나고, 어긋난 표는 아무도 다시 맞추지 않는다.

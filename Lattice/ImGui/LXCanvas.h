@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 
 #include "../Core/LXGraph.h"
@@ -23,7 +24,7 @@ struct CanvasState
     bool snapToGrid = false;
     Id selectedNode = 0;
     Id selectedFrame = 0;
-    std::vector<Id> selectedNodes;
+    ce::dynamic_array<Id> selectedNodes;
     Id pendingPin = 0;
     Id pendingDocument = 0;
     std::uint64_t pendingRevision = 0;
@@ -36,10 +37,10 @@ struct CanvasState
     Id creationPin = 0;
     ImVec2 creationAt{};
     bool creationPopupOpen = false;
-    std::array<char, 64> creationQuery{};
+    ce::fixed_array<char, 64> creationQuery{};
     Id draggingNode = 0;
     ImVec2 dragStartMouse{};
-    std::vector<NodePosition> dragStartNodes;
+    ce::dynamic_array<NodePosition> dragStartNodes;
     Id draggingFrame = 0;
     ImVec2 frameDragStartMouse{};
     float frameDragStartX = 0.0f;
@@ -53,11 +54,11 @@ struct CanvasState
     std::string colorKey;
     ImVec4 colorValue{};
     Id editingPin = 0;
-    std::array<float, 3> vectorValue{};
+    ce::fixed_array<float, 3> vectorValue{};
     std::int64_t integerValue = 0;
     std::string editingProperty;
     Id editingNode = 0;
-    std::array<char, 512> textValue{};
+    ce::fixed_array<char, 512> textValue{};
     std::string message;
     bool dirty = false;
 };

@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -47,7 +48,7 @@ namespace
         {
             return false;
         }
-        std::array<std::vector<float>, 16> references;
+        ce::fixed_array<ce::dynamic_array<float>, 16> references;
         for (uint32_t policy = 0; policy < 3; ++policy)
         {
             for (uint32_t fixture = 0; fixture < 16; ++fixture)
@@ -84,7 +85,7 @@ namespace
                     policy == 1 ? RGOrderPolicy::PreserveDeclarationOrder : RGOrderPolicy::DependencyOrder);
                 const auto write = policy == 0 ? RGAccessMode::LegacyState : RGAccessMode::Write;
                 const auto read = policy == 0 ? RGAccessMode::LegacyState : RGAccessMode::Read;
-                const auto clearColor = [&](const char *name, RHIFormat format, const std::array<float, 4> &clear) {
+                const auto clearColor = [&](const char *name, RHIFormat format, const ce::fixed_array<float, 4> &clear) {
                     RGTextureDesc desc{};
                     desc.width = 16;
                     desc.height = 16;
@@ -137,7 +138,7 @@ namespace
                         ec.encoder->ClearDepthTarget(targets, 0.5f);
                     },
                     true);
-                std::vector<EnhancedSpritePass::Item> items;
+                ce::dynamic_array<EnhancedSpritePass::Item> items;
                 if (variant != 0)
                 {
                     items.resize(1);
@@ -172,11 +173,11 @@ namespace
                     error = "RG5 screen output version or bypass identity mismatch";
                     return false;
                 }
-                const std::array<RGHandle, 4> handles = {color, horizontal, scattered, output};
+                const ce::fixed_array<RGHandle, 4> handles = {color, horizontal, scattered, output};
                 struct Readbacks
                 {
                     DX12DeviceResources &resources;
-                    std::array<RHIReadback, 4> values{};
+                    ce::fixed_array<RHIReadback, 4> values{};
                     ~Readbacks()
                     {
                         for (auto &value : values)
@@ -185,7 +186,7 @@ namespace
                         }
                     }
                 } readbacks{resources};
-                std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+                ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> uses;
                 for (uint32_t i = 0; i < 4; ++i)
                 {
                     if (!resources.CreateReadback(16, 16, RHIFormat::RGBA16Float, 1, readbacks.values[i], error))
@@ -242,7 +243,7 @@ namespace
                     return false;
                 }
                 resources.WaitForGpu();
-                std::array<RHIReadbackImage, 4> images;
+                ce::fixed_array<RHIReadbackImage, 4> images;
                 for (uint32_t i = 0; i < 4; ++i)
                 {
                     if (!resources.MapReadback(readbacks.values[i], images[i], error))

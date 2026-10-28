@@ -1,4 +1,7 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
 
 #include "LXMaterialGraph.h"
 
@@ -27,8 +30,8 @@ struct LXMaterialIRNode
     Id groupId = 0;
     std::string definition;
     std::uint32_t schemaRevision = 1;
-    std::vector<LXMaterialIRSocket> sockets;
-    std::map<std::string, std::string> properties;
+    ce::dynamic_array<LXMaterialIRSocket> sockets;
+    ce::engine_ordered_map<std::string, std::string> properties;
 
     bool operator==(const LXMaterialIRNode&) const = default;
 };
@@ -46,10 +49,10 @@ struct LXMaterialIRLink
 struct LXMaterialIRScope
 {
     Id groupId = 0;
-    std::vector<LXGroupSocket> groupInterface;
+    ce::dynamic_array<LXGroupSocket> groupInterface;
     // Dependency order, with stable node ID as the tie breaker. Socket order is definition order.
-    std::vector<LXMaterialIRNode> nodes;
-    std::vector<LXMaterialIRLink> links;
+    ce::dynamic_array<LXMaterialIRNode> nodes;
+    ce::dynamic_array<LXMaterialIRLink> links;
 
     bool operator==(const LXMaterialIRScope&) const = default;
 };
@@ -58,13 +61,13 @@ struct LXMaterialIR
 {
     Id graphId = 0;
     Id activeOutput = 0;
-    std::vector<LXMaterialParameter> blackboard;
-    std::vector<LXMaterialIRScope> scopes;
+    ce::dynamic_array<LXMaterialParameter> blackboard;
+    ce::dynamic_array<LXMaterialIRScope> scopes;
 
     bool operator==(const LXMaterialIR&) const = default;
 };
 
-std::optional<LXMaterialIR> BuildMaterialIR(const LXMaterialAsset& asset, std::vector<Issue>* issues = nullptr);
+std::optional<LXMaterialIR> BuildMaterialIR(const LXMaterialAsset& asset, ce::dynamic_array<Issue>* issues = nullptr);
 
 class LXMaterialDocument
 {
@@ -75,10 +78,10 @@ class LXMaterialDocument
     const LXMaterialAsset& Asset() const { return asset_; }
     const std::optional<LXMaterialIR>& LastValidIR() const { return lastValidIR_; }
     std::uint64_t Generation() const { return generation_; }
-    bool PublishIR(std::vector<Issue>* issues = nullptr);
+    bool PublishIR(ce::dynamic_array<Issue>* issues = nullptr);
     bool Reload(const std::filesystem::path& path, std::string* error = nullptr);
     // The Material host must transact the entire asset, including socket metadata and Blackboard.
-    bool Edit(const std::function<bool(LXMaterialAsset&)>& operation);
+    bool Edit(const ce::owned_func<bool(LXMaterialAsset&)>& operation);
     bool Undo();
     bool Redo();
 
@@ -86,8 +89,8 @@ class LXMaterialDocument
     LXMaterialAsset asset_;
     std::optional<LXMaterialIR> lastValidIR_;
     std::uint64_t generation_ = 0;
-    std::vector<LXMaterialAsset> undo_;
-    std::vector<LXMaterialAsset> redo_;
+    ce::dynamic_array<LXMaterialAsset> undo_;
+    ce::dynamic_array<LXMaterialAsset> redo_;
 };
 
 } // namespace LX

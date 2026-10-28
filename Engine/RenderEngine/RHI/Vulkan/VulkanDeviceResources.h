@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -433,8 +434,8 @@ private:
     VkSemaphore m_timeline{ VK_NULL_HANDLE };
     uint64_t    m_nextFenceValue{ 1 };
     uint64_t    m_lastAdmittedFenceValue{ 0 };
-    std::array<uint64_t, kFrameCount> m_frameFenceValues{};
-    std::array<RHISubmissionTicket, kFrameCount> m_frameSubmissionTickets;
+    ce::fixed_array<uint64_t, kFrameCount> m_frameFenceValues{};
+    ce::fixed_array<RHISubmissionTicket, kFrameCount> m_frameSubmissionTickets;
     bool m_submissionClient{ false };
     RHILifecycleResult m_lastLifecycleResult{};
 
@@ -446,7 +447,7 @@ private:
         uint64_t completionValue{ 0 };
         CommandContextState state{ CommandContextState::Available };
     };
-    std::vector<CommandContext> m_commandContexts;
+    ce::dynamic_array<CommandContext> m_commandContexts;
     uint32_t m_currentCommandContext{ UINT32_MAX };
     uint32_t m_frameIndex{ 0 };
     bool     m_frameOpen{ false };
@@ -456,17 +457,17 @@ private:
     VkSwapchainKHR m_swapChain{ VK_NULL_HANDLE };
     VkFormat       m_swapChainFormat{ VK_FORMAT_UNDEFINED };
     VkExtent2D     m_swapChainExtent{};
-    std::vector<VkImage> m_backBuffers;
+    ce::dynamic_array<VkImage> m_backBuffers;
     uint32_t m_backBufferIndex{ 0 };
 
     // ★ 획득·표시용 이진 세마포어. 타임라인으로 대체할 수 없다 —
     //   vkAcquireNextImageKHR 와 vkQueuePresentKHR 이 이진만 받는다.
     //   DX12 에는 대응이 없는 개념이라, 이것이 인터페이스로 새면 계약이
     //   Vulkan 쪽으로 기운다. 여기 가둬 둔다.
-    std::vector<VkSemaphore> m_acquireSemaphores;
+    ce::dynamic_array<VkSemaphore> m_acquireSemaphores;
     // vkQueuePresentKHR의 wait는 완료 신호를 노출하지 않는다. 같은 swapchain
     // image를 다시 acquire한 뒤에만 안전하게 재사용할 수 있어 image별로 둔다.
-    std::vector<VkSemaphore> m_presentSemaphores;
+    ce::dynamic_array<VkSemaphore> m_presentSemaphores;
     uint32_t m_semaphoreIndex{ 0 };
     bool     m_imageAcquired{ false };
     VkResult m_swapChainError{ VK_SUCCESS };
@@ -487,7 +488,7 @@ private:
 
     /// 프레임 수명이다. `BeginFrame`의 frame-slot fence 대기 뒤에만 비운다.
     /// shader-visible descriptor version과 달리 기록 시점에 소비되는 view 표다.
-    std::array<VulkanRenderTargetTable, kFrameCount> m_renderTargetTables;
+    ce::fixed_array<VulkanRenderTargetTable, kFrameCount> m_renderTargetTables;
 
     /// CreateBindings가 보관하는 프레임 수명 요청. backend에는 이 표의
     /// 1-based 슬롯만 들어가며, BeginFrame의 펜스 대기 뒤에 비운다.
@@ -508,7 +509,7 @@ private:
     VulkanUploadSegmentAllocator m_uploadAllocator;
     uint64_t m_nextRecordingId{ 1 };
     uint64_t m_currentRecordingId{ 0 };
-    std::vector<IRHIUploadTransactionListener*> m_uploadTransactionListeners;
+    ce::dynamic_array<IRHIUploadTransactionListener*> m_uploadTransactionListeners;
     VulkanDescriptorPoolRecycler m_descriptorRecycler;
 
 public:
@@ -527,7 +528,7 @@ private:
 
     // 검증 레이어 콜백이 다른 스레드에서 올 수 있다.
     mutable std::mutex       m_messageMutex;
-    std::vector<std::string> m_debugMessages;
+    ce::dynamic_array<std::string> m_debugMessages;
     uint32_t                 m_debugProblemCount{ 0 };
 
     static VKAPI_ATTR VkBool32 VKAPI_CALL DebugCallback(

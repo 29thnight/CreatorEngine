@@ -1,4 +1,5 @@
 #pragma once
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "SceneGC.h"
 #include "../Utility_Framework/Reflection/ClassProperty.h"
@@ -19,7 +20,7 @@ public:
     gc::root_ref<Component> CreateManaged(gc::domain& domain, const reflgen::type_descriptor& type);
 	void LoadComponent(Entity* obj, const Authoring::NodeView& itNode, bool isEditorToGame = false);
 
-	std::map<std::string, const reflgen::type_descriptor*> m_componentTypes{};
+	ce::engine_ordered_map<std::string, const reflgen::type_descriptor*> m_componentTypes{};
 };
 
 static auto ComponentFactorys = ComponentFactory::GetInstance();

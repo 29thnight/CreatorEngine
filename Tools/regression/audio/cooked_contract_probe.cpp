@@ -70,13 +70,13 @@ namespace
             header.spatialKind = ck::AudioSpatialKind::PointMono;
             header.channels = 1; header.sampleRate = 48000; header.frameCount = 4096;
             header.payloadBytes = payload.size();
-            header.payloadSha256 = ce::hash::sha256::compute(payload.data(), payload.size());
+            header.payloadSha256 = ce::crypto::sha256::compute(payload.data(), payload.size());
             const auto h = ck::WriteAudioClipHeader(header);
             artifact.assign(h.begin(), h.end()); artifact.insert(artifact.end(), payload.begin(), payload.end());
             entry.assetId = id; entry.kind = ck::CookedAssetKind::AudioClip;
             entry.formatVersion = ck::kAudioClipArtifactVersion;
             entry.byteSize = artifact.size(); entry.artifactPath = ck::MakeDerivedAudioClipArtifactPath(id);
-            entry.contentSha256 = ce::hash::sha256::compute(artifact.data(), artifact.size());
+            entry.contentSha256 = ce::crypto::sha256::compute(artifact.data(), artifact.size());
         }
         std::shared_ptr<MemoryBytes> Source() const {
             auto p = std::make_shared<MemoryBytes>(); p->bytes = artifact; p->path = entry.artifactPath; return p;
@@ -156,10 +156,10 @@ namespace
         changed=f.entry;changed.artifactPath="Derived/Audio/../escape.ceac";reject(changed,f.Source(),"manifest path traversal rejected");
         reject(f.entry,nullptr,"null source rejected");
         auto bad=f.Source();bad->bytes.back()^=std::byte{1};reject(f.entry,bad,"payload tamper rejected");
-        changed=f.entry;changed.contentSha256=ce::hash::sha256::compute(bad->bytes.data(),bad->bytes.size());
+        changed=f.entry;changed.contentSha256=ce::crypto::sha256::compute(bad->bytes.data(),bad->bytes.size());
         reject(changed,bad,"payload tamper rejected even with updated outer digest");
         bad=f.Source();bad->bytes[40]^=std::byte{1};changed=f.entry;
-        changed.contentSha256=ce::hash::sha256::compute(bad->bytes.data(),bad->bytes.size());
+        changed.contentSha256=ce::crypto::sha256::compute(bad->bytes.data(),bad->bytes.size());
         reject(changed,bad,"inner digest tamper rejected even with updated outer digest");
         bad=f.Source();bad->bytes[0]=std::byte{'X'};reject(f.entry,bad,"invalid CEAC header rejected");
         bad=f.Source();bad->bytes.pop_back();reject(f.entry,bad,"truncated artifact rejected");
@@ -364,7 +364,7 @@ int main(int argc,char** argv){try{
     fs::create_directories(argv[1]);
     const std::array<std::uint8_t,32> abc={0xba,0x78,0x16,0xbf,0x8f,0x01,0xcf,0xea,0x41,0x41,0x40,0xde,0x5d,0xae,0x22,0x23,
         0xb0,0x03,0x61,0xa3,0x96,0x17,0x7a,0x9c,0xb4,0x10,0xff,0x61,0xf2,0x00,0x15,0xad};
-    Check(ce::hash::sha256::compute("abc",3)==abc,"production SHA256 known-answer vector");
+    Check(ce::crypto::sha256::compute("abc",3)==abc,"production SHA256 known-answer vector");
     Fixture f;TestHeaders(f);TestMemory(f);TestLoose(f,fs::path(argv[1]));TestLooseOwnership(f,fs::path(argv[1]));TestManifest(f);
     std::cout<<"COOKED_CONTRACT_OK checks="<<checks<<" pak=not-tested device=not-used\n";
     return 0;

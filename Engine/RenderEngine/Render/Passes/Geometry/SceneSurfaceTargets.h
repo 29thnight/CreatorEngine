@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #pragma once
 #include "../../Graph/EnhancedRenderPass.h"
 #include "../../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -13,7 +14,7 @@ public:
         RGHandle diffuse, metalRough, normal, emissive, bitmask, depth, visibility;
         // Optional immutable pre-Decal versions, ordered diffuse/ORM/normal.
         // Carried with the post-Decal surface; never registered in SceneHost state.
-        std::array<RGHandle,3> decalBaseline{};
+        ce::fixed_array<RGHandle,3> decalBaseline{};
     };
     static RHIFormat GetRenderTargetFormat(uint32_t index);
     void Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context);

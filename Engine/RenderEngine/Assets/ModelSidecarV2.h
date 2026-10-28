@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -50,7 +51,7 @@ namespace assets
         uuid::uuid16 assetId{};
         std::uint64_t generation{};
         std::string sourceFingerprint{};   // sha256:<64hex>
-        std::vector<ModelSubAssetRecord> subAssets{};
+        ce::dynamic_array<ModelSubAssetRecord> subAssets{};
     };
 
     enum class SidecarIssueCode : std::uint8_t
@@ -86,22 +87,22 @@ namespace assets
 
     // 문법·형식 검사. 실패면 out은 건드리지 않는다.
     [[nodiscard]] bool ReadModelSidecarV2(std::string_view yaml, ModelSidecarV2& out,
-        std::vector<SidecarIssue>& outIssues);
+        ce::dynamic_array<SidecarIssue>& outIssues);
 
     // existingYaml의 다른 최상위 키를 보존하며 v2 신원 키를 덮어 쓴다. 문서가 형식
     // 검사를 통과하지 못하면 빈 문자열.
     [[nodiscard]] std::string WriteModelSidecarV2(const ModelSidecarV2& document,
-        std::string_view existingYaml, std::vector<SidecarIssue>& outIssues);
+        std::string_view existingYaml, ce::dynamic_array<SidecarIssue>& outIssues);
 
     // header 대조·모델 id 재유도·subasset id 재유도·bijection(IdentityRegistry).
     [[nodiscard]] bool ValidateModelSidecarV2Closure(const ModelSidecarV2& document,
-        const IdentityEpochHeader& header, std::vector<SidecarIssue>& outIssues);
+        const IdentityEpochHeader& header, ce::dynamic_array<SidecarIssue>& outIssues);
 
     // stable key 배정 결과에서 문서를 만든다(신원 전부 유도). 실패면 false.
     [[nodiscard]] bool BuildModelSidecarV2(const IdentityEpochHeader& header,
         std::string_view modelAuthoringKey, std::uint64_t generation,
         std::string_view sourceFingerprint, std::span<const StableKeyAssignment> assignments,
-        ModelSidecarV2& out, std::vector<SidecarIssue>& outIssues);
+        ModelSidecarV2& out, ce::dynamic_array<SidecarIssue>& outIssues);
 
     // 원본 파일 바이트의 `sha256:<64hex>`.
     [[nodiscard]] std::string MakeSourceFingerprint(std::span<const std::uint8_t> bytes);

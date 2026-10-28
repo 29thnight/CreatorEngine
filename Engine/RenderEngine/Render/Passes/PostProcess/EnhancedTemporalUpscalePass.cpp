@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #include "EnhancedTemporalUpscalePass.h"
 
 void EnhancedTemporalUpscalePass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameContext& context)
@@ -43,7 +44,7 @@ void EnhancedTemporalUpscalePass::Declare(EnhancedRenderGraph& graph, const Enha
             execute.encoder->ClearRenderTargets(targets, clear);
         });
     }
-    std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> uses;
     uses.reserve(m_inputs.size() + 1);
     for (const auto input : m_inputs)
         uses.push_back({input, RHIResourceState::ShaderResource,

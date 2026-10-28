@@ -1,4 +1,7 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Utility_Framework/Foundation/EngineOrderedSet.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -62,7 +65,7 @@ class SceneLookupFrame
         }
     }
     void BindRuntime(RHIEncoder& encoder, unsigned firstRootSlot) const;
-    const std::array<RGHandle, 11>& DeclareInputs(EnhancedRenderGraph& graph) const;
+    const ce::fixed_array<RGHandle, 11>& DeclareInputs(EnhancedRenderGraph& graph) const;
     bool InputsDeclared(const EnhancedRenderGraph& graph) const
     {
         if (!graph_)
@@ -72,8 +75,8 @@ class SceneLookupFrame
         CheckCurrent(graph);
         return true;
     }
-    const std::array<RGHandle, 11>& GraphInputs(const EnhancedRenderGraph& graph) const;
-    std::array<RGHandle, 11> DeclareCaptureOutputs(EnhancedRenderGraph& graph, unsigned first, unsigned count) const;
+    const ce::fixed_array<RGHandle, 11>& GraphInputs(const EnhancedRenderGraph& graph) const;
+    ce::fixed_array<RGHandle, 11> DeclareCaptureOutputs(EnhancedRenderGraph& graph, unsigned first, unsigned count) const;
     void DeclareBake(EnhancedRenderGraph& graph, RGHandle owners) const;
     void DeclareReady(EnhancedRenderGraph& graph) const;
     RGHandle GraphSamples(const EnhancedRenderGraph& graph) const;
@@ -90,11 +93,11 @@ class SceneLookupFrame
     std::uint64_t frameId_{}, viewId_{}, sceneEpoch_{}, environmentGeneration_{}, recording_{}, descriptors_{};
     std::uint64_t resourceBytes_{}, exclusiveBytes_{};
     RHITextureHandle environment_, irradiance_, prefiltered_, source_;
-    std::array<RHITextureHandle, 3> importance_{};
-    std::array<RHITextureHandle, 11> inputs_{};
+    ce::fixed_array<RHITextureHandle, 3> importance_{};
+    ce::fixed_array<RHITextureHandle, 11> inputs_{};
     RHIBufferHandle samples_, statistics_, emptyPrevious_;
     own::shared_owner<const LX::Runtime::ComputeGeneration> bake_, clear_;
-    std::vector<RHIBufferSlice> constants_;
+    ce::dynamic_array<RHIBufferSlice> constants_;
     RHIBindingTable outputs_;
     RHIBindingTable runtimeInputs_;
     RHIBufferSlice runtimeConstants_;
@@ -104,9 +107,9 @@ class SceneLookupFrame
     own::weak_owner<const SceneLookupFrame> self_;
     mutable const EnhancedRenderGraph* graph_{};
     mutable std::uint64_t graphEpoch_{};
-    mutable std::array<RGHandle, 11> graphInputs_{};
+    mutable ce::fixed_array<RGHandle, 11> graphInputs_{};
     mutable RGHandle graphSamples_, graphStatistics_;
-    mutable std::array<RHIResourceState, 11> inputStates_{};
+    mutable ce::fixed_array<RHIResourceState, 11> inputStates_{};
     mutable RHIResourceState sampleState_ = RHIResourceState::Common;
     mutable RHIResourceState statisticState_ = RHIResourceState::Common;
     mutable std::atomic<unsigned> stages_{};
@@ -119,7 +122,7 @@ class SceneLookupCache : private IRHIUploadTransactionListener
     bool Prepare(const EnhancedFrameContext& context, std::uint64_t viewId, RHITextureHandle environment,
                  RHITextureHandle irradiance, RHITextureHandle prefiltered, std::uint64_t environmentGeneration,
                  std::uint64_t memoryBudget, own::shared_owner<const SceneLookupFrame>& result, std::string& error,
-                 std::array<RHITextureHandle, 3> importance = {}, RHITextureHandle source = {}, bool standalone = false,
+                 ce::fixed_array<RHITextureHandle, 3> importance = {}, RHITextureHandle source = {}, bool standalone = false,
                  bool approximate = false, bool capture = true, bool runtimeEvaluation = false);
     void ResetPreparationStatus() { preparationDeferred_ = false; }
     bool PreparationDeferred() const { return preparationDeferred_; }
@@ -137,11 +140,11 @@ class SceneLookupCache : private IRHIUploadTransactionListener
   private:
     IRenderDeviceServices* device_{};
     LX::Runtime::ComputePipeline bake_, clear_;
-    std::vector<own::shared_owner<const SceneLookupFrame>> published_;
+    ce::dynamic_array<own::shared_owner<const SceneLookupFrame>> published_;
     own::shared_owner<SceneLookupResourcePool> resourcePool_;
     std::mutex submissionMutex_;
-    std::map<std::uint64_t, RHICompletionPoint> submitted_;
-    std::set<std::uint64_t> acceptedRecordings_;
+    ce::engine_ordered_map<std::uint64_t, RHICompletionPoint> submitted_;
+    ce::engine_ordered_set<std::uint64_t> acceptedRecordings_;
     bool preparationDeferred_{};
     void OnUploadSubmitted(std::uint64_t recordingId, RHICompletionPoint completion) override;
     void OnUploadCompleted(std::uint64_t completed) override;

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -103,7 +104,7 @@ namespace experiment
 	struct ModelDecodeResult final
 	{
 		std::optional<ModelDraft> draft{};
-		std::vector<ModelLoadIssue> issues{};
+		ce::dynamic_array<ModelLoadIssue> issues{};
 	};
 
 	// Assimp/source와 cooked codec은 이 경계 뒤의 별도 구현이다. decoder는 Scene,
@@ -118,7 +119,7 @@ namespace experiment
 	struct ModelLoadResult final
 	{
 		Model::Shared model{};
-		std::vector<ModelLoadIssue> issues{};
+		ce::dynamic_array<ModelLoadIssue> issues{};
 
 		[[nodiscard]] bool Succeeded() const noexcept
 		{
@@ -145,9 +146,9 @@ namespace experiment
 		// 같은 종류의 per-vertex 위반은 mesh당 첫 발견 한 건만 보고한다.
 		// importOptions 오버로드는 decoder가 maxBoneInfluences 제한을 지켰는지도
 		// 검사한다. 단일 인자 버전은 ModelData의 고정 slot 수를 상한으로 쓴다.
-		[[nodiscard]] static std::vector<ModelLoadIssue> Validate(
+		[[nodiscard]] static ce::dynamic_array<ModelLoadIssue> Validate(
 			const ModelDraft& draft);
-		[[nodiscard]] static std::vector<ModelLoadIssue> Validate(
+		[[nodiscard]] static ce::dynamic_array<ModelLoadIssue> Validate(
 			const ModelDraft& draft, const ModelImportOptions& importOptions);
 
 	private:

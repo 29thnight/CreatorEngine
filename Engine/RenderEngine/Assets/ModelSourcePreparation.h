@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -24,9 +25,9 @@ namespace assets
     // exclusively in ModelAssetAuthoringTransaction.
     [[nodiscard]] own::unique_owner<experiment::importer::IAssetImporter>
         CreateModelSourceImporter(const std::filesystem::path& source);
-    [[nodiscard]] bool NormalizeModelStableInputs(std::vector<StableKeyElement>& elements,
+    [[nodiscard]] bool NormalizeModelStableInputs(ce::dynamic_array<StableKeyElement>& elements,
         std::string& failure);
     [[nodiscard]] bool ReconcileAuthoredModelBindings(const experiment::importer::ImportedScene& scene,
-        const ModelSidecarV2& sidecar, std::vector<StableKeyAssignment>& out,
+        const ModelSidecarV2& sidecar, ce::dynamic_array<StableKeyAssignment>& out,
         std::string& failure);
 }

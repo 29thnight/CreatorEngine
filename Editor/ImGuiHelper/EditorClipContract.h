@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 // PHASE 21 W2-2 — 잘라 그리기 계약을 **잴 수 있게** 만든다.
 //
@@ -71,24 +72,24 @@ namespace editor::clipping
 
         // 넘치는데 안 잘랐다 — 옆 칸을 덮는다.
         std::uint64_t overflowFrames{0};
-        std::vector<std::string> overflowWidgets;
+        ce::dynamic_array<std::string> overflowWidgets;
 
         // 잘랐는데 전체를 돌려줄 길이 없다 — 이름이 조용히 사라진다.
         std::uint64_t silentFrames{0};
-        std::vector<std::string> silentWidgets;
+        ce::dynamic_array<std::string> silentWidgets;
 
         // 넘쳐서 잘랐고 tooltip 도 준다. 정상이지만 **수를 남긴다** —
         // 이 수가 0 이면 좁은 상황을 한 번도 안 만든 것이라 위 둘의 0 은
         // 아무 뜻이 없다.
         std::uint64_t truncated{0};
-        std::vector<std::string> truncatedWidgets;
+        ce::dynamic_array<std::string> truncatedWidgets;
 
         // 잴 기회가 온 위젯들. 자극이 닿았는지를 게이트가 먼저 본다.
-        std::vector<std::string> measuredWidgets;
+        ce::dynamic_array<std::string> measuredWidgets;
 
         // 클립 스택이 균형을 잃은 횟수.
         std::uint64_t unbalanced{0};
-        std::vector<std::string> unbalancedWidgets;
+        ce::dynamic_array<std::string> unbalancedWidgets;
     };
 
     // 글자를 그리기 직전에 부른다.

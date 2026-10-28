@@ -1,3 +1,5 @@
+#include "../../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Containers/ContainerAPI.h"
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -27,7 +29,7 @@ namespace assets
         std::string context, const uuid::uuid16& claimed)
     {
         IdentityRegisterResult result;
-        std::vector<std::uint8_t> canonical;
+        ce::dynamic_array<std::uint8_t> canonical;
         std::string issueContext;
         if (!BuildIdentityInputBytes(input, canonical, result.issue, issueContext))
         {
@@ -51,7 +53,7 @@ namespace assets
     }
 
     IdentityRegisterResult IdentityRegistry::RegisterDerived(
-        std::vector<std::uint8_t> canonicalInput, const uuid::uuid16& uuid,
+        ce::dynamic_array<std::uint8_t> canonicalInput, const uuid::uuid16& uuid,
         std::string context)
     {
         IdentityRegisterResult result;
@@ -77,7 +79,7 @@ namespace assets
     }
 
     void IdentityRegistry::InsertUncheckedForTest(
-        std::vector<std::uint8_t> canonicalInput, const uuid::uuid16& uuid,
+        ce::dynamic_array<std::uint8_t> canonicalInput, const uuid::uuid16& uuid,
         std::string context)
     {
         const std::size_t index = m_entries.size();
@@ -87,7 +89,7 @@ namespace assets
     }
 
     IdentityRegisterResult IdentityRegistry::Insert(
-        std::vector<std::uint8_t> canonicalInput, const uuid::uuid16& uuid,
+        ce::dynamic_array<std::uint8_t> canonicalInput, const uuid::uuid16& uuid,
         std::string context)
     {
         IdentityRegisterResult result;
@@ -132,15 +134,15 @@ namespace assets
         return found == m_byUuid.end() ? nullptr : &m_entries[found->second];
     }
 
-    bool IdentityRegistry::VerifyBijection(std::vector<std::string>& outIssues) const
+    bool IdentityRegistry::VerifyBijection(ce::dynamic_array<std::string>& outIssues) const
     {
         const std::size_t before = outIssues.size();
 
         // 색인이 아니라 **항목 벡터**를 다시 훑는다. 색인은 삽입 시점의 판정을
         // 반영할 뿐이고, 이 함수의 목적은 그 판정과 무관하게 현재 내용을 검산하는
         // 것이다(InsertUncheckedForTest가 넣은 충돌도 여기서 드러나야 한다).
-        std::map<std::vector<std::uint8_t>, std::size_t> seenInput;
-        std::map<uuid::uuid16, std::size_t> seenUuid;
+        ce::engine_ordered_map<ce::dynamic_array<std::uint8_t>, std::size_t> seenInput;
+        ce::engine_ordered_map<uuid::uuid16, std::size_t> seenUuid;
         for (std::size_t index = 0; index < m_entries.size(); ++index)
         {
             const IdentityRegistryEntry& entry = m_entries[index];

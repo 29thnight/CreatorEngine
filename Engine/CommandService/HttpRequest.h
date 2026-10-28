@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 // LC4 (PHASE 14.5) — HTTP/1.1 최소 서브셋 파서.
 //
@@ -45,7 +46,7 @@ namespace CommandService
         std::string             method;
         std::string             target;    ///< 경로 + 쿼리
         std::string             path;      ///< 쿼리를 뗀 경로
-        std::vector<HttpHeader> headers;
+        ce::dynamic_array<HttpHeader> headers;
         std::string             body;
         bool                    keepAlive{ true };
 

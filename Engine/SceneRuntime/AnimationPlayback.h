@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include <mathematics/matrix4x4.hpp>
@@ -42,7 +43,7 @@ namespace animation
     // Authored order breaks ties, including during reverse playback.
     template <typename Event, typename KeyOf, typename Emit>
     std::size_t ForEachCrossedEvent(std::span<const Event> events,
-        double begin, double end, bool looping, std::vector<std::size_t>& order,
+        double begin, double end, bool looping, ce::dynamic_array<std::size_t>& order,
         KeyOf keyOf, Emit emit)
     {
         if (events.empty() || !std::isfinite(begin) || !std::isfinite(end)
@@ -101,7 +102,7 @@ namespace animation
     std::size_t ForEachCrossedEvent(std::span<const Event> events,
         double begin, double end, bool looping, KeyOf keyOf, Emit emit)
     {
-        std::vector<std::size_t> order;
+        ce::dynamic_array<std::size_t> order;
         return ForEachCrossedEvent(events, begin, end, looping, order,
             keyOf, emit);
     }

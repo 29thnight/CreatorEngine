@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
 #else
@@ -147,7 +148,7 @@ struct XeSSFrameGenerationDX12State
     TemporalExtent m_renderExtent;
     TemporalFrame m_pendingFrame;
     uint32_t m_markers{ 0 };
-    std::function<TemporalResult()> m_drain;
+    ce::owned_func<TemporalResult()> m_drain;
     ce::lifetime_token m_lifetimeToken;
 
     TemporalResult Drain()
@@ -259,7 +260,7 @@ TemporalResult XeSSFrameGenerationDX12::QuerySupport(ID3D12Device* device, const
 TemporalResult XeSSFrameGenerationDX12::Initialize(ID3D12Device* device, ID3D12CommandQueue* queue,
     IDXGIFactory2* factory, void* window, const DXGI_SWAP_CHAIN_DESC1& description,
     const wchar_t* runtimeDirectory, const TemporalFrameGenerationConfig& config, bool depthInverted,
-    std::function<TemporalResult()> drain, bool uiPremultiplied)
+    ce::owned_func<TemporalResult()> drain, bool uiPremultiplied)
 {
     const auto valid = ValidateTemporalFrameGenerationConfig(config);
     if (!valid.IsSuccess()) return valid;
@@ -723,7 +724,7 @@ namespace
 class XeSSFrameGeneratorBridgeDX12 final : public ITemporalFrameGenerator
 {
 public:
-    XeSSFrameGeneratorBridgeDX12(DX12DeviceResources& resources, std::function<TemporalResult()> drain)
+    XeSSFrameGeneratorBridgeDX12(DX12DeviceResources& resources, ce::owned_func<TemporalResult()> drain)
         : m_resources(resources), m_drain(std::move(drain)), m_adapter(own::make_unique<XeSSFrameGenerationDX12>()) {}
     ~XeSSFrameGeneratorBridgeDX12() override
     {
@@ -733,7 +734,7 @@ public:
         }
     }
     XeSSFrameGenerationDX12& GetAdapter() { return *m_adapter; }
-    const std::function<TemporalResult()>& GetDrain() const { return m_drain; }
+    const ce::owned_func<TemporalResult()>& GetDrain() const { return m_drain; }
     TemporalCapabilities GetCapabilities() const override
     {
         TemporalCapabilities capabilities;
@@ -783,7 +784,7 @@ public:
     }
 private:
     DX12DeviceResources& m_resources;
-    std::function<TemporalResult()> m_drain;
+    ce::owned_func<TemporalResult()> m_drain;
     own::unique_owner<XeSSFrameGenerationDX12> m_adapter;
 };
 }
@@ -793,7 +794,7 @@ TemporalResult CreateXeSSFrameGeneratorDX12(DX12DeviceResources& resources,
     ID3D12CommandQueue* queue, IDXGIFactory2* factory, void* window,
     const DXGI_SWAP_CHAIN_DESC1& description, const wchar_t* runtimeDirectory,
     const TemporalFrameGenerationConfig& config, bool depthInverted,
-    std::function<TemporalResult()> drain, own::unique_owner<ITemporalFrameGenerator>& frameGenerator,
+    ce::owned_func<TemporalResult()> drain, own::unique_owner<ITemporalFrameGenerator>& frameGenerator,
     XeSSFrameGenerationDX12*& presentation)
 {
     presentation = nullptr;

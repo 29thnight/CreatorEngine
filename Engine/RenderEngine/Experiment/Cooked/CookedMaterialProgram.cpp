@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -18,7 +19,7 @@ static_assert(kMaterialProgramArtifactVersion == material_graph::CookedProgramVe
 
 namespace
 {
-bool MaterialTextureDependencies(const LX::LXMaterialProgram& program, std::vector<AssetId>& result, std::string& error)
+bool MaterialTextureDependencies(const LX::LXMaterialProgram& program, ce::dynamic_array<AssetId>& result, std::string& error)
 {
     for (const auto& resource : program.resources)
     {
@@ -65,7 +66,7 @@ bool BuildMaterialProgramCookProduct(const AssetId& graphId, const LX::LXMateria
     }
     if (!MaterialTextureDependencies(verified.program, candidate.manifestEntry.dependencies, error))
         return false;
-    std::vector<std::uint8_t> payload;
+    ce::dynamic_array<std::uint8_t> payload;
     if (!material_graph::WriteCookedProgram(verified, budget, payload, error))
         return false;
     candidate.artifactBytes.resize(payload.size());
@@ -103,7 +104,7 @@ bool OpenCookedMaterialProgram(const CookedAssetManifestEntry& entry, const Arti
         return false;
     if (size != entry.byteSize)
         return invalid();
-    std::vector<std::byte> payload(static_cast<std::size_t>(size));
+    ce::dynamic_array<std::byte> payload(static_cast<std::size_t>(size));
     if (!source.ReadAt(entry.artifactPath, 0, payload, error))
         return false;
     Sha256Digest digest;
@@ -117,7 +118,7 @@ bool OpenCookedMaterialProgram(const CookedAssetManifestEntry& entry, const Arti
         return false;
     if (candidate.product.materialShader && candidate.product.materialShader->meta.guid.m_guid != entry.assetId.value)
         return invalid();
-    std::vector<AssetId> dependencies;
+    ce::dynamic_array<AssetId> dependencies;
     if (!MaterialTextureDependencies(candidate.product.program, dependencies, error))
         return false;
     auto recorded = entry.dependencies;

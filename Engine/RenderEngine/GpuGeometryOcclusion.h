@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -30,7 +31,7 @@ class GpuGeometryOcclusion final
         IRenderDeviceServices* device{};
         std::uint64_t recording{}, descriptors{}, frameId{}, sceneEpoch{};
         std::uint32_t width{}, height{};
-        std::array<std::uint32_t, 16> projectionBits{};
+        ce::fixed_array<std::uint32_t, 16> projectionBits{};
         bool operator==(const ViewKey&) const = default;
     };
 
@@ -40,7 +41,7 @@ class GpuGeometryOcclusion final
         IRenderDeviceServices* device{};
         ViewKey source;
         std::uint64_t viewId{}, revision{}, completion{};
-        std::vector<RHITextureHandle> textures;
+        ce::dynamic_array<RHITextureHandle> textures;
         std::string name{"METEOR.Camera"};
         std::atomic<bool> recorded{};
         own::shared_owner<HistoryPool> pool;
@@ -84,7 +85,7 @@ class GpuGeometryOcclusion final
             }
         }
         RHIBindingTable Bindings(const EnhancedRenderGraph::ExecuteContext& execution) const;
-        std::array<RHIBindingDesc, kMaximumLevels> BindingInputs(
+        ce::fixed_array<RHIBindingDesc, kMaximumLevels> BindingInputs(
             const EnhancedRenderGraph::ExecuteContext& execution) const;
         std::uint32_t LevelCount() const { return m_levelCount; }
         const own::shared_owner<History>& HistoryOwner() const { return m_history; }
@@ -102,7 +103,7 @@ class GpuGeometryOcclusion final
         mutable const EnhancedRenderGraph* m_graph{};
         mutable std::uint64_t m_graphEpoch{};
         mutable RGHandle m_depth;
-        mutable std::array<RGHandle, kMaximumLevels> m_levels{};
+        mutable ce::fixed_array<RGHandle, kMaximumLevels> m_levels{};
         mutable std::uint32_t m_declaredLevels{};
         own::shared_owner<History> m_history;
         bool m_historyReader{};
@@ -127,6 +128,6 @@ class GpuGeometryOcclusion final
     LX::Runtime::ComputePipeline m_build;
     own::shared_owner<HistoryPool> m_historyPool;
     // Bounded CPU-only descriptions. Submitted pyramids retain evicted layouts.
-    std::array<own::shared_owner<const DeclarationLayout>, 16> m_declarationLayouts;
+    ce::fixed_array<own::shared_owner<const DeclarationLayout>, 16> m_declarationLayouts;
     std::size_t m_nextDeclarationLayout{};
 };

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
@@ -17,7 +18,7 @@ struct contact_role_id
 {
     std::uint32_t a = 0;
     std::uint16_t b = 0, c = 0;
-    std::array<std::uint8_t, 8> d{};
+    ce::fixed_array<std::uint8_t, 8> d{};
     auto operator<=>(const contact_role_id&) const = default;
 };
 static_assert(sizeof(contact_role_id) == 16);

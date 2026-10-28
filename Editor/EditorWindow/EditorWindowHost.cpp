@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 // 선언된 창의 프레임 소유자 (PHASE 21 M4 · 계획서 부록 B.3).
 //
 // 이 TU도 유니티에서 뺀다 — EditorWindowRegistry.cpp와 같은 이유.
@@ -99,7 +100,7 @@ namespace editor
         // 이름은 표의 자리마다 한 번만 등록한다(이 표는 표시 스레드만 읽는다).
         ce::marker_id panel_marker(std::size_t index, std::string_view stableId)
         {
-            static std::vector<ce::marker_id> markers;
+            static ce::dynamic_array<ce::marker_id> markers;
             if (markers.size() <= index) markers.resize(index + 1, ce::invalid_marker);
             if (ce::invalid_marker == markers[index])
             {

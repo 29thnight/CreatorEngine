@@ -1,3 +1,5 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
 #else
@@ -222,7 +224,7 @@ MenuBarWindow::MenuBarWindow(std::mutex& sceneStructureMutex)
             return;
         }
         const auto snapshot = project->Snapshot();
-        std::vector<const ce::layers::layer_definition*> layers;
+        ce::dynamic_array<const ce::layers::layer_definition*> layers;
         for (const auto& layer : snapshot->catalog.definitions)
             if (layer && !layer->retired)
                 layers.push_back(&*layer);
@@ -1180,7 +1182,7 @@ void MenuBarWindow::BehaviorTreeWindow(bool drawing)
 {
     static BTBuildGraph graph;
     // 편집기 화면 좌표 — 저작 데이터(BTBuildNode) 밖의 편집기 세션 상태다(E3-5).
-    static std::unordered_map<HashedGuid, ImVec2> s_nodeScreenPos;
+    static ce::engine_node_map<HashedGuid, ImVec2> s_nodeScreenPos;
     static bool isfirstLoad = false;
 	static std::string BTName;
 
@@ -2170,9 +2172,10 @@ void MenuBarWindow::BlackBoardWindow(bool drawing)
             ImGui::Separator();
 
             // List of existing keys
-            std::vector<std::pair<std::string, BlackBoardValue>> sortedKeys;
+            ce::dynamic_array<ce::pair<std::string, BlackBoardValue>> sortedKeys;
+            sortedKeys.reserve(editorBlackBoard.m_values.size());
             for (const auto& pair : editorBlackBoard.m_values) {
-				sortedKeys.push_back(pair);
+                sortedKeys.emplace_back(pair.first, pair.second);
             }
 			std::sort(sortedKeys.begin(), sortedKeys.end(),
 				[](const auto& a,const auto& b) {

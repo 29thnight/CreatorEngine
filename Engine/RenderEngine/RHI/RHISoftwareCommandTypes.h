@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "RHIEncoder.h"
 #include "RHICommandFailure.h"
@@ -36,7 +37,7 @@ struct RHICommandTranslationStats
 // No default accept-all validator is provided for production recording.
 struct RHISoftwareEncoderState
 {
-    std::array<RHIPipelineHandle, 2> pipelines;
+    ce::fixed_array<RHIPipelineHandle, 2> pipelines;
     RHIPipelineHandle boundPipeline;
     RHIBindPoint bindPoint{RHIBindPoint::Graphics};
     RHIRenderTargetBinding renderTargets;

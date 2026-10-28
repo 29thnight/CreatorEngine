@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -483,7 +484,7 @@ void FoliageComponent::RemoveFoliageType(uint32 typeID)
         m_assetBindings.erase(m_assetBindings.begin() + typeID);
         m_foliageTypes.erase(m_foliageTypes.begin() + typeID);
         m_worldBoundsCache.InvalidateAll();
-        std::erase_if(m_foliageInstances, [typeID](const auto& instance)
+        ce::erase_if(m_foliageInstances, [typeID](const auto& instance)
         {
             return instance.m_foliageTypeID == typeID;
         });
@@ -616,15 +617,46 @@ void FoliageComponent::UpdateFoliageCullingData(
     // Add/load/terrain insertion and every owner-thread edit seal the matrix.
     // Culling borrows that pose instead of rebuilding S*Rx*Ry*Rz*T each frame.
     if (m_foliageTypes.empty() || m_foliageInstances.empty()) return;
-    m_worldBoundsCache.Cull(std::span{m_foliageInstances}, m_foliageTypes.size(),
-        [&](std::uint32_t typeID) -> const math::aabb*
+    const auto resolve = [&](std::uint32_t typeID) -> const math::aabb*
         {
             const auto& type = m_foliageTypes[typeID];
             if (type.m_meshDescriptor) return &type.m_meshDescriptor->bounds;
             if (type.m_modelGeneration && type.m_modelMeshIndex < type.m_modelGeneration->Meshes().size())
                 return &type.m_modelGeneration->Meshes()[type.m_modelMeshIndex].bounds;
             return nullptr;
-        }, cameraFrustum, SceneManagers->IsGameStart());
+        };
+    const bool playing = SceneManagers->IsGameStart();
+    if (!m_cullingProbeEnabled)
+    {
+        m_worldBoundsCache.Cull(std::span{m_foliageInstances}, m_foliageTypes.size(), resolve, cameraFrustum, playing);
+        return;
+    }
+    const auto start = std::chrono::steady_clock::now();
+    const auto transformed = m_cullingProbeCached
+        ? m_worldBoundsCache.Cull(std::span{m_foliageInstances}, m_foliageTypes.size(), resolve, cameraFrustum, playing)
+        : foliage::CullSealedInstances(std::span{m_foliageInstances}, m_foliageTypes.size(), resolve, cameraFrustum, playing);
+    const double milliseconds = std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - start).count();
+    if (m_cullingProbeSamples.size() < m_cullingProbeSamples.capacity())
+    {
+        m_cullingProbeSamples.push_back(milliseconds);
+        m_cullingProbeFrames.push_back(m_cullingProbeLastFrame == std::chrono::steady_clock::time_point{}
+            ? 0.0 : std::chrono::duration<double, std::milli>(start - m_cullingProbeLastFrame).count());
+        m_cullingProbeTransforms += transformed;
+    }
+    m_cullingProbeLastFrame = start;
+}
+
+void FoliageComponent::ConfigureCullingProbe(bool cached)
+{
+    m_cullingProbeSamples.clear();
+    m_cullingProbeSamples.reserve(2048);
+    m_cullingProbeFrames.clear();
+    m_cullingProbeFrames.reserve(2048);
+    m_cullingProbeLastFrame = {};
+    m_cullingProbeTransforms = 0;
+    m_cullingProbeCached = cached;
+    m_cullingProbeEnabled = true;
+    if (!cached) m_worldBoundsCache.ReleaseStorage();
 }
 
 

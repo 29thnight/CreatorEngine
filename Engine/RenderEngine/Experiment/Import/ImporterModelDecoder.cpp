@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -27,14 +28,14 @@ namespace experiment::importer
             }
         }
 
-        void AppendIssues(const std::vector<ImportNote>& notes,
-            std::vector<ModelLoadIssue>& out)
+        void AppendIssues(const ce::dynamic_array<ImportNote>& notes,
+            ce::dynamic_array<ModelLoadIssue>& out)
         {
             out.reserve(out.size() + notes.size());
             for (const ImportNote& note : notes) out.push_back(ToLoadIssue(note));
         }
 
-        [[nodiscard]] bool HasError(const std::vector<ModelLoadIssue>& issues) noexcept
+        [[nodiscard]] bool HasError(const ce::dynamic_array<ModelLoadIssue>& issues) noexcept
         {
             for (const ModelLoadIssue& issue : issues)
             {
@@ -66,7 +67,7 @@ namespace experiment::importer
     }
 
     ImporterModelDecoder::ImporterModelDecoder(ImporterDecoderOptions options,
-        std::vector<own::unique_owner<IAssetImporter>> importers)
+        ce::dynamic_array<own::unique_owner<IAssetImporter>> importers)
         : options_(std::move(options))
         , importers_(std::move(importers))
     {

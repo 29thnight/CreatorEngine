@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineFunc.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -60,7 +62,7 @@ Entity* UIManager::MakeCanvas(std::string_view name)
         // 화면 크기는 화면 크기 버스에서 온다. 예전에는 DX11 전역
         // (g_ClientRect)을 읽었는데, D4에서 나머지 판독부는 전부 버스로
         // 옮겼고 여기와 UIButton 둘만 남아 출처가 갈려 있었다.
-        const std::array<float, 2> screenSize{
+        const ce::fixed_array<float, 2> screenSize{
             static_cast<float>(ScreenResizeBus::Get().GetWidth()),
             static_cast<float>(ScreenResizeBus::Get().GetHeight())
         };
@@ -113,7 +115,7 @@ void UIManager::AddCanvas(Entity* canvas)
 		// 이름은 잡혀 있는데 해석이 안 된다 = 캐시가 낡았다. 이름과 목록의 짝을
 		// 함께 걷어야 다음 등록이 막히지 않는다.
 		CanvasMap.erase(it);
-		std::erase_if(Canvases, [&](const EntityHandle& handle) {
+		ce::erase_if(Canvases, [&](const EntityHandle& handle) {
 			Entity* obj = curScene->Resolve(handle);
 			return !obj || obj->ToString() == canvasName;
 		});
@@ -191,7 +193,7 @@ Entity* UIManager::MakeImage(std::string_view name, const own::shared_owner<cons
     return MakeImage(name, texture, canvas, Pos);
 }
 
-Entity* UIManager::MakeButton(std::string_view name, const own::shared_owner<const Texture>& texture, std::function<void()> clickfun, math::vector2 Pos, Entity* canvas)
+Entity* UIManager::MakeButton(std::string_view name, const own::shared_owner<const Texture>& texture, ce::owned_func<void()> clickfun, math::vector2 Pos, Entity* canvas)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -251,7 +253,7 @@ Entity* UIManager::MakeButton(std::string_view name, const own::shared_owner<con
     return newButton;
 }
 
-Entity* UIManager::MakeButton(std::string_view name, const own::shared_owner<const Texture>& texture, std::function<void()> clickfun, std::string_view canvasname,  math::vector2 Pos)
+Entity* UIManager::MakeButton(std::string_view name, const own::shared_owner<const Texture>& texture, ce::owned_func<void()> clickfun, std::string_view canvasname,  math::vector2 Pos)
 {
 	auto curScene = SceneManagers->GetActiveScene();
 	if (curScene == nullptr) return nullptr;
@@ -653,7 +655,7 @@ void UIManager::SortCanvas()
 		// 아래 정렬 비교자는 둘 다 살아 있다고 가정할 수 있다(비교자가 널을 만나
 		// false를 반환하면 엄격 약순서가 깨져 UB다).
 		auto& canvases = curScene->GetCanvases();
-		std::erase_if(canvases, [curScene](const EntityHandle& handle) {
+		ce::erase_if(canvases, [curScene](const EntityHandle& handle) {
 			Entity* obj = curScene->Resolve(handle);
 			if (!obj) return true;
 			Canvas* canvas = obj->GetComponent<Canvas>();
@@ -694,17 +696,17 @@ void UIManager::RegisterSpriteSheetComponent(SpriteSheetComponent* spriteSheet)
 
 void UIManager::UnregisterImageComponent(ImageComponent* image)
 {
-	std::erase(Images, image);
+	ce::erase(Images, image);
 }
 
 void UIManager::UnregisterTextComponent(TextComponent* text)
 {
-	std::erase(Texts, text);
+	ce::erase(Texts, text);
 }
 
 void UIManager::UnregisterSpriteSheetComponent(SpriteSheetComponent* spriteSheet)
 {
-	std::erase(SpriteSheets, spriteSheet);
+	ce::erase(SpriteSheets, spriteSheet);
 }
 
 

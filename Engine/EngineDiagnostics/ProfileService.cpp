@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "ProfileService.h"
 #include <stdio.h>
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -83,9 +84,9 @@ namespace ce::detail::profile_service_impl
         return *lock;
     }
 
-    std::vector<retained_stream>& retained_streams()
+    ce::dynamic_array<retained_stream>& retained_streams()
     {
-        static std::vector<retained_stream>* list = new std::vector<retained_stream>();
+        static ce::dynamic_array<retained_stream>* list = new ce::dynamic_array<retained_stream>();
         return *list;
     }
 }
@@ -406,7 +407,7 @@ namespace ce
         return static_cast<std::uint32_t>(m_threadInfo.size());
     }
 
-    std::vector<thread_info> profiler_service::threads() const
+    ce::dynamic_array<thread_info> profiler_service::threads() const
     {
         std::lock_guard<std::mutex> guard(m_streamLock);
         return m_threadInfo;
@@ -1747,7 +1748,7 @@ namespace ce
 
         m_ring.discard_pending();
 
-        std::vector<thread_info> threads;
+        ce::dynamic_array<thread_info> threads;
         {
             std::lock_guard<std::mutex> guard(m_streamLock);
             threads = m_threadInfo;
@@ -1837,7 +1838,7 @@ namespace ce
         m_lastLiveCapture = tick;
         m_liveCaptureRequested.store(false, std::memory_order_relaxed);
 
-        std::vector<thread_info> threads;
+        ce::dynamic_array<thread_info> threads;
         std::uint32_t unacked = 0;
         {
             std::lock_guard<std::mutex> guard(m_streamLock);
@@ -1870,7 +1871,7 @@ namespace ce
             // A live-only projection never enters the ring or continuous file. The owner
             // claims completion before writing its event; snapshots taken after the sealed
             // drain therefore cannot duplicate an already collected completed event.
-            std::vector<frame_record> frames(live->frames().begin(), live->frames().end());
+            ce::dynamic_array<frame_record> frames(live->frames().begin(), live->frames().end());
             frame_record& last = frames.back();
             const std::uint64_t generation = m_generation.load(std::memory_order_acquire);
             bool projected = false;
@@ -2031,7 +2032,7 @@ namespace ce
         {
             return;
         }
-        std::vector<thread_info> vocabulary;
+        ce::dynamic_array<thread_info> vocabulary;
         {
             std::lock_guard<std::mutex> guard(m_streamLock);
             vocabulary = m_threadInfo;
@@ -2124,7 +2125,7 @@ namespace ce
         return m_capture;
     }
 
-    std::pair<capture_session_ptr, std::uint64_t> profiler_service::capture_publication() const
+    ce::pair<capture_session_ptr, std::uint64_t> profiler_service::capture_publication() const
     {
         std::lock_guard<std::mutex> guard(m_captureLock);
         return {m_capture, m_captureGeneration};

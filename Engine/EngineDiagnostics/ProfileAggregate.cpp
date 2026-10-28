@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "ProfileAggregate.h"
 
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -58,8 +59,8 @@ namespace ce::detail::profile_aggregate_impl
 	// ★ 부르는 자리가 중요하다. `rows` 의 색인이 표본의 `row` 와 같아야 하므로,
 	//   행을 다시 세우는(전위 순서로 옮기는) **앞**에서 부르거나, 옮긴 뒤라면
 	//   표본의 색인도 같이 옮겨야 한다. §0.5.20 의 스팬 경계와 같은 함정이다.
-	inline void fold_call_samples(std::vector<call_sample>& samples,
-	                              std::vector<aggregate_row>& rows)
+	inline void fold_call_samples(ce::dynamic_array<call_sample>& samples,
+	                              ce::dynamic_array<aggregate_row>& rows)
 	{
 		if (samples.empty() || rows.empty())
 		{
@@ -162,7 +163,7 @@ namespace ce
 		// 모아서 세운 것을 그대로 결과에 남긴다(m_spans). Timeline 이 그리는
 		// 원시 구간이 이것이고, 그리는 층이 다시 정렬하면 두 정렬이 갈리는
 		// 순간 표와 타임라인이 서로 다른 트리를 말하게 된다.
-		std::vector<profile_event>& events = result.m_spans;
+		ce::dynamic_array<profile_event>& events = result.m_spans;
 		bool sawFrame = false;
 		for (const frame_record& frame : capture.frames())
 		{
@@ -331,12 +332,12 @@ namespace ce
 		//
 		// 전위 순서를 한 번 훑으며 depth 스택으로 부모를 찾는다. 같은 부모 ·
 		// 같은 스레드 · 같은 marker 는 한 줄로 접는다.
-		std::unordered_map<node_key, std::uint32_t, node_key_hash> nodes;
-		std::vector<std::uint32_t> parentOf;
-		std::vector<std::uint32_t> stack;        // 행 인덱스 + 1
-		std::vector<profile_tick>  stackEnd;
-		std::vector<profile_tick>  childTicks;   // 행마다 직속 자식 total 합
-		std::vector<call_sample>   samples;      // 호출마다 길이와 프레임
+		ce::node_hash_map<node_key, std::uint32_t, node_key_hash> nodes;
+		ce::dynamic_array<std::uint32_t> parentOf;
+		ce::dynamic_array<std::uint32_t> stack;        // 행 인덱스 + 1
+		ce::dynamic_array<profile_tick>  stackEnd;
+		ce::dynamic_array<profile_tick>  childTicks;   // 행마다 직속 자식 total 합
+		ce::dynamic_array<call_sample>   samples;      // 호출마다 길이와 프레임
 		samples.reserve(events.size());
 
 		for (const profile_event& event : events)
@@ -427,7 +428,7 @@ namespace ce
 		// 한 부모의 자식들이 흩어져 있다 — 표가 트리로 보이려면 서브트리가
 		// 이어져 있어야 한다.
 		{
-			std::vector<std::vector<std::uint32_t>> childrenOf(result.m_hierarchy.size() + 1);
+			ce::dynamic_array<ce::dynamic_array<std::uint32_t>> childrenOf(result.m_hierarchy.size() + 1);
 			for (std::uint32_t i = 0; i < result.m_hierarchy.size(); ++i)
 			{
 				childrenOf[parentOf[i]].push_back(i);
@@ -450,11 +451,11 @@ namespace ce
 				          });
 			}
 
-			std::vector<aggregate_row> ordered;
+			ce::dynamic_array<aggregate_row> ordered;
 			ordered.reserve(result.m_hierarchy.size());
-			std::vector<std::uint32_t> remap(result.m_hierarchy.size(), 0);
+			ce::dynamic_array<std::uint32_t> remap(result.m_hierarchy.size(), 0);
 
-			std::vector<std::uint32_t> pending;
+			ce::dynamic_array<std::uint32_t> pending;
 			for (auto it = childrenOf[0].rbegin(); it != childrenOf[0].rend(); ++it)
 			{
 				pending.push_back(*it);
@@ -474,7 +475,7 @@ namespace ce
 
 			// 전위 순서에서 한 노드의 서브트리는 연속이다. 직속 자식의 범위는
 			// 첫 자식부터 마지막 자식의 서브트리 끝까지다.
-			std::vector<std::uint32_t> nextSibling;
+			ce::dynamic_array<std::uint32_t> nextSibling;
 			for (std::size_t remaining = ordered.size(); remaining > 0; --remaining)
 			{
 				const auto row = static_cast<std::uint32_t>(remaining - 1);
@@ -504,8 +505,8 @@ namespace ce
 		// 부모를 무시하고 (스레드, marker) 로 접는다. self 는 Hierarchy 의
 		// self 를 더한 것이라 총합이 보존된다.
 		{
-			std::unordered_map<std::uint64_t, std::uint32_t> flatIndex;
-			std::vector<std::uint32_t> flatOfRow(result.m_hierarchy.size(), 0);
+			ce::node_hash_map<std::uint64_t, std::uint32_t> flatIndex;
+			ce::dynamic_array<std::uint32_t> flatOfRow(result.m_hierarchy.size(), 0);
 			std::uint32_t source = 0;
 			for (const aggregate_row& node : result.m_hierarchy)
 			{

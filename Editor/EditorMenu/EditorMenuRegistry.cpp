@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 // 에디터 메뉴 런타임 표 (PHASE 21 M0 · 계획서 부록 A.5).
 //
 // 이 TU는 유니티 빌드에서 일부러 뺀다(Editor.vcxproj). `Commands/*.cpp`가
@@ -36,9 +37,9 @@ namespace editor
 
         // ── 상단 저장소 ───────────────────────────────────────────────────
 
-        std::array<top_menu_storage, static_cast<std::size_t>(top_menu_root::count)>& top_storage()
+        ce::fixed_array<top_menu_storage, static_cast<std::size_t>(top_menu_root::count)>& top_storage()
         {
-            static std::array<top_menu_storage, static_cast<std::size_t>(top_menu_root::count)> storage;
+            static ce::fixed_array<top_menu_storage, static_cast<std::size_t>(top_menu_root::count)> storage;
             return storage;
         }
 
@@ -48,16 +49,16 @@ namespace editor
         // 제품 표와 **같은 모양**으로 하나 더 두고 통째로 맞바꾼다 — 복사가 아니라
         // swap 이라 항목 수에 무관하게 싸고, 되돌릴 때 원본이 그대로 돌아온다.
 
-        std::array<top_menu_storage, static_cast<std::size_t>(top_menu_root::count)>& top_stash()
+        ce::fixed_array<top_menu_storage, static_cast<std::size_t>(top_menu_root::count)>& top_stash()
         {
-            static std::array<top_menu_storage, static_cast<std::size_t>(top_menu_root::count)> storage;
+            static ce::fixed_array<top_menu_storage, static_cast<std::size_t>(top_menu_root::count)> storage;
             return storage;
         }
 
         template<popup_host Host>
-        std::vector<menu_entry<popup_context_t<Host>>>& popup_stash()
+        ce::dynamic_array<menu_entry<popup_context_t<Host>>>& popup_stash()
         {
-            static std::vector<menu_entry<popup_context_t<Host>>> storage;
+            static ce::dynamic_array<menu_entry<popup_context_t<Host>>> storage;
             return storage;
         }
 

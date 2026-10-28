@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 // PHASE 14 P2 — 스레드 스트림과 청크 풀.
 //
@@ -105,7 +106,7 @@ namespace ce
 		std::uint32_t free_count() const;
 
 	private:
-		std::vector<std::unique_ptr<event_chunk>> m_storage;
+		ce::dynamic_array<std::unique_ptr<event_chunk>> m_storage;
 
 		mutable std::mutex m_lock;
 		// Sealed FIFO publication must not wait behind allocation or free-list maintenance.

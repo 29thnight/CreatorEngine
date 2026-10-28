@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
@@ -37,7 +38,7 @@ struct DX12PSOManager::PendingCompile
 {
     RHIGraphicsPipelineRequest m_input;
     RHIMeshPipelineDesc m_meshInput;
-    std::vector<std::byte> m_meshBytes, m_pixelBytes;
+    ce::dynamic_array<std::byte> m_meshBytes, m_pixelBytes;
     std::string m_error;
     winrt::com_ptr<ID3D12RootSignature> m_signature;
     winrt::com_ptr<ID3D12PipelineState> m_result;
@@ -493,7 +494,7 @@ winrt::com_ptr<ID3D12PipelineState> DX12PSOManager::CreateOne(
     d3dDesc.DepthStencilState.DepthFunc = DX12Translate::ToD3D12Depth(desc.depthFunc);
     d3dDesc.SampleMask = UINT_MAX;
     // 중립 원소를 DX12 배열로 편다. PSO 생성이 끝날 때까지만 살면 된다.
-    std::vector<D3D12_INPUT_ELEMENT_DESC> nativeElements;
+    ce::dynamic_array<D3D12_INPUT_ELEMENT_DESC> nativeElements;
     nativeElements.reserve(desc.inputElementCount);
     for (uint32_t i = 0; i < desc.inputElementCount; ++i)
     {
@@ -1111,7 +1112,7 @@ bool DX12PSOManager::SaveCache(std::string& outError)
     const SIZE_T size = m_library->GetSerializedSize();
     if (0 == size) { outError = "직렬화 크기 0"; return false; }
 
-    std::vector<uint8_t> blob(size);
+    ce::dynamic_array<uint8_t> blob(size);
     const HRESULT hr = m_library->Serialize(blob.data(), size);
     if (FAILED(hr)) { outError = "직렬화 실패 " + PsoHrToString(hr); return false; }
 

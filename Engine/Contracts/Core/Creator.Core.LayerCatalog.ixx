@@ -1,5 +1,5 @@
 export module Creator.Core.LayerCatalog;
-
+export import "Creator.Containers.h";
 import std;
 import Creator.Core.Layers;
 
@@ -17,7 +17,7 @@ export namespace ce::layers
     {
         std::uint64_t revision = 1;
         std::uint64_t next_id = 2;
-        std::array<std::optional<layer_definition>, 32> definitions{};
+        ce::fixed_array<std::optional<layer_definition>, 32> definitions{};
 
         const layer_definition* find(layer_id id) const noexcept
         {

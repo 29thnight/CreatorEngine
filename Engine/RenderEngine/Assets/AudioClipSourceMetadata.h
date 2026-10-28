@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
 #else
@@ -51,7 +52,7 @@ namespace assets
     {
         AudioCodec codec{};
         std::uint64_t payloadSize{};
-        ce::hash::sha256_digest sourceContentHash{};
+        ce::crypto::sha256_digest sourceContentHash{};
     };
 
     // This is a source fingerprint and a cheap signature check, not a full
@@ -93,9 +94,9 @@ namespace assets
             error = "audio source cannot be opened";
             return false;
         }
-        ce::hash::sha256 hash;
-        std::array<char, 64u * 1024u> buffer{};
-        std::array<unsigned char, 12u> prefix{};
+        ce::crypto::sha256 hash;
+        ce::fixed_array<char, 64u * 1024u> buffer{};
+        ce::fixed_array<unsigned char, 12u> prefix{};
         std::size_t prefixSize = 0u;
         std::uint64_t count = 0u;
         while (input)

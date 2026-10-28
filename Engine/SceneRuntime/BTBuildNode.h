@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include <mathematics/vector2.hpp>
 #include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
@@ -19,9 +20,9 @@ struct [[reflgen::reflect]] BTBuildNode
 	std::string 			ScriptName; // 스크립트 이름
 	ParallelPolicy			Policy; // 병렬 실행 정책
 
-	std::vector<HashedGuid> Children; // 자식 노드들
+	ce::dynamic_array<HashedGuid> Children; // 자식 노드들
 
-	std::vector<float>	ChildWeights; // 가중치 (WeightedSelector용)
+	ce::dynamic_array<float>	ChildWeights; // 가중치 (WeightedSelector용)
 
 	math::vector2	Position; // 노드 위치 (에디터용)
 

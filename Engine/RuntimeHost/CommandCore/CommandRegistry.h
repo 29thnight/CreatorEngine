@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 // LC3 (PHASE 14.5) — descriptor snapshot 과 그 무결성 검사.
 //
@@ -35,7 +36,7 @@ namespace CommandCore
         /// 이름으로 정렬한 snapshot. **순서가 결정적이다** — 등록 순서나
         /// 해시 순회에 기대면 실행마다 discovery 출력이 흔들리고, 그러면
         /// 소비자가 diff 로 비교할 수 없다(§13 LC3 완료 기준).
-        const std::vector<CommandDescriptor>& Sorted() const;
+        const ce::dynamic_array<CommandDescriptor>& Sorted() const;
 
         /// canonical 또는 alias 로 찾는다. 없으면 nullptr.
         const CommandDescriptor* Find(std::string_view name) const;
@@ -44,7 +45,7 @@ namespace CommandCore
         ///
         /// 예전에는 이름 중복이 `printf` 한 줄로 지나갔고, 그 뒤로 조용히 한쪽이
         /// 먹혔다. 이제는 목록으로 남고 selftest 가 그것을 판정한다.
-        const std::vector<std::string>& Problems() const noexcept { return m_problems; }
+        const ce::dynamic_array<std::string>& Problems() const noexcept { return m_problems; }
 
         std::size_t CommandCount() const noexcept { return m_descriptors.size(); }
         std::size_t NameCount() const noexcept;
@@ -55,10 +56,10 @@ namespace CommandCore
         CommandRegistry(const CommandRegistry&)            = delete;
         CommandRegistry& operator=(const CommandRegistry&) = delete;
 
-        std::vector<CommandDescriptor>          m_descriptors;
-        std::vector<std::string>                m_problems;
+        ce::dynamic_array<CommandDescriptor>          m_descriptors;
+        ce::dynamic_array<std::string>                m_problems;
 
-        mutable std::vector<CommandDescriptor>  m_sortedCache;
+        mutable ce::dynamic_array<CommandDescriptor>  m_sortedCache;
         mutable bool                            m_sortedDirty{ true };
     };
 

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -17,7 +18,7 @@ struct VerifiedProduct;
 struct GeneratedMaterialShader : LX::Runtime::ShaderGeneration
 {
     // Retain the validated binary tree for generation validation and recooking.
-    std::vector<std::byte> cookedContract;
+    ce::dynamic_array<std::byte> cookedContract;
 };
 
     // Public converting owners retain the derived allocation without raw adoption

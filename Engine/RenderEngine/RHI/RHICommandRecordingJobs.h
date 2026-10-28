@@ -1,4 +1,6 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -26,7 +28,7 @@ struct RHIRecordingExecutionOptions
 
 // RG4 and owned queue recording share the same engine jobs and join contract.
 // A completed handle has released every callback, including on job failure.
-inline void RHIRunCommandRecordingJobs(job_scheduler& scheduler, const std::function<void(uint32_t)>& job,
+inline void RHIRunCommandRecordingJobs(job_scheduler& scheduler, const ce::owned_func<void(uint32_t)>& job,
                                        uint32_t targetCount)
 {
     if (targetCount == 0)
@@ -45,7 +47,7 @@ inline void RHIRunCommandRecordingJobs(job_scheduler& scheduler, const std::func
 
 // 독립 작업은 먼저 진행하고 target·CPU 선행 조건만 합류한다. 소유자는 마지막에 한 번 기다린다.
 inline void RHIRunCommandRecordingTaskGraph(job_scheduler& scheduler, const RHIRecordingTaskGraph& graph,
-                                            const std::function<void(uint32_t)>& job,
+                                            const ce::owned_func<void(uint32_t)>& job,
                                             const RHIRecordingExecutionOptions& options = {})
 {
     if (graph.nodes.empty())
@@ -73,7 +75,7 @@ inline void RHIRunCommandRecordingTaskGraph(job_scheduler& scheduler, const RHIR
         // Retain conversion storage; the native executor copies or reuses its
         // own topology before submit_graph returns. Owner-side joins exclude
         // recursive recording on this thread.
-        static thread_local std::vector<job_graph_node> storage;
+        static thread_local ce::dynamic_array<job_graph_node> storage;
         if (storage.size() < graph.nodes.size())
         {
             storage.resize(graph.nodes.size());
@@ -97,8 +99,8 @@ inline void RHIRunCommandRecordingTaskGraph(job_scheduler& scheduler, const RHIR
     }
     struct fallback_storage
     {
-        std::vector<job_handle> handles;
-        std::vector<job_handle> dependencies;
+        ce::dynamic_array<job_handle> handles;
+        ce::dynamic_array<job_handle> dependencies;
     };
     static thread_local fallback_storage storage;
     auto& handles = storage.handles;

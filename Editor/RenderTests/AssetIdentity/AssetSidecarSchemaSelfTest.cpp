@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
 #else
@@ -44,7 +45,7 @@ namespace RenderTest
 
         // 결정적 authoring key 공장 — 검사 안에서 CSPRNG 대신 쓴다(재현 가능).
         std::uint32_t g_factoryCounter = 0;
-        bool DeterministicFactory(std::array<std::uint8_t, assets::kAuthoringKeyBytes>& out,
+        bool DeterministicFactory(ce::fixed_array<std::uint8_t, assets::kAuthoringKeyBytes>& out,
             std::string& error)
         {
             error.clear();
@@ -56,7 +57,7 @@ namespace RenderTest
 
         [[nodiscard]] std::string Fp(std::string_view seed)
         {
-            std::vector<std::uint8_t> bytes(seed.begin(), seed.end());
+            ce::dynamic_array<std::uint8_t> bytes(seed.begin(), seed.end());
             return assets::MakeSourceFingerprint(bytes);
         }
 
@@ -71,26 +72,26 @@ namespace RenderTest
             return e;
         }
 
-        [[nodiscard]] std::vector<assets::ModelSubAssetRecord> ToRecords(
+        [[nodiscard]] ce::dynamic_array<assets::ModelSubAssetRecord> ToRecords(
             const assets::StableKeyResult& result)
         {
-            std::vector<assets::ModelSubAssetRecord> records;
+            ce::dynamic_array<assets::ModelSubAssetRecord> records;
             for (const assets::StableKeyAssignment& a : result.assignments)
                 records.push_back({ a.kind, a.stableKey, {}, a.binding, a.name, a.fingerprint });
             return records;
         }
 
-        [[nodiscard]] bool HasIssue(const std::vector<assets::SidecarIssue>& issues,
+        [[nodiscard]] bool HasIssue(const ce::dynamic_array<assets::SidecarIssue>& issues,
             assets::SidecarIssueCode code)
         {
             return std::ranges::any_of(issues, [code](const assets::SidecarIssue& i) { return i.code == code; });
         }
-        [[nodiscard]] bool HasIssue(const std::vector<assets::StableKeyIssue>& issues,
+        [[nodiscard]] bool HasIssue(const ce::dynamic_array<assets::StableKeyIssue>& issues,
             assets::StableKeyIssueCode code)
         {
             return std::ranges::any_of(issues, [code](const assets::StableKeyIssue& i) { return i.code == code; });
         }
-        [[nodiscard]] bool HasIssue(const std::vector<assets::EpochHeaderIssue>& issues,
+        [[nodiscard]] bool HasIssue(const ce::dynamic_array<assets::EpochHeaderIssue>& issues,
             assets::EpochHeaderIssueCode code)
         {
             return std::ranges::any_of(issues, [code](const assets::EpochHeaderIssue& i) { return i.code == code; });
@@ -109,7 +110,7 @@ namespace RenderTest
         [[nodiscard]] std::string Repeat(char c, std::size_t n) { return std::string(n, c); }
 
         [[nodiscard]] bool ReadFileBytes(const std::filesystem::path& path,
-            std::vector<std::uint8_t>& out)
+            ce::dynamic_array<std::uint8_t>& out)
         {
             std::ifstream stream(path, std::ios::binary);
             if (!stream) return false;
@@ -145,7 +146,7 @@ namespace RenderTest
                 && yaml.find("identityEpochSeed: 000102030405") != std::string::npos,
                 "header YAML 쓰기");
             assets::IdentityEpochHeader back;
-            std::vector<assets::EpochHeaderIssue> issues;
+            ce::dynamic_array<assets::EpochHeaderIssue> issues;
             check.Check(assets::ReadIdentityEpochHeader(yaml, back, issues)
                 && back.identityEpoch == header.identityEpoch
                 && back.identityEpochSeed == header.identityEpochSeed
@@ -154,7 +155,7 @@ namespace RenderTest
             auto expectReject = [&](std::string text, assets::EpochHeaderIssueCode code, const char* label)
             {
                 assets::IdentityEpochHeader h;
-                std::vector<assets::EpochHeaderIssue> is;
+                ce::dynamic_array<assets::EpochHeaderIssue> is;
                 const bool ok = assets::ReadIdentityEpochHeader(text, h, is);
                 check.Check(!ok && HasIssue(is, code), std::string("header 거부: ") + label);
             };
@@ -214,7 +215,7 @@ namespace RenderTest
         using K = assets::SubAssetKind;
         {
             // a. 유일한 이름 → 전부 semantic
-            std::vector<assets::StableKeyElement> named = {
+            ce::dynamic_array<assets::StableKeyElement> named = {
                 Element(K::Material, 0, "MatA", "fa"), Element(K::Material, 1, "MatB", "fb"),
                 Element(K::Texture, 0, "TexA", "ta"), Element(K::Mesh, 0, "MeshA", "ma"),
                 Element(K::Skeleton, 0, "Root", "sa"), Element(K::Animation, 0, "Idle", "aa"),
@@ -230,7 +231,7 @@ namespace RenderTest
                 && matA->binding == "material/0" && !matA->reboundFromPrior, "key 텍스트 name:MatA");
 
             // b. 이름 중복 → 중복분만 authoring, 유일분은 semantic. 같은 이름이 다른 kind면 무관.
-            std::vector<assets::StableKeyElement> dup = {
+            ce::dynamic_array<assets::StableKeyElement> dup = {
                 Element(K::Material, 0, "Mat", "f0"), Element(K::Material, 1, "Mat", "f1"),
                 Element(K::Material, 2, "Only", "f2"), Element(K::Texture, 0, "Mat", "t0"),
             };
@@ -241,14 +242,14 @@ namespace RenderTest
                 "중복 이름 → authoring 2 + semantic 1, 다른 kind 동명 무관");
 
             // c. 무명 → authoring, 지문으로 재결합(순서 바뀌어도 같은 key)
-            std::vector<assets::StableKeyElement> nameless = {
+            ce::dynamic_array<assets::StableKeyElement> nameless = {
                 Element(K::Material, 0, "", "n0"), Element(K::Material, 1, "", "n1"), Element(K::Material, 2, "", "n2"),
             };
             const assets::StableKeyResult first = assets::DeriveModelStableKeys(nameless, {}, &DeterministicFactory);
             check.Check(first.Succeeded() && first.CountOrigin(K::Material, assets::StableKeyOrigin::Authoring) == 3u,
                 "무명 3 → authoring 3");
-            std::vector<assets::ModelSubAssetRecord> prior = ToRecords(first);
-            std::vector<assets::StableKeyElement> reordered = {
+            ce::dynamic_array<assets::ModelSubAssetRecord> prior = ToRecords(first);
+            ce::dynamic_array<assets::StableKeyElement> reordered = {
                 Element(K::Material, 0, "", "n2"), Element(K::Material, 1, "", "n0"), Element(K::Material, 2, "", "n1"),
             };
             const assets::StableKeyResult again = assets::DeriveModelStableKeys(reordered, prior, &DeterministicFactory);
@@ -261,7 +262,7 @@ namespace RenderTest
             check.Check(sameKeys, "재임포트(순서 변경) → 지문으로 같은 authoring key 재결합 3/3");
 
             // e. 내용이 바뀐 무명 요소 + prior → 증명 불가 → 오류
-            std::vector<assets::StableKeyElement> changed = {
+            ce::dynamic_array<assets::StableKeyElement> changed = {
                 Element(K::Material, 0, "", "n0"), Element(K::Material, 1, "", "n1"), Element(K::Material, 2, "", "CHANGED"),
             };
             const assets::StableKeyResult amb = assets::DeriveModelStableKeys(changed, prior, &DeterministicFactory);
@@ -269,7 +270,7 @@ namespace RenderTest
                 "무명 요소 내용 변경 + prior → AuthoringRebindAmbiguous 오류");
 
             // f. 삭제 → 은퇴 경고, 성공
-            std::vector<assets::StableKeyElement> fewer = {
+            ce::dynamic_array<assets::StableKeyElement> fewer = {
                 Element(K::Material, 0, "", "n0"), Element(K::Material, 1, "", "n1"),
             };
             const assets::StableKeyResult del = assets::DeriveModelStableKeys(fewer, prior, &DeterministicFactory);
@@ -278,7 +279,7 @@ namespace RenderTest
                 "무명 요소 삭제 → 2 재결합 + AuthoringKeyRetired 경고");
 
             // g. 추가 → 2 재결합 + 1 신규, 오류 없음
-            std::vector<assets::StableKeyElement> more = nameless;
+            ce::dynamic_array<assets::StableKeyElement> more = nameless;
             more.push_back(Element(K::Material, 3, "", "n3"));
             const assets::StableKeyResult add = assets::DeriveModelStableKeys(more, prior, &DeterministicFactory);
             std::size_t rebound = 0;
@@ -287,11 +288,11 @@ namespace RenderTest
                 "무명 요소 추가 → 3 재결합 + 1 신규");
 
             // 같은 지문 둘 + prior 하나 → 어느 것인지 모름 → 오류
-            std::vector<assets::StableKeyElement> twins = {
+            ce::dynamic_array<assets::StableKeyElement> twins = {
                 Element(K::Material, 0, "", "same"), Element(K::Material, 1, "", "same"),
             };
             const assets::StableKeyResult twinFirst = assets::DeriveModelStableKeys(twins, {}, &DeterministicFactory);
-            std::vector<assets::ModelSubAssetRecord> twinPrior = ToRecords(twinFirst);
+            ce::dynamic_array<assets::ModelSubAssetRecord> twinPrior = ToRecords(twinFirst);
             twinPrior.pop_back();
             const assets::StableKeyResult twinAgain = assets::DeriveModelStableKeys(twins, twinPrior, &DeterministicFactory);
             std::size_t twinRebound = 0;
@@ -299,13 +300,13 @@ namespace RenderTest
             check.Check(twinAgain.Succeeded() && twinAgain.assignments.size() == 2u && twinRebound == 1u
                 && twinAgain.assignments[0].stableKey == twinPrior[0].stableKey,
                 "같은 지문 무명 둘 + prior 하나 → binding 순 1 재결합 + 1 신규(동일 콘텐츠는 교환 불가시)");
-            const std::vector<assets::ModelSubAssetRecord> twinPriorBoth = ToRecords(twinFirst);
+            const ce::dynamic_array<assets::ModelSubAssetRecord> twinPriorBoth = ToRecords(twinFirst);
             const assets::StableKeyResult twinBoth = assets::DeriveModelStableKeys(twins, twinPriorBoth, &DeterministicFactory);
             check.Check(twinBoth.Succeeded() && twinBoth.assignments.size() == 2u
                 && twinBoth.assignments[0].stableKey == twinPriorBoth[0].stableKey
                 && twinBoth.assignments[1].stableKey == twinPriorBoth[1].stableKey,
                 "같은 지문 무명 둘 + prior 둘 → binding 순 짝짓기 결정적");
-            std::vector<assets::StableKeyElement> swapped = {
+            ce::dynamic_array<assets::StableKeyElement> swapped = {
                 Element(K::Material, 0, "", "same"), Element(K::Material, 1, "", "different"),
             };
             const assets::StableKeyResult swappedAgain = assets::DeriveModelStableKeys(swapped, twinPriorBoth, &DeterministicFactory);
@@ -314,13 +315,13 @@ namespace RenderTest
                 "지문 그룹 축소 + 새 지문 → 증명 불가 오류");
 
             // h. exporter id
-            std::vector<assets::StableKeyElement> exported = {
+            ce::dynamic_array<assets::StableKeyElement> exported = {
                 Element(K::Material, 0, "Mat", "e0", "dcc-1"), Element(K::Material, 1, "Mat", "e1", "dcc-2"),
             };
             r = assets::DeriveModelStableKeys(exported, {}, &DeterministicFactory);
             check.Check(r.Succeeded() && r.CountOrigin(K::Material, assets::StableKeyOrigin::Exporter) == 2u
                 && r.assignments[0].stableKey == "exporter:dcc-1", "exporter id → exporter: 2/2 (이름 중복 무관)");
-            std::vector<assets::StableKeyElement> dupExport = {
+            ce::dynamic_array<assets::StableKeyElement> dupExport = {
                 Element(K::Material, 0, "A", "e0", "dcc-1"), Element(K::Material, 1, "B", "e1", "dcc-1"),
             };
             r = assets::DeriveModelStableKeys(dupExport, {}, &DeterministicFactory);
@@ -333,7 +334,7 @@ namespace RenderTest
             importedMaterial.name = "Mat";
             importedMaterial.persistentId = "dcc-material-42";
             importedWithExporterId.materials.push_back(std::move(importedMaterial));
-            const std::vector<assets::StableKeyElement> collected =
+            const ce::dynamic_array<assets::StableKeyElement> collected =
                 assets::CollectStableKeyElements(importedWithExporterId);
             r = assets::DeriveModelStableKeys(collected, {}, &DeterministicFactory);
             check.Check(r.Succeeded() && r.assignments.size() == 1u
@@ -356,7 +357,7 @@ namespace RenderTest
             animationChannel.target = im::SceneNodeIndex(1);
             animationClip.channels.push_back(std::move(animationChannel));
             animationOnly.clips.push_back(std::move(animationClip));
-            const std::vector<assets::StableKeyElement> animationElements =
+            const ce::dynamic_array<assets::StableKeyElement> animationElements =
                 assets::CollectStableKeyElements(animationOnly);
             r = assets::DeriveModelStableKeys(
                 animationElements, {}, &DeterministicFactory);
@@ -368,7 +369,7 @@ namespace RenderTest
                 "animation-only node 폐포 → derived skeleton 신규 UUIDv8 + clip");
 
             // 비NFC 이름 → authoring으로 강등(경고), 성공
-            std::vector<assets::StableKeyElement> nfd = { Element(K::Material, 0, "e\xCC\x81", "d0") };
+            ce::dynamic_array<assets::StableKeyElement> nfd = { Element(K::Material, 0, "e\xCC\x81", "d0") };
             r = assets::DeriveModelStableKeys(nfd, {}, &DeterministicFactory);
             check.Check(r.Succeeded() && r.CountOrigin(K::Material, assets::StableKeyOrigin::Authoring) == 1u
                 && HasIssue(r.issues, assets::StableKeyIssueCode::NameNotNfc), "비NFC 이름 → authoring + 경고");
@@ -379,14 +380,14 @@ namespace RenderTest
         assets::ModelSidecarV2 doc;
         const assets::IdentityEpochHeader header = TestHeader();
         {
-            std::vector<assets::StableKeyElement> named = {
+            ce::dynamic_array<assets::StableKeyElement> named = {
                 Element(K::Material, 0, "MatA", "fa"), Element(K::Material, 1, "", "fb"),
                 Element(K::Texture, 0, "TexA", "ta"), Element(K::Mesh, 0, "MeshA", "ma"),
                 Element(K::Skeleton, 0, "Root", "sa"), Element(K::Animation, 0, "Idle", "aa"),
             };
             const assets::StableKeyResult r = assets::DeriveModelStableKeys(named, {}, &DeterministicFactory);
             const std::string modelKey = "authoring:" + Repeat('a', 64);
-            std::vector<assets::SidecarIssue> issues;
+            ce::dynamic_array<assets::SidecarIssue> issues;
             check.Check(assets::BuildModelSidecarV2(header, modelKey, 1u, Fp("source-bytes"),
                 r.assignments, doc, issues) && issues.empty(),
                 "BuildModelSidecarV2 (" + std::to_string(issues.size()) + " issues)");
@@ -436,7 +437,7 @@ namespace RenderTest
             auto expectReject = [&](const std::string& text, assets::SidecarIssueCode code, const char* label)
             {
                 assets::ModelSidecarV2 d;
-                std::vector<assets::SidecarIssue> is;
+                ce::dynamic_array<assets::SidecarIssue> is;
                 const bool ok = assets::ReadModelSidecarV2(text, d, is);
                 check.Check(!ok && HasIssue(is, code), std::string("v2 읽기 거부: ") + label);
             };
@@ -516,7 +517,7 @@ namespace RenderTest
         else
         {
             std::error_code ec;
-            std::vector<std::filesystem::path> sources;
+            ce::dynamic_array<std::filesystem::path> sources;
             for (std::filesystem::recursive_directory_iterator it(assetRoot, ec), end; it != end && !ec; it.increment(ec))
             {
                 if (!it->is_regular_file(ec)) continue;
@@ -551,24 +552,24 @@ namespace RenderTest
                     continue;
                 }
                 const im::ImportedScene& scene = *imported.scene;
-                const std::vector<assets::StableKeyElement> elements = assets::CollectStableKeyElements(scene);
+                const ce::dynamic_array<assets::StableKeyElement> elements = assets::CollectStableKeyElements(scene);
                 const assets::StableKeyResult keys = assets::DeriveModelStableKeys(elements, {}, &DeterministicFactory);
 
-                std::vector<std::uint8_t> bytes;
+                ce::dynamic_array<std::uint8_t> bytes;
                 const bool readOk = ReadFileBytes(source, bytes);
                 std::string error;
                 const std::string modelKey = assets::CreateModelAuthoringKey(error);
                 assets::ModelSidecarV2 sidecar;
-                std::vector<assets::SidecarIssue> issues;
+                ce::dynamic_array<assets::SidecarIssue> issues;
                 const bool built = readOk && !modelKey.empty() && keys.Succeeded()
                     && assets::BuildModelSidecarV2(header, modelKey, 1u, assets::MakeSourceFingerprint(bytes),
                         keys.assignments, sidecar, issues);
 
                 // 재배정: 첫 결과를 prior로 같은 입력 → 같은 신원(authoring 재결합 포함)
-                const std::vector<assets::ModelSubAssetRecord> prior = ToRecords(keys);
+                const ce::dynamic_array<assets::ModelSubAssetRecord> prior = ToRecords(keys);
                 const assets::StableKeyResult again = assets::DeriveModelStableKeys(elements, prior, &DeterministicFactory);
                 assets::ModelSidecarV2 sidecarAgain;
-                std::vector<assets::SidecarIssue> issuesAgain;
+                ce::dynamic_array<assets::SidecarIssue> issuesAgain;
                 const bool sameIdentity = built && again.Succeeded()
                     && assets::BuildModelSidecarV2(header, modelKey, 2u, sidecar.sourceFingerprint,
                         again.assignments, sidecarAgain, issuesAgain)
@@ -625,7 +626,7 @@ namespace RenderTest
                     outLog += "      - sidecar " + issue.context + ": " + issue.message + "\n";
                 check.Check(modelOk, "corpus 모델 신원 폐포: " + file);
             }
-            std::vector<std::string> bijection;
+            ce::dynamic_array<std::string> bijection;
             check.Check(global.VerifyBijection(bijection), "전 corpus registry bijection ("
                 + std::to_string(bijection.size()) + " issues)");
             if (report) { report->models = models; report->modelsPassed = ok; report->subAssets = totalSub; report->registry = global.Size(); }

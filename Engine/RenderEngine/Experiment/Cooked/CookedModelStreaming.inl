@@ -11,10 +11,10 @@ namespace
         return result;
     }
 
-    std::vector<std::vector<std::byte>> GeometryTopologyPages(const ModelGeometryArtifact& value,
+    ce::dynamic_array<ce::dynamic_array<std::byte>> GeometryTopologyPages(const ModelGeometryArtifact& value,
                                                               const assets::cluster::Archive& attributes)
     {
-        std::vector<std::vector<std::byte>> result;
+        ce::dynamic_array<ce::dynamic_array<std::byte>> result;
         const auto append = [&](const MeshletPayload& meshlets, uint32_t primitives)
         {
             for (const auto& descriptor : meshlets.descriptors)
@@ -33,7 +33,7 @@ namespace
     }
 
     WireWriter GeometryStreamMetadata(const ModelGeometryArtifact& value, const assets::cluster::Archive& attributes,
-                                      const std::vector<std::vector<std::byte>>& pages)
+                                      const ce::dynamic_array<ce::dynamic_array<std::byte>>& pages)
     {
         WireWriter wire;
         wire.Integer(kVertexLayoutTableHash);
@@ -95,7 +95,7 @@ namespace
 
     void ValidateStreamDescriptors(ModelGeometryStreamMetadata& value)
     {
-        auto flat = own::make_shared<std::vector<MeshletDescriptor>>();
+        auto flat = own::make_shared<ce::dynamic_array<MeshletDescriptor>>();
         uint64_t primitiveBase{};
         const auto append = [&](const MeshletPayload& payload, uint32_t level)
         {
@@ -293,7 +293,7 @@ bool ReadModelGeometryStreamMetadata(std::span<const std::byte> prefix, uint64_t
         failure);
 }
 
-bool WriteModelGeometryArtifact(const ModelGeometryArtifact& value, std::vector<std::byte>& out, std::string& failure)
+bool WriteModelGeometryArtifact(const ModelGeometryArtifact& value, ce::dynamic_array<std::byte>& out, std::string& failure)
 {
     return Checked(
         [&]
@@ -320,7 +320,7 @@ bool WriteModelGeometryArtifact(const ModelGeometryArtifact& value, std::vector<
 }
 
 bool ExpandModelGeometryPages(std::span<const std::byte> bytes, ModelGeometryArtifact& out, std::string& failure,
-                              std::vector<std::string>* warnings)
+                              ce::dynamic_array<std::string>* warnings)
 {
     return Checked(
         [&]
@@ -337,13 +337,13 @@ bool ExpandModelGeometryPages(std::span<const std::byte> bytes, ModelGeometryArt
             value.mesh.coarseLods = metadata.lods;
             value.requiredBoneCount = metadata.requiredBoneCount;
             value.requiredSkinBindingSha256 = metadata.requiredSkinBindingSha256;
-            std::vector<std::byte> vertices(uint64_t(metadata.vertexCount) * metadata.stride);
+            ce::dynamic_array<std::byte> vertices(uint64_t(metadata.vertexCount) * metadata.stride);
             ce::dynamic_bitset seen(metadata.vertexCount);
             auto archive = own::make_shared<assets::cluster::Archive>(*metadata.archive);
             archive->packets.clear();
             archive->pagedTopology = false; // Explicit CPU expansion uses QMC1 attribute packets.
             uint32_t page{};
-            const auto level = [&](MeshletPayload& topology, std::vector<uint32_t>& indices, uint32_t ordinal)
+            const auto level = [&](MeshletPayload& topology, ce::dynamic_array<uint32_t>& indices, uint32_t ordinal)
             {
                 const auto& counts = metadata.counts.at(ordinal);
                 indices.resize(counts.indexCount);
@@ -361,7 +361,7 @@ bool ExpandModelGeometryPages(std::span<const std::byte> bytes, ModelGeometryArt
                             (metadata.lods.groups.at(descriptor.reserved).reserved[2] & 1u));
                     const auto view =
                         assets::cluster::InspectTopologyPage(stored, metadata.vertexCount, counts.indexCount / 3);
-                    std::vector<std::byte> raw;
+                    ce::dynamic_array<std::byte> raw;
                     Require(assets::cluster::Decode(view.attributes, raw, failure), failure.c_str());
                     for (uint32_t vertex = 0; vertex < view.vertices; ++vertex)
                     {
@@ -480,7 +480,7 @@ bool LoadModelGeometryStreamMetadata(ResolvedAssetEntry& resolved,
                         resolved.byteSource->Size(resolved.blob.artifactPath, total, failure) &&
                         total == resolved.blob.byteSize,
                     "Cannot capture exact streaming artifact");
-            std::array<std::byte, 12> header{};
+            ce::fixed_array<std::byte, 12> header{};
             uint32_t prefix{};
             Require(resolved.byteSource->ReadAt(resolved.blob.artifactPath, 0, header, failure) &&
                         ModelGeometryStreamPrefixSize(header, total, prefix, failure),
@@ -500,7 +500,7 @@ bool LoadModelGeometryStreamMetadata(ResolvedAssetEntry& resolved,
             {
                 inputStaging->store(prefix, std::memory_order_relaxed);
             }
-            std::vector<std::byte> bytes(prefix);
+            ce::dynamic_array<std::byte> bytes(prefix);
             Sha256Digest actual{};
             Require(resolved.byteSource->ReadAt(resolved.blob.artifactPath, 0, bytes, failure) &&
                         ComputeSha256(bytes, actual, failure) && actual == expected,
@@ -527,7 +527,7 @@ bool LoadModelGeometryStreamMetadata(ResolvedAssetEntry& resolved,
                 uint64_t actualSize{};
                 assets::quantized::Require(source && source->Size(cpuPath, actualSize, error) && actualSize == size,
                                            "Exact CPU geometry artifact size");
-                std::vector<std::byte> result(static_cast<size_t>(size));
+                ce::dynamic_array<std::byte> result(static_cast<size_t>(size));
                 Sha256Digest actual{};
                 assets::quantized::Require(source->ReadAt(cpuPath, 0, result, error) &&
                                                ComputeSha256(result, actual, error) && actual == digest,
@@ -543,7 +543,7 @@ bool LoadModelGeometryStreamMetadata(ResolvedAssetEntry& resolved,
                                    positionError = archive->grid.positionError](uint32_t page)
             {
                 assets::quantized::Require(page < offsets.size(), "Streaming page ordinal");
-                std::vector<std::byte> packet(sizes[page]);
+                ce::dynamic_array<std::byte> packet(sizes[page]);
                 Sha256Digest hash{};
                 std::string error;
                 if (!source->ReadAt(path, offsets[page], packet, error) || !ComputeSha256(packet, hash, error) ||

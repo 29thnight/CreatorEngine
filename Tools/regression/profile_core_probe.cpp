@@ -1611,7 +1611,7 @@ namespace
 	{
 		auto make_capture = [](std::uint32_t count) -> ce::capture_session_ptr
 		{
-			std::vector<ce::frame_record> frames;
+			ce::dynamic_array<ce::frame_record> frames;
 			frames.reserve(count);
 			for (std::uint32_t i = 0; i < count; ++i)
 			{
@@ -1622,7 +1622,7 @@ namespace
 				frames.push_back(std::move(frame));
 			}
 			return std::make_shared<const ce::capture_session>(std::move(frames),
-				std::vector<ce::thread_info>{}, std::vector<ce::capture_marker>{},
+				ce::dynamic_array<ce::thread_info>{}, ce::dynamic_array<ce::capture_marker>{},
 				ce::capture_environment{ 1000 }, true, 0);
 		};
 		ce::capture_reader early;
@@ -4046,8 +4046,12 @@ void test_counter_lookup_and_compaction()
     {
         bytes += frame.memory_bytes();
     }
+    // A frame owns the allocated capacity, not only its number of live samples.
+    ce::dynamic_array<ce::profile_counter_sample> oneCounter;
+    oneCounter.push_back({ id, 2.0 });
+    const auto counterStorageBytes = oneCounter.capacity() * sizeof(ce::profile_counter_sample);
     check(bytes <= ring.memory_bytes() &&
-        ring.memory_bytes() + retired[0].memory_bytes() == bytesBeforeRetirement + sizeof(ce::profile_counter_sample) &&
+        ring.memory_bytes() + retired[0].memory_bytes() == bytesBeforeRetirement + counterStorageBytes &&
         capture->find_frame(24)->counters[0].value == 2.0,
         "counter-compaction/budget - retained storage accounting and future values remain correct");
     ring.clear();
@@ -4269,7 +4273,8 @@ void test_capture_file_round_trip()
 	check(sawDepth, "file/stimulus-depth — 자극에 중첩 구간이 있다");
 	check(capture->threads().size() >= 2, "file/stimulus-threads — 자극에 스레드가 둘 이상이다");
 
-	const std::vector<std::byte> bytes = ce::encode_capture(*capture);
+	const auto encoded = ce::encode_capture(*capture);
+	const std::vector<std::byte> bytes(encoded.begin(), encoded.end());
 	check(bytes.size() > 64, "file/encoded — 인코딩이 비어 있지 않다");
 
 	const auto decoded = ce::decode_capture(bytes);
@@ -4354,7 +4359,8 @@ void test_capture_file_rejects()
 		check(false, "file-reject/capture — 얼린 캡처가 있다");
 		return;
 	}
-	const std::vector<std::byte> bytes = ce::encode_capture(*capture);
+	const auto encoded = ce::encode_capture(*capture);
+	const std::vector<std::byte> bytes(encoded.begin(), encoded.end());
 
 	// ★ **모든 바이트 위치**에서 잘라 본다. 몇 군데만 고르면 그 사이의 경계
 	//   (개수 필드 한가운데, 문자열 길이 뒤)가 비는데, 거기가 실제로 넘치는 곳이다.
@@ -4400,12 +4406,12 @@ void test_capture_file_rejects()
 
 	// 프레임이 오름차순이 아니면 find_frame 의 이분 탐색이 **조용히** 엉뚱한
 	// 프레임을 낸다. 읽는 자리에서 막는다.
-	std::vector<ce::frame_record> shuffled(capture->frames().begin(), capture->frames().end());
+	ce::dynamic_array<ce::frame_record> shuffled(capture->frames().begin(), capture->frames().end());
 	std::swap(shuffled.front(), shuffled.back());
 	const ce::capture_session unordered(
 		std::move(shuffled),
-		std::vector<ce::thread_info>(capture->threads().begin(), capture->threads().end()),
-		std::vector<ce::capture_marker>(capture->markers().begin(), capture->markers().end()),
+		ce::dynamic_array<ce::thread_info>(capture->threads().begin(), capture->threads().end()),
+		ce::dynamic_array<ce::capture_marker>(capture->markers().begin(), capture->markers().end()),
 		capture->environment(), capture->complete(), capture->unacked_streams());
 	const auto order = ce::decode_capture(ce::encode_capture(unordered));
 	check(!order.has_value() && order.error() == ce::capture_file_error::malformed,
@@ -5168,7 +5174,7 @@ namespace
     void test_recording_partial_eof_preserves_valid_prefix()
     {
         const auto marker = ce::marker<"RecoveryPrefix">();
-        std::vector<ce::frame_record> frames(2);
+        ce::dynamic_array<ce::frame_record> frames(2);
         for (std::uint32_t i = 0; i < 2; ++i)
         {
             auto& frame = frames[i];
@@ -5184,7 +5190,7 @@ namespace
             frame.events.push_back(event);
         }
         const auto fixture = std::make_shared<const ce::capture_session>(
-            std::move(frames), std::vector<ce::thread_info>{{"RecoveryOwner", 0, 0}},
+            std::move(frames), ce::dynamic_array<ce::thread_info>{{"RecoveryOwner", 0, 0}},
             ce::snapshot_markers(), ce::capture_environment{1000}, true, 0);
         auto writer = ce::continuous_capture_writer::start();
         check(bool(writer), "recovery/start — unique temporary recording can be created");
@@ -5533,8 +5539,8 @@ namespace
         gpu.flags = ce::event_flags::gpu_span;
         frame.events.push_back(gpu);
         const auto capture = std::make_shared<const ce::capture_session>(
-            std::vector<ce::frame_record>{frame},
-            std::vector<ce::thread_info>{{"GpuTail", 0, 0, ce::track_kind::gpu_graphics, 0}},
+            ce::dynamic_array<ce::frame_record>{frame},
+            ce::dynamic_array<ce::thread_info>{{"GpuTail", 0, 0, ce::track_kind::gpu_graphics, 0}},
             ce::snapshot_markers(), ce::capture_environment{100000}, true, 0);
         const auto aggregate = ce::aggregate_frames(*capture, 141, 141);
         check(aggregate.tick_begin() == cpu_begin && aggregate.tick_end() == gpu_end,
@@ -5564,6 +5570,18 @@ namespace
               reader.view_begin() == cpu_begin && reader.view_end() == gpu_end &&
               reader.view_span() == gpu_end - cpu_begin,
               "gpu-tail/prepared-fit — publishing prepared GPU bounds expands an existing whole-window fit");
+        bool laneValid = false;
+        if (prepared)
+        {
+            const auto lane = prepared->lanes_.find(std::uint16_t{0});
+            laneValid = lane != prepared->lanes_.end() && lane->second.size() == 1 &&
+                lane->second[0].depth_ == 0 && lane->second[0].intervals_.size() == 1 &&
+                lane->second[0].intervals_[0].prefix_end_ == gpu_end;
+        }
+        check(laneValid, "gpu-tail/lane-index - prepared lane remains addressable");
+        reader.reset();
+        check(prepared && prepared->lanes_.find(std::uint16_t{0}) != prepared->lanes_.end(),
+              "gpu-tail/lane-lifetime - retained snapshot survives reader reset");
         check(capture->frames()[0].tick_end == cpu_stop,
               "gpu-tail/prepared-immutable — preparing the reader never mutates frame ownership");
     }

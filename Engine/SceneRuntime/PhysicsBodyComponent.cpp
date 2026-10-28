@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -25,7 +26,7 @@ import Creator.Core.LayerCatalog;
 
 using namespace ce::physics;
 
-PhysicsBodyComponent::PhysicsBodyComponent(body_kind motion, std::vector<PhysicsShapeDefinition> shapes)
+PhysicsBodyComponent::PhysicsBodyComponent(body_kind motion, ce::dynamic_array<PhysicsShapeDefinition> shapes)
     : m_motion(motion), m_shapes(std::move(shapes))
 {
     if (auto valid = ValidatePhysicsShapes(m_shapes, {1, 1, 1}, {}, motion); !valid)
@@ -89,13 +90,13 @@ result<body_definition> PhysicsBodyComponent::CaptureDefinition(std::span<const 
         return std::unexpected(error{error_code::wrong_phase, 0, "Collision geometry asset provider is not installed"});
 #else
         if (!ce::paths::is_asset_authoring_enabled())
-            return scene->m_collisionGeometry.ResolveCooked(key, [](geometry_asset_key expected) -> result<std::vector<std::byte>> {
+            return scene->m_collisionGeometry.ResolveCooked(key, [](geometry_asset_key expected) -> result<ce::dynamic_array<std::byte>> {
                 const auto catalog = DataSystems->GetCookedCatalog();
                 if (!catalog)
                     return std::unexpected(error{error_code::invalid_argument, 0, "Player geometry requires CEMF"});
 
                 experiment::cooked::LooseArtifactByteSource bytes(catalog->DerivedRoot());
-                std::vector<std::byte> artifact;
+                ce::dynamic_array<std::byte> artifact;
                 std::string failure;
                 if (!catalog->ReadCollisionGeometry({expected.asset}, bytes, artifact, failure))
                     return std::unexpected(error{error_code::invalid_argument, 0, "Player cooked geometry unavailable"});
@@ -147,7 +148,7 @@ void PhysicsBodyComponent::OnDeserialized(const Authoring::NodeView& view)
         throw std::runtime_error("Invalid physics body shape definition");
 }
 
-result<void> PhysicsBodyComponent::SetShapes(std::vector<PhysicsShapeDefinition> shapes)
+result<void> PhysicsBodyComponent::SetShapes(ce::dynamic_array<PhysicsShapeDefinition> shapes)
 {
     if (!m_scene && GetOwner() && GetOwner()->GetScene())
         return std::unexpected(error{error_code::wrong_phase, 0, "Physics body is not registered with its scene"});
@@ -185,7 +186,7 @@ result<void> PhysicsBodyComponent::SetShapes(std::vector<PhysicsShapeDefinition>
     return {};
 }
 
-result<void> PhysicsBodyComponent::ReplaceShapes(std::vector<PhysicsShapeDefinition> shapes)
+result<void> PhysicsBodyComponent::ReplaceShapes(ce::dynamic_array<PhysicsShapeDefinition> shapes)
 {
     if (!m_scene || !m_scene->m_physicsSimulation.IsRunning() ||
         m_scene->m_physicsSimulation.Runtime()->status().phase != scene_phase::idle)

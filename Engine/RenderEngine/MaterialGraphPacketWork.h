@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -39,8 +40,8 @@ namespace material_graph
         RHIBindingTable outputs;
         RHIBufferSlice constants, plans;
         Constants values;
-        std::vector<ScanLevel> levels;
-        std::vector<Slice> slices;
+        ce::dynamic_array<ScanLevel> levels;
+        ce::dynamic_array<Slice> slices;
         uint32_t scratchWords{}, argumentWords{};
         mutable RGHandle graphArguments, graphRanges, graphPackets, graphScratch;
         mutable const EnhancedRenderGraph* graphOwner{};
@@ -177,8 +178,8 @@ namespace material_graph
                 std::memcpy(plans.cpuAddress, plan->values.data(), plan->values.size() * sizeof(plan->values.front()));
             }
             const std::wstring label(name.begin(), name.end());
-            std::array<RHIBufferDesc, 4> descriptions{};
-            const std::array sizes{uint64_t(argumentWords) * 4, uint64_t(values.bucketCount) * 16,
+            ce::fixed_array<RHIBufferDesc, 4> descriptions{};
+            const ce::fixed_array sizes{uint64_t(argumentWords) * 4, uint64_t(values.bucketCount) * 16,
                                    uint64_t(capacity) * 8, uint64_t(scratchWords) * 4};
             for (std::size_t index = 0; index < descriptions.size(); ++index)
             {
@@ -188,7 +189,7 @@ namespace material_graph
                 desc.allowIndirectArguments = index == 0;
                 desc.debugName = label.c_str();
             }
-            std::array<RHIBufferHandle, 4> packetBuffers{};
+            ce::fixed_array<RHIBufferHandle, 4> packetBuffers{};
             bool acquired = true;
             if (pool)
             {
@@ -235,7 +236,7 @@ namespace material_graph
         }
         template<class Owner, class InputUses, class BindInputs>
         void Declare(EnhancedRenderGraph& graph, own::shared_owner<const Owner> owner,
-                     const std::array<own::shared_owner<const LX::Runtime::ComputeGeneration>, 6>& pipelines,
+                     const ce::fixed_array<own::shared_owner<const LX::Runtime::ComputeGeneration>, 6>& pipelines,
                      const std::string& name, bool tileWork, InputUses inputUses, BindInputs bindInputs) const
         {
             if (graphOwner == graph.DeclarationGraph() && graphEpoch == graph.DeclarationEpoch())
@@ -261,7 +262,7 @@ namespace material_graph
             struct Declaration
             {
                 own::shared_owner<const Owner> owner;
-                std::array<own::shared_owner<const LX::Runtime::ComputeGeneration>, 6> pipelines;
+                ce::fixed_array<own::shared_owner<const LX::Runtime::ComputeGeneration>, 6> pipelines;
                 BindInputs bindInputs;
             };
             const auto* declaration =

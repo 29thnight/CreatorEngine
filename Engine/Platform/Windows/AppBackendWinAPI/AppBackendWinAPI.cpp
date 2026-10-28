@@ -2,8 +2,11 @@ module;
 #include "AppBackendWinAPI.Crash.h"
 
 module Creator.AppBackend.WinAPI;
+import std;
+import "Creator.Containers.h";
 
 import std;
+import "Creator.Containers.h";
 import "Creator.WinAPI.h";
 
 namespace backend_crash = ::ce::platform::winapi::crash;
@@ -11,7 +14,7 @@ namespace backend_crash = ::ce::platform::winapi::crash;
 struct AppBackendWinAPI::state final : public Core::IWindowBackend
 {
 public:
-    using MessageHandler = std::function<LRESULT(HWND, WPARAM, LPARAM)>;
+    using MessageHandler = ce::owned_func<LRESULT(HWND, WPARAM, LPARAM)>;
 
     state(HINSTANCE hInstance, const WindowsWindowDesc& desc, AppBackendWinAPI* owner)
         : m_hInstance(hInstance), m_desc(desc)
@@ -174,7 +177,7 @@ private:
     int m_width = 800;
     int m_iconResourceId = 0;
     int m_height = 600;
-    std::unordered_map<UINT, MessageHandler> m_handlers;
+    ce::node_hash_map<UINT, MessageHandler, std::hash<UINT>, std::equal_to<UINT>, ce::heap_allocator, false> m_handlers;
 	static MessageHandler m_CreateEventHandler;
 
     // 표시 모드 전환 상태 넷(m_displayModeChanged · m_targetDeviceName ·

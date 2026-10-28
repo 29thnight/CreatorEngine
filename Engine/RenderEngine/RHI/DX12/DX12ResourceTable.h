@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
@@ -573,7 +574,7 @@ class DX12ResourceTable
     };
 
     template<typename T>
-    static uint32_t AcquireEntry(std::vector<EntrySlot<T>>& slots, std::vector<uint32_t>& freeList, const T& value)
+    static uint32_t AcquireEntry(ce::dynamic_array<EntrySlot<T>>& slots, ce::dynamic_array<uint32_t>& freeList, const T& value)
     {
         uint32_t slot = 0;
         if (!freeList.empty())
@@ -597,20 +598,20 @@ class DX12ResourceTable
         return RHIHandleBits::Encode(slot, target.generation);
     }
 
-    static uint32_t AcquirePipeline(std::vector<EntrySlot<DX12PipelineEntry>>& slots, std::vector<uint32_t>& freeList,
+    static uint32_t AcquirePipeline(ce::dynamic_array<EntrySlot<DX12PipelineEntry>>& slots, ce::dynamic_array<uint32_t>& freeList,
                                     const DX12PipelineEntry& value)
     {
         return AcquireEntry(slots, freeList, value);
     }
 
-    static uint32_t AcquireLayout(std::vector<EntrySlot<DX12PipelineLayoutEntry>>& slots,
-                                  std::vector<uint32_t>& freeList, const DX12PipelineLayoutEntry& value)
+    static uint32_t AcquireLayout(ce::dynamic_array<EntrySlot<DX12PipelineLayoutEntry>>& slots,
+                                  ce::dynamic_array<uint32_t>& freeList, const DX12PipelineLayoutEntry& value)
     {
         return AcquireEntry(slots, freeList, value);
     }
 
     template<typename T>
-    static T ResolveEntry(const std::vector<EntrySlot<T>>& slots, uint32_t id)
+    static T ResolveEntry(const ce::dynamic_array<EntrySlot<T>>& slots, uint32_t id)
     {
         if (0 == id)
         {
@@ -631,7 +632,7 @@ class DX12ResourceTable
     }
 
     template<typename T>
-    static void ReleaseEntry(std::vector<EntrySlot<T>>& slots, std::vector<uint32_t>& freeList, uint32_t id)
+    static void ReleaseEntry(ce::dynamic_array<EntrySlot<T>>& slots, ce::dynamic_array<uint32_t>& freeList, uint32_t id)
     {
         if (0 == id)
         {
@@ -658,22 +659,22 @@ class DX12ResourceTable
     mutable ce::render_vector<own::shared_owner<RecordingSnapshot>> m_recordingSnapshots;
 
     // Texture registration can overlap material uploads and shadow history creation.
-    std::vector<Slot> m_textures;
+    ce::dynamic_array<Slot> m_textures;
     std::atomic<std::uint32_t> m_textureHighWater{};
     std::atomic<std::size_t> m_liveTextures{};
     mutable std::mutex m_textureRegistryMutex;
     // 고정 크기로 한 번만 할당한다. worker segment 등록과 완료 후 slot 재사용
     // 중에도 기존 slot 주소가 움직이지 않는 stable registry 저장소다.
-    std::vector<Slot> m_buffers;
-    std::vector<uint32_t> m_textureFree;
-    std::vector<uint32_t> m_bufferFree;
+    ce::dynamic_array<Slot> m_buffers;
+    ce::dynamic_array<uint32_t> m_textureFree;
+    ce::dynamic_array<uint32_t> m_bufferFree;
     std::atomic<uint32_t> m_bufferHighWater{0};
     std::atomic<uint32_t> m_liveBuffers{0};
     std::atomic<uint64_t> m_bufferSlotReuses{0};
     mutable std::mutex m_bufferRegistryMutex;
 
-    std::vector<EntrySlot<DX12PipelineEntry>> m_pipelines;
-    std::vector<EntrySlot<DX12PipelineLayoutEntry>> m_layouts;
-    std::vector<uint32_t> m_pipelineFree;
-    std::vector<uint32_t> m_layoutFree;
+    ce::dynamic_array<EntrySlot<DX12PipelineEntry>> m_pipelines;
+    ce::dynamic_array<EntrySlot<DX12PipelineLayoutEntry>> m_layouts;
+    ce::dynamic_array<uint32_t> m_pipelineFree;
+    ce::dynamic_array<uint32_t> m_layoutFree;
 };

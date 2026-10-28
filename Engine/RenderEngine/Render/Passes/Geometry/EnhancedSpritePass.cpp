@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #include "EnhancedSpritePass.h"
 #include "../../../RHI/RHIEncoder.h"
 #include "../../../RHI/RHIShaderCompiler.h"
@@ -155,7 +156,7 @@ bool EnhancedSpritePass::PrepareFrame(const EnhancedFrameContext &context, std::
         return false;
     }
     m_visibilitySpheres.reserve(m_items->size());
-    std::vector<uint32_t> order(m_items->size());
+    ce::dynamic_array<uint32_t> order(m_items->size());
     for (uint32_t i = 0; i < order.size(); ++i)
     {
         order[i] = i;
@@ -245,8 +246,8 @@ bool EnhancedSpritePass::PrepareGpuVisibility(const EnhancedFrameContext& contex
     {
         return false;
     }
-    std::vector<GpuGeometryVisibility::Candidate> candidates;
-    std::vector<GpuGeometryVisibility::Bin> bins;
+    ce::dynamic_array<GpuGeometryVisibility::Candidate> candidates;
+    ce::dynamic_array<GpuGeometryVisibility::Bin> bins;
     candidates.reserve(m_instances.size());
     bins.reserve(m_batches.size());
     uint64_t outputOffset = 0;
@@ -330,7 +331,7 @@ void EnhancedSpritePass::Declare(EnhancedRenderGraph &graph, const EnhancedFrame
     const auto output = m_output;
     const auto depth = m_inputs.depth;
 
-    std::vector<EnhancedRenderGraph::RGPassUsage> usages = {
+    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> usages = {
         {output, RHIResourceState::RenderTarget, colorAccess},
     };
     if (m_inputs.depth.IsValid())
@@ -449,8 +450,8 @@ void EnhancedSpritePass::Declare(EnhancedRenderGraph &graph, const EnhancedFrame
         });
 }
 
-std::array<RGHandle, 5> EnhancedSpritePass::DeclareTemporal(EnhancedRenderGraph& graph,
-    const EnhancedFrameContext& context, std::array<RGHandle, 5> outputs)
+ce::fixed_array<RGHandle, 5> EnhancedSpritePass::DeclareTemporal(EnhancedRenderGraph& graph,
+    const EnhancedFrameContext& context, ce::fixed_array<RGHandle, 5> outputs)
 {
     if (m_instances.empty()) return outputs;
     if (!m_temporalPso.IsValid() || !m_width || !m_height || !m_output.IsValid() || !m_inputs.depth.IsValid() ||
@@ -464,7 +465,7 @@ std::array<RGHandle, 5> EnhancedSpritePass::DeclareTemporal(EnhancedRenderGraph&
     const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
     const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
     const auto modify = explicitAccess ? RGAccessMode::ReadWrite : RGAccessMode::LegacyState;
-    std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> uses;
     for (unsigned i = 0; i < outputs.size(); ++i)
     {
         if (versioned) outputs[i] = graph.Modify(outputs[i]);
@@ -507,7 +508,7 @@ std::array<RGHandle, 5> EnhancedSpritePass::DeclareTemporal(EnhancedRenderGraph&
         [this, &context, outputs, sourceDepth, visibility, camera](const auto& execute) mutable {
             m_lastTemporalRecordedItemCount = 0;
             uint32_t recordedItemCount = 0;
-            std::array<RHITextureHandle, 4> colors;
+            ce::fixed_array<RHITextureHandle, 4> colors;
             for (unsigned i = 0; i < colors.size(); ++i) colors[i] = execute.ResolveHandle(outputs[i]);
             const auto depth = RHIDepthTargetDesc::Depth(
                 execute.ResolveHandle(outputs[4]), SceneSurfaceTargets::kDepthFormat);

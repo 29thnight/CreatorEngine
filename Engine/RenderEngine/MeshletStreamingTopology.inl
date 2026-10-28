@@ -1,13 +1,15 @@
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Utility_Framework/Foundation/EngineOrderedSet.h"
 // Included inside material_graph after RHIModelMeshletUpload.h.
 struct SparseClusterPayload
 {
     struct Packet
     {
         uint32_t offset{}, priority{};
-        own::shared_owner<const std::vector<std::byte>> bytes;
+        own::shared_owner<const ce::dynamic_array<std::byte>> bytes;
     };
     uint64_t virtualBytes{};
-    std::vector<Packet> packets;
+    ce::dynamic_array<Packet> packets;
 };
 
 inline void PackStreamedMeshletGpuPayload(RHIModelMeshletUpload& result, const MeshSurfaceInput& input)
@@ -78,7 +80,7 @@ inline void AppendClusterTopology(RHIModelMeshletUpload& upload, const MeshSurfa
     // Metadata occupies pinned tiles. Packet addresses depend on the sealed
     // topology alone, so residency changes never relocate a surviving packet.
     uint64_t packetEnd = (bytes.size() + RHISparseTileBytes - 1) & ~(RHISparseTileBytes - 1);
-    std::map<uint32_t, uint32_t> packetOffsets;
+    ce::engine_ordered_map<uint32_t, uint32_t> packetOffsets;
     if (sparse)
     {
         for (const auto& descriptor : input.Meshlets().descriptors)
@@ -93,7 +95,7 @@ inline void AppendClusterTopology(RHIModelMeshletUpload& upload, const MeshSurfa
         }
         sparse->virtualBytes = (packetEnd + RHISparseTileBytes - 1) & ~(RHISparseTileBytes - 1);
     }
-    std::set<uint32_t> emitted;
+    ce::engine_ordered_set<uint32_t> emitted;
     for (uint32_t g = 0; g < resident.groups.size(); ++g)
     {
         Put(bytes, header.clusterGroupResidentOffset + g * 4, resident.groups[g]);

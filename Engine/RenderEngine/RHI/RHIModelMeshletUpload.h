@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "IRenderDeviceServices.h"
@@ -7,7 +8,7 @@
 
 struct RHIModelMeshletUpload
 {
-    std::vector<std::byte> bytes;
+    ce::dynamic_array<std::byte> bytes;
     uint32_t meshletCount{};
     uint32_t profileVersion{};
 };

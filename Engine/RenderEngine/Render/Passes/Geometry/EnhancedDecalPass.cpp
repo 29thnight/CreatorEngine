@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #include "EnhancedDecalPass.h"
 #include "../../../RHI/DX12/DX12DeviceResources.h"
 #include "../../../RHI/DX12/DX12PSOManager.h"
@@ -370,8 +371,8 @@ bool EnhancedDecalPass::PrepareGpuVisibility(const EnhancedFrameContext& context
     {
         return false;
     }
-    std::vector<GpuGeometryVisibility::Candidate> candidates;
-    std::vector<GpuGeometryVisibility::Bin> bins;
+    ce::dynamic_array<GpuGeometryVisibility::Candidate> candidates;
+    ce::dynamic_array<GpuGeometryVisibility::Bin> bins;
     candidates.reserve(m_instances.size());
     bins.reserve(m_batches.size());
     uint64_t outputOffset = 0;
@@ -512,7 +513,7 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
     const auto outputs = m_outputs;
 
     // ── 덧칠 ──
-    std::vector<EnhancedRenderGraph::RGPassUsage> applyUses{
+    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> applyUses{
         {m_copiedDiffuse, RHIResourceState::ShaderResource, readAccess},
         {m_copiedNormal, RHIResourceState::ShaderResource, readAccess},
         {m_copiedOrm, RHIResourceState::ShaderResource, readAccess},
@@ -734,15 +735,15 @@ void EnhancedDecalPass::Declare(EnhancedRenderGraph& graph, const EnhancedFrameC
         m_keepAlive);
 }
 
-std::array<RGHandle, 5> EnhancedDecalPass::DeclareTemporal(EnhancedRenderGraph& graph,
-    const EnhancedFrameContext& context, std::array<RGHandle, 5> outputs)
+ce::fixed_array<RGHandle, 5> EnhancedDecalPass::DeclareTemporal(EnhancedRenderGraph& graph,
+    const EnhancedFrameContext& context, ce::fixed_array<RGHandle, 5> outputs)
 {
     if (m_batches.empty()) return outputs;
     const bool versioned = graph.GetSchedulingMode() == RGSchedulingMode::ExplicitVersioned;
     const bool explicitAccess = graph.GetSchedulingMode() != RGSchedulingMode::DeclarationOrder;
     const auto read = explicitAccess ? RGAccessMode::Read : RGAccessMode::LegacyState;
     const auto modify = explicitAccess ? RGAccessMode::ReadWrite : RGAccessMode::LegacyState;
-    std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> uses;
     for (unsigned i=0; i<4; ++i)
     {
         if (versioned) outputs[i] = graph.Modify(outputs[i]);
@@ -760,7 +761,7 @@ std::array<RGHandle, 5> EnhancedDecalPass::DeclareTemporal(EnhancedRenderGraph& 
             uses.push_back({handle,RHIResourceState::PixelShaderResource,read});
     }
     graph.AddPass("Temporal.DecalMotion",uses,[this,outputs,sourceDepth,&context](const auto& execute){
-        std::array<RHITextureHandle,4> colors;
+        ce::fixed_array<RHITextureHandle,4> colors;
         for (unsigned i=0;i<4;++i) colors[i]=execute.ResolveHandle(outputs[i]);
         const auto targets=context.resources->CreateRenderTargets(colors);
         if (!targets.IsValid()) throw std::runtime_error("Temporal decal render targets unavailable.");

@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -18,7 +20,7 @@ import Creator.Core.Ownership;
 namespace
 {
     namespace cooked = experiment::cooked;
-    using ArtifactFiles = std::map<std::string, std::vector<std::byte>, std::less<>>;
+    using ArtifactFiles = ce::engine_ordered_map<std::string, ce::dynamic_array<std::byte>, std::less<>>;
 
     class MotionArtifactSource final : public cooked::ArtifactByteSource
     {
@@ -62,7 +64,7 @@ namespace
 
     experiment::AssetId FixtureId(std::uint8_t discriminator)
     {
-        constexpr std::array<std::uint8_t, 16> kNamespace{
+        constexpr ce::fixed_array<std::uint8_t, 16> kNamespace{
             0x54u, 0x4du, 0x46u, 0x34u, 0x35u, 0x2du, 0x66u, 0x69u,
             0x78u, 0x74u, 0x75u, 0x72u, 0x65u, 0x2du, 0x30u, 0x31u };
         const std::string key = std::to_string(discriminator);
@@ -95,10 +97,10 @@ namespace
             failure = "Temporal motion fixture vertex layout is unsupported.";
             return false;
         }
-        const std::array<math::vector3, 4> positions{
+        const ce::fixed_array<math::vector3, 4> positions{
             math::vector3{ -1.0f, -1.0f, 0.0f }, math::vector3{ 1.0f, -1.0f, 0.0f },
             math::vector3{ 1.0f, 1.0f, 0.0f }, math::vector3{ -1.0f, 1.0f, 0.0f } };
-        const std::array<math::vector2, 4> coordinates{
+        const ce::fixed_array<math::vector2, 4> coordinates{
             math::vector2{ 0.0f, 1.0f }, math::vector2{ 1.0f, 1.0f },
             math::vector2{ 1.0f, 0.0f }, math::vector2{ 0.0f, 0.0f } };
         for (std::size_t index = 0; index < positions.size(); ++index)
@@ -149,7 +151,7 @@ namespace
         return true;
     }
 
-    bool MakeTexture(bool masked, std::vector<std::byte>& bytes, std::string& failure)
+    bool MakeTexture(bool masked, ce::dynamic_array<std::byte>& bytes, std::string& failure)
     {
         constexpr std::uint32_t kDimension = 16u;
         constexpr std::uint32_t kMipLevels = 5u;
@@ -214,7 +216,7 @@ namespace
         {
             return false;
         }
-        std::vector<LX::LXMaterialDiagnostic> diagnostics;
+        ce::dynamic_array<LX::LXMaterialDiagnostic> diagnostics;
         const auto generated = LX::GenerateMaterialSlang(*graph, &diagnostics);
         if (!generated)
         {
@@ -235,7 +237,7 @@ namespace
         program.representation = cooked::kMaterialProgramRepresentation;
         program.schemaVersion = cooked::kMaterialProgramArtifactVersion;
         program.extension = ".celx";
-        std::vector<std::uint8_t> programBytes;
+        ce::dynamic_array<std::uint8_t> programBytes;
         if (!cooked::CollectMaterialProgramAssetSetDependencies(verified, programId, program.dependencies, failure)
             || !material_graph::WriteCookedProgram(verified, {}, programBytes, failure))
         {
@@ -291,8 +293,8 @@ bool TemporalMotionFixtureAssets::Build(const TemporalMotionFixtureAssetOptions&
         manifest.targetAbi = options.targetAbi;
         ArtifactFiles files;
         const auto add = [&](const cooked::TypedAssetReference& asset, std::string path,
-            std::vector<std::byte> bytes, std::uint32_t representation, std::uint32_t schema,
-            std::vector<cooked::AssetDependency> dependencies)
+            ce::dynamic_array<std::byte> bytes, std::uint32_t representation, std::uint32_t schema,
+            ce::dynamic_array<cooked::AssetDependency> dependencies)
         {
             cooked::AssetBlobRecord blob;
             blob.kind = asset.kind;
@@ -345,7 +347,7 @@ bool TemporalMotionFixtureAssets::Build(const TemporalMotionFixtureAssetOptions&
         skeleton.skeleton.bones = {
             { "MotionRoot", {}, math::matrix4x4::identity() },
             { "MotionTip", experiment::BoneIndex(0u), math::matrix4x4::identity() } };
-        std::vector<std::byte> bytes;
+        ce::dynamic_array<std::byte> bytes;
         if (!cooked::ComputeBoneLayoutDigest(skeleton.skeleton, skeleton.boneLayoutSha256, failure)
             || !cooked::WriteSkeletonArtifact(skeleton, bytes, failure)
             || !add(result.skeleton.ToReference(), "Derived/TemporalMotionFixture/skeleton.cesl",
@@ -478,7 +480,7 @@ bool TemporalMotionFixtureAssets::Build(const TemporalMotionFixtureAssetOptions&
                 result.meshletMesh.identity.assetId } } };
         // 작은 표시용 fixture가 물리 cook를 일으키지 않게 명시한다.
         descriptor.createMeshCollider = false;
-        const std::vector<cooked::AssetDependency> modelDependencies{
+        const ce::dynamic_array<cooked::AssetDependency> modelDependencies{
             Dependency(result.skeleton.ToReference(), cooked::AssetDependencyKind::Loadable),
             Dependency(result.clip.ToReference(), cooked::AssetDependencyKind::Loadable),
             Dependency(result.staticMesh.ToReference(), cooked::AssetDependencyKind::Loadable),

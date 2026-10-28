@@ -1,3 +1,5 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineStorage.h"
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -71,12 +73,12 @@ namespace RenderTest
             std::size_t shaderLoads{};
             std::size_t cookedLookups{};
             std::size_t sourceLookups{};
-            std::vector<std::filesystem::path> loadedPaths{};
-            std::deque<bool> loadedCompress{};
-            std::vector<experiment::TextureColorSpace> loadedColorSpaces{};
+            ce::dynamic_array<std::filesystem::path> loadedPaths{};
+            ce::segmented_deque<bool> loadedCompress{};
+            ce::dynamic_array<experiment::TextureColorSpace> loadedColorSpaces{};
 
             // cooked 표: 여기 있는 GUID만 cooked 로 해석된다.
-            std::vector<experiment::AssetId> cookedIds{};
+            ce::dynamic_array<experiment::AssetId> cookedIds{};
             bool textureLoadFails{};
 
             void Wire(const FileGuid& shaderGuid)
@@ -190,7 +192,7 @@ namespace RenderTest
                 check.Check(fake.lastShaderGuid == shaderGuid,
                     "shader GUID로 handle을 물어야 한다");
                 check.Check(resolved.keywordSelections
-                    == std::vector<std::uint16_t>{ 1, 1, 0 },
+                    == ce::dynamic_array<std::uint16_t>{ 1, 1, 0 },
                     "keyword 정규화 — 인덱스(QUALITY=1)+이름(FOG=on)+기본(SHADOW=0)");
 
                 check.Check(resolved.textures.size() == 2u,
@@ -213,9 +215,9 @@ namespace RenderTest
                     "source 조회는 cooked 미해석 texture에만");
                 check.Check(fake.shaderLoads == 1u, "shader 조회는 한 번");
                 check.Check(fake.loadedCompress
-                    == std::deque<bool>{ true, false },
+                    == ce::segmented_deque<bool>{ true, false },
                     "compress is limited to sRGB base color");
-                check.Check(fake.loadedColorSpaces == std::vector{experiment::TextureColorSpace::Srgb,
+                check.Check(fake.loadedColorSpaces == ce::dynamic_array{experiment::TextureColorSpace::Srgb,
                     experiment::TextureColorSpace::Linear}, "W6 source/cooked color space reaches loader");
                 check.Check(fake.loadedPaths.size() == 2u
                     && fake.loadedPaths[0].generic_string().starts_with("Derived/")
@@ -238,7 +240,7 @@ namespace RenderTest
                 material, fake.services, resolved, error);
             check.Check(ok, "이름 우선 해석 통과 (" + error + ")");
             check.Check(ok && resolved.keywordSelections
-                == std::vector<std::uint16_t>{ 0, 1, 1 },
+                == ce::dynamic_array<std::uint16_t>{ 0, 1, 1 },
                 "이름 기반 keyword가 인덱스 선택을 덮어야 한다");
         }
 
@@ -425,7 +427,7 @@ namespace RenderTest
                 && resolved.shaderMeta->guid == guid,
                 "resolve된 meta가 fixture여야 한다");
             check.Check(resolved.keywordSelections
-                == std::vector<std::uint16_t>{ 1 },
+                == ce::dynamic_array<std::uint16_t>{ 1 },
                 "fixture QUALITY=high 정규화");
             check.Check(resolved.textures.empty()
                 && 0u == resolved.notes.cookedTextures
@@ -442,7 +444,7 @@ namespace RenderTest
             std::filesystem::create_directories(directory / "b");
             const auto first = directory / "a" / "same.tga";
             const auto second = directory / "b" / "same.tga";
-            std::array<unsigned char, 22> tga{};
+            ce::fixed_array<unsigned char, 22> tga{};
             tga[2] = 2; tga[12] = 1; tga[14] = 1; tga[16] = 32; tga[17] = 0x28;
             tga[18] = 192; tga[19] = 64; tga[20] = 128; tga[21] = 255;
             { std::ofstream file(first, std::ios::binary); file.write(reinterpret_cast<const char*>(tga.data()), tga.size()); }

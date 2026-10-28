@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Engine/Platform/WindowsSDK/Creator.WinAPI.h"
@@ -42,7 +43,7 @@ namespace Editor::AuthoringPublish
         {
             return false;
         }
-        std::vector<std::byte> storage(sizeof(FILE_RENAME_INFO) + nameBytes);
+        ce::dynamic_array<std::byte> storage(sizeof(FILE_RENAME_INFO) + nameBytes);
         auto* rename = reinterpret_cast<FILE_RENAME_INFO*>(storage.data());
         rename->ReplaceIfExists = FALSE;
         rename->RootDirectory = nullptr;

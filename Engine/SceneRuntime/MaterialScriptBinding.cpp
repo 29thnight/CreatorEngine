@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -156,11 +157,11 @@ bool SetFloatVector(Material& material, const ShaderMeta& meta, std::string_view
         }
         if (values.size() == 3)
         {
-            return SetGraphValue(material, name, std::array<double, 3>{values[0], values[1], values[2]});
+            return SetGraphValue(material, name, ce::fixed_array<double, 3>{values[0], values[1], values[2]});
         }
         if (values.size() == 4)
         {
-            return SetGraphValue(material, name, std::array<double, 4>{values[0], values[1], values[2], values[3]});
+            return SetGraphValue(material, name, ce::fixed_array<double, 4>{values[0], values[1], values[2], values[3]});
         }
         return false;
     }
@@ -240,7 +241,7 @@ void SetTexture(Material& material, std::string_view name, const FileGuid& guid,
             return;
         }
         auto description = material.GetMaterialGraphInstance()->description;
-        std::erase_if(description.textures, [id = parameter->id](const auto& value) { return value.parameter == id; });
+        ce::erase_if(description.textures, [id = parameter->id](const auto& value) { return value.parameter == id; });
         description.textures.push_back({parameter->id, experiment::AssetId{guid.m_guid}});
         std::string error;
         if (!DataSystems->ConfigureMaterialGraph(material, description, error))
@@ -286,7 +287,7 @@ math::color GetBaseColor(const Material& material)
 {
     if (const auto value = GraphValue(material, standard_material::property::BaseColor))
     {
-        if (const auto* color = std::get_if<std::array<double, 4>>(&*value))
+        if (const auto* color = std::get_if<ce::fixed_array<double, 4>>(&*value))
         {
             return {float((*color)[0]), float((*color)[1]), float((*color)[2]),
                     GetFloat(material, "alpha", float((*color)[3]))};
@@ -313,8 +314,8 @@ void SetBaseColor(Material& material, const math::color& color, experiment::Mate
             Debug::PrintLog(spdlog::level::err, "Graph material has no editable Base Color/Alpha parameter.");
             return;
         }
-        std::vector<material_graph::ParameterOverride> edits{
-            {base->id, std::array<double, 4>{color.r, color.g, color.b, color.a}}};
+        ce::dynamic_array<material_graph::ParameterOverride> edits{
+            {base->id, ce::fixed_array<double, 4>{color.r, color.g, color.b, color.a}}};
         if (const auto* alpha = GraphParameter(material, "alpha"))
         {
             edits.push_back({alpha->id, double(color.a)});

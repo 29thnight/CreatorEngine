@@ -34,10 +34,10 @@ struct GpuGeometryVisibility::SharedBatch
     bool ordered{};
     // Sealed inputs have no back-reference to Frame. Keep diagnostic counts
     // through these owners instead of copying them or retaining upload scratch.
-    std::array<own::shared_owner<const MeshletInputs>, kSharedViewCapacity> inputs;
+    ce::fixed_array<own::shared_owner<const MeshletInputs>, kSharedViewCapacity> inputs;
     RHIBufferSlice constants, candidates, binData, worlds, viewData;
     RHIBindingTable outputs, vertices, topologies, ids, arguments, first;
-    std::array<own::shared_owner<const GpuGeometryOcclusion::Pyramid>, kSharedViewCapacity> pyramids;
+    ce::fixed_array<own::shared_owner<const GpuGeometryOcclusion::Pyramid>, kSharedViewCapacity> pyramids;
     own::shared_owner<const LX::Runtime::ComputeGeneration> reset, cull, count, finalize, scatter;
     static constexpr std::uint64_t kQueueBytes = (kWorkRingHeaderWords + kWorkRingSlots) * sizeof(std::uint32_t);
     ~SharedBatch()
@@ -74,7 +74,7 @@ struct GpuGeometryVisibility::SharedBatch
             const auto fallback = std::ranges::find_if(pyramids, [](const auto& pyramid) { return bool(pyramid); });
             if (fallback != pyramids.end())
             {
-                std::array<RHIBindingDesc, kSharedViewCapacity * kOcclusionLevels> descriptions;
+                ce::fixed_array<RHIBindingDesc, kSharedViewCapacity * kOcclusionLevels> descriptions;
                 for (unsigned view = 0; view < kSharedViewCapacity; ++view)
                 {
                     const auto& pyramid = view < pyramids.size() && pyramids[view] ? pyramids[view] : *fallback;
@@ -165,7 +165,7 @@ void GpuGeometryVisibility::Frame::UploadMeshletInputs() const
         {input.candidates.size() * sizeof(Candidate), RHIUploadUsage::Raw, 256},
         {input.bins.size() * sizeof(Bin), RHIUploadUsage::Raw, 256},
         {m_meshletGeometries.size() * kMeshletInstanceRows * sizeof(math::vector4), RHIUploadUsage::Raw, 16}};
-    std::array<RHIBufferSlice, 4> uploads;
+    ce::fixed_array<RHIBufferSlice, 4> uploads;
     std::string error;
     if (!m_device->ReserveUploadBatch(requests, uploads, error) ||
         std::ranges::any_of(uploads, [](const auto& upload) { return !upload.IsWritable(); }))
@@ -254,7 +254,7 @@ own::shared_owner<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Fra
     batch->count = firstFrame.m_sharedCount;
     batch->finalize = firstFrame.m_sharedFinalize;
     batch->scatter = firstFrame.m_sharedScatter;
-    std::array<RHIBindingDesc, kSharedViewCapacity> ids, arguments, first;
+    ce::fixed_array<RHIBindingDesc, kSharedViewCapacity> ids, arguments, first;
     std::size_t totalBins{};
     for (const auto& frame : frames)
     {
@@ -279,7 +279,7 @@ own::shared_owner<GpuGeometryVisibility::SharedBatch> GpuGeometryVisibility::Fra
         {totalBins * kMeshletInstanceRows * sizeof(math::vector4), RHIUploadUsage::Raw, 16},
         {frames.size() * sizeof(SharedBatch::ViewData), RHIUploadUsage::Raw, 16},
         {sizeof(std::uint32_t), RHIUploadUsage::Raw, 16}};
-    std::array<RHIBufferSlice, 6> uploads;
+    ce::fixed_array<RHIBufferSlice, 6> uploads;
     std::string error;
     if (!batch->device->ReserveUploadBatch(requests, uploads, error) ||
         std::ranges::any_of(uploads, [](const auto& upload) { return !upload.IsWritable(); }))

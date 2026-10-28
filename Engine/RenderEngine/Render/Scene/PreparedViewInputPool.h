@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -32,5 +33,5 @@ class PreparedViewInputPool
     }
 
   private:
-    std::array<own::shared_owner<T>, SlotCount> m_slots;
+    ce::fixed_array<own::shared_owner<T>, SlotCount> m_slots;
 };

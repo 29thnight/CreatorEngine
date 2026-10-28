@@ -1,3 +1,6 @@
+#include "../../../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../../Containers/ContainerAPI.h"
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
@@ -69,7 +72,7 @@ namespace experiment::cooked
             std::uint32_t pathBytes{};
         };
 
-        void AddIssue(std::vector<AssetManifestIssue>& issues,
+        void AddIssue(ce::dynamic_array<AssetManifestIssue>& issues,
             std::string context, std::string message)
         {
             issues.push_back(AssetManifestIssue{
@@ -196,13 +199,13 @@ namespace experiment::cooked
                 bytes_.insert(bytes_.end(), first, first + size);
             }
 
-            [[nodiscard]] std::vector<std::byte> Take() noexcept
+            [[nodiscard]] ce::dynamic_array<std::byte> Take() noexcept
             {
                 return std::move(bytes_);
             }
 
         private:
-            std::vector<std::byte> bytes_{};
+            ce::dynamic_array<std::byte> bytes_{};
         };
 
         class Reader final
@@ -270,7 +273,7 @@ namespace experiment::cooked
 
         [[nodiscard]] bool ValidateManifest(
             const CookedAssetManifest& manifest,
-            std::vector<AssetManifestIssue>& issues)
+            ce::dynamic_array<AssetManifestIssue>& issues)
         {
             if (manifest.entries.empty())
             {
@@ -280,7 +283,7 @@ namespace experiment::cooked
             }
 
             bool valid = true;
-            std::vector<AssetId> ids;
+            ce::dynamic_array<AssetId> ids;
             ids.reserve(manifest.entries.size());
             for (std::size_t index = 0; index < manifest.entries.size(); ++index)
             {
@@ -341,7 +344,7 @@ namespace experiment::cooked
                     valid = false;
                 }
 
-                std::vector<AssetId> dependencies;
+                ce::dynamic_array<AssetId> dependencies;
                 dependencies.reserve(entry.dependencies.size());
                 for (std::size_t dependencyIndex = 0;
                     dependencyIndex < entry.dependencies.size(); ++dependencyIndex)
@@ -399,8 +402,8 @@ namespace experiment::cooked
                 }
             }
 
-            std::vector<AssetId> sourceIds;
-            std::vector<std::string_view> sourcePaths;
+            ce::dynamic_array<AssetId> sourceIds;
+            ce::dynamic_array<std::string_view> sourcePaths;
             sourceIds.reserve(manifest.sourceAssets.size());
             sourcePaths.reserve(manifest.sourceAssets.size());
             for (std::size_t index = 0u; index < manifest.sourceAssets.size(); ++index)
@@ -567,7 +570,7 @@ namespace experiment::cooked
 #if defined(_WIN32)
         BCRYPT_ALG_HANDLE algorithm{};
         BCRYPT_HASH_HANDLE hash{};
-        std::vector<std::uint8_t> object;
+        ce::dynamic_array<std::uint8_t> object;
         const auto close = [&]() noexcept
         {
             if (hash) BCryptDestroyHash(hash);
@@ -638,7 +641,7 @@ namespace experiment::cooked
         outError.clear();
         return true;
 #else
-        ce::hash::sha256 hash;
+        ce::crypto::sha256 hash;
         hash.update(bytes.data(), bytes.size());
         outDigest = hash.finish();
         outError.clear();
@@ -755,7 +758,7 @@ namespace experiment::cooked
 
     bool ReadAssetManifest(std::span<const std::byte> bytes,
         CookedAssetManifest& outManifest,
-        std::vector<AssetManifestIssue>& outIssues)
+        ce::dynamic_array<AssetManifestIssue>& outIssues)
     {
         if (bytes.size() < kHeaderBytes)
         {
@@ -829,7 +832,7 @@ namespace experiment::cooked
             return false;
         }
 
-        std::vector<RawEntry> rawEntries;
+        ce::dynamic_array<RawEntry> rawEntries;
         rawEntries.reserve(entryCount);
         for (std::uint32_t index = 0u; index < entryCount; ++index)
         {
@@ -855,7 +858,7 @@ namespace experiment::cooked
             rawEntries.push_back(raw);
         }
 
-        std::vector<RawSourceEntry> rawSourceEntries;
+        ce::dynamic_array<RawSourceEntry> rawSourceEntries;
         rawSourceEntries.reserve(sourceEntryCount);
         for (std::uint32_t index = 0u; index < sourceEntryCount; ++index)
         {
@@ -872,7 +875,7 @@ namespace experiment::cooked
             rawSourceEntries.push_back(raw);
         }
 
-        std::vector<AssetId> dependencyIds(dependencyCount);
+        ce::dynamic_array<AssetId> dependencyIds(dependencyCount);
         for (AssetId& dependency : dependencyIds)
         {
             if (!reader.Raw(dependency.value.data_.data(), dependency.value.data_.size()))
@@ -935,7 +938,7 @@ namespace experiment::cooked
             parsed.sourceAssets.push_back(std::move(source));
         }
 
-        std::vector<AssetManifestIssue> validationIssues;
+        ce::dynamic_array<AssetManifestIssue> validationIssues;
         if (!ValidateManifest(parsed, validationIssues))
         {
             outIssues.insert(outIssues.end(),
@@ -975,7 +978,7 @@ namespace experiment::cooked
 
     bool VerifyArtifact(const CookedAssetManifestEntry& entry,
         std::uint64_t actualByteSize, const Sha256Digest& actualSha256,
-        std::vector<AssetManifestIssue>& outIssues)
+        ce::dynamic_array<AssetManifestIssue>& outIssues)
     {
         bool valid = true;
         if (entry.byteSize != actualByteSize)
@@ -1109,7 +1112,7 @@ namespace experiment::cooked
             return true;
         }
 
-        [[nodiscard]] bool SetIssue(std::vector<AssetManifestIssue>& issues,
+        [[nodiscard]] bool SetIssue(ce::dynamic_array<AssetManifestIssue>& issues,
             std::string context, std::string message)
         {
             AddIssue(issues, std::move(context), std::move(message));
@@ -1118,12 +1121,12 @@ namespace experiment::cooked
 
         [[nodiscard]] auto BlobContentKey(const AssetBlobRecord& blob) noexcept
         {
-            return std::tie(blob.contentSha256, blob.kind, blob.representation,
+            return ce::tie(blob.contentSha256, blob.kind, blob.representation,
                 blob.schemaVersion, blob.targetPlatform, blob.targetAbi);
         }
 
         [[nodiscard]] bool CheckSetBounds(const AssetSetManifest& manifest,
-            std::vector<AssetManifestIssue>& issues)
+            ce::dynamic_array<AssetManifestIssue>& issues)
         {
             if (manifest.entries.empty() || manifest.blobs.empty() || manifest.roots.empty()
                 || manifest.entries.size() > kAssetSetManifestMaxEntries
@@ -1176,8 +1179,8 @@ namespace experiment::cooked
         }
 
         [[nodiscard]] bool CheckHardCycles(const AssetSetManifest& manifest,
-            const std::map<AssetIdentity, std::size_t>& entries,
-            std::vector<AssetManifestIssue>& issues)
+            const ce::engine_ordered_map<AssetIdentity, std::size_t>& entries,
+            ce::dynamic_array<AssetManifestIssue>& issues)
         {
             // Iterative DFS avoids stack exhaustion on a long valid dependency
             // chain. Only hard edges form the ownership graph; loadable loops
@@ -1187,8 +1190,8 @@ namespace experiment::cooked
                 std::size_t entry{};
                 std::size_t nextDependency{};
             };
-            std::vector<std::uint8_t> color(manifest.entries.size(), 0u);
-            std::vector<Frame> stack;
+            ce::dynamic_array<std::uint8_t> color(manifest.entries.size(), 0u);
+            ce::dynamic_array<Frame> stack;
             for (std::size_t start = 0u; start < manifest.entries.size(); ++start)
             {
                 if (color[start] != 0u)
@@ -1271,7 +1274,7 @@ namespace experiment::cooked
     }
 
     bool ValidateAssetSetManifest(const AssetSetManifest& manifest,
-        std::vector<AssetManifestIssue>& outIssues)
+        ce::dynamic_array<AssetManifestIssue>& outIssues)
     {
         if (!CheckSetBounds(manifest, outIssues))
         {
@@ -1286,9 +1289,9 @@ namespace experiment::cooked
             return SetIssue(outIssues, "assetSet.target", "Target platform and ABI must be nonempty bounded tokens.");
         }
 
-        std::set<std::tuple<Sha256Digest, CookedAssetKind, std::uint32_t,
+        ce::engine_ordered_set<ce::tuple<Sha256Digest, CookedAssetKind, std::uint32_t,
             std::uint32_t, std::string, std::string>> blobKeys;
-        std::map<std::string_view, std::size_t> paths;
+        ce::engine_ordered_map<std::string_view, std::size_t> paths;
         for (std::size_t index = 0u; index < manifest.blobs.size(); ++index)
         {
             const AssetBlobRecord& blob = manifest.blobs[index];
@@ -1321,7 +1324,7 @@ namespace experiment::cooked
             }
         }
 
-        std::map<AssetIdentity, std::size_t> entries;
+        ce::engine_ordered_map<AssetIdentity, std::size_t> entries;
         for (std::size_t index = 0u; index < manifest.entries.size(); ++index)
         {
             const AssetSetEntry& entry = manifest.entries[index];
@@ -1342,7 +1345,7 @@ namespace experiment::cooked
         }
         for (const AssetSetEntry& entry : manifest.entries)
         {
-            std::set<AssetIdentity> declared;
+            ce::engine_ordered_set<AssetIdentity> declared;
             for (const AssetDependency& edge : entry.dependencies)
             {
                 const std::string path = IdentityText(entry.asset.key) + " -> " + IdentityText(edge.target.key);
@@ -1375,7 +1378,7 @@ namespace experiment::cooked
                 }
             }
         }
-        std::set<AssetIdentity> roots;
+        ce::engine_ordered_set<AssetIdentity> roots;
         for (const TypedAssetReference& root : manifest.roots)
         {
             const auto target = entries.find(root.key);
@@ -1393,20 +1396,20 @@ namespace experiment::cooked
     }
 
     bool NormalizeAssetSetManifest(const AssetSetManifest& manifest,
-        AssetSetManifest& outManifest, std::vector<AssetManifestIssue>& outIssues)
+        AssetSetManifest& outManifest, ce::dynamic_array<AssetManifestIssue>& outIssues)
     {
         if (!ValidateAssetSetManifest(manifest, outIssues))
         {
             return false;
         }
         AssetSetManifest canonical = manifest;
-        std::vector<std::size_t> order(canonical.blobs.size());
+        ce::dynamic_array<std::size_t> order(canonical.blobs.size());
         std::iota(order.begin(), order.end(), 0u);
         std::ranges::sort(order, [&](std::size_t left, std::size_t right)
         {
             return manifest.blobs[left] < manifest.blobs[right];
         });
-        std::vector<std::uint32_t> remap(order.size());
+        ce::dynamic_array<std::uint32_t> remap(order.size());
         for (std::size_t index = 0u; index < order.size(); ++index)
         {
             canonical.blobs[index] = manifest.blobs[order[index]];
@@ -1517,7 +1520,7 @@ namespace experiment::cooked
     }
 
     bool ReadAssetSetManifest(std::span<const std::byte> bytes,
-        AssetSetManifest& outManifest, std::vector<AssetManifestIssue>& outIssues)
+        AssetSetManifest& outManifest, ce::dynamic_array<AssetManifestIssue>& outIssues)
     {
         if (bytes.size() < kSetHeaderBytes || bytes.size() > kAssetSetManifestMaxBytes)
         {
@@ -1587,7 +1590,7 @@ namespace experiment::cooked
         }
 
         parsed.entries.reserve(entryCount);
-        std::vector<std::uint32_t> dependencyCounts;
+        ce::dynamic_array<std::uint32_t> dependencyCounts;
         dependencyCounts.reserve(entryCount);
         std::uint32_t expectedDependency = 0u;
         for (std::uint32_t index = 0u; index < entryCount; ++index)

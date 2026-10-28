@@ -1,3 +1,6 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../../Engine/Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -90,7 +93,7 @@ namespace EditorObjectOperations
             void Redo() override { Apply(m_after, m_afterOverrides); }
 
         private:
-            void Apply(ce::layers::layer_id layer, const std::vector<PrefabOverride>& overrides)
+            void Apply(ce::layers::layer_id layer, const ce::dynamic_array<PrefabOverride>& overrides)
             {
                 if (auto* object = m_target.Resolve())
                 {
@@ -101,7 +104,7 @@ namespace EditorObjectOperations
             }
             Meta::EntityReference m_target;
             ce::layers::layer_id m_before, m_after;
-            std::vector<PrefabOverride> m_beforeOverrides, m_afterOverrides;
+            ce::dynamic_array<PrefabOverride> m_beforeOverrides, m_afterOverrides;
         };
 
         class RenameCommand final : public Meta::IUndoableCommand
@@ -156,7 +159,7 @@ namespace EditorObjectOperations
             std::string buffer = raw;
             for (char& c : buffer) if (c == ',') c = ' ';
             std::istringstream stream(buffer);
-            std::vector<double> numbers;
+            ce::dynamic_array<double> numbers;
             double number;
             while (stream >> number) { if (!std::isfinite(number)) return false; numbers.push_back(number); }
             if (!stream.eof() || numbers.empty()) return false;
@@ -559,7 +562,7 @@ namespace EditorObjectOperations
         auto desiredOrder = destination->GetChildrenIndices();
         if (anchor)
         {
-            std::erase(desiredOrder, target.index);
+            ce::erase(desiredOrder, target.index);
             auto position = std::ranges::find(desiredOrder, anchor->m_index);
             if (position == desiredOrder.end())
             {
@@ -578,7 +581,7 @@ namespace EditorObjectOperations
             Meta::EntityReference reference(object), before(object->GetScene()->TryGetEntity(oldParentIndex)), after(destination);
             const auto captureOrder = [](Entity* parentObject)
             {
-                std::vector<Meta::EntityReference> order;
+                ce::dynamic_array<Meta::EntityReference> order;
                 if (parentObject)
                 {
                     for (auto index : parentObject->GetChildrenIndices())
@@ -591,7 +594,7 @@ namespace EditorObjectOperations
                 }
                 return order;
             };
-            const auto restoreOrder = [](Meta::EntityReference parentReference, const std::vector<Meta::EntityReference>& order)
+            const auto restoreOrder = [](Meta::EntityReference parentReference, const ce::dynamic_array<Meta::EntityReference>& order)
             {
                 auto* parentObject = parentReference.Resolve();
                 if (!parentObject)
@@ -599,19 +602,19 @@ namespace EditorObjectOperations
                     return;
                 }
                 auto remaining = parentObject->GetChildrenIndices();
-                std::vector<Entity::Index> restored;
+                ce::dynamic_array<Entity::Index> restored;
                 for (const auto& reference : order)
                 {
                     if (auto* child = reference.Resolve())
                     {
-                        if (std::erase(remaining, child->m_index))
+                        if (ce::erase(remaining, child->m_index))
                         {
                             restored.push_back(child->m_index);
                         }
                     }
                 }
                 restored.insert(restored.end(), remaining.begin(), remaining.end());
-                std::vector<EntityHandle> handles;
+                ce::dynamic_array<EntityHandle> handles;
                 for (auto index : restored)
                 {
                     handles.push_back(parentObject->GetScene()->HandleOf(index));
@@ -624,8 +627,8 @@ namespace EditorObjectOperations
             };
             const auto oldOrder = captureOrder(before.Resolve());
             const auto destinationOrder = captureOrder(destination);
-            auto newOldOrder = std::make_shared<std::vector<Meta::EntityReference>>();
-            auto newDestinationOrder = std::make_shared<std::vector<Meta::EntityReference>>();
+            auto newOldOrder = std::make_shared<ce::dynamic_array<Meta::EntityReference>>();
+            auto newDestinationOrder = std::make_shared<ce::dynamic_array<Meta::EntityReference>>();
             auto orderCaptured = std::make_shared<bool>(false);
             auto beforeRect = std::make_shared<Authoring::WriteDocument>();
             auto afterRect = std::make_shared<Authoring::WriteDocument>();
@@ -675,7 +678,7 @@ namespace EditorObjectOperations
                     {
                         if (auto* destinationObject = after.Resolve())
                         {
-                            std::vector<EntityHandle> handles;
+                            ce::dynamic_array<EntityHandle> handles;
                             for (auto index : desiredOrder)
                             {
                                 handles.push_back(destinationObject->GetScene()->HandleOf(index));
@@ -745,7 +748,7 @@ namespace EditorObjectOperations
         if (IsEditLocked(object, true)) return PreconditionFailed("object.locked", "Unlock the entity or its hierarchy before editing");
         for (float value : {position.x, position.y, position.z, rotation.x, rotation.y, rotation.z, rotation.w, scale.x, scale.y, scale.z})
             if (!std::isfinite(value)) return InvalidArguments("Transform requires finite numbers");
-        std::vector<PropertyEdit> edits;
+        ce::dynamic_array<PropertyEdit> edits;
         edits.push_back(CapturePropertyEdit(object->Transform_(), {"position", "rotation", "scale"}));
         object->Transform_().SetPosition(position); object->Transform_().SetRotation(rotation); object->Transform_().SetScale(scale);
         const bool changed = CommitPropertyEdits(std::move(edits));
@@ -753,7 +756,7 @@ namespace EditorObjectOperations
         return Ok("object.transform", std::move(data));
     }
 
-    PropertyEdit CapturePropertyEdit(Component& component, std::vector<std::string> fields)
+    PropertyEdit CapturePropertyEdit(Component& component, ce::dynamic_array<std::string> fields)
     {
         const auto* type = Meta::Find(component.GetTypeID());
         auto* object = component.GetOwner();
@@ -761,10 +764,10 @@ namespace EditorObjectOperations
             std::move(fields), Meta::SerializeDocument(&component, *type)};
     }
 
-    bool CommitPropertyEdits(std::vector<PropertyEdit> edits)
+    bool CommitPropertyEdits(ce::dynamic_array<PropertyEdit> edits)
     {
-        struct Action { std::function<void()> undo, redo; };
-        std::vector<Action> actions;
+        struct Action { ce::owned_func<void()> undo, redo; };
+        ce::dynamic_array<Action> actions;
         for (auto& edit : edits)
         {
             auto* object = Resolve(edit.target);
@@ -775,7 +778,7 @@ namespace EditorObjectOperations
             auto before = std::make_shared<Authoring::WriteDocument>(std::move(edit.before));
             auto after = std::make_shared<Authoring::WriteDocument>(Meta::SerializeDocument(component, *type));
             auto fields = std::move(edit.fields);
-            std::erase_if(fields, [&](const std::string& field) {
+            ce::erase_if(fields, [&](const std::string& field) {
                 return Authoring::NodesEqual(before->Root().Read()[field.c_str()], after->Root().Read()[field.c_str()]);
             });
             if (fields.empty()) continue;
@@ -815,7 +818,7 @@ namespace EditorObjectOperations
     bool CommitProperty(Component& component, const std::string& field, Authoring::WriteDocument before)
     {
         auto* object = component.GetOwner();
-        std::vector<PropertyEdit> edits;
+        ce::dynamic_array<PropertyEdit> edits;
         edits.push_back({object->GetScene()->HandleOf(object->m_index), "#" + std::to_string(component.GetInstanceID()), {field}, std::move(before)});
         return CommitPropertyEdits(std::move(edits));
     }
@@ -909,7 +912,7 @@ namespace EditorObjectOperations
         class PhysicsShapesCommand final : public Meta::IUndoableCommand
         {
           public:
-            PhysicsShapesCommand(Entity* owner, PhysicsBodyComponent& body, std::vector<PhysicsShapeDefinition> after)
+            PhysicsShapesCommand(Entity* owner, PhysicsBodyComponent& body, ce::dynamic_array<PhysicsShapeDefinition> after)
                 : m_owner(owner), m_component("#" + std::to_string(body.GetInstanceID())),
                   m_project(SceneManagers->ProjectLayers()), m_before(body.Shapes().begin(), body.Shapes().end()),
                   m_after(std::move(after)), m_beforeDocument(ShapeDocument(m_before)), m_afterDocument(ShapeDocument(m_after)),
@@ -940,7 +943,7 @@ namespace EditorObjectOperations
             {
                 return item.m_componentType == m_type && item.m_componentSlot == m_slot && item.m_propertyName == "m_shapes";
             }
-            void Apply(const std::vector<PhysicsShapeDefinition>& shapes, const Authoring::WriteDocument& expected,
+            void Apply(const ce::dynamic_array<PhysicsShapeDefinition>& shapes, const Authoring::WriteDocument& expected,
                        const std::optional<PrefabOverride>& override, Meta::PropertyChangeSource source)
             {
                 auto* owner = m_owner.Resolve();
@@ -955,7 +958,7 @@ namespace EditorObjectOperations
                 ce::profile_scope scope{ce::marker<"Physics.ShapeAuthoringPublish">()};
                 auto preparedShapes = shapes;
                 auto preparedOverrides = owner->m_prefabOverrides;
-                std::erase_if(preparedOverrides, [&](const auto& item) { return Matches(item); });
+                ce::erase_if(preparedOverrides, [&](const auto& item) { return Matches(item); });
                 if (override) preparedOverrides.push_back(*override);
                 Meta::ScopedPropertyChangeSource origin(source);
                 if (auto changed = body->SetShapes(std::move(preparedShapes)); !changed)
@@ -966,7 +969,7 @@ namespace EditorObjectOperations
             Meta::EntityReference m_owner;
             std::string m_component;
             own::weak_owner<ProjectLayerSettings> m_project;
-            std::vector<PhysicsShapeDefinition> m_before, m_after;
+            ce::dynamic_array<PhysicsShapeDefinition> m_before, m_after;
             Authoring::WriteDocument m_beforeDocument, m_afterDocument;
             int m_slot;
             std::string m_type;
@@ -1024,7 +1027,7 @@ namespace EditorObjectOperations
         return Describe(handle);
     }
 
-    CommandCore::CommandResult Select(Scene* scene, const std::vector<EntityHandle>& targets)
+    CommandCore::CommandResult Select(Scene* scene, const ce::dynamic_array<EntityHandle>& targets)
     {
         using namespace CommandCore;
         if (!scene) return PreconditionFailed("scene.none", "No active scene");
@@ -1247,13 +1250,13 @@ namespace EditorObjectOperations
         return object ? Describe(object->GetScene()->HandleOf(object->m_index)) : Fail("prefab.instantiate_failed", "Cannot instantiate prefab");
     }
 
-    CommandCore::CommandResult MaterialMode(const std::vector<own::shared_owner<Material>>& materials, MaterialRenderingMode mode)
+    CommandCore::CommandResult MaterialMode(const ce::dynamic_array<own::shared_owner<Material>>& materials, MaterialRenderingMode mode)
     {
         using namespace CommandCore;
         if (mode != MaterialRenderingMode::Opaque && mode != MaterialRenderingMode::Transparent)
             return InvalidArguments("Material mode must be opaque or transparent");
-        std::vector<std::pair<own::shared_owner<Material>, MaterialRenderingMode>> changes;
-        std::unordered_set<std::size_t> seen;
+        ce::dynamic_array<ce::pair<own::shared_owner<Material>, MaterialRenderingMode>> changes;
+        ce::engine_node_set<std::size_t> seen;
         for (const auto& material : materials)
         {
             if (material && seen.insert(material->m_materialGuid.m_ID_Data).second && material->m_renderingMode != mode)
@@ -1293,8 +1296,8 @@ namespace EditorObjectOperations
         auto* object = Resolve(target);
         if (!object) return CommandCore::PreconditionFailed("object.stale", "Object no longer exists");
         if (IsEditLocked(object, true)) return CommandCore::PreconditionFailed("object.locked", "Unlock the entity hierarchy before editing");
-        std::vector<own::shared_owner<Material>> materials;
-        std::function<void(Entity*)> collect = [&](Entity* node) {
+        ce::dynamic_array<own::shared_owner<Material>> materials;
+        ce::owned_func<void(Entity*)> collect = [&](Entity* node) {
             if (!node || node->IsDestroyMark()) return;
             for (const auto& component : node->m_components)
                 if (auto* renderer = dynamic_cast<MeshRenderer*>(component.get()); renderer && !renderer->IsDestroyMark())
@@ -1316,7 +1319,7 @@ namespace EditorObjectOperations
     //   fixture 가 저장소에 없었다. 그 구멍을 메우는 자리다.
     CommandCore::CommandResult MaterialOverride(EntityHandle target,
         int rendererIndex, const std::string& property,
-        const std::vector<float>& values)
+        const ce::dynamic_array<float>& values)
     {
         using namespace CommandCore;
         auto* object = Resolve(target);
@@ -1329,8 +1332,8 @@ namespace EditorObjectOperations
 
         // MaterialMode(EntityHandle) 와 **같은** 깊이 우선 순회다. 색인 규약이 두
         // 곳에서 따로 정해지면 같은 인자가 다른 렌더러를 가리키게 된다.
-        std::vector<MeshRenderer*> renderers;
-        std::function<void(Entity*)> collect = [&](Entity* node) {
+        ce::dynamic_array<MeshRenderer*> renderers;
+        ce::owned_func<void(Entity*)> collect = [&](Entity* node) {
             if (!node || node->IsDestroyMark()) return;
             for (const auto& component : node->m_components)
                 if (auto* renderer = dynamic_cast<MeshRenderer*>(component.get());

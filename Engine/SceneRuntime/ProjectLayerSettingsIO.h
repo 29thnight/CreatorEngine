@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
@@ -25,7 +26,7 @@ class ProjectLayerSettingsIO final
             if (size <= 0 || size > static_cast<std::streamoff>(ce::layers::ProjectLayerSettingsCodec::max_bytes))
                 return std::unexpected(ce::layers::error::corrupt_data);
 
-            std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+            ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(size));
             input.seekg(0);
             if (!input.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size())))
                 return std::unexpected(ce::layers::error::io_failure);

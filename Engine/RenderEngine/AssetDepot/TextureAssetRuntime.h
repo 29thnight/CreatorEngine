@@ -1,4 +1,6 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -96,8 +98,8 @@ namespace AssetDepot
         TextureAssetVariant variant{};
         TextureImageKey imageKey{};
         own::shared_owner<const TextureImageSource> imageSource{};
-        std::vector<own::shared_owner<const Texture>> hardDependencies{};
-        std::vector<experiment::cooked::TypedAssetReference> loadableDependencies{};
+        ce::dynamic_array<own::shared_owner<const Texture>> hardDependencies{};
+        ce::dynamic_array<experiment::cooked::TypedAssetReference> loadableDependencies{};
         // Conservative child-closure descriptor charge; decoded image bytes have
         // their independent budget. Shared metadata may be counted twice.
         std::size_t hardDependencyChargeBytes{};
@@ -108,7 +110,7 @@ namespace AssetDepot
         TextureImageKey key{};
         experiment::cooked::ResolvedAssetEntry resolved{};
         own::shared_owner<const TextureImageSource> source{};
-        std::vector<own::weak_owner<AssetRequestState<Texture::CodecImage>>> consumers{};
+        ce::dynamic_array<own::weak_owner<AssetRequestState<Texture::CodecImage>>> consumers{};
         std::uint64_t requestId{};
         job_handle completion{};
         AssetRequestStatus status{ AssetRequestStatus::Pending };
@@ -126,7 +128,7 @@ namespace AssetDepot
         std::size_t retainedCharge{};
         std::uint64_t lastUse{};
     };
-    using TextureImageEntries = std::map<TextureImageKey, TextureImageCacheEntry>;
+    using TextureImageEntries = ce::engine_ordered_map<TextureImageKey, TextureImageCacheEntry>;
 
     struct TextureAssetWork final
     {
@@ -134,8 +136,8 @@ namespace AssetDepot
         own::shared_owner<TextureImageWork> imageWork{};
         experiment::cooked::ResolvedAssetEntry resolved{};
         own::shared_owner<const experiment::cooked::CookedAssetCatalog> catalog{};
-        std::vector<own::shared_owner<TextureAssetWork>> dependencies{};
-        std::vector<own::weak_owner<AssetRequestState<Texture>>> consumers{};
+        ce::dynamic_array<own::shared_owner<TextureAssetWork>> dependencies{};
+        ce::dynamic_array<own::weak_owner<AssetRequestState<Texture>>> consumers{};
         std::uint64_t epoch{};
         std::uint64_t requestId{};
         job_handle completion{};
@@ -154,7 +156,7 @@ namespace AssetDepot
         std::uint64_t lastUse{};
     };
 
-    using TextureAssetEntries = std::map<TextureAssetKey, TextureAssetCacheEntry>;
+    using TextureAssetEntries = ce::engine_ordered_map<TextureAssetKey, TextureAssetCacheEntry>;
 
     // Caller constructs this before a root transaction. Stage fills consumerPins
     // before mutation; detached nodes and cancellation pins die after outer unlock.
@@ -162,10 +164,10 @@ namespace AssetDepot
     {
         TextureAssetEntries entries;
         TextureImageEntries images;
-        std::vector<own::shared_owner<const Texture>> descriptorPins;
-        std::vector<own::shared_owner<const Texture::CodecImage>> imagePins;
-        std::vector<own::shared_owner<AssetRequestState<Texture::CodecImage>>> imageConsumers;
-        std::vector<own::shared_owner<AssetRequestState<Texture>>> consumerPins;
+        ce::dynamic_array<own::shared_owner<const Texture>> descriptorPins;
+        ce::dynamic_array<own::shared_owner<const Texture::CodecImage>> imagePins;
+        ce::dynamic_array<own::shared_owner<AssetRequestState<Texture::CodecImage>>> imageConsumers;
+        ce::dynamic_array<own::shared_owner<AssetRequestState<Texture>>> consumerPins;
     };
 
     struct TextureAssetCacheSnapshot final
@@ -215,7 +217,7 @@ namespace AssetDepot
         TextureAssetEntries entries{};
         std::size_t budgetBytes{ 4u * 1024u * 1024u };
         TextureImageEntries images{};
-        std::vector<own::weak_owner<AssetRequestState<Texture::CodecImage>>> imageRequests{};
+        ce::dynamic_array<own::weak_owner<AssetRequestState<Texture::CodecImage>>> imageRequests{};
         std::size_t imageBudgetBytes{ 64u * 1024u * 1024u };
         std::size_t retainedImageBytes{};
         std::atomic<std::size_t> imageInputStagingBytes{};

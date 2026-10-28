@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -63,7 +64,7 @@ bool Material::ReloadCodeShader(own::shared_owner<const LX::Runtime::ShaderGener
 bool Material::ReplaceTextureOwner(const Texture* previous,
     const own::shared_owner<const Texture>& replacement, std::string& error)
 {
-    std::vector<std::string> properties;
+    ce::dynamic_array<std::string> properties;
     for (const auto& owner : GetTextureOwners())
     {
         if (owner.textureOwner && &*owner.textureOwner == previous)
@@ -440,7 +441,7 @@ bool Material::ConfigureShaderProperties(const ShaderMeta& meta,
         return false;
     }
 
-    std::vector<MaterialPropertyValue> values;
+    ce::dynamic_array<MaterialPropertyValue> values;
     values.reserve(meta.properties.size());
     for (const ShaderPropertyDesc& desc : meta.properties)
     {
@@ -464,7 +465,7 @@ bool Material::ConfigureShaderProperties(const ShaderMeta& meta,
         values.push_back(std::move(value));
     }
 
-    std::vector<std::uint16_t> selections(meta.keywords.size(), 0);
+    ce::dynamic_array<std::uint16_t> selections(meta.keywords.size(), 0);
     for (std::size_t index = 0;
         index < selections.size() && index < m_keywordSelections.size(); ++index)
     {
@@ -474,7 +475,7 @@ bool Material::ConfigureShaderProperties(const ShaderMeta& meta,
 
     own::shared_owner<const LX::Runtime::ShaderGeneration> shader;
     own::shared_owner<const LX::Runtime::Instance> instance;
-    std::vector<MaterialTextureOwner> owners;
+    ce::dynamic_array<MaterialTextureOwner> owners;
     for (const auto& owner : m_textureOwners)
     {
         const auto* binding = FindBinding(layout, owner.propertyName);
@@ -533,7 +534,7 @@ void Material::SynchronizeCodeRuntime()
 
 bool Material::BuildShaderPropertyBlock(const ShaderMeta& meta,
     const ShaderMetaBindingLayout& layout,
-    std::vector<std::uint8_t>& outBytes, std::string& outError) const
+    ce::dynamic_array<std::uint8_t>& outBytes, std::string& outError) const
 {
     if (m_materialGraphInstance)
     {
@@ -557,7 +558,7 @@ bool Material::BuildShaderPropertyBlock(const ShaderMeta& meta,
         return false;
     }
 
-    std::vector<std::uint8_t> bytes(layout.constantBufferByteSize, 0);
+    ce::dynamic_array<std::uint8_t> bytes(layout.constantBufferByteSize, 0);
     for (const ShaderPropertyDesc& desc : meta.properties)
     {
         const ShaderMetaPropertyBinding* binding = FindBinding(layout, desc.name);
@@ -713,11 +714,11 @@ bool Material::WriteBytes(const VarView& v, const void* src, size_t size)
         case ShaderPropertyType::Float: { float input; std::memcpy(&input, src, 4); value = double(input); break; }
           case ShaderPropertyType::Float3: case ShaderPropertyType::Float4:
           {
-              std::array<float, 4> input{};
+              ce::fixed_array<float, 4> input{};
               if (size > sizeof(input)) return false;
               std::memcpy(input.data(), src, size);
-            if (desc.type == ShaderPropertyType::Float3) value = std::array<double, 3>{input[0], input[1], input[2]};
-            else value = std::array<double, 4>{input[0], input[1], input[2], input[3]};
+            if (desc.type == ShaderPropertyType::Float3) value = ce::fixed_array<double, 3>{input[0], input[1], input[2]};
+            else value = ce::fixed_array<double, 4>{input[0], input[1], input[2], input[3]};
             break;
         }
         default: return false;

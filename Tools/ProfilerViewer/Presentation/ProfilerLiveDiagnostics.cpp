@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "ProfilerLiveDiagnostics.h"
 #include "ProfilerView.h"
 #include "ImGui.h"
@@ -13,7 +14,7 @@ namespace editor::profiler_view
 
         struct decode_operation
         {
-            std::shared_ptr<const std::vector<std::byte>> raw;
+            std::shared_ptr<const ce::dynamic_array<std::byte>> raw;
             std::shared_ptr<const dto::snapshot> decoded;
             std::uint64_t target_revision{};
             clock::time_point received_at{};
@@ -42,8 +43,8 @@ namespace editor::profiler_view
             std::uint64_t target_revision{};
             std::uint64_t next_command_id{};
             std::uint64_t pending_command_id{};
-            std::shared_ptr<const std::vector<std::byte>> raw;
-            std::shared_ptr<const std::vector<std::byte>> processed;
+            std::shared_ptr<const ce::dynamic_array<std::byte>> raw;
+            std::shared_ptr<const ce::dynamic_array<std::byte>> processed;
             std::shared_ptr<const dto::snapshot> decoded;
             std::shared_ptr<decode_operation> operation;
             clock::time_point received_at{};
@@ -185,7 +186,7 @@ namespace editor::profiler_view
             command.scene_id = value.decoded->scene_id;
             command.value = payload;
             command.acknowledge = show_status;
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
             if (!dto::encode_request(command, bytes) || !source().request_diagnostic(bytes, value.target))
             {
                 if (show_status)

@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
 #else
@@ -40,7 +41,7 @@ namespace editor::components
     inline std::string Category(std::string_view type)
     {
         struct Group { std::string_view category, types; };
-        constexpr std::array groups{
+        constexpr ce::fixed_array groups{
             Group{"Rendering", "|CameraComponent|LightComponent|MeshRenderer|SpriteRenderer|DecalComponent|SceneRenderProfileComponent|TerrainComponent|FoliageComponent|"},
             Group{"Animation", "|Animator|SpriteSheetComponent|"},
             Group{"Physics", "|PhysicsBodyComponent|CharacterMovementComponent|"},
@@ -76,7 +77,7 @@ namespace editor::components
         return true;
     }
 
-    inline void Sort(std::vector<Entry>& entries)
+    inline void Sort(ce::dynamic_array<Entry>& entries)
     {
         std::ranges::sort(entries, [](const Entry& a, const Entry& b) {
             if (a.label != b.label) return a.label < b.label;

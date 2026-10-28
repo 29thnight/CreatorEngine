@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "IRHICommandTranslator.h"
 #include "IRenderDeviceServices.h"
 #include "RHIParallelCommandPool.h"
@@ -60,7 +61,7 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
     };
     // Retain diagnostic strings on the coordinating thread. Jobs borrow
     // disjoint slots only until RunParallel joins, including on failure.
-    static thread_local std::array<TargetResult, IRHIParallelCommandPool::kMaxWorkers> resultStorage;
+    static thread_local ce::fixed_array<TargetResult, IRHIParallelCommandPool::kMaxWorkers> resultStorage;
     auto* const results = resultStorage.data();
     static thread_local bool resultsInUse{};
     if (resultsInUse)
@@ -88,7 +89,7 @@ bool RHICommandTranslator::Translate(RHISoftwareBatch&& softwareBatch, const RHI
         jobs = static_cast<uint32_t>((std::max)(
             uint64_t{1}, (std::min)({uint64_t(options.maxTranslationJobs), uint64_t(order.size()), budget})));
     }
-    std::array<uint64_t, IRHIParallelCommandPool::kMaxWorkers> targetCosts{};
+    ce::fixed_array<uint64_t, IRHIParallelCommandPool::kMaxWorkers> targetCosts{};
     if (jobs > 1)
     {
         for (size_t index = 0; index < order.size(); ++index)

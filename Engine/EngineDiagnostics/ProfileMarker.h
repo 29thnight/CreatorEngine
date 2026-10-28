@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 // PHASE 14 P1 — 컴파일 타임 마커.
 //
@@ -123,5 +124,5 @@ namespace ce
 	// ★ `registered_markers()` 와 달리 잠금 밖으로 포인터를 내보내지 않는다.
 	//   그쪽은 등록이 겹치면 재할당된 옛 저장소를 볼 수 있어 "등록이 멈춘
 	//   뒤에만 쓴다" 는 약속에 기대고 있었다. 복사는 그 약속이 필요 없다.
-	std::vector<capture_marker> snapshot_markers();
+	ce::dynamic_array<capture_marker> snapshot_markers();
 }

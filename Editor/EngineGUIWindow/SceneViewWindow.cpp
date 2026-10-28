@@ -1,3 +1,5 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "../EngineEntry/Assets/Models/EditorModelPlacement.h"
 #include "EditorTheme.h"
 #include "../EngineEntry/Scene/EditorObjectOperations.h"
@@ -265,8 +267,8 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 
 		if (auto* rect = obj->GetComponent<RectTransformComponent>())
 		{
-			static std::unordered_map<std::string, math::vector2> startWorldPivots;
-            static std::vector<EditorObjectOperations::PropertyEdit> edits;
+			static ce::engine_node_map<std::string, math::vector2> startWorldPivots;
+            static ce::dynamic_array<EditorObjectOperations::PropertyEdit> edits;
 			static math::vector2 startWorldPos{};
 
 			bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
@@ -330,8 +332,8 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 		}
 		else
 		{
-			static std::unordered_map<std::string, math::matrix4x4> startWorldMatrices;
-            static std::vector<EditorObjectOperations::PropertyEdit> edits;
+			static ce::engine_node_map<std::string, math::matrix4x4> startWorldMatrices;
+            static ce::dynamic_array<EditorObjectOperations::PropertyEdit> edits;
 
 			bool isDragging = ImGui::IsMouseDragging(ImGuiMouseButton_Left);
 			bool mouseReleased = ImGui::IsMouseReleased(ImGuiMouseButton_Left);
@@ -400,7 +402,7 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 	if (selectionEditable && ImGui::IsWindowFocused() && !m_overlay.blocksShortcuts && ImGui::IsKeyPressed(ImGuiKey_G, false)) {
 		auto scene = SceneManagers->GetActiveScene();
 		auto selectedObjects = scene->m_selectedEntities;
-        std::vector<EditorObjectOperations::PropertyEdit> edits;
+        ce::dynamic_array<EditorObjectOperations::PropertyEdit> edits;
         for (auto* target : selectedObjects)
         {
             edits.push_back(EditorObjectOperations::CapturePropertyEdit(target->Transform_(), {"position", "rotation"}));
@@ -471,7 +473,7 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
 			{
 				// 이번 클릭이 맞힌 더미의 신원. 순환을 이것으로 가르는 이유와
 				// 포인터가 아니라 핸들인 이유는 AdvanceCycleIndex 주석 참고.
-				std::vector<EntityHandle> cycleIdentity;
+				ce::dynamic_array<EntityHandle> cycleIdentity;
 				cycleIdentity.reserve(hits.size());
 				for (const RayHitResult& hit : hits)
 					cycleIdentity.push_back(scene->HandleOf(hit.object->m_index));
@@ -489,7 +491,7 @@ void SceneViewWindow::RenderSceneView(float* matrix, Entity* obj, Camera* cam)
                     if (it != desired.end()) desired.erase(it); else desired.push_back(selected);
                 }
                 else desired = {selected};
-                std::vector<EntityHandle> handles;
+                ce::dynamic_array<EntityHandle> handles;
                 for (auto* target : desired) handles.push_back(scene->HandleOf(target->m_index));
                 EditorObjectOperations::Select(scene, handles);
 			}
@@ -702,10 +704,10 @@ Ray SceneViewWindow::CreateRayFromCamera(const FrameCameraSnapshot& camera, cons
 namespace editor::picking
 {
 
-std::vector<Entity*> CollectOccupants(
-	const std::vector<gc::trace_ref<Entity>>& slots)
+ce::dynamic_array<Entity*> CollectOccupants(
+	const ce::dynamic_array<gc::trace_ref<Entity>>& slots)
 {
-	std::vector<Entity*> occupants;
+	ce::dynamic_array<Entity*> occupants;
 	occupants.reserve(slots.size());
 	for (const gc::trace_ref<Entity>& slot : slots)
 	{
@@ -719,10 +721,10 @@ std::vector<Entity*> CollectOccupants(
 	return occupants;
 }
 
-std::vector<RayHitResult> GatherRayHits(
-	const Ray& ray, const std::vector<gc::trace_ref<Entity>>& slots)
+ce::dynamic_array<RayHitResult> GatherRayHits(
+	const Ray& ray, const ce::dynamic_array<gc::trace_ref<Entity>>& slots)
 {
-	std::vector<RayHitResult> hits;
+	ce::dynamic_array<RayHitResult> hits;
 	const math::ray pickRay{ ray.origin, ray.direction };
 
 	for (Entity* obj : CollectOccupants(slots))
@@ -776,8 +778,8 @@ std::vector<RayHitResult> GatherRayHits(
 }
 
 std::size_t AdvanceCycleIndex(
-	const std::vector<EntityHandle>& identity,
-	std::vector<EntityHandle>& lastIdentity,
+	const ce::dynamic_array<EntityHandle>& identity,
+	ce::dynamic_array<EntityHandle>& lastIdentity,
 	std::size_t& cursor)
 {
 	if (identity.empty())

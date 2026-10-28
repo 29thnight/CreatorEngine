@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -99,7 +100,7 @@ namespace experiment
 
     bool BuildMaterialPropertyBlock(const Material& material,
         const ShaderMeta& meta, const ShaderMetaBindingLayout& layout,
-        std::vector<std::uint8_t>& outBytes, std::string& outError)
+        ce::dynamic_array<std::uint8_t>& outBytes, std::string& outError)
     {
         if (layout.properties.size() != meta.properties.size()
             || layout.constantBufferName.empty()
@@ -142,7 +143,7 @@ namespace experiment
         {
             return false;
         }
-        std::vector<::MaterialPropertyValue> values;
+        ce::dynamic_array<::MaterialPropertyValue> values;
         for (const ShaderPropertyDesc& desc : meta.properties)
         {
             const ShaderMetaPropertyBinding* binding =
@@ -173,7 +174,7 @@ namespace experiment
             values.push_back(std::move(value));
         }
 
-        std::vector<std::uint16_t> keywords;
+        ce::dynamic_array<std::uint16_t> keywords;
         if (!NormalizeMaterialKeywordSelections(material, meta.keywords, keywords, outError)) return false;
         return LX::Runtime::BuildInstance(std::move(shader), values, keywords, textures, outInstance, outError);
     }

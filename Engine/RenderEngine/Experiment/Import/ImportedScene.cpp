@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "ImportedScene.h"
 
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -21,7 +22,7 @@ namespace experiment::importer
             severity, code, std::move(context), std::move(message), 1 });
     }
 
-    void ImportNoteSink::Absorb(std::vector<ImportNote> other)
+    void ImportNoteSink::Absorb(ce::dynamic_array<ImportNote> other)
     {
         for (ImportNote& incoming : other)
         {
@@ -113,7 +114,7 @@ namespace experiment::importer
         // 스트림 하나를 검사한다. 비어 있으면 "그 속성 없음"이라 합법이고,
         // 비어 있지 않으면 정점 수와 길이가 같아야 한다.
         template <typename T>
-        void CheckStream(const std::vector<T>& stream, std::size_t vertexCount,
+        void CheckStream(const ce::dynamic_array<T>& stream, std::size_t vertexCount,
             const std::string& context, std::string_view label,
             NoteAccumulator& notes)
         {
@@ -124,7 +125,7 @@ namespace experiment::importer
 
         template <typename Key>
         [[nodiscard]] bool HasSortedFiniteTimes(
-            const std::vector<Key>& keys, double duration) noexcept
+            const ce::dynamic_array<Key>& keys, double duration) noexcept
         {
             double previous = 0.0;
             bool first = true;
@@ -149,10 +150,10 @@ namespace experiment::importer
             bool ambiguous{};
         };
 
-        [[nodiscard]] std::vector<MeshSkinBinding> ResolveMeshSkins(
+        [[nodiscard]] ce::dynamic_array<MeshSkinBinding> ResolveMeshSkins(
             const ImportedScene& scene)
         {
-            std::vector<MeshSkinBinding> bindings(scene.meshes.size());
+            ce::dynamic_array<MeshSkinBinding> bindings(scene.meshes.size());
             for (const SceneNode& node : scene.nodes)
             {
                 // 범위 밖 skin 은 ValidateNodes 가 따로 보고한다. 여기서 걸러야
@@ -237,7 +238,7 @@ namespace experiment::importer
         }
 
         void ValidateMeshes(const ImportedScene& scene,
-            const std::vector<MeshSkinBinding>& meshSkins, NoteAccumulator& notes)
+            const ce::dynamic_array<MeshSkinBinding>& meshSkins, NoteAccumulator& notes)
         {
             for (std::size_t meshIndex = 0; meshIndex < scene.meshes.size(); ++meshIndex)
             {
@@ -506,7 +507,7 @@ namespace experiment::importer
             //   유도하므로 전 채널이 제자리를 찾는다 — 경고를 내면 전부 거짓이
             //   된다(실측: 애니메이션 전용 FBX 에서 84채널 전부 오경보).
             const bool hasJoints = !scene.skins.empty();
-            std::vector<std::uint8_t> isJoint(scene.nodes.size(), 0);
+            ce::dynamic_array<std::uint8_t> isJoint(scene.nodes.size(), 0);
             for (const ImportedSkin& skin : scene.skins)
             {
                 for (SceneNodeIndex joint : skin.joints)
@@ -529,7 +530,7 @@ namespace experiment::importer
                         "clip 이름 또는 durationSeconds 가 유효하지 않다.");
                 }
 
-                std::vector<std::uint8_t> targeted(scene.nodes.size(), 0);
+                ce::dynamic_array<std::uint8_t> targeted(scene.nodes.size(), 0);
                 for (const ImportedChannel& channel : clip.channels)
                 {
                     if (!IsInRange(channel.target, scene.nodes.size()))
@@ -639,7 +640,7 @@ namespace experiment::importer
         return total;
     }
 
-    std::vector<ImportNote> ValidateImportedScene(const ImportedScene& scene)
+    ce::dynamic_array<ImportNote> ValidateImportedScene(const ImportedScene& scene)
     {
         NoteAccumulator notes;
 
@@ -656,7 +657,7 @@ namespace experiment::importer
         }
 
         ValidateNodes(scene, notes);
-        const std::vector<MeshSkinBinding> meshSkins = ResolveMeshSkins(scene);
+        const ce::dynamic_array<MeshSkinBinding> meshSkins = ResolveMeshSkins(scene);
         ValidateMeshes(scene, meshSkins, notes);
         ValidateMaterials(scene, notes);
         ValidateSkins(scene, notes);

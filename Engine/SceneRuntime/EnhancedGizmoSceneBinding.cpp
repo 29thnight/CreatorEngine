@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -192,7 +193,7 @@ bool BuildEnhancedGizmoSceneData(const FrameCameraSnapshot& snapshot,
     if (collectColliders)
     {
         ce::profile_scope scope{ce::marker<"Physics.GizmoCollect">()};
-        std::vector<PhysicsBodyComponent*> bodies;
+        ce::dynamic_array<PhysicsBodyComponent*> bodies;
 
         for (const auto& object : activeScene->m_Entities)
         {

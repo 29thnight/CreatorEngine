@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -43,7 +44,7 @@ import Creator.Core.Ownership;
 // 맵은 거부한다 — 시퀀스의 포인터 원소는 SceneManager 가 복원하지만 맵에는 그
 // 복원자가 없어 "적기만 하고 못 읽는" 한쪽 방향이 된다.
 #include "ReflectionYml.h"
-#include "../../SceneRuntime/SceneGC.h"
+#include "../Foundation/ManagedObjectContract.h"
 #include "../Authoring/AuthoringNodeViewAccess.h" // D3-a-4
 #include "../Authoring/AuthoringScalarConvert.h" // D3-b-2b-1a
 #include "../Authoring/AuthoringReadNode.h" // D3-b-2b-1b
@@ -245,9 +246,9 @@ namespace Meta::Typed
         static_assert(!SerializedAsSequence<float> && !SerializedAsSequence<int>);
 
         // 시퀀스와 맵은 서로 배타다 — 한 타입이 둘 다면 분기 순서가 결과를 정한다.
-        static_assert(!(SerializedAsSequence<std::vector<int>>
-            && SerializedAsKeyedRange<std::vector<int>>));
-        static_assert(SerializedAsSequence<std::vector<int>>);
+        static_assert(!(SerializedAsSequence<ce::dynamic_array<int>>
+            && SerializedAsKeyedRange<ce::dynamic_array<int>>));
+        static_assert(SerializedAsSequence<ce::dynamic_array<int>>);
 
         // 부동소수 키 금지가 실제로 서 있는가. 값으로는 실리는 타입이라
         // "스칼라면 키도 된다"로 새기 쉬운 자리다.
@@ -260,9 +261,9 @@ namespace Meta::Typed
         // 인스턴스화에서 깨진다 — K2 스테이지 A 에서 실제로 밟은 함정이다.
         // 맵·집합·고정 배열까지 포함한 전수 대조는 reflect.container.roundtrip
         // 프로브가 든다(그쪽 TU 가 <map>/<set>/<array> 를 이미 물고 있다).
-        static_assert(!IsCopyableForProperty<std::vector<std::unique_ptr<int>>>(),
+        static_assert(!IsCopyableForProperty<ce::dynamic_array<std::unique_ptr<int>>>(),
             "vector<unique_ptr<T>> 가 복사 가능으로 판정됐다");
-        static_assert(IsCopyableForProperty<std::vector<int>>());
+        static_assert(IsCopyableForProperty<ce::dynamic_array<int>>());
         static_assert(IsCopyableForProperty<std::string>());
     }
 

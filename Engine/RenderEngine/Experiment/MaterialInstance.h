@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -89,9 +90,9 @@ namespace experiment
 
     private:
         own::shared_owner<const Material> base_{};
-        std::vector<MaterialProperty> propertyOverrides_{};
-        std::vector<std::string> keywordOverrides_{};
-        std::optional<std::vector<std::uint16_t>> keywordSelectionOverrides_{};
+        ce::dynamic_array<MaterialProperty> propertyOverrides_{};
+        ce::dynamic_array<std::string> keywordOverrides_{};
+        std::optional<ce::dynamic_array<std::uint16_t>> keywordSelectionOverrides_{};
         std::uint64_t revision_{};
     };
 }

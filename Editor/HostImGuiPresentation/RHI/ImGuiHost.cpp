@@ -1,3 +1,4 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -185,7 +186,7 @@ namespace
             ImGui::NewFrame();
         }
 
-        void EndFrame(std::function<void()> onRecorded) override
+        void EndFrame(ce::owned_func<void()> onRecorded) override
         {
             if (!m_renderer) return;
             {
@@ -202,8 +203,8 @@ namespace
             ImGuiIO& io = ImGui::GetIO();
             const bool hasPlatformWindows =
                 0 != (io.ConfigFlags & ImGuiConfigFlags_ViewportsEnable);
-            const std::function<void()> recordCallback =
-                hasPlatformWindows ? std::function<void()>{} : onRecorded;
+            const ce::owned_func<void()> recordCallback =
+                hasPlatformWindows ? ce::owned_func<void()>{} : onRecorded;
             std::string presentError;
             // 장치 제거는 셸이 한 번만 알린다. 이후 매 프레임 같은 실패를 다시 찍지 않는다.
             if (!m_renderer->RenderAndPresent(presentError, recordCallback) &&

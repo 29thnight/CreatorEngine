@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "CookedAssetManifest.h"
@@ -10,7 +11,7 @@ class ArtifactByteSource;
 struct MaterialProgramCookProduct
 {
     CookedAssetManifestEntry manifestEntry;
-    std::vector<std::byte> artifactBytes;
+    ce::dynamic_array<std::byte> artifactBytes;
 };
 
 // The source graph is regenerated with the canonical compiler before cook.

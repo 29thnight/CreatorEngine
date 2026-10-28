@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include <stddef.h>
@@ -17,7 +18,7 @@ namespace ce::dx_capture
     inline constexpr std::uint32_t shutdown_timeout_ms = 1500;
     inline constexpr std::uint32_t permission_denied_exit_code = 5;
 
-    using session_nonce = std::array<std::uint8_t, 16>;
+    using session_nonce = ce::fixed_array<std::uint8_t, 16>;
 
     enum class record_kind : std::uint32_t
     {

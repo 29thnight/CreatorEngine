@@ -1,4 +1,6 @@
+#include "../../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -98,7 +100,7 @@ private:
     static FfxErrorCode CreateContext(FfxInterface*, FfxEffect, FfxEffectBindlessConfig*, FfxUInt32*);
     static FfxErrorCode DestroyContext(FfxInterface*, FfxUInt32);
     static FsrBackendStorage* GetOwner(FfxInterface*);
-    std::vector<std::max_align_t> m_scratch;
+    ce::dynamic_array<std::max_align_t> m_scratch;
     FfxInterface m_interface{};
     FfxCreateBackendContextFunc m_createContext{ nullptr };
     FfxDestroyBackendContextFunc m_destroyContext{ nullptr };
@@ -167,7 +169,7 @@ public:
     uint32_t GetCompletedGeneratedFrameCount() const { return m_completedGeneratedFrameCount; }
 #if CE_DEVELOPMENT && !CE_SHIPPING
     // Set only between drained frames. No callback/global lookup in normal use.
-    void SetDevelopmentEvaluationFailure(std::function<bool()> reject) { m_developmentEvaluationFailure = std::move(reject); }
+    void SetDevelopmentEvaluationFailure(ce::owned_func<bool()> reject) { m_developmentEvaluationFailure = std::move(reject); }
 #endif
 
 private:
@@ -199,7 +201,7 @@ private:
     uint32_t m_completedGeneratedFrameCount{ 0 };
     FfxErrorCode m_generationError{ FFX_OK };
 #if CE_DEVELOPMENT && !CE_SHIPPING
-    std::function<bool()> m_developmentEvaluationFailure;
+    ce::owned_func<bool()> m_developmentEvaluationFailure;
 #endif
     bool m_reset{ true };
     bool m_initialized{ false };

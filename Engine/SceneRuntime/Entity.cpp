@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.LayerCatalog.h"
 #else
@@ -419,7 +420,7 @@ Component* Entity::PublishManagedComponent(const gc::root_ref<Component>& compon
             m_ownerScene->UnregisterComponent(raw);
         }
         raw->FinalizeManagedDestroy();
-        std::erase_if(m_components, [raw](const gc::trace_ref<Component>& entry)
+        ce::erase_if(m_components, [raw](const gc::trace_ref<Component>& entry)
         {
             return entry.get() == raw;
         });
@@ -532,7 +533,7 @@ Entity::Index Entity::GetRootIndex() const
 	return kSceneRootIndex;
 }
 
-const std::vector<Entity::Index>& Entity::GetChildrenIndices() const
+const ce::dynamic_array<Entity::Index>& Entity::GetChildrenIndices() const
 {
 	if (m_ownerScene && Entity::IsValidIndex(m_index)
 		&& m_ownerScene->GetEntityRaw(m_index) == this)
@@ -541,7 +542,7 @@ const std::vector<Entity::Index>& Entity::GetChildrenIndices() const
 		const size_t slot = static_cast<size_t>(m_index);
 		if (store.IsOccupied(slot)) return store.ChildrenOf(slot);
 	}
-	static const std::vector<Index> empty;
+	static const ce::dynamic_array<Index> empty;
 	return empty;
 }
 
@@ -586,7 +587,7 @@ void Entity::ClearChildren()
 	}
 }
 
-void Entity::SetChildrenIndices(std::vector<Index> children)
+void Entity::SetChildrenIndices(ce::dynamic_array<Index> children)
 {
 	if (m_ownerScene && Entity::IsValidIndex(m_index)
 		&& m_ownerScene->GetEntityRaw(m_index) == this)

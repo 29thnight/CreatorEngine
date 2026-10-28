@@ -1,5 +1,5 @@
 export module Creator.Core.BoundedMemory;
-
+export import "Creator.Containers.h";
 import std;
 
 export namespace ce
@@ -347,8 +347,8 @@ export namespace ce
             free_ = index;
         }
 
-        std::array<slot, capacity_value> slots_;
-        std::array<std::uint64_t, word_count_> live_{};
+        ce::fixed_array<slot, capacity_value> slots_;
+        ce::fixed_array<std::uint64_t, word_count_> live_{};
         std::size_t free_{};
         std::size_t size_{};
     };

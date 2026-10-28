@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "SceneToModelDraft.h"
 
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -10,7 +11,7 @@ namespace experiment::importer
             (std::numeric_limits<std::uint32_t>::max)();
 
         template <typename T>
-        [[nodiscard]] T ValueAt(const std::vector<T>& stream, std::size_t index) noexcept
+        [[nodiscard]] T ValueAt(const ce::dynamic_array<T>& stream, std::size_t index) noexcept
         {
             return index < stream.size() ? stream[index] : T{};
         }
@@ -19,7 +20,7 @@ namespace experiment::importer
         struct NodeLayout final
         {
             // 원본 node index → ModelDraft node index. 합성 루트가 생기면 +1.
-            std::vector<std::uint32_t> sceneToDraft{};
+            ce::dynamic_array<std::uint32_t> sceneToDraft{};
             bool synthesizedRoot{};
             std::size_t rootCount{};
         };
@@ -43,7 +44,7 @@ namespace experiment::importer
         }
 
         void BuildNodes(const ImportedScene& scene, const NodeLayout& layout,
-            const ConversionOptions& options, std::vector<ModelNode>& nodes)
+            const ConversionOptions& options, ce::dynamic_array<ModelNode>& nodes)
         {
             nodes.reserve(scene.nodes.size() + (layout.synthesizedRoot ? 1 : 0));
 
@@ -84,10 +85,10 @@ namespace experiment::importer
             bool present{};
             SkinIndex sourceSkin{};
             // 원본 node index → bone index (없으면 InvalidMapping)
-            std::vector<std::uint32_t> nodeToBone{};
+            ce::dynamic_array<std::uint32_t> nodeToBone{};
             // skin.joints 순번 → bone index (스킨이 없으면 비어 있다)
-            std::vector<std::uint32_t> jointToBone{};
-            std::vector<std::uint32_t> boneToNode{};
+            ce::dynamic_array<std::uint32_t> jointToBone{};
+            ce::dynamic_array<std::uint32_t> boneToNode{};
 
             // 스킨이 없어 애니메이션 채널에서 유도한 스켈레톤이다.
             // ★ 바인드 포즈가 **존재하지 않는다** — inverse bind 는 항등이고,
@@ -111,7 +112,7 @@ namespace experiment::importer
             //   코드라 애니메이션 전용 FBX(메시 0·스킨 0·클립 2)가 통째로
             //   버려졌다. 조상 폐포는 두 경우에 똑같이 필요하므로 알고리즘은
             //   그대로 두고 씨앗만 갈라 준다.
-            std::vector<SceneNodeIndex> seeds;
+            ce::dynamic_array<SceneNodeIndex> seeds;
             if (!scene.skins.empty())
             {
                 if (scene.skins.size() > 1)
@@ -145,7 +146,7 @@ namespace experiment::importer
             }
             if (seeds.empty()) return plan;
 
-            std::vector<std::uint8_t> inSkeleton(scene.nodes.size(), 0);
+            ce::dynamic_array<std::uint8_t> inSkeleton(scene.nodes.size(), 0);
             for (SceneNodeIndex joint : seeds)
             {
                 if (!IsInRange(joint, scene.nodes.size())) continue;
@@ -161,7 +162,7 @@ namespace experiment::importer
             }
 
             // 깊이 기준 안정 정렬로 parent < index 계약을 만든다.
-            std::vector<std::uint32_t> members;
+            ce::dynamic_array<std::uint32_t> members;
             for (std::uint32_t i = 0; i < inSkeleton.size(); ++i)
             {
                 if (inSkeleton[i]) members.push_back(i);
@@ -178,7 +179,7 @@ namespace experiment::importer
                 return plan;
             }
 
-            std::vector<std::uint32_t> depth(scene.nodes.size(), 0);
+            ce::dynamic_array<std::uint32_t> depth(scene.nodes.size(), 0);
             for (std::uint32_t member : members)
             {
                 std::uint32_t steps = 0;
@@ -234,7 +235,7 @@ namespace experiment::importer
             // 정점 weight 도 없으니 참조하는 쪽이 없다.
             if (plan.sourceSkin.IsValid())
             {
-                const std::vector<SceneNodeIndex>& joints =
+                const ce::dynamic_array<SceneNodeIndex>& joints =
                     scene.skins[plan.sourceSkin.Value()].joints;
                 plan.jointToBone.assign(joints.size(), InvalidMapping);
                 for (std::size_t j = 0; j < joints.size(); ++j)
@@ -259,7 +260,7 @@ namespace experiment::importer
             // joint 순번 → inverse bind. skin joint 가 아닌 계층 bone 은 항등.
             // 스킨이 없으면(애니메이션 유도) 전부 항등이다 — 바인드 포즈가
             // 존재하지 않으므로 그것이 지어내지 않은 정확한 값이다.
-            std::vector<const math::matrix4x4*> inverseBindOf(plan.boneToNode.size(), nullptr);
+            ce::dynamic_array<const math::matrix4x4*> inverseBindOf(plan.boneToNode.size(), nullptr);
             if (skin)
             {
                 for (std::size_t j = 0; j < skin->joints.size(); ++j)
@@ -321,9 +322,9 @@ namespace experiment::importer
         // ── 메시 ────────────────────────────────────────────────────────
         // 이름이 ImportedScene.cpp 의 동류 헬퍼와 겹치면 안 된다 — 유니티 빌드가
         // 두 TU 를 합치면 같은 익명 네임스페이스로 병합돼 재정의가 된다.
-        [[nodiscard]] std::vector<SkinIndex> MapMeshToSkin(const ImportedScene& scene)
+        [[nodiscard]] ce::dynamic_array<SkinIndex> MapMeshToSkin(const ImportedScene& scene)
         {
-            std::vector<SkinIndex> bindings(scene.meshes.size());
+            ce::dynamic_array<SkinIndex> bindings(scene.meshes.size());
             for (const SceneNode& node : scene.nodes)
             {
                 if (!IsInRange(node.skin, scene.skins.size())) continue;
@@ -346,7 +347,7 @@ namespace experiment::importer
                 streams.InfluencesOf(vertexIndex);
             if (influences.empty()) return;
 
-            std::array<BoneInfluence, MaxBoneInfluences> best{};
+            ce::fixed_array<BoneInfluence, MaxBoneInfluences> best{};
             std::size_t kept = 0;
             bool droppedAny = false;
             bool unmappedJoint = false;
@@ -413,7 +414,7 @@ namespace experiment::importer
         }
 
         MeshMetadata DescribeMesh(const ImportedScene& scene, const SkeletonPlan& plan,
-            const std::vector<SkinIndex>& meshSkins, std::size_t meshIndex)
+            const ce::dynamic_array<SkinIndex>& meshSkins, std::size_t meshIndex)
         {
             const auto& source = scene.meshes[meshIndex];
             const auto& streams = source.streams;
@@ -462,7 +463,7 @@ namespace experiment::importer
         }
 
         Mesh BuildMesh(const ImportedScene& scene, const SkeletonPlan& plan,
-            const std::vector<SkinIndex>& meshSkins, std::size_t meshIndex, ImportNoteSink& notes)
+            const ce::dynamic_array<SkinIndex>& meshSkins, std::size_t meshIndex, ImportNoteSink& notes)
         {
             const auto& source = scene.meshes[meshIndex];
             const auto& streams = source.streams;
@@ -660,11 +661,11 @@ namespace experiment::importer
 
         // ── 애니메이션 ──────────────────────────────────────────────────
         template <typename Key>
-        [[nodiscard]] std::vector<Key> ScaleKeyTimes(const std::vector<Key>& keys,
+        [[nodiscard]] ce::dynamic_array<Key> ScaleKeyTimes(const ce::dynamic_array<Key>& keys,
             double ticksPerSecond, double durationTicks, InterpolationMode mode,
             const std::string& context, ImportNoteSink& notes)
         {
-            std::vector<Key> out;
+            ce::dynamic_array<Key> out;
             out.reserve(keys.size());
             for (const Key& key : keys)
             {

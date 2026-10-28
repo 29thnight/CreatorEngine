@@ -1,4 +1,6 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../Engine/Utility_Framework/Foundation/EngineFunc.h"
 
 #include "LXMaterialIR.h"
 #include "LXMaterialExecution.h"
@@ -11,7 +13,7 @@ struct LXMaterialSource
     Id scope = 0;
     Id node = 0;
     Id pin = 0;
-    std::vector<Id> instances;
+    ce::dynamic_array<Id> instances;
     std::string property;
 
     bool operator==(const LXMaterialSource&) const = default;
@@ -65,9 +67,9 @@ struct LXMaterialProgram
     bool surface = false;
     bool volume = false;
     std::uint32_t textureSamples = 0;
-    std::vector<LXMaterialParameter> parameters;
-    std::vector<LXMaterialResource> resources;
-    std::vector<LXMaterialSourceRange> sourceMap;
+    ce::dynamic_array<LXMaterialParameter> parameters;
+    ce::dynamic_array<LXMaterialResource> resources;
+    ce::dynamic_array<LXMaterialSourceRange> sourceMap;
     LXMaterialExecutionRequirements execution;
 };
 
@@ -86,12 +88,12 @@ inline constexpr std::uint32_t kMaterialSourceKeyVersion = 1;
 bool ComputeMaterialSourceKey(const LXMaterialAsset& asset, std::string& result, std::string& error);
 
 std::optional<LXMaterialProgram> GenerateMaterialSlang(const LXMaterialAsset& asset,
-                                                       std::vector<LXMaterialDiagnostic>* diagnostics = nullptr,
+                                                       ce::dynamic_array<LXMaterialDiagnostic>* diagnostics = nullptr,
                                                        LXMaterialCompilerOptions options = {});
 std::optional<LXMaterialSource> FindMaterialSource(const LXMaterialProgram& program, std::uint32_t line);
 // Maps Slang's file(line[,column]) or file:line[:column] messages. Diagnostics
 // from common includes remain visible without a graph location.
-std::vector<LXMaterialDiagnostic> MapMaterialCompilerDiagnostics(const LXMaterialProgram& program,
+ce::dynamic_array<LXMaterialDiagnostic> MapMaterialCompilerDiagnostics(const LXMaterialProgram& program,
                                                                  const std::filesystem::path& sourceFile,
                                                                  const std::string& text);
 // Deterministic, backend-neutral generated metadata. This is not the engine's
@@ -102,11 +104,11 @@ struct LXMaterialShaderArtifact
 {
     std::string backend;
     std::string entryPoint;
-    std::vector<std::uint8_t> bytecode;
+    ce::dynamic_array<std::uint8_t> bytecode;
 };
 
-using LXMaterialVerifier = std::function<bool(const LXMaterialProgram&, std::vector<LXMaterialShaderArtifact>&,
-                                              std::vector<LXMaterialDiagnostic>&)>;
+using LXMaterialVerifier = ce::owned_func<bool(const LXMaterialProgram&, ce::dynamic_array<LXMaterialShaderArtifact>&,
+                                              ce::dynamic_array<LXMaterialDiagnostic>&)>;
 
 // A CPU-side publication boundary. The verifier must compile every backend and
 // entry required by its host; RHI/PSO lifetime and scene replacement are MAT-7.
@@ -114,14 +116,14 @@ class LXMaterialProgramStore
 {
   public:
     bool Publish(const LXMaterialAsset& asset, const LXMaterialVerifier& verifier,
-                 std::vector<LXMaterialDiagnostic>* diagnostics = nullptr, LXMaterialCompilerOptions options = {});
+                 ce::dynamic_array<LXMaterialDiagnostic>* diagnostics = nullptr, LXMaterialCompilerOptions options = {});
     const std::optional<LXMaterialProgram>& LastValidProgram() const { return program_; }
-    const std::vector<LXMaterialShaderArtifact>& Artifacts() const { return artifacts_; }
+    const ce::dynamic_array<LXMaterialShaderArtifact>& Artifacts() const { return artifacts_; }
     std::uint64_t Generation() const { return generation_; }
 
   private:
     std::optional<LXMaterialProgram> program_;
-    std::vector<LXMaterialShaderArtifact> artifacts_;
+    ce::dynamic_array<LXMaterialShaderArtifact> artifacts_;
     std::uint64_t generation_ = 0;
 };
 

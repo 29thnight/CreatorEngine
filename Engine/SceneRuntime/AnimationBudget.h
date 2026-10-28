@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include "AnimTaskList.h"
@@ -16,7 +17,7 @@ namespace animation
         if (raw == quality_stage::l7 || previous == quality_stage::l7
             || !observation.visible || observation.editor_preview
             || !observation.has_camera || hysteresis <= 0.) return raw;
-        constexpr std::array<double, 7> boundaries{
+        constexpr ce::fixed_array<double, 7> boundaries{
             .12, .08, .05, .035, .02, .01, .005 };
         const double height = observation.projected_height;
         if (!std::isfinite(height)) return raw;
@@ -127,8 +128,8 @@ namespace animation
             return static_cast<double>((std::max)(bones, std::uint32_t{ 1 }));
         }
 
-        std::array<double, task_kind_count> m_unitMicroseconds{};
-        std::array<std::uint32_t, task_kind_count> m_observations{};
+        ce::fixed_array<double, task_kind_count> m_unitMicroseconds{};
+        ce::fixed_array<std::uint32_t, task_kind_count> m_observations{};
         double m_interpolationUnitUs{};
         std::uint32_t m_interpolationObservations{};
     };

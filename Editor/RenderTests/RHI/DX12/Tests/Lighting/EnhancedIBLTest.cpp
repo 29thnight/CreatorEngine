@@ -1,3 +1,4 @@
+#include "../../../../../../Engine/Containers/ContainerAPI.h"
 #include "../../../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../../Engine/Platform/WindowsSDK/Creator.ComSupport.h"
@@ -224,7 +225,7 @@ namespace
         const auto area = [](double u, double v)
         { return std::atan2(u * v, std::sqrt(u * u + v * v + 1.0)); };
         struct Cell { Direction d; double radiance, solidAngle; };
-        std::vector<Cell> cells;
+        ce::dynamic_array<Cell> cells;
         for (uint32_t face = 0; face < 6; ++face)
             for (uint32_t y = 0; y < grid; ++y)
                 for (uint32_t x = 0; x < grid; ++x)

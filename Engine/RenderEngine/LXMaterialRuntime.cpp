@@ -1,3 +1,6 @@
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -40,9 +43,9 @@ namespace LX::Runtime
             {
                 return Fail(error, "LX runtime contract and binding layout differ.");
             }
-            std::set<std::string> names;
-            std::vector<std::pair<std::uint32_t, std::uint32_t>> regions;
-            std::set<std::pair<std::uint32_t, std::uint32_t>> textureRegisters;
+            ce::engine_ordered_set<std::string> names;
+            ce::dynamic_array<ce::pair<std::uint32_t, std::uint32_t>> regions;
+            ce::engine_ordered_set<ce::pair<std::uint32_t, std::uint32_t>> textureRegisters;
             for (const auto& property : meta.properties)
             {
                 const auto* binding = MaterialPropertyPacker::FindBinding(layout, property.name);
@@ -86,7 +89,7 @@ namespace LX::Runtime
                 {
                     return Fail(error, "LX runtime keyword axis is invalid.");
                 }
-                std::set<std::string> values;
+                ce::engine_ordered_set<std::string> values;
                 for (const auto& value : axis.values)
                 {
                     if (value.empty() || !values.insert(value).second)
@@ -119,14 +122,14 @@ namespace LX::Runtime
         // Weak entries reuse contract owners across frame seals and permutations;
         // cache retirement cannot destroy an instance's accepted shader generation.
         static std::mutex cacheMutex;
-        static std::map<std::uint32_t, std::vector<own::weak_owner<const ShaderGeneration>>> cache;
+        static ce::engine_ordered_map<std::uint32_t, ce::dynamic_array<own::weak_owner<const ShaderGeneration>>> cache;
         if (handle.IsValid())
         {
             std::lock_guard lock(cacheMutex);
             const auto found = cache.find(handle.slot);
             if (found != cache.end())
             {
-                std::erase_if(found->second, [](const auto& entry) { return entry.expired(); });
+                ce::erase_if(found->second, [](const auto& entry) { return entry.expired(); });
                 for (const auto& entry : found->second)
                 {
                     if (const auto accepted = entry.lock(); accepted && accepted->codeHandle == handle &&
@@ -184,7 +187,7 @@ namespace LX::Runtime
         const auto& meta = candidate.shader->meta;
         const auto& layout = candidate.shader->layout;
         candidate.uniforms.resize(layout.constantBufferByteSize);
-        std::set<std::string> seen;
+        ce::engine_ordered_set<std::string> seen;
         for (const auto& value : values)
         {
             if (!seen.insert(value.m_name).second || !MaterialPropertyPacker::FindBinding(layout, value.m_name))
@@ -273,7 +276,7 @@ namespace LX::Runtime
         }
         if (property->type == ShaderPropertyType::Texture2D && existing->m_textureGuid != value.m_textureGuid)
         {
-            std::erase_if(candidate.textureOwners, [&](const auto& owner) { return owner.propertyName == value.m_name; });
+            ce::erase_if(candidate.textureOwners, [&](const auto& owner) { return owner.propertyName == value.m_name; });
         }
         *existing = value;
         result = own::make_shared<const Instance>(std::move(candidate));
@@ -290,7 +293,7 @@ namespace LX::Runtime
             return Fail(error, "LX runtime texture owner is unknown.");
         }
         Instance candidate(instance);
-        std::erase_if(candidate.textureOwners, [&](const auto& entry) { return entry.propertyName == name; });
+        ce::erase_if(candidate.textureOwners, [&](const auto& entry) { return entry.propertyName == name; });
         if (owner)
         {
             candidate.textureOwners.push_back({std::string(name), std::move(owner)});

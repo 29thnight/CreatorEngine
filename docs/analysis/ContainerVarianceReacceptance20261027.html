@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/ContainerVarianceReacceptance20261027.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>컨테이너 편차 원인 분리와 전체 성능 재수용 — 2026-10-27</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#최종-결과">최종 결과</a></li><li><a href="#원인-분리">원인 분리</a></li><li><a href="#측정-환경-통제">측정 환경 통제</a></li><li><a href="#문자열소유권수명할당-보존">문자열·소유권·수명·할당 보존</a></li><li><a href="#증거">증거</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="ContainerVarianceReacceptance20261027.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>컨테이너 편차 원인 분리와 전체 성능 재수용 — 2026-10-27</h1>
+<div class="meta"><p>엔진 내부 정본을 수정하지 않고 전체 재수용에 통과했다. 기존 3건은 중앙값 성능이 아니라 15개 표본의 편차 기준 미달이었다. 새 캠페인은 원시 결과 전체를 보존하고 기존 기준을 그대로 적용했다.</p>
+</div>
+</header>
+<div class="kpis"><div class="kpi"><span class="ve-label">표·제목에 적힌 상태</span><span class="val">3<span class="unit">곳</span></span>
+<div class="stack" role="img" aria-label="완료·통과 3"><i class="ok" style="flex:3"></i></div>
+<span class="legend"><span class="chip ok">완료·통과 3</span></span></div></div>
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
+<a class="map-row" href="#최종-결과"><span class="ve-label">§00</span><span class="map-name">최종 결과</span><span class="map-bar"><i style="width:54%"></i></span><span class="map-marks"><span class="chip ok" title="완료·통과">3</span></span></a>
+<a class="map-row" href="#원인-분리"><span class="ve-label">§01</span><span class="map-name">원인 분리</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#측정-환경-통제"><span class="ve-label">§02</span><span class="map-name">측정 환경 통제</span><span class="map-bar"><i style="width:60.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#문자열소유권수명할당-보존"><span class="ve-label">§03</span><span class="map-name">문자열·소유권·수명·할당 보존</span><span class="map-bar"><i style="width:49.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#증거"><span class="ve-label">§04</span><span class="map-name">증거</span><span class="map-bar"><i style="width:95.3%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「원인 분리」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-최종-결과">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="최종-결과">최종 결과</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>검증군</th><th style="text-align:right">통과</th><th style="text-align:right">반복</th></tr></thead>
+<tbody><tr><td>일반 모듈 컨테이너</td><td style="text-align:right">82/82</td><td style="text-align:right">각 3개 프로세스</td></tr>
+<tr><td>MPSC 단일 전송</td><td style="text-align:right">4/4</td><td style="text-align:right">3회</td></tr>
+<tr><td>MPSC 주 기준</td><td style="text-align:right">4/4</td><td style="text-align:right">3회</td></tr>
+<tr><td>FAA / PPL 확장 큐</td><td style="text-align:right">6/6</td><td style="text-align:right">기존 5회 게이트</td></tr>
+<tr><td>동시성</td><td style="text-align:right">8/8</td><td style="text-align:right">3회</td></tr>
+<tr><td>pair / tuple / get / tie / apply</td><td style="text-align:right">7/7</td><td style="text-align:right">3개 프로세스</td></tr></tbody></table></div>
+<p>일반·MPSC 기준은 각 반복 CE/STL 또는 CE/PPL 중앙값 비율 ≤1.10, 양측 정렬 15표본의 x[13]/x[1] ≤1.30이다. 두 번째 반복의 역순 실행, 100ms 목표 시간, 1초 워밍업을 유지했다. FAA는 기존 5프로세스 전송·수명 비율 게이트를 유지하며 편차를 별도 공개한다. 실패 표본 삭제, 합격 표본 짜깁기, 기준 완화는 하지 않았다.</p>
+<h3 id="앞서-실패한-3건">앞서 실패한 3건</h3>
+<p>아래는 3회 중 최댓값이다. 비율은 작을수록 빠르다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>항목</th><th style="text-align:right">CE/STL 비율</th><th style="text-align:right">CE 편차</th><th style="text-align:right">STL 편차</th><th>판정</th></tr></thead>
+<tbody><tr><td>core/map_hit/65536</td><td class="num" style="text-align:right">0.5482</td><td class="num" style="text-align:right">1.0355</td><td class="num" style="text-align:right">1.0596</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>core/map_miss/65536</td><td class="num" style="text-align:right">0.3236</td><td class="num" style="text-align:right">1.0279</td><td class="num" style="text-align:right">1.0775</td><td><span class="chip ok">PASS</span></td></tr>
+<tr><td>core/string_find/65536</td><td class="num" style="text-align:right">0.1695</td><td class="num" style="text-align:right">1.0281</td><td class="num" style="text-align:right">1.0254</td><td><span class="chip ok">PASS</span></td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-원인-분리">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="원인-분리">원인 분리</h2></div>
+<div class="prose"><p>이전 <code>20261027-values-format-full1</code>은 79/82였다. map_hit/65536의 STL 편차 2.6496, map_miss/65536의 STL 1.4708, string_find/65536의 CE 1.3534가 실패 원인이다. 해당 실패 기록은 유지한다.</p>
+<p>별도 계측용 헤더 바이너리에서 세 항목 × 다섯 부하 조건 × 두 우선순위, 총 30개 프로세스를 실행했다. 실제 수용에는 기존 모듈 바이너리를 사용했다. 같은 CPU4의 경쟁 작업을 고정했을 때 다음과 같이 재현됐다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>항목</th><th>Normal CE/STL 편차</th><th>High CE/STL 편차</th><th>Normal 벽시계−CPU시간 상위값 CE/STL(ms)</th><th>High(ms)</th></tr></thead>
+<tbody><tr><td>map_hit</td><td>1.02 / 2.93</td><td>1.04 / 1.11</td><td>6 / 320</td><td>7 / 7</td></tr>
+<tr><td>map_miss</td><td>2.81 / 2.65</td><td>1.03 / 1.08</td><td>220 / 311</td><td>10 / 11</td></tr>
+<tr><td>string_find</td><td>3.20 / 3.55</td><td>1.02 / 1.03</td><td>284 / 283</td><td>2 / 10</td></tr></tbody></table></div>
+<p>상위값은 15표본 정렬 x[13]이다. 이 실험은 스케줄링 선점으로 큰 편차가 발생하는 경로를 분리했다. 원래 실패 시점의 특정 외부 프로그램이나 유일한 원인을 확인한 것은 아니다. 해당 30개 프로세스에서 페이지 폴트 증가량은 0이었다. PDH DPC·인터럽트 피크는 0이 아니므로 인터럽트를 배제하지 않는다. QueryThreadCycleTime을 하드웨어 PMU 주파수나 캐시 미스로 해석하지 않았다.</p>
+<p>High 우선순위만 적용한 첫 전체 캠페인에서도 map_miss STL 편차 1.4993이 발생해 즉시 실패로 보존했다. 그 시점의 대량 관측 출력이 간섭했을 가능성은 있으나 인과관계가 입증되지는 않았다. CPU4/8 및 별도 코어의 64MB 순차 메모리 부하를 추가한 12개 프로세스에서는 기준 상태 편차 약 1.02~1.09, 스트림 부하 최대 약 1.1372였으며 1.50을 재현하지 못했다. 메모리 대역폭이나 특정 코어만을 단독 원인으로 단정할 근거가 없다. ETW/하드웨어 PMU 계측은 수행하지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-측정-환경-통제">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="측정-환경-통제">측정 환경 통제</h2></div>
+<div class="prose"><p>최종 <code>20261027-variance-window-full1</code>에서는 기존 바이너리·입력·표준 라이브러리 참조 파일을 해시 검증하고 재빌드하지 않았다. 일반 측정 CPU4, 기존 CPU5 pause 보조 작업을 유지하고, 자체 일반·값 타입 측정 프로세스와 보조 작업만 High 우선순위로 시작했다. 다른 앱의 우선순위·친화도나 OS 설정은 변경하지 않았다. 인위적인 경쟁 부하는 최종 수용에 넣지 않았다.</p>
+<p>일반·값 타입은 전체 프로세스가 끝난 뒤에만 분석·상태 출력을 허용하고 재개 후 고정 3초를 기다렸다. 일반 246개 프로세스의 시작·종료 시간과 관측 허용 구간을 대조한 중첩은 0이다. MPSC 주 기준의 긴 프로세스 중에는 짧은 상태 안내가 있었으므로 이 분리 보장을 모든 큐 계측으로 확대하지 않는다. CPU5 보조 작업은 작업 종료 시까지 살아 있었다.</p>
+<p>일반 모듈은 기존 MSVC 195035730 / STL 145 바이너리, 값 타입은 기존 MSVC 195136260 / STL 145 바이너리를 사용했다. 결과는 현재 Windows / i7-8700K 환경에서 선언한 통제 조건의 수용 결과다. 다른 OS의 일정한 성능이나 실제 프레임 성능 향상을 증명하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-문자열소유권수명할당-보존">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="문자열소유권수명할당-보존">문자열·소유권·수명·할당 보존</h2></div>
+<div class="prose"><p>컨테이너 정본 66개와 기존 전환 소스 193개, 기존 엔진 바이너리 2개가 이전 해시와 일치했다. 문자열·컨테이너 알고리즘·메모리 순서·락 프리 구현은 수정하지 않았다. 정본 파일 해시 목록은 그대로 두고 수용 메타데이터만 갱신했다. 이전 실패와 더 오래된 합격 이력도 유지한다.</p>
+<p>기존 네이티브 값 타입 실행 파일을 다시 실행한 결과 Debug 4035, Release 4034, ASAN 4034 검사가 통과했다. Debug의 8192회 값 타입 연산은 allocations=0이며 소유권·참조 수명 계약 검사도 통과했다. Release·ASAN은 allocationChecks=0이므로 이 둘을 무할당 계측 증거로 사용하지 않는다. 기존 모듈 기능 검사도 다시 통과했다.</p>
+<p>이번 작업에서는 엔진을 다시 빌드하거나 Editor/DX12 실행 검증을 새로 수행하지 않았다. 이전 실제 엔진 실행 증거는 동일 소스·바이너리 해시로 연결한다. 추가 STL 사용처 전환은 수행하지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-증거">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="증거">증거</h2></div>
+<div class="prose"><ul>
+<li><span class="local-record">전체 판정 <small>로컬 기록 · 사이트 미포함</small> (<code>Build/Verification/ContainerMigration/VarianceReacceptance20261027/full-verdict.json</code>)</span>, <span class="local-record">값 타입 21개 결과 <small>로컬 기록 · 사이트 미포함</small> (<code>Build/Verification/ContainerMigration/VarianceReacceptance20261027/values-summary.json</code>)</span></li>
+<li><span class="local-record">소스 보존·기능 검사 <small>로컬 기록 · 사이트 미포함</small> (<code>Build/Verification/ContainerMigration/VarianceReacceptance20261027/preserved-state.json</code>)</span>, <span class="local-record">최종 독립 감사 <small>로컬 기록 · 사이트 미포함</small> (<code>Build/Verification/ContainerMigration/VarianceReacceptance20261027/final-audit.json</code>)</span></li>
+<li><span class="local-record">관측 허용 시간 기록 <small>로컬 기록 · 사이트 미포함</small> (<code>Build/Verification/ContainerMigration/VarianceReacceptance20261027/observer-windows.json</code>)</span></li>
+<li>외부 원시 증거: <code>../CreatorContainers/results/20261027-variance-window-full1-*</code>, <code>20261027-variance-window-values-*</code>, <code>20261027-variance3-*</code>, <code>20261027-execution-*</code>.</li>
+<li>실패 캠페인: <code>20261027-values-format-full1</code>, <code>20261027-variance-high-full1</code>; 초기 실험 실패 로그도 유지했다.</li>
+<li>재현 드라이버: <code>../CreatorContainers/experiments/20261027-variance-isolation/run-window-full-suite.ps1</code>. 새 태그와 별도의 값 타입 출력 경로로 실행해야 기존 증거를 덮어쓰지 않는다.</li>
+</ul>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="ContainerVarianceReacceptance20261027.md"><code>docs/analysis/ContainerVarianceReacceptance20261027.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

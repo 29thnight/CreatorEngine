@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "NormalGeneration.h"
 
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -77,7 +78,7 @@ namespace experiment::importer
             flat.influences.reserve(streams.influences.size());
         }
 
-        std::vector<std::uint32_t> newIndices;
+        ce::dynamic_array<std::uint32_t> newIndices;
         newIndices.reserve(mesh.indices.size());
 
         for (std::size_t face = 0; face + 2 < mesh.indices.size(); face += 3)

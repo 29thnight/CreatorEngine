@@ -1,4 +1,5 @@
 export module Creator.Concurrency.Jobs;
+export import "Creator.Containers.h";
 import std;
 import Creator.Core.Ownership;
 import Creator.Concurrency.JobGraph;
@@ -40,12 +41,12 @@ export class thread_pool
   private:
     friend class job_scheduler;
     friend class job_handle;
-    void assist_until(const std::function<bool()>& ready);
+    void assist_until(ce::func_ref<bool()> ready);
     struct state;
-    void dispatch(std::size_t count, std::function<void(std::size_t)> execute,
-                  std::function<void(std::exception_ptr)> complete);
-    void dispatch_graph(std::span<const job_graph_node> nodes, std::function<void(std::size_t)> execute,
-                        std::function<void(std::exception_ptr)> complete,
+    void dispatch(std::size_t count, ce::unique_func<void(std::size_t)> execute,
+                  ce::unique_func<void(std::exception_ptr)> complete);
+    void dispatch_graph(std::span<const job_graph_node> nodes, ce::unique_func<void(std::size_t)> execute,
+                        ce::unique_func<void(std::exception_ptr)> complete,
                         own::shared_owner<job_graph_diagnostics> diagnostics);
     std::shared_ptr<state> snapshot() const;
     mutable std::mutex mutex_;
@@ -100,14 +101,14 @@ export class job_group
     // failure before a task body runs. Invoked after task captures are released,
     // before the completion token becomes ready; observer captures are also
     // released before readiness. May run inline during submit_after.
-    void on_complete(std::function<void(std::exception_ptr)> observer) { terminal_observer_ = std::move(observer); }
+    void on_complete(ce::unique_func<void(std::exception_ptr)> observer) { terminal_observer_ = std::move(observer); }
     std::size_t size() const noexcept { return tasks_.size(); }
     bool empty() const noexcept { return tasks_.empty(); }
 
   private:
     friend class job_scheduler;
-    std::vector<std::function<void()>> tasks_;
-    std::function<void(std::exception_ptr)> terminal_observer_;
+    ce::dynamic_array<ce::unique_func<void()>> tasks_;
+    ce::unique_func<void(std::exception_ptr)> terminal_observer_;
 };
 
 export class job_scheduler
@@ -137,13 +138,13 @@ export class job_scheduler
     job_handle submit_after(std::span<const job_handle> dependencies, job_group group);
     // One callback is shared by an indexed batch. No per-index task vector is
     // built; callers keep captured storage alive until the handle completes.
-    job_handle submit_indexed(std::size_t count, std::function<void(std::size_t)> task);
+    job_handle submit_indexed(std::size_t count, ce::unique_func<void(std::size_t)> task);
     // 전체 그래프를 한 번에 수락하고 한 번만 dispatcher로 전달한다.
     // 선행 실패의 후손은 본문을 건너뛰고 독립 가지는 끝까지 실행한다.
     // 최종 handle은 공유 callback 캡처를 해제한 뒤에만 완료된다.
-    job_handle submit_graph(std::span<const job_graph_node> nodes, std::function<void(std::size_t)> task,
+    job_handle submit_graph(std::span<const job_graph_node> nodes, ce::unique_func<void(std::size_t)> task,
                             own::shared_owner<job_graph_diagnostics> diagnostics = {});
-    job_handle parallel_for(std::size_t count, std::size_t grain, std::function<void(std::size_t, std::size_t)> task);
+    job_handle parallel_for(std::size_t count, std::size_t grain, ce::owned_func<void(std::size_t, std::size_t)> task);
 
   private:
     std::shared_ptr<job_detail::scheduler_state> state_;

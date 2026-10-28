@@ -5,7 +5,7 @@
 #error "Native consumers must import the named module directly."
 #endif
 
-
+#include "../../../Engine/Containers/Creator.Containers.h"
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
 // UUID v5(RFC 4122) 자체 구현 — boost/uuid를 대신한다.
@@ -169,7 +169,7 @@ namespace uuid
     //   크기와 배치가 같아야 한다. static_assert로 붙들어 둔다.
     struct uuid16
     {
-        std::array<std::uint8_t, 16> data_{};
+        ce::fixed_array<std::uint8_t, 16> data_{};
 
         friend bool operator==(const uuid16& a, const uuid16& b) noexcept { return a.data_ == b.data_; }
         friend auto operator<=>(const uuid16& a, const uuid16& b) noexcept { return a.data_ <=> b.data_; }

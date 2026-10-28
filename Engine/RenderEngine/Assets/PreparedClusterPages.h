@@ -1,4 +1,8 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineFunc.h"
+#include "../../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Utility_Framework/Foundation/EngineOrderedSet.h"
 #include "MeshletCompression.h"
 #include "../Experiment/MeshLodData.h"
 
@@ -9,22 +13,22 @@ namespace assets::cluster
 // streaming/eviction, and each immutable archive owns its own bounded cache.
 class PreparedRootPageReader final
 {
-    using Page = std::shared_ptr<const std::vector<std::byte>>;
+    using Page = std::shared_ptr<const ce::dynamic_array<std::byte>>;
     struct State
     {
-        std::function<std::vector<std::byte>(uint32_t)> read;
-        std::vector<uint32_t> roots;
+        ce::owned_func<ce::dynamic_array<std::byte>(uint32_t)> read;
+        ce::dynamic_array<uint32_t> roots;
         std::mutex mutex;
-        std::map<uint32_t, Page> pages;
+        ce::engine_ordered_map<uint32_t, Page> pages;
     };
     std::shared_ptr<State> m_state;
 public:
-    PreparedRootPageReader(std::function<std::vector<std::byte>(uint32_t)> read,
+    PreparedRootPageReader(ce::owned_func<ce::dynamic_array<std::byte>(uint32_t)> read,
         const Archive& archive, std::span<const experiment::MeshClusterGroup> groups,
         uint64_t byteLimit = 32ull << 20) : m_state(std::make_shared<State>())
     {
         m_state->read = std::move(read);
-        std::set<uint32_t> roots;
+        ce::engine_ordered_set<uint32_t> roots;
         if (groups.empty())
             for (uint32_t page = 0; page < archive.packets.size(); ++page) roots.insert(page);
         else
@@ -43,7 +47,7 @@ public:
             }
         }
     }
-    std::vector<std::byte> operator()(uint32_t page) const
+    ce::dynamic_array<std::byte> operator()(uint32_t page) const
     {
         Page cached;
         {
@@ -63,7 +67,7 @@ public:
             }
             // Never hold the cache mutex across I/O, validation or byte copies.
             // A concurrent miss can duplicate work, but cannot publish unverified bytes.
-            auto bytes = std::make_shared<const std::vector<std::byte>>(m_state->read(page));
+            auto bytes = std::make_shared<const ce::dynamic_array<std::byte>>(m_state->read(page));
             std::lock_guard lock(m_state->mutex);
             m_state->pages.emplace(page, std::move(bytes));
         }

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -24,7 +25,7 @@ namespace assets
         experiment::cooked::Sha256Digest requiredBoneLayoutSha256{};
         std::uint32_t requiredBoneCount{};
         // Borrows from this object's immutable clip, never a logical wrapper.
-        std::vector<const ModelAnimationTrack*> tracks{};
+        ce::dynamic_array<const ModelAnimationTrack*> tracks{};
         own::shared_owner<const experiment::cooked::ArtifactByteSource> byteSource{};
         std::string artifactPath{};
         std::size_t decodedBytes{};
@@ -51,7 +52,7 @@ namespace assets
         const own::shared_owner<const ModelAnimationStorage> storage;
         const ModelAnimationAsset& clip;
         const own::shared_owner<const ModelSkeletonPayload> skeleton;
-        const std::vector<const ModelAnimationTrack*>& tracks;
+        const ce::dynamic_array<const ModelAnimationTrack*>& tracks;
         experiment::cooked::ResolvedAssetEntry origin{};
         std::size_t decodedBytes{};
 

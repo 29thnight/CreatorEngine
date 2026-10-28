@@ -1,5 +1,5 @@
 export module Creator.Core.DynamicBitset;
-
+export import "Creator.Containers.h";
 import std;
 
 export namespace ce
@@ -95,7 +95,7 @@ export namespace ce
 
       private:
         static constexpr std::size_t bits_per_block_ = 64;
-        using block_type = std::bitset<bits_per_block_>;
+        using block_type = ce::fixed_bitset<bits_per_block_>;
 
         static std::size_t block_count(std::size_t size) noexcept
         {
@@ -119,7 +119,7 @@ export namespace ce
             }
         }
 
-        std::vector<block_type> blocks_;
+        ce::dynamic_array<block_type> blocks_;
         std::size_t size_{};
     };
 } // namespace ce

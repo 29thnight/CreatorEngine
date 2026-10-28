@@ -1,3 +1,5 @@
+#include "../../../../../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../../../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.DynamicBitset.h"
 #else
@@ -35,7 +37,7 @@ namespace
 {
     bool ShadowReadbackPoints(const material_graph::MeshSurfaceBatch& geometry,
         std::span<const std::byte> pose, std::span<const std::byte> topology,
-        std::vector<material_graph::SurfacePoint>& points, std::string& error)
+        ce::dynamic_array<material_graph::SurfacePoint>& points, std::string& error)
     {
         using namespace assets::quantized;
         try
@@ -51,7 +53,7 @@ namespace
             Require(boneCount == geometry.Input()->Bones().size() && 32ull + boneCount * 48ull <= pose.size(),
                 "Shadow GPU pose header");
             const auto map = Word(topology, 80);
-            std::map<uint32_t, std::vector<std::byte>> decoded;
+            ce::engine_ordered_map<uint32_t, ce::dynamic_array<std::byte>> decoded;
             for (uint32_t vertex = 0; vertex < geometry.Count(); ++vertex)
             {
                 const auto packet = Word(topology, map + vertex * 8ull);
@@ -62,7 +64,7 @@ namespace
                 {
                     const auto bytes = Word(topology, packet + 20ull);
                     Require(bytes <= topology.size() - packet, "Shadow packet range");
-                    std::vector<std::byte> attributes;
+                    ce::dynamic_array<std::byte> attributes;
                     Require(assets::cluster::Decode(topology.subspan(packet, bytes), attributes, error), "Shadow packet decode");
                     found = decoded.emplace(packet, std::move(attributes)).first;
                 }
@@ -200,7 +202,7 @@ namespace
     //
     // 정점을 세 층으로 둔다(y = -1, 0, +1). 가운데 층의 가중치를 반씩
     // 나누면 본 1이 옮겨갈 때 딱 절반만 따라간다 — ③의 재료다.
-    void BuildSkinnedStrip(std::vector<Vertex>& outVertices, std::vector<uint32_t>& outIndices)
+    void BuildSkinnedStrip(ce::dynamic_array<Vertex>& outVertices, ce::dynamic_array<uint32_t>& outIndices)
     {
         const float kHalfWidth = 1.f;
         const float kRows[3] = { -1.f, 0.f, 1.f };
@@ -243,7 +245,7 @@ namespace
     }
 
     // 스키닝 가중치가 전혀 없는 사각형 — ④의 대조군.
-    void BuildStaticQuad(std::vector<Vertex>& outVertices, std::vector<uint32_t>& outIndices,
+    void BuildStaticQuad(ce::dynamic_array<Vertex>& outVertices, ce::dynamic_array<uint32_t>& outIndices,
         float centerX)
     {
         const uint32_t base = static_cast<uint32_t>(outVertices.size());
@@ -311,14 +313,14 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
     outLog += "[1/5] 셰이더 컴파일·PSO 생성 통과(BLENDINDICES·BLENDWEIGHT 포함)\n";
 
     // ── 합성 메시 ──
-    std::vector<Vertex> skinnedVertices;
-    std::vector<uint32_t> skinnedIndices;
+    ce::dynamic_array<Vertex> skinnedVertices;
+    ce::dynamic_array<uint32_t> skinnedIndices;
     BuildSkinnedStrip(skinnedVertices, skinnedIndices);
     Mesh skinnedMesh("dx12_skin_strip", skinnedVertices, skinnedIndices);
     skinnedMesh.RecalculateBounds();
 
-    std::vector<Vertex> staticVertices;
-    std::vector<uint32_t> staticIndices;
+    ce::dynamic_array<Vertex> staticVertices;
+    ce::dynamic_array<uint32_t> staticIndices;
     BuildStaticQuad(staticVertices, staticIndices, 3.f);   // 오른쪽에 따로 세운다
     Mesh staticMesh("dx12_skin_static", staticVertices, staticIndices);
     staticMesh.RecalculateBounds();
@@ -364,10 +366,10 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
     bool passed = true;
 
     // 본 팔레트 둘. [0]은 항상 항등(아래 절반이 기준으로 남는다).
-    std::vector<math::matrix4x4> palette(
+    ce::dynamic_array<math::matrix4x4> palette(
         2, math::matrix4x4::identity());
 
-    const auto renderOnce = [&](const std::vector<EnhancedDrawItem>& draws,
+    const auto renderOnce = [&](const ce::dynamic_array<EnhancedDrawItem>& draws,
         SkinCapture& outCapture) -> bool
     {
         frameContext.draws = &draws;
@@ -430,7 +432,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
     };
 
     // 스킨드 띠 + 비스킨드 사각형을 함께 그린다 — ④가 매 프레임 확인된다.
-    std::vector<EnhancedDrawItem> draws(2);
+    ce::dynamic_array<EnhancedDrawItem> draws(2);
     draws[0].mesh = &skinnedMesh;
     draws[0].worldMatrix = math::matrix4x4::identity();
     draws[0].bonePalette = palette.data();
@@ -621,7 +623,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
         else
         {
             // 방향광이 있어야 캐스케이드가 선다.
-            std::vector<EnhancedLight> lights(1);
+            ce::dynamic_array<EnhancedLight> lights(1);
             lights[0].position = math::vector4(0.f, 0.f, 0.f, 0.f);   // w=0 방향광
             const math::vector3 lightDirection = math::normalize(
                 math::vector3{ 0.3f, -1.f, 0.4f });
@@ -632,13 +634,13 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
             frameContext.draws = &draws;
             // 캐스터 드로우는 같은 팔레트 포인터를 들고 간다. 봉인이 프레임마다
             // 그 시점의 포즈를 복사한다.
-            const std::vector<std::string> cases = suite
-                ? std::vector<std::string>{"base", "alpha-pass", "alpha-equal", "alpha-reject",
+            const ce::dynamic_array<std::string> cases = suite
+                ? ce::dynamic_array<std::string>{"base", "alpha-pass", "alpha-equal", "alpha-reject",
                     "face-front", "face-back", "face-double", "transform", "boundary-near", "boundary-far", "far", "multi"}
-                : std::vector<std::string>{"base"};
+                : ce::dynamic_array<std::string>{"base"};
             for (const auto& caseName : cases)
             {
-            std::vector<EnhancedDrawItem> shadowCasters{
+            ce::dynamic_array<EnhancedDrawItem> shadowCasters{
                 casters.Caster(draws[0]), casters.Caster(draws[1]) };
             frameContext.shadowDraws = &shadowCasters;
             auto& staticCaster = shadowCasters[1];
@@ -692,8 +694,8 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
             }
             if (caseName == "multi")
             {
-                std::vector<Vertex> grid;
-                std::vector<uint32_t> indices;
+                ce::dynamic_array<Vertex> grid;
+                ce::dynamic_array<uint32_t> indices;
                 for (unsigned y = 0; y <= 16; ++y)
                     for (unsigned x = 0; x <= 16; ++x)
                     {
@@ -718,7 +720,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                 std::to_string(staticCaster.coverage.flags) + " cutoff=" + std::to_string(staticCaster.coverage.cutoff) + "\n";
 
             const auto renderShadow = [&](RHIReadbackImage& outMap,
-                const char* label, std::array<math::matrix4x4, 3>& matrices) -> bool
+                const char* label, ce::fixed_array<math::matrix4x4, 3>& matrices) -> bool
             {
                 ++frameContext.frameId;
                 if (!resources.BeginFrame(error) || !casters.Prepare(frameContext, shadow, error))
@@ -732,14 +734,14 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                 const auto outputs = casters.ShadowMeshletOutputs();
                 struct Readbacks {
                     struct Row {
-                        std::array<RHIReadback, 4> buffers;
-                        std::vector<std::pair<uint32_t, RHIReadback>> packets;
+                        ce::fixed_array<RHIReadback, 4> buffers;
+                        ce::dynamic_array<ce::pair<uint32_t, RHIReadback>> packets;
                         bool sparse{};
                         RHIReadback& operator[](size_t index) { return buffers[index]; }
                         const RHIReadback& operator[](size_t index) const { return buffers[index]; }
                     };
                     IRenderDeviceServices& device;
-                    std::vector<Row> rows;
+                    ce::dynamic_array<Row> rows;
                     ~Readbacks() { for (auto& row : rows) {
                         for (auto& item : row.buffers) device.ReleaseReadback(item);
                         for (auto& packet : row.packets) device.ReleaseReadback(packet.second);
@@ -772,7 +774,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                         !resources.CreateBufferReadback((geometry->MeshletCount() + 1) * 4, row[1], error) ||
                         !resources.CreateBufferReadback(geometry->BufferBytes(), row[2], error) ||
                         !resources.CreateBufferReadback(metadataBytes, row[3], error)) return false;
-                    std::vector<EnhancedRenderGraph::RGPassUsage> uses;
+                    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> uses;
                     output.frame->AddReadUsages(graph, uses);
                     for (auto& use : uses) use.state = RHIResourceState::CopySource;
                     uses.push_back({geometry->GraphOutput(graph), RHIResourceState::CopySource,
@@ -820,7 +822,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                 for (size_t outputIndex = 0; outputIndex < outputs.size(); ++outputIndex) {
                     const auto& output = outputs[outputIndex];
                     const auto& geometry = output.frame->MeshletGeometry(output.bin);
-                    std::array<RHIReadbackImage, 4> images;
+                    ce::fixed_array<RHIReadbackImage, 4> images;
                     for (unsigned i = 0; i < 4; ++i)
                         if (!resources.MapReadback(lists.rows[outputIndex][i], images[i], error)) return false;
                     if (lists.rows[outputIndex].sparse)
@@ -838,7 +840,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
                     }
                     const auto args = images[0].Elements<RHIDrawIndexedIndirectArguments>();
                     const auto ids = images[1].Elements<std::uint32_t>();
-                    std::vector<material_graph::SurfacePoint> points;
+                    ce::dynamic_array<material_graph::SurfacePoint> points;
                     if (!ShadowReadbackPoints(*geometry, std::as_bytes(std::span(images[2].data)),
                         std::as_bytes(std::span(images[3].data)), points, error))
                     {
@@ -966,7 +968,7 @@ bool DX12Test::RunSkinningTest(std::string& outLog)
             };
 
             RHIReadbackImage bindPose{}, posed{};
-            std::array<math::matrix4x4, 3> bindMatrices{}, posedMatrices{};
+            ce::fixed_array<math::matrix4x4, 3> bindMatrices{}, posedMatrices{};
             const math::matrix4x4 posedBone = palette[1];
             palette[1] = math::matrix4x4::identity();
             bool rendered = renderShadow(bindPose, "meshlet-bind", bindMatrices);

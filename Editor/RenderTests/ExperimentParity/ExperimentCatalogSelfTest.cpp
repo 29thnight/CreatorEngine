@@ -1,3 +1,5 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../../Engine/Containers/ContainerAPI.h"
 #include "ExperimentParity/ExperimentCatalogSelfTest.h"
 
 #include "Experiment/AssetIdentity.h"
@@ -26,7 +28,7 @@ namespace RenderTest
         };
 
         [[nodiscard]] bool ReadBytes(const std::filesystem::path& path,
-            std::vector<std::byte>& out)
+            ce::dynamic_array<std::byte>& out)
         {
             std::ifstream stream(path, std::ios::binary);
             if (!stream) return false;
@@ -52,7 +54,7 @@ namespace RenderTest
 
         [[nodiscard]] ck::CookedAssetManifestEntry MakeEntry(
             const experiment::AssetId& id, ck::CookedAssetKind kind,
-            std::string path, std::vector<experiment::AssetId> dependencies = {})
+            std::string path, ce::dynamic_array<experiment::AssetId> dependencies = {})
         {
             ck::CookedAssetManifestEntry entry;
             entry.assetId = id;
@@ -105,7 +107,7 @@ namespace RenderTest
         if (!written.Succeeded()) return false;
 
         // ── 1. 정상 로드 ───────────────────────────────────────────────
-        std::vector<ck::AssetManifestIssue> issues;
+        ce::dynamic_array<ck::AssetManifestIssue> issues;
         const ck::CookedAssetCatalog catalog =
             ck::CookedAssetCatalog::Load(written.bytes, "C:/probe/Assets", issues);
         check.Check(issues.empty(), "정상 CEMF 는 issue 가 없어야 한다");
@@ -133,7 +135,7 @@ namespace RenderTest
 
         // ── 2. 폐포 — 위상 순서 ────────────────────────────────────────
         {
-            std::vector<experiment::AssetId> ordered;
+            ce::dynamic_array<experiment::AssetId> ordered;
             std::string failure;
             check.Check(catalog.CollectClosure(scene, ordered, failure),
                 "scene 폐포 수집");
@@ -141,7 +143,7 @@ namespace RenderTest
 
             // ★ 위상 순서: 의존이 자기보다 먼저. 로더가 이 순서대로 열면
             //   참조가 항상 준비돼 있다.
-            std::map<experiment::AssetId, std::size_t> position;
+            ce::engine_ordered_map<experiment::AssetId, std::size_t> position;
             for (std::size_t index = 0u; index < ordered.size(); ++index)
                 position[ordered[index]] = index;
             check.Check(position.size() == ordered.size(), "폐포에 중복이 없다");
@@ -156,7 +158,7 @@ namespace RenderTest
         }
         {
             // 잎에서 시작하면 자기 하나.
-            std::vector<experiment::AssetId> ordered;
+            ce::dynamic_array<experiment::AssetId> ordered;
             std::string failure;
             check.Check(catalog.CollectClosure(texture, ordered, failure),
                 "잎 폐포 수집");
@@ -164,7 +166,7 @@ namespace RenderTest
                 "잎 폐포는 자기 하나");
         }
         {
-            std::vector<experiment::AssetId> ordered;
+            ce::dynamic_array<experiment::AssetId> ordered;
             std::string failure;
             check.Check(!catalog.CollectClosure(absent, ordered, failure),
                 "없는 root 는 실패");
@@ -196,11 +198,11 @@ namespace RenderTest
             check.Check(cyclicBytes.Succeeded(), "순환 fixture 기록");
             if (cyclicBytes.Succeeded())
             {
-                std::vector<ck::AssetManifestIssue> cyclicIssues;
+                ce::dynamic_array<ck::AssetManifestIssue> cyclicIssues;
                 const ck::CookedAssetCatalog cyclicCatalog =
                     ck::CookedAssetCatalog::Load(cyclicBytes.bytes, "C:/probe",
                         cyclicIssues);
-                std::vector<experiment::AssetId> ordered;
+                ce::dynamic_array<experiment::AssetId> ordered;
                 std::string failure;
                 check.Check(cyclicCatalog.CollectClosure(a, ordered, failure),
                     "순환 폐포가 멈춰야 한다");
@@ -210,8 +212,8 @@ namespace RenderTest
 
         // ── 4. fail-closed ─────────────────────────────────────────────
         {
-            std::vector<ck::AssetManifestIssue> bad;
-            const std::vector<std::byte> garbage(32, std::byte{ 0x7Fu });
+            ce::dynamic_array<ck::AssetManifestIssue> bad;
+            const ce::dynamic_array<std::byte> garbage(32, std::byte{ 0x7Fu });
             const ck::CookedAssetCatalog broken =
                 ck::CookedAssetCatalog::Load(garbage, "C:/probe", bad);
             check.Check(broken.IsEmpty(), "깨진 CEMF 는 빈 catalog");
@@ -221,7 +223,7 @@ namespace RenderTest
             check.Check(broken.Find(scene) == nullptr, "깨진 catalog 는 조회 0");
         }
         {
-            std::vector<ck::AssetManifestIssue> bad;
+            ce::dynamic_array<ck::AssetManifestIssue> bad;
             const ck::CookedAssetCatalog noRoot =
                 ck::CookedAssetCatalog::Load(written.bytes, {}, bad);
             check.Check(noRoot.IsEmpty(), "derived root 가 비면 catalog 도 빈다");
@@ -248,7 +250,7 @@ namespace RenderTest
         const std::filesystem::path manifestPath =
             root / "Derived" / "asset-manifest.cemf";
 
-        std::vector<std::byte> bytes;
+        ce::dynamic_array<std::byte> bytes;
         check.Check(ReadBytes(manifestPath, bytes), "CEMF 를 읽을 수 있어야 한다");
         if (bytes.empty())
         {
@@ -256,7 +258,7 @@ namespace RenderTest
             return false;
         }
 
-        std::vector<ck::AssetManifestIssue> issues;
+        ce::dynamic_array<ck::AssetManifestIssue> issues;
         const ck::CookedAssetCatalog catalog =
             ck::CookedAssetCatalog::Load(bytes, root, issues);
         check.Check(issues.empty(), "CEMF 판독에 issue 가 없어야 한다");
@@ -270,7 +272,7 @@ namespace RenderTest
 
         // catalog 전 entry 를 다시 훑기 위해 GUID 목록을 만든다. Find 로만
         // 접근하므로 kind 별 계수로 총수를 재구성한다.
-        std::vector<experiment::AssetId> all;
+        ce::dynamic_array<experiment::AssetId> all;
         for (const ck::CookedAssetKind kind : {
                 ck::CookedAssetKind::Model, ck::CookedAssetKind::Material,
                 ck::CookedAssetKind::Texture, ck::CookedAssetKind::ShaderMeta,
@@ -281,7 +283,7 @@ namespace RenderTest
 
         // manifest 를 다시 읽어 GUID 목록을 얻는다(catalog 는 조회 전용이다).
         ck::CookedAssetManifest manifest;
-        std::vector<ck::AssetManifestIssue> reread;
+        ce::dynamic_array<ck::AssetManifestIssue> reread;
         check.Check(ck::ReadAssetManifest(bytes, manifest, reread),
             "GUID 열거를 위한 재판독");
         check.Check(!manifest.sourceAssets.empty(),
@@ -301,7 +303,7 @@ namespace RenderTest
 
         // artifact 는 여러 entry 가 공유할 수 있다(재질이 model CEMC 를 쓴다).
         // 같은 파일을 반복해서 해시하지 않는다.
-        std::map<std::string, std::pair<std::uint64_t, ck::Sha256Digest>> fileCache;
+        ce::engine_ordered_map<std::string, ce::pair<std::uint64_t, ck::Sha256Digest>> fileCache;
 
         for (const ck::CookedAssetManifestEntry& entry : manifest.entries)
         {
@@ -318,7 +320,7 @@ namespace RenderTest
             auto cached = fileCache.find(entry.artifactPath);
             if (cached == fileCache.end())
             {
-                std::vector<std::byte> artifact;
+                ce::dynamic_array<std::byte> artifact;
                 if (!ReadBytes(file, artifact))
                 {
                     missingArtifact = true;
@@ -333,10 +335,10 @@ namespace RenderTest
                     continue;
                 }
                 cached = fileCache.emplace(entry.artifactPath,
-                    std::pair{ static_cast<std::uint64_t>(artifact.size()),
+                    ce::pair{ static_cast<std::uint64_t>(artifact.size()),
                         digest }).first;
             }
-            std::vector<ck::AssetManifestIssue> verifyIssues;
+            ce::dynamic_array<ck::AssetManifestIssue> verifyIssues;
             if (!ck::VerifyArtifact(*found, cached->second.first,
                 cached->second.second, verifyIssues))
             {
@@ -359,7 +361,7 @@ namespace RenderTest
             }
 
             // 4. 폐포와 위상 순서
-            std::vector<experiment::AssetId> ordered;
+            ce::dynamic_array<experiment::AssetId> ordered;
             std::string failure;
             if (!catalog.CollectClosure(entry.assetId, ordered, failure))
             {
@@ -372,7 +374,7 @@ namespace RenderTest
 
             // ★ 의존이 자기보다 먼저 나와야 한다. 이걸 안 보면 "폐포에 다
             //   들었다"만 맞고 순서는 아무래도 좋은 상태가 된다.
-            std::map<experiment::AssetId, std::size_t> position;
+            ce::engine_ordered_map<experiment::AssetId, std::size_t> position;
             for (std::size_t index = 0u; index < ordered.size(); ++index)
                 position[ordered[index]] = index;
             for (const experiment::AssetId& node : ordered)

@@ -1,3 +1,5 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -138,12 +140,12 @@ void draw_physics_shapes(PhysicsBodyComponent& body)
     }
     struct Draft
     {
-        std::vector<PhysicsShapeDefinition> shapes;
+        ce::dynamic_array<PhysicsShapeDefinition> shapes;
         Authoring::WriteDocument before;
         std::string failure;
     };
     static EntityHandle owner;
-    static std::unordered_map<std::uint64_t, Draft> drafts;
+    static ce::engine_node_map<std::uint64_t, Draft> drafts;
     const auto target = body.GetOwner()->GetScene()->HandleOf(body.GetOwner()->m_index);
     if (target != owner)
     {
@@ -286,7 +288,7 @@ void draw_character_movement(CharacterMovementComponent& character, editor::widg
         return std::string(node.AsString());
     };
     static EntityHandle previousOwner;
-    static std::unordered_map<std::string, std::string> drafts;
+    static ce::engine_node_map<std::string, std::string> drafts;
     static std::string failure;
     if (previousOwner != target)
     {
@@ -298,7 +300,7 @@ void draw_character_movement(CharacterMovementComponent& character, editor::widg
     ImGui::TextWrapped("World +Y capsule. Positive uniform scale required.");
     ImGui::BeginDisabled(SceneManagers->IsGameStart() ||
                          EditorObjectOperations::IsEditLocked(character.GetOwner(), true));
-    const std::pair<const char*, const char*> fields[]{
+    const ce::pair<const char*, const char*> fields[]{
         {"m_radius", "Radius (m)"}, {"m_cylinderHeight", "Cylinder height (m)"},
         {"m_contactOffset", "Contact offset (m)"}, {"m_stepOffset", "Step offset (m)"},
         {"m_slopeLimitCosine", "Slope limit cosine (0 disables)"}, {"m_gravity", "Gravity (m/s squared)"},
@@ -357,7 +359,7 @@ void draw_physics_body(PhysicsBodyComponent& character, editor::widgets::propert
         return std::string(node.AsString());
     };
     static EntityHandle previousOwner;
-    static std::unordered_map<std::string, std::string> drafts;
+    static ce::engine_node_map<std::string, std::string> drafts;
     static std::string failure;
     if (previousOwner != target)
     {
@@ -369,7 +371,7 @@ void draw_physics_body(PhysicsBodyComponent& character, editor::widgets::propert
     ImGui::TextWrapped("Motion: 0 Static, 1 Kinematic, 2 Dynamic. Axis locks: X=1, Y=2, Z=4.");
     ImGui::BeginDisabled(SceneManagers->IsGameStart() ||
                          EditorObjectOperations::IsEditLocked(character.GetOwner(), true));
-    const std::pair<const char*, const char*> fields[]{
+    const ce::pair<const char*, const char*> fields[]{
         {"m_motion", "Motion (0/1/2)"}, {"m_mass", "Mass (kg)"},
         {"m_gravityEnabled", "Gravity enabled (true/false)"},
         {"m_translationLocks", "Translation locks (0..7)"}, {"m_rotationLocks", "Rotation locks (0..7)"},
@@ -480,7 +482,7 @@ struct ComponentMenuVisual
 	std::mutex g_inspectorMailboxMutex;
 	editor::windows::inspector_snapshot g_inspectorSnapshot{};
 	// 그리는 스레드만 만진다. 프레임 끝에 사본으로 게시한다.
-	std::vector<editor::windows::inspector_body> g_inspectorBodies;
+	ce::dynamic_array<editor::windows::inspector_body> g_inspectorBodies;
 	std::string g_inspectorEntity;
 
 	// 본문 하나가 차지한 가로 범위를 잰다.
@@ -757,7 +759,7 @@ void InspectorWindow::DrawAddComponent(Entity* entity)
     const bool searching = !ce::strings::to_lower_without_whitespace(m_componentSearch).empty();
     const bool categoryPage = !searching && m_componentCategory.empty();
     struct Row { std::string title; const Entry* entry{}; };
-    std::vector<Row> rows;
+    ce::dynamic_array<Row> rows;
     if (categoryPage)
     {
         for (const auto& entry : m_componentCatalog)
@@ -2055,7 +2057,7 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
         }
         else
         {
-            std::vector<CurvePoint> curve;
+            ce::dynamic_array<CurvePoint> curve;
             if (settings.rolloff == Rolloff::Linear)
             {
                 BuildLinearCurve(curve, settings.minDistance, settings.maxDistance);
@@ -2098,11 +2100,11 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
     }
 }
 
-bool InspectorWindow::DrawRolloffCurveEditor(std::vector<CurvePoint>& sourceCurve, float maxDist, ImVec2 size, int* outSelected, bool readOnly)
+bool InspectorWindow::DrawRolloffCurveEditor(ce::dynamic_array<CurvePoint>& sourceCurve, float maxDist, ImVec2 size, int* outSelected, bool readOnly)
 {
 	using namespace ImGui;
     readOnly |= (GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) != 0;
-    std::vector<CurvePoint> preview;
+    ce::dynamic_array<CurvePoint> preview;
     if (readOnly) preview = sourceCurve;
     auto& curve = readOnly ? preview : sourceCurve;
 	if (curve.size() < 2) {
@@ -2137,7 +2139,7 @@ bool InspectorWindow::DrawRolloffCurveEditor(std::vector<CurvePoint>& sourceCurv
 		float ny = (sp.y - rc.Min.y) / std::max(1e-6f, (rc.Max.y - rc.Min.y));
 		float dist = clamp01(nx) * std::max(0.0f, maxDist);
 		float gain = clamp01(1.f - clamp01(ny));
-		return std::pair<float, float>(dist, gain);
+		return ce::pair<float, float>(dist, gain);
 		};
 
 	const ImVec2  mouse = GetIO().MousePos;

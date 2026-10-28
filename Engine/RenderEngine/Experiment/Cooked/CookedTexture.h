@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../../TextureImage.h"
@@ -32,7 +33,7 @@ namespace experiment::cooked
     // Payloads are contiguous and exact; trailing bytes and overlapping ranges
     // are rejected. A complete validated table precedes any pixel allocation.
     [[nodiscard]] bool EncodeCookedTexture(TextureImageView image,
-        std::vector<std::byte>& artifact, std::string& failure, CookedTextureInfo info = {});
+        ce::dynamic_array<std::byte>& artifact, std::string& failure, CookedTextureInfo info = {});
     // Shares the strict decoder's parser without allocating image storage.
     [[nodiscard]] bool ValidateCookedTexture(std::span<const std::byte> artifact, std::string& failure);
     [[nodiscard]] bool DecodeCookedTexture(std::span<const std::byte> artifact,
@@ -41,5 +42,5 @@ namespace experiment::cooked
     // Offline only. Implemented separately in TextureCooker.cpp with DirectXTex.
     // Desktop DX12/Vulkan BC output; no ASTC/mobile fallback or GPU encoder.
     [[nodiscard]] bool CookTexture(std::span<const std::byte> source,
-        const TextureImportSettings& settings, std::vector<std::byte>& artifact, std::string& failure);
+        const TextureImportSettings& settings, ce::dynamic_array<std::byte>& artifact, std::string& failure);
 }

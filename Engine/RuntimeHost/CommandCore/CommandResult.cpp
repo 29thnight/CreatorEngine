@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "CommandResult.h"
 
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -118,7 +119,7 @@ namespace CommandCore
         }
 
         const auto found = std::find_if(m_object.begin(), m_object.end(),
-            [&key](const std::pair<std::string, CommandData>& field) { return field.first == key; });
+            [&key](const ce::pair<std::string, CommandData>& field) { return field.first == key; });
 
         if (found != m_object.end()) { found->second = std::move(value); return; }
         m_object.emplace_back(std::move(key), std::move(value));

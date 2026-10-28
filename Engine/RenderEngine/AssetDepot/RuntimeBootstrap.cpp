@@ -1,3 +1,6 @@
+#include "../../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -66,7 +69,7 @@ namespace
             || kind == Texture || kind == Material || kind == MaterialProgram || kind == ShaderMeta;
     }
 
-    std::vector<std::byte> ReadMetadata(const std::filesystem::path& path, std::size_t limit)
+    ce::dynamic_array<std::byte> ReadMetadata(const std::filesystem::path& path, std::size_t limit)
     {
         own::shared_owner<const cooked::ArtifactByteSource> source =
             own::make_shared<const cooked::LooseArtifactByteSource>(path.parent_path());
@@ -76,7 +79,7 @@ namespace
         if (!cooked::CaptureArtifactSource(source, name, error) || !source->Size(name, size, error)
             || size == 0u || size > limit)
             throw std::runtime_error("Bootstrap metadata is missing/oversized: " + error);
-        std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+        ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(size));
         if (!source->ReadAt(name, 0u, bytes, error)) throw std::runtime_error(error);
         return bytes;
     }
@@ -105,7 +108,7 @@ namespace AssetDepot
                 (void)ParseHash(hash);
                 output << "set " << hash << '\n';
             }
-            std::set<experiment::AssetId> identities;
+            ce::engine_ordered_set<experiment::AssetId> identities;
             std::size_t references{};
             for (auto& document : documents)
             {
@@ -117,7 +120,7 @@ namespace AssetDepot
                 std::ranges::sort(document.references);
                 if (std::adjacent_find(document.references.begin(), document.references.end()) != document.references.end())
                     throw std::runtime_error("Repeated bootstrap reference.");
-                std::map<experiment::AssetId, cooked::CookedAssetKind> kinds;
+                ce::engine_ordered_map<experiment::AssetId, cooked::CookedAssetKind> kinds;
                 for (const auto& reference : document.references)
                 {
                     if (++references > MaxReferences || !ExternalKind(reference.kind)
@@ -210,7 +213,7 @@ namespace AssetDepot
     }
 
     bool ValidateRuntimeBootstrap(const std::filesystem::path& assetRoot,
-        const std::vector<std::string>& assetSetHashes, const cooked::CookedAssetCatalog& candidate,
+        const ce::dynamic_array<std::string>& assetSetHashes, const cooked::CookedAssetCatalog& candidate,
         std::string& failure)
     {
         failure.clear();
@@ -234,7 +237,7 @@ namespace AssetDepot
             const auto legacyBytes = ReadMetadata(assetRoot / "Derived/asset-manifest.cemf", 128u * 1024u * 1024u);
             cooked::Sha256Digest digest;
             cooked::CookedAssetManifest legacy;
-            std::vector<cooked::AssetManifestIssue> issues;
+            ce::dynamic_array<cooked::AssetManifestIssue> issues;
             if (!cooked::ComputeSha256(legacyBytes, digest, failure) || digest != receipt.legacyManifestSha256
                 || !cooked::ReadAssetManifest(legacyBytes, legacy, issues))
                 throw std::runtime_error("Bootstrap legacy manifest changed or is invalid.");

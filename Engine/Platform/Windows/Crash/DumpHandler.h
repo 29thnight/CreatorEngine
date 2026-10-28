@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Distribution.h"
@@ -208,7 +209,7 @@ inline void PruneOldDumpFiles()
     const std::filesystem::path directory = ce::paths::dump_path();
     if (!std::filesystem::exists(directory, ec)) return;
 
-    std::vector<std::filesystem::path> dumps;
+    ce::dynamic_array<std::filesystem::path> dumps;
     for (const auto& entry : std::filesystem::directory_iterator(directory, ec))
     {
         if (ec) break;

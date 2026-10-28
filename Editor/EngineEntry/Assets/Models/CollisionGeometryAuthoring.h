@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Uuid.h"
 #else
@@ -27,7 +28,7 @@ inline ce::physics::result<ce::physics::CollisionGeometrySource> ReadCollisionGe
         if (size <= 0 || size > static_cast<std::streamoff>(CollisionGeometryCodec::max_bytes))
             return std::unexpected(error{error_code::invalid_argument, 0, "Invalid geometry source file size"});
 
-        std::vector<std::byte> bytes(static_cast<std::size_t>(size));
+        ce::dynamic_array<std::byte> bytes(static_cast<std::size_t>(size));
         input.seekg(0);
         if (!input.read(reinterpret_cast<char*>(bytes.data()), static_cast<std::streamsize>(bytes.size())))
             return std::unexpected(error{error_code::invalid_argument, 0, "Geometry source read failed"});
@@ -89,7 +90,7 @@ inline ce::physics::result<ce::physics::CollisionGeometrySource> ParseCollisionG
             if (!next(count) || count < (kind == "convex" ? 4u : 3u) || count > 1024 * 1024)
                 return invalid();
 
-            std::vector<math::vector3> points(count);
+            ce::dynamic_array<math::vector3> points(count);
             if (!std::ranges::all_of(points,
                                      [&](auto& point) { return next(point.x) && next(point.y) && next(point.z); }))
                 return invalid();
@@ -101,7 +102,7 @@ inline ce::physics::result<ce::physics::CollisionGeometrySource> ParseCollisionG
                 if (!next(count) || !count || count > 4 * 1024 * 1024)
                     return invalid();
 
-                std::vector<triangle_indices> triangles(count);
+                ce::dynamic_array<triangle_indices> triangles(count);
                 if (!std::ranges::all_of(triangles, [&](auto& triangle) {
                         return next(triangle.a) && next(triangle.b) && next(triangle.c);
                     }))
@@ -215,7 +216,7 @@ class CollisionGeometryAuthoring final
             const auto after = CollisionGeometryCodec::Encode(replacement);
             const auto current = ReadCollisionGeometrySource(target);
             const auto actual = current ? CollisionGeometryCodec::Encode(*current)
-                                        : result<std::vector<std::byte>>{std::unexpected(
+                                        : result<ce::dynamic_array<std::byte>>{std::unexpected(
                                               error{error_code::invalid_argument, 0, "Missing current geometry"})};
             if (!before || !after || !actual || *before != *actual)
                 return std::unexpected(error{error_code::invalid_argument, 0, "Stale geometry edit"});
@@ -240,7 +241,7 @@ class CollisionGeometryAuthoring final
                 {
                     const auto old = ReadCollisionGeometrySource(path);
                     const auto oldBytes = old ? CollisionGeometryCodec::Encode(*old)
-                                              : result<std::vector<std::byte>>{std::unexpected(
+                                              : result<ce::dynamic_array<std::byte>>{std::unexpected(
                                                     error{error_code::invalid_argument, 0, "Corrupt revision"})};
                     return oldBytes && *oldBytes == bytes;
                 }

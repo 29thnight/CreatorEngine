@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
 #else
@@ -176,8 +177,8 @@ public:
     static constexpr uint32_t kQueueCapacity = 3;
     static constexpr uint64_t kSoftwareByteCapacity = 256ull << 20;
 
-    using Work = std::function<bool(std::string&)>;
-    using CompletionQuery = std::function<uint64_t()>;
+    using Work = ce::owned_func<bool(std::string&)>;
+    using CompletionQuery = ce::owned_func<uint64_t()>;
 
     explicit RHISubmissionThread(uint64_t softwareByteCapacity = kSoftwareByteCapacity);
     ~RHISubmissionThread();

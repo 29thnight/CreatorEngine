@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -109,7 +110,7 @@ public:
 private:
     friend class ComputePipeline;
     RHIComputePipelineDesc desc_{};
-    std::vector<std::uint8_t> bytecode_;
+    ce::dynamic_array<std::uint8_t> bytecode_;
     RHIPipelineHandle handle_{};
 };
 

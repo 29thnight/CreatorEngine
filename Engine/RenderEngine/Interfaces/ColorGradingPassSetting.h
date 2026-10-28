@@ -1,13 +1,4 @@
 #pragma once
-#include "../../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
-#include "../../Utility_Framework/Foundation/Core.Minimal.h"
 
-struct [[reflgen::reflect]] ColorGradingPassSetting
-{
-   public:
-    ColorGradingPassSetting() = default;
-
-    bool isOn{ true };
-    float lerp{ 0.f };
-    std::string textureFilePath{"None"};
-};
+// Compatibility include; the runtime and renderer share this settings contract.
+#include "../../Utility_Framework/Runtime/RenderSettings/ColorGradingPassSetting.h"

@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "AnimationPaletteArena.h"
 #if defined(CE_CONTRACT_STANDALONE)
@@ -110,8 +111,8 @@ public:
 		bool isEnabled{ false };
 		math::matrix4x4 worldMatrix{ math::matrix4x4::identity() };
 		math::vector3 worldPosition{};
-		std::vector<FoliageType> foliageTypes{};
-		std::vector<FoliageInstance> foliageInstances{};
+		ce::dynamic_array<FoliageType> foliageTypes{};
+		ce::dynamic_array<FoliageInstance> foliageInstances{};
 	};
 
 	struct DecalUpdate
@@ -207,7 +208,7 @@ public:
 	ApplyResult Apply(RenderScene& renderScene, uint64_t sceneEpoch,
 		own::shared_owner<const ce::animation_palette_arena> paletteArena = {},
 		std::uint32_t localPaletteOffset = 0);
-	[[nodiscard]] std::pair<std::uint32_t, std::uint32_t> GetPaletteSlice() const noexcept
+	[[nodiscard]] ce::pair<std::uint32_t, std::uint32_t> GetPaletteSlice() const noexcept
 	{
 		if (const auto* update = std::get_if<MeshUpdate>(&m_payload))
 			return { update->paletteOffset, update->boneCount };

@@ -1172,22 +1172,22 @@
     <ClInclude Include="GpuGeometryVisibilityShared.inl">
       <Filter>Render\Passes\Geometry</Filter>
     </ClInclude>
-    <ClInclude Include="Interfaces\AAPassSetting.h">
+    <ClInclude Include="..\Utility_Framework\Runtime\RenderSettings\AAPassSetting.h">
       <Filter>RenderPass\AAPass</Filter>
     </ClInclude>
     <ClInclude Include="Interfaces\AssetAuthoringPort.h">
       <Filter>Asset\ManagerSystem\AssetMetaHandler</Filter>
     </ClInclude>
-    <ClInclude Include="Interfaces\BitMaskPassSetting.h">
+    <ClInclude Include="..\Utility_Framework\Runtime\RenderSettings\BitMaskPassSetting.h">
       <Filter>RenderPass\PostProcessingPass\BitMaskPass</Filter>
     </ClInclude>
-    <ClInclude Include="Interfaces\BloomSetting.h">
+    <ClInclude Include="..\Utility_Framework\Runtime\RenderSettings\BloomSetting.h">
       <Filter>RenderPass\PostProcessingPass</Filter>
     </ClInclude>
-    <ClInclude Include="Interfaces\ColorGradingPassSetting.h">
+    <ClInclude Include="..\Utility_Framework\Runtime\RenderSettings\ColorGradingPassSetting.h">
       <Filter>RenderPass\PostProcessingPass\ColorGradingPass</Filter>
     </ClInclude>
-    <ClInclude Include="Interfaces\DeferredPassSetting.h">
+    <ClInclude Include="..\Utility_Framework\Runtime\RenderSettings\DeferredPassSetting.h">
       <Filter>RenderPass\DeferredPass</Filter>
     </ClInclude>
     <ClInclude Include="Interfaces\FoliageInstance.h">
@@ -1208,28 +1208,28 @@
     <ClInclude Include="Interfaces\RenderBackend.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
-    <ClInclude Include="Interfaces\RenderPassSettings.h">
+    <ClInclude Include="..\Utility_Framework\Runtime\RenderSettings\RenderPassSettings.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
-    <ClInclude Include="Interfaces\ShadowMapPassSetting.h">
+    <ClInclude Include="..\Utility_Framework\Runtime\RenderSettings\ShadowMapPassSetting.h">
       <Filter>RenderPass\ShadowMapPass</Filter>
     </ClInclude>
-    <ClInclude Include="Interfaces\SSAOPassSetting.h">
+    <ClInclude Include="..\Utility_Framework\Runtime\RenderSettings\SSAOPassSetting.h">
       <Filter>RenderPass\SSAOPass</Filter>
     </ClInclude>
-    <ClInclude Include="Interfaces\SSGIPassSetting.h">
+    <ClInclude Include="..\Utility_Framework\Runtime\RenderSettings\SSGIPassSetting.h">
       <Filter>RenderPass\SSGIPass</Filter>
     </ClInclude>
     <ClInclude Include="Interfaces\TerrainBuffers.h">
       <Filter>Interfaces</Filter>
     </ClInclude>
-    <ClInclude Include="Interfaces\ToneMapPassSetting.h">
+    <ClInclude Include="..\Utility_Framework\Runtime\RenderSettings\ToneMapPassSetting.h">
       <Filter>RenderPass\ToneMapPass</Filter>
     </ClInclude>
-    <ClInclude Include="Interfaces\VignettePassSetting.h">
+    <ClInclude Include="..\Utility_Framework\Runtime\RenderSettings\VignettePassSetting.h">
       <Filter>RenderPass\PostProcessingPass\VignettePass</Filter>
     </ClInclude>
-    <ClInclude Include="Interfaces\VolumetricFogPassSetting.h">
+    <ClInclude Include="..\Utility_Framework\Runtime\RenderSettings\VolumetricFogPassSetting.h">
       <Filter>RenderPass\PostProcessingPass\VolumetricFogPass</Filter>
     </ClInclude>
     <ClInclude Include="KeyFrameEvent.h">

@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -85,7 +86,7 @@ namespace RenderTest
                         }
                 return false;
             };
-            if (!author("Base Color", std::array<double, 4>{0.01, 1.0, 0.03, 1.0}) ||
+            if (!author("Base Color", ce::fixed_array<double, 4>{0.01, 1.0, 0.03, 1.0}) ||
                 !author("Metallic", 0.0) || !author("Roughness", 0.6))
             { error = "Default material graph lacks a Principled base color socket"; return false; }
             material_graph::InstanceDescription description;
@@ -277,7 +278,7 @@ namespace RenderTest
         report.paletteDigest = 2166136261u;
         for (std::size_t b = 0; b < generation->Skeleton()->bones.size() && b < kMaxBones; ++b)
         {
-            std::array<float, 16> values;
+            ce::fixed_array<float, 16> values;
             std::memcpy(values.data(), &animator->GetInstance().finalTransforms[b], sizeof(values));
             for (const float v : values)
                 report.paletteDigest = (report.paletteDigest ^ std::bit_cast<std::uint32_t>(v)) * 16777619u;

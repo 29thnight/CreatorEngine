@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -38,7 +39,7 @@ namespace
             error = "RG5 Sprite texture creation failed";
             return false;
         }
-        std::array<std::vector<float>, 6> references;
+        ce::fixed_array<ce::dynamic_array<float>, 6> references;
         for (uint32_t policy = 0; policy < 3; ++policy)
         {
             for (uint32_t fixture = 0; fixture < 6; ++fixture)
@@ -134,7 +135,7 @@ namespace
                         },
                         true);
                 }
-                std::vector<EnhancedSpritePass::Item> items(2);
+                ce::dynamic_array<EnhancedSpritePass::Item> items(2);
                 items[0].texture = (texture ? &*texture.borrow() : nullptr);
                 items[0].color = {0.125f, 0.25f, 0.375f, 1.f};
                 items[1] = items[0];
@@ -242,7 +243,7 @@ namespace
                 {
                     if (image.At(8, 8, channel) != expected[channel] ||
                         image.At(0, 0, channel) !=
-                            (ownsColor ? 0.f : std::array<float, 4>{0.0625f, 0.125f, 0.25f, 1.f}[channel]))
+                            (ownsColor ? 0.f : ce::fixed_array<float, 4>{0.0625f, 0.125f, 0.25f, 1.f}[channel]))
                     {
                         error = "RG5 Sprite independent result mismatch policy=" + std::to_string(policy) +
                                 " fixture=" + std::to_string(fixture) + " channel=" + std::to_string(channel) +

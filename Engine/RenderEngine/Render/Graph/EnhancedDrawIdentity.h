@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 // I6-C — 드로우 아이템의 **신원·반경 창구**.
@@ -47,11 +48,11 @@ namespace enhanced_draw
             const assets::ModelMeshHandle* mesh{};
         };
         // Scratch retains capacity, never ownership or a borrowed draw after validation.
-        static thread_local std::vector<Identity> storage;
+        static thread_local ce::dynamic_array<Identity> storage;
         storage.resize(draws.size());
         struct BorrowedIdentities
         {
-            std::vector<Identity>& entries;
+            ce::dynamic_array<Identity>& entries;
             ~BorrowedIdentities()
             {
                 for (auto& entry : std::span(entries.data(), entries.size()))

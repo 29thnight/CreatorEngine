@@ -66,7 +66,7 @@ int main()
             require(deaths == 2 && weak.expired() && erased_weak.expired(), "Last owner destroys exactly once");
             require(!erased_weak.lock(), "Expired lock empty");
         }
-        ce::heap_allocator<std::uint64_t> heap;
+        ce::stl_heap_allocator<std::uint64_t> heap;
         auto* storage = heap.allocate(8);
         require(reinterpret_cast<std::uintptr_t>(storage) % alignof(std::uint64_t) == 0, "Heap alignment");
         std::thread free_on_other_thread([&] { heap.deallocate(storage, 8); });

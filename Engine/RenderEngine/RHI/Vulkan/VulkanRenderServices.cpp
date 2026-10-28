@@ -1,3 +1,6 @@
+#include "../../../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -65,7 +68,7 @@ struct VulkanTextureCache::Impl
         uint64_t bytes{ 0 };
         uint64_t lastUsedFrame{ 0 };
     };
-    std::unordered_map<HashedGuid, Resident> entries;
+    ce::engine_node_map<HashedGuid, Resident> entries;
     RHITextureEntry white;
     VulkanPersistentHeap::ImageAllocation whiteAllocation;
     RHITextureEntry black;
@@ -90,7 +93,7 @@ struct VulkanTextureCache::Impl
         uint64_t completionValue{ 0 };
         RHIUploadTransactionState state{ RHIUploadTransactionState::Recording };
     };
-    std::unordered_map<uint32_t, Transaction> transactions;
+    ce::engine_node_map<uint32_t, Transaction> transactions;
 
     void Track(RHITextureHandle handle)
     {
@@ -184,7 +187,7 @@ struct VulkanTextureCache::Impl
             return false;
         }
 
-        std::vector<VkBufferImageCopy> copies;
+        ce::dynamic_array<VkBufferImageCopy> copies;
         copies.reserve(static_cast<size_t>(arraySize) * mipLevels);
         uint64_t localOffset = 0;
         for (uint32_t slice = 0; slice < arraySize; ++slice)
@@ -494,7 +497,7 @@ uint64_t VulkanTextureCache::RetireUnused(uint64_t completionValue,
     RHIAssetEvictionPass* evictionPass)
 {
     uint64_t retiredBytes = 0;
-    std::vector<RHIAssetEvictionCandidate> candidates;
+    ce::dynamic_array<RHIAssetEvictionCandidate> candidates;
     candidates.reserve(m_impl->entries.size());
     for (const auto& pair : m_impl->entries)
     {
@@ -570,7 +573,7 @@ void VulkanTextureCache::OnUploadSubmitted(uint64_t recordingId,
 
 void VulkanTextureCache::OnUploadCompleted(uint64_t completedValue)
 {
-    std::erase_if(m_impl->transactions, [&](const auto& entry)
+    ce::erase_if(m_impl->transactions, [&](const auto& entry)
     {
         const auto& transaction = entry.second;
         return transaction.state == RHIUploadTransactionState::Queued &&
@@ -657,7 +660,7 @@ struct VulkanMeshCache::Impl
         VulkanPersistentHeap::Allocation vertices;
         VulkanPersistentHeap::Allocation indices;
         VulkanPersistentHeap::Allocation meshlets;
-        std::array<CoarseLodAllocations, kRHIMaxCoarseMeshLods> coarseLods;
+        ce::fixed_array<CoarseLodAllocations, kRHIMaxCoarseMeshLods> coarseLods;
         uint64_t bytes{ 0 };
         uint64_t lastUsedFrame{ 0 };
         uint64_t recordingId{ 0 };
@@ -673,14 +676,14 @@ struct VulkanMeshCache::Impl
         VulkanPersistentHeap::Allocation indexAllocation;
         RHIBufferHandle meshlets;
         VulkanPersistentHeap::Allocation meshletAllocation;
-        std::array<CoarseLodAllocations, kRHIMaxCoarseMeshLods> coarseLods;
+        ce::fixed_array<CoarseLodAllocations, kRHIMaxCoarseMeshLods> coarseLods;
         RHIBufferHandle coarseIndices[kRHIMaxCoarseMeshLods]{};
         RHIBufferHandle coarseMeshlets[kRHIMaxCoarseMeshLods]{};
     };
 
     VulkanDeviceResources* resources{ nullptr };
-    std::unordered_map<HashedGuid, Buffers> entries;
-    std::map<assets::ModelMeshHandle, Buffers> modelEntries;
+    ce::engine_node_map<HashedGuid, Buffers> entries;
+    ce::engine_ordered_map<assets::ModelMeshHandle, Buffers> modelEntries;
     RHICompletionRetireQueue<RetiredBuffers> retireQueue;
     VulkanPersistentHeap persistentHeap;
     uint64_t frameIndex{ 0 };
@@ -1013,12 +1016,12 @@ RHIMeshBinding VulkanMeshCache::UploadResolved(size_t legacyKey,
 
     // Secure the indexed buffers first. Optional staging/allocation failures may
     // drop only meshlets, and every native object exists before any copy is recorded.
-    const std::array<RHIUploadRequest, 3> requests = {{
+    const ce::fixed_array<RHIUploadRequest, 3> requests = {{
         { vertexBytes, RHIUploadUsage::VertexData, alignof(Vertex) },
         { indexBytes, RHIUploadUsage::IndexData, alignof(uint32) },
         { meshletUpload.bytes.size(), RHIUploadUsage::BufferCopy, 16 }
     }};
-    std::array<RHIBufferSlice, 3> staging{};
+    ce::fixed_array<RHIBufferSlice, 3> staging{};
     bool reserved = false;
     if (!meshletUpload.bytes.empty())
     {
@@ -1086,10 +1089,10 @@ RHIMeshBinding VulkanMeshCache::UploadResolved(size_t legacyKey,
         RHIModelMeshView view;
         uint64_t indexBytes{};
         RHIModelMeshletUpload meshlets;
-        std::array<RHIBufferSlice, 2> staging;
+        ce::fixed_array<RHIBufferSlice, 2> staging;
         VulkanBufferEntry indexSource, indexDestination, meshletSource, meshletDestination;
     };
-    std::array<CoarseLodUpload, kRHIMaxCoarseMeshLods> coarseUploads{};
+    ce::fixed_array<CoarseLodUpload, kRHIMaxCoarseMeshLods> coarseUploads{};
     uint64_t coarseBytes = 0;
     const auto* sourceMesh = modelView ? modelView->SourceMesh() : nullptr;
     if (sourceMesh)
@@ -1170,7 +1173,7 @@ RHIMeshBinding VulkanMeshCache::UploadResolved(size_t legacyKey,
                 }
             }
 
-            const std::array<RHIUploadRequest, 2> lodRequests = {{
+            const ce::fixed_array<RHIUploadRequest, 2> lodRequests = {{
                 { plan.indexBytes, RHIUploadUsage::IndexData, alignof(uint32_t) },
                 { plan.meshlets.bytes.size(), RHIUploadUsage::BufferCopy, 16 }
             }};
@@ -1467,7 +1470,7 @@ uint64_t VulkanMeshCache::RetireUnused(uint64_t completionValue,
 {
     if (!m_impl) return 0;
     uint64_t retiredBytes = 0;
-    std::vector<RHIAssetEvictionCandidate> candidates;
+    ce::dynamic_array<RHIAssetEvictionCandidate> candidates;
     candidates.reserve(m_impl->entries.size());
     for (const auto& pair : m_impl->entries)
     {
@@ -1512,8 +1515,8 @@ uint64_t VulkanMeshCache::RetireUnused(uint64_t completionValue,
         m_impl->entries.erase(it);
     }
 
-    std::vector<assets::ModelMeshHandle> modelKeys;
-    std::vector<RHIAssetEvictionCandidate> modelCandidates;
+    ce::dynamic_array<assets::ModelMeshHandle> modelKeys;
+    ce::dynamic_array<RHIAssetEvictionCandidate> modelCandidates;
     modelKeys.reserve(m_impl->modelEntries.size());
     modelCandidates.reserve(m_impl->modelEntries.size());
     for (const auto& pair : m_impl->modelEntries)
@@ -1868,7 +1871,7 @@ void VulkanDeviceResources::TransitionResources(std::span<const RHITransition> t
     //   것과 같은 판단이 여기 한 번 더 있는 것이다.
     if (nullptr != m_encoder) m_encoder->EndRenderTargets();
 
-    static thread_local std::vector<VkImageMemoryBarrier2> barriers;
+    static thread_local ce::dynamic_array<VkImageMemoryBarrier2> barriers;
     barriers.clear();
     barriers.reserve(transitions.size());
 
@@ -1933,7 +1936,7 @@ void VulkanDeviceResources::TransitionBuffers(
     if (!m_frameOpen || transitions.empty()) return;
     if (nullptr != m_encoder) m_encoder->EndRenderTargets();
 
-    static thread_local std::vector<VkBufferMemoryBarrier2> barriers;
+    static thread_local ce::dynamic_array<VkBufferMemoryBarrier2> barriers;
     barriers.clear();
     barriers.reserve(transitions.size());
     for (const RHIBufferTransition& transition : transitions)

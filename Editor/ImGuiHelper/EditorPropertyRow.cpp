@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 // Numeric activation is adapted from Dear ImGui 1.92.8 (MIT).
 // Copyright (c) 2014-2026 Omar Cornut
 // Permission is hereby granted, free of charge, to any person obtaining a copy
@@ -264,7 +265,7 @@ namespace editor::widgets
         // 매 프레임 문자열을 만들지 않는 것도 이유다 — 이 줄은 인스펙터가
         // 열려 있는 동안 계속 도는 자리고, 성능 계약(§8.2)이 정적 경로의
         // frame 당 heap 할당 0 을 목표로 둔다.
-        constexpr std::array<const char*, 4> kPropertyFieldIds{ "##f0", "##f1", "##f2", "##f3" };
+        constexpr ce::fixed_array<const char*, 4> kPropertyFieldIds{ "##f0", "##f1", "##f2", "##f3" };
     }
 
     int property_row_field_limit() noexcept

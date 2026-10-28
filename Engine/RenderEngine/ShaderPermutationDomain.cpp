@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "ShaderPermutationDomain.h"
 
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -10,9 +11,9 @@ namespace
         const ShaderKeywordAxis* axis{};
     };
 
-    std::vector<CanonicalAxis> CanonicalAxes(const ShaderMeta& meta)
+    ce::dynamic_array<CanonicalAxis> CanonicalAxes(const ShaderMeta& meta)
     {
-        std::vector<CanonicalAxis> axes;
+        ce::dynamic_array<CanonicalAxis> axes;
         axes.reserve(meta.keywords.size());
         for (std::size_t index = 0; index < meta.keywords.size(); ++index)
             axes.push_back({ index, &meta.keywords[index] });
@@ -131,7 +132,7 @@ bool ShaderPermutationDomain::Resolve(const ShaderMeta& meta,
     resolved.passIndex = passIndex;
     resolved.selections.reserve(meta.keywords.size());
 
-    const std::vector<CanonicalAxis> axes = CanonicalAxes(meta);
+    const ce::dynamic_array<CanonicalAxis> axes = CanonicalAxes(meta);
     for (const CanonicalAxis& canonical : axes)
     {
         const ShaderKeywordAxis& axis = *canonical.axis;
@@ -158,7 +159,7 @@ bool ShaderPermutationDomain::Resolve(const ShaderMeta& meta,
 
 bool ShaderPermutationDomain::EnumerateForBuild(const ShaderMeta& meta,
     std::uint64_t maxCompileRequests,
-    std::vector<ShaderMetaPermutation>& outPermutations,
+    ce::dynamic_array<ShaderMetaPermutation>& outPermutations,
     ShaderMetaPermutationStats& outStats, std::string& outError)
 {
     ShaderMetaPermutationStats stats;
@@ -177,10 +178,10 @@ bool ShaderPermutationDomain::EnumerateForBuild(const ShaderMeta& meta,
         return false;
     }
 
-    const std::vector<CanonicalAxis> axes = CanonicalAxes(meta);
-    std::vector<ShaderMetaPermutation> permutations;
+    const ce::dynamic_array<CanonicalAxis> axes = CanonicalAxes(meta);
+    ce::dynamic_array<ShaderMetaPermutation> permutations;
     permutations.reserve(static_cast<std::size_t>(stats.compileRequests));
-    std::vector<std::uint16_t> indices(meta.keywords.size(), 0);
+    ce::dynamic_array<std::uint16_t> indices(meta.keywords.size(), 0);
 
     for (std::uint32_t passIndex = 0; passIndex < meta.passes.size(); ++passIndex)
     {

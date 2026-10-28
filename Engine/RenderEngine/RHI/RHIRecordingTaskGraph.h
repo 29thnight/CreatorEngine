@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #include "../RenderContainerReusePolicy.h"
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -5,7 +6,7 @@
 struct RHIRecordingPassDependencies
 {
     bool independent{false};
-    std::vector<uint32_t> producers;
+    ce::dynamic_array<uint32_t> producers;
 };
 
 struct RHIRecordingTaskNode
@@ -13,7 +14,7 @@ struct RHIRecordingTaskNode
     uint32_t target{0};
     uint32_t wave{0};
     uint64_t work{0};
-    std::vector<uint32_t> dependencies;
+    ce::dynamic_array<uint32_t> dependencies;
 };
 
 enum class RHIRecordingDependencyReason : uint8_t
@@ -30,8 +31,8 @@ struct RHIRecordingTaskDependency
 
 struct RHIRecordingTaskDetails
 {
-    std::vector<RHIRecordingTaskDependency> dependencies;
-    std::vector<uint32_t> units;
+    ce::dynamic_array<RHIRecordingTaskDependency> dependencies;
+    ce::dynamic_array<uint32_t> units;
 };
 
 // 진단을 요청한 경우에만 연결 이유와 역매핑을 보관한다. 상한을 넘으면 부분 그래프를 공개하지 않는다.
@@ -40,24 +41,24 @@ struct RHIRecordingTaskTopology
     static constexpr size_t kMaximumEntries = 4096;
     static constexpr size_t kMaximumDependencies = 16384;
     bool available{false}, truncated{false};
-    std::vector<RHIRecordingTaskDetails> nodes;
-    std::vector<uint32_t> unitNodes;
+    ce::dynamic_array<RHIRecordingTaskDetails> nodes;
+    ce::dynamic_array<uint32_t> unitNodes;
 };
 
 struct RHIRecordingTaskGraph
 {
     struct Scratch
     {
-        std::vector<std::pair<uint32_t, uint32_t>> groups;
-        std::vector<uint32_t> previous, unitNodes, required;
-        std::vector<std::vector<uint32_t>> frontiers;
-        std::vector<RHIRecordingTaskNode> stagedNodes;
+        ce::dynamic_array<ce::pair<uint32_t, uint32_t>> groups;
+        ce::dynamic_array<uint32_t> previous, unitNodes, required;
+        ce::dynamic_array<ce::dynamic_array<uint32_t>> frontiers;
+        ce::dynamic_array<RHIRecordingTaskNode> stagedNodes;
         RHIRecordingTaskTopology details;
-        std::vector<std::pair<std::pair<uint32_t, uint32_t>, uint8_t>> dependencyReasons;
+        ce::dynamic_array<ce::pair<ce::pair<uint32_t, uint32_t>, uint8_t>> dependencyReasons;
     };
     Scratch scratch;
-    mutable std::vector<uint64_t> completion;
-    std::vector<RHIRecordingTaskNode> nodes;
+    mutable ce::dynamic_array<uint64_t> completion;
+    ce::dynamic_array<RHIRecordingTaskNode> nodes;
 
     bool ReplacesWaveJoins() const
     {
@@ -81,7 +82,7 @@ struct RHIRecordingTaskGraph
 
     uint64_t CriticalWork() const
     {
-        std::optional<std::vector<uint64_t>> freshCompletion;
+        std::optional<ce::dynamic_array<uint64_t>> freshCompletion;
         if (!RenderContainerReuseEnabled())
         {
             freshCompletion.emplace();
@@ -144,7 +145,7 @@ inline bool RHIBuildRecordingTaskGraph(std::span<const uint32_t> unitTargets, st
         {
             return;
         }
-        const auto key = std::pair{node, dependency};
+        const auto key = ce::pair{node, dependency};
         auto& recorded = dependencyReasons;
         const auto found = std::ranges::lower_bound(recorded, key, {}, [](const auto& value) { return value.first; });
         if (found == recorded.end() || found->first != key)
@@ -198,11 +199,11 @@ inline bool RHIBuildRecordingTaskGraph(std::span<const uint32_t> unitTargets, st
     for (size_t unit = 0; unit < unitTargets.size(); ++unit)
     {
         const auto node = static_cast<uint32_t>(
-            std::ranges::lower_bound(groups, std::pair{unitWaves[unit], unitTargets[unit]}) - groups.begin());
+            std::ranges::lower_bound(groups, ce::pair{unitWaves[unit], unitTargets[unit]}) - groups.begin());
         unitNodes[unit] = node;
         nodes[node].work += unitWork.empty() ? 1 : unitWork[unit];
     }
-    const auto unique = [](std::vector<uint32_t>& values)
+    const auto unique = [](ce::dynamic_array<uint32_t>& values)
     {
         std::ranges::sort(values);
         values.erase(std::unique(values.begin(), values.end()), values.end());
@@ -301,7 +302,7 @@ inline bool RHIBuildRecordingTaskGraph(std::span<const uint32_t> unitTargets, st
     if (!reuse)
     {
         // Commit only after validation. Failed inputs preserve the accepted DAG.
-        result.nodes = std::vector<RHIRecordingTaskNode>{};
+        result.nodes = ce::dynamic_array<RHIRecordingTaskNode>{};
     }
     result.nodes.resize(nodes.size());
     for (size_t index = 0; index < nodes.size(); ++index)

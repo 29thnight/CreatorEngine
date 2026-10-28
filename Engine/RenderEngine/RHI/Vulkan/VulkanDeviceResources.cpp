@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -27,7 +29,7 @@ namespace
     // 유니티 빌드에서 익명 네임스페이스가 파일 간 합쳐지므로 이름을 고유하게 둔다.
     constexpr const char* kVkValidationLayer = "VK_LAYER_KHRONOS_validation";
 
-    bool VkHasLayer(const std::vector<VkLayerProperties>& layers, const char* name)
+    bool VkHasLayer(const ce::dynamic_array<VkLayerProperties>& layers, const char* name)
     {
         for (const auto& layer : layers)
         {
@@ -36,7 +38,7 @@ namespace
         return false;
     }
 
-    bool VkHasExtension(const std::vector<VkExtensionProperties>& extensions, const char* name)
+    bool VkHasExtension(const ce::dynamic_array<VkExtensionProperties>& extensions, const char* name)
     {
         for (const auto& extension : extensions)
         {
@@ -275,19 +277,19 @@ bool VulkanDeviceResources::CreateInstance(bool enableValidation, std::string& o
 {
     uint32_t layerCount = 0;
     vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-    std::vector<VkLayerProperties> layers(layerCount);
+    ce::dynamic_array<VkLayerProperties> layers(layerCount);
     if (0 != layerCount) vkEnumerateInstanceLayerProperties(&layerCount, layers.data());
 
     uint32_t extensionCount = 0;
     vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, nullptr);
-    std::vector<VkExtensionProperties> extensions(extensionCount);
+    ce::dynamic_array<VkExtensionProperties> extensions(extensionCount);
     if (0 != extensionCount)
     {
         vkEnumerateInstanceExtensionProperties(nullptr, &extensionCount, extensions.data());
     }
 
-    std::vector<const char*> enabledLayers;
-    std::vector<const char*> enabledExtensions;
+    ce::dynamic_array<const char*> enabledLayers;
+    ce::dynamic_array<const char*> enabledExtensions;
 
     if (VkHasExtension(extensions, VK_KHR_SURFACE_EXTENSION_NAME))
     {
@@ -416,7 +418,7 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
         return false;
     }
 
-    std::vector<VkPhysicalDevice> devices(count);
+    ce::dynamic_array<VkPhysicalDevice> devices(count);
     vkEnumeratePhysicalDevices(m_instance, &count, devices.data());
 
     VkPhysicalDevice best = VK_NULL_HANDLE;
@@ -453,7 +455,7 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
         // 그래픽 큐가 있어야 한다.
         uint32_t familyCount = 0;
         vkGetPhysicalDeviceQueueFamilyProperties(candidate, &familyCount, nullptr);
-        std::vector<VkQueueFamilyProperties> families(familyCount);
+        ce::dynamic_array<VkQueueFamilyProperties> families(familyCount);
         vkGetPhysicalDeviceQueueFamilyProperties(candidate, &familyCount, families.data());
 
         uint32_t graphics = UINT32_MAX;
@@ -488,7 +490,7 @@ bool VulkanDeviceResources::PickPhysicalDevice(std::string& outError)
 
     uint32_t extensionCount = 0;
     vkEnumerateDeviceExtensionProperties(best, nullptr, &extensionCount, nullptr);
-    std::vector<VkExtensionProperties> extensions(extensionCount);
+    ce::dynamic_array<VkExtensionProperties> extensions(extensionCount);
     if (0 != extensionCount)
     {
         vkEnumerateDeviceExtensionProperties(best, nullptr, &extensionCount,
@@ -558,7 +560,7 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
     queueInfo.queueCount = 1;
     queueInfo.pQueuePriorities = &priority;
 
-    std::vector<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
+    ce::dynamic_array<const char*> deviceExtensions = { VK_KHR_SWAPCHAIN_EXTENSION_NAME };
     if (m_externalMemoryWin32Supported)
     {
         deviceExtensions.push_back(VK_KHR_EXTERNAL_MEMORY_WIN32_EXTENSION_NAME);
@@ -675,7 +677,7 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
         auto status = m_temporalXeSSBootstrap->QueryRequiredDeviceExtensions(m_instance, m_physicalDevice, count, names);
         uint32_t availableCount = 0;
         vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &availableCount, nullptr);
-        std::vector<VkExtensionProperties> available(availableCount);
+        ce::dynamic_array<VkExtensionProperties> available(availableCount);
         vkEnumerateDeviceExtensionProperties(m_physicalDevice, nullptr, &availableCount, available.data());
         if (status.IsSuccess())
             for (uint32_t i = 0; i != count; ++i)
@@ -690,7 +692,7 @@ bool VulkanDeviceResources::CreateDevice(std::string& outError)
             // Give XeSS the existing writable Features2 chain; it patches in
             // place, instead of concatenating duplicate feature structures.
             status = m_temporalXeSSBootstrap->PatchRequiredDeviceFeatures(m_instance, m_physicalDevice, featureChain);
-            std::set<VkStructureType> types;
+            ce::engine_ordered_set<VkStructureType> types;
             for (auto* node = static_cast<VkBaseOutStructure*>(featureChain); status.IsSuccess() && node; node = node->pNext)
                 if (types.size() >= 64 || !types.insert(node->sType).second)
                     status = { TemporalStatus::InvalidInput };
@@ -1601,7 +1603,7 @@ bool VulkanDeviceResources::SubmitParallelCommandBuffers(
         return false;
     }
 
-    std::array<VkCommandBufferSubmitInfo, IRHIParallelCommandPool::kMaxWorkers> commandInfos{};
+    ce::fixed_array<VkCommandBufferSubmitInfo, IRHIParallelCommandPool::kMaxWorkers> commandInfos{};
     if (buffers.size() > commandInfos.size())
     {
         outError = "Vulkan parallel submission exceeds its fixed target bound.";
@@ -1848,7 +1850,7 @@ bool VulkanDeviceResources::CreateSwapChainInternal(uint32_t width, uint32_t hei
     uint32_t formatCount = 0;
     vkGetPhysicalDeviceSurfaceFormatsKHR(m_physicalDevice, m_surface, &formatCount, nullptr);
     if (0 == formatCount) { outError = "서피스 포맷이 없다"; return false; }
-    std::vector<VkSurfaceFormatKHR> formats(formatCount);
+    ce::dynamic_array<VkSurfaceFormatKHR> formats(formatCount);
     vkGetPhysicalDeviceSurfaceFormatsKHR(m_physicalDevice, m_surface, &formatCount,
         formats.data());
 

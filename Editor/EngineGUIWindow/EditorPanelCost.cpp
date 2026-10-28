@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "EditorPanelCost.h"
 
 #include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
@@ -24,7 +25,7 @@ namespace
         bool touchedThisFrame{};
 
         // ── 잠금 아래 ──
-        std::vector<double> ring;
+        ce::dynamic_array<double> ring;
         std::size_t ringNext{};
         std::uint64_t frames{};
         double lastMs{};
@@ -43,9 +44,9 @@ namespace
         return mutex;
     }
 
-    std::array<slot_state, kPanelCostSlotCount>& slots()
+    ce::fixed_array<slot_state, kPanelCostSlotCount>& slots()
     {
-        static std::array<slot_state, kPanelCostSlotCount> state;
+        static ce::fixed_array<slot_state, kPanelCostSlotCount> state;
         return state;
     }
 
@@ -79,7 +80,7 @@ namespace
 
         // ── 잠금 아래 ──
         std::string id;
-        std::vector<double> ring;
+        ce::dynamic_array<double> ring;
         std::size_t ringNext{};
         std::uint64_t frames{};
         double lastMs{};
@@ -107,9 +108,9 @@ namespace
         return "(shell.unknown)";
     }
 
-    std::vector<window_state>& window_states()
+    ce::dynamic_array<window_state>& window_states()
     {
-        static std::vector<window_state> state;
+        static ce::dynamic_array<window_state> state;
         return state;
     }
 
@@ -121,10 +122,10 @@ namespace
     }
 
     /// 링에 담긴 표본의 95 백분위. 표본이 비면 0 이다.
-    double percentile95(const std::vector<double>& ring)
+    double percentile95(const ce::dynamic_array<double>& ring)
     {
         if (ring.empty()) return 0.0;
-        std::vector<double> sorted = ring;
+        ce::dynamic_array<double> sorted = ring;
         // 95 백분위의 자리. 표본 하나면 그 값이다.
         const std::size_t index =
             std::min(sorted.size() - 1, static_cast<std::size_t>(sorted.size() * 0.95));
@@ -292,7 +293,7 @@ namespace editor::windows
 
     void begin_window_cost(std::size_t index, const char* stable_id) noexcept
     {
-        std::vector<window_state>& table = window_states();
+        ce::dynamic_array<window_state>& table = window_states();
         if (index >= table.size())
         {
             // 표를 키우는 것은 드문 일(창 선언은 시작에 한 번)이라 여기서 잠근다.
@@ -312,7 +313,7 @@ namespace editor::windows
 
     void end_window_cost(std::size_t index) noexcept
     {
-        std::vector<window_state>& table = window_states();
+        ce::dynamic_array<window_state>& table = window_states();
         if (index >= table.size()) return;
         window_state& state = table[index];
         if (state.depth <= 0) return;

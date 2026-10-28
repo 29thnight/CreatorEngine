@@ -1,3 +1,6 @@
+#include "../Utility_Framework/Foundation/EngineStorage.h"
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -161,10 +164,10 @@ namespace
 	// PHASE 3.75 MBC8 — typed·experiment 두 뼈 목록에 같은 규칙을 적용하는 일반형.
 	// nameOf(i)·parentOf(i)(부모 없음 = boneCount 이상)만 받는다.
 	template <typename NameOf, typename ParentOf>
-	[[nodiscard]] std::vector<std::uint8_t> DeriveBoneRegionsFrom(
+	[[nodiscard]] ce::dynamic_array<std::uint8_t> DeriveBoneRegionsFrom(
 		std::size_t boneCount, NameOf nameOf, ParentOf parentOf)
 	{
-		std::vector<std::uint8_t> regions(boneCount,
+		ce::dynamic_array<std::uint8_t> regions(boneCount,
 			static_cast<std::uint8_t>(BoneRegion::Root));
 		for (std::size_t index = 0; index < boneCount; ++index)
 		{
@@ -199,7 +202,7 @@ namespace
 		return regions;
 	}
 
-	[[nodiscard]] std::vector<std::uint8_t> DeriveTypedBoneRegions(
+	[[nodiscard]] ce::dynamic_array<std::uint8_t> DeriveTypedBoneRegions(
 		const assets::ModelSkeletonAsset& skeleton)
 	{
 		return DeriveBoneRegionsFrom(skeleton.bones.size(),
@@ -423,7 +426,7 @@ AnimatorAnimationBinding Animator::CaptureAnimationBinding()
     {
         return binding;
     }
-    std::vector<int> indices;
+    ce::dynamic_array<int> indices;
     const auto select = [&](int index)
     {
         if (index >= 0 && static_cast<std::size_t>(index) < TypedClipCount()
@@ -462,7 +465,7 @@ AnimatorAnimationBinding Animator::CaptureAnimationBinding()
     GetInstance().layerTrackTables.clear();
     // Drop deselected owners and subscriber handles. Submitted decode jobs own
     // their own captures and can drain without keeping the old clip resident here.
-    std::erase_if(m_requestedClips, [&](const RequestedAnimationClip& clip)
+    ce::erase_if(m_requestedClips, [&](const RequestedAnimationClip& clip)
     {
         return std::find(indices.begin(), indices.end(), clip.clipIndex) == indices.end();
     });
@@ -829,7 +832,7 @@ namespace
 		std::size_t boneCount, std::size_t rootBone, NameOf nameOf, ParentOf parentOf)
 	{
 		if (rootBone >= boneCount) return nullptr;
-		std::vector<std::vector<std::uint32_t>> children(boneCount);
+		ce::dynamic_array<ce::dynamic_array<std::uint32_t>> children(boneCount);
 		for (std::size_t index = 0; index < boneCount; ++index)
 		{
 			const std::size_t parent = parentOf(index);
@@ -837,8 +840,8 @@ namespace
 				children[parent].push_back(static_cast<std::uint32_t>(index));
 		}
 
-		std::vector<BoneMask*> masks(boneCount, nullptr);
-		std::vector<std::uint32_t> stack{ static_cast<std::uint32_t>(rootBone) };
+		ce::dynamic_array<BoneMask*> masks(boneCount, nullptr);
+		ce::dynamic_array<std::uint32_t> stack{ static_cast<std::uint32_t>(rootBone) };
 		while (!stack.empty())
 		{
 			const std::uint32_t boneIndex = stack.back();
@@ -1234,7 +1237,7 @@ bool Animator::ConvertLegacyAvatarMask(AvatarMask& mask)
 
 	// Resolve every entry before changing the mask. A partial or stale tree
 	// remains readable through its legacy flags instead of silently losing bones.
-	std::vector<float> weights;
+	ce::dynamic_array<float> weights;
 	weights.reserve(mask.m_BoneMasks.size());
 	ce::dynamic_bitset matched(skeleton->bones.size(), false);
 	for (const BoneMask* boneMask : mask.m_BoneMasks)
@@ -1288,8 +1291,8 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 	// Parameters·m_animationControllers는 포인터 원소 벡터라 typed 역직렬화가
 	// 건드리지 않는다 — 여기의 수동 복원이 실채움이다.
 	Model* model = nullptr;
-	std::deque<bool> animationBools;
-	std::unordered_map<int, std::vector<KeyFrameEvent>> animationKeyFrameMap;
+	ce::segmented_deque<bool> animationBools;
+	ce::engine_node_map<int, ce::dynamic_array<KeyFrameEvent>> animationKeyFrameMap;
 	int aniIndex = 0;
 	// I6-B1 — 클립 오버라이드 표기가 Animator 소유로 이주했다. 새 정본을
 	// 먼저 읽고, 없을 때만 구 씬의 legacy Skeleton 서브트리를 읽는다. 폴백은
@@ -1334,7 +1337,7 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 				bool _aniBool = animation["m_isLoop"].As<bool>();
 				animationBools.push_back(_aniBool);
 				const auto keyFrameEvents = animation["m_keyFrameEvent"];
-				std::vector<KeyFrameEvent> KeyFrameEventVec;
+				ce::dynamic_array<KeyFrameEvent> KeyFrameEventVec;
 				for (const auto keyFrameEvent : keyFrameEvents)
 				{
 					KeyFrameEvent newEvent;
@@ -1460,7 +1463,7 @@ void Animator::OnDeserialized(const Authoring::NodeView& view)
 					Meta::Deserialize(sharedState.operator->(), state);
 					animationController->StateVec.push_back(sharedState);
 					animationController->StateNameSet.insert(sharedState->m_name);
-					animationController->m_nameToState.insert(std::make_pair(sharedState->m_name, sharedState));
+					animationController->m_nameToState.insert(ce::make_pair(sharedState->m_name, sharedState));
 					sharedState->m_ownerController = animationController.operator->();
 					sharedState->SetBehaviour(sharedState->behaviourName);
 					if (sharedState->m_isAny)

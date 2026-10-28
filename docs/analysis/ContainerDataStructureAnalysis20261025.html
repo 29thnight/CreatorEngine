@@ -1,0 +1,839 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/ContainerDataStructureAnalysis20261025.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>컨테이너·자료구조 최적화 분석 (2026-10-25)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#0-분석-범위">0. 분석 범위</a></li><li><a href="#1-결론-요약">1. 결론 요약</a></li><li><a href="#2-우선순위-표">2. 우선순위 표</a></li><li><a href="#3-slot-map--generational-index--free-list">3. Slot map / generational index / free-list</a></li><li><a href="#4-공간-분할-셀-격자--bvh--클러스터-계층">4. 공간 분할 (셀 격자 / BVH / 클러스터 계층)</a></li><li><a href="#5-soa와-csr">5. SoA와 CSR</a></li><li><a href="#6-프레임마다-다시-만드는-임시-컨테이너">6. 프레임마다 다시 만드는 임시 컨테이너</a></li><li><a href="#7-string-interning--투명-조회--perfect-hash">7. String interning / 투명 조회 / perfect hash</a></li><li><a href="#8-축출-정책-연령-버킷--intrusive-lru--clock">8. 축출 정책: 연령 버킷 / intrusive LRU / CLOCK</a></li><li><a href="#9-퇴역-큐-단일-패스-압축--조건부-fifo-링-hitch-우선-조사-후보">9. 퇴역 큐: 단일 패스 압축 / 조건부 FIFO 링 (hitch 우선 조사 후보)</a></li><li><a href="#10-할당기큐태스크">10. 할당기·큐·태스크</a></li><li><a href="#11-sequence-buffer-단조-증가-id--상한-있는-창">11. Sequence buffer (단조 증가 ID + 상한 있는 창)</a></li><li><a href="#12-프록시-스냅샷-borrowed--지연-퇴역">12. 프록시 스냅샷: borrowed + 지연 퇴역</a></li><li><a href="#13-해시-품질-정적-캐시-프레임-핀">13. 해시 품질, 정적 캐시, 프레임 핀</a></li><li><a href="#14-gpu스트리밍-자료구조">14. GPU·스트리밍 자료구조</a></li><li><a href="#15-정렬-키와-radix-sort">15. 정렬 키와 radix sort</a></li><li><a href="#16-애니메이션-클립-데이터-배치">16. 애니메이션 클립 데이터 배치</a></li><li><a href="#17-기타-런타임">17. 기타 런타임</a></li><li><a href="#18-관리-코드-c-f">18. 관리 코드 (C#, F#)</a></li><li><a href="#19-에디터도구정확성">19. 에디터·도구·정확성</a></li><li><a href="#20-엔진-안의-기존-도구-재사용-우선">20. 엔진 안의 기존 도구 (재사용 우선)</a></li><li><a href="#21-이미-적절해서-바꾸지-않는-곳">21. 이미 적절해서 바꾸지 않는 곳</a></li><li><a href="#22-b-tree-판정">22. B-tree 판정</a></li><li><a href="#23-공용화-후보와-도입-원칙">23. 공용화 후보와 도입 원칙</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="ContainerDataStructureAnalysis20261025.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>컨테이너·자료구조 최적화 분석 (2026-10-25)</h1>
+<div class="meta"><p>기준: <code>master</code> <code>d86fe25e0</code> + 작업 트리(미커밋 변경 포함). 줄 번호는 작업 트리 기준이므로, 커밋된 리비전과 어긋날 수 있다.</p>
+<p>이 문서는 소스 정적 분석에 근거한 <strong>추정 연구 문서</strong>다. 비용은 호출 빈도, 원소 규모(N), 할당 횟수, 복잡도, 메모리 접근 모델로 추정했고, 장면 규모 가정은 항목마다 적었다.</p>
+<p>재검토: 2026-10-25, <code>master</code> <code>54e937658</code> + 작업 트리에서 주요 항목을 대조했다. 최초 분석 전체를 다시 검증한 것은 아니며, 아래 정정과 안전 조건을 반영했다.</p>
+<p><strong>검증 범위:</strong> 이번 재검토는 문서·소스 확인만 수행했다. 엔진 실행, 프로파일링, 전후 벤치마크는 수행하지 않았다. 본문의 시간(ns/µs/ms), 배속, 메모리 절감률은 해당 경로의 실측 결과가 아니라 가정에 따른 추정이다. 기존 mem.bench 기록도 개별 경로의 프레임 비용을 입증하지 않는다. 호출처 수는 프레임당 실행 횟수를 뜻하지 않는다.</p>
+<p><strong>우선순위 해석:</strong> 모든 순위는 복잡도·예상 규모·정확성 위험에 따른 잠정 조사 순서이며, 측정된 병목 순위나 확정 구현 순서가 아니다. 실제 장면의 활성 경로, 호출 빈도, 원소 수·축출 수, 캐시 상태와 전후 CPU/GPU 시간을 계측한 뒤 다시 정해야 한다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 24개의 분량 막대">
+<a class="map-row" href="#0-분석-범위"><span class="ve-label">§0</span><span class="map-name">분석 범위</span><span class="map-bar"><i style="width:96.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#1-결론-요약"><span class="ve-label">§1</span><span class="map-name">결론 요약</span><span class="map-bar"><i style="width:40%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#2-우선순위-표"><span class="ve-label">§2</span><span class="map-name">우선순위 표</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#3-slot-map--generational-index--free-list"><span class="ve-label">§3</span><span class="map-name">Slot map / generational index / free-list</span><span class="map-bar"><i style="width:35.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#4-공간-분할-셀-격자--bvh--클러스터-계층"><span class="ve-label">§4</span><span class="map-name">공간 분할 (셀 격자 / BVH / 클러스터 계층)</span><span class="map-bar"><i style="width:18.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#5-soa와-csr"><span class="ve-label">§5</span><span class="map-name">SoA와 CSR</span><span class="map-bar"><i style="width:20.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#6-프레임마다-다시-만드는-임시-컨테이너"><span class="ve-label">§6</span><span class="map-name">프레임마다 다시 만드는 임시 컨테이너</span><span class="map-bar"><i style="width:34.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#7-string-interning--투명-조회--perfect-hash"><span class="ve-label">§7</span><span class="map-name">String interning / 투명 조회 / perfect hash</span><span class="map-bar"><i style="width:50.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#8-축출-정책-연령-버킷--intrusive-lru--clock"><span class="ve-label">§8</span><span class="map-name">축출 정책: 연령 버킷 / intrusive LRU / CLOCK</span><span class="map-bar"><i style="width:82.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#9-퇴역-큐-단일-패스-압축--조건부-fifo-링-hitch-우선-조사-후보"><span class="ve-label">§9</span><span class="map-name">퇴역 큐: 단일 패스 압축 / 조건부 FIFO 링 (hitch 우선 조사 후보)</span><span class="map-bar"><i style="width:47.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#10-할당기큐태스크"><span class="ve-label">§10</span><span class="map-name">할당기·큐·태스크</span><span class="map-bar"><i style="width:93.9%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#11-sequence-buffer-단조-증가-id--상한-있는-창"><span class="ve-label">§11</span><span class="map-name">Sequence buffer (단조 증가 ID + 상한 있는 창)</span><span class="map-bar"><i style="width:40.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#12-프록시-스냅샷-borrowed--지연-퇴역"><span class="ve-label">§12</span><span class="map-name">프록시 스냅샷: borrowed + 지연 퇴역</span><span class="map-bar"><i style="width:52.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#13-해시-품질-정적-캐시-프레임-핀"><span class="ve-label">§13</span><span class="map-name">해시 품질, 정적 캐시, 프레임 핀</span><span class="map-bar"><i style="width:52.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#14-gpu스트리밍-자료구조"><span class="ve-label">§14</span><span class="map-name">GPU·스트리밍 자료구조</span><span class="map-bar"><i style="width:66.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#15-정렬-키와-radix-sort"><span class="ve-label">§15</span><span class="map-name">정렬 키와 radix sort</span><span class="map-bar"><i style="width:23.8%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#16-애니메이션-클립-데이터-배치"><span class="ve-label">§16</span><span class="map-name">애니메이션 클립 데이터 배치</span><span class="map-bar"><i style="width:20.3%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#17-기타-런타임"><span class="ve-label">§17</span><span class="map-name">기타 런타임</span><span class="map-bar"><i style="width:24.4%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#18-관리-코드-c-f"><span class="ve-label">§18</span><span class="map-name">관리 코드 (C#, F#)</span><span class="map-bar"><i style="width:46.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#19-에디터도구정확성"><span class="ve-label">§19</span><span class="map-name">에디터·도구·정확성</span><span class="map-bar"><i style="width:90.7%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#20-엔진-안의-기존-도구-재사용-우선"><span class="ve-label">§20</span><span class="map-name">엔진 안의 기존 도구 (재사용 우선)</span><span class="map-bar"><i style="width:25%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#21-이미-적절해서-바꾸지-않는-곳"><span class="ve-label">§21</span><span class="map-name">이미 적절해서 바꾸지 않는 곳</span><span class="map-bar"><i style="width:29.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#22-b-tree-판정"><span class="ve-label">§22</span><span class="map-name">B-tree 판정</span><span class="map-bar"><i style="width:17%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#23-공용화-후보와-도입-원칙"><span class="ve-label">§23</span><span class="map-name">공용화 후보와 도입 원칙</span><span class="map-bar"><i style="width:22.9%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 24개 가운데 「2. 우선순위 표」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><h3 id="비용-모델의-공통-전제">비용 모델의 공통 전제</h3>
+<ul>
+<li><p><strong>할당기</strong>: mimalloc은 전역 할당기가 아니다. 다음 경로에서만 쓰인다.</p>
+<ul>
+<li><code>Engine/Utility_Framework/Arena.cpp:65</code></li>
+<li><code>Engine/Utility_Framework/HeapAllocator.h</code></li>
+<li><code>Engine/RenderEngine/RenderAllocator.h</code></li>
+</ul>
+<p><code>std::map</code>/<code>unordered_map</code> 노드와 <code>std::function</code> 힙 캡처는 CRT(Windows heap)로 간다. <code>Editor/EngineEntry/Commands/DiagnosticsCommands.cpp:176</code>의 mem.bench 기록에는 다음이 있다.</p>
+<ul>
+<li>프레임당 약 272건</li>
+<li>mimalloc 기준 256B 이하 22~75ns</li>
+</ul>
+</li>
+<li><p><strong>연산 단가</strong>:</p>
+<div class="table-scroll"><table>
+<thead><tr><th>연산</th><th>가정 비용</th></tr></thead>
+<tbody><tr><td>CRT 소형 노드 할당 + 해제</td><td>50~150ns</td></tr>
+<tr><td>MSVC <code>unordered_map</code> 조회 (FNV-1a + 버킷 리스트 노드 미스)</td><td>30~80ns</td></tr>
+<tr><td>차가운 캐시 라인 원자 RMW</td><td>40~100ns</td></tr>
+<tr><td>연속 배열 원소</td><td>수 ns</td></tr></tbody></table></div>
+</li>
+</ul>
+</section>
+<section class="doc-sec" id="sec-0-분석-범위">
+<div class="sec-head"><p class="ve-label">§0</p><h2 id="0-분석-범위">0. 분석 범위</h2></div>
+<div class="prose"><h3 id="방법">방법</h3>
+<ul>
+<li><code>Engine/</code> 전체의 연관 컨테이너·<code>deque</code>·<code>priority_queue</code> 선언 약 470곳을 전수 분류했다.</li>
+<li>다음 비효율 패턴은 grep 휴리스틱으로 전체를 훑었고, 밀집 파일은 직접 읽었다.<ul>
+<li><code>vector</code> 중간 <code>erase</code> / 앞쪽 <code>insert</code></li>
+<li><code>std::find</code>·<code>any_of</code> 류 선형 탐색</li>
+<li><code>vector&lt;bool&gt;</code></li>
+<li><code>std::function</code> 멤버·컨테이너</li>
+<li>스냅샷 반환 함수</li>
+<li>&quot;가장 오래된 것 전수 탐색&quot; 축출 패턴</li>
+</ul>
+</li>
+</ul>
+<h3 id="직접-읽은-영역">직접 읽은 영역</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>영역</th><th>범위</th></tr></thead>
+<tbody><tr><td>RenderEngine</td><td>씬 렌더러, MaterialGraph(SceneHost·SceneLookup·MeshSurface·RenderBindings·InstancePins·Runtime), 렌더 그래프, RenderScene, 프록시 큐, 클러스터 스트리밍, 폰트, 광원 선별, 스프라이트·UI·반투명 정렬, DataSystem 캐시, AssetDepot(Texture·Model·Material 런타임), LX 머티리얼 런타임 캐시, ShaderMetadataRuntime, 애니메이션 샘플러·트랙 배치</td></tr>
+<tr><td>RHI</td><td>영속 힙, 디스크립터, PSO, 루트 시그니처, 텍스처·메시 캐시, 축출 정책, 퇴역 큐, 제출 스레드, sparse 페이지 풀, 입력 레이아웃 캐시, 배치 시그니처, DLSS 어댑터, Vulkan 리소스 테이블·렌더 서비스·파이프라인 캐시, 예산 코디네이터</td></tr>
+<tr><td>셰이더</td><td><code>Dynamic_CPP/Assets/Shaders/DefaultPassShader/ForwardCull.slang</code> (광원 타일 컬링)</td></tr>
+<tr><td>SceneRuntime</td><td>Scene(선택·물리·Canvas), 물리 바인딩, Tag, BlackBoard, 폴리지, 트랜스폼 계층, 오디오 런타임·PlaybackService, Entity 컴포넌트 조회, SystemSchedule, SceneManager 일부, 입력 액션, BT 평탄화, 충돌 지오메트리 라이브러리</td></tr>
+<tr><td>Physics / Effect / EngineDiagnostics</td><td><code>PhysicsScene</code> 디스패처·슬롯·센서 페어 / <code>EffectState</code> / 마커·스레드 스트림·집계·작업 큐</td></tr>
+<tr><td>Utility_Framework</td><td>JobScheduler, ThreadPool, Arena, LogSystem·LogStore, Delegate, TypeTrait, 자체 컨테이너(RingBuffer·ConcurrentQueue·FixedPool·DynamicBitset·HashingString·MemoryPool)</td></tr>
+<tr><td>ThirdParty</td><td>GCCE <code>block_allocator</code>·<code>domain</code>, <code>ownership_cpp</code> <code>ownership.hpp</code></td></tr>
+<tr><td>관리 코드</td><td>ScriptRuntime(F#) Registry·Contacts·Trees, ScriptCore(C#) Entity·ScriptRegistry·BlackBoard·BehaviorTree</td></tr>
+<tr><td>Lattice</td><td><code>Core/LXGraph</code>, <code>ImGui/LXCanvas</code>·<code>LXNodeItems</code>·<code>LXStyle</code> 선언, <code>Material</code> 선언</td></tr>
+<tr><td>Editor</td><td>자산 DB, 썸네일 캐시, 콘솔 명령 큐, HierarchyFlatten, 인스펙터 등록 표</td></tr></tbody></table></div>
+<h3 id="제외하거나-얕게-본-영역">제외하거나 얕게 본 영역</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>영역</th><th>이유 / 상태</th></tr></thead>
+<tbody><tr><td><code>BuildTool</code>(C#)</td><td>오프라인 패키징 도구</td></tr>
+<tr><td><code>GameScripts</code></td><td>수용 프로브. 할당 패턴만 확인</td></tr>
+<tr><td><code>Engine/Network</code></td><td>계약 인터페이스만 있고 구현 없음</td></tr>
+<tr><td><code>Engine/Contracts</code>, <code>Engine/RuntimeHost</code>, <code>Player</code>, <code>HeadlessHost</code>, <code>SingletonManager</code></td><td>플랫폼·명령 파싱·부트스트랩. 프레임 경로가 아님. 선언만 확인</td></tr>
+<tr><td><code>Tools/</code>, GCCE·ownership_cpp 외 <code>ThirdParty</code></td><td>범위 밖</td></tr>
+<tr><td><code>vector</code> 약 2,910곳</td><td>개별 열람하지 않음. 위 휴리스틱에 걸린 지점만 읽음</td></tr>
+<tr><td>Lattice <code>Material</code> 컴파일러, <code>LXDocument</code></td><td>선언만 확인. 컴파일 시점 맵</td></tr>
+<tr><td>Editor 인스펙터·컨텐츠 브라우저·노드 에디터 창 본문, <code>EditorRender</code> 패스 본문</td><td>선언만 확인</td></tr>
+<tr><td><code>AssetMetaRegistry</code>, <code>ArtifactByteSource</code>, <code>PrefabUtility</code> 본문</td><td>선언만 확인</td></tr>
+<tr><td>셰이더</td><td><code>ForwardCull.slang</code>만 읽음. 나머지 GPU 자료구조(파티클 정렬, Effect GPU 시뮬레이션)는 보지 않음</td></tr>
+<tr><td>Effect 정의·IR 검증, cooked manifest, 임포터 대부분</td><td>빌드·로드 시점. 결정성 요구 때문에 대상에서 뺌(§21)</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-1-결론-요약">
+<div class="sec-head"><p class="ve-label">§1</p><h2 id="1-결론-요약">1. 결론 요약</h2></div>
+<div class="prose"><ul>
+<li>비용 증가가 예상되는 후보는 주로 <strong>접근 패턴과 맞지 않는 자료구조 계열</strong>이다. 실제 비용 비중은 미확인이다.<ul>
+<li>매 프레임 전수 순회·정렬</li>
+<li>중첩 선형 탐색</li>
+<li>노드 기반 조회</li>
+<li>원자 refcount 복사</li>
+<li>예산 축출의 전수 최소값 탐색</li>
+</ul>
+</li>
+<li>런타임 프레임 비용의 상위 조사 후보는 다음 셋이다. 아래 수치는 미실측 가설이며, 실제 상위 병목인지는 미확인이다.<ul>
+<li>폴리지 CPU 컬링: 0.4~4ms</li>
+<li>프록시 스냅샷 refcount: 0.5~3ms</li>
+<li>GPU 자산 축출 전체 검사 + 조건을 통과한 후보 정렬: 0.2~1ms</li>
+</ul>
+</li>
+<li>순간 정지(hitch) 우선 조사 후보는 <strong>퇴역 큐 <code>vector</code> 루프 <code>erase</code></strong> 다. 대량 언로드 때 50~200ms라는 미실측 추정은 있으나 실제 발생 시간이나 위험 1위는 입증하지 않았다.</li>
+<li>에디터 우선 조사 후보는 <strong>Lattice 캔버스의 O(L²·(P+N)) 헤더 링크 처리</strong>다. 링크 200·핀 1천에서 프레임당 수십 ms는 미실측 추정이며, 헤더 전용 노드 스타일 등 해당 경로의 활성 조건에 좌우된다.</li>
+<li>정확성 문제를 4건 발견했다.<ul>
+<li><code>TagManager</code>의 <code>string_view.data()</code> 조회: 범위 밖 읽기 가능성</li>
+<li>폰트 아틀라스 고갈: 한글 대량 텍스트</li>
+<li>헤더 <code>static std::set g_guids</code>: TU마다 사본이 생겨 중복 검사가 무력화됨</li>
+<li>Forward+ 타일당 32개 고정 목록: 넘치면 광원이 조용히 잘림</li>
+</ul>
+</li>
+<li>엔진 안에 이미 쓸 수 있는 도구가 있다. 새 구조를 만들기보다 이것들을 넓혀 쓰는 편이 낫다(§20).<ul>
+<li><code>FixedPool</code>, <code>DynamicBitset</code>, <code>render_pointer_set</code></li>
+<li><code>ownership_cpp</code>의 <code>borrowed</code> / <code>local_owner</code> / 지연 퇴역 훅</li>
+</ul>
+</li>
+<li>B-tree가 맞는 곳은 로드 시점 카탈로그뿐이고 효과도 작다(§22).</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-2-우선순위-표">
+<div class="sec-head"><p class="ve-label">§2</p><h2 id="2-우선순위-표">2. 우선순위 표</h2></div>
+<div class="prose"><p>표의 순위는 <strong>잠정 조사 우선순위</strong>, 비용은 <strong>미실측 추정</strong>이다. 정확성 항목도 실제 재현 여부와 잠재 위험을 구분해 검증해야 한다.</p>
+<h3 id="21-런타임-게임플레이어-프레임">2.1 런타임 (게임·플레이어 프레임)</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>순위</th><th>지점</th><th>제안 계열</th><th>추정 비용(가정)</th><th>절</th></tr></thead>
+<tbody><tr><td class="num">1</td><td>퇴역 큐 <code>RHICompletionRetireQueue::Collect</code></td><td>FIFO 링 / <code>erase_if</code> 한 패스</td><td>대량 언로드 시 50~200ms 1회(1만 엔트리)</td><td>§9</td></tr>
+<tr><td class="num">2</td><td>폴리지 컬링</td><td>셀 격자/BVH + SoA + 캐시된 월드 AABB</td><td>0.4<del>4ms/프레임(인스턴스 1만</del>10만)</td><td>§4, §5</td></tr>
+<tr><td class="num">3</td><td>프록시 스냅샷</td><td><code>borrowed</code> 배열 + 지연 퇴역(에폭) / 청크 COW</td><td>0.5~3ms/프레임(프록시 1만 × 프레임당 4회라는 미검증 가정)</td><td>§12</td></tr>
+<tr><td class="num">4</td><td>GPU 자산 축출</td><td>연령 버킷(timer wheel)</td><td>0.2<del>1ms/프레임(상주 2천</del>1만)</td><td>§8</td></tr>
+<tr><td class="num">5</td><td>Forward+ 광원 목록</td><td>2.5D 깊이 마스크 / 클러스터 / z-binning + 가변 길이 목록</td><td>정확성(타일당 32개 초과분 잘림) + 깊이 불연속 타일 과다 셰이딩</td><td>§14</td></tr>
+<tr><td class="num">6</td><td>예산 LRU 전수 탐색 10곳 + MeshSurface touch</td><td>Intrusive LRU / linked hash map</td><td>축출 1회 O(n), 트림 O(n·k), touch O(n)</td><td>§8</td></tr>
+<tr><td class="num">7</td><td>프레임 임시 set/map</td><td>재사용 정렬 vector / open addressing / 고정 배열</td><td>0.05~0.5ms/프레임</td><td>§6</td></tr>
+<tr><td class="num">8</td><td>반투명·스프라이트·UI 정렬</td><td>패킹 키 radix sort</td><td>0.05~0.3ms/프레임(수천 항목)</td><td>§15</td></tr>
+<tr><td class="num">9</td><td>애니메이션 클립 데이터</td><td>클립 단일 블롭 + SoA 시간 배열 / 균일 샘플</td><td>뼈 수 × 트랙 3개의 포인터 추적, 캐시 미스</td><td>§16</td></tr>
+<tr><td class="num">10</td><td>폰트 아틀라스</td><td>Skyline 패킹 + 페이지 LRU</td><td>정확성(아틀라스 고갈)</td><td>§17</td></tr>
+<tr><td class="num">11</td><td>TagManager / 헤더 <code>g_guids</code></td><td>Interning + 투명 조회 / 단일 정의</td><td>정확성</td><td>§7, §19</td></tr>
+<tr><td class="num">12</td><td>영속 힙 free-list</td><td>TLSF</td><td>할당마다 1~3µs(mutex 안)</td><td>§10</td></tr>
+<tr><td class="num">13</td><td>recording ID 키 <code>std::map</code> 7종</td><td>Sequence buffer</td><td>0.01~0.05ms/프레임</td><td>§11</td></tr>
+<tr><td class="num">14</td><td>물리 바인딩 조회</td><td>Slot map</td><td>0.05<del>0.15ms/프레임(바디 1</del>2천)</td><td>§3</td></tr>
+<tr><td class="num">15</td><td>MaterialGraph InstancePins / 입력 레이아웃·LX 셰이더 정적 캐시</td><td>Open addressing / 슬롯 인덱스 배열 / 읽기 위주 COW 스냅샷</td><td>draw·인스턴스마다 전역 mutex + 노드 조회</td><td>§13</td></tr>
+<tr><td class="num">16</td><td>C# BlackBoard / <code>GetComponents*</code> / BT 인스턴스</td><td>Tagged union + key ID / 호출자 버퍼 / 공유 평탄 BT + 에이전트별 상태</td><td>GC 압력(Set마다 박싱, 조회마다 <code>List</code>)</td><td>§18</td></tr>
+<tr><td class="num">17</td><td>미리 해시된 <code>uint64</code> 키 맵</td><td>Identity hasher + open addressing</td><td>조회마다 FNV 재해시</td><td>§13</td></tr>
+<tr><td class="num">18</td><td>스레드 간 큐, MSVC deque, PPL <code>concurrent_queue</code></td><td>상한 SPSC/MPSC 링 / 프레임 이중 버퍼</td><td>원소마다 노드 할당 + 동기화</td><td>§10</td></tr>
+<tr><td class="num">19</td><td>JobScheduler 태스크, 페이지 리더</td><td>태스크 객체 풀 + inplace function / 호출자 버퍼</td><td>제출·페이지 읽기마다 할당</td><td>§10</td></tr>
+<tr><td class="num">20</td><td>클러스터 스트리밍 LRU, sparse 페이지 풀</td><td>Intrusive LRU / 평탄 페이지 테이블</td><td>재구성마다 O(n log n), 타일마다 노드</td><td>§8, §14</td></tr>
+<tr><td class="num">21</td><td>오디오 보이스 제한</td><td>증분 카운터 + 인덱스 힙</td><td>제한 강제 시 O(V²)</td><td>§17</td></tr>
+<tr><td class="num">22</td><td>Effect 슬롯, SystemSchedule origin 집합, F# 레지스트리</td><td>Free-list 스택 / 플래그 + 카운터 / mark-and-compact</td><td>소규모 O(n)</td><td>§3, §17, §18</td></tr></tbody></table></div>
+<h3 id="22-에디터도구">2.2 에디터·도구</h3>
+<div class="table-scroll"><table>
+<thead><tr><th>순위</th><th>지점</th><th>제안 계열</th><th>추정 비용(가정)</th><th>절</th></tr></thead>
+<tbody><tr><td class="num">1</td><td>Lattice 캔버스 링크 그리기</td><td>프레임(또는 그래프 리비전) 단위 인덱스: 핀→노드, 노드→레이아웃·크기, 노드별 측면 포트 순서</td><td>O(L²·(P+N))/프레임, 링크 200·핀 1천이면 수십 ms</td><td>§19</td></tr>
+<tr><td class="num">2</td><td>Lattice 그래프 검증·undo</td><td>ID 인덱스 + 구조 공유 undo</td><td>편집마다 1~3ms, undo 메모리 O(편집 × 그래프)</td><td>§19</td></tr>
+<tr><td class="num">3</td><td>Scene 선택 목록</td><td>순서 vector + 엔티티 인덱스 소속 비트셋</td><td>전체 선택(N=1만) 시 O(N²) ≈ 5천만 비교</td><td>§19</td></tr>
+<tr><td class="num">4</td><td>자산 DB 경로 맵·debounce</td><td>경로 interning + linked hash map / radix tree</td><td>대량 변경 시 틱마다 O(n log n · 경로 비교)</td><td>§19</td></tr>
+<tr><td class="num">5</td><td>임포트·쿠킹 해시</td><td>양자화 공간 해시 / 64비트 간선 키</td><td>임포트 시간</td><td>§19</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-3-slot-map--generational-index--free-list">
+<div class="sec-head"><p class="ve-label">§3</p><h2 id="3-slot-map--generational-index--free-list">3. Slot map / generational index / free-list</h2></div>
+<div class="prose"><p>ID → 객체 조회를 해시 대신 배열 인덱스 접근 한 번으로 바꾼다. 엔티티(<code>Engine/SceneRuntime/EntityHandle.h</code>)와 Vulkan 리소스 테이블(<code>VulkanResourceTable.h:318</code>, 슬롯 + free 목록)은 이미 이 패턴을 쓴다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>지점</th><th>현재</th><th>관찰</th></tr></thead>
+<tbody><tr><td><code>Engine/SceneRuntime/Scene.cpp:2280</code></td><td><code>m_physicsBodies.find(pose.binding)</code></td><td>렌더 포즈마다 해시 조회</td></tr>
+<tr><td><code>Engine/SceneRuntime/Scene.cpp:3328</code></td><td><code>m_physicsContactOwners.find</code> × 2</td><td>접촉마다 조회 2회</td></tr>
+<tr><td><code>Engine/SceneRuntime/ScenePhysicsSimulation.h:173</code></td><td>같은 ID로 해시맵 4개</td><td><code>binding_id</code>가 <code>++m_next</code>로 계속 증가(<code>ScenePhysicsSimulation.cpp:60</code>)</td></tr>
+<tr><td><code>AnimationScheduler.h:72</code>, <code>AIManager.h:114</code>, <code>AnimatorSystem.h:205</code></td><td><code>unordered_map&lt;id, …&gt;</code></td><td>ID → 슬롯 매핑만 해시로 남은 경우 포함</td></tr>
+<tr><td><code>Engine/Effect/EffectState.cpp:64</code></td><td>빈 슬롯을 선형 탐색</td><td>generation은 이미 있다. free-list 스택만 붙이면 O(1)</td></tr></tbody></table></div>
+<ul>
+<li>제안: <code>binding_id = (slot &lt;&lt; 32) | generation</code>. 저장소로는 <code>Engine/Utility_Framework/FixedPool.h</code>(free list + live 비트맵, O(1), 할당 없음)를 재사용할 수 있다. 현재 사용처는 1곳뿐이다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-4-공간-분할-셀-격자--bvh--클러스터-계층">
+<div class="sec-head"><p class="ve-label">§4</p><h2 id="4-공간-분할-셀-격자--bvh--클러스터-계층">4. 공간 분할 (셀 격자 / BVH / 클러스터 계층)</h2></div>
+<div class="prose"><ul>
+<li>이 분석에서 확인한 폴리지 컬링 경로에는 CPU 셀/BVH 기반 일괄 기각이 없다. 엔진 전체의 CPU 공간 구조 부재를 입증한 것은 아니다. 메시에는 GPU 컬링(HZB) 경로가 있다.</li>
+<li>폴리지는 <code>Engine/SceneRuntime/FoliageComponent.cpp:591</code>에서 인스턴스마다 <code>RebuildWorldMatrix()</code> → AABB 변환 → 프러스텀 판정을 매 프레임 반복한다. 인스턴스당 약 40ns로 보면 1만<del>10만 개에서 0.4</del>4ms다.</li>
+<li>제안:<ul>
+<li>정적 폴리지를 셀 격자나 셀 BVH로 묶는다.<ul>
+<li>셀이 프러스텀 밖이면 셀 전체를 건너뛴다.</li>
+<li>셀이 완전히 안쪽이면 개별 판정 없이 수용한다.</li>
+</ul>
+</li>
+<li>월드 행렬과 월드 AABB는 배치·편집 시점에 캐시한다.</li>
+<li>같은 구조를 에디터 피킹, 근접 질의, 데칼·라이트 영향 범위 질의에 재사용한다.</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-5-soa와-csr">
+<div class="sec-head"><p class="ve-label">§5</p><h2 id="5-soa와-csr">5. SoA와 CSR</h2></div>
+<div class="prose"><ul>
+<li>폴리지 SoA: 컬링은 위치·바운드·플래그만 읽는다. 분리하면 SIMD로 4<del>8개씩 판정할 수 있다. §4와 함께 적용하면 2</del>6배를 추정한다.</li>
+<li>CSR / counting sort:<ul>
+<li><code>Engine/RenderEngine/PrimitiveRenderProxy.cpp:27</code> <code>instanceMap</code>: 키가 밀집된 타입 인덱스다. <code>offsets[]</code> + 평탄 배열로 바꾼다.</li>
+<li><code>Engine/RenderEngine/Render/Graph/EnhancedRenderGraph.cpp:2046</code>, <code>:2071</code>: 간선마다 <code>none_of</code>로 중복 검사(O(E·deg))를 한다. 비트 인접 행렬 + CSR로 바꾼다.</li>
+<li>같은 파일 <code>:2080</code> <code>priority_queue&lt;uint16_t&gt;</code>: 비트셋 + find-first-set.</li>
+<li>같은 파일 <code>:1731</code>, <code>:1980</code> <code>seen</code> 선형 중복 검사: 패스 수 상한이 작으므로 <code>DynamicBitset</code>.</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-6-프레임마다-다시-만드는-임시-컨테이너">
+<div class="sec-head"><p class="ve-label">§6</p><h2 id="6-프레임마다-다시-만드는-임시-컨테이너">6. 프레임마다 다시 만드는 임시 컨테이너</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>지점</th><th>현재</th><th>제안</th></tr></thead>
+<tbody><tr><td><code>Engine/RenderEngine/Render/Scene/EnhancedSceneRenderer.cpp:5550</code> <code>activeMeshes</code></td><td><code>std::set</code> 삽입</td><td>재사용 vector + sort/unique</td></tr>
+<tr><td><code>EnhancedSceneRenderer.cpp:5645</code> <code>modelPinIndices</code> / <code>meshPinIndices</code></td><td>빌드마다 <code>std::map</code> 2개</td><td>재사용 open addressing</td></tr>
+<tr><td><code>EnhancedSceneRenderer.cpp:6040</code>, <code>:6131</code> <code>currentViews</code></td><td><code>std::set</code>, 상한 <code>kMaxLiveCameraViews</code></td><td>고정 배열에서 선형 탐색</td></tr>
+<tr><td><code>Engine/RenderEngine/Render/Scene/EnhancedTemporalViewState.h:21</code>, <code>:28</code></td><td>프레임마다 <code>clear</code> + 원소마다 노드</td><td>정렬 vector 2개 swap + 이진 탐색</td></tr>
+<tr><td><code>Engine/RenderEngine/MaterialGraphSceneHost.cpp:1856</code> <code>sources</code></td><td>draw마다 <code>std::map</code></td><td>재사용 해시</td></tr>
+<tr><td><code>MaterialGraphSceneHost.cpp:710</code>, <code>Engine/RenderEngine/MaterialGraphSceneGpuData.h:53</code></td><td>포인터 키 <code>std::map</code></td><td>원래 주소 순서라 해시로 바꿔도 잃는 것 없음</td></tr></tbody></table></div>
+<ul>
+<li>이미 있는 도구: <code>Engine/RenderEngine/RenderArena.h:33</code> <code>render_pointer_set</code>.</li>
+<li><code>arena_map</code>(<code>Arena.h:373</code>)은 할당 비용만 줄인다. RB-tree 포인터 추적은 남는다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-7-string-interning--투명-조회--perfect-hash">
+<div class="sec-head"><p class="ve-label">§7</p><h2 id="7-string-interning--투명-조회--perfect-hash">7. String interning / 투명 조회 / perfect hash</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>지점</th><th>문제</th><th>제안</th></tr></thead>
+<tbody><tr><td><code>Engine/SceneRuntime/TagManager.cpp:162</code>, <code>:176</code>, <code>:191</code>, <code>:202</code>, <code>:223</code></td><td><code>find(tag.data())</code>: 조회마다 <code>std::string</code> 할당. <strong><code>string_view.data()</code>는 널 종료가 보장되지 않아 범위 밖을 읽을 수 있다</strong></td><td>투명 해시로 <code>string_view</code> 직접 조회</td></tr>
+<tr><td><code>TagManager::m_taggedObjects</code></td><td>태그 ID가 있는데도 문자열로 다시 키잉</td><td><code>vector&lt;vector&lt;Entity*&gt;&gt;[tagId]</code> + swap-remove</td></tr>
+<tr><td><code>Engine/SceneRuntime/BlackBoard.h:59</code></td><td>AI 틱 경로의 문자열 키(호출처 21곳)</td><td>Interned atom ID</td></tr>
+<tr><td><code>Engine/RenderEngine/Material.cpp:756</code></td><td>cbuffer 이름 문자열 조회</td><td>레이아웃 시점에 슬롯으로 해석</td></tr>
+<tr><td><code>ComponentFactory.h:22</code>, <code>RenderState.h:28</code>, <code>Player/PlayerCommands.cpp:782</code>, <code>InputActionManager.h:16</code>(<code>FindActionMap(std::string)</code> 값 전달 + 선형)</td><td>키 집합이 고정됨</td><td>정적 perfect hash / interned ID / <code>string_view</code> 인자</td></tr>
+<tr><td><code>Engine/RenderEngine/DataSystem.cpp:3479</code> 등 <code>Materials.find(std::string(name))</code></td><td>경로 문자열 키, 임시 문자열 생성</td><td>투명 조회 + FileGuid 키로 일원화</td></tr>
+<tr><td><code>Engine/RenderEngine/AssetDepot/TextureAssetRuntime.h:50</code> <code>TextureImageKey</code></td><td>엔트리마다 <code>targetPlatform</code>/<code>targetAbi</code> 문자열 2개(프로세스 내 상수)</td><td>플랫폼·ABI interned ID</td></tr>
+<tr><td><code>Engine/RenderEngine/RHI/DX12/DX12DescriptorHeaps.h:349</code></td><td><code>map&lt;vector&lt;uint64_t&gt;&gt;</code>: 조회마다 키 할당</td><td>합성 해시 + 정확 비교, inline small vector</td></tr></tbody></table></div>
+<p>참고: <code>Engine/Utility_Framework/HashingString.h</code>는 문자열과 캐시된 해시를 함께 들고 다니는 구조이지, interning이 아니다. 문자열 소유와 비교 비용은 남는다. atom 테이블은 별도로 필요하다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-8-축출-정책-연령-버킷--intrusive-lru--clock">
+<div class="sec-head"><p class="ve-label">§8</p><h2 id="8-축출-정책-연령-버킷--intrusive-lru--clock">8. 축출 정책: 연령 버킷 / intrusive LRU / CLOCK</h2></div>
+<div class="prose"><h3 id="81-전체-검사--조건부-후보-정렬">8.1 전체 검사 + 조건부 후보 정렬</h3>
+<ul>
+<li><code>Engine/RenderEngine/RHI/DX12/EnhancedSceneRendererLiveDX12Adapter.cpp:1909</code> → <code>DX12TextureCache::RetireUnused</code> / <code>DX12MeshCache::RetireUnused</code> → <code>Engine/RenderEngine/RHI/RHIAssetEvictionPolicy.cpp:46</code>.<ul>
+<li>현재: 상주 엔트리로 구성한 입력 후보 전체를 검사한 뒤, 연령·축출 가능 여부·메모리 압박 조건을 통과한 <code>normal</code>/<code>pressured</code> 목록만 각각 <code>std::sort</code>한다. 전체 검사 비용과 실제 정렬 대상 수를 구분해야 한다(<code>RHIAssetEvictionPolicy.cpp:64</code>~`:96`).</li>
+<li>제안: <code>lastUsedFrame</code> 연령 버킷(timer wheel).<ul>
+<li>touch할 때 버킷을 옮긴다.</li>
+<li>축출은 임계 연령을 넘은 버킷만 비운다.</li>
+<li>압박 모드의 정렬은 버킷 안에서만 한다.</li>
+<li>축출 선택 단계의 빈 버킷 확인은 O(1)을 목표로 할 수 있다. 프레임 전체 비용에는 touch·버킷 이동·프레임 진행 처리가 남는다.</li>
+<li>안전 조건: 기존의 최근 사용 보호, 업로드 미완료 제외, 압박 목표 바이트, 동일 연령의 바이트 내림차순·assetId 오름차순 규칙을 보존하거나 변경 계약을 명시한다.</li>
+</ul>
+</li>
+</ul>
+</li>
+</ul>
+<h3 id="82-예산-초과-시-가장-오래된-것-전수-탐색-10곳">8.2 예산 초과 시 &quot;가장 오래된 것&quot; 전수 탐색 (10곳)</h3>
+<p><code>while (charge &gt; budget) { 전체를 훑어 lastUse 최소를 찾고 축출 }</code> 형태다. 축출 1회가 O(n), 트림 1회가 O(n·k)다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>지점</th></tr></thead>
+<tbody><tr><td><code>Engine/RenderEngine/AssetDepot/TextureAssetRuntime.cpp:515</code>, <code>:639</code>, <code>:661</code>, <code>:1149</code></td></tr>
+<tr><td><code>Engine/RenderEngine/AssetDepot/MaterialAssetRuntime.cpp:256</code>, <code>:818</code></td></tr>
+<tr><td><code>Engine/RenderEngine/AssetDepot/ModelAssetRuntime.cpp:686</code></td></tr>
+<tr><td><code>Engine/RenderEngine/Assets/ModelAssetGeneration.cpp:1319</code></td></tr>
+<tr><td><code>Engine/RenderEngine/MaterialGraphRuntime.cpp:509</code></td></tr>
+<tr><td><code>Engine/RenderEngine/ShaderMetadataRuntime.cpp:125</code></td></tr></tbody></table></div>
+<ul>
+<li>제안: 엔트리에 prev/next를 두는 intrusive LRU(또는 hash + 리스트의 linked hash map). touch O(1), 축출 O(1). 기존 <code>clock</code>/<code>lastUse</code> 값은 진단용으로만 남긴다.</li>
+<li>캐시가 <code>std::map</code> 노드에 들어 있으므로, 노드 안에 리스트 링크를 넣는 방식으로 바로 적용할 수 있다. 이터레이터가 안정적이기 때문이다.</li>
+</ul>
+<h3 id="83-기타-lru">8.3 기타 LRU</h3>
+<ul>
+<li><code>Engine/RenderEngine/MaterialGraphMeshSurface.cpp:1407</code>: touch할 때 <code>std::erase(insertionOrder, key)</code>로 deque를 선형 삭제하고 다시 넣는다. touch가 O(n)이다. 같은 intrusive LRU로 바꾼다.</li>
+<li><code>Engine/RenderEngine/Assets/ClusterStreaming.h:373</code>: 재구성마다 <code>stable_sort(m_lastUse)</code>를 한다. 그룹 배열 intrusive LRU로 바꾸면 결정성을 유지하면서 O(1)/O(k)가 된다.</li>
+<li><code>MaterialGraphRenderBindings.h:164</code> <code>descriptions_</code>(<code>lastUse</code> + 바이트 예산), <code>Editor/EngineGUIWindow/BrowserThumbnailCache.cpp</code>: 같은 대상이다.</li>
+</ul>
+<p>공용 <code>intrusive_lru&lt;Index&gt;</code> 하나로 14곳 이상을 정리할 수 있다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-9-퇴역-큐-단일-패스-압축--조건부-fifo-링-hitch-우선-조사-후보">
+<div class="sec-head"><p class="ve-label">§9</p><h2 id="9-퇴역-큐-단일-패스-압축--조건부-fifo-링-hitch-우선-조사-후보">9. 퇴역 큐: 단일 패스 압축 / 조건부 FIFO 링 (hitch 우선 조사 후보)</h2></div>
+<div class="prose"><ul>
+<li><code>Engine/RenderEngine/RHI/RHICompletionRetireQueue.h:55</code> <code>Collect</code>: <code>std::vector&lt;Entry&gt;</code>를 순회하며 원소마다 <code>it = m_entries.erase(it)</code>를 한다. O(n·k)다.</li>
+<li>사용처는 매 프레임 실행된다: <code>DX12TextureCache</code>, <code>DX12MeshCache</code>, <code>DX12PSOManager</code>, <code>VulkanPipelineCache</code>, <code>VulkanRenderServices</code>.</li>
+<li>대량 언로드나 압박 축출 때 1만 엔트리 중 절반을 회수하면 삭제 위치에 따라 수천만 회의 원소 이동이 생길 수 있다. 약 5천만 회는 거친 상한 규모 가정이며, 실제 Entry 크기·payload 이동/해제 비용은 별도 확인이 필요하다. 50~200ms는 실측하지 않은 추정으로, 실제 hitch 시간이나 순위를 입증하지 않는다.</li>
+<li>제안:<ul>
+<li>즉시: <code>std::erase_if</code> 또는 안정적 단일 패스 압축으로 O(n). releaser를 회수 대상마다 정확히 한 번 호출하고, 잔존 순서·pending bytes/count·quarantine count를 보존한다.</li>
+<li>구조: 모든 생산자의 enqueue 순서에서 completion 값이 단조 증가하고 같은 완료 타임라인을 사용함을 입증한 경우에만 FIFO 링의 앞쪽 pop으로 O(k)를 적용한다. 현재 컨테이너 자체는 이 순서를 강제하지 않는다. 순서가 보장되지 않으면 단일 패스 검사를 유지한다.</li>
+<li>안전 조건: completion 값 0인 quarantine은 Collect에서 절대 회수하지 않고 producer/consumer 정지 후 Drain에서만 해제한다. 별도 저장소로 분리해도 이 계약과 집계를 보존한다. 미완료·완료 항목 혼재, 역순 값, quarantine, 중복 해제 방지를 회귀 검증한다.</li>
+</ul>
+</li>
+<li>같은 패턴(원소 수가 작아 우선순위는 낮음): <code>RHISubmissionThread.cpp:1261</code>, <code>ScreenSizedResource.h:111</code>, <code>:157</code>, <code>EnhancedIBLGenerator.cpp:937</code>, <code>MaterialGraphSceneLookup.cpp:923</code>(vector 앞쪽 삭제).</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-10-할당기큐태스크">
+<div class="sec-head"><p class="ve-label">§10</p><h2 id="10-할당기큐태스크">10. 할당기·큐·태스크</h2></div>
+<div class="prose"><h3 id="tlsf">TLSF</h3>
+<ul>
+<li><code>Engine/RenderEngine/RHI/RHIPersistentHeapPolicy.h:136</code>: 세그먼트마다 <code>map</code> + <code>multimap</code> + <code>map</code>을 두고, 할당마다 mutex 안에서 <code>lower_bound</code>와 노드 2~3개 할당·해제를 한다.</li>
+<li>TLSF(2단계 비트맵 + 블록 헤더의 물리 이웃 링크)로 바꾸면 탐색·병합이 O(1)이고 노드 할당이 없다.</li>
+<li>디스크립터 할당(<code>DX12DescriptorRecycler::Allocate</code>, <code>DX12TargetViewHeap::Allocate</code>)은 원자 bump라 이미 최적이다.</li>
+</ul>
+<h3 id="큐">큐</h3>
+<p>MSVC <code>std::deque</code>는 원소가 8바이트를 넘으면 블록 하나에 원소 하나라서 원소마다 노드를 할당한다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>지점</th><th>현재</th><th>제안</th></tr></thead>
+<tbody><tr><td><code>Engine/RenderEngine/ProxyCommandQueue.h:384</code> <code>m_proxyCommands</code></td><td>PPL <code>Concurrency::concurrent_queue</code>(MPMC, 무제한, 세그먼트 할당) — <code>Engine/Contracts/Creator.Concurrency.ixx</code></td><td>생산자가 게임 스레드 하나라면 프레임 이중 버퍼 명령 배열(arena) 또는 SPSC 링. 이미 배치 단위로 drain하는 구조와도 맞는다</td></tr>
+<tr><td><code>ProxyCommandQueue.h:389</code> <code>m_deferredCommands</code></td><td>deque</td><td>vector 두 개 swap</td></tr>
+<tr><td><code>Engine/EngineDiagnostics/ProfileService.h:467</code></td><td>mutex + deque, 상한 있음</td><td>상한 MPSC 링</td></tr>
+<tr><td><code>Engine/RenderEngine/Assets/ClusterStreaming.h:87</code></td><td><code>deque&lt;std::function&lt;void()&gt;&gt;</code></td><td>링 + SBO 태스크</td></tr>
+<tr><td><code>RHISubmissionThread.cpp:183</code>, <code>EffectState.h:33</code>, <code>OperationTable.h:95</code>, <code>ConsoleCommandSystem.h:323</code>, <code>Player/PlayerCommands.h:99</code>, <code>Utility_Framework/LogStore.h:396</code>~`:403`</td><td>deque</td><td>고정 링 / vector swap</td></tr>
+<tr><td><code>EnhancedSceneRenderer.cpp:2555</code> <code>renderQueue</code></td><td>deque, 용량 1</td><td><code>std::optional</code></td></tr></tbody></table></div>
+<ul>
+<li><p>물리 디스패처 큐(<code>Engine/Physics/PhysicsScene.cpp:345</code>)는 이미 고정 링이다.</p>
+</li>
+<li><p>자체 <code>Engine/Utility_Framework/RingBuffer.h</code>는 다음 문제가 있어 그대로 재사용하기 어렵다.</p>
+<ul>
+<li><code>get_all</code>이 vector를 새로 만들어 반환한다.</li>
+<li>pop이 없는 덮어쓰기 로그 버퍼다.</li>
+<li>주석 인코딩이 깨져 있다.</li>
+</ul>
+<p>상한 링은 새로 정의하는 편이 낫다.</p>
+</li>
+</ul>
+<h3 id="태스크-객체와-콜백">태스크 객체와 콜백</h3>
+<ul>
+<li><code>Engine/Utility_Framework/JobScheduler.h:57</code>와 <code>ThreadPool.cpp:65</code>: 제출마다 <code>work</code> 객체(+ mutex)와 <code>std::function</code> 2~3개를 할당한다. 렌더 그래프, 씬 렌더러, 애니메이션 스케줄러, DataSystem이 매 프레임 제출한다.<ul>
+<li>제안: <code>work</code> 풀링(free-list), inplace function, 그룹 태스크 벡터는 프레임 arena에 둔다. enkiTS 자체는 락프리라 유지한다.</li>
+</ul>
+</li>
+<li>페이지 리더가 <code>std::vector&lt;std::byte&gt;</code>를 값으로 반환한다. 페이지·청크 읽기마다 할당이 생긴다.<ul>
+<li>위치: <code>Engine/RenderEngine/Assets/MeshletCompression.h:29</code>, <code>PreparedClusterPages.h:15</code>, <code>Experiment/Cooked/CookedModelSubAssetCodec.h:77</code></li>
+<li>제안: 호출자가 준 <code>std::span&lt;std::byte&gt;</code> 버퍼에 쓰는 시그니처, 또는 스트리밍 전용 버퍼 풀.</li>
+</ul>
+</li>
+<li><code>Engine/Utility_Framework/Delegate.inl:132</code> <code>Broadcast</code>: 호출마다 <code>vector&lt;CallbackInfo&gt;</code>(<code>std::function</code> 포함)를 통째로 복사한다.<ul>
+<li>프레임 이벤트 6종(<code>SceneManager.cpp:828</code><del><code>:879</code>)은 구독자가 1</del>2개라 현재 비용은 작다.</li>
+<li>구독자가 늘면 비례한다. 불변 콜백 목록을 <code>shared_owner&lt;const vector&gt;</code>로 COW하면 Broadcast는 포인터 획득 하나로 끝난다.</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-11-sequence-buffer-단조-증가-id--상한-있는-창">
+<div class="sec-head"><p class="ve-label">§11</p><h2 id="11-sequence-buffer-단조-증가-id--상한-있는-창">11. Sequence buffer (단조 증가 ID + 상한 있는 창)</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>지점</th></tr></thead>
+<tbody><tr><td><code>Engine/RenderEngine/GpuGeometryVisibility.h:329</code> <code>m_recordings</code></td></tr>
+<tr><td><code>Engine/RenderEngine/MaterialGraphResidentBuffer.h:456</code> <code>recordings_</code></td></tr>
+<tr><td><code>Engine/RenderEngine/MaterialGraphSceneHost.h:357</code> <code>recordings_</code>(순회 삭제 <code>:3933</code>, <code>:5049</code>)</td></tr>
+<tr><td><code>Engine/RenderEngine/MaterialGraphSceneLookup.h:139</code> <code>submitted_</code> + <code>:140</code> <code>acceptedRecordings_</code>(128 상한, <code>begin()</code>부터 삭제)</td></tr>
+<tr><td><code>MaterialGraphSceneLookup.cpp:250</code>, <code>MaterialGraphSceneRuntimeEffects.cpp:314</code> <code>uploads</code></td></tr>
+<tr><td><code>MaterialGraphSceneRuntimeEffects.h:79</code> <code>depthBindings_</code></td></tr>
+<tr><td><code>Engine/RenderEngine/RHI/Temporal/DlssTemporalAdapter.cpp:232</code> <code>frames</code></td></tr></tbody></table></div>
+<ul>
+<li>제안: <code>slot = id % N</code> 링 배열에 <code>id</code> 태그를 저장하고 조회 시 전체 ID를 비교한다. 노드 할당을 없앨 수 있지만, 덮어쓰기는 기존 슬롯의 수명이 끝났음이 보장될 때만 허용한다.</li>
+<li>안전 조건: 최대 동시 미완료 수뿐 아니라 살아 있는 ID 사이의 간격과 modulo 충돌도 확인한다. ID의 단조 증가만으로 안전한 상한 창이 보장되지는 않는다. GPU 지연·취소·재시도·오래된 완료 통지를 고려해 미완료 슬롯 충돌 시 확장/별도 저장/대기 정책을 정한다. ID wraparound, 정리 순서, payload 퇴역 계약을 검증한다. 128개 이력 상한을 다른 미완료 저장소에도 그대로 적용하지 않는다.</li>
+<li>함께 다니는 set은 같은 슬롯의 플래그 비트로 합친다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-12-프록시-스냅샷-borrowed--지연-퇴역">
+<div class="sec-head"><p class="ve-label">§12</p><h2 id="12-프록시-스냅샷-borrowed--지연-퇴역">12. 프록시 스냅샷: <code>borrowed</code> + 지연 퇴역</h2></div>
+<div class="prose"><ul>
+<li><code>Engine/RenderEngine/RenderScene.cpp:91</code> <code>GetPrimitiveProxySnapshot</code>: 맵 노드를 따라가며 <code>shared_owner</code>를 복사한다. 확인한 호출처 4곳 중 3곳은 <code>EnhancedSceneRenderer.cpp</code>, 1곳은 에디터 테스트다. 프레임당 실행 횟수는 분기·뷰 수·테스트 실행 여부에 따라 달라지며 미계측이다.</li>
+<li><code>ThirdParty/ownership_cpp/include/own/ownership.hpp:376</code>, <code>:449</code>를 보면 strong 복사는 relaxed <code>fetch_add</code>, 해제는 release <code>fetch_sub</code>(+ 마지막일 때 acquire)다. 원자 RMW 자체는 최소화되어 있지만, 프록시마다 control block 라인을 건드리는 비용은 남는다.</li>
+<li>프록시 1만 개를 프레임당 4회 복사·해제한다고 가정하면 RMW 약 8만 회다. 이는 호출처 수를 실행 횟수로 둔 미검증 시나리오이며, 0.5~3ms도 해당 경로의 실측값이 아니다.</li>
+<li>같은 라이브러리에 해법 재료가 이미 있다.<ul>
+<li><code>borrowed&lt;T&gt;</code>(<code>:766</code>): 비소유 참조</li>
+<li><code>local_owner&lt;T&gt;</code>(<code>:1274</code>): 비원자 스레드 로컬 그룹</li>
+<li><code>retirement_hook</code> / <code>retirement_task</code>(<code>:263</code>, <code>:286</code>): 마지막 strong 해제를 지연 퇴역으로 돌리는 훅</li>
+</ul>
+</li>
+<li>제안:<ul>
+<li>모든 소비자를 보호하는 에폭/읽기 가드를 먼저 설계한 뒤 프록시의 마지막 해제를 지연한다. <code>borrowed&lt;PrimitiveRenderProxy&gt;</code> 자체는 수명을 연장하지 않으며, 퇴역 훅의 존재만으로 안전해지지 않는다. 조건 충족 시 원소별 strong 복사·해제 RMW를 제거할 수 있으나 가드·동기화 비용은 남는다.</li>
+<li>안전 조건: 맵 락 안에서 읽기 보호와 스냅샷 획득을 연결하고, 렌더 워커·비동기 작업·에디터 소비자를 포함한 마지막 접근 이후에만 퇴역한다. 해제 스레드, 종료 시 drain, unregister/re-registration과 같은 주소 재사용을 검증한다. 수명 보호와 별개로 가변 프록시 데이터의 동시 접근 규약도 유지한다. <code>local_owner</code>는 스레드 로컬 계약을 입증한 범위에서만 사용한다.</li>
+<li>저장소 <code>ProxyMap</code>(노드 해시)은 밀집 배열 + 인덱스 맵으로 바꿔 순회를 연속 메모리로 만든다.</li>
+<li>대안: 청크 COW 배열(바뀐 청크만 새로 만듦).</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-13-해시-품질-정적-캐시-프레임-핀">
+<div class="sec-head"><p class="ve-label">§13</p><h2 id="13-해시-품질-정적-캐시-프레임-핀">13. 해시 품질, 정적 캐시, 프레임 핀</h2></div>
+<div class="prose"><ul>
+<li><strong>Identity hasher</strong>: MSVC <code>std::hash&lt;uint64_t&gt;</code>는 8바이트 FNV-1a다. 키가 이미 해시값인 맵은 이중 해시다.<ul>
+<li>대상: <code>DX12PSOManager::m_cache</code>, <code>DX12RootSignatureCache::m_cache</code>, <code>VulkanPipelineCache::m_layoutByHash</code> / <code>m_pipelineByHash</code>, <code>DX12DescriptorHeaps::m_cache</code>, <code>DX12PersistentHeap::m_segments</code>, 렌더 그래프 <code>freeList</code>·<code>allocationCache</code>(<code>EnhancedRenderGraph.h:177</code>, <code>:231</code>)</li>
+<li>제안: identity(또는 곱셈 mix) 해셔 + open addressing. 7워드 키는 XOR 결합 대신 wyhash/xxh3.</li>
+</ul>
+</li>
+<li><strong>전역 mutex 정적 캐시</strong>:<ul>
+<li><code>Engine/RenderEngine/RHI/ModelVertexInputLayout.cpp:94</code>: 전역 mutex + <code>std::map&lt;pair&lt;mask,mask&gt;&gt;</code>를 조회마다 잡는다. 키 공간이 작고 읽기 위주다. 읽기를 락 없이 하는 COW 스냅샷(원자 포인터 교체)이나 사전 계산 표로 바꾼다.</li>
+<li><code>Engine/RenderEngine/LXMaterialRuntime.cpp:117</code>: 전역 mutex + <code>map&lt;uint32_t slot, vector&lt;weak_owner&gt;&gt;</code>. slot이 밀집 인덱스라면 slot 인덱스 vector로 바꾼다.</li>
+</ul>
+</li>
+<li><strong>프레임 핀</strong>: <code>Engine/RenderEngine/MaterialGraphInstancePins.h:91</code>은 mutex + <code>std::map&lt;Key, index&gt;</code>를 인스턴스마다 매 프레임 조회한다. open addressing으로 바꾸거나, 워커별 로컬 핀을 모은 뒤 끝에 병합한다.</li>
+<li><code>MaterialGraphRenderBindings.h:160</code> <code>prepared_</code>(<code>map&lt;Key, vector&lt;weak_owner&gt;&gt;</code>)도 같은 키라 해시 대상이다.</li>
+<li><code>Engine/RenderEngine/RHI/RHIDeviceMemoryBudgetCoordinator.h:124</code>~`:136`: 도메인·소유자가 작은 정수 ID라면 평탄 배열.</li>
+<li><code>Engine/RenderEngine/RHI/DX12/DX12DeviceResources.h:645</code> <code>m_meshBatchSignatures</code>: 생성 시점 캐시. 순위 낮음.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-14-gpu스트리밍-자료구조">
+<div class="sec-head"><p class="ve-label">§14</p><h2 id="14-gpu스트리밍-자료구조">14. GPU·스트리밍 자료구조</h2></div>
+<div class="prose"><h3 id="forward-광원-목록-정확성-포함">Forward+ 광원 목록 (정확성 포함)</h3>
+<ul>
+<li><code>Dynamic_CPP/Assets/Shaders/DefaultPassShader/ForwardCull.slang</code>은 2D 화면 타일 + 근거리 <code>minViewZ = 0</code> / 불투명 최대 깊이의 프러스텀 + 타일당 고정 <code>kMaxLightsPerTile(32)</code> 목록이다. 하늘만 있는 타일은 원거리도 연다. 근거리는 불투명 최소 깊이가 아니며, 투명면의 광원을 보존하려고 카메라까지 열어 둔 것이다(<code>:65</code>~`:84<code>). 넘치면 잘린다(</code>:78` 주석, GetLastOverflowTileCount).</li>
+<li>CPU(<code>Engine/RenderEngine/Render/Core/EnhancedLightPacking.h:171</code>)는 모든 광원을 점수순으로 정렬해 전부 올린다. 타일마다 스레드가 전체 광원을 순회한다(<code>:111</code>).</li>
+<li>문제:<ul>
+<li>깊이 불연속 타일(전경 + 원경)은 카메라~불투명 최대 깊이 구간에서 실제 표면이 없는 깊이의 광원도 수용할 수 있다. 과다 셰이딩 규모는 미계측이다.</li>
+<li>32개를 넘으면 광원이 시각적으로 빠진다.</li>
+</ul>
+</li>
+<li>제안(택일 또는 조합):<ul>
+<li><strong>2.5D 깊이 마스크</strong>: 타일 깊이 구간을 32비트 비트마스크로 나누고, 광원 구간 마스크와 AND로 판정한다.</li>
+<li><strong>클러스터(froxel) 3D 격자</strong> + 전역 압축 목록. 슬롯 대신 prefix-sum으로 가변 길이를 만들면 잘림이 사라진다.</li>
+<li><strong>z-binning</strong>: CPU에서 광원을 뷰 깊이로 정렬한 뒤 z-bin마다 인덱스 범위를 두고, 타일 비트마스크와 교차한다. 메모리가 O(타일 × 광원/32 + bin)이다.</li>
+</ul>
+</li>
+<li>광원 수가 적은(수십) 현재 장면에서는 비용보다 잘림·과다 셰이딩 정확성 측면이 크다.</li>
+<li>안전 조건: 불투명 깊이만으로 만든 2.5D 마스크를 투명 패스에 그대로 적용하지 않는다. 불투명보다 앞선 투명면, 하늘 배경의 투명면을 보수적으로 수용하거나 별도 목록을 제공한다. 가변 목록도 전역 용량 초과·prefix-sum 크기·동기화·오버플로 fallback이 필요하다. 32개 초과 광원과 투명면 회귀 장면에서 누락을 검증한다.</li>
+</ul>
+<h3 id="sparse-페이지-풀">Sparse 페이지 풀</h3>
+<ul>
+<li><code>Engine/RenderEngine/RHI/RHISharedSparsePagePool.h:18</code>: 할당마다 <code>map&lt;uint32_t tile, uint32_t physical&gt;</code>와 <code>map&lt;uint32_t tile, priority&gt;</code>를 둔다. 가상 타일 인덱스는 <code>virtualBytes / 타일 크기</code> 이내의 밀집 범위다.</li>
+<li>제안: 평탄 페이지 테이블(<code>vector&lt;uint32_t&gt;</code>, 무효값 표시)과 병렬 우선순위 배열. 축출 후보 수집은 상주 타일 목록(sparse set)만 훑는다.</li>
+<li>정적 <code>registry</code>(<code>:46</code>)는 장치 수가 작아 문제없다.</li>
+</ul>
+<h3 id="클러스터-스트리밍-소규모">클러스터 스트리밍 소규모</h3>
+<ul>
+<li><code>ClusterStreaming.h:406</code> <code>m_feedback</code>: <code>set&lt;uint32_t&gt;</code> → 비트셋 + vector.</li>
+<li><code>:175</code>: 앞쪽 <code>insert</code>.</li>
+<li><code>:418</code> <code>m_reads</code>: 상한 있는 flat vector로.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-15-정렬-키와-radix-sort">
+<div class="sec-head"><p class="ve-label">§15</p><h2 id="15-정렬-키와-radix-sort">15. 정렬 키와 radix sort</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>지점</th><th>현재</th><th>제안</th></tr></thead>
+<tbody><tr><td><code>Engine/RenderEngine/Render/Passes/Geometry/EnhancedSpritePass.cpp:163</code></td><td>인덱스 배열 <code>stable_sort</code> + 간접 비교(<code>canvasOrder</code>, <code>layerOrder</code>)</td><td><code>(canvasOrder, layerOrder, index)</code>를 64비트로 패킹해 LSD radix sort. 안정성이 자동으로 보장되고 간접 참조가 없음</td></tr>
+<tr><td><code>Engine/RenderEngine/Render/Passes/UI/EnhancedUIPass.cpp:367</code></td><td>같은 패턴</td><td>같음</td></tr>
+<tr><td><code>Engine/RenderEngine/MaterialGraphSceneHost.cpp:276</code> 반투명</td><td><code>(depth desc, geometryKey, index)</code> 비교 정렬</td><td>float 깊이 → 정렬 가능한 uint 변환 + 키 패킹 radix</td></tr>
+<tr><td><code>EnhancedLightPacking.h:171</code></td><td>전체 정렬</td><td>상한 N만 쓰게 되면 <code>nth_element</code> + 부분 정렬</td></tr></tbody></table></div>
+<p>수천 항목 기준으로 비교 정렬 대비 2~4배, 항목 수가 적으면 차이가 미미하다고 추정한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-16-애니메이션-클립-데이터-배치">
+<div class="sec-head"><p class="ve-label">§16</p><h2 id="16-애니메이션-클립-데이터-배치">16. 애니메이션 클립 데이터 배치</h2></div>
+<div class="prose"><ul>
+<li><code>Engine/RenderEngine/Assets/ModelAssetGeneration.h:254</code> <code>ModelAnimationTrack</code>이 뼈마다 <code>translations</code>/<code>rotations</code>/<code>scales</code> vector 3개를 따로 할당한다. 키는 <code>double time</code> + 값(AoS)이다.</li>
+<li>탐색 자체는 <code>Engine/RenderEngine/ClipSamplingCursor.h</code>의 커서 + <code>lower_bound</code> 폴백으로 이미 O(1) 근사다.</li>
+<li>남은 비용은 &quot;뼈 수 × 3개 vector&quot;의 포인터 추적과 캐시 미스다.</li>
+<li>제안:<ul>
+<li>클립 하나를 단일 블롭으로 만든다(트랙 오프셋 표 + 시간 배열(float/정규화 uint16) SoA + 값 배열).</li>
+<li>더 나아가 균일 샘플링 클립이면 키 탐색 없이 <code>index = t × rate</code>로 바로 접근할 수 있고, 회전 양자화(ACL 계열)로 메모리를 2~4배 줄일 수 있다.</li>
+</ul>
+</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-17-기타-런타임">
+<div class="sec-head"><p class="ve-label">§17</p><h2 id="17-기타-런타임">17. 기타 런타임</h2></div>
+<div class="prose"><h3 id="폰트--skyline-패킹--페이지-lru-정확성-포함">폰트 — skyline 패킹 + 페이지 LRU (정확성 포함)</h3>
+<ul>
+<li><code>Engine/RenderEngine/FontAsset.cpp:346</code>: 단일 줄 shelf, 글리프 축출 없음, 페이지 8개 상한. 한글 대량 텍스트에서 아틀라스가 고갈된다.</li>
+<li>제안: skyline 패킹 + 페이지 LRU. 글리프 캐시는 open addressing.</li>
+</ul>
+<h3 id="오디오--증분-카운터--인덱스-힙">오디오 — 증분 카운터 + 인덱스 힙</h3>
+<ul>
+<li><code>Engine/SceneRuntime/Audio/AudioRuntime.cpp:282</code> <code>PhysicalCount</code>가 전수 순회를 하고, <code>EnforceLimits</code>(<code>:773</code>)는 O(V²)다.</li>
+<li>제안: 버스·그룹별 증분 카운터, 위치 역참조 4진 힙. 버스 ID 키 맵은 평탄 배열.</li>
+</ul>
+<h3 id="systemschedule-origin-집합">SystemSchedule origin 집합</h3>
+<ul>
+<li><code>Engine/SceneRuntime/SystemSchedule.h:121</code>의 <code>unordered_set&lt;Component*&gt;</code> 2개는 <code>insert</code>/<code>erase</code>/<code>size</code>/<code>clear</code>로만 쓰인다(<code>:168</code>~`:208`). 컴포넌트 쪽 origin 플래그 비트 + 카운터 2개면 충분하다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-18-관리-코드-c-f">
+<div class="sec-head"><p class="ve-label">§18</p><h2 id="18-관리-코드-c-f">18. 관리 코드 (C#, F#)</h2></div>
+<div class="prose"><ul>
+<li><strong><code>ScriptCore/BlackBoard.cs:30</code></strong>: <code>Value(type, object boxed)</code>라서 Set마다 박싱 할당이 생긴다.<ul>
+<li>제안: 명시적 레이아웃 tagged union struct + interned key ID. 네이티브 BlackBoard(§7)와 같이 바꾼다.</li>
+</ul>
+</li>
+<li><strong><code>ScriptCore/Entity.cs:103</code> <code>GetComponentsInChildren</code>, <code>ScriptCore/ScriptRegistry.cs:41</code> <code>FindAll</code></strong>: 호출마다 새 <code>List&lt;T&gt;</code>를 할당하고, 계층 순회는 자식마다 네이티브 호출 + 래퍼 생성을 한다.<ul>
+<li>제안: 호출자 버퍼 오버로드, 풀링 리스트, 계층을 네이티브에서 평탄 배열로 한 번에 받기.</li>
+</ul>
+</li>
+<li><strong><code>ScriptCore/BehaviorTree.cs:42</code></strong>: 노드가 클래스 계층 + 가상 <code>Tick</code>이다. <code>ScriptRuntime/Trees.fs:8</code>은 인스턴스마다 루트 객체 그래프를 보관한다.<ul>
+<li>같은 트리를 쓰는 에이전트가 많으면 객체 그래프가 에이전트 수만큼 복제되어 GC 힙이 커진다.</li>
+<li>제안: 정의는 공유 평탄 배열(노드 종류·자식 범위·가중치 — 네이티브 <code>BTGraphFlatten.h</code>가 이미 이 형태로 넘김), 에이전트별 상태는 작은 struct 배열(실행 중 자식 인덱스 등).</li>
+</ul>
+</li>
+<li><strong><code>ScriptRuntime/Registry.fs:221</code></strong>: 제거 대상마다 <code>active.Remove</code>(O(n·k))를 한다. 실행 순서를 보존하는 mark-and-compact(<code>RemoveAll</code> 한 번)로 바꾼다.</li>
+<li><strong><code>ScriptRuntime/Contacts.fs:165</code> <code>EndUpdate</code></strong>: 틱마다 모든 구독자의 모든 스트림을 훑어 <code>ClearTick</code>한다. <code>touched</code> 목록(<code>EndFrame</code>이 이미 사용 중)처럼 이번 틱에 건드린 스트림만 비운다.<ul>
+<li>키 타입 <code>ShapeRole</code>(record struct)과 <code>ObjectHandle</code>(<code>IEquatable</code>)은 박싱이 없어 문제없다.</li>
+</ul>
+</li>
+<li><strong><code>GameScripts</code></strong>: 수용 프로브라 제품 비용은 아니다. 다만 위 API의 할당 패턴이 사용자 코드로 그대로 옮겨질 수 있으므로 API 쪽에서 막는다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-19-에디터도구정확성">
+<div class="sec-head"><p class="ve-label">§19</p><h2 id="19-에디터도구정확성">19. 에디터·도구·정확성</h2></div>
+<div class="prose"><h3 id="lattice-캔버스-에디터-우선-조사-후보">Lattice 캔버스 (에디터 우선 조사 후보)</h3>
+<ul>
+<li><code>Lattice/ImGui/LXCanvas.cpp:891</code> <code>forEachHeaderPort</code>가 링크마다 <code>HeaderLinkEndpoints</code>(<code>:423</code>)를 부른다. 그 안의 <code>order</code> 람다(<code>:450</code>)가 다시 <strong>전체 링크</strong>를 순회하면서 링크마다 <code>FindPin</code> × 2(전체 핀 선형, <code>LXGraph.cpp:540</code>), <code>FindNode</code> × 2(선형, <code>:516</code>), <code>MeasureNode</code>를 호출한다.</li>
+<li>이것만으로 O(L²·(P+N))다. 여기에 다음이 더해진다.<ul>
+<li><code>:870</code> 핀마다 전체 링크 <code>any_of</code>: O(P·L)</li>
+<li><code>:910</code> 링크 그리기 루프의 <code>FindPin</code>/<code>Owner</code>: O(L·P)</li>
+<li><code>:835</code>, <code>:1154</code>, <code>:1168</code> 선택 목록 선형 <code>find</code></li>
+</ul>
+</li>
+<li>링크 200, 핀 1천, 노드 100이면 프레임당 약 9천만 단계 연산으로, 수십 ms를 추정한다.</li>
+<li>제안:<ul>
+<li>그래프 리비전 단위로 인덱스를 만든다: 핀 ID → (노드, 핀), 노드 ID → (레이아웃, 측정 크기), 노드 × 측면별 포트 순서 목록.</li>
+<li>그리기는 이 인덱스로 O(L + P)에 끝낸다.</li>
+<li>선택 목록은 정렬 vector나 해시 집합으로.</li>
+</ul>
+</li>
+</ul>
+<h3 id="lattice-그래프-검증undo">Lattice 그래프 검증·undo</h3>
+<ul>
+<li>링크 검증·컴파일 루프(<code>LXGraph.cpp:877</code>, <code>:934</code>, <code>:973</code>)가 링크마다 <code>FindPin</code>을 2회 호출해 O(L·P)다. ID 인덱스로 해결된다(<code>nextId</code>가 단조 증가하므로 정렬 vector도 가능).</li>
+<li>undo(<code>LXGraph.h:257</code> <code>Snapshot</code>, <code>:561</code>, <code>:2251</code>)는 편집마다 그래프 전체를 깊은 복사한다. 노드를 불변 블록으로 두는 구조 공유 스냅샷이나 역연산 기록으로 바꾼다.</li>
+<li><code>Lattice/ImGui/LXStyle.h:162</code>~`:169<code>의 </code>std::map&lt;Id/string, Style&gt;`은 노드·핀·와이어마다 프레임 조회한다. 타입 스타일은 문자열 → 인덱스로 한 번만 해석한다.</li>
+</ul>
+<h3 id="scene-선택-목록">Scene 선택 목록</h3>
+<ul>
+<li><code>Engine/SceneRuntime/Scene.cpp:3614</code>, <code>:3624</code>의 <code>AddSelectedEntity</code>/<code>RemoveSelectedEntity</code>가 <code>m_selectedEntities</code> 선형 <code>find</code> + 중간 <code>erase</code>를 한다.</li>
+<li>전체 선택(N=1만)이면 O(N²), 약 5천만 비교다.</li>
+<li>제안: 순서 vector + 엔티티 인덱스 소속 비트셋(<code>DynamicBitset</code>). 제거는 지연 압축.</li>
+</ul>
+<h3 id="에디터-자산-db">에디터 자산 DB</h3>
+<ul>
+<li><code>Editor/EngineEntry/EditorAssetDatabase.cpp:4304</code>~`:4325<code>의 </code>std::map&lt;file::path, …&gt;` 10개 이상: 정규화 경로 interning, 접두사 질의가 필요하면 경로 radix tree.</li>
+<li><code>m_modifiedPaths</code>(<code>:1248</code>) debounce: 지연이 일정하므로 linked hash map으로 O(만료 수).</li>
+</ul>
+<h3 id="임포트쿠킹">임포트·쿠킹</h3>
+<ul>
+<li><code>MaterialGraphSceneVolume.cpp:51</code> 용접: 비트 키 open addressing / 격자 공간 해시.</li>
+<li><code>MeshLodBuilder.cpp:111</code> 간선: 64비트 키 정렬 후 스캔.</li>
+<li><code>VertexWelding.cpp:134</code>, <code>TangentGeneration.cpp:282</code>, <code>FbxImporter.cpp:226</code>: open addressing 또는 meshoptimizer <code>generateVertexRemap</code>.</li>
+</ul>
+<h3 id="헤더-정적-집합-정확성">헤더 정적 집합 (정확성)</h3>
+<ul>
+<li><code>Engine/Utility_Framework/TypeTrait.h:250</code> <code>static std::set&lt;HashedGuid&gt; g_guids;</code>는 헤더의 namespace 범위 <code>static</code>이라 <strong>포함하는 TU마다 별도 사본</strong>이 생긴다.</li>
+<li><code>GUIDCreator::MakeGUID</code>(<code>:318</code>)의 중복 검사와 <code>InsertGUID</code>/<code>EraseGUID</code>(Editor <code>GameObjectCommand.h:23</code>, <code>:25</code>, <code>:141</code>)가 서로 다른 집합을 볼 수 있어서, 의도한 중복 방지가 TU 경계에서 무력화된다. 동기화도 없다.</li>
+<li>무작위 64비트 충돌 확률은 낮아 실제 영향은 작다. 그래도 단일 정의(<code>inline</code> 변수 또는 .cpp)로 고치거나 집합 자체를 제거해야 한다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-20-엔진-안의-기존-도구-재사용-우선">
+<div class="sec-head"><p class="ve-label">§20</p><h2 id="20-엔진-안의-기존-도구-재사용-우선">20. 엔진 안의 기존 도구 (재사용 우선)</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>도구</th><th>상태</th><th>재사용처</th></tr></thead>
+<tbody><tr><td><code>Engine/Utility_Framework/FixedPool.h</code></td><td>O(1) free list + live 비트맵, 할당 없음. 사용처 1곳</td><td>§3 slot map 저장소</td></tr>
+<tr><td><code>Engine/Utility_Framework/DynamicBitset.h</code></td><td>사용처 16곳</td><td>§5 <code>seen</code> 중복 검사, §14 피드백 비트셋, §19 선택 소속</td></tr>
+<tr><td><code>Engine/RenderEngine/RenderArena.h</code> <code>render_pointer_set</code>, <code>render_arena_vector</code></td><td>프레임 수명 재사용</td><td>§6, §10 태스크 벡터</td></tr>
+<tr><td><code>ownership_cpp</code> <code>borrowed</code> / <code>local_owner</code> / <code>retirement_hook</code></td><td>존재</td><td>§12</td></tr>
+<tr><td><code>HashingString.h</code></td><td>해시 캐시일 뿐 interning이 아님</td><td>§7 atom 테이블은 별도로 필요</td></tr>
+<tr><td><code>RingBuffer.h</code>, <code>MemoryPool.h</code>, <code>LinkedListLib.hpp</code></td><td>각 사용처 1곳, 기능 제한</td><td>재사용 대신 새 상한 링·intrusive 리스트 정의 권장</td></tr>
+<tr><td><code>ConcurrentQueue.h</code></td><td>PPL <code>concurrent_queue</code> 별칭</td><td>§10에서 용도별 링으로 교체</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-21-이미-적절해서-바꾸지-않는-곳">
+<div class="sec-head"><p class="ve-label">§21</p><h2 id="21-이미-적절해서-바꾸지-않는-곳">21. 이미 적절해서 바꾸지 않는 곳</h2></div>
+<div class="prose"><div class="table-scroll"><table>
+<thead><tr><th>지점</th><th>이유</th></tr></thead>
+<tbody><tr><td>엔티티 저장소, Vulkan 리소스 테이블</td><td>slot + free 목록</td></tr>
+<tr><td><code>Entity::GetComponent</code> / <code>HasComponent</code></td><td>타입 마스크 선판정</td></tr>
+<tr><td>트랜스폼 계층(<code>Scene.cpp:595</code>)</td><td>평탄화, 에폭·세대 dedup, 포화 시 전체 resolve</td></tr>
+<tr><td>에디터 하이어라키(<code>HierarchyFlatten.h</code>)</td><td>리비전 기반 평탄 목록 + clipper. 실측 근거 주석 있음</td></tr>
+<tr><td>물리 레이어(<code>PhysicsScene.cpp</code>)</td><td>슬롯 배열, 센서 페어 슬롯 + active, 디스패처 링, 스냅샷 free-list</td></tr>
+<tr><td>애니메이션 키 탐색(<code>ClipSamplingCursor.h</code>)</td><td>커서 힌트 + <code>lower_bound</code> 폴백</td></tr>
+<tr><td>디스크립터 할당</td><td>원자 bump</td></tr>
+<tr><td>프로파일 마커·스레드 스트림, 로그 스냅샷</td><td>thread-local 캐시, chunk pool, revision <code>IfChanged</code></td></tr>
+<tr><td>GCCE <code>block_allocator</code></td><td>크기 클래스 + 페이지 free list. <code>chunk_index_</code>는 디버그 전용</td></tr>
+<tr><td>Effect 정의·IR 검증, cooked manifest, <code>ModelStableKeys</code>, sidecar</td><td>빌드·로드 시점. 결정적 순서 때문에 정렬 컨테이너 사용. 바꾸더라도 정렬 vector</td></tr>
+<tr><td><code>Engine/SceneRuntime/WorldState.h</code> <code>AIWorldState</code></td><td>사용처 0, 죽은 코드</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-22-b-tree-판정">
+<div class="sec-head"><p class="ve-label">§22</p><h2 id="22-b-tree-판정">22. B-tree 판정</h2></div>
+<div class="prose"><ul>
+<li>정렬 + 대용량 + 장수명 맵: <code>CookedAssetCatalog::m_mountedEntries</code>, <code>ModelAssetGeneration::generations_</code> / <code>currentByAsset_</code>, <code>AssetIdentityRegistry::m_byInput</code> / <code>m_byUuid</code>, AssetDepot <code>*Entries</code> 맵, <code>DataSystem</code> model texture 맵, 에디터 <code>file::path</code> 맵.</li>
+<li>B-tree는 RB-tree 대비 메모리가 약 절반이고 지역성이 좋다. 하지만 로드·편집 시점 조회라 효과는 작다.</li>
+<li>AssetDepot 맵에서는 B-tree보다 §8.2의 intrusive LRU 효과가 훨씬 크다. 에디터 경로 맵에서는 interning이 더 크다.</li>
+</ul>
+</div>
+</section>
+<section class="doc-sec" id="sec-23-공용화-후보와-도입-원칙">
+<div class="sec-head"><p class="ve-label">§23</p><h2 id="23-공용화-후보와-도입-원칙">23. 공용화 후보와 도입 원칙</h2></div>
+<div class="prose"><ul>
+<li>외부 의존: boost는 걷어냈다(<code>vcpkg.json</code> <code>$comment</code>). 자체 구현을 기본으로 하고, 쓴다면 단일 헤더 MIT(<code>ankerl::unordered_dense</code>)까지만.</li>
+<li><code>Engine/Utility_Framework</code> 추가 후보(기존 도구 §20 우선):<ul>
+<li><code>slot_map&lt;T&gt;</code> (FixedPool 기반)</li>
+<li><code>sequence_buffer&lt;T, N&gt;</code></li>
+<li><code>intrusive_lru&lt;Index&gt;</code></li>
+<li><code>age_buckets</code></li>
+<li><code>bounded_spsc_ring</code> / <code>bounded_mpsc_ring</code></li>
+<li><code>flat_hash_map</code> + <code>identity_hash</code></li>
+<li><code>string_atom</code> 테이블</li>
+<li><code>inplace_function&lt;Sig, Size&gt;</code></li>
+<li>TLSF</li>
+<li>패킹 키 <code>radix_sort</code></li>
+</ul>
+</li>
+<li>C++23 <code>std::flat_map</code>/<code>flat_set</code>은 현재 MSVC 툴체인 지원 여부를 먼저 확인한다.</li>
+<li>결정적 출력이 필요한 경로(쿠킹·검증·LRU 이력·렌더 그래프 위상 순서·스프라이트 안정 정렬)는 교체 후에도 순서가 같도록 회귀 테스트로 고정한다.</li>
+</ul>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="ContainerDataStructureAnalysis20261025.md"><code>docs/analysis/ContainerDataStructureAnalysis20261025.md</code></a> · 마지막 커밋 2026-10-25 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

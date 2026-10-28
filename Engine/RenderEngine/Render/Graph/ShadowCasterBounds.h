@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #include "ShadowMath.h"
 #include "EnhancedDrawIdentity.h"
@@ -41,8 +42,8 @@ namespace shadow_math
 
     namespace bounds_detail
     {
-        using Vector = std::array<double, 3>;
-        using Matrix = std::array<std::array<double, 4>, 4>;
+        using Vector = ce::fixed_array<double, 3>;
+        using Matrix = ce::fixed_array<ce::fixed_array<double, 4>, 4>;
 
         inline Matrix Widen(const math::matrix4x4& source)
         {

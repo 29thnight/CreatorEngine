@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
 #else
@@ -34,8 +36,8 @@ public:
 
 	Entity* MakeImage(std::string_view name, const own::shared_owner<const Texture>& texture,Entity* canvas = nullptr,math::vector2 Pos = { 0, 0 });
 	Entity* MakeImage(std::string_view name, const own::shared_owner<const Texture>& texture, std::string_view canvasname, math::vector2 Pos = { 0, 0 });
-	Entity* MakeButton(std::string_view name, const own::shared_owner<const Texture>& texture, std::function<void()> clickfun, math::vector2 Pos = { 0, 0 },Entity* canvas = nullptr);
-	Entity* MakeButton(std::string_view name, const own::shared_owner<const Texture>& texture, std::function<void()> clickfun, std::string_view canvasname, math::vector2 Pos = { 0, 0 });
+	Entity* MakeButton(std::string_view name, const own::shared_owner<const Texture>& texture, ce::owned_func<void()> clickfun, math::vector2 Pos = { 0, 0 },Entity* canvas = nullptr);
+	Entity* MakeButton(std::string_view name, const own::shared_owner<const Texture>& texture, ce::owned_func<void()> clickfun, std::string_view canvasname, math::vector2 Pos = { 0, 0 });
 	Entity* MakeText(std::string_view name, std::filesystem::path FontName, Entity* canvas = nullptr, math::vector2 Pos = { 0, 0 });
 	Entity* MakeText(std::string_view name, std::filesystem::path FontName, std::string_view canvasname, math::vector2 Pos = { 0, 0 });
 
@@ -66,9 +68,9 @@ public:
 
 public:
 	//캔버스 컴포넌트가 들어있는것만 들어가게끔
-	std::vector<ImageComponent*>			Images;
-	std::vector<TextComponent*>			Texts;
-	std::vector<SpriteSheetComponent*>    SpriteSheets;
+	ce::dynamic_array<ImageComponent*>			Images;
+	ce::dynamic_array<TextComponent*>			Texts;
+	ce::dynamic_array<SpriteSheetComponent*>    SpriteSheets;
 	// 이전 캔버스 / 현재 상호작용할 UI — **저장은 핸들, 사용은 해석**(트랙 E5-R3).
 	//
 	// 예전에는 weak_ptr였고 그 자리 주석이 "EntityHandle로 못 바꾼다"고 사유를

@@ -1,4 +1,5 @@
 #pragma once
+#include "../Containers/ContainerAPI.h"
 #include "AnimationPaletteArena.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Arena.h"
@@ -27,7 +28,7 @@ class ProxyCommandQueueController : public Singleton<ProxyCommandQueueController
 {
 private:
 	friend class Singleton;
-	using ImplProxyCommandQueue = ce::concurrent_queue<ProxyCommand>;
+	using ImplProxyCommandQueue = ce::lock_free_queue<ProxyCommand>;
 
 private:
 	ProxyCommandQueueController() = default;
@@ -49,7 +50,7 @@ public:
 	class Batch final
 	{
 	public:
-		using iterator = std::vector<ProxyCommand>::iterator;
+		using iterator = ProxyCommand*;
 		[[nodiscard]] iterator begin() noexcept { return m_commands.begin(); }
 		[[nodiscard]] iterator end() noexcept { return m_commands.end(); }
 		[[nodiscard]] size_t size() const noexcept { return m_commands.size(); }
@@ -135,7 +136,7 @@ public:
 			m_paletteCount += source.m_paletteCount;
 		}
 
-		[[nodiscard]] std::pair<own::shared_owner<const ce::animation_palette_arena>,
+		[[nodiscard]] ce::pair<own::shared_owner<const ce::animation_palette_arena>,
 			std::uint32_t> resolve(const ProxyCommand& command) const
 		{
 			const auto [offset, count] = command.GetPaletteSlice();
@@ -143,7 +144,7 @@ public:
 			auto check = [offset, count](
 				const own::shared_owner<const ce::animation_palette_arena>& arena,
 				std::uint32_t base, std::uint32_t limit)
-				-> std::pair<own::shared_owner<const ce::animation_palette_arena>, std::uint32_t>
+				-> ce::pair<own::shared_owner<const ce::animation_palette_arena>, std::uint32_t>
 			{
 				if (!arena || offset < base || offset - base >= limit) return {};
 				const auto local = offset - base;
@@ -152,7 +153,7 @@ public:
 				return { arena, local };
 			};
 			if (auto found = check(m_primaryArena, 0,
-				m_extraArenas.empty() ? m_paletteCount : m_extraArenas.front().base);
+				m_extraArenas.empty() ? m_paletteCount : m_extraArenas[0].base);
 				found.first) return found;
 			for (size_t index = 0; index < m_extraArenas.size(); ++index)
 			{
@@ -182,9 +183,9 @@ public:
 			if (b > (std::numeric_limits<std::uint32_t>::max)() - a)
 				throw std::length_error("merged palette address space overflow");
 		}
-		std::vector<ProxyCommand> m_commands{};
+		ce::dynamic_array<ProxyCommand> m_commands{};
 		own::shared_owner<const ce::animation_palette_arena> m_primaryArena{};
-		std::vector<PaletteSegment> m_extraArenas{};
+		ce::dynamic_array<PaletteSegment> m_extraArenas{};
 		std::uint32_t m_paletteCount{};
 	};
 	struct PaletteCapture
@@ -235,7 +236,11 @@ public:
 		Batch batch;
 		ProxyCommand command;
 		while (m_proxyCommands.try_pop(command))
+		{
 			batch.push_back(std::move(command));
+			if ((batch.size() & 63) == 0) m_proxyCommands.reclaim();
+		}
+		m_proxyCommands.reclaim();
 		// A command captured before the drain can be pushed afterward; its
 		// transient owner survives until a later batch adopts it.
 		{
@@ -251,14 +256,15 @@ public:
 	// 이어서 해당 frame packet과 함께 넘어온 delta를 적용한다.
 	void ExecuteBatch(RenderScene& renderScene, uint64_t sceneEpoch, Batch batch)
 	{
-		const size_t deferredCount = m_deferredCommands.size();
-		for (size_t i = 0; i < deferredCount; ++i)
+		if (batch.size() > SIZE_MAX - m_deferredCommands.size()) throw std::length_error("deferred command capacity overflow");
+		m_deferredScratch.reserve(m_deferredCommands.size() + batch.size());
+		m_deferredScratch.swap(m_deferredCommands);
+		for (auto& entry : m_deferredScratch)
 		{
-			DeferredCommand deferred = std::move(m_deferredCommands.front());
-			m_deferredCommands.pop_front();
-			Consume(std::move(deferred.command), renderScene, sceneEpoch,
-				std::move(deferred.arena), deferred.localOffset);
+			Consume(std::move(entry.command), renderScene, sceneEpoch,
+				std::move(entry.arena), entry.localOffset);
 		}
+		m_deferredScratch.clear();
 
 		for (ProxyCommand& command : batch)
 		{
@@ -299,7 +305,12 @@ public:
 	{
 		uint64_t discarded = 0;
 		ProxyCommand command;
-		while (m_proxyCommands.try_pop(command)) ++discarded;
+		while (m_proxyCommands.try_pop(command))
+		{
+			++discarded;
+			if ((discarded & 63) == 0) m_proxyCommands.reclaim();
+		}
+		m_proxyCommands.reclaim();
 		discarded += static_cast<uint64_t>(m_deferredCommands.size());
 		m_deferredCommands.clear();
 		{
@@ -397,9 +408,10 @@ private:
 	ImplProxyCommandQueue m_proxyCommands;
 	std::mutex m_paletteMutex;
 	own::shared_owner<ce::animation_palette_arena> m_paletteArena;
-	std::vector<own::shared_owner<ce::animation_palette_arena>> m_paletteArenas;
+	ce::dynamic_array<own::shared_owner<ce::animation_palette_arena>> m_paletteArenas;
 	// 렌더 소비 스레드만 접근한다.
-	std::deque<DeferredCommand> m_deferredCommands;
+	ce::dynamic_array<DeferredCommand> m_deferredCommands;
+	ce::dynamic_array<DeferredCommand> m_deferredScratch;
 	std::atomic_ullong m_enqueued{};
 	std::atomic_ullong m_applied{};
 	std::atomic_ullong m_dropped{};

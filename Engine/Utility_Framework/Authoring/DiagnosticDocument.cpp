@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "DiagnosticDocument.h"
 #include <charconv>
 #include <cmath>
@@ -14,7 +15,7 @@ namespace Diagnostics
         {
             Kind kind = Kind::Null;
             std::string text;
-            std::vector<std::pair<std::string, std::size_t>> children;
+            ce::dynamic_array<ce::pair<std::string, std::size_t>> children;
         };
 
         void Quote(std::string& output, std::string_view text)
@@ -58,7 +59,7 @@ namespace Diagnostics
     // Diagnostics never initializes the authoring parser or its error policy.
     struct DocumentState
     {
-        std::vector<Value> values{1};
+        ce::dynamic_array<Value> values{1};
 
         Value& At(std::size_t id)
         {

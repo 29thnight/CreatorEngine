@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -214,8 +216,8 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         void DispatchMeshletStage(RHIEncoder& encoder, MeshletStage stage, RHIBindingTable depth = {}) const;
         static void ConsumeStreamingFeedback(std::span<const own::shared_owner<const Frame>> frames);
 
-        std::vector<own::shared_owner<const material_graph::MeshSurfaceBatch>> m_meshletGeometries;
-        std::vector<std::uint32_t> m_meshletOffsets;
+        ce::dynamic_array<own::shared_owner<const material_graph::MeshSurfaceBatch>> m_meshletGeometries;
+        ce::dynamic_array<std::uint32_t> m_meshletOffsets;
         mutable RHIBindingTable m_meshletVertices, m_meshletTopologies;
         own::shared_owner<MeshletInputs> m_meshletInputs;
         std::uint32_t m_meshletGroups{}, m_meshletJobs{};
@@ -227,7 +229,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
         RHIBufferHandle m_visibleIds, m_arguments;
         own::shared_owner<BufferPool> m_bufferPool;
         std::uint64_t m_visibleBytes{}, m_argumentBytes{};
-        std::vector<RHIReadback> m_streamingFeedback;
+        ce::dynamic_array<RHIReadback> m_streamingFeedback;
         mutable std::atomic<bool> m_feedbackRecorded{};
         mutable std::atomic<bool> m_poolReusable{true};
         mutable RHIBufferSlice m_candidates, m_bins, m_constants;
@@ -297,7 +299,7 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
   private:
     struct Recording
     {
-        std::vector<own::shared_owner<const Frame>> owners;
+        ce::dynamic_array<own::shared_owner<const Frame>> owners;
         std::uint64_t completion{};
         bool submitted{}, quarantined{};
     };
@@ -330,6 +332,6 @@ class GpuGeometryVisibility final : private IRHIUploadTransactionListener
     LX::Runtime::ComputePipeline m_sharedReset, m_sharedCull, m_sharedOcclusion,
         m_sharedCount, m_sharedFinalize, m_sharedScatter;
     std::mutex m_recordingMutex;
-    std::map<std::uint64_t, Recording> m_recordings;
+    ce::engine_ordered_map<std::uint64_t, Recording> m_recordings;
     std::uint64_t m_completed{};
 };

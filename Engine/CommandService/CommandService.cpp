@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "CommandService.h"
 
 #include "JsonValue.h"
@@ -262,7 +263,7 @@ namespace CommandService
 
     void Service::JoinAllWorkers()
     {
-        std::vector<Worker> workers;
+        ce::dynamic_array<Worker> workers;
         {
             std::lock_guard<std::mutex> guard(m_workerMutex);
             workers.swap(m_workers);
@@ -510,7 +511,7 @@ namespace CommandService
 
             // ★ args 는 문자열 배열이다. 라인 문자열을 받지 않는다(§5.2).
             //   여기서 이어 붙였다 다시 자르면 §3.2 의 왕복 손실이 되살아난다.
-            std::vector<std::string> arguments;
+            ce::dynamic_array<std::string> arguments;
             arguments.push_back(command->AsString());
 
             if (const JsonValue* parameters = parsed.value.Find("parameters"))

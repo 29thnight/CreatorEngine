@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -53,7 +54,7 @@ public:
         return table;
     }
 
-    const std::vector<RHIBindingDesc>* Resolve(const RHIBindingTable& table) const
+    const ce::dynamic_array<RHIBindingDesc>* Resolve(const RHIBindingTable& table) const
     {
         const std::lock_guard lock(m_mutex);
         if (!table.IsValid() || 0 == table.backend || table.version != m_epoch)
@@ -64,7 +65,7 @@ public:
             return nullptr;
         }
 
-        const std::vector<RHIBindingDesc>& descs =
+        const ce::dynamic_array<RHIBindingDesc>& descs =
             m_requests[static_cast<size_t>(index)]->descs;
         if (descs.size() != table.count) return nullptr;
         return &descs;
@@ -75,12 +76,12 @@ private:
   size_t m_activeRequests{};
   struct Request
   {
-      std::vector<RHIBindingDesc> descs;
+      ce::dynamic_array<RHIBindingDesc> descs;
     };
 
     // Request를 따로 할당해 Add의 vector 재할당 중에도 Resolve가 돌려준 descs
     // 주소가 안정적으로 유지되게 한다. Reset은 worker join 뒤에만 호출된다.
-    std::vector<own::unique_owner<Request>> m_requests;
+    ce::dynamic_array<own::unique_owner<Request>> m_requests;
     mutable std::mutex m_mutex;
     uint64_t m_epoch{ 1 };
 };
@@ -140,7 +141,7 @@ public:
         return RHISamplerTable{ static_cast<uint64_t>(m_requests.size()) };
     }
 
-    const std::vector<VkSampler>* Resolve(const RHISamplerTable& table) const
+    const ce::dynamic_array<VkSampler>* Resolve(const RHISamplerTable& table) const
     {
         if (!table.IsValid()) return nullptr;
         const uint64_t index = table.backend - 1;
@@ -164,8 +165,8 @@ private:
   friend class VulkanRecordingResources;
   struct Request
   {
-      std::vector<RHISamplerDesc> descs;
-      std::vector<VkSampler> samplers;
+      ce::dynamic_array<RHISamplerDesc> descs;
+      ce::dynamic_array<VkSampler> samplers;
     };
 
     static bool Same(const RHISamplerDesc& a, const RHISamplerDesc& b)
@@ -176,7 +177,7 @@ private:
             a.border == b.border && a.maxLod == b.maxLod;
     }
 
-    static bool Same(const std::vector<RHISamplerDesc>& a,
+    static bool Same(const ce::dynamic_array<RHISamplerDesc>& a,
         std::span<const RHISamplerDesc> b)
     {
         if (a.size() != b.size()) return false;
@@ -222,5 +223,5 @@ private:
         }
     }
 
-    std::vector<Request> m_requests;
+    ce::dynamic_array<Request> m_requests;
 };

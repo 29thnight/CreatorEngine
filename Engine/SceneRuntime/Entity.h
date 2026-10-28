@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "Object.h"
 #include "SceneGC.h"
@@ -39,7 +40,7 @@ public:
 	{
 		Index parentIndex{ kInvalidIndex };
 		Index rootIndex{ kSceneRootIndex };
-		std::vector<Index> childrenIndices{};
+		ce::dynamic_array<Index> childrenIndices{};
 	};
 	Entity();
 	Entity(Scene* scene, std::string_view name, GameObjectType type, Entity::Index index, Entity::Index parentIndex);
@@ -132,7 +133,7 @@ public:
 	// HierarchyStore만 읽는다. Scene 밖의 임시 Entity에는 계층 상태가 없다.
 	Index GetParentIndex() const;
 	Index GetRootIndex() const;
-	const std::vector<Index>& GetChildrenIndices() const;
+	const ce::dynamic_array<Index>& GetChildrenIndices() const;
 
 	void SetRootIndex(Index rootIndex);
 	template<typename T>
@@ -148,18 +149,18 @@ public:
 	T* GetComponentDynamicCast();
 
 	template<typename T>
-	std::vector<T*> GetComponentsInChildren();
+	ce::dynamic_array<T*> GetComponentsInChildren();
 
 	template<typename T>
-	std::vector<T*> GetComponentsInchildrenDynamicCast();
+	ce::dynamic_array<T*> GetComponentsInchildrenDynamicCast();
 
 	template<typename T>
 	bool HasComponent();
 
 	template<typename T>
-	std::vector<T*> GetComponents();
+	ce::dynamic_array<T*> GetComponents();
 	template<typename T>
-	void CollectComponents(std::vector<T*>& out);
+	void CollectComponents(ce::dynamic_array<T*>& out);
 
 	template<typename T>
 	void RemoveComponent(T* component);
@@ -206,7 +207,7 @@ private:
 	void AttachChildIndex(Index childIndex);
 	void DetachChildIndex(Index childIndex);
 	void ClearChildren();
-	void SetChildrenIndices(std::vector<Index> children);
+	void SetChildrenIndices(ce::dynamic_array<Index> children);
 
 	// Transform 컴포넌트 캐시 (S1-b: m_transform 값 멤버 소멸, 저장소는
 	// m_components로 이동). 생성자에서 AddComponent<Transform>() 직후 채운다 —
@@ -327,7 +328,7 @@ public:
 	// 프리팹 인스턴스가 아니면 항상 비어 있다. UpdateInstances는 이 목록에 있는 경로만
 	// 프리팹의 새 값 적용에서 제외하고, 나머지는 그대로 받는다. 목록이 비어 있는
 	// 구버전 씬/프리팹은 "오버라이드 없음"으로 읽힌다(예외 1의 읽기 호환).
-	std::vector<PrefabOverride> m_prefabOverrides{};
+	ce::dynamic_array<PrefabOverride> m_prefabOverrides{};
 
 public:
     std::string m_tag{ "Untagged" };
@@ -345,7 +346,7 @@ public:
     // Ordered strong graph edges. Scene lifecycle drops these only after
     // unregistering every raw schedule/proxy/script observer.
     [[reflgen::readonly]]
-    std::vector<gc::trace_ref<Component>> m_components{};
+    ce::dynamic_array<gc::trace_ref<Component>> m_components{};
 
 	// 컴포넌트 타입 비트마스크 (SceneGraphRedesignPlan K1-a). 프로세스 로컬 순차
 	// 인덱스(TypeTrait::ComponentTypeIndex) 기준이라 절대 직렬화하지 않는다 —

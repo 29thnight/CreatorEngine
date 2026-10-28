@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineStorage.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Layers.h"
 #else
@@ -175,18 +177,18 @@ class ScenePhysicsSimulation final
     static std::uint64_t Key(ce::physics::body_handle handle);
 
     std::thread::id m_owner = std::this_thread::get_id();
-    std::unordered_map<binding_id, entry> m_entries;
-    std::unordered_map<binding_id, character_entry> m_characters;
-    std::vector<binding_id> m_characterOrder;
-    std::vector<changed_character> m_changedCharacters;
-    std::unordered_map<std::uint64_t, binding_id> m_handles;
+    ce::engine_extractable_map<binding_id, entry> m_entries;
+    ce::engine_extractable_map<binding_id, character_entry> m_characters;
+    ce::dynamic_array<binding_id> m_characterOrder;
+    ce::dynamic_array<changed_character> m_changedCharacters;
+    ce::engine_extractable_map<std::uint64_t, binding_id> m_handles;
     // Replaced actors may emit a final lost-pair event at the next fetch.
-    std::unordered_map<std::uint64_t, binding_id> m_retiredContactHandles;
-    std::vector<contact_event> m_contacts;
-    std::vector<changed_pose> m_changed;
-    std::vector<render_pose> m_render, m_nextRender;
+    ce::engine_extractable_map<std::uint64_t, binding_id> m_retiredContactHandles;
+    ce::dynamic_array<contact_event> m_contacts;
+    ce::dynamic_array<changed_pose> m_changed;
+    ce::dynamic_array<render_pose> m_render, m_nextRender;
     // Owner-only scratch; entry addresses are stable throughout one synchronous step.
-    std::vector<entry*> m_renderPrepared;
+    ce::dynamic_array<entry*> m_renderPrepared;
     std::unique_ptr<ce::physics::PhysicsScene> m_runtime;
     binding_id m_next = 1;
     std::uint64_t m_publication = 0;

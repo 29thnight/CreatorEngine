@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
@@ -63,6 +64,6 @@ namespace Animation
 
     private:
         int m_clipIndex{ -1 };
-        std::vector<TrackKeyCursor> m_tracks{};
+        ce::dynamic_array<TrackKeyCursor> m_tracks{};
     };
 }

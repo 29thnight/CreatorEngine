@@ -1,3 +1,5 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
 // 애니메이터 편집 창 셋의 본문 (PHASE 21 M4 3b).
 //
 // 옛 자리는 `ImGuiDrawHelperAnimator` 안이었다. 셋이 서로 다른 깊이에
@@ -41,7 +43,7 @@
 // 재생성하므로, 슬롯 재사용이 이월시키는 상태는 없다.
 static NodeEditor* GetControllerNodeEditor(AnimationController* controller)
 {
-	static std::unordered_map<AnimationController*, std::unique_ptr<NodeEditor>> s_controllerNodeEditors;
+	static ce::engine_node_map<AnimationController*, std::unique_ptr<NodeEditor>> s_controllerNodeEditors;
 	auto& slot = s_controllerNodeEditors[controller];
 	if (!slot)
 	{
@@ -1194,7 +1196,7 @@ if (avatarMask->isHumanoid)
 else
 {
 	auto& rootMask = avatarMask->RootMask;
-	std::function<void(BoneMask*)> drawMaskTree;
+	ce::owned_func<void(BoneMask*)> drawMaskTree;
 	if (rootMask)
 	{
 		drawMaskTree = [&](BoneMask* mask)

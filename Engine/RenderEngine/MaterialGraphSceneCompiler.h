@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include "MaterialGraphProduct.h"
@@ -24,7 +25,7 @@ struct SceneShaderSet
 
 // No backend means both. AssetCooker always cooks both; the editor compiles only
 // the backend its renderer runs, because the other half is never consumed there.
-std::vector<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& program,
+ce::dynamic_array<CompileTarget> SceneCompileTargets(const LX::LXMaterialProgram& program,
                                                std::optional<RHIShaderBinary> backend = std::nullopt);
 
 // Editor preparation and AssetCooker use the same host, permutations and stage set.

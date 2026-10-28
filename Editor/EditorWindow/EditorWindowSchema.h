@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Engine/Containers/ContainerAPI.h"
 // 에디터 창 선언 어휘 (PHASE 21 M4 · 계획서 부록 B.3) — std만 의존한다.
 //
 // 부록 A의 `EditorMenuSchema.h`와 같은 층 구성이다: 짧은 별칭이 정본 표기이고,
@@ -185,13 +186,13 @@ namespace editor
     template<class... Items>
     struct window_declaration
     {
-        std::tuple<Items...> items{};
+        ce::tuple<Items...> items{};
     };
 
     template<class... Items>
     consteval auto window_set(Items... items)
     {
-        return window_declaration<Items...>{ std::tuple<Items...>{ items... } };
+        return window_declaration<Items...>{ ce::tuple<Items...>{ items... } };
     }
 
     namespace detail

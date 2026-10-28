@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 // 에디터 크롬 스냅샷 (PHASE 21 W0 전반 · 계획서 §1.9) — 밖에서 배치를 볼 수단.
 //
@@ -132,16 +133,16 @@ namespace editor
         float         min_central_width{ 0.f };
         float         min_central_height{ 0.f };
 
-        std::vector<dock_node_view>        nodes;
-        std::vector<dock_tab_view>         tabs;
-        std::vector<window_placement_view> placements;
+        ce::dynamic_array<dock_node_view>        nodes;
+        ce::dynamic_array<dock_tab_view>         tabs;
+        ce::dynamic_array<window_placement_view> placements;
         std::string moving_window;
         std::string hovered_window_under_moving;
         bool docking_payload{ false };
 
         /// 스타일 값. 색은 RGBA8 로 접어 담는다(0xRRGGBBAA).
-        std::vector<std::pair<std::string, std::uint32_t>> style_colors;
-        std::vector<std::pair<std::string, float>>         style_scalars;
+        ce::dynamic_array<ce::pair<std::string, std::uint32_t>> style_colors;
+        ce::dynamic_array<ce::pair<std::string, float>>         style_scalars;
         std::size_t   colors_differing_from_default{ 0 };
 
         /// 글자 배율의 **정식 경로**. 1.92 에서 `io.FontGlobalScale` 이
@@ -156,15 +157,15 @@ namespace editor
         bool          os_viewports_enabled{ false };
         bool          theme_mapping_matches{ false };
         bool          geometry_matches{ false };
-        std::vector<std::pair<std::string, std::uint32_t>> theme_tokens;
+        ce::dynamic_array<ce::pair<std::string, std::uint32_t>> theme_tokens;
         /// 적재한 폰트 전부(PHASE 21 W1).
-        std::vector<font_view> fonts;
+        ce::dynamic_array<font_view> fonts;
         /// 후보가 하나도 없을 때 해상이 빈 것을 돌려주는가. 살아 있는
         /// 에디터에서 negative 경로를 재는 자리다 — 실제 시스템 폰트를
         /// 지울 수 없으므로 해상 함수만 태운다.
         bool          font_fallback_probe_ok{ false };
         std::size_t   icon_role_count{ 0 };
-        std::vector<std::string> missing_icon_roles;
+        ce::dynamic_array<std::string> missing_icon_roles;
         bool icon_source_policy_valid{ false };
 
         float         preference_scale{ 0.f };
@@ -271,10 +272,10 @@ namespace editor
         std::size_t docked_windows{ 0 };
 
         /// 그려지고 있는데 도크 노드가 0인 창.
-        std::vector<std::string> undocked_slots;
+        ce::dynamic_array<std::string> undocked_slots;
         /// 도크 노드가 들고 있는데 선언 표에 없는 이름. 옛 `GetContext` 가
         /// `operator[]` 라 오타로 유령 창을 만들던 자리의 관측이다.
-        std::vector<std::string> ghost_tabs;
+        ce::dynamic_array<std::string> ghost_tabs;
 
         /// 내부 구조체를 읽어도 되는 판인가. 계획서 §9 가 W8 에 요구한
         /// "ImGui internal adapter version canary" 의 씨앗이다. 여기 두는 이유는
@@ -337,7 +338,7 @@ namespace editor
         /// 적재한 폰트 수.
         std::size_t fonts{ 0 };
         std::size_t icon_role_count{ 0 };
-        std::vector<std::string> missing_icon_roles;
+        ce::dynamic_array<std::string> missing_icon_roles;
         bool icon_source_policy_valid{ false };
 
         /// 글리프가 빠진 라벨들. `<창 안정 id>:<빠진 수>` 로 적는다.
@@ -346,7 +347,7 @@ namespace editor
         /// 블롭은 서브셋이라 `EditorIcons.h` 에 정의돼 있다고 해서 실제로
         /// 들어 있는 것은 아니고, 없으면 조용히 네모가 그려진다. W1 이 토큰을
         /// 갈아엎을 때 이 수가 곧바로 답한다.
-        std::vector<std::string> labels_missing_glyphs;
+        ce::dynamic_array<std::string> labels_missing_glyphs;
 
         bool clean() const noexcept
         {
@@ -369,14 +370,14 @@ namespace editor
         /// 같은 창 이름이 ini 에 두 번. 표시 문자열이 persistence ID 인 계약의
         /// 대가가 실제로 나타나는 모양이다(계획서 §1.4 — 공백 하나가 달라
         /// Content Browser 항목이 둘로 갈린 이력이 있다).
-        std::vector<std::string> duplicate_entries;
+        ce::dynamic_array<std::string> duplicate_entries;
         /// ini 에 있으나 선언에 없는 항목. 옛 빌드의 흔적일 수 있어 `clean()`
         /// **판정에는 넣지 않는다** — 개발자 기계에는 지난 빌드의 창 이름이
         /// 남아 있을 수 있다. 대신 W3 이 격리된 시나리오 폴더에서 이 값을
         /// 단정한다(`verify-editor-workspace.ps1`). 이주가 옛 이름을 한 줄
         /// 남겼을 때 붉어지는 자리는 거기 하나뿐이다 — 살아 있는 도크 탭이
         /// 아니라 아무도 만들지 않는 항목이라 ghost 로도 undocked 로도 안 잡힌다.
-        std::vector<std::string> orphan_entries;
+        ce::dynamic_array<std::string> orphan_entries;
 
         bool clean() const noexcept
         {

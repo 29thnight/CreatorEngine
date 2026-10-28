@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "CookedAssetManifest.h"
@@ -67,10 +68,10 @@ struct SceneCookProduct final
     AssetId sceneAssetId{};
     CookedAssetKind kind{CookedAssetKind::Scene};
     std::string artifactPath{};
-    std::vector<std::byte> artifactBytes{};
+    ce::dynamic_array<std::byte> artifactBytes{};
     CookedAssetManifestEntry manifestEntry{};
     // Explicit expected kinds for the optional source-free document bridge.
-    std::vector<TypedAssetReference> bootstrapReferences{};
+    ce::dynamic_array<TypedAssetReference> bootstrapReferences{};
 
     std::size_t geometryEdges{};
     std::size_t modelEdges{};
@@ -95,7 +96,7 @@ struct SceneCookProductIssue final
 struct SceneCookProductResult final
 {
     std::optional<SceneCookProduct> product{};
-    std::vector<SceneCookProductIssue> issues{};
+    ce::dynamic_array<SceneCookProductIssue> issues{};
 
     [[nodiscard]] bool Succeeded() const noexcept { return product.has_value() && issues.empty(); }
 };
@@ -107,5 +108,5 @@ struct SceneCookProductResult final
 // Source-only validation of the existing FoliageAsset.Types document shape.
 // Reuses the same bounded bootstrap walker; no new cooked kind or payload load.
 [[nodiscard]] bool CollectFoliageBootstrapReferences(const Authoring::ReadNode& root,
-    std::vector<TypedAssetReference>& outReferences, std::string& failure);
+    ce::dynamic_array<TypedAssetReference>& outReferences, std::string& failure);
 } // namespace experiment::cooked

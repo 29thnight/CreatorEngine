@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -75,22 +76,22 @@ namespace EditorObjectOperations
     {
         EntityHandle target;
         std::string component;
-        std::vector<std::string> fields;
+        ce::dynamic_array<std::string> fields;
         Authoring::WriteDocument before;
     };
-    PropertyEdit CapturePropertyEdit(Component& component, std::vector<std::string> fields);
-    bool CommitPropertyEdits(std::vector<PropertyEdit> edits);
+    PropertyEdit CapturePropertyEdit(Component& component, ce::dynamic_array<std::string> fields);
+    bool CommitPropertyEdits(ce::dynamic_array<PropertyEdit> edits);
     bool CommitProperty(Component& component, const std::string& field, Authoring::WriteDocument before);
     CommandCore::CommandResult PhysicsShapes(EntityHandle target, const std::string& component, const std::string& document, const Authoring::WriteDocument* expected = nullptr);
     CommandCore::CommandResult Property(EntityHandle target, const std::string& component, const std::string& field, const std::string& value);
     CommandCore::CommandResult AddComponent(EntityHandle target, const std::string& type);
     CommandCore::CommandResult AddManagedScript(EntityHandle target, const std::string& type);
     CommandCore::CommandResult RemoveComponent(EntityHandle target, const std::string& component);
-    CommandCore::CommandResult Select(Scene* scene, const std::vector<EntityHandle>& targets);
+    CommandCore::CommandResult Select(Scene* scene, const ce::dynamic_array<EntityHandle>& targets);
     CommandCore::CommandResult NavigateSelection(Scene* scene, int direction);
     CommandCore::CommandResult InstantiatePrefab(const std::string& prefab, const std::string& name);
     CommandCore::CommandResult InstantiatePrefab(Prefab* prefab, const std::string& name);
-    CommandCore::CommandResult MaterialMode(const std::vector<own::shared_owner<Material>>& materials, MaterialRenderingMode mode);
+    CommandCore::CommandResult MaterialMode(const ce::dynamic_array<own::shared_owner<Material>>& materials, MaterialRenderingMode mode);
     CommandCore::CommandResult MaterialMode(EntityHandle target, MaterialRenderingMode mode);
 
     // PBR-W8 — 렌더러별 MaterialInstance override 를 헤드리스로 얹는다.
@@ -110,7 +111,7 @@ namespace EditorObjectOperations
     // (MaterialScriptBinding), 이름·타입이 안 맞으면 조용히 삼키지 않고 실패한다.
     CommandCore::CommandResult MaterialOverride(EntityHandle target,
         int rendererIndex, const std::string& property,
-        const std::vector<float>& values);
+        const ce::dynamic_array<float>& values);
     CommandCore::CommandResult AnimatorParameter(EntityHandle target, const std::string& name, ValueType type);
     CommandCore::CommandResult AnimatorDefaultParameter(Animator& animator, ValueType type);
     CommandCore::CommandResult UndoRedo(bool redo);

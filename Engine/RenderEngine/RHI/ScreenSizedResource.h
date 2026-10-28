@@ -1,4 +1,6 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineFunc.h"
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
 // 화면 크기를 따라가는 리소스의 계약 (PHASE 3-2 / 7 교차).
@@ -72,7 +74,7 @@ public:
     {
         const void* owner{ nullptr };
         std::string name;
-        std::function<std::pair<uint32_t, uint32_t>()> querySize;
+        ce::owned_func<ce::pair<uint32_t, uint32_t>()> querySize;
     };
 
     // 정의는 ScreenSizedResource.cpp — 헤더에 두면 include한 TU마다 사본이
@@ -80,7 +82,7 @@ public:
     static ScreenSizedRegistry& Get();
 
     void Register(const void* owner, std::string name,
-        std::function<std::pair<uint32_t, uint32_t>()> querySize)
+        ce::owned_func<ce::pair<uint32_t, uint32_t>()> querySize)
     {
         if (nullptr == owner) return;
 
@@ -95,7 +97,7 @@ public:
         Unregister_NoLock(owner);
     }
 
-    std::vector<Entry> Snapshot() const
+    ce::dynamic_array<Entry> Snapshot() const
     {
         std::lock_guard<std::mutex> guard(m_mutex);
         return m_entries;
@@ -115,7 +117,7 @@ private:
     }
 
     mutable std::mutex m_mutex;
-    std::vector<Entry> m_entries;
+    ce::dynamic_array<Entry> m_entries;
 };
 
 class ScreenResizeBus
@@ -131,8 +133,8 @@ public:
         uint64_t generation{ 0 };
     };
 
-    using ReleaseCallback = std::function<void()>;
-    using ResizeCallback = std::function<void(uint32_t width, uint32_t height)>;
+    using ReleaseCallback = ce::owned_func<void()>;
+    using ResizeCallback = ce::owned_func<void(uint32_t width, uint32_t height)>;
 
     // 정의는 ScreenSizedResource.cpp — 위 ScreenSizedRegistry::Get과 같은 이유.
     static ScreenResizeBus& Get();
@@ -217,14 +219,14 @@ private:
 
     // 콜백이 도는 동안 구독이 바뀔 수 있다(리소스를 다시 만들면서 등록/해제).
     // 잠금을 쥔 채 콜백을 부르면 그 자리에서 교착하므로 사본을 떠서 돈다.
-    std::vector<Subscriber> SnapshotSubscribers() const
+    ce::dynamic_array<Subscriber> SnapshotSubscribers() const
     {
         std::lock_guard<std::mutex> guard(m_mutex);
         return m_subscribers;
     }
 
     mutable std::mutex      m_mutex;
-    std::vector<Subscriber> m_subscribers;
+    ce::dynamic_array<Subscriber> m_subscribers;
     Handle                  m_nextHandle{ kInvalidHandle };
     mutable std::mutex      m_sizeMutex;
     SizeSnapshot            m_size;

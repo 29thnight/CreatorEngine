@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "CookedTexture.h"
 
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -66,7 +67,7 @@ namespace experiment::cooked
             return mipLevels <= fullLevels && (!cube || (width == height && arraySize % 6u == 0u));
         }
 
-        void CookedTexturePut(std::vector<std::byte>& bytes, std::size_t offset,
+        void CookedTexturePut(ce::dynamic_array<std::byte>& bytes, std::size_t offset,
             std::uint64_t value, std::size_t count)
         {
             for (std::size_t index = 0u; index < count; ++index)
@@ -87,7 +88,7 @@ namespace experiment::cooked
         }
     }
 
-    bool EncodeCookedTexture(TextureImageView image, std::vector<std::byte>& artifact,
+    bool EncodeCookedTexture(TextureImageView image, ce::dynamic_array<std::byte>& artifact,
         std::string& failure, CookedTextureInfo info)
     {
         artifact.clear();
@@ -127,7 +128,7 @@ namespace experiment::cooked
         }
         try
         {
-            std::vector<std::byte> result(static_cast<std::size_t>(total));
+            ce::dynamic_array<std::byte> result(static_cast<std::size_t>(total));
             result[0] = std::byte{ 'C' }; result[1] = std::byte{ 'E' };
             result[2] = std::byte{ 'C' }; result[3] = std::byte{ 'T' };
             CookedTexturePut(result, 4u, kCookedTextureSchemaVersion, 4u);

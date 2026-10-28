@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include <array>
 #include <atomic>
@@ -25,7 +26,7 @@ namespace Runtime
     {
         std::uint64_t entity{}, component{};
         ObservedLocation owner{};
-        std::array<char,128> property{};
+        ce::fixed_array<char,128> property{};
         Meta::PropertyChangeSource source{};
         bool allProperties{};
     };
@@ -50,7 +51,7 @@ namespace Runtime
         }
         void Clear()
         {
-            RequireOwner(); std::array<Slot,16> retired;
+            RequireOwner(); ce::fixed_array<Slot,16> retired;
             { std::lock_guard lock(mutex_); retired=std::move(slots_);slots_={};count_=0;head_=0;Refresh(); }
         }
         bool HasWriteObservers() const noexcept { return writes_.load(std::memory_order_relaxed); }
@@ -62,7 +63,7 @@ namespace Runtime
             RequireOwner(); if(draining_)return;draining_=true;
             for(std::uint32_t processed=0;processed<256;++processed)
             {
-                Event event;std::array<Slot,16> snapshot;
+                Event event;ce::fixed_array<Slot,16> snapshot;
                 { std::lock_guard lock(mutex_);if(!count_) {draining_=false;return;}event=queue_[head_];head_=(head_+1)%queue_.size();--count_;snapshot=slots_; }
                 for(const auto& selected:snapshot)
                 {
@@ -98,8 +99,8 @@ namespace Runtime
         }
         std::thread::id owner_{std::this_thread::get_id()};
         mutable std::mutex mutex_;
-        std::array<Slot,16> slots_{};
-        std::array<Event,256> queue_{};
+        ce::fixed_array<Slot,16> slots_{};
+        ce::fixed_array<Event,256> queue_{};
         std::uint32_t head_{},count_{};
         std::uint64_t next_{};
         bool draining_{};

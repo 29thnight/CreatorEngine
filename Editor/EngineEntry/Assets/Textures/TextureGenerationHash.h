@@ -1,3 +1,4 @@
+#include "../../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 
 #include "../../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
@@ -47,9 +48,9 @@ public:
             size -= count;
         }
     }
-    bool Finish(std::array<std::uint8_t, 32>& output, std::string& failure)
+    bool Finish(ce::fixed_array<std::uint8_t, 32>& output, std::string& failure)
     {
-        std::array<std::uint8_t, 32> digest{};
+        ce::fixed_array<std::uint8_t, 32> digest{};
         if (m_status >= 0)
             m_status = BCryptFinishHash(m_hash, digest.data(), static_cast<ULONG>(digest.size()), 0);
         if (m_status < 0)
@@ -64,6 +65,6 @@ public:
 private:
     BCRYPT_ALG_HANDLE m_algorithm{};
     BCRYPT_HASH_HANDLE m_hash{};
-    std::vector<unsigned char> m_object;
+    ce::dynamic_array<unsigned char> m_object;
     NTSTATUS m_status{};
 };

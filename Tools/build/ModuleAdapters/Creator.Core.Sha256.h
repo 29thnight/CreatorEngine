@@ -7,12 +7,12 @@
 
 #include "../../../Engine/Contracts/Compiler/Creator.RotateIntrinsic.h"
 
-
+#include "../../../Engine/Containers/Creator.Containers.h"
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
-namespace ce::hash
+namespace ce::crypto
 {
-    using sha256_digest = std::array<std::uint8_t, 32>;
+    using sha256_digest = ce::fixed_array<std::uint8_t, 32>;
 
     class sha256
     {
@@ -171,4 +171,4 @@ namespace ce::hash
         }
         return s;
     }
-} // namespace ce::hash
+} // namespace ce::crypto

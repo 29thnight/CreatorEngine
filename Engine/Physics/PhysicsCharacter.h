@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #include "PhysicsGeometry.h"
 #include <stdint.h>
@@ -19,7 +20,7 @@ struct character_desc
 
 inline bool valid_character_desc(const character_desc& value)
 {
-    const std::array scalars{value.position.x,      value.position.y,     value.position.z,  value.radius,
+    const ce::fixed_array scalars{value.position.x,      value.position.y,     value.position.z,  value.radius,
                              value.cylinder_height, value.contact_offset, value.step_offset, value.slope_limit_cosine};
     return std::ranges::all_of(scalars, [](float scalar) { return std::isfinite(scalar); }) && value.radius > 0 &&
            value.cylinder_height > 0 && value.contact_offset > 0 && value.step_offset >= 0 &&

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -32,7 +33,7 @@ namespace experiment
 
     [[nodiscard]] bool BuildMaterialPropertyBlock(const Material& material,
         const ShaderMeta& meta, const ShaderMetaBindingLayout& layout,
-        std::vector<std::uint8_t>& outBytes, std::string& outError);
+        ce::dynamic_array<std::uint8_t>& outBytes, std::string& outError);
     [[nodiscard]] bool BuildMaterialRuntimeInstance(const Material& material,
         const ShaderMeta& meta, const ShaderMetaBindingLayout& layout,
         ShaderMetaHandle handle, std::span<const MaterialTextureOwner> textures,

@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include <stddef.h>
@@ -103,7 +104,7 @@ namespace assets
     ///
     /// V2 런타임 배치의 정본. Uv1은 V3/Lightmap이 선택적으로 다시 붙일 수 있게
     /// 표에는 남기되 `kV2VertexAttributes`에서 제외한다.
-    inline constexpr std::array<VertexAttributeDesc,
+    inline constexpr ce::fixed_array<VertexAttributeDesc,
         static_cast<std::size_t>(VertexAttribute::Count)> kVertexAttributeTable{{
         { VertexAttribute::Position,    "position",    "POSITION",     0, VertexFormat::RGB32Float, nullptr },
         { VertexAttribute::Normal,      "normal",      "NORMAL",       0, VertexFormat::RGB32Float, nullptr },
@@ -179,7 +180,7 @@ namespace assets
     /// 제품 경로의 core/color/skin 조합과 각 UV1 변형.
     inline constexpr VertexAttributeMask kColorVertexAttributes =
         Bit(VertexAttribute::Color);
-    inline constexpr std::array<VertexAttributeMask, 8> kModelVertexMasks{{
+    inline constexpr ce::fixed_array<VertexAttributeMask, 8> kModelVertexMasks{{
         kCoreVertexAttributes,
         kCoreVertexAttributes | kColorVertexAttributes,
         kCoreVertexAttributes | kSkinVertexAttributes,

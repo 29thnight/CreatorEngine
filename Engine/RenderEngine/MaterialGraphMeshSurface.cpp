@@ -1,3 +1,6 @@
+#include "../Utility_Framework/Foundation/EngineStorage.h"
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
@@ -41,11 +44,11 @@ namespace material_graph
                 const void* vertexData{};
                 const std::uint32_t* indexData{};
             };
-            using Key = std::pair<assets::ModelMeshHandle, uint32_t>;
+            using Key = ce::pair<assets::ModelMeshHandle, uint32_t>;
 
             std::mutex mutex;
-            std::map<Key, Entry> entries;
-            std::deque<Key> insertionOrder;
+            ce::engine_ordered_map<Key, Entry> entries;
+            ce::segmented_deque<Key> insertionOrder;
             std::uint64_t bytes{};
         };
 
@@ -69,7 +72,7 @@ namespace material_graph
 
         bool Affine(const math::matrix4x4& matrix)
         {
-            return Finite(std::bit_cast<std::array<float, 16>>(matrix)) && matrix.m[0][3] == 0 && matrix.m[1][3] == 0 &&
+            return Finite(std::bit_cast<ce::fixed_array<float, 16>>(matrix)) && matrix.m[0][3] == 0 && matrix.m[1][3] == 0 &&
                    matrix.m[2][3] == 0 && matrix.m[3][3] == 1;
         }
 
@@ -99,19 +102,19 @@ namespace material_graph
         MeshSurfaceRequestCache() = default;
         MeshSurfaceRequestCache(const MeshSurfaceRequestCache&) = delete;
         MeshSurfaceRequestCache& operator=(const MeshSurfaceRequestCache&) = delete;
-        using Key = std::tuple<std::uintptr_t, std::uint64_t, std::uint64_t, std::array<std::uint32_t, 16>,
-                               std::array<std::uint32_t, 4>>;
+        using Key = ce::tuple<std::uintptr_t, std::uint64_t, std::uint64_t, ce::fixed_array<std::uint32_t, 16>,
+                               ce::fixed_array<std::uint32_t, 4>>;
         struct Entry
         {
             own::weak_owner<const MeshSurfaceInput> identity;
-            own::shared_owner<const std::vector<std::uint32_t>> requests;
+            own::shared_owner<const ce::dynamic_array<std::uint32_t>> requests;
             std::uint64_t generation{}, charge{};
             const Key* key{};
             Entry* previous{};
             Entry* next{};
         };
-        std::map<Key, Entry> entries;
-        std::vector<double> distances;
+        ce::engine_ordered_map<Key, Entry> entries;
+        ce::dynamic_array<double> distances;
         Entry* newest{};
         Entry* oldest{};
         std::uint64_t bytes{};
@@ -150,7 +153,7 @@ namespace material_graph
             }
             newest = &entry;
         }
-        void Erase(std::map<Key, Entry>::iterator entry)
+        void Erase(ce::engine_ordered_map<Key, Entry>::iterator entry)
         {
             bytes -= entry->second.charge;
             Unlink(entry->second);
@@ -171,13 +174,13 @@ namespace material_graph
             }
         }
 
-        own::shared_owner<const std::vector<std::uint32_t>> Acquire(
+        own::shared_owner<const ce::dynamic_array<std::uint32_t>> Acquire(
             const own::shared_owner<const MeshSurfaceInput>& identity, const MeshSurfaceInput& input,
             std::uint64_t view, std::uint64_t generation)
         {
             const Key key{reinterpret_cast<std::uintptr_t>(identity.operator->()), view, input.View().sceneEpoch,
-                          std::bit_cast<std::array<std::uint32_t, 16>>(input.World()),
-                          std::bit_cast<std::array<std::uint32_t, 4>>(input.View().eye)};
+                          std::bit_cast<ce::fixed_array<std::uint32_t, 16>>(input.World()),
+                          std::bit_cast<ce::fixed_array<std::uint32_t, 4>>(input.View().eye)};
             if (const auto found = entries.find(key); found != entries.end())
             {
                 // The live caller pins the partition. Compare control-block identity
@@ -195,7 +198,7 @@ namespace material_graph
             ce::profile_scope sortProfile{ce::marker<"MaterialClusterRequestSort">()};
             const auto count = input.Hierarchy().groupCount ? input.Hierarchy().groupCount : 1;
             const auto& groups = input.Hierarchy().groups;
-            auto requests = own::make_shared<std::vector<std::uint32_t>>(count);
+            auto requests = own::make_shared<ce::dynamic_array<std::uint32_t>>(count);
             distances.assign(count, 0.);
             for (std::uint32_t group = 0; group < count; ++group)
             {
@@ -251,16 +254,16 @@ namespace material_graph
         uint64_t admissionTiles{}, lastLeasedRecording{}, lastLeaseSerial{};
         bool budgetLimited{};
         own::shared_owner<MeshletSparseStorage> sparse;
-        std::vector<std::pair<RHIBufferSlice, RHIBufferSlice>> sparseCopies;
+        ce::dynamic_array<ce::pair<RHIBufferSlice, RHIBufferSlice>> sparseCopies;
         SparseClusterPayload sparsePayload;
-        std::vector<std::byte> sparseMetadata;
+        ce::dynamic_array<std::byte> sparseMetadata;
         uint64_t sparseRevision{}, sparseSerial{};
         RHIBufferSlice vertices, indices, lods, meshlets;
         uint32_t meshletCount{};
-        std::array<RHIBufferSlice, 4> staging;
+        ce::fixed_array<RHIBufferSlice, 4> staging;
         const EnhancedRenderGraph* graph{};
         std::uint64_t graphEpoch{};
-        std::array<RGHandle, 4> graphBuffers;
+        ce::fixed_array<RGHandle, 4> graphBuffers;
         std::uint64_t bytes{}, recording{}, completion{};
         RHIUploadTransactionState state{RHIUploadTransactionState::Recording};
         bool prepared{};
@@ -286,17 +289,17 @@ namespace material_graph
     {
         IRenderDeviceServices& device;
         mutable std::mutex mutex;
-        std::vector<own::shared_owner<MeshSurfaceStaticBuffers>> entries;
-        std::map<const MeshSurfaceInput*, own::weak_owner<MeshSurfaceStaticBuffers>> lookup;
+        ce::dynamic_array<own::shared_owner<MeshSurfaceStaticBuffers>> entries;
+        ce::engine_ordered_map<const MeshSurfaceInput*, own::weak_owner<MeshSurfaceStaticBuffers>> lookup;
         std::uint64_t maintenanceRecording{};
         // Guarded by mutex; reuse storage while checking every current owner.
-        std::vector<std::pair<MeshletSparseStorage*, bool>> idleScratch;
+        ce::dynamic_array<ce::pair<MeshletSparseStorage*, bool>> idleScratch;
         struct RecordingOwners
         {
             std::uint64_t serial{};
-            std::vector<own::shared_owner<MeshSurfaceStaticBuffers>> owners;
+            ce::dynamic_array<own::shared_owner<MeshSurfaceStaticBuffers>> owners;
         };
-        std::map<std::uint64_t, RecordingOwners> recordings;
+        ce::engine_ordered_map<std::uint64_t, RecordingOwners> recordings;
         std::uint64_t leaseSerial{};
         struct ProvisionalEntry
         {
@@ -307,9 +310,9 @@ namespace material_graph
         struct ProvisionalSubmission
         {
             RHICompletionPoint completion;
-            std::vector<ProvisionalEntry> entries;
+            ce::dynamic_array<ProvisionalEntry> entries;
         };
-        std::map<std::uint64_t, ProvisionalSubmission> provisional;
+        ce::engine_ordered_map<std::uint64_t, ProvisionalSubmission> provisional;
         std::uint64_t completed{};
         MeshSurfaceCacheStats stats;
         static constexpr std::uint64_t maxBytes = 128ull << 20;
@@ -366,14 +369,14 @@ namespace material_graph
                     }
                 }
             }
-            std::erase_if(provisional, [&](const auto& item)
+            ce::erase_if(provisional, [&](const auto& item)
                           { return item.second.completion.IsValid() && item.second.completion.value <= completed; });
         }
         void OnUploadAborted(std::uint64_t recording) override
         {
             std::lock_guard lock(mutex);
             recordings.erase(recording);
-            std::erase_if(entries,
+            ce::erase_if(entries,
                           [&](const auto& entry)
                           {
                               if (entry->recording != recording || entry->state != RHIUploadTransactionState::Recording)
@@ -410,7 +413,7 @@ namespace material_graph
             }
             // Submitted 통지 도중 예외가 난 경우 아직 Recording인 입력도
             // 같은 never-admitted R의 일부다. 완료된 기존 자산은 건드리지 않는다.
-            std::erase_if(entries,
+            ce::erase_if(entries,
                           [&](const auto& entry)
                           {
                               if (entry->recording != recording)
@@ -533,7 +536,7 @@ namespace material_graph
                     ++it;
                 }
             }
-            std::erase_if(lookup, [](const auto& hint) { return hint.second.expired(); });
+            ce::erase_if(lookup, [](const auto& hint) { return hint.second.expired(); });
             lock.unlock();
             std::string error;
             if (!MaintainSparsePool(device.GetCurrentUploadRecordingId(), error))
@@ -729,7 +732,7 @@ namespace material_graph
             {
                 return false;
             }
-            const std::array<std::byte, 16> empty{};
+            const ce::fixed_array<std::byte, 16> empty{};
             const void* sources[]{entry->residency ? empty.data() : entry->identity->PackedVertices().data(),
                                   entry->identity->StreamedTopology() ? static_cast<const void*>(empty.data())
                                                                       : static_cast<const void*>(geometry.indexData),
@@ -876,7 +879,7 @@ namespace material_graph
     struct MeshTransformDeclarationScratch
     {
         MeshTransformDeclarationPlan m_plan;
-        std::array<RHIBindingDesc, MeshTransformDeclarationPlan::kMaxJobs> m_outputs;
+        ce::fixed_array<RHIBindingDesc, MeshTransformDeclarationPlan::kMaxJobs> m_outputs;
     };
 
     struct MeshSurfaceBufferPool
@@ -935,7 +938,7 @@ namespace material_graph
         IRenderDeviceServices& device;
         std::mutex mutex;
         std::atomic<std::uint64_t> completed{};
-        std::vector<Entry> idle;
+        ce::dynamic_array<Entry> idle;
         // GPU 버퍼 풀의 수명 동안 한 번만 만든다. 선언별 원본 포인터와 출력
         // 설명만 덮어쓰며, 버퍼 회수 mutex를 쥔 채 워커에 합류하지 않는다.
         std::mutex m_declarationMutex;
@@ -956,8 +959,8 @@ namespace material_graph
             return;
         }
         const auto infinity = std::numeric_limits<double>::infinity();
-        std::array<double, 3> minimum{infinity, infinity, infinity};
-        std::array<double, 3> maximum{-infinity, -infinity, -infinity};
+        ce::fixed_array<double, 3> minimum{infinity, infinity, infinity};
+        ce::fixed_array<double, 3> maximum{-infinity, -infinity, -infinity};
         for (const auto& descriptor : meshlets_.descriptors)
         {
             // QMC2 페이지 검증과 같은 오차 범위를 포함한다. 캐시 적중/매 프레임
@@ -1129,15 +1132,15 @@ namespace material_graph
                     continue;
                 }
                 const auto bytes = assets::SizeOf(attribute.format);
-                std::array<float, 4> value{};
+                ce::fixed_array<float, 4> value{};
                 std::memcpy(value.data(), vertex + assets::OffsetOf(mask, attribute.attribute), bytes);
                 if (!Finite(value))
                 {
                     return Fail(error, "Mesh surface vertex " + std::to_string(i) + " contains a nonfinite attribute.");
                 }
             }
-            const auto normal = Read<std::array<float, 3>>(vertex, mask, assets::VertexAttribute::Normal);
-            const auto tangent = Read<std::array<float, 4>>(vertex, mask, assets::VertexAttribute::Tangent);
+            const auto normal = Read<ce::fixed_array<float, 3>>(vertex, mask, assets::VertexAttribute::Normal);
+            const auto tangent = Read<ce::fixed_array<float, 4>>(vertex, mask, assets::VertexAttribute::Tangent);
             if (!Direction(normal.data()) || (tangent[3] != -1.f && tangent[3] != 1.f))
             {
                 return Fail(error, "Mesh surface vertex " + std::to_string(i) +
@@ -1146,8 +1149,8 @@ namespace material_graph
             if (skin)
             {
                 const auto indices =
-                    Read<std::array<std::uint8_t, 4>>(vertex, mask, assets::VertexAttribute::BoneIndices);
-                const auto weights = Read<std::array<float, 4>>(vertex, mask, assets::VertexAttribute::BoneWeights);
+                    Read<ce::fixed_array<std::uint8_t, 4>>(vertex, mask, assets::VertexAttribute::BoneIndices);
+                const auto weights = Read<ce::fixed_array<float, 4>>(vertex, mask, assets::VertexAttribute::BoneWeights);
                 const float sum = weights[0] + weights[1] + weights[2] + weights[3];
                 if (!std::ranges::all_of(weights, [](float weight) { return weight >= 0 && weight <= 1; }) ||
                     (sum != 0 && std::abs(sum - 1.f) > 1e-5f) || (sum > 0 && weights[0] <= 0))
@@ -1270,11 +1273,11 @@ namespace material_graph
         const auto& source = *candidate->source_;
         const auto* sourceBytes = static_cast<const std::byte*>(source.Geometry().vertexData);
         constexpr auto unused = std::numeric_limits<std::uint32_t>::max();
-        std::vector<std::uint32_t> remap(cost.sourceVertices, unused);
+        ce::dynamic_array<std::uint32_t> remap(cost.sourceVertices, unused);
         ce::dynamic_bitset referenced(cost.sourceVertices);
         own::shared_owner<MeshSurfaceInput> chunk;
         MeshSurfaceChunk description;
-        own::shared_owner<std::vector<std::uint32_t>> sourceVertices;
+        own::shared_owner<ce::dynamic_array<std::uint32_t>> sourceVertices;
         const auto start = [&](std::uint32_t firstTriangle)
         {
             chunk = own::make_shared<MeshSurfaceInput>(MeshSurfaceInput::ConstructionKey{});
@@ -1287,7 +1290,7 @@ namespace material_graph
             chunk->clusterArchive_ = source.ClusterArchive();
             chunk->clusterStream_ = source.ClusterStream();
             description = {};
-            sourceVertices = own::make_shared<std::vector<std::uint32_t>>();
+            sourceVertices = own::make_shared<ce::dynamic_array<std::uint32_t>>();
             description.firstTriangle = firstTriangle;
         };
         const auto finish = [&]()
@@ -1387,7 +1390,7 @@ namespace material_graph
                     start(triangle);
                 }
             }
-            const std::array indices{source.indices_[std::size_t(triangle) * 3],
+            const ce::fixed_array indices{source.indices_[std::size_t(triangle) * 3],
                                      source.indices_[std::size_t(triangle) * 3 + 1],
                                      source.indices_[std::size_t(triangle) * 3 + 2]};
             std::uint32_t additional = 0;
@@ -1580,7 +1583,7 @@ namespace material_graph
         }
         if (!reusable)
         {
-            std::vector<float> zeroLods;
+            ce::dynamic_array<float> zeroLods;
             if (lods.empty() && geometry.IsComplete())
             {
                 if (geometry.vertexBytes / geometry.vertexStride > budget.maxSourceVertices)
@@ -1606,7 +1609,7 @@ namespace material_graph
                 {
                     cachedBytes -= found->second.plan->cost_.cpuPayloadBytes;
                     cache.erase(found);
-                    std::erase(insertionOrder, key);
+                    ce::erase(insertionOrder, key);
                 }
                 cache.emplace(key, Entry{result, budget, geometry.vertexData, geometry.indexData});
                 insertionOrder.push_back(key);
@@ -1625,7 +1628,7 @@ namespace material_graph
         if (!Affine(draw.worldMatrix))
         {
             std::string values;
-            for (const float value : std::bit_cast<std::array<float, 16>>(draw.worldMatrix))
+            for (const float value : std::bit_cast<ce::fixed_array<float, 16>>(draw.worldMatrix))
             {
                 values += std::to_string(value) + "[" + std::to_string(std::bit_cast<std::uint32_t>(value)) + "],";
             }
@@ -1743,7 +1746,7 @@ namespace material_graph
         {
             const auto& point = points[i];
             const auto& eye = input_->View().eye;
-            if (!Finite(std::bit_cast<std::array<float, 20>>(point)) || point.position[3] != 0 ||
+            if (!Finite(std::bit_cast<ce::fixed_array<float, 20>>(point)) || point.position[3] != 0 ||
                 point.uvLod[3] != (IsSampled() ? (*samples_)[i].lod : input_->Lods()[i]) ||
                 !Direction(point.normal.data()) || !ValidSurfaceTangentPair(point) ||
                 std::hypot(double(eye[0]) - point.position[0], double(eye[1]) - point.position[1],
@@ -1815,7 +1818,7 @@ namespace material_graph
             requestCache_->Trim(cacheGeneration_);
         }
         const auto completed = bufferPool_ ? bufferPool_->completed.load(std::memory_order_acquire) : 0;
-        std::erase_if(transformedCache_,
+        ce::erase_if(transformedCache_,
                       [&](const auto& batch)
                       {
                           // Keep the preceding two recordings for motion/history and queue
@@ -1934,7 +1937,7 @@ namespace material_graph
             {
                 requestCache_ = own::make_shared<MeshSurfaceRequestCache>();
             }
-            own::shared_owner<const std::vector<std::uint32_t>> requests;
+            own::shared_owner<const ce::dynamic_array<std::uint32_t>> requests;
             {
                 ce::profile_scope requestProfile{ce::marker<"MeshClusterRequests">()};
                 requests = requestCache_->Acquire(identity, *input, auditView, cacheGeneration_);
@@ -2095,9 +2098,9 @@ namespace material_graph
         struct Job
         {
             math::matrix4x4 world;
-            std::array<uint32_t, 4> countStrideMaskBones;
-            std::array<uint32_t, 8> offsets;
-            std::array<uint32_t, 4> inputOffsets;
+            ce::fixed_array<uint32_t, 4> countStrideMaskBones;
+            ce::fixed_array<uint32_t, 8> offsets;
+            ce::fixed_array<uint32_t, 4> inputOffsets;
         };
         struct Group
         {
@@ -2120,14 +2123,14 @@ namespace material_graph
         auto dispatch = own::make_shared<MeshTransformDispatch>();
         auto& device = *batches.front()->device_;
         ce::profile_scope prepareScope{ce::marker<"MaterialMeshDispatchPrepare">()};
-        std::vector<std::byte> inputs;
-        std::vector<MeshTransformDispatch::Job> jobs;
-        std::vector<MeshTransformDispatch::Group> groups;
-        std::vector<RHIBindingDesc> outputs;
-        std::map<std::pair<uintptr_t, size_t>, uint32_t> immutableInputs;
+        ce::dynamic_array<std::byte> inputs;
+        ce::dynamic_array<MeshTransformDispatch::Job> jobs;
+        ce::dynamic_array<MeshTransformDispatch::Group> groups;
+        ce::dynamic_array<RHIBindingDesc> outputs;
+        ce::engine_ordered_map<ce::pair<uintptr_t, size_t>, uint32_t> immutableInputs;
         const auto append = [&](const void* data, size_t bytes, bool deduplicate) -> uint32_t
         {
-            const auto key = std::pair{reinterpret_cast<uintptr_t>(data), bytes};
+            const auto key = ce::pair{reinterpret_cast<uintptr_t>(data), bytes};
             if (deduplicate)
             {
                 const auto found = immutableInputs.find(key);
@@ -2191,7 +2194,7 @@ namespace material_graph
         dispatch->dispatchY =
             (dispatch->groupCount + MeshTransformDispatch::GroupWidth - 1) / MeshTransformDispatch::GroupWidth;
         dispatch->dispatchX = (dispatch->groupCount + dispatch->dispatchY - 1) / dispatch->dispatchY;
-        const std::array<uint32_t, 4> constants{dispatch->groupCount, dispatch->dispatchX,
+        const ce::fixed_array<uint32_t, 4> constants{dispatch->groupCount, dispatch->dispatchX,
                                                 static_cast<uint32_t>(jobs.size()), 0};
         dispatch->uniform = device.UploadConstants(constants.data(), sizeof(constants));
         const auto upload = [&](const void* data, size_t bytes)
@@ -2275,7 +2278,7 @@ namespace material_graph
         dispatch->dispatchY =
             (dispatch->groupCount + MeshTransformDispatch::GroupWidth - 1) / MeshTransformDispatch::GroupWidth;
         dispatch->dispatchX = (dispatch->groupCount + dispatch->dispatchY - 1) / dispatch->dispatchY;
-        const std::array<std::uint32_t, 4> constants{dispatch->groupCount, dispatch->dispatchX,
+        const ce::fixed_array<std::uint32_t, 4> constants{dispatch->groupCount, dispatch->dispatchX,
                                                      static_cast<std::uint32_t>(plan.JobCount()), 0};
         const RHIUploadRequest requests[]{
             {sizeof(constants), RHIUploadUsage::ConstantBuffer, 256},
@@ -2283,7 +2286,7 @@ namespace material_graph
             {plan.JobCount() * sizeof(MeshTransformDispatch::Job), RHIUploadUsage::Raw,
              (std::max)(std::size_t{16}, alignof(MeshTransformDispatch::Job))},
             {std::uint64_t(plan.GroupCount()) * sizeof(MeshTransformDispatch::Group), RHIUploadUsage::Raw, 16}};
-        std::array<RHIBufferSlice, 4> uploads;
+        ce::fixed_array<RHIBufferSlice, 4> uploads;
         if (!device.ReserveUploadBatch(requests, uploads, error) ||
             std::ranges::any_of(uploads,
                                 [](const auto& upload) { return !upload.IsValid() || !upload.IsWritable(); }) ||
@@ -2416,8 +2419,8 @@ namespace material_graph
     {
         struct DeclarationScratch
         {
-            std::vector<own::shared_owner<const MeshSurfaceBatch>> transformed, reused, direct, aliases, producers;
-            std::vector<EnhancedRenderGraph::RGPassUsage> transformUses, readyUses, reuseUses, clusterUses,
+            ce::dynamic_array<own::shared_owner<const MeshSurfaceBatch>> transformed, reused, direct, aliases, producers;
+            ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> transformUses, readyUses, reuseUses, clusterUses,
                 clusterReadyUses;
             ce::render_pointer_set<MeshSurfaceBatch> selected, producerSet;
             void Clear()
@@ -2632,7 +2635,7 @@ namespace material_graph
     }
 
     bool MeshSurfaceBatch::DeclareResources(EnhancedRenderGraph& graph,
-                                            std::vector<EnhancedRenderGraph::RGPassUsage>& inputs, bool& reused,
+                                            ce::dynamic_array<EnhancedRenderGraph::RGPassUsage>& inputs, bool& reused,
                                             std::string& error) const
     {
         reused = false;
@@ -2793,7 +2796,7 @@ namespace material_graph
         {
             const auto& sample = samples[i];
             if (sample.triangle >= vertices->Input()->Geometry().indexCount / 3 ||
-                !Finite(std::array{sample.b, sample.c, sample.lod}) || sample.b < 0 || sample.c < 0 ||
+                !Finite(ce::fixed_array{sample.b, sample.c, sample.lod}) || sample.b < 0 || sample.c < 0 ||
                 sample.b + sample.c > 1 || sample.lod < 0 || sample.lod > 32)
             {
                 return Fail(error,
@@ -2805,7 +2808,7 @@ namespace material_graph
         candidate->input_ = vertices->Input();
         candidate->source_ = std::move(vertices);
         candidate->samplePipeline_ = samplerPipeline_;
-        candidate->samples_ = own::make_unique<std::vector<MeshSurfaceSample>>(samples.begin(), samples.end());
+        candidate->samples_ = own::make_unique<ce::dynamic_array<MeshSurfaceSample>>(samples.begin(), samples.end());
         candidate->count_ = static_cast<std::uint32_t>(samples.size());
         candidate->recordingId_ = device.GetCurrentUploadRecordingId();
         const auto descriptorVersion = device.GetDescriptorVersionToken();
@@ -2821,7 +2824,7 @@ namespace material_graph
         const auto indexBytes = std::uint64_t(geometry.indexCount) * sizeof(std::uint32_t);
         const auto indices = device.AllocateUpload({indexBytes, RHIUploadUsage::Raw, 16});
         const auto requests = device.AllocateUpload({samples.size_bytes(), RHIUploadUsage::Raw, 16});
-        const std::array<std::uint32_t, 4> constants{candidate->Count(), 0, 0, 0};
+        const ce::fixed_array<std::uint32_t, 4> constants{candidate->Count(), 0, 0, 0};
         const auto uniform = device.UploadConstants(constants.data(), sizeof(constants));
         const auto output = RHIBindingDesc::UavBuffer(candidate->buffer_, candidate->Count(), sizeof(SurfacePoint));
         const auto table = device.CreateBindings({&output, 1});

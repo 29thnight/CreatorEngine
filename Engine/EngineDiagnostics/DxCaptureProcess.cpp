@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "DxCaptureProcess.h"
 #include "DxCaptureSecurity.h"
 #if defined(CE_CONTRACT_STANDALONE)
@@ -55,7 +56,7 @@ namespace ce::dx_capture
 
         security::handle create_pipe(const std::wstring& name)
         {
-            std::vector<std::byte> sid;
+            ce::dynamic_array<std::byte> sid;
             if (!security::logon_sid(GetCurrentProcess(), sid))
             {
                 return {};
@@ -96,7 +97,7 @@ namespace ce::dx_capture
         std::atomic<std::uint64_t> dropped{0};
         security::handle stop_event{CreateEventW(nullptr, TRUE, FALSE, nullptr)};
         security::handle finished_event{CreateEventW(nullptr, TRUE, TRUE, nullptr)};
-        std::array<record, maximum_queued_records> queue{};
+        ce::fixed_array<record, maximum_queued_records> queue{};
         alignas(64) std::atomic<std::uint64_t> write_position{0};
         alignas(64) std::atomic<std::uint64_t> read_position{0};
         std::uint64_t reported_loss = 0;

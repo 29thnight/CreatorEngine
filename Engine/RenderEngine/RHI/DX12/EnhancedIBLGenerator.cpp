@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -573,7 +574,7 @@ void EnhancedIBLGenerator::ReleaseTargets()
     m_targetsWaitForIdle = false;
 }
 
-std::array<RHITextureHandle*, 12> EnhancedIBLGenerator::Targets()
+ce::fixed_array<RHITextureHandle*, 12> EnhancedIBLGenerator::Targets()
 {
     return {&m_cubeMapHandle, &m_cubeSourceHandle, &m_irradianceHandle, &m_prefilteredHandle,
         &m_brdfLutHandle, &m_importanceRows, &m_importanceMarginal, &m_importanceSamples,
@@ -682,7 +683,7 @@ void EnhancedIBLGenerator::OnUploadAccepted(uint64_t recording, RHICompletionPoi
 
 void EnhancedIBLGenerator::OnUploadCompleted(uint64_t completion)
 {
-    std::erase_if(m_retiredOwners, [&](const auto& snapshot)
+    ce::erase_if(m_retiredOwners, [&](const auto& snapshot)
     {
         return !snapshot.waitForIdle && snapshot.completion && snapshot.completion <= completion;
     });
@@ -690,7 +691,7 @@ void EnhancedIBLGenerator::OnUploadCompleted(uint64_t completion)
 
 void EnhancedIBLGenerator::OnUploadAborted(uint64_t recording)
 {
-    std::erase_if(m_cookedCaptures, [&](auto& capture)
+    ce::erase_if(m_cookedCaptures, [&](auto& capture)
     {
         if (capture.recording != recording || capture.accepted)
         {

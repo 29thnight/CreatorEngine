@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineStorage.h"
 // PHASE 14 P1+P2 — 프로파일러 서비스.
 //
 // ★ 스트림의 소유자는 서비스다. 옛 코어는 `GetTLSUnsafe()` 가 함수 지역
@@ -176,7 +178,7 @@ namespace ce
 
         // 지금 등록되어 있는 스레드. 얼린 캡처가 없어도 읽힌다 — 녹화 중에
         // 스레드가 잡히고 있는지 보는 것이 라이브 기준선의 축 하나다.
-        std::vector<thread_info> threads() const;
+        ce::dynamic_array<thread_info> threads() const;
 
         // --- 기록 --------------------------------------------------------
         // hot path. 상태가 recording 이 아니면 곧바로 돌아온다.
@@ -215,7 +217,7 @@ namespace ce
             m_latestVramBudget.store(budget_mb, std::memory_order_release);
             publish_counter(engine_frame, profile_counter_id::gpu_vram_mb, static_cast<double>(used_mb));
         }
-        std::pair<std::uint64_t, std::uint64_t> latest_video_memory() const
+        ce::pair<std::uint64_t, std::uint64_t> latest_video_memory() const
         {
             const auto budget = m_latestVramBudget.load(std::memory_order_acquire);
             return { m_latestVramUsed.load(std::memory_order_relaxed), budget };
@@ -297,7 +299,7 @@ namespace ce
         capture_session_ptr capture() const;
         // Snapshot and its collector generation are read under the same lock.
         // A Clear may advance the current generation before replacing a capture.
-        std::pair<capture_session_ptr, std::uint64_t> capture_publication() const;
+        ce::pair<capture_session_ptr, std::uint64_t> capture_publication() const;
         std::uint64_t capture_generation() const { return m_generation.load(std::memory_order_acquire); }
         ce::recording_status recording_status() const;
         std::filesystem::path recording_path() const;
@@ -464,7 +466,7 @@ namespace ce
             event_chunk* sealed = nullptr;
         };
         mutable std::mutex            m_workLock;
-        std::deque<collector_work>    m_workQueue;
+        ce::segmented_deque<collector_work>    m_workQueue;
         std::counting_semaphore<INT_MAX> m_workSignal{ 0 };
         std::size_t                   m_maxQueuedFrames = 0;
         std::size_t                   m_queuedFrames = 0;
@@ -508,15 +510,15 @@ namespace ce
         std::size_t   m_memoryBudget = kDefaultMemoryBudget;
 
         mutable std::mutex        m_streamLock;
-        std::vector<stream_entry> m_streams;
-        std::vector<thread_info>  m_threadInfo;
+        ce::dynamic_array<stream_entry> m_streams;
+        ce::dynamic_array<thread_info>  m_threadInfo;
 
         // 파일 쓰기는 별도 worker가 소유한다. 이 잠금은 UI의 짧은 상태/경로 조회만 보호한다.
         mutable std::mutex recording_lock_;
         std::unique_ptr<continuous_capture_writer> recording_writer_;
         std::uint64_t recording_writer_id_ = 0;
         std::optional<capture_file_error> recording_start_error_;
-        std::vector<frame_record> recording_batch_;
+        ce::dynamic_array<frame_record> recording_batch_;
         std::size_t recording_batch_bytes_ = 0;
         bool recording_finalized_ = true;
         bool finalizing_recording_ = false;

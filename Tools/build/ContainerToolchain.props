@@ -1,0 +1,14 @@
+<Project>
+  <!-- MSVC 19.50 fails to deserialize the combined container/reflection IFC graph
+       (C1054/C1001). Select the tested installed toolchain before Cpp.Default.props
+       chooses v145's older default. Explicit developer selections remain intact. -->
+  <PropertyGroup Condition="'$(MSBuildProjectExtension)' == '.vcxproj'">
+    <_CreatorContainerToolchainRoot>$([System.IO.Path]::GetFullPath('$(MSBuildToolsPath)\..\..\..\..'))\VC\Tools\MSVC\14.51.36231\</_CreatorContainerToolchainRoot>
+    <VCToolsVersion Condition="'$(VCToolsVersion)' == '' and Exists('$(_CreatorContainerToolchainRoot)bin\Hostx64\x64\cl.exe')">14.51.36231</VCToolsVersion>
+  </PropertyGroup>
+  <Target Name="RequireContainerModuleCompiler" BeforeTargets="PrepareForBuild"
+          Condition="'$(MSBuildProjectName)' == 'EngineContracts' and '$(VCToolsVersion)' != ''">
+    <Error Condition="$([MSBuild]::VersionLessThan('$(VCToolsVersion)', '14.51'))"
+           Text="CreatorEngine container/reflection modules require MSVC 19.51 or newer. Use Visual Studio 2026 18.11+ and an installed compatible VCToolsVersion. The 19.50 integration fails with C1054/C1001; standalone benchmark support is separate." />
+  </Target>
+</Project>

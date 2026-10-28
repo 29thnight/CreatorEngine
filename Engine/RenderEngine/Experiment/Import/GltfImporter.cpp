@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
 #else
@@ -22,16 +24,16 @@ namespace experiment::importer
     {
         struct GltfPersistentIds final
         {
-            std::vector<std::string> images{};
-            std::vector<std::string> materials{};
-            std::vector<std::string> meshes{};
-            std::vector<std::string> skins{};
-            std::vector<std::string> animations{};
+            ce::dynamic_array<std::string> images{};
+            ce::dynamic_array<std::string> materials{};
+            ce::dynamic_array<std::string> meshes{};
+            ce::dynamic_array<std::string> skins{};
+            ce::dynamic_array<std::string> animations{};
 
             void Put(fastgltf::Category category, std::size_t index,
                 std::string_view value)
             {
-                std::vector<std::string>* target = nullptr;
+                ce::dynamic_array<std::string>* target = nullptr;
                 switch (category)
                 {
                 case fastgltf::Category::Images: target = &images; break;
@@ -46,7 +48,7 @@ namespace experiment::importer
             }
 
             [[nodiscard]] static std::string Get(
-                const std::vector<std::string>& values, std::size_t index)
+                const ce::dynamic_array<std::string>& values, std::size_t index)
             {
                 return index < values.size() ? values[index] : std::string{};
             }
@@ -177,9 +179,9 @@ namespace experiment::importer
         // 훑으며 새 인덱스를 부여한다(= 자동으로 정렬을 만족한다).
         struct NodeOrder final
         {
-            std::vector<std::size_t> gltfOrder{};                 // 새 인덱스 → glTF
-            std::vector<std::uint32_t> gltfToNew{};               // glTF → 새 인덱스
-            std::vector<std::uint32_t> parentOf{};                // 새 인덱스 기준
+            ce::dynamic_array<std::size_t> gltfOrder{};                 // 새 인덱스 → glTF
+            ce::dynamic_array<std::uint32_t> gltfToNew{};               // glTF → 새 인덱스
+            ce::dynamic_array<std::uint32_t> parentOf{};                // 새 인덱스 기준
         };
 
         constexpr std::uint32_t NoParent = (std::numeric_limits<std::uint32_t>::max)();
@@ -191,7 +193,7 @@ namespace experiment::importer
             const std::size_t count = asset.nodes.size();
             order.gltfToNew.assign(count, NoParent);
 
-            std::vector<std::uint8_t> isChild(count, 0);
+            ce::dynamic_array<std::uint8_t> isChild(count, 0);
             for (const fastgltf::Node& node : asset.nodes)
             {
                 for (std::size_t child : node.children)
@@ -201,7 +203,7 @@ namespace experiment::importer
             }
 
             // scene 이 지정한 루트를 우선 쓰고, 없으면 부모 없는 노드 전부.
-            std::vector<std::size_t> queue;
+            ce::dynamic_array<std::size_t> queue;
             if (asset.defaultScene.has_value()
                 && *asset.defaultScene < asset.scenes.size())
             {
@@ -220,7 +222,7 @@ namespace experiment::importer
 
             order.gltfOrder.reserve(count);
             order.parentOf.reserve(count);
-            std::vector<std::uint32_t> pendingParent(queue.size(), NoParent);
+            ce::dynamic_array<std::uint32_t> pendingParent(queue.size(), NoParent);
 
             for (std::size_t head = 0; head < queue.size(); ++head)
             {
@@ -303,7 +305,7 @@ namespace experiment::importer
         }
 
         void ReadUv(const fastgltf::Asset& asset,
-            const fastgltf::Accessor& accessor, std::vector<math::vector2>& out)
+            const fastgltf::Accessor& accessor, ce::dynamic_array<math::vector2>& out)
         {
             out.resize(accessor.count);
             fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec2>(
@@ -362,13 +364,13 @@ namespace experiment::importer
             // JOINTS_0 은 glTF 상 unsigned byte 또는 unsigned short 다. u16 으로
             // 받으면 둘 다 무손실이고(최대 65535 joint), fastgltf 가 성분 타입
             // 변환을 대신한다. uvec4 는 ElementTraits 가 없어 쓸 수 없다.
-            std::vector<fastgltf::math::u16vec4> jointValues(vertexCount);
+            ce::dynamic_array<fastgltf::math::u16vec4> jointValues(vertexCount);
             fastgltf::iterateAccessorWithIndex<fastgltf::math::u16vec4>(
                 asset, joints, [&](fastgltf::math::u16vec4 value, std::size_t index)
             {
                 jointValues[index] = value;
             });
-            std::vector<fastgltf::math::fvec4> weightValues(vertexCount);
+            ce::dynamic_array<fastgltf::math::fvec4> weightValues(vertexCount);
             fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec4>(
                 asset, weights, [&](fastgltf::math::fvec4 value, std::size_t index)
             {
@@ -537,7 +539,7 @@ namespace experiment::importer
         [[nodiscard]] ImportTextureIndex ResolveTexture(
             const fastgltf::Asset& asset, const fastgltf::TextureInfo& info,
             TextureColorSpace colorSpace, const std::filesystem::path& baseDirectory,
-            ImportedScene& scene, std::unordered_map<std::size_t, std::uint32_t>& cache,
+            ImportedScene& scene, ce::engine_node_map<std::size_t, std::uint32_t>& cache,
             const GltfPersistentIds& persistentIds, const ImportRequest& request,
             bool& dependencyFailed, ImportNoteSink& notes)
         {
@@ -712,7 +714,7 @@ namespace experiment::importer
 
         // glTF mesh 하나가 primitive 여럿을 들고, 우리 IR 은 primitive 하나가
         // 메시 하나다(재질별 분할). 노드가 참조할 수 있도록 사상을 만든다.
-        std::vector<std::vector<std::uint32_t>> meshPrimitives(asset.meshes.size());
+        ce::dynamic_array<ce::dynamic_array<std::uint32_t>> meshPrimitives(asset.meshes.size());
 
         scene.nodes.reserve(order.gltfOrder.size());
         for (std::size_t newIndex = 0; newIndex < order.gltfOrder.size(); ++newIndex)
@@ -894,7 +896,7 @@ namespace experiment::importer
         }
 
         // ── 머테리얼 ────────────────────────────────────────────────────
-        std::unordered_map<std::size_t, std::uint32_t> textureCache;
+        ce::engine_node_map<std::size_t, std::uint32_t> textureCache;
         bool textureDependencyFailed = false;
         scene.materials.reserve(asset.materials.size());
         for (std::size_t materialIndex = 0;
@@ -1082,7 +1084,7 @@ namespace experiment::importer
 
             // glTF 는 (노드, 경로)마다 채널이 따로다. IR 은 노드마다 T/R/S 를
             // 한 채널에 모으므로 노드 기준으로 합친다.
-            std::unordered_map<std::uint32_t, std::size_t> channelOfNode;
+            ce::engine_node_map<std::uint32_t, std::size_t> channelOfNode;
             double duration = 0.0;
 
             for (const fastgltf::AnimationChannel& channel : source.channels)
@@ -1129,7 +1131,7 @@ namespace experiment::importer
 
                 const fastgltf::Accessor& input = asset.accessors[sampler.inputAccessor];
                 const fastgltf::Accessor& output = asset.accessors[sampler.outputAccessor];
-                std::vector<double> times(input.count);
+                ce::dynamic_array<double> times(input.count);
                 fastgltf::iterateAccessorWithIndex<float>(
                     asset, input, [&](float value, std::size_t index)
                 {
@@ -1147,7 +1149,7 @@ namespace experiment::importer
                 case fastgltf::AnimationPath::Translation:
                 {
                     target.translationInterpolation = interpolation;
-                    std::vector<fastgltf::math::fvec3> values(output.count);
+                    ce::dynamic_array<fastgltf::math::fvec3> values(output.count);
                     fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
                         asset, output,
                         [&](fastgltf::math::fvec3 value, std::size_t index)
@@ -1167,7 +1169,7 @@ namespace experiment::importer
                 case fastgltf::AnimationPath::Rotation:
                 {
                     target.rotationInterpolation = interpolation;
-                    std::vector<fastgltf::math::fquat> values(output.count);
+                    ce::dynamic_array<fastgltf::math::fquat> values(output.count);
                     fastgltf::iterateAccessorWithIndex<fastgltf::math::fquat>(
                         asset, output,
                         [&](fastgltf::math::fquat value, std::size_t index)
@@ -1187,7 +1189,7 @@ namespace experiment::importer
                 case fastgltf::AnimationPath::Scale:
                 {
                     target.scaleInterpolation = interpolation;
-                    std::vector<fastgltf::math::fvec3> values(output.count);
+                    ce::dynamic_array<fastgltf::math::fvec3> values(output.count);
                     fastgltf::iterateAccessorWithIndex<fastgltf::math::fvec3>(
                         asset, output,
                         [&](fastgltf::math::fvec3 value, std::size_t index)

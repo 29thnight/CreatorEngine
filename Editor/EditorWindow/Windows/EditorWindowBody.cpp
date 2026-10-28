@@ -1,3 +1,5 @@
+#include "../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
+#include "../../../Engine/Containers/ContainerAPI.h"
 // 창 본문 보관소 (PHASE 21 M4 2·3단계 → W3).
 //
 // 이 TU도 유니티에서 뺀다 — EditorWindowRegistry.cpp와 같은 이유.
@@ -72,7 +74,7 @@ namespace editor::windows
     }
 
     window_body_binding bind_window_body(body_table& table, std::string_view stable_id,
-                                         std::function<void()> body)
+                                         ce::owned_func<void()> body)
     {
         const std::uint64_t token = next_token();
         if (body_binding_record* existing = find_record(table, stable_id))
@@ -86,7 +88,7 @@ namespace editor::windows
     }
 
     window_body_binding bind_window_body(std::string_view stable_id,
-                                         std::function<void()> body)
+                                         ce::owned_func<void()> body)
     {
         return bind_window_body(process_window_bodies(), stable_id, std::move(body));
     }
@@ -132,9 +134,9 @@ namespace editor::windows
         m_token = 0;
     }
 
-    std::vector<std::string_view> bound_window_bodies(const body_table& table)
+    ce::dynamic_array<std::string_view> bound_window_bodies(const body_table& table)
     {
-        std::vector<std::string_view> names;
+        ce::dynamic_array<std::string_view> names;
         names.reserve(table.entries.size());
         for (const body_binding_record& one : table.entries)
         {
@@ -143,7 +145,7 @@ namespace editor::windows
         return names;
     }
 
-    std::vector<std::string_view> bound_window_bodies()
+    ce::dynamic_array<std::string_view> bound_window_bodies()
     {
         return bound_window_bodies(process_window_bodies());
     }

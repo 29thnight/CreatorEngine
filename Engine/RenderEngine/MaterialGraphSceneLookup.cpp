@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -52,9 +54,9 @@ struct SceneLookupResourcePool
         std::uint32_t width{}, height{};
         std::uint64_t completion{}, bytes{};
         bool runtimeEvaluation{}, capture{};
-        std::array<RHITextureHandle, 11> inputs{};
+        ce::fixed_array<RHITextureHandle, 11> inputs{};
         RHIBufferHandle samples, statistics;
-        std::array<RHIResourceState, 11> inputStates{};
+        ce::fixed_array<RHIResourceState, 11> inputStates{};
         RHIResourceState sampleState{RHIResourceState::Common};
         RHIResourceState statisticState{RHIResourceState::Common};
     };
@@ -250,8 +252,8 @@ struct SceneLookupResourcePool
     IRenderDeviceServices& device;
     std::mutex mutex;
     std::atomic<std::uint64_t> completed{};
-    std::vector<Bundle> idle;
-    std::map<std::uint64_t, UploadReservation> uploads;
+    ce::dynamic_array<Bundle> idle;
+    ce::engine_ordered_map<std::uint64_t, UploadReservation> uploads;
     std::uint64_t resourceBytes{}, uploadBytes{};
 };
 
@@ -352,7 +354,7 @@ bool SceneLookupCache::Prepare(const EnhancedFrameContext& context, std::uint64_
                                RHITextureHandle irradiance, RHITextureHandle prefiltered,
                                std::uint64_t environmentGeneration, std::uint64_t memoryBudget,
                                own::shared_owner<const SceneLookupFrame>& result, std::string& error,
-                               std::array<RHITextureHandle, 3> importance, RHITextureHandle source, bool standalone,
+                               ce::fixed_array<RHITextureHandle, 3> importance, RHITextureHandle source, bool standalone,
                                bool approximate, bool capture, bool runtimeEvaluation)
 {
     ce::profile_scope profile{ce::marker<"MaterialLookupPrepare">()};
@@ -597,7 +599,7 @@ void SceneLookupFrame::BindRuntime(RHIEncoder& encoder, unsigned firstRootSlot) 
     encoder.SetConstantBuffer(RHIBindPoint::Graphics, firstRootSlot + 1, runtimeConstants_);
 }
 
-const std::array<RGHandle, 11>& SceneLookupFrame::DeclareInputs(EnhancedRenderGraph& graph) const
+const ce::fixed_array<RGHandle, 11>& SceneLookupFrame::DeclareInputs(EnhancedRenderGraph& graph) const
 {
     if (graph_)
     {
@@ -620,13 +622,13 @@ const std::array<RGHandle, 11>& SceneLookupFrame::DeclareInputs(EnhancedRenderGr
     return graphInputs_;
 }
 
-const std::array<RGHandle, 11>& SceneLookupFrame::GraphInputs(const EnhancedRenderGraph& graph) const
+const ce::fixed_array<RGHandle, 11>& SceneLookupFrame::GraphInputs(const EnhancedRenderGraph& graph) const
 {
     CheckCurrent(graph);
     return graphInputs_;
 }
 
-std::array<RGHandle, 11> SceneLookupFrame::DeclareCaptureOutputs(EnhancedRenderGraph& graph, unsigned first,
+ce::fixed_array<RGHandle, 11> SceneLookupFrame::DeclareCaptureOutputs(EnhancedRenderGraph& graph, unsigned first,
                                                                  unsigned count) const
 {
     CheckCurrent(graph);
@@ -682,7 +684,7 @@ void SceneLookupFrame::DeclareBake(EnhancedRenderGraph& graph, RGHandle owners) 
     {
         throw std::runtime_error("Scene lookup lost its previous cache owner before declaration.");
     }
-    std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> uses{
         {owners, RHIResourceState::ShaderResource, readAccess},
         {graphSamples_, RHIResourceState::UnorderedAccess, writeAccess},
         {graphStatistics_, RHIResourceState::UnorderedAccess, writeAccess}};
@@ -743,7 +745,7 @@ void SceneLookupFrame::DeclareBake(EnhancedRenderGraph& graph, RGHandle owners) 
     }
     graph.AddPass("METEOR.Scene.LookupBake", uses, [owner, previous, owners](const auto& execution) {
         owner->CheckCurrent(*execution.graph);
-        std::array<RHIBindingDesc, 24> descriptions;
+        ce::fixed_array<RHIBindingDesc, 24> descriptions;
         for (unsigned i = 0; i < 11; ++i)
         {
             descriptions[i] = RHIBindingDesc::Srv2D(owner->inputs_[i], RHIFormat::RGBA32Float);
@@ -817,7 +819,7 @@ void SceneLookupFrame::DeclareReady(EnhancedRenderGraph& graph) const
     const auto readAccess = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder ? RGAccessMode::LegacyState
                                                                                             : RGAccessMode::Read;
     const auto owner = self_.lock();
-    std::vector<EnhancedRenderGraph::RGPassUsage> uses{{graphSamples_, RHIResourceState::ShaderResource, readAccess}};
+    ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> uses{{graphSamples_, RHIResourceState::ShaderResource, readAccess}};
     // Deferred and the next frame consume these retained maps as pixel SRVs.
     // Restore their exact state after the compute bake before graph submission.
     for (const auto texture :
@@ -908,7 +910,7 @@ bool SceneLookupCache::PublishSubmitted(const SceneLookupFrame& frame, std::uint
     {
         if (frame.runtimeEvaluation_ && !frame.standalone_)
         {
-            std::erase_if(published_, [&](const auto& item) { return item->viewId_ == frame.viewId_; });
+            ce::erase_if(published_, [&](const auto& item) { return item->viewId_ == frame.viewId_; });
         }
         if (!frame.standalone_)
         {
@@ -921,7 +923,7 @@ bool SceneLookupCache::PublishSubmitted(const SceneLookupFrame& frame, std::uint
     }
     // The callback retains the previous frame through submission completion.
     // The published frame has only a weak history link, preventing a chain.
-    std::erase_if(published_, [&](const auto& item) { return item->viewId_ == frame.viewId_; });
+    ce::erase_if(published_, [&](const auto& item) { return item->viewId_ == frame.viewId_; });
     if (published_.size() == 2)
     {
         published_.erase(published_.begin());

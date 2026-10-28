@@ -117,13 +117,13 @@ int main()
     {
         {
             ce::render_arena_objects objects;
-            std::array<int, 4> destruction{};
+            ce::fixed_array<int, 4> destruction{};
             size_t destroyed{};
             struct Capture
             {
                 own::shared_owner<int> owner;
                 int id;
-                std::array<int, 4>* order;
+                ce::fixed_array<int, 4>* order;
                 size_t* count;
                 ~Capture() { (*order)[(*count)++] = id; }
             };
@@ -133,7 +133,7 @@ int main()
             const auto address = reinterpret_cast<uintptr_t>(first);
             Require(address % alignof(Capture) == 0, "Declaration capture alignment failed.");
             objects.emplace<Capture>(owner, 2, &destruction, &destroyed);
-            std::array owners{owner, owner};
+            ce::fixed_array owners{owner, owner};
             const auto copied = objects.copy(std::span<const own::shared_owner<int>>{owners});
             Require(copied.size() == 2 && *copied[1] == 17, "Declaration owner array copy failed.");
             owners.fill({});
@@ -157,7 +157,7 @@ int main()
             objects.reset();
         }
         {
-            std::array<int, 4096> identities{};
+            ce::fixed_array<int, 4096> identities{};
             ce::render_pointer_set<int> set;
             for (size_t repeat = 0; repeat < 32; ++repeat)
             {
@@ -189,7 +189,7 @@ int main()
                 }
                 ~ThrowingCopy() { --*live; }
             };
-            const std::array values{ThrowingCopy(copies, live), ThrowingCopy(copies, live)};
+            const ce::fixed_array values{ThrowingCopy(copies, live), ThrowingCopy(copies, live)};
             bool rejected{};
             try
             {
@@ -315,7 +315,7 @@ int main()
         {
             ce::RenderArenaPool concurrentPool;
             std::atomic<bool> intact{true};
-            std::array<std::thread, 8> clients;
+            ce::fixed_array<std::thread, 8> clients;
             for (size_t client = 0; client < clients.size(); ++client)
             {
                 clients[client] = std::thread(
@@ -391,7 +391,7 @@ int main()
             Require(values.data() == firstBlock && recycled->Resource(0).stats().block_count == retained.block_count,
                     "Next frame did not reuse retained arena storage.");
         }
-        std::array<std::thread, ce::RenderArenaSet::DomainCount> writers;
+        ce::fixed_array<std::thread, ce::RenderArenaSet::DomainCount> writers;
         for (size_t domain = 0; domain < writers.size(); ++domain)
         {
             writers[domain] = std::thread(
@@ -453,14 +453,14 @@ int main()
         Require(list.GetCommandCount() == 0 && list.GetPayloadBytes() == 0, "Rejected operation mutated list.");
         validator.allow = true;
         {
-            std::array<uint32_t, 3> roots{7, 8, 9};
+            ce::fixed_array<uint32_t, 3> roots{7, 8, 9};
             Require(writer.DispatchMeshIndirectBatch({1}, 0, 1, roots), "Valid root slots rejected.");
             roots.fill(0);
-            std::array<RHITransition, 1> transitions{{{{11}, RHIResourceState::Common, RHIResourceState::CopySource}}};
-            std::array<RHIBufferTransition, 1> buffers{
+            ce::fixed_array<RHITransition, 1> transitions{{{{11}, RHIResourceState::Common, RHIResourceState::CopySource}}};
+            ce::fixed_array<RHIBufferTransition, 1> buffers{
                 {{{12}, RHIResourceState::Common, RHIResourceState::CopySource}}};
-            std::array<RHITextureHandle, 1> uavTextures{{{13}}}, aliasTextures{{{15}}};
-            std::array<RHIBufferHandle, 1> uavBuffers{{{14}}}, aliasBuffers{{{16}}};
+            ce::fixed_array<RHITextureHandle, 1> uavTextures{{{13}}}, aliasTextures{{{15}}};
+            ce::fixed_array<RHIBufferHandle, 1> uavBuffers{{{14}}}, aliasBuffers{{{16}}};
             writer.ResourceBarriers({transitions, buffers, uavTextures, uavBuffers, aliasTextures, aliasBuffers});
             transitions[0].texture.id = 0;
             buffers[0].buffer.id = 0;
@@ -503,7 +503,7 @@ int main()
         Require(!tiny.Seal(error), "Command budget overflow sealed successfully.");
         RHISoftwareCommandList tinyPayload(1024, 1);
         RHISoftwareEncoder tinyPayloadWriter(tinyPayload, validator);
-        std::array<uint32_t, 3> slots{7, 8, 9};
+        ce::fixed_array<uint32_t, 3> slots{7, 8, 9};
         Require(!tinyPayloadWriter.DispatchMeshIndirectBatch({1}, 0, 1, slots), "Payload budget overflow accepted.");
         Require(tinyPayload.GetCommandCount() == 0 && tinyPayload.GetPayloadBytes() == 0 &&
                     tinyPayload.GetRecordingStats().allocatedBytes == 0 && tinyPayload.GetError().empty(),
@@ -582,12 +582,12 @@ int main()
         batchDesc.backendGeneration = 1;
         batchDesc.lifetimeToken = owner;
         RHISoftwareBatch batch;
-        const std::array<uint32_t, 2> duplicate{0, 0};
+        const ce::fixed_array<uint32_t, 2> duplicate{0, 0};
         Require(!recorder.FinishRecording(duplicate, batchDesc, batch, error), "Duplicate target accepted.");
-        const std::array<uint32_t, 1> omitted{0};
+        const ce::fixed_array<uint32_t, 1> omitted{0};
         Require(!recorder.FinishRecording(omitted, batchDesc, batch, error), "Nonempty target omitted.");
         Require(recorder.GetRecordingId() == firstRecordingId, "Rejected seal replaced the active recording identity.");
-        const std::array<uint32_t, 2> order{0, 1};
+        const ce::fixed_array<uint32_t, 2> order{0, 1};
         Require(recorder.FinishRecording(order, batchDesc, batch, error), "Software batch seal failed.");
         Require(batch.GetRecordingId() == firstRecordingId && recorder.GetRecordingId() == 0,
                 "Sealing did not transfer the recording identity to the batch.");
@@ -638,8 +638,8 @@ int main()
         recordingDesc.maxCommandBytes = 65536;
         Require(recorder.BeginRecording(recordingDesc, error), "Concurrent recording session failed.");
         const uint64_t concurrentRecordingId = recorder.GetRecordingId();
-        std::array<std::exception_ptr, 2> workerErrors;
-        std::array<std::thread, 2> threads;
+        ce::fixed_array<std::exception_ptr, 2> workerErrors;
+        ce::fixed_array<std::thread, 2> threads;
         for (uint32_t target = 0; target < 2; ++target)
         {
             threads[target] = std::thread(
@@ -730,8 +730,8 @@ int main()
             differentValidator.CancelRecording();
         }
         {
-            std::array<RHIEncoder*, 8> retainedTargets{};
-            std::array<uint32_t, 8> wideOrder{};
+            ce::fixed_array<RHIEncoder*, 8> retainedTargets{};
+            ce::fixed_array<uint32_t, 8> wideOrder{};
             recordingDesc.targetCount = static_cast<uint32_t>(retainedTargets.size());
             recordingDesc.maxCommandBytes = 65536;
             recordingDesc.maxPayloadBytes = 65536;
@@ -757,7 +757,7 @@ int main()
                 inactiveRejected = true;
             }
             Require(inactiveRejected, "Inactive retained target accepted a writer.");
-            const std::array<uint32_t, 2> inactiveOrder{0, 7};
+            const ce::fixed_array<uint32_t, 2> inactiveOrder{0, 7};
             Require(!recorder.FinishRecording(inactiveOrder, batchDesc, batch, error),
                     "Inactive retained target was accepted in submission order.");
             Require(recorder.FinishRecording(std::span(wideOrder).first(1), batchDesc, batch, error),

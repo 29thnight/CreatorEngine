@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -35,7 +36,7 @@ namespace
         return usage.textureRange != RHITextureSubresourceRange{} || usage.bufferRange != RHIBufferSubresourceRange{};
     }
     template<class T>
-    void Unique(std::vector<T>& values)
+    void Unique(ce::dynamic_array<T>& values)
     {
         std::sort(values.begin(), values.end());
         values.erase(std::unique(values.begin(), values.end()), values.end());
@@ -244,7 +245,7 @@ bool EnhancedRenderGraph::ValidateSubresources(std::string& outError)
     return true;
 }
 
-void EnhancedRenderGraph::BuildSubresourceCells(uint16_t index, bool states, std::vector<SubresourceCell>& cells,
+void EnhancedRenderGraph::BuildSubresourceCells(uint16_t index, bool states, ce::dynamic_array<SubresourceCell>& cells,
                                                 SubresourceScratch& scratch) const
 {
     const auto& resource = m_resources[index];
@@ -417,11 +418,11 @@ bool EnhancedRenderGraph::BuildSubresourceDependencies(std::string& outError)
         uint16_t pass;
         const RGPassUsage* usage;
     };
-    std::vector<std::vector<std::vector<Access>>> accesses(m_resources.size());
+    ce::dynamic_array<ce::dynamic_array<ce::dynamic_array<Access>>> accesses(m_resources.size());
     const auto& cells = m_subresourceScratch->accessCells;
-    std::vector<Edge> dependencies;
+    ce::dynamic_array<Edge> dependencies;
     ce::dynamic_bitset alive(m_passes.size(), false);
-    std::vector<uint16_t> roots;
+    ce::dynamic_array<uint16_t> roots;
     const auto retain = [&](uint16_t pass)
     {
         if (!alive.test(pass))
@@ -520,7 +521,7 @@ bool EnhancedRenderGraph::BuildSubresourceDependencies(std::string& outError)
         const auto& resource = m_resources[index];
         for (uint16_t version = 0; version < resource.versions.size(); ++version)
         {
-            std::vector<uint16_t> producers;
+            ce::dynamic_array<uint16_t> producers;
             for (const auto& access : accesses[index][version])
             {
                 if (WritesRange(*access.usage))
@@ -539,10 +540,10 @@ bool EnhancedRenderGraph::BuildSubresourceDependencies(std::string& outError)
         for (const auto& cell : cells[index])
         {
             bool initialized = resource.imported && resource.state != RHIResourceState::ExternalShared;
-            std::vector<uint16_t> writers;
+            ce::dynamic_array<uint16_t> writers;
             for (uint16_t version = 0; version < resource.versions.size(); ++version)
             {
-                std::vector<uint16_t> next;
+                ce::dynamic_array<uint16_t> next;
                 for (const auto& access : accesses[index][version])
                 {
                     if (!WritesRange(*access.usage) || !CoversSubresource(index, *access.usage, cell, false))
@@ -595,7 +596,7 @@ bool EnhancedRenderGraph::BuildSubresourceDependencies(std::string& outError)
             }
         }
     }
-    std::vector<std::vector<uint16_t>> producers(m_passes.size());
+    ce::dynamic_array<ce::dynamic_array<uint16_t>> producers(m_passes.size());
     for (const auto& dependency : dependencies)
     {
         producers[dependency.consumer].push_back(static_cast<uint16_t>(dependency.producer));
@@ -609,16 +610,16 @@ bool EnhancedRenderGraph::BuildSubresourceDependencies(std::string& outError)
             retain(producer);
         }
     }
-    std::erase_if(dependencies, [&](const Edge& dependency)
+    ce::erase_if(dependencies, [&](const Edge& dependency)
                   { return !alive.test(dependency.producer) || !alive.test(dependency.consumer); });
     for (uint16_t index = 0; index < m_resources.size(); ++index)
     {
         for (const auto& cell : cells[index])
         {
-            std::vector<uint16_t> writers, readers;
+            ce::dynamic_array<uint16_t> writers, readers;
             for (uint16_t version = 0; version < accesses[index].size(); ++version)
             {
-                std::vector<uint16_t> next;
+                ce::dynamic_array<uint16_t> next;
                 for (const auto& access : accesses[index][version])
                 {
                     if (alive.test(access.pass) && WritesRange(*access.usage) &&
@@ -655,7 +656,7 @@ bool EnhancedRenderGraph::BuildSubresourceDependencies(std::string& outError)
         }
     }
     const auto key = [](const Edge& value)
-    { return std::tuple{value.producer, value.consumer, value.resource, value.version, value.reason}; };
+    { return ce::tuple{value.producer, value.consumer, value.resource, value.version, value.reason}; };
     std::sort(dependencies.begin(), dependencies.end(), [&](const Edge& a, const Edge& b) { return key(a) < key(b); });
     dependencies.erase(std::unique(dependencies.begin(), dependencies.end(),
                                    [&](const Edge& a, const Edge& b) { return key(a) == key(b); }),

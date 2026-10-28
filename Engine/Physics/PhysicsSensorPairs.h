@@ -1,4 +1,5 @@
 #pragma once
+#include "../Containers/ContainerAPI.h"
 #include "PhysicsStep.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -81,7 +82,7 @@ class sensor_pairs final
   private:
     static void Canonicalize(event_endpoint& first, event_endpoint& second)
     {
-        if (std::tuple{second.body, second.shape} < std::tuple{first.body, first.shape})
+        if (ce::tuple{second.body, second.shape} < ce::tuple{first.body, first.shape})
             std::swap(first, second);
     }
 
@@ -97,7 +98,7 @@ class sensor_pairs final
         return hash;
     }
 
-    std::pair<bool, std::size_t> Find(const event_endpoint& first, const event_endpoint& second) const noexcept
+    ce::pair<bool, std::size_t> Find(const event_endpoint& first, const event_endpoint& second) const noexcept
     {
         const auto hash = Hash(first, second);
         for (std::size_t probe = 0; probe < m_slots.size(); ++probe)
@@ -113,8 +114,8 @@ class sensor_pairs final
         return {false, m_slots.size()};
     }
 
-    std::vector<slot> m_slots;
-    std::vector<std::size_t> m_active;
+    ce::dynamic_array<slot> m_slots;
+    ce::dynamic_array<std::size_t> m_active;
     std::size_t m_capacity;
 };
 } // namespace ce::physics

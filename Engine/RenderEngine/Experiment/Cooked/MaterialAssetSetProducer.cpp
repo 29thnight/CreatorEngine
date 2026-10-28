@@ -1,3 +1,6 @@
+#include "../../../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../../Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
 #else
@@ -46,7 +49,7 @@ namespace experiment::cooked
             {
                 return Fail(failure, "Material sidecar root must be a mapping.");
             }
-            std::set<std::string> keys;
+            ce::engine_ordered_set<std::string> keys;
             for (const auto entry : root.Map())
             {
                 if (!entry.key.IsScalar() || !keys.insert(entry.key.AsString()).second)
@@ -65,7 +68,7 @@ namespace experiment::cooked
             return true;
         }
 
-        void AppendSize(std::vector<std::byte>& bytes, std::uint64_t value)
+        void AppendSize(ce::dynamic_array<std::byte>& bytes, std::uint64_t value)
         {
             for (unsigned shift = 0; shift < 64; shift += 8)
             {
@@ -73,7 +76,7 @@ namespace experiment::cooked
             }
         }
 
-        void AppendText(std::vector<std::byte>& bytes, std::string_view value)
+        void AppendText(ce::dynamic_array<std::byte>& bytes, std::string_view value)
         {
             AppendSize(bytes, value.size());
             for (const char character : value)
@@ -82,7 +85,7 @@ namespace experiment::cooked
             }
         }
 
-        bool AppendInput(std::vector<std::byte>& inventory, std::string_view role,
+        bool AppendInput(ce::dynamic_array<std::byte>& inventory, std::string_view role,
             std::span<const std::byte> bytes, std::string& failure)
         {
             Sha256Digest digest;
@@ -103,7 +106,7 @@ namespace experiment::cooked
             std::span<const std::byte> meta, std::span<const std::byte> verified,
             Sha256Digest& out, std::string& failure)
         {
-            std::vector<std::byte> inventory;
+            ce::dynamic_array<std::byte> inventory;
             AppendText(inventory, domain);
             AppendSize(inventory, verified.empty() ? 2u : 3u);
             if (!AppendInput(inventory, "source", source, failure) ||
@@ -128,7 +131,7 @@ namespace experiment::cooked
             {
                 return Fail(failure, "Code recipe must be a mapping.");
             }
-            std::set<std::string> keys;
+            ce::engine_ordered_set<std::string> keys;
             for (const auto entry : node.Map())
             {
                 if (!entry.key.IsScalar() || !keys.insert(entry.key.AsString()).second ||
@@ -150,7 +153,7 @@ namespace experiment::cooked
         bool IncludeClosure(std::span<const CodeProgramCapturedInput> inputs, const CodeProgram& program,
             std::string& failure)
         {
-            std::map<std::string, std::span<const std::byte>> files;
+            ce::engine_ordered_map<std::string, std::span<const std::byte>> files;
             for (const auto& input : inputs)
             {
                 if (input.path != program.metadataPath && input.path != program.metadataPath + ".meta" &&
@@ -159,8 +162,8 @@ namespace experiment::cooked
                     files.emplace(input.path, input.bytes);
                 }
             }
-            std::set<std::string> visited;
-            std::vector<std::string> pending{program.rootSourcePath};
+            ce::engine_ordered_set<std::string> visited;
+            ce::dynamic_array<std::string> pending{program.rootSourcePath};
             while (!pending.empty())
             {
                 auto path = std::move(pending.back()); pending.pop_back();
@@ -395,7 +398,7 @@ namespace experiment::cooked
                 return Fail(failure, "Code root shader identity sidecar must contain a canonical UUIDv4.");
             }
             const auto parsed = Authoring::ParsedDocument::ParseText(Text(metadata->bytes), failure);
-            std::vector<std::byte> canonical;
+            ce::dynamic_array<std::byte> canonical;
             if (!parsed || !Authoring::EncodeCookedDocument(parsed.Root(), canonical, failure) || canonical != program.metadataBytes)
             {
                 return Fail(failure, "Code recipe captured metadata differs from its canonical verified descriptor.");
@@ -430,7 +433,7 @@ namespace experiment::cooked
                 }
             }
             CodeProgram program;
-            std::vector<AssetDependency> edges;
+            ce::dynamic_array<AssetDependency> edges;
             if (!ReadVerifiedCodeProgram(request.verifiedProgramBytes, program, edges, result.failure))
             {
                 return result;
@@ -457,7 +460,7 @@ namespace experiment::cooked
             product.representation = kCodeProgramRepresentation;
             product.schemaVersion = kCodeProgramVersion;
             product.extension = ".cecp";
-            std::vector<std::byte> inventory;
+            ce::dynamic_array<std::byte> inventory;
             AppendText(inventory, "code-program-asset-set-source-v1");
             AppendSize(inventory, 3u + request.codeInputs.size());
             if (!AppendInput(inventory, "recipe", request.sourceBytes, result.failure) ||
@@ -503,7 +506,7 @@ namespace experiment::cooked
                 return result;
             }
             CodeProgram program;
-            std::vector<AssetDependency> edges;
+            ce::dynamic_array<AssetDependency> edges;
             if (!ReadVerifiedCodeProgram(request.verifiedProgramBytes, program, edges, result.failure) ||
                 !CollectCodeProgramDefaultTextures(program.meta, document.defaultTextureAssetIds, result.failure))
             {

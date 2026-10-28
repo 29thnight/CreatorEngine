@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 // 모델 자산 신원 프로필 `ce.uuidv8.sha256.v1` — ModelAssetBigBangCutoverPlan §2 (MBC1).
 //
@@ -67,7 +68,7 @@ namespace assets
 
     // cutover 시 CSPRNG로 한 번 발급하는 256-bit seed. legacy GUID가 아니고
     // 제품 AssetId로 노출하지 않는다(§2.3).
-    using IdentityEpochSeed = std::array<std::uint8_t, 32>;
+    using IdentityEpochSeed = ce::fixed_array<std::uint8_t, 32>;
     inline constexpr std::size_t kEpochSeedBytes = 32u;
     inline constexpr std::size_t kUuidBytes = 16u;
 
@@ -115,7 +116,7 @@ namespace assets
     // canonical tuple의 **정본 표현**이기도 하다 — registry가 이 바이트열을
     // 키로 쓴다(같은 바이트열 = 같은 tuple).
     [[nodiscard]] bool BuildIdentityInputBytes(const IdentityInput& input,
-        std::vector<std::uint8_t>& out, IdentityIssue& outIssue,
+        ce::dynamic_array<std::uint8_t>& out, IdentityIssue& outIssue,
         std::string& outContext) noexcept;
 
     // 바이트열에서 UUID만 낸다(SHA-256 → 16바이트 → v8/variant bit). 바이트열은

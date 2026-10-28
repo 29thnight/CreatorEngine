@@ -1,4 +1,6 @@
-﻿#pragma once
+﻿#include "../../../Engine/Containers/ContainerAPI.h"
+#pragma once
+#include "../../../Engine/Utility_Framework/Foundation/EngineNodeSet.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
 #else
@@ -59,7 +61,7 @@ namespace Meta
     struct SelectionSnapshot
     {
         uint32_t sceneId{};
-        std::vector<EntityReference> selected;
+        ce::dynamic_array<EntityReference> selected;
         EntityReference primary;
         void Capture(Scene* scene)
         {
@@ -90,7 +92,7 @@ namespace Meta
         SelectionSnapshot selection; selection.Capture(scene);
         bool changed = removed(scene->m_selectedEntity);
         if (changed) selection.primary = {};
-        std::erase_if(selection.selected, [&](const EntityReference& reference) {
+        ce::erase_if(selection.selected, [&](const EntityReference& reference) {
             const bool erase = removed(reference.Resolve()); changed = changed || erase; return erase;
         });
         if (changed) selection.Apply();
@@ -106,14 +108,14 @@ namespace Meta
             Authoring::WriteDocument document;
             std::string name;
         };
-        std::vector<Record> m_records;
+        ce::dynamic_array<Record> m_records;
     public:
         void Capture(Entity* object)
         {
             m_records.clear();
             if (!object) return;
             Scene* scene = object->GetScene();
-            std::vector<Entity*> nodes{object};
+            ce::dynamic_array<Entity*> nodes{object};
             for (size_t i = 0; i < nodes.size(); ++i)
             {
                 Entity* node = nodes[i];
@@ -290,7 +292,7 @@ namespace Meta
         DuplicateGameObjectsCommand(Scene* scene, std::span<Entity* const> originals)
             : m_scene(scene)
         {
-            std::unordered_set<Entity::Index> selectedIndices{};
+            ce::engine_node_set<Entity::Index> selectedIndices{};
             selectedIndices.reserve(originals.size());
 
             for (auto* obj : originals)
@@ -344,7 +346,7 @@ namespace Meta
 
     private:
         Scene* m_scene{};
-        std::vector<DuplicateGameObjectCommand> m_commands{};
+        ce::dynamic_array<DuplicateGameObjectCommand> m_commands{};
     };
 
     class LoadModelToSceneObjCommand : public IUndoableCommand

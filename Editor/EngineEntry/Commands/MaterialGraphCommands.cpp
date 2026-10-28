@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -171,7 +172,7 @@ CommandResult MaterialGraph(const ConsoleCommandContext& context)
         {
             return Fail("material.graph.rejected", "Parameter ID is not declared by this graph");
         }
-        std::array<double, 4> numbers{};
+        ce::fixed_array<double, 4> numbers{};
         const auto count = parts.size() - 4;
         if (count == 2)
         {
@@ -205,7 +206,7 @@ CommandResult MaterialGraph(const ConsoleCommandContext& context)
             }
             if (count == 3)
             {
-                value = std::array<double, 3>{numbers[0], numbers[1], numbers[2]};
+                value = ce::fixed_array<double, 3>{numbers[0], numbers[1], numbers[2]};
             }
             if (count == 4)
             {

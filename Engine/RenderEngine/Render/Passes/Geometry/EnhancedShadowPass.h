@@ -1,3 +1,4 @@
+#include "../../../../Containers/ContainerAPI.h"
 #pragma once
 #include "../../../RHI/RHIFormat.h"
 #include "../../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -105,7 +106,7 @@ public:
         bool          visibilityCountsExact{ true };
         uint64_t      gpuSubmittedCandidates{ 0 };
         uint64_t      gpuSubmittedBins{ 0 };
-        std::array<CascadeStats, kCascadeCount> cascades{};
+        ce::fixed_array<CascadeStats, kCascadeCount> cascades{};
     };
 
     DebugStats GetDebugStats() const;
@@ -125,7 +126,7 @@ private:
     void ComputeCascades(const EnhancedFrameContext& context);
 
     RGHandle m_shadowMap;
-    std::array<Cascade, kCascadeCount>  m_cascades{};
+    ce::fixed_array<Cascade, kCascadeCount>  m_cascades{};
 
     EnhancedShadowData m_shadowData{};
     math::vector3      m_lightDirection{ 0.f, -1.f, 0.f };
@@ -145,5 +146,5 @@ private:
     uint32_t           m_lastCasterCandidates{ 0 };
 
     // 캐스터 경계 구. 광원 쪽 backOff가 캐스케이드 밖 가림막까지 덮도록 쓴다.
-    std::vector<shadow_math::Sphere> m_casterBounds;
+    ce::dynamic_array<shadow_math::Sphere> m_casterBounds;
 };

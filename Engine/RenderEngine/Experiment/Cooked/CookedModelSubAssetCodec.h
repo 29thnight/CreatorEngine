@@ -1,4 +1,6 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -72,13 +74,13 @@ struct ModelGeometryStreamMetadata final
     Sha256Digest requiredSkinBindingSha256{};
     MeshletPayload meshlets{}; // Descriptors only; connectivity lives in pages.
     MeshLodChain lods{};       // Descriptors/DAG only; level.indices are empty.
-    std::vector<ModelStreamLodCounts> counts;
+    ce::dynamic_array<ModelStreamLodCounts> counts;
     own::shared_owner<const assets::cluster::Archive> archive;
-    std::vector<Sha256Digest> pageHashes;
-    own::shared_owner<const std::vector<MeshletDescriptor>> flatDescriptors;
+    ce::dynamic_array<Sha256Digest> pageHashes;
+    own::shared_owner<const ce::dynamic_array<MeshletDescriptor>> flatDescriptors;
     std::uint64_t metadataBytes{}, cpuGeometryBytes{};
     Sha256Digest cpuGeometrySha256{};
-    std::function<std::vector<std::byte>()> cpuReader;
+    ce::owned_func<ce::dynamic_array<std::byte>()> cpuReader;
 };
 struct ResolvedAssetEntry;
 [[nodiscard]] bool ModelGeometryStreamPrefixSize(std::span<const std::byte> header, std::uint64_t totalBytes,
@@ -111,7 +113,7 @@ struct ModelNodeSummary final
     std::string name{};
     NodeIndex parent{};
     math::matrix4x4 localTransform{math::matrix4x4::identity()};
-    std::vector<AssetId> meshAssetIds{};
+    ce::dynamic_array<AssetId> meshAssetIds{};
 };
 
 struct ModelMaterialSummary final
@@ -128,10 +130,10 @@ struct ModelDescriptorArtifact final
     AssetId modelAssetId{};
     AssetId skeletonAssetId{};
     std::string name{};
-    std::vector<ModelClipSummary> clips{};
-    std::vector<ModelMeshSummary> meshes{};
-    std::vector<ModelNodeSummary> nodes{};
-    std::vector<ModelMaterialSummary> materials{};
+    ce::dynamic_array<ModelClipSummary> clips{};
+    ce::dynamic_array<ModelMeshSummary> meshes{};
+    ce::dynamic_array<ModelNodeSummary> nodes{};
+    ce::dynamic_array<ModelMaterialSummary> materials{};
     bool createMeshCollider{};
 };
 
@@ -151,23 +153,23 @@ struct ModelDescriptorArtifact final
 [[nodiscard]] bool ValidateModelDescriptorDependencies(const ModelDescriptorArtifact& descriptor,
                                                        std::span<const AssetDependency> dependencies,
                                                        std::string& failure);
-[[nodiscard]] bool WriteModelGeometryArtifact(const ModelGeometryArtifact& value, std::vector<std::byte>& out,
+[[nodiscard]] bool WriteModelGeometryArtifact(const ModelGeometryArtifact& value, ce::dynamic_array<std::byte>& out,
                                               std::string& failure);
 // Explicit CPU expansion of current QMC2 pages. Attributes are quantized, not original. Exact collision uses CECP.
 // Old geometry schemas and malformed metadata/pages are rejected; recook required.
 [[nodiscard]] bool ExpandModelGeometryPages(std::span<const std::byte> bytes, ModelGeometryArtifact& out,
-                                             std::string& failure, std::vector<std::string>* warnings = nullptr);
+                                             std::string& failure, ce::dynamic_array<std::string>* warnings = nullptr);
 
 // Bounded little-endian wire fields; no native struct layout or padding.
 // Failure leaves the output unchanged. Readers reject trailing bytes.
-[[nodiscard]] bool WriteSkeletonArtifact(const SkeletonArtifact& value, std::vector<std::byte>& out,
+[[nodiscard]] bool WriteSkeletonArtifact(const SkeletonArtifact& value, ce::dynamic_array<std::byte>& out,
                                          std::string& failure);
 [[nodiscard]] bool ReadSkeletonArtifact(std::span<const std::byte> bytes, SkeletonArtifact& out, std::string& failure);
-[[nodiscard]] bool WriteAnimationClipArtifact(const AnimationClipArtifact& value, std::vector<std::byte>& out,
+[[nodiscard]] bool WriteAnimationClipArtifact(const AnimationClipArtifact& value, ce::dynamic_array<std::byte>& out,
                                               std::string& failure);
 [[nodiscard]] bool ReadAnimationClipArtifact(std::span<const std::byte> bytes, AnimationClipArtifact& out,
                                              std::string& failure);
-[[nodiscard]] bool WriteModelDescriptorArtifact(const ModelDescriptorArtifact& value, std::vector<std::byte>& out,
+[[nodiscard]] bool WriteModelDescriptorArtifact(const ModelDescriptorArtifact& value, ce::dynamic_array<std::byte>& out,
                                                 std::string& failure);
 [[nodiscard]] bool ReadModelDescriptorArtifact(std::span<const std::byte> bytes, ModelDescriptorArtifact& out,
                                                std::string& failure);

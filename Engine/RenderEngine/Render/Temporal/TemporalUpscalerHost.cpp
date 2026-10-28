@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -52,11 +53,11 @@ struct TemporalUpscalerHost::State
     TemporalExtent display, render;
     TemporalProvider provider{ TemporalProvider::None };
     TemporalResult result{ TemporalStatus::NotQueried }, requestedResult{ TemporalStatus::NotQueried };
-    std::vector<TemporalCapabilities> capabilities;
+    ce::dynamic_array<TemporalCapabilities> capabilities;
     own::unique_owner<ITemporalUpscaler> adapter;
     own::shared_owner<DlssTemporalAdapter> dlss;
-    std::array<bool, 4> failed{};
-    std::array<TemporalResult, 4> failures{};
+    ce::fixed_array<bool, 4> failed{};
+    ce::fixed_array<TemporalResult, 4> failures{};
     uint32_t viewportId{ g_nextViewport.fetch_add(1) };
     bool dirty{ false }, depthInverted{ false }, orthographic{ false };
 };
@@ -73,7 +74,7 @@ TemporalExtent TemporalUpscalerHost::RenderExtent() const { return m_state->rend
 TemporalProvider TemporalUpscalerHost::Provider() const { return m_state->provider; }
 TemporalResult TemporalUpscalerHost::LastResult() const { return m_state->result; }
 TemporalResult TemporalUpscalerHost::RequestedResult() const { return m_state->requestedResult; }
-const std::vector<TemporalCapabilities>& TemporalUpscalerHost::Capabilities() const { return m_state->capabilities; }
+const ce::dynamic_array<TemporalCapabilities>& TemporalUpscalerHost::Capabilities() const { return m_state->capabilities; }
 TemporalResult TemporalUpscalerHost::Shutdown()
 {
     auto& state = *m_state;
@@ -229,7 +230,7 @@ TemporalResult TemporalUpscalerHost::Configure(IRHIDeviceResources& resources, T
         }
         return { TemporalStatus::InvalidInput };
     };
-    const std::array candidates{ settings.requestedUpscaler, TemporalProvider::Fsr };
+    const ce::fixed_array candidates{ settings.requestedUpscaler, TemporalProvider::Fsr };
     for (size_t i = 0; i != candidates.size(); ++i)
     {
         const auto provider = candidates[i];

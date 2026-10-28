@@ -1,4 +1,6 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
 #include "EditorWorkspaceFile.h"
 #include "EditorLayoutPreset.h"
 #include "EditorWindowRegistry.h"
@@ -28,9 +30,9 @@ namespace editor
         /// 이름 붙인 workspace 목록. 디렉터리를 프레임마다 훑지 않는다 —
         /// 바뀔 만한 일이 있을 때만 새로 읽는다(W7-1 이 브라우저에서 끊은 것과
         /// 같은 죄다).
-        std::vector<std::string> workspaces;
+        ce::dynamic_array<std::string> workspaces;
         std::uint64_t revision{};
-        std::map<std::string,bool> panels;
+        ce::engine_ordered_map<std::string,bool> panels;
     };
     // Commands only enqueue work and read published values; ImGui belongs to the renderer.
     bool request_workspace_action(workspace_action action, std::string panel = {});
@@ -63,11 +65,11 @@ namespace editor
         window_table& m_windows;
         const layout_preset* m_preset{ &default_layout_preset() };
         std::filesystem::path m_path, m_legacy;
-        std::map<std::string,bool> m_defaults;
+        ce::engine_ordered_map<std::string,bool> m_defaults;
         workspace::document m_document;
         workspace_status m_status;
         bool m_buildDefault{}, m_saveRequested{}, m_writable{true};
-        std::vector<std::string> m_names;   ///< 디렉터리에서 읽은 목록. RefreshNames 만 채운다
+        ce::dynamic_array<std::string> m_names;   ///< 디렉터리에서 읽은 목록. RefreshNames 만 채운다
         bool m_named{};                     ///< `m_document.name` 이 파일로 있는가
         std::string m_lastBytes;
         std::string m_focusViewport;

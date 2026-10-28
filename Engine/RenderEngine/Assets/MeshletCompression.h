@@ -1,4 +1,6 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -16,12 +18,12 @@ namespace assets::cluster
     // mesh-wide error policy admits it; skin weights retain their original bits.
     struct Policy
     {
-        std::array<unsigned, 8> bits{16, 10, 16, 16, 10, 8, 32, 32};
-        std::array<float, 8> absoluteError{0.0001f, 0.002f, 0.0001f, 0.0001f, 0.002f, 0.002f, 0, 0.00001f};
+        ce::fixed_array<unsigned, 8> bits{16, 10, 16, 16, 10, 8, 32, 32};
+        ce::fixed_array<float, 8> absoluteError{0.0001f, 0.002f, 0.0001f, 0.0001f, 0.002f, 0.002f, 0, 0.00001f};
     };
     struct Grid
     {
-        std::vector<float> origin, step;
+        ce::dynamic_array<float> origin, step;
         float positionError{};
         float normalError{0.002f};
         bool octahedralNormals{true};
@@ -31,16 +33,16 @@ namespace assets::cluster
         uint32_t mask{}, sourceVertices{};
         bool pagedTopology{};
         Grid grid;
-        std::vector<std::vector<std::byte>> packets;
-        std::vector<uint64_t> fileOffsets;
-        std::vector<uint32_t> packetSizes;
-        std::function<std::vector<std::byte>(uint32_t)> pageReader;
+        ce::dynamic_array<ce::dynamic_array<std::byte>> packets;
+        ce::dynamic_array<uint64_t> fileOffsets;
+        ce::dynamic_array<uint32_t> packetSizes;
+        ce::owned_func<ce::dynamic_array<std::byte>(uint32_t)> pageReader;
         uint64_t PacketBytes(uint32_t page) const
         {
             quantized::Require(page < packets.size(), "Cluster page ordinal");
             return packetSizes.empty() ? packets[page].size() : packetSizes[page];
         }
-        std::vector<std::byte> Read(uint32_t page) const
+        ce::dynamic_array<std::byte> Read(uint32_t page) const
         {
             auto result = pageReader ? pageReader(page) : packets.at(page);
             quantized::Require(result.size() == PacketBytes(page), "Cluster page short read");
@@ -95,7 +97,7 @@ namespace assets::cluster
                     grid.octahedralNormals = unit;
                     for (uint32_t vertex = 0; vertex < count && grid.octahedralNormals; ++vertex)
                     {
-                        std::array<float, 3> normal;
+                        ce::fixed_array<float, 3> normal;
                         std::memcpy(normal.data(),
                                     raw.data() + uint64_t(vertex) * stride + OffsetOf(mask, VertexAttribute::Normal),
                                     12);
@@ -185,13 +187,13 @@ namespace assets::cluster
         }
         return grid;
     }
-    inline std::vector<std::byte> Encode(uint32_t mask, uint32_t count, std::span<const std::byte> raw,
+    inline ce::dynamic_array<std::byte> Encode(uint32_t mask, uint32_t count, std::span<const std::byte> raw,
                                          const Grid& grid)
     {
         using namespace quantized;
         const auto channels = StrideOf(mask) / 4;
         Require(grid.step.size() == channels && grid.origin.size() == channels, "Cluster grid layout");
-        auto codes = std::vector<std::byte>(raw.begin(), raw.end());
+        auto codes = ce::dynamic_array<std::byte>(raw.begin(), raw.end());
         for (uint32_t vertex = 0; vertex < count; ++vertex)
         {
             for (unsigned channel = 0; channel < channels; ++channel)
@@ -209,13 +211,13 @@ namespace assets::cluster
         }
         bool octahedral = grid.octahedralNormals && Has(mask, VertexAttribute::Normal);
         const auto normalOffset = OffsetOf(mask, VertexAttribute::Normal);
-        std::vector<uint32_t> normals;
+        ce::dynamic_array<uint32_t> normals;
         if (octahedral)
         {
             normals.reserve(count);
             for (uint32_t vertex = 0; vertex < count; ++vertex)
             {
-                std::array<float, 3> normal;
+                ce::fixed_array<float, 3> normal;
                 std::memcpy(normal.data(), raw.data() + uint64_t(vertex) * channels * 4 + normalOffset, 12);
                 const double length =
                     double(normal[0]) * normal[0] + double(normal[1]) * normal[1] + double(normal[2]) * normal[2];
@@ -243,11 +245,11 @@ namespace assets::cluster
                 Put(codes, offset + 8, 0);
             }
         }
-        std::vector<std::byte> encoded;
+        ce::dynamic_array<std::byte> encoded;
         std::string error;
         Require(quantized::Encode(mask, count, codes, encoded, error), "Cluster code encoding");
         const uint32_t payload = 32 + channels * 8;
-        std::vector<std::byte> packet(payload);
+        ce::dynamic_array<std::byte> packet(payload);
         Put(packet, 0, Magic);
         Put(packet, 4, 2);
         Put(packet, 28, uint32_t(octahedral));
@@ -269,7 +271,7 @@ namespace assets::cluster
         packet.insert(packet.end(), encoded.begin(), encoded.end());
         return packet;
     }
-    inline bool Decode(std::span<const std::byte> packet, std::vector<std::byte>& out, std::string& error)
+    inline bool Decode(std::span<const std::byte> packet, ce::dynamic_array<std::byte>& out, std::string& error)
     {
         using namespace quantized;
         out.clear();
@@ -284,7 +286,7 @@ namespace assets::cluster
             Require(IsSupportedModelVertexLayout(mask) && count && count <= experiment::kMeshletMaxVertices &&
                         packet.size() <= MaximumBytes && start == 32 + channels * 8 && start <= packet.size(),
                     "Cluster packet layout");
-            std::vector<std::byte> codes;
+            ce::dynamic_array<std::byte> codes;
             Require(quantized::Decode(packet.subspan(start), mask, count, codes, error), "Cluster code payload");
             for (unsigned channel = 0; channel < channels; ++channel)
             {
@@ -351,7 +353,7 @@ namespace assets::cluster
                                    uint64_t(descriptor.vertexOffset) + descriptor.vertexCount <=
                                        meshlets.vertexRemap.size(),
                                "Cluster vertex range");
-            std::vector<std::byte> vertices;
+            ce::dynamic_array<std::byte> vertices;
             for (uint32_t i = 0; i < descriptor.vertexCount; ++i)
             {
                 const auto vertex = meshlets.vertexRemap[descriptor.vertexOffset + i];

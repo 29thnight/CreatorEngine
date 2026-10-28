@@ -1,0 +1,412 @@
+#pragma once
+#include "detail/atomic_ptr.h"
+#include "detail/queue_profile.h"
+#include <new>
+#include <stddef.h>
+#if defined(_MSC_VER)
+#pragma warning(push)
+#pragma warning(disable : 4324)
+#endif
+namespace ce {
+struct queue_operation_limit {};
+namespace detail {
+struct queue_no_hooks {
+  static void after_link() noexcept {}
+  static void after_head_protected() noexcept {}
+  static void node_created() noexcept {}
+  static void node_destroyed() noexcept {}
+};
+} // namespace detail
+// Michael-Scott + two hazards. No queue lock. prepare may allocate.
+// Default push reuses hazard-cleared nodes; a cache miss may allocate.
+// reclaim() recycles; release_retired() deletes safe retired nodes.
+// Recycled memory is retained until quiescent clear/destruction.
+// publish/try_pop never allocate or invoke reclaim themselves.
+template <class T, size_t MaxOperations = 64,
+          class Hooks = detail::queue_no_hooks>
+class lock_free_queue {
+  static_assert(MaxOperations > 0 && MaxOperations <= 4096);
+  static_assert(noexcept(*static_cast<T *>(nullptr) =
+                             static_cast<T &&>(*static_cast<T *>(nullptr))));
+  static_assert(noexcept(static_cast<T *>(nullptr)->~T()));
+  static_assert(noexcept(Hooks::after_link()) &&
+                noexcept(Hooks::after_head_protected()) &&
+                noexcept(Hooks::node_created()) &&
+                noexcept(Hooks::node_destroyed()));
+  struct node {
+    detail::atomic_ptr<node> next;
+    node *retired_next = nullptr;
+    node *pool_next =
+        nullptr; // immutable while in pool or protected by a pool reader
+    size_t home = 0;
+    bool live = false;
+    alignas(T) unsigned char storage[sizeof(T)];
+    node() noexcept { Hooks::node_created(); }
+    template <class... A> node(int, A &&...a) {
+      ::new (static_cast<void *>(storage)) T(static_cast<A &&>(a)...);
+      live = true;
+      Hooks::node_created();
+    }
+    T *value() noexcept { return std::launder(reinterpret_cast<T *>(storage)); }
+    ~node() {
+      if (live)
+        value()->~T();
+      Hooks::node_destroyed();
+    }
+  };
+  struct alignas(64) hazard_record {
+    detail::atomic_u32 busy;
+    detail::atomic_ptr<node> first, second, retired, pool;
+    node *local_free = nullptr; // owned exclusively by the active record holder
+  };
+  alignas(64) detail::atomic_ptr<node> head_;
+  alignas(64) detail::atomic_ptr<node> tail_;
+  alignas(64) detail::atomic_ptr<node> retired_;
+  alignas(64) detail::atomic_ptr<node> pool_;
+  mutable hazard_record records_[MaxOperations];
+  class operation {
+    const lock_free_queue &q_;
+    hazard_record *record_ = nullptr;
+    size_t index_ = 0;
+
+  public:
+    explicit operation(const lock_free_queue &q) : q_(q) {
+      detail::queue_profile_scope<Hooks, detail::registration> profile;
+      static thread_local size_t preferred = 0;
+      for (size_t i = 0; i < MaxOperations; ++i) {
+        auto index = (preferred + i) % MaxOperations;
+        uint32_t e = 0;
+        if (q_.records_[index].busy.compare_exchange(e, 1)) {
+          record_ = &q_.records_[index];
+          index_ = index;
+          preferred = index;
+          return;
+        }
+      }
+      throw queue_operation_limit{};
+    }
+    ~operation() {
+      record_->second.store_release(nullptr);
+      record_->first.store_release(nullptr);
+      record_->busy.store(0);
+    }
+    node *protect(const detail::atomic_ptr<node> &src) {
+      detail::queue_profile_scope<Hooks, detail::hazard_first> profile;
+      node *p;
+      do {
+        p = src.load();
+        if (record_->first.load() != p)
+          record_->first.store(p);
+      } while (src.load() != p);
+      return p;
+    }
+    void protect_second(node *p) {
+      detail::queue_profile_scope<Hooks, detail::hazard_second> profile;
+      record_->second.store_release(p);
+    }
+    detail::atomic_ptr<node> &retired() noexcept { return record_->retired; }
+    size_t index() const noexcept { return index_; }
+    hazard_record &record() noexcept { return *record_; }
+    operation(const operation &) = delete;
+    operation &operator=(const operation &) = delete;
+  };
+  static void retire_to(detail::atomic_ptr<node> &list, node *p) noexcept {
+    detail::queue_profile_scope<Hooks, detail::retire_cas> profile;
+    auto old = list.load();
+    do {
+      p->retired_next = old;
+    } while (!list.compare_exchange(old, p));
+  }
+  node *acquire(operation &op) {
+    detail::queue_profile_scope<Hooks, detail::pool_acquire> profile;
+    auto &r = op.record();
+    if (!r.local_free) {
+      for (size_t offset = 0; offset < MaxOperations; ++offset) {
+        auto &list = records_[(op.index() + offset) % MaxOperations].pool;
+        if (!list.load())
+          continue;
+        r.local_free = list.exchange(nullptr);
+        if (r.local_free)
+          break;
+      }
+    }
+    node *p = r.local_free;
+    if (p) {
+      detail::queue_profile_scope<Hooks, detail::pool_reuse> reuse_profile;
+      r.local_free = p->pool_next;
+      p->home = op.index();
+      p->next.store_release(nullptr);
+      p->retired_next = nullptr;
+      return p;
+    }
+    detail::queue_profile_scope<Hooks, detail::allocation> allocate_profile;
+    p = new node;
+    p->home = op.index();
+    return p;
+  }
+  void link(node *fresh, operation &op) {
+    unsigned backoff = 8;
+    for (;;) {
+      auto tail = op.protect(tail_);
+      auto next = tail->next.load();
+      if (tail_.load() != tail) {
+        for (unsigned i = 0; i < backoff; ++i)
+          detail::spin_pause();
+        if (backoff < 256)
+          backoff *= 2;
+        continue;
+      }
+      if (next) {
+        tail_.compare_exchange(tail, next);
+        continue;
+      }
+      node *e = nullptr;
+      bool linked;
+      {
+        detail::queue_profile_scope<Hooks, detail::link_cas> profile;
+        linked = tail->next.compare_exchange(e, fresh);
+      }
+      if (linked) {
+        Hooks::after_link();
+        tail_.compare_exchange(tail, fresh);
+        return;
+      }
+      detail::queue_profile_failure<Hooks>(detail::link_cas);
+      for (unsigned i = 0; i < backoff; ++i)
+        detail::spin_pause();
+      if (backoff < 256)
+        backoff *= 2;
+    }
+  }
+  template <class... A> void append(A &&...a) {
+    operation op(*this);
+    auto p = acquire(op);
+    try {
+      ::new (static_cast<void *>(p->storage)) T(static_cast<A &&>(a)...);
+      p->live = true;
+    } catch (...) {
+      retire_to(op.retired(), p);
+      throw;
+    }
+    link(p, op);
+  }
+  size_t collect(bool reuse) noexcept {
+    detail::queue_profile_scope<Hooks, detail::reclaim_total> profile;
+    node *lists[MaxOperations + 1];
+    size_t list_count = 0;
+    if (retired_.load())
+      lists[list_count++] = retired_.exchange(nullptr);
+    for (auto &r : records_)
+      if (r.retired.load())
+        lists[list_count++] = r.retired.exchange(nullptr);
+    if (!list_count)
+      return 0;
+    node *hazards[MaxOperations * 2];
+    size_t hc = 0;
+    for (auto &r : records_) {
+      auto a = r.first.load(), b = r.second.load();
+      if (a)
+        hazards[hc++] = a;
+      if (b)
+        hazards[hc++] = b;
+    }
+    node *ready[MaxOperations]{}, *last[MaxOperations]{};
+    size_t count = 0;
+    for (size_t j = 0; j < list_count; ++j) {
+      auto list = lists[j];
+      while (list) {
+        auto p = list;
+        list = p->retired_next;
+        bool held = false;
+        for (size_t i = 0; i < hc; ++i)
+          if (hazards[i] == p) {
+            held = true;
+            break;
+          }
+        if (held)
+          retire_to(retired_, p);
+        else if (reuse) {
+          auto h = p->home;
+          p->pool_next = ready[h];
+          ready[h] = p;
+          if (!last[h])
+            last[h] = p;
+          ++count;
+        } else {
+          detail::queue_profile_scope<Hooks, detail::node_release>
+              release_profile;
+          delete p;
+          ++count;
+        }
+      }
+    }
+    for (size_t i = 0; i < MaxOperations; ++i)
+      if (ready[i]) {
+        auto &pool = records_[i].pool;
+        auto old = pool.load();
+        do {
+          last[i]->pool_next = old;
+        } while (!pool.compare_exchange(old, ready[i]));
+      }
+    return count;
+  }
+  void destroy_quiescent() noexcept {
+    auto p = head_.exchange(nullptr);
+    tail_.store(nullptr);
+    while (p) {
+      auto n = p->next.load();
+      delete p;
+      p = n;
+    }
+    p = retired_.exchange(nullptr);
+    while (p) {
+      auto n = p->retired_next;
+      delete p;
+      p = n;
+    }
+    for (auto &r : records_) {
+      p = r.retired.exchange(nullptr);
+      while (p) {
+        auto n = p->retired_next;
+        delete p;
+        p = n;
+      }
+    }
+    for (auto &r : records_) {
+      p = r.local_free;
+      r.local_free = nullptr;
+      while (p) {
+        auto n = p->pool_next;
+        delete p;
+        p = n;
+      }
+      p = r.pool.exchange(nullptr);
+      while (p) {
+        auto n = p->pool_next;
+        delete p;
+        p = n;
+      }
+    }
+    p = pool_.exchange(nullptr);
+    while (p) {
+      auto n = p->pool_next;
+      delete p;
+      p = n;
+    }
+  }
+
+public:
+  class prepared_node {
+    node *p_ = nullptr;
+    friend class lock_free_queue;
+    explicit prepared_node(node *p) noexcept : p_(p) {}
+
+  public:
+    prepared_node() noexcept = default;
+    prepared_node(prepared_node &&o) noexcept : p_(o.p_) { o.p_ = nullptr; }
+    prepared_node &operator=(prepared_node &&o) noexcept {
+      if (this != &o) {
+        delete p_;
+        p_ = o.p_;
+        o.p_ = nullptr;
+      }
+      return *this;
+    }
+    prepared_node(const prepared_node &) = delete;
+    prepared_node &operator=(const prepared_node &) = delete;
+    ~prepared_node() { delete p_; }
+    explicit operator bool() const noexcept { return p_ != nullptr; }
+  };
+  lock_free_queue() {
+    auto dummy = new node;
+    head_.store(dummy);
+    tail_.store(dummy);
+  }
+  ~lock_free_queue() { destroy_quiescent(); }
+  lock_free_queue(const lock_free_queue &) = delete;
+  lock_free_queue &operator=(const lock_free_queue &) = delete;
+  template <class... A> static prepared_node prepare(A &&...a) {
+    detail::queue_profile_scope<Hooks, detail::allocation> profile;
+    return prepared_node(new node(0, static_cast<A &&>(a)...));
+  }
+  bool publish(prepared_node &&prepared) {
+    if (!prepared.p_)
+      return false;
+    operation op(*this);
+    auto p = prepared.p_;
+    prepared.p_ = nullptr;
+    link(p, op);
+    return true;
+  }
+  void push(const T &x) { append(x); }
+  void push(T &&x) { append(static_cast<T &&>(x)); }
+  template <class... A> void emplace(A &&...a) {
+    append(static_cast<A &&>(a)...);
+  }
+  bool try_pop(T &out) {
+    operation op(*this);
+    unsigned backoff = 8;
+    for (;;) {
+      auto head = op.protect(head_);
+      Hooks::after_head_protected();
+      auto next = head->next.load();
+      if (head_.load() != head) {
+        for (unsigned i = 0; i < backoff; ++i)
+          detail::spin_pause();
+        if (backoff < 256)
+          backoff *= 2;
+        continue;
+      }
+      if (!next)
+        return false;
+      auto tail = tail_.load();
+      if (head == tail) {
+        tail_.compare_exchange(tail, next);
+        continue;
+      }
+      // This release publication is ordered before the successful SC head CAS.
+      // A remover of next must observe that CAS before it can retire next, so
+      // its collector's hazard snapshot cannot precede publication. Failed CAS
+      // never dereferences next.
+      op.protect_second(next);
+      bool removed;
+      {
+        detail::queue_profile_scope<Hooks, detail::head_cas> profile;
+        removed = head_.compare_exchange(head, next);
+      }
+      if (removed) {
+        out = static_cast<T &&>(*next->value());
+        next->value()->~T();
+        next->live = false;
+        retire_to(op.retired(), head);
+        return true;
+      }
+      detail::queue_profile_failure<Hooks>(detail::head_cas);
+      for (unsigned i = 0; i < backoff; ++i)
+        detail::spin_pause();
+      if (backoff < 256)
+        backoff *= 2;
+    }
+  }
+  bool empty() const {
+    operation op(*this);
+    for (;;) {
+      auto head = op.protect(head_);
+      auto next = head->next.load();
+      if (head_.load() == head)
+        return next == nullptr;
+    }
+  }
+  size_t reclaim() noexcept { return collect(true); }
+  size_t release_retired() noexcept { return collect(false); }
+  void clear() {
+    auto dummy = new node;
+    destroy_quiescent();
+    head_.store(dummy);
+    tail_.store(dummy);
+  }
+};
+} // namespace ce
+#if defined(_MSC_VER)
+#pragma warning(pop)
+#endif

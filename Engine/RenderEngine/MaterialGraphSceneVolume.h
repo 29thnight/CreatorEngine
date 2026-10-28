@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -56,7 +57,7 @@ namespace material_graph
         {
             return constants_.front();
         }
-        std::array<RHIBindingDesc, 2> LightingBindings(RHITextureHandle shadow) const;
+        ce::fixed_array<RHIBindingDesc, 2> LightingBindings(RHITextureHandle shadow) const;
         RGHandle GraphCoefficients(const EnhancedRenderGraph& graph) const;
         std::uint32_t TriangleCount() const
         {
@@ -77,7 +78,7 @@ namespace material_graph
         RHITextureHandle environment_;
         own::shared_owner<const LX::Runtime::ComputeGeneration> composite_;
         RHIBindingTable coefficientOutput_;
-        std::vector<RHIBufferSlice> constants_;
+        ce::dynamic_array<RHIBufferSlice> constants_;
         own::weak_owner<const SceneVolumeFrame> self_;
         mutable const EnhancedRenderGraph* graph_{};
         mutable std::uint64_t graphEpoch_{};

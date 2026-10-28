@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -118,7 +120,7 @@ void InputActionManager::LoadManager()
 		return;
 	}
 
-	std::vector<fs::path> files;
+	ce::dynamic_array<fs::path> files;
 	for (const fs::directory_entry& entry : fs::directory_iterator(directory))
 	{
 		if (entry.is_regular_file() && entry.path().extension() == ".inputmap")
@@ -221,7 +223,7 @@ ActionMap* InputActionManager::LoadMap(const std::string& filepath)
 
 	auto map = std::make_unique<ActionMap>();
 	map->m_name = mapName;
-	std::unordered_set<std::string> actionNames;
+	ce::engine_node_set<std::string> actionNames;
 	for (const Authoring::ReadNode actionNode : actionsNode)
 	{
 		const Authoring::ReadNode actionNameNode = actionNode["actionName"];

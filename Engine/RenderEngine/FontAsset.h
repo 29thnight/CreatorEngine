@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -48,7 +49,7 @@ struct TextGlyph
 
 struct TextLayout
 {
-    std::vector<TextGlyph> glyphs;
+    ce::dynamic_array<TextGlyph> glyphs;
     float width{}, height{}, lineHeight{};
     std::size_t fallbackCount{};
     std::size_t invalidUtf8Count{};

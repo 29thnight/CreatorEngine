@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Containers/ContainerAPI.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../Platform/WindowsSDK/Creator.ComSupport.h"
@@ -34,9 +36,9 @@ namespace
     bool                          g_hasBaseline = false;
 
     // 집계를 "타입:개수" 목록으로 만든다. 개수가 많은 순으로 상위 항목만 남긴다.
-    std::string SummarizeByType(const std::map<std::string, uint32_t>& byType, size_t maxEntries)
+    std::string SummarizeByType(const ce::engine_ordered_map<std::string, uint32_t>& byType, size_t maxEntries)
     {
-        std::vector<std::pair<std::string, uint32_t>> sorted(byType.begin(), byType.end());
+        ce::dynamic_array<ce::pair<std::string, uint32_t>> sorted(byType.begin(), byType.end());
         std::sort(sorted.begin(), sorted.end(),
             [](const auto& lhs, const auto& rhs) { return lhs.second > rhs.second; });
 
@@ -103,7 +105,7 @@ namespace
         }
 
         // 증가한 타입만 추린다. 회수되지 않은 리소스가 여기에 그대로 드러난다.
-        std::map<std::string, uint32_t> increased;
+        ce::engine_ordered_map<std::string, uint32_t> increased;
         for (const auto& [type, count] : current.byType)
         {
             const auto previous = g_baselineCensus.byType.find(type);

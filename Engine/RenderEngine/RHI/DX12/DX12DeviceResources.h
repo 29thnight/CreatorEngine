@@ -1,4 +1,6 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineOrderedMap.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
 #else
@@ -325,7 +327,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
         return payload != 0;
     }
     bool EncodeIndirectIndexBuffer(const RHIBufferSlice& slice, RHIFormat format,
-                                   std::array<uint32_t, 4>& payload) const override
+                                   ce::fixed_array<uint32_t, 4>& payload) const override
     {
         uint64_t address{};
         if (format != RHIFormat::R32Uint || !slice.size || slice.size > UINT32_MAX || slice.size % 4 ||
@@ -660,7 +662,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     winrt::com_ptr<ID3D12CommandSignature> m_dispatchIndirectSignature;
     // Ascending unique root slots have an exact allocation-free representation:
     // native root identity, occupied slots, CBV slots, indexed/mesh command kind.
-    using MaterialBatchSignatureKey = std::tuple<uintptr_t, uint64_t, uint64_t, bool>;
+    using MaterialBatchSignatureKey = ce::tuple<uintptr_t, uint64_t, uint64_t, bool>;
     struct MaterialBatchSignature
     {
         winrt::com_ptr<ID3D12RootSignature> root;
@@ -669,7 +671,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     static uint64_t NextMaterialBatchSignatureGeneration();
     uint64_t m_meshBatchSignatureGeneration{NextMaterialBatchSignatureGeneration()};
     std::mutex m_meshBatchSignatureMutex;
-    std::map<MaterialBatchSignatureKey, MaterialBatchSignature> m_meshBatchSignatures;
+    ce::engine_ordered_map<MaterialBatchSignatureKey, MaterialBatchSignature> m_meshBatchSignatures;
     RHIAtomicCapabilities m_atomicCapabilities;
     RHIMeshShaderCapabilities m_meshShaderCapabilities;
     RHIShaderArrayCapabilities m_shaderArrayCapabilities;
@@ -678,10 +680,10 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     // 포인터 하나 검사로 끝난다.
     winrt::com_ptr<ID3D12InfoQueue> m_infoQueue;
     winrt::com_ptr<ID3D12CommandQueue> m_queue;
-    std::array<winrt::com_ptr<ID3D12CommandAllocator>, kFrameCount> m_allocators;
-    std::array<uint64_t, kFrameCount> m_frameFenceValues{};
-    std::array<RHISubmissionTicket, kFrameCount> m_frameSubmissionTickets;
-    std::array<std::vector<winrt::com_ptr<ID3D12GraphicsCommandList>>, kFrameCount> m_retiredCommandLists;
+    ce::fixed_array<winrt::com_ptr<ID3D12CommandAllocator>, kFrameCount> m_allocators;
+    ce::fixed_array<uint64_t, kFrameCount> m_frameFenceValues{};
+    ce::fixed_array<RHISubmissionTicket, kFrameCount> m_frameSubmissionTickets;
+    ce::fixed_array<ce::dynamic_array<winrt::com_ptr<ID3D12GraphicsCommandList>>, kFrameCount> m_retiredCommandLists;
     winrt::com_ptr<ID3D12GraphicsCommandList> m_commandList;
 
     /// 지금 열린 리스트에 붙은 인코더 (A-3). 리스트를 Reset 할 때마다 다시
@@ -702,7 +704,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     ce::RenderArenaPool m_pendingCommandPool;
     own::shared_owner<DX12PendingCommands> m_pendingCommands;
     own::shared_owner<DeferredImmediate> m_deferred;
-    std::array<own::shared_owner<DeferredNativeFrame>, kFrameCount> m_deferredFrames;
+    ce::fixed_array<own::shared_owner<DeferredNativeFrame>, kFrameCount> m_deferredFrames;
     void BeginDeferredImmediate();
     void BeginPendingImmediate();
     RHIEncoder& GetDeferredImmediateEncoder();
@@ -731,7 +733,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     // allocator·백버퍼 링과 별개로 미완료 호스트 프레임은 하나만 허용한다.
     RHISubmissionTicket m_hostSubmissionTicket;
     uint64_t m_hostFenceValue{0};
-    std::array<winrt::com_ptr<ID3D12Resource>, kFrameCount> m_backBuffers;
+    ce::fixed_array<winrt::com_ptr<ID3D12Resource>, kFrameCount> m_backBuffers;
     winrt::com_ptr<ID3D12DescriptorHeap> m_backBufferRtvHeap;
     uint32_t m_backBufferRtvSize{0};
 
@@ -740,7 +742,7 @@ class DX12DeviceResources : public IRHIDeviceResources, public IRenderDeviceServ
     RHIDeviceMemoryBudgetCoordinator m_persistentMemoryBudget;
     uint64_t m_nextRecordingId{1};
     uint64_t m_currentRecordingId{0};
-    std::vector<IRHIUploadTransactionListener*> m_uploadTransactionListeners;
+    ce::dynamic_array<IRHIUploadTransactionListener*> m_uploadTransactionListeners;
     DX12DescriptorRecycler m_descriptorRecycler;
     DX12SamplerHeap m_samplerHeap;
 

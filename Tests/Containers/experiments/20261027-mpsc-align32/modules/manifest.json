@@ -1,0 +1,156 @@
+[
+  {
+    "header": "fixed_bitset.h",
+    "partition": "fixed_bitset",
+    "newline": "lf"
+  },
+  {
+    "header": "age_buckets.h",
+    "partition": "age_buckets",
+    "newline": "lf",
+    "initialHash": "C9EFFF3879E9CF31C6E7B4367B18DCECE4435CFC9B6051F885D05AB8B3DE9F2E"
+  },
+  {
+    "header": "bounded_mpsc_queue.h",
+    "partition": "bounded_mpsc_queue",
+    "newline": "lf",
+    "initialHash": "9DFFBC3B91F196B4E78C99442EC9822642B723DED0D2EBEB52B83AB9AA2CE548"
+  },
+  {
+    "header": "concurrent_queue.h",
+    "partition": "concurrent_queue",
+    "newline": "lf",
+    "initialHash": "BB3CA866665CCF8AB696757DB3A77DDCA978083C439078F220C0D69E9AEC39A4"
+  },
+  {
+    "header": "containers.h",
+    "partition": "containers",
+    "newline": "lf",
+    "initialHash": "2BF6338749F58F8AA004C92D00A0FFDBCB0304A34135ED69F37D1F4536B38C79"
+  },
+  {
+    "header": "detail/atomic.h",
+    "partition": "detail_atomic",
+    "newline": "lf",
+    "initialHash": "2DBFE2AC1933A9C354B62CA711456FA2A0C03CE8379B9EA8CC1EEBC19C4A41B9"
+  },
+  {
+    "header": "detail/atomic_ptr.h",
+    "partition": "detail_atomic_ptr",
+    "newline": "lf",
+    "initialHash": "6552B3719F3608427F8E8B69908B52F54CDE84CC27C0A0E10CF8A4E5A30EC170"
+  },
+  {
+    "header": "detail/atomic_u64.h",
+    "partition": "detail_atomic_u64",
+    "newline": "lf",
+    "initialHash": "26B1C82AF02587588CFE0614CCE2BA2DED4F93FF5840FBEFC612364BB1A06985"
+  },
+  {
+    "header": "detail/queue_profile.h",
+    "partition": "detail_queue_profile",
+    "newline": "lf",
+    "initialHash": "DC261EAE682B36260921E70610D3DA65E33398F3112F6BBC96BD17C19804ADEE"
+  },
+  {
+    "header": "dynamic_array.h",
+    "partition": "dynamic_array",
+    "newline": "lf",
+    "initialHash": "057688C02ED9442C9B164558230A8DD82EC58CFBFA540E6F1A0472F36C9EB245"
+  },
+  {
+    "header": "faa_lock_free_queue.h",
+    "partition": "faa_lock_free_queue",
+    "newline": "lf",
+    "initialHash": "44463EFA4D263ECB8CDC41E778EC63046EE004F415ADDEC7519AA9EFE4212D03"
+  },
+  {
+    "header": "fixed_array.h",
+    "partition": "fixed_array",
+    "newline": "lf",
+    "initialHash": "new-20261026"
+  },
+  {
+    "header": "flat_hash_map.h",
+    "partition": "flat_hash_map",
+    "newline": "lf",
+    "initialHash": "91E86D9032B6F0ACE5D718AE2985A1D3660184EB1C31F1A6DB8C2048ABB018A7"
+  },
+  {
+    "header": "hash.h",
+    "partition": "hash",
+    "newline": "lf",
+    "initialHash": "6D264E1D9D3CFB007D4EB7B9C0DC8401C5C145D5BD8D3086287A68275A9BA804"
+  },
+  {
+    "header": "inplace_function.h",
+    "partition": "inplace_function",
+    "newline": "lf",
+    "initialHash": "2503449F4EC46A852C0EF5338BC4C3A483E4D61B0A6AC941B5CCED57A9C62BAA"
+  },
+  {
+    "header": "intrusive_lru.h",
+    "partition": "intrusive_lru",
+    "newline": "lf",
+    "initialHash": "40B69177EFE3ACEB90F655A4EEE8AE3CFB3993570A1F915F140D2D898DC62581"
+  },
+  {
+    "header": "lock_free_queue.h",
+    "partition": "lock_free_queue",
+    "newline": "lf",
+    "initialHash": "FF05A61AF3865139763C885EDDC1816075C5196F9C9B80A4661B6C97F89FA5EB"
+  },
+  {
+    "header": "memory.h",
+    "partition": "memory",
+    "newline": "lf",
+    "initialHash": "5D4DFF6BBF4AC014243A6FD3AD6FF72FF4371C46B0977A19037E891108F555E5"
+  },
+  {
+    "header": "node_hash_map.h",
+    "partition": "node_hash_map",
+    "newline": "lf",
+    "initialHash": "new-20261026"
+  },
+  {
+    "header": "radix_sort.h",
+    "partition": "radix_sort",
+    "newline": "lf",
+    "initialHash": "55CC6C5FDBBF8AAF181084F19C79620001C0863DD3ADB7BDDE330F6B94DE1AE9"
+  },
+  {
+    "header": "sequence_buffer.h",
+    "partition": "sequence_buffer",
+    "newline": "lf",
+    "initialHash": "87CCBA31AAB9F73F2F37C7FAC5A0F13241076700FC9B31E9AD3B04E40DE3C328"
+  },
+  {
+    "header": "slot_map.h",
+    "partition": "slot_map",
+    "newline": "lf",
+    "initialHash": "02B893B6CE255D785A10628C670D85FFC70E29D0D2BD521B5A596C65B79B20BD"
+  },
+  {
+    "header": "string.h",
+    "partition": "string",
+    "newline": "lf",
+    "initialHash": "B4B62C5ECF3EE55F69082B10D7BBAFB5554AD11AC7329D8D457C27B4FAA2AA57"
+  },
+  {
+    "header": "string_atom.h",
+    "partition": "string_atom",
+    "newline": "lf",
+    "initialHash": "86D981F128B88DCE80DA6AF64EEFA1E8F886255C7F79BF4331CE05741B6EB94D"
+  },
+  {
+    "header": "tlsf_resource.h",
+    "partition": "tlsf_resource",
+    "newline": "lf",
+    "initialHash": "6E2A101C2A66ADE7690C19FAEF67896B1606B7BD98DE7F81547881A75F1B47B2"
+  },
+  {
+    "header": "utf8_copy.h",
+    "partition": "utf8_copy",
+    "newline": "lf"
+  }
+]

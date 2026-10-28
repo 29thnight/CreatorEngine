@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "../VulkanSelfTest.h"
 
 #include "../../../../../Engine/Utility_Framework/Authoring/AuthoringRymlErrorPolicy.h"
@@ -42,7 +43,7 @@ namespace
     }
 
     bool ReadDraws(const std::filesystem::path& directory,
-        std::vector<DrawNormalState>& out, std::string& error)
+        ce::dynamic_array<DrawNormalState>& out, std::string& error)
     {
         std::string text;
         if (!ReadNormalPairManifestText(directory / "manifest.json", text, error)) return false;
@@ -89,7 +90,7 @@ namespace
 bool RunPbrNormalPairVerification(const std::string& directory, std::string& outLog)
 {
     std::string error;
-    std::vector<DrawNormalState> draws;
+    ce::dynamic_array<DrawNormalState> draws;
     if (!ReadDraws(directory, draws, error))
     {
         outLog += error + "\n";

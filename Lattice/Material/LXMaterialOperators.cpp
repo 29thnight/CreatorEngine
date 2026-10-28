@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "LXMaterialOperators.h"
 
 #include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
@@ -32,7 +33,7 @@ void RegisterMaterialOperators(LXMaterialDefinitions& result, LXNodeDefinitionRe
     for (PinType type : {PinType::Float, PinType::Color})
     {
         const LXSocketValue one =
-            type == PinType::Float ? LXSocketValue(1.0) : LXSocketValue(std::array<double, 4>{1, 1, 1, 1});
+            type == PinType::Float ? LXSocketValue(1.0) : LXSocketValue(ce::fixed_array<double, 4>{1, 1, 1, 1});
         NodeSpec multiply;
         multiply.type = std::string("LXMultiply") + PinTypeName(type);
         multiply.title = "Multiply";
@@ -47,7 +48,7 @@ void RegisterMaterialOperators(LXMaterialDefinitions& result, LXNodeDefinitionRe
     sample.pins = {
         {0, 0, "Texture", Direction::Input, PinType::Texture, false, false, "Texture", std::string()},
         {0, 0, "Sampler", Direction::Input, PinType::Sampler, false, false, "Sampler", std::string("linear-repeat")},
-        {0, 0, "Vector", Direction::Input, PinType::Vector, false, false, "Vector", std::array<double, 3>{0, 0, 0}},
+        {0, 0, "Vector", Direction::Input, PinType::Vector, false, false, "Vector", ce::fixed_array<double, 3>{0, 0, 0}},
         {0, 0, "Color", Direction::Output, PinType::Color, false, false, "Color"},
         {0, 0, "Alpha", Direction::Output, PinType::Float, false, false, "Alpha"}};
     sample.properties = {{"colorSpace", "data"}};
@@ -57,7 +58,7 @@ void RegisterMaterialOperators(LXMaterialDefinitions& result, LXNodeDefinitionRe
     separate.type = "ShaderNodeSeparateColor";
     separate.title = "Separate Color";
     separate.pins = {
-        {0, 0, "Color", Direction::Input, PinType::Color, false, false, "Color", std::array<double, 4>{0, 0, 0, 1}},
+        {0, 0, "Color", Direction::Input, PinType::Color, false, false, "Color", ce::fixed_array<double, 4>{0, 0, 0, 1}},
         {0, 0, "Red", Direction::Output, PinType::Float, false, false, "Red"},
         {0, 0, "Green", Direction::Output, PinType::Float, false, false, "Green"},
         {0, 0, "Blue", Direction::Output, PinType::Float, false, false, "Blue"}};
@@ -67,8 +68,8 @@ void RegisterMaterialOperators(LXMaterialDefinitions& result, LXNodeDefinitionRe
     coordinates.type = "LXTextureCoordinates";
     coordinates.title = "Texture Coordinates";
     coordinates.pins = {
-        {0, 0, "Offset", Direction::Input, PinType::Vector, false, false, "Offset", std::array<double, 3>{0, 0, 0}},
-        {0, 0, "Scale", Direction::Input, PinType::Vector, false, false, "Scale", std::array<double, 3>{1, 1, 1}},
+        {0, 0, "Offset", Direction::Input, PinType::Vector, false, false, "Offset", ce::fixed_array<double, 3>{0, 0, 0}},
+        {0, 0, "Scale", Direction::Input, PinType::Vector, false, false, "Scale", ce::fixed_array<double, 3>{1, 1, 1}},
         {0, 0, "Rotation", Direction::Input, PinType::Float, false, false, "Rotation", 0.0},
         {0, 0, "Vector", Direction::Output, PinType::Vector, false, false, "Vector"}};
     add(std::move(coordinates));
@@ -90,14 +91,14 @@ void RegisterMaterialOperators(LXMaterialDefinitions& result, LXNodeDefinitionRe
     // MAT-5's six-input Blender-compatible homogeneous subset. This is not a
     // registration of Blender's full string-attribute/blackbody Volume node.
     volume.pins = {
-        {0, 0, "Color", Direction::Input, PinType::Color, false, false, "Color", std::array<double, 4>{.5, .5, .5, 1}},
+        {0, 0, "Color", Direction::Input, PinType::Color, false, false, "Color", ce::fixed_array<double, 4>{.5, .5, .5, 1}},
         {0, 0, "Density", Direction::Input, PinType::Float, false, false, "Density", 1.0},
         {0, 0, "Anisotropy", Direction::Input, PinType::Float, false, false, "Anisotropy", 0.0},
         {0, 0, "Absorption Color", Direction::Input, PinType::Color, false, false, "Absorption Color",
-         std::array<double, 4>{0, 0, 0, 1}},
+         ce::fixed_array<double, 4>{0, 0, 0, 1}},
         {0, 0, "Emission Strength", Direction::Input, PinType::Float, false, false, "Emission Strength", 0.0},
         {0, 0, "Emission Color", Direction::Input, PinType::Color, false, false, "Emission Color",
-         std::array<double, 4>{1, 1, 1, 1}},
+         ce::fixed_array<double, 4>{1, 1, 1, 1}},
         {0, 0, "Volume", Direction::Output, PinType::Closure, false, false, "Volume"}};
     add(std::move(volume));
     NodeSpec reroute;

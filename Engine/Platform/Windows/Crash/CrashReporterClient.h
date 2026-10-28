@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "CrashReportProtocol.h"
@@ -72,7 +73,7 @@ namespace crash_report
             SIZE_T attributeBytes{};
             InitializeProcThreadAttributeList(nullptr, 1, 0, &attributeBytes);
             if (!attributeBytes) return false;
-            std::vector<BYTE> attributeStorage(attributeBytes);
+            ce::dynamic_array<BYTE> attributeStorage(attributeBytes);
             STARTUPINFOEXW startup{};
             startup.StartupInfo.cb = sizeof(startup);
             startup.lpAttributeList = reinterpret_cast<LPPROC_THREAD_ATTRIBUTE_LIST>(

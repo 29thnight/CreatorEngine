@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.SpinLock.h"
 #else
@@ -238,7 +239,7 @@ private:
         ScriptAssetLink* links, int capacity, int& count);
     void ReleaseAssetLocked(AssetSlot& slot);
     std::mutex m_assetMutex;
-    std::vector<AssetSlot> m_assetSlots;
+    ce::dynamic_array<AssetSlot> m_assetSlots;
     DataSystem* m_assetDataSystem{};
     std::thread::id m_assetThread{};
     bool m_assetsActive{};
@@ -257,6 +258,6 @@ private:
 	// 근거는 정적 추적일 뿐 실측(빌드·동시성 스트레스)이 아니다 — 이번 슬라이스는
 	// 빌드가 금지라 실측할 수 없었다. "필요 시 유지" 쪽으로 보수적으로 남긴다.
 	mutable std::mutex m_mutex;
-	std::vector<Slot> m_slots;
-	std::vector<uint32_t> m_freeSlots;
+	ce::dynamic_array<Slot> m_slots;
+	ce::dynamic_array<uint32_t> m_freeSlots;
 };

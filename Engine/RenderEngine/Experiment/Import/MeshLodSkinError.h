@@ -1,14 +1,15 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #include "../ModelData.h"
 
 namespace experiment::importer
 {
-    using SkinErrorVector = std::array<double, 3>;
+    using SkinErrorVector = ce::fixed_array<double, 3>;
     struct SkinErrorVertex
     {
         SkinErrorVector position;
-        std::array<uint32_t, 4> joints{};
-        std::array<double, 4> weights{};
+        ce::fixed_array<uint32_t, 4> joints{};
+        ce::fixed_array<double, 4> weights{};
     };
     inline double SkinErrorDot(const SkinErrorVector& a, const SkinErrorVector& b)
     {
@@ -18,9 +19,9 @@ namespace experiment::importer
     {
         return {a[0] - b[0], a[1] - b[1], a[2] - b[2]};
     }
-    inline std::vector<SkinErrorVertex> SkinErrorVertices(const Mesh& mesh)
+    inline ce::dynamic_array<SkinErrorVertex> SkinErrorVertices(const Mesh& mesh)
     {
-        std::vector<SkinErrorVertex> vertices(mesh.vertices.size());
+        ce::dynamic_array<SkinErrorVertex> vertices(mesh.vertices.size());
         const auto mask = mesh.vertices.AttributeMask();
         for (size_t i = 0; i < vertices.size(); ++i)
         {
@@ -61,7 +62,7 @@ namespace experiment::importer
         }
         return vertices;
     }
-    inline std::array<double, 3> SkinErrorClosestBarycentric(const SkinErrorVector& p, const SkinErrorVector& a,
+    inline ce::fixed_array<double, 3> SkinErrorClosestBarycentric(const SkinErrorVector& p, const SkinErrorVector& a,
                                                              const SkinErrorVector& b, const SkinErrorVector& c)
     {
         const auto ab = SkinErrorSubtract(b, a), ac = SkinErrorSubtract(c, a), ap = SkinErrorSubtract(p, a);
@@ -76,7 +77,7 @@ namespace experiment::importer
             }
         }
         const SkinErrorVector points[]{a, b, c};
-        std::array<double, 3> best{1, 0, 0};
+        ce::fixed_array<double, 3> best{1, 0, 0};
         double distance = INFINITY;
         for (unsigned edge = 0; edge < 3; ++edge)
         {
@@ -131,11 +132,11 @@ namespace experiment::importer
             {
                 double best = INFINITY;
                 size_t target{};
-                std::array<std::array<double, 3>, 3> bary{};
+                ce::fixed_array<ce::fixed_array<double, 3>, 3> bary{};
                 for (size_t candidate = 0; candidate < to.size(); candidate += 3)
                 {
                     double distance{};
-                    std::array<std::array<double, 3>, 3> current;
+                    ce::fixed_array<ce::fixed_array<double, 3>, 3> current;
                     for (unsigned corner = 0; corner < 3; ++corner)
                     {
                         const auto& p = vertices[from[source + corner]].position;
@@ -172,7 +173,7 @@ namespace experiment::importer
                         SkinErrorVector position{};
                         double weight{};
                     };
-                    std::array<Residual, 16> residuals{};
+                    ce::fixed_array<Residual, 16> residuals{};
                     size_t count{};
                     const auto add = [&](const SkinErrorVertex& v, double factor)
                     {

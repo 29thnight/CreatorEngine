@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -108,7 +109,7 @@ namespace assets
         ModelMeshletSummary meshlets{};
         experiment::MeshLodBuildSettings lodSettings{};
         experiment::MeshletGeometryDigest lodGeometryDigest{};
-        std::array<ModelMeshLodSummary, experiment::kMeshLodMaxLevels> coarseLods{};
+        ce::fixed_array<ModelMeshLodSummary, experiment::kMeshLodMaxLevels> coarseLods{};
         std::uint32_t coarseLodCount{};
         std::size_t metadataBytes{};
         own::shared_owner<const experiment::cooked::ModelGeometryStreamMetadata> streamMetadata;

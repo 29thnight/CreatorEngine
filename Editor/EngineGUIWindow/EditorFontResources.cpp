@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 // 에디터 폰트 자원 (PHASE 21 W1). 왜 이 파일이 있는지는 헤더에 적었다.
 
 #include "EditorFontResources.h"
@@ -60,9 +61,9 @@ namespace editor::fonts
         constexpr ImWchar kIconExclusions[]{ 0xe000, 0xf8ff, 0 };
         static_assert(std::size(kIconExclusions) <= 64);
 
-        std::vector<loaded_font>& store()
+        ce::dynamic_array<loaded_font>& store()
         {
-            static std::vector<loaded_font> value;
+            static ce::dynamic_array<loaded_font> value;
             return value;
         }
 
@@ -291,7 +292,7 @@ namespace editor::fonts
         return merged;
     }
 
-    const std::vector<loaded_font>& loaded_fonts()
+    const ce::dynamic_array<loaded_font>& loaded_fonts()
     {
         return store();
     }

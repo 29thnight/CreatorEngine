@@ -35,7 +35,7 @@ SceneSurfaceTargets::Outputs SceneHost::VisibilityStage::Declare(const own::shar
     return targets;
 }
 
-std::array<RGHandle, 2> SceneHost::MaterialWorkStage::Declare(const own::shared_owner<const Frame>& prepared,
+ce::fixed_array<RGHandle, 2> SceneHost::MaterialWorkStage::Declare(const own::shared_owner<const Frame>& prepared,
                                                               EnhancedRenderGraph& graph, RGHandle expectedVisibility,
                                                               RGHandle visibility) const
 {
@@ -66,7 +66,7 @@ SceneSurfaceTargets::Outputs SceneHost::SurfaceResolveStage::Declare(const own::
                                                                      EnhancedRenderGraph& graph,
                                                                      RGHandle expectedVisibility,
                                                                      const SceneSurfaceTargets::Outputs& incoming,
-                                                                     const std::array<RGHandle, 2>& material) const
+                                                                     const ce::fixed_array<RGHandle, 2>& material) const
 {
     ce::profile_scope profile{ce::marker<"MaterialSceneResolveDeclare">()};
     const auto& frame = prepared;
@@ -113,7 +113,7 @@ SceneSurfaceTargets::Outputs SceneHost::SurfaceResolveStage::Declare(const own::
         {
             frame->CheckCurrent(execution.graph);
             auto& encoder = *execution.encoder;
-            std::array<RHITextureHandle, 5> colors;
+            ce::fixed_array<RHITextureHandle, 5> colors;
             const auto handles = Colors(inputs);
             for (unsigned i = 0; i < colors.size(); ++i)
             {

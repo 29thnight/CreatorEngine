@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "RHIAssetEvictionPolicy.h"
 
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -44,7 +45,7 @@ RHIAssetEvictionPass BeginRHIAssetEvictionPass(bool memoryPressure,
 }
 
 RHIAssetEvictionSelection SelectRHIAssetEvictionCandidates(
-    const std::vector<RHIAssetEvictionCandidate>& candidates,
+    const ce::dynamic_array<RHIAssetEvictionCandidate>& candidates,
     uint64_t currentFrame, const RHIAssetEvictionPass* pass,
     const RHIAssetEvictionConfig& config)
 {
@@ -55,8 +56,8 @@ RHIAssetEvictionSelection SelectRHIAssetEvictionCandidates(
     };
 
     const bool pressure = nullptr != pass && pass->memoryPressure;
-    std::vector<Ranked> normal;
-    std::vector<Ranked> pressured;
+    ce::dynamic_array<Ranked> normal;
+    ce::dynamic_array<Ranked> pressured;
     RHIAssetEvictionSelection result{};
     normal.reserve(candidates.size());
     pressured.reserve(candidates.size());
@@ -123,7 +124,7 @@ bool RunRHIAssetEvictionPolicyContractTest(std::string& outLog)
 {
     RHIAssetEvictionConfig config{};
     config.minimumPressureTargetBytes = 0;
-    const std::vector<RHIAssetEvictionCandidate> candidates = {
+    const ce::dynamic_array<RHIAssetEvictionCandidate> candidates = {
         { 1, 0,   32, true  },
         { 2, 117, 40, true  },
         { 3, 118, 50, true  },
@@ -161,7 +162,7 @@ bool RunRHIAssetEvictionPolicyContractTest(std::string& outLog)
         return false;
     }
 
-    const std::vector<RHIAssetEvictionCandidate> secondCache = {
+    const ce::dynamic_array<RHIAssetEvictionCandidate> secondCache = {
         { 5, 100, 80, true }
     };
     if (!SelectRHIAssetEvictionCandidates(secondCache, 120, &pressure, config)

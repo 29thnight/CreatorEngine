@@ -1,4 +1,6 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineFunc.h"
 
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -44,9 +46,9 @@ namespace ce::profiler_viewer
         // immutable DTO in pump and returns its worker-only serializer. The
         // handler also runs in pump and must validate the complete schema/object
         // epoch before effects. The deferred serializer cannot retain scene pointers.
-        using diagnostic_encoder = std::function<std::vector<std::byte>()>;
-        using diagnostic_publisher = std::function<diagnostic_encoder()>;
-        using diagnostic_handler = std::function<bool(std::span<const std::byte>)>;
+        using diagnostic_encoder = ce::owned_func<ce::dynamic_array<std::byte>()>;
+        using diagnostic_publisher = ce::owned_func<diagnostic_encoder()>;
+        using diagnostic_handler = ce::owned_func<bool(std::span<const std::byte>)>;
         void set_diagnostic_hooks(diagnostic_publisher publish, diagnostic_handler apply);
 
     private:

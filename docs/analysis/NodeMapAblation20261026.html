@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/NodeMapAblation20261026.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>노드 맵 중복 탐색·키 삭제 경로 분리 계측</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#실험-구성">실험 구성</a></li><li><a href="#변경별-시간-효과">변경별 시간 효과</a></li><li><a href="#실제-제거된-작업">실제 제거된 작업</a></li><li><a href="#수용-판정과-한계">수용 판정과 한계</a></li><li><a href="#증거">증거</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="NodeMapAblation20261026.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>노드 맵 중복 탐색·키 삭제 경로 분리 계측</h1>
+<div class="meta"><p>삽입 위치 탐색 재사용은 생성·삽입·파괴 종합 시간에서 약 2.6~4.1% 개선을 보였다. 키 삭제의 다음 반복자 탐색 제거는 이번 측정에서 뚜렷한 시간 이득을 입증하지 못했다. 두 변경을 합쳐도 STL 수용 기준에는 도달하지 않았다. 앞서 지적한 두 중복 작업만으로 전체 성능 미달을 설명할 수 없다는 결과다.</p>
+</div>
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
+<a class="map-row" href="#실험-구성"><span class="ve-label">§00</span><span class="map-name">실험 구성</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#변경별-시간-효과"><span class="ve-label">§01</span><span class="map-name">변경별 시간 효과</span><span class="map-bar"><i style="width:77.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#실제-제거된-작업"><span class="ve-label">§02</span><span class="map-name">실제 제거된 작업</span><span class="map-bar"><i style="width:55.1%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#수용-판정과-한계"><span class="ve-label">§03</span><span class="map-name">수용 판정과 한계</span><span class="map-bar"><i style="width:38.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#증거"><span class="ve-label">§04</span><span class="map-name">증거</span><span class="map-bar"><i style="width:57.4%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「실험 구성」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="doc-sec" id="sec-실험-구성">
+<div class="sec-head"><p class="ve-label">§00</p><h2 id="실험-구성">실험 구성</h2></div>
+<div class="prose"><p>엔진 정본 <code>Engine/Containers/modules/node_hash_map.ixx</code>를 입력으로 실험용 named module을 자동 생성했다. 공통 배열·할당자·해시는 엔진의 <code>Creator.Containers</code>를 직접 import한다. 실험용 구현은 외부 <code>CreatorContainers/experiments/20261026-node-map-ablation</code>에 있으며 정본으로 사용하지 않는다. 원본 위치와 해시, 생성기 및 생성 결과를 함께 보존했다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>변형</th><th>변경</th></tr></thead>
+<tbody><tr><td>canonical</td><td>변경 없는 엔진 정본</td></tr>
+<tr><td>baseline</td><td>실험용 기준 구현, 두 변경 꺼짐</td></tr>
+<tr><td>reuse</td><td>중복 키 검사에서 찾은 삽입 위치 재사용</td></tr>
+<tr><td>erase</td><td>키 삭제 시 사용하지 않는 다음 반복자 탐색 생략</td></tr>
+<tr><td>both</td><td>reuse와 erase 결합</td></tr></tbody></table></div>
+<p>reuse는 tombstone을 발견해도 중복 키 검사를 끝까지 수행한다. 재해시 또는 tombstone 정리가 필요하면 새 인덱스에서 삽입 위치를 다시 찾는다. 인덱스 준비와 값 생성이 모두 성공한 뒤 발행하는 기존 예외 보장을 유지한다. erase는 키 기반 삭제만 바꾸며 다음 반복자를 반환해야 하는 반복자 삭제는 유지한다.</p>
+<p>MSVC 19.50.35730.0 x64 Release에서 5개 변형을 하나의 실행 파일에 넣었다. 64·4,096·65,536개 키와 생성·성공 조회·실패 조회·삭제 후 재삽입의 12조건을 각각 3개 독립 프로세스에서 실행했다. 총 180조건, 각 측정의 양쪽 15개 원시 샘플을 모두 유지했다. 배치는 기존 노드 맵 검사와 동일한 30ms 목표이며 각 컨테이너를 독립 보정한다. 변형 순서와 두 번째 반복의 A/B 순서를 뒤집었다. CPU4 측정 스레드와 기존 CPU5 SMT helper를 사용했고 수집 중에는 빌드하지 않았다.</p>
+<p>충돌·재해시 후 참조 안정성·복사 실패·할당 실패·tombstone 뒤 중복 키 회귀를 네 실험 조합 모두에서 검사했다. 일반 검사 4/4와 AddressSanitizer 검사 4/4가 통과했다. 작업 횟수 카운터는 별도 실행 파일에서만 켜고 시간 측정 변형에서는 컴파일 시 제거했다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-변경별-시간-효과">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="변경별-시간-효과">변경별 시간 효과</h2></div>
+<div class="prose"><p>양수는 실험용 baseline보다 빨라진 비율이다. 각 조건의 독립 프로세스 3개에서 얻은 키당 시간 중앙값을 사용했다. 생성 조건은 reserve·삽입·파괴를 모두 포함하므로 순수 삽입 시간으로 해석하지 않는다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>키 수</th><th>연산</th><th style="text-align:right">탐색 재사용</th><th style="text-align:right">키 삭제 분리</th><th style="text-align:right">두 변경 결합</th></tr></thead>
+<tbody><tr><td class="num">64</td><td>생성·삽입·파괴</td><td class="num" style="text-align:right">+2.63%</td><td style="text-align:right">+0.82%*</td><td class="num" style="text-align:right">+1.91%</td></tr>
+<tr><td class="num">4,096</td><td>생성·삽입·파괴</td><td class="num" style="text-align:right">+4.05%</td><td style="text-align:right">+0.59%*</td><td class="num" style="text-align:right">+3.61%</td></tr>
+<tr><td class="num">65,536</td><td>생성·삽입·파괴</td><td class="num" style="text-align:right">+3.28%</td><td style="text-align:right">-1.28%*</td><td class="num" style="text-align:right">+1.79%</td></tr>
+<tr><td class="num">64</td><td>삭제 후 재삽입</td><td class="num" style="text-align:right">+1.06%</td><td class="num" style="text-align:right">+0.04%</td><td class="num" style="text-align:right">+0.39%</td></tr>
+<tr><td class="num">4,096</td><td>삭제 후 재삽입</td><td class="num" style="text-align:right">+2.81%</td><td class="num" style="text-align:right">+0.26%</td><td class="num" style="text-align:right">+2.36%</td></tr>
+<tr><td class="num">65,536</td><td>삭제 후 재삽입</td><td class="num" style="text-align:right">+1.72%</td><td class="num" style="text-align:right">-0.80%</td><td class="num" style="text-align:right">+0.91%</td></tr></tbody></table></div>
+<p>별표 조건은 키 삭제 경로를 실행하지 않으므로 해당 차이를 삭제 최적화의 효과로 해석하면 안 된다. 이 수치들은 프로세스·코드 생성·배치 상태 차이가 만드는 대조 오차의 크기도 보여준다. 정본과 실험용 baseline의 조건별 키당 시간 중앙값 차이는 전체 12조건에서 0.78% 이내였다. 다만 65,536개 생성의 개별 반복 차이는 이보다 컸다.</p>
+<p>4,096개 삭제 후 재삽입에서 탐색 재사용의 같은 반복끼리 비교한 개선율은 1.92<del>4.06%였고, 키 삭제 분리는 0.12</del>0.64%였다. 삭제 분리의 작은 이득은 정본·실험용 기준 구현의 차이와 비교해 확실한 속도 개선으로 단정하지 않는다. 두 변경의 개선율을 단순 합산할 수도 없다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>4,096개 조건</th><th style="text-align:right">baseline</th><th style="text-align:right">reuse</th><th style="text-align:right">erase</th><th style="text-align:right">both</th></tr></thead>
+<tbody><tr><td>생성·삽입·파괴 키당 ns</td><td class="num" style="text-align:right">90.04</td><td class="num" style="text-align:right">86.39</td><td class="num" style="text-align:right">89.51</td><td class="num" style="text-align:right">86.79</td></tr>
+<tr><td>삭제 후 재삽입 키당 ns</td><td class="num" style="text-align:right">97.51</td><td class="num" style="text-align:right">94.77</td><td class="num" style="text-align:right">97.25</td><td class="num" style="text-align:right">95.20</td></tr></tbody></table></div>
+</div>
+</section>
+<section class="doc-sec" id="sec-실제-제거된-작업">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="실제-제거된-작업">실제 제거된 작업</h2></div>
+<div class="prose"><p>카운터의 삽입 조건은 reserve 후부터 세며 최종 파괴는 포함하지 않는다. 삭제 후 재삽입 조건은 이미 채운 맵에서 각 키를 한 번 삭제하고 다시 삽입한다. 다음은 4,096개 키의 결과다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th>작업</th><th style="text-align:right">baseline</th><th style="text-align:right">reuse</th><th style="text-align:right">erase</th><th style="text-align:right">both</th></tr></thead>
+<tbody><tr><td>삽입: 중복 키 검사 슬롯 확인</td><td class="num" style="text-align:right">6,128</td><td class="num" style="text-align:right">6,128</td><td class="num" style="text-align:right">6,128</td><td class="num" style="text-align:right">6,128</td></tr>
+<tr><td>삽입: 추가 삽입 위치 슬롯 확인</td><td class="num" style="text-align:right">6,128</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">6,128</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>삭제·재삽입: 키 검사 슬롯 확인</td><td class="num" style="text-align:right">25,104</td><td class="num" style="text-align:right">25,104</td><td class="num" style="text-align:right">25,104</td><td class="num" style="text-align:right">25,104</td></tr>
+<tr><td>삭제·재삽입: 추가 삽입 위치 슬롯 확인</td><td class="num" style="text-align:right">6,128</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">6,128</td><td class="num" style="text-align:right">0</td></tr>
+<tr><td>삭제·재삽입: 반복자 슬롯 확인</td><td class="num" style="text-align:right">20,477</td><td class="num" style="text-align:right">20,477</td><td class="num" style="text-align:right">8,192</td><td class="num" style="text-align:right">8,192</td></tr>
+<tr><td>삭제·재삽입: 노드 할당</td><td class="num" style="text-align:right">4,096</td><td class="num" style="text-align:right">4,096</td><td class="num" style="text-align:right">4,096</td><td class="num" style="text-align:right">4,096</td></tr>
+<tr><td>삭제·재삽입: 노드 해제</td><td class="num" style="text-align:right">4,096</td><td class="num" style="text-align:right">4,096</td><td class="num" style="text-align:right">4,096</td><td class="num" style="text-align:right">4,096</td></tr>
+<tr><td>삭제·재삽입: 인덱스 재구축</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td><td class="num" style="text-align:right">0</td></tr></tbody></table></div>
+<p>추가 삽입 위치 탐색은 실제로 사라졌다. 삭제 분리도 반복자 확인을 약 60% 줄였지만 시간 이득은 작았다. 슬롯 확인 횟수 감소율을 실행 시간 개선율로 환산하면 안 된다. 노드 할당·해제 횟수는 그대로이며, 이번 실험만으로 할당·해제가 잔여 시간에서 차지하는 비중을 확정할 수 없다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-수용-판정과-한계">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="수용-판정과-한계">수용 판정과 한계</h2></div>
+<div class="prose"><p>STL 대비 비율 ≤ 1.10 및 양쪽 편차 x[13]/x[1] ≤ 1.30을 각 반복에 적용하면 canonical 18/36, baseline 17/36, reuse 18/36, erase 18/36, both 18/36이다. 따라서 두 변경 모두 현재 맵의 전체 성능 수용을 달성하지 못했다.</p>
+<p>4,096개에서 both의 STL 대비 비율 중앙값은 생성 1.148, 삭제 후 재삽입 1.180이었다. 생성 조건은 STL 쪽 편차도 약 1.5까지 커서 미달 원인을 중앙값 하나로만 판단하지 않는다. 실패 조회 경로는 두 변경으로 바뀌지 않는다. 다음 비용 분리는 노드 할당·해제, 인덱스 초기화 및 실패 조회의 탐색 비용을 대상으로 해야 한다. 엔진의 노드 맵 구현에는 이번 실험 변경을 적용하지 않았다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-증거">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="증거">증거</h2></div>
+<div class="prose"><p>외부 <code>CreatorContainers/results</code>에 다음 자료를 보존했다.</p>
+<ul>
+<li><code>20261026-node-map-ablation1-ablation.json</code>: 180조건, 원시 샘플 재검산, 입력·바이너리 해시.</li>
+<li><code>20261026-node-map-ablation1-effects.json</code>: 조건별 중앙값, 개선율, 반복 간 범위, 수용 결과.</li>
+<li><code>20261026-node-map-ablation1-&lt;variant&gt;-&lt;run&gt;.csv</code>: 15개 원시 샘플과 요약.</li>
+<li><code>20261026-node-map-ablation1-snapshot</code>: 당시 입력과 동일 실행 파일.</li>
+<li><code>20261026-node-map-ablation1-guard-guard.json</code>: helper의 전체 수집 구간 생존·정상 종료.</li>
+<li><code>node-ablation-counts.csv</code>: 시간 측정과 분리한 작업 횟수.</li>
+<li><code>node-ablation-correctness.log</code>, <code>node-ablation-asan-correctness.log</code>: 네 조합의 회귀 검사.</li>
+</ul>
+<p>생성기는 정본을 읽어 실험용 모듈을 다시 만들며, 외부 주 구현은 계속 엔진 정본을 참조한다. <code>CE_NODE_MAP_ABLATION</code> 옵션은 기본 OFF다.</p>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="NodeMapAblation20261026.md"><code>docs/analysis/NodeMapAblation20261026.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

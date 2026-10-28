@@ -1,3 +1,4 @@
+#include "../Foundation/EngineNodeSet.h"
 #include "CookedDocumentTree.h"
 
 namespace Cedo
@@ -69,7 +70,7 @@ namespace Cedo
                 if (children > Remaining() / 16)
                     throw std::runtime_error("Truncated CEDO children");
                 node.children.reserve(children);
-                std::unordered_set<std::string> keys;
+                ce::engine_node_set<std::string> keys;
                 for (std::uint32_t i = 0; i < children; ++i)
                 {
                     auto child = ReadNode(depth + 1, node.kind == Kind::Map, count, expected);

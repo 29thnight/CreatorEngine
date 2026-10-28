@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/LockFreeQueueImplementation20261025.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>락 프리 MPMC 큐 구현·검증 (2026-10-25)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell has-toc">
+<nav class="toc" aria-label="목차"><span class="ve-label">목차</span><ol><li><a href="#구조와-보장-범위">구조와 보장 범위</a></li><li><a href="#사용-예">사용 예</a></li><li><a href="#정확성-검사와-실행-결과">정확성 검사와 실행 결과</a></li><li><a href="#ppl-직접-비교">PPL 직접 비교</a></li><li><a href="#재현과-근거">재현과 근거</a></li></ol></nav>
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="LockFreeQueueImplementation20261025.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>락 프리 MPMC 큐 구현·검증 (2026-10-25)</h1>
+
+</header>
+
+<figure>
+<div class="frame doc-map" role="img" aria-label="절 5개의 분량 막대">
+<a class="map-row" href="#구조와-보장-범위"><span class="ve-label">§01</span><span class="map-name">구조와 보장 범위</span><span class="map-bar"><i style="width:100%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#사용-예"><span class="ve-label">§02</span><span class="map-name">사용 예</span><span class="map-bar"><i style="width:29.6%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#정확성-검사와-실행-결과"><span class="ve-label">§03</span><span class="map-name">정확성 검사와 실행 결과</span><span class="map-bar"><i style="width:59.2%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#ppl-직접-비교"><span class="ve-label">§04</span><span class="map-name">PPL 직접 비교</span><span class="map-bar"><i style="width:63.5%"></i></span><span class="map-marks"></span></a>
+<a class="map-row" href="#재현과-근거"><span class="ve-label">§05</span><span class="map-name">재현과 근거</span><span class="map-bar"><i style="width:37.8%"></i></span><span class="map-marks"></span></a>
+</div>
+<figcaption><span class="fig-n">그림 1</span>절 5개 가운데 「구조와 보장 범위」가 가장 길다. 막대는 글자 수, 칩은 표·제목에 적힌 상태 수다.</figcaption>
+</figure>
+<section class="prose"><blockquote>
+<p>후속 갱신: 현재 선택 구현·병목 분리·수용 판정은 <a href="LockFreeQueueOptimization20261025.html">락 프리 큐 최적화 보고서</a>를 따른다. 아래는 당시 구현의 기록이며 현재 타입의 구조나 성능 판정으로 사용하지 않는다.</p>
+</blockquote>
+<p><code>CreatorContainers/include/ce/lock_free_queue.h</code>에 Michael–Scott 연결 큐와 hazard pointer 회수를 구현했다. 기존 스핀락 <code>ce::concurrent_queue</code>와 구분되는 <code>ce::lock_free_queue</code> 타입이다. 핵심 연결/제거 알고리즘 구현과 독립 검증을 완료했으나, 기본 할당·회수 경로의 PPL 처리량 목표는 아직 충족하지 않았다. CreatorEngine PPL 별칭과 엔진 소비자는 변경하지 않는다.</p>
+</section>
+<section class="doc-sec" id="sec-구조와-보장-범위">
+<div class="sec-head"><p class="ve-label">§01</p><h2 id="구조와-보장-범위">구조와 보장 범위</h2></div>
+<div class="prose"><ul>
+<li>Michael–Scott 방식의 head/tail CAS와 tail helping을 사용한다. 생산자가 next를 연결한 뒤 멈춰도 다른 참여자가 tail을 전진시킨다. 아직 공개되지 않은 예약 슬롯을 후속 소비자가 기다리는 형태의 링을 락 프리라고 표기하지 않는다.</li>
+<li>동시 활성 호출당 hazard pointer 2개를 사용한다. 참조를 발행한 뒤 원본 포인터를 재검증하고, 순차 일관적 발행/스냅샷으로 제거된 노드를 보호한다. 보호가 사라지기 전에는 재사용·해제하지 않는다.</li>
+<li><code>prepare(args...)</code>: 객체와 노드를 생성하는 단계다. heap 할당·생성자 비용을 포함한다. 실패하면 큐는 변경하지 않는다.</li>
+<li><code>publish(prepared&amp;&amp;)</code>: 준비된 노드를 CAS로 연결한다. 성공 순간에 노드 소유권을 큐로 넘긴다. 정상 경로에서 할당·회수·스핀락·운영체제 대기를 하지 않는다.</li>
+<li><code>try_pop(out)</code>: head CAS 승자만 값을 이동하고 파괴한다. 이전 dummy는 retired 목록에 넣는다. 정상 경로에서 할당·회수를 하지 않는다. 값 이동은 head CAS 뒤에 수행하므로 이동 대입과 소멸자가 noexcept인 T만 지원한다.</li>
+<li><code>reclaim()</code>: retired 목록을 떼고 hazard snapshot과 대조해 안전한 노드를 해제한다. 보호 중인 노드는 다시 retired 목록에 넣는다. 여러 회수자와 생산자/소비자가 함께 실행할 수 있다. allocator 호출의 진행 시간은 보장하지 않는다.</li>
+<li>편의 <code>push/emplace</code>는 prepare와 publish를 합친다. 동적 할당자·T의 연산·C++ 예외 런타임까지 포함해 전체 호출이 무조건 락 프리라고 주장하지 않는다. 핵심 연결/제거 알고리즘의 진행 보장은 원자 primitive와 T 연산이 완료되고 활성 호출 수가 설정 범위 안에 있다는 전제다.</li>
+</ul>
+<p>기본 <code>MaxOperations=64</code>는 동시에 참여 중인 호출 수의 상한이다. 평생 사용한 스레드 수가 아니다. 빈 hazard record가 없으면 기다리지 않고 <code>ce::queue_operation_limit</code>를 던지며 준비된 노드의 소유권을 보존한다. 예외 처리 자체의 런타임 할당 가능성은 정상 경로의 무할당 보장에 포함하지 않는다. 큐 생성은 dummy 노드를 할당한다. clear/소멸은 참여자 join 이후에만 허용한다. prepared handle은 이동 전용이며 버리면 미공개 노드를 해제한다.</p>
+<p>reclaim을 호출하지 않으면 제거된 노드가 누적된다. 엔진에 넣을 때는 별도 유지보수/프레임 경계 호출 지점을 정해야 한다. 생성·이동·파괴·사용자 Hook이 동일 큐로 재진입하지 않아야 한다. thread death 후 완전한 자원 회수나 wait-free 완료·스레드별 공정성은 제공하지 않는다.</p>
+<p>공개 구현은 STL 컨테이너·std::atomic·mutex·thread·PPL에 의존하지 않는다. <code>&lt;new&gt;</code>/언어 런타임과 컴파일러 원자 intrinsic은 사용한다. <code>detail/atomic_ptr.h</code>는 순차 일관적 포인터 load/store/CAS를 제공한다. GNU 계열은 포인터 원자가 내부 락으로 폴백하지 않는 타깃만 허용한다. 기본 MSVC x64 백엔드와 ClangCL만 실행 검증했다. 다른 OS, GCC, ARM64는 미검증이다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-사용-예">
+<div class="sec-head"><p class="ve-label">§02</p><h2 id="사용-예">사용 예</h2></div>
+<div class="prose"><pre><code class="language-cpp">#include &lt;ce/lock_free_queue.h&gt;
+
+ce::lock_free_queue&lt;command&gt; queue;
+// 할당/객체 생성은 큐의 공개 단계 이전에 수행한다.
+auto ready = decltype(queue)::prepare(command_data);
+queue.publish(static_cast&lt;decltype(ready)&amp;&amp;&gt;(ready));
+command result;
+if (queue.try_pop(result)) { /* result 처리 */ }
+// 별도 유지보수 경로에서 실행. allocator 지연은 이 단계에 남는다.
+queue.reclaim();
+// 모든 생산자·소비자·회수자 join 뒤 queue 소멸.</code></pre>
+<p>현재 실제 ProxyCommand에는 noexcept 이동 대입 선언이 있다. 파일 경로 타입은 독립 테스트에서 확인했다. 이것만으로 엔진 모듈/ABI/리플렉션/종료 수용이 끝났다고 보지는 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-정확성-검사와-실행-결과">
+<div class="sec-head"><p class="ve-label">§03</p><h2 id="정확성-검사와-실행-결과">정확성 검사와 실행 결과</h2></div>
+<div class="prose"><ul>
+<li>MSVC Release CTest 5/5 통과. 기존 배열/문자열, 스핀락 큐, 락 프리 큐와 공개 헤더 독립 실행을 포함한다.</li>
+<li>락 프리 대조 검사 전체를 Release에서 10회 반복하고, AddressSanitizer에서 5회 반복해 통과했다. ClangCL 20.1.8 Release에서도 동일 검사를 통과했다.</li>
+<li>검사 1회당 1P1C/4P1C/4P4C를 각각 3회, 총 810,000개 ID의 유실·중복을 검사한다. 1소비자에서는 생산자별 FIFO도 검사한다. 별도로 unique_ptr 소유권 MPMC 40,000개를 대조하고 여러 소비자가 회수를 함께 실행한다.</li>
+<li>생성 실패, 미공개 handle 파괴/이동, 빈 handle 공개, clear 후 재사용, const empty, 실제 filesystem::path 복사/이동, 128바이트 정렬을 검사한다.</li>
+<li>enqueue 연결 직후 생산자 정지: 다른 스레드의 enqueue 및 두 원소 drain이 끝난 뒤 정지한 생산자를 재개했다.</li>
+<li>hazard 보호 직후 소비자 정지: 다른 소비자가 10,000회 enqueue/dequeue/reclaim을 진행했다. 정지한 소비자의 보호 노드와 현재 dummy만 남았고, 재개 뒤 보호 노드도 회수됐다.</li>
+<li>활성 record 한도를 고의로 소진하고, 예외 뒤 prepared node의 소유권이 유지되어 다시 공개 가능한지 검사했다.</li>
+<li>3스레드 × 4연산의 호출/반환 이력 100개를 수집해, 실시간 선후 관계를 지키는 순차 FIFO 설명이 존재하는지 탐색했다. 이는 관측한 작은 이력의 선형화 검사이며 전체 알고리즘의 형식 증명은 아니다.</li>
+</ul>
+<p>ASan은 데이터 레이스 검출기가 아니다. ThreadSanitizer, Relacy/CDSChecker, 모든 인터리빙의 모델 검사, 실제 엔진 프레임/종료 수용은 수행하지 않았다. 중단 검사는 특정 두 경로의 진행 증거이며 모든 가능한 장애의 증명으로 확대하지 않는다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-ppl-직접-비교">
+<div class="sec-head"><p class="ve-label">§04</p><h2 id="ppl-직접-비교">PPL 직접 비교</h2></div>
+<div class="prose"><p>Windows 11 Pro 10.0.26300, i7-8700K 6C/12T, MSVC 19.50.35730, x64 Release /O2 /MD, iterator debug 0. 생산자당 16,000개, 8B/128B payload, 워밍업 2회, 표본 9개, A/B 순서 교대, 프로세스 3회. 표의 값은 프로세스별 중앙값 비율 3개의 중앙값이다. 1보다 작으면 자체 큐가 빠르다.</p>
+<p>자체 경로는 노드별 할당을 포함한 push와 소비자별 성공 pop 64회마다 수행하는 concurrent reclaim을 포함한다. PPL은 기본 allocator/페이지 정책이다. 스레드 생성은 제외하고 시작 신호·데이터 전달·join은 포함한다. 양쪽 큐 소멸과 마지막 잔여 노드 회수는 타이머 밖이다. 할당 없는 publish만 측정한 결과로 PPL 전체 경로와 비교하지 않았다.</p>
+<div class="table-scroll"><table>
+<thead><tr><th style="text-align:right">값 크기</th><th>생산자/소비자</th><th style="text-align:right">custom/PPL 중앙값</th><th>프로세스별 비율 범위</th><th>판정</th></tr></thead>
+<tbody><tr><td style="text-align:right">8B</td><td>1/1</td><td class="num" style="text-align:right">2.377</td><td>2.163~2.421</td><td>목표 미달</td></tr>
+<tr><td style="text-align:right">8B</td><td>4/1</td><td class="num" style="text-align:right">4.136</td><td>3.913~4.302</td><td>목표 미달</td></tr>
+<tr><td style="text-align:right">8B</td><td>4/4</td><td class="num" style="text-align:right">2.057</td><td>1.986~2.241</td><td>목표 미달</td></tr>
+<tr><td style="text-align:right">128B</td><td>1/1</td><td class="num" style="text-align:right">1.239</td><td>1.081~1.243</td><td>목표 미달</td></tr>
+<tr><td style="text-align:right">128B</td><td>4/1</td><td class="num" style="text-align:right">2.042</td><td>1.916~2.094</td><td>목표 미달</td></tr>
+<tr><td style="text-align:right">128B</td><td>4/4</td><td class="num" style="text-align:right">1.994</td><td>1.909~1.998</td><td>목표 미달</td></tr></tbody></table></div>
+<p>대부분 경로에서 동급 기준(custom/PPL ≤ 1.10)을 넘는다. 일부 표본의 변동성도 남아 있다. 단일 스핀락 큐에서 나왔던 처리량 우위를 락 프리 구현의 결과로 가져오지 않는다. 노드 단위 할당·회수·hazard 발행·CAS는 소스상 비용 후보지만 각 비용의 실측 기여율은 아직 분해하지 않았다. 다음 성능 단계는 이 비용의 분리 계측, 준비된 노드 전달 경로, allocator/회수 정책의 A/B다. 안전한 재사용을 입증하기 전에는 단순 freelist로 노드를 재순환시키지 않는다.</p>
+<p>실행 중 다른 프로그램을 종료하거나 전원 정책/affinity를 바꾸지 않았다. 콜드 캐시·RSS·꼬리 지연·과부하·OS 간 일관성·실제 엔진 프레임 성능은 미검증이다. 엔진 통합은 보류한다.</p>
+</div>
+</section>
+<section class="doc-sec" id="sec-재현과-근거">
+<div class="sec-head"><p class="ve-label">§05</p><h2 id="재현과-근거">재현과 근거</h2></div>
+<div class="prose"><ul>
+<li>독립 프로젝트: <code>C:/Users/idene/source/repos/CreatorContainers</code></li>
+<li>재현: <code>./run-lock-free-tests.ps1</code></li>
+<li>소스: <code>include/ce/lock_free_queue.h</code>, <code>include/ce/detail/atomic_ptr.h</code>, <code>tests/lock_free.cpp</code></li>
+<li>결과: <code>results/lock-free-run1.csv</code>~`lock-free-run3.csv<code>, </code>lock-free-ctest.txt<code>, </code>lock-free-repeat.txt<code>, </code>lock-free-asan.txt<code>, </code>lock-free-clang.txt`</li>
+<li>환경/소스/실행 파일 해시: <code>results/lock-free-environment.json</code></li>
+<li>공개 헤더 단독 실행의 DLL 의존: <code>results/lock-free-header-dependencies.txt</code>. PPL/ConcRT 및 MSVC STL DLL 의존 없음. C/C++와 OS 런타임은 남는다.</li>
+<li>알고리즘 원전: <a href="https://ftp.cs.rochester.edu/research/synchronization/pseudocode/queues.html">Michael–Scott 설명과 의사 코드</a>, <a href="https://research.ibm.com/publications/safe-memory-reclamation-for-dynamic-lock-free-objects-using-atomic-reads-and-writes">Michael의 hazard pointer 연구</a>. 논문 아이디어를 토대로 작성했으며 외부 큐 구현 코드를 복사하지 않았다.</li>
+<li><a href="PPLQueueReplacement20261025.html">기존 스핀락 큐/PPL 비교</a>, <a href="../design/ContainerLibraryDesign.html">공용 설계와 통합 게이트</a>.</li>
+</ul>
+</div>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="LockFreeQueueImplementation20261025.md"><code>docs/analysis/LockFreeQueueImplementation20261025.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

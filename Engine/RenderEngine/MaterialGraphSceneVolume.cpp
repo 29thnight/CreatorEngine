@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -39,7 +41,7 @@ namespace material_graph
         }
 
         bool AppendVolume(const MeshSurfaceInput& source, std::uint32_t object,
-                          std::vector<SceneVolumeTriangle>& triangles, std::string& error)
+                          ce::dynamic_array<SceneVolumeTriangle>& triangles, std::string& error)
         {
             const auto& geometry = source.Geometry();
             if (!source.Bones().empty() ||
@@ -52,21 +54,21 @@ namespace material_graph
             {
                 return Fail(error, "Scene Volume boundary has a singular world transform.");
             }
-            std::map<std::array<float, 3>, std::uint32_t> welded;
-            std::vector<std::uint32_t> vertices;
-            std::vector<math::vector4> positions;
+            ce::engine_ordered_map<ce::fixed_array<float, 3>, std::uint32_t> welded;
+            ce::dynamic_array<std::uint32_t> vertices;
+            ce::dynamic_array<math::vector4> positions;
             for (std::uint32_t i = 0; i < source.Count(); ++i)
             {
                 const auto* bytes =
                     static_cast<const std::byte*>(geometry.vertexData) + std::size_t(i) * geometry.vertexStride;
-                std::array<float, 3> position;
+                ce::fixed_array<float, 3> position;
                 std::memcpy(position.data(),
                             bytes + assets::OffsetOf(geometry.vertexAttributeMask, assets::VertexAttribute::Position),
                             sizeof(position));
                 const auto [entry, inserted] = welded.try_emplace(position, static_cast<std::uint32_t>(welded.size()));
                 vertices.push_back(entry->second);
                 const auto& world = source.World();
-                std::array<float, 3> transformed;
+                ce::fixed_array<float, 3> transformed;
                 for (unsigned axis = 0; axis < 3; ++axis)
                 {
                     transformed[axis] = position[0] * world.m[0][axis] + position[1] * world.m[1][axis] +
@@ -84,7 +86,7 @@ namespace material_graph
                 unsigned count{};
                 int orientation{};
             };
-            std::map<std::pair<std::uint32_t, std::uint32_t>, Edge> edges;
+            ce::engine_ordered_map<ce::pair<std::uint32_t, std::uint32_t>, Edge> edges;
             for (std::uint32_t i = 0; i < geometry.indexCount; i += 3)
             {
                 const std::uint32_t indices[]{geometry.indexData[i], geometry.indexData[i + 1],
@@ -184,7 +186,7 @@ namespace material_graph
         {
             return Fail(error, "Scene Volume requires current device services, viewport and upload recording.");
         }
-        std::vector<SceneVolumeTriangle> triangles;
+        ce::dynamic_array<SceneVolumeTriangle> triangles;
         std::uint32_t objects = 0;
         for (const auto& draw : input.Draws())
         {
@@ -345,8 +347,8 @@ namespace material_graph
             graphCoefficients_ = graph.Write(graphCoefficients_);
         }
         const auto owner = self_.lock();
-        const std::vector<SceneVolumeBinding> draws(bindings.begin(), bindings.end());
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+        const ce::dynamic_array<SceneVolumeBinding> draws(bindings.begin(), bindings.end());
+        ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> uses{
             {graphCoefficients_, RHIResourceState::UnorderedAccess, writeAccess}};
         for (const auto& draw : draws)
         {
@@ -405,7 +407,7 @@ namespace material_graph
             output_ = graph.Write(output_);
         }
         const auto outputHandle = output_;
-        std::vector<EnhancedRenderGraph::RGPassUsage> uses{
+        ce::dynamic_array<EnhancedRenderGraph::RGPassUsage> uses{
             {lighting, RHIResourceState::ShaderResource, readAccess},
             {depth, RHIResourceState::ShaderResource, readAccess},
             {graphCoefficients_, RHIResourceState::ShaderResource, readAccess},
@@ -477,7 +479,7 @@ namespace material_graph
         return graphCoefficients_;
     }
 
-    std::array<RHIBindingDesc, 2> SceneVolumeFrame::LightingBindings(RHITextureHandle shadow) const
+    ce::fixed_array<RHIBindingDesc, 2> SceneVolumeFrame::LightingBindings(RHITextureHandle shadow) const
     {
         return {RHIBindingDesc::SrvArray(shadow, RHIFormat::R32Float, 3).OrNull(),
                 RHIBindingDesc::SrvCube(

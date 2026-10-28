@@ -1,3 +1,4 @@
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
 #pragma once
 
 
@@ -129,7 +130,7 @@ private:
         RHIDeviceMemoryBudgetDomain budgetDomain{ 0 };
         uint64_t bytes{ 0 };
     };
-    std::unordered_map<uint64_t, NativeSegment> m_segments;
+    ce::engine_node_map<uint64_t, NativeSegment> m_segments;
     RHIDeviceMemoryBudgetCoordinator* m_budgetCoordinator{ nullptr };
     RHIDeviceMemoryBudgetOwner m_budgetOwner{ 0 };
     uint64_t m_softBudgetBytes{ 0 };

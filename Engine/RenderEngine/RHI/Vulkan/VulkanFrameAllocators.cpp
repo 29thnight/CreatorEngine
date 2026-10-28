@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
 #else
@@ -596,7 +597,7 @@ bool VulkanUploadSegmentAllocator::ReserveBatch(uint64_t recordingId,
     return true;
 }
 
-bool VulkanUploadSegmentAllocator::PinRecording(uint64_t recordingId, std::vector<ce::lifetime_token>& leases,
+bool VulkanUploadSegmentAllocator::PinRecording(uint64_t recordingId, ce::dynamic_array<ce::lifetime_token>& leases,
                                                 std::string& outError)
 {
     const std::lock_guard lock(m_mutex);
@@ -794,7 +795,7 @@ bool VulkanDescriptorPoolRecycler::EnsurePool(VkDevice device, uint32_t slot, si
         return false;
     }
 
-    std::array<VkDescriptorPoolSize, VulkanDescriptorTypes.size()> budget{};
+    ce::fixed_array<VkDescriptorPoolSize, VulkanDescriptorTypes.size()> budget{};
     PoolPage candidate;
     uint64_t descriptors{};
     for (size_t type = 0; type < budget.size(); ++type)

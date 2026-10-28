@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -84,7 +85,7 @@ namespace Editor
 	private:
         own::shared_owner<ProjectLayerSettings> m_projectLayers;
         std::unique_ptr<wave::AudioHost> m_audioHost;
-        std::array<std::uint64_t, 1025u> m_audioUpdateHistogram{};
+        ce::fixed_array<std::uint64_t, 1025u> m_audioUpdateHistogram{};
         std::uint64_t m_audioUpdateSamples{};
         std::uint64_t m_audio128UpdateSamples{};
         std::uint64_t m_audio128UpdatesOverOneMillisecond{};

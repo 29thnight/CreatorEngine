@@ -1,3 +1,4 @@
+#include "../../../../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -107,8 +108,8 @@ bool GraphSceneFixture::Initialize(const EnhancedFrameContext& context, std::str
     return true;
 }
 
-std::uint32_t GraphSceneFixture::AddMesh(const std::vector<Vertex>& vertices,
-    const std::vector<std::uint32_t>& indices)
+std::uint32_t GraphSceneFixture::AddMesh(const ce::dynamic_array<Vertex>& vertices,
+    const ce::dynamic_array<std::uint32_t>& indices)
 {
     const auto index = static_cast<std::uint32_t>(m_meshes.size());
     // Legacy test vertices carry skin as float4 indices. Any active weight
@@ -347,7 +348,7 @@ RGHandle GraphSceneFixture::Declare(EnhancedRenderGraph& graph, EnhancedShadowPa
     const RGHandle lighting = material_graph::SceneHost::DeclareHdrTarget(graph, m_cameraContext);
     const RGHandle ambientOcclusion = DeclareClearedInput(graph, resources, m_cameraContext,
         RHIFormat::RG16Float, 1.f, "GraphShadowFixture.AO");
-    const RGHandle color = m_host.DeclareColor(graph, outputs, {meteorLayerWork.layer, m_host.MaterialWork() ? m_host.MaterialWork()->GraphInputs(graph) : std::array<RGHandle,2>{}}, lighting, ambientOcclusion, shadowMap);
+    const RGHandle color = m_host.DeclareColor(graph, outputs, {meteorLayerWork.layer, m_host.MaterialWork() ? m_host.MaterialWork()->GraphInputs(graph) : ce::fixed_array<RGHandle,2>{}}, lighting, ambientOcclusion, shadowMap);
     // Sink: without a consumer the graph would cull the camera route.
     const auto read = graph.GetSchedulingMode() == RGSchedulingMode::DeclarationOrder
         ? RGAccessMode::LegacyState : RGAccessMode::Read;
@@ -430,7 +431,7 @@ void GraphSceneFixture::DeclareSurface(EnhancedRenderGraph& graph, const Enhance
     m_cameraTargets.Declare(graph, context);
     m_surfaceOutputs = m_host.DeclareGBuffer(graph, meteorFinalList, m_cameraTargets.GetOutputs());
     m_layerWork = meteorLayerWork;
-    m_colorInputs = {m_layerWork.layer, m_host.MaterialWork() ? m_host.MaterialWork()->GraphInputs(graph) : std::array<RGHandle,2>{}};
+    m_colorInputs = {m_layerWork.layer, m_host.MaterialWork() ? m_host.MaterialWork()->GraphInputs(graph) : ce::fixed_array<RGHandle,2>{}};
 }
 
 RGHandle GraphSceneFixture::DeclareColor(EnhancedRenderGraph& graph, const EnhancedFrameContext& context,
@@ -457,7 +458,7 @@ uint32_t GraphSceneFixture::GetLastSkinnedCount() const
 }
 uint32_t GraphSceneFixture::GetLastBonePaletteCount() const
 {
-    std::vector<const math::matrix4x4*> palettes;
+    ce::dynamic_array<const math::matrix4x4*> palettes;
     for (const auto& draw : m_surfaceDraws)
         if (draw.boneCount && draw.bonePalette && std::find(palettes.begin(),palettes.end(),draw.bonePalette)==palettes.end())
             palettes.push_back(draw.bonePalette);

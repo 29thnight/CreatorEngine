@@ -1,0 +1,7 @@
+build*/
+**/build*/
+results/
+*.obj
+*.pdb
+*.ifc
+*.exe

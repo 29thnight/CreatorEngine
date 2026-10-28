@@ -1,4 +1,5 @@
 #pragma once
+#include "../../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Concurrency.Jobs.h"
 #else
@@ -29,10 +30,10 @@ public:
     bool BeginRecording(const own::shared_owner<IRHICommandQueue>& queue,
         uint32_t targetCount, ce::lifetime_token token,
         ce::pooled_owner<IRHIQueueRecording>& recording, std::string& error) override;
-    bool ExecuteSubmission(const std::function<bool(std::string&)>& submit,
+    bool ExecuteSubmission(const ce::owned_func<bool(std::string&)>& submit,
         std::string& error) override;
     bool Record(const own::shared_owner<IRHICommandQueue>& queue,
-        const std::function<void(RHIEncoder&)>& commands, ce::lifetime_token token,
+        const ce::owned_func<void(RHIEncoder&)>& commands, ce::lifetime_token token,
         ce::pooled_owner<IRHIQueueCommandBatch>& batch, std::string& error) override;
 private:
     DX12DeviceResources& resources_;

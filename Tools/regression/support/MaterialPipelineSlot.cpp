@@ -5,7 +5,7 @@ namespace material_graph
 {
 namespace
 {
-bool Fail(std::vector<LX::LXMaterialDiagnostic>& diagnostics, std::string code, std::string message)
+bool Fail(ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics, std::string code, std::string message)
 {
     diagnostics.push_back({std::move(code), std::move(message), {}});
     return false;
@@ -15,10 +15,10 @@ bool PipelineSlot::Publish(IRenderPipelineCache& cache, const VerifiedProduct& p
                            const Capabilities& capabilities, const Budget& budget,
                            std::span<const ParameterOverride> parameters, std::span<const TextureBinding> textures,
                            const RHIGraphicsPipelineDesc& pipeline, RHICompletionPoint retireAfter,
-                           std::vector<LX::LXMaterialDiagnostic>& diagnostics)
+                           ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics)
 {
     std::string error;
-    std::vector<std::uint8_t> verifiedEnvelope;
+    ce::dynamic_array<std::uint8_t> verifiedEnvelope;
     if (!WriteCookedProgram(product, budget, verifiedEnvelope, error))
         return Fail(diagnostics, "product.generation", error);
     const auto& program = product.program;

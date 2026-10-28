@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -34,7 +35,7 @@ namespace experiment::cooked
         float maxHeight{};
         std::uint32_t layerCount{};
         std::span<const std::byte> heights;
-        std::array<CookedTerrainLayerView, kCookedTerrainMaxLayers> layers;
+        ce::fixed_array<CookedTerrainLayerView, kCookedTerrainMaxLayers> layers;
     };
 
     // 48-byte LE header: magic/version u32, totalBytes u64, terrainId/width/
@@ -45,7 +46,7 @@ namespace experiment::cooked
     [[nodiscard]] bool ReadCookedTerrain(std::span<const std::byte> bytes,
         CookedTerrainView& terrain, std::string& failure);
     [[nodiscard]] bool EncodeCookedTerrain(const CookedTerrainView& terrain,
-        std::vector<std::byte>& bytes, std::string& failure);
+        ce::dynamic_array<std::byte>& bytes, std::string& failure);
     [[nodiscard]] float CookedTerrainHeight(std::span<const std::byte> bytes,
         std::size_t index) noexcept;
 }

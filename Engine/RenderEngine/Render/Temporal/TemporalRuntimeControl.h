@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #include "TemporalReconstruction.h"
 #include "SpatialPostEffects.h"
@@ -60,7 +61,7 @@ TemporalRuntimeSettings TemporalRuntimeSettingsFromProduct(const TemporalProduct
 TemporalProductSettings TemporalProductSettingsFromRuntime(const TemporalRuntimeSettings& settings, bool fallbackAa);
 // Zero means unknown/unsupported, not a guessed one-frame allowance.
 uint32_t TemporalSupportedInterpolatedFrameCount(TemporalProvider provider, TemporalBackend backend,
-    const std::vector<TemporalCapabilities>& capabilities);
+    const ce::dynamic_array<TemporalCapabilities>& capabilities);
 
 // One identified native/SDK Present return. Publish the entire value under the
 // existing runtime mutex. This is neither a GPU/SDK final-consumption proof nor
@@ -107,7 +108,7 @@ struct TemporalRuntimeSnapshot
     uint64_t lastRealFrameId{ 0 }, historyResetGeneration{ 0 };
     TemporalFrame frame;
     TemporalHistoryResetObservation lastHistoryReset;
-    std::vector<TemporalCapabilities> capabilities;
+    ce::dynamic_array<TemporalCapabilities> capabilities;
     TemporalProvider selectedUpscaler{ TemporalProvider::None }, selectedFrameGenerator{ TemporalProvider::None };
     TemporalProvider activeUpscaler{ TemporalProvider::None }, activeFrameGenerator{ TemporalProvider::None };
     // Belongs to lastRealFrameId, not the latest requested settings. Recorded

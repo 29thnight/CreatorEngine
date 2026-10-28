@@ -1,3 +1,4 @@
+#include "../../../../../Engine/Containers/ContainerAPI.h"
 #include "../VulkanSelfTest.h"
 #include "RHI/Vulkan/VulkanDeviceResources.h"
 #include "RHI/Vulkan/VulkanPipelineCache.h"
@@ -47,7 +48,7 @@ namespace
         float beyondStep{ 0.f };
         float towardFlat{ 0.f };
         double energy{ 0.0 };
-        std::vector<float> rgba;
+        ce::dynamic_array<float> rgba;
         EnhancedRenderGraph::Stats graph{};
     };
 

@@ -1,9 +1,12 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
 #else
 import Creator.Core.Strings;
 #endif
 #pragma once
+#include "../../Engine/Utility_Framework/Foundation/EngineStorage.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
 
 // Output Log 3단계 — 화면이 쓰는 상태. ImGui 를 알지 못한다.
 //
@@ -137,7 +140,7 @@ namespace editor
 
         // 글자 단위 이분 탐색. 폭은 글자 수에 단조가 아닐 수 있으므로(커닝)
         // 경계 후보를 좁힌 뒤 마지막에 한 글자씩 물러서며 확정한다.
-        std::vector<std::size_t> boundaries;
+        ce::dynamic_array<std::size_t> boundaries;
         for (std::size_t index = 0; index < text.size(); index = NextUtf8Boundary(text, index))
             boundaries.push_back(index);
         boundaries.push_back(text.size());
@@ -214,7 +217,7 @@ namespace editor
         // 저장소가 센 값을 그대로 물린다. 창이 따로 세면 상태 표시줄과 두 벌이
         // 되어 한쪽만 맞는 일이 생긴다.
         const LogLevelTotals& LevelTotals() const { return m_levelTotals; }
-        const std::vector<OutputLogRow>& Rows() const { return m_rows; }
+        const ce::dynamic_array<OutputLogRow>& Rows() const { return m_rows; }
         // 목록이 빈 이유를 가른다 — 아직 아무것도 안 찍혔나, 걸러졌나.
         bool HasAnyGroup() const { return !m_groups.empty(); }
         const OutputLogSelection& Selection() const { return m_selection; }
@@ -290,9 +293,9 @@ namespace editor
                 ce::strings::ascii_to_lower(group.loggerName).find(loweredNeedle) != std::string::npos;
         }
 
-        std::map<std::uint64_t, LogGroup> m_groups;
-        std::deque<LogOccurrence> m_occurrences;
-        std::vector<OutputLogRow> m_rows;
+        ce::engine_ordered_map<std::uint64_t, LogGroup> m_groups;
+        ce::segmented_deque<LogOccurrence> m_occurrences;
+        ce::dynamic_array<OutputLogRow> m_rows;
         OutputLogSelection m_selection;
         OutputLogFilter m_filter;
         LogCursor m_cursor;

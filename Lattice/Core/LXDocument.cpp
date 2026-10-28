@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "LXDocument.h"
 #include "LXNodeDefinition.h"
 
@@ -29,7 +30,7 @@ std::optional<LXDocument> LXDocument::Open(const std::string& path, std::string*
     return LXDocument(std::move(*graph), path, true);
 }
 
-bool LXDocument::PreviewNodePositions(const std::vector<NodePosition>& positions)
+bool LXDocument::PreviewNodePositions(const ce::dynamic_array<NodePosition>& positions)
 {
     if (!graph_.SetNodePositions(positions, false))
     {
@@ -40,8 +41,8 @@ bool LXDocument::PreviewNodePositions(const std::vector<NodePosition>& positions
     return true;
 }
 
-LXCommandResult LXDocument::FinishNodePositionPreview(const std::vector<NodePosition>& start,
-                                                      const std::vector<NodePosition>& final)
+LXCommandResult LXDocument::FinishNodePositionPreview(const ce::dynamic_array<NodePosition>& start,
+                                                      const ce::dynamic_array<NodePosition>& final)
 {
     graph_.SetNodePositions(start, false);
     previewActive_ = false;

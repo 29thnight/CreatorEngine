@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #include "PoseSampler.h"
 
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
@@ -24,7 +25,7 @@ namespace experiment::sampler
 		//   프레임 격자 키에 fraction 0.5 가 정확히 떨어져 4.88e-4 편차 —
 		//   구 규약 `<=` 는 참조 재구현끼리만 맞고 실물 legacy 와 어긋났다).
 		template <typename Key>
-		std::size_t LinearIntervalIndex(const std::vector<Key>& keys, double time)
+		std::size_t LinearIntervalIndex(const ce::dynamic_array<Key>& keys, double time)
 		{
 			std::size_t index = 0;
 			while (index + 2 < keys.size() && SamplerKeyTime(keys[index + 1]) < time)
@@ -37,7 +38,7 @@ namespace experiment::sampler
 		// Step 은 구간이 아니라 "시각 이하의 마지막 키" 하나가 답이다. Linear 용
 		// index 를 그대로 쓰면 마지막 키 이후 구간에서 한 칸 뒤처지므로 보정한다.
 		template <typename Key>
-		std::size_t StepKeyIndex(const std::vector<Key>& keys, double time)
+		std::size_t StepKeyIndex(const ce::dynamic_array<Key>& keys, double time)
 		{
 			std::size_t index = LinearIntervalIndex(keys, time);
 			if (index + 1 < keys.size() && SamplerKeyTime(keys[index + 1]) <= time)
@@ -127,7 +128,7 @@ namespace experiment::sampler
 		pose.finals.assign(boneCount, math::matrix4x4::identity());
 		pose.hasChannel.assign(boneCount, 0);
 
-		std::vector<const experiment::AnimationChannel*> channelOf(boneCount, nullptr);
+		ce::dynamic_array<const experiment::AnimationChannel*> channelOf(boneCount, nullptr);
 		for (const experiment::AnimationChannel& channel : clip.channels)
 		{
 			if (experiment::IsInRange(channel.bone, boneCount))
@@ -138,7 +139,7 @@ namespace experiment::sampler
 		const math::matrix4x4& globalInverse = skeleton.globalInverseTransform;
 
 		// 게시 계약(parent < index) 덕에 단일 순회로 충분하다.
-		std::vector<math::matrix4x4> globals(boneCount, rootTransform);
+		ce::dynamic_array<math::matrix4x4> globals(boneCount, rootTransform);
 		for (std::size_t boneIndex = 0; boneIndex < boneCount; ++boneIndex)
 		{
 			const experiment::Bone& bone = skeleton.bones[boneIndex];

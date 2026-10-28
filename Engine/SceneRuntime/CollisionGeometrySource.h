@@ -1,4 +1,5 @@
 #pragma once
+#include "../Containers/ContainerAPI.h"
 
 #include "../Physics/PhysicsGeometry.h"
 #if defined(CE_CONTRACT_STANDALONE)
@@ -20,19 +21,19 @@ struct geometry_asset_key
 
 struct convex_source
 {
-    std::vector<math::vector3> points;
+    ce::dynamic_array<math::vector3> points;
 };
 
 struct triangle_mesh_source
 {
-    std::vector<math::vector3> points;
-    std::vector<triangle_indices> triangles;
+    ce::dynamic_array<math::vector3> points;
+    ce::dynamic_array<triangle_indices> triangles;
 };
 
 struct heightfield_source
 {
     std::uint32_t rows = 0, columns = 0;
-    std::vector<std::int16_t> heights;
+    ce::dynamic_array<std::int16_t> heights;
 };
 
 using collision_geometry_source = std::variant<convex_source, triangle_mesh_source, heightfield_source>;

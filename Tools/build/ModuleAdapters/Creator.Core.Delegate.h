@@ -6,6 +6,7 @@
 #endif
 
 extern "C" void creator_report_delegate_exception(const char*, const char*) noexcept;
+#include "../../../Engine/Containers/Creator.Containers.h"
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 #include "Creator.Core.SpinLock.h"
 namespace ce
@@ -94,14 +95,14 @@ namespace ce
         struct callback_info
         {
             delegate_handle handle;
-            std::function<Ret(Args...)> callback;
+            ce::owned_func<Ret(Args...)> callback;
             int priority{};
         };
 
-        delegate_handle add_internal(std::function<Ret(Args...)> func, int priority);
+        delegate_handle add_internal(ce::owned_func<Ret(Args...)> func, int priority);
 
         std::atomic_flag atomic_flag_{};
-        std::vector<callback_info> callbacks_;
+        ce::dynamic_array<callback_info> callbacks_;
         std::uint32_t next_id_;
 
         // 브로드캐스트를 도중에 끊는 신호 (PHASE 9-5).
@@ -134,7 +135,7 @@ namespace ce
     auto delegate<Ret, Args...>::add_lambda(callable_with_signature<Ret, Args...> auto&& func, int priority)
         -> delegate_handle
     {
-        return add_internal(std::function<Ret(Args...)>(std::forward<decltype(func)>(func)), priority);
+        return add_internal(ce::owned_func<Ret(Args...)>(std::forward<decltype(func)>(func)), priority);
     }
 
     template<typename Ret, typename... Args>
@@ -170,7 +171,7 @@ namespace ce
     }
 
     template<typename Ret, typename... Args>
-    auto delegate<Ret, Args...>::add_internal(std::function<Ret(Args...)> func, int priority) -> delegate_handle
+    auto delegate<Ret, Args...>::add_internal(ce::owned_func<Ret(Args...)> func, int priority) -> delegate_handle
     {
         spin_lock lock(atomic_flag_);
         delegate_handle handle(next_id_++);
@@ -209,7 +210,7 @@ namespace ce
         //
         // swap으로 소유권만 옮기고 락을 놓은 뒤에 파괴하면, 그 연쇄가
         // 일어나도 락이 비어 있어 통과한다.
-        std::vector<callback_info> doomed;
+        ce::dynamic_array<callback_info> doomed;
         {
             spin_lock lock(atomic_flag_);
             // 진행 중일 수 있는 순회를 끊는다.
@@ -237,7 +238,7 @@ namespace ce
     template<typename Ret, typename... Args>
     void delegate<Ret, Args...>::broadcast(Args... args)
     {
-        std::vector<callback_info> callbacks_to_invoke;
+        ce::dynamic_array<callback_info> callbacks_to_invoke;
         {
             spin_lock lock(atomic_flag_);
             callbacks_to_invoke = callbacks_;

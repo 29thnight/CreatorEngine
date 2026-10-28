@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #pragma once
 #include "../../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
 
@@ -6,7 +7,7 @@ namespace RenderTest
     struct AnimationVisualReport
     {
         std::string modelId, markerMeshId, bone;
-        std::array<float, 3> socketPosition{};
+        ce::fixed_array<float, 3> socketPosition{};
         std::uint32_t paletteDigest{};
         std::size_t skinnedMeshes{};
         std::uint64_t observedBones{}, projectedBones{}, localWrites{}, paletteDirty{};

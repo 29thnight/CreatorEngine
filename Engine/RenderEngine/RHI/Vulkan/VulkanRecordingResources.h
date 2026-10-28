@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.LifetimeToken.h"
@@ -41,7 +42,7 @@ class VulkanRecordingResources final
   private:
     struct Layout
     {
-        std::vector<VulkanLayoutSlot> m_parameters;
+        ce::dynamic_array<VulkanLayoutSlot> m_parameters;
         VulkanDescriptorRequirements m_requirements;
     };
     uint64_t m_uploadRecordingId{};
@@ -50,13 +51,13 @@ class VulkanRecordingResources final
     size_t m_bindingCount{};
     size_t m_samplerCount{};
     size_t m_layoutCount{};
-    std::vector<VulkanPipelineCache::PipelineSlot> m_pipelines;
-    std::vector<Layout> m_layouts;
-    std::vector<VulkanResourceTable::Slot<VulkanImageEntry>> m_images;
-    std::vector<VulkanResourceTable::Slot<VulkanBufferEntry>> m_buffers;
-    std::vector<std::vector<RHIBindingDesc>> m_bindings;
-    std::vector<std::vector<VkSampler>> m_samplers;
-    std::vector<VulkanRenderTargetBinding> m_renderTargets;
+    ce::dynamic_array<VulkanPipelineCache::PipelineSlot> m_pipelines;
+    ce::dynamic_array<Layout> m_layouts;
+    ce::dynamic_array<VulkanResourceTable::Slot<VulkanImageEntry>> m_images;
+    ce::dynamic_array<VulkanResourceTable::Slot<VulkanBufferEntry>> m_buffers;
+    ce::dynamic_array<ce::dynamic_array<RHIBindingDesc>> m_bindings;
+    ce::dynamic_array<ce::dynamic_array<VkSampler>> m_samplers;
+    ce::dynamic_array<VulkanRenderTargetBinding> m_renderTargets;
     ce::lifetime_token m_renderTargetLease;
-    std::vector<ce::lifetime_token> m_uploadLeases;
+    ce::dynamic_array<ce::lifetime_token> m_uploadLeases;
 };

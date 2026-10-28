@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -503,7 +504,7 @@ D3D12_GPU_DESCRIPTOR_HANDLE DX12SamplerHeap::CreateRange(std::span<const RHISamp
 
     const uint32_t count = static_cast<uint32_t>(descs.size());
 
-    std::vector<uint64_t> key;
+    ce::dynamic_array<uint64_t> key;
     key.reserve(count);
     for (const auto& desc : descs)
     {

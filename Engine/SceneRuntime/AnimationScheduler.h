@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Delegate.h"
@@ -78,9 +80,9 @@ private:
 	mutable std::mutex m_animatorMutex;
 	// Raw pointers remain valid through Update's in-frame job wait. The mutex
 	// permits read-only count queries from other threads; it does not own Animators.
-	std::unordered_map<size_t, Animator*> m_animators;
+	ce::engine_node_map<size_t, Animator*> m_animators;
 	// Game-thread scratch; Update joins its jobs before the next snapshot.
-	std::vector<Animator*> m_snapshotAnimators;
+	ce::dynamic_array<Animator*> m_snapshotAnimators;
 	const std::thread::id m_ownerThreadId{ std::this_thread::get_id() };
 	std::unique_ptr<animation::task_cost_model> m_taskCostModel;
 	std::atomic<std::int64_t> m_hudRequestedAtNs{};

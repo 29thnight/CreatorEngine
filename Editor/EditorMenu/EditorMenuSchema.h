@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 // 에디터 메뉴 선언 어휘 (PHASE 21 M0 · 계획서 부록 A.4) — std만 의존한다.
 //
@@ -79,7 +80,7 @@ namespace editor
             static constexpr std::string_view raw = action_name_raw<Fn>();
             static constexpr auto storage = []
             {
-                std::array<char, raw.size() + 1> a{};
+                ce::fixed_array<char, raw.size() + 1> a{};
                 for (std::size_t i = 0; i < raw.size(); ++i) { a[i] = raw[i]; }
                 return a;
             }();
@@ -231,13 +232,13 @@ namespace editor
     template<class... Items>
     struct menu_declaration
     {
-        std::tuple<Items...> items{};
+        ce::tuple<Items...> items{};
     };
 
     template<class... Items>
     consteval auto menu_set(Items... items)
     {
-        return menu_declaration<Items...>{ std::tuple<Items...>{ items... } };
+        return menu_declaration<Items...>{ ce::tuple<Items...>{ items... } };
     }
 
     namespace detail

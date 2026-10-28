@@ -1,3 +1,5 @@
+#include "../../../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../../Containers/ContainerAPI.h"
 #include "TangentGeneration.h"
 
 #include "mikktspace.h"
@@ -13,9 +15,9 @@ namespace experiment::importer
         struct TangentWorkspace final
         {
             const ImportedMesh* mesh{};
-            const std::vector<math::vector2>* coordinates{};
+            const ce::dynamic_array<math::vector2>* coordinates{};
             // 코너 c(= 면*3 + 정점) 의 결과. mikktspace 가 여기 채운다.
-            std::vector<math::vector4> cornerTangents{};
+            ce::dynamic_array<math::vector4> cornerTangents{};
 
             [[nodiscard]] std::size_t FaceCount() const noexcept
             {
@@ -279,10 +281,10 @@ namespace experiment::importer
             welded.influences.reserve(streams.influences.size());
         }
 
-        std::unordered_map<WeldKey, std::uint32_t, WeldKeyHash> lookup;
+        ce::engine_node_map<WeldKey, std::uint32_t, WeldKeyHash> lookup;
         lookup.reserve(vertexCount * 2);
 
-        std::vector<std::uint32_t> newIndices;
+        ce::dynamic_array<std::uint32_t> newIndices;
         newIndices.reserve(mesh.indices.size());
 
         for (std::size_t corner = 0; corner < mesh.indices.size(); ++corner)
@@ -342,8 +344,8 @@ namespace experiment::importer
             TangentGenerationStats stats{};
         };
 
-        std::vector<MeshOutcome> outcomes(scene.meshes.size());
-        std::vector<std::size_t> order(scene.meshes.size());
+        ce::dynamic_array<MeshOutcome> outcomes(scene.meshes.size());
+        ce::dynamic_array<std::size_t> order(scene.meshes.size());
         for (std::size_t i = 0; i < order.size(); ++i) order[i] = i;
 
         const auto runOne = [&](std::size_t i)
@@ -372,8 +374,8 @@ namespace experiment::importer
         for (const MeshOutcome& outcome : outcomes)
         {
             notes.Absorb(outcome.notes.View().empty()
-                ? std::vector<ImportNote>{}
-                : std::vector<ImportNote>(outcome.notes.View().begin(),
+                ? ce::dynamic_array<ImportNote>{}
+                : ce::dynamic_array<ImportNote>(outcome.notes.View().begin(),
                     outcome.notes.View().end()));
 
             stats.verticesBefore += outcome.before;

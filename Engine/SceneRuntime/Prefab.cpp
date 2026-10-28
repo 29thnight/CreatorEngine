@@ -1,3 +1,5 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "Prefab.h"
 #include "EntityAuthoringRead.h" // D3-a-2: 저작 읽기 어댑터
@@ -22,12 +24,12 @@ namespace
 	struct PrefabNodeRecord
 	{
 		Authoring::WriteNode node;
-		std::vector<uint32_t> path;
+		ce::dynamic_array<uint32_t> path;
 	};
 
-	void CollectPrefabNodes(Authoring::WriteNode node, std::vector<uint32_t>& path,
-		std::vector<PrefabNodeRecord>& records,
-		std::unordered_map<size_t, std::vector<uint32_t>>& pathByLegacyId)
+	void CollectPrefabNodes(Authoring::WriteNode node, ce::dynamic_array<uint32_t>& path,
+		ce::dynamic_array<PrefabNodeRecord>& records,
+		ce::engine_node_map<size_t, ce::dynamic_array<uint32_t>>& pathByLegacyId)
 	{
 		if (!node) return;
 		records.push_back({ node, path });
@@ -60,9 +62,9 @@ namespace
 		for (uint32_t rootOrdinal = 0;
 			rootOrdinal < static_cast<uint32_t>(prefabData.Size()); ++rootOrdinal)
 		{
-			std::vector<PrefabNodeRecord> records;
-			std::unordered_map<size_t, std::vector<uint32_t>> pathByLegacyId;
-			std::vector<uint32_t> path;
+			ce::dynamic_array<PrefabNodeRecord> records;
+			ce::engine_node_map<size_t, ce::dynamic_array<uint32_t>> pathByLegacyId;
+			ce::dynamic_array<uint32_t> path;
 			CollectPrefabNodes(prefabData.At(rootOrdinal), path, records, pathByLegacyId);
 
 			for (PrefabNodeRecord& record : records)
@@ -100,7 +102,7 @@ namespace
 							continue;
 						}
 
-						const std::vector<uint32_t>& targetPath = targetIt->second;
+						const ce::dynamic_array<uint32_t>& targetPath = targetIt->second;
 						size_t common = 0;
 						while (common < record.path.size() && common < targetPath.size()
 							&& record.path[common] == targetPath[common])
@@ -137,8 +139,8 @@ struct Prefab::InstantiateContext
 		Entity::Index sourceRootIndex{ Entity::kInvalidIndex };
 	};
 
-	std::unordered_map<Entity::Index, Entity::Index> indexRemap;
-	std::vector<RootFixup> rootFixups;
+	ce::engine_node_map<Entity::Index, Entity::Index> indexRemap;
+	ce::dynamic_array<RootFixup> rootFixups;
 
 	void RecordIndex(Entity::Index sourceIndex, Entity::Index targetIndex)
 	{

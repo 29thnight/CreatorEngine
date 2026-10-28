@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 
 #include "ProfilerRenderingDiagnostics.h"
@@ -32,14 +33,14 @@ namespace ce::profiler_viewer::diagnostics
         std::uint64_t upload_payload_bytes{};
         bool cpu_size_known{};
         bool shared_alias{};
-        std::array<std::uint8_t, 32> full_name_sha256{};
+        ce::fixed_array<std::uint8_t, 32> full_name_sha256{};
         bool identity_valid{};
     };
 
     struct memory_object_key
     {
         object_kind kind{};
-        std::array<std::uint8_t, 32> full_name_sha256{};
+        ce::fixed_array<std::uint8_t, 32> full_name_sha256{};
         std::uint64_t unmatched_side{};
         std::uint64_t unmatched_row{};
         auto operator<=>(const memory_object_key&) const = default;
@@ -90,10 +91,10 @@ namespace ce::profiler_viewer::diagnostics
         std::uint64_t committed_image_bytes{};
         std::uint64_t committed_mapped_bytes{};
         std::uint64_t reserved_virtual_bytes{};
-        std::array<std::uint64_t, 5> object_kind_counts{};
-        std::array<std::uint64_t, 5> object_kind_cpu_bytes{};
-        std::vector<object_entry> objects;
-        std::vector<virtual_region> regions;
+        ce::fixed_array<std::uint64_t, 5> object_kind_counts{};
+        ce::fixed_array<std::uint64_t, 5> object_kind_cpu_bytes{};
+        ce::dynamic_array<object_entry> objects;
+        ce::dynamic_array<virtual_region> regions;
         // Exact totals before bounded transport; UI must disclose truncation.
         std::uint64_t object_count{};
         std::uint64_t region_count{};
@@ -142,10 +143,10 @@ namespace ce::profiler_viewer::diagnostics
         double budgetUs{};
         double predictedUs{};
         double measuredUs{};
-        std::array<std::uint64_t, 8> stages{};
-        std::vector<animation_actor> animators;
+        ce::fixed_array<std::uint64_t, 8> stages{};
+        ce::dynamic_array<animation_actor> animators;
         std::uint64_t selectedAnimatorId{};
-        std::vector<animation_task> tasks;
+        ce::dynamic_array<animation_task> tasks;
         std::uint64_t workerPosePool{};
         std::uint64_t workerCurrentStorage{};
         std::uint64_t instancePoseStorage{};
@@ -184,8 +185,8 @@ namespace ce::profiler_viewer::diagnostics
         bool acknowledge{};
     };
 
-    bool encode_snapshot(const snapshot& value, std::vector<std::byte>& bytes);
+    bool encode_snapshot(const snapshot& value, ce::dynamic_array<std::byte>& bytes);
     bool decode_snapshot(std::span<const std::byte> bytes, snapshot& value);
-    bool encode_request(const request& value, std::vector<std::byte>& bytes);
+    bool encode_request(const request& value, ce::dynamic_array<std::byte>& bytes);
     bool decode_request(std::span<const std::byte> bytes, request& value);
 }

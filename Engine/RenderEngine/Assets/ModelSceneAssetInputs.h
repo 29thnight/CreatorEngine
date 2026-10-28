@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -38,8 +39,8 @@ namespace assets
     struct ModelSceneAssetInputs final
     {
         own::shared_owner<const ModelAnimationDescriptor> descriptor{};
-        std::vector<own::shared_owner<const ModelMeshDescriptor>> meshes{};
-        std::vector<own::shared_owner<const Material>> materials{};
+        ce::dynamic_array<own::shared_owner<const ModelMeshDescriptor>> meshes{};
+        ce::dynamic_array<own::shared_owner<const Material>> materials{};
         own::shared_owner<const ModelSkeletonPayload> skeleton{};
         // The effective choice is fixed during preparation, before geometry
         // requests are admitted. Scene construction cannot add hidden I/O.
@@ -48,6 +49,6 @@ namespace assets
         // Empty when the effective collider policy is disabled. Otherwise follows
         // summary.meshes with null entries for uninstantiated meshes. These are
         // transient collision inputs; components retain only mesh descriptions.
-        std::vector<own::shared_owner<const ModelCpuGeometryPayload>> geometry{};
+        ce::dynamic_array<own::shared_owner<const ModelCpuGeometryPayload>> geometry{};
     };
 }

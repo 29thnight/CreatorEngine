@@ -1,5 +1,5 @@
 export module Creator.Core.Strings;
-
+export import "Creator.Containers.h";
 import std;
 
 export namespace ce::strings
@@ -128,9 +128,9 @@ export namespace ce::strings
         return !needle || contains_case_insensitive(text, std::string_view(needle));
     }
 
-    inline std::vector<std::string> split(const std::string& s, char delim)
+    inline ce::dynamic_array<std::string> split(const std::string& s, char delim)
     {
-        std::vector<std::string> out;
+        ce::dynamic_array<std::string> out;
         std::string cur;
         std::istringstream iss(s);
         while (std::getline(iss, cur, delim))
@@ -140,9 +140,9 @@ export namespace ce::strings
         return out;
     }
 
-    inline std::vector<std::string> tokenize_preserve_quotes(const std::string& s)
+    inline ce::dynamic_array<std::string> tokenize_preserve_quotes(const std::string& s)
     {
-        std::vector<std::string> toks;
+        ce::dynamic_array<std::string> toks;
         std::string cur;
         bool inq = false;
         char qc = '\0';

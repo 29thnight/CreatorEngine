@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "CookedAssetManifest.h"
@@ -13,8 +14,8 @@ namespace experiment::cooked
     struct MaterialAssetSetProduct final
     {
         TypedAssetReference asset{};
-        std::vector<std::byte> artifactBytes{};
-        std::vector<AssetDependency> dependencies{};
+        ce::dynamic_array<std::byte> artifactBytes{};
+        ce::dynamic_array<AssetDependency> dependencies{};
         std::uint32_t representation{};
         std::uint32_t schemaVersion{};
         std::string extension{};
@@ -27,15 +28,15 @@ namespace experiment::cooked
     // Fresh dependencies default to Internal; a recipe may explicitly choose
     // External later without changing the content-addressed document bytes.
     [[nodiscard]] bool EncodeMaterialAssetSetDocument(
-        const material_graph::InstanceDocument& document, std::vector<std::byte>& outBytes,
-        std::vector<AssetDependency>& outDependencies, std::string& failure);
+        const material_graph::InstanceDocument& document, ce::dynamic_array<std::byte>& outBytes,
+        ce::dynamic_array<AssetDependency>& outDependencies, std::string& failure);
 
     // Requires a decoded/verified product. Reads texture references directly
     // from program.resources, never from a legacy manifest dependency list.
     // Also checks the generated identity and both complete Scene backends.
     [[nodiscard]] bool CollectMaterialProgramAssetSetDependencies(
         const material_graph::VerifiedProduct& product, const AssetId& programAssetId,
-        std::vector<AssetDependency>& outDependencies, std::string& failure);
+        ce::dynamic_array<AssetDependency>& outDependencies, std::string& failure);
 
     // Cross-check selected Material -> MaterialProgram products without a v2
     // manifest, texture I/O, renderer objects or a source fallback. The caller

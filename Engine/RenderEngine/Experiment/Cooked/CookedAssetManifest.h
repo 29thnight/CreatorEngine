@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "../AssetIdentity.h"
@@ -41,7 +42,7 @@ namespace experiment::cooked
         AnimationClip = 14,
     };
 
-    using Sha256Digest = std::array<std::uint8_t, 32>;
+    using Sha256Digest = ce::fixed_array<std::uint8_t, 32>;
 
     struct CookedAssetManifestEntry final
     {
@@ -54,7 +55,7 @@ namespace experiment::cooked
         // pak 안의 normalized UTF-8 virtual path. 절대/역슬래시/dot segment는
         // 허용하지 않고 모든 cooked artifact는 Derived/ 아래에 둔다.
         std::string artifactPath{};
-        std::vector<AssetId> dependencies{};
+        ce::dynamic_array<AssetId> dependencies{};
     };
 
     // D5 Player cutover identity table. Cooked entries describe artifacts; this
@@ -69,8 +70,8 @@ namespace experiment::cooked
 
     struct CookedAssetManifest final
     {
-        std::vector<CookedAssetManifestEntry> entries{};
-        std::vector<AssetSourceManifestEntry> sourceAssets{};
+        ce::dynamic_array<CookedAssetManifestEntry> entries{};
+        ce::dynamic_array<AssetSourceManifestEntry> sourceAssets{};
 
         [[nodiscard]] const CookedAssetManifestEntry* Find(
             const AssetId& assetId) const noexcept;
@@ -146,7 +147,7 @@ namespace experiment::cooked
     {
         TypedAssetReference asset{};
         std::uint32_t blobIndex{};
-        std::vector<AssetDependency> dependencies{};
+        ce::dynamic_array<AssetDependency> dependencies{};
     };
 
     struct AssetSetManifest final
@@ -155,9 +156,9 @@ namespace experiment::cooked
         std::uint64_t revision{};
         std::string targetPlatform{};
         std::string targetAbi{};
-        std::vector<AssetSetEntry> entries{};
-        std::vector<TypedAssetReference> roots{};
-        std::vector<AssetBlobRecord> blobs{};
+        ce::dynamic_array<AssetSetEntry> entries{};
+        ce::dynamic_array<TypedAssetReference> roots{};
+        ce::dynamic_array<AssetBlobRecord> blobs{};
 
         // Valid for authored and normalized manifests; performs no payload I/O.
         [[nodiscard]] const AssetSetEntry* Find(
@@ -172,8 +173,8 @@ namespace experiment::cooked
 
     struct AssetManifestWriteResult final
     {
-        std::vector<std::byte> bytes{};
-        std::vector<AssetManifestIssue> issues{};
+        ce::dynamic_array<std::byte> bytes{};
+        ce::dynamic_array<AssetManifestIssue> issues{};
 
         [[nodiscard]] bool Succeeded() const noexcept
         {
@@ -231,7 +232,7 @@ namespace experiment::cooked
     // 실패 시 outManifest는 바꾸지 않는다.
     [[nodiscard]] bool ReadAssetManifest(std::span<const std::byte> bytes,
         CookedAssetManifest& outManifest,
-        std::vector<AssetManifestIssue>& outIssues);
+        ce::dynamic_array<AssetManifestIssue>& outIssues);
 
     // Validates local type/reference integrity and rejects hard ownership cycles.
     // Explicit external hard edges must additionally resolve, with the expected
@@ -239,24 +240,24 @@ namespace experiment::cooked
     // Only external loadable edges may remain unresolved until RequestAsync.
     [[nodiscard]] bool ValidateAssetSetManifest(
         const AssetSetManifest& manifest,
-        std::vector<AssetManifestIssue>& outIssues);
+        ce::dynamic_array<AssetManifestIssue>& outIssues);
 
     // Sorts entries, roots, edges and blob records, remapping blob indices.
     // Both functions are transactional: failed input never replaces the output.
     [[nodiscard]] bool NormalizeAssetSetManifest(
         const AssetSetManifest& manifest, AssetSetManifest& outManifest,
-        std::vector<AssetManifestIssue>& outIssues);
+        ce::dynamic_array<AssetManifestIssue>& outIssues);
 
     [[nodiscard]] AssetManifestWriteResult WriteAssetSetManifest(
         const AssetSetManifest& manifest);
 
     [[nodiscard]] bool ReadAssetSetManifest(std::span<const std::byte> bytes,
         AssetSetManifest& outManifest,
-        std::vector<AssetManifestIssue>& outIssues);
+        ce::dynamic_array<AssetManifestIssue>& outIssues);
 
     [[nodiscard]] bool VerifyArtifact(
         const CookedAssetManifestEntry& entry,
         std::uint64_t actualByteSize,
         const Sha256Digest& actualSha256,
-        std::vector<AssetManifestIssue>& outIssues);
+        ce::dynamic_array<AssetManifestIssue>& outIssues);
 }

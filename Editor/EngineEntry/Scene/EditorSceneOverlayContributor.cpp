@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -63,7 +64,7 @@ namespace
 
     struct EditorOverlayPassStorage
     {
-        std::vector<own::shared_owner<EditorOverlayPassBundle>> views;
+        ce::dynamic_array<own::shared_owner<EditorOverlayPassBundle>> views;
 
         EditorOverlayPassBundle& Get(uint32_t viewIndex) const { return *views.at(viewIndex); }
     };

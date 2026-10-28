@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #pragma once
 // PHASE 14 P2 — rolling capture 와 immutable reader.
 //
@@ -108,7 +109,7 @@ namespace ce
         counter_category category = counter_category::process;
     };
     profile_counter_id register_counter(std::string_view name, std::string_view unit, counter_category category);
-    std::vector<capture_counter> snapshot_counters();
+    ce::dynamic_array<capture_counter> snapshot_counters();
     counter_mask counter_category_bit(profile_counter_id id);
     const capture_counter* find_counter(std::span<const capture_counter> counters, profile_counter_id id);
     struct profile_counter_sample
@@ -172,14 +173,14 @@ namespace ce
         struct segment
         {
             std::shared_ptr<const event_chunk> page;
-            std::shared_ptr<std::vector<profile_event, capture_allocator<profile_event>>> owned;
+            std::shared_ptr<ce::dynamic_array<profile_event, capture_byte_allocator>> owned;
             std::size_t begin = 0;
             std::uint32_t offset = 0;
             std::uint32_t count = 0;
         };
         void append_segment(const segment& value, std::uint32_t offset, std::uint32_t count);
         void materialize();
-        std::vector<segment, capture_allocator<segment>> m_segments;
+        ce::dynamic_array<segment, capture_byte_allocator> m_segments;
         std::size_t m_count = 0;
         std::size_t m_memoryBytes = 0;
     };
@@ -193,8 +194,8 @@ namespace ce
         profile_tick tick_begin = 0;
         profile_tick tick_end = 0;
         frame_events events;
-        std::vector<profile_counter_sample> counters;
-        std::vector<profile_render_measurement> render_measurements;
+        ce::dynamic_array<profile_counter_sample> counters;
+        ce::dynamic_array<profile_render_measurement> render_measurements;
 
         std::uint64_t dropped_events = 0;
 
@@ -274,10 +275,10 @@ namespace ce
     {
       public:
         capture_session() = default;
-        capture_session(std::vector<frame_record> frames, std::vector<thread_info> threads,
-                        std::vector<capture_marker> markers, capture_environment environment, bool complete,
+        capture_session(ce::dynamic_array<frame_record> frames, ce::dynamic_array<thread_info> threads,
+                        ce::dynamic_array<capture_marker> markers, capture_environment environment, bool complete,
                         std::uint32_t unacked_streams, std::uint64_t dropped_counters = 0,
-                        std::vector<capture_counter> counters = {});
+                        ce::dynamic_array<capture_counter> counters = {});
 
         std::span<const frame_record> frames() const { return m_frames; }
         std::span<const thread_info> threads() const { return m_threads; }
@@ -322,10 +323,10 @@ namespace ce
         const frame_record* find_frame(std::uint32_t engine_frame) const;
 
       private:
-        std::vector<frame_record> m_frames;
-        std::vector<thread_info> m_threads;
-        std::vector<capture_marker> m_markers;
-        std::vector<capture_counter> m_counters;
+        ce::dynamic_array<frame_record> m_frames;
+        ce::dynamic_array<thread_info> m_threads;
+        ce::dynamic_array<capture_marker> m_markers;
+        ce::dynamic_array<capture_counter> m_counters;
         capture_environment m_environment{};
         std::size_t m_memoryBytes = 0;
         std::uint64_t m_totalEvents = 0;
@@ -353,7 +354,7 @@ namespace ce
 
         // 이 프레임을 닫고 다음 프레임을 연다.
         void close_frame(std::uint32_t engine_frame, profile_tick tick_begin, profile_tick tick_end);
-        std::vector<frame_record> take_retired_frames();
+        ce::dynamic_array<frame_record> take_retired_frames();
         void discard_pending();
         void set_archive_enabled(bool enabled) { archive_enabled_ = enabled; }
         // Collector-only. Late owner samples keep their original engine frame.
@@ -422,8 +423,8 @@ namespace ce
         bool place_by_tick(const profile_event& value, const std::shared_ptr<const event_chunk>& page,
                            std::uint32_t offset);
 
-        std::vector<frame_record> m_frames;
-        std::vector<frame_record> retired_frames_;
+        ce::dynamic_array<frame_record> m_frames;
+        ce::dynamic_array<frame_record> retired_frames_;
         bool archive_enabled_ = false;
         frame_record m_pending;
         struct deferred_counter
@@ -431,15 +432,15 @@ namespace ce
             std::uint32_t frame;
             profile_counter_sample sample;
         };
-        std::vector<deferred_counter> m_deferredCounters;
+        ce::dynamic_array<deferred_counter> m_deferredCounters;
         std::uint64_t m_droppedCounters = 0;
 
         // 아직 제 프레임이 닫히지 않아 기다리는 구간. 상한을 두는 이유는
         // 프레임이 영영 안 닫히는 경우(녹화를 멈춘 채 GPU 만 도는 경우)에
         // 이 목록이 무한히 자라지 않게 하기 위해서다.
         static constexpr std::size_t kMaxDeferredSpans = 4096;
-        std::vector<profile_event> m_deferredSpans;
-        std::vector<profile_render_measurement> m_deferredRenderMeasurements;
+        ce::dynamic_array<profile_event> m_deferredSpans;
+        ce::dynamic_array<profile_render_measurement> m_deferredRenderMeasurements;
         std::uint64_t m_lateSpansPlaced = 0;
         std::uint64_t m_lateSpansDropped = 0;
         std::uint64_t m_staleChunksDropped = 0;

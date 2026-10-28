@@ -1,4 +1,6 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../../Engine/Utility_Framework/Foundation/EngineFunc.h"
 // 창 본문 보관소 (PHASE 21 M4 2·3단계 → W3 · 계획서 부록 B.3).
 //
 // 계획서가 정한 대로 **이관은 프레임만 옮긴다.** 본문 코드는 창 클래스가 있던
@@ -39,7 +41,7 @@ namespace editor::windows
     struct body_binding_record
     {
         std::string_view      stable_id{};
-        std::function<void()> body{};
+        ce::owned_func<void()> body{};
         std::uint64_t         token{ 0 };
     };
 
@@ -49,7 +51,7 @@ namespace editor::windows
     /// 쓰고 제품은 `process_window_bodies()` 하나를 쓴다.
     struct body_table
     {
-        std::vector<body_binding_record> entries;
+        ce::dynamic_array<body_binding_record> entries;
     };
 
     /// 제품 본문 보관소. 진입점 매크로가 읽는 것이 이것이다.
@@ -59,11 +61,11 @@ namespace editor::windows
 
     /// 본문을 이름에 건다. 반환된 핸들이 그 바인딩의 수명이다.
     [[nodiscard]] window_body_binding bind_window_body(
-        body_table& table, std::string_view stable_id, std::function<void()> body);
+        body_table& table, std::string_view stable_id, ce::owned_func<void()> body);
 
     /// 제품 보관소에 거는 짧은 표기.
     [[nodiscard]] window_body_binding bind_window_body(
-        std::string_view stable_id, std::function<void()> body);
+        std::string_view stable_id, ce::owned_func<void()> body);
 
     /// 바인딩 하나의 수명을 드는 핸들. 이동만 되고 복사는 되지 않는다.
     class window_body_binding
@@ -90,7 +92,7 @@ namespace editor::windows
 
     private:
         friend window_body_binding bind_window_body(
-            body_table&, std::string_view, std::function<void()>);
+            body_table&, std::string_view, ce::owned_func<void()>);
 
         window_body_binding(body_table& table, std::string_view stable_id,
                             std::uint64_t token) noexcept
@@ -108,8 +110,8 @@ namespace editor::windows
     /// 고아 검사가 이것을 읽는다 — 표에 없는 이름에 본문이 걸려 있으면 그
     /// 본문은 영영 불리지 않는다. 오타 하나가 조용히 죽은 창을 만들던 옛
     /// `GetContext` 결함의 반대편이고, 그래서 반대 방향도 봐야 한다.
-    std::vector<std::string_view> bound_window_bodies(const body_table& table);
-    std::vector<std::string_view> bound_window_bodies();
+    ce::dynamic_array<std::string_view> bound_window_bodies(const body_table& table);
+    ce::dynamic_array<std::string_view> bound_window_bodies();
 
     namespace detail
     {

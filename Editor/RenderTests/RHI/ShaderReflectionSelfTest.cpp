@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -107,7 +108,7 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
         return false;
     }
 
-    const std::array<std::uint16_t, 1> keywordSelection{ 1 };
+    const ce::fixed_array<std::uint16_t, 1> keywordSelection{ 1 };
     ShaderMetaPermutation permutation;
     if (!ShaderPermutationDomain::Resolve(meta, 0, keywordSelection,
         permutation, error))
@@ -116,15 +117,15 @@ static bool RunShaderReflectionSelfTestImpl(const std::string& texturePath, std:
         return false;
     }
 
-    std::vector<ReflectionStageRequest> requests;
+    ce::dynamic_array<ReflectionStageRequest> requests;
     const ShaderPassDesc& pass = meta.passes[0];
     if (pass.vertex) requests.push_back({ pass.vertex->entry, "vs_5_0" });
     if (pass.pixel) requests.push_back({ pass.pixel->entry, "ps_5_0" });
     if (pass.compute) requests.push_back({ pass.compute->entry, "cs_5_0" });
 
     stage = "DXIL and SPIR-V reflection";
-    std::vector<RHIShaderReflection> dxilStages;
-    std::vector<RHIShaderReflection> spirvStages;
+    ce::dynamic_array<RHIShaderReflection> dxilStages;
+    ce::dynamic_array<RHIShaderReflection> spirvStages;
     dxilStages.reserve(requests.size());
     spirvStages.reserve(requests.size());
     for (const ReflectionStageRequest& request : requests)

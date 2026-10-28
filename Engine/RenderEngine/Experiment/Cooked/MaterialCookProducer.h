@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "CookedAssetManifest.h"
@@ -22,7 +23,7 @@ struct MaterialCookProduct final
     AssetId materialAssetId{};
     AssetId shaderMetaAssetId{};
     std::string artifactPath{};
-    std::vector<std::byte> artifactBytes{};
+    ce::dynamic_array<std::byte> artifactBytes{};
     CookedAssetManifestEntry manifestEntry{};
 
     // 진단용. identity 가 아니다.
@@ -40,7 +41,7 @@ struct MaterialCookProductIssue final
 struct MaterialCookProductResult final
 {
     std::optional<MaterialCookProduct> product{};
-    std::vector<MaterialCookProductIssue> issues{};
+    ce::dynamic_array<MaterialCookProductIssue> issues{};
 
     [[nodiscard]] bool Succeeded() const noexcept { return product.has_value() && issues.empty(); }
 };

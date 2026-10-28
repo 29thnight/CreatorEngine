@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "EnhancedMaterialSealIdentity.h"
@@ -51,7 +52,7 @@ struct EnhancedDrawDropCounters
     static constexpr std::size_t kCount =
         static_cast<std::size_t>(EnhancedDrawDropReason::Count);
 
-    std::array<std::atomic<std::uint32_t>, kCount> counts{};
+    ce::fixed_array<std::atomic<std::uint32_t>, kCount> counts{};
 
     void Clear() noexcept
     {
@@ -243,5 +244,7 @@ struct EnhancedDrawSealLedger
     Counters counters{};
     EnhancedDrawDropCounters recordDrops{};
     std::string lastReason{};
-    std::unordered_map<std::uint64_t, Binding> bindings{};
+    // Match the former per-node release policy when a frame is reset.
+    ce::node_hash_map<std::uint64_t, Binding, ce::hash<std::uint64_t>,
+        ce::equal_to<std::uint64_t>, ce::heap_allocator, false> bindings{};
 };

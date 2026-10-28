@@ -1,3 +1,8 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineOrderedSet.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineNodeSet.h"
+#include "../../Engine/Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "LXGraph.h"
 #include "LXNodeDefinition.h"
 
@@ -16,7 +21,7 @@ constexpr std::size_t kUndoLimit = 128;
 constexpr std::size_t kDocumentLimit = 100000;
 constexpr unsigned kMaxGroupNesting = 16;
 std::atomic_uint64_t gSaveSequence = 0;
-bool IsAcyclicGroupTree(const LXGraph& graph, unsigned depth, std::unordered_set<const LXGraph*>& active)
+bool IsAcyclicGroupTree(const LXGraph& graph, unsigned depth, ce::engine_node_set<const LXGraph*>& active)
 {
     if (depth > kMaxGroupNesting || !active.insert(&graph).second)
     {
@@ -53,7 +58,7 @@ struct CanonicalGroup
     unsigned depth = 0;
 };
 
-void CollectCanonicalGroups(const LXGraph& graph, unsigned depth, std::map<Id, CanonicalGroup>& groups)
+void CollectCanonicalGroups(const LXGraph& graph, unsigned depth, ce::engine_ordered_map<Id, CanonicalGroup>& groups)
 {
     for (const auto& [id, group] : graph.Groups())
     {
@@ -74,8 +79,8 @@ enum class GroupReferenceIssue
     Missing
 };
 
-GroupReferenceIssue VisitGroupReference(Id id, const std::map<Id, CanonicalGroup>& groups,
-                                        std::map<Id, unsigned>& state, unsigned depth, std::vector<Id>* order)
+GroupReferenceIssue VisitGroupReference(Id id, const ce::engine_ordered_map<Id, CanonicalGroup>& groups,
+                                        ce::engine_ordered_map<Id, unsigned>& state, unsigned depth, ce::dynamic_array<Id>* order)
 {
     if (depth > kMaxGroupNesting)
     {
@@ -115,11 +120,11 @@ GroupReferenceIssue VisitGroupReference(Id id, const std::map<Id, CanonicalGroup
     return GroupReferenceIssue::None;
 }
 
-GroupReferenceIssue CheckGroupReferences(const LXGraph& graph, std::vector<Id>* order = nullptr)
+GroupReferenceIssue CheckGroupReferences(const LXGraph& graph, ce::dynamic_array<Id>* order = nullptr)
 {
-    std::map<Id, CanonicalGroup> groups;
+    ce::engine_ordered_map<Id, CanonicalGroup> groups;
     CollectCanonicalGroups(graph, 0, groups);
-    std::map<Id, unsigned> state;
+    ce::engine_ordered_map<Id, unsigned> state;
     for (const auto& [id, group] : groups)
     {
         const GroupReferenceIssue issue = VisitGroupReference(id, groups, state, 1, order);
@@ -131,7 +136,7 @@ GroupReferenceIssue CheckGroupReferences(const LXGraph& graph, std::vector<Id>* 
     return GroupReferenceIssue::None;
 }
 
-bool SharedGroupCopiesMatch(const LXGraph& graph, const std::map<Id, CanonicalGroup>& canonical)
+bool SharedGroupCopiesMatch(const LXGraph& graph, const ce::engine_ordered_map<Id, CanonicalGroup>& canonical)
 {
     for (const auto& [id, group] : graph.Groups())
     {
@@ -174,28 +179,28 @@ void WriteSocketValue(std::ostream& out, const LXSocketValue& value)
     switch (value.index())
     {
     case 1:
-        out << ' ' << std::get<bool>(value);
+        out << ' ' << ce::get<bool>(value);
         break;
     case 2:
-        out << ' ' << std::get<std::int64_t>(value);
+        out << ' ' << ce::get<std::int64_t>(value);
         break;
     case 3:
-        out << ' ' << std::get<double>(value);
+        out << ' ' << ce::get<double>(value);
         break;
     case 4:
-        for (double component : std::get<std::array<double, 3>>(value))
+        for (double component : ce::get<ce::fixed_array<double, 3>>(value))
         {
             out << ' ' << component;
         }
         break;
     case 5:
-        for (double component : std::get<std::array<double, 4>>(value))
+        for (double component : ce::get<ce::fixed_array<double, 4>>(value))
         {
             out << ' ' << component;
         }
         break;
     case 6:
-        out << ' ' << std::quoted(std::get<std::string>(value));
+        out << ' ' << std::quoted(ce::get<std::string>(value));
         break;
     default:
         break;
@@ -242,7 +247,7 @@ bool ReadSocketValue(std::istream& in, LXSocketValue& value)
         return true;
     }
     case 4: {
-        std::array<double, 3> field{};
+        ce::fixed_array<double, 3> field{};
         if (!(in >> field[0] >> field[1] >> field[2]))
         {
             return false;
@@ -251,7 +256,7 @@ bool ReadSocketValue(std::istream& in, LXSocketValue& value)
         return true;
     }
     case 5: {
-        std::array<double, 4> field{};
+        ce::fixed_array<double, 4> field{};
         if (!(in >> field[0] >> field[1] >> field[2] >> field[3]))
         {
             return false;
@@ -287,17 +292,17 @@ bool IsSocketValueValid(PinType type, const LXSocketValue& value)
     case PinType::Int:
         return std::holds_alternative<std::int64_t>(value);
     case PinType::Float:
-        return std::holds_alternative<double>(value) && std::isfinite(std::get<double>(value));
+        return std::holds_alternative<double>(value) && std::isfinite(ce::get<double>(value));
     case PinType::Vector:
     case PinType::Normal:
-        if (const auto* components = std::get_if<std::array<double, 3>>(&value))
+        if (const auto* components = std::get_if<ce::fixed_array<double, 3>>(&value))
         {
             return std::all_of(components->begin(), components->end(),
                                [](double component) { return std::isfinite(component); });
         }
         return false;
     case PinType::Color:
-        if (const auto* components = std::get_if<std::array<double, 4>>(&value))
+        if (const auto* components = std::get_if<ce::fixed_array<double, 4>>(&value))
         {
             return std::all_of(components->begin(), components->end(),
                                [](double component) { return std::isfinite(component); });
@@ -359,7 +364,7 @@ bool LXGraph::MatchesGroupDefinition(const LXGroupDefinition& definition) const
     {
         return false;
     }
-    std::unordered_set<const LXGraph*> active;
+    ce::engine_node_set<const LXGraph*> active;
     if (!IsAcyclicGroupTree(*definition.body, 1, active))
     {
         return false;
@@ -396,9 +401,9 @@ bool LXGraph::MatchesGroupDefinition(const LXGroupDefinition& definition) const
     {
         return false;
     }
-    std::unordered_set<Id> socketIds;
-    std::unordered_set<Id> internalPins;
-    std::set<std::pair<Direction, std::string>> identifiers;
+    ce::engine_node_set<Id> socketIds;
+    ce::engine_node_set<Id> internalPins;
+    ce::engine_ordered_set<ce::pair<Direction, std::string>> identifiers;
     bool hasOutput = false;
     for (const LXGroupSocket& socket : definition.sockets)
     {
@@ -434,7 +439,7 @@ bool LXGraph::MatchesGroupDefinition(const LXGroupDefinition& definition) const
            (!boundaryMode || internalPins.size() == inputBoundary->pins.size() + outputBoundary->pins.size());
 }
 
-bool LXGraph::SynchronizeGroupBoundaryPins(LXGraph& body, const std::vector<LXGroupSocket>& sockets) const
+bool LXGraph::SynchronizeGroupBoundaryPins(LXGraph& body, const ce::dynamic_array<LXGroupSocket>& sockets) const
 {
     const bool boundaryMode = std::any_of(body.nodes_.begin(), body.nodes_.end(),
                                           [](const Node& node) { return IsGroupBoundaryType(node.type); });
@@ -476,7 +481,7 @@ bool LXGraph::SynchronizeGroupBoundaryPins(LXGraph& body, const std::vector<LXGr
         {
             continue;
         }
-        std::vector<Pin> ordered;
+        ce::dynamic_array<Pin> ordered;
         ordered.reserve(node.pins.size());
         for (const LXGroupSocket& socket : sockets)
         {
@@ -687,9 +692,9 @@ bool LXGraph::RemoveGroupBoundaryPin(Id pinId)
     return false;
 }
 
-Id LXGraph::CreateGroup(std::string name, const LXGraph& body, std::vector<LXGroupSocket> sockets)
+Id LXGraph::CreateGroup(std::string name, const LXGraph& body, ce::dynamic_array<LXGroupSocket> sockets)
 {
-    std::unordered_set<const LXGraph*> activeGroups;
+    ce::engine_node_set<const LXGraph*> activeGroups;
     if (name.empty() || sockets.empty() || sockets.size() > kDocumentLimit ||
         !IsAcyclicGroupTree(body, 0, activeGroups))
     {
@@ -771,10 +776,10 @@ Id LXGraph::CreateGroupInstance(Id groupId, float x, float y)
     return id;
 }
 
-Id LXGraph::CollapseToGroup(const std::vector<Id>& nodeIds, std::string name, Id idFloor,
+Id LXGraph::CollapseToGroup(const ce::dynamic_array<Id>& nodeIds, std::string name, Id idFloor,
                             LXGroupCollapseMapping* mapping)
 {
-    const std::unordered_set<Id> selected(nodeIds.begin(), nodeIds.end());
+    const ce::engine_node_set<Id> selected(nodeIds.begin(), nodeIds.end());
     if (name.empty() || selected.empty() || selected.size() != nodeIds.size() || selected.size() > kDocumentLimit)
     {
         return 0;
@@ -816,9 +821,9 @@ Id LXGraph::CollapseToGroup(const std::vector<Id>& nodeIds, std::string name, Id
 
     LXGraph body(domain_, definitions_);
     body.nextId_ = std::max(nextId_, idFloor);
-    std::unordered_map<Id, Id> copiedPins;
+    ce::engine_node_map<Id, Id> copiedPins;
     LXGroupCollapseMapping copiedIds;
-    std::unordered_map<Id, Id> copiedFrames;
+    ce::engine_node_map<Id, Id> copiedFrames;
     for (const Node& original : nodes_)
     {
         if (!selected.contains(original.id))
@@ -900,11 +905,11 @@ Id LXGraph::CollapseToGroup(const std::vector<Id>& nodeIds, std::string name, Id
         return 0;
     }
 
-    std::vector<LXGroupSocket> sockets;
-    std::unordered_map<Id, std::size_t> inboundBySource;
-    std::unordered_map<Id, std::size_t> outboundBySource;
-    std::unordered_map<Id, std::size_t> inboundLinks;
-    std::unordered_map<Id, std::size_t> outboundLinks;
+    ce::dynamic_array<LXGroupSocket> sockets;
+    ce::engine_node_map<Id, std::size_t> inboundBySource;
+    ce::engine_node_map<Id, std::size_t> outboundBySource;
+    ce::engine_node_map<Id, std::size_t> inboundLinks;
+    ce::engine_node_map<Id, std::size_t> outboundLinks;
     const auto addSocket = [&](Direction direction, const Pin& original) -> std::optional<std::size_t> {
         std::string identifier = original.Identifier();
         for (unsigned suffix = 2; std::any_of(sockets.begin(), sockets.end(),
@@ -1023,14 +1028,14 @@ Id LXGraph::CollapseToGroup(const std::vector<Id>& nodeIds, std::string name, Id
         return 0;
     }
     const Node* grouped = proposed.FindNode(instance);
-    std::vector<Id> instancePins;
+    ce::dynamic_array<Id> instancePins;
     for (const Pin& pin : grouped->pins)
     {
         instancePins.push_back(pin.id);
     }
     proposed.layout_.nodes.at(instance).frame = commonFrame ? instanceFrame : 0;
-    std::unordered_set<std::size_t> emittedInputs;
-    std::vector<Link> rewritten;
+    ce::engine_node_set<std::size_t> emittedInputs;
+    ce::dynamic_array<Link> rewritten;
     for (Link link : proposed.links_)
     {
         const Pin* output = FindPin(link.output);
@@ -1093,7 +1098,7 @@ bool LXGraph::ReplaceGroupBody(Id groupId, const LXGraph& body, bool* contentCha
     return existing && UpdateGroup(groupId, existing->name, body, existing->sockets, contentChanged);
 }
 
-bool LXGraph::UpdateGroup(Id groupId, std::string name, const LXGraph& body, std::vector<LXGroupSocket> sockets,
+bool LXGraph::UpdateGroup(Id groupId, std::string name, const LXGraph& body, ce::dynamic_array<LXGroupSocket> sockets,
                           bool* contentChanged)
 {
     if (contentChanged)
@@ -1130,7 +1135,7 @@ bool LXGraph::UpdateGroup(Id groupId, std::string name, const LXGraph& body, std
 
 bool LXGraph::SynchronizeGroupCopies()
 {
-    std::vector<Id> order;
+    ce::dynamic_array<Id> order;
     if (CheckGroupReferences(*this, &order) != GroupReferenceIssue::None)
     {
         return false;
@@ -1183,7 +1188,7 @@ bool LXGraph::SynchronizeGroupCopies(Id id, const LXGroupDefinition& source, boo
     return true;
 }
 
-bool LXGraph::UpdateGroupLocal(Id groupId, std::string name, const LXGraph& body, std::vector<LXGroupSocket> sockets,
+bool LXGraph::UpdateGroupLocal(Id groupId, std::string name, const LXGraph& body, ce::dynamic_array<LXGroupSocket> sockets,
                                bool allowAssignedNewIds)
 {
     const LXGroupDefinition* existing = FindGroup(groupId);
@@ -1191,13 +1196,13 @@ bool LXGraph::UpdateGroupLocal(Id groupId, std::string name, const LXGraph& body
     {
         return false;
     }
-    std::unordered_map<Id, LXGroupSocket> oldSockets;
+    ce::engine_node_map<Id, LXGroupSocket> oldSockets;
     for (const LXGroupSocket& socket : existing->sockets)
     {
         oldSockets.emplace(socket.id, socket);
     }
     Id next = nextId_;
-    std::unordered_set<Id> socketIds;
+    ce::engine_node_set<Id> socketIds;
     for (LXGroupSocket& socket : sockets)
     {
         if (!socket.id)
@@ -1238,7 +1243,7 @@ bool LXGraph::UpdateGroupLocal(Id groupId, std::string name, const LXGraph& body
         return false;
     }
 
-    std::vector<Node> updatedNodes = nodes_;
+    ce::dynamic_array<Node> updatedNodes = nodes_;
     for (Node& node : updatedNodes)
     {
         if (node.groupId != groupId)
@@ -1249,7 +1254,7 @@ bool LXGraph::UpdateGroupLocal(Id groupId, std::string name, const LXGraph& body
         {
             return false;
         }
-        std::unordered_map<Id, Pin> oldPins;
+        ce::engine_node_map<Id, Pin> oldPins;
         for (const Pin& pin : node.pins)
         {
             oldPins.emplace(pin.interfaceId, pin);
@@ -1260,7 +1265,7 @@ bool LXGraph::UpdateGroupLocal(Id groupId, std::string name, const LXGraph& body
                 return false;
             }
         }
-        std::vector<Pin> updatedPins;
+        ce::dynamic_array<Pin> updatedPins;
         updatedPins.reserve(replacement.sockets.size());
         for (const LXGroupSocket& socket : replacement.sockets)
         {
@@ -1379,9 +1384,9 @@ bool LXGraph::RemoveNode(Id id)
     return RemoveNodes({id});
 }
 
-bool LXGraph::RemoveNodes(const std::vector<Id>& ids)
+bool LXGraph::RemoveNodes(const ce::dynamic_array<Id>& ids)
 {
-    std::unordered_set<Id> removed(ids.begin(), ids.end());
+    ce::engine_node_set<Id> removed(ids.begin(), ids.end());
     if (std::any_of(nodes_.begin(), nodes_.end(),
                     [&](const Node& node) { return removed.contains(node.id) && !CanEditNode(node); }))
     {
@@ -1393,7 +1398,7 @@ bool LXGraph::RemoveNodes(const std::vector<Id>& ids)
         return false;
     }
     Commit();
-    std::unordered_set<Id> pins;
+    ce::engine_node_set<Id> pins;
     for (const Node& node : nodes_)
     {
         if (removed.contains(node.id))
@@ -1490,11 +1495,11 @@ bool LXGraph::MoveDynamicPin(Id pinId, int direction)
     return false;
 }
 
-GraphFragment LXGraph::CopyNodes(const std::vector<Id>& ids) const
+GraphFragment LXGraph::CopyNodes(const ce::dynamic_array<Id>& ids) const
 {
     GraphFragment fragment;
-    const std::unordered_set<Id> selected(ids.begin(), ids.end());
-    std::unordered_set<Id> copiedPins;
+    const ce::engine_node_set<Id> selected(ids.begin(), ids.end());
+    ce::engine_node_set<Id> copiedPins;
     for (const Node& node : nodes_)
     {
         if (!selected.contains(node.id))
@@ -1527,9 +1532,9 @@ GraphFragment LXGraph::CopyNodes(const std::vector<Id>& ids) const
     return fragment;
 }
 
-std::vector<Id> LXGraph::PasteNodes(const GraphFragment& fragment, float offsetX, float offsetY)
+ce::dynamic_array<Id> LXGraph::PasteNodes(const GraphFragment& fragment, float offsetX, float offsetY)
 {
-    std::vector<Id> added;
+    ce::dynamic_array<Id> added;
     if (fragment.nodes.empty() || !std::isfinite(offsetX) || !std::isfinite(offsetY) ||
         std::any_of(fragment.nodes.begin(), fragment.nodes.end(),
                     [](const Node& node) { return IsGroupBoundaryType(node.type); }))
@@ -1537,8 +1542,8 @@ std::vector<Id> LXGraph::PasteNodes(const GraphFragment& fragment, float offsetX
         return added;
     }
     std::size_t required = fragment.nodes.size() + fragment.links.size();
-    std::unordered_set<Id> originalPins;
-    std::unordered_set<Id> originalNodes;
+    ce::engine_node_set<Id> originalPins;
+    ce::engine_node_set<Id> originalNodes;
     if (fragment.layout.nodes.size() != fragment.nodes.size())
     {
         return added;
@@ -1582,8 +1587,8 @@ std::vector<Id> LXGraph::PasteNodes(const GraphFragment& fragment, float offsetX
         return added;
     }
     const auto append = [&](LXGraph& graph) {
-        std::vector<Id> inserted;
-        std::unordered_map<Id, Id> pinIds;
+        ce::dynamic_array<Id> inserted;
+        ce::engine_node_map<Id, Id> pinIds;
         inserted.reserve(fragment.nodes.size());
         for (Node copy : fragment.nodes)
         {
@@ -1636,7 +1641,7 @@ bool LXGraph::SetNodePosition(Id id, float x, float y, bool undoable)
     return SetNodePositions({{id, x, y}}, undoable);
 }
 
-bool LXGraph::SetNodePositions(const std::vector<NodePosition>& positions, bool undoable)
+bool LXGraph::SetNodePositions(const ce::dynamic_array<NodePosition>& positions, bool undoable)
 {
     bool changed = false;
     for (const NodePosition& position : positions)
@@ -1680,14 +1685,14 @@ bool LXGraph::SetNodeCollapsed(Id id, bool collapsed)
     return true;
 }
 
-Id LXGraph::AddFrame(std::string label, float x, float y, float width, float height, const std::vector<Id>& members)
+Id LXGraph::AddFrame(std::string label, float x, float y, float width, float height, const ce::dynamic_array<Id>& members)
 {
     if (label.empty() || !std::isfinite(x) || !std::isfinite(y) || !std::isfinite(width) || !std::isfinite(height) ||
         width <= 0.0f || height <= 0.0f || nextId_ == std::numeric_limits<Id>::max())
     {
         return 0;
     }
-    std::unordered_set<Id> unique;
+    ce::engine_node_set<Id> unique;
     for (Id member : members)
     {
         if (!FindNode(member) || !unique.insert(member).second)
@@ -1854,8 +1859,8 @@ bool LXGraph::WouldCycle(Id outputNode, Id inputNode) const
     {
         return true;
     }
-    std::vector<Id> stack{inputNode};
-    std::unordered_set<Id> seen;
+    ce::dynamic_array<Id> stack{inputNode};
+    ce::engine_node_set<Id> seen;
     while (!stack.empty())
     {
         const Id current = stack.back();
@@ -1982,7 +1987,7 @@ std::optional<Id> LXGraph::Connect(Id first, Id second, std::string* reason)
         Commit();
         if (!input->multiple)
         {
-            std::erase_if(links_, [&](const Link& link) { return link.input == input->id; });
+            ce::erase_if(links_, [&](const Link& link) { return link.input == input->id; });
         }
         const Id id = nextId_++;
         links_.push_back({id, output->id, input->id});
@@ -2007,10 +2012,10 @@ bool LXGraph::Disconnect(Id id)
     return true;
 }
 
-std::vector<Issue> LXGraph::Validate(bool checkSharedCopies) const
+ce::dynamic_array<Issue> LXGraph::Validate(bool checkSharedCopies) const
 {
-    std::vector<Issue> issues;
-    std::unordered_set<const LXGraph*> activeGroups;
+    ce::dynamic_array<Issue> issues;
+    ce::engine_node_set<const LXGraph*> activeGroups;
     if (!IsAcyclicGroupTree(*this, 0, activeGroups))
     {
         issues.push_back({"group_cycle", "Group ownership contains a cycle or exceeds nesting limit"});
@@ -2032,7 +2037,7 @@ std::vector<Issue> LXGraph::Validate(bool checkSharedCopies) const
     }
     if (checkSharedCopies)
     {
-        std::map<Id, CanonicalGroup> canonical;
+        ce::engine_ordered_map<Id, CanonicalGroup> canonical;
         CollectCanonicalGroups(*this, 0, canonical);
         if (!SharedGroupCopiesMatch(*this, canonical))
         {
@@ -2040,8 +2045,8 @@ std::vector<Issue> LXGraph::Validate(bool checkSharedCopies) const
             return issues;
         }
     }
-    std::unordered_set<Id> ids;
-    std::unordered_map<Id, unsigned> fanIn;
+    ce::engine_node_set<Id> ids;
+    ce::engine_node_map<Id, unsigned> fanIn;
     if (definitions_ && !definitions_->HasDomain(domain_))
     {
         issues.push_back({"unknown_domain", "Graph domain is not registered"});
@@ -2695,9 +2700,9 @@ std::optional<LXGraph> LXGraph::LoadStream(std::istream& in, std::string* error,
 
 namespace
 {
-    bool SameGraphContent(const std::vector<Node>& nodes, const std::vector<Node>& otherNodes,
-        const std::vector<Link>& links, const std::vector<Link>& otherLinks,
-        const std::map<Id, LXGroupDefinition>& groups, const std::map<Id, LXGroupDefinition>& otherGroups,
+    bool SameGraphContent(const ce::dynamic_array<Node>& nodes, const ce::dynamic_array<Node>& otherNodes,
+        const ce::dynamic_array<Link>& links, const ce::dynamic_array<Link>& otherLinks,
+        const ce::engine_ordered_map<Id, LXGroupDefinition>& groups, const ce::engine_ordered_map<Id, LXGroupDefinition>& otherGroups,
         bool includeLayout)
     {
         if (nodes.size() != otherNodes.size() || links.size() != otherLinks.size() ||

@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "VertexCacheOptimization.h"
 
 #include "meshoptimizer.h"
@@ -90,13 +91,13 @@ namespace experiment::importer
                     vertexCount, vertexBytes);
 
             // ── 1. 삼각형 순서 (인덱스만 바뀐다) ────────────────────────
-            std::vector<std::uint32_t> optimized(indexCount);
+            ce::dynamic_array<std::uint32_t> optimized(indexCount);
             meshopt_optimizeVertexCache(optimized.data(), mesh.indices.data(),
                 indexCount, vertexCount);
 
             // ── 2. 정점 순서 remap ──────────────────────────────────────
             // remap[old] = new. 참조되지 않는 정점은 ~0u 가 되어 사라진다.
-            std::vector<std::uint32_t> remap(vertexCount);
+            ce::dynamic_array<std::uint32_t> remap(vertexCount);
             const std::size_t unique = meshopt_optimizeVertexFetchRemap(
                 remap.data(), optimized.data(), indexCount, vertexCount);
 
@@ -115,7 +116,7 @@ namespace experiment::importer
             // skin 은 정점당 가변 길이라 그 API 로는 못 옮긴다. 그래서 새
             // 인덱스 순서로 한 번 훑으며 ValueStreams()/AppendSkin 규약을
             // 그대로 쓴다 — 새 스트림이 생겨도 자동으로 따라온다.
-            std::vector<std::uint32_t> inverse(unique, ~0u);
+            ce::dynamic_array<std::uint32_t> inverse(unique, ~0u);
             for (std::uint32_t original = 0; original < vertexCount; ++original)
             {
                 const std::uint32_t fresh = remap[original];

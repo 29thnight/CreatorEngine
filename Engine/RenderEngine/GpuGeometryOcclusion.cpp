@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -32,11 +33,11 @@ struct GpuGeometryOcclusion::HistoryPool
     {
         std::uint32_t width{}, height{};
         std::uint64_t bytes{};
-        std::vector<RHITextureHandle> textures;
+        ce::dynamic_array<RHITextureHandle> textures;
     };
     IRenderDeviceServices& device;
     std::mutex mutex;
-    std::vector<Entry> free;
+    ce::dynamic_array<Entry> free;
     std::uint64_t cachedBytes{};
     bool closed{};
     explicit HistoryPool(IRenderDeviceServices& value) : device(value) {}
@@ -52,7 +53,7 @@ struct GpuGeometryOcclusion::HistoryPool
         } while (width > 1u || height > 1u);
         return bytes;
     }
-    bool Acquire(std::uint32_t width, std::uint32_t height, std::vector<RHITextureHandle>& textures)
+    bool Acquire(std::uint32_t width, std::uint32_t height, ce::dynamic_array<RHITextureHandle>& textures)
     {
         std::lock_guard lock(mutex);
         const auto found = std::ranges::find_if(
@@ -66,7 +67,7 @@ struct GpuGeometryOcclusion::HistoryPool
         free.erase(found);
         return true;
     }
-    void Return(std::uint32_t width, std::uint32_t height, std::vector<RHITextureHandle> textures, bool reusable)
+    void Return(std::uint32_t width, std::uint32_t height, ce::dynamic_array<RHITextureHandle> textures, bool reusable)
     {
         std::lock_guard lock(mutex);
         const auto bytes = Bytes(width, height);
@@ -141,8 +142,8 @@ struct GpuGeometryOcclusion::DeclarationLayout
 {
     std::uint32_t width{}, height{};
     std::string name, buildName;
-    std::array<RGTextureDesc, kMaximumLevels> textures;
-    std::array<std::string, kMaximumLevels> nextHistoryNames;
+    ce::fixed_array<RGTextureDesc, kMaximumLevels> textures;
+    ce::fixed_array<std::string, kMaximumLevels> nextHistoryNames;
 };
 
 bool GpuGeometryOcclusion::Prepare(const EnhancedFrameContext& context, const math::matrix4x4& viewProjection,
@@ -410,9 +411,9 @@ void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle
     m_graphEpoch = graph.DeclarationEpoch();
     m_depth = depth;
     using Usage = EnhancedRenderGraph::RGPassUsage;
-    std::array<Usage, kMaximumLevels + 1u> uses;
-    std::array<std::array<Usage, 2>, kMaximumLevels> phaseUses;
-    std::array<EnhancedRenderGraph::RepeatedPhaseView, kMaximumLevels> phases;
+    ce::fixed_array<Usage, kMaximumLevels + 1u> uses;
+    ce::fixed_array<ce::fixed_array<Usage, 2>, kMaximumLevels> phaseUses;
+    ce::fixed_array<EnhancedRenderGraph::RepeatedPhaseView, kMaximumLevels> phases;
     uses[0] = {depth, RHIResourceState::ShaderResource, RGAccessMode::Read};
     auto source = depth;
     for (std::uint32_t level = 0; level < m_levelCount; ++level)
@@ -486,7 +487,7 @@ void GpuGeometryOcclusion::Pyramid::Declare(EnhancedRenderGraph& graph, RGHandle
 
 
 
-std::array<RHIBindingDesc, GpuGeometryOcclusion::kMaximumLevels> GpuGeometryOcclusion::Pyramid::BindingInputs(
+ce::fixed_array<RHIBindingDesc, GpuGeometryOcclusion::kMaximumLevels> GpuGeometryOcclusion::Pyramid::BindingInputs(
     const EnhancedRenderGraph::ExecuteContext& execution) const
 {
     CheckCurrent(execution.graph);
@@ -494,7 +495,7 @@ std::array<RHIBindingDesc, GpuGeometryOcclusion::kMaximumLevels> GpuGeometryOccl
     {
         throw std::runtime_error("Current-depth pyramid binding requires a complete declaration.");
     }
-    std::array<RHIBindingDesc, kMaximumLevels> inputs;
+    ce::fixed_array<RHIBindingDesc, kMaximumLevels> inputs;
     for (std::size_t index = 0; index < inputs.size(); ++index)
     {
         const auto levelIndex = (std::min)(index, static_cast<size_t>(m_declaredLevels - 1u));

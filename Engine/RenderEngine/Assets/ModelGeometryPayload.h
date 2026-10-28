@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -21,7 +22,7 @@ namespace assets
         own::shared_owner<const experiment::cooked::ArtifactByteSource> byteSource{};
         ModelMeshAsset mesh{};
         ModelMeshletSummary meshletSummary{};
-        std::array<ModelMeshLodSummary, experiment::kMeshLodMaxLevels> lodSummaries{};
+        ce::fixed_array<ModelMeshLodSummary, experiment::kMeshLodMaxLevels> lodSummaries{};
         std::uint32_t requiredBoneCount{};
         experiment::cooked::Sha256Digest requiredSkinBindingSha256{};
         std::size_t decodedBytes{};

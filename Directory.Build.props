@@ -16,6 +16,7 @@
   자기 ItemDefinitionGroup으로 덮어쓰므로(임포트 순서상 프로젝트가 뒤다) 무력화된다.
 -->
 <Project>
+  <Import Project="$(MSBuildThisFileDirectory)Tools\build\ContainerToolchain.props" />
   <PropertyGroup>
     <EngineAsan Condition="'$(EngineAsan)' == ''">false</EngineAsan>
     <!-- Optional development-only ETW collector. Never downloads or installs an SDK. -->

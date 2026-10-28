@@ -1,4 +1,6 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
+#include "../../Utility_Framework/Foundation/EngineFunc.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -35,23 +37,23 @@ namespace experiment
     {
         // Transitional engine-internal load hands the owner and identity to the
         // consumer together. A numeric handle alone cannot pin a cache generation.
-        std::function<own::shared_owner<const ShaderMeta>(
+        ce::owned_func<own::shared_owner<const ShaderMeta>(
             const FileGuid&, ShaderMetaHandle&, std::string&)> loadShaderMetaOwner{};
         // 경로 → texture generation owner. 정본: DataSystem::LoadSharedMaterialTexture.
-        std::function<own::shared_owner<const Texture>(const std::filesystem::path&, bool, TextureColorSpace)>
+        ce::owned_func<own::shared_owner<const Texture>(const std::filesystem::path&, bool, TextureColorSpace)>
             loadTexture{};
         // GUID → cooked artifact 경로. 정본: CookedAssetCatalog::ResolveArtifactPath.
         // 비어 있으면(catalog 부재) source만 쓴다.
-        std::function<std::filesystem::path(const AssetId&)>
+        ce::owned_func<std::filesystem::path(const AssetId&)>
             resolveCookedArtifactPath{};
         // GUID → 원본 경로. 정본: AssetMetaRegistry(DataSystem::GetFilePath).
-        std::function<std::filesystem::path(const FileGuid&)> resolveSourcePath{};
+        ce::owned_func<std::filesystem::path(const FileGuid&)> resolveSourcePath{};
         // PHASE 3.75 MBC7 — model generation closure의 embedded texture. 이 재질을
         // 그리는 renderer가 붙든 ModelAssetGeneration 안의 TextureId면 여기서
         // owner를 받는다 — 경로 해석이 없다(파일이 없는 subasset이다). nullptr이면
         // 그 generation에 없는 것이고 cooked/source 경로로 내려간다. 비어 있으면
         // (generation 없는 재질) 건너뛴다. 정본: DataSystem::ResolveModelGenerationTexture.
-        std::function<own::shared_owner<const Texture>(const AssetId&)> resolveEmbeddedTexture{};
+        ce::owned_func<own::shared_owner<const Texture>(const AssetId&)> resolveEmbeddedTexture{};
     };
 
     struct ResolvedMaterialTexture final
@@ -79,8 +81,8 @@ namespace experiment
         own::shared_owner<const ShaderMeta> shaderMeta{};
         // ShaderMeta 축 순서 기준 정규화 결과. 이름 기반 keywords가 정본이고
         // 인덱스 keywordSelections는 보조다(ModelData.h의 저작 계약 그대로).
-        std::vector<std::uint16_t> keywordSelections{};
-        std::vector<ResolvedMaterialTexture> textures{};
+        ce::dynamic_array<std::uint16_t> keywordSelections{};
+        ce::dynamic_array<ResolvedMaterialTexture> textures{};
         ResolvedMaterialNotes notes{};
     };
 
@@ -98,6 +100,6 @@ namespace experiment
     // 공유한다(두 번째 정규화 구현 금지). 이름 기반 keywords가 정본으로 인덱스
     // 선택을 덮고, 모호/미지/범위 밖은 fail-closed다.
     [[nodiscard]] bool NormalizeMaterialKeywordSelections(const Material& material,
-        const std::vector<ShaderKeywordAxis>& axes,
-        std::vector<std::uint16_t>& outSelections, std::string& outError);
+        const ce::dynamic_array<ShaderKeywordAxis>& axes,
+        ce::dynamic_array<std::uint16_t>& outSelections, std::string& outError);
 }

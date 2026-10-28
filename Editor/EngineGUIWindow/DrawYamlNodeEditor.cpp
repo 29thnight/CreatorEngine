@@ -1,3 +1,4 @@
+#include "../../Engine/Utility_Framework/Foundation/EngineNodeSet.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
 #else
@@ -151,7 +152,7 @@ bool DrawTextureImportEditor(Authoring::WriteNode node, const std::filesystem::p
 
 namespace
 {
-	const std::unordered_set<std::string> ignoredKeys = {
+	const ce::engine_node_set<std::string> ignoredKeys = {
 		"guid",
 		"importSettings"
 	};

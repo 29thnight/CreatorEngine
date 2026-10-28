@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "MaterialAssetSetCodec.h"
 
 #include "../../Assets/AssetIdentityProfile.h"
@@ -35,7 +36,7 @@ namespace experiment::cooked
             return true;
         }
 
-        bool AddDependency(std::vector<AssetDependency>& dependencies, const AssetId& owner,
+        bool AddDependency(ce::dynamic_array<AssetDependency>& dependencies, const AssetId& owner,
             const AssetId& target, CookedAssetKind kind, std::string& failure)
         {
             if (!ValidId(target) || target == owner)
@@ -60,13 +61,13 @@ namespace experiment::cooked
         }
 
         bool DocumentDependencies(const material_graph::InstanceDocument& document,
-            std::vector<AssetDependency>& out, std::string& failure)
+            ce::dynamic_array<AssetDependency>& out, std::string& failure)
         {
             if (!ValidId(document.materialId))
             {
                 return Fail(failure, "Material document requires a nonnil UUIDv4/v8 identity.");
             }
-            std::vector<AssetDependency> dependencies;
+            ce::dynamic_array<AssetDependency> dependencies;
             if (!AddDependency(dependencies, document.materialId, document.description.graphId,
                 CookedAssetKind::MaterialProgram, failure))
             {
@@ -92,7 +93,7 @@ namespace experiment::cooked
             {
                 return Fail(failure, "Material artifact dependency count differs from its typed catalog entry.");
             }
-            std::vector<TypedAssetReference> targets;
+            ce::dynamic_array<TypedAssetReference> targets;
             targets.reserve(expected.size());
             for (const auto& dependency : expected)
             {
@@ -125,7 +126,7 @@ namespace experiment::cooked
     }
 
     bool EncodeMaterialAssetSetDocument(const material_graph::InstanceDocument& document,
-        std::vector<std::byte>& outBytes, std::vector<AssetDependency>& outDependencies, std::string& failure)
+        ce::dynamic_array<std::byte>& outBytes, ce::dynamic_array<AssetDependency>& outDependencies, std::string& failure)
     {
         try
         {
@@ -141,12 +142,12 @@ namespace experiment::cooked
             {
                 return false;
             }
-            std::vector<AssetDependency> dependencies;
+            ce::dynamic_array<AssetDependency> dependencies;
             if (!material_asset_set_codec_detail::DocumentDependencies(validated, dependencies, failure))
             {
                 return false;
             }
-            std::vector<std::byte> bytes;
+            ce::dynamic_array<std::byte> bytes;
             if (!Authoring::EncodeCookedDocument(staging.Root().Read(), bytes, failure))
             {
                 return false;
@@ -167,7 +168,7 @@ namespace experiment::cooked
     }
 
     bool CollectMaterialProgramAssetSetDependencies(const material_graph::VerifiedProduct& product,
-        const AssetId& programAssetId, std::vector<AssetDependency>& outDependencies, std::string& failure)
+        const AssetId& programAssetId, ce::dynamic_array<AssetDependency>& outDependencies, std::string& failure)
     {
         failure.clear();
         if (!material_asset_set_codec_detail::ValidId(programAssetId) || !product.materialShader ||
@@ -196,7 +197,7 @@ namespace experiment::cooked
                 return false;
             }
         }
-        std::vector<AssetDependency> dependencies;
+        ce::dynamic_array<AssetDependency> dependencies;
         for (const auto& resource : product.program.resources)
         {
             if (resource.kind == LX::LXMaterialResourceKind::Sampler)
@@ -229,8 +230,8 @@ namespace experiment::cooked
     bool ValidateMaterialAssetSetBinding(const material_graph::InstanceDocument& document,
         const material_graph::VerifiedProduct& product, std::string& failure)
     {
-        std::vector<std::byte> documentBytes;
-        std::vector<AssetDependency> dependencies;
+        ce::dynamic_array<std::byte> documentBytes;
+        ce::dynamic_array<AssetDependency> dependencies;
         if (!EncodeMaterialAssetSetDocument(document, documentBytes, dependencies, failure))
         {
             return false;
@@ -240,8 +241,8 @@ namespace experiment::cooked
             return material_asset_set_codec_detail::Fail(failure,
                 "Material instance requires the matching generated MaterialProgram binding contract.");
         }
-        std::vector<std::uint8_t> uniforms;
-        std::vector<LX::LXMaterialDiagnostic> diagnostics;
+        ce::dynamic_array<std::uint8_t> uniforms;
+        ce::dynamic_array<LX::LXMaterialDiagnostic> diagnostics;
         if (!material_graph::PrepareUniforms(product.layout, document.description.parameters, uniforms, diagnostics))
         {
             return material_asset_set_codec_detail::Fail(failure,
@@ -296,7 +297,7 @@ namespace experiment::cooked
         {
             return material_asset_set_codec_detail::Fail(failure, "Material document identity differs from the catalog.");
         }
-        std::vector<AssetDependency> actual;
+        ce::dynamic_array<AssetDependency> actual;
         if (!material_asset_set_codec_detail::DocumentDependencies(candidate, actual, failure) ||
             !material_asset_set_codec_detail::MatchDependencies(dependencies, actual, failure))
         {
@@ -325,7 +326,7 @@ namespace experiment::cooked
         {
             return false;
         }
-        std::vector<AssetDependency> actual;
+        ce::dynamic_array<AssetDependency> actual;
         if (!CollectMaterialProgramAssetSetDependencies(candidate.product, expected.key.assetId, actual, failure) ||
             !material_asset_set_codec_detail::MatchDependencies(dependencies, actual, failure))
         {

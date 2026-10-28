@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -19,7 +20,7 @@ namespace experiment::cooked
         }
 
         void AppendIssues(ModelDecodeResult& into,
-            std::vector<ModelLoadIssue> from)
+            ce::dynamic_array<ModelLoadIssue> from)
         {
             into.issues.insert(into.issues.end(),
                 std::make_move_iterator(from.begin()),

@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<!-- Tools/docs/render-markdown-docs.mjs 가 docs/analysis/ContainerLibraryBenchmark20261025.md 에서 만들었다. 이 파일을 고치지 말고 Markdown 을 고친 뒤 다시 실행한다. -->
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>C++23 독립 컨테이너·문자열 측정 (2026-10-25)</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='8' fill='%230d1520'/%3E%3Cpath d='M14 20h36M14 32h24M14 44h30' stroke='%23ffb547' stroke-width='5' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans+KR:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark light;
+    --bg: #0d1520; --surface: #132031; --border: #22324a; --border-bright: #596b87;
+    --text: #e3ecf5; --text-dim: #92a6bb; --accent: #ffb547; --accent-dim: rgba(255,181,71,.14);
+    --ok: #6fd3a0; --warn: #e8d36a; --risk: #ff7b6b; --info: #7cc0f0;
+    --node-top: color-mix(in srgb, var(--text) 7%, var(--surface)); --lift: rgb(0 0 0 / .45); --halo: 32%;
+    --font-body: 'IBM Plex Sans KR', 'Malgun Gothic', sans-serif;
+    --font-mono: 'IBM Plex Mono', 'IBM Plex Sans KR', ui-monospace, monospace;
+    --t-label: .75rem; --t-small: .875rem; --t-body: 1rem; --t-lead: 1.25rem; --t-h2: 1.625rem; --t-h1: clamp(2rem, 4.6vw, 3.25rem);
+    --s-1: .25rem; --s-2: .5rem; --s-3: .75rem; --s-4: 1rem; --s-5: 1.5rem; --s-6: 2rem; --s-7: 3rem; --s-8: 4.5rem;
+    --r-1: 4px; --r-2: 10px;
+    --ease: cubic-bezier(.16,1,.3,1); --fast: 150ms; --med: 300ms; --slow: 500ms;
+  }
+  @media (prefers-color-scheme: light) {
+    :root {
+      --bg: #f2f6fa; --surface: #ffffff; --border: #d6e0ea; --border-bright: #818f9e;
+      --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --accent-dim: rgba(163,71,0,.12);
+      --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99;
+      --node-top: var(--surface); --lift: rgb(15 26 38 / .12); --halo: 22%;
+    }
+  }
+  html { font-size: 17px; scroll-padding-top: var(--s-6); }
+  * { box-sizing: border-box; margin: 0; }
+  body { background: var(--bg); color: var(--text); font: 400 var(--t-body)/1.6 var(--font-body); text-wrap: pretty; font-kerning: normal; font-synthesis: none; -webkit-font-smoothing: antialiased; word-break: keep-all; overflow-wrap: anywhere; }
+  body::before { content: ''; position: fixed; inset: 0; z-index: -1; pointer-events: none; opacity: .5;
+    background-image: linear-gradient(var(--border) 1px, transparent 1px), linear-gradient(90deg, var(--border) 1px, transparent 1px); background-size: 24px 24px;
+    mask-image: linear-gradient(to bottom, #000, transparent 40rem); }
+  ::selection { background: var(--accent-dim); }
+  :focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  a { color: var(--info); text-underline-offset: .2em; text-decoration-thickness: 1px; }
+  a:hover { color: var(--accent); }
+  .shell { max-width: 80rem; margin: 0 auto; padding: var(--s-7) var(--s-5) var(--s-8); display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-6); }
+  @media (min-width: 75rem) { .shell.has-toc { grid-template-columns: 14rem minmax(0, 1fr); } }
+  main { min-width: 0; max-width: 64rem; display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-7); }
+  main > *, section, figure, header { min-width: 0; }
+  .crumbs { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+  .crumbs a { color: var(--text-dim); }
+  header.page { display: grid; gap: var(--s-4); }
+  .eyebrow { display: flex; align-items: center; gap: var(--s-2); font: 600 var(--t-label) var(--font-mono); letter-spacing: .08em; color: var(--accent); }
+  .eyebrow::before { content: ''; width: 1.25rem; height: 2px; background: currentColor; }
+  h1, h2 { text-box: trim-both cap alphabetic; }
+  h1 { font-size: var(--t-h1); line-height: 1.15; font-weight: 600; letter-spacing: -.02em; text-wrap: balance; max-width: 26ch; }
+  h2 { font-size: var(--t-h2); line-height: 1.25; font-weight: 600; letter-spacing: -.01em; text-wrap: balance; }
+  h3 { font-size: 1.125rem; line-height: 1.35; font-weight: 600; margin-top: var(--s-6); }
+  h4, h5, h6 { font-size: var(--t-body); line-height: 1.4; font-weight: 600; margin-top: var(--s-5); color: var(--text); }
+  .lead { font-size: var(--t-lead); line-height: 1.5; color: var(--text-dim); max-width: 48ch; }
+  .meta { font: 500 var(--t-label)/1.7 var(--font-mono); color: var(--text-dim); font-variant-numeric: tabular-nums; max-width: 90ch; }
+  .meta p + p { margin-top: var(--s-1); }
+  .ve-label { font: 500 var(--t-label) var(--font-mono); color: var(--text-dim); }
+  code { font: .875em var(--font-mono); font-variant-ligatures: none; color: var(--text); background: color-mix(in srgb, var(--text) 7%, transparent); padding: .05em .3em; border-radius: var(--r-1); }
+  kbd { font: .8em var(--font-mono); border: 1px solid var(--border-bright); border-radius: var(--r-1); padding: 0 .3em; }
+
+  /* figure: stage on the dot grid */
+  figure { display: grid; gap: var(--s-3); }
+  .frame { background: radial-gradient(circle at 1px 1px, color-mix(in srgb, var(--text) 13%, transparent) 1px, transparent 1.5px) 0 0 / 20px 20px, var(--bg); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-5); overflow-x: auto; }
+  figcaption { font-size: var(--t-body); color: var(--text-dim); max-width: 70ch; }
+  .fig-n { font: 600 var(--t-label) var(--font-mono); color: var(--text); margin-right: var(--s-2); }
+
+  /* chips: shape + word, never color alone */
+  .chip { display: inline-flex; align-items: center; gap: .4em; font: 600 var(--t-label)/1.5 var(--font-mono); padding: 0 var(--s-2); border: 1px solid currentColor; border-radius: var(--r-1); white-space: nowrap; vertical-align: .1em; }
+  .chip::before { content: ''; width: .5rem; height: .5rem; background: currentColor; flex: none; }
+  .chip.ok { color: var(--ok); } .chip.ok::before { border-radius: 50%; }
+  .chip.warn { color: var(--warn); } .chip.warn::before { clip-path: polygon(50% 0, 100% 100%, 0 100%); }
+  .chip.risk { color: var(--risk); }
+  .chip.info { color: var(--info); } .chip.info::before { transform: rotate(45deg) scale(.8); }
+  .chip.dim { color: var(--text-dim); } .chip.dim::before { background: none; border: 1.5px solid currentColor; border-radius: 50%; }
+
+  /* KPI strip: one frame, hairline cells */
+  .kpis { display: flex; flex-wrap: wrap; gap: 1px; background: var(--border); border: 1px solid var(--border); border-radius: var(--r-2); overflow: hidden; }
+  .kpi { flex: 1 1 12rem; background: var(--surface); padding: var(--s-4) var(--s-5); display: grid; gap: var(--s-2); align-content: start; min-width: 0; }
+  .kpi .val { font: 600 2.25rem/1 var(--font-body); font-variant-numeric: tabular-nums; letter-spacing: -.03em; text-box: trim-both cap alphabetic; }
+  .kpi .unit { font-size: .5em; font-weight: 500; color: var(--text-dim); letter-spacing: 0; margin-left: .15em; }
+
+  /* stacked status bar */
+  .stack { display: flex; height: .75rem; border-radius: var(--r-1); overflow: hidden; background: var(--border); gap: 2px; }
+  .stack > i { display: block; min-width: 2px; }
+  .stack .ok { background: var(--ok); } .stack .info { background: var(--info); } .stack .warn { background: var(--warn); }
+  .stack .risk { background: var(--risk); } .stack .dim { background: repeating-linear-gradient(135deg, var(--border-bright) 0 2px, transparent 2px 6px); }
+  .legend { display: flex; flex-wrap: wrap; gap: var(--s-2) var(--s-4); }
+
+  /* prose */
+  .prose { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--s-4); }
+  .prose > p, .prose > ul, .prose > ol, .prose > blockquote, .prose > h3, .prose > h4, .prose > h5, .prose > h6, .prose > dl { max-width: 72ch; }
+  .prose ul, .prose ol { padding-left: 1.4em; display: grid; gap: var(--s-1); }
+  .prose li > ul, .prose li > ol { margin-top: var(--s-1); }
+  .prose li::marker { color: var(--text-dim); }
+  .prose li.task { list-style: none; margin-left: -1.4em; display: block; }
+  .prose li.task > input { accent-color: var(--ok); margin-right: var(--s-2); vertical-align: -.1em; }
+  .prose blockquote { border-left: 2px solid var(--border-bright); padding: var(--s-1) 0 var(--s-1) var(--s-4); color: var(--text-dim); }
+  .prose hr { border: 0; border-top: 1px solid var(--border); }
+  .prose img { max-width: 100%; height: auto; border-radius: var(--r-2); border: 1px solid var(--border); }
+  .prose strong { font-weight: 600; color: var(--text); }
+  .prose h3 + *, .prose h4 + * { margin-top: calc(-1 * var(--s-2)); }
+
+  /* section opener: hairline, mono label in columns 1-3, h2 in 4-12 */
+  .doc-sec { display: grid; gap: var(--s-4); scroll-margin-top: var(--s-5); }
+  .sec-head { display: grid; gap: var(--s-2) var(--s-5); align-items: baseline; border-top: 1px solid var(--border); padding-top: var(--s-5); margin-bottom: var(--s-2); }
+  @media (min-width: 52rem) { .sec-head { grid-template-columns: 3fr 9fr; } }
+  .sec-head .ve-label { letter-spacing: .08em; }
+
+  /* tables */
+  .table-scroll { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--r-2); background: var(--surface); }
+  table { width: 100%; border-collapse: collapse; font-size: .9375rem; font-variant-numeric: tabular-nums; }
+  th { font: 600 var(--t-label) var(--font-mono); color: var(--text-dim); text-align: left; padding: var(--s-3) var(--s-4); background: color-mix(in srgb, var(--text) 4%, var(--surface)); border-bottom: 1px solid var(--border-bright); white-space: nowrap; }
+  td { padding: var(--s-3) var(--s-4); border-top: 1px solid var(--border); vertical-align: top; min-width: 6rem; }
+  td.num, th.num { text-align: right; }
+  tr:hover td { background: color-mix(in srgb, var(--accent) 4%, transparent); }
+
+  /* code */
+  pre { font: var(--t-small)/1.55 var(--font-mono); font-variant-ligatures: none; background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-2); padding: var(--s-4); overflow-x: auto; tab-size: 4; }
+  pre code { background: none; padding: 0; font-size: inherit; color: var(--text); }
+  pre.mermaid { background: var(--bg); text-align: left; }
+  pre.mermaid svg { max-width: none; }
+
+  details { border-top: 1px solid var(--border); padding-top: var(--s-3); }
+  summary { cursor: pointer; font: 500 var(--t-small) var(--font-mono); color: var(--text-dim); }
+  summary:hover { color: var(--accent); }
+
+  /* table of contents with scroll-spy */
+  nav.toc { display: none; }
+  @media (min-width: 75rem) {
+    nav.toc { display: block; position: sticky; top: var(--s-6); align-self: start; max-height: calc(100vh - 2 * var(--s-6)); overflow-y: auto; padding-right: var(--s-2); }
+    nav.toc ol { list-style: none; padding: 0; display: grid; gap: 2px; }
+    nav.toc a { display: block; font-size: var(--t-small); line-height: 1.4; color: var(--text-dim); text-decoration: none; padding: var(--s-1) var(--s-2); border-left: 2px solid var(--border); }
+    nav.toc a:hover { color: var(--text); }
+    nav.toc a.is-on { color: var(--text); border-left-color: var(--accent); background: var(--accent-dim); }
+    nav.toc .ve-label { display: block; margin-bottom: var(--s-3); letter-spacing: .08em; }
+  }
+
+  .sources { border-top: 1px solid var(--border); padding-top: var(--s-4); display: grid; gap: var(--s-2); }
+
+  /* entrance: blocks rise in once; JS adds .js-motion only when motion is allowed */
+  .js-motion main > * { transition: opacity var(--slow) var(--ease), transform var(--slow) var(--ease); }
+  .js-motion main > :not(.in) { opacity: 0; transform: translateY(1rem); }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+  @media print {
+    :root { --bg: #fff; --surface: #fff; --border: #d6e0ea; --border-bright: #818f9e; --text: #0f1a26; --text-dim: #4d6074; --accent: #a34700; --ok: #1c7443; --warn: #776300; --risk: #b0341e; --info: #145f99; --node-top: #fff; }
+    body::before, nav.toc, .crumbs { display: none; }
+    .frame, .kpi, .table-scroll, pre { break-inside: avoid; } h2, h3 { break-after: avoid; }
+    .js-motion main > * { opacity: 1 !important; transform: none !important; }
+    svg * { filter: none !important; }
+  }
+  .doc-map { display: grid; gap: 2px; padding: var(--s-4); }
+  .map-row { display: grid; grid-template-columns: 3.5rem minmax(0, 16rem) minmax(4rem, 1fr) auto; align-items: center; gap: var(--s-3); padding: var(--s-1) var(--s-2); border-radius: var(--r-1); color: var(--text); text-decoration: none; }
+  .map-row:hover, .map-row:focus-visible { background: var(--accent-dim); color: var(--text); }
+  .map-name { font-size: var(--t-small); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .map-bar { height: .5rem; background: var(--border); border-radius: 2px; overflow: hidden; }
+  .map-bar i { display: block; height: 100%; background: var(--border-bright); }
+  .map-row:hover .map-bar i { background: var(--accent); }
+  .map-marks { display: flex; gap: var(--s-1); justify-content: flex-end; min-width: 3rem; }
+  @media (max-width: 40rem) { .map-row { grid-template-columns: 3rem minmax(0, 1fr) 4rem; } .map-marks { display: none; } }
+
+</style>
+</head>
+<body>
+<div class="shell">
+
+<main>
+<header class="page">
+<nav class="crumbs" aria-label="위치"><a href="../RefactoringPlanDashboard.html">계획 대시보드</a><span>docs/analysis/</span><a href="ContainerLibraryBenchmark20261025.md">원본 Markdown</a></nav>
+<p class="eyebrow">분석</p>
+<h1>C++23 독립 컨테이너·문자열 측정 (2026-10-25)</h1>
+<div class="meta"><p>독립 솔루션 초기 구현을 작성하고 MSVC STL Release와 비교했다. 배열·FIFO·정수 키 해시맵은 다수 항목에서 우위 후보지만, 문자열 일부 경로와 변동성이 큰 항목이 남아 전체 엔진 통합 게이트는 통과하지 않았다. 이 보고서는 실제 엔진 프레임 성능을 주장하지 않는다.</p>
+<p>환경: Windows 11 Pro 10.0.26300, Intel i7-8700K 6C/12T, x64 MSVC 19.50.35730, MSVC STL 145, <code>/O2 /MD</code>, iterator debug 0, C++23 요청에 대한 MSVC <code>/std:c++latest</code>. CMake가 설치된 BuildTools 인스턴스를 선택했으며 Community의 도구 경로를 호출했다고 Community 컴파일러를 사용한 것으로 간주하지 않는다.</p>
+<p>측정: 프로세스 3회, 각 케이스 warmup 3회 + 15개 표본, 적응 반복(약 2ms 목표), A/B 순서 교대. 아래 비율은 각 프로세스 중앙값 비율의 중앙값이다. p약90/p약10 비가 어느 쪽이든 1.25 초과인 실행이 있으면 &#39;변동 큼&#39;으로 보수 표기한다. 통계적 신뢰구간이나 고립된 CPU 측정은 아니다. 일부 작은 SSO 측정은 최적화 효과가 클 수 있으므로 실제 문자열 소비자 부하로 다시 검증한다.</p>
+</div>
+</header>
+
+
+<section class="prose"><div class="table-scroll"><table>
+<thead><tr><th>항목</th><th style="text-align:right">N</th><th style="text-align:right">3회 중앙값 비율(custom/STL)</th><th>범위</th><th>판정</th></tr></thead>
+<tbody><tr><td>array_growth</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.180</td><td>0.148~0.181</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>array_growth</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.309</td><td>0.306~0.480</td><td>우위 후보</td></tr>
+<tr><td>array_growth</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.484</td><td>0.465~0.485</td><td>우위 후보</td></tr>
+<tr><td>array_growth</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.525</td><td>0.521~0.534</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>array_growth</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.562</td><td>0.414~0.578</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>array_growth</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">0.698</td><td>0.678~0.836</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>array_reserved</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.976</td><td>0.965~0.979</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>array_reserved</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.874</td><td>0.869~0.880</td><td>우위 후보</td></tr>
+<tr><td>array_reserved</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.875</td><td>0.860~0.889</td><td>우위 후보</td></tr>
+<tr><td>array_reserved</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.761</td><td>0.749~0.775</td><td>우위 후보</td></tr>
+<tr><td>array_reserved</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.635</td><td>0.634~0.639</td><td>우위 후보</td></tr>
+<tr><td>array_reserved</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">0.650</td><td>0.632~0.657</td><td>우위 후보</td></tr>
+<tr><td>fifo_batch</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.604</td><td>0.549~0.608</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>fifo_batch</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.609</td><td>0.592~0.619</td><td>우위 후보</td></tr>
+<tr><td>fifo_batch</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.615</td><td>0.597~0.619</td><td>우위 후보</td></tr>
+<tr><td>fifo_batch</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.616</td><td>0.609~0.616</td><td>우위 후보</td></tr>
+<tr><td>fifo_batch</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.587</td><td>0.540~0.594</td><td>우위 후보</td></tr>
+<tr><td>fifo_batch</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">0.570</td><td>0.566~0.571</td><td>우위 후보</td></tr>
+<tr><td>map_build</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.107</td><td>0.103~0.158</td><td>우위 후보</td></tr>
+<tr><td>map_build</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.119</td><td>0.118~0.136</td><td>우위 후보</td></tr>
+<tr><td>map_build</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.128</td><td>0.128~0.128</td><td>우위 후보</td></tr>
+<tr><td>map_build</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.082</td><td>0.080~0.089</td><td>우위 후보</td></tr>
+<tr><td>map_build</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.102</td><td>0.101~0.110</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>map_build</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">0.224</td><td>0.209~0.225</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>map_hit</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.509</td><td>0.507~0.513</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>map_hit</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.558</td><td>0.542~0.559</td><td>우위 후보</td></tr>
+<tr><td>map_hit</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.516</td><td>0.514~0.542</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>map_hit</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.590</td><td>0.580~0.591</td><td>우위 후보</td></tr>
+<tr><td>map_hit</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.491</td><td>0.490~0.507</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>map_hit</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">0.496</td><td>0.477~0.498</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>map_miss</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.669</td><td>0.669~0.670</td><td>우위 후보</td></tr>
+<tr><td>map_miss</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.584</td><td>0.581~0.587</td><td>우위 후보</td></tr>
+<tr><td>map_miss</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.567</td><td>0.507~0.568</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>map_miss</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.649</td><td>0.632~0.653</td><td>우위 후보</td></tr>
+<tr><td>map_miss</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.591</td><td>0.590~0.610</td><td>우위 후보</td></tr>
+<tr><td>map_miss</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">0.822</td><td>0.677~0.828</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>string_append</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.255</td><td>0.255~0.255</td><td>우위 후보</td></tr>
+<tr><td>string_append</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.117</td><td>0.116~0.321</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>string_append</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.228</td><td>0.227~0.619</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>string_append</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.634</td><td>0.617~0.652</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>string_append</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">1.014</td><td>1.008~1.051</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>string_append</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">1.117</td><td>1.094~1.123</td><td>보완</td></tr>
+<tr><td>string_copy</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">1.517</td><td>1.500~1.719</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>string_copy</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.014</td><td>0.013~0.093</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>string_copy</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.998</td><td>0.996~0.999</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>string_copy</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">1.023</td><td>1.018~1.031</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>string_copy</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">1.127</td><td>1.060~1.210</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>string_copy</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">1.010</td><td>0.996~1.141</td><td>동급 후보</td></tr>
+<tr><td>string_find</td><td class="num" style="text-align:right">8</td><td class="num" style="text-align:right">0.731</td><td>0.675~0.750</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>string_find</td><td class="num" style="text-align:right">23</td><td class="num" style="text-align:right">0.766</td><td>0.763~0.768</td><td>우위 후보</td></tr>
+<tr><td>string_find</td><td class="num" style="text-align:right">24</td><td class="num" style="text-align:right">0.798</td><td>0.791~0.810</td><td>우위 후보</td></tr>
+<tr><td>string_find</td><td class="num" style="text-align:right">64</td><td class="num" style="text-align:right">0.429</td><td>0.427~0.429</td><td>변동 큼 / 재측정</td></tr>
+<tr><td>string_find</td><td class="num" style="text-align:right">4096</td><td class="num" style="text-align:right">0.216</td><td>0.214~0.217</td><td>우위 후보</td></tr>
+<tr><td>string_find</td><td class="num" style="text-align:right">65536</td><td class="num" style="text-align:right">0.219</td><td>0.219~0.221</td><td>우위 후보</td></tr></tbody></table></div>
+<p>정확성: MSVC Release, MSVC Release + AddressSanitizer, ClangCL 20.1.8 Release에서 동일 대조 검사를 실행한다. 실행 로그의 <code>CORRECTNESS_PASS</code>와 소스·바이너리 SHA-256은 독립 프로젝트 <code>results</code>에서 확인한다. ClangCL도 같은 Windows CRT/STL 환경이며 Linux/macOS 검증을 대신하지 않는다.</p>
+<p>제약: 배열/맵은 단순 타입, 맵은 uint64 키다. 해시맵의 load factor/슬롯 메모리, 문자열의 SSO 용량, FIFO의 고정 용량 계약이 STL과 다르다. 기본 정책의 용도 비교이며 API·메모리 예산이 동일한 범용 대체 성능으로 일반화하지 않는다. 해시맵 churn/erase는 정확성 검사만 수행했고 성능은 build/hit/miss만 측정했다. 문자열 검색은 반복 문자 안의 고정 패턴이며 적대적 패턴의 worst-case 검증이 남아 있다. CPU affinity·전원 정책·백그라운드 프로그램은 변경하지 않았다. 냉 캐시·할당량·RSS·엔진 프레임·다른 OS는 미검증이다.</p>
+<p>원본: <code>C:/Users/idene/source/repos/CreatorContainers/results/release-run1.csv</code>, <code>release-run2.csv</code>, <code>release-run3.csv</code>, <code>environment.json</code>, <code>asan.txt</code>, <code>clang.txt</code>. 재실행: 독립 디렉터리에서 <code>./run-tests.ps1</code>. 실행 코드는 <code>tests/main.cpp</code>, 공개 헤더는 <code>include/ce/containers.h</code>, <code>include/ce/string.h</code>다.</p>
+<p><a href="../design/ContainerLibraryDesign.html">새 설계와 통합 게이트</a>. 기존 &#39;자체 제작하지 않는다&#39;는 결정은 폐기하고 해당 문서를 새 계약으로 교체했다. 엔진의 기존 컨테이너 사용처는 변경하지 않았다.</p>
+</section>
+<section class="sources" aria-label="출처">
+<p class="ve-label">출처</p>
+<p><a href="ContainerLibraryBenchmark20261025.md"><code>docs/analysis/ContainerLibraryBenchmark20261025.md</code></a> · 아직 커밋 전 · <code>Tools/docs/render-markdown-docs.mjs</code> 로 생성</p>
+</section>
+</main>
+</div>
+<script>
+(() => {
+  const still = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const links = [...document.querySelectorAll('nav.toc a[href^="#"]')];
+  if (links.length) {
+    const byId = new Map(links.map(a => [decodeURIComponent(a.hash.slice(1)), a]));
+    const spy = new IntersectionObserver(entries => {
+      for (const e of entries) if (e.isIntersecting) {
+        for (const a of links) a.classList.toggle('is-on', a === byId.get(e.target.id));
+      }
+    }, { rootMargin: '0px 0px -70% 0px' });
+    for (const id of byId.keys()) { const el = document.getElementById(id); if (el) spy.observe(el); }
+  }
+  if (still) return;
+  document.documentElement.classList.add('js-motion');
+  const io = new IntersectionObserver(entries => {
+    for (const e of entries) if (e.isIntersecting) { io.unobserve(e.target); e.target.classList.add('in'); }
+  }, { rootMargin: '0px 0px -5% 0px' });
+  for (const el of document.querySelectorAll('main > *')) io.observe(el);
+})();
+</script>
+
+</body>
+</html>

@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #include "ModelCookIdentity.h"
 #include "../../../Utility_Framework/Authoring/AuthoringParsedDocument.h"
 
@@ -7,7 +8,7 @@ namespace experiment::cooked
 {
     namespace
     {
-        void AddIssue(std::vector<ModelIdentityIssue>& issues,
+        void AddIssue(ce::dynamic_array<ModelIdentityIssue>& issues,
             ModelIdentityIssueCode code, std::string context,
             std::string message)
         {
@@ -17,7 +18,7 @@ namespace experiment::cooked
 
         [[nodiscard]] bool ReadScalar(const Authoring::ReadNode& parent,
             const char* key, const std::string& context, std::string& out,
-            std::vector<ModelIdentityIssue>& issues)
+            ce::dynamic_array<ModelIdentityIssue>& issues)
         {
             const Authoring::ReadNode node = parent[key];
             if (!node)
@@ -38,7 +39,7 @@ namespace experiment::cooked
 
         [[nodiscard]] bool ReadGuid(const Authoring::ReadNode& parent,
             const char* key, const std::string& context, AssetId& out,
-            std::vector<ModelIdentityIssue>& issues)
+            ce::dynamic_array<ModelIdentityIssue>& issues)
         {
             std::string text;
             if (!ReadScalar(parent, key, context, text, issues)) return false;
@@ -54,7 +55,7 @@ namespace experiment::cooked
     }
 
     bool ReadAssetIdFromMeta(std::string_view yaml, AssetId& outAssetId,
-        std::vector<ModelIdentityIssue>& outIssues)
+        ce::dynamic_array<ModelIdentityIssue>& outIssues)
     {
         std::string parseError;
         const Authoring::ParsedDocument document =

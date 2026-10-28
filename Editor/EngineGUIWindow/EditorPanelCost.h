@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
 
 // PHASE 21 W7-0 — 패널별 draw 비용 관측.
@@ -58,7 +59,7 @@ namespace editor::windows
 
     struct panel_cost_snapshot
     {
-        std::array<panel_cost_sample, kPanelCostSlotCount> slots{};
+        ce::fixed_array<panel_cost_sample, kPanelCostSlotCount> slots{};
         std::uint64_t publishedFrames{};  ///< 게시된 UI 프레임 수(리셋 이후)
     };
 
@@ -149,7 +150,7 @@ namespace editor::windows
 
     struct window_cost_snapshot
     {
-        std::vector<window_cost_sample> windows;
+        ce::dynamic_array<window_cost_sample> windows;
         /// 프레임 총계. `id` 는 "(frame)" 이다 — 창 식별자와 겹치지 않는다.
         window_cost_sample frame;
     };

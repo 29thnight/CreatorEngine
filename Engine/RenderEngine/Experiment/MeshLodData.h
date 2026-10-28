@@ -1,3 +1,4 @@
+#include "../../Containers/ContainerAPI.h"
 #pragma once
 
 #include "MeshletData.h"
@@ -31,7 +32,7 @@ namespace experiment
         // bidirectional triangle correspondence certificates. Levels aggregate equal depths.
         float geometricError{};
         // References unchanged LOD0 vertices. Base mesh indices are never replaced.
-        std::vector<std::uint32_t> indices{};
+        ce::dynamic_array<std::uint32_t> indices{};
         // Primitive remap is this level's own finalized triangle ordinal, NOT
         // an original LOD0 primitive ID. All descriptor offsets are level-local.
         MeshletPayload meshlets{};
@@ -61,7 +62,7 @@ namespace experiment
     struct MeshClusterHierarchy final
     {
         std::uint32_t groupCount{}, rootGroup{UINT32_MAX};
-        std::vector<MeshClusterGroup> groups{};
+        ce::dynamic_array<MeshClusterGroup> groups{};
         [[nodiscard]] std::uint64_t GpuBytes() const noexcept
         {
             return groupCount ? 16ull + groups.size() * sizeof(MeshClusterGroup) : 0ull;
@@ -72,8 +73,8 @@ namespace experiment
     {
         MeshLodBuildSettings settings{};
         MeshletGeometryDigest geometryDigest{};
-        std::vector<MeshLodLevel> levels{};
-        std::vector<MeshClusterGroup> groups{}; // Spatial DAG; children precede parents, last group is root.
+        ce::dynamic_array<MeshLodLevel> levels{};
+        ce::dynamic_array<MeshClusterGroup> groups{}; // Spatial DAG; children precede parents, last group is root.
 
         [[nodiscard]] bool IsEmpty() const noexcept
         {

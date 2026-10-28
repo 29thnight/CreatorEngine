@@ -22,7 +22,7 @@
 //   Property::hasRange 등      → field_info::attributes() (creator:: 속성)
 #include "TypeTrait.h"
 #include <reflgen/runtime/registry.h>
-#include "../../SceneRuntime/SceneGC.h"
+#include "../Foundation/ManagedObjectContract.h"
 #include "../Foundation/StandardLibrary.h"
 
 namespace Meta

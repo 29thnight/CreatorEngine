@@ -1,3 +1,5 @@
+#include "../../Utility_Framework/Foundation/EngineStorage.h"
+#include "../../Containers/ContainerAPI.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -156,7 +158,7 @@ namespace wave
         instance.graph.reset();
         instance.children.clear();
         instance.parameters.clear();
-        std::vector<GraphVoice> voices;
+        ce::dynamic_array<GraphVoice> voices;
         if (resolved.source.kind == SoundSourceKind::Graph)
         {
             instance.graph = m_graphs.at(resolved.source.asset);
@@ -380,7 +382,7 @@ namespace wave
         auto parameters = instance->parameters;
         parameters[name] = std::move(value);
         auto random = instance->randomState;
-        std::vector<GraphVoice> selected;
+        ce::dynamic_array<GraphVoice> selected;
         if (!EvaluateSoundGraph(*instance->graph, parameters, random, selected, m_lastError))
         {
             return false;
@@ -399,7 +401,7 @@ namespace wave
                 m_audio.Stop(child.voice);
             }
         }
-        std::vector<Child> children;
+        ce::dynamic_array<Child> children;
         children.reserve(selected.size());
         for (const auto& voice : selected)
         {
@@ -610,7 +612,7 @@ namespace wave
 
     void PlaybackService::Update()
     {
-        std::deque<PlaybackCommand> commands;
+        ce::segmented_deque<PlaybackCommand> commands;
         {
             std::lock_guard lock(m_commandMutex);
             commands.swap(m_commands);
@@ -686,10 +688,10 @@ namespace wave
         m_presets.clear();
     }
 
-    std::vector<PlaybackStarted> PlaybackService::TakeStarted()
+    ce::dynamic_array<PlaybackStarted> PlaybackService::TakeStarted()
     {
         std::lock_guard lock(m_commandMutex);
-        std::vector<PlaybackStarted> result;
+        ce::dynamic_array<PlaybackStarted> result;
         result.swap(m_started);
         m_pendingResults -= result.size();
         return result;
@@ -706,9 +708,9 @@ namespace wave
         return true;
     }
 
-    std::vector<PlaybackCompletion> PlaybackService::TakeCompletions()
+    ce::dynamic_array<PlaybackCompletion> PlaybackService::TakeCompletions()
     {
-        std::vector<PlaybackCompletion> result;
+        ce::dynamic_array<PlaybackCompletion> result;
         result.swap(m_completions);
         return result;
     }

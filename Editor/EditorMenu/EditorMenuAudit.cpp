@@ -1,3 +1,4 @@
+#include "../../Engine/Containers/ContainerAPI.h"
 // 메뉴 배선 감사 (PHASE 21 M2 · 계획서 부록 A.5).
 //
 // 이 TU 도 유니티에서 뺀다(Editor.vcxproj) — 선언 계층의 다른 구현 TU 와 같은 이유.
@@ -10,12 +11,12 @@ namespace editor
 {
     namespace
     {
-        bool contains(const std::vector<std::string>& seen, const std::string& one)
+        bool contains(const ce::dynamic_array<std::string>& seen, const std::string& one)
         {
             return seen.end() != std::find(seen.begin(), seen.end(), one);
         }
 
-        void push_once(std::vector<std::string>& out, std::string one)
+        void push_once(ce::dynamic_array<std::string>& out, std::string one)
         {
             if (!contains(out, one)) { out.push_back(std::move(one)); }
         }
@@ -23,8 +24,8 @@ namespace editor
         /// 한 표면의 항목 하나를 감사에 먹인다. 문맥 타입이 달라도 보는 것은 같다.
         template<class Context>
         void audit_one(const menu_entry<Context>& entry, std::string_view surface,
-                       std::vector<std::string>& pathsSeen,
-                       menu_audit& audit, std::vector<std::string>& declarersSeen)
+                       ce::dynamic_array<std::string>& pathsSeen,
+                       menu_audit& audit, ce::dynamic_array<std::string>& declarersSeen)
         {
             const std::string key = std::string(surface) + ":" + std::string(entry.sub_path);
 
@@ -76,7 +77,7 @@ namespace editor
         menu_audit audit;
         audit.declarers_expected = expected_declarers.size();
 
-        std::vector<std::string> declarersSeen;
+        ce::dynamic_array<std::string> declarersSeen;
 
         for (const top_menu_root root : all_top_menu_roots)
         {
@@ -88,7 +89,7 @@ namespace editor
             //
             // 한 뿌리의 전역·선택 두 목록은 한 메뉴로 합쳐 그려지므로(draw 쪽)
             // 같은 바구니에서 본다. 여기서 나누면 화면에서 겹치는 경로를 놓친다.
-            std::vector<std::string> pathsSeen;
+            ce::dynamic_array<std::string> pathsSeen;
             for (const menu_entry<global_target>& entry : storage.global_items)
             {
                 audit_one(entry, to_string(root), pathsSeen, audit, declarersSeen);
@@ -105,7 +106,7 @@ namespace editor
                 const auto& entries = popup_menu_entries<Host>();
                 audit.popup_items += entries.size();
 
-                std::vector<std::string> pathsSeen;
+                ce::dynamic_array<std::string> pathsSeen;
                 for (const auto& entry : entries)
                 {
                     audit_one(entry, to_string(Host), pathsSeen, audit, declarersSeen);
@@ -162,7 +163,7 @@ namespace editor
         const menu_audit audit = audit_declared_menus(expected_declarers);
 
         const auto append_list = [](std::string& out, const char* label,
-                                    const std::vector<std::string>& names)
+                                    const ce::dynamic_array<std::string>& names)
         {
             out += label;
             out += '=';

@@ -1,3 +1,4 @@
+#include "../../../Engine/Containers/ContainerAPI.h"
 // PHASE 14 P3 — 녹화 UI.
 //
 // 옛 ProfilerWindow(557줄)는 걷었다. 그것은 전역 프로파일러의 vector 를 매
@@ -195,11 +196,11 @@ namespace editor::profiler_view::capture_integrity
     struct stop_details
     {
         std::weak_ptr<const ce::capture_session> capture_;
-        std::array<std::string, 6> counters_;
+        ce::fixed_array<std::string, 6> counters_;
         std::optional<double> admitted_gpu_;
-        std::vector<std::uint16_t> timed_out_threads_;
-        std::vector<const ce::profile_event*> open_scopes_;
-        std::vector<std::string> gpu_errors_;
+        ce::dynamic_array<std::uint16_t> timed_out_threads_;
+        ce::dynamic_array<const ce::profile_event*> open_scopes_;
+        ce::dynamic_array<std::string> gpu_errors_;
         std::size_t other_truncated_ = 0;
         bool recorded_ = false;
     };
@@ -221,7 +222,7 @@ namespace editor::profiler_view::capture_integrity
 
         // Decode only the immutable final frame, once per capture. Never walk
         // the retained recording or resolve file IDs through the live registry.
-        constexpr std::array<std::string_view, 6> names = {
+        constexpr ce::fixed_array<std::string_view, 6> names = {
             "Capture.UnackedCpuStreams", "Capture.OpenScopesAtStop", "Capture.PendingGpuSubmissions",
             "Capture.FailedGpuSubmissions", "Capture.StopDrainMilliseconds", "Capture.AdmittedGpuSubmissions"
         };

@@ -23,7 +23,7 @@ class PipelineSlot
     bool Publish(IRenderPipelineCache& cache, const VerifiedProduct& product, RHIShaderBinary backend,
                  const Capabilities& capabilities, const Budget& budget, std::span<const ParameterOverride> parameters,
                  std::span<const TextureBinding> textures, const RHIGraphicsPipelineDesc& pipeline,
-                 RHICompletionPoint retireAfter, std::vector<LX::LXMaterialDiagnostic>& diagnostics);
+                 RHICompletionPoint retireAfter, ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics);
     const std::shared_ptr<const PipelineGeneration>& Active() const { return active_; }
     // Called with the completed graphics timeline before retiring CPU texture
     // owners. Zero fences retain owners until destruction after device idle.

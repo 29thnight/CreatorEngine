@@ -1,4 +1,7 @@
+#include "../Utility_Framework/Foundation/EngineNodeMap.h"
+#include "../Containers/ContainerAPI.h"
 #pragma once
+#include "../Utility_Framework/Foundation/EngineOrderedSet.h"
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
 #else
@@ -33,13 +36,13 @@ public:
 	[[reflgen::ignore]]
 	Animator* m_owner{};
 
-	std::vector<own::shared_owner<AnimationState>> StateVec;
+	ce::dynamic_array<own::shared_owner<AnimationState>> StateVec;
 
 	[[reflgen::ignore]]
-	std::unordered_map<std::string, own::weak_owner<AnimationState>> m_nameToState;
+	ce::engine_node_map<std::string, own::weak_owner<AnimationState>> m_nameToState;
 
 	[[reflgen::ignore]]
-	std::set<std::string> StateNameSet;
+	ce::engine_ordered_set<std::string> StateNameSet;
 
 	own::shared_owner<AnimationState> m_anyState;
 	AvatarMask* m_avatarMask{};

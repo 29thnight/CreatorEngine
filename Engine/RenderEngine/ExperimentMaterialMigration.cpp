@@ -1,3 +1,4 @@
+#include "../Containers/ContainerAPI.h"
 #include "ExperimentMaterialMigration.h"
 
 #include "Assets/ModelAssetGeneration.h" // MBC7
@@ -29,7 +30,7 @@ namespace ExperimentMaterialMigration
             const ShaderPropertyDesc& desc,
             experiment::MaterialPropertyValue& outValue, std::string& outError)
         {
-            const std::vector<float>& numeric = value.m_numericValue;
+            const ce::dynamic_array<float>& numeric = value.m_numericValue;
             switch (desc.type)
             {
             case ShaderPropertyType::Float:
@@ -247,7 +248,7 @@ namespace ExperimentMaterialMigration
     {
         // Material은 복사/이동 대입이 없다 — 성분을 지역에서 완성한 뒤 성공이
         // 확정된 마지막에만 outLegacy의 필드에 쓴다(부분 출력 금지).
-        std::vector<std::uint16_t> keywordSelections;
+        ce::dynamic_array<std::uint16_t> keywordSelections;
         if (!material.keywords.empty())
         {
             if (nullptr == meta)
@@ -267,7 +268,7 @@ namespace ExperimentMaterialMigration
             keywordSelections = material.keywordSelections;
         }
 
-        std::vector<MaterialPropertyValue> propertyValues;
+        ce::dynamic_array<MaterialPropertyValue> propertyValues;
         bool doubleSided = false;
 
         for (const experiment::MaterialProperty& property : material.properties)

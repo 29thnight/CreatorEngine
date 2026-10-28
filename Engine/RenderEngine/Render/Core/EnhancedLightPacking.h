@@ -1,3 +1,4 @@
+#include "../../../Containers/ContainerAPI.h"
 #pragma once
 #if defined(CE_CONTRACT_STANDALONE)
 #include "../../../../Tools/build/ModuleAdapters/Creator.Core.Ownership.h"
@@ -46,7 +47,7 @@ inline EnhancedLight MakeEnhancedLight(const LightRenderProxy& source)
 struct ViewLightSelection
 {
     // 기여도 내림차순. 패스는 앞에서부터 자기 한도만큼 가져간다.
-    std::vector<EnhancedLight> lights;
+    ce::dynamic_array<EnhancedLight> lights;
 
     uint32_t sceneLights{ 0 };       // 켜져 있던 광원 수
     uint32_t culledByFrustum{ 0 };   // 뷰에 닿지 않아 뺀 수
@@ -63,7 +64,7 @@ struct ViewLightSelectionScratch
         float score{};
         bool isDirectional{};
     };
-    std::vector<Scored> scored;
+    ce::dynamic_array<Scored> scored;
 };
 
 // 카메라 절두체. 직교 투영에서는 만들지 않는다 — compact slope frustum 생성은
@@ -203,7 +204,7 @@ inline void SelectLightsForView(std::span<const own::shared_owner<LightRenderPro
 
 // Convenience for one-shot consumers. The live renderer supplies retained
 // output/scratch through the overload above to avoid allocating per view.
-inline ViewLightSelection SelectLightsForView(const std::vector<own::shared_owner<LightRenderProxy>>& proxies,
+inline ViewLightSelection SelectLightsForView(const ce::dynamic_array<own::shared_owner<LightRenderProxy>>& proxies,
                                               const FrameCameraSnapshot& camera)
 {
     ViewLightSelection selection;
