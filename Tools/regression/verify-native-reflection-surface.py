@@ -95,8 +95,8 @@ def prepare_vcpkg(engine: Path, work: Path, executable: Path) -> tuple[Path, str
 
 
 def msbuild_properties(values: dict[str, str]) -> list[str]:
-    # Semicolons separate MSBuild properties even when argv already preserved a
-    # single argument. Escape list separators without shell interpolation.
+    # Every value here is a scalar. Escape literal MSBuild separators without
+    # shell interpolation; escaped semicolons cannot represent property lists.
     return ["-p:" + key + "=" + value.replace("%", "%25").replace(";", "%3B") for key, value in values.items()]
 
 
@@ -164,7 +164,10 @@ def main() -> None:
         "ReflgenExecutable": str(args.generator.resolve()), "ReflgenIncludeDirectory": str(reflgen / "include") + os.sep,
         "ReflgenReflectionBackend": "Legacy", "CreatorGameInputIncludeDir": str(include) + os.sep,
         "CreatorCppWinRTPackageRoot": str(cppwinrt) + os.sep,
-        "ExternalIncludePath": ";".join((str(include), str(cppwinrt_include))),
+        # ConfigureCreatorContractsForReflgen already adds the installed include
+        # directory through CreatorGameInputIncludeDir. Pass only this additional
+        # root here: an escaped semicolon would become one invalid FullPath item.
+        "ExternalIncludePath": str(cppwinrt_include),
     })
     modules = ("RenderEngine", "SceneRuntime")
     generated: dict[str, Path] = {}

@@ -70,7 +70,8 @@ let value = terrain.BorrowOverload(methodInfo.Name, methodInfo.Signature).Derefe
 `InvokeOverload`도 같은 서명을 받는다. `Invoke` 결과의 `ReturnValue`는 JSON,
 `Read<'T>()`는 관리 값으로의 역직렬화, `Arguments`는 호출 이후의 인자 배열이다.
 마지막 항목에는 수정된 native reference 인자도 포함된다. 레코드의 JSON 필드
-이름은 네이티브 서술자의 이름을 사용한다.
+이름은 필드 서술자의 `SerializedName`을 사용한다. 경로의 `Field(name)`과 문자열
+인덱서는 원래 네이티브 필드 이름인 `Name`을 사용한다.
 
 ## 타입 정보와 쓰기 규약
 
