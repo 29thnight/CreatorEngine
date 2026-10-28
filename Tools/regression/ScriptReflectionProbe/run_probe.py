@@ -28,6 +28,7 @@ def main() -> None:
     env["PATH"] = str(args.dotnet.resolve().parent) + os.pathsep + env.get("PATH", "")
     env["DOTNET_CLI_TELEMETRY_OPTOUT"] = "1"
     env["DOTNET_NOLOGO"] = "1"
+    env["SCRIPT_REFLECTION_CATALOG_PATH"] = str(work / "runtime-catalog.json")
     # Use exactly the production facade generator on actual libclang declarations.
     # A distinct namespace keeps fixture records separate from production schemas.
     declarations = json.loads(args.declarations.read_text(encoding="utf-8-sig"))

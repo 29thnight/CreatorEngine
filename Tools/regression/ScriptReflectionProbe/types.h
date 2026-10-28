@@ -83,6 +83,8 @@ namespace reflection_probe
 
     struct [[reflgen::reflect("ProbeComponent"), reflgen::public_methods]] Component : Base
     {
+        using GraphValue = std::variant<std::monostate, bool, long long, double,
+            ce::fixed_array<double, 3>, ce::fixed_array<double, 4>, std::string>;
         ce::string title{u"한글 \U0001F3B9"};
         std::string utf8 = "hello";
         ce::utf8_string engineUtf8{"engine UTF-8"};
@@ -124,6 +126,7 @@ namespace reflection_probe
         [[reflgen::reflect]] int Choose(float value) const { return static_cast<int>(value) + 20; }
         [[reflgen::reflect]] int ChooseSpan(std::span<int> values) const { return 100 + static_cast<int>(values.size()); }
         [[reflgen::reflect]] int ChooseSpan(std::span<const int> values) const { return 200 + static_cast<int>(values.size()); }
+        [[reflgen::reflect]] int GraphAlternative(GraphValue value) const { return static_cast<int>(value.index()); }
         [[reflgen::reflect]] int FillSpan(std::span<int> values) const
         {
             for (auto& value : values) value += 10;

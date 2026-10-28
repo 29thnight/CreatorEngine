@@ -83,6 +83,9 @@ let main _ =
 
     // A complete type closure includes inherited, container-only and cyclic referenced types.
     let catalog = NativeReflection.Types
+    let catalogPath = Environment.GetEnvironmentVariable("SCRIPT_REFLECTION_CATALOG_PATH")
+    if not (String.IsNullOrEmpty(catalogPath)) then
+        System.IO.File.WriteAllBytes(catalogPath, JsonSerializer.SerializeToUtf8Bytes(catalog |> Array.map _.Metadata))
     let byName = catalog |> Array.map (fun item -> item.Name, item) |> Map.ofArray
     check (byName.Count = catalog.Length) "catalog has no duplicate type names"
     check (catalog |> Array.map _.Id |> Array.distinct |> Array.length = catalog.Length) "catalog has no duplicate type IDs"

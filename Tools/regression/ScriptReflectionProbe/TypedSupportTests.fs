@@ -77,6 +77,17 @@ let run (check: bool -> string -> unit) (rejected: (unit -> unit) -> string -> s
     let spanInput = (snapshot "[1,2]").ReadJson()
     check ((root.Invoke(mutableSpan, [|spanInput|])).Read<int>() = 102) "typed selector preserves mutable template argument"
     check ((root.Invoke(constSpan, [|spanInput|])).Read<int>() = 202) "typed selector preserves const template argument"
+    let msvcMutableSpan = NativeMethodSpec("ProbeComponent", "ChooseSpan", true, [|"std::span<int,0xffffffffffffffffui64>"|], [|"value"|])
+    let msvcConstSpan = NativeMethodSpec("ProbeComponent", "ChooseSpan", true, [|"std::span<int const,18446744073709551615ui64>"|], [|"value"|])
+    check ((root.Invoke(msvcMutableSpan, [|spanInput|])).Read<int>() = 102) "typed selector normalizes MSVC hex dynamic extent"
+    check ((root.Invoke(msvcConstSpan, [|spanInput|])).Read<int>() = 202) "typed selector normalizes trailing base const without losing constness"
+    let graph = NativeMethodSpec("ProbeComponent", "GraphAlternative", true,
+        [|"std::variant<std::monostate,bool,long long,double,ce::fixed_array<double,0x3>,ce::fixed_array<double,0x4>,std::basic_string<char>>"|], [|"value"|])
+    check ((root.Invoke(graph, [|(snapshot "[4,[1,2,3]]").ReadJson()|])).Read<int>() = 4) "typed selector normalizes actual material-style nested fixed-array extents"
+    let wrongExtent = NativeMethodSpec("ProbeComponent", "ChooseSpan", true, [|"std::span<int,0x3>"|], [|"value"|])
+    check (rejected (fun () -> root.Invoke(wrongExtent, [|spanInput|]) |> ignore) "fixed extent cannot become dynamic" = "method_not_found") "typed selector preserves unequal extent identity"
+    let trailingPointee = NativeMethodSpec("ProbeComponent", "EchoCString", true, [|"char const *"|], [|"value"|])
+    check ((root.Invoke(trailingPointee, [|NativeCodecs.String.Encode("const")|])).Read<string>() = "const") "typed selector preserves const pointee with MSVC qualifier spelling"
     let echo = NativeMethodSpec("ProbeComponent", "Echo", true,
         [|"std::basic_string<char, std::char_traits<char>, std::allocator<char>>"|], [|"const_reference"|])
     check ((root.Invoke(echo, [|NativeCodecs.String.Encode("선택 🎹")|])).Read<string>() = "선택 🎹") "typed template normalization resolves string overload"

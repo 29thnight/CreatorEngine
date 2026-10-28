@@ -20,6 +20,40 @@ module internal NativeTypedJson =
 
     // libclang declarations omit default template arguments, while compiler type names
     // may spell them out. Remove only known defaults, retaining overload identity.
+    let private canonicalBaseCv (text: string) =
+        // MSVC spells pointee/element qualifiers after their base type. Move
+        // only base qualifiers: int const* == const int*, while int* const
+        // remains a const pointer and must not become a pointer to const int.
+        let mutable depth = 0
+        let mutable finish = text.Length
+        for index = 0 to text.Length - 1 do
+            match text.[index] with
+            | '<' -> depth <- depth + 1
+            | '>' -> depth <- depth - 1
+            | '*' | '&' when depth = 0 && finish = text.Length -> finish <- index
+            | _ -> ()
+        let baseType = text.Substring(0, finish).TrimEnd()
+        let trailing = Regex.Match(baseType, @"\s+((?:const|volatile)(?:\s+(?:const|volatile))*)$")
+        if trailing.Success then
+            trailing.Groups.[1].Value + " " + baseType.Substring(0, trailing.Index) + text.Substring(finish)
+        else text
+
+    let private extentKey (text: string) =
+        // Extents are size_t non-type arguments. MSVC prints them in hex (the
+        // native type-name implementation deliberately preserves that spelling).
+        // Canonicalize this known numeric position only, preserving its value.
+        let text = text.Replace("'", "")
+        let literal = Regex.Match(text, @"^(0[xX][0-9a-fA-F]+|[0-9]+)(?:[uU](?:[lL]{1,2}|[iI]64)?|[lL]{1,2}[uU]?)?$")
+        if not literal.Success then text
+        else
+            let digits = literal.Groups.[1].Value
+            let mutable value = 0UL
+            let parsed =
+                if digits.StartsWith("0x", StringComparison.OrdinalIgnoreCase) then
+                    UInt64.TryParse(digits.Substring(2), NumberStyles.AllowHexSpecifier, CultureInfo.InvariantCulture, &value)
+                else UInt64.TryParse(digits, NumberStyles.None, CultureInfo.InvariantCulture, &value)
+            if parsed then value.ToString(CultureInfo.InvariantCulture) else text
+
     let rec private typeKeyInner stripTopCv (text: string) =
         let text = Regex.Replace(text, @"\b(class|struct|enum)\s+", "")
         let text = text.Replace("std::__cxx11::", "std::").Replace("std::__1::", "std::").Trim()
@@ -30,6 +64,7 @@ module internal NativeTypedJson =
                 if text.EndsWith("*", StringComparison.Ordinal) then text
                 else Regex.Replace(text, @"^(const|volatile)\s+", "")
             else text
+        let text = canonicalBaseCv text
         let first = text.IndexOf('<')
         if first >= 0 && text.EndsWith(">", StringComparison.Ordinal) then
             let name = Regex.Replace(text.Substring(0, first), @"\s+", "")
@@ -44,6 +79,8 @@ module internal NativeTypedJson =
                 | ',' when depth = 0 -> parts.Add(typeKeyInner false (inner.Substring(start, index - start))); start <- index + 1
                 | _ -> ()
             parts.Add(typeKeyInner false (inner.Substring(start)))
+            if (name = "std::array" || name = "std::span" || name = "ce::fixed_array") && parts.Count >= 2 then
+                parts.[1] <- extentKey parts.[1]
             let defaults (item: string) =
                 item.StartsWith("std::allocator<", StringComparison.Ordinal) ||
                 item.StartsWith("std::char_traits<", StringComparison.Ordinal) ||
@@ -118,10 +155,10 @@ type NativeMethodSpec(declaringType: string, name: string, isConst: bool,
                 match NativeReflection.FindType(declaringType) with
                 | Some value -> value
                 | None -> NativeTypedJson.fail "type_not_found" $"Native type '{declaringType}' is unavailable."
+            let named = nativeType.Methods |> Array.filter (fun method -> method.Name = name)
             let candidates =
-                nativeType.Methods
-                |> Array.filter (fun method ->
-                    method.Name = name && method.IsConst = isConst &&
+                named |> Array.filter (fun method ->
+                    method.IsConst = isConst &&
                     NativeTypedJson.typeKey method.DeclaringType = NativeTypedJson.typeKey declaringType &&
                     method.Parameters.Length = parameters.Length &&
                     Array.forall2 (fun (actual: NativeParameterDescriptor) (expected, mode) ->
@@ -129,7 +166,14 @@ type NativeMethodSpec(declaringType: string, name: string, isConst: bool,
                         method.Parameters (Array.zip parameters passing))
             match candidates with
             | [| method |] -> resolved <- Some (binding, method); method
-            | [||] -> NativeTypedJson.fail "method_not_found" $"No native overload matches '{declaringType}::{name}'."
+            | [||] ->
+                let expected = Array.map2 (fun kind mode -> kind + " [" + mode + "]") parameters passing |> String.concat ", "
+                let actual =
+                    named |> Array.map (fun method ->
+                        let arguments = method.Parameters |> Array.map (fun parameter -> parameter.TypeName + " [" + parameter.Passing + "]") |> String.concat ", "
+                        $"{method.DeclaringType}::{method.Name}({arguments}) const={method.IsConst}; signature={method.Signature}")
+                    |> String.concat " | "
+                NativeTypedJson.fail "method_not_found" $"No native overload matches '{declaringType}::{name}' ({expected}) const={isConst}. Available: {actual}"
             | _ -> NativeTypedJson.fail "ambiguous_method" $"Multiple native overloads match '{declaringType}::{name}'."
 
 /// An explicit explanation for a member that has no safe typed ABI representation.
