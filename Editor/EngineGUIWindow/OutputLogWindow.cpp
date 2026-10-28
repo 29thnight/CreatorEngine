@@ -417,7 +417,7 @@ namespace editor
                 if (TryOutputLogFilePath(path, nativePath))
                     EditorPlatform::Get().OpenFile(nativePath);
                 else
-                    Debug::LogWarning("Cannot open log path: the path is not valid UTF-8 text.");
+                    Debug::PrintLog(spdlog::level::warn, "Cannot open log path: the path is not valid UTF-8 text.");
             }
             if (ImGui::IsItemHovered())
             {

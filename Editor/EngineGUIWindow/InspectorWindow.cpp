@@ -1324,7 +1324,10 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 			if (strlen(newTagName) > 0)
 			{
 				const auto tagResult = EditorProjectOperations::AddTag(newTagName);
-				if (tagResult.IsSuccess()) assignTag(std::string(newTagName));
+				if (tagResult.IsSuccess())
+				{
+					assignTag(ce::utf8_string_view(newTagName));
+				}
 				else Debug::PrintLog(spdlog::level::err, tagResult.message);
 			}
 			ImGui::CloseCurrentPopup();

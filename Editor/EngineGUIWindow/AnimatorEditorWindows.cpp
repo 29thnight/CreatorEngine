@@ -397,9 +397,13 @@ if (showControllerTabs)
 							nodeEditor->m_filePath = *currentPath;
 					}
 					if (path && nodeEditor->ReNameJson(*path))
+					{
 						controller->name.assign(nameText.data(), nameText.size());
+					}
 					else
-						Debug::LogWarning("Controller name could not be changed: check the settings filename and destination.");
+					{
+						Debug::PrintLog(spdlog::level::warn, "Controller name could not be changed: check the settings filename and destination.");
+					}
 				}
 				ImGui::Checkbox("Additive (clip start reference)", &controller->m_additive);
 
