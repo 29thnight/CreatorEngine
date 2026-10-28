@@ -42,6 +42,10 @@ jobs:
         configuration: [Debug, Release]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
+    env:
+      # CMake's generated VS projects must not inherit the engine's
+      # Directory.Build.props/targets and its native module package graph.
+      CE_STRING_BUILD_DIR: ${{ runner.temp }}/StringContracts
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,7 +62,7 @@ jobs:
         run: python Tools/regression/prepare-string-contract-deps.py --directory Build/StringDependencies
       - name: Configure contracts
         run: >-
-          cmake -S Tests/Containers -B Build/StringContracts
+          cmake -S Tests/Containers -B "${{ env.CE_STRING_BUILD_DIR }}"
           -DCMAKE_BUILD_TYPE=${{ matrix.configuration }}
           -DCE_STRING_IMGUI_SOURCE_DIR=${{ github.workspace }}/Build/StringDependencies/imgui
           -DCE_STRING_NODE_EDITOR_SOURCE_DIR=${{ github.workspace }}/Build/StringDependencies/imgui-node-editor
@@ -67,11 +71,11 @@ jobs:
           -DCE_STRING_RYML_SOURCE_DIR=${{ github.workspace }}/Build/StringDependencies/rapidyaml
           -DCE_STRING_REFLGEN_INCLUDE_DIR=${{ github.workspace }}/Build/StringDependencies/reflgen/include
       - name: Build contracts
-        run: cmake --build Build/StringContracts --config ${{ matrix.configuration }} --parallel 4
+        run: cmake --build "${{ env.CE_STRING_BUILD_DIR }}" --config ${{ matrix.configuration }} --parallel 4
       - name: Run contracts
-        run: ctest --test-dir Build/StringContracts -C ${{ matrix.configuration }} --output-on-failure --parallel 4
+        run: ctest --test-dir "${{ env.CE_STRING_BUILD_DIR }}" -C ${{ matrix.configuration }} --output-on-failure --parallel 4
       - uses: actions/upload-artifact@v4
         if: always()
         with:
           name: string-contracts-${{ matrix.os }}-${{ matrix.configuration }}
-          path: Build/StringContracts/Testing/Temporary/**
+          path: ${{ env.CE_STRING_BUILD_DIR }}/Testing/Temporary/**

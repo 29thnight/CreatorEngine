@@ -62,18 +62,18 @@
 
 ```sh
 python Tools/regression/prepare-string-contract-deps.py --directory Build/StringDependencies
-cmake -S Tests/Containers -B Build/StringContracts -DCMAKE_BUILD_TYPE=Debug \
+cmake -S Tests/Containers -B ../CreatorStringContracts -DCMAKE_BUILD_TYPE=Debug \
   -DCE_STRING_IMGUI_SOURCE_DIR="$PWD/Build/StringDependencies/imgui" \
   -DCE_STRING_NODE_EDITOR_SOURCE_DIR="$PWD/Build/StringDependencies/imgui-node-editor" \
   -DCE_STRING_SPDLOG_INCLUDE_DIR="$PWD/Build/StringDependencies/spdlog/include" \
   -DCE_STRING_FMT_INCLUDE_DIR="$PWD/Build/StringDependencies/fmt/include" \
   -DCE_STRING_RYML_SOURCE_DIR="$PWD/Build/StringDependencies/rapidyaml" \
   -DCE_STRING_REFLGEN_INCLUDE_DIR="$PWD/Build/StringDependencies/reflgen/include"
-cmake --build Build/StringContracts --config Debug --parallel 4
-ctest --test-dir Build/StringContracts -C Debug --output-on-failure --parallel 4
+cmake --build ../CreatorStringContracts --config Debug --parallel 4
+ctest --test-dir ../CreatorStringContracts -C Debug --output-on-failure --parallel 4
 ```
 
-`.github/workflows/string-contracts.yml`은 Windows/Linux × Debug/Release로 같은 계약을 검사한다. 이 타깃은 실제 ImGui·node editor·ryml·reflgen·spdlog/fmt를 연결하지만 렌더러 없이 실행한다. 전체 Windows Engine/Editor 모듈 빌드, 실제 IME 입력·UI 조작, 렌더링 성능 측정을 대신하지 않는다. Unix의 `CE_ASAN=ON`은 AddressSanitizer와 UndefinedBehaviorSanitizer를 활성화한다.
+`.github/workflows/string-contracts.yml`은 Windows/Linux × Debug/Release로 같은 계약을 검사한다. CMake binary directory는 checkout 외부에 둔다(CI에서는 `runner.temp/StringContracts`). 저장소 내부에 생성하면 Visual Studio의 compiler 탐지 프로젝트부터 엔진의 `Directory.Build.props/targets`와 CppWinRT 패키지 그래프를 상속한다. 이 타깃은 실제 ImGui·node editor·ryml·reflgen·spdlog/fmt를 연결하지만 렌더러 없이 실행한다. 전체 Windows Engine/Editor 모듈 빌드, 실제 IME 입력·UI 조작, 렌더링 성능 측정을 대신하지 않는다. Unix의 `CE_ASAN=ON`은 AddressSanitizer와 UndefinedBehaviorSanitizer를 활성화한다.
 
 2026-10-28 로컬 Linux/GCC 13.3 검증에서는 Debug 25개와 Release 25개가 통과했다. 의존성까지 계측한 ASan/UBSan에서는 Unicode·문자열 11개가 통과했다. 이 환경의 `/proc` 제약으로 LeakSanitizer는 비활성화(`ASAN_OPTIONS=detect_leaks=0`)했으므로 누수 검사 통과를 의미하지 않는다. Unicode 검사는 유효 scalar 1,112,064개와 변이 입력 20,000개를 포함한다.
 
