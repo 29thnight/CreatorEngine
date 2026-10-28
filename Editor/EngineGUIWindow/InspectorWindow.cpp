@@ -29,6 +29,7 @@ import Creator.Core.Layers;
 #include "../EngineEntry/Project/EditorProjectOperations.h"
 #include "EditorTheme.h"
 #include "InspectorWindow.h"
+#include "../ImGuiHelper/Utf8Text.h"
 #include "InspectorControl.h"
 #include "EditorNavContract.h"
 #include "InspectorLayoutFixture.h"
@@ -119,6 +120,26 @@ static void RegisterAllTypedDraws()
 
 namespace
 {
+ce::utf8_string_view InspectorUtf8(std::string_view text)
+{
+    return {text.data(), text.size()};
+}
+
+bool HasComponentSearch(ce::utf8_string_view text)
+{
+    for (std::size_t index = 0; index < text.size(); ++index)
+        if (!std::isspace(static_cast<unsigned char>(text[index]))) return true;
+    return false;
+}
+
+void CacheClipKeys(ce::dynamic_array<ce::utf8_string>& destination,
+    const ce::dynamic_array<std::string>& source)
+{
+    destination.clear();
+    destination.reserve(source.size());
+    for (const auto& key : source) destination.emplace_back(InspectorUtf8(key));
+}
+
 Authoring::WriteDocument physics_shape_document(std::span<const PhysicsShapeDefinition> shapes)
 {
     Authoring::WriteDocument document;
@@ -416,7 +437,7 @@ struct ComponentMenuVisual
     const char* fallback{};
 };
 
-    ComponentMenuVisual component_category_visual(std::string_view category)
+    ComponentMenuVisual component_category_visual(ce::utf8_string_view category)
 	{
 		auto& images = EditorAssetPresentation::Get();
 		using FileType = EditorAssetPresentation::FileType;
@@ -445,7 +466,7 @@ struct ComponentMenuVisual
 		if (entry.type == "DecalComponent") return {images.GetFileIcon(FileType::MaterialTexture), EditorIcon::Material};
 		if (entry.type == "SceneRenderProfileComponent") return {images.GetFileIcon(FileType::SceneRenderProfile), EditorIcon::RenderProfile};
 		if (entry.type == "TextComponent") return {images.GetFileIcon(FileType::Font), EditorIcon::Font};
-		return component_category_visual(entry.category);
+		return component_category_visual(InspectorUtf8(entry.category));
 	}
 
 	void draw_component_menu_row(const ComponentMenuVisual& visual, const char* label, bool category)
@@ -720,7 +741,7 @@ void InspectorWindow::DrawAddComponent(Entity* entity)
         }
         ImGui::SameLine();
     }
-    ImGui::TextUnformatted(m_newScriptPage ? "New Script" : !ce::strings::to_lower_without_whitespace(m_componentSearch).empty() ? "Search Results"
+    ImGui::TextUnformatted(m_newScriptPage ? "New Script" : HasComponentSearch(m_componentSearch.view()) ? "Search Results"
         : m_componentCategory.empty() ? "Add Component" : m_componentCategory.c_str());
     ImGui::Separator();
     if (m_newScriptPage)
@@ -728,16 +749,17 @@ void InspectorWindow::DrawAddComponent(Entity* entity)
         ImGui::TextUnformatted("Name");
         ImGui::SetNextItemWidth(-FLT_MIN);
         if (m_focusNewScriptName) { ImGui::SetKeyboardFocusHere(); m_focusNewScriptName = false; }
-        ImGui::InputTextWithHint("##NewScriptName", "PlayerController", &m_newScriptName);
+        editor::text::InputTextWithHintUtf8("##NewScriptName", "PlayerController", m_newScriptName);
         ImGui::TextDisabled("C# component");
         ImGui::TextWrapped("Assets/Script/%s.cs", m_newScriptName.empty() ? "<Name>" : m_newScriptName.c_str());
         ImGui::TextWrapped("Create the script, compile it, then add it to this entity.");
         ImGui::BeginDisabled(status.busy || SceneManagers->IsGameStart());
         if (ImGui::Button("Create and Add", {-FLT_MIN, 0}))
         {
-            const auto result = EditorScriptAuthoring::CreateAndAttach(target, m_newScriptName);
+            const auto result = EditorScriptAuthoring::CreateAndAttach(
+                target, std::string(m_newScriptName.data(), m_newScriptName.size()));
             if (result.IsSuccess()) ImGui::CloseCurrentPopup();
-            else m_componentError = result.message;
+            else m_componentError.assign(InspectorUtf8(result.message));
         }
         ImGui::EndDisabled();
         if (SceneManagers->IsGameStart()) ImGui::TextWrapped("Stop Play to create a script.");
@@ -748,7 +770,7 @@ void InspectorWindow::DrawAddComponent(Entity* entity)
 
     if (ImGui::IsWindowAppearing()) ImGui::SetKeyboardFocusHere();
     ImGui::SetNextItemWidth(-FLT_MIN);
-    if (ImGui::InputTextWithHint("##ComponentSearch", "Search components and scripts...", &m_componentSearch))
+    if (editor::text::InputTextWithHintUtf8("##ComponentSearch", "Search components and scripts...", m_componentSearch))
     {
         m_componentSelection = 0;
         resetResultsScroll = true;
@@ -756,22 +778,23 @@ void InspectorWindow::DrawAddComponent(Entity* entity)
     // Browse results while keeping the search field ready for further typing.
     ImGui::SetItemKeyOwner(ImGuiKey_UpArrow);
     ImGui::SetItemKeyOwner(ImGuiKey_DownArrow);
-    const bool searching = !ce::strings::to_lower_without_whitespace(m_componentSearch).empty();
+    const bool searching = HasComponentSearch(m_componentSearch.view());
     const bool categoryPage = !searching && m_componentCategory.empty();
-    struct Row { std::string title; const Entry* entry{}; };
+    // Rows borrow the popup catalog, which is stable until this draw finishes.
+    struct Row { ce::utf8_string_view title; const Entry* entry{}; };
     ce::dynamic_array<Row> rows;
     if (categoryPage)
     {
         for (const auto& entry : m_componentCatalog)
-            if (std::ranges::none_of(rows, [&](const Row& row) { return row.title == entry.category; }))
-                rows.push_back({entry.category, nullptr});
+            if (std::ranges::none_of(rows, [&](const Row& row) { return row.title == InspectorUtf8(entry.category); }))
+                rows.push_back({InspectorUtf8(entry.category), nullptr});
         if (std::ranges::none_of(rows, [](const Row& row) { return row.title == "Scripts"; })) rows.push_back({"Scripts", nullptr});
-        std::ranges::sort(rows, {}, &Row::title);
+        std::ranges::sort(rows, [](const Row& a, const Row& b) { return a.title.compare(b.title) < 0; });
     }
     else
         for (const auto& entry : m_componentCatalog)
-            if ((searching && Matches(entry, m_componentSearch)) || (!searching && entry.category == m_componentCategory))
-                rows.push_back({entry.label, &entry});
+            if ((searching && Matches(entry, std::string_view(m_componentSearch.data(), m_componentSearch.size()))) || (!searching && InspectorUtf8(entry.category) == m_componentCategory.view()))
+                rows.push_back({InspectorUtf8(entry.label), &entry});
     m_componentSelection = std::clamp(m_componentSelection, 0, ImMax(0, static_cast<int>(rows.size()) - 1));
     const bool focused = ImGui::IsWindowFocused(ImGuiFocusedFlags_RootAndChildWindows);
     bool moveSelection = false;
@@ -781,7 +804,7 @@ void InspectorWindow::DrawAddComponent(Entity* entity)
         if (ImGui::IsKeyPressed(ImGuiKey_UpArrow)) { m_componentSelection = (m_componentSelection + rows.size() - 1) % rows.size(); moveSelection = true; }
     }
     const bool enter = focused && (ImGui::IsKeyPressed(ImGuiKey_Enter) || ImGui::IsKeyPressed(ImGuiKey_KeypadEnter));
-    std::string openCategory;
+    ce::utf8_string openCategory;
     const Entry* chosen = nullptr;
     const float spacing = ImGui::GetStyle().ItemSpacing.y;
     const float errorHeight = m_componentError.empty() ? 0.f :
@@ -808,8 +831,8 @@ void InspectorWindow::DrawAddComponent(Entity* entity)
             }
             ImGui::PushID(i);
             ImGui::BeginDisabled(attached);
-            const auto rowLabel = row.entry ? row.title + (row.entry->managed ? " (Script)" : attached ? " (Added)" : "")
-                : row.title;
+            ce::utf8_string rowLabel(row.title);
+            if (row.entry) rowLabel.append(row.entry->managed ? " (Script)" : attached ? " (Added)" : "");
             const bool clicked = ImGui::Selectable("##ComponentRow", i == m_componentSelection, ImGuiSelectableFlags_DontClosePopups,
                 {0, ImGui::GetFrameHeight()});
             draw_component_menu_row(row.entry ? component_entry_visual(*row.entry) : component_category_visual(row.title),
@@ -817,7 +840,7 @@ void InspectorWindow::DrawAddComponent(Entity* entity)
             if (clicked || (!attached && enter && i == m_componentSelection))
             {
                 if (row.entry) chosen = row.entry;
-                else openCategory = row.title;
+                else openCategory.assign(row.title);
             }
             ImGui::EndDisabled();
             if (moveSelection && i == m_componentSelection) ImGui::SetScrollHereY();
@@ -829,13 +852,13 @@ void InspectorWindow::DrawAddComponent(Entity* entity)
     }
     ImGui::EndChild();
     ImGui::PopStyleColor();
-    if (!openCategory.empty()) { m_componentCategory = openCategory; m_componentSelection = 0; }
+    if (!openCategory.empty()) { m_componentCategory = std::move(openCategory); m_componentSelection = 0; }
     if (chosen)
     {
         const auto result = chosen->managed ? EditorObjectOperations::AddManagedScript(target, chosen->type)
             : EditorObjectOperations::AddComponent(target, chosen->type);
         if (result.IsSuccess()) ImGui::CloseCurrentPopup();
-        else m_componentError = result.message;
+        else m_componentError.assign(InspectorUtf8(result.message));
     }
     ImGui::Separator();
     if (ImGui::Button(EditorIcon::Label<EditorIcon::Script, " New Script...">, {-FLT_MIN, 0}))
@@ -1186,9 +1209,9 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
     const auto layerSnapshot = projectLayers ? projectLayers->Snapshot() : nullptr;
     auto& selectedTag = gameObject->m_tag;
     const auto* selectedLayer = layerSnapshot ? layerSnapshot->catalog.find(gameObject->GetLayer()) : nullptr;
-    const auto assignTag = [&](const std::string& tag) {
+    const auto assignTag = [&](ce::utf8_string_view tag) {
         TagManagers->RemoveTagFromObject(selectedTag, gameObject);
-        selectedTag = tag;
+        selectedTag.assign(tag.data(), tag.size());
 		TagManagers->AddTagToObject(selectedTag, gameObject);
     };
 
@@ -1243,7 +1266,7 @@ void InspectorWindow::ImGuiDrawHelperGameObjectBaseInfo(Entity* gameObject)
 	{
 		for (const auto& tag : tags)
 		{
-			const bool isSelected = (selectedTag == tag);
+			const bool isSelected = (std::string_view(selectedTag) == std::string_view(tag.data(), tag.size()));
 			if (ImGui::MenuItem(tag.c_str(), nullptr, isSelected)) assignTag(tag);
 			if (isSelected) ImGui::SetItemDefaultFocus();
 		}
@@ -1974,7 +1997,7 @@ void InspectorWindow::ImGuiDrawHelperSoundComponent(SoundComponent* sc)
         if (DrawNamedPicker(sheet, "Clip", settings.clipKey, "None",
             EditorIcon::Label<EditorIcon::Audio, "##PickClip">))
         {
-            m_clipKeyCache = sc->GetOwner()->GetScene()->Sounds().ClipKeys();
+            CacheClipKeys(m_clipKeyCache, sc->GetOwner()->GetScene()->Sounds().ClipKeys());
             m_clipSearch.clear();
             m_clipPickerOwner = sc->GetOwner()->GetScene()->HandleOf(sc->GetOwner()->m_index);
             m_clipPickerComponent = sc->GetInstanceID();
@@ -2266,33 +2289,38 @@ void InspectorWindow::DrawSoundClipPicker()
     if (Begin("Select Audio Clip", &m_openClipPicker,
         ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoDocking))
     {
-        InputTextWithHint("##search", "Search clip GUID...", &m_clipSearch);
+        editor::text::InputTextWithHintUtf8("##search", "Search clip GUID...", m_clipSearch);
         SameLine();
         if (Button("Refresh"))
         {
-            m_clipKeyCache = clipPickerTarget->GetOwner()->GetScene()->Sounds().ClipKeys();
+            CacheClipKeys(m_clipKeyCache, clipPickerTarget->GetOwner()->GetScene()->Sounds().ClipKeys());
         }
         Separator();
         BeginChild("##cliplist", ImVec2(0, -48), true);
         for (std::size_t i = 0; i < m_clipKeyCache.size(); ++i)
         {
             const auto& key = m_clipKeyCache[i];
-            if (!m_clipSearch.empty() && key.find(m_clipSearch) == std::string::npos)
+            if (!m_clipSearch.empty() && key.find(m_clipSearch.view()) == ce::utf8_string_view::npos)
             {
                 continue;
             }
             if (Selectable(key.c_str(), false))
             {
                 auto settings = clipPickerTarget->ReadSettings();
-                settings.clipKey = key;
+                settings.clipKey.assign(key.data(), key.size());
                 settings.sourceKind = wave::SoundSourceKind::Clip;
                 clipPickerTarget->QueueSettings(std::move(settings));
                 m_openClipPicker = false;
             }
             SameLine();
-            if (SmallButton((EditorIcon::Label<EditorIcon::Play, "##prev"> + std::to_string(i)).c_str()))
+            ce::utf8_string previewLabel{ce::utf8_string_view(EditorIcon::Label<EditorIcon::Play, "##prev">)};
+            char indexText[32]{};
+            const auto formatted = std::to_chars(indexText, indexText + sizeof(indexText), i);
+            previewLabel.append(ce::utf8_string_view(indexText, static_cast<std::size_t>(formatted.ptr - indexText)));
+            if (SmallButton(previewLabel.c_str()))
             {
-                clipPickerTarget->QueuePreview(SoundComponent::PreviewCommand::OneShot, key);
+                clipPickerTarget->QueuePreview(SoundComponent::PreviewCommand::OneShot,
+                    std::string(key.data(), key.size()));
             }
         }
         EndChild();

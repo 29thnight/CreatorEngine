@@ -15,8 +15,8 @@ struct LogGroup
     // again receives a new id so a stale selection cannot latch onto it.
     std::uint64_t groupId{};
     spdlog::level::level_enum level{};
-    std::string loggerName;
-    std::string message; // Original payload, including whitespace and embedded NULs.
+    ce::utf8_string loggerName;
+    ce::utf8_string message; // Original UTF-8 bytes, including whitespace and embedded NULs.
     LogSourceLocation source;
 
     // Survives occurrence eviction. This is the count a collapsed row shows,

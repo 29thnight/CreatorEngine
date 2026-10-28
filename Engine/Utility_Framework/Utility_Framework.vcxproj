@@ -65,6 +65,8 @@
     <ClInclude Include="Reflection/ReflgenAttributes.h" />
     <ClInclude Include="Reflection/ReflgenAuthoring.h" />
     <ClInclude Include="Reflection/ReflgenAuthoringSerializers.h" />
+    <ClInclude Include="Reflection/ReflgenStringSerializers.h" />
+    <ClInclude Include="Reflection/ReflectionString.h" />
     <ClInclude Include="Reflection/ReflgenRuntime.h" />
     <ClInclude Include="Reflection/ReflectionRegister.h" />
     <ClInclude Include="Reflection/ReflectionType.h" />

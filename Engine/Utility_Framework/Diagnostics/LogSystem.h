@@ -18,7 +18,7 @@ private:
     const std::shared_ptr<LogStore> m_logStore{ std::make_shared<LogStore>() };
     std::shared_ptr<LogSink> logSink{};
 	std::shared_ptr<HtmlFileSink> htmlSink{};
-	std::string m_logFilePath{};
+	ce::utf8_string m_logFilePath{};
 	std::atomic<bool> m_initialized{ false };
 
 public:
@@ -39,7 +39,7 @@ public:
 	void NotifyCrash(std::string_view reason);
 
 	bool IsInitialized() const noexcept { return m_initialized.load(std::memory_order_acquire); }
-	const std::string& GetLogFilePath() const noexcept { return m_logFilePath; }
+	const ce::utf8_string& GetLogFilePath() const noexcept { return m_logFilePath; }
 
 	// 호출 지점(file/line/function)은 where가 기본 인자로 채운다 — 호출부가
 	// __FILE__을 넘길 필요가 없다.

@@ -414,7 +414,7 @@ namespace RenderTest
 		std::string sourceParseError;
 		std::string cookedParseError;
 		const Authoring::ParsedDocument sourceDocument =
-			Authoring::ParsedDocument::ParseFile(source.string(), sourceParseError);
+			Authoring::ParsedDocument::ParseFilePath(source, sourceParseError);
 		const Authoring::ParsedDocument cookedDocument =
 			Authoring::ParsedDocument::ParseCooked(
 				product.artifactBytes, cookedParseError);

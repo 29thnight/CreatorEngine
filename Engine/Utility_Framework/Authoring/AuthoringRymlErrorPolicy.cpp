@@ -17,18 +17,18 @@ namespace Authoring
 		{
 			// 메시지가 비어 오는 경우가 있다(내부 assert 경로). 빈 what()은
 			// 진단에서 "예외가 안 왔다"와 구분되지 않으므로 자리표를 채운다.
-			std::string text = "[";
-			text += channel;
-			text += "] ";
+			ce::utf8_string text("[");
+			text.append(channel);
+			text.append("] ");
 			if (nullptr == message.str || 0 == message.len)
 			{
-				text += "(no message)";
+				text.append("(no message)");
 			}
 			else
 			{
-				text.append(message.str, message.len);
+				text.append({ message.str, message.len });
 			}
-			throw std::runtime_error(text);
+			throw std::runtime_error(std::string(text.data(), text.size()));
 		}
 
 		void Install()
@@ -77,22 +77,22 @@ namespace Authoring
 		EnsureRymlErrorPolicy();
 
 		RymlErrorPolicyProbe probe;
-		std::string loneCrChannel;
-		std::string tabChannel;
+		ce::utf8_string loneCrChannel;
+		ce::utf8_string tabChannel;
 
-		const auto channelOf = [](const std::string& message) -> std::string
+		const auto channelOf = [](ce::utf8_string_view message) -> ce::utf8_string
 		{
 			// 메시지는 "[basic] ..." 꼴이다. 태그가 없으면 빈 문자열을 돌려
 			// "채널을 알 수 없음"을 통과로 읽지 않게 한다.
 			if (message.size() < 2 || message[0] != '[') return {};
-			const std::size_t close = message.find(']');
-			if (std::string::npos == close) return {};
-			return message.substr(1, close - 1);
+			const std::size_t close = message.find("]");
+			if (ce::utf8_string_view::npos == close) return {};
+			return ce::utf8_string(message.substr(1, close - 1));
 		};
 
 		const auto record = [&probe](const std::exception& exception)
 		{
-			if (probe.firstMessage.empty()) probe.firstMessage = exception.what();
+			if (probe.firstMessage.empty()) probe.firstMessage.assign(exception.what());
 		};
 
 		// ── basic 채널: 홀로 선 \r ──────────────────────────────────────────
@@ -163,7 +163,7 @@ namespace Authoring
 		return probe;
 	}
 
-	RymlParseAttempt TryParseWithPolicy(const std::string& text)
+	RymlParseAttempt TryParseWithPolicy(ce::utf8_string_view text)
 	{
 		EnsureRymlErrorPolicy();
 
@@ -178,8 +178,8 @@ namespace Authoring
 		catch (const std::exception& exception)
 		{
 			attempt.threw = true;
-			attempt.message = exception.what();
-			if (attempt.message.empty()) attempt.message = "(empty what())";
+			attempt.message.assign(exception.what());
+			if (attempt.message.empty()) attempt.message.assign("(empty what())");
 		}
 		return attempt;
 	}

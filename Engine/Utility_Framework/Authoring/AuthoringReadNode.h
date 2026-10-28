@@ -77,19 +77,33 @@ namespace Authoring
 		// 키에서 visit 오류를 내므로 반드시 find_child로 조회한다.
 		[[nodiscard]] ReadNode operator[](const char* key) const
 		{
-			if (!IsMap() || nullptr == key) return {};
+			return key ? (*this)[ce::utf8_string_view(key)] : ReadNode{};
+		}
+
+		template<class Text> requires Scalar::detail::is_utf8_text<Text>
+		[[nodiscard]] ReadNode operator[](const Text& text) const
+		{
+			if (!IsMap()) return {};
+			const ce::utf8_string_view key = text;
 			const ryml::id_type child =
-				m_tree->find_child(m_id, ryml::to_csubstr(key));
+				m_tree->find_child(m_id, ryml::csubstr(key.data(), key.size()));
 			return ryml::NONE == child ? ReadNode{} : FromRyml(*m_tree, child);
 		}
 
 		[[nodiscard]] bool HasChild(const char* key) const
 		{
-			return IsMap() && nullptr != key
-				&& ryml::NONE != m_tree->find_child(m_id, ryml::to_csubstr(key));
+			return key && HasChild(ce::utf8_string_view(key));
 		}
 
-		[[nodiscard]] std::string_view Scalar() const
+		template<class Text> requires Scalar::detail::is_utf8_text<Text>
+		[[nodiscard]] bool HasChild(const Text& text) const
+		{
+			const ce::utf8_string_view key = text;
+			return IsMap()
+				&& ryml::NONE != m_tree->find_child(m_id, ryml::csubstr(key.data(), key.size()));
+		}
+
+		[[nodiscard]] ce::utf8_string_view ScalarUtf8() const
 		{
 			if (!static_cast<bool>(*this)) return {};
 			if (Kind::Key == m_kind)
@@ -99,24 +113,33 @@ namespace Authoring
 				return { key.str, key.len };
 			}
 			if (!m_tree->has_val(m_id)) return {};
-			if (m_tree->val_is_null(m_id)) return std::string_view{ "null" };
+			if (m_tree->val_is_null(m_id)) return ce::utf8_string_view{ "null" };
 			const ryml::csubstr value = m_tree->val(m_id);
 			return { value.str, value.len };
+		}
+
+		// Existing reflection/serialization interfaces still consume standard views.
+		[[nodiscard]] std::string_view Scalar() const
+		{
+			const auto value = ScalarUtf8();
+			return value.data() ? std::string_view(value.data(), value.size()) : std::string_view{};
 		}
 
 		template<class T>
 		[[nodiscard]] T As() const
 		{
+			if (!IsNull() && !IsScalar()) ThrowConversionFailure();
 			T value{};
-			if (Authoring::Scalar::TryConvert(Scalar(), value)) return value;
+			if (Authoring::Scalar::TryConvert(ScalarUtf8(), value)) return value;
 			ThrowConversionFailure();
 		}
 
 		template<class T>
 		[[nodiscard]] T As(T fallback) const
 		{
+			if (!IsNull() && !IsScalar()) return fallback;
 			T value{};
-			return Authoring::Scalar::TryConvert(Scalar(), value) ? value : fallback;
+			return Authoring::Scalar::TryConvert(ScalarUtf8(), value) ? value : fallback;
 		}
 
 		[[nodiscard]] std::string AsString() const

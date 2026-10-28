@@ -37,7 +37,7 @@ static void synthetic() {
   ImGui::NewFrame(); ImGui::Begin("Hints");
   ce::string hinted; ce::utf16_input_state hintedState;
   check(bool(editor::text::InputTextWithHint("Hint","UTF-8 hint",hinted,hintedState).status),"hint adapter");
-  auto unsupported=editor::text::InputText("Unsupported",hinted,hintedState,ImGuiInputTextFlags_EnterReturnsTrue);
+  auto unsupported=editor::text::InputText("Unsupported",hinted,hintedState,ImGuiInputTextFlags_CallbackResize);
   check(!unsupported.status && unsupported.status.error==ce::unicode_error::unsupported_input_flags,"unsupported flags rejected in Release");
   ImGui::End(); ImGui::Render();
   ImGui::DestroyContext(); std::puts("IMGUI_ADAPTER_PASS events=Korean+surrogate backspace=scalar resize=4096 (synthetic; not IME)");

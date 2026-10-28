@@ -1809,7 +1809,7 @@ own::shared_owner<DataSystem::SceneAssetPreparation> DataSystem::PrepareSceneAss
         const auto resolved = ce::strings::to_lower(path.extension().string()) == ".shadergraph"
             ? path : ResolveCatalogAssetPath(guid);
         std::string error;
-        const auto document = Authoring::ParsedDocument::ParseFile(resolved.string(), error);
+        const auto document = Authoring::ParsedDocument::ParseFilePath(resolved, error);
         if (!document)
         {
             if (ce::paths::is_asset_authoring_enabled() && ce::strings::to_lower(path.extension().string()) == ".shadergraph")
@@ -2877,8 +2877,8 @@ void DataSystem::LoadAssetCatalog(const std::filesystem::path& root)
 			{
 				std::string parseError;
 				const Authoring::ParsedDocument document =
-					Authoring::ParsedDocument::ParseFile(
-						entry.path().string(), parseError);
+					Authoring::ParsedDocument::ParseFilePath(
+						entry.path(), parseError);
 				if (!document)
 				{
 					Debug::PrintLog(spdlog::level::warn, "Asset catalog ignored invalid meta: " +
@@ -3582,7 +3582,7 @@ bool DataSystem::ReloadMaterialAsset(FileGuid guid, std::string& error)
     error.clear();
     const auto expected = FindCachedMaterial(guid);
     const auto path = GetFilePath(guid);
-    const auto document = Authoring::ParsedDocument::ParseFile(path.string(), error);
+    const auto document = Authoring::ParsedDocument::ParseFilePath(path, error);
     material_graph::InstanceDocument authored;
     if (!ce::paths::is_asset_authoring_enabled() || !document ||
         !material_graph::ReadInstanceDocument(document.Root(), authored,
@@ -5700,7 +5700,7 @@ own::shared_owner<const Material> DataSystem::LoadMaterial(std::string_view name
 
 	std::string parseError;
 	const Authoring::ParsedDocument document =
-		Authoring::ParsedDocument::ParseFile(loadPath.string(), parseError);
+		Authoring::ParsedDocument::ParseFilePath(loadPath, parseError);
 	if (!document)
 		throw std::runtime_error("Material parse failed: " + parseError);
 	const Authoring::ReadNode node = document.Root();
@@ -5830,7 +5830,7 @@ own::shared_owner<const experiment::Material> DataSystem::LoadAuthoredMaterialSh
 	// 것은 authored 쪽이고, 캐시라 자산당 1회다.
 	std::string parseError;
 	const Authoring::ParsedDocument document =
-		Authoring::ParsedDocument::ParseFile(path.string(), parseError);
+		Authoring::ParsedDocument::ParseFilePath(path, parseError);
 	if (!document)
 		throw std::runtime_error("Authored material parse failed: " + parseError);
 	const Authoring::ReadNode node = document.Root();
@@ -7693,7 +7693,7 @@ bool DataSystem::ReadModelCreateMeshCollider(FileGuid guid) const
 	sidecarPath += ".meta";
 	std::string parseError;
 	const Authoring::ParsedDocument document =
-		Authoring::ParsedDocument::ParseFile(sidecarPath.string(), parseError);
+		Authoring::ParsedDocument::ParseFilePath(sidecarPath, parseError);
 	if (!document) return false;
 	const Authoring::ReadNode importer = document.Root()["ModelImporter"];
 	if (!importer || !importer["CreateMeshCollider"]) return false;

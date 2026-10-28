@@ -26,7 +26,7 @@ namespace editor
     {
         std::mutex mailboxMutex;
         workspace_action pendingAction{};
-        std::string pendingPanel;
+        ce::utf8_string pendingPanel;
         workspace_status published;
         bool resetDialog{};
         // 이름 대화 상자는 UTF-16 값과 소유된 UTF-8 편집 상태를 공유한다.
@@ -37,6 +37,15 @@ namespace editor
         ce::utf16_input_state nameInput;
         ce::string deleteTarget;
         ce::utf8_conversion_cache deleteTargetUtf8;
+        ce::utf8_string joined(ce::utf8_string_view prefix, ce::utf8_string_view value,
+                               ce::utf8_string_view suffix = {})
+        {
+            ce::utf8_string result(prefix);
+            result.append(value);
+            result.append(suffix);
+            return result;
+        }
+
         /// 지금 화면 구성의 지문. 뷰포트 좌표를 믿어도 되는지를 이것 하나로 가른다.
         ///
         /// 모니터의 **가상 데스크톱 사각형**만 쓴다 — 장치 이름이나 핸들은 케이블을
@@ -45,7 +54,7 @@ namespace editor
         /// 때문이다(같은 구성인데 순서가 달라 지문이 갈리면 아무 때나 버린다).
         /// 배율은 넣지 않는다: 가상 좌표는 물리 픽셀이라 배율을 바꿔도 뜻이 같고,
         /// 창 크기 쪽은 이미 `geometry` 의 dpi 가 보정한다.
-        std::string current_monitor_fingerprint()
+        ce::utf8_string current_monitor_fingerprint()
         {
             // ★ 게이트가 **화면 구성을 모르는 환경**을 자극하는 창구다. 열거가 실패한
             //   상태는 실제 기계에서 만들 수 없고(모니터는 늘 하나는 잡힌다), 만들 수
@@ -59,10 +68,17 @@ namespace editor
             {
                 const std::wstring_view value{forced,length};
                 if(value==L"none") return {};
-                return std::string(value.begin(),value.end());  // 지문은 ASCII 다
+                ce::utf8_string result;
+                result.reserve(value.size());
+                for (const wchar_t character : value)
+                {
+                    if (character > 0x7f) return {}; // The fingerprint protocol is ASCII.
+                    result.push_back(static_cast<char>(character));
+                }
+                return result;
             }
 
-            ce::dynamic_array<std::string> rectangles;
+            ce::dynamic_array<ce::utf8_string> rectangles;
             ::EnumDisplayMonitors(nullptr, nullptr,
                 [](HMONITOR monitor, HDC, LPRECT, LPARAM param) -> BOOL
                 {
@@ -74,17 +90,17 @@ namespace editor
                             info.rcMonitor.right - info.rcMonitor.left,
                             info.rcMonitor.bottom - info.rcMonitor.top,
                             info.rcMonitor.left, info.rcMonitor.top);
-                        reinterpret_cast<ce::dynamic_array<std::string>*>(param)->emplace_back(buffer);
+                        reinterpret_cast<ce::dynamic_array<ce::utf8_string>*>(param)->emplace_back(buffer);
                     }
                     return TRUE;
                 },
                 reinterpret_cast<LPARAM>(&rectangles));
-            std::sort(rectangles.begin(), rectangles.end());
-            std::string out;
+            std::sort(rectangles.begin(), rectangles.end(), workspace::utf8_less{});
+            ce::utf8_string out;
             for (const auto& rectangle : rectangles)
             {
-                if (!out.empty()) out += ';';
-                out += rectangle;
+                if (!out.empty()) out.push_back(';');
+                out.append(rectangle);
             }
             // 열거가 실패하면 빈 문자열이다. 그것은 "모니터가 없다" 가 아니라 **모른다**
             // 이므로, 아래 비교에서 어떤 저장본과도 같지 않게 되어 좌표를 버리는 쪽으로
@@ -104,8 +120,10 @@ namespace editor
             for(const auto& a:EditorWindowName::legacy_names)
             {
                 // Both pre-M4 bare names and M4's ### suffix hash are present in legacy files.
-                for(const auto& old: {std::string(a.old_name), "###"+std::string(a.old_name)})
-                    result.push_back({old,std::string(a.stable_id),ImHashStr(old.c_str()),ImHashStr(a.stable_id.data())});
+                for(const auto& old: {ce::utf8_string(workspace::utf8_view(a.old_name)),
+                                      joined("###", workspace::utf8_view(a.old_name))})
+                    result.push_back({old,ce::utf8_string(workspace::utf8_view(a.stable_id)),
+                                      ImHashStr(old.c_str()),ImHashStr(a.stable_id.data())});
             }
             // ImGui does not store the name Begin received. CreateNewWindowSettings skips
             // past "###" and keeps only the text after it, marker dropped, so a file the
@@ -114,19 +132,19 @@ namespace editor
             // a window added after W3 from reading back as an unknown section.
             for(const auto& entry:windows.entries)
             {
-                const std::string id(entry.stable_id);
-                if(!id.starts_with("###")) continue;
-                const auto bare=id.substr(3);
+                const ce::utf8_string id(workspace::utf8_view(entry.stable_id));
+                if(!id.view().starts_with("###")) continue;
+                const ce::utf8_string bare(id.view().substr(3));
                 result.push_back({bare,id,ImHashStr(bare.c_str()),ImHashStr(id.c_str())});
             }
             return result;
         }
     }
-    bool request_workspace_action(workspace_action action,std::string panel)
+    bool request_workspace_action(workspace_action action,ce::utf8_string_view panel)
     {
         std::lock_guard lock(mailboxMutex);
         if(pendingAction!=workspace_action::none || published.pending) return false;
-        pendingAction=action; pendingPanel=std::move(panel); published.pending=true; return true;
+        pendingPanel.assign(panel); pendingAction=action; published.pending=true; return true;
     }
     workspace_status get_workspace_status() { std::lock_guard lock(mailboxMutex); return published; }
     void draw_workspace_menu()
@@ -141,9 +159,9 @@ namespace editor
         {
             for(const auto& preset:layout_presets())
             {
-                const std::string label(preset.label);
-                if(ImGui::MenuItem(label.c_str(),nullptr,status.preset==preset.id))
-                    request_workspace_action(workspace_action::apply_preset,std::string(preset.id));
+                const ce::utf8_string label(workspace::utf8_view(preset.label));
+                if(ImGui::MenuItem(label.c_str(),nullptr,status.preset.view()==workspace::utf8_view(preset.id)))
+                    request_workspace_action(workspace_action::apply_preset,workspace::utf8_view(preset.id));
             }
             ImGui::EndMenu();
         }
@@ -210,14 +228,17 @@ namespace editor
             const auto& nameBuffer=nameInput.buffer();
             // 만들기 전에 거절한다. 파일 이름으로 못 쓰는 이름을 받아 두고
             // 저장할 때 실패하면, 사람은 무엇이 문제인지 모른 채 배치를 잃는다.
-            std::string error;
-            const bool ok=bool(input.status) && !input.conflict && workspace::valid_name(std::string_view(nameBuffer.data(),nameBuffer.size()),error);
+            ce::utf8_string error;
+            bool ok = false;
+            if (!input.status) error.assign("The workspace name is not valid editable Unicode.");
+            else if (input.conflict) error.assign("The workspace name changed while editing; close and reopen the dialog.");
+            else ok = workspace::valid_name(nameBuffer.view(),error);
             if(!ok) ImGui::TextWrapped("%s",error.c_str());
             ImGui::BeginDisabled(!ok);
             if(ImGui::Button(renaming?"Rename":"Save"))
             {
-                request_workspace_action(renaming?workspace_action::rename:workspace_action::save_as,std::string(nameBuffer.data(),nameBuffer.size()));
-                nameDialog=name_dialog::none; ImGui::CloseCurrentPopup();
+                if (request_workspace_action(renaming?workspace_action::rename:workspace_action::save_as,nameBuffer.view()))
+                { nameDialog=name_dialog::none; ImGui::CloseCurrentPopup(); }
             }
             ImGui::EndDisabled();
             ImGui::SameLine();
@@ -234,8 +255,8 @@ namespace editor
             if(ImGui::Button("Delete"))
             {
                 const auto& name = deleteTargetUtf8.text();
-                request_workspace_action(workspace_action::delete_named, std::string(name.data(), name.size()));
-                deleteTarget.clear(); ImGui::CloseCurrentPopup();
+                if (request_workspace_action(workspace_action::delete_named, name.view()))
+                { deleteTarget.clear(); ImGui::CloseCurrentPopup(); }
             }
             ImGui::EndDisabled();
             ImGui::SameLine();
@@ -253,7 +274,7 @@ namespace editor
         // panel state is dropped and the declaration defaults win on every start.
         if(windows.entries.empty())
             throw std::runtime_error("register_editor_windows() must run before the workspace store reads the table");
-        for(const auto& entry:windows.entries) if(entry.persist_open) m_defaults.emplace(entry.stable_id,entry.open);
+        for(const auto& entry:windows.entries) if(entry.persist_open) m_defaults.emplace(workspace::utf8_view(entry.stable_id),entry.open);
         // Own the ini blob together with panel state; the backend must not write a second copy.
         ImGui::GetIO().IniFilename=nullptr;
         Load(true); RefreshNames(); Publish();
@@ -276,7 +297,7 @@ namespace editor
         const ImGuiID mainDockspaceId = ImHashStr("MainWindowGroup", 0, ImHashStr("Debug##Default"));
         char rootIdentity[32]{};
         std::snprintf(rootIdentity, sizeof(rootIdentity), "ID=0x%08X", mainDockspaceId);
-        std::istringstream savedIni{restored.ini};
+        std::istringstream savedIni{workspace::std_string(restored.ini)};
         std::ostringstream migratedIni;
         std::string line;
         while (std::getline(savedIni, line))
@@ -289,23 +310,23 @@ namespace editor
             }
             migratedIni << line << '\n';
         }
-        restored.ini = migratedIni.str();
+        restored.ini.assign(workspace::utf8_view(migratedIni.str()));
         ImGui::LoadIniSettingsFromMemory(restored.ini.data(),restored.ini.size());
         m_document=std::move(restored);
         // 파일이 든 preset 이 없는 이름이면(손으로 고쳤거나 옛 판) 기본으로 돌린다.
         // 배치 자체는 ini 가 들고 있으므로 이름 하나 때문에 배치를 버리지 않는다.
-        if(const layout_preset* named=find_layout_preset(document.preset)) m_preset=named;
-        else { m_preset=&default_layout_preset(); m_document.preset=std::string(m_preset->id); }
+        if(const layout_preset* named=find_layout_preset(workspace::std_view(document.preset))) m_preset=named;
+        else { m_preset=&default_layout_preset(); m_document.preset.assign(workspace::utf8_view(m_preset->id)); }
         // W4: `viewport` 는 이제 창 이름이 아니라 Host 의 표시 모드 토큰이다.
         // 옛 파일이 든 값이 그대로 모드 이름이라 스키마를 올리지 않아도 읽힌다.
-        windows::request_viewport_mode(document.viewport==EditorWindowName::kGame
+        windows::request_viewport_mode(document.viewport.view()==workspace::utf8_view(EditorWindowName::kGame)
             ? windows::viewport_mode::game : windows::viewport_mode::scene);
-        m_focusViewport=EditorWindowName::kViewport;
+        m_focusViewport.assign(workspace::utf8_view(EditorWindowName::kViewport));
         for(auto& entry:m_windows.entries)
         {
             if(!entry.persist_open) continue;
-            const auto found=document.panels.find(std::string(entry.stable_id));
-            entry.open=entry.role==window_role::central || (found==document.panels.end()?m_defaults.at(std::string(entry.stable_id)):found->second);
+            const auto found=document.panels.find(workspace::utf8_view(entry.stable_id));
+            entry.open=entry.role==window_role::central || (found==document.panels.end()?m_defaults.at(workspace::utf8_view(entry.stable_id)):found->second);
         }
         EditorSettingsStore::Get().Preferences().SetContentTreeWidth(document.tree_width);
         // Apply DPI once to floating windows. Dock layout scales with its root viewport.
@@ -344,16 +365,16 @@ namespace editor
             case preset_visibility::inherit: break;
             }
         }
-        m_document.preset=std::string(preset.id);
-        m_document.name=std::string(preset.label);
-        m_status.message="Layout preset applied: "+std::string(preset.label)+"; backup preserved";
+        m_document.preset.assign(workspace::utf8_view(preset.id));
+        m_document.name.assign(workspace::utf8_view(preset.label));
+        m_status.message=joined("Layout preset applied: ",workspace::utf8_view(preset.label),"; backup preserved");
     }
-    std::filesystem::path EditorWorkspaceStore::NamedPath(const std::string& name) const
+    std::filesystem::path EditorWorkspaceStore::NamedPath(ce::utf8_string_view name) const
     {
         // `std::filesystem::path` 를 좁은 문자열로 만들면 Windows 의 ANSI 코드
         // 페이지로 읽는다. 한글 이름이 그 자리에서 깨지므로 u8 로 건넨다.
-        const auto file=name+".workspace";
-        const std::u8string wide(file.begin(),file.end());
+        const auto file=joined(name,".workspace");
+        const std::u8string wide(file.data(),file.data()+file.size());
         return (m_path.parent_path()/std::filesystem::path(wide)).lexically_normal().make_preferred();
     }
     void EditorWorkspaceStore::RefreshNames()
@@ -371,23 +392,25 @@ namespace editor
                 // 여기서 저절로 빠진다. `.invalid` 덤프도 마찬가지다.
                 if(file.extension()!=".workspace") continue;
                 const auto stem=file.stem().u8string();
-                std::string name(stem.begin(),stem.end());
+                ce::utf8_string name;
+                name.resize_and_overwrite(stem.size(), [&](char* bytes, size_t size)
+                { if (size) std::memcpy(bytes, stem.data(), size); return size; });
                 if(name=="active") continue;
                 m_names.push_back(std::move(name));
             }
         }
-        std::sort(m_names.begin(),m_names.end());
+        std::sort(m_names.begin(),m_names.end(),workspace::utf8_less{});
         m_named=!m_document.name.empty() &&
             std::find(m_names.begin(),m_names.end(),m_document.name)!=m_names.end();
     }
-    void EditorWorkspaceStore::SaveAs(const std::string& name)
+    void EditorWorkspaceStore::SaveAs(ce::utf8_string_view name)
     {
-        std::string error;
-        if(!workspace::valid_name(name,error)) throw std::runtime_error(error);
+        ce::utf8_string error;
+        if(!workspace::valid_name(name,error)) throw std::runtime_error(error.c_str());
         // 이름을 문서에 **먼저** 적고 굳힌다. 활성 파일과 이름 붙인 파일이 같은
         // 바이트여야 다음 기동이 "지금 어느 배치를 쓰는 중인가" 를 그대로 읽는다.
         const auto previous=m_document.name;
-        m_document.name=name;
+        m_document.name.assign(name);
         try { Save(); }
         catch(...) { m_document.name=previous; throw; }
         const auto target=NamedPath(name);
@@ -396,14 +419,14 @@ namespace editor
         if(std::filesystem::exists(target)) workspace::backup(target,"before-overwrite");
         workspace::atomic_write(target,workspace::encode(m_document));
         RefreshNames();
-        m_status.message="Workspace saved as "+name;
+        m_status.message=joined("Workspace saved as ",name);
     }
-    void EditorWorkspaceStore::LoadNamed(const std::string& name)
+    void EditorWorkspaceStore::LoadNamed(ce::utf8_string_view name)
     {
-        std::string error;
-        if(!workspace::valid_name(name,error)) throw std::runtime_error(error);
+        ce::utf8_string error;
+        if(!workspace::valid_name(name,error)) throw std::runtime_error(error.c_str());
         const auto source=NamedPath(name);
-        if(!std::filesystem::exists(source)) throw std::runtime_error("No workspace named "+name);
+        if(!std::filesystem::exists(source)) throw std::runtime_error(workspace::std_string(joined("No workspace named ",name)));
         // 이름 붙인 것을 여는 것도 지금 배치를 덮는 일이다. preset 적용과 같은
         // 순서로 먼저 굳히고 백업한다.
         Save();
@@ -411,36 +434,36 @@ namespace editor
         auto document=workspace::decode(workspace::read_file(source));
         // 파일 안의 이름보다 **파일 이름**이 정본이다. 파일을 복사해 둔 사람이
         // 있으면 안쪽 이름은 남의 것을 가리킨다.
-        document.name=name;
+        document.name.assign(name);
         Apply(document,false);
         RefreshNames();
-        m_status.message="Workspace loaded: "+name;
+        m_status.message=joined("Workspace loaded: ",name);
     }
-    void EditorWorkspaceStore::Rename(const std::string& name)
+    void EditorWorkspaceStore::Rename(ce::utf8_string_view name)
     {
-        std::string error;
-        if(!workspace::valid_name(name,error)) throw std::runtime_error(error);
+        ce::utf8_string error;
+        if(!workspace::valid_name(name,error)) throw std::runtime_error(error.c_str());
         RefreshNames();
         if(!m_named) throw std::runtime_error("The current layout has no saved name; save it first");
         if(name==m_document.name) return;
         const auto from=NamedPath(m_document.name), to=NamedPath(name);
         // 덮어쓰기로 바꾸지 않는다. 이름을 바꾸다 남의 배치를 지우는 것은
         // 이름 바꾸기가 요구한 일이 아니다.
-        if(std::filesystem::exists(to)) throw std::runtime_error("A workspace named "+name+" already exists");
+        if(std::filesystem::exists(to)) throw std::runtime_error(workspace::std_string(joined("A workspace named ",name," already exists")));
         std::error_code ec;
         std::filesystem::rename(from,to,ec);
         if(ec) throw std::system_error(ec,"Cannot rename workspace");
-        m_document.name=name;
+        m_document.name.assign(name);
         Save();
         RefreshNames();
-        m_status.message="Workspace renamed to "+name;
+        m_status.message=joined("Workspace renamed to ",name);
     }
-    void EditorWorkspaceStore::DeleteNamed(const std::string& name)
+    void EditorWorkspaceStore::DeleteNamed(ce::utf8_string_view name)
     {
-        std::string error;
-        if(!workspace::valid_name(name,error)) throw std::runtime_error(error);
+        ce::utf8_string error;
+        if(!workspace::valid_name(name,error)) throw std::runtime_error(error.c_str());
         const auto target=NamedPath(name);
-        if(!std::filesystem::exists(target)) throw std::runtime_error("No workspace named "+name);
+        if(!std::filesystem::exists(target)) throw std::runtime_error(workspace::std_string(joined("No workspace named ",name)));
         // 지운 것을 되돌릴 다른 방법이 없다.
         workspace::backup(target,"before-delete");
         std::error_code ec;
@@ -450,11 +473,11 @@ namespace editor
         // 배치를 갈아엎는 것은 지우기가 요구한 일이 아니다.
         if(name==m_document.name)
         {
-            m_document.name=std::string(m_preset->label);
+            m_document.name.assign(workspace::utf8_view(m_preset->label));
             m_saveRequested=true;
         }
         RefreshNames();
-        m_status.message="Workspace deleted: "+name+"; backup preserved";
+        m_status.message=joined("Workspace deleted: ",name,"; backup preserved");
     }
     void EditorWorkspaceStore::Load(bool startup)
     {
@@ -465,44 +488,44 @@ namespace editor
             {
                 const auto bytes=workspace::read_file(m_path);
                 Apply(workspace::decode(bytes),startup); m_lastBytes=bytes;
-                m_status.message="Workspace restored";
+                m_status.message.assign("Workspace restored");
             }
             else if(startup && std::filesystem::exists(m_legacy))
             {
                 const auto bytes=workspace::read_file(m_legacy);
                 workspace::backup(m_legacy,"pre-workspace-v1");
                 auto legacy=m_document; legacy.ini=workspace::migrate_ini(bytes,aliases(m_windows));
-                std::string error;
-                if(!workspace::validate_ini(legacy.ini,error)) throw std::runtime_error(error);
+                ce::utf8_string error;
+                if(!workspace::validate_ini(legacy.ini,error)) throw std::runtime_error(error.c_str());
                 legacy.panels=m_defaults; legacy.dpi=ImGui::GetStyle().FontScaleDpi;
                 legacy.tree_width=EditorSettingsStore::Get().Preferences().GetContentTreeWidth();
-                Apply(legacy,startup); m_status.migrated=true; m_status.message="Legacy layout migrated; original preserved";
+                Apply(legacy,startup); m_status.migrated=true; m_status.message.assign("Legacy layout migrated; original preserved");
             }
             else
             {
                 ImGui::ClearIniSettings(); m_buildDefault=true; m_saveRequested=true;
-                for(auto& entry:m_windows.entries) if(entry.persist_open) entry.open=m_defaults.at(std::string(entry.stable_id));
-                m_status.message="Default workspace";
+                for(auto& entry:m_windows.entries) if(entry.persist_open) entry.open=m_defaults.at(workspace::utf8_view(entry.stable_id));
+                m_status.message.assign("Default workspace");
             }
         }
         catch(const std::exception& ex)
         {
-            m_status.error=ex.what(); m_status.recovered=true;
+            m_status.error.assign(ex.what()); m_status.recovered=true;
             // Preserve rejected bytes before allowing an automatic save to replace them.
             try { workspace::backup(m_path,"rejected"); }
-            catch(const std::exception& backupError) { m_writable=false; m_status.error+="; "+std::string(backupError.what()); }
+            catch(const std::exception& backupError) { m_writable=false; m_status.error.append("; "); m_status.error.append(backupError.what()); }
             ImGui::ClearIniSettings(); m_buildDefault=true; m_saveRequested=true;
-            for(auto& entry:m_windows.entries) if(entry.persist_open) entry.open=m_defaults.at(std::string(entry.stable_id));
+            for(auto& entry:m_windows.entries) if(entry.persist_open) entry.open=m_defaults.at(workspace::utf8_view(entry.stable_id));
             // The reason belongs in the message, not only in `error`: `error` is the
             // last operation's outcome and the very next save clears it, which would
             // leave a recovered session with no record of what was wrong.
-            m_status.message="Invalid layout preserved; restored default layout: "+m_status.error;
+            m_status.message=joined("Invalid layout preserved; restored default layout: ",m_status.error);
         }
         ++m_status.revision;
     }
     bool EditorWorkspaceStore::BeforeFrame()
     {
-        workspace_action action; std::string panel;
+        workspace_action action; ce::utf8_string panel;
         { std::lock_guard lock(mailboxMutex); action=pendingAction; panel=std::move(pendingPanel); pendingAction=workspace_action::none; }
         if(action!=workspace_action::none)
         {
@@ -514,20 +537,20 @@ namespace editor
                 {
                     Save(); workspace::backup(m_path,"before-reset");
                     ImGui::ClearIniSettings(); m_buildDefault=true; m_saveRequested=true;
-                    for(auto& entry:m_windows.entries) if(entry.persist_open) entry.open=m_defaults.at(std::string(entry.stable_id));
+                    for(auto& entry:m_windows.entries) if(entry.persist_open) entry.open=m_defaults.at(workspace::utf8_view(entry.stable_id));
                     EditorSettingsStore::Get().Preferences().SetContentTreeWidth(220.f);
                     windows::request_viewport_mode(windows::viewport_mode::scene);
-                    m_focusViewport=EditorWindowName::kViewport;
+                    m_focusViewport.assign(workspace::utf8_view(EditorWindowName::kViewport));
                     // 되돌리는 대상은 "기본 preset" 이 아니라 **지금 preset** 이다.
                     // Legacy Unity 를 쓰던 사람이 Reset 을 눌러 S&Box 로 튀면
                     // 그것은 복원이 아니라 다른 배치다.
-                    m_document.preset=std::string(m_preset->id);
-                    m_document.name=std::string(m_preset->label);
-                    m_status.message="Default "+std::string(m_preset->label)+" layout restored; backup preserved";
+                    m_document.preset.assign(workspace::utf8_view(m_preset->id));
+                    m_document.name.assign(workspace::utf8_view(m_preset->label));
+                    m_status.message=joined("Default ",workspace::utf8_view(m_preset->label)," layout restored; backup preserved");
                 }
                 else if(action==workspace_action::apply_preset)
                 {
-                    const layout_preset* target=find_layout_preset(panel);
+                    const layout_preset* target=find_layout_preset(workspace::std_view(panel));
                     if(!target) throw std::runtime_error("Unknown layout preset");
                     ApplyPreset(*target);
                 }
@@ -538,12 +561,12 @@ namespace editor
                 else if(action==workspace_action::delete_named) DeleteNamed(panel);
                 else
                 {
-                    auto* entry=find_window(m_windows,panel);
+                    auto* entry=find_window(m_windows,workspace::std_view(panel));
                     if(!entry || entry->role!=window_role::panel || !entry->closable) throw std::runtime_error("Panel is unavailable or cannot be closed");
                     entry->open=action==workspace_action::open_panel; m_saveRequested=true;
                 }
             }
-            catch(const std::exception& ex) { m_status.error=ex.what(); }
+            catch(const std::exception& ex) { m_status.error.assign(ex.what()); }
             ++m_status.revision;
         }
         m_status.pending=false; Publish();
@@ -557,14 +580,14 @@ namespace editor
         // ImGui writes back the name Begin received, which is `label###id`. Store the
         // stable half only, so a renamed or re-iconed window keeps its dock slot and a
         // relabelled duplicate cannot appear as a second section (plan 1.4).
-        value.ini=workspace::migrate_ini(std::string_view(ini,size),aliases(m_windows));
-        std::string error; if(!workspace::validate_ini(value.ini,error)) {
+        value.ini=workspace::migrate_ini(ce::utf8_string_view(ini,size),aliases(m_windows));
+        ce::utf8_string error; if(!workspace::validate_ini(value.ini,error)) {
             // Keep the rejected bytes next to the workspace. A validator message alone
             // does not say which section broke, and this path refuses to save at all,
             // so without the dump the layout that failed is gone when the editor exits.
             auto dump=m_path; dump+=".invalid"; try{ workspace::atomic_write(dump,value.ini); }catch(...){}
-            throw std::runtime_error(error); }
-        for(const auto& entry:m_windows.entries) if(entry.persist_open) value.panels[std::string(entry.stable_id)]=entry.open;
+            throw std::runtime_error(error.c_str()); }
+        for(const auto& entry:m_windows.entries) if(entry.persist_open) value.panels.insert_or_assign(workspace::utf8_view(entry.stable_id),entry.open);
         // 지금 화면 구성을 같이 적는다. ini 에 뷰포트 좌표가 하나도 없더라도 적는다 —
         // 다음에 누가 창을 꺼내면 그 좌표가 **이 구성에서** 적힌 것이 되기 때문이다.
         value.monitors=current_monitor_fingerprint();
@@ -573,8 +596,8 @@ namespace editor
         if(value.width<=0.f || value.height<=0.f) return; // minimized windows never replace valid geometry
         value.tree_width=EditorSettingsStore::Get().Preferences().GetContentTreeWidth();
         value.imgui_version=IMGUI_VERSION_NUM;
-        value.viewport=windows::viewport_mode::game==windows::get_viewport_mode()
-            ?EditorWindowName::kGame:EditorWindowName::kScene;
+        value.viewport.assign(workspace::utf8_view(windows::viewport_mode::game==windows::get_viewport_mode()
+            ?EditorWindowName::kGame:EditorWindowName::kScene));
         const auto bytes=workspace::encode(value);
         if(bytes!=m_lastBytes) { workspace::atomic_write(m_path,bytes); m_lastBytes=bytes; }
         m_document=std::move(value); m_status.ready=true; m_status.error.clear();
@@ -590,7 +613,7 @@ namespace editor
         if(m_saveRequested || now-m_lastSave>=std::chrono::seconds(2))
         {
             try { Save(); }
-            catch(const std::exception& ex) { m_status.error=ex.what(); }
+            catch(const std::exception& ex) { m_status.error.assign(ex.what()); }
             m_saveRequested=false; m_lastSave=now; ++m_status.revision;
         }
         Publish();
@@ -601,14 +624,16 @@ namespace editor
     }
     void EditorWorkspaceStore::Publish()
     {
-        const auto path=m_path.u8string(); m_status.path.assign(path.begin(),path.end());
-        m_status.preset=std::string(m_preset->id);
-        m_status.preset_label=std::string(m_preset->label);
+        const auto path=m_path.u8string();
+        m_status.path.resize_and_overwrite(path.size(), [&](char* bytes, size_t size)
+        { if (size) std::memcpy(bytes, path.data(), size); return size; });
+        m_status.preset.assign(workspace::utf8_view(m_preset->id));
+        m_status.preset_label.assign(workspace::utf8_view(m_preset->label));
         m_status.name=m_document.name;
         m_status.named=m_named;
         m_status.workspaces=m_names;
         m_status.panels.clear();
-        for(const auto& entry:m_windows.entries) if(entry.persist_open) m_status.panels.emplace(entry.stable_id,entry.open);
+        for(const auto& entry:m_windows.entries) if(entry.persist_open) m_status.panels.emplace(workspace::utf8_view(entry.stable_id),entry.open);
         std::lock_guard lock(mailboxMutex);
         m_status.pending=m_saveRequested || pendingAction!=workspace_action::none;
         published=m_status;

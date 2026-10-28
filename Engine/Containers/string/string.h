@@ -1146,7 +1146,8 @@ namespace ce
         invalid_utf8,
         invalid_surrogate,
         embedded_null,
-        unsupported_input_flags
+        unsupported_input_flags,
+        input_too_large
     };
 
     struct unicode_result
@@ -1248,7 +1249,7 @@ namespace ce
             count = 0;
             for (size_t i = 0; i < input.size();)
             {
-                uint32_t cp;
+                uint32_t cp = 0;
                 auto r = decode_utf16(input, i, cp);
                 if (!r)
                 {
@@ -1269,7 +1270,7 @@ namespace ce
             count = 0;
             for (size_t i = 0; i < input.size();)
             {
-                uint32_t cp;
+                uint32_t cp = 0;
                 auto r = decode_utf8(input, i, cp);
                 if (!r)
                 {
@@ -1285,6 +1286,21 @@ namespace ce
             return {};
         }
     } // namespace detail
+
+    // Validation does not allocate or convert an already UTF-8 protocol value.
+    inline unicode_result validate_utf8(utf8_string_view input) noexcept
+    {
+        for (size_t i = 0; i < input.size();)
+        {
+            uint32_t scalar = 0;
+            auto result = detail::decode_utf8(input, i, scalar);
+            if (!result)
+            {
+                return result;
+            }
+        }
+        return {};
+    }
 
     // Validate before resizing: malformed input leaves the destination unchanged.
     template<class Output>
@@ -1312,7 +1328,7 @@ namespace ce
                                         size_t n = 0;
                                         for (size_t i = 0; i < input.size();)
                                         {
-                                            uint32_t cp;
+                                           uint32_t cp = 0;
                                             (void)detail::decode_utf16(input, i, cp);
                                             if (cp < 0x80)
                                             {
@@ -1367,7 +1383,7 @@ namespace ce
                                         size_t n = 0;
                                         for (size_t i = 0; i < input.size();)
                                         {
-                                            uint32_t cp;
+                                            uint32_t cp = 0;
                                             (void)detail::decode_utf8(input, i, cp);
                                             if (cp <= 0xffff)
                                             {

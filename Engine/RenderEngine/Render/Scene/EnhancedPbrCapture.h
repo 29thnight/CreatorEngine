@@ -1184,7 +1184,9 @@ struct EnhancedPbrCapture
             graphNode["transientPrepareCpuMs"] << stats.transientPrepareCpuMs;
             rootNode["finite"] << (finite ? "true" : "false");
             std::ofstream output(root / "manifest.json", std::ios::trunc);
-            output << manifest.ToJson() << '\n';
+            const auto json = manifest.ToJson();
+            output.write(json.data(), static_cast<std::streamsize>(json.size()));
+            output.put('\n');
             output.close();
             if (!output) { error = "capture manifest write failed"; return false; }
             if (!finite) { error = "capture contains nonfinite pixels"; return false; }

@@ -1,5 +1,5 @@
 #pragma once
-// 컨테이너 형상 판정 (range 일반화) — std 전용 계층.
+// 컨테이너 형상 판정 (range 일반화) — 표준·엔진 컨테이너 공통 계층.
 //
 // ── 무엇을 고치는가 ────────────────────────────────────────────────────
 //
@@ -23,24 +23,26 @@
 // 여기에 더해 **스칼라 계약이 range 판정보다 앞선다**는 순서를 따로 세운다.
 // 두 겹을 두는 이유는 하나가 뚫려도 다른 하나가 남게 하기 위해서다.
 //
-// ── 왜 std 만 아는가 ───────────────────────────────────────────────────
+// ── 저작 backend와 분리된 타입 판정 ────────────────────────────────────
 //
 // MetaSchema.h 와 같은 이유다. 이 판정은 저작 backend(ryml)·로깅·Meta 레지스트리
 // 와 무관해야 하고, 무관해야 독립적으로 컴파일해 재어 볼 수 있다. <ranges> 를
 // 여기 가두는 것도 같은 값이다 — TypeTrait.h 는 이 헤더를 물지 않는다(그쪽은
 // Core.Minimal 을 타고 수백 TU 로 퍼진다).
 #include "../Foundation/StandardLibrary.h"
+#include "ReflectionString.h"
 
 namespace meta::container
 {
     // ── 제외 목록 — 이것만은 "능력"으로 판정하면 안 되는 것들 ─────────────
     //
     // 글자를 담았을 뿐 컨테이너로 다룰 뜻이 없는 타입. std::string_view 와
-    // std::string 은 변환으로, path 는 이름으로 잡는다(path 는 string_view 로
+    // std::string 은 변환으로, ce 문자열은 명시 타입으로, path 는 이름으로 잡는다(path 는 string_view 로
     // 변환되지 않지만 range 다 — 변환 하나로는 못 막는다는 실측이다).
     template<class T>
     concept StringLike =
         std::is_convertible_v<const std::remove_cvref_t<T>&, std::string_view>
+        || meta::text::StringLike<T>
         || std::is_same_v<std::remove_cvref_t<T>, std::filesystem::path>;
 
     /// 직렬화기가 컨테이너로 다룰 range.
@@ -147,6 +149,9 @@ namespace meta::container
             "std::string 이 컨테이너로 판정됐다 - 이름 필드가 글자 시퀀스로 저장된다");
         static_assert(!Range<std::string_view>,
             "std::string_view 가 컨테이너로 판정됐다");
+        static_assert(StringLike<ce::string> && StringLike<ce::utf8_string>);
+        static_assert(StringLike<ce::string_view> && StringLike<ce::utf8_string_view>);
+        static_assert(!Range<ce::string> && !Range<ce::utf8_string>);
         static_assert(!Range<std::filesystem::path>,
             "path 가 컨테이너로 판정됐다 - path 는 string_view 로 변환되지 않으므로 "
             "변환 판정만으로는 못 막는다");

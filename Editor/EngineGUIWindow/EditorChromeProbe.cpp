@@ -364,9 +364,10 @@ namespace editor
         const auto workspace = get_workspace_status();
         if (!workspace.path.empty())
         {
-            snapshot.ini_path = workspace.path;
+            snapshot.ini_path.assign(workspace.path.data(), workspace.path.size());
             std::error_code error{};
-            const std::filesystem::path path{ snapshot.ini_path };
+            const std::filesystem::path path{ std::u8string(workspace.path.data(),
+                workspace.path.data() + workspace.path.size()) };
             snapshot.ini_exists = std::filesystem::exists(path, error) && !error;
             if (snapshot.ini_exists)
             {

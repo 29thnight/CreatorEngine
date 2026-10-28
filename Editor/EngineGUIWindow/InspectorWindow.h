@@ -20,13 +20,13 @@ private:
     void DrawAddComponent(Entity* entity);
     EntityHandle m_addComponentTarget{};
     ce::dynamic_array<editor::components::Entry> m_componentCatalog;
-    std::string m_componentSearch;
-    std::string m_componentCategory;
-    std::string m_componentError;
+    ce::utf8_string m_componentSearch;
+    ce::utf8_string m_componentCategory;
+    ce::utf8_string m_componentError;
     int m_componentSelection{};
     bool m_newScriptPage{};
     bool m_focusNewScriptName{};
-    std::string m_newScriptName;
+    ce::utf8_string m_newScriptName;
     Entity* DrawNavigation(class Scene* scene, Entity* selected);
     void DrawEntityIcon(Entity* entity);
     EntityHandle m_previousEntity{};
@@ -67,6 +67,6 @@ private:
 	bool            m_openClipPicker{ false };
     EntityHandle m_clipPickerOwner{};
     std::uint64_t m_clipPickerComponent{};
-	std::string     m_clipSearch;                 // 검색어
-	ce::dynamic_array<std::string> m_clipKeyCache;      // 캐시
+	ce::utf8_string m_clipSearch;                 // 검색어
+	ce::dynamic_array<ce::utf8_string> m_clipKeyCache;   // 캐시
 };

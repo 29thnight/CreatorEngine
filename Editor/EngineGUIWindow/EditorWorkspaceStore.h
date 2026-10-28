@@ -19,10 +19,10 @@ namespace editor
     struct workspace_status
     {
         bool ready{}, pending{}, recovered{}, migrated{};
-        std::string path, message, error;
+        ce::utf8_string path, message, error;
         // 지금 서 있는 배치의 신원(PHASE 21 W6). 계획서가 "active workspace 표시" 로
         // 적은 것이고, 메뉴·제목·CLI 가 같은 값을 읽는다.
-        std::string preset, preset_label, name;
+        ce::utf8_string preset, preset_label, name;
         /// 지금 이름이 **파일로 존재하는가.** preset 을 막 적용한 직후처럼 이름은
         /// 있는데 저장된 적 없는 상태가 있어서, 이름만으로는 Rename·Delete 가
         /// 가능한지 알 수 없다.
@@ -30,12 +30,12 @@ namespace editor
         /// 이름 붙인 workspace 목록. 디렉터리를 프레임마다 훑지 않는다 —
         /// 바뀔 만한 일이 있을 때만 새로 읽는다(W7-1 이 브라우저에서 끊은 것과
         /// 같은 죄다).
-        ce::dynamic_array<std::string> workspaces;
+        ce::dynamic_array<ce::utf8_string> workspaces;
         std::uint64_t revision{};
-        ce::engine_ordered_map<std::string,bool> panels;
+        workspace::panel_states panels;
     };
     // Commands only enqueue work and read published values; ImGui belongs to the renderer.
-    bool request_workspace_action(workspace_action action, std::string panel = {});
+    bool request_workspace_action(workspace_action action, ce::utf8_string_view panel = {});
     workspace_status get_workspace_status();
     void draw_workspace_menu();
     void draw_workspace_dialog();
@@ -52,12 +52,12 @@ namespace editor
     private:
         void ApplyPreset(const layout_preset& preset);
         /// `<이름>.workspace`. 이름은 이미 `workspace::valid_name` 을 통과한 것이어야 한다.
-        std::filesystem::path NamedPath(const std::string& name) const;
+        std::filesystem::path NamedPath(ce::utf8_string_view name) const;
         void RefreshNames();
-        void SaveAs(const std::string& name);
-        void LoadNamed(const std::string& name);
-        void Rename(const std::string& name);
-        void DeleteNamed(const std::string& name);
+        void SaveAs(ce::utf8_string_view name);
+        void LoadNamed(ce::utf8_string_view name);
+        void Rename(ce::utf8_string_view name);
+        void DeleteNamed(ce::utf8_string_view name);
         void Load(bool startup);
         void Apply(const workspace::document& document, bool startup);
         void Save();
@@ -65,14 +65,14 @@ namespace editor
         window_table& m_windows;
         const layout_preset* m_preset{ &default_layout_preset() };
         std::filesystem::path m_path, m_legacy;
-        ce::engine_ordered_map<std::string,bool> m_defaults;
+        workspace::panel_states m_defaults;
         workspace::document m_document;
         workspace_status m_status;
         bool m_buildDefault{}, m_saveRequested{}, m_writable{true};
-        ce::dynamic_array<std::string> m_names;   ///< 디렉터리에서 읽은 목록. RefreshNames 만 채운다
+        ce::dynamic_array<ce::utf8_string> m_names;   ///< 디렉터리에서 읽은 목록. RefreshNames 만 채운다
         bool m_named{};                     ///< `m_document.name` 이 파일로 있는가
-        std::string m_lastBytes;
-        std::string m_focusViewport;
+        ce::utf8_string m_lastBytes;
+        ce::utf8_string m_focusViewport;
         std::chrono::steady_clock::time_point m_lastSave{};
     };
 }

@@ -1,0 +1,77 @@
+name: String ownership and Unicode contracts
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - 'Engine/Containers/**'
+      - 'Engine/Utility_Framework/Authoring/**'
+      - 'Engine/Utility_Framework/Diagnostics/**'
+      - 'Engine/Utility_Framework/Foundation/Engine*Map.h'
+      - 'Engine/Utility_Framework/Foundation/Engine*Set.h'
+      - 'Engine/Utility_Framework/Reflection/**'
+      - 'Editor/ImGuiHelper/**'
+      - 'Editor/EngineGUIWindow/**'
+      - 'Tests/Containers/**'
+      - 'Tools/regression/**'
+      - '.github/workflows/string-contracts.yml'
+  pull_request:
+    paths:
+      - 'Engine/Containers/**'
+      - 'Engine/Utility_Framework/Authoring/**'
+      - 'Engine/Utility_Framework/Diagnostics/**'
+      - 'Engine/Utility_Framework/Foundation/Engine*Map.h'
+      - 'Engine/Utility_Framework/Foundation/Engine*Set.h'
+      - 'Engine/Utility_Framework/Reflection/**'
+      - 'Editor/ImGuiHelper/**'
+      - 'Editor/EngineGUIWindow/**'
+      - 'Tests/Containers/**'
+      - 'Tools/regression/**'
+      - '.github/workflows/string-contracts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  strings:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest]
+        configuration: [Debug, Release]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            Engine
+            Editor
+            Tools
+            Tests/Containers/tests
+            Tests/Containers/modules
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Prepare pinned source dependencies
+        run: python Tools/regression/prepare-string-contract-deps.py --directory Build/StringDependencies
+      - name: Configure contracts
+        run: >-
+          cmake -S Tests/Containers -B Build/StringContracts
+          -DCMAKE_BUILD_TYPE=${{ matrix.configuration }}
+          -DCE_STRING_IMGUI_SOURCE_DIR=${{ github.workspace }}/Build/StringDependencies/imgui
+          -DCE_STRING_NODE_EDITOR_SOURCE_DIR=${{ github.workspace }}/Build/StringDependencies/imgui-node-editor
+          -DCE_STRING_SPDLOG_INCLUDE_DIR=${{ github.workspace }}/Build/StringDependencies/spdlog/include
+          -DCE_STRING_FMT_INCLUDE_DIR=${{ github.workspace }}/Build/StringDependencies/fmt/include
+          -DCE_STRING_RYML_SOURCE_DIR=${{ github.workspace }}/Build/StringDependencies/rapidyaml
+          -DCE_STRING_REFLGEN_INCLUDE_DIR=${{ github.workspace }}/Build/StringDependencies/reflgen/include
+      - name: Build contracts
+        run: cmake --build Build/StringContracts --config ${{ matrix.configuration }} --parallel 4
+      - name: Run contracts
+        run: ctest --test-dir Build/StringContracts -C ${{ matrix.configuration }} --output-on-failure --parallel 4
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: string-contracts-${{ matrix.os }}-${{ matrix.configuration }}
+          path: Build/StringContracts/Testing/Temporary/**

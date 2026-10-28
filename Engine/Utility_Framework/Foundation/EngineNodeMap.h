@@ -16,6 +16,28 @@ template<> struct engine_node_hash<std::wstring> {
     size_t operator()(std::wstring_view key) const noexcept { return std::hash<std::wstring_view>{}(key); }
 };
 template<> struct engine_node_equal<std::wstring> : std::equal_to<> {};
+template<class Allocator> struct engine_node_hash<basic_utf8_string<Allocator>> : string_hash {
+    using is_transparent = void;
+};
+template<> struct engine_node_hash<utf8_string_view> : string_hash {
+    using is_transparent = void;
+};
+template<class Allocator> struct engine_node_equal<basic_utf8_string<Allocator>> {
+    using is_transparent = void;
+    bool operator()(utf8_string_view left, utf8_string_view right) const noexcept { return left == right; }
+};
+template<> struct engine_node_equal<utf8_string_view> : engine_node_equal<utf8_string> {};
+template<class Allocator> struct engine_node_hash<basic_utf16_string<Allocator>> : utf16_string_hash {
+    using is_transparent = void;
+};
+template<> struct engine_node_hash<string_view> : utf16_string_hash {
+    using is_transparent = void;
+};
+template<class Allocator> struct engine_node_equal<basic_utf16_string<Allocator>> {
+    using is_transparent = void;
+    bool operator()(string_view left, string_view right) const noexcept { return left == right; }
+};
+template<> struct engine_node_equal<string_view> : engine_node_equal<string> {};
 
 template<class Key, class Value, class Hash=engine_node_hash<Key>, class Equal=engine_node_equal<Key>>
 class engine_node_map : public node_hash_map<Key,Value,Hash,Equal,heap_allocator,false> {

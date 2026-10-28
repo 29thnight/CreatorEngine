@@ -99,8 +99,8 @@ bool EditorSettingsStore::Initialize() noexcept
 		{
 			std::string parseError;
 			const Authoring::ParsedDocument document =
-				Authoring::ParsedDocument::ParseFile(
-					settingsPath.string(), parseError);
+				Authoring::ParsedDocument::ParseFilePath(
+					settingsPath, parseError);
 			if (!document)
 				return ReportSettingsError(
 					"Unable to load Editor settings: " + parseError);

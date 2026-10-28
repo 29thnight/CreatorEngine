@@ -620,8 +620,8 @@ namespace RenderTest
             {
                 std::string parseError;
                 const Authoring::ParsedDocument corpusDocument =
-                    Authoring::ParsedDocument::ParseFile(
-                        corpusPath.string(), parseError);
+                    Authoring::ParsedDocument::ParseFilePath(
+                        corpusPath, parseError);
                 // legacy 문서 decode — typed reflection 직결(창구 시그니처 불변).
                 if (corpusDocument)
                     Meta::Deserialize(&corpusMaterial, corpusDocument.Root());

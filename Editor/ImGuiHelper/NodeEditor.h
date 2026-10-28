@@ -1,5 +1,5 @@
-#include "../../Engine/Containers/ContainerAPI.h"
 #pragma once
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "ImGui.h"
 #include <imgui.h>
 #include <imgui_internal.h>
@@ -31,11 +31,17 @@ class NodeEditor
 {
 public:
 	NodeEditor() = default;
-	~NodeEditor() = default;
-	void MakeEdit(std::string filePath);//저장할  or 불러올 json이름 없으면 만들어짐
+	~NodeEditor();
+	NodeEditor(const NodeEditor&) = delete;
+	NodeEditor& operator=(const NodeEditor&) = delete;
+	NodeEditor(NodeEditor&&) = delete;
+	NodeEditor& operator=(NodeEditor&&) = delete;
+	static std::optional<std::filesystem::path> SettingsPath(
+		const std::filesystem::path& directory, ce::utf8_string_view filename);
+	bool MakeEdit(const std::filesystem::path& filePath);
 	void EndEdit();
-	void MakeNode(std::string nodeName);
-	void MakeLink(std::string fromNodeName, std::string toNodeName, std::string LineName);
+	void MakeNode(ce::utf8_string_view nodeName);
+	void MakeLink(ce::utf8_string_view fromNodeName, ce::utf8_string_view toNodeName);
 	void DrawNode(int* selectedNodeIndex = nullptr);
 	void DrawLink(int* selectedLinkIndex = nullptr);
 
@@ -44,20 +50,29 @@ public:
 
 	void MakeNewLink(int* returnIndex);
 
-	void ReNameJson(std::string filepath);
+	bool ReNameJson(const std::filesystem::path& filePath);
 	bool IsMouseNearLink(const ImVec2& p1, const ImVec2& cp1, const ImVec2& cp2, const ImVec2& p2, float threshold = 5.0f);
 	ImVec2 ImBezierCubicCalcDerivative(const ImVec2& p0, const ImVec2& p1, const ImVec2& p2, const ImVec2& p3, float t);
 	int startNodeId = 1000;
-	Node* FindNode(std::string nodeName);
+	Node* FindNode(ce::utf8_string_view nodeName);
 	SelectedType m_selectedType = SelectedType::None;
 	int seletedCurNodeIndex = -1;
 	int seletedCurLinkIndex = -1;
 	ax::NodeEditor::EditorContext* m_nodeContext = nullptr;
-	std::string m_filePath;
+	std::filesystem::path m_filePath;
 	ce::dynamic_array<Node*> Nodes;
 	ce::dynamic_array<NodeLink*> Links;
 	
 	int* m_retrunIndex = nullptr; 
 	bool needMakeLink = false;
+
+private:
+	static std::size_t LoadSettings(char* data, void* userPointer);
+	static bool SaveSettings(const char* data, std::size_t size,
+		ax::NodeEditor::SaveReasonFlags reason, void* userPointer);
+	void ReleaseContext();
+	// The library first asks for a length, then provides exactly that much space.
+	// Keep one owned snapshot so an intervening file change cannot overrun it.
+	ce::utf8_string m_loadedSettings;
 };
 

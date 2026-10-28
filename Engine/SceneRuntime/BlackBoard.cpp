@@ -302,7 +302,7 @@ void BlackBoard::Deserialize(std::string_view name)
 	// ★ 문서가 트리를 소유한다. 아래 노드들은 이 스코프를 벗어나면 안 된다.
 	std::string parseError;
 	const Authoring::ParsedDocument document =
-		Authoring::ParsedDocument::ParseFile(filePath.string(), parseError);
+		Authoring::ParsedDocument::ParseFilePath(filePath, parseError);
 	if (!document)
 	{
 		Debug::PrintLog(spdlog::level::err, "Blackboard parse failed: " + filePath.string() + " (" + parseError + ")");

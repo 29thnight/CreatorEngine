@@ -204,7 +204,7 @@ void FoliageComponent::LoadFoliageAsset(FileGuid assetGuid)
 
     std::string parseError;
     const Authoring::ParsedDocument document =
-        Authoring::ParsedDocument::ParseFile(assetPath.string(), parseError);
+        Authoring::ParsedDocument::ParseFilePath(assetPath, parseError);
     const Authoring::ReadNode assetNode = document.Root();
     if (!document || assetNode.IsNull() || !assetNode["FoliageAsset"])
     {

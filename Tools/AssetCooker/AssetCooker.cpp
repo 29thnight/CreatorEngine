@@ -943,7 +943,7 @@ namespace
             }
             std::string parseError;
             const Authoring::ParsedDocument source =
-                Authoring::ParsedDocument::ParseFile(path.string(), parseError);
+                Authoring::ParsedDocument::ParseFilePath(path, parseError);
             if (!source)
             {
                 std::cerr << "asset-cooker error: runtime document parse 실패: "
@@ -1127,7 +1127,7 @@ namespace
 
             std::string parseError;
             const Authoring::ParsedDocument document =
-                Authoring::ParsedDocument::ParseFile(sidecar.string(), parseError);
+                Authoring::ParsedDocument::ParseFilePath(sidecar, parseError);
             if (!document)
             {
                 failure = "source sidecar parse 실패: " + sidecar.string()
@@ -1853,7 +1853,7 @@ namespace
         for (const auto& source : arguments.scenes)
         {
             std::string error;
-            const auto document = Authoring::ParsedDocument::ParseFile(source.string(), error);
+            const auto document = Authoring::ParsedDocument::ParseFilePath(source, error);
             if (!document) return 3;
 
             std::vector<Authoring::ReadNode> pending{document.Root()};
@@ -1907,7 +1907,7 @@ namespace
                 }
                 foliageBytes += size;
                 std::string failure;
-                const auto document = Authoring::ParsedDocument::ParseFile(item.path().string(), failure);
+                const auto document = Authoring::ParsedDocument::ParseFilePath(item.path(), failure);
                 std::vector<ck::TypedAssetReference> references;
                 if (!document || !ck::CollectFoliageBootstrapReferences(document.Root(), references, failure))
                 {
@@ -1965,7 +1965,7 @@ namespace
         {
             std::string failure;
             const auto path = source.is_relative() ? assetRoot / source : source;
-            const auto document = Authoring::ParsedDocument::ParseFile(path.string(), failure);
+            const auto document = Authoring::ParsedDocument::ParseFilePath(path, failure);
             if (!document || !material_cook::ValidateInstances(document.Root(), materialPrograms, manifest, failure, bootstrap ? &bootstrapCatalog : nullptr))
             {
                 std::cerr << "asset-cooker error: material instance closure failed: " << failure << '\n';

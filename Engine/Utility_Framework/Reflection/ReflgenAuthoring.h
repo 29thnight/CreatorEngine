@@ -59,7 +59,18 @@ namespace Authoring
 		void write_uint(std::uint64_t value) override { Next(ChildKind::scalar).SetScalar(value); }
 		void write_float(double value) override { Next(ChildKind::scalar).SetScalar(value); }
 		void write_float32(float value) override { Next(ChildKind::scalar).SetScalar(value); }
-		void write_string(std::string_view value) override { Next(ChildKind::scalar).SetScalar(value); }
+		void write_string(std::string_view value) override
+		{
+			const WriteNode node = Next(ChildKind::scalar);
+			// Retain the ordinary scalar spelling used by existing asset goldens,
+			// but a typed string must not turn into a YAML null on the next read.
+			const bool control = std::any_of(value.begin(), value.end(), [](unsigned char c)
+			{ return c < 0x20 || c == 0x7f; });
+			if (control || value == "~" || value == "null" || value == "Null" || value == "NULL")
+				node.SetString(value);
+			else
+				node.SetScalar(value);
+		}
 
 		void write_bytes(std::span<const std::byte> value) override
 		{

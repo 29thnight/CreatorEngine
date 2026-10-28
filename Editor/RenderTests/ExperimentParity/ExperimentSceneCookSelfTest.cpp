@@ -94,7 +94,7 @@ namespace RenderTest
                 }
                 std::string error;
                 const auto sidecar = assetRoot / "Textures" / (std::filesystem::path(reference).filename().string() + ".meta");
-                const auto meta = Authoring::ParsedDocument::ParseFile(sidecar.string(), error);
+                const auto meta = Authoring::ParsedDocument::ParseFilePath(sidecar, error);
                 return meta && meta.Root()["guid"].Scalar() == cooked.Scalar();
             }
             if (!source || !cooked) return !source && !cooked;
@@ -609,7 +609,7 @@ namespace RenderTest
 		std::string sourceParseError;
 		std::string cookedParseError;
 		const Authoring::ParsedDocument sourceDocument =
-			Authoring::ParsedDocument::ParseFile(source.string(), sourceParseError);
+			Authoring::ParsedDocument::ParseFilePath(source, sourceParseError);
 		const Authoring::ParsedDocument cookedDocument =
 			Authoring::ParsedDocument::ParseCooked(
 				product.artifactBytes, cookedParseError);

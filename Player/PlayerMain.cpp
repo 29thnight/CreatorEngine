@@ -119,7 +119,7 @@ namespace
         data["calls"] << parseTelemetry.calls;
     });
     std::printf("[runtime.text-parser] calls=%llu\n", static_cast<unsigned long long>(parseTelemetry.calls));
-		for (const std::string& context : parseTelemetry.contexts)
+		for (const auto& context : parseTelemetry.contexts)
 			std::printf("[runtime.text-parser.call] source=%s\n", context.c_str());
 
 		// ── 직렬화 단계 계측 (SerializationPlan D5-d · §5 완료 기준 2) ──

@@ -8,7 +8,7 @@ New-Item -ItemType Directory -Force -Path $work | Out-Null
 $deps=Join-Path $repo 'vcpkg_installed/x64-windows/x64-windows'
 $exe=Join-Path $work 'workspace_probe.exe'
 $vcvars=Join-Path $VisualStudioInstallation 'VC/Auxiliary/Build/vcvars64.bat'
-$command='call "'+$vcvars+'" >nul && cl.exe /nologo /EHsc /std:c++20 /utf-8 /MDd /Od /W4 /DNOMINMAX '+
+$command='call "'+$vcvars+'" >nul && cl.exe /nologo /EHsc /std:c++20 /utf-8 /MDd /Od /W4 /DNOMINMAX /DCE_CONTRACT_STANDALONE=1 '+
     '/I"'+(Join-Path $repo 'Editor/EngineGUIWindow')+'" /I"'+(Join-Path $repo 'Editor/ImGuiHelper')+'" '+
     '/I"'+(Join-Path $deps 'include')+'" /Fo"'+$work+'/" /Fe"'+$exe+'" '+
     '"'+(Join-Path $PSScriptRoot 'editor_workspace_probe.cpp')+'" '+

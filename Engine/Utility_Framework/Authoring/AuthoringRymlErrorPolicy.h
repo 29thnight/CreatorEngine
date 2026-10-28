@@ -67,7 +67,7 @@ namespace Authoring
 		bool coveredDistinctChannels{ false };
 
 		// 처음 잡힌 메시지(채널 태그 포함). 비어 있으면 "예외가 던져졌다"가 공허하다.
-		std::string firstMessage{};
+		ce::utf8_string firstMessage{};
 	};
 
 	// ★ `m_error_visit`은 여기서 재지 않는다. 그 채널은 파싱이 아니라 트리 순회
@@ -87,10 +87,18 @@ namespace Authoring
 		bool parsed{ false };
 		bool threw{ false };
 		std::uint64_t nodeCount{ 0 };
-		std::string message{};
+		ce::utf8_string message{};
 	};
 
 	// 정책을 보장한 뒤 `text`를 있는 그대로(정규화 없이) 파싱한다. abort하면
 	// 프로세스가 죽는다 — 그것이 이 함수로 재려는 사실이다.
-	[[nodiscard]] RymlParseAttempt TryParseWithPolicy(const std::string& text);
+	[[nodiscard]] RymlParseAttempt TryParseWithPolicy(ce::utf8_string_view text);
+	[[nodiscard]] inline RymlParseAttempt TryParseWithPolicy(const std::string& text)
+	{
+		return TryParseWithPolicy(ce::utf8_string_view(text.data(), text.size()));
+	}
+	[[nodiscard]] inline RymlParseAttempt TryParseWithPolicy(const char* text)
+	{
+		return TryParseWithPolicy(ce::utf8_string_view(text ? text : ""));
+	}
 }

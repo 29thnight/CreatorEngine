@@ -164,7 +164,7 @@ void BehaviorTreeComponent::GraphToBuild()
 			own::shared_owner<BTBuildGraph> graph = own::make_shared<BTBuildGraph>();
 			std::string parseError;
 			const Authoring::ParsedDocument document =
-				Authoring::ParsedDocument::ParseFile(BTpath.string(), parseError);
+				Authoring::ParsedDocument::ParseFilePath(BTpath, parseError);
 			if (!document)
 			{
 				Debug::PrintLog(spdlog::level::err, "Behavior Tree parse failed: " + parseError);

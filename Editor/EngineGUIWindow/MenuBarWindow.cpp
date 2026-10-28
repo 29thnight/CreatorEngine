@@ -1251,8 +1251,8 @@ void MenuBarWindow::BehaviorTreeWindow(bool drawing)
 					s_nodeScreenPos.clear();
 					std::string parseError;
 					const Authoring::ParsedDocument document =
-						Authoring::ParsedDocument::ParseFile(
-							fileName.string(), parseError);
+						Authoring::ParsedDocument::ParseFilePath(
+							fileName, parseError);
 					if (!document)
 					{
 						Debug::PrintLog(spdlog::level::err, "Behavior Tree parse failed: " + parseError);

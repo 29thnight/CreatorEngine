@@ -20,7 +20,7 @@ void SceneRenderProfileComponent::OnInitialized()
         if (!path.empty() && std::filesystem::exists(path))
         {
             std::string parseError;
-            const Authoring::ParsedDocument document = Authoring::ParsedDocument::ParseFile(path.string(), parseError);
+            const Authoring::ParsedDocument document = Authoring::ParsedDocument::ParseFilePath(path, parseError);
             const Authoring::ReadNode node = document.Root();
             if (!document)
             {
@@ -68,7 +68,7 @@ void SceneRenderProfileComponent::LoadProfile(FileGuid profileGuid)
     if (!path.empty() && std::filesystem::exists(path))
     {
         std::string parseError;
-        const Authoring::ParsedDocument document = Authoring::ParsedDocument::ParseFile(path.string(), parseError);
+        const Authoring::ParsedDocument document = Authoring::ParsedDocument::ParseFilePath(path, parseError);
         const Authoring::ReadNode node = document.Root();
         if (!document)
         {

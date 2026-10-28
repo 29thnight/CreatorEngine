@@ -66,11 +66,12 @@ namespace Meta::Typed
     //
     // 정확 타입 목록 — 오버로드 가시성(requires{EmitScalar(...)})으로 정의하면
     // 비스코프드 enum이 HashedGuid(size_t) 비명시 생성자로 암묵 변환돼 스칼라로
-    // 오판된다(실측: LightType). 레거시 테이블 23종과 동일 집합.
+    // 오판된다(실측: LightType). 기존 표준 타입과 엔진 소유 문자열을 명시한다.
     template<class T>
     concept YamlScalar =
         (std::is_arithmetic_v<T> && !std::is_enum_v<T>)
         || std::is_same_v<T, std::string>
+        || meta::text::OwningString<T>
         || std::is_same_v<T, HashedGuid>
         || std::is_same_v<T, std::filesystem::path>
         || std::is_same_v<T, FileGuid>
@@ -126,6 +127,14 @@ namespace Meta::Typed
 	inline void ReadScalar(const Authoring::ReadNode& n, T& out) { out = n.As<T>(); }
 
     inline void ReadScalar(const Authoring::ReadNode& n, std::string& out) { out = ScalarDetail::StringOf(n); }
+    template<meta::text::OwningString T>
+    inline void ReadScalar(const Authoring::ReadNode& n, T& out)
+    {
+        // The node validates before returning; assign preserves the destination
+        // allocator and leaves it intact when conversion fails.
+        const T decoded = n.As<T>();
+        out.assign(decoded.view());
+    }
     // 절단 수정: 레거시는 as<uint32_t>였다 — FNV64 값이 오면 BadConversion.
     inline void ReadScalar(const Authoring::ReadNode& n, HashedGuid& out) { out = HashedGuid(ScalarDetail::ConvertOrThrow<size_t>(n)); }
     inline void ReadScalar(const Authoring::ReadNode& n, std::filesystem::path& out) { out = std::filesystem::path(ScalarDetail::StringOf(n)); }
@@ -193,6 +202,7 @@ namespace Meta::Typed
         std::is_integral_v<T>
         || std::is_enum_v<T>
         || std::is_same_v<std::remove_cv_t<T>, std::string>
+        || meta::text::OwningString<T>
         || std::is_same_v<std::remove_cv_t<T>, HashedGuid>
         || std::is_same_v<std::remove_cv_t<T>, std::filesystem::path>
         || std::is_same_v<std::remove_cv_t<T>, FileGuid>;
@@ -210,6 +220,14 @@ namespace Meta::Typed
         }
         else if constexpr (std::is_integral_v<U>) { return std::to_string(key); }
         else if constexpr (std::is_same_v<U, std::string>) { return key; }
+        else if constexpr (meta::text::Utf8String<U>) { return std::string(key.data(), key.size()); }
+        else if constexpr (meta::text::Utf16String<U>)
+        {
+            ce::utf8_string bytes;
+            if (!ce::to_utf8(key.view(), bytes))
+                throw std::invalid_argument("invalid UTF-16 inspector map key");
+            return std::string(bytes.data(), bytes.size());
+        }
         else if constexpr (std::is_same_v<U, HashedGuid>) { return std::to_string(key.m_ID_Data); }
         else if constexpr (std::is_same_v<U, std::filesystem::path>) { return key.string(); }
         else { return key.ToString(); } // FileGuid
@@ -233,6 +251,8 @@ namespace Meta::Typed
         // 스칼라 13종이 하나도 range 로 새지 않는다는 것을, 판정하는 자리에서
         // 직접 붙든다. 런타임 게이트는 생성되지 않은 분기를 볼 수 없다.
         static_assert(!SerializedAsSequence<std::string>);
+        static_assert(YamlScalar<ce::string> && YamlScalar<ce::utf8_string>);
+        static_assert(!SerializedAsSequence<ce::string> && !SerializedAsSequence<ce::utf8_string>);
         static_assert(!SerializedAsSequence<std::filesystem::path>);
         static_assert(!SerializedAsSequence<HashedGuid>);
         static_assert(!SerializedAsSequence<FileGuid>);
@@ -255,6 +275,7 @@ namespace Meta::Typed
         static_assert(!YamlMapKey<float> && !YamlMapKey<double>);
         static_assert(!YamlMapKey<math::vector3>);
         static_assert(YamlMapKey<std::string> && YamlMapKey<int>);
+        static_assert(YamlMapKey<ce::string> && YamlMapKey<ce::utf8_string>);
 
         // TypeTrait 의 value_type 계보(IsCopyableForProperty)와 여기 range 계보가
         // 같은 답을 내는가. 갈리면 콘솔 세터가 "복사 가능"으로 오판해 any_cast

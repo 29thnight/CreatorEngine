@@ -49,7 +49,7 @@ std::terminate_handler g_previousTerminate{ nullptr };
     std::atomic<bool> g_crashDumpWritten{ false };
 
     // 크래시 경로는 중복 진입할 수 있으므로(terminate -> abort) 덤프도 1회로 막는다.
-    void WriteCrashDumpOnce(void* exceptionPointers, std::string_view reason)
+    void WriteCrashDumpOnce(void* exceptionPointers, ce::utf8_string_view reason)
     {
         if (nullptr == g_crashDumpWriter)
         {
@@ -73,14 +73,14 @@ std::terminate_handler g_previousTerminate{ nullptr };
             return;
         }
 
-        const std::string text(reason);
+        const ce::utf8_string text(reason);
         g_crashDumpWriter(exceptionPointers, text.c_str());
     }
     LPTOP_LEVEL_EXCEPTION_FILTER g_previousSehFilter{ nullptr };
 
     // 크래시 경로는 중복 진입할 수 있다(예: terminate -> abort).
     // 최초 1회만 기록해 로그가 어지러워지는 것을 막는다.
-    void ReportCrashOnce(std::string_view reason)
+    void ReportCrashOnce(ce::utf8_string_view reason)
     {
         bool expected = false;
         if (!g_crashReported.compare_exchange_strong(expected, true, std::memory_order_acq_rel))
@@ -93,7 +93,7 @@ std::terminate_handler g_previousTerminate{ nullptr };
             return;
         }
 
-        DebugClass::GetInstance()->NotifyCrash(reason);
+        DebugClass::GetInstance()->NotifyCrash(std::string_view(reason.data(), reason.size()));
     }
 
     void OnTerminate()
@@ -141,49 +141,49 @@ std::terminate_handler g_previousTerminate{ nullptr };
         }
     }
 
-    std::string DescribeExceptionCode(DWORD code)
+    ce::utf8_string DescribeExceptionCode(DWORD code)
     {
         switch (code)
         {
-        case EXCEPTION_ACCESS_VIOLATION:      return "ACCESS_VIOLATION (잘못된 메모리 접근 - 널/댕글링 포인터 의심)";
-        case EXCEPTION_STACK_OVERFLOW:        return "STACK_OVERFLOW (스택 오버플로 - 무한 재귀 의심)";
-        case EXCEPTION_INT_DIVIDE_BY_ZERO:    return "INT_DIVIDE_BY_ZERO (정수 0 나눗셈)";
-        case EXCEPTION_FLT_DIVIDE_BY_ZERO:    return "FLT_DIVIDE_BY_ZERO (부동소수 0 나눗셈)";
-        case EXCEPTION_ILLEGAL_INSTRUCTION:   return "ILLEGAL_INSTRUCTION (잘못된 명령 - 손상된 함수 포인터 의심)";
-        case EXCEPTION_PRIV_INSTRUCTION:      return "PRIV_INSTRUCTION (특권 명령 실행)";
-        case EXCEPTION_IN_PAGE_ERROR:         return "IN_PAGE_ERROR (페이지 로드 실패)";
-        case EXCEPTION_ARRAY_BOUNDS_EXCEEDED: return "ARRAY_BOUNDS_EXCEEDED (배열 범위 초과)";
-        case 0xE06D7363:                      return "C++ 예외 (미처리 throw)";
+        case EXCEPTION_ACCESS_VIOLATION:      return ce::utf8_string(ce::utf8_string_view("ACCESS_VIOLATION (잘못된 메모리 접근 - 널/댕글링 포인터 의심)"));
+        case EXCEPTION_STACK_OVERFLOW:        return ce::utf8_string(ce::utf8_string_view("STACK_OVERFLOW (스택 오버플로 - 무한 재귀 의심)"));
+        case EXCEPTION_INT_DIVIDE_BY_ZERO:    return ce::utf8_string(ce::utf8_string_view("INT_DIVIDE_BY_ZERO (정수 0 나눗셈)"));
+        case EXCEPTION_FLT_DIVIDE_BY_ZERO:    return ce::utf8_string(ce::utf8_string_view("FLT_DIVIDE_BY_ZERO (부동소수 0 나눗셈)"));
+        case EXCEPTION_ILLEGAL_INSTRUCTION:   return ce::utf8_string(ce::utf8_string_view("ILLEGAL_INSTRUCTION (잘못된 명령 - 손상된 함수 포인터 의심)"));
+        case EXCEPTION_PRIV_INSTRUCTION:      return ce::utf8_string(ce::utf8_string_view("PRIV_INSTRUCTION (특권 명령 실행)"));
+        case EXCEPTION_IN_PAGE_ERROR:         return ce::utf8_string(ce::utf8_string_view("IN_PAGE_ERROR (페이지 로드 실패)"));
+        case EXCEPTION_ARRAY_BOUNDS_EXCEEDED: return ce::utf8_string(ce::utf8_string_view("ARRAY_BOUNDS_EXCEEDED (배열 범위 초과)"));
+        case 0xE06D7363:                      return ce::utf8_string(ce::utf8_string_view("C++ 예외 (미처리 throw)"));
         default:                              break;
         }
 
         char buffer[64]{};
         std::snprintf(buffer, sizeof(buffer), "예외 코드 0x%08lX", static_cast<unsigned long>(code));
-        return buffer;
+        return ce::utf8_string(ce::utf8_string_view(buffer));
     }
 
-    std::string BuildSehReason(EXCEPTION_POINTERS* info)
+    ce::utf8_string BuildSehReason(EXCEPTION_POINTERS* info)
     {
-        std::string reason = "미처리 예외로 프로세스 종료 - ";
+        ce::utf8_string reason{ce::utf8_string_view("미처리 예외로 프로세스 종료 - ")};
         if (info && info->ExceptionRecord)
         {
-            reason += DescribeExceptionCode(info->ExceptionRecord->ExceptionCode);
+            reason.append(DescribeExceptionCode(info->ExceptionRecord->ExceptionCode));
 
             char address[64]{};
             std::snprintf(address, sizeof(address), " @ 0x%p",
                 info->ExceptionRecord->ExceptionAddress);
-            reason += address;
+            reason.append(address);
         }
         else
         {
-            reason += "예외 정보 없음";
+            reason.append("예외 정보 없음");
         }
         return reason;
     }
 
     LONG WINAPI OnUnhandledException(EXCEPTION_POINTERS* info)
     {
-        const std::string sehReason = BuildSehReason(info);
+        const ce::utf8_string sehReason = BuildSehReason(info);
         ReportCrashOnce(sehReason);
         WriteCrashDumpOnce(info, sehReason);
 
@@ -228,7 +228,7 @@ std::terminate_handler g_previousTerminate{ nullptr };
         }
     }
 
-    std::string BuildLogFileName(std::string_view sessionName)
+    ce::utf8_string BuildLogFileName(ce::utf8_string_view sessionName)
     {
         const std::time_t raw = std::time(nullptr);
         std::tm local{};
@@ -237,10 +237,10 @@ std::terminate_handler g_previousTerminate{ nullptr };
         char stamp[32]{};
         std::strftime(stamp, sizeof(stamp), "%Y%m%d_%H%M%S", &local);
 
-        std::string name(sessionName);
-        name += '_';
-        name += stamp;
-        name += ".html";
+        ce::utf8_string name(sessionName);
+        name.push_back('_');
+        name.append(stamp);
+        name.append(".html");
         return name;
     }
 }
@@ -316,12 +316,18 @@ void DebugClass::Initialize(std::string_view sessionName)
     std::filesystem::create_directories(logDirectory, ec);
     PruneOldLogFiles(logDirectory);
 
-    const std::filesystem::path logFile = logDirectory / BuildLogFileName(sessionName);
-    m_logFilePath = logFile.string();
+    const auto logName = BuildLogFileName(ce::utf8_string_view(sessionName.data(), sessionName.size()));
+    const std::filesystem::path logFile = logDirectory /
+        std::filesystem::path(std::u8string(logName.data(), logName.data() + logName.size()));
+    const auto utf8Path = logFile.u8string();
+    m_logFilePath.resize_and_overwrite(utf8Path.size(), [&](char* data, std::size_t size) {
+        if (size != 0) std::memcpy(data, utf8Path.data(), size);
+        return size;
+    });
 
     m_logStore->Clear();
     logSink = std::make_shared<LogSink>(m_logStore);
-    htmlSink = std::make_shared<HtmlFileSink>(m_logFilePath, false);
+    htmlSink = std::make_shared<HtmlFileSink>(logFile, false);
 
     ce::dynamic_array<spdlog::sink_ptr> sinks{ logSink, htmlSink };
 
@@ -349,7 +355,7 @@ void DebugClass::Initialize(std::string_view sessionName)
     // 유실 방지 3차: 비정상 종료 경로 전반에 flush 훅 설치.
     Log::InstallCrashGuards();
 
-    spdlog::info("로그 세션 시작: {}", m_logFilePath);
+    spdlog::info("로그 세션 시작: {}", std::string_view(m_logFilePath.data(), m_logFilePath.size()));
 }
 
 void DebugClass::AbortInitialization() noexcept

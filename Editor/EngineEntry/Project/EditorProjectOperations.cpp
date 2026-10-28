@@ -34,7 +34,7 @@ bool ValidTag(const std::string& name)
 class TagDefinitionsCommand final : public Meta::IUndoableCommand
 {
   public:
-    TagDefinitionsCommand(ce::dynamic_array<std::string> before, ce::dynamic_array<std::string> after)
+    TagDefinitionsCommand(ce::dynamic_array<ce::utf8_string> before, ce::dynamic_array<ce::utf8_string> after)
         : m_before(std::move(before)), m_after(std::move(after))
     {
     }
@@ -42,7 +42,7 @@ class TagDefinitionsCommand final : public Meta::IUndoableCommand
     void Redo() override { Apply(m_after); }
 
   private:
-    static void Apply(const ce::dynamic_array<std::string>& definitions)
+    static void Apply(const ce::dynamic_array<ce::utf8_string>& definitions)
     {
         const auto previous = TagManagers->GetTags();
         TagManagers->SetTagDefinitions(definitions);
@@ -57,7 +57,7 @@ class TagDefinitionsCommand final : public Meta::IUndoableCommand
             throw;
         }
     }
-    ce::dynamic_array<std::string> m_before, m_after;
+    ce::dynamic_array<ce::utf8_string> m_before, m_after;
 };
 
 class LayerSettingsCommand final : public Meta::IUndoableCommand
@@ -125,7 +125,8 @@ CommandCore::CommandResult ChangeTag(const std::string& name, bool remove)
         return InvalidArguments("Invalid or reserved tag name");
     const auto before = TagManagers->GetTags();
     auto after = before;
-    const auto found = std::find(after.begin(), after.end(), name);
+    const ce::utf8_string_view nameView(name.data(), name.size());
+    const auto found = std::find(after.begin(), after.end(), nameView);
     const bool changed = remove ? found != after.end() : found == after.end();
     if (changed)
     {
@@ -134,7 +135,7 @@ CommandCore::CommandResult ChangeTag(const std::string& name, bool remove)
         if (remove)
             after.erase(found);
         else
-            after.push_back(name);
+            after.emplace_back(nameView);
         try
         {
             Meta::UndoManager::GetInstance()->Execute(
@@ -157,7 +158,7 @@ CommandCore::CommandResult Tags()
     using namespace CommandCore;
     CommandData data = CommandData::Object(), tags = CommandData::Array(), layers = CommandData::Array();
     for (const auto& tag : TagManagers->GetTags())
-        tags.Append(CommandData::String(tag));
+        tags.Append(CommandData::String(std::string(tag.data(), tag.size())));
     if (const auto project = SceneManagers->ProjectLayers())
         for (const auto& layer : project->Snapshot()->catalog.definitions)
             if (layer && !layer->retired)

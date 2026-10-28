@@ -276,6 +276,17 @@ namespace Meta::TypedDraw
             }
             return false;
         }
+        else if constexpr (std::is_same_v<E, ce::utf8_string> || std::is_same_v<E, ce::string>)
+        {
+            auto edit = editor::text::InputReflectedString(id, value);
+            if (edit.changed)
+            {
+                value = edit.value();
+                edit.accept(value);
+            }
+            editor::text::DrawStringInputIssue(edit.status, edit.conflict);
+            return edit.changed;
+        }
         else if constexpr (std::is_same_v<E, bool>)
         {
             return ImGui::Checkbox(id, &value);
@@ -344,6 +355,7 @@ namespace Meta::TypedDraw
         editor::inspector::HasInspectorDrawer<E>
         || std::is_arithmetic_v<E> || std::is_enum_v<E>
         || std::is_same_v<E, std::string>
+        || std::is_same_v<E, ce::utf8_string> || std::is_same_v<E, ce::string>
         || std::is_same_v<E, HashedGuid>
         || std::is_same_v<E, math::vector2> || std::is_same_v<E, math::vector3>
         || std::is_same_v<E, math::vector4> || std::is_same_v<E, math::quaternion>
@@ -547,20 +559,35 @@ namespace Meta::TypedDraw
         // (`InspectorDrawerList.h`). 특수화가 없으면 이 `if` 는 컴파일에서
         // 통째로 사라지므로 런타임 비용도 간접 호출도 없다.
         if constexpr (std::is_same_v<Owner, PhysicsShapeDefinition> &&
-                      (std::is_same_v<MemberT, std::string> || std::is_same_v<MemberT, std::uint64_t>))
+                      (std::is_same_v<MemberT, std::string> || std::is_same_v<MemberT, ce::utf8_string>
+                       || std::is_same_v<MemberT, ce::string> || std::is_same_v<MemberT, std::uint64_t>))
         {
             // These are authoring draft values. Apply Shapes owns validation
             // and the single Undo entry; typing must retain the draft buffer.
             ImGui::PushID(name);
             ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
 
+            ce::unicode_result status;
+            bool conflict = false;
             if constexpr (std::is_same_v<MemberT, std::string>)
                 ImGui::InputText(kValueId, &value);
+            else if constexpr (std::is_same_v<MemberT, ce::utf8_string> || std::is_same_v<MemberT, ce::string>)
+            {
+                auto edit = editor::text::InputReflectedString(kValueId, value);
+                if (edit.changed)
+                {
+                    value = edit.value();
+                    edit.accept(value);
+                }
+                status = edit.status;
+                conflict = edit.conflict;
+            }
             else
                 ImGui::InputScalar(kValueId, ImGuiDataType_U64, &value);
 
             editor::nav::announce_item(name, ImGui::GetItemID(),
                 (ImGui::GetCurrentContext()->CurrentItemFlags & ImGuiItemFlags_Disabled) == 0, true);
+            editor::text::DrawStringInputIssue(status, conflict);
             ImGui::PopID();
         }
         else if constexpr (editor::inspector::HasInspectorDrawer<MemberT>)
@@ -663,6 +690,27 @@ namespace Meta::TypedDraw
                     (void)CommitMemberChange<Owner, MemberT, MP>(&obj, value, v, name);
                 }
             }
+            ImGui::PopID();
+        }
+        else if constexpr (std::is_same_v<MemberT, ce::utf8_string> || std::is_same_v<MemberT, ce::string>)
+        {
+            const std::string_view fieldName{name};
+            const bool requiresText =
+                (std::is_same_v<Owner, Object> && fieldName == "m_name") ||
+                (std::is_same_v<Owner, Entity> && fieldName == "m_tag") ||
+                (std::is_same_v<Owner, Scene> && fieldName == "m_sceneName") ||
+                (std::is_same_v<Owner, ColorGradingPassSetting> && fieldName == "textureFilePath");
+            ImGui::PushID(&obj);
+            ImGui::PushID(name);
+            ImGui::SetNextItemWidth(editor::widgets::begin_property_line(label, layout));
+            auto edit = editor::text::InputReflectedString(kValueId, value, ImGuiInputTextFlags_EnterReturnsTrue);
+            if (edit.submitted && (!requiresText || !edit.value().empty()))
+            {
+                if (CommitMemberChange<Owner, MemberT, MP>(&obj, value, edit.value(), name))
+                    edit.accept(value);
+            }
+            editor::text::DrawStringInputIssue(edit.status, edit.conflict);
+            ImGui::PopID();
             ImGui::PopID();
         }
         else if constexpr (std::is_same_v<MemberT, math::vector2>)
@@ -816,8 +864,14 @@ namespace Meta::TypedDraw
                 for (auto& entry : value)
                 {
                     ImGui::PushID(index++);
-                    const std::string keyLabel =
-                        Meta::Typed::EncodeMapKey(entry.first);
+                    std::string keyLabel;
+                    try { keyLabel = Meta::Typed::EncodeMapKey(entry.first); }
+                    catch (const std::invalid_argument& error)
+                    {
+                        ImGui::TextDisabled("%s", error.what());
+                        ImGui::PopID();
+                        continue;
+                    }
                     if constexpr (kElementHasWidget<M>)
                     {
                         ImGui::SetNextItemWidth(

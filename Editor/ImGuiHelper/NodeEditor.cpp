@@ -1,28 +1,87 @@
-#if defined(CE_CONTRACT_STANDALONE)
-#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
-#else
-import Creator.Core.Paths;
-#endif
 #include "NodeEditor.h"
 namespace ed = ax::NodeEditor;
-void NodeEditor::MakeEdit(std::string filePath)
+std::optional<std::filesystem::path> NodeEditor::SettingsPath(
+    const std::filesystem::path& directory, ce::utf8_string_view filename)
 {
-    
-     std::filesystem::path filepath = ce::paths::node_editor_path(filePath);
-     std::string  _filepath= filepath.string();
-    //std::string _filepath = "NodeEditor\\" + filePath;
-    if (!m_nodeContext || m_filePath != _filepath)
+    if (filename.empty() || filename.find(ce::utf8_string_view("\0", 1)) != ce::utf8_string_view::npos)
+        return std::nullopt;
+    ce::string validated;
+    if (!ce::to_utf16(filename, validated)) return std::nullopt;
+    return directory / std::filesystem::path(
+        std::u8string(filename.data(), filename.data() + filename.size()));
+}
+
+NodeEditor::~NodeEditor()
+{
+    ReleaseContext();
+    for (auto link : Links) delete link;
+    for (auto node : Nodes) delete node;
+}
+
+void NodeEditor::ReleaseContext()
+{
+    if (!m_nodeContext) return;
+    if (ed::GetCurrentEditor() == m_nodeContext) ed::SetCurrentEditor(nullptr);
+    ed::DestroyEditor(m_nodeContext);
+    m_nodeContext = nullptr;
+}
+
+std::size_t NodeEditor::LoadSettings(char* data, void* userPointer)
+{
+    auto& editor = *static_cast<NodeEditor*>(userPointer);
+    if (data == nullptr)
     {
-        if (m_nodeContext)
-        {
-            ed::DestroyEditor(m_nodeContext);
-            m_nodeContext = nullptr;
-        }
+        editor.m_loadedSettings.clear();
+        std::ifstream file(editor.m_filePath, std::ios::binary | std::ios::ate);
+        if (!file) return 0;
+        const auto length = file.tellg();
+        if (length <= 0 || static_cast<std::uintmax_t>(length) >
+            static_cast<std::uintmax_t>((std::numeric_limits<std::streamsize>::max)())) return 0;
+        file.seekg(0, std::ios::beg);
+        editor.m_loadedSettings.resize_and_overwrite(static_cast<std::size_t>(length),
+            [&](char* destination, std::size_t size) {
+                file.read(destination, static_cast<std::streamsize>(size));
+                return file ? size : std::size_t{};
+            });
+    }
+    else if (!editor.m_loadedSettings.empty())
+    {
+        std::memcpy(data, editor.m_loadedSettings.data(), editor.m_loadedSettings.size());
+    }
+    return editor.m_loadedSettings.size();
+}
 
+bool NodeEditor::SaveSettings(const char* data, std::size_t size,
+    ed::SaveReasonFlags, void* userPointer)
+{
+    if ((data == nullptr && size != 0) || size >
+        static_cast<std::size_t>((std::numeric_limits<std::streamsize>::max)())) return false;
+    auto& editor = *static_cast<NodeEditor*>(userPointer);
+    std::ofstream file(editor.m_filePath, std::ios::binary | std::ios::trunc);
+    if (size != 0) file.write(data, static_cast<std::streamsize>(size));
+    file.flush();
+    return static_cast<bool>(file);
+}
+
+bool NodeEditor::MakeEdit(const std::filesystem::path& filePath)
+{
+    if (filePath.empty()) return false;
+    if (!m_nodeContext || m_filePath != filePath)
+    {
+        // Flush the old context while its native path is still the active one.
+        ReleaseContext();
+        m_filePath = filePath;
+        m_loadedSettings.clear();
+        m_selectedType = SelectedType::None;
+        seletedCurNodeIndex = -1;
+        seletedCurLinkIndex = -1;
+        needMakeLink = false;
+        m_retrunIndex = nullptr;
         ed::Config config;
-        m_filePath = _filepath;
-        config.SettingsFile = m_filePath.c_str();
-
+        config.SettingsFile = nullptr;
+        config.LoadSettings = &NodeEditor::LoadSettings;
+        config.SaveSettings = &NodeEditor::SaveSettings;
+        config.UserPointer = this;
         m_nodeContext = ed::CreateEditor(&config);
     }
 
@@ -40,6 +99,7 @@ void NodeEditor::MakeEdit(std::string filePath)
 	ed::SetCurrentEditor(m_nodeContext);
 	ed::Begin("Node Editor");
     startNodeId = 1000;
+    return true;
 }
 
 void NodeEditor::EndEdit()
@@ -48,34 +108,30 @@ void NodeEditor::EndEdit()
 	ed::SetCurrentEditor(nullptr);
 }
 
-void NodeEditor::MakeNode(std::string nodeName)
+void NodeEditor::MakeNode(ce::utf8_string_view nodeName)
 {
 	Node* newNode = new Node();
-	newNode->name.assign(ce::utf8_string_view(nodeName.data(), nodeName.size()));
+	newNode->name.assign(nodeName);
     newNode->id = startNodeId++;
 	Nodes.push_back(newNode);
 }
 
-void NodeEditor::MakeLink(std::string fromNodeName, std::string toNodeName, std::string LineName)
+void NodeEditor::MakeLink(ce::utf8_string_view fromNodeName, ce::utf8_string_view toNodeName)
 {
-	NodeLink* newLink = new NodeLink();
-	newLink->fromNode = FindNode(fromNodeName);
-	newLink->toNode = FindNode(toNodeName);
-
-
-	for (auto& link : Links)
-	{
-		if (link->toNode == FindNode(fromNodeName) && link->fromNode == FindNode(toNodeName))
-		{
-			newLink->haveReverse = true;
-			break;
-		}
-	}
-
-	Links.push_back(newLink);
+    Node* from = FindNode(fromNodeName);
+    Node* to = FindNode(toNodeName);
+    if (!from || !to) return;
+    auto* newLink = new NodeLink{from, to};
+    for (const auto* link : Links)
+    {
+        if (link->toNode == from && link->fromNode == to)
+        {
+            newLink->haveReverse = true;
+            break;
+        }
+    }
+    Links.push_back(newLink);
 }
-
-
 
 void NodeEditor::DrawNode(int* selectedNodeIndex)
 {
@@ -187,6 +243,12 @@ void NodeEditor::DrawLink(int* selectedLinkIndex)
 
 void NodeEditor::Update()
 {
+    if (needMakeLink && (seletedCurNodeIndex < 0 ||
+        static_cast<std::size_t>(seletedCurNodeIndex) >= Nodes.size()))
+    {
+        needMakeLink = false;
+        m_retrunIndex = nullptr;
+    }
     if (needMakeLink == true && seletedCurNodeIndex != -1)
     {
         ed::NodeId nodeID = Nodes[seletedCurNodeIndex]->id;
@@ -263,29 +325,26 @@ void NodeEditor::MakeNewLink(int* returnIndex)
 
 
 
-void NodeEditor::ReNameJson(std::string filepath)
+bool NodeEditor::ReNameJson(const std::filesystem::path& filePath)
 {
-
-    std::filesystem::path __filepath = ce::paths::node_editor_path(filepath);
-    std::string  _filepath = __filepath.string();
-   // std::string _filepath = "NodeEditor\\" + filepath;
-
-    // 이전 파일이 존재하면 새 경로로 복사 or 이동
-    if (std::filesystem::exists(m_filePath))
+    if (filePath.empty()) return false;
+    if (m_filePath == filePath) return true;
+    std::error_code error;
+    if (std::filesystem::exists(filePath, error) || error) return false;
+    if (!m_filePath.empty())
     {
-        std::filesystem::rename(m_filePath, _filepath);
-        m_filePath = _filepath;
+        const bool exists = std::filesystem::exists(m_filePath, error);
+        if (error) return false;
+        if (exists)
+        {
+            std::filesystem::rename(m_filePath, filePath, error);
+            if (error) return false;
+        }
     }
-
-    // 파일 경로 업데이트
-    //m_filePath = newFilePath;
-
-    // NodeEditor가 이미 열려있다면 새 파일 경로로 저장 설정 변경
-   /* if (m_nodeContext)
-    {
-        ed::Config config = ed::GetConfig(m_nodeContext);
-        config.SettingsFile = m_filePath.c_str();
-    }*/
+    // The callbacks consult this owner instead of retaining a pointer into a
+    // reallocated UTF-8 filename. Renaming preserves the live graph layout.
+    m_filePath = filePath;
+    return true;
 }
 
 bool NodeEditor::IsMouseNearLink(const ImVec2& p1, const ImVec2& cp1, const ImVec2& cp2, const ImVec2& p2, float threshold)
@@ -326,15 +385,16 @@ ImVec2 NodeEditor::ImBezierCubicCalcDerivative(const ImVec2& p0, const ImVec2& p
             3 * u * u * (p1.y - p0.y) + 6 * u * t * (p2.y - p1.y) + 3 * t * t * (p3.y - p2.y));
 }
 
-Node* NodeEditor::FindNode(std::string nodeName)
+Node* NodeEditor::FindNode(ce::utf8_string_view nodeName)
 {
     for (auto& node : Nodes)
     {
-        if (node->name.view() == ce::utf8_string_view(nodeName.data(), nodeName.size()))
+        if (node->name.view() == nodeName)
         {
             return node;
         }
     }
+    return nullptr;
 }
 
 

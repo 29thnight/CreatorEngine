@@ -24,6 +24,7 @@ public:
 	// 맵 하나당 YAML 1.2 `.inputmap` 하나로 저장한다.
 	bool SaveMap(ActionMap* actionMap);
 	ActionMap* LoadMap(const std::string& filepath);
+	ActionMap* LoadMapPath(const std::filesystem::path& filepath);
 	void ClearActionMaps() 
 	{
 		for (auto& actionMap : m_actionMaps) 

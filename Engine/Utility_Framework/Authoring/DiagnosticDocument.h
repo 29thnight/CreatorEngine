@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Containers/ContainerAPI.h"
 #include <concepts>
 #include <cstddef>
 #include <cstdint>
@@ -16,13 +17,23 @@ namespace Diagnostics
     {
     public:
         Node() = default;
-        Node operator[](std::string_view key) const;
+        Node operator[](ce::utf8_string_view key) const;
+        Node operator[](std::string_view key) const { return (*this)[ce::utf8_string_view(key.data(), key.size())]; }
+        template<class T> requires std::convertible_to<T, const char*>
+        Node operator[](T&& key) const
+        {
+            const char* text = key;
+            return (*this)[ce::utf8_string_view(text ? text : "")];
+        }
         Node operator[](std::size_t index) const;
         Node Append() const;
-        bool Has(std::string_view key) const;
+        bool Has(ce::utf8_string_view key) const;
+        bool Has(std::string_view key) const { return Has(ce::utf8_string_view(key.data(), key.size())); }
+        bool Has(const char* key) const { return Has(ce::utf8_string_view(key ? key : "")); }
         void SetMap() const;
         void SetSequence() const;
-        void operator<<(std::string_view value) const;
+        void operator<<(ce::utf8_string_view value) const;
+        void operator<<(std::string_view value) const { *this << ce::utf8_string_view(value.data(), value.size()); }
         void operator<<(const std::string& value) const { *this << std::string_view(value); }
         void operator<<(const char* value) const { *this << std::string_view(value ? value : ""); }
         void operator<<(bool value) const;
@@ -51,7 +62,7 @@ namespace Diagnostics
         Document(const Document&)=delete;
         Document& operator=(const Document&)=delete;
         Node Root();
-        std::string ToJson() const;
+        ce::utf8_string ToJson() const;
     private:
         std::unique_ptr<DocumentState> state_;
     };

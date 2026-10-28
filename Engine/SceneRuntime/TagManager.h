@@ -10,14 +10,10 @@ class TagManager : public Singleton<TagManager>
   private:
     // Keys remain owning strings. Heterogeneous lookup respects view bounds
     // without allocating a temporary string, including for embedded nulls.
-    struct TagHash
+    static ce::utf8_string_view TagView(std::string_view tag) noexcept
     {
-        using is_transparent = void;
-        size_t operator()(std::string_view tag) const noexcept
-        {
-            return std::hash<std::string_view>{}(tag);
-        }
-    };
+        return {tag.data(), tag.size()};
+    }
     friend Singleton<TagManager>;
     TagManager() = default;
     ~TagManager() = default;
@@ -33,9 +29,9 @@ class TagManager : public Singleton<TagManager>
     void RemoveTag(std::string_view tag);
     bool HasTag(std::string_view tag) const;
     // Restore ordered definitions without disturbing the object membership index.
-    void SetTagDefinitions(const ce::dynamic_array<std::string>& tags);
+    void SetTagDefinitions(const ce::dynamic_array<ce::utf8_string>& tags);
 
-    ce::dynamic_array<std::string>& GetTags() { return m_tags; }
+    ce::dynamic_array<ce::utf8_string>& GetTags() { return m_tags; }
 
     size_t GetTagIndex(std::string_view tag) const
     {
@@ -43,7 +39,7 @@ class TagManager : public Singleton<TagManager>
         {
             return 0;
         }
-        auto it = m_tagMap.find(tag);
+        auto it = m_tagMap.find(TagView(tag));
         if (it != m_tagMap.end())
         {
             return it->second;
@@ -61,7 +57,7 @@ class TagManager : public Singleton<TagManager>
             return {};
         }
 
-        auto it = m_taggedObjects.find(tag);
+        auto it = m_taggedObjects.find(TagView(tag));
         if (it != m_taggedObjects.end())
         {
             return it->second;
@@ -76,7 +72,7 @@ class TagManager : public Singleton<TagManager>
             return nullptr;
         }
 
-        auto it = m_taggedObjects.find(tag);
+        auto it = m_taggedObjects.find(TagView(tag));
         if (it != m_taggedObjects.end() && !it->second.empty())
         {
             return it->second[0];
@@ -102,9 +98,9 @@ class TagManager : public Singleton<TagManager>
     //   다르므로(D3-b-2b-0: 21건) yaml-cpp가 읽던 파일을 ryml이 거부할 수 있고,
     //   그 순간 저장이 손실을 확정한다. 그래서 로드 성공 여부를 기억한다.
     bool m_loadSucceeded{false};
-    ce::engine_node_map<std::string, size_t, TagHash, std::equal_to<>> m_tagMap{};
-    ce::dynamic_array<std::string> m_tags{};
-    ce::engine_node_map<std::string, ce::dynamic_array<Entity*>, TagHash, std::equal_to<>> m_taggedObjects{};
+    ce::engine_node_map<ce::utf8_string, size_t> m_tagMap{};
+    ce::dynamic_array<ce::utf8_string> m_tags{};
+    ce::engine_node_map<ce::utf8_string, ce::dynamic_array<Entity*>> m_taggedObjects{};
 };
 
 static auto TagManagers = TagManager::GetInstance();

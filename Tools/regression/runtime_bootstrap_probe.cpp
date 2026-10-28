@@ -203,7 +203,7 @@ namespace
 
         const auto foliageSource = root / "Source/Foliage/Trees.foliage";
         Text(foliageSource, "FoliageAsset: {Types: [" + foliageType + "], Instances: []}\n");
-        const auto foliageDocument = Authoring::ParsedDocument::ParseFile(foliageSource.string(), error);
+        const auto foliageDocument = Authoring::ParsedDocument::ParseFilePath(foliageSource, error);
         std::vector<cooked::TypedAssetReference> foliageReferences;
         Require(foliageDocument && cooked::CollectFoliageBootstrapReferences(foliageDocument.Root(), foliageReferences, error)
             && foliageReferences == inlineFoliage.product->bootstrapReferences,
@@ -246,7 +246,7 @@ namespace
         Require(!allFound(foliageCatalog(-1, true)), "Wrong-kind Foliage identity passed preflight");
         Text(foliageSource, "FoliageAsset: {Types: [{m_modelGuid: " + uuid::to_string(Id(5).value)
             + ", m_meshAssetId: 00000000-0000-0000-0000-000000000000, m_materialAssetId: 00000000-0000-0000-0000-000000000000}], Instances: []}\n");
-        const auto defaultChildren = Authoring::ParsedDocument::ParseFile(foliageSource.string(), error);
+        const auto defaultChildren = Authoring::ParsedDocument::ParseFilePath(foliageSource, error);
         Require(defaultChildren && cooked::CollectFoliageBootstrapReferences(defaultChildren.Root(), foliageReferences, error)
             && foliageReferences == std::vector<cooked::TypedAssetReference>{{{Id(5), {}}, cooked::CookedAssetKind::Model}},
             "Optional Foliage child identities could not use their model descriptor defaults");
@@ -255,7 +255,7 @@ namespace
             std::string("FoliageAsset: {Types: {m_modelName: Tree}, Instances: []}\n")})
         {
             Text(foliageSource, invalid);
-            const auto rejected = Authoring::ParsedDocument::ParseFile(foliageSource.string(), error);
+            const auto rejected = Authoring::ParsedDocument::ParseFilePath(foliageSource, error);
             Require(rejected && !cooked::CollectFoliageBootstrapReferences(rejected.Root(), foliageReferences, error),
                 "Source-only or malformed Foliage type passed bootstrap preflight");
         }

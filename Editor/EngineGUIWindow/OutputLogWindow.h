@@ -43,7 +43,6 @@ namespace editor
         OutputLogView m_view;
         OutputLogFilter m_filter;
         ImFont* m_font{ nullptr };
-        char m_search[192]{};
         int m_levelChoice{ 0 };
         bool m_autoScroll{ true };
         // 목록이 늘었을 때만 바닥으로 민다. 매 프레임 밀면 사람이 위로 올려

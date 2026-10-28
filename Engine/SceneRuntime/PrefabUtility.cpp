@@ -849,7 +849,7 @@ Prefab* PrefabUtility::LoadPrefabFullPath(const std::string& path)
 
 	std::string parseError;
 	Authoring::ParsedDocument document =
-		Authoring::ParsedDocument::ParseFile(readPath.string(), parseError);
+		Authoring::ParsedDocument::ParseFilePath(readPath, parseError);
 	if (!document)
 	{
 		Debug::PrintLog(spdlog::level::err, "Prefab parse failed: " + readPath.string()

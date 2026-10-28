@@ -36,8 +36,8 @@ int main(int argc, char** argv)
     const auto imported = Editor::ImportLegacyProjectLayers(source);
     check(bool(imported), "real project legacy settings import");
     std::string parse_error;
-    const auto tags = Authoring::ParsedDocument::ParseFile((source / "TagManager.asset").string(), parse_error);
-    const auto matrix = Authoring::ParsedDocument::ParseFile((source / "CollisionMatrix.asset").string(), parse_error);
+    const auto tags = Authoring::ParsedDocument::ParseFilePath((source / "TagManager.asset"), parse_error);
+    const auto matrix = Authoring::ParsedDocument::ParseFilePath((source / "CollisionMatrix.asset"), parse_error);
     check(tags && matrix, "independent source documents loaded");
     check(std::ranges::count_if(imported->catalog.definitions, [](const auto& item) { return bool(item); }) ==
               static_cast<std::ptrdiff_t>(tags.Root()["layers"].Size()),
@@ -94,7 +94,7 @@ int main(int argc, char** argv)
             (asset.path().extension() != ".creator" && asset.path().extension() != ".prefab"))
             continue;
         current_asset = asset.path();
-        const auto document = Authoring::ParsedDocument::ParseFile(asset.path().string(), parse_error);
+        const auto document = Authoring::ParsedDocument::ParseFilePath(asset.path(), parse_error);
         check(bool(document), "native parser accepts migrated authoring asset");
         visit(document.Root());
         ++asset_count;

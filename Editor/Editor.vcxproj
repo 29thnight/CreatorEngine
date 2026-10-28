@@ -140,6 +140,8 @@
     <ClInclude Include="ImGuiHelper\EditorIconAlignment.h" />
     <ClInclude Include="ImGuiHelper\Utf8Text.h" />
     <ClInclude Include="ImGuiHelper\Utf16Text.h" />
+    <ClInclude Include="ImGuiHelper\ReflectedStringInput.h" />
+    <ClInclude Include="ImGuiHelper\ReflectedMethodText.h" />
     <ClInclude Include="ImGuiHelper\EditorTextFallback.h" />
     <ClInclude Include="EngineGUIWindow\EditorTheme.h" />
     <ClInclude Include="EngineGUIWindow\EditorThemeSelfTest.h" />

@@ -443,7 +443,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 
 	std::string parseError;
 	const Authoring::ParsedDocument document =
-		Authoring::ParsedDocument::ParseFile(descriptorPath.string(), parseError);
+		Authoring::ParsedDocument::ParseFilePath(descriptorPath, parseError);
 	if (!document)
 	{
 		Debug::PrintLog(spdlog::level::err, "Terrain descriptor parse failed: "
@@ -619,7 +619,7 @@ bool TerrainComponent::Load(const std::wstring& filePath)
 	{
 		std::string parseError;
 		const Authoring::ParsedDocument document =
-			Authoring::ParsedDocument::ParseFile(Path.string(), parseError);
+			Authoring::ParsedDocument::ParseFilePath(Path, parseError);
 		const Authoring::ReadNode node = document.Root();
 
 		if (!document)

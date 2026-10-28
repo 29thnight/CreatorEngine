@@ -1,10 +1,5 @@
-#include "../../Engine/Containers/ContainerAPI.h"
-#if defined(CE_CONTRACT_STANDALONE)
-#include "../../Tools/build/ModuleAdapters/Creator.Core.Strings.h"
-#else
-import Creator.Core.Strings;
-#endif
 #pragma once
+#include "../../Engine/Containers/ContainerAPI.h"
 #include "../../Engine/Utility_Framework/Foundation/EngineStorage.h"
 #include "../../Engine/Utility_Framework/Foundation/EngineOrderedMap.h"
 
@@ -59,7 +54,7 @@ namespace editor
         bool collapse{ true };
         // 본문 원문과 로거명을 본다. ASCII 만 대소문자를 무시한다 — 한글에는
         // 대소문자가 없고, 로케일을 끌어들이면 같은 입력이 기계마다 달라진다.
-        std::string search;
+        ce::utf8_string search;
 
         // 멤버로 둔다. 네임스페이스에 두면 클래스 안에서 부르는 자리가
         // 선언을 못 본다.
@@ -82,13 +77,13 @@ namespace editor
         return (static_cast<unsigned char>(byte) & 0xC0u) == 0x80u;
     }
 
-    inline std::size_t PreviousUtf8Boundary(std::string_view text, std::size_t index)
+    inline std::size_t PreviousUtf8Boundary(ce::utf8_string_view text, std::size_t index)
     {
         while (index > 0 && IsUtf8ContinuationByte(text[index - 1])) --index;
         return index > 0 ? index - 1 : 0;
     }
 
-    inline std::size_t NextUtf8Boundary(std::string_view text, std::size_t index)
+    inline std::size_t NextUtf8Boundary(ce::utf8_string_view text, std::size_t index)
     {
         if (index >= text.size()) return text.size();
         ++index;
@@ -98,13 +93,14 @@ namespace editor
 
     // 목록 행에 쓸 한 줄. 개행·탭·연속 공백을 공백 하나로 접고 NUL 도 공백으로
     // 바꾼다. 앞뒤 공백은 떼어 아이콘과의 간격이 본문마다 달라지지 않게 한다.
-    inline std::string FlattenForRow(std::string_view text)
+    inline ce::utf8_string FlattenForRow(ce::utf8_string_view text)
     {
-        std::string flattened;
+        ce::utf8_string flattened;
         flattened.reserve(text.size());
         bool pendingSpace = false;
-        for (const char character : text)
+        for (std::size_t index = 0; index < text.size(); ++index)
         {
+            const char character = text[index];
             const bool isBlank = character == '\n' || character == '\r' ||
                 character == '\t' || character == ' ' || character == '\0';
             if (isBlank)
@@ -129,14 +125,14 @@ namespace editor
     // 말줄임표를 붙인 결과가 한계 폭을 넘지 않는 것까지 지킨다 — 붙이고 나서
     // 넘치면 자르는 의미가 없다.
     template <typename Measure>
-    std::string EllipsizeToWidth(std::string_view text, float maxWidth, Measure measure)
+    ce::utf8_string EllipsizeToWidth(ce::utf8_string_view text, float maxWidth, Measure measure)
     {
         const char* const ellipsis = "...";
-        if (text.empty() || maxWidth <= 0.0f) return std::string();
-        if (measure(text) <= maxWidth) return std::string(text);
+        if (text.empty() || maxWidth <= 0.0f) return {};
+        if (measure(text) <= maxWidth) return ce::utf8_string(text);
 
-        const float ellipsisWidth = measure(std::string_view(ellipsis));
-        if (ellipsisWidth > maxWidth) return std::string();
+        const float ellipsisWidth = measure(ce::utf8_string_view(ellipsis));
+        if (ellipsisWidth > maxWidth) return {};
 
         // 글자 단위 이분 탐색. 폭은 글자 수에 단조가 아닐 수 있으므로(커닝)
         // 경계 후보를 좁힌 뒤 마지막에 한 글자씩 물러서며 확정한다.
@@ -149,7 +145,7 @@ namespace editor
         while (low <= high)
         {
             const std::size_t middle = low + (high - low) / 2;
-            const std::string_view candidate = text.substr(0, boundaries[middle]);
+            const ce::utf8_string_view candidate = text.substr(0, boundaries[middle]);
             if (measure(candidate) + ellipsisWidth <= maxWidth)
             {
                 best = middle;
@@ -165,9 +161,43 @@ namespace editor
             measure(text.substr(0, boundaries[best])) + ellipsisWidth > maxWidth)
             --best;
 
-        std::string result(text.substr(0, boundaries[best]));
-        result += ellipsis;
+        ce::utf8_string result(text.substr(0, boundaries[best]));
+        result.append(ellipsis);
         return result;
+    }
+
+    // Log payloads retain arbitrary original bytes. Only the explicit file-open
+    // boundary requires valid UTF-8 and rejects NUL instead of truncating a path.
+    inline bool TryOutputLogFilePath(ce::utf8_string_view text, std::filesystem::path& path)
+    {
+        if (text.empty() || text.find(ce::utf8_string_view("\0", 1)) != ce::utf8_string_view::npos)
+            return false;
+        ce::string validated;
+        if (!ce::to_utf16(text, validated)) return false;
+        path = std::filesystem::path(std::u8string(text.data(), text.data() + text.size()));
+        return true;
+    }
+
+    // ASCII case folding preserves all non-ASCII bytes, including invalid UTF-8
+    // and embedded NULs that belong to the original log record. Searching views
+    // avoids allocating two lowercased copies for every retained group.
+    inline bool ContainsOutputLogText(ce::utf8_string_view text, ce::utf8_string_view needle)
+    {
+        if (needle.empty()) return true;
+        if (needle.size() > text.size()) return false;
+        const auto lower = [](unsigned char value) {
+            return value >= 'A' && value <= 'Z' ? value + ('a' - 'A') : value;
+        };
+        for (std::size_t start = 0; start <= text.size() - needle.size(); ++start)
+        {
+            std::size_t offset = 0;
+            while (offset < needle.size() &&
+                lower(static_cast<unsigned char>(text[start + offset])) ==
+                    lower(static_cast<unsigned char>(needle[offset])))
+                ++offset;
+            if (offset == needle.size()) return true;
+        }
+        return false;
     }
 
     // 저장소의 변경분을 받아 화면이 읽을 상태를 들고 있는다. 프레임마다 전체를
@@ -243,7 +273,7 @@ namespace editor
             m_dirty = false;
             m_rows.clear();
 
-            const std::string needle = ce::strings::ascii_to_lower(filter.search);
+            const ce::utf8_string_view needle = filter.search.view();
             if (filter.collapse)
             {
                 // 첫 발생 순서(= groupId 오름차순)로 둔다. 최근 순으로 다시
@@ -272,25 +302,25 @@ namespace editor
         }
 
         // 화면이 행을 그릴 때 쓰는 본문. 원문은 그룹에 그대로 있다.
-        std::string RowText(const OutputLogRow& row) const
+        ce::utf8_string RowText(const OutputLogRow& row) const
         {
             const LogGroup* const group = FindGroup(row.groupId);
-            return group == nullptr ? std::string() : FlattenForRow(group->message);
+            return group == nullptr ? ce::utf8_string() : FlattenForRow(group->message.view());
         }
 
 
 
     private:
         static bool Passes(const LogGroup& group, spdlog::level::level_enum minimumLevel,
-            const std::string& loweredNeedle)
+            ce::utf8_string_view needle)
         {
             // 옛 화면은 `level != trace && level < 필터` 라 **Trace 를 언제나**
             // 보여 줬다 — 고르는 값이 무엇이든 새어 나왔다. 여기서는 고른 값
             // 이상만 지난다.
             if (group.level < minimumLevel) return false;
-            if (loweredNeedle.empty()) return true;
-            return ce::strings::ascii_to_lower(group.message).find(loweredNeedle) != std::string::npos ||
-                ce::strings::ascii_to_lower(group.loggerName).find(loweredNeedle) != std::string::npos;
+            if (needle.empty()) return true;
+            return ContainsOutputLogText(group.message.view(), needle) ||
+                ContainsOutputLogText(group.loggerName.view(), needle);
         }
 
         ce::engine_ordered_map<std::uint64_t, LogGroup> m_groups;

@@ -29,7 +29,7 @@ inline ce::layers::result<project_layer_snapshot> ImportLegacyProjectLayers(cons
         std::string parse_error;
         if (std::filesystem::exists(tags_path))
         {
-            const auto document = Authoring::ParsedDocument::ParseFile(tags_path.string(), parse_error);
+            const auto document = Authoring::ParsedDocument::ParseFilePath(tags_path, parse_error);
             if (!document || !document.Root()["layers"].IsSequence())
                 return std::unexpected(error::invalid_definition);
 
@@ -46,7 +46,7 @@ inline ce::layers::result<project_layer_snapshot> ImportLegacyProjectLayers(cons
         const auto matrix_path = directory / "CollisionMatrix.asset";
         if (std::filesystem::exists(matrix_path))
         {
-            const auto document = Authoring::ParsedDocument::ParseFile(matrix_path.string(), parse_error);
+            const auto document = Authoring::ParsedDocument::ParseFilePath(matrix_path, parse_error);
             if (!document || !document.Root().IsSequence() ||
                 (document.Root().Size() != names.size() && document.Root().Size() != 32))
                 return std::unexpected(error::invalid_definition);

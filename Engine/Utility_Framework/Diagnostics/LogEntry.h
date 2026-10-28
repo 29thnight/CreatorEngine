@@ -7,8 +7,8 @@
 // A zero line means that the producer did not supply a source location.
 struct LogSourceLocation
 {
-    std::string file;
-    std::string function;
+    ce::utf8_string file;
+    ce::utf8_string function;
     int line{};
 };
 
@@ -22,7 +22,7 @@ struct LogEntry
     spdlog::level::level_enum level{};
     spdlog::log_clock::time_point timestamp{};
     std::size_t threadId{};
-    std::string loggerName;
-    std::string message; // Original payload, including whitespace and embedded NULs.
+    ce::utf8_string loggerName;
+    ce::utf8_string message; // Original UTF-8 bytes, including whitespace and embedded NULs.
     LogSourceLocation source;
 };

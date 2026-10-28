@@ -19,11 +19,11 @@ protected:
         entry.timestamp = msg.time;
         entry.threadId = msg.thread_id;
         if (msg.logger_name.size() != 0)
-            entry.loggerName.assign(msg.logger_name.data(), msg.logger_name.size());
+            entry.loggerName.assign(ce::utf8_string_view(msg.logger_name.data(), msg.logger_name.size()));
         if (msg.payload.size() != 0)
-            entry.message.assign(msg.payload.data(), msg.payload.size());
-        if (msg.source.filename) entry.source.file = msg.source.filename;
-        if (msg.source.funcname) entry.source.function = msg.source.funcname;
+            entry.message.assign(ce::utf8_string_view(msg.payload.data(), msg.payload.size()));
+        if (msg.source.filename) entry.source.file.assign(msg.source.filename);
+        if (msg.source.funcname) entry.source.function.assign(msg.source.funcname);
         entry.source.line = msg.source.line;
         m_store->Append(std::move(entry));
     }

@@ -71,7 +71,7 @@ bool RuntimeSettings::Load() noexcept
 
         std::string parseError;
         const Authoring::ParsedDocument document =
-            Authoring::ParsedDocument::ParseFile(settingsPath.string(), parseError);
+            Authoring::ParsedDocument::ParseFilePath(settingsPath, parseError);
         if (!document)
         {
             Debug::PrintLog(spdlog::level::err, "Unable to load EngineSettings.asset: " + parseError);

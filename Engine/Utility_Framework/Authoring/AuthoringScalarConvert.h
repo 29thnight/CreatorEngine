@@ -22,6 +22,22 @@
 //   이 계층이 예외를 던지면 ryml 경로에서 두 가지 실패 표현이 섞인다.
 namespace Authoring::Scalar
 {
+	namespace detail
+	{
+		template<class T> inline constexpr bool is_utf8_string = false;
+		template<class Allocator>
+		inline constexpr bool is_utf8_string<ce::basic_utf8_string<Allocator>> = true;
+		template<class T> inline constexpr bool is_utf16_string = false;
+		template<class Allocator>
+		inline constexpr bool is_utf16_string<ce::basic_utf16_string<Allocator>> = true;
+		template<class T> inline constexpr bool is_utf8_text =
+			is_utf8_string<std::remove_cvref_t<T>>
+			|| std::is_same_v<std::remove_cvref_t<T>, ce::utf8_string_view>;
+		template<class T> inline constexpr bool is_utf16_text =
+			is_utf16_string<std::remove_cvref_t<T>>
+			|| std::is_same_v<std::remove_cvref_t<T>, ce::string_view>;
+	}
+
 	// YAML 1.1 불리언. yaml-cpp가 받는 표기의 **전부**이며, `1`/`0`은 포함되지
 	// 않는다(실측: yaml-cpp `as<bool>`이 "1"에서 실패한다).
 	[[nodiscard]] bool TryParseBool(std::string_view text, bool& out);
@@ -41,7 +57,22 @@ namespace Authoring::Scalar
 	template<class T>
 	[[nodiscard]] inline bool TryConvert(std::string_view raw, T& out)
 	{
-		if constexpr (std::is_same_v<T, bool>)
+		if constexpr (detail::is_utf8_string<T>)
+		{
+			out.assign(ce::utf8_string_view(raw.data(), raw.size()));
+			return true;
+		}
+		else if constexpr (detail::is_utf16_string<T>)
+		{
+			// Conversion validates the whole source before replacing the output.
+			return static_cast<bool>(ce::to_utf16(ce::utf8_string_view(raw.data(), raw.size()), out));
+		}
+		else if constexpr (std::is_same_v<T, std::string>)
+		{
+			out.assign(raw.data() ? raw.data() : "", raw.size());
+			return true;
+		}
+		else if constexpr (std::is_same_v<T, bool>)
 		{
 			return TryParseBool(raw, out);
 		}
@@ -82,6 +113,13 @@ namespace Authoring::Scalar
 			out = static_cast<T>(value);
 			return true;
 		}
+	}
+
+	template<class Text, class T> requires detail::is_utf8_text<Text>
+	[[nodiscard]] inline bool TryConvert(const Text& text, T& out)
+	{
+		const ce::utf8_string_view raw = text;
+		return TryConvert(std::string_view(raw.data() ? raw.data() : "", raw.size()), out);
 	}
 }
 

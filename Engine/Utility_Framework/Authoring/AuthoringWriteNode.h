@@ -100,6 +100,23 @@ namespace Authoring
 			}
 		}
 
+		template<class Text> requires Scalar::detail::is_utf8_text<Text>
+		void SetScalar(const Text& source) const
+		{
+			const ce::utf8_string_view value = source;
+			SetScalar(std::string_view(value.data() ? value.data() : "", value.size()));
+		}
+
+		template<class Text> requires Scalar::detail::is_utf16_text<Text>
+		void SetScalar(const Text& value) const
+		{
+			if (!IsValid()) return;
+			ce::utf8_string text;
+			if (!ce::to_utf8(value, text))
+				throw std::invalid_argument("Authoring::WriteNode: invalid UTF-16 scalar");
+			SetScalar(text.view());
+		}
+
         // Explicit string scalars must never be reinterpreted as YAML null
         // (for example a typed audio String parameter containing "null" or "~").
         void SetString(std::string_view value) const
@@ -117,6 +134,23 @@ namespace Authoring
                 ryml::NodeType{ ryml::VAL_DQUO });
         }
 
+		template<class Text> requires Scalar::detail::is_utf8_text<Text>
+		void SetString(const Text& source) const
+		{
+			const ce::utf8_string_view value = source;
+			SetString(std::string_view(value.data() ? value.data() : "", value.size()));
+		}
+
+		template<class Text> requires Scalar::detail::is_utf16_text<Text>
+		void SetString(const Text& value) const
+		{
+			if (!IsValid()) return;
+			ce::utf8_string text;
+			if (!ce::to_utf8(value, text))
+				throw std::invalid_argument("Authoring::WriteNode: invalid UTF-16 string");
+			SetString(text.view());
+		}
+
 		void SetScalar(const std::string& value) const
 		{
 			SetScalar(std::string_view{ value });
@@ -132,6 +166,14 @@ namespace Authoring
 			SetScalar(std::string_view{ value });
 		}
 
+		void SetScalar(const char16_t* value) const
+		{
+			if (value) SetScalar(ce::string_view(value));
+			else SetNull();
+		}
+
+		void SetScalar(std::nullptr_t) const { SetNull(); }
+
 		// ryml의 기본 bool scalar_serialize는 1/0을 낸다. yaml-cpp의 기존
 		// `as<bool>()` 계약은 그 표기를 거부하고 true/false만 받으므로 writer에서
 		// 명시 고정한다. D3-b-2b 스칼라 파리티가 이미 밝힌 방향 역전과 같은 축이다.
@@ -141,7 +183,9 @@ namespace Authoring
 		}
 
 		template<class T>
-			requires (!std::is_convertible_v<const T&, std::string_view>)
+			requires (!std::is_convertible_v<const T&, std::string_view>
+				&& !std::is_convertible_v<const T&, ce::utf8_string_view>
+				&& !std::is_convertible_v<const T&, ce::string_view>)
 		void SetScalar(const T& value) const
 		{
 			if (!IsValid()) return;
@@ -164,6 +208,13 @@ namespace Authoring
 				m_tree->set_key(child, m_tree->copy_to_arena(lookup));
 			}
 			return WriteNode{ *m_tree, child };
+		}
+
+		template<class Text> requires Scalar::detail::is_utf8_text<Text>
+		[[nodiscard]] WriteNode Child(const Text& text) const
+		{
+			const ce::utf8_string_view key = text;
+			return Child(std::string_view(key.data() ? key.data() : "", key.size()));
 		}
 
 		[[nodiscard]] WriteNode Append() const
@@ -199,6 +250,13 @@ namespace Authoring
 			if (ryml::NONE == child) return false;
 			m_tree->remove(child);
 			return true;
+		}
+
+		template<class Text> requires Scalar::detail::is_utf8_text<Text>
+		bool RemoveChild(const Text& text) const
+		{
+			const ce::utf8_string_view key = text;
+			return RemoveChild(std::string_view(key.data() ? key.data() : "", key.size()));
 		}
 
 		// 다른 writer 트리의 값을 이 노드에 복제한다. 대상 노드의 key는 유지하고
@@ -345,7 +403,7 @@ namespace Authoring
 		WriteDocument& operator=(const WriteDocument&) = delete;
 
 		[[nodiscard]] static std::optional<WriteDocument> ParseText(
-			std::string_view text, std::string* error = nullptr)
+			ce::utf8_string_view text, ce::utf8_string& error)
 		{
 			EnsureRymlErrorPolicy();
 			try
@@ -354,29 +412,74 @@ namespace Authoring
 				RecordTextParserCall("<write-memory>");
 				document.m_tree = ryml::parse_in_arena(
 					ryml::csubstr(text.data(), text.size()));
-				if (error) error->clear();
+				error.clear();
 				return document;
 			}
 			catch (const std::exception& exception)
 			{
-				if (error) *error = exception.what();
+				error.assign(exception.what());
 				return std::nullopt;
 			}
 		}
 
 		[[nodiscard]] static std::optional<WriteDocument> ParseFile(
-			const std::filesystem::path& path, std::string* error = nullptr)
+			const std::filesystem::path& path, ce::utf8_string& error)
 		{
-			std::ifstream input(path, std::ios::binary);
-			if (!input.is_open())
+			try
 			{
-				if (error) *error = "failed to open authoring document: "
-					+ path.string();
+				const auto pathBytes = path.u8string();
+				const ce::utf8_string_view pathText(
+					reinterpret_cast<const char*>(pathBytes.data()), pathBytes.size());
+				if (pathText.find(ce::utf8_string_view("\0", 1)) != ce::utf8_string_view::npos)
+				{
+					error.assign("authoring document path contains NUL");
+					return std::nullopt;
+				}
+				std::ifstream input(path, std::ios::binary);
+				if (!input.is_open())
+				{
+					error.assign("failed to open authoring document: ");
+					error.append(pathText);
+					return std::nullopt;
+				}
+				ce::utf8_string text;
+				char chunk[16384];
+				while (input)
+				{
+					input.read(chunk, static_cast<std::streamsize>(sizeof(chunk)));
+					text.append({chunk, static_cast<std::size_t>(input.gcount())});
+				}
+				if (input.bad() || !input.eof())
+				{
+					error.assign("failed to read authoring document: ");
+					error.append(pathText);
+					return std::nullopt;
+				}
+				return ParseText(text.view(), error);
+			}
+			catch (const std::exception& exception)
+			{
+				error.assign(exception.what());
 				return std::nullopt;
 			}
-			const std::string text{ std::istreambuf_iterator<char>{ input },
-				std::istreambuf_iterator<char>{} };
-			return ParseText(text, error);
+		}
+
+		[[nodiscard]] static std::optional<WriteDocument> ParseText(
+			std::string_view text, std::string* error = nullptr)
+		{
+			ce::utf8_string diagnostic;
+			auto document = ParseText(ce::utf8_string_view(text.data(), text.size()), diagnostic);
+			if (error) error->assign(diagnostic.data(), diagnostic.size());
+			return document;
+		}
+
+		[[nodiscard]] static std::optional<WriteDocument> ParseFile(
+			const std::filesystem::path& path, std::string* error = nullptr)
+		{
+			ce::utf8_string diagnostic;
+			auto document = ParseFile(path, diagnostic);
+			if (error) error->assign(diagnostic.data(), diagnostic.size());
+			return document;
 		}
 
 		[[nodiscard]] WriteNode Root()

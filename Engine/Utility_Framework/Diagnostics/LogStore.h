@@ -262,15 +262,16 @@ private:
             group.source.file.size() + group.source.function.size();
     }
 
-    static std::size_t KeyHash(spdlog::level::level_enum level, const std::string& loggerName,
-        const std::string& message, const LogSourceLocation& source)
+    static std::size_t KeyHash(spdlog::level::level_enum level, const ce::utf8_string& loggerName,
+        const ce::utf8_string& message, const LogSourceLocation& source)
     {
         std::size_t seed = std::hash<int>{}(static_cast<int>(level));
         for (const auto* text : { &loggerName, &message, &source.file, &source.function })
         {
-            // std::hash<std::string> reads the whole size, so an embedded NUL
-            // does not cut the payload short the way a C string would.
-            seed ^= std::hash<std::string>{}(*text) + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2);
+            // The standard hash boundary borrows the full byte range. Embedded
+            // NULs remain part of the identity and no temporary owner is needed.
+            seed ^= std::hash<std::string_view>{}({text->data(), text->size()}) +
+                0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2);
         }
         seed ^= std::hash<int>{}(source.line) + 0x9e3779b97f4a7c15ull + (seed << 6) + (seed >> 2);
         return seed;

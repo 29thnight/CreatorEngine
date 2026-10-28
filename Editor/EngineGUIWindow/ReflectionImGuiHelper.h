@@ -16,6 +16,8 @@ namespace EditorImGuiTexture
 // ImGui 심볼을 하나도 쓰지 않으면서 UF 전체를 imgui에 묶고 있었다.
 // 실제로 쓰는 여기서 직접 든다.
 #include <imgui.h>
+#include "../ImGuiHelper/ReflectedStringInput.h"
+#include "../ImGuiHelper/ReflectedMethodText.h"
 #include "../../Engine/Utility_Framework/Reflection/ReflectionRegister.h"
 #include "../../Engine/Utility_Framework/Reflection/ReflgenRuntime.h"
 #include "SceneManager.h"
@@ -72,17 +74,6 @@ namespace Meta
         }
     }
 
-    enum class MethodInputKind { Int, Float, Bool, String, Unsupported };
-
-    inline MethodInputKind MethodInputOf(reflgen::type_id type)
-    {
-        if (type == reflgen::type_id_of<int>()) return MethodInputKind::Int;
-        if (type == reflgen::type_id_of<float>()) return MethodInputKind::Float;
-        if (type == reflgen::type_id_of<bool>()) return MethodInputKind::Bool;
-        if (type == reflgen::type_id_of<std::string>()) return MethodInputKind::String;
-        return MethodInputKind::Unsupported;
-    }
-
     struct MethodUiState
     {
         ce::dynamic_array<std::any> arguments;
@@ -90,31 +81,6 @@ namespace Meta
         bool failed = false;
         int lastSeenFrame = 0;
     };
-
-    // 인자 칸의 값 객체 — 파라미터 타입(참조·cv 를 뗀)의 객체다. method_info::invoke 가 그 주소를 받는다.
-    inline void* MethodArgumentAddress(std::any& argument)
-    {
-        if (auto* value = std::any_cast<int>(&argument)) return value;
-        if (auto* value = std::any_cast<float>(&argument)) return value;
-        if (auto* value = std::any_cast<bool>(&argument)) return value;
-        if (auto* value = std::any_cast<std::string>(&argument)) return value;
-        return nullptr;
-    }
-
-    // 반환값을 받아 적는다 — 표시할 수 있는 타입(int·float·bool·string)만 받고 나머지는 버린다.
-    inline std::string InvokeAndDescribe(void* instance, const reflgen::method_info& method, std::span<void* const> arguments)
-    {
-        switch (MethodInputOf(method.return_type()))
-        {
-        case MethodInputKind::Int: { int result{}; method.invoke(instance, arguments, &result); return "Result: " + std::to_string(result); }
-        case MethodInputKind::Float: { float result{}; method.invoke(instance, arguments, &result); return "Result: " + std::to_string(result); }
-        case MethodInputKind::Bool: { bool result{}; method.invoke(instance, arguments, &result); return result ? "Result: true" : "Result: false"; }
-        case MethodInputKind::String: { std::string result; method.invoke(instance, arguments, &result); return "Result: " + result; }
-        case MethodInputKind::Unsupported: break;
-        }
-        method.invoke(instance, arguments);
-        return method.return_type() == reflgen::type_id_of<void>() ? "Invoked" : "Invoked (result cannot be displayed)";
-    }
 
     inline void InvokeInspectorMethod(void* instance, const reflgen::method_info& method, MethodUiState& state)
     {
@@ -234,6 +200,40 @@ namespace Meta
                         if (ImGui::InputText("##value", value->data(), value->capacity() + 1,
                             ImGuiInputTextFlags_CallbackResize, InputTextCallback, value))
                             state.feedback.clear();
+                        break;
+                    }
+                    case MethodInputKind::Utf8String:
+                    {
+                        if (!std::any_cast<ce::utf8_string>(&argument)) argument = ce::utf8_string{};
+                        auto& value = *std::any_cast<ce::utf8_string>(&argument);
+                        ImGui::TextUnformatted(paramName.c_str());
+                        ImGui::SetNextItemWidth(-1.f);
+                        auto edit = editor::text::InputReflectedString("##value", value);
+                        if (edit.changed)
+                        {
+                            value = edit.value();
+                            edit.accept(value);
+                            state.feedback.clear();
+                        }
+                        supported = supported && bool(edit.status) && !edit.conflict;
+                        editor::text::DrawStringInputIssue(edit.status, edit.conflict);
+                        break;
+                    }
+                    case MethodInputKind::Utf16String:
+                    {
+                        if (!std::any_cast<ce::string>(&argument)) argument = ce::string{};
+                        auto& value = *std::any_cast<ce::string>(&argument);
+                        ImGui::TextUnformatted(paramName.c_str());
+                        ImGui::SetNextItemWidth(-1.f);
+                        auto edit = editor::text::InputReflectedString("##value", value);
+                        if (edit.changed)
+                        {
+                            value = edit.value();
+                            edit.accept(value);
+                            state.feedback.clear();
+                        }
+                        supported = supported && bool(edit.status) && !edit.conflict;
+                        editor::text::DrawStringInputIssue(edit.status, edit.conflict);
                         break;
                     }
                     case MethodInputKind::Unsupported:

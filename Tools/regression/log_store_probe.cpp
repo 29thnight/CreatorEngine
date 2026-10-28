@@ -1,7 +1,11 @@
+#ifndef CE_CONTRACT_STANDALONE
+#define CE_CONTRACT_STANDALONE 1
+#endif
 #include "../../Engine/Utility_Framework/Diagnostics/LogSink.h"
+#if defined(_WIN32) && !defined(CE_LOG_STORAGE_PORTABLE)
 #include "../../Engine/Utility_Framework/Diagnostics/LogSystem.h"
+#endif
 #include "../../Engine/Utility_Framework/Diagnostics/HtmlFileSink.h"
-#include "MenuBarWindow.h"
 #include "OutputLogView.h"
 #include <spdlog/logger.h>
 #include <stdio.h>
@@ -9,6 +13,11 @@
 
 namespace
 {
+    ce::utf8_string_view Utf8(std::string_view text)
+    {
+        return {text.data(), text.size()};
+    }
+
     void Require(bool condition, const char* description)
     {
         if (!condition) throw std::runtime_error(description);
@@ -17,7 +26,7 @@ namespace
     LogEntry Entry(std::string message)
     {
         LogEntry entry;
-        entry.message = std::move(message);
+        entry.message.assign(Utf8(message));
         return entry;
     }
 
@@ -80,14 +89,14 @@ namespace
         auto snapshot = store->ReadSnapshot();
         Require(snapshot.entries.size() == 1, "one captured record");
         const auto& entry = snapshot.entries.front();
-        Require(entry.message == original && entry.loggerName == "producer", "owned original strings");
+        Require(entry.message == Utf8(original) && entry.loggerName == "producer", "owned original strings");
         Require(entry.timestamp == timestamp && entry.threadId == 12345 &&
             entry.level == spdlog::level::warn, "captured occurrence metadata");
-        Require(entry.source.file == originalFile && entry.source.function == "Producer" &&
+        Require(entry.source.file == Utf8(originalFile) && entry.source.function == "Producer" &&
             entry.source.line == 42, "owned source metadata");
         Require(!store->ReadSnapshotIfChanged(snapshot.revision), "unchanged snapshot is not copied");
-        snapshot.entries.front().message = "reader mutation";
-        Require(store->ReadSnapshot().entries.front().message == original, "reader cannot mutate history");
+        snapshot.entries.front().message.assign("reader mutation");
+        Require(store->ReadSnapshot().entries.front().message == Utf8(original), "reader cannot mutate history");
 
         spdlog::details::log_msg empty;
         empty.time = timestamp;
@@ -101,7 +110,7 @@ namespace
         std::weak_ptr<LogStore> weak = store;
         store.reset();
         Require(!weak.expired(), "sink retains store lifetime");
-        Require(snapshot.entries.front().source.file == originalFile, "snapshot owns its fields");
+        Require(snapshot.entries.front().source.file == Utf8(originalFile), "snapshot owns its fields");
         std::puts("PASS ownership, metadata, original bytes, snapshot isolation");
     }
 
@@ -109,11 +118,13 @@ namespace
     {
         // The real facade is usable before sink initialization; UI reads do not
         // depend on a live LogSink pointer or its friend-only storage members.
+#if defined(_WIN32) && !defined(CE_LOG_STORAGE_PORTABLE)
         const auto initialFacade = Debug::GetLogSnapshot();
         Debug::Clear();
         Require(Debug::GetLogSnapshot().clearGeneration == initialFacade.clearGeneration + 1 &&
             Debug::GetLogSnapshotIfChanged(initialFacade.revision).has_value(),
             "DebugClass snapshot/Clear before sink initialization");
+#endif
         LogStore store({ 3, 64, 100 });
         Require(store.ReadSnapshotIfChanged(0).has_value(), "initial empty snapshot published");
         store.Append(Entry("a"));
@@ -144,8 +155,8 @@ namespace
         Require(limited.entries.front().message == "abcd" && limited.rejectedEntries == 1,
             "rejection preserves existing history");
         auto metadataHeavy = Entry("a");
-        metadataHeavy.loggerName = "logger";
-        metadataHeavy.source.file = "file";
+        metadataHeavy.loggerName.assign("logger");
+        metadataHeavy.source.file.assign("file");
         Require(!bytes.Append(std::move(metadataHeavy)), "metadata included in text budget");
         bytes.Append(Entry("efghij"));
         limited = bytes.ReadSnapshot();
@@ -218,7 +229,7 @@ namespace
                         const auto index = entry.source.line - 1;
                         const auto expected = "writer=" + std::to_string(entry.threadId - 1) +
                             ";record=" + std::to_string(index);
-                        Require(entry.message == expected && entry.loggerName == "concurrent" &&
+                        Require(entry.message == Utf8(expected) && entry.loggerName == "concurrent" &&
                             entry.source.file == "producer.cpp" && entry.source.function == "Write" &&
                             entry.timestamp.time_since_epoch() == std::chrono::milliseconds{ index },
                             "no torn metadata/payload");
@@ -285,6 +296,64 @@ namespace
         std::puts("PASS actual spdlog logger / HTML sink independence");
     }
 
+    void CheckUtf8StringBoundaries(const char* outputPath)
+    {
+        // Log storage must retain bytes that a text widget cannot edit: NUL and
+        // malformed UTF-8 are not a reason to silently shorten a diagnostic.
+        std::string payload = "한글 \xF0\x9F\x8E\xB9 before";
+        payload.push_back('\0');
+        payload += "AFTER";
+        payload.push_back(static_cast<char>(0xff));
+        LogStore store;
+        store.Append(Entry(payload));
+        editor::OutputLogView view;
+        view.Apply(*store.ReadDeltaSince({}));
+        editor::OutputLogFilter filter;
+        filter.search.assign(ce::utf8_string_view("\0after", 6));
+        view.Rebuild(filter);
+        Require(view.Rows().size() == 1, "case-insensitive search crosses an embedded NUL");
+        Require(view.FindGroup(view.Rows().front().groupId)->message == Utf8(payload),
+            "view preserves supplementary characters, embedded NUL and malformed bytes");
+        const char invalid = static_cast<char>(0xff);
+        filter.search.assign(ce::utf8_string_view(&invalid, 1));
+        view.Rebuild(filter);
+        Require(view.Rows().size() == 1, "search preserves non-ASCII byte identity");
+
+        std::filesystem::path path;
+        const ce::utf8_string_view koreanPath("C:\\프로젝트\\\xF0\x9F\x8E\xB9.txt");
+        Require(editor::TryOutputLogFilePath(koreanPath, path), "UTF-8 file path is accepted");
+        Require(path.u8string() == u8"C:\\프로젝트\\🎹.txt", "native path keeps Korean and supplementary text");
+        const auto previous = path;
+        Require(!editor::TryOutputLogFilePath({}, path) && path == previous, "empty path is rejected atomically");
+        Require(!editor::TryOutputLogFilePath(ce::utf8_string_view("a\0b", 3), path) && path == previous,
+            "NUL path is rejected instead of opening a prefix");
+        Require(!editor::TryOutputLogFilePath(ce::utf8_string_view("\xC0\xAF", 2), path) && path == previous,
+            "invalid UTF-8 path is rejected atomically");
+
+        // The HTML writer has its own UTF-8 builders and a native filename
+        // boundary. Exercise real I/O through a non-ASCII filename as well.
+        const auto htmlPath = std::filesystem::path(outputPath).parent_path() / u8"로그-🎹.html";
+        {
+            HtmlFileSink html(htmlPath);
+            const std::string message = "한글 🎹 <&>\"\n다음";
+            const spdlog::details::log_msg entry(
+                spdlog::source_loc{"C:\\프로젝트\\source&.cpp", 42, "Tick"},
+                "utf8", spdlog::level::warn, {message.data(), message.size()});
+            html.log(entry);
+            html.WriteCrashBanner("한글 <crash>");
+            html.MarkGracefulShutdown();
+        }
+        std::ifstream html(htmlPath, std::ios::binary);
+        const std::string document((std::istreambuf_iterator<char>(html)), std::istreambuf_iterator<char>());
+        Require(document.find("한글 🎹 &lt;&amp;&gt;&quot;<br>다음") != std::string::npos,
+            "HTML text preserves Unicode and escapes markup");
+        Require(document.find("source&amp;.cpp:42") != std::string::npos &&
+            document.find("한글 &lt;crash&gt;") != std::string::npos &&
+            document.find("window.__engineGraceful=true") != std::string::npos,
+            "HTML source, crash reason and footer survive UTF-8 builders");
+        std::puts("PASS UTF-8 storage/search, native Unicode paths, HTML encoding boundaries");
+    }
+
     // ── 2단계: 반복 집계 ──────────────────────────────────────────────────
     //
     // Unity 의 Collapse 는 "비슷한" 줄이 아니라 **같은 정체성**을 접는다.
@@ -295,10 +364,10 @@ namespace
     {
         LogEntry entry;
         entry.level = spdlog::level::warn;
-        entry.loggerName = "gameplay";
-        entry.message = std::move(message);
-        entry.source.file = "C:\\src\\Player.cpp";
-        entry.source.function = "Tick";
+        entry.loggerName.assign("gameplay");
+        entry.message.assign(Utf8(message));
+        entry.source.file.assign("C:\\src\\Player.cpp");
+        entry.source.function.assign("Tick");
         entry.source.line = 95;
         entry.threadId = 7;
         entry.timestamp = spdlog::log_clock::time_point{ std::chrono::milliseconds{ 1000 } };
@@ -344,15 +413,15 @@ namespace
         struct KeyAxis { const char* name; LogEntry entry; };
         std::vector<KeyAxis> axes;
         {
-            const std::string base = repeated.message;
+            const std::string base(repeated.message.data(), repeated.message.size());
             auto level = Keyed(base); level.level = spdlog::level::err;
             axes.push_back({ "level", std::move(level) });
-            auto logger = Keyed(base); logger.loggerName = "input";
+            auto logger = Keyed(base); logger.loggerName.assign("input");
             axes.push_back({ "logger", std::move(logger) });
             axes.push_back({ "message", Keyed(base + "?") });
-            auto file = Keyed(base); file.source.file = "C:\\src\\Other.cpp";
+            auto file = Keyed(base); file.source.file.assign("C:\\src\\Other.cpp");
             axes.push_back({ "source file", std::move(file) });
-            auto function = Keyed(base); function.source.function = "Update";
+            auto function = Keyed(base); function.source.function.assign("Update");
             axes.push_back({ "source function", std::move(function) });
             auto line = Keyed(base); line.source.line = 96;
             axes.push_back({ "source line", std::move(line) });
@@ -370,7 +439,7 @@ namespace
 
         // 시각·스레드는 정체성이 아니다 — 프레임을 넘겨도 같은 줄로 모인다.
         const auto beforeGroups = snapshot.groups.size();
-        auto later = Keyed(repeated.message);
+        auto later = Keyed(std::string(repeated.message.data(), repeated.message.size()));
         later.threadId = 99;
         later.timestamp = spdlog::log_clock::time_point{ std::chrono::milliseconds{ 50000 } };
         store.Append(std::move(later));
@@ -488,7 +557,7 @@ namespace
     // 길이로 자르는 구현은 이 자를 통과하지 못한다(옛 `WordWrapText` 가 그랬다).
     struct GlyphWidth
     {
-        float operator()(std::string_view text) const
+        float operator()(ce::utf8_string_view text) const
         {
             std::size_t glyphs = 0;
             for (std::size_t index = 0; index < text.size();
@@ -503,7 +572,7 @@ namespace
     // "바이트 경계로 자른다" 변이가 통과해 버렸다(2026-09-16 실측).
     struct ByteWidth
     {
-        float operator()(std::string_view text) const
+        float operator()(ce::utf8_string_view text) const
         {
             return static_cast<float>(text.size()) * 3.0f;
         }
@@ -522,7 +591,7 @@ namespace
         auto at = [](spdlog::level::level_enum level, std::string message) {
             LogEntry entry;
             entry.level = level;
-            entry.message = std::move(message);
+            entry.message.assign(Utf8(message));
             return entry;
         };
 
@@ -585,18 +654,18 @@ namespace
         const GlyphWidth measure;
         // 한글 열 글자 = 30 바이트. 폭으로는 70, 바이트로는 210 이다.
         const std::string korean = "가나다라마바사아자차";
-        Require(korean.size() == 30 && measure(korean) == 70.0f, "fixture 전제");
+        Require(korean.size() == 30 && measure(Utf8(korean)) == 70.0f, "fixture 전제");
 
-        Require(editor::EllipsizeToWidth(korean, 70.0f, measure) == korean,
+        Require(editor::EllipsizeToWidth(Utf8(korean), 70.0f, measure) == Utf8(korean),
             "글자 폭에 들어가면 그대로 둔다 — 바이트로 셌다면 여기서 잘린다");
 
-        const std::string cut = editor::EllipsizeToWidth(korean, 50.0f, measure);
-        Require(cut.size() == 15 && cut.substr(cut.size() - 3) == "...",
+        const ce::utf8_string cut = editor::EllipsizeToWidth(Utf8(korean), 50.0f, measure);
+        Require(cut.size() == 15 && cut.view().substr(cut.size() - 3) == "...",
             "말줄임표를 붙인다");
-        Require(cut.substr(0, 12) == korean.substr(0, 12),
+        Require(cut.view().substr(0, 12) == Utf8(korean).substr(0, 12),
             "글자 경계에서 자른다 — 한글이 반 토막 나지 않는다");
         Require(measure(cut) <= 50.0f, "말줄임표까지 더한 결과가 한계를 넘지 않는다");
-        Require(editor::EllipsizeToWidth(korean, 10.0f, measure).empty(),
+        Require(editor::EllipsizeToWidth(Utf8(korean), 10.0f, measure).empty(),
             "말줄임표조차 못 들어가면 빈 문자열");
         Require(editor::EllipsizeToWidth("", 100.0f, measure).empty(), "빈 입력");
 
@@ -605,19 +674,19 @@ namespace
             editor::IsUtf8ContinuationByte(korean[10]),
             "fixture 전제: 9 는 글자 경계이고 10 은 이어지는 바이트다");
         const ByteWidth byteMeasure;
-        const std::string byteCut = editor::EllipsizeToWidth(korean, 40.0f, byteMeasure);
-        Require(byteCut.size() == 12 && byteCut.substr(byteCut.size() - 3) == "...",
+        const ce::utf8_string byteCut = editor::EllipsizeToWidth(Utf8(korean), 40.0f, byteMeasure);
+        Require(byteCut.size() == 12 && byteCut.view().substr(byteCut.size() - 3) == "...",
             "바이트 자 아래에서도 글자 경계까지만 담는다");
-        Require(byteCut.substr(0, 9) == korean.substr(0, 9),
+        Require(byteCut.view().substr(0, 9) == Utf8(korean).substr(0, 9),
             "자른 자리가 글자 경계다 — 바이트 경계면 10 바이트에서 끊어 한 글자가 깨진다");
 
         std::string messy = "  앞뒤\t공백과\r\n개행  그리고";
         messy.push_back('\0');
         messy += "NUL";
-        const std::string flat = editor::FlattenForRow(messy);
+        const ce::utf8_string flat = editor::FlattenForRow(Utf8(messy));
         Require(flat == "앞뒤 공백과 개행 그리고 NUL", "행 본문은 한 줄로 접힌다");
-        Require(flat.find('\n') == std::string::npos && flat.find('\t') == std::string::npos &&
-            flat.find('\0') == std::string::npos, "개행·탭·NUL 이 남지 않는다");
+        Require(flat.find("\n") == ce::utf8_string_view::npos && flat.find("\t") == ce::utf8_string_view::npos &&
+            flat.find(ce::utf8_string_view("\0", 1)) == ce::utf8_string_view::npos, "개행·탭·NUL 이 남지 않는다");
 
         // ── 필터 · Collapse · 검색 · 선택 ──────────────────────────────────
         LogStore store({ 64, 64, 8192 });
@@ -669,21 +738,21 @@ namespace
             "고른 수준 미만은 전부 걸러진다 — 옛 화면은 Trace 를 언제나 흘렸다");
 
         filter.minimumLevel = spdlog::level::trace;
-        filter.search = "오류";
+        filter.search.assign("오류");
         view.Rebuild(filter);
         Require(view.Rows().size() == 1, "검색은 본문을 본다");
 
-        filter.search = "compile";
+        filter.search.assign("compile");
         view.Rebuild(filter);
         Require(view.Rows().size() == 1, "ASCII 는 대소문자를 무시한다");
 
         // 검색은 **원문**을, 행 본문은 평탄화한 것을 본다. 두 칸이 그 차이다.
-        filter.search = "오류  두";
+        filter.search.assign("오류  두");
         view.Rebuild(filter);
         Require(view.Rows().size() == 1, "검색이 보는 것은 평탄화 이전의 원문이다");
-        const std::string rowText = view.RowText(view.Rows().front());
-        Require(rowText.find("오류 두") != std::string::npos &&
-            rowText.find("오류  두") == std::string::npos,
+        const ce::utf8_string rowText = view.RowText(view.Rows().front());
+        Require(rowText.find("오류 두") != ce::utf8_string_view::npos &&
+            rowText.find("오류  두") == ce::utf8_string_view::npos,
             "행 본문은 접혔는데 검색은 접히기 전을 본다");
 
         filter.search.clear();
@@ -810,6 +879,7 @@ int main(int argc, char** argv)
         CheckConcurrentAccess(false);
         CheckConcurrentAccess(true);
         CheckFileSinkIndependence(argv[1]);
+        CheckUtf8StringBoundaries(argv[1]);
         std::puts("LOG_STORAGE_OK");
         return 0;
     }

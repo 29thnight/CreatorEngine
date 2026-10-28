@@ -2089,7 +2089,7 @@ namespace ConsoleCmd
                 }
                 auto presetData=CommandData::Object();
                 presetData.Set("presets",std::move(list));
-                presetData.Set("active",CommandData::String(editor::get_workspace_status().preset));
+                presetData.Set("active",CommandData::String(editor::workspace::std_string(editor::get_workspace_status().preset)));
                 return Ok("Layout presets",std::move(presetData));
             }
             // `list` 도 대기열에 넣을 일이 없다 — 게시된 목록을 읽기만 한다.
@@ -2098,10 +2098,10 @@ namespace ConsoleCmd
                 if(args.size()!=2) return InvalidArguments("editor.workspace list");
                 const auto listed=editor::get_workspace_status();
                 auto names=CommandData::Array();
-                for(const auto& name:listed.workspaces) names.Append(CommandData::String(name));
+                for(const auto& name:listed.workspaces) names.Append(CommandData::String(editor::workspace::std_string(name)));
                 auto listData=CommandData::Object();
                 listData.Set("workspaces",std::move(names));
-                listData.Set("active",CommandData::String(listed.name));
+                listData.Set("active",CommandData::String(editor::workspace::std_string(listed.name)));
                 listData.Set("named",CommandData::Bool(listed.named));
                 return Ok("Named workspaces",std::move(listData));
             }
@@ -2136,9 +2136,9 @@ namespace ConsoleCmd
                 for(std::size_t part=3;part<args.size();++part) argument+=" "+args[part];
                 // 쓸 수 없는 이름은 **여기서** 튕긴다. preset 과 같은 이유다 — 대기열에
                 // 넣으면 실패가 다음 프레임의 status.error 로만 남아 명령이 초록이 된다.
-                std::string nameError;
-                if(!editor::workspace::valid_name(argument,nameError))
-                    return InvalidArguments(nameError);
+                ce::utf8_string nameError;
+                if(!editor::workspace::valid_name(editor::workspace::utf8_view(argument),nameError))
+                    return InvalidArguments(editor::workspace::std_string(nameError));
             }
             else
             {
@@ -2155,7 +2155,7 @@ namespace ConsoleCmd
             if(named)
             {
                 const auto listed=editor::get_workspace_status();
-                const bool exists=std::find(listed.workspaces.begin(),listed.workspaces.end(),argument)
+                const bool exists=std::find(listed.workspaces.begin(),listed.workspaces.end(),editor::workspace::utf8_view(argument))
                     !=listed.workspaces.end();
                 if((action==editor::workspace_action::load_named ||
                     action==editor::workspace_action::delete_named) && !exists)
@@ -2165,11 +2165,11 @@ namespace ConsoleCmd
                     if(!listed.named)
                         return PreconditionFailed("editor.workspace.unnamed",
                             "The current layout has no saved name; save it first");
-                    if(exists && argument!=listed.name)
+                    if(exists && editor::workspace::utf8_view(argument)!=listed.name.view())
                         return InvalidArguments("A workspace named "+argument+" already exists");
                 }
             }
-            if(!editor::request_workspace_action(action,argument))
+            if(!editor::request_workspace_action(action,editor::workspace::utf8_view(argument)))
                 return PreconditionFailed("editor.workspace.busy","A workspace operation is pending");
         }
         const auto status=editor::get_workspace_status();
@@ -2178,20 +2178,20 @@ namespace ConsoleCmd
         data.Set("pending",CommandData::Bool(status.pending));
         data.Set("recovered",CommandData::Bool(status.recovered));
         data.Set("migrated",CommandData::Bool(status.migrated));
-        data.Set("path",CommandData::String(status.path));
-        data.Set("preset",CommandData::String(status.preset));
-        data.Set("presetLabel",CommandData::String(status.preset_label));
-        data.Set("name",CommandData::String(status.name));
+        data.Set("path",CommandData::String(editor::workspace::std_string(status.path)));
+        data.Set("preset",CommandData::String(editor::workspace::std_string(status.preset)));
+        data.Set("presetLabel",CommandData::String(editor::workspace::std_string(status.preset_label)));
+        data.Set("name",CommandData::String(editor::workspace::std_string(status.name)));
         data.Set("named",CommandData::Bool(status.named));
         auto workspaces=CommandData::Array();
-        for(const auto& name:status.workspaces) workspaces.Append(CommandData::String(name));
+        for(const auto& name:status.workspaces) workspaces.Append(CommandData::String(editor::workspace::std_string(name)));
         data.Set("workspaces",std::move(workspaces));
-        data.Set("error",CommandData::String(status.error));
+        data.Set("error",CommandData::String(editor::workspace::std_string(status.error)));
         data.Set("revision",CommandData::Int(static_cast<int64_t>(status.revision)));
         auto panels=CommandData::Object();
-        for(const auto& [id,open]:status.panels) panels.Set(id,CommandData::Bool(open));
+        for(const auto& [id,open]:status.panels) panels.Set(editor::workspace::std_string(id),CommandData::Bool(open));
         data.Set("panels",std::move(panels));
-        return Ok(status.pending?"Workspace operation queued":status.message,std::move(data));
+        return Ok(status.pending?"Workspace operation queued":editor::workspace::std_string(status.message),std::move(data));
     }
 
     static CommandCore::CommandResult Cmd_editor_layout(const ConsoleCommandContext& ctx)

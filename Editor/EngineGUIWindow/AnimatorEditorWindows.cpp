@@ -22,6 +22,12 @@
 #include "ClrHost.h"
 #include "Animator.h"
 #include "NodeEditor.h"
+#include "../ImGuiHelper/Utf8Text.h"
+#if defined(CE_CONTRACT_STANDALONE)
+#include "../../Tools/build/ModuleAdapters/Creator.Core.Paths.h"
+#else
+import Creator.Core.Paths;
+#endif
 #include "AnimationController.h"
 #include "EditorIcons.h"
 #include "EditorTheme.h"
@@ -37,9 +43,31 @@
 #include "Scene.h"
 #include "SceneManager.h"
 
+namespace
+{
+    // Animation/reflection still publishes standard UTF-8 strings. Borrow them
+    // only for the immediate UI call; editor-owned text uses ce storage.
+    ce::utf8_string_view AnimatorUtf8(std::string_view text)
+    {
+        return {text.data(), text.size()};
+    }
+
+    ce::utf8_string AnimatorNodeFilename(ce::utf8_string_view name)
+    {
+        ce::utf8_string filename(name);
+        filename.append(".json");
+        return filename;
+    }
+
+    std::optional<std::filesystem::path> AnimatorNodePath(ce::utf8_string_view filename)
+    {
+        return NodeEditor::SettingsPath(ce::paths::node_editor_path({}), filename);
+    }
+}
+
 // 컨트롤러별 노드 편집기 세션 — 에디터가 소유한다(E3-5). Core의
 // AnimationController는 편집기 세션을 모른다. NodeEditor의 프레임 간 상태는
-// SettingsFile 경로에 결속된 컨텍스트뿐이고 MakeEdit이 경로 변화 시
+// native 설정 경로에 결속된 컨텍스트뿐이고 MakeEdit이 경로 변화 시
 // 재생성하므로, 슬롯 재사용이 이월시키는 상태는 없다.
 static NodeEditor* GetControllerNodeEditor(AnimationController* controller)
 {
@@ -354,16 +382,24 @@ if (showControllerTabs)
 				ImGui::Text("Detail: %s", "ControllerDetailPopup");
 				ImGui::Separator();
 
-				char buffer[128];
-				strcpy_s(buffer, controller->name.c_str());
-				buffer[sizeof(buffer) - 1] = '\0';
+				ce::utf8_string nameText(AnimatorUtf8(controller->name));
 				ImGui::Text("Name");
 				ImGui::SameLine();
-				if (ImGui::InputText("##Controller Name", buffer, sizeof(buffer)))
+				if (editor::text::InputTextUtf8("##Controller Name", nameText))
 				{
-					controller->name = buffer;
-					std::string filename = controller->name + ".json";
-					GetControllerNodeEditor(controller.operator->())->ReNameJson(filename);
+					const auto filename = AnimatorNodeFilename(nameText.view());
+					const auto path = AnimatorNodePath(filename.view());
+					auto* nodeEditor = GetControllerNodeEditor(controller.operator->());
+					if (nodeEditor->m_filePath.empty())
+					{
+						const auto currentFilename = AnimatorNodeFilename(AnimatorUtf8(controller->name));
+						if (const auto currentPath = AnimatorNodePath(currentFilename.view()))
+							nodeEditor->m_filePath = *currentPath;
+					}
+					if (path && nodeEditor->ReNameJson(*path))
+						controller->name.assign(nameText.data(), nameText.size());
+					else
+						Debug::LogWarning("Controller name could not be changed: check the settings filename and destination.");
 				}
 				ImGui::Checkbox("Additive (clip start reference)", &controller->m_additive);
 
@@ -445,10 +481,8 @@ if (showControllerTabs)
 		{
 			ImGui::PushID(index);
 			auto& parameter = parameters[index];
-			char buffer[128];
-			strcpy_s(buffer, parameter->name.c_str());
-			buffer[sizeof(buffer) - 1] = '\0';
-			if (ImGui::InputText("", buffer, sizeof(buffer)))
+			ce::utf8_string nameText(AnimatorUtf8(parameter->name));
+			if (editor::text::InputTextUtf8("", nameText))
 			{
 
 				for (auto& controller : controllers)
@@ -456,20 +490,20 @@ if (showControllerTabs)
 					for (auto& state : controller->StateVec)
 					{
 						if (state->animationSpeedParameterName == parameter->name)
-							state->animationSpeedParameterName = buffer;
+							state->animationSpeedParameterName.assign(nameText.data(), nameText.size());
 						for (auto& transtion : state->Transitions)
 						{
 							for (auto& condition : transtion->conditions)
 							{
 								if (condition.valueName == parameter->name)
 								{
-									condition.valueName = buffer;
+									condition.valueName.assign(nameText.data(), nameText.size());
 								}
 							}
 						}
 					}
 				}
-				parameter->name = buffer;
+				parameter->name.assign(nameText.data(), nameText.size());
 				animator->NotifyParameterLayoutChanged();
 			}
 			ImGui::SameLine();
@@ -488,21 +522,16 @@ if (showControllerTabs)
 }
 AnimationController* controller = nullptr;
 NodeEditor* nodeEdtior = nullptr;
+bool nodeGraphReady = false;
 ImGui::EndChild();
 ImGui::SameLine();
 ImGui::BeginChild("Controller Info", ImVec2(900, 500), false);
 if (selectedControllerIndex >= 0
     && selectedControllerIndex < static_cast<int>(animator->m_animationControllers.size()))
 	controller = animator->m_animationControllers[selectedControllerIndex].operator->();
-std::string controllerName;
-if (controller)
-{
-	controllerName = controller->name + " Controller Info";
-}
-else
-{
-	controllerName = " Controller Info";
-}
+ce::utf8_string controllerName;
+if (controller) controllerName.assign(AnimatorUtf8(controller->name));
+controllerName.append(" Controller Info");
 ImGui::TextUnformatted(controllerName.c_str());
 ImGui::Separator();
 if (selectedControllerIndex >= 0 && selectedControllerIndex < animator->m_animationControllers.size())
@@ -520,20 +549,22 @@ if (selectedControllerIndex >= 0 && selectedControllerIndex < animator->m_animat
 		isOpenPopUp = false;
 		isOpenNodePopUp = false;
 	}
-	std::string fileName = controller->name + ".json";
+	const auto fileName = AnimatorNodeFilename(AnimatorUtf8(controller->name));
+	const auto settingsPath = AnimatorNodePath(fileName.view());
+	if (settingsPath && GetControllerNodeEditor(controller)->MakeEdit(*settingsPath))
 	{
-		GetControllerNodeEditor(controller)->MakeEdit(fileName);
-
+		nodeGraphReady = true;
 		for (auto& state : controller->StateVec)
 		{
-			GetControllerNodeEditor(controller)->MakeNode(state->m_name);
+			GetControllerNodeEditor(controller)->MakeNode(AnimatorUtf8(state->m_name));
 		}
 
 		for (auto& state : controller->StateVec)
 		{
 			for (auto& trans : state->Transitions)
 			{
-				GetControllerNodeEditor(controller)->MakeLink(trans->GetCurState(), trans->GetNextState(), trans->m_name);
+				GetControllerNodeEditor(controller)->MakeLink(
+                    AnimatorUtf8(trans->GetCurState()), AnimatorUtf8(trans->GetNextState()));
 			}
 		}
 
@@ -545,8 +576,9 @@ if (selectedControllerIndex >= 0 && selectedControllerIndex < animator->m_animat
 		{
 			auto states = controller->StateVec;
 			int curIndex = GetControllerNodeEditor(controller)->seletedCurNodeIndex;
-			if (states[targetNodeIndex]->m_isAny == true) {}
-			else
+			if (curIndex >= 0 && curIndex < states.size() &&
+				targetNodeIndex >= 0 && targetNodeIndex < states.size() &&
+				!states[targetNodeIndex]->m_isAny)
 			{
 				controller->CreateTransition(states[curIndex]->m_name, states[targetNodeIndex]->m_name);
 			}
@@ -582,7 +614,8 @@ if (selectedControllerIndex >= 0 && selectedControllerIndex < animator->m_animat
 				isOpenNodePopUp = false;
 				ClickNodeIndex = -1;
 			}
-			if (ImGui::MenuItem("Delete State"))
+			if (ImGui::MenuItem("Delete State", nullptr, false,
+				ClickNodeIndex >= 0 && ClickNodeIndex < controller->StateVec.size()))
 			{
 				controller->DeleteState(controller->StateVec[ClickNodeIndex]->m_name);
 				isOpenNodePopUp = false;
@@ -630,6 +663,11 @@ if (selectedControllerIndex >= 0 && selectedControllerIndex < animator->m_animat
 			ClickNodeIndex = -1;
 		}
 	}
+	else
+	{
+		linkIndex = ClickNodeIndex = targetNodeIndex = -1;
+		ImGui::TextUnformatted("Controller name cannot be used as a UTF-8 settings filename.");
+	}
 }
 
 ImGui::EndChild();
@@ -645,7 +683,9 @@ if (preSelectIndex != selectedControllerIndex)
 	preSelectIndex = selectedControllerIndex;
 
 }
-if (controller != nullptr && GetControllerNodeEditor(controller)->m_selectedType == SelectedType::Link && linkIndex != -1)
+if (nodeGraphReady && controller != nullptr &&
+    GetControllerNodeEditor(controller)->m_selectedType == SelectedType::Link &&
+    linkIndex >= 0 && linkIndex < GetControllerNodeEditor(controller)->Links.size())
 {
 	if (preInspectorIndex != linkIndex)
 	{
@@ -656,18 +696,16 @@ if (controller != nullptr && GetControllerNodeEditor(controller)->m_selectedType
 	ImGui::Separator();
 	const auto& fromName = GetControllerNodeEditor(controller)->Links[linkIndex]->fromNode->name;
 	const auto& toName = GetControllerNodeEditor(controller)->Links[linkIndex]->toNode->name;
-	std::string fromNode(fromName.data(), fromName.size());
-	std::string toNode(toName.data(), toName.size());
-	auto transitions = controller->FindState(fromNode)->FindTransitions(toNode);
+	const std::string fromNode(fromName.data(), fromName.size());
+	const std::string toNode(toName.data(), toName.size());
+	auto* sourceState = controller->FindState(fromNode);
+	auto transitions = sourceState ? sourceState->FindTransitions(toNode) : ce::dynamic_array<AniTransition*>{};
 
 	if (!transitions.empty())
 	{
 		for (int i = 0; i < transitions.size(); ++i)
 		{
 			auto& transition = transitions[i];
-			std::string curStateName = transition->GetCurState();
-			std::string nextStateName = transition->GetNextState();
-			std::string transitionName = curStateName + " to " + nextStateName;
 
 			bool isSelected = (selectedTransitionIndex == i);
 			if (ImGui::Selectable(transitions[i]->m_name.c_str(), isSelected))
@@ -698,18 +736,18 @@ if (controller != nullptr && GetControllerNodeEditor(controller)->m_selectedType
 						ImGui::PushID(i);
 						auto& condition = conditions[i];
 						auto parameter = condition.valueParameter;
-						std::string parameterName = condition.valueName;
+						const char* parameterName;
 						if (parameter == nullptr)
 						{
 							parameterName = "NoParameter";
 						}
 						else
 						{
-							parameterName = parameter->name;
+							parameterName = parameter->name.c_str();
 						}
 						auto& compareParameter = condition.CompareParameter;
 
-						if (ImGui::Button(parameterName.c_str(), ImVec2(140, 0)))
+						if (ImGui::Button(parameterName, ImVec2(140, 0)))
 						{
 							ImGui::OpenPopup("ConditionIndexSelect");
 						}
@@ -811,7 +849,10 @@ if (controller != nullptr && GetControllerNodeEditor(controller)->m_selectedType
 	}
 
 }
-else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selectedType == SelectedType::Node && GetControllerNodeEditor(controller)->seletedCurNodeIndex != -1)
+else if (nodeGraphReady && controller != nullptr &&
+    GetControllerNodeEditor(controller)->m_selectedType == SelectedType::Node &&
+    GetControllerNodeEditor(controller)->seletedCurNodeIndex >= 0 &&
+    GetControllerNodeEditor(controller)->seletedCurNodeIndex < controller->StateVec.size())
 {
 	nodeEdtior = GetControllerNodeEditor(controller);
 	if (preInspectorIndex != nodeEdtior->seletedCurNodeIndex)
@@ -823,43 +864,83 @@ else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selecte
 	ImGui::Separator();
 	ImGui::PushID(nodeEdtior->seletedCurNodeIndex);
 	auto& state = controller->StateVec[nodeEdtior->seletedCurNodeIndex];
-	char buffer[128];
-	strcpy_s(buffer, state->m_name.c_str());
-	buffer[sizeof(buffer) - 1] = '\0';
+	struct StateNameInput
+	{
+		const AnimationState* owner{};
+		ce::utf8_string original;
+		ce::utf8_string value;
+		ce::utf8_string error;
+		int lastSeenFrame = -1;
+		bool active{};
+	};
+	static StateNameInput nameInput;
+	const int frame = ImGui::GetFrameCount();
+	const bool gap = nameInput.lastSeenFrame != frame && nameInput.lastSeenFrame != frame - 1;
+	if (nameInput.owner != state.operator->() || gap)
+	{
+		const auto id = ImGui::GetID("##stateName");
+		if (ImGui::GetActiveID() == id) ImGui::ClearActiveID();
+		auto& deactivated = ImGui::GetCurrentContext()->InputTextDeactivatedState;
+		if (deactivated.ID == id) deactivated.ID = 0;
+		if (auto* input = ImGui::GetInputTextState(id)) input->ID = 0;
+		nameInput.active = false;
+		nameInput.error.clear();
+	}
+	if (nameInput.owner != state.operator->() || !nameInput.active)
+	{
+		nameInput.owner = state.operator->();
+		nameInput.original.assign(AnimatorUtf8(state->m_name));
+		nameInput.value = nameInput.original;
+	}
+	nameInput.lastSeenFrame = frame;
 	ImGui::Text("State Name");
 	ImGui::SameLine();
 	if (state->m_isAny == false)
 	{
-
-
-		if (ImGui::InputText("##stateName", buffer, sizeof(buffer)))
+		ce::unicode_result nameStatus;
+		if (editor::text::InputTextUtf8("##stateName", nameInput.value, 0, nullptr, nullptr, &nameStatus))
+			nameInput.error.clear();
+		nameInput.active = bool(nameStatus) && ImGui::IsItemActive();
+		// Deactivation is reported on a separate frame from text edits. Commit
+		// the persistent buffer here, retaining externally changed state names.
+		if (!nameStatus)
+			nameInput.error.assign("State name is not valid editable UTF-8.");
+		else if (ImGui::IsItemDeactivatedAfterEdit())
 		{
-			if (ImGui::IsItemDeactivatedAfterEdit())
+			const bool duplicate = std::ranges::any_of(controller->StateVec, [&](const auto& other) {
+				return other.operator->() != state.operator->() && AnimatorUtf8(other->m_name) == nameInput.value.view();
+			});
+			if (nameInput.original.view() != AnimatorUtf8(state->m_name))
+				nameInput.error.assign("State name changed outside this field. Edit the current name to retry.");
+			else if (nameInput.value.empty() || duplicate)
+				nameInput.error.assign("State name must be nonempty and unique in this controller.");
+			else if (nameInput.value.view() != AnimatorUtf8(state->m_name))
 			{
-				// 실제 변경 적용은 입력 완료 시점에만 수행
-				nodeEdtior->Nodes[nodeEdtior->seletedCurNodeIndex]->name.assign(buffer);
-
+				// These standard strings belong to the animation runtime's name index.
+				const std::string nextName(nameInput.value.data(), nameInput.value.size());
+				controller->StateNameSet.insert(nextName);
+				controller->m_nameToState[nextName] = state;
 				for (auto& st : controller->StateVec)
 				{
-					for (auto& transiton : st->Transitions)
+					for (auto& transition : st->Transitions)
 					{
-						if (transiton->curStateName == state->m_name)
-						{
-							transiton->curStateName = buffer;
-						}
-						if (transiton->nextStateName == state->m_name)
-						{
-							transiton->nextStateName = buffer;
-						}
+						if (transition->curStateName == state->m_name)
+							transition->curStateName.assign(nameInput.value.data(), nameInput.value.size());
+						if (transition->nextStateName == state->m_name)
+							transition->nextStateName.assign(nameInput.value.data(), nameInput.value.size());
 					}
 				}
-
-				state->m_name = buffer;
+				controller->StateNameSet.erase(state->m_name);
+				controller->m_nameToState.erase(state->m_name);
+				state->m_name.assign(nameInput.value.data(), nameInput.value.size());
+				nodeEdtior->Nodes[nodeEdtior->seletedCurNodeIndex]->name = nameInput.value;
 			}
 		}
+		if (!nameInput.error.empty()) ImGui::TextUnformatted(nameInput.error.c_str());
 	}
 	else
 	{
+		nameInput.active = false;
 		ImGui::TextUnformatted(state->m_name.c_str());
 	}
 	if (state->m_isAny == false)
@@ -927,9 +1008,9 @@ else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selecte
 	{
 		for (int i = 0; i < state->Transitions.size(); ++i)
 		{
-			std::string curStateName = state->Transitions[i]->GetCurState();
-			std::string nextStateName = state->Transitions[i]->GetNextState();
-			std::string transitionName = curStateName + " to " + nextStateName;
+			ce::utf8_string transitionName(AnimatorUtf8(state->Transitions[i]->GetCurState()));
+			transitionName.append(" to ");
+			transitionName.append(AnimatorUtf8(state->Transitions[i]->GetNextState()));
 			if (ImGui::Selectable(transitionName.c_str(), true))
 			{
 				selectedTransitionIndex = i;
@@ -965,18 +1046,18 @@ else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selecte
 				ImGui::PushID(i);
 				auto& condition = conditions[i];
 				auto parameter = condition.valueParameter;
-				std::string parameterName;
+				const char* parameterName;
 				if (parameter == nullptr)
 				{
 					parameterName = "NoParameter";
 				}
 				else
 				{
-					parameterName = parameter->name;
+					parameterName = parameter->name.c_str();
 				}
 				auto& compareParameter = condition.CompareParameter;
 
-				if (ImGui::Button(parameterName.c_str(), ImVec2(140, 0)))
+				if (ImGui::Button(parameterName, ImVec2(140, 0)))
 				{
 					ImGui::OpenPopup("ConditionIndexSelect");
 				}
@@ -1070,7 +1151,7 @@ else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selecte
 	const float buttonWidth = 210.0f; // 버튼의 가로 너비 (임의로 지정 또는 측정)
 	const float windowWidth = ImGui::GetContentRegionAvail().x;
 	float offsetX = (windowWidth - buttonWidth) * 0.5f;
-	std::string stateName{};
+	const char* stateName;
 	ImGui::Separator();
 	ImGui::Text("Animation Behaviour");
 	if (nullptr == state->behaviour)
@@ -1079,10 +1160,10 @@ else if (controller != nullptr && GetControllerNodeEditor(controller)->m_selecte
 	}
 	else
 	{
-		stateName = state->behaviour->m_name;
+		stateName = state->behaviour->m_name.c_str();
 	}
 
-	if (ImGui::Button(stateName.c_str(), ImVec2(buttonWidth, 0)))
+	if (ImGui::Button(stateName, ImVec2(buttonWidth, 0)))
 	{
 		if(nullptr != state->behaviour)
 		{
@@ -1204,14 +1285,21 @@ else
 		drawMaskTree = [&](BoneMask* mask)
 			{
 				// 고유 ID 만들기
-				std::string label = mask->boneName + "##" + mask->boneName;
+				const auto boneName = AnimatorUtf8(mask->boneName);
+				ce::utf8_string label(boneName);
+				label.append("##");
+				label.append(boneName);
 
 				// TreeNode는 펼칠 수 있는 드롭다운 역할
 				if (ImGui::TreeNode(label.c_str()))
 				{
 					// Checkbox를 트리 노드 안에 표시
-					ImGui::Checkbox(("Enable##" + mask->boneName).c_str(), &mask->isEnabled);
-					ImGui::SliderFloat(("Weight##" + mask->boneName).c_str(), &mask->weight, 0.f, 1.f);
+					ce::utf8_string enableLabel(ce::utf8_string_view("Enable##"));
+					enableLabel.append(boneName);
+					ce::utf8_string weightLabel(ce::utf8_string_view("Weight##"));
+					weightLabel.append(boneName);
+					ImGui::Checkbox(enableLabel.c_str(), &mask->isEnabled);
+					ImGui::SliderFloat(weightLabel.c_str(), &mask->weight, 0.f, 1.f);
 
 					for (auto& child : mask->m_children)
 					{

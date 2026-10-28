@@ -35,14 +35,15 @@ void TagManager::Initialize()
     if (!std::filesystem::exists(ResolveTagManagerPath()))
     {
         // Initialize the tag map with some default tags if needed
-        m_tagMap["Untagged"] = 0;
-        m_tagMap["Respawn"] = 1;
-        m_tagMap["Finish"] = 2;
-        m_tagMap["MainCamera"] = 3;
-        m_tagMap["Player"] = 4;
-        m_tagMap["GameController"] = 5;
+        m_tagMap[ce::utf8_string("Untagged")] = 0;
+        m_tagMap[ce::utf8_string("Respawn")] = 1;
+        m_tagMap[ce::utf8_string("Finish")] = 2;
+        m_tagMap[ce::utf8_string("MainCamera")] = 3;
+        m_tagMap[ce::utf8_string("Player")] = 4;
+        m_tagMap[ce::utf8_string("GameController")] = 5;
 
-        m_tags = {"Untagged", "Respawn", "Finish", "MainCamera", "Player", "GameController"};
+        m_tags = {ce::utf8_string("Untagged"), ce::utf8_string("Respawn"), ce::utf8_string("Finish"),
+            ce::utf8_string("MainCamera"), ce::utf8_string("Player"), ce::utf8_string("GameController")};
 
         Save();
     }
@@ -78,7 +79,7 @@ void TagManager::Load()
     // D3-b-L: ryml로 읽는다(leaf 파서 — 소비자가 backend에 묶여 있지 않다).
     // ★ 문서가 트리를 소유한다. root 이하 노드는 이 스코프 안에서만 유효하다.
     std::string parseError;
-    const Authoring::ParsedDocument document = Authoring::ParsedDocument::ParseFile(path.string(), parseError);
+    const Authoring::ParsedDocument document = Authoring::ParsedDocument::ParseFilePath(path, parseError);
     if (!document)
     {
         Debug::PrintLog(spdlog::level::err, "TagManager parse failed: " + path.string() + " (" + parseError + ")");
@@ -94,7 +95,7 @@ void TagManager::Load()
         size_t index = 0;
         for (const auto t : root["tags"])
         {
-            std::string tag = t.AsString();
+            ce::utf8_string tag(TagView(t.Scalar()));
             m_tags.push_back(tag);
             m_tagMap[tag] = index++;
         }
@@ -125,7 +126,7 @@ bool TagManager::Save()
     tagsNode.SetSequence();
     for (const auto& tag : m_tags)
     {
-        tagsNode.Append().SetScalar(tag);
+        tagsNode.Append().SetScalar(std::string_view(tag.data(), tag.size()));
     }
 
     // 목적 경로는 Load와 같은 규약으로 만든다. 게시는 Editor Host가 소유하며
@@ -149,7 +150,7 @@ bool TagManager::Save()
 // 부재로 에디터 전용이다 — 호출자는 Inspector와 에디터 CLI뿐이고 Player는
 // 그 층(EngineEntry·EngineGUIWindow)을 링크하지 않는다. Load는 이 경로를
 // 거치지 않고 컨테이너를 직접 채운다.
-void TagManager::SetTagDefinitions(const ce::dynamic_array<std::string>& tags)
+void TagManager::SetTagDefinitions(const ce::dynamic_array<ce::utf8_string>& tags)
 {
     decltype(m_tagMap) indices;
     for (size_t index = 0; index < tags.size(); ++index)
@@ -165,11 +166,11 @@ void TagManager::AddTag(std::string_view tag)
         return; // Avoid adding empty tags
     }
 
-    if (m_tagMap.find(tag) == m_tagMap.end())
+    if (m_tagMap.find(TagView(tag)) == m_tagMap.end())
     {
         // Acquire an owning key before vector growth can invalidate an input
         // view into m_tags. Existing tags take the allocation-free lookup path.
-        auto [it, inserted] = m_tagMap.try_emplace(std::string(tag), m_tags.size());
+        auto [it, inserted] = m_tagMap.try_emplace(ce::utf8_string(TagView(tag)), m_tags.size());
         if (inserted)
         {
             try { m_tags.push_back(it->first); }
@@ -185,7 +186,7 @@ void TagManager::RemoveTag(std::string_view tag)
         return; // Avoid adding empty tags
     }
 
-    auto it = m_tagMap.find(tag);
+    auto it = m_tagMap.find(TagView(tag));
     if (it != m_tagMap.end())
     {
         // The map key stays valid while vector compaction may invalidate tag.
@@ -201,7 +202,7 @@ bool TagManager::HasTag(std::string_view tag) const
         return false;
     }
 
-    auto it = m_tagMap.find(tag);
+    auto it = m_tagMap.find(TagView(tag));
     return it != m_tagMap.end();
 }
 
@@ -212,7 +213,7 @@ void TagManager::AddTagToObject(std::string_view tag, Entity* object)
         return;
     }
 
-    auto it = m_tagMap.find(tag);
+    auto it = m_tagMap.find(TagView(tag));
     if (it != m_tagMap.end())
     {
         m_taggedObjects[it->first].push_back(object);
@@ -222,7 +223,7 @@ void TagManager::AddTagToObject(std::string_view tag, Entity* object)
         // If the tag does not exist, you might want to add it or handle the error
         // For now, we'll just add the object to the "Untagged" category
         object->SetTag("Untagged");
-        m_taggedObjects["Untagged"].push_back(object);
+        m_taggedObjects[ce::utf8_string("Untagged")].push_back(object);
     }
 }
 
@@ -233,7 +234,7 @@ void TagManager::RemoveTagFromObject(std::string_view tag, Entity* object)
         return;
     }
 
-    auto it = m_taggedObjects.find(tag);
+    auto it = m_taggedObjects.find(TagView(tag));
     if (it != m_taggedObjects.end())
     {
         it->second.erase(std::remove(it->second.begin(), it->second.end(), object), it->second.end());

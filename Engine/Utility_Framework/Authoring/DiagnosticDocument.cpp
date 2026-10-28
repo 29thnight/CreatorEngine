@@ -14,44 +14,45 @@ namespace Diagnostics
         struct Value
         {
             Kind kind = Kind::Null;
-            std::string text;
-            ce::dynamic_array<ce::pair<std::string, std::size_t>> children;
+            ce::utf8_string text;
+            ce::dynamic_array<ce::pair<ce::utf8_string, std::size_t>> children;
         };
 
-        void Quote(std::string& output, std::string_view text)
+        void Quote(ce::utf8_string& output, ce::utf8_string_view text)
         {
             constexpr char hex[] = "0123456789abcdef";
-            output += '"';
-            for (const unsigned char c : text)
+            output.push_back('"');
+            for (std::size_t index = 0; index < text.size(); ++index)
             {
+                const auto c = static_cast<unsigned char>(text[index]);
                 switch (c)
                 {
-                case '"': output += "\\\""; break;
-                case '\\': output += "\\\\"; break;
-                case '\b': output += "\\b"; break;
-                case '\f': output += "\\f"; break;
-                case '\n': output += "\\n"; break;
-                case '\r': output += "\\r"; break;
-                case '\t': output += "\\t"; break;
+                case '"': output.append("\\\""); break;
+                case '\\': output.append("\\\\"); break;
+                case '\b': output.append("\\b"); break;
+                case '\f': output.append("\\f"); break;
+                case '\n': output.append("\\n"); break;
+                case '\r': output.append("\\r"); break;
+                case '\t': output.append("\\t"); break;
                 default:
                     if (c < 0x20)
                     {
-                        output += "\\u00";
-                        output += hex[c >> 4];
-                        output += hex[c & 15];
+                        output.append("\\u00");
+                        output.push_back(hex[c >> 4]);
+                        output.push_back(hex[c & 15]);
                     }
-                    else output += static_cast<char>(c);
+                    else output.push_back(static_cast<char>(c));
                 }
             }
-            output += '"';
+            output.push_back('"');
         }
 
-        template<class T> std::string Numeric(T value)
+        template<class T> ce::utf8_string Numeric(T value)
         {
             char buffer[128];
             const auto [end, error] = std::to_chars(buffer, buffer + sizeof(buffer), value);
             if (error != std::errc{}) throw std::runtime_error("Diagnostic number conversion failed");
-            return {buffer, end};
+            return ce::utf8_string(ce::utf8_string_view(buffer, static_cast<std::size_t>(end - buffer)));
         }
     }
 
@@ -67,24 +68,24 @@ namespace Diagnostics
             return values[id];
         }
 
-        void Emit(std::size_t id, std::string& output, std::size_t depth = 0) const
+        void Emit(std::size_t id, ce::utf8_string& output, std::size_t depth = 0) const
         {
             if (depth > 512) throw std::length_error("Diagnostic document depth exceeded");
             const auto& value = values.at(id);
-            if (value.kind == Kind::Null) { output += "null"; return; }
+            if (value.kind == Kind::Null) { output.append("null"); return; }
             if (value.kind == Kind::String) { Quote(output, value.text); return; }
-            if (value.kind == Kind::Literal) { output += value.text; return; }
+            if (value.kind == Kind::Literal) { output.append(value.text); return; }
             const bool map = value.kind == Kind::Map;
-            output += map ? '{' : '[';
+            output.push_back(map ? '{' : '[');
             bool first = true;
             for (const auto& [key, child] : value.children)
             {
-                if (!first) output += ',';
+                if (!first) output.push_back(',');
                 first = false;
-                if (map) { Quote(output, key); output += ':'; }
+                if (map) { Quote(output, key); output.push_back(':'); }
                 Emit(child, output, depth + 1);
             }
-            output += map ? '}' : ']';
+            output.push_back(map ? '}' : ']');
         }
     };
 
@@ -102,7 +103,7 @@ namespace Diagnostics
             if (value.kind != kind) throw std::logic_error("Diagnostic node kind mismatch");
         }
 
-        void Scalar(Value& value, Kind kind, std::string text)
+        void Scalar(Value& value, Kind kind, ce::utf8_string text)
         {
             if (value.kind == Kind::Map || value.kind == Kind::Sequence)
                 throw std::logic_error("Cannot replace diagnostic container with scalar");
@@ -122,15 +123,15 @@ namespace Diagnostics
         return Node(state_.get(), 0);
     }
 
-    std::string Document::ToJson() const
+    ce::utf8_string Document::ToJson() const
     {
         if (!state_) throw std::logic_error("Moved diagnostic document");
-        std::string result;
+        ce::utf8_string result;
         state_->Emit(0, result);
         return result;
     }
 
-    Node Node::operator[](std::string_view key) const
+    Node Node::operator[](ce::utf8_string_view key) const
     {
         auto& parent = Ref(state_, id_);
         Container(parent, Kind::Map);
@@ -155,12 +156,12 @@ namespace Diagnostics
         auto& parent = Ref(state_, id_);
         Container(parent, Kind::Sequence);
         const auto child = state_->values.size();
-        parent.children.emplace_back(std::string{}, child);
+        parent.children.emplace_back(ce::utf8_string{}, child);
         state_->values.emplace_back();
         return Node(state_, child);
     }
 
-    bool Node::Has(std::string_view key) const
+    bool Node::Has(ce::utf8_string_view key) const
     {
         const auto& parent = Ref(state_, id_);
         for (const auto& child : parent.children)
@@ -170,8 +171,8 @@ namespace Diagnostics
 
     void Node::SetMap() const { Container(Ref(state_, id_), Kind::Map); }
     void Node::SetSequence() const { Container(Ref(state_, id_), Kind::Sequence); }
-    void Node::operator<<(std::string_view value) const { Scalar(Ref(state_, id_), Kind::String, std::string(value)); }
-    void Node::operator<<(bool value) const { Scalar(Ref(state_, id_), Kind::Literal, value ? "true" : "false"); }
+    void Node::operator<<(ce::utf8_string_view value) const { Scalar(Ref(state_, id_), Kind::String, ce::utf8_string(value)); }
+    void Node::operator<<(bool value) const { Scalar(Ref(state_, id_), Kind::Literal, ce::utf8_string(value ? "true" : "false")); }
     void Node::SetSigned(std::int64_t value) const { Scalar(Ref(state_, id_), Kind::Literal, Numeric(value)); }
     void Node::SetUnsigned(std::uint64_t value) const { Scalar(Ref(state_, id_), Kind::Literal, Numeric(value)); }
     void Node::SetFloat(double value) const

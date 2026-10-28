@@ -20,10 +20,15 @@ public:
     // flushEveryEntry가 true면 매 로그마다 디스크까지 밀어낸다.
     // 크래시 직전 로그까지 보장되지만 쓰기 비용이 커지므로,
     // 통상적으로는 logger의 flush_on/flush_every 정책과 조합해 false로 둔다.
-    HtmlFileSink(const std::string& filename, bool flushEveryEntry = false)
+    HtmlFileSink(const std::filesystem::path& filename, bool flushEveryEntry = false)
         : m_flushEveryEntry(flushEveryEntry)
     {
-        if (::fopen_s(&m_file, filename.c_str(), "wb") != 0)
+#if defined(_WIN32)
+        if (::_wfopen_s(&m_file, filename.c_str(), L"wb") != 0)
+#else
+        m_file = ::fopen(filename.c_str(), "wb");
+        if (!m_file)
+#endif
         {
             m_file = nullptr;
             return;
@@ -75,13 +80,13 @@ public:
             return;
         }
 
-        std::string row;
+        ce::utf8_string row;
         row.reserve(reason.size() + 256);
-        row += "<tr data-lv=\"crash\" class=\"lv-crash\"><td class=\"c-time\">";
-        row += FormatNow();
-        row += "</td><td class=\"c-lv\">CRASH</td><td class=\"c-tid\">-</td><td class=\"c-msg\">";
-        AppendEscaped(row, reason);
-        row += "</td></tr>\n";
+        row.append("<tr data-lv=\"crash\" class=\"lv-crash\"><td class=\"c-time\">");
+        row.append(FormatNow());
+        row.append("</td><td class=\"c-lv\">CRASH</td><td class=\"c-tid\">-</td><td class=\"c-msg\">");
+        AppendEscaped(row, ce::utf8_string_view(reason.data(), reason.size()));
+        row.append("</td></tr>\n");
 
         ::fwrite(row.data(), 1, row.size(), m_file);
         ::fflush(m_file);
@@ -100,12 +105,13 @@ public:
 protected:
     // 경로에서 파일 이름만. `__FILE__`/`std::source_location` 둘 다 절대 경로를
     // 주고, C# 쪽 `[CallerFilePath]` 도 컴파일 기계의 절대 경로다.
-    static std::string_view BaseName(const char* path) noexcept
+    static ce::utf8_string_view BaseName(const char* path) noexcept
     {
         if (nullptr == path) return {};
-        std::string_view view{ path };
-        const std::size_t cut = view.find_last_of("/\\");
-        return std::string_view::npos == cut ? view : view.substr(cut + 1);
+        const ce::utf8_string_view view(path);
+        std::size_t start = view.size();
+        while (start != 0 && view[start - 1] != '/' && view[start - 1] != '\\') --start;
+        return view.substr(start);
     }
 
     void sink_it_(const spdlog::details::log_msg& msg) override
@@ -115,43 +121,43 @@ protected:
             return;
         }
 
-        const std::string_view levelName = LevelSlug(msg.level);
-        const std::string_view payload{ msg.payload.data(), msg.payload.size() };
+        const ce::utf8_string_view levelName = LevelSlug(msg.level);
+        const ce::utf8_string_view payload{ msg.payload.data(), msg.payload.size() };
 
-        std::string row;
+        ce::utf8_string row;
         row.reserve(payload.size() + 192);
-        row += "<tr data-lv=\"";
-        row += levelName;
-        row += "\" class=\"lv-";
-        row += levelName;
+        row.append("<tr data-lv=\"");
+        row.append(levelName);
+        row.append("\" class=\"lv-");
+        row.append(levelName);
         // 호출 지점. 경로 전체는 빌드 기계마다 달라 잡음이 되므로 파일 이름만
         // 싣는다 — 사람이 추적할 때도 기계가 대조할 때도 그것으로 충분하다.
-        const std::string_view sourceFile = BaseName(msg.source.filename);
+        const ce::utf8_string_view sourceFile = BaseName(msg.source.filename);
         const bool hasSource = !sourceFile.empty() && msg.source.line > 0;
         if (hasSource)
         {
-            row += "\" data-src=\"";
+            row.append("\" data-src=\"");
             AppendEscaped(row, sourceFile);
-            row += ':';
-            row += std::to_string(msg.source.line);
+            row.push_back(':');
+            AppendNumber(row, msg.source.line);
         }
-        row += "\"><td class=\"c-time\">";
+        row.append("\"><td class=\"c-time\">");
         AppendTimestamp(row, msg.time);
-        row += "</td><td class=\"c-lv\">";
-        row += LevelLabel(msg.level);
-        row += "</td><td class=\"c-tid\">";
-        row += std::to_string(msg.thread_id);
-        row += "</td><td class=\"c-msg\">";
+        row.append("</td><td class=\"c-lv\">");
+        row.append(LevelLabel(msg.level));
+        row.append("</td><td class=\"c-tid\">");
+        AppendNumber(row, msg.thread_id);
+        row.append("</td><td class=\"c-msg\">");
         AppendEscaped(row, payload);
         if (hasSource)
         {
-            row += "<span class=\"c-src\">";
+            row.append("<span class=\"c-src\">");
             AppendEscaped(row, sourceFile);
-            row += ':';
-            row += std::to_string(msg.source.line);
-            row += "</span>";
+            row.push_back(':');
+            AppendNumber(row, msg.source.line);
+            row.append("</span>");
         }
-        row += "</td></tr>\n";
+        row.append("</td></tr>\n");
 
         ::fwrite(row.data(), 1, row.size(), m_file);
 
@@ -180,7 +186,7 @@ protected:
     }
 
 private:
-    static std::string_view LevelSlug(spdlog::level::level_enum level) noexcept
+    static ce::utf8_string_view LevelSlug(spdlog::level::level_enum level) noexcept
     {
         switch (level)
         {
@@ -194,7 +200,7 @@ private:
         }
     }
 
-    static std::string_view LevelLabel(spdlog::level::level_enum level) noexcept
+    static ce::utf8_string_view LevelLabel(spdlog::level::level_enum level) noexcept
     {
         switch (level)
         {
@@ -208,24 +214,34 @@ private:
         }
     }
 
-    static void AppendEscaped(std::string& out, std::string_view text)
+    template<class Integer>
+    static void AppendNumber(ce::utf8_string& out, Integer value)
     {
-        for (const char c : text)
+        char digits[32]{};
+        const auto result = std::to_chars(digits, digits + sizeof(digits), value);
+        if (result.ec == std::errc{})
+            out.append(ce::utf8_string_view(digits, static_cast<std::size_t>(result.ptr - digits)));
+    }
+
+    static void AppendEscaped(ce::utf8_string& out, ce::utf8_string_view text)
+    {
+        for (std::size_t index = 0; index < text.size(); ++index)
         {
+            const char c = text[index];
             switch (c)
             {
-            case '&':  out += "&amp;";  break;
-            case '<':  out += "&lt;";   break;
-            case '>':  out += "&gt;";   break;
-            case '"':  out += "&quot;"; break;
-            case '\n': out += "<br>";   break;
+            case '&':  out.append("&amp;");  break;
+            case '<':  out.append("&lt;");   break;
+            case '>':  out.append("&gt;");   break;
+            case '"':  out.append("&quot;"); break;
+            case '\n': out.append("<br>");   break;
             case '\r': break;
-            default:   out += c;        break;
+            default:   out.push_back(c);        break;
             }
         }
     }
 
-    static void AppendTimestamp(std::string& out, spdlog::log_clock::time_point tp)
+    static void AppendTimestamp(ce::utf8_string& out, spdlog::log_clock::time_point tp)
     {
         const auto sysTime = std::chrono::system_clock::time_point(
             std::chrono::duration_cast<std::chrono::system_clock::duration>(tp.time_since_epoch()));
@@ -234,20 +250,24 @@ private:
             sysTime.time_since_epoch()) % 1000;
 
         std::tm local{};
+#if defined(_WIN32)
         ::localtime_s(&local, &raw);
+#else
+        ::localtime_r(&raw, &local);
+#endif
 
         char buffer[32]{};
         const int written = std::snprintf(buffer, sizeof(buffer), "%02d:%02d:%02d.%03d",
             local.tm_hour, local.tm_min, local.tm_sec, static_cast<int>(millis.count()));
         if (written > 0)
         {
-            out.append(buffer, static_cast<size_t>(written));
+            out.append(ce::utf8_string_view(buffer, static_cast<size_t>(written)));
         }
     }
 
-    static std::string FormatNow()
+    static ce::utf8_string FormatNow()
     {
-        std::string out;
+        ce::utf8_string out;
         AppendTimestamp(out, spdlog::log_clock::now());
         return out;
     }
@@ -256,13 +276,17 @@ private:
     {
         const std::time_t raw = std::time(nullptr);
         std::tm local{};
+#if defined(_WIN32)
         ::localtime_s(&local, &raw);
+#else
+        ::localtime_r(&raw, &local);
+#endif
         char started[64]{};
         std::strftime(started, sizeof(started), "%Y-%m-%d %H:%M:%S", &local);
 
-        std::string head;
+        ce::utf8_string head;
         head.reserve(8192);
-        head += R"(<!DOCTYPE html>
+        head.append(R"(<!DOCTYPE html>
 <html lang="ko"><head><meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>CreatorEngine Log</title>
@@ -317,9 +341,9 @@ footer{padding:16px 20px;color:var(--dim);font-size:12.5px;border-top:1px solid 
 </style></head><body>
 <header>
 <h1><span>CreatorEngine</span> Log Session</h1>
-<div class="meta">시작: )";
-        head += started;
-        head += R"( · 이 문서는 실행 중 실시간으로 기록됩니다.</div>
+<div class="meta">시작: )");
+        head.append(started);
+        head.append(R"( · 이 문서는 실행 중 실시간으로 기록됩니다.</div>
 <div class="toolbar">
 <button data-f="trace">TRACE</button><button data-f="debug">DEBUG</button><button data-f="info">INFO</button>
 <button data-f="warn">WARN</button><button data-f="error">ERROR</button><button data-f="critical">CRITICAL</button>
@@ -329,10 +353,10 @@ footer{padding:16px 20px;color:var(--dim);font-size:12.5px;border-top:1px solid 
 </div>
 </header>
 <div id="banner"></div>
-)";
+)");
         // 스크립트를 테이블보다 앞에 두어 푸터가 없어도 뷰어가 동작하게 한다.
         // (DOMContentLoaded 시점에는 이미 모든 로그 행이 파싱되어 있다.)
-        head += R"(<script>
+        head.append(R"(<script>
 (function(){
   function boot(){
     var rows = Array.prototype.slice.call(document.querySelectorAll('tr[data-lv]'));
@@ -384,7 +408,7 @@ footer{padding:16px 20px;color:var(--dim);font-size:12.5px;border-top:1px solid 
 })();
 </script>
 <table><tbody>
-)";
+)");
         // table/tbody를 연 채로 둔다. 로그는 여기에 한 행씩 append되고,
         // 크래시로 닫는 태그가 없어도 HTML 파서가 EOF에서 열린 요소를 자동으로 닫으므로
         // 지금까지 기록된 행이 모두 정상 렌더된다.
@@ -396,21 +420,21 @@ footer{padding:16px 20px;color:var(--dim);font-size:12.5px;border-top:1px solid 
     {
         const bool graceful = m_graceful.load(std::memory_order_acquire);
 
-        std::string tail;
+        ce::utf8_string tail;
         tail.reserve(512);
-        tail += "</tbody></table>\n<footer>세션 종료 · 총 ";
-        tail += std::to_string(m_entryCount.load(std::memory_order_relaxed));
-        tail += "행 · 경고 ";
-        tail += std::to_string(m_warnCount.load(std::memory_order_relaxed));
-        tail += "건 · 오류 ";
-        tail += std::to_string(m_errorCount.load(std::memory_order_relaxed));
-        tail += "건</footer>\n";
+        tail.append("</tbody></table>\n<footer>세션 종료 · 총 ");
+        AppendNumber(tail, m_entryCount.load(std::memory_order_relaxed));
+        tail.append("행 · 경고 ");
+        AppendNumber(tail, m_warnCount.load(std::memory_order_relaxed));
+        tail.append("건 · 오류 ");
+        AppendNumber(tail, m_errorCount.load(std::memory_order_relaxed));
+        tail.append("건</footer>\n");
 
         if (graceful)
         {
-            tail += "<script>window.__engineGraceful=true;</script>\n";
+            tail.append("<script>window.__engineGraceful=true;</script>\n");
         }
-        tail += "</body></html>\n";
+        tail.append("</body></html>\n");
 
         ::fwrite(tail.data(), 1, tail.size(), m_file);
         ::fflush(m_file);

@@ -293,6 +293,12 @@
     <ClInclude Include="Reflection/ReflgenAuthoringSerializers.h">
       <Filter>Reflection</Filter>
     </ClInclude>
+    <ClInclude Include="Reflection/ReflgenStringSerializers.h">
+      <Filter>Reflection</Filter>
+    </ClInclude>
+    <ClInclude Include="Reflection/ReflectionString.h">
+      <Filter>Reflection</Filter>
+    </ClInclude>
     <ClInclude Include="Reflection/ReflgenRuntime.h">
       <Filter>Reflection</Filter>
     </ClInclude>

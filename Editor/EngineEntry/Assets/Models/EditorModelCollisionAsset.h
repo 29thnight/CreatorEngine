@@ -53,7 +53,7 @@ inline ce::physics::result<ModelCollisionAsset> PrepareModelCollisionAsset(
                 return std::unexpected(error{error_code::invalid_argument, 0, "Invalid generated model geometry"});
 
             std::string failure;
-            auto metadata = Authoring::ParsedDocument::ParseFile(meta.string(), failure);
+            auto metadata = Authoring::ParsedDocument::ParseFilePath(meta, failure);
             if (!metadata || !metadata.Root()["guid"].IsScalar() ||
                 metadata.Root()["guid"].AsString() != uuid::to_string(stored->key.asset) ||
                 !metadata.Root()["geometryRevision"].IsScalar() ||

@@ -59,7 +59,7 @@ namespace Authoring::Scalar
 			else if (text[0] == '+') { i = 1; }
 			if (i >= text.size() || text[i] != '.') return false;
 
-			std::string rest;
+			ce::utf8_string rest;
 			rest.reserve(text.size() - i - 1);
 			for (std::size_t k = i + 1; k < text.size(); ++k)
 			{

@@ -33,9 +33,9 @@ void Exercise(TagManager& tags, std::string_view view)
 {
     const std::string expected(view);
     tags.ClearTags();
-    tags.SetTagDefinitions({"Untagged", "Anchor"});
+    tags.SetTagDefinitions({ce::utf8_string("Untagged"), ce::utf8_string("Anchor")});
     tags.AddTag(view);
-    Check(tags.GetTags().size() == 3 && tags.GetTags().back() == expected,
+    Check(tags.GetTags().size() == 3 && tags.GetTags().back() == ce::utf8_string_view(expected.data(), expected.size()),
         "AddTag must preserve the exact view bytes");
     Check(tags.HasTag(view) && tags.GetTagIndex(view) == 2,
         "bounded definition lookup failed");
@@ -105,7 +105,7 @@ int main()
             "definition retained a borrowed caller buffer");
         tags.ClearTags();
 
-        tags.SetTagDefinitions({"Untagged", std::string(longTag)});
+        tags.SetTagDefinitions({ce::utf8_string("Untagged"), ce::utf8_string(ce::utf8_string_view(longTag.data(), longTag.size()))});
         Entity member;
         tags.AddTagToObject(longTag, &member);
         tags.RemoveTagFromObject(longTag, &member); // retain membership capacity
@@ -125,14 +125,15 @@ int main()
         Check(allocationChecks && allocationCount == 0,
             "long-tag lookup/duplicate/warmed membership/removal allocated");
 
-        tags.SetTagDefinitions({"Untagged", "Player", "PlayerSuffix", "A"});
+        tags.SetTagDefinitions({ce::utf8_string("Untagged"), ce::utf8_string("Player"),
+            ce::utf8_string("PlayerSuffix"), ce::utf8_string("A")});
         Check(tags.HasTag(std::string_view(suffixed.data(), 6)) &&
             tags.GetTagIndex(std::string_view(suffixed.data(), 6)) == 1,
             "substring confused with suffixed definition");
         Check(!tags.HasTag(std::string_view(embeddedNull, sizeof(embeddedNull))),
             "embedded null confused with prefix definition");
         // RemoveTag must own a view into m_tags before vector compaction.
-        tags.RemoveTag(std::string_view(tags.GetTags()[1]));
+        tags.RemoveTag(std::string_view(tags.GetTags()[1].data(), tags.GetTags()[1].size()));
         Check(!tags.HasTag("Player") && tags.HasTag("PlayerSuffix"),
             "aliased definition removal corrupted another tag");
         const auto count = tags.GetTags().size();
@@ -145,7 +146,9 @@ int main()
             tags.GetObjectsWithTag({}).empty() && tags.GetObjectWithTag({}) == nullptr,
             "empty/Untagged contract changed");
         tags.ClearTags();
-        std::cout << "TAG_MANAGER_STRING_VIEW_OK hot_path_allocations=" << allocationCount << '\n';
+        // ce heap allocations are checked with an allocator probe in
+        // string_storage_contract_probe; this counter observes standard new only.
+        std::cout << "TAG_MANAGER_STRING_VIEW_OK std_new_allocations=" << allocationCount << '\n';
         return 0;
     }
     catch (const std::exception& error)

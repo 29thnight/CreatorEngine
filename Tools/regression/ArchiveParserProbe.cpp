@@ -55,7 +55,7 @@ int main(int argc,char** argv){try{
     moved.Root()["draws"][std::size_t{0}]["visible"]<<true;
     bool rejected=false;try{moved.Root()["draws"][std::size_t{1}];}catch(const std::out_of_range&){rejected=true;}Check(rejected,"invalid sequence index");
     rejected=false;try{Diagnostics::Node{}.SetMap();}catch(const std::logic_error&){rejected=true;}Check(rejected,"invalid diagnostic node");
-    std::ofstream json(work/"diagnostic.json",std::ios::binary);json<<moved.ToJson();json.close();
+    std::ofstream json(work/"diagnostic.json",std::ios::binary);const auto jsonText=moved.ToJson();json.write(jsonText.data(),static_cast<std::streamsize>(jsonText.size()));json.close();
     Check(Authoring::GetTextParseTelemetry().calls==baseline+1,"diagnostic output called text parser");
     std::cout<<"ARCHIVE_PARSER_OK checks="<<checks<<" cookedTextParserCalls=0\n";return 0;
 }catch(const std::exception& e){std::cerr<<"ARCHIVE_PARSER_FAILED "<<e.what()<<"\n";return 1;}}

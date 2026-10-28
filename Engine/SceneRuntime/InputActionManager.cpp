@@ -133,7 +133,7 @@ void InputActionManager::LoadManager()
 
 	for (const fs::path& path : files)
 	{
-		if (ActionMap* map = LoadMap(path.string()))
+		if (ActionMap* map = LoadMapPath(path))
 		{
 			m_actionMaps.push_back(map);
 		}
@@ -199,9 +199,18 @@ bool InputActionManager::SaveMap(ActionMap* actionMap)
 
 ActionMap* InputActionManager::LoadMap(const std::string& filepath)
 {
+	// Preserve the legacy native narrow-path entry point; discovered filesystem
+	// paths enter LoadMapPath directly and keep their native Unicode spelling.
+	return LoadMapPath(std::filesystem::path(filepath));
+}
+
+ActionMap* InputActionManager::LoadMapPath(const std::filesystem::path& nativePath)
+{
+	const auto pathBytes = nativePath.u8string();
+	const std::string filepath(pathBytes.begin(), pathBytes.end());
 	std::string parseError;
 	Authoring::ParsedDocument document =
-		Authoring::ParsedDocument::ParseFile(filepath, parseError);
+		Authoring::ParsedDocument::ParseFilePath(nativePath, parseError);
 	if (!document)
 	{
 		Debug::PrintLog(spdlog::level::err, "Input map parse failed: " + filepath + " / " + parseError);

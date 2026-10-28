@@ -111,7 +111,7 @@ namespace
         const auto& previous = *instance.shader;
         const auto metadataPath = previous.codeProgram ? root / previous.codeProgram->metadataPath
             : previous.meta.originPath;
-        const auto document = Authoring::ParsedDocument::ParseFile(metadataPath.string(), error);
+        const auto document = Authoring::ParsedDocument::ParseFilePath(metadataPath, error);
         ShaderMeta meta;
         if (!document || !ShaderMetaLoader::Parse(ReadModelRecoveryText(metadataPath), metadataPath,
             previous.meta.guid, meta, error))
@@ -3591,7 +3591,7 @@ private:
 	{
 		std::string error;
 		const Authoring::ParsedDocument document =
-			Authoring::ParsedDocument::ParseFile(metaPath.string(), error);
+			Authoring::ParsedDocument::ParseFilePath(metaPath, error);
 		if (!document) return {};
 		Authoring::ReadNode guid = document.Root()["assetId"];
 		if (!guid || !guid.IsScalar()) guid = document.Root()["guid"];
@@ -3730,7 +3730,7 @@ private:
 
 		std::string error;
 		const Authoring::ParsedDocument document =
-			Authoring::ParsedDocument::ParseFile(targetFile.string(), error);
+			Authoring::ParsedDocument::ParseFilePath(targetFile, error);
 		if (!document) return {};
         const auto root = document.Root();
         const Authoring::ReadNode identity = material && root["lattice_material"]

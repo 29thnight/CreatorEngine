@@ -18,7 +18,7 @@ import Creator.Core.Uuid;
 //   - 반영 클래스 봉투: OnBeforeSerialize → 헤더(컴포넌트 `이름: typeID`·m_typeUUID, Entity `Entity: typeID`) → 필드
 //     (reflgen::write_fields) → OnAfterSerialize(같은 맵에 키를 더한다). 읽기는 필드 순서대로 키를 찾아(레거시 순서)
 //     레거시의 건너뛰기 규칙을 지키고 OnPropertyChanged 를 부른다.
-//   - 스칼라: std::string·FileGuid 는 문자열, HashedGuid 는 정수, math 값은 한 줄(flow) 맵·시퀀스.
+//   - 스칼라: std::string·ce 문자열·FileGuid 는 문자열, HashedGuid 는 정수, math 값은 한 줄(flow) 맵·시퀀스.
 //   - enum 은 정수(underlying) — 이름이 아니다.
 //   - 포인터: 정적 타입의 객체로 쓴다(null·반영되지 않은 대상은 `~`). 읽을 때는 맵이면 새 인스턴스를 만든다.
 //   - 포인터 원소 시퀀스: 원소마다 위와 같고, 정적 타입이 Component 면 실타입(typeID → TypeOps)으로 쓴다. 읽지 않는다
@@ -27,6 +27,7 @@ import Creator.Core.Uuid;
 #include "ReflgenAuthoring.h"
 
 #include <reflgen/serial/serializer.h>
+#include "ReflgenStringSerializers.h"
 
 #include "../Foundation/StandardLibrary.h"
 

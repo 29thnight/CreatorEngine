@@ -4,6 +4,7 @@
 #include "EditorTheme.h"
 #include "EditorIcons.h"
 #include "../EngineEntry/Bootstrap/EditorPlatform.h"
+#include "../ImGuiHelper/Utf8Text.h"
 #include "../../Engine/Utility_Framework/Diagnostics/LogSystem.h"
 
 #include "../../Engine/Utility_Framework/Foundation/StandardLibrary.h"
@@ -64,7 +65,7 @@ namespace
 
     // ImGui 가 지금 쓰는 글꼴로 그 문자열이 차지하는 폭. 이것이 옛 화면에
     // 없던 자다 — 거기서는 UTF-8 **바이트 수**를 120 과 견줬다.
-    float MeasureText(std::string_view text)
+    float MeasureText(ce::utf8_string_view text)
     {
         if (text.empty()) return 0.0f;
         return ImGui::CalcTextSize(text.data(), text.data() + text.size()).x;
@@ -87,7 +88,7 @@ namespace
     // 메시지 안의 Windows 경로. 옛 화면은 아무 줄이나 **한 번 누르면** 이것을
     // 찾아 파일을 열었다 — 읽으려고 고른 것만으로 편집기가 떴다. 여기서는
     // 상세 영역의 버튼으로만 연다.
-    ce::utf8_string_view FindWindowsPath(std::string_view message)
+    ce::utf8_string_view FindWindowsPath(ce::utf8_string_view message)
     {
         for (std::size_t index = 0; index + 2 < message.size(); ++index)
         {
@@ -157,7 +158,6 @@ namespace editor
             if (auto delta = Debug::GetLogDeltaSince(m_view.Cursor())) m_view.Apply(*delta);
         }
         m_filter.minimumLevel = static_cast<spdlog::level::level_enum>(m_levelChoice);
-        m_filter.search = m_search;
         m_view.Rebuild(m_filter);
     }
 
@@ -216,9 +216,9 @@ namespace editor
 
         // 둘째 줄: 검색. 첫 줄에 이어 붙이면 좁은 창에서 밀려 나간다.
         ImGui::SetNextItemWidth(ImGui::GetContentRegionAvail().x);
-        ImGui::InputTextWithHint("##OutputLogSearch",
+        editor::text::InputTextWithHintUtf8("##OutputLogSearch",
             EditorIcon::Label<EditorIcon::Search, " Search (본문 원문과 로거명)">,
-            m_search, sizeof(m_search));
+            m_filter.search);
 
         const std::uint64_t evicted = m_view.EvictedEntries();
         const std::uint64_t rejected = m_view.RejectedEntries();
@@ -279,7 +279,7 @@ namespace editor
                     badge.assign(countText);
                 }
                 const float badgeWidth = badge.empty()
-                    ? 0.0f : MeasureText(std::string_view(badge.data(), badge.size())) + style.FramePadding.x * 4.0f;
+                    ? 0.0f : MeasureText(badge.view()) + style.FramePadding.x * 4.0f;
 
                 ImGui::PushID(index);
 
@@ -323,9 +323,9 @@ namespace editor
                 ImGui::PopStyleColor(3);
                 const bool itemHovered = ImGui::IsItemHovered();
 
-                const std::string flat = m_view.RowText(row);
+                const ce::utf8_string flat = m_view.RowText(row);
                 const float messageWidth = cardWidth - gutter - badgeWidth - style.ItemSpacing.x;
-                const std::string shown = EllipsizeToWidth(flat, messageWidth, MeasureText);
+                const ce::utf8_string shown = EllipsizeToWidth(flat.view(), messageWidth, MeasureText);
 
                 // 본문을 그 위에 겹치려면 같은 줄로 돌아와야 한다. `SetCursorPos`
                 // 로 돌아오면 ImGui 가 **창 경계를 늘리려는 시도**로 읽어 매
@@ -413,7 +413,11 @@ namespace editor
             ImGui::SameLine();
             if (ImGui::Button(EditorIcon::Label<EditorIcon::Folder, " Open File">))
             {
-                EditorPlatform::Get().OpenFile(std::filesystem::path(std::string(path.data(), path.size())));
+                std::filesystem::path nativePath;
+                if (TryOutputLogFilePath(path, nativePath))
+                    EditorPlatform::Get().OpenFile(nativePath);
+                else
+                    Debug::LogWarning("Cannot open log path: the path is not valid UTF-8 text.");
             }
             if (ImGui::IsItemHovered())
             {

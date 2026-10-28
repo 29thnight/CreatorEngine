@@ -161,7 +161,7 @@ namespace N3Pacing
             {
                 EnhancedLivePbrCaptureStatus capture;
                 if(!record->armed){
-                    std::ofstream trace(path/"trace.json",std::ios::binary);trace<<record->document.ToJson();
+                    std::ofstream trace(path/"trace.json",std::ios::binary);const auto json=record->document.ToJson();trace.write(json.data(),static_cast<std::streamsize>(json.size()));
                     return Fail("n3.moving","No zero-tick window admitted a real moving capture: "+record->captureError);
                 }
                 if(!EnhancedSceneRenderer::TryGetLivePbrCaptureStatus(capture))return std::nullopt;
@@ -169,7 +169,7 @@ namespace N3Pacing
                 if(capture.state!=EnhancedPbrCaptureState::Complete)return Fail("n3.moving",capture.error);
             }
             SceneManagers->SimulationCommands().Bind(s.epoch,nullptr);
-            std::ofstream output(path/"trace.json",std::ios::binary);output<<record->document.ToJson();output.close();
+            std::ofstream output(path/"trace.json",std::ios::binary);const auto json=record->document.ToJson();output.write(json.data(),static_cast<std::streamsize>(json.size()));output.close();
             if(!output)return Fail("n3.output","Cannot persist trace");
             auto data=CommandData::Object();data.Set("frames",CommandData::Int(record->frames));
             data.Set("scope",CommandData::String("Recorded actual frames/ticks; independent oracle required"));

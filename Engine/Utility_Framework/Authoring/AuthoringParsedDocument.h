@@ -1,4 +1,5 @@
 #pragma once
+#include "../../Containers/ContainerAPI.h"
 #include "AuthoringReadNode.h"
 
 #include "../Foundation/StandardLibrary.h"
@@ -38,20 +39,32 @@ namespace Authoring
 		// 파일을 읽어 파싱한다. 실패하면 유효하지 않은 문서를 돌려주고 `error`에
 		// 이유를 담는다 — **예외를 던지지 않는다.** 호출부가 "파일 없음"과 "파싱
 		// 실패"를 각자의 방식으로 다뤄 왔으므로 그 선택을 빼앗지 않는다.
-		[[nodiscard]] static ParsedDocument ParseFile(const std::string& utf8Path,
-			std::string& error);
+		[[nodiscard]] static ParsedDocument ParseFile(ce::utf8_string_view utf8Path,
+			ce::utf8_string& error);
 
 		// Windows의 native 경로를 좁은 문자열로 바꾸면 Unicode cache 경로를 열 수 없다.
 		// 별도 이름을 써서 기존 문자열 리터럴 호출과 overload가 모호해지지 않게 한다.
 		[[nodiscard]] static ParsedDocument ParseFilePath(const std::filesystem::path& path,
-			std::string& error);
+			ce::utf8_string& error);
 
 		// 이미 읽어 둔 텍스트를 파싱한다(임베디드 payload 등).
-		[[nodiscard]] static ParsedDocument ParseText(const std::string& text,
-			std::string& error);
+		[[nodiscard]] static ParsedDocument ParseText(ce::utf8_string_view text,
+			ce::utf8_string& error);
 
 		// CEDO만 받는 strict runtime 경계. 구버전 YAML payload를 여기서
 		// 호환하지 않는다; producer 변경 뒤의 artifact는 재쿠킹해야 한다.
+		[[nodiscard]] static ParsedDocument ParseCooked(
+			std::span<const std::byte> bytes, ce::utf8_string& error);
+
+		// Existing serialization and tool interfaces still exchange std strings.
+		// Keep that adaptation at this boundary; parser storage and diagnostics use
+		// the engine UTF-8 types, and every view preserves the caller's length.
+		[[nodiscard]] static ParsedDocument ParseFile(const std::string& utf8Path,
+			std::string& error);
+		[[nodiscard]] static ParsedDocument ParseFilePath(const std::filesystem::path& path,
+			std::string& error);
+		[[nodiscard]] static ParsedDocument ParseText(const std::string& text,
+			std::string& error);
 		[[nodiscard]] static ParsedDocument ParseCooked(
 			std::span<const std::byte> bytes, std::string& error);
 
@@ -63,7 +76,7 @@ namespace Authoring
 
 	private:
 		[[nodiscard]] static ParsedDocument ParseTextWithContext(
-			const std::string& text, std::string& error, std::string_view context);
+			ce::utf8_string_view text, ce::utf8_string& error, ce::utf8_string_view context);
 
 		bool m_valid{ false };
 		ryml::Tree m_tree{};

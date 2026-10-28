@@ -493,7 +493,7 @@ namespace ConsoleCmd
             {
                 std::string parseError;
                 Authoring::ParsedDocument published =
-                    Authoring::ParsedDocument::ParseFile(result.assetPath.string(), parseError);
+                    Authoring::ParsedDocument::ParseFilePath(result.assetPath, parseError);
                 if (!published)
                     throw std::runtime_error(parseError);
                 const Authoring::ReadNode publishedInstances =
@@ -942,8 +942,8 @@ namespace ConsoleCmd
                 const FileGuid catalogGuid = DataSystems->GetFileGuid(assetPath);
                 std::string parseError;
                 const Authoring::ParsedDocument sourceDocument =
-                    Authoring::ParsedDocument::ParseFile(
-                        assetPath.string(), parseError);
+                    Authoring::ParsedDocument::ParseFilePath(
+                        assetPath, parseError);
                 const Authoring::ReadNode source = sourceDocument.Root();
                 Material first;
                 decoded = sourceDocument

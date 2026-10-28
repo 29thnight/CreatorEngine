@@ -126,7 +126,7 @@ namespace
 
         std::string error;
         Authoring::ParsedDocument document =
-			Authoring::ParsedDocument::ParseFile(readPath.string(), error);
+			Authoring::ParsedDocument::ParseFilePath(readPath, error);
         if (!document)
         {
 			throw std::runtime_error("씬 runtime 문서 파싱 실패: "
