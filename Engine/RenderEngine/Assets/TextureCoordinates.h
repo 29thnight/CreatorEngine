@@ -6,7 +6,7 @@ namespace assets
 {
     // Per texture reference, independent of image/cache identity. glTF order:
     // offset + rotation * scale * selected UV. Missing data means UV0/identity.
-    struct TextureCoordinates final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] TextureCoordinates final
     {
         std::uint32_t set{};
         ce::fixed_array<float, 2> offset{};

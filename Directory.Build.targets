@@ -199,13 +199,15 @@
   <!-- RuntimeLauncher loads the runtime through HostAbi and owns no reflected
        Scene/Editor types. Injecting their reflection headers into its container
        provider imports Creator.Containers back into its own partitions. -->
-  <!-- Physics/diagnostics have no reflected engine types or Scene/Editor dependencies. -->
+  <!-- Physics has no scripting registry dependency. Its public value schemas are
+       owned by SceneRuntime; generating them again here would duplicate the
+       schemas when project-reference injections are collected. -->
   <ItemDefinitionGroup Condition="'$(MSBuildProjectName)' == 'Physics'">
     <ClCompile>
       <AdditionalIncludeDirectories>$(_EngineVcpkgInstalledDir)$(_EngineVcpkgTriplet)\include\physx;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
   </ItemDefinitionGroup>
-  <Import Project="$(EngineReflgenTargets)" Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'DxCaptureHelper' and '$(MSBuildProjectName)' != 'ProfilerViewer' and '$(MSBuildProjectName)' != 'GCCE' and '$(MSBuildProjectName)' != 'RuntimeLauncher' and Exists('$(EngineReflgenTargets)')" />
+  <Import Project="$(EngineReflgenTargets)" Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'Physics' and '$(MSBuildProjectName)' != 'DxCaptureHelper' and '$(MSBuildProjectName)' != 'ProfilerViewer' and '$(MSBuildProjectName)' != 'GCCE' and '$(MSBuildProjectName)' != 'RuntimeLauncher' and Exists('$(EngineReflgenTargets)')" />
   <!-- Only explicitly marked module interfaces are reflection providers. The
        engine also compiles implementation modules with unsupported inheritance. -->
   <ItemGroup Condition="'$(ReflgenTargetsImported)' == 'true'">
@@ -242,7 +244,7 @@
   <Target Name="_EngineRequireReflgen"
           BeforeTargets="ClCompile"
           DependsOnTargets="$(_EngineRequireReflgenAfter)"
-          Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'DxCaptureHelper' and '$(MSBuildProjectName)' != 'ProfilerViewer' and '$(MSBuildProjectName)' != 'GCCE' and '$(MSBuildProjectName)' != 'RuntimeLauncher' and '$(ReflgenTargetsImported)' != 'true' and '$(DesignTimeBuild)' != 'true'">
+          Condition="'$(MSBuildProjectExtension)' == '.vcxproj' and '$(MSBuildProjectName)' != 'Physics' and '$(MSBuildProjectName)' != 'DxCaptureHelper' and '$(MSBuildProjectName)' != 'ProfilerViewer' and '$(MSBuildProjectName)' != 'GCCE' and '$(MSBuildProjectName)' != 'RuntimeLauncher' and '$(ReflgenTargetsImported)' != 'true' and '$(DesignTimeBuild)' != 'true'">
     <Error Condition="Exists('$(EngineReflgenTargets)')"
            Text="reflgen was installed by vcpkg during this build, after its MSBuild targets could be imported. Build again (once per environment)." />
     <Error Condition="!Exists('$(EngineReflgenTargets)')"

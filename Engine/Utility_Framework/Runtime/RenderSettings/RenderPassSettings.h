@@ -13,7 +13,7 @@
 #include "VolumetricFogPassSetting.h"
 #include "BitMaskPassSetting.h"
 
-struct [[reflgen::reflect]] RenderPassSettings
+struct [[reflgen::reflect, reflgen::public_methods]] RenderPassSettings
 {
    public:
     RenderPassSettings() = default;

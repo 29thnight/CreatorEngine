@@ -14,7 +14,7 @@ namespace experiment
 
     // Profile/builder changes invalidate derived data independently of the model
     // file version. Every setting is included in the final geometry digest.
-    struct MeshletBuildSettings final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] MeshletBuildSettings final
     {
         std::uint32_t profileVersion{ kMeshletProfileVersion };
         std::uint32_t builderVersion{ kMeshletBuilderVersion };
@@ -33,7 +33,7 @@ namespace experiment
     // conservative deformed bounds before using them for rejection. ConeValid
     // is necessary, never sufficient: two-sided/mirrored/deformed draws also
     // need the runtime material/transform eligibility check.
-    struct alignas(16) MeshletDescriptor final
+    struct alignas(16) [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] MeshletDescriptor final
     {
         std::uint32_t vertexOffset{};
         std::uint32_t triangleOffset{};
@@ -51,7 +51,7 @@ namespace experiment
         float coneCutoff{ 1.0f };
     };
 
-    struct MeshletLodRange final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] MeshletLodRange final
     {
         std::uint32_t firstMeshlet{};
         std::uint32_t meshletCount{};
@@ -61,7 +61,7 @@ namespace experiment
 
     // Owned alongside the original indexed geometry in the same immutable Model
     // generation. No side cache, source GUID, timestamp, or runtime buffer handle.
-    struct MeshletPayload final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] MeshletPayload final
     {
         MeshletBuildSettings settings{};
         MeshletGeometryDigest geometryDigest{};

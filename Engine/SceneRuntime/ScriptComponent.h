@@ -15,7 +15,7 @@
 // 경계를 넘으면 스크립트 수만큼 건너게 되어 그 설계가 무너진다.
 // 6단계 훅과 OnEnable/OnDisable은 전부 override해 NotifyManagedLifecycle로 넘긴다
 // (ScriptLifecyclePhase.h) — 관리 측 생명주기의 드라이버를 네이티브 하나로 두기 위해서다.
-class [[reflgen::reflect]] ScriptComponent : public meta::identity<ScriptComponent, Component>
+class [[reflgen::reflect, reflgen::public_methods]] ScriptComponent : public meta::identity<ScriptComponent, Component>
 {
    public:
     [[reflgen::ignore]]
@@ -27,7 +27,9 @@ class [[reflgen::reflect]] ScriptComponent : public meta::identity<ScriptCompone
 public:
 	ScriptComponent() = default;
 
+	[[reflgen::script_internal]]
 	void OnInitialized() override;
+	[[reflgen::script_internal]]
 	void OnUninitializing() override;
 
 	// 관리 인스턴스를 만들고 저장된 필드 값을 되돌린다. **생명주기 훅은 부르지 않는다.**
@@ -60,9 +62,13 @@ public:
 	// 뒤쪽 셋은 관리 측 TearDown과 겹칠 수 있다(고아 청소·어셈블리 리로드는 구동할
 	// 네이티브 컴포넌트가 없어 관리 측 발화가 남아야 한다). 그 화해는 관리 측
 	// '축소 전달됨' 상태가 맡는다 — 사유는 ScriptLifecyclePhase.h.
+	[[reflgen::script_internal]]
 	void OnAddedToScene() override;
+	[[reflgen::script_internal]]
 	void OnBeginSimulation() override;
+	[[reflgen::script_internal]]
 	void OnEndSimulation() override;
+	[[reflgen::script_internal]]
 	void OnRemovingFromScene() override;
 
 	// ── 활성 축 (PHASE 9 트랙 L · 6단계와 직교) ──
@@ -75,7 +81,9 @@ public:
 	// 계속 틱을 받았다(관리 측 Component.Enabled는 여전히 true였다).
 	//
 	// 6단계와 창구를 나눈 이유는 ClrHost::DispatchEnabled 선언부에 있다.
+	[[reflgen::script_internal]]
 	void OnEnable() override;
+	[[reflgen::script_internal]]
 	void OnDisable() override;
 
 	// 네이티브에서만 일어나는 사건을 관리 인스턴스에 흘린다(트랙 L · L3 잔여).

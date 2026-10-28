@@ -3,7 +3,7 @@
 #include "Component.h"
 #include "SceneRenderProfile.h"
 
-class [[reflgen::reflect]] SceneRenderProfileComponent : public meta::identity<SceneRenderProfileComponent, Component>
+class [[reflgen::reflect, reflgen::public_methods]] SceneRenderProfileComponent : public meta::identity<SceneRenderProfileComponent, Component>
 {
   public:
     [[reflgen::ignore]]
@@ -14,7 +14,9 @@ class [[reflgen::reflect]] SceneRenderProfileComponent : public meta::identity<S
 
     SceneRenderProfileComponent() = default;
 
+    [[reflgen::script_internal]]
     void OnInitialized() override;
+    [[reflgen::script_internal]]
     void OnUninitializing() override;
 
     void LoadProfile(FileGuid profileGuid);

@@ -16,7 +16,7 @@ import Creator.Core.Ownership;
 class Texture;
 class UIMesh;
 class Canvas;
-class [[reflgen::reflect]] ImageComponent : public meta::identity<ImageComponent, UIComponent>
+class [[reflgen::reflect, reflgen::public_methods]] ImageComponent : public meta::identity<ImageComponent, UIComponent>
 {
    friend struct reflgen::access;
    public:
@@ -33,16 +33,21 @@ public:
 	void Load(const own::shared_owner<const Texture>& ptr);
 	void DeserializeTexture(const own::shared_owner<const Texture>& ptr);
 	bool ReplaceTextureOwner(const Texture* previous, const own::shared_owner<const Texture>& replacement);
+	[[reflgen::script_internal]]
 	void OnDeserialized(); // CT6-d: 텍스처 경로 일괄 로드(구 팩토리 분기)
 
+	[[reflgen::script_internal]]
 	virtual void OnInitialized() override;
+	[[reflgen::script_internal]]
 	virtual void OnUninitializing() override;
 
 	// 레인 UI — 가상 Update 오버라이드를 걷어내고 UITickSystem(조밀 벡터, 전용 틱)
 	// 으로 옮겼다. 등록/해지는 씬 편입/이탈 훅으로 한다(DDOL 안전, 근거는
 	// UITickSystem.h 주석). OnInitialized/OnUninitializing은 RenderScene 커맨드
 	// 등록·UIManager 레지스트리 등록용으로 그대로 둔다(트랙 범위 밖).
+	[[reflgen::script_internal]]
 	void OnAddedToScene() override;
+	[[reflgen::script_internal]]
 	void OnRemovingFromScene() override;
 
 	// 옛 Update(float tick)의 본문 그대로(RefreshTransformFromRect() 하나) —

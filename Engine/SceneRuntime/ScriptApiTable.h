@@ -364,6 +364,12 @@ namespace ce::script::binding
         float (__stdcall* Decal_GetFloat)(ScriptObjectHandle handle, int field);
         void (__stdcall* Decal_SetFloat)(ScriptObjectHandle handle, int field, float value);
 
+        // Append-only v48. Execute exactly once, read a retained UTF-8 response,
+        // then release it. The generic protocol walks live reflgen descriptors.
+        std::uint64_t (__stdcall* NativeReflection_Execute)(ScriptObjectHandle owner, const char* request, int bytes);
+        int (__stdcall* NativeReflection_Read)(std::uint64_t ticket, char* output, int capacity);
+        void (__stdcall* NativeReflection_Release)(std::uint64_t ticket);
+
 	};
 
     using ScriptApiBinding [[reflgen::table("ScriptApi", "version", "structSize", CreatorScriptApiVersion)]] = ScriptApiTable;

@@ -14,7 +14,7 @@ namespace experiment
     inline constexpr std::uint32_t kMeshClusterMaxGroups = (1u << (kMeshLodMaxLevels + 1)) - 1u;
     inline constexpr std::uint32_t kMeshLodLockBorder = 1u;
 
-    struct MeshLodBuildSettings final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] MeshLodBuildSettings final
     {
         std::uint32_t builderVersion{kMeshLodBuilderVersion};
         std::uint32_t meshoptimizerVersion{kMeshletMeshoptimizerVersion};
@@ -24,7 +24,7 @@ namespace experiment
         std::uint32_t flags{kMeshLodLockBorder};
     };
 
-    struct MeshLodLevel final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] MeshLodLevel final
     {
         // Meshoptimizer's simplification error metric, in mesh-local position
         // units, rounded outward. Per-group errors are monotonic toward parents. It is not a
@@ -42,7 +42,7 @@ namespace experiment
     // a disjoint binary tree (one parent per group), a bounded acyclic subset of
     // the DAG contract. Parent topology replaces BOTH children atomically; patch
     // borders stay original so independently selected neighbouring cuts meet.
-    struct MeshClusterGroup final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] MeshClusterGroup final
     {
         std::uint32_t firstMeshlet{}, meshletCount{}, childGroup{UINT32_MAX}, secondChild{UINT32_MAX};
         std::uint32_t parentGroup{UINT32_MAX}, lodIndex{}, primitiveBase{};
@@ -59,7 +59,7 @@ namespace experiment
     static_assert(offsetof(MeshClusterGroup, sphere) == 32);
     static_assert(offsetof(MeshClusterGroup, levelFirstMeshlet) == 48);
 
-    struct MeshClusterHierarchy final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] MeshClusterHierarchy final
     {
         std::uint32_t groupCount{}, rootGroup{UINT32_MAX};
         ce::dynamic_array<MeshClusterGroup> groups{};
@@ -69,7 +69,7 @@ namespace experiment
         }
     };
 
-    struct MeshLodChain final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] MeshLodChain final
     {
         MeshLodBuildSettings settings{};
         MeshletGeometryDigest geometryDigest{};

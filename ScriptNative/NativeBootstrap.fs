@@ -26,7 +26,8 @@ type NativeBootstrap private () =
                     let required =
                         set [ "Asset_RequestTyped"; "Asset_TryAcquireTyped"; "Camera_NotifyCameraCut"
                               "Simulation_Status"; "Simulation_Submit"; "Simulation_Read"
-                              "ExtraComponent_Exists"; "ExtraComponent_GetEnabled"; "ExtraComponent_SetEnabled" ]
+                              "ExtraComponent_Exists"; "ExtraComponent_GetEnabled"; "ExtraComponent_SetEnabled"
+                              "NativeReflection_Execute"; "NativeReflection_Read"; "NativeReflection_Release" ]
                     let candidate =
                         match headless with
                         | 0 -> ScriptApi.Bind(address, availableBytes, fingerprint)

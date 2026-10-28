@@ -5,7 +5,7 @@
 #include "BTBuildNode.h"
 #include "../Utility_Framework/Reflection/ReflectionYml.h"
 
-struct [[reflgen::reflect]] BTBuildGraph
+struct [[reflgen::reflect, reflgen::public_methods]] BTBuildGraph
 {
    public:
 	[[reflgen::ignore]]

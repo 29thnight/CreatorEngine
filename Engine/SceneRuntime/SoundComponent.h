@@ -6,7 +6,7 @@
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // Value snapshot used by Inspector. Serialized component field names stay unchanged.
-struct SoundComponentSettings final
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] SoundComponentSettings final
 {
     std::string clipKey;
     std::string soundPresetKey;
@@ -35,7 +35,7 @@ struct SoundComponentSettings final
     wave::OwnerDestroyedPolicy ownerDestroyedPolicy{ wave::OwnerDestroyedPolicy::Stop };
 };
 
-class [[reflgen::reflect]] SoundComponent : public meta::identity<SoundComponent, Component>
+class [[reflgen::reflect, reflgen::public_methods]] SoundComponent : public meta::identity<SoundComponent, Component>
 {
 public:
     [[reflgen::ignore]]
@@ -44,10 +44,15 @@ public:
         Component::gc_trace(tracer);
     }
 
+    [[reflgen::script_internal]]
     void OnBeginSimulation() override;
+    [[reflgen::script_internal]]
     void OnEndSimulation() override;
+    [[reflgen::script_internal]]
     void OnUninitializing() override;
+    [[reflgen::script_internal]]
     void OnAddedToScene() override;
+    [[reflgen::script_internal]]
     void OnRemovingFromScene() override;
     void TickUpdate(float tick);
     void TickLateUpdate(float tick);

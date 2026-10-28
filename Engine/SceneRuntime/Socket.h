@@ -12,7 +12,7 @@ class Entity;
 
 // A socket owns pose data, not an Entity component. It does not participate in
 // scene registration or GC and can be read by a fenced animation worker.
-class SocketTransform
+class [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] SocketTransform
 {
 public:
     const math::matrix4x4& GetLocalMatrix() const noexcept { return m_local; }
@@ -23,11 +23,12 @@ public:
 private:
     math::matrix4x4 m_local{ math::matrix4x4::identity() };
 };
-class Socket
+class [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Socket
 {
 public:
 	Socket();
     ~Socket() = default;
+    [[reflgen::script_internal]]
     void ReleaseManagedResources();
 
     std::string m_name;
@@ -44,6 +45,7 @@ public:
     void AttachObject(Entity* Object);
     void DetachObject(Entity* Object);
     void DetachAllObject();
+    [[reflgen::script_internal]]
     void Update();
 };
 

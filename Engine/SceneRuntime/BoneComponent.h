@@ -29,7 +29,7 @@
 // FindBone으로 풀며, -1도 그 serial의 유효한 negative 결과로 캐시한다. 따라서
 // 존재하지 않는 본을 steady frame마다 재탐색하지 않는다. recursive A/B fallback만
 // Scene.cpp의 같은 serial 규약으로 이 필드를 직접 읽는다.
-class [[reflgen::reflect]] BoneComponent : public meta::identity<BoneComponent, Component>
+class [[reflgen::reflect, reflgen::public_methods]] BoneComponent : public meta::identity<BoneComponent, Component>
 {
 public:
     [[reflgen::ignore]]

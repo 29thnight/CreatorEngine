@@ -4,7 +4,7 @@
 #include "ConditionParameter.h"
 
 class AnimationController;
-class [[reflgen::reflect]] TransCondition
+class [[reflgen::reflect, reflgen::public_methods]] TransCondition
 {
    public:
 public:

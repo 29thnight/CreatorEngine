@@ -7,7 +7,7 @@
 #include "UIManager.h"
 #include "UIComponent.h"
 
-class [[reflgen::reflect]] UIButton : public meta::identity<UIButton, UIComponent>
+class [[reflgen::reflect, reflgen::public_methods]] UIButton : public meta::identity<UIButton, UIComponent>
 {
    public:
     [[reflgen::ignore]]
@@ -24,7 +24,9 @@ public:
 	// C3 — 시스템 등록·해지는 6단계 훅에 건다. OnInitialized/OnUninitializing이 아닌 이유는
 	// DDOL 오브젝트가 씬을 건널 때 OnInitialized가 다시 불리지 않아 등록부에서 영구
 	// 이탈하기 때문이다(UITickSystem.h 주석의 근거와 동일).
+	[[reflgen::script_internal]]
 	void OnAddedToScene() override;
+	[[reflgen::script_internal]]
 	void OnRemovingFromScene() override;
 
 	void SetClickFunction(ce::owned_func<void()> func)

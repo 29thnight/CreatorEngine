@@ -4,7 +4,7 @@
 #include "Camera.h"
 #include <mathematics/bounds.hpp>
 
-class [[reflgen::reflect]] CameraComponent : public meta::identity<CameraComponent, Component>
+class [[reflgen::reflect, reflgen::public_methods]] CameraComponent : public meta::identity<CameraComponent, Component>
 {
    friend struct reflgen::access;
    public:
@@ -16,6 +16,7 @@ class [[reflgen::reflect]] CameraComponent : public meta::identity<CameraCompone
 
 public:
     // CT6-d: 팩토리 분기의 강제 활성(저장된 비활성도 켬 — 기존 특이 동작 보존)
+    [[reflgen::script_internal]]
     void OnDeserialized() { SetEnabled(true); }
 
    CameraComponent() 
@@ -25,7 +26,9 @@ public:
 
 	// 등록/해지는 씬 편입/이탈 훅으로 한다. CameraSystem은 소유하지 않고
 	// 현재 씬의 후보만 추적한다. DDOL 이송도 같은 두 훅을 통과한다.
+	[[reflgen::script_internal]]
 	void OnAddedToScene() override;
+	[[reflgen::script_internal]]
 	void OnRemovingFromScene() override;
 
 	Camera* GetCamera() noexcept { return &m_Camera; }

@@ -7,7 +7,7 @@
 namespace ce::physics
 {
 // The descriptor's shape span is never retained. view() always binds owned storage.
-struct body_definition
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] body_definition
 {
     body_desc properties;
     ce::dynamic_array<ShapeInstance> shapes;

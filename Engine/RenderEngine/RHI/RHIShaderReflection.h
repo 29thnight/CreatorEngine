@@ -31,7 +31,7 @@ enum class RHIShaderScalarKind : std::uint8_t
     Float32,
 };
 
-struct RHIShaderValueType
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] RHIShaderValueType
 {
     RHIShaderScalarKind scalar{ RHIShaderScalarKind::Float32 };
     std::uint16_t rows{ 1 };
@@ -41,7 +41,7 @@ struct RHIShaderValueType
     bool operator==(const RHIShaderValueType&) const = default;
 };
 
-struct RHIShaderFieldReflection
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] RHIShaderFieldReflection
 {
     std::string name;
     RHIShaderValueType type;
@@ -51,7 +51,7 @@ struct RHIShaderFieldReflection
     bool operator==(const RHIShaderFieldReflection&) const = default;
 };
 
-struct RHIShaderResourceReflection
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] RHIShaderResourceReflection
 {
     std::string name;
     RHIShaderResourceKind kind{ RHIShaderResourceKind::ConstantBuffer };
@@ -66,7 +66,7 @@ struct RHIShaderResourceReflection
 
 // backend decoration이 아니라 HLSL 논리 register/space 기준의 정본이다.
 // Vulkan b/t/u/s binding shift는 Slang 추출 경계에서 제거한다.
-struct RHIShaderReflection
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] RHIShaderReflection
 {
     RHIShaderStage stage{ RHIShaderStage::Vertex };
     ce::dynamic_array<RHIShaderResourceReflection> resources;

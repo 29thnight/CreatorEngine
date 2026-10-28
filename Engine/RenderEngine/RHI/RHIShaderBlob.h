@@ -30,7 +30,7 @@ import winrt_base;
 //   아니라 Initialize 에서 일어나고, 크기도 수 KB 다. 매 프레임 도는 것을
 //   재는 자리가 아니므로 단순한 쪽을 고른다.
 
-class RHIShaderBlob
+class [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] RHIShaderBlob
 {
 public:
     RHIShaderBlob() = default;

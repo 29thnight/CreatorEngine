@@ -3,7 +3,7 @@
 
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 
-struct RHIShaderPermutationKey
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] RHIShaderPermutationKey
 {
     std::uint64_t lo{};
     std::uint64_t hi{};
@@ -15,10 +15,10 @@ struct RHIShaderPermutationKey
 // 셰이더 컴파일 변형의 정본. 이름순으로 보관하므로 호출자가 축을 추가한
 // 순서와 무관하게 같은 Entry 목록과 PermutationKey를 만든다. 문자열 수명과
 // 널 종료 sentinel을 호출자에게 맡기지 않는다.
-class RHIShaderPermutation final
+class [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] RHIShaderPermutation final
 {
 public:
-    struct Entry
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Entry
     {
         std::string name;
         std::string value;

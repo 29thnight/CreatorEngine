@@ -39,7 +39,7 @@ namespace experiment::cooked
         std::string message{};
     };
 
-    struct ResolvedAssetEntry final
+    struct [[reflgen::runtime]] ResolvedAssetEntry final
     {
         AssetDepot::AssetMountId mountId{};
         AssetId assetSetId{};

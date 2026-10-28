@@ -11,12 +11,13 @@
     <ScriptNativeOutput>$(MSBuildProjectDirectory)/obj/$(Configuration)/native-bindings</ScriptNativeOutput>
     <ScriptNativeGenerator Condition="'$(ScriptNativeGenerator)' == ''">$(MSBuildProjectDirectory)/../vcpkg_installed/x64-windows/x64-windows/tools/reflgen/reflgen.exe</ScriptNativeGenerator>
     <ScriptNativeHeader>$(MSBuildProjectDirectory)/../Engine/SceneRuntime/ScriptApiTable.h</ScriptNativeHeader>
+    <ScriptNativeClangArguments Condition="'$(ScriptNativeClangArguments)' == ''">-std=c++20 -target x86_64-pc-windows-msvc</ScriptNativeClangArguments>
   </PropertyGroup>
   <ItemGroup>
     <ProjectReference Include="../ScriptNative.AudioValues/ScriptNative.AudioValues.fsproj" />
   </ItemGroup>
   <ItemGroup>
-    <_ScriptNativeInput Include="$(ScriptNativeHeader);$(MSBuildProjectDirectory)/../Engine/SceneRuntime/ScriptBindingValues.h;$(MSBuildProjectDirectory)/../Engine/SceneRuntime/ScriptPhysicsValues.h;$(MSBuildProjectDirectory)/../Engine/SceneRuntime/SimulationExchangeABI.h;$(MSBuildProjectDirectory)/../Engine/Utility_Framework/Runtime/ScriptApiVersion.h;$(ScriptNativeGenerator)" />
+    <_ScriptNativeInput Include="$(ScriptNativeHeader);$(MSBuildProjectDirectory)/../Engine/SceneRuntime/ScriptBindingValues.h;$(MSBuildProjectDirectory)/../Engine/SceneRuntime/ScriptPhysicsValues.h;$(MSBuildProjectDirectory)/../Engine/SceneRuntime/SimulationExchangeABI.h;$(MSBuildProjectDirectory)/../Engine/Utility_Framework/Runtime/ScriptApiVersion.h;$(ScriptNativeGenerator);$(ScriptNativeOutput)/generator-options.txt" />
     <Compile Include="AssemblyInfo.fs" />
     <Compile Include="$(ScriptNativeOutput)/reflgen_creator_script_native.fs" />
     <Compile Include="FastNativeCalls.fs" />
@@ -25,11 +26,13 @@
     <Compile Include="Debug.fs" />
     <Compile Include="Profiler.fs" />
     <Compile Include="Values.fs" />
+    <Compile Include="NativeReflection.fs" />
     <Compile Include="KeyCode.fs" />
     <Compile Include="NativeApi.fs" />
     <Compile Include="Assets.fs" />
     <Compile Include="ComponentLifetime.fs" />
     <Compile Include="Entity.fs" />
+    <Compile Include="NativeReflectionExtensions.fs" />
     <Compile Include="Simulation.fs" />
     <Compile Include="Audio.fs" />
     <Compile Include="Sound.fs" />
@@ -78,9 +81,13 @@
     <Compile Include="GcControl.fs" />
     <Compile Include="RuntimeBootstrap.fs" />
   </ItemGroup>
+  <Target Name="WriteScriptNativeGeneratorOptions" BeforeTargets="GenerateScriptNativeBindings">
+    <MakeDir Directories="$(ScriptNativeOutput)" />
+    <WriteLinesToFile File="$(ScriptNativeOutput)/generator-options.txt" Lines="$(ScriptNativeGenerator);$(ScriptNativeClangArguments)" Overwrite="true" WriteOnlyWhenDifferent="true" />
+  </Target>
   <Target Name="GenerateScriptNativeBindings" BeforeTargets="CoreCompile" Inputs="@(_ScriptNativeInput)" Outputs="$(ScriptNativeOutput)/reflgen_creator_script_native.fs;$(ScriptNativeOutput)/reflgen_creator_script_native.cpp;$(ScriptNativeOutput)/reflgen_creator_script_native.json">
     <Error Condition="!Exists('$(ScriptNativeGenerator)')" Text="reflgen not found: $(ScriptNativeGenerator). Install the engine vcpkg manifest or set ScriptNativeGenerator." />
     <MakeDir Directories="$(ScriptNativeOutput)" />
-    <Exec Command="&quot;$(ScriptNativeGenerator)&quot; --module creator_script --output &quot;$(ScriptNativeOutput)&quot; --fsharp-table --fsharp-namespace CreatorEngine.Native &quot;$(ScriptNativeHeader)&quot; -- -std=c++20 -target x86_64-pc-windows-msvc" />
+    <Exec Command="&quot;$(ScriptNativeGenerator)&quot; --module creator_script --output &quot;$(ScriptNativeOutput)&quot; --fsharp-table --fsharp-namespace CreatorEngine.Native &quot;$(ScriptNativeHeader)&quot; -- $(ScriptNativeClangArguments)" />
   </Target>
 </Project>

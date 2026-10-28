@@ -29,6 +29,9 @@ extern void ProbeMissingSlot()
 extern void ProbeMissingRequiredSlot()
 
 [<DllImport("ScriptNativeProvider.dll", CallingConvention = CallingConvention.Cdecl)>]
+extern void ProbeMissingReflectionSlot(int slot)
+
+[<DllImport("ScriptNativeProvider.dll", CallingConvention = CallingConvention.Cdecl)>]
 extern uint64 reflgen_creator_script_native_abi_fingerprint()
 
 [<DllImport("ScriptNativeProvider.dll", CallingConvention = CallingConvention.Cdecl)>]
@@ -337,10 +340,15 @@ let main _ =
     check (ProbeInitialize(initialize, table, size, fingerprint, 1) = 0) "headless provider accepts optional slot"
     ProbeMissingRequiredSlot()
     check (ProbeInitialize(initialize, table, size, fingerprint, 1) = -1) "headless provider rejects missing required slot"
+    for slot in 0 .. 2 do
+        let incomplete = ProbeHeadlessTable()
+        ProbeMissingReflectionSlot(slot)
+        check (ProbeInitialize(initialize, incomplete, size, fingerprint, 1) = -1) "headless provider requires every reflection transport slot"
     let headlessTable = ProbeHeadlessTable()
     check (ProbeInitialize(initialize, headlessTable, size, fingerprint, 1) = 0) "headless sparse table initializes"
     check (ProbeEntityIsAlive(isAlive, 7u, 3u) = 1) "headless supported entry remains callable"
     check (ProbeShutdown(shutdown) = 0) "native invokes F# shutdown"
     check (ProbeEntityIsAlive(isAlive, 7u, 3u) = -1) "shutdown revokes binding"
-    printfn "SCRIPT_NATIVE_TABLE_OK version=%d entries=212" ScriptApiVersion
+    let entries = typeof<ScriptApi>.GetProperties() |> Array.filter (fun property -> typeof<Delegate>.IsAssignableFrom(property.PropertyType)) |> Array.length
+    printfn "SCRIPT_NATIVE_TABLE_OK version=%d entries=%d" ScriptApiVersion entries
     0

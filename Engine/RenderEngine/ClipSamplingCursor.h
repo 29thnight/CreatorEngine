@@ -30,7 +30,7 @@ namespace Animation
         return cursor = static_cast<std::size_t>(upper - keys.begin()) - 1;
     }
 
-    struct TrackKeyCursor final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] TrackKeyCursor final
     {
         std::size_t m_translation{};
         std::size_t m_rotation{};
@@ -39,7 +39,7 @@ namespace Animation
 
     // An evaluation slot owns separate current/next cursors. Animator clears
     // them when rebinding a generation; published animation keys stay immutable.
-    class ClipSamplingCursor final
+    class [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ClipSamplingCursor final
     {
     public:
         [[nodiscard]] std::span<TrackKeyCursor> Prepare(int clipIndex, std::size_t boneCount)

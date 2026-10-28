@@ -5,7 +5,7 @@
 #include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "InputAction.h"
-class [[reflgen::reflect]] ActionMap
+class [[reflgen::reflect, reflgen::public_methods]] ActionMap
 {
    public:
 public:

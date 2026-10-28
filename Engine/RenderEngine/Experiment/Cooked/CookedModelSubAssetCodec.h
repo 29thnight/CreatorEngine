@@ -27,14 +27,14 @@ inline constexpr std::size_t kModelSubAssetMaxBytes = 256u * 1024u * 1024u;
 inline constexpr std::uint32_t kModelSubAssetMaxBones = 65536u;
 inline constexpr std::uint32_t kModelSubAssetMaxClips = 65536u;
 
-struct SkeletonArtifact final
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] SkeletonArtifact final
 {
     // clips must be empty: this payload never owns animation tracks.
     Skeleton skeleton{};
     Sha256Digest boneLayoutSha256{};
 };
 
-struct AnimationClipArtifact final
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] AnimationClipArtifact final
 {
     AssetId skeletonAssetId{};
     Sha256Digest requiredBoneLayoutSha256{};
@@ -42,7 +42,7 @@ struct AnimationClipArtifact final
     AnimationClip clip{};
 };
 
-struct ModelClipSummary final
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelClipSummary final
 {
     AssetId clipAssetId{};
     std::string name{};
@@ -51,7 +51,7 @@ struct ModelClipSummary final
     bool looping{true};
 };
 
-struct ModelGeometryArtifact final
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelGeometryArtifact final
 {
     // Mesh는 저장소 어댑터다. name/material은 wire에서 제외하고 decode도 비워 둔다.
     // 논리 ID를 manifest/세대에 남겨 서로 다른 자산이 raw bytes를 공유할 수 있다.
@@ -62,11 +62,11 @@ struct ModelGeometryArtifact final
 
 // Thin streaming admission owns descriptors/DAG and authenticated page locators,
 // never original vertex, index or meshlet connectivity arrays.
-struct ModelStreamLodCounts final
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelStreamLodCounts final
 {
     std::uint32_t indexCount{}, vertexRemapCount{}, triangleByteCount{}, primitiveRemapCount{};
 };
-struct ModelGeometryStreamMetadata final
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelGeometryStreamMetadata final
 {
     VertexAttributeMask attributes{};
     std::uint32_t stride{}, vertexCount{}, requiredBoneCount{};
@@ -95,7 +95,7 @@ struct ResolvedAssetEntry;
     own::shared_owner<const ModelGeometryStreamMetadata>& out, std::string& failure,
     std::atomic<std::size_t>* inputStaging = nullptr);
 
-struct ModelMeshSummary final
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelMeshSummary final
 {
     AssetId meshAssetId{};
     AssetId materialAssetId{};
@@ -108,7 +108,7 @@ struct ModelMeshSummary final
     bool skinned{};
 };
 
-struct ModelNodeSummary final
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelNodeSummary final
 {
     std::string name{};
     NodeIndex parent{};
@@ -116,7 +116,7 @@ struct ModelNodeSummary final
     ce::dynamic_array<AssetId> meshAssetIds{};
 };
 
-struct ModelMaterialSummary final
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelMaterialSummary final
 {
     // 연결용 설명 정보다. 준비된 material을 소유하거나 source-free 생산을 뜻하지 않는다.
     // Material is an independent Loadable record; the descriptor pins no bulk.
@@ -125,7 +125,7 @@ struct ModelMaterialSummary final
     MaterialBlendMode blendMode{MaterialBlendMode::Opaque};
 };
 
-struct ModelDescriptorArtifact final
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelDescriptorArtifact final
 {
     AssetId modelAssetId{};
     AssetId skeletonAssetId{};

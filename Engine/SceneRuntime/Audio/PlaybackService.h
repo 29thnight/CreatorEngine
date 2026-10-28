@@ -15,7 +15,7 @@ import Creator.Core.Ownership;
 
 namespace wave
 {
-    struct PlaybackHandle final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] PlaybackHandle final
     {
         std::uint32_t index{};
         std::uint32_t generation{};
@@ -31,7 +31,7 @@ namespace wave
         bool operator==(const PlaybackHandle&) const = default;
     };
 
-    struct PlaybackScope final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] PlaybackScope final
     {
         std::uint32_t index{};
         std::uint32_t generation{};
@@ -44,7 +44,7 @@ namespace wave
     enum class PlaybackState : std::uint8_t { Stopped, Playing, Paused };
     enum class PlaybackEndReason : std::uint8_t { Finished, Stopped, ScopeEnded, OwnerDestroyed, Replaced };
 
-    struct PlaybackRequest final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] PlaybackRequest final
     {
         SoundSource source;
         PlayRequest settings;
@@ -58,7 +58,7 @@ namespace wave
         std::optional<bool> loopOverride;
     };
 
-    struct PlaybackCompletion final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] PlaybackCompletion final
     {
         PlaybackHandle playback;
         PlaybackScope scope;
@@ -67,7 +67,7 @@ namespace wave
     };
 
     enum class PlaybackCommandKind : std::uint8_t { Play, Stop, Pause, Resume, SetGainPitch, SetParameter };
-    struct PlaybackCommand final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] PlaybackCommand final
     {
         PlaybackCommandKind kind{ PlaybackCommandKind::Stop };
         PlaybackHandle playback;
@@ -80,7 +80,7 @@ namespace wave
         std::uint64_t ticket{};
     };
 
-    struct PlaybackStarted final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] PlaybackStarted final
     {
         std::uint64_t ticket{};
         PlaybackHandle playback;

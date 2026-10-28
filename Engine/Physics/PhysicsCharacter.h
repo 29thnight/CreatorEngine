@@ -6,7 +6,7 @@
 
 namespace ce::physics
 {
-struct character_desc
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] character_desc
 {
     math::vector3 position{0, 2, 0}; // Capsule center, metres; local up is +Y.
     float radius = .5f;
@@ -29,21 +29,21 @@ inline bool valid_character_desc(const character_desc& value)
            value.slope_limit_cosine <= 1;
 }
 
-struct character_move
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] character_move
 {
     math::vector3 displacement; // Metres for this move, not metres/second.
     float seconds = 1.f / 60;
     float minimum_distance = .001f;
 };
 
-struct character_state
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] character_state
 {
     math::vector3 position, foot_position;
     math::vector3 actual_displacement;
     bool sides = false, above = false, below = false; // Flags of the last move; not a persistent ground probe.
 };
 
-struct character_pose
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] character_pose
 {
     character_handle character;
     character_state state;

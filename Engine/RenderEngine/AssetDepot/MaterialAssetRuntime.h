@@ -32,7 +32,7 @@ namespace AssetDepot
     // The immutable descriptor pins only its exact captured artifact source.
     // Its typed Loadable declarations stay in resolved.entry.dependencies;
     // metadata readiness does not request those assets or compile source code.
-    struct ShaderMetaAssetOrigin final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ShaderMetaAssetOrigin final
     {
         experiment::cooked::ResolvedAssetEntry resolved{};
         // Present only on accepted code-program metadata snapshots. The
@@ -78,14 +78,14 @@ namespace AssetDepot
         friend auto operator<=>(const MaterialPipelineAssetKey&, const MaterialPipelineAssetKey&) = default;
     };
 
-    struct MaterialAssetTexturePin final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] MaterialAssetTexturePin final
     {
         experiment::AssetId assetId{};
         LX::LXColorSpace colorSpace{};
         own::shared_owner<const Texture> owner{};
     };
 
-    struct MaterialProgramAssetOrigin final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] MaterialProgramAssetOrigin final
     {
         experiment::cooked::ResolvedAssetEntry resolved{};
         ce::dynamic_array<MaterialAssetTexturePin> defaultTextures{};
@@ -96,7 +96,7 @@ namespace AssetDepot
         own::shared_owner<const ShaderMeta> shaderMetadata{};
     };
 
-    struct MaterialDocumentAssetOrigin final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] MaterialDocumentAssetOrigin final
     {
         experiment::cooked::ResolvedAssetEntry resolved{};
         own::shared_owner<const LX::Runtime::ShaderGeneration> codeProgram{};

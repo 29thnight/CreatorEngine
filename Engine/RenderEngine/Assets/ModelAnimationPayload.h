@@ -12,7 +12,7 @@ namespace assets
 {
     // Clip bytes contain a skeleton binding. Only the same compatible blob can
     // share this storage; keyframes alone are not a sufficient reuse identity.
-    struct ModelAnimationStorage final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelAnimationStorage final
     {
         ModelAnimationStorage() = default;
         ModelAnimationStorage(const ModelAnimationStorage&) = delete;
@@ -35,7 +35,7 @@ namespace assets
 
     // Published only after this logical generation's exact hard skeleton has
     // passed identity and ordered-layout validation against the decoded binding.
-    struct ModelAnimationPayload final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelAnimationPayload final
     {
         ModelAnimationPayload(own::shared_owner<const ModelAnimationStorage> decoded,
             own::shared_owner<const ModelSkeletonPayload> hardSkeleton,

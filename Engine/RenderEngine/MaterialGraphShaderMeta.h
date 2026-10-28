@@ -15,7 +15,7 @@ import Creator.Core.Ownership;
 namespace material_graph
 {
 struct VerifiedProduct;
-struct GeneratedMaterialShader : LX::Runtime::ShaderGeneration
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] GeneratedMaterialShader : LX::Runtime::ShaderGeneration
 {
     // Retain the validated binary tree for generation validation and recooking.
     ce::dynamic_array<std::byte> cookedContract;

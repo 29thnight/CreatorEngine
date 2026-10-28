@@ -9,7 +9,7 @@ namespace assets
 {
     // v3 model enumeration metadata only; children stay lazy and do not
     // retain geometry, skeleton, animation or image bulk.
-    struct ModelAnimationDescriptor final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelAnimationDescriptor final
     {
         experiment::cooked::ModelDescriptorArtifact summary{};
         experiment::cooked::ResolvedAssetEntry origin{};

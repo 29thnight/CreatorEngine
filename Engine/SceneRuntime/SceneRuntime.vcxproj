@@ -238,6 +238,7 @@
     <ClCompile Include="ScriptEntityBindings.cpp" />
     <ClCompile Include="ScriptTransformBindings.cpp" />
     <ClCompile Include="ScriptInputBindings.cpp" />
+    <ClCompile Include="ScriptReflectionBindings.cpp" />
     <ClCompile Include="$(ScriptNativeProofDir)\reflgen_creator_script_native.cpp">
       <PrecompiledHeader>NotUsing</PrecompiledHeader>
       <IncludeInUnityFile>false</IncludeInUnityFile>
@@ -359,6 +360,8 @@
     <ClInclude Include="ClrHost.h" />
     <ClInclude Include="ScriptBindingValues.h" />
     <ClInclude Include="ScriptBindingRegistry.h" />
+    <ClInclude Include="ScriptReflectionBindings.h" />
+    <ClInclude Include="ScriptReflectionService.h" />
     <ClInclude Include="ScriptPhysicsValues.h" />
     <ClInclude Include="ScriptApiTable.h" />
     <ClInclude Include="SimulationExchangeABI.h" />
@@ -473,6 +476,14 @@
     <ClInclude Include="Audio\AudioSourceInspection.h" />
     <ClInclude Include="Audio\AudioSourceValidation.h" />
     <ClInclude Include="Audio\EditorAudioClipCache.h" />
+  </ItemGroup>
+  <!-- SceneRuntime owns the reflection schemas for the public Physics values.
+       Physics itself has no runtime registry or scripting dependency. -->
+  <ItemGroup>
+    <ClInclude Include="..\Physics\PhysicsTypes.h" />
+    <ClInclude Include="..\Physics\PhysicsGeometry.h" />
+    <ClInclude Include="..\Physics\PhysicsCharacter.h" />
+    <ClInclude Include="..\Physics\PhysicsStep.h" />
   </ItemGroup>
 </Project>
 

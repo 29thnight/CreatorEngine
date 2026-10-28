@@ -3,7 +3,7 @@
 #include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "AssetEntry.h"
 
-struct [[reflgen::reflect]] AssetBundle
+struct [[reflgen::reflect, reflgen::public_methods]] AssetBundle
 {
    public:
 	AssetBundle() = default;

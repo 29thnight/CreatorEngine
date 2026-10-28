@@ -31,7 +31,7 @@ namespace wave
     // generation 0 은 언제나 무효다 — 값 초기화한 핸들이 유효해 보이면 안 된다.
     // AudioHost 안에서는 상위 비트를 Null fallback 영역으로 예약한다. 장치가
     // 복구돼 runtime 이 바뀌어도 이전 Null 핸들이 새 장치 보이스에 닿지 않는다.
-    struct VoiceHandle final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] VoiceHandle final
     {
         std::uint32_t index{ 0 };
         std::uint32_t generation{ 0 };
@@ -54,7 +54,7 @@ namespace wave
     // ★ 값을 wire 나 cooked identity 로 쓰지 않는다. 저작 파일에 저장되는 것은
     //   여전히 `ChannelType` 이고, 그것을 이 안정 id 로 사상하는 자는 서비스다.
     //   버스를 추가·재배치해도 저장된 씬이 흔들리지 않게 하려는 분리다.
-    struct BusId final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] BusId final
     {
         std::uint16_t value{ 0 };
 
@@ -83,7 +83,7 @@ namespace wave
         inline constexpr BusId Room{ 7u };
     }
 
-    struct ConcurrencyGroupId final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ConcurrencyGroupId final
     {
         std::uint32_t value{ 0u };
         [[nodiscard]] constexpr bool IsValid() const noexcept { return value != 0u; }
@@ -104,13 +104,13 @@ namespace wave
         Hall,
     };
 
-    struct RolloffPoint final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] RolloffPoint final
     {
         float distance{ 0.0f };
         float gain{ 1.0f };
     };
 
-    struct ClipInfo final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ClipInfo final
     {
         std::uint32_t channels{ 0u };
         std::uint32_t sampleRate{ 48000u };
@@ -118,7 +118,7 @@ namespace wave
         bool streaming{ false };
     };
 
-    struct VoiceMetrics final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] VoiceMetrics final
     {
         std::size_t active{ 0u };
         std::size_t physical{ 0u };
@@ -135,7 +135,7 @@ namespace wave
     // AU2 이행 중에는 legacy filename stem과 cooked GUID를 구분해 보관한다.
     // 같은 글자라도 두 종류의 키는 같지 않다. 저작 씬 참조 전환은 AU7에서
     // 진행하며 cooked loader는 manifest GUID만 사용한다.
-    class ClipKey final
+    class [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ClipKey final
     {
     public:
         ClipKey() = default;
@@ -199,13 +199,13 @@ namespace wave
     //
     // ★ 여기에 포인터를 담아도 이 헤더는 vendor 타입을 모른다 — 그것이 요점이다.
     //   상위 계층은 이 값을 **비교·전달만** 하고 절대 역참조하지 않는다.
-    struct BackendClipId final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] BackendClipId final
     {
         std::uint64_t value{ 0u };
         [[nodiscard]] constexpr bool IsValid() const noexcept { return value != 0u; }
     };
 
-    struct BackendVoiceId final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] BackendVoiceId final
     {
         std::uint64_t value{ 0 };
 

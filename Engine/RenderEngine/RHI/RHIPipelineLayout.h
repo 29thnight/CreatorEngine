@@ -84,7 +84,7 @@ enum class RHIBorderColor
     OpaqueWhite,
 };
 
-struct RHISamplerDesc
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] RHISamplerDesc
 {
     // D3D12_FLOAT32_MAX. 실측한 모든 샘플러가 이 값을 쓴다 — 기본값으로
     // 두면 25곳에서 그 줄이 사라진다. 0(구조체 영초기화의 값)이면 밉 0만

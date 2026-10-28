@@ -2,7 +2,7 @@
 #include "../../Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../../Foundation/Core.Minimal.h"
 
-struct [[reflgen::reflect]] BloomPassSetting
+struct [[reflgen::reflect, reflgen::public_methods]] BloomPassSetting
 {
    public:
     BloomPassSetting() = default;

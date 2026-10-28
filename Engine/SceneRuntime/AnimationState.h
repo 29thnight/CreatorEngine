@@ -12,7 +12,7 @@ import Creator.Core.Ownership;
 
 class AnimationController;
 class ConditionParameter;
-class [[reflgen::reflect]] AnimationState
+class [[reflgen::reflect, reflgen::public_methods]] AnimationState
 {
    public:
 public:

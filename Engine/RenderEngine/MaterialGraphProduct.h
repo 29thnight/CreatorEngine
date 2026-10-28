@@ -51,7 +51,7 @@ enum class Route : std::uint8_t
 };
 
 // Capabilities describe implemented transports, not user-selected quality.
-struct Capabilities
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Capabilities
 {
     std::uint32_t deferredFeatures = 0x003Fu;
     bool coreForward = false;
@@ -61,7 +61,7 @@ struct Capabilities
     bool volume = false;
 };
 
-struct Budget
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Budget
 {
     std::uint32_t textureSamples = 32;
     std::uint32_t textures = 64;
@@ -71,7 +71,7 @@ struct Budget
     std::uint64_t compiledBytes = 32u * 1024u * 1024u;
 };
 
-struct Selection
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Selection
 {
     Tier tier{};
     Route route{};
@@ -102,7 +102,7 @@ inline RHIShaderResourceReflection DescriptorIndexReflection()
 // space0 material ranges. Resource names and source-map lines stay unchanged.
 std::string BuildBoundSource(const LX::LXMaterialProgram& program);
 
-struct ParameterBinding
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ParameterBinding
 {
     LX::LXMaterialParameter parameter;
     std::uint32_t offset{};
@@ -119,7 +119,7 @@ enum class TextureSampleEncoding : std::uint32_t
     BC5Normal = 1
 };
 
-struct TextureEncodingBinding
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] TextureEncodingBinding
 {
     std::uint32_t slot{};
     std::uint32_t offset{};
@@ -132,7 +132,7 @@ inline std::string TextureEncodingUniformName(std::uint32_t slot)
     return "lx_bound_texture_" + std::to_string(slot) + "_encoding";
 }
 
-struct BindingLayout
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] BindingLayout
 {
     std::uint32_t uniformBytes{};
     ce::dynamic_array<ParameterBinding> parameters;
@@ -148,14 +148,14 @@ bool ResolveBindings(const LX::LXMaterialProgram& program, const RHIShaderReflec
 bool MergeMaterialReflections(std::span<const RHIShaderReflection* const> stages, RHIShaderReflection& result,
                               ce::dynamic_array<LX::LXMaterialDiagnostic>& diagnostics);
 
-struct CompileTarget
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] CompileTarget
 {
     RHIShaderBinary binary{};
     std::string entry;
     std::string profile;
 };
 
-struct VerifiedProduct
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] VerifiedProduct
 {
     LX::LXMaterialProgram program;
     Selection selection;
@@ -185,13 +185,13 @@ bool DescribeGraphicsShader(const VerifiedProduct& product, RHIShaderBinary back
 bool DescribeComputeShader(const VerifiedProduct& product, RHIShaderBinary backend, std::string_view entry,
                            LX::Runtime::ComputeShaderDescription& result, std::string& error);
 
-struct ParameterOverride
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ParameterOverride
 {
     LX::Id id{};
     LX::LXSocketValue value;
 };
 
-struct TextureBinding
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] TextureBinding
 {
     std::uint32_t slot{};
     RHITextureEntry texture;
@@ -200,7 +200,7 @@ struct TextureBinding
     bool linearStorage = false;
 };
 
-struct ResourcePacket
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ResourcePacket
 {
     ce::dynamic_array<std::uint8_t> uniforms;
     ce::dynamic_array<RHIBindingDesc> textures;
@@ -225,7 +225,7 @@ bool PrepareResourcesWithUniforms(const BindingLayout& layout, std::span<const s
 
 // Cook payloads use a versioned, bounded binary envelope. Backend/entry pairs
 // are unique and the exact dependency-bearing semantic key is retained.
-struct CookedProgram
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] CookedProgram
 {
     VerifiedProduct product;
     std::string metadata;

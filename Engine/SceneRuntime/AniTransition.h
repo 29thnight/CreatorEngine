@@ -6,7 +6,7 @@
 #include "ConditionParameter.h"
 class AnimationState;
 class AnimationController;
-class [[reflgen::reflect]] AniTransition
+class [[reflgen::reflect, reflgen::public_methods]] AniTransition
 {
    public:
 public:

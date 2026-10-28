@@ -4,7 +4,7 @@
 #include "../../Utility_Framework/Foundation/StandardLibrary.h"
 #include <mathematics/transform.hpp>
 
-struct [[reflgen::reflect]] FoliageInstance
+struct [[reflgen::reflect, reflgen::public_methods]] FoliageInstance
 {
    public:
     // Runtime identity survives copies, sorting and transform edits. New/deserialized

@@ -21,7 +21,7 @@
 //-----------------------------------------------------------------------------
 
 class Texture;
-class TerrainMaterial
+class [[reflgen::runtime]] TerrainMaterial
 {
 public:
 	TerrainMaterial() = default;

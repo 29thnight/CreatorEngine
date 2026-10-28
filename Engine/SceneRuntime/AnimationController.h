@@ -19,7 +19,7 @@ import Creator.Core.Ownership;
 class AniTransition;
 class AvatarMask;
 class Animator;
-class [[reflgen::reflect]] AnimationController : public own::enable_owner_from_this<AnimationController>
+class [[reflgen::reflect, reflgen::public_methods]] AnimationController : public own::enable_owner_from_this<AnimationController>
 {
    public:
 public:
@@ -68,6 +68,7 @@ public:
 	[[nodiscard]] bool IsBlending() const { return GetPlayback().isBlending; }
 	[[nodiscard]] bool HasEndedAnimation() const { return GetPlayback().endAnimation; }
 	void MarkAnimationEnded() { GetPlayback().endAnimation = true; }
+	[[reflgen::script_internal]]
 	void OnBeforeSerialize();
 	bool BlendingAnimation(float tick);
 	Animator* GetOwner() { return m_owner; };

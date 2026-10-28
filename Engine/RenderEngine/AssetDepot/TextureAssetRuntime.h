@@ -38,7 +38,7 @@ namespace AssetDepot
 
     // These remain part of the runtime identity even when two options happen to
     // decode to equal bytes. Dependencies use their own default representation.
-    struct TextureAssetVariant final
+    struct [[reflgen::runtime]] TextureAssetVariant final
     {
         TextureAssetColorSpace colorSpace{ TextureAssetColorSpace::Source };
         bool compress{};
@@ -52,13 +52,13 @@ namespace AssetDepot
     // Version 2 consumes immutable GPU-ready CECT bytes. Offline import recipe
     // changes alter the artifact hash; runtime role/sampler choices do not change
     // payload bytes. Only the decoder compatibility version belongs here.
-    struct TextureImageRecipe final
+    struct [[reflgen::runtime]] TextureImageRecipe final
     {
         std::uint32_t version{ 2u };
         friend auto operator<=>(const TextureImageRecipe&, const TextureImageRecipe&) noexcept = default;
     };
 
-    struct TextureImageKey final
+    struct [[reflgen::runtime]] TextureImageKey final
     {
         experiment::cooked::Sha256Digest contentSha256{};
         std::uint64_t byteSize{};
@@ -75,13 +75,13 @@ namespace AssetDepot
         const experiment::cooked::AssetBlobRecord& blob, const TextureAssetVariant& variant);
 
     // The path always travels with the source that captured and verified it.
-    struct TextureImageSource final
+    struct [[reflgen::runtime]] TextureImageSource final
     {
         own::shared_owner<const experiment::cooked::ArtifactByteSource> byteSource{};
         std::string artifactPath{};
     };
 
-    struct TextureAssetKey final
+    struct [[reflgen::runtime]] TextureAssetKey final
     {
         experiment::cooked::TypedAssetReference asset{};
         experiment::cooked::AssetBlobRecord blob{};
@@ -92,7 +92,7 @@ namespace AssetDepot
 
     // Exact provenance travels with the immutable Texture generation. The source
     // owner pins the selected backing across logical unmount, independently of bulk.
-    struct TextureAssetOrigin final
+    struct [[reflgen::runtime]] TextureAssetOrigin final
     {
         experiment::cooked::ResolvedAssetEntry resolved{};
         TextureAssetVariant variant{};

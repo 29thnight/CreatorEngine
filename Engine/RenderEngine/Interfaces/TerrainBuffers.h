@@ -15,7 +15,7 @@ import Creator.Core.Ownership;
 
 // 향후 terrain pass가 그대로 constant buffer에 올릴 CPU 정본이다.
 // HLSL 배열의 원소 stride가 float4(16바이트)이므로 해당 layout을 고정한다.
-cbuffer TerrainLayerBuffer
+cbuffer [[reflgen::runtime]] TerrainLayerBuffer
 {
     int useLayer{};
     int numLayers{};
@@ -39,9 +39,9 @@ static_assert(offsetof(TerrainLayerBuffer, layerTilling) == 16u);
 //-----------------------------------------------------------------------------
 
 class Texture;
-struct TerrainBrush
+struct [[reflgen::runtime]] TerrainBrush
 {
-    struct BrushMask 
+    struct [[reflgen::runtime]] BrushMask
     {
         ce::dynamic_array<uint8_t> m_mask;
         int m_maskWidth{ 0 };
@@ -72,7 +72,7 @@ struct TerrainBrush
 	}
 };
 
-struct TerrainLayer
+struct [[reflgen::runtime]] TerrainLayer
 {
     uint32_t m_layerID{ 0 };
     std::string layerName;

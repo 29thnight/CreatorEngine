@@ -4,7 +4,7 @@
 
 namespace ce::physics
 {
-struct character_motion_parameters
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] character_motion_parameters
 {
     float acceleration = 0;    // m/s²; zero selects direct input, bypassing acceleration and braking.
     float braking_decay = 0;   // 1/s exponential decay; zero means no decay in accelerated mode.
@@ -12,7 +12,7 @@ struct character_motion_parameters
     float max_fall_speed = 55; // Positive downward speed limit, m/s.
 };
 
-struct character_motion_memory
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] character_motion_memory
 {
     math::vector3 velocity{}, forced_velocity{};
     double forced_remaining = 0; // Simulation seconds, not render/wall-clock time.

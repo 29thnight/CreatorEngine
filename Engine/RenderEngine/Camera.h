@@ -15,7 +15,7 @@
 // 카메라 한 대의 값 상태. 소유권·활성 뷰 선택·렌더 슬롯 배정은 이 타입의
 // 책임이 아니다. SceneRuntime의 CameraComponent와 Editor의 camera rig가 각각
 // 값을 소유하고 RenderCore에는 FrameCameraSnapshot만 전달한다.
-class [[reflgen::reflect]] Camera
+class [[reflgen::reflect, reflgen::public_methods]] Camera
 {
    public:
 public:

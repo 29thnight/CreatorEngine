@@ -4,7 +4,7 @@
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 // Listening is independent of rendering cameras. Enable one active listener per world.
-class [[reflgen::reflect]] AudioListenerComponent
+class [[reflgen::reflect, reflgen::public_methods]] AudioListenerComponent
     : public meta::identity<AudioListenerComponent, Component>
 {
 public:
@@ -14,11 +14,13 @@ public:
         Component::gc_trace(tracer);
     }
 
+    [[reflgen::script_internal]]
     void OnAddedToScene() override;
+    [[reflgen::script_internal]]
     void OnRemovingFromScene() override;
 
     [[nodiscard]] wave::ListenerState CaptureListener() const;
-    struct Settings
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Settings
     {
         bool active{ true };
         math::vector3 velocity{};

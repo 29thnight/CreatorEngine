@@ -39,7 +39,7 @@ type FSharpNativePlayerProbe() =
                         releaseTick <- ticks
             if releaseTick > 0 && ticks >= releaseTick + 2 then
                 completed <- true
-                Console.WriteLine($"[FSHARP_PLAYER_OK] asset texture={width}x{height} workerRelease=true ticks={ticks} api=47")
+                Console.WriteLine($"[FSHARP_PLAYER_OK] asset texture={width}x{height} workerRelease=true ticks={ticks} api={CreatorEngine.Native.reflgen_creator_script_native.ScriptApiVersion}")
 
     member _.OnEndSimulation() : unit =
         if not (isNull request) && not request.IsDisposed then

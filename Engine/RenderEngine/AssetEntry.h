@@ -16,7 +16,7 @@ enum class ManagedAssetType
 	SpriteSheet
 };
 
-struct [[reflgen::reflect]] AssetEntry
+struct [[reflgen::reflect, reflgen::public_methods]] AssetEntry
 {
    public:
 	AssetEntry() = default;

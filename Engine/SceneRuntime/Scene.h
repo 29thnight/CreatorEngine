@@ -295,7 +295,7 @@ struct TransformWriteMetrics
 	ce::fixed_array<uint64_t, kTransformWriteReasonCount> byReason{};
 };
 
-class [[reflgen::reflect]] Scene : public gc::managed
+class [[reflgen::reflect, reflgen::public_methods]] Scene : public gc::managed
 {
 private:
     [[reflgen::ignore]]
@@ -357,6 +357,7 @@ public:
     // A marked diagnostic root is still serializable until EndFramePass removes
     // its slots. Keep the save barrier attached to its exact scene incarnation.
     void ProtectTransientDiagnosticRoot(EntityHandle root);
+    [[reflgen::script_internal]]
     void OnBeforeSerialize() const;
 
 	// Strong scene-graph edges. External users borrow pointers or resolve handles;
@@ -447,6 +448,7 @@ public:
 	void CommitRenderProxies();
 	// 커밋 대상 컴포넌트 총수 — 벤치가 "무엇을 얼마나 쟀는지" 함께 보고한다.
 	size_t RenderProxyComponentCount() const;
+	[[reflgen::script_internal]]
 	bool PublishRenderProxyDirty(Component* component, ProxyDirty dirty);
 	size_t PublishRenderProxyDirty(EntityHandle owner, ProxyDirty dirty);
 	RenderProxyCommitMetrics GetRenderProxyCommitMetrics() const;

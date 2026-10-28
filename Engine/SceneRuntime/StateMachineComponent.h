@@ -17,7 +17,7 @@ namespace FSM
 	class Transition;
 }
 
-class [[reflgen::reflect]] StateMachineComponent :public meta::identity<StateMachineComponent, Component>, public IAIComponent
+class [[reflgen::reflect, reflgen::public_methods]] StateMachineComponent :public meta::identity<StateMachineComponent, Component>, public IAIComponent
 {
    public:
     [[reflgen::ignore]]
@@ -37,7 +37,9 @@ public:
 	std::string name;
 
 	void Initialize() override;
+	[[reflgen::script_internal]]
 	void OnAddedToScene() override;
+	[[reflgen::script_internal]]
 	void OnRemovingFromScene() override;
 	//void Tick(float deltaTime) override;
 

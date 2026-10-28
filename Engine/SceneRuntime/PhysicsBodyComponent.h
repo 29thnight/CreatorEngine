@@ -9,7 +9,7 @@
 class Scene;
 
 // One complete body definition; shape ownership never follows the Entity hierarchy.
-class [[reflgen::reflect]] PhysicsBodyComponent final : public meta::identity<PhysicsBodyComponent, Component>
+class [[reflgen::reflect, reflgen::public_methods]] PhysicsBodyComponent final : public meta::identity<PhysicsBodyComponent, Component>
 {
     friend struct reflgen::access;
     friend class CookedSceneLoader;
@@ -25,12 +25,19 @@ class [[reflgen::reflect]] PhysicsBodyComponent final : public meta::identity<Ph
     PhysicsBodyComponent() = default;
     PhysicsBodyComponent(ce::physics::body_kind motion, ce::dynamic_array<PhysicsShapeDefinition> shapes);
 
+    [[reflgen::script_internal]]
     void OnAddedToScene() override;
+    [[reflgen::script_internal]]
     void OnRemovingFromScene() override;
+    [[reflgen::script_internal]]
     void OnUninitializing() override;
+    [[reflgen::script_internal]]
     void OnEnable() override;
+    [[reflgen::script_internal]]
     void OnDisable() override;
+    [[reflgen::script_internal]]
     void OnBeforeDeserialize(const Authoring::NodeView& view) const;
+    [[reflgen::script_internal]]
     void OnDeserialized(const Authoring::NodeView& view);
 
     std::span<const PhysicsShapeDefinition> Shapes() const noexcept { return m_shapes; }

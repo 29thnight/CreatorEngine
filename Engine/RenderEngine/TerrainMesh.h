@@ -17,7 +17,7 @@
 //   이제 CPU 배열이 진실이다. 갱신은 전부 여기에 쓰고, GPU 반영은 새로 쓸
 //   지형 패스가 m_revision을 보고 판단한다.
 //-----------------------------------------------------------------------------
-class TerrainMesh
+class [[reflgen::runtime]] TerrainMesh
 {
 public:
     // meshWidth: 정점 격자의 가로 폭(m_width). 패치 갱신의 행 계산에 쓴다.

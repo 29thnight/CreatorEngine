@@ -3,7 +3,7 @@
 
 namespace FSM
 {
-	class FSMState : public IScriptedFSM
+	class [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] FSMState : public IScriptedFSM
 	{
 	public:
 		FSMState(const std::string& stateName) : m_stateName(stateName) {}

@@ -87,7 +87,7 @@ namespace experiment::cooked
     inline constexpr std::uint32_t kAssetSetManifestMaxDependencies = 4u * 1024u * 1024u;
     inline constexpr std::uint32_t kAssetSetManifestMaxStringBytes = 64u * 1024u * 1024u;
 
-    struct AssetIdentity final
+    struct [[reflgen::runtime]] AssetIdentity final
     {
         AssetId assetId{};
         // Nil selects the whole asset. Otherwise this is a stable UUIDv4/v8,
@@ -97,7 +97,7 @@ namespace experiment::cooked
         friend auto operator<=>(const AssetIdentity&, const AssetIdentity&) noexcept = default;
     };
 
-    struct TypedAssetReference final
+    struct [[reflgen::runtime]] TypedAssetReference final
     {
         AssetIdentity key{};
         CookedAssetKind kind{ CookedAssetKind::Model };
@@ -117,7 +117,7 @@ namespace experiment::cooked
         External = 2,
     };
 
-    struct AssetDependency final
+    struct [[reflgen::runtime]] AssetDependency final
     {
         TypedAssetReference target{};
         AssetDependencyKind kind{ AssetDependencyKind::Hard };
@@ -129,7 +129,7 @@ namespace experiment::cooked
     // Content address includes type, representation, schema and target ABI.
     // Matching SHA-256 alone does not permit typed payload/decode sharing.
     // artifactPath locates these exact bytes in the associated mount backing.
-    struct AssetBlobRecord final
+    struct [[reflgen::runtime]] AssetBlobRecord final
     {
         Sha256Digest contentSha256{};
         std::uint64_t byteSize{};
@@ -143,7 +143,7 @@ namespace experiment::cooked
         friend auto operator<=>(const AssetBlobRecord&, const AssetBlobRecord&) = default;
     };
 
-    struct AssetSetEntry final
+    struct [[reflgen::runtime]] AssetSetEntry final
     {
         TypedAssetReference asset{};
         std::uint32_t blobIndex{};

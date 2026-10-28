@@ -2,7 +2,7 @@
 #include "../../Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../../Foundation/Core.Minimal.h"
 
-struct [[reflgen::reflect]] VignettePassSetting
+struct [[reflgen::reflect, reflgen::public_methods]] VignettePassSetting
 {
    public:
     VignettePassSetting() = default;

@@ -9,7 +9,7 @@
 // Neutral storage shared by the strict cooked reader and the authoring adapter.
 // The Editor-only derived object retains SDK pixels in their original allocation.
 // Player constructs only this base with owned cooked/procedural TextureImage data.
-struct Texture::CodecImage
+struct [[reflgen::runtime]] Texture::CodecImage
 {
     TextureImage owned;
     ce::dynamic_array<TextureSubimage> subresources;
@@ -25,6 +25,6 @@ struct Texture::CodecImage
     std::size_t accountedBytes{};
     std::size_t sourceRetainedBytes{};
 
-    void Account();
+    [[reflgen::script_internal]] void Account();
     virtual ~CodecImage();
 };

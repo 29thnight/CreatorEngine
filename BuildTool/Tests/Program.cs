@@ -5,7 +5,7 @@ using CreatorBuildTool;
 if (args.Length == 2 && args[0] == "--native-api-check")
 {
     var version = EnginePublisher.ReadManagedApiVersion(Path.GetFullPath(args[1]), true);
-    if (version != 47) throw new Exception($"Unexpected native F# API version: {version}");
+    if (version != 48) throw new Exception($"Unexpected native F# API version: {version}");
     Console.WriteLine($"FSHARP_NATIVE_METADATA_OK version={version}");
     return 0;
 }

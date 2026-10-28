@@ -20,7 +20,7 @@ enum class UItype : uint16_t
 };
 
 
-class [[reflgen::reflect]] UIComponent : public meta::identity<UIComponent, Component>
+class [[reflgen::reflect, reflgen::public_methods]] UIComponent : public meta::identity<UIComponent, Component>
 {
    public:
     [[reflgen::ignore]]
@@ -46,10 +46,13 @@ public:
 	}
 	int GetLayerOrder() const { return _layerorder; }
 	void SetNavi(Direction dir, Entity* otherUI);
+	[[reflgen::script_internal]]
 	void OnAddedToScene() override;
+	[[reflgen::script_internal]]
 	void OnRemovingFromScene() override;
 	// typed 직렬화기가 필드를 읽기 직전에 호출한다. 런타임 약참조를 현재 계층의
 	// 로컬 경로로 재계산해, 링크 설정 뒤 reparent한 경우도 다음 로드에서 맞게 한다.
+	[[reflgen::script_internal]]
 	void OnBeforeSerialize();
 	// 구 Navigation.navObject(instanceID) 파일의 읽기 전용 승격. 새 파일에는
 	// navObject를 쓰지 않고, 한 번 해석되면 OnBeforeSerialize가 새 경로로 치유한다.

@@ -12,7 +12,7 @@ type Runtime() =
     let trees = Trees(fun () -> auxiliary.NodeCount)
 
     interface IManagedRuntime with
-        member _.ScriptApi = 47
+        member _.ScriptApi = 48
         member _.Contacts = contacts
         member _.ActiveCount = registry.ActiveCount
         member _.InFixedUpdate = registry.InFixedUpdate

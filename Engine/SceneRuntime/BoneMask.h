@@ -3,7 +3,7 @@
 #include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 
-class [[reflgen::reflect]] BoneMask
+class [[reflgen::reflect, reflgen::public_methods]] BoneMask
 {
    public:
 public:

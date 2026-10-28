@@ -4,7 +4,7 @@
 
 // DataSystem이 소유하는 ShaderMeta cache slot의 세대 식별자다. slot 0과
 // generation 0은 항상 invalid이며, reload/remove 뒤 이전 handle은 resolve되지 않는다.
-struct ShaderMetaHandle
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ShaderMetaHandle
 {
 	std::uint32_t slot{};
 	std::uint32_t generation{};

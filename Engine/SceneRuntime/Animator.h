@@ -28,7 +28,7 @@ import Creator.Core.Ownership;
 // (m_Skeleton->m_animations)에 재주입해 같은 스켈레톤을 공유하는 Animator 간
 // 오염(마지막 로드 승자)을 만들었다. 이제 재생 루프 판정·발화·에디터 편집·
 // 직렬화가 전부 이 구조를 정본으로 본다 — 공유 자산은 불변이다.
-struct AnimatorClipOverride final
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] AnimatorClipOverride final
 {
 	int clipIndex{ -1 };
 	std::optional<bool> loopOverride{};
@@ -80,13 +80,13 @@ namespace assets // PHASE 3.75 MBC8: typed 재생 정본(shared_owner 보관용)
 
 // One frame's exact immutable owners. Sparse clip indices refer to the descriptor's
 // summary order; unselected siblings never become resident through this view.
-struct AnimatorAnimationClipPin final
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] AnimatorAnimationClipPin final
 {
     int clipIndex{ -1 };
     own::shared_owner<const assets::ModelAnimationPayload> payload{};
 };
 
-struct AnimatorAnimationBinding final
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] AnimatorAnimationBinding final
 {
     own::shared_owner<const assets::ModelAnimationDescriptor> descriptor{};
     own::shared_owner<const assets::ModelSkeletonPayload> skeleton{};
@@ -110,7 +110,7 @@ enum class AnimatorDataPath : std::uint8_t
 
 // K2: enable_shared_from_this 제거 — AnimationJob은 이제 shared_ptr을 빌리지
 // 않고 this를 프레임-로컬 raw 포인터로만 관찰한다(OnInitialized/OnUninitializing 참조).
-class [[reflgen::reflect]] Animator : public meta::identity<Animator, Component>
+class [[reflgen::reflect, reflgen::public_methods]] Animator : public meta::identity<Animator, Component>
 {
     public:
     [[reflgen::ignore]]
@@ -128,9 +128,13 @@ public:
     // 트랙 C3: 가상 Update 오버라이드를 걷어내고 AnimatorSystem(조밀 벡터,
     // 전용 틱)으로 옮겼다. AnimationJob 등록도 씬 편입/이탈 훅을 쓴다:
     // DDOL 재부착에는 OnInitialized가 다시 호출되지 않기 때문이다.
+    [[reflgen::script_internal]]
     void OnAddedToScene() override;
+    [[reflgen::script_internal]]
     void OnRemovingFromScene() override;
+    [[reflgen::script_internal]]
     void OnUninitializing() override;
+    [[reflgen::script_internal]]
     void OnPropertyChanged(std::string_view propertyName,
         Meta::PropertyChangeSource source) override;
     void SetAnimation(int index);
@@ -152,15 +156,18 @@ public:
     Socket* FindSocket(std::string_view socketName);
 
     // CT6-d: 스켈레톤·파라미터·컨트롤러 그래프 복원(구 팩토리 분기 이동)
+    [[reflgen::script_internal]]
     void OnDeserialized(const Authoring::NodeView& node); // D3-a-4
 
     // Preserve the existing m_AnimIndexChosen YAML key while runtime selection
     // lives in the system-owned instance.
+    [[reflgen::script_internal]]
     void OnBeforeSerialize();
 
     // I5-D4e-2 — 씬 표기는 기존 형상(m_Skeleton.m_animations[i].m_isLoop/
     // m_keyFrameEvent)을 유지하되, 리플렉션이 적은 공유 자산 값을 Animator
     // 소유 오버라이드로 교체한다(reader 구세대 호환·스키마 무변경).
+    [[reflgen::script_internal]]
     void OnAfterSerialize(const Authoring::MutableNodeView& node);
 
     // I5-D4e-2 — 클립 오버라이드 표면. 재생(AnimationJob)·발화·에디터가 쓴다.
@@ -268,7 +275,9 @@ public:
     [[reflgen::hidden]]
     uint32_t m_AnimIndexChosen{};
 
+    [[reflgen::script_internal]]
     [[nodiscard]] AnimInstance& GetInstance() noexcept;
+    [[reflgen::script_internal]]
     [[nodiscard]] const AnimInstance& GetInstance() const noexcept;
     [[nodiscard]] uint32_t GetSelectedClipIndex() const noexcept { return GetInstance().selectedClipIndex; }
     void SetSelectedClipIndex(uint32_t index) noexcept { GetInstance().selectedClipIndex = index; }

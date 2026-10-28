@@ -32,7 +32,7 @@ namespace experiment
     //
     // keyword override는 base.keywords 뒤에 덧붙는다. resolver가 목록 순서대로
     // 축 선택을 덮으므로 같은 축의 override가 base를 이긴다.
-    class MaterialInstance final
+    class [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] MaterialInstance final
     {
     public:
         MaterialInstance() = default;

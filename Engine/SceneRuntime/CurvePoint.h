@@ -3,7 +3,7 @@
 #include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 
-struct [[reflgen::reflect]] CurvePoint
+struct [[reflgen::reflect, reflgen::public_methods]] CurvePoint
 {
    public:
     float distance = 0.f;

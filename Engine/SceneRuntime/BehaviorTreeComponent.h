@@ -12,7 +12,7 @@ import Creator.Core.Ownership;
 
 using namespace BT;
 
-class [[reflgen::reflect]] BehaviorTreeComponent :
+class [[reflgen::reflect, reflgen::public_methods]] BehaviorTreeComponent :
 	public meta::identity<BehaviorTreeComponent, Component>, public IAIComponent
 {
    public:
@@ -30,12 +30,16 @@ public:
 
 	// IAIComponent 인터페이스 구현
 	void Initialize() override;
+	[[reflgen::script_internal]]
 	void OnInitialized() override;
+	[[reflgen::script_internal]]
 	void OnAddedToScene() override;
+	[[reflgen::script_internal]]
 	void OnRemovingFromScene() override;
     void InternalAIUpdate(float deltaSecond) override;
     int GetTreeInstanceID() const { return m_treeInstanceId; }
     uint64_t GetTreeRevision() const { return m_treeRevision; }
+	[[reflgen::script_internal]]
 	void OnUninitializing() override;
 	BlackBoard* GetBlackBoard();
 private:

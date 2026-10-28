@@ -12,7 +12,7 @@
 class Entity;
 class Transform;
 namespace Meta { enum class PropertyChangeSource : std::uint8_t; }
-class [[reflgen::reflect]] Component : public meta::identity<Component, Object>, public gc::managed
+class [[reflgen::reflect, reflgen::public_methods]] Component : public meta::identity<Component, Object>, public gc::managed
 {
     friend class CookedSceneLoader;
    friend struct reflgen::access;
@@ -64,6 +64,7 @@ public:
 	// 즉 "코드로 만든 오브젝트"와 "파일에서 연 오브젝트"가 다르게 동작하게 된다.
 	// virtual로 두면 두 경로가 같은 함수를 부른다. Component는 이미 vtable을
 	// 가지므로(생명주기 훅 14종) 추가 비용은 엔트리 하나뿐이다.
+	[[reflgen::script_internal]]
 	virtual void SetOwner(Entity* owner);
 	Entity* GetOwner() const { return m_pOwner; }
 
@@ -90,18 +91,26 @@ public:
 	//      (그 무관함이 곧 부채였다 — 라벨이 옛 3훅 이름에 굳어 기준선이 "무엇이
 	//       실제로 불렸는가"를 못 말했다. C5에서 라벨을 이 여섯 이름으로 맞추고
 	//       기록 없던 셋을 계측해 93→200 사건이 됐다.)
+	[[reflgen::script_internal]]
 	virtual void OnInitialized() {}
+	[[reflgen::script_internal]]
 	virtual void OnAddedToScene() {}
+	[[reflgen::script_internal]]
 	virtual void OnBeginSimulation() {}
+	[[reflgen::script_internal]]
 	virtual void OnEndSimulation() {}
+	[[reflgen::script_internal]]
 	virtual void OnRemovingFromScene() {}
+	[[reflgen::script_internal]]
 	virtual void OnUninitializing() {}
 
 	// ── 활성/비활성 축 (6단계와 직교) ──
 	//
 	// 씬 페이즈와 무관하게 "지금 켜져 있는가"를 다룬다. 6단계에 대응물이 없어
 	// 남는다 — 씬에 있고 시뮬레이션 중이면서도 꺼져 있을 수 있기 때문이다.
+	[[reflgen::script_internal]]
 	virtual void OnEnable() {}
+	[[reflgen::script_internal]]
 	virtual void OnDisable() {}
 
 	// ── 틱 축은 여기 없다 (트랙 C3 완결) ──
@@ -137,6 +146,7 @@ public:
 	};
 
 	bool HasLifecycleState(uint8_t bit) const noexcept { return 0 != (m_lifecycleState & bit); }
+	[[reflgen::script_internal]]
 	void MarkLifecycleState(uint8_t bit) noexcept { m_lifecycleState |= bit; }
 
 	// 활성 전이에서 OnEnable/OnDisable을 부른다 (PHASE 9-2).
@@ -153,8 +163,10 @@ public:
 	// X8 writer boundary. Reflection-backed fields inherit this hook; explicit
 	// setters call PublishRenderProxyDirty directly. Non-render components are
 	// harmless because Scene rejects components absent from its proxy registry.
+	[[reflgen::script_internal]]
 	virtual void OnPropertyChanged(std::string_view propertyName,
 		Meta::PropertyChangeSource source);
+	[[reflgen::script_internal]]
 	void PublishRenderProxyDirty(ProxyDirty dirty) const;
     [[reflgen::ignore]]
     void NotifyPropertyChanged(std::string_view propertyName, Meta::PropertyChangeSource source);

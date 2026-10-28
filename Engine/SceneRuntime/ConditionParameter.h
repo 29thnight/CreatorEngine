@@ -22,7 +22,7 @@ enum class ValueType : std::uint16_t
 	Trigger,
 };
 
-class [[reflgen::reflect]] ConditionParameter
+class [[reflgen::reflect, reflgen::public_methods]] ConditionParameter
 {
    public:
 public:

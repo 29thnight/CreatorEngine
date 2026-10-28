@@ -268,10 +268,11 @@ and [<AllowNullLiteral; AbstractClass>] Component() =
     abstract member InvokeMessage: string -> bool
     default _.InvokeMessage(_) = false
 
-and [<AllowNullLiteral; AbstractClass>] NativeComponent internal (owner: ObjectHandle) as this =
+and [<AllowNullLiteral; AbstractClass>] NativeComponent internal (owner: ObjectHandle, ?nativeInstance: uint64) as this =
     inherit Component()
     do this.Entity <- Entity(owner)
     member internal _.OwnerHandle = owner
+    member internal _.NativeInstanceId = nativeInstance
 
 and [<AllowNullLiteral; Sealed>] Transform internal (owner: ObjectHandle) =
     inherit NativeComponent(owner)

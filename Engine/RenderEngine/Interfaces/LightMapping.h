@@ -3,7 +3,7 @@
 #include "../../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../../Utility_Framework/Foundation/Core.Minimal.h"
 
-struct [[reflgen::reflect]] LightMapping
+struct [[reflgen::reflect, reflgen::public_methods]] LightMapping
 {
    public:
     int lightmapIndex{ -1 };

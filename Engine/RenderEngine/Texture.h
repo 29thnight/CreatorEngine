@@ -61,7 +61,7 @@ enum class TextureType
 	ImageTexture,
 };
 
-class Texture : public meta::polymorphic,
+class [[reflgen::runtime]] Texture : public meta::polymorphic,
 	private Diagnostics::CountedResource<Diagnostics::EngineResource::Texture>
 {
 public:
@@ -141,7 +141,7 @@ public:
         const own::shared_owner<const CodecImage>& image) noexcept;
     [[nodiscard]] static std::size_t ImageRetainedCharge(
         const own::shared_owner<const CodecImage>& image) noexcept;
-    struct ImageMemorySnapshot final
+    struct [[reflgen::runtime]] ImageMemorySnapshot final
     {
         std::size_t liveBytes{};
         std::size_t nonRehydratableBytes{};
@@ -160,7 +160,7 @@ public:
 	//   텍스처'로만 나타난다. 신원으로 키를 잡으면 성립 자체가 불가능하다.
 	//
 	// Mesh::m_hashingMesh와 같은 규약이다(그쪽은 이미 이렇게 되어 있었다).
-	HashedGuid m_assetId{ TypeTrait::MakeRuntimeResourceId() };
+	[[reflgen::readonly]] HashedGuid m_assetId{ TypeTrait::MakeRuntimeResourceId() };
 
 	TextureType m_textureType = TextureType::Unknown;
 

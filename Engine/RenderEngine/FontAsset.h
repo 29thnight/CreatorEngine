@@ -15,7 +15,7 @@ enum class TextAlignment : std::uint8_t;
 // A stable append-only page identity. Existing glyph texels and UVs never move.
 // Static layouts follow its latest immutable Texture rather than pinning one
 // full atlas version forever; frame sealing retains the returned actual Texture.
-class TextAtlasPage final
+class [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] TextAtlasPage final
 {
   public:
     own::shared_owner<const Texture> GetTexture() const
@@ -37,7 +37,7 @@ class TextAtlasPage final
 };
 
 // Immutable GT-produced geometry. Atlas publication is separate and append-only.
-struct TextGlyph
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] TextGlyph
 {
     float left{}, top{}, right{}, bottom{};
     float uvLeft{}, uvTop{}, uvRight{}, uvBottom{};
@@ -47,7 +47,7 @@ struct TextGlyph
     own::shared_owner<const Texture> GetTexture() const { return atlasPage ? atlasPage->GetTexture() : texture; }
 };
 
-struct TextLayout
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] TextLayout
 {
     ce::dynamic_array<TextGlyph> glyphs;
     float width{}, height{}, lineHeight{};

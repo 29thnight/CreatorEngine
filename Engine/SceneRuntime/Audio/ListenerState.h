@@ -10,7 +10,7 @@ namespace wave
     //   custom rolloff 감쇠를 계산하고 있었다 — 즉 항상 원점에 선 듣는 자를 기준으로
     //   거리를 재고 있었다. 계약에 넣어 두면 "세우는 자가 없다" 가 컴파일 시점이나
     //   게이트에서 드러난다.
-    struct ListenerState final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ListenerState final
     {
         math::vector3 position{ 0.0f, 0.0f, 0.0f };
         math::vector3 velocity{ 0.0f, 0.0f, 0.0f };

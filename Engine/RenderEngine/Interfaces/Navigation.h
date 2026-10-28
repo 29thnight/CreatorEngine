@@ -36,7 +36,7 @@ constexpr bool HasUIEffect(UIEffects value, UIEffects flag) noexcept
 	return 0 != (static_cast<std::uint32_t>(value) & static_cast<std::uint32_t>(flag));
 }
 
-struct [[reflgen::reflect]] Navigation
+struct [[reflgen::reflect, reflgen::public_methods]] Navigation
 {
    public:
 	int mode{};

@@ -21,7 +21,7 @@ namespace assets
     //
     // 기본값은 패스가 지금 고정으로 걸고 있는 값(선형 · WRAP)이다. 배선이
     // 붙어도 샘플러를 선언하지 않은 기존 자산의 그림은 달라지지 않는다.
-    struct TextureSampler final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] TextureSampler final
     {
         RHIFilterMode  minMag{ RHIFilterMode::Linear };
         RHIFilterMode  mip{ RHIFilterMode::Linear };

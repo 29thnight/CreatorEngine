@@ -19,7 +19,7 @@ import Creator.Core.Ownership;
 //-----------------------------------------------------------------------------
 class ComponentFactory;
 class ProxyCommand;
-class [[reflgen::reflect]] TerrainComponent : public meta::identity<TerrainComponent, Component>
+class [[reflgen::reflect, reflgen::public_methods]] TerrainComponent : public meta::identity<TerrainComponent, Component>
 {
     public:
     [[reflgen::ignore]]
@@ -29,6 +29,7 @@ class [[reflgen::reflect]] TerrainComponent : public meta::identity<TerrainCompo
     }
 
 public:
+    [[reflgen::script_internal]]
     void OnDeserialized(); // CT6-d: 지형 애셋 로드(구 팩토리 분기)
 
     TerrainComponent();
@@ -43,9 +44,13 @@ public:
     // 가로 세로 크기 변경
     void Resize(int newWidth, int newHeight);
 
+    [[reflgen::script_internal]]
     virtual void OnInitialized() override;
+    [[reflgen::script_internal]]
     void OnAddedToScene() override;
+    [[reflgen::script_internal]]
     void OnRemovingFromScene() override;
+    [[reflgen::script_internal]]
     virtual void OnUninitializing() override;
 
     //에디터 save/load

@@ -46,7 +46,7 @@ namespace assets
     inline constexpr std::uint32_t kInvalidModelAssetIndex =
         (std::numeric_limits<std::uint32_t>::max)();
 
-    struct ModelAssetGenerationHandle final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelAssetGenerationHandle final
     {
         uuid::uuid16 modelId{};
         std::uint64_t generation{};
@@ -68,7 +68,7 @@ namespace assets
         Granular,
     };
 
-    struct ModelMeshHandle final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelMeshHandle final
     {
         // Keep the legacy aggregate initializer/source adapter stable.
         uuid::uuid16 modelId{};
@@ -115,7 +115,7 @@ namespace assets
     // Small descriptor identity only; no parent model or CPU geometry is needed.
     [[nodiscard]] ModelMeshHandle MakeModelMeshHandle(const ModelMeshDescriptor& descriptor);
 
-    struct ModelTextureHandle final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelTextureHandle final
     {
         uuid::uuid16 textureId{};
         // 0은 이 모델 generation 밖의 독립 texture asset이다. 같은 model
@@ -139,7 +139,7 @@ namespace assets
         Srgb,
     };
 
-    struct ModelMaterialTexture final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelMaterialTexture final
     {
         ModelTextureHandle handle{};
         TextureCoordinates coordinates{};
@@ -161,13 +161,13 @@ namespace assets
         std::string,
         ModelMaterialTexture>;
 
-    struct ModelMaterialProperty final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelMaterialProperty final
     {
         std::string name{};
         ModelMaterialPropertyValue value{};
     };
 
-    struct ModelMaterialAsset final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelMaterialAsset final
     {
         uuid::uuid16 materialId{};
         uuid::uuid16 shaderAssetId{};
@@ -179,7 +179,7 @@ namespace assets
         ce::dynamic_array<std::uint16_t> keywordSelections{};
     };
 
-    struct ModelMeshAsset final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelMeshAsset final
     {
         uuid::uuid16 meshId{};
         uuid::uuid16 materialId{};
@@ -196,7 +196,7 @@ namespace assets
           own::shared_owner<const ModelMeshDescriptor> streamDescriptor{};
     };
 
-    struct ModelTextureSubresource final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelTextureSubresource final
     {
         std::uint32_t width{};
         std::uint32_t height{};
@@ -205,7 +205,7 @@ namespace assets
         std::uint64_t slicePitch{};
     };
 
-    struct ModelTextureAsset final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelTextureAsset final
     {
         uuid::uuid16 textureId{};
         std::string name{};
@@ -223,7 +223,7 @@ namespace assets
         ce::dynamic_array<std::byte> pixels{};
     };
 
-    struct ModelNodeAsset final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelNodeAsset final
     {
         std::string name{};
         std::uint32_t parent{ kInvalidModelAssetIndex };
@@ -231,7 +231,7 @@ namespace assets
         ce::dynamic_array<uuid::uuid16> meshes{};
     };
 
-    struct ModelBoneAsset final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelBoneAsset final
     {
         std::string name{};
         std::uint32_t parent{ kInvalidModelAssetIndex };
@@ -244,25 +244,25 @@ namespace assets
         Step,
     };
 
-    struct ModelTranslationKey final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelTranslationKey final
     {
         double time{};
         math::vector3 value{};
     };
 
-    struct ModelRotationKey final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelRotationKey final
     {
         double time{};
         math::quaternion value{};
     };
 
-    struct ModelScaleKey final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelScaleKey final
     {
         double time{};
         math::vector3 value{ 1.0f, 1.0f, 1.0f };
     };
 
-    struct ModelAnimationTrack final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelAnimationTrack final
     {
         std::uint32_t bone{ kInvalidModelAssetIndex };
         ModelInterpolationMode translationInterpolation{ ModelInterpolationMode::Linear };
@@ -273,13 +273,13 @@ namespace assets
         ce::dynamic_array<ModelScaleKey> scales{};
     };
 
-    struct ModelAnimationEvent final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelAnimationEvent final
     {
         double time{};
         std::string name{};
     };
 
-    struct ModelAnimationAsset final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelAnimationAsset final
     {
         uuid::uuid16 animationId{};
         std::string name{};
@@ -290,7 +290,7 @@ namespace assets
         ce::dynamic_array<ModelAnimationEvent> events{};
     };
 
-    struct ModelSkeletonAsset final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelSkeletonAsset final
     {
         uuid::uuid16 skeletonId{};
         std::uint32_t rootBone{ kInvalidModelAssetIndex };
@@ -299,7 +299,7 @@ namespace assets
         ce::dynamic_array<ModelBoneAsset> bones{};
     };
 
-    struct ModelAnimatorAsset final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelAnimatorAsset final
     {
         uuid::uuid16 motionAssetId{};
         uuid::uuid16 defaultAnimationId{};
@@ -314,7 +314,7 @@ namespace assets
 
     // 백엔드 객체를 만들지 않는 immutable request. MBC6의 DX12/Vulkan adapter는
     // assetId와 sourceIndex로 generation 내부 저장소를 찾아 실제 upload를 수행한다.
-    struct ModelGpuUploadDescriptor final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelGpuUploadDescriptor final
     {
         ModelGpuUploadKind kind{ ModelGpuUploadKind::VertexBuffer };
         uuid::uuid16 assetId{};
@@ -330,7 +330,7 @@ namespace assets
         bool isCube{};
     };
 
-    struct ModelAssetGenerationIdentity final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelAssetGenerationIdentity final
     {
         uuid::uuid16 modelId{};
         std::uint64_t generation{};
@@ -380,7 +380,7 @@ namespace assets
     [[nodiscard]] ModelAssetGenerationLoadResult LoadModelAssetGeneration(
         const ModelAssetGenerationLoadRequest& request);
 
-    class ModelAssetGeneration final
+    class [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelAssetGeneration final
     {
     public:
         using Shared = own::shared_owner<const ModelAssetGeneration>;

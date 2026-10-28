@@ -25,7 +25,7 @@ namespace assets
     struct ModelMeshDescriptor;
 }
 
-struct [[reflgen::reflect]] FoliageType
+struct [[reflgen::reflect, reflgen::public_methods]] FoliageType
 {
 public:
     // Serialized values, interpreted only through their expected typed links.

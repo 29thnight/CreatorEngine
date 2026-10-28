@@ -14,7 +14,7 @@ import Creator.Core.Layers;
 namespace ce::physics
 {
 // GUID-compatible value layout; opaque subscription metadata, independent of collision filters.
-struct contact_role_id
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] contact_role_id
 {
     std::uint32_t a = 0;
     std::uint16_t b = 0, c = 0;
@@ -23,7 +23,7 @@ struct contact_role_id
 };
 static_assert(sizeof(contact_role_id) == 16);
 
-struct pose
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] pose
 {
     math::vector3 position{};
     math::quaternion rotation{};
@@ -37,7 +37,7 @@ enum class geometry_kind : std::uint8_t
 };
 
 // Immutable SDK asset. Keeps its SDK alive even after its cooking scene is destroyed.
-class CollisionGeometry final
+class [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] CollisionGeometry final
 {
   public:
     ~CollisionGeometry();
@@ -55,22 +55,22 @@ class CollisionGeometry final
     std::unique_ptr<implementation> m_state;
 };
 
-struct box_geometry
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] box_geometry
 {
     math::vector3 half_extent{.5f, .5f, .5f};
 };
-struct sphere_geometry
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] sphere_geometry
 {
     float radius = .5f;
 };
 // Capsule's longitudinal axis is local +Y; half_height excludes the spherical caps.
-struct capsule_geometry
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] capsule_geometry
 {
     float radius = .5f;
     float half_height = .5f;
 };
 
-struct cooked_geometry
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] cooked_geometry
 {
     std::shared_ptr<const CollisionGeometry> asset;
     math::vector3 scale{1.f, 1.f, 1.f}; // Positive scale; primitive dimensions are already baked.
@@ -78,21 +78,21 @@ struct cooked_geometry
 
 using geometry = std::variant<box_geometry, sphere_geometry, capsule_geometry, cooked_geometry>;
 
-struct material
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] material
 {
     float static_friction = .5f;
     float dynamic_friction = .5f;
     float restitution = 0.f;
 };
 
-struct collision_filter
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] collision_filter
 {
     std::uint32_t belongs_to = 1;
     std::uint32_t collides_with = ~0u;
     std::uint32_t query_layers = ~0u;
 };
 
-struct ShapeInstance
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ShapeInstance
 {
     shape_id id{1};
     geometry form = box_geometry{};
@@ -129,13 +129,13 @@ constexpr axis_lock operator|(axis_lock left, axis_lock right) noexcept
     return static_cast<axis_lock>(std::to_underlying(left) | std::to_underlying(right));
 }
 
-struct body_constraints
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] body_constraints
 {
     axis_lock translation = axis_lock::none;
     axis_lock rotation = axis_lock::none;
 };
 
-struct body_desc
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] body_desc
 {
     body_kind kind = body_kind::static_body;
     pose initial_pose{};
@@ -149,7 +149,7 @@ struct body_desc
     bool gravity_enabled = true;
 };
 
-struct body_state
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] body_state
 {
     body_kind kind;
     pose transform;
@@ -160,26 +160,26 @@ struct body_state
     pose center_of_mass{}; // Local COM pose; inertia is expressed in its principal axes.
 };
 
-struct triangle_indices
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] triangle_indices
 {
     std::uint32_t a, b, c;
 };
 
-struct heightfield_desc
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] heightfield_desc
 {
     std::uint32_t rows = 0;
     std::uint32_t columns = 0;
     std::span<const std::int16_t> heights; // Row-major signed samples; scale is applied at instantiation.
 };
 
-struct query_filter
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] query_filter
 {
     std::uint32_t layers = ~0u;
     bool include_sensors = false;
     body_handle ignore{};
 };
 
-struct query_hit
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] query_hit
 {
     body_handle body;
     shape_id shape;
@@ -190,14 +190,14 @@ struct query_hit
     bool has_location = false; // Overlap hits have identity only.
 };
 
-struct ray_query
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ray_query
 {
     math::vector3 origin{};
     math::vector3 direction{};
     float distance = 0.f;
 };
 
-struct sweep_query
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] sweep_query
 {
     geometry form;
     pose origin{};
@@ -205,7 +205,7 @@ struct sweep_query
     float distance = 0.f;
 };
 
-struct overlap_query
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] overlap_query
 {
     geometry form;
     pose origin{};
@@ -213,14 +213,14 @@ struct overlap_query
 
 using query_input = std::variant<ray_query, sweep_query, overlap_query>;
 
-struct query_request
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] query_request
 {
     query_input input;
     std::span<query_hit> output;
     query_filter filter{};
 };
 
-struct query_result
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] query_result
 {
     std::size_t written = 0;
     std::size_t required_capacity = 0;

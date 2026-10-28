@@ -18,7 +18,7 @@ namespace AssetDepot
 }
 
 class Texture;
-struct MaterialTextureOwner
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] MaterialTextureOwner
 {
     std::string propertyName;
     own::shared_owner<const Texture> textureOwner;
@@ -28,7 +28,7 @@ struct MaterialTextureOwner
 // ShaderMeta is a contract description, not the owner of material instances.
 namespace LX::Runtime
 {
-    struct ShaderGeneration
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ShaderGeneration
     {
         std::filesystem::path metaPath;
         std::string document;
@@ -41,7 +41,7 @@ namespace LX::Runtime
         own::shared_owner<const AssetDepot::MaterialProgramAssetOrigin> assetOrigin{};
     };
 
-    struct Instance
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Instance
     {
         Instance() = default;
         Instance(const Instance& source)

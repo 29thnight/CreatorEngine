@@ -5,7 +5,7 @@
 #include "BoneMask.h"
 
 enum class BoneRegion;
-class [[reflgen::reflect]] AvatarMask
+class [[reflgen::reflect, reflgen::public_methods]] AvatarMask
 {
    public:
 

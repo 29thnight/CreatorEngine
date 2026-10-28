@@ -61,7 +61,7 @@ const char* TransformWriteReasonName(TransformWriteReason reason);
 // Entity.cpp) 안의 호출부는 이미 고쳤다 — 나머지는 이 슬라이스 최종
 // 보고의 "통합 시 필요한 배선" 목록 참고(파일 밖 편집 금지 규칙 때문에
 // 여기서 고칠 수 없었다).
-class [[reflgen::reflect]] Transform : public meta::identity<Transform, Component>
+class [[reflgen::reflect, reflgen::public_methods]] Transform : public meta::identity<Transform, Component>
 {
    friend struct reflgen::access;
    public:
@@ -72,7 +72,9 @@ class [[reflgen::reflect]] Transform : public meta::identity<Transform, Componen
     }
 
 public:
+	[[reflgen::script_internal]]
 	void CaptureSceneTransferState();
+	[[reflgen::script_internal]]
 	void RestoreSceneTransferState();
     Transform() = default;
     ~Transform() = default;
@@ -122,6 +124,7 @@ public:
 	// (리플렉션 로드 vs 템플릿 AddComponent<T>())를 합류시킨다. GetOwner()는
 	// 기반(Component)이 주는 것과 완전히 같아져서 제거했다 — m_pOwner가 유일한
 	// 소유자 저장소다(아래 m_owner 필드 소멸).
+	[[reflgen::script_internal]]
 	void SetOwner(Entity* owner) override;
 
 	math::matrix4x4 GetLocalMatrix();
@@ -160,6 +163,7 @@ public:
 		TransformWriteReason reason = TransformWriteReason::Reset);
 	// typed reflection이 실제 존재하는 필드를 쓴 직후 호출한다. detach 상태면
 	// reason 하나를 보류했다가 owner/scene 부착 뒤 publish한다.
+	[[reflgen::script_internal]]
 	void OnPropertyChanged(std::string_view propertyName,
 		Meta::PropertyChangeSource source);
 	void FlushPendingLocalWrite();
@@ -251,6 +255,7 @@ private:
 	// 유일한 소유자 저장소다. Transform 자신의 멤버 함수는 이름 은닉 없이
 	// m_pOwner를 직접 쓴다(Transform은 템플릿이 아니라 CRTP 베이스 조회
 	// 규칙의 영향을 받지 않는다).
+    [[reflgen::readonly]]
 	uint32 m_parentID{ 0 };
 
 	[[reflgen::ignore]]

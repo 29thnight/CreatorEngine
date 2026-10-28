@@ -24,7 +24,7 @@ namespace reflgen { class type_descriptor; }
 class RenderScene;
 class ModelLoader;
 class Prefab;
-class [[reflgen::reflect]] Entity : public Object, public gc::managed
+class [[reflgen::reflect, reflgen::public_methods]] Entity : public Object, public gc::managed
 {
     friend class CookedSceneLoader;
 public:
@@ -73,6 +73,7 @@ public:
 
 	void SetName(std::string_view name) { m_name = name; }
     void SetTag(std::string_view tag);
+    [[reflgen::script_internal]]
     void OnBeforeDeserialize(const Authoring::NodeView& node) const;
     ce::layers::result<void> SetLayer(std::string_view name);
     ce::layers::result<void> SetLayer(ce::layers::layer_id layer);
@@ -110,6 +111,7 @@ public:
 	// ★ 이 훅은 옮기지 않았다. 리플렉션이 SFINAE로 **멤버의 존재를 탐지해** 부르므로
 	//   (`ReflectionTypedYml.h:519`) 자유 함수로 빼면 컴파일은 되고 계층 직렬화만
 	//   조용히 사라진다. 리플렉션 계약과 함께 D3-a-4에서 바뀐다.
+	[[reflgen::script_internal]]
 	void OnAfterSerialize(const Authoring::MutableNodeView& node) const; // D3-a-4, D3-b-2 쓰기 분리
 
 	// K2 스테이지 A: 반환이 shared_ptr<Component> → Component*로 바뀌었다.

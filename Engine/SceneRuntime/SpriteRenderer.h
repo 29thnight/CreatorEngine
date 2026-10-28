@@ -12,7 +12,7 @@ import Creator.Core.Ownership;
 #include "BillboardType.h"
 #include "Texture.h"
 
-class [[reflgen::reflect]] SpriteRenderer : public meta::identity<SpriteRenderer, Component>
+class [[reflgen::reflect, reflgen::public_methods]] SpriteRenderer : public meta::identity<SpriteRenderer, Component>
 {
    friend struct reflgen::access;
    public:
@@ -25,12 +25,17 @@ class [[reflgen::reflect]] SpriteRenderer : public meta::identity<SpriteRenderer
 public:
     SpriteRenderer() = default;
 
+   [[reflgen::script_internal]]
    virtual void OnInitialized() override;
+   [[reflgen::script_internal]]
    void OnAddedToScene() override;
+   [[reflgen::script_internal]]
    void OnRemovingFromScene() override;
+   [[reflgen::script_internal]]
    virtual void OnUninitializing() override;
 
    void SetSprite(const own::shared_owner<const Texture>& ptr);
+   [[reflgen::script_internal]]
    void OnDeserialized(); // CT6-d: 스프라이트 텍스처 로드(구 팩토리 분기)
 
 

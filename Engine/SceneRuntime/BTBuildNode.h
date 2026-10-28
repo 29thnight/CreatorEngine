@@ -5,7 +5,7 @@
 #include "BTEnum.h"
 
 
-struct [[reflgen::reflect]] BTBuildNode
+struct [[reflgen::reflect, reflgen::public_methods]] BTBuildNode
 {
    public:
 	BTBuildNode() = default;

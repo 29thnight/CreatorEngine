@@ -20,7 +20,7 @@ namespace assets
 {
     // Compatible raw decode identity. Logical IDs, source paths and resolver
     // revisions deliberately do not participate in geometry sharing.
-    struct ModelGeometryKey final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelGeometryKey final
     {
         experiment::cooked::Sha256Digest contentSha256{};
         std::uint64_t byteSize{};
@@ -34,7 +34,7 @@ namespace assets
         friend auto operator<=>(const ModelGeometryKey&, const ModelGeometryKey&) = default;
     };
 
-    struct ModelMeshletSummary final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelMeshletSummary final
     {
         experiment::MeshletBuildSettings settings{};
         experiment::MeshletGeometryDigest geometryDigest{};
@@ -76,7 +76,7 @@ namespace assets
         [[nodiscard]] bool HasMeshlets() const noexcept { return descriptorCount != 0u; }
     };
 
-    struct ModelMeshLodSummary final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelMeshLodSummary final
     {
         float geometricError{};
         std::uint32_t indexCount{};
@@ -86,7 +86,7 @@ namespace assets
 
     // Immutable render metadata. Original vertices/indices and meshlet
     // connectivity remain outside this descriptor, including streamed meshes.
-    struct ModelMeshDescriptor final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelMeshDescriptor final
     {
         // entry/revisions identify this logical generation and hard closure.
         // blob.artifactPath + byteSource are a matched, verified exact backing

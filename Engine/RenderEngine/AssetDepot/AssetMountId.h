@@ -5,7 +5,7 @@
 namespace AssetDepot
 {
     // A lookup token, not ownership of a mount or its artifact backing.
-    struct AssetMountId final
+    struct [[reflgen::runtime]] AssetMountId final
     {
         std::uint64_t value{};
 

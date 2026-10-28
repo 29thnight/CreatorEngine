@@ -54,7 +54,7 @@
 // 맞춘 것이다.
 
 /// 서브리소스 하나(밉 하나 x 배열 원소 하나)의 CPU 픽셀. 소유하지 않는다.
-struct TextureSubimage
+struct [[reflgen::runtime]] TextureSubimage
 {
     const std::byte* pixels{ nullptr };
     size_t   rowPitch{ 0 };    ///< 압축이면 '블록 한 줄'의 바이트 수
@@ -79,7 +79,7 @@ inline void CopyImageRows(std::byte* destination, size_t destinationPitch,
 
 // Small image description. It contains no subresource pointers and remains valid
 // when the independently cached CPU payload has been evicted.
-struct TextureImageDescription final
+struct [[reflgen::runtime]] TextureImageDescription final
 {
     RHIFormat format{ RHIFormat::Unknown };
     uint32_t width{};
@@ -102,7 +102,7 @@ struct TextureImageDescription final
 ///
 /// RHI 경계를 넘는 것은 이 타입이다. 값으로 들고 다녀도 싼 크기지만(포인터
 /// 하나 + 서술자), 가리키는 픽셀보다 오래 살면 안 된다.
-class TextureImageView
+class [[reflgen::runtime]] TextureImageView
 {
 public:
     TextureImageView() = default;
@@ -166,7 +166,7 @@ private:
 /// 복사를 막는다 — 서브리소스가 자기 픽셀 버퍼 안을 가리키므로 복사하면 그
 /// 포인터가 원본을 가리킨 채 남는다. 이동은 안전하다(vector 이동은 버퍼
 /// 주소를 보존한다).
-class TextureImage
+class [[reflgen::runtime]] TextureImage
 {
 public:
     TextureImage() = default;

@@ -96,12 +96,12 @@ namespace assets::cluster
         ce::segmented_deque<ce::unique_func<void()>> m_queue;
         ce::dynamic_array<std::jthread> m_workers;
     };
-    struct StreamBudget
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] StreamBudget
     {
         uint64_t residentBytes{32ull << 20}, uploadBytes{1ull << 20};
         uint64_t residencyAlignment{1};
     };
-    struct ResidentSet
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ResidentSet
     {
         uint64_t revision{}, bytes{}, uploadedBytes{}, evictions{}, readFailures{};
         uint64_t residencyAlignment{1}, residentLimit{};

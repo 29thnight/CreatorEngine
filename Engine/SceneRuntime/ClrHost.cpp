@@ -28,6 +28,7 @@ import Creator.Core.Uuid;
 #include "ScriptPhysicsABI.h"
 #include "ScriptApiTable.h"
 #include "ScriptBindingRegistry.h"
+#include "ScriptReflectionBindings.h"
 #include <stddef.h>
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "Transform.h"
@@ -123,7 +124,7 @@ namespace
     static_assert(offsetof(ScriptApiTable, Camera_NotifyCameraCut)
         == offsetof(ScriptApiTable, Body_ShapeRole) + sizeof(decltype(ScriptApiTable::Body_ShapeRole)));
     static_assert(sizeof(ScriptApiTable)
-        == offsetof(ScriptApiTable, Decal_SetFloat) + sizeof(decltype(ScriptApiTable::Decal_SetFloat)));
+        == offsetof(ScriptApiTable, NativeReflection_Release) + sizeof(decltype(ScriptApiTable::NativeReflection_Release)));
 
 	ScriptApiTable g_apiTable{};
 
@@ -2598,6 +2599,7 @@ namespace
 
         ce::script::binding::RegisterEntityApi(g_apiTable);
         ce::script::binding::RegisterTransformApi(g_apiTable);
+        ce::script::binding::RegisterReflectionApi(g_apiTable);
         g_apiTable.ExtraComponent_Exists = &Api_ExtraComponent_Exists;
         g_apiTable.ExtraComponent_GetEnabled = &Api_ExtraComponent_GetEnabled;
         g_apiTable.ExtraComponent_SetEnabled = &Api_ExtraComponent_SetEnabled;
@@ -2829,6 +2831,7 @@ bool ClrHost::Initialize()
 #endif
 	if (0 != initResult)
 	{
+        ce::script::binding::EndReflectionSession();
         ScriptObjectRegistry::Get().EndAssetSession();
 		char buffer[256]{};
 		std::snprintf(buffer, sizeof(buffer),
@@ -2985,6 +2988,7 @@ void ClrHost::Shutdown()
 {
     if (!m_ready)
     {
+        ce::script::binding::EndReflectionSession();
         ScriptObjectRegistry::Get().EndAssetSession();
         return;
     }
@@ -2994,6 +2998,7 @@ void ClrHost::Shutdown()
     {
         m_fnFSharpUnbind();
     }
+    ce::script::binding::EndReflectionSession();
     ScriptObjectRegistry::Get().EndAssetSession();
 
 	m_ready = false;

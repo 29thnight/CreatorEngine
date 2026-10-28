@@ -3,7 +3,7 @@
 #include "Component.h"
 #include "KeyState.h"
 class ActionMap;
-class [[reflgen::reflect]] PlayerInputComponent : public meta::identity<PlayerInputComponent, Component>
+class [[reflgen::reflect, reflgen::public_methods]] PlayerInputComponent : public meta::identity<PlayerInputComponent, Component>
 {
    public:
     [[reflgen::ignore]]

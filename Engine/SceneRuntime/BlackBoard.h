@@ -14,7 +14,7 @@ import Creator.Core.Delegate;
 class Entity;
 class Transform;
 class MenuBarWindow;
-class BlackBoard
+class [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] BlackBoard
 {
 public:
 	// Setters

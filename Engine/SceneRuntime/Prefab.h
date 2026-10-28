@@ -7,7 +7,7 @@
 #include "SceneManager.h"
 #include "ComponentFactory.h"
 
-class [[reflgen::reflect]] Prefab : public Object
+class [[reflgen::reflect, reflgen::public_methods]] Prefab : public Object
 {
    friend struct reflgen::access;
 public:

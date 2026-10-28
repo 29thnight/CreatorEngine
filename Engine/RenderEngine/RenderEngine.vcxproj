@@ -1069,4 +1069,10 @@
     <ClInclude Include="RHI\DX12\DX12SubresourceRange.h" />
     <ClInclude Include="RHI\Vulkan\VulkanSharedDisplayImage.h" />
   </ItemGroup>
+  <!-- These public runtime value headers must be explicit generator inputs;
+       reaching their definitions through a component include is insufficient. -->
+  <ItemGroup>
+    <ClInclude Include="Assets\ModelCpuGeometry.h" />
+    <ClInclude Include="Assets\TextureSampler.h" />
+  </ItemGroup>
 </Project>

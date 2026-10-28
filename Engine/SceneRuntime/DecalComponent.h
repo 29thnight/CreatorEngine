@@ -11,7 +11,7 @@ import Creator.Core.Ownership;
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 class Texture;
-class [[reflgen::reflect]] DecalComponent : public meta::identity<DecalComponent, Component>
+class [[reflgen::reflect, reflgen::public_methods]] DecalComponent : public meta::identity<DecalComponent, Component>
 {
    friend struct reflgen::access;
    public:
@@ -24,14 +24,18 @@ class [[reflgen::reflect]] DecalComponent : public meta::identity<DecalComponent
 public:
     DecalComponent() = default;
 
+    [[reflgen::script_internal]]
     void OnInitialized() override;
+    [[reflgen::script_internal]]
     void OnUninitializing() override;
 
     // 트랙 C3: 가상 Update 오버라이드를 걷어내고 DecalSystem(조밀 벡터, 전용
     // 틱)으로 옮겼다 — 등록/해지는 씬 편입/이탈 훅으로 한다(DDOL 안전, 근거는
     // AnimatorSystem.h 주석 참고). OnInitialized/OnUninitializing은 렌더 등록(scene->Collect
     // DecalComponent, RegisterCommand)용으로 그대로 둔다(트랙 범위 밖).
+    [[reflgen::script_internal]]
     void OnAddedToScene() override;
+    [[reflgen::script_internal]]
     void OnRemovingFromScene() override;
 
     void SetDecalTexture(const std::string_view& fileName);

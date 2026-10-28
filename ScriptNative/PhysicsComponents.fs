@@ -42,7 +42,7 @@ type PhysicsShapeState =
 
 [<AllowNullLiteral; Sealed>]
 type PhysicsBodyComponent internal (owner: ObjectHandle, instance: uint64) =
-    inherit NativeComponent(owner)
+    inherit NativeComponent(owner, nativeInstance = instance)
     member _.ComponentId = instance
     override _.Enabled with get () = raise (NotSupportedException("Use Entity.SetEnabled to control native body activation.")) and set _ = raise (NotSupportedException("Use Entity.SetEnabled to control native body activation."))
     member this.ReadState(state: byref<PhysicsBodyState>) =
@@ -123,7 +123,7 @@ type CharacterMovementState =
 
 [<AllowNullLiteral; Sealed>]
 type CharacterMovementComponent internal (owner: ObjectHandle, instance: uint64) =
-    inherit NativeComponent(owner)
+    inherit NativeComponent(owner, nativeInstance = instance)
     member _.ComponentId = instance
     override _.Enabled with get () = raise (NotSupportedException("Use Entity.SetEnabled to control native character activation.")) and set _ = raise (NotSupportedException("Use Entity.SetEnabled to control native character activation."))
     member this.ReadState(state: byref<CharacterMovementState>) =

@@ -31,7 +31,7 @@ var assembly = typeof(Physics).Assembly;
 var native = assembly.GetType("CreatorEngine.Native", true)!;
 var version = native.GetField("ExpectedVersion", BindingFlags.Static | BindingFlags.NonPublic | BindingFlags.Public)!;
 var apiVersion = (int)version.GetRawConstantValue()!;
-Check(apiVersion == 47, "current host ABI version includes extra component bindings");
+Check(apiVersion == 48, "current host ABI version includes recursive native reflection bindings");
 // Validate the current physics PODs and append-only host table together.
 // The camera-cut slot follows the v40 physics extensions without moving them.
 var apiTable = assembly.GetType("CreatorEngine.ScriptApiTable", true)!;
@@ -54,9 +54,13 @@ Check(Offset("Simulation_Submit") == Offset("Simulation_Status") + IntPtr.Size &
     "v43 bounded command and snapshot copy entries are contiguous");
 Check(Offset("ExtraComponent_Exists") == Offset("Simulation_Read") + IntPtr.Size &&
     Offset("ExtraComponent_GetEnabled") == Offset("ExtraComponent_Exists") + IntPtr.Size &&
-    Offset("ExtraComponent_SetEnabled") == Offset("ExtraComponent_GetEnabled") + IntPtr.Size &&
-    Marshal.SizeOf(apiTable) == Offset("ExtraComponent_SetEnabled") + IntPtr.Size,
+    Offset("ExtraComponent_SetEnabled") == Offset("ExtraComponent_GetEnabled") + IntPtr.Size,
     "v46 extra component slots follow simulation exchange");
+Check(Offset("NativeReflection_Execute") == Offset("Decal_SetFloat") + IntPtr.Size &&
+    Offset("NativeReflection_Read") == Offset("NativeReflection_Execute") + IntPtr.Size &&
+    Offset("NativeReflection_Release") == Offset("NativeReflection_Read") + IntPtr.Size &&
+    Marshal.SizeOf(apiTable) == Offset("NativeReflection_Release") + IntPtr.Size,
+    "v48 reflection transport preserves the complete v47 prefix and ends the table");
 Check(Marshal.SizeOf<SimulationStatus>() == 32 && Marshal.SizeOf<SimulationSnapshot>() == 32,
     "v43 simulation value layouts");
 var bodyRemove = apiTable.GetField("Body_Remove")!.FieldType;

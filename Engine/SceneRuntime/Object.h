@@ -8,7 +8,7 @@
 namespace Meta { struct EditorObjectIdentity; }
 class RenderScene;
 class SceneManager;
-class [[reflgen::reflect]] Object : public IObject, public meta::polymorphic
+class [[reflgen::reflect, reflgen::public_methods]] Object : public IObject, public meta::polymorphic
 {
     friend class CookedSceneLoader;
    friend struct reflgen::access;
@@ -37,6 +37,7 @@ public:
 
 public:
     size_t GetInstanceID() const override final { return m_instanceID.m_ID_Data; }
+    [[reflgen::script_internal]]
     void MakeInstanceID() { TypeTrait::GUIDCreator::EraseGUID(m_instanceID); m_instanceID = make_guid(); }
 	HashedGuid GetTypeID() const override final { return m_typeID; }
     std::string ToString() const override final { return m_name; }
@@ -86,6 +87,6 @@ protected:
     // 훅이 전이 시점에 불리게 바뀐 뒤로(PHASE 9-2) 이 필드를 밖에서 직접 쓰는 것은
     // 곧 생명주기를 건너뛰는 것이다. 인스펙터 체크박스가 실제로 그러고 있었다.
     // 그래서 리플렉션은 이 필드를 그리지 않는다(hidden) — 전용 체크박스가 SetEnabled 를 거친다.
-    [[reflgen::hidden]]
+    [[reflgen::hidden, reflgen::readonly]]
     bool                    m_isEnabled{ true };
 };

@@ -14,7 +14,7 @@ namespace assets
 {
     // One identity-free skeleton decode. Logical generations borrow the same
     // immutable arrays, but never inherit another generation's origin or ID.
-    struct ModelSkeletonStorage final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelSkeletonStorage final
     {
         ModelSkeletonAsset skeleton{}; // skeletonId stays nil in shared storage.
         experiment::cooked::Sha256Digest boneLayoutSha256{};
@@ -29,7 +29,7 @@ namespace assets
 
     // Logical skeleton generation. Identity is origin.entry.asset; the legacy
     // sampling adapter below deliberately carries no logical skeletonId.
-    struct ModelSkeletonPayload final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelSkeletonPayload final
     {
         ModelSkeletonPayload(own::shared_owner<const ModelSkeletonStorage> decoded,
             experiment::cooked::ResolvedAssetEntry resolved, std::size_t charge)

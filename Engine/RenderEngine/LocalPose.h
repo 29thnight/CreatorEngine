@@ -21,7 +21,7 @@ namespace Animation
         return count;
     }
     // Local-space animation value. Scale keeps all three authored axes.
-    struct LocalTransform final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] LocalTransform final
     {
         math::vector3 m_translation{};
         math::quaternion m_rotation{ 0.f, 0.f, 0.f, 1.f };
@@ -57,7 +57,7 @@ namespace Animation
     // Scale deltas are differences so zero and signed reference scales remain
     // representable. Rotation composition follows math::quaternion's row-vector
     // convention: reference * delta == source.
-    struct AdditiveDelta final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] AdditiveDelta final
     {
         math::vector3 m_translation{};
         math::quaternion m_rotation{ 0.f, 0.f, 0.f, 1.f };
@@ -85,7 +85,7 @@ namespace Animation
 
     // Bone-indexed SoA pose. Final output belongs to an instance; evaluation
     // scratch belongs to the executing worker and reuses capacity across jobs.
-    class LocalPose final
+    class [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] LocalPose final
     {
     public:
         void Resize(std::size_t count)

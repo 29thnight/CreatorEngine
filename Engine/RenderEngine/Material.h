@@ -43,7 +43,7 @@ enum class MaterialRenderingMode
 
 // Model-facing authoring facade. Accepted execution values, shader contracts
 // and texture generations are owned by LX::Runtime::Instance.
-class [[reflgen::reflect]] Material : private Diagnostics::CountedResource<Diagnostics::EngineResource::Material>
+class [[reflgen::reflect, reflgen::public_methods]] Material : private Diagnostics::CountedResource<Diagnostics::EngineResource::Material>
 {
    public:
 public:
@@ -59,6 +59,7 @@ public:
         return m_materialGraphInstance;
     }
     bool HasMaterialGraph() const { return !!m_materialGraphInstance; }
+    [[reflgen::script_internal]]
     void TagEditorPlacement(std::uint64_t id, double startMs, std::shared_ptr<std::atomic<bool>> previewSubmitted = {})
     {
         if (!m_materialGraphInstance || !id) return;
@@ -68,6 +69,7 @@ public:
         instance->editorPreviewSubmitted = std::move(previewSubmitted);
         m_materialGraphInstance = std::move(instance);
     }
+    [[reflgen::script_internal]]
     void MarkEditorPreview(experiment::AssetId sourceGraph = {}, std::string sourceBlend = "opaque")
     {
         if (!m_materialGraphInstance) return;
@@ -124,6 +126,7 @@ public:
 	Material& UseTextureMap(std::string_view property, own::shared_owner<const Texture> texture);
     bool ReplaceTextureOwner(const Texture* previous, const own::shared_owner<const Texture>& replacement,
         std::string& error);
+    [[reflgen::script_internal]]
     bool ReloadCodeShader(own::shared_owner<const LX::Runtime::ShaderGeneration> shader, std::string& error);
 
 	const own::shared_owner<const Texture>& GetTextureMapShared(
@@ -145,6 +148,7 @@ public:
 
 	// M5: ShaderMeta의 논리 schema와 M7의 Slang reflection layout을 결합한다.
 	// Material은 layout의 소유 복사본을 공유하므로 meta/cache 주소 수명에 기대지 않는다.
+	[[reflgen::script_internal]]
 	bool ConfigureShaderProperties(const ShaderMeta& meta,
 		const ShaderMetaBindingLayout& layout, std::string& outError,
 		ShaderMetaHandle shaderMetaHandle);

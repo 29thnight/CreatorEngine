@@ -8,7 +8,7 @@ namespace assets::cpu_geometry
 {
 // Exact rest-pose positions and original LOD0 indices. No normals, UVs,
 // meshlets, coarse LODs, material data or decoded GPU pages are retained.
-struct Geometry
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Geometry
 {
     ce::dynamic_array<math::vector3> positions;
     ce::dynamic_array<uint32_t> indices;

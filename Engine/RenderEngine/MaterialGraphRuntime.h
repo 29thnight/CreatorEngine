@@ -33,7 +33,7 @@ namespace experiment::cooked
 
 namespace material_graph
 {
-    struct Generation
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Generation
     {
         experiment::AssetId assetId;
         std::uint64_t generation{};
@@ -197,20 +197,20 @@ namespace material_graph
                               const experiment::cooked::ArtifactByteSource& bytes, const experiment::AssetId& id,
                               const LX::LXMaterialAsset* source, CookedProgram& result, std::string& error);
 
-    struct TextureOverride
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] TextureOverride
     {
         LX::Id parameter{};
         experiment::AssetId assetId;
     };
 
-    struct InstanceDescription
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] InstanceDescription
     {
         experiment::AssetId graphId;
         ce::dynamic_array<ParameterOverride> parameters;
         ce::dynamic_array<TextureOverride> textures;
     };
 
-    struct InstanceTexture
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] InstanceTexture
     {
         std::uint32_t slot{};
         experiment::AssetId assetId;
@@ -219,7 +219,7 @@ namespace material_graph
         own::shared_owner<const Texture> owner;
     };
 
-    struct Instance : LX::Runtime::Instance
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Instance : LX::Runtime::Instance
     {
         // Transient Editor placement only. Never serialized or used by Player.
         bool editorPreview{};
@@ -240,7 +240,7 @@ namespace material_graph
 
     // Disk values contain stable parameter IDs and typed values, never byte offsets
     // or runtime generation numbers. Generated ShaderMeta is derived from the graph.
-    struct InstanceDocument
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] InstanceDocument
     {
         std::string name;
         experiment::AssetId materialId;

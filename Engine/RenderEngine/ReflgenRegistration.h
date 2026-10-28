@@ -18,4 +18,16 @@ import Creator.Core.Ownership;
 //   ② 반영 header 가 전방 선언만 하는 필드 타입의 정의 — 서술된 타입이 여기서 불완전하면 그 서술(생성된 describe())이
 //      실체화되며 컴파일이 멈춘다. 새로 생기면 그 타입의 header 를 여기에 더한다.
 #include "../Utility_Framework/Reflection/ReflectionTypedYml.h"
+#include "../Utility_Framework/Reflection/ScriptReflectionValues.h"
 #include "Material.h" // MeshRenderer::m_Material(own::shared_owner<Material>) — MeshRenderer.h 는 전방 선언만 한다
+#include "ScriptReflectionValueTypes.h"
+#include "ScriptReflectionLattice.h"
+#include "ScriptReflectionShaderBytes.h"
+// Complete forward-only public values in every canonical descriptor TU. A
+// pointer to an incomplete type would otherwise quietly acquire an opaque view.
+#include "MaterialGraphShaderMeta.h"
+#include "AssetDepot/MaterialAssetRuntime.h"
+#include "AssetDepot/TextureAssetRuntime.h"
+#include "FontAsset.h"
+#include "Assets/ModelMeshDescriptor.h"
+#include "Assets/ModelAnimationDescriptor.h"

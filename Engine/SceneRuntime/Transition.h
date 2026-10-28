@@ -5,7 +5,7 @@
 namespace FSM  
 {  
 	class FSMState;  // Forward declaration of FSMState class
-	class Transition  
+	class [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Transition
 	{  
 	public:  
 		Transition(FSMState* from, FSMState* to, ::ConditionFunc condition)  

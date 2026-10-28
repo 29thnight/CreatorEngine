@@ -23,6 +23,11 @@ namespace
     int logLine = 0;
 
     void __stdcall Unused() {}
+    // This ABI fixture does not provide a reflection catalog. Typed stubs keep
+    // the required slots valid and reject accidental reflection calls safely.
+    std::uint64_t __stdcall ReflectionExecute(ScriptObjectHandle, const char*, int) { return 0; }
+    int __stdcall ReflectionRead(std::uint64_t, char*, int) { return -1; }
+    void __stdcall ReflectionRelease(std::uint64_t) {}
     template<typename T>
     void SetUnused(T& slot)
     {
@@ -302,6 +307,9 @@ extern "C" __declspec(dllexport) ScriptApiTable* __cdecl ProbeTable()
     table.Transform_GetLocalPosition = &GetPosition;
     table.Transform_SetLocalPosition = &SetPosition;
     table.Transform_AddLocalPosition = &AddPosition;
+    table.NativeReflection_Execute = &ReflectionExecute;
+    table.NativeReflection_Read = &ReflectionRead;
+    table.NativeReflection_Release = &ReflectionRelease;
     return &table;
 }
 
@@ -326,6 +334,9 @@ extern "C" __declspec(dllexport) ScriptApiTable* __cdecl ProbeHeadlessTable()
     SetUnused(table.ExtraComponent_Exists);
     SetUnused(table.ExtraComponent_GetEnabled);
     SetUnused(table.ExtraComponent_SetEnabled);
+    table.NativeReflection_Execute = &ReflectionExecute;
+    table.NativeReflection_Read = &ReflectionRead;
+    table.NativeReflection_Release = &ReflectionRelease;
     table.Entity_IsAlive = &IsAlive;
     return &table;
 }
@@ -333,6 +344,13 @@ extern "C" __declspec(dllexport) ScriptApiTable* __cdecl ProbeHeadlessTable()
 extern "C" __declspec(dllexport) void __cdecl ProbeMissingRequiredSlot()
 {
     table.Simulation_Read = nullptr;
+}
+
+extern "C" __declspec(dllexport) void __cdecl ProbeMissingReflectionSlot(int slot)
+{
+    if (slot == 0) table.NativeReflection_Execute = nullptr;
+    else if (slot == 1) table.NativeReflection_Read = nullptr;
+    else if (slot == 2) table.NativeReflection_Release = nullptr;
 }
 
 extern "C" __declspec(dllexport) int __cdecl ProbeInitialize(

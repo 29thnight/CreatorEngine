@@ -1,0 +1,142 @@
+name: Native reflection and F# contracts
+
+on:
+  push:
+    paths:
+      - 'Engine/SceneRuntime/**'
+      - 'Engine/RenderEngine/**'
+      - 'Engine/Physics/**'
+      - 'Engine/Audio/**'
+      - 'Lattice/**'
+      - 'Engine/Contracts/**'
+      - 'Engine/Platform/WindowsSDK/**'
+      - 'Engine/Containers/**'
+      - 'ThirdParty/Mathematics/**'
+      - 'ThirdParty/ownership_cpp/**'
+      - 'Engine/Utility_Framework/**'
+      - 'ScriptNative/**'
+      - 'ScriptNative.AudioValues/**'
+      - 'Tools/build/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'vcpkg.json'
+      - 'Tools/build/ModuleAdapters/**'
+      - 'Tools/build/Contracts.targets'
+      - 'Tools/build/Windows*.props'
+      - 'Tools/regression/ScriptReflectionProbe/**'
+      - 'Tools/regression/verify-native-reflection-inventory.py'
+      - 'Tools/regression/verify-native-reflection-ownership.py'
+      - 'Tools/regression/verify-native-reflection-surface.py'
+      - 'Directory.Build.*'
+      - 'ports/reflgen/**'
+      - '.github/workflows/native-reflection-contracts.yml'
+  pull_request:
+    paths:
+      - 'Engine/SceneRuntime/**'
+      - 'Engine/RenderEngine/**'
+      - 'Engine/Physics/**'
+      - 'Engine/Audio/**'
+      - 'Lattice/**'
+      - 'Engine/Contracts/**'
+      - 'Engine/Platform/WindowsSDK/**'
+      - 'Engine/Containers/**'
+      - 'ThirdParty/Mathematics/**'
+      - 'ThirdParty/ownership_cpp/**'
+      - 'Engine/Utility_Framework/**'
+      - 'ScriptNative/**'
+      - 'ScriptNative.AudioValues/**'
+      - 'Tools/build/**'
+      - 'Directory.Build.props'
+      - 'Directory.Build.targets'
+      - 'vcpkg.json'
+      - 'Tools/build/ModuleAdapters/**'
+      - 'Tools/build/Contracts.targets'
+      - 'Tools/build/Windows*.props'
+      - 'Tools/regression/ScriptReflectionProbe/**'
+      - 'Tools/regression/verify-native-reflection-inventory.py'
+      - 'Tools/regression/verify-native-reflection-ownership.py'
+      - 'Tools/regression/verify-native-reflection-surface.py'
+      - 'Directory.Build.*'
+      - 'ports/reflgen/**'
+      - '.github/workflows/native-reflection-contracts.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  native-fsharp:
+    runs-on: windows-2025-vs2026
+    strategy:
+      fail-fast: false
+      matrix:
+        configuration: [Debug, Release]
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Read the engine's pinned reflgen revision
+        id: reflgen
+        shell: pwsh
+        run: |
+          $port = Get-Content ports/reflgen/portfile.cmake -Raw
+          $match = [regex]::Match($port, 'REPO\s+29thnight/reflgen_cpp\s+REF\s+([0-9a-f]{40})')
+          if (!$match.Success) { throw 'The engine must pin an exact reflgen commit.' }
+          "revision=$($match.Groups[1].Value)" >> $env:GITHUB_OUTPUT
+          $manifest = Get-Content vcpkg.json -Raw | ConvertFrom-Json
+          "vcpkg=$($manifest.'builtin-baseline')" >> $env:GITHUB_OUTPUT
+        with:
+          repository: 29thnight/reflgen_cpp
+          ref: ${{ steps.reflgen.outputs.revision }}
+          path: Build/ReflectionDependency
+        with:
+          repository: microsoft/vcpkg
+          ref: ${{ steps.reflgen.outputs.vcpkg }}
+          path: Build/ReflectionVcpkg
+      - name: Bootstrap pinned dependency manager
+        shell: pwsh
+        run: |
+          & ./Build/ReflectionVcpkg/bootstrap-vcpkg.bat -disableMetrics
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Build native service and execute F# contracts
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $vswhere = Join-Path ${env:ProgramFiles(x86)} 'Microsoft Visual Studio/Installer/vswhere.exe'
+          $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+          Import-Module (Join-Path $vs 'Common7/Tools/Microsoft.VisualStudio.DevShell.dll')
+          Enter-VsDevShell -VsInstallPath $vs -SkipAutomaticLocation -DevCmdArguments '-arch=x64 -host_arch=x64' | Out-Null
+          $dependency = Join-Path $env:GITHUB_WORKSPACE 'Build/ReflectionDependency'
+          $generatorBuild = Join-Path $env:RUNNER_TEMP 'ReflectionGenerator'
+          $probeBuild = Join-Path $env:RUNNER_TEMP 'NativeReflectionContracts'
+          cmake -S $dependency -B $generatorBuild -G Ninja -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=Release -DREFLGEN_BUILD_TESTS=OFF -DREFLGEN_BUILD_EXAMPLES=OFF -DREFLGEN_BUILD_IFC=OFF
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build $generatorBuild --target reflgen_cli --parallel 4
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          $generator = Join-Path $generatorBuild 'generator/reflgen.exe'
+          cmake -S Tools/regression/ScriptReflectionProbe -B $probeBuild -G Ninja -DCMAKE_CXX_COMPILER=cl -DCMAKE_BUILD_TYPE=${{ matrix.configuration }} "-DREFLGEN_EXECUTABLE=$generator" "-DREFLGEN_INCLUDE_DIR=$dependency/include"
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          cmake --build $probeBuild --parallel 4
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          ctest --test-dir $probeBuild --output-on-failure --no-tests=error
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          python Tools/regression/verify-native-reflection-surface.py --generator $generator --reflgen-root $dependency --vcpkg (Join-Path $env:GITHUB_WORKSPACE 'Build/ReflectionVcpkg/vcpkg.exe') --configuration ${{ matrix.configuration }} --work (Join-Path $env:RUNNER_TEMP 'NativeReflectionSurface')
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: native-reflection-${{ matrix.configuration }}
+          path: |
+            ${{ runner.temp }}/NativeReflectionContracts/Testing/Temporary/
+            ${{ runner.temp }}/NativeReflectionContracts/managed/
+            ${{ runner.temp }}/NativeReflectionSurface/logs/
+            ${{ runner.temp }}/NativeReflectionSurface/commands/
+            ${{ runner.temp }}/NativeReflectionSurface/generated/
+            ${{ runner.temp }}/NativeReflectionSurface/result.json
+            ${{ runner.temp }}/NativeReflectionSurface/ownership.json
+          if-no-files-found: warn

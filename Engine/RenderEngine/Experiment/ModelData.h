@@ -84,7 +84,7 @@ namespace experiment
 	// 기존 FileGuid의 바이트 정체성과 호환되지만, 실험 구조가 TypeTrait의 전역
 	// alias/macro 표면을 열지 않도록 UUID 값만 직접 소유한다. 이후 adapter는
 	// FileGuid::m_guid와 명시적으로 왕복한다.
-	struct AssetId final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] AssetId final
 	{
 		uuid::uuid16 value{};
 
@@ -114,7 +114,7 @@ namespace experiment
 	//     merge 에서 원점을 끌어들였다 — 새 규약이 맞다.
 	//     min/max 로 만들 때는 반드시 math::aabb::from_min_max 를 쓴다.
 
-	struct BoneInfluence final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] BoneInfluence final
 	{
 		BoneIndex bone{};
 		float weight{};
@@ -127,7 +127,7 @@ namespace experiment
 	inline constexpr std::uint32_t MaxPackedBoneIndex =
 		static_cast<std::uint32_t>(InvalidPackedBoneIndex) - 1u;
 
-	struct Vertex final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Vertex final
 	{
 		math::vector3 position{};
 		math::vector3 normal{};
@@ -160,7 +160,7 @@ namespace experiment
 	// 메시별 interleaved 정점 저장소. 논리 Vertex는 CPU 검사/변환 값이고 실제
 	// 저장 바이트는 attribute mask가 정한다. 따라서 static mesh는 core 48B만,
 	// skinned mesh는 68B를 내며 uv1/color는 원본에 있을 때만 붙는다.
-	class VertexBuffer final
+	class [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] VertexBuffer final
 	{
 	public:
 		VertexBuffer() noexcept = default;
@@ -318,7 +318,7 @@ namespace experiment
 
 	// 런타임 Texture*가 아니라 안정 ID + 진단/legacy fallback 경로만 보관한다.
 	// 실제 texture generation의 소유권은 이후 resource adapter가 결정한다.
-	struct TextureReference final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] TextureReference final
 	{
 		AssetId assetId{};
 		std::string logicalName{};
@@ -342,7 +342,7 @@ namespace experiment
 		std::string,
 		TextureReference>;
 
-	struct MaterialProperty final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] MaterialProperty final
 	{
 		std::string name{};
 		MaterialPropertyValue value{};
@@ -358,7 +358,7 @@ namespace experiment
 	// 고정 texture pointer 5개 대신 shader property 이름을 정본으로 삼는다.
 	// M-phase 디스크 정본(shaderMetaGuid + 이름 기반 property + keyword 선택 +
 	// rendering mode)과 1:1 대응하도록 유지한다.
-	struct Material final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Material final
 	{
 		AssetId assetId{};
 		AssetId shaderAssetId{};
@@ -375,7 +375,7 @@ namespace experiment
         own::shared_owner<const AssetDepot::MaterialDocumentAssetOrigin> assetOrigin{};
 	};
 
-	struct Mesh final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Mesh final
 	{
 		std::string name{};
 		MaterialIndex material{};
@@ -393,7 +393,7 @@ namespace experiment
 	// parent 하나만 hierarchy 정본이다. children/count 중복 저장을 없앴고,
 	// validation은 parent가 항상 자기보다 앞선 index임을 강제한다. 따라서 향후
 	// Scene adapter는 단일 순회로 parent EntityHandle을 안전하게 찾을 수 있다.
-	struct ModelNode final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelNode final
 	{
 		std::string name{};
 		NodeIndex parent{};
@@ -403,13 +403,13 @@ namespace experiment
 		ce::dynamic_array<MeshIndex> meshes{};
 	};
 
-	struct TranslationKey final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] TranslationKey final
 	{
 		double time{};
 		math::vector3 value{};
 	};
 
-	struct RotationKey final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] RotationKey final
 	{
 		double time{};
 		// ★ vector4 가 아니라 quaternion 이다. 크기는 같지만 규약이 다르다 —
@@ -418,7 +418,7 @@ namespace experiment
 		math::quaternion quaternion{};
 	};
 
-	struct ScaleKey final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ScaleKey final
 	{
 		double time{};
 		math::vector3 value{ 1.0f, 1.0f, 1.0f };
@@ -435,7 +435,7 @@ namespace experiment
 		Step,
 	};
 
-	struct AnimationChannel final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] AnimationChannel final
 	{
 		BoneIndex bone{};
 		// 트랙마다 따로 둔다 — glTF는 sampler가 트랙 단위이므로 한 채널 안에서
@@ -448,7 +448,7 @@ namespace experiment
 		ce::dynamic_array<ScaleKey> scales{};
 	};
 
-	struct AnimationClip final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] AnimationClip final
 	{
 		std::string name{};
 		double durationTicks{};
@@ -457,14 +457,14 @@ namespace experiment
 		ce::dynamic_array<AnimationChannel> channels{};
 	};
 
-	struct Bone final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Bone final
 	{
 		std::string name{};
 		BoneIndex parent{};
 		math::matrix4x4 inverseBindMatrix{ math::matrix4x4::identity() };
 	};
 
-	struct Skeleton final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Skeleton final
 	{
 		BoneIndex rootBone{};
 		math::matrix4x4 rootTransform{ math::matrix4x4::identity() };
@@ -476,7 +476,7 @@ namespace experiment
 	// Skeleton 포인터를 소유하지 않는다. Model이 Skeleton과 AnimatorData를 같은
 	// immutable generation 안에서 값으로 보유하고, loader validation이 둘의 관계를
 	// 검사한다. skeleton-only bind pose도 합법이므로 이 값 자체가 optional이다.
-	struct AnimatorData final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] AnimatorData final
 	{
 		AssetId motionAssetId{};
 		AnimationClipIndex defaultClip{};
@@ -488,7 +488,7 @@ namespace experiment
 		Cooked,
 	};
 
-	struct ModelMetadata final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelMetadata final
 	{
 		AssetId assetId{};
 		std::string name{};
@@ -500,7 +500,7 @@ namespace experiment
 
 	// Decoder만 수정할 수 있는 완전 소유 staging 값이다. ModelLoader는 이 전체를
 	// 검증한 뒤 한 번에 immutable Model generation으로 move한다.
-	struct ModelDraft final
+	struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ModelDraft final
 	{
 		ModelMetadata metadata{};
 		ce::dynamic_array<ModelNode> nodes{};

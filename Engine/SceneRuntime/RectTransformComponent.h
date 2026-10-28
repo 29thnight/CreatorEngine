@@ -38,7 +38,7 @@ const AnchorPresetEntry* GetAnchorPresetTable();
 size_t GetAnchorPresetCount();
 const AnchorPresetEntry& GetAnchorPresetEntry(AnchorPreset preset);
 
-class [[reflgen::reflect]] RectTransformComponent : public meta::identity<RectTransformComponent, Component>
+class [[reflgen::reflect, reflgen::public_methods]] RectTransformComponent : public meta::identity<RectTransformComponent, Component>
 {
    friend struct reflgen::access;
    public:
@@ -104,6 +104,7 @@ public:
     float GetLayoutScale() const { return m_layoutScale; }
     void SetLayoutScale(float scale, bool publishDomain = true);
 
+    [[reflgen::script_internal]]
     void OnPropertyChanged(std::string_view propertyName,
         Meta::PropertyChangeSource source);
 

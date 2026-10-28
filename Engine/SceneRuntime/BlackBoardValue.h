@@ -6,7 +6,7 @@
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "BlackBoardEnum.h"
 
-struct [[reflgen::reflect]] BlackBoardValue
+struct [[reflgen::reflect, reflgen::public_methods]] BlackBoardValue
 {
    public:
 	BlackBoardValue() = default;

@@ -16,7 +16,7 @@
 // 필요해졌는데, 그 헤더는 Camera·RenderPassData·프록시 계층을 통째로 끌고 온다.
 // ScriptBinder의 어느 헤더도 그것을 include하지 않는 것이 이 저장소의 규약이라
 // 정의를 .cpp로 옮겼다.
-class [[reflgen::reflect]] LightComponent : public meta::identity<LightComponent, Component>
+class [[reflgen::reflect, reflgen::public_methods]] LightComponent : public meta::identity<LightComponent, Component>
 {
     public:
     [[reflgen::ignore]]
@@ -27,6 +27,7 @@ class [[reflgen::reflect]] LightComponent : public meta::identity<LightComponent
 
 public:
     // CT6-d: 팩토리 분기의 강제 활성 보존
+    [[reflgen::script_internal]]
     void OnDeserialized() { SetEnabled(true); }
 
 	LightComponent() = default;
@@ -77,14 +78,18 @@ public:
 		PublishRenderPropertyWrite(ProxyDirty::Payload);
 	}
 
+    [[reflgen::script_internal]]
     void OnInitialized() override;
     // 트랙 렌더: 가상 Update 오버라이드를 걷어내고 LightSystem(조밀 벡터,
     // 전용 틱)으로 옮겼다 — 등록/해지는 씬 편입/이탈 훅으로 한다(DDOL 안전,
     // 근거는 AnimatorSystem.h 상단 주석 참고). 렌더 프록시 갱신은 X8부터
     // LightSystem에서 직접 실행하지 않고 dirty 발행 뒤 Scene의 final commit이
     // 담당한다.
+    [[reflgen::script_internal]]
     void OnAddedToScene() override;
+    [[reflgen::script_internal]]
     void OnRemovingFromScene() override;
+    [[reflgen::script_internal]]
     void OnUninitializing() override;
 
 	math::aabb GetEditorBoundingBox() const

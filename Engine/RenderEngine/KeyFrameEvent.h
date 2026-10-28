@@ -1,7 +1,7 @@
 #pragma once
 #include "../Utility_Framework/Reflection/Reflection.hpp" // CT3: was transitive via Core.Minimal.h
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
-class [[reflgen::reflect]] KeyFrameEvent
+class [[reflgen::reflect, reflgen::public_methods]] KeyFrameEvent
 {
    public:
 public:

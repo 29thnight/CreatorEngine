@@ -17,7 +17,7 @@ namespace experiment::cooked
     inline constexpr std::size_t kCodeProgramMaxBytes = 160u * 1024u * 1024u;
     inline constexpr std::size_t kCodeProgramMaxVariants = 4096u;
 
-    struct CodeProgramInput final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] CodeProgramInput final
     {
         // Canonical, Assets-relative path; actual captured bytes never ship.
         std::string path;
@@ -26,7 +26,7 @@ namespace experiment::cooked
         bool operator==(const CodeProgramInput&) const = default;
     };
 
-    struct CodeProgramStage final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] CodeProgramStage final
     {
         RHIShaderStage stage{};
         std::string entry;
@@ -35,7 +35,7 @@ namespace experiment::cooked
         RHIShaderReflection reflection;
     };
 
-    struct CodeProgramVariant final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] CodeProgramVariant final
     {
         RHIShaderBinary backend{};
         std::uint32_t passIndex{};
@@ -49,7 +49,7 @@ namespace experiment::cooked
 
     // Value-only linked-program product. No source, device, compiler, manager,
     // runtime owner or adopting raw pointer is carried by this representation.
-    struct CodeProgram final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] CodeProgram final
     {
         AssetId programAssetId{};
         AssetId shaderMetaAssetId{};
@@ -65,7 +65,7 @@ namespace experiment::cooked
         ce::dynamic_array<CodeProgramVariant> variants;
     };
 
-    struct AuthoredMaterialDocument final
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] AuthoredMaterialDocument final
     {
         Material material;
         AssetId programAssetId{};

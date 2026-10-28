@@ -67,7 +67,7 @@ type FSharpNativePlayerProbe() =
                     failwith "F# native CCT command did not move"
 
                 Console.WriteLine(
-                    $"[FSHARP_PLAYER_OK] ticks={count} dt={dt} moved={transform.WorldPosition.X - origin} api=47"
+                    $"[FSHARP_PLAYER_OK] ticks={count} dt={dt} moved={transform.WorldPosition.X - origin} api={CreatorEngine.Native.reflgen_creator_script_native.ScriptApiVersion}"
                 )
         with error ->
             Console.WriteLine("[FSHARP_PLAYER_FAIL] " + error.ToString())

@@ -88,7 +88,7 @@ class Material;
 class ModelLoader;
 class MeshOptimizer;
 class Camera;
-class [[reflgen::reflect]] Mesh : public meta::polymorphic, public own::enable_owner_from_this<Mesh>,
+class [[reflgen::reflect, reflgen::public_methods]] Mesh : public meta::polymorphic, public own::enable_owner_from_this<Mesh>,
 	private Diagnostics::CountedResource<Diagnostics::EngineResource::Mesh>
 {
    friend struct reflgen::access;

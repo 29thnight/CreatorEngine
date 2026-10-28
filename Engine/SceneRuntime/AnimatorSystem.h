@@ -89,7 +89,7 @@ struct AnimInstanceHandle final
     std::uint32_t generation{};
 };
 
-struct ControllerPlayback final
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ControllerPlayback final
 {
     AnimationState* currentState{};
     AnimationState* nextState{};
@@ -108,7 +108,7 @@ struct ControllerPlayback final
     float blendingTime{};
 };
 
-struct AnimatorPlaybackControl final
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] AnimatorPlaybackControl final
 {
     float blendT{};
     int nextClipIndex{ -1 };

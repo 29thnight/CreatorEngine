@@ -27,7 +27,7 @@ namespace experiment::cooked
     // address a loose cooked tree or an entry inside a mounted pak. Holding the
     // source owner retains its backing; calling CaptureArtifact/Size/ReadAt is
     // explicit I/O and must not occur during metadata-only mount/root lookup.
-    class ArtifactByteSource
+    class [[reflgen::runtime]] ArtifactByteSource
     {
     public:
         virtual ~ArtifactByteSource() = default;

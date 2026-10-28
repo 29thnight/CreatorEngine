@@ -12,7 +12,7 @@
 
 namespace Meta { enum class PropertyChangeSource : std::uint8_t; }
 
-class [[reflgen::reflect]] Canvas : public meta::identity<Canvas, Component>
+class [[reflgen::reflect, reflgen::public_methods]] Canvas : public meta::identity<Canvas, Component>
 {
    public:
     [[reflgen::ignore]]
@@ -25,13 +25,16 @@ public:
 	Canvas();
 	~Canvas() = default;
 
+	[[reflgen::script_internal]]
 	void OnUninitializing() override;
 
 	// 레인 UI — 가상 Update 오버라이드를 걷어내고 UITickSystem이 부르는 비가상
 	// 진입점으로 옮긴다(UITickSystem.h 상단 주석 참고). 등록/해지는 OnInitialized/OnUninitializing이
 	// 아니라 6단계 씬 편입/이탈 훅에 건다 — DDOL 오브젝트가 씬을 건널 때 OnInitialized가
 	// 다시 불리지 않아 등록부에서 영구 이탈하는 결함을 피하기 위해서다(근거 동일).
+	[[reflgen::script_internal]]
 	void OnAddedToScene() override;
+	[[reflgen::script_internal]]
 	void OnRemovingFromScene() override;
 
 	void AddUIObject(Entity* obj);
@@ -51,7 +54,9 @@ public:
 	float GetPlaneDistance() const { return PlaneDistance; }
 
 	void SetCanvasName(std::string_view name) { CanvasName = name.data(); }
+	[[reflgen::script_internal]]
 	void OnDeserialized(); // CT6-d: UIManager 등록 + prevCanvasName 동기화(구 팩토리 분기)
+	[[reflgen::script_internal]]
 	void OnPropertyChanged(std::string_view propertyName,
 		Meta::PropertyChangeSource source);
 

@@ -2,7 +2,7 @@
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "Component.h"
 
-class [[reflgen::reflect]] InvalidScriptComponent : public meta::identity<InvalidScriptComponent, Component>
+class [[reflgen::reflect, reflgen::public_methods]] InvalidScriptComponent : public meta::identity<InvalidScriptComponent, Component>
 {
    public:
     [[reflgen::ignore]]

@@ -6,7 +6,7 @@
 class Scene;
 
 // Capsule controller owns no rigid-body component. Inputs are world-space velocity in metres/second.
-class [[reflgen::reflect]] CharacterMovementComponent final
+class [[reflgen::reflect, reflgen::public_methods]] CharacterMovementComponent final
     : public meta::identity<CharacterMovementComponent, Component>
 {
     friend class CookedSceneLoader;
@@ -20,12 +20,19 @@ class [[reflgen::reflect]] CharacterMovementComponent final
         Component::gc_trace(tracer);
     }
 
+    [[reflgen::script_internal]]
     void OnAddedToScene() override;
+    [[reflgen::script_internal]]
     void OnRemovingFromScene() override;
+    [[reflgen::script_internal]]
     void OnUninitializing() override;
+    [[reflgen::script_internal]]
     void OnEnable() override;
+    [[reflgen::script_internal]]
     void OnDisable() override;
+    [[reflgen::script_internal]]
     void OnBeforeDeserialize(const Authoring::NodeView& view) const;
+    [[reflgen::script_internal]]
     void OnDeserialized(const Authoring::NodeView& view);
 
     ce::physics::result<ce::physics::character_desc> CaptureCapsule() const;

@@ -16,7 +16,7 @@
 //
 // m_componentType이 비어 있으면 Entity 자신의 프로퍼티(예: m_tag)를 가리키고,
 // 채워져 있으면 그 이름의 컴포넌트 타입에 속한 프로퍼티를 가리킨다.
-struct [[reflgen::reflect]] PrefabOverride
+struct [[reflgen::reflect, reflgen::public_methods]] PrefabOverride
 {
     public:
     PrefabOverride() = default;

@@ -38,7 +38,7 @@ extern ControllerButton ParseControllerButton(const std::string& str);
 extern std::string KeyBoardString(KeyBoard _key);
 extern KeyBoard ParseKeyBoard(const std::string& str);
 
-class [[reflgen::reflect]] InputAction
+class [[reflgen::reflect, reflgen::public_methods]] InputAction
 {
    public:
 public:

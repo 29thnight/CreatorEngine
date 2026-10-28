@@ -18,7 +18,7 @@ enum class error_code : std::uint8_t
     duplicate_command
 };
 
-struct error
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] error
 {
     error_code code;
     std::uint32_t sdk_code = 0;
@@ -29,13 +29,13 @@ struct error
 template<class T>
 using result = std::expected<T, error>;
 
-struct tick_id
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] tick_id
 {
     std::uint64_t value = 0;
     auto operator<=>(const tick_id&) const = default;
 };
 
-struct scene_id
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] scene_id
 {
     std::uint64_t value = 0;
     auto operator<=>(const scene_id&) const = default;
@@ -59,7 +59,7 @@ struct body_tag;
 struct character_tag;
 using body_handle = handle<body_tag>;
 using character_handle = handle<character_tag>;
-struct shape_id
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] shape_id
 {
     std::uint32_t value = 0;
     auto operator<=>(const shape_id&) const = default;

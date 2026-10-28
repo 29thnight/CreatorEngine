@@ -18,7 +18,7 @@ class ScenePhysicsSimulation final
   public:
     using binding_id = std::uint64_t;
 
-    struct character_definition
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] character_definition
     {
         ce::physics::character_desc capsule;
         math::vector3 initial_velocity{};
@@ -29,7 +29,7 @@ class ScenePhysicsSimulation final
         ce::physics::character_motion_memory initial_motion;
     };
 
-    struct character_motion_state
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] character_motion_state
     {
         ce::physics::character_state collision{};
         math::vector3 desired_velocity{};

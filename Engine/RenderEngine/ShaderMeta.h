@@ -49,7 +49,7 @@ using ShaderPropertyDefault = std::variant<
     ce::fixed_array<float, 16>,
     FileGuid>;
 
-struct ShaderPropertyDesc
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ShaderPropertyDesc
 {
     std::string name;
     std::string label;
@@ -64,7 +64,7 @@ struct ShaderPropertyDesc
     bool operator==(const ShaderPropertyDesc&) const = default;
 };
 
-struct ShaderMaterialSampler
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ShaderMaterialSampler
 {
     std::string name;
     std::string description;
@@ -73,7 +73,7 @@ struct ShaderMaterialSampler
     bool operator==(const ShaderMaterialSampler&) const = default;
 };
 
-struct ShaderGeneratedMaterial
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ShaderGeneratedMaterial
 {
     static constexpr std::uint32_t kAdapterVersion = 1;
     FileGuid graphGuid{};
@@ -87,14 +87,14 @@ struct ShaderGeneratedMaterial
     bool operator==(const ShaderGeneratedMaterial&) const = default;
 };
 
-struct ShaderKeywordAxis
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ShaderKeywordAxis
 {
     std::string name;
     ce::dynamic_array<std::string> values;
     bool operator==(const ShaderKeywordAxis&) const = default;
 };
 
-struct ShaderStageEntry
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ShaderStageEntry
 {
     std::string entry;
     bool operator==(const ShaderStageEntry&) const = default;
@@ -117,7 +117,7 @@ enum class ShaderBlendMode : std::uint8_t
 
 // ShaderMeta의 state 블록은 별도 그래픽 어휘를 만들지 않는다. 실제 PSO 기술과
 // 같은 RHI 열거를 소유하고, 조립 시 bytecode/layout/format을 보존한 채 상태만 채운다.
-struct ShaderRenderState
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ShaderRenderState
 {
     RHIFillMode fillMode{ RHIFillMode::Solid };
     RHICullMode cullMode{ RHICullMode::Back };
@@ -126,6 +126,7 @@ struct ShaderRenderState
     bool depthWrite{ true };
     RHITopologyType topologyType{ RHITopologyType::Triangle };
 
+    [[reflgen::script_internal]]
     void ApplyTo(RHIGraphicsPipelineDesc& desc) const;
     bool operator==(const ShaderRenderState&) const = default;
 };
@@ -144,7 +145,7 @@ enum class ShaderGeometryVisibility : std::uint8_t
     IndexedInstanceV1,
 };
 
-struct ShaderPassDesc
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ShaderPassDesc
 {
     std::string name;
     std::optional<ShaderStageEntry> vertex;
@@ -158,7 +159,7 @@ struct ShaderPassDesc
     bool operator==(const ShaderPassDesc&) const = default;
 };
 
-struct ShaderMeta
+struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] ShaderMeta
 {
     static constexpr std::uint32_t kSchemaVersion = 1;
 

@@ -16,19 +16,19 @@ namespace assets::cluster
     // Policy v2: position uses one mesh-wide grid, so duplicated seam vertices
     // decode identically in every meshlet. Normals use oct-SNORM12x2 when the
     // mesh-wide error policy admits it; skin weights retain their original bits.
-    struct Policy
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Policy
     {
         ce::fixed_array<unsigned, 8> bits{16, 10, 16, 16, 10, 8, 32, 32};
         ce::fixed_array<float, 8> absoluteError{0.0001f, 0.002f, 0.0001f, 0.0001f, 0.002f, 0.002f, 0, 0.00001f};
     };
-    struct Grid
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Grid
     {
         ce::dynamic_array<float> origin, step;
         float positionError{};
         float normalError{0.002f};
         bool octahedralNormals{true};
     };
-    struct Archive
+    struct [[reflgen::runtime, reflgen::public_fields, reflgen::public_methods]] Archive
     {
         uint32_t mask{}, sourceVertices{};
         bool pagedTopology{};
