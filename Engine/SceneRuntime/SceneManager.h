@@ -15,7 +15,7 @@ import Creator.Core.Ownership;
 #include "SceneObservation.h"
 #include "SceneGC.h"
 #include "Object.h"
-#include "AssetBundle.h"
+#include "../RenderEngine/AssetBundle.h"
 #include "../Utility_Framework/Reflection/ReflectionYml.h"
 #include "../Utility_Framework/Authoring/AuthoringDocument.h"
 #include "../Utility_Framework/Authoring/AuthoringNodeView.h" // D3-a-5

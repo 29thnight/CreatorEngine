@@ -1,7 +1,7 @@
 #pragma once
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "Component.h"
-#include "Camera.h"
+#include "../RenderEngine/Camera.h"
 #include <mathematics/bounds.hpp>
 
 class [[reflgen::reflect, reflgen::public_methods]] CameraComponent : public meta::identity<CameraComponent, Component>

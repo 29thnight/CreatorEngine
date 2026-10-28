@@ -6,7 +6,7 @@
 #include "Component.h"
 #include "IRenderable.h"
 #include "CanvasScaleMode.h"
-#include "CanvasRenderMode.h"
+#include "../RenderEngine/CanvasRenderMode.h"
 #include "EntityHandle.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 

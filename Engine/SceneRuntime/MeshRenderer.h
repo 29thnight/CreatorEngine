@@ -9,7 +9,7 @@ import Creator.Core.Ownership;
 #include "Component.h"
 #include "Entity.h"
 #include "LightMapping.h"
-#include "AssetDepot/AssetRequest.h"
+#include "../RenderEngine/AssetDepot/AssetRequest.h"
 #include <mathematics/bounds.hpp>
 
 namespace experiment { struct Material; class MaterialInstance; } // I5-D5c1

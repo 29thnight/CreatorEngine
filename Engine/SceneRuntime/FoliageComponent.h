@@ -11,7 +11,7 @@ import Creator.Core.Ownership;
 #include "FoliageCulling.h"
 #include "TerrainBuffers.h"
 #include "Component.h"
-#include "AssetDepot/AssetRequest.h"
+#include "../RenderEngine/AssetDepot/AssetRequest.h"
 #include <mathematics/frustum.hpp>
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 

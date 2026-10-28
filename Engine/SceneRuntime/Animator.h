@@ -14,13 +14,13 @@ import Creator.Core.Ownership;
 //#include "IOnDestroy.h"
 #include "AnimationController.h"
 #include "AnimatorSystem.h"
-#include "KeyFrameEvent.h" // I5-D4e-2: 클립 오버라이드 소유
+#include "../RenderEngine/KeyFrameEvent.h" // I5-D4e-2: 클립 오버라이드 소유
 #include "../RenderEngine/LocalPose.h"
 #include "../RenderEngine/ClipSamplingCursor.h"
 #include "../RenderEngine/AssetDepot/AssetRequest.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include <mathematics/matrix4x4.hpp>
-#include "BoneRegion.h" // kMaxBones·BoneRegion
+#include "../RenderEngine/BoneRegion.h" // kMaxBones·BoneRegion
 
 // I5-D4e-2 — 클립별 이벤트·루프 오버라이드. 소유는 씬(Animator)이다(D0a 판정):
 // legacy조차 모델 자산에 직렬화한 적이 없고(.asset 캐시 포맷에 이벤트 없음) 씬

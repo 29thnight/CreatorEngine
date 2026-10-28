@@ -8,7 +8,7 @@
 #include "SceneManager.h"
 #include "Entity.h"
 #include "Scene.h"
-#include "DataSystem.h"
+#include "../RenderEngine/DataSystem.h"
 
 // 생명주기 함수의 정의는 LightComponent.cpp에 있다.
 //

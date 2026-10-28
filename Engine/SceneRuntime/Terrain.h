@@ -9,8 +9,8 @@ import Creator.Core.Ownership;
 #include "Component.h"
 //#include "IOnDestroy.h"
 //#include "IAwakable.h"
-#include "TerrainMesh.h"
-#include "TerrainMaterial.h"
+#include "../RenderEngine/TerrainMesh.h"
+#include "../RenderEngine/TerrainMaterial.h"
 #include <mathematics/vector2.hpp>
 #include <mathematics/vector3.hpp>
 

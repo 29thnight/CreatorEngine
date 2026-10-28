@@ -7,7 +7,7 @@ import Creator.Core.Ownership;
 #endif
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "Component.h"
-#include "AssetDepot/AssetRequest.h"
+#include "../RenderEngine/AssetDepot/AssetRequest.h"
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 
 class Texture;

@@ -1,7 +1,7 @@
 #pragma once
 #include "../Utility_Framework/Foundation/Core.Minimal.h"
 #include "Component.h"
-#include "SceneRenderProfile.h"
+#include "../RenderEngine/SceneRenderProfile.h"
 
 class [[reflgen::reflect, reflgen::public_methods]] SceneRenderProfileComponent : public meta::identity<SceneRenderProfileComponent, Component>
 {

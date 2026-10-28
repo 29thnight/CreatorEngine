@@ -9,8 +9,8 @@ import Creator.Core.Ownership;
 #include "Component.h"
 #include "IRenderable.h"
 #include "LightMapping.h"
-#include "BillboardType.h"
-#include "Texture.h"
+#include "../RenderEngine/BillboardType.h"
+#include "../RenderEngine/Texture.h"
 
 class [[reflgen::reflect, reflgen::public_methods]] SpriteRenderer : public meta::identity<SpriteRenderer, Component>
 {

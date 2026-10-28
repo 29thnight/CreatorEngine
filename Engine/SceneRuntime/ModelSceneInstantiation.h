@@ -22,7 +22,7 @@ import Creator.Core.Ownership;
 #include "../Utility_Framework/Foundation/StandardLibrary.h"
 #include "CollisionGeometrySource.h"
 #include "EntityHandle.h"
-#include "Assets/ModelSceneAssetInputs.h"
+#include "../RenderEngine/Assets/ModelSceneAssetInputs.h"
 
 class Entity;
 class Scene;
