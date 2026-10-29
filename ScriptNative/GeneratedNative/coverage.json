@@ -2,7 +2,7 @@
   "format": "creator-native-fsharp-facades",
   "version": 1,
   "namespace": "CreatorEngine.NativeTypes",
-  "sourceSha256": "afabcccfb0733bc3cbe97bc7adbd3dd65f25cbe187b6fcc3cd8f678f4bfec152",
+  "sourceSha256": "7e60d888f4b04ad13e85a99db420934fdaba498d8f2732bb8ca596624e6b6807",
   "counts": {
     "components": 27,
     "nativeDeclarations": 302,

@@ -94,6 +94,27 @@ def normalize_paths(value: object) -> object:
     return value
 
 
+def normalize_type_layouts(value: object) -> object:
+    """Keep scalar ABI widths while discarding unused object sizeof metadata.
+
+    These facades exchange JSON and resolve native paths; they do not copy record
+    memory. MSVC Debug iterator bookkeeping changes STL and containing-record
+    sizes without changing this API, and clang also reports the referred-to size
+    for reference types. Record/reference sizes therefore have no typed-facade
+    meaning. Preserve primitive/enum/pointer widths, array extents, all nested
+    types, and every declaration/signature so genuine API drift still fails.
+    """
+    if isinstance(value, list):
+        return [normalize_type_layouts(item) for item in value]
+    if isinstance(value, dict):
+        normalized = {key: normalize_type_layouts(item) for key, item in value.items()}
+        if (normalized.get("kind") in ("record", "lvalue_reference", "rvalue_reference") and
+                "canonical_spelling" in normalized and "size_bytes" in normalized):
+            normalized["size_bytes"] = -1
+        return normalized
+    return value
+
+
 def component_names(engine: Path) -> list[str]:
     source = (engine / "Engine/SceneRuntime/ComponentTypeUUID.h").read_text(encoding="utf-8-sig")
     return sorted(re.findall(r'\{\s*"(\w+)"\s*,\s*"[0-9a-fA-F-]{36}"\s*\}', source))
@@ -108,7 +129,7 @@ def import_surface(paths: list[Path], engine: Path) -> dict:
                         "version": document["version"], "target": document["target"]})
         for header in document["headers"]:
             for original in header["classes"]:
-                record = normalize_paths(original)
+                record = normalize_type_layouts(normalize_paths(original))
                 name = record["qualified_name"]
                 if name in classes:
                     raise ValueError("duplicate native schema owner: " + name)
@@ -808,7 +829,7 @@ def main() -> None:
     if args.declarations:
         snapshot = import_surface(args.declarations, args.engine)
     else:
-        snapshot = json.loads((args.surface or source).read_text(encoding="utf-8"))
+        snapshot = normalize_type_layouts(json.loads((args.surface or source).read_text(encoding="utf-8")))
     generated = Generator(snapshot, args.namespace).generate()
     generated[SOURCE_NAME] = dump(snapshot)
     previous = {path.relative_to(args.output).as_posix() for path in args.output.rglob("*") if path.is_file()} if args.output.exists() else set()
