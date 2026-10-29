@@ -47,7 +47,7 @@ namespace
         Time decoded;
         Read(Write(oldTime), decoded);
         Check(decoded == oldTime, "native file-clock epoch or precision changed");
-        const Time limit(Time::duration((std::numeric_limits<Time::duration::rep>::max)()));
+        const Time limit{Time::duration{(std::numeric_limits<Time::duration::rep>::max)()}};
         Read(Write(limit), decoded);
         Check(decoded == limit, "maximum file-clock ticks lost precision");
         bool rejected = false;
