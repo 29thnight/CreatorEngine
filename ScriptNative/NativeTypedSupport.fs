@@ -81,6 +81,9 @@ module internal NativeTypedJson =
             parts.Add(typeKeyInner false (inner.Substring(start)))
             if (name = "std::array" || name = "std::span" || name = "ce::fixed_array") && parts.Count >= 2 then
                 parts.[1] <- extentKey parts.[1]
+                // MSVC's type-name spelling uses -1 for span's unsigned
+                // dynamic_extent sentinel. This equivalence is span-specific.
+                if name = "std::span" && parts.[1] = "-1" then parts.[1] <- "std::dynamic_extent"
             let defaults (item: string) =
                 item.StartsWith("std::allocator<", StringComparison.Ordinal) ||
                 item.StartsWith("std::char_traits<", StringComparison.Ordinal) ||

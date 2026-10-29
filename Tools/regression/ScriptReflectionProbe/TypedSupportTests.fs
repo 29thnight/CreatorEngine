@@ -81,6 +81,10 @@ let run (check: bool -> string -> unit) (rejected: (unit -> unit) -> string -> s
     let msvcConstSpan = NativeMethodSpec("ProbeComponent", "ChooseSpan", true, [|"std::span<int const,18446744073709551615ui64>"|], [|"value"|])
     check ((root.Invoke(msvcMutableSpan, [|spanInput|])).Read<int>() = 102) "typed selector normalizes MSVC hex dynamic extent"
     check ((root.Invoke(msvcConstSpan, [|spanInput|])).Read<int>() = 202) "typed selector normalizes trailing base const without losing constness"
+    let actualMsvcSpan = NativeMethodSpec("ProbeComponent", "ChooseSpan", true, [|"std::span<int,-1>"|], [|"value"|])
+    let actualMsvcConstSpan = NativeMethodSpec("ProbeComponent", "ChooseSpan", true, [|"std::span<int const,-1>"|], [|"value"|])
+    check ((root.Invoke(actualMsvcSpan, [|spanInput|])).Read<int>() = 102) "typed selector accepts observed MSVC signed dynamic sentinel"
+    check ((root.Invoke(actualMsvcConstSpan, [|spanInput|])).Read<int>() = 202) "typed selector accepts observed MSVC const span spelling"
     let graph = NativeMethodSpec("ProbeComponent", "GraphAlternative", true,
         [|"std::variant<std::monostate,bool,long long,double,ce::fixed_array<double,0x3>,ce::fixed_array<double,0x4>,std::basic_string<char>>"|], [|"value"|])
     check ((root.Invoke(graph, [|(snapshot "[4,[1,2,3]]").ReadJson()|])).Read<int>() = 4) "typed selector normalizes actual material-style nested fixed-array extents"
